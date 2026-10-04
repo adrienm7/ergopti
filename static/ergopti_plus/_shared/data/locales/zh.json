@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "从 Karabiner 中移除 Ergopti",
 	"menu.global.restore_touchpad_gestures": "恢复 Windows 触摸板手势",
 	"dialog.start_at_login.failed": "无法更改自动启动。请检查系统启动设置。",
-	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。"
+	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。",
+	"platform_reason.token_streaming_transport_missing": "Windows 上没有: Windows 暂时无法逐个令牌显示建议。此选项保持停用。",
+	"menu.layout.number_row": "数字行",
+	"menu.layout.number_row_native": "系统顺序",
+	"menu.layout.number_row_digits": "数字优先",
+	"menu.layout.number_row_symbols": "符号优先",
+	"platform_reason.number_row_override_unsupported": "不支持: 此驱动保留系统的原生数字行，无法强制使用数字或符号。",
+	"platform_reason.number_row_source_unavailable": "不可用: 符号优先需要启用模拟布局，且数字行的每个位置都必须具有有效的数字和符号层级。"
 }

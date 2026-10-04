@@ -406,6 +406,7 @@ local function empty_document()
 	return {
 		meta = { description = "", sections = {}, sections_order = {}, section_delays = {} },
 		sections_order = {},
+		source_entries = {},
 		sections = {}
 	}
 end
@@ -418,6 +419,7 @@ local function parse_lines(lines)
 	local result = {
 		meta           = { description = "", sections = {}, sections_order = {}, section_delays = {} },
 		sections_order = {},
+		source_entries = {},
 		sections       = {},
 	}
 
@@ -606,6 +608,9 @@ local function parse_lines(lines)
 						return
 					end
 					table.insert(result.sections[current_sec].entries, entry)
+					table.insert(result.source_entries, {
+						section = current_sec, index = #result.sections[current_sec].entries,
+					})
 				else
 					-- Try parsing as a plain key-value pair (e.g. constants.toml)
 					local key, val = parse_kv_value(line)
@@ -689,7 +694,9 @@ function M.parse(path)
 	-- A cache miss or provider failure falls through to the canonical parser
 	if _cache_provider and type(_cache_provider.load) == "function" then
 		local ok_load, cached = pcall(_cache_provider.load, path)
-		if ok_load and type(cached) == "table" then return cached, true end
+		if ok_load and type(cached) == "table" and type(cached.source_entries) == "table" then
+			return cached, true
+		end
 	end
 
 	-- Capture before reading; the provider revalidates identity before publication
@@ -722,6 +729,29 @@ function M.parse(path)
 
 	Logger.info(LOG, "TOML file parsed successfully.")
 	return result, true
+end
+
+--- Returns entry identities in the category's registration order.
+--- Common autocorrection preserves physical order across section boundaries;
+--- other categories retain their historical declared section order.
+--- @param data table Parsed hotstring document.
+--- @param category string Native category identity.
+--- @param section_entries table|nil Native normalized entries by section.
+--- @return table records Section and one-based entry index pairs.
+function M.registration_order(data, category, section_entries)
+	if category == "autocorrection" and data.registration_order ~= "sections" then
+		assert(type(data.source_entries) == "table", "hotstring source order is unavailable")
+		return data.source_entries
+	end
+	local records = {}
+	for _, section in ipairs(data.sections_order or {}) do
+		local entries = section_entries and section_entries[section]
+			or (data.sections[section] and data.sections[section].entries)
+		for index in ipairs(entries or {}) do
+			records[#records + 1] = { section = section, index = index }
+		end
+	end
+	return records
 end
 
 --- Injects an optional disk-cache provider so repeat parses of an unchanged

@@ -134,6 +134,7 @@ global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
 ; two counters only, exercised by unit/test_diagnostic_logging.ahk.
 #Include ../infra/boot_profiler.ahk
+#Include ../infra/startup_smoke.ahk
 #Include ../infra/diagnostic_snapshot.ahk
 #Include ../infra/issue_link.ahk
 #Include ../infra/redact.ahk
@@ -240,6 +241,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
+#Include ../../_shared/modules/features/number_row_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).
@@ -300,6 +302,8 @@ InstallHotstringHooks()
 #Include ../adapters/graphics_renderer.ahk
 #Include ../ui/spotlight/ownership.ahk
 #Include ../adapters/shell_runner.ahk
+#Include ../../_shared/modules/actions/brightness.ahk
+#Include ../adapters/screen_brightness.ahk
 #Include ../adapters/crash_report_worker.ahk
 #Include ../modules/diagnostics/crash_reporter.ahk
 #Include ../infra/error_net.ahk
@@ -546,10 +550,12 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_api_common.ahk
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
+#Include ..\..\_shared\modules\llm\local_server_auth.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
+#Include unit/test_local_server_auth.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
@@ -730,6 +736,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
 #Include unit/test_system_actions.ahk
+#Include unit/test_screen_brightness.ahk
 #Include unit/test_llm_rewrite.ahk
 #Include unit/test_llm_prompt_action.ahk
 #Include unit/test_llm_prompt_prediction.ahk
@@ -865,6 +872,7 @@ global _AhkSubDir := ""
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keylogger/keylogger_event_id.ahk
 #Include unit/test_keylogger_event_id.ahk
+#Include unit/test_keylogger_device_uuid.ahk
 #Include unit/test_keylogger_full_id_recovery.ahk
 ; keylogger_text_cipher.ahk (KL_Enc_* at-rest encryption) is pure definitions
 ; with no top-level hotkeys, and keylogger_sql.ahk now calls it, so it must load
@@ -1060,6 +1068,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_warmup_retry_suspend_guard.ahk
 #Include meta/test_halflife_tick_suspend_guard.ahk
 #Include meta/test_layout_poll_suspend_guard.ahk
+#Include meta/test_layout_poll_native_arming.ahk
 #Include meta/test_lalt_rctrl_accept_suspend_guard.ahk
 #Include meta/test_tap_hold_fire_action_suspend_guard.ahk
 #Include meta/test_tap_hold_native_dispatch_guard.ahk
@@ -1915,6 +1924,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_activate_hotstrings_commits_synchronously.ahk
 #Include unit/test_cache_builder_strips_header_comment.ahk
 #Include unit/test_bundle_skip_validation.ahk
+#Include unit/test_startup_smoke_receipt.ahk
 #Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
 #Include unit/test_changelog_network_resilience.ahk

@@ -35,6 +35,8 @@
 require('./test-native-menu-flags.cjs');
 
 const fs = require('fs');
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -216,6 +218,44 @@ function builderContract() {
 			problems.push(
 				`builder glob semantics: expected ${expected.join(', ')}, got ${shippedFixture.join(', ') || ok.stderr}`
 			);
+		write('tree/a.json', Buffer.from([0, 255, 13, 10, 1]));
+		const archivePath = path.join(fixture, 'build/static_bundle.zip');
+		const built = runBuilder(['--repo-root', fixture, '--output', archivePath]);
+		assert.equal(built.status, 0, built.stdout + built.stderr);
+		const inventoryBytes = fs.readFileSync(path.join(fixture, 'build/bundle_inventory.ahk'));
+		assert.deepEqual([...inventoryBytes.subarray(0, 3)], [239, 187, 191]);
+		const inventorySource = inventoryBytes.toString('utf8');
+		assert.equal(inventorySource.includes('\r'), false, 'generated AHK requires LF');
+		const rows = [
+			...inventorySource.matchAll(/^\s*\["([^"]+)", (\d+), "([0-9a-f]{64})"\],?$/gm)
+		].map((match) => [match[1], Number(match[2]), match[3]]);
+		assert.deepEqual(
+			rows.map((row) => row[0]).sort(),
+			expected,
+			'the inventory must contain every selected file and no excluded file'
+		);
+		const zipContents = spawnSync(
+			python[0],
+			[
+				...python[1],
+				'-c',
+				'import base64,json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); print(json.dumps({n:base64.b64encode(z.read(n)).decode() for n in z.namelist()}))',
+				archivePath
+			],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(zipContents.status, 0, zipContents.stderr);
+		const archived = JSON.parse(zipContents.stdout);
+		assert.deepEqual(Object.keys(archived).sort(), expected);
+		for (const row of rows) {
+			const bytes = Buffer.from(archived[row[0]], 'base64');
+			assert.equal(bytes.length, row[1]);
+			assert.equal(
+				crypto.createHash('sha256').update(bytes).digest('hex'),
+				row[2],
+				'the compiled digest must describe the exact ZIP bytes'
+			);
+		}
 		for (const [label, manifest, message] of [
 			[
 				'a missing include source',

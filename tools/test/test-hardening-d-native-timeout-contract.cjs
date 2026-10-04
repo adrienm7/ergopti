@@ -2,12 +2,13 @@
 
 /**
  * ==============================================================================
- * MODULE: Lua ↔ Native Timeout Contract (hardening-d-native-timeout-contract)
+ * MODULE: Caller ↔ Native Timeout Contract (hardening-d-native-timeout-contract)
  * DESCRIPTION:
- * Every deadline Hammerspoon arms while it waits for the launcher's native
- * worker must leave at least MARGIN_SEC over the budget that worker gives
- * itself for the same answer. The two sides live in two languages, so nothing
- * but this test reads them together.
+ * Every deadline a native worker caller arms must leave at least MARGIN_SEC
+ * over the budget that worker gives itself for the same answer. The two sides
+ * can live in different languages, so this test reads their actual owners
+ * together. Supplementary no-prompt AppleEvent admission also needs this
+ * margin for subprocess startup, JXA construction and numeric status delivery.
  *
  * ROOT CAUSE ENCODED (incident of 2026-09-30):
  * The Karabiner lease worker answers every PING, PAUSE and RESUME within its
@@ -117,14 +118,14 @@ function count(haystack, needle) {
 	return haystack.split(needle).length - 1;
 }
 
-function requirePair(label, luaName, luaValue, swiftLabel, swiftBudget) {
+function requirePair(label, luaName, luaValue, swiftLabel, swiftBudget, caller = 'Lua') {
 	if (!Number.isFinite(luaValue) || !Number.isFinite(swiftBudget)) {
 		errors.push(`${label}: one side of the pair could not be read (see above)`);
 		return;
 	}
 	const margin = luaValue - swiftBudget;
 	const line =
-		`${label}: Lua ${luaName} = ${luaValue} s, native ${swiftLabel} = ` +
+		`${label}: ${caller} ${luaName} = ${luaValue} s, native ${swiftLabel} = ` +
 		`${swiftBudget.toFixed(2)} s, margin ${margin.toFixed(2)} s`;
 	if (margin + 1e-9 < MARGIN_SEC) {
 		errors.push(
@@ -316,17 +317,94 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 	}
 }
 
+// ── 5. Supplementary no-prompt AppleEvent status delivery ─────────────────
+// The outer deadline includes interpreter startup, descriptor construction,
+// native sending and receipt delivery. Equal inner/outer budgets lose the
+// native timeout status before the same owned osascript child can report it.
+{
+	const file = 'tools/diagnostics/hs_delayed_timer_probe.py';
+	const source = read(path.join(ROOT, file));
+	// Python formatting may wrap this binding; its exact owner and uniqueness remain mandatory.
+	const usesNativeTimeoutOwner = (script) =>
+		[
+			...script.matchAll(
+				/"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",\s*str\(NO_PROMPT_NATIVE_TIMEOUT_SECONDS\)/g
+			)
+		].length === 1;
+	const compactBinding =
+		'"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)';
+	for (const [binding, expected] of [
+		[compactBinding, true],
+		[
+			'"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",\n                str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)',
+			true
+		],
+		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(SCRIPTING_TIMEOUT_SECONDS)', false],
+		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", 8', false],
+		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS_FUTURE)', false],
+		['"__FOREIGN_TIMEOUT__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)', false],
+		[`${compactBinding}\n${compactBinding}`, false],
+		['', false]
+	]) {
+		if (usesNativeTimeoutOwner(binding) !== expected)
+			errors.push(
+				`${file}: native timeout-owner recognition failed its independent binding fixture`
+			);
+	}
+	const seconds = (name) => {
+		const match = source.match(new RegExp(`^${name} = ([\\d.]+)$`, 'm'));
+		if (!match) {
+			errors.push(`${file}: ${name} is not declared as a numeric owner any more`);
+			return NaN;
+		}
+		return Number(match[1]);
+	};
+	const execute = source.match(/    def execute\([\s\S]*?(?=\n    (?:@staticmethod|def ))/);
+	const script = source.match(
+		/^    def no_prompt_script\((?:scope=None)?\):[\s\S]*?(?=\n    (?:@staticmethod|def ))/m
+	);
+	if (!execute || !script) {
+		errors.push(`${file}: the actual executor and no-prompt script owners could not be read`);
+	} else {
+		const executor = execute[0].replace(/#[^\n]*/g, '');
+		const nativeScript = script[0]
+			.replace(/\/\*[\s\S]*?\*\//g, '')
+			.replace(/\/\/[^\n]*/g, '')
+			.replace(/^\s*#.*$/gm, '');
+		if (
+			count(executor, 'command.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)') !== 1 ||
+			count(
+				nativeScript,
+				'event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __NO_PROMPT_NATIVE_TIMEOUT_SECONDS__, error)'
+			) !== 1 ||
+			!usesNativeTimeoutOwner(nativeScript)
+		) {
+			errors.push(
+				`${file}: the outer executor and inner native send no longer spend their declared owners`
+			);
+		}
+	}
+	requirePair(
+		'no-prompt AppleEvent status delivery',
+		'SCRIPTING_TIMEOUT_SECONDS',
+		seconds('SCRIPTING_TIMEOUT_SECONDS'),
+		'NO_PROMPT_NATIVE_TIMEOUT_SECONDS',
+		seconds('NO_PROMPT_NATIVE_TIMEOUT_SECONDS'),
+		'Python'
+	);
+}
+
 for (const line of passes) console.log(`  PASS  ${line}`);
 if (errors.length > 0) {
 	for (const e of errors) console.error(`  FAIL  ${e}`);
 	console.error(
-		`\n[hardening-d-native-timeout-contract] ${errors.length} Lua ↔ native timeout pair(s) ` +
+		`\n[hardening-d-native-timeout-contract] ${errors.length} caller ↔ native timeout pair(s) ` +
 			'break the contract.'
 	);
 	process.exit(1);
 }
-if (passes.length < 5) {
-	console.error('[hardening-d-native-timeout-contract] fewer than 5 pairs were checked.');
+if (passes.length < 6) {
+	console.error('[hardening-d-native-timeout-contract] fewer than 6 pairs were checked.');
 	process.exit(1);
 }
 console.log(`[hardening-d-native-timeout-contract] ${passes.length} pair(s) keep ${MARGIN_SEC} s.`);

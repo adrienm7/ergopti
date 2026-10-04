@@ -177,7 +177,14 @@ end
 
 -- [call_handlers].macos in _shared/keymap/layer_actions.toml; each fills the
 -- manipulator's outputs.
+local Brightness = require("brightness_actions").load()
 local CALL_HANDLERS = {
+	brightness_up = function(manipulator)
+		manipulator.to = { { consumer_key_code = Brightness.actions.brightness_up.karabiner_consumer } }
+	end,
+	brightness_down = function(manipulator)
+		manipulator.to = { { consumer_key_code = Brightness.actions.brightness_down.karabiner_consumer } }
+	end,
 	-- Escape on a tap; Option+Shift while held, the Ergopti keylayout's symbol level.
 	tap_escape_hold_option_shift = function(manipulator, registry)
 		local shift = karabiner_event("ShiftLeft", registry)
@@ -300,6 +307,9 @@ end
 --- @return string|nil problem Why the binding cannot run on the wheel.
 local function wheel_strokes(code, resolution, registry)
 	if resolution.kind == "none" then return {} end
+	if resolution.kind == "call" and Brightness.actions[resolution.handler] then
+		return { { system = Brightness.actions[resolution.handler].macos_system } }
+	end
 	if resolution.kind ~= "keystroke" then
 		return nil, "a " .. tostring(resolution.kind) .. " resolution is no stroke a wheel turn can send"
 	end

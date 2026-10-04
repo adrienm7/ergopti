@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "إزالة Ergopti من Karabiner",
 	"menu.global.restore_touchpad_gestures": "استعادة إيماءات لوحة اللمس في Windows",
 	"dialog.start_at_login.failed": "تعذر تغيير التشغيل التلقائي. تحقق من إعدادات بدء التشغيل في النظام.",
-	"onboarding.error.open_failed": "تعذر فتح معالج الإعداد. تحقق من السجلات ثم حاول مجددًا من القائمة."
+	"onboarding.error.open_failed": "تعذر فتح معالج الإعداد. تحقق من السجلات ثم حاول مجددًا من القائمة.",
+	"platform_reason.token_streaming_transport_missing": "ليس على Windows: لا يستطيع Windows عرض الاقتراحات رمزًا برمز بعد. يظل هذا الخيار غير نشط.",
+	"menu.layout.number_row": "صف الأرقام",
+	"menu.layout.number_row_native": "الترتيب الأصلي",
+	"menu.layout.number_row_digits": "الأرقام أولًا",
+	"menu.layout.number_row_symbols": "الرموز أولًا",
+	"platform_reason.number_row_override_unsupported": "غير مدعوم: يحتفظ هذا المشغّل بصف الأرقام الأصلي للنظام، ولا يمكن فرض الأرقام أو الرموز.",
+	"platform_reason.number_row_source_unavailable": "غير متاح: تتطلب أولوية الرموز تخطيطًا محاكى نشطًا بمستويات صالحة للأرقام والرموز في كل موضع من صف الأرقام."
 }

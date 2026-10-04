@@ -37,7 +37,9 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			-- it, so a stub without it hands nil to load_toml and the group silently
 			-- registers under no name. A stub must model the real API it stands in for.
 			PERSONAL_GROUP_NAME = "personal",
-			load_toml = function(name, path) table.insert(registered, { name = name, path = path }) end,
+			load_toml = function(name, path, sections, source)
+				registered[#registered + 1] = { name = name, path = path, sections = sections, source = source }
+			end,
 			source_priority = function(_) return nil end,
 		})
 		mock("ui.hotstring_editor", { init = function() end })
@@ -84,6 +86,13 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		helpers.assert_eq(table.concat(names, ","),
 			"personal,personal_ext_alpha,personal_ext_zebra",
 			"personal must load first, extensions in alphabetical-by-stem order")
+
+		helpers.assert_nil(registered[1].source, "the canonical personal file retains its existing owner")
+		helpers.assert_eq(registered[2].source.id, "personal-file:616c7068612e746f6d6c")
+		helpers.assert_eq(registered[3].source.id, "personal-file:7a656272612e746f6d6c")
+		helpers.assert_eq(loaded[2].personal_source.id, registered[2].source.id)
+		registered[2].source.components[1] = "mutated.toml"
+		helpers.assert_eq(loaded[2].personal_source.components[1], "alpha.toml", "discovery and registry own different snapshots")
 
 		-- The returned list must mirror exactly what reached keymap.load_toml.
 		helpers.assert_eq(#registered, #loaded, "every returned group must have been registered with keymap")
@@ -208,8 +217,58 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 				collision_warned = true
 			end
 		end
+		helpers.assert_eq(#loaded, 3, "descriptor transport does not silently discard either legacy collision source")
+		local identities = {}
+		for _, record in ipairs(loaded) do
+			if record.personal_source then identities[record.personal_source.id] = record.name end
+		end
+		helpers.assert_eq(identities["personal-file:615f5f622e746f6d6c"], "personal_ext_a__b")
+		helpers.assert_eq(identities["personal-file:61:622e746f6d6c"], "personal_ext_a__b")
 		helpers.assert_true(collision_warned,
 			"a Logger.warn must fire naming the colliding group 'personal_ext_a__b' (got: "
 				.. table.concat(warnings, " | ") .. ")")
+	end)
+end)
+
+
+helpers.describe("personal-file descriptors: independent cross-driver corpus", function()
+	helpers.it("preserves exact relative components without borrowing mutable arrays", function()
+		local PersonalFiles = require("hotstrings.personal_files")
+		local handle = assert(io.open(helpers.shared("tests/corpus/hotstrings/personal_file_descriptors.json"), "r"))
+		local content = assert(handle:read("*a")); assert(handle:close())
+		local corpus = assert(require("json").decode(content))
+		helpers.assert_eq(#corpus.vectors, 13, "the independent corpus must not become vacuous")
+		local identities = {}
+		for _, vector in ipairs(corpus.vectors) do
+			local descriptor = PersonalFiles.describe(vector.components)
+			helpers.assert_eq(descriptor.id, vector.id, vector.name)
+			helpers.assert_eq(descriptor.label, vector.label, vector.name)
+			helpers.assert_eq(PersonalFiles.components(vector.id), vector.components, vector.name)
+			helpers.assert_nil(identities[descriptor.id], "each admitted filename has a distinct identity")
+			identities[descriptor.id] = true
+			helpers.assert_true(not descriptor.id:find(".", 1, true), "the id remains one TOML path segment")
+			local copied = PersonalFiles.copy(descriptor)
+			descriptor.components[1] = "mutated.toml"
+			helpers.assert_eq(copied.components, vector.components, "each consumer owns its components")
+			helpers.assert_true(PersonalFiles.is_descriptor(copied))
+			helpers.assert_eq(PersonalFiles.is_descriptor(descriptor), false, "forged components refuse")
+			copied.label = "forged"
+			helpers.assert_eq(PersonalFiles.is_descriptor(copied), false, "forged display labels refuse")
+		end
+		for _, components in ipairs(corpus.invalid_components) do
+			local accepted = pcall(PersonalFiles.describe, components)
+			helpers.assert_eq(accepted, false, "malformed relative components refuse")
+		end
+		for _, identity in ipairs(corpus.invalid_ids) do
+			helpers.assert_nil(PersonalFiles.components(identity), "noncanonical identities refuse: " .. identity)
+		end
+		for _, components in ipairs({ { "a.toml", extra = true }, { [1] = "a", [3] = "b.toml" },
+			{ string.char(0xED, 0xA0, 0x80) .. ".toml" } }) do
+			local admitted, refusal = pcall(PersonalFiles.describe, components)
+			helpers.assert_eq(admitted, false, "shape and Unicode refuse")
+			helpers.assert_true(type(refusal) == "string" and refusal:find("invalid personal-file", 1, true) ~= nil)
+		end
+		local extra = PersonalFiles.describe({ "a.toml" }); extra.future = true
+		helpers.assert_eq(PersonalFiles.is_descriptor(extra), false, "unknown descriptor fields refuse")
 	end)
 end)

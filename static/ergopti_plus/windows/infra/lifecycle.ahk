@@ -492,6 +492,9 @@ Ergopti_OnSuspendEnter() {
 	; Screenshot children are external processes: stopping their AHK polls does
 	; not stop their disk or clipboard work. Retire every owner first, then ask
 	; the shared process lifecycle to terminate each tree exactly once.
+	if IsSet(ScreenBrightnessCancel)
+		_LifecycleRunRequiredStep(Transition, "screen-brightness",
+			() => ScreenBrightnessCancel("suspended"), true)
 	if IsSet(GestureScreenshotCancelAll)
 		_LifecycleRunRequiredStep(Transition, "gesture-screenshot",
 			() => GestureScreenshotCancelAll("suspended"))
@@ -1106,6 +1109,7 @@ Ergopti_OnShutdown(reason, code) {
 		; transfers have accepted while the live driver was still intact.
 		if (SupersededReload is Map)
 			try ReloadTerminalHandoffAbandon(SupersededReload, reason)
+		try ScreenBrightnessCancel("shutdown")
 		try GestureScreenshotCancelAll("shutdown")
 		try HotstringPrefixWatcherStop()
 		try HotstringPrefixWatcherOnShutdown()

@@ -527,3 +527,40 @@ helpers.describe("Registry collision priority", function()
 		helpers.assert_eq(Registry.resolve_priority(nil, nil, nil, "autocorrection"), 10)
 	end)
 end)
+
+
+helpers.describe("personal-file descriptor transport through the real registry", function()
+	helpers.it("owns snapshots across load, disable, enable and same-path reload without changing output", function()
+		local path = os.tmpname()
+		local handle = assert(io.open(path, "w"))
+		assert(handle:write('[probe]\n"pqx" = { output = "Owned", auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true, priority = 73 }\n'))
+		assert(handle:close())
+		local ok, err = pcall(function()
+			local state, R = fresh_registry()
+			local PersonalFiles = require("hotstrings.personal_files")
+			local source = PersonalFiles.describe({ "Équipe", "mémoire.toml" })
+			helpers.assert_true(R.load_toml("personal_ext_memory", path, nil, source))
+			helpers.assert_eq(#state.mappings, 1)
+			local entry = state.mappings[1]
+			helpers.assert_eq({ entry.trigger, entry.repl, entry.group, entry.section, entry.priority },
+				{ "pqx", "Owned", "personal_ext_memory", "probe", 73 })
+			helpers.assert_eq(entry.personal_source.id, "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c")
+			source.components[1] = "mutated"
+			helpers.assert_eq(entry.personal_source.components[1], "Équipe")
+			helpers.assert_true(entry.personal_source ~= state.groups.personal_ext_memory.personal_source)
+			helpers.assert_true(R.disable_group("personal_ext_memory")); helpers.assert_eq(#state.mappings, 0)
+			helpers.assert_true(R.enable_group("personal_ext_memory")); helpers.assert_eq(#state.mappings, 1)
+			helpers.assert_eq(state.mappings[1].personal_source.id, entry.personal_source.id)
+			helpers.assert_true(R.reload_toml("personal_ext_memory", path))
+			helpers.assert_eq(#state.mappings, 1); helpers.assert_eq(state.mappings[1].personal_source.id, entry.personal_source.id)
+			local retained = state.mappings[1]
+			source = PersonalFiles.describe({ "a.toml" }); source.id = "forged"
+			helpers.assert_eq(R.load_toml("personal_ext_memory", path, nil, source), false)
+			helpers.assert_true(state.mappings[1] == retained, "a forged descriptor cannot replace the live registration")
+			helpers.assert_true(R.reload_toml("personal_ext_memory", path))
+			helpers.assert_eq(state.mappings[1].repl, "Owned", "explicit retry retains the historical expansion")
+		end)
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+end)

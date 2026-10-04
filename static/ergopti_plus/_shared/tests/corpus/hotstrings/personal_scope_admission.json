@@ -1,0 +1,370 @@
+{
+	"version": 1,
+	"vectors": [
+		{
+			"name": "one exclusive current owner",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				},
+				{
+					"source": {
+						"id": "personal-file:622e746f6d6c",
+						"components": ["b.toml"],
+						"label": "b"
+					},
+					"owner": "native-b",
+					"path": "owned-b",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"expected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			}
+		},
+		{
+			"name": "unknown descriptor",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:622e746f6d6c",
+						"components": ["b.toml"],
+						"label": "b"
+					},
+					"owner": "native-b",
+					"path": "owned-b",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"refusal": "unknown-source"
+		},
+		{
+			"name": "different current native path",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "native-a",
+					"path": "new-route",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"refusal": "stale-binding"
+		},
+		{
+			"name": "different current native group",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "new-owner",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"refusal": "stale-binding"
+		},
+		{
+			"name": "Linux discovery loser",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": false,
+					"exclusive": true
+				},
+				{
+					"source": {
+						"id": "personal-file:622e746f6d6c",
+						"components": ["b.toml"],
+						"label": "b"
+					},
+					"owner": "native-b",
+					"path": "owned-b",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"refusal": "unadmitted-source"
+		},
+		{
+			"name": "Windows default group is not a file gate",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "default",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": false
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "default",
+				"path": "owned-a"
+			},
+			"refusal": "unavailable-owner"
+		},
+		{
+			"name": "flat and nested sources share one admitted gate",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:615f5f622e746f6d6c",
+					"components": ["a__b.toml"],
+					"label": "a__b"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"refusal": "shared-owner"
+		},
+		{
+			"name": "distinct Unicode components are retained",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c",
+						"components": ["Équipe", "mémoire.toml"],
+						"label": "Équipe / mémoire"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c",
+					"components": ["Équipe", "mémoire.toml"],
+					"label": "Équipe / mémoire"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"expected": {
+				"source": {
+					"id": "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c",
+					"components": ["Équipe", "mémoire.toml"],
+					"label": "Équipe / mémoire"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			}
+		},
+		{
+			"name": "duplicate descriptor is not independent evidence",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				},
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"refusal": "duplicate-source"
+		},
+		{
+			"name": "forged descriptor",
+			"inventory": [
+				{
+					"source": {
+						"id": "forged",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"refusal": "invalid-inventory"
+		},
+		{
+			"name": "unadmitted sibling cannot own the winner",
+			"inventory": [
+				{
+					"source": {
+						"id": "personal-file:612e746f6d6c",
+						"components": ["a.toml"],
+						"label": "a"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": true,
+					"exclusive": true
+				},
+				{
+					"source": {
+						"id": "personal-file:622e746f6d6c",
+						"components": ["b.toml"],
+						"label": "b"
+					},
+					"owner": "native-a",
+					"path": "owned-a",
+					"admitted": false,
+					"exclusive": true
+				}
+			],
+			"selected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			},
+			"expected": {
+				"source": {
+					"id": "personal-file:612e746f6d6c",
+					"components": ["a.toml"],
+					"label": "a"
+				},
+				"owner": "native-a",
+				"path": "owned-a"
+			}
+		}
+	]
+}

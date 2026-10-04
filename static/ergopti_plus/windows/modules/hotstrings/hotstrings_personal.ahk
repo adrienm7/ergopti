@@ -74,6 +74,6 @@ _HS_RegisterPersonal() {
 	; and nothing anywhere reported the gap. One enumeration means they cannot drift
 	; apart again.
 	for _, Pack in HS_EnumeratePersonalExtFiles()
-		LoadExtTomlFile(Pack["Path"], Pack["Label"])
+		LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"])
 	try BootProfile_Mark("HS sub: personal + extension TOML registered")
 }

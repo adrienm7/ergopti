@@ -797,7 +797,7 @@ function M.predict(context, output_context, override)
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
 			if not is_batch and request_index < requested then
 				-- Shown now: the next variant may wait for the backend's interval.
-				if #candidates > 0 then publish() end
+				if #candidates > 0 and DisplaySettings.get("streaming_multi") == true then publish() end
 				dispatch()
 				return
 			end
@@ -2618,6 +2618,10 @@ end
 
 function M.is_enabled() return _enabled end
 
+--- The real master/backend/scope revision observed by retained display commands.
+--- @return integer revision Monotonic native admission revision.
+function M.streaming_revision() return _enable_generation end
+
 --- Requests a fresh local receipt before the existing consent owner publishes.
 --- API activation does not depend on a local Ollama installation or server.
 --- @param on_changed function|nil Menu refresh after acknowledged publication.
@@ -2721,15 +2725,29 @@ function M.get_backend()
 	return value
 end
 
+--- Current admission for local-server configuration, including master OFF.
+--- The existing preference transaction owns the backend mutation separately.
+--- @return boolean
+function M.can_configure_local_servers()
+	return _scope_owner == nil and not _is_paused()
+end
+
 --- Selects the backend.
 --- @param kind string "ollama" or "api"
 --- @return boolean
-function M.set_backend(kind)
-	if _scope_owner then return false end
+function M.set_backend(kind, admit)
+	local function admitted()
+		if admit == nil then return true end
+		if type(admit) ~= "function" then return false end
+		local ok, value = pcall(admit)
+		return ok and value == true
+	end
+	if _scope_owner or not admitted() then return false end
 	if not BACKENDS[kind] then return false end
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.dismiss()
+	if _scope_owner or not admitted() then return false end
 	if require("infra.llm_preferences").set(BACKEND_KEY, kind) ~= true then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
 	return true

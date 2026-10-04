@@ -25,7 +25,7 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
-const { findRuntime } = require('./run-linux-lua.cjs');
+const { findRuntime, run: runLinux } = require('./run-linux-lua.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 
@@ -37,6 +37,8 @@ const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const WORKFLOW = pipeline.file(LINUX_BOX);
 const GATE = pipeline.locate('linux-ok');
 const SHA = '0123456789abcdef';
+// Native Lua stdio uses host text mode; Bash tee receipts below remain byte-exact.
+const NATIVE_LUA_EOL = process.platform === 'win32' ? '\r\n' : '\n';
 
 // The real live-updater probe must expose the same refused HTTP response while
 // its original assertion and exit remain red. No release or network is faked as
@@ -46,6 +48,95 @@ const updaterProbe = path.join(
 	'static/ergopti_plus/linux/tests/hardware/run_updater_live.lua'
 );
 const updaterDriver = path.join(ROOT, 'static/ergopti_plus/linux');
+// The native Linux lane must never certify POSIX observations with Windows Lua.
+const targetCwd = 'C:\\owned checkout\\static\\ergopti_plus\\linux';
+const targetArgv = ['tests/run.lua', '--only', 'an exact case with spaces'];
+const goodTarget = { status: 0, stdout: 'LuaJIT 2.1.fixture\nLinux\n', stderr: '' };
+function observeRouting(platform, receipts) {
+	const calls = [],
+		reports = [];
+	const status = runLinux(targetArgv, {
+		platform,
+		linuxRoot: targetCwd,
+		report: (line) => reports.push(line),
+		spawn: (command, args, options) => {
+			calls.push({ command, args, options });
+			assert.ok(receipts.length, 'no unplanned interpreter or fallback may execute');
+			return receipts.shift();
+		}
+	});
+	return { status, calls, reports };
+}
+const windowsTarget = observeRouting('win32', [goodTarget, { status: 0 }]);
+assert.strictEqual(windowsTarget.status, 0);
+assert.deepStrictEqual(
+	windowsTarget.calls.map((call) => call.command),
+	['wsl.exe', 'wsl.exe']
+);
+assert.deepStrictEqual(windowsTarget.calls[0].args.slice(0, 4), [
+	'--exec',
+	'luajit',
+	'-e',
+	windowsTarget.calls[0].args[3]
+]);
+assert.ok(windowsTarget.calls[0].args[3].includes('jit.os == "Linux"'));
+assert.ok(windowsTarget.calls[0].args[3].includes('jit.version'));
+assert.ok(windowsTarget.calls[0].options.timeout > 0, 'target preparation is bounded');
+assert.deepStrictEqual(windowsTarget.calls[1].args, [
+	'--cd',
+	targetCwd,
+	'--exec',
+	'luajit',
+	...targetArgv
+]);
+assert.strictEqual(windowsTarget.calls[1].options.cwd, targetCwd);
+assert.strictEqual(windowsTarget.calls[1].options.stdio, 'inherit');
+assert.ok(windowsTarget.reports.some((line) => line.includes('Linux via WSL')));
+for (const refusal of [
+	{ error: Object.assign(new Error('WSL missing'), { code: 'ENOENT' }), status: null },
+	{ error: Object.assign(new Error('WSL startup timed out'), { code: 'ETIMEDOUT' }), status: null },
+	{ status: 127, stderr: 'luajit missing' },
+	{ status: null, signal: 'SIGTERM' },
+	{ status: 0, stdout: 'Lua 5.4\nLinux\n' },
+	{ status: 0, stdout: 'LuaJIT 2.1.fixture\nWindows\n' }
+]) {
+	const refused = observeRouting('win32', [refusal]);
+	assert.strictEqual(refused.status, 1, 'an unavailable or wrong native target fails the gate');
+	assert.strictEqual(refused.calls.length, 1, 'Windows Lua is never a fallback');
+}
+for (const receipt of [
+	{ status: 7 },
+	{ status: null, signal: 'SIGTERM' },
+	{ status: null, error: new Error('native target launch refused') }
+]) {
+	const failed = observeRouting('win32', [goodTarget, receipt]);
+	assert.strictEqual(failed.status, receipt.status === 7 ? 7 : 1);
+}
+for (const platform of ['linux', 'darwin']) {
+	const direct = observeRouting(platform, [{ status: 0 }, { status: 3 }]);
+	assert.strictEqual(direct.status, 3);
+	assert.deepStrictEqual(
+		direct.calls.map((call) => call.command),
+		['luajit', 'luajit']
+	);
+	assert.deepStrictEqual(direct.calls[1].args, targetArgv);
+}
+const hostProbeCalls = [];
+assert.strictEqual(
+	findRuntime((command, args) => {
+		hostProbeCalls.push({ command, args });
+		return command === 'lua'
+			? { status: 0 }
+			: { error: Object.assign(new Error('absent'), { code: 'ENOENT' }) };
+	}),
+	'lua',
+	'diagnostic consumers retain host-runtime discovery'
+);
+assert.deepStrictEqual(
+	hostProbeCalls.map((call) => call.command),
+	['luajit', 'lua5.4', 'lua']
+);
+
 const nativeLua = findRuntime();
 assert.ok(nativeLua, 'the real updater probe regression requires the shared Lua runtime');
 const updaterScratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-updater-live-evidence-'));
@@ -55,9 +146,392 @@ try {
 			'API rate limit exceeded. Bearer ABCDEFGHIJKLMNOP; https://private.invalid/path?sig=secret',
 		documentation_url: 'https://docs.github.com/rate-limits'
 	});
+	// Run the actual fixture wrapper against independent URL decisions. Its
+	// release refusal stays red, and authentication never becomes update proof.
+	const fixtureToken = 'CI_UPDATER_ONLY_SECRET_MARKER_123456789';
+	const releaseOrigin = 'https://api.github.com/repos/adrienm7/ergopti/releases';
+	const authenticationCases = [
+		[releaseOrigin, true],
+		[`${releaseOrigin}?per_page=20&page=2`, true],
+		[`${releaseOrigin}?per_page=20`, true],
+		['http://api.github.com/repos/adrienm7/ergopti/releases', false],
+		['HTTPS://api.github.com/repos/adrienm7/ergopti/releases', false],
+		['https://API.GITHUB.COM/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com./repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com:443/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com.evil.invalid/repos/adrienm7/ergopti/releases', false],
+		['https://evil.api.github.com/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com@evil.invalid/repos/adrienm7/ergopti/releases', false],
+		['https://evil.invalid@api.github.com/repos/adrienm7/ergopti/releases', false],
+		['https://user:password@api.github.com/repos/adrienm7/ergopti/releases', false],
+		[`${releaseOrigin}/`, false],
+		[`${releaseOrigin}/latest`, false],
+		['https://api.github.com/repos/adrienm7/other/releases', false],
+		['https://api.github.com/repos/ADRIENM7/ergopti/releases', false],
+		['https://api.github.com/repos/adrienm7/ergopti/%72eleases', false],
+		['https://api.github.com/repos/adrienm7/ergopti/x/../releases', false],
+		[`${releaseOrigin}#owned`, false],
+		[`${releaseOrigin}?per_page=20#owned`, false],
+		[`${releaseOrigin}?per_page=20?page=2`, false],
+		[`${releaseOrigin}?page=2\n`, false],
+		[`${releaseOrigin} `, false],
+		['https://github.com/adrienm7/ergopti/releases/download/v1/package.tar.gz', false],
+		['https://release-assets.githubusercontent.com/package.tar.gz', false]
+	];
+	const authenticationHarness = `
+local native = { requests = 0 }
+local uv = {}
+function uv.run() error('synchronous refusal needs no event loop') end
+function uv.new_pipe() return {} end
+function uv.new_timer() return {} end
+function uv.timer_start() return true end
+function uv.timer_stop() return true end
+function uv.read_start(pipe, callback) pipe.read = callback; return true end
+function uv.read_stop() return true end
+function uv.is_closing(handle) return handle.closing == true end
+function uv.close(handle) handle.closing = true end
+function uv.write(_, config, callback) native.config = config; callback(nil); return true end
+function uv.kill() error('completed receipt must not cancel a live successor') end
+function uv.spawn(command, options, callback)
+ assert(command == 'curl' and options.detached == true, 'native curl ownership changed')
+ native.argv, native.pipes, native.exit = options.args, options.stdio, callback
+ native.requests = native.requests + 1
+ return {}, 4000 + native.requests
+end
+package.preload.luv = function() return uv end
+package.preload['logger.shim'] = function() return {
+ debug = function() end,
+ error = function(_, format, detail)
+  assert(not tostring(detail):find(os.getenv('GITHUB_TOKEN'), 1, true), 'native logger exposed CI authentication')
+  if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end
+ end,
+} end
+package.preload['adapters.shell_runner'] = function() return { validate_spawn_args = function() return '' end } end
+local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')
+package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. package.path
+local Client = dofile(os.getenv('UPDATER_NATIVE_CLIENT'))
+local Json = require('json')
+local rows = assert(Json.decode(os.getenv('UPDATER_AUTH_CASES')))
+local original_headers = { Accept = 'application/vnd.github+json', ['If-None-Match'] = 'original-etag' }
+local options = { owner = 'updater', timeout_ms = 9000, follow_redirects = true, https_only = true, etag_compare = '/owned/etag-in', etag_save = '/owned/etag-out', max_body_bytes = 65536 }
+local http_status = tonumber(os.getenv('UPDATER_HTTP_STATUS')) or 403
+local answer = { ok = false, status = http_status, error = 'HTTP ' .. http_status }
+local expected, count, callbacks = nil, 0, 0
+local original_get = function(url, headers, sent_options, callback)
+ assert(url == expected[1], 'fixture changed original URL')
+ assert(headers.Accept == original_headers.Accept and headers['If-None-Match'] == original_headers['If-None-Match'], 'fixture changed ordinary headers')
+ if expected[2] and os.getenv('GITHUB_ACTIONS') == 'true' then
+  assert(headers.Authorization == 'Bearer ' .. os.getenv('GITHUB_TOKEN'), 'exact release request is not authenticated')
+  assert(headers ~= original_headers, 'authentication must not mutate caller headers')
+  assert(sent_options ~= options and sent_options.follow_redirects == false, 'authenticated request follows a redirect')
+ else
+  assert(headers == original_headers and headers.Authorization == nil, 'authentication escaped its exact CI origin')
+  assert(sent_options == options, 'non-authenticated request lost exact options identity')
+ end
+ assert(original_headers.Authorization == nil, 'caller header table was mutated')
+ assert(options.follow_redirects == true, 'caller redirect policy was mutated')
+ for name, value in pairs(options) do
+  assert(name == 'follow_redirects' or sent_options[name] == value, 'request ownership, deadline, cache or limit changed')
+ end
+ count = count + 1
+ local delivered = false
+ local sent = Client.get(url, headers, sent_options, function(result)
+  assert(result.status == http_status and result.ok == false, 'native HTTP refusal changed')
+  answer = result
+  assert(callback(result, 'original callback receipt') == 'original callback return')
+  delivered = true
+ end)
+ assert(sent == true and not delivered, 'native adapter must return before completion')
+ local argv = table.concat(native.argv, '\\n')
+ assert(not argv:find(os.getenv('GITHUB_TOKEN'), 1, true), 'CI token reached native argv')
+ assert(argv:find('--config\\n-', 1, true), 'native curl lost private stdin config')
+ assert((argv:find('--location', 1, true) == nil) == (expected[2] and os.getenv('GITHUB_ACTIONS') == 'true'), 'native curl redirect policy escaped authentication scope')
+ if expected[2] and os.getenv('GITHUB_ACTIONS') == 'true' then
+  assert(native.config:find('header = "Authorization: Bearer ' .. os.getenv('GITHUB_TOKEN') .. '"', 1, true), 'native stdin lacks exact CI authentication')
+ else
+  assert(not native.config:find(os.getenv('GITHUB_TOKEN'), 1, true), 'native stdin authenticated a foreign request')
+ end
+ local response_body = http_status == 304 and '' or os.getenv('UPDATER_ECHO_CI_TOKEN') == 'true'
+  and Json.encode({ message = 'controlled refusal: Bearer ' .. os.getenv('GITHUB_TOKEN')
+   .. ' repeated ' .. os.getenv('GITHUB_TOKEN') .. ' suffix kept' })
+  or '{"message":"actual refused response"}'
+ native.pipes[2].read(nil, response_body .. '\\nERGOPTI_HTTP_STATUS:' .. http_status .. '\\n')
+ native.pipes[2].read(nil, nil)
+ native.pipes[3].read(nil, nil)
+ native.exit(http_status >= 400 and 22 or 0, 0)
+ assert(native.callback_error == nil, 'native callback assertion was swallowed')
+ assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')
+ return sent
+end
+local trusted_url, getter_calls = os.getenv('UPDATER_TRUSTED_RELEASE_URL'), 0
+local manager = { _http_client = { get = original_get }, init = function()
+ trusted_url = 'https://api.github.com/repos/untrusted/changed/releases'
+end, current_version = function() return '0.0.0-dev.1' end, get_channel = function() return 'dev' end }
+if os.getenv('UPDATER_GETTER_ABSENT') ~= 'true' then
+ manager.release_api_url = function() getter_calls = getter_calls + 1; return trusted_url end
+end
+manager.check_for_updates = function(_, callback)
+ for _, row in ipairs(rows) do
+  expected = row
+  assert(manager._http_client.get(row[1], original_headers, options, function(result, receipt)
+   assert(result == answer and receipt == 'original callback receipt', 'fixture changed response ownership')
+   callbacks = callbacks + 1
+   return 'original callback return'
+  end) == true, 'fixture changed dispatch result')
+ end
+ assert(count == #rows and callbacks == #rows, 'fixture skipped a scoped request')
+ callback(false, nil, answer.error)
+end
+package.preload['modules.updater.manager'] = function() return manager end
+local original_exit = os.exit
+os.exit = function(status)
+ assert(manager._http_client.get == original_get, 'authentication wrapper was not released')
+ assert(status == 1, 'authentication cannot forgive a release refusal')
+ assert(getter_calls == (os.getenv('GITHUB_ACTIONS') == 'true' and 1 or 0), 'trusted release owner was not captured exactly once')
+ print('scoped request and cleanup observations: ' .. count)
+ original_exit(status)
+end
+`;
+	const customOrigin = 'https://api.github.com/repos/fixture-owner/other-project/releases';
+	const authVariants = [
+		...['true', 'false', 'TRUE'].map((ci) => ({
+			ci,
+			origin: releaseOrigin,
+			cases: authenticationCases,
+			status: 403,
+			name: ci
+		})),
+		{
+			ci: 'true',
+			origin: customOrigin,
+			cases: [
+				[customOrigin, true],
+				[`${customOrigin}?per_page=20&page=2`, true],
+				[releaseOrigin, false],
+				[`${releaseOrigin}?per_page=20&page=2`, false],
+				[`${customOrigin}/latest`, false],
+				['https://api.github.com/repos/untrusted/changed/releases', false]
+			],
+			status: 403,
+			name: 'custom-owner'
+		},
+		{
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [[releaseOrigin, true]],
+			status: 302,
+			name: 'redirect-refusal'
+		},
+		{
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [
+				[releaseOrigin, true],
+				[`${releaseOrigin}?per_page=20&page=2`, true]
+			],
+			status: 304,
+			name: 'conditional-cache-observation'
+		},
+		...[
+			['short-response-echo', 'short'],
+			['punctuated-response-echo', 'OPAQUE.valid-~_+/123=='],
+			['long-response-echo', 'LONG_ECHO_' + 'Ab09-._~+/'.repeat(300) + '==']
+		].map(([name, token]) => ({
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [[releaseOrigin, true]],
+			status: 403,
+			name,
+			token,
+			echo: true
+		})),
+		// These inert values are valid RFC 6750 credentials. The original probe
+		// wrongly rejected short values, >255 bytes, and opaque punctuation.
+		...[
+			['short-token', 'short'],
+			['old-length-boundary', 'x'.repeat(256)],
+			['opaque-token', 'OPAQUE.valid-~_+/123=='],
+			['long-opaque-token', 'LONG_OPAQUE_' + 'Ab09-._~+/'.repeat(100) + '==']
+		].map(([name, token]) => ({
+			ci: 'true',
+			origin: releaseOrigin,
+			cases: [
+				[releaseOrigin, true],
+				[customOrigin, false],
+				['https://release-assets.githubusercontent.com/package.tar.gz', false]
+			],
+			status: 403,
+			name,
+			token
+		}))
+	];
+	for (const [caseIndex, variant] of authVariants.entries()) {
+		const { ci } = variant;
+		const token = variant.token || fixtureToken;
+		const evidence = path.join(updaterScratch, `authentication-${caseIndex}-${variant.name}`);
+		fs.mkdirSync(evidence);
+		const authenticated = spawnSync(
+			nativeLua,
+			['-e', authenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					GITHUB_ACTIONS: ci,
+					GITHUB_TOKEN: token,
+					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_TRUSTED_RELEASE_URL: `${variant.origin}?per_page=100`,
+					UPDATER_HTTP_STATUS: String(variant.status),
+					UPDATER_ECHO_CI_TOKEN: variant.echo ? 'true' : 'false',
+					UPDATER_AUTH_CASES: JSON.stringify(variant.cases)
+				}
+			}
+		);
+		assert.ifError(authenticated.error);
+		assert.strictEqual(authenticated.status, 1, 'real release refusal must remain nonzero');
+		assert.match(authenticated.stdout, /FAIL the newest release is found/);
+		assert.ok(
+			authenticated.stdout.includes(
+				`scoped request and cleanup observations: ${variant.cases.length}${NATIVE_LUA_EOL}`
+			)
+		);
+		const captured = fs.readFileSync(path.join(evidence, 'http.json'), 'utf8');
+		assert.strictEqual(JSON.parse(captured).responses.length, variant.cases.length);
+		assert.ok(
+			JSON.parse(captured).responses.every((response) => response.status === variant.status)
+		);
+		if (variant.status === 304) {
+			assert.strictEqual(
+				(authenticated.stderr.match(/^::notice title=Linux updater live HTTP::/gm) || []).length,
+				variant.cases.length,
+				'conditional responses are observations; the updater owns cache admission'
+			);
+			assert.doesNotMatch(authenticated.stderr, /^::error title=Linux updater live HTTP::/m);
+			for (const response of JSON.parse(captured).responses) {
+				assert.strictEqual(response.body, '', 'a 304 response has no body');
+				assert.strictEqual(response.headers_available, false, 'absent headers stay unavailable');
+			}
+		}
+		if (variant.echo) {
+			const response = JSON.parse(captured).responses[0];
+			assert.strictEqual(response.status, 403);
+			assert.strictEqual(
+				response.message,
+				'controlled refusal: Bearer <secret> repeated <secret> suffix kept'
+			);
+			assert.strictEqual(JSON.parse(response.body).message, response.message);
+			assert.ok(response.error.includes('HTTP 403'), 'real HTTP refusal detail was lost');
+			assert.ok(
+				authenticated.stderr.includes('controlled refusal:'),
+				'echo sanitization dropped all response evidence'
+			);
+			if (variant.name === 'long-response-echo') {
+				assert.ok(
+					token.length > 2048,
+					'long credential must cross the actual diagnostic clip bound'
+				);
+				assert.ok(!captured.includes(token.slice(0, 32)), 'clipping exposed a credential fragment');
+				assert.ok(
+					!authenticated.stdout.includes(token.slice(0, 32)),
+					'stdout exposed a credential fragment'
+				);
+				assert.ok(
+					!authenticated.stderr.includes(token.slice(0, 32)),
+					'stderr exposed a credential fragment'
+				);
+			}
+		}
+		for (const privateText of [token, 'Authorization', 'original-etag', 'user:password']) {
+			assert.ok(!authenticated.stdout.includes(privateText), 'stdout leaked private request state');
+			assert.ok(!authenticated.stderr.includes(privateText), 'stderr leaked private request state');
+			assert.ok(!captured.includes(privateText), 'artifact leaked private request state');
+		}
+	}
+	for (const token of [
+		'',
+		fixtureToken + '\n',
+		fixtureToken + '\r',
+		fixtureToken + ' ',
+		fixtureToken + 'é',
+		fixtureToken + '\t',
+		fixtureToken + '\x01',
+		fixtureToken + '\x7f',
+		'=',
+		fixtureToken + '=interior',
+		fixtureToken + '"',
+		fixtureToken + '\\',
+		fixtureToken + '\r\nX-Injected: true',
+		fixtureToken + '"\nurl = "https://foreign.invalid"'
+	]) {
+		const refused = spawnSync(
+			nativeLua,
+			['-e', authenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					GITHUB_ACTIONS: 'true',
+					GITHUB_TOKEN: token,
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
+					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
+				}
+			}
+		);
+		assert.ifError(refused.error);
+		assert.notStrictEqual(refused.status, 0);
+		assert.match(refused.stderr, /CI updater authentication is unavailable or invalid/);
+		assert.doesNotMatch(refused.stdout + refused.stderr, /CI_UPDATER_ONLY_SECRET_MARKER/);
+		assert.doesNotMatch(refused.stdout, /installed |scoped request and cleanup/);
+	}
+	for (const endpoint of [
+		null,
+		'http://api.github.com/repos/fixture/owned/releases',
+		'https://api.github.com:443/repos/fixture/owned/releases',
+		'https://api.github.com@evil.invalid/repos/fixture/owned/releases',
+		'https://api.github.com/repos/fixture/owned/releases#foreign',
+		'https://api.github.com/repos/../owned/releases'
+	]) {
+		const rejectedOwner = spawnSync(
+			nativeLua,
+			['-e', authenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					GITHUB_ACTIONS: 'true',
+					GITHUB_TOKEN: fixtureToken,
+					UPDATER_GETTER_ABSENT: endpoint === null ? 'true' : 'false',
+					UPDATER_TRUSTED_RELEASE_URL: endpoint || '',
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
+				}
+			}
+		);
+		assert.ifError(rejectedOwner.error);
+		assert.notStrictEqual(rejectedOwner.status, 0);
+		assert.match(rejectedOwner.stderr, /CI updater release owner is (unavailable|invalid)/);
+		assert.doesNotMatch(rejectedOwner.stdout, /installed |scoped request and cleanup/);
+		assert.ok(!rejectedOwner.stderr.includes(fixtureToken));
+	}
+	// Binary fixture bytes avoid native getenv transcoding the UTF-8 response.
+	const responseFile = path.join(updaterScratch, 'response.json');
+	fs.writeFileSync(responseFile, refusal);
+	const boundedResponseFile = path.join(updaterScratch, 'bounded-response.json');
+	fs.writeFileSync(
+		boundedResponseFile,
+		JSON.stringify({ message: 'refused 100%\r\n::error::foreign ' + 'é'.repeat(2000) })
+	);
 	const injected = `
 package.preload.luv = function() return { run = function() error('a synchronous refusal needs no event loop') end } end
-local response = { ok = false, status = 403, error = 'HTTP 403', error_body = os.getenv('UPDATER_RESPONSE') }
+local response_file = assert(io.open(os.getenv('UPDATER_RESPONSE_FILE'), 'rb'))
+local fixture_response = assert(response_file:read('*a'))
+assert(response_file:close())
+local response = { ok = false, status = 403, error = 'HTTP 403', error_body = fixture_response }
 local headers, options = { Authorization = 'Bearer ORIGINAL_REQUEST_SECRET' }, { owner = 'updater' }
 local original_get = function(url, sent_headers, sent_options, callback)
  assert(url == 'https://api.github.com/owned/releases')
@@ -68,11 +542,12 @@ local original_get = function(url, sent_headers, sent_options, callback)
  return true
 end
 local manager = { _http_client = { get = original_get }, init = function() end,
+ release_api_url = function() return 'https://api.github.com/repos/fixture/owned/releases?per_page=100' end,
  current_version = function() return '0.0.0-dev.1' end, get_channel = function() return 'dev' end }
 manager.check_for_updates = function(_, callback)
  assert(manager._http_client.get('https://api.github.com/owned/releases', headers, options, function(received, receipt)
   assert(receipt == 'owned callback receipt', 'the wrapper changed callback arguments')
-  assert(received == response and received.error_body == os.getenv('UPDATER_RESPONSE'), 'the wrapper changed the result')
+  assert(received == response and received.error_body == fixture_response, 'the wrapper changed the result')
   callback(false, nil, received.error)
   return 'callback return preserved'
  end) == true, 'the wrapper changed the transport return')
@@ -94,8 +569,9 @@ end
 				...process.env,
 				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 				GITHUB_ACTIONS: 'true',
+				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: updaterScratch,
-				UPDATER_RESPONSE: refusal
+				UPDATER_RESPONSE_FILE: responseFile
 			}
 		}
 	);
@@ -105,10 +581,17 @@ end
 		1,
 		'the original failed release-check assertion remains nonzero'
 	);
-	assert.match(probe.stdout, /transport stdout preserved\n/);
-	assert.match(probe.stderr, /transport stderr preserved\n/);
-	assert.match(probe.stderr, /probe lifecycle cleanup preserved\n/);
-	assert.match(probe.stdout, /  check: nil HTTP 403\n  FAIL the newest release is found\n/);
+	assert.ok(probe.stdout.includes('transport stdout preserved' + NATIVE_LUA_EOL));
+	assert.ok(probe.stderr.includes('transport stderr preserved' + NATIVE_LUA_EOL));
+	assert.ok(probe.stderr.includes('probe lifecycle cleanup preserved' + NATIVE_LUA_EOL));
+	assert.ok(
+		probe.stdout.includes(
+			'  check: nil HTTP 403' +
+				NATIVE_LUA_EOL +
+				'  FAIL the newest release is found' +
+				NATIVE_LUA_EOL
+		)
+	);
 	assert.match(
 		probe.stderr,
 		/::error title=Linux updater live HTTP::.*HTTP 403.*API rate limit exceeded/
@@ -148,16 +631,15 @@ end
 				...process.env,
 				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 				GITHUB_ACTIONS: 'true',
+				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: boundedDir,
-				UPDATER_RESPONSE: JSON.stringify({
-					message: 'refused 100%\r\n::error::foreign ' + 'é'.repeat(2000)
-				})
+				UPDATER_RESPONSE_FILE: boundedResponseFile
 			}
 		}
 	);
 	assert.ifError(bounded.error);
 	assert.strictEqual(bounded.status, 1);
-	assert.match(bounded.stderr, /probe lifecycle cleanup preserved\n/);
+	assert.ok(bounded.stderr.includes('probe lifecycle cleanup preserved' + NATIVE_LUA_EOL));
 	assert.match(bounded.stderr, /100%25%0D%0A::error::foreign/);
 	assert.strictEqual(
 		(bounded.stderr.match(/^::error/gm) || []).length,
@@ -168,6 +650,10 @@ end
 		.responses[0].message;
 	assert.ok(Buffer.byteLength(boundedMessage) <= 2061, 'response body evidence is bounded');
 	assert.ok(boundedMessage.endsWith(' <truncated>'));
+	assert.ok(
+		boundedMessage.startsWith('refused 100%\r\n::error::foreign é'),
+		'the actual response retains its UTF-8 prefix'
+	);
 	assert.ok(!boundedMessage.includes('�'), 'bounded evidence retains complete UTF-8 characters');
 
 	// A refused evidence write cannot replace the actual HTTP failure or
@@ -183,15 +669,23 @@ end
 				...process.env,
 				LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 				GITHUB_ACTIONS: 'true',
+				GITHUB_TOKEN: fixtureToken,
 				ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: blockedEvidence,
-				UPDATER_RESPONSE: refusal
+				UPDATER_RESPONSE_FILE: responseFile
 			}
 		}
 	);
 	assert.ifError(blocked.error);
 	assert.strictEqual(blocked.status, 1);
-	assert.match(blocked.stderr, /probe lifecycle cleanup preserved\n/);
-	assert.match(blocked.stdout, /  check: nil HTTP 403\n  FAIL the newest release is found\n/);
+	assert.ok(blocked.stderr.includes('probe lifecycle cleanup preserved' + NATIVE_LUA_EOL));
+	assert.ok(
+		blocked.stdout.includes(
+			'  check: nil HTTP 403' +
+				NATIVE_LUA_EOL +
+				'  FAIL the newest release is found' +
+				NATIVE_LUA_EOL
+		)
+	);
 	assert.match(blocked.stderr, /HTTP refusal evidence could not be captured/);
 
 	// Execute the actual Bash owner with controlled build/install/interpreter
@@ -431,7 +925,7 @@ assert.doesNotMatch(WORKFLOW, /no Wayland socket appeared[^\n]*[\s\S]{0,180}exit
 assert.doesNotMatch(WORKFLOW, /WebKit\/lgi unavailable[^\n]*[\s\S]{0,180}exit 0/);
 
 // Native physical admission must retain its real X11 group/map evidence.
-assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['xkb-source-qualification'], 17);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['xkb-source-qualification'], 26);
 rejects(({ evidence }) => {
 	const document = evidence.find((row) => 'xkb-source-qualification' in row.subjects);
 	delete document.subjects['xkb-source-qualification'];
@@ -616,6 +1110,29 @@ const testLinuxSteps = pipeline.steps(pipeline.job('e2e-linux'));
 const updaterStep = pipeline.step(
 	pipeline.job('e2e-linux'),
 	'Update to the newest release and restart'
+);
+/** The fixture token belongs only to the exact owned updater step. */
+function assertUpdaterAuthentication(step) {
+	assert.match(step, /^          GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);
+	assert.strictEqual(pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+	assert.match(
+		step,
+		/^          bash static\/ergopti_plus\/linux\/tests\/hardware\/run_updater_live\.sh$/m
+	);
+}
+assertUpdaterAuthentication(updaterStep);
+assert.throws(() =>
+	assertUpdaterAuthentication(
+		updaterStep.replace('          GITHUB_TOKEN: ${{ github.token }}\n', '')
+	)
+);
+assert.throws(() =>
+	assertUpdaterAuthentication(
+		updaterStep.replace('${{ github.token }}', '${{ secrets.PAT_ERGOPTI }}')
+	)
+);
+assert.throws(() =>
+	assertUpdaterAuthentication(updaterStep.replace('${{ !cancelled() }}', '${{ success() }}'))
 );
 assert.match(
 	updaterStep,

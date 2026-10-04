@@ -16,6 +16,8 @@ local Runtime = require("_generated.native_runtime")
 
 local _native, _connection, _display_name = nil, nil, nil
 local _generation, _last_keymap, _last_group = 0, nil, nil
+local _last_canonical_keymap = nil
+local _last_expected, _last_canonical_expected = nil, nil
 local CORE_KEYBOARD = 0x100
 local GROUP_COMPONENTS = 0xf0
 local SOURCE_EVENTS = 0x7
@@ -73,6 +75,7 @@ local function bind()
 		struct xkb_context *xkb_context_new(int flags);
 		void xkb_context_unref(struct xkb_context *context);
 		void xkb_keymap_unref(struct xkb_keymap *keymap);
+		struct xkb_keymap *xkb_keymap_new_from_string(struct xkb_context *, const char *, int, int);
 		char *xkb_keymap_get_as_string(struct xkb_keymap *keymap, int format);
 		void free(void *pointer);
 	]])
@@ -94,6 +97,8 @@ function M.close()
 		Logger.info(LOG, "Closed the native X11 source connection.")
 	end
 	_connection, _display_name, _last_keymap, _last_group = nil, nil, nil, nil
+	_last_canonical_keymap = nil
+	_last_expected, _last_canonical_expected = nil, nil
 	_generation = _generation + 1
 end
 
@@ -154,6 +159,38 @@ local function drain(native, connection)
 	end
 end
 
+--- Orders complete alias declarations without changing any alias name or target.
+--- The codec preserves declaration order, which differs between X11 and xkbcomp.
+local function ordered_aliases(text)
+	local result, sections = text:gsub("(xkb_keycodes[^\n]*{\n)(.-)(\n};)", function(header, body, footer)
+		body = body .. "\n"
+		local aliases = {}
+		-- Native serializers align alias columns; only horizontal spacing is syntax.
+		local declaration = "\talias[ \t]+<[^<>\n]+>[ \t]+=[ \t]+<[^<>\n]+>;\n"
+		for line in body:gmatch(declaration) do aliases[#aliases + 1] = line end
+		table.sort(aliases)
+		local index = 0
+		body = body:gsub(declaration, function()
+			index = index + 1
+			return aliases[index]
+		end)
+		return header .. body .. footer:sub(2)
+	end)
+	return sections == 1 and result or nil
+end
+
+--- Projects native serialization through the capture owner's exact parser codec.
+--- X11 may retain unreferenced types and interprets that a parsed map omits.
+local function canonical_keymap(native, connection, text)
+	local keymap = native.xkb.xkb_keymap_new_from_string(connection.context, text, 1, 0)
+	if keymap == nil then return nil end
+	local bytes = native.xkb.xkb_keymap_get_as_string(keymap, 1)
+	local canonical = bytes ~= nil and native.ffi.string(bytes) or nil
+	if bytes ~= nil then native.ffi.C.free(bytes) end
+	native.xkb.xkb_keymap_unref(keymap)
+	return canonical and ordered_aliases(canonical) or nil
+end
+
 --- Reads actual native server state, requiring the capture owner's exact map.
 --- @param expected string Canonical serialization of the loaded native keymap.
 --- @param groups integer Number of groups in that loaded native keymap.
@@ -187,6 +224,12 @@ function M.read(expected, groups)
 	if native.x11.XkbGetState(connection.display, CORE_KEYBOARD, after) ~= 0 then return nil, "native-group-unavailable" end
 	local group = tonumber(after[0].group)
 	if tonumber(before[0].group) ~= group then drain(native, connection) return nil, "native-group-raced" end
+	if actual == nil then return nil, "native-keymap-identity-unavailable" end
+	if actual ~= _last_keymap then
+		local canonical = canonical_keymap(native, connection, actual)
+		if canonical == nil then return nil, "native-keymap-canonicalization-refused" end
+		_last_canonical_keymap = canonical
+	end
 	if actual ~= _last_keymap or group ~= _last_group then
 		_last_keymap, _last_group = actual, group
 		_generation = _generation + 1
@@ -194,7 +237,12 @@ function M.read(expected, groups)
 	local acknowledged_epoch = _generation
 	drain(native, connection)
 	if _generation ~= acknowledged_epoch then return nil, "native-source-raced" end
-	if actual ~= expected then return nil, "native-keymap-unacknowledged" end
+	if expected ~= _last_expected then
+		local canonical = ordered_aliases(expected)
+		if canonical == nil then return nil, "native-keymap-canonicalization-refused" end
+		_last_expected, _last_canonical_expected = expected, canonical
+	end
+	if _last_canonical_keymap ~= _last_canonical_expected then return nil, "native-keymap-unacknowledged" end
 	if group < 0 or group >= groups then return nil, "native-group-outside-keymap" end
 	return { group = group, generation = _generation, backend = "x11" }
 end

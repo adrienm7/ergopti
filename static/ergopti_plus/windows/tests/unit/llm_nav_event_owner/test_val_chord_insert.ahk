@@ -57,7 +57,7 @@ Test("LLM nav event owner: validation chord receipt arms slot insertion (llm-val
 	_LNEO_JumpReceiptArmsSlotInsertion)
 
 _LNEO_SlotAcceptWaitSteps() {
-	State := Map("generation", 5, "deadline", 1000)
+	State := Map("generation", 5, "started_at", 0, "timeout_ms", 1000)
 	AssertEqual("insert", _LLM_SlotAccept_Step(State, 5, false, 10),
 		"released modifiers must insert")
 	AssertEqual("wait", _LLM_SlotAccept_Step(State, 5, true, 999),
@@ -70,3 +70,27 @@ _LNEO_SlotAcceptWaitSteps() {
 
 Test("LLM val chord: the release wait inserts, waits, or drops (llm-val-chord-inserts)",
 	_LNEO_SlotAcceptWaitSteps)
+
+_LNEO_SlotAcceptExpiresAcrossWrap() {
+	Origin := 0xFFFFFFF0
+	; Keep the former absolute deadline in the reproducer so restoring the old
+	; implementation fails its actual verdict rather than a missing-map-key read.
+	State := Map("generation", 5, "started_at", Origin, "timeout_ms", 100,
+		"deadline", Origin + 100)
+	AssertEqual("wait", _LLM_SlotAccept_Step(State, 5, true, 83))
+	AssertEqual("drop", _LLM_SlotAccept_Step(State, 5, true, 84),
+		"validation-chord-expiry: a modifier wait cannot survive clock rollover")
+	AssertEqual("insert", _LLM_SlotAccept_Step(State, 5, false, 83))
+	AssertEqual("drop", _LLM_SlotAccept_Step(State, 5, false, 84),
+		"a delayed release notification cannot revive an expired chord")
+}
+Test("LLM validation-chord-expiry: rollover preserves the release timeout",
+	_LNEO_SlotAcceptExpiresAcrossWrap)
+
+_LNEO_SlotAcceptDelayedReleaseStaysExpired() {
+	State := Map("generation", 5, "started_at", 0, "timeout_ms", 1000, "deadline", 1000)
+	AssertEqual("drop", _LLM_SlotAccept_Step(State, 5, false, 1001),
+		"validation-chord-expiry: late timers must not insert after modifiers release")
+}
+Test("LLM validation-chord-expiry: a released modifier cannot revive a stale chord",
+	_LNEO_SlotAcceptDelayedReleaseStaysExpired)

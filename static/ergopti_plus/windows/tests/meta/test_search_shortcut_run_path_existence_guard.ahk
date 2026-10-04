@@ -56,8 +56,11 @@ _TSSRPEG_CheckSearchPathRunGuard() {
 	; We do a simpler structural check: assert that "try Run(" appears (all guarded
 	; calls are directly try Run(... or inside a try { Run(...) block) and that the
 	; unguarded "Run(SelectedText, , " pattern from before the fix is absent.
-	Assert(InStr(Body, "try Run("),
-		"AHK-18: All Run() calls in SearchPath must be wrapped in try so OS-call failures (non-existent path, blocked URL) are caught locally rather than propagating to ErgoptiGlobalErrorHandler")
+	Assert(InStr(Body, "LaunchFn := Run"),
+		"the explicit launch port must retain the native Run default")
+	_SPT_AssertRecordingBoundary()
+	Assert(InStr(Body, "try LaunchFn.Call("),
+		"AHK-18: All launch-port calls in SearchPath must be wrapped in try so OS-call failures (non-existent path, blocked URL) are caught locally rather than propagating to ErgoptiGlobalErrorHandler")
 }
 
 

@@ -185,10 +185,20 @@ if (windowsSmokeStep !== null) {
 	try {
 		const verdict = pipeline.scriptBlock(
 			pipeline.runOf(windowsSmokeStep) ?? [],
-			'if ($crashedEarly -or -not $markerSeen) {'
+			'if (-not $proc.HasExited -or $crashedEarly -or -not $markerSeen -or $dialogSeen) {'
 		);
-		if (!pipeline.blockExits(verdict, '1')) {
-			errors.push('the Windows exe smoke must end its crash branch with exit 1');
+		if (
+			!/^throw\s/.test(
+				verdict
+					.slice(1, -1)
+					.map((line) => line.trim())
+					.filter(Boolean)
+					.at(-1) ?? ''
+			)
+		) {
+			errors.push(
+				'the Windows exe smoke must end its failed readiness branch with an unconditional throw'
+			);
 		}
 	} catch (error) {
 		errors.push(`the Windows exe smoke lost its crash verdict: ${error.message}`);
@@ -212,13 +222,13 @@ const WINDOWS_SMOKE_HANG_HEADROOM = 3;
 const WINDOWS_SMOKE_STEP_MARGIN_SECONDS = 60;
 // PowerShell names are case-insensitive, so $seconds is the same parameter.
 const WINDOWS_SMOKE_PRINTS_ELAPSED = /Write-Host .*\$Seconds\b/i;
-const WINDOWS_SMOKE_VERDICT = 'if ($crashedEarly -or -not $markerSeen) {';
+const WINDOWS_SMOKE_VERDICT =
+	'if (-not $proc.HasExited -or $crashedEarly -or -not $markerSeen -or $dialogSeen) {';
 const WINDOWS_SMOKE_WAIT_OPENER = 'while ($clock.Elapsed.TotalSeconds -lt $hangBoundSeconds) {';
-// The only ways out of the wait, in order. Any other exit, such as a
-// wall-clock deadline, turns a slow extraction back into a false failure.
+// Process completion and a dialog end the wait. The extraction marker is
+// diagnostic only: its presence cannot prove input/menu readiness.
 const WINDOWS_SMOKE_WAIT_EXITS = [
 	'if ($proc.HasExited) { break }',
-	'if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }',
 	'if ([SmokeWindows]::HasDialog($proc.Id)) { $dialogSeen = $true; break }'
 ];
 
@@ -310,7 +320,7 @@ function windowsSmokeWaitProblems(script, timeoutMinutes) {
 		);
 		if (exits.join('\n') !== WINDOWS_SMOKE_WAIT_EXITS.join('\n')) {
 			problems.push(
-				`the Windows exe smoke wait must end only on a crash, the marker or a dialog: ` +
+				`the Windows exe smoke wait must end only on process exit or a dialog: ` +
 					`expected ${WINDOWS_SMOKE_WAIT_EXITS.join(' | ')}; got ${exits.join(' | ')}`
 			);
 		}
@@ -348,6 +358,14 @@ function windowsSmokeWaitProblems(script, timeoutMinutes) {
 			}
 		}
 		const verdict = pipeline.scriptBlock(code, WINDOWS_SMOKE_VERDICT);
+		const lastStatement = verdict
+			.slice(1, -1)
+			.map((line) => line.trim())
+			.filter(Boolean)
+			.at(-1);
+		if (!/^throw\s/.test(lastStatement ?? '')) {
+			problems.push('the failed readiness verdict must end with an unconditional throw');
+		}
 		const callInVerdict = verdict.findIndex((line) => /^\s*Write-LaunchDiagnostics\b/.test(line));
 		if (callInVerdict < 0) {
 			problems.push('the Windows exe smoke must print its diagnostics before it fails');
@@ -458,6 +476,24 @@ if (windowsSmokeStep !== null) {
 			(lines) =>
 				lines.map((line) =>
 					line.replace('if (owner == (uint)processId) found.Add(window);', 'found.Add(window);')
+				)
+		],
+		[
+			'an extraction marker admitted before readiness',
+			(lines) =>
+				lines.map((line) =>
+					line.replace(
+						'if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true }',
+						'if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }'
+					)
+				)
+		],
+		[
+			'a failure without a failing process status',
+			(lines) =>
+				lines.filter(
+					(line) =>
+						!line.trimStart().startsWith('throw "ErgoptiPlus.exe did not complete native readiness')
 				)
 		],
 		[
@@ -977,7 +1013,7 @@ const macosSmokeStep = releaseStep(
 if (macosSmokeStep !== null) {
 	for (const token of [
 		'python3 tools/diagnostics/macos_release_launch_test.py',
-		'ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications',
+		'node tools/build/macos-release-archives.cjs --ci-install',
 		'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app'
 	]) {
 		if (!macosSmokeStep.includes(token)) {
@@ -986,16 +1022,18 @@ if (macosSmokeStep !== null) {
 	}
 }
 
-// The zip is smoked, then signed, and the appcast embeds that signature; the
+// The preferred archive is smoked, then the historical ZIP is signed; the
 // upload must follow every file it carries. A signature or keylayout step
 // moved past the upload leaves its file out, and the release preflight then
 // stops the whole release after every box has run.
 const MACOS_ORDER = [
 	'Build ErgoptiPlus.app',
+	'Record signed CI archive source',
 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
 	'Install Sparkle signing tool',
 	'Sign zip with Sparkle EdDSA key',
 	'Generate Sparkle appcast',
+	'Upload the independent CI archive source',
 	'Upload the package'
 ];
 const packageMacosSteps = pipeline
@@ -1043,6 +1081,729 @@ for (const [name, condition] of [
 		errors.push(`the macOS release step '${name}' must not set continue-on-error`);
 	}
 }
+
+/** Negative launch evidence must survive the original strict native verdict. */
+function windowsFailureEvidenceProblems(smoke, upload) {
+	const problems = [];
+	if (pipeline.stepField(upload, 'if') !== 'always()') {
+		problems.push('Windows launch evidence must upload on success or failure with always()');
+	}
+	if (pipeline.stepField(upload, 'continue-on-error') !== null) {
+		problems.push('Windows launch evidence must not forgive publication failure');
+	}
+	if (
+		pipeline.stepField(upload, 'uses') !== 'actions/upload-artifact@v4' ||
+		!/^ {10}path: \$\{\{ runner\.temp \}\}\/evidence\.json$/m.test(upload) ||
+		!/^ {10}if-no-files-found: error$/m.test(upload)
+	) {
+		problems.push(
+			'Windows launch evidence must retain only its exact owned JSON and refuse absence'
+		);
+	}
+	try {
+		const code = (pipeline.runOf(smoke) ?? []).filter((line) => !line.trimStart().startsWith('#'));
+		const trimmed = code.map((line) => line.trim());
+		const initial = pipeline.scriptBlock(code, '$startupEvidence = [ordered]@{');
+		for (const statement of [
+			"failures = @('startup_incomplete')",
+			"failure_phase = 'probe_setup'",
+			'package_sha256 = $null',
+			'readiness_acknowledged = $false',
+			'native_exit_code = $null',
+			'native_descendant_observations = @()'
+		]) {
+			if (!initial.some((line) => line.trim() === statement)) {
+				problems.push(`Windows incomplete startup evidence lost ${statement}`);
+			}
+		}
+		const save = pipeline.scriptBlock(code, 'function Save-StartupFailureEvidence');
+		if (
+			!save.some(
+				(line) =>
+					line.trim() ===
+					'$startupEvidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8'
+			)
+		) {
+			problems.push('Windows startup failure evidence must persist its owned bounded JSON');
+		}
+		if (
+			!save.some((line) =>
+				line.includes(
+					"Write-Warning 'Startup failure evidence publication failed (detail omitted).' -WarningAction Continue"
+				)
+			)
+		) {
+			problems.push('Windows startup failure evidence must retain the primary native error');
+		}
+		if (save.some((line) => /Exception\.Message|CommandLine|\$stdout|\$stderr/.test(line))) {
+			problems.push('Windows startup failure publication must not expose raw private output');
+		}
+		const firstSave = trimmed.indexOf('Save-StartupFailureEvidence');
+		const probeSetup = trimmed.findIndex((line) => line.startsWith('Add-Type '));
+		const spawn = trimmed.findIndex((line) => line.startsWith('$proc = Start-Process '));
+		if (
+			firstSave < 0 ||
+			probeSetup < 0 ||
+			spawn < 0 ||
+			firstSave >= probeSetup ||
+			probeSetup >= spawn
+		) {
+			problems.push(
+				'Windows negative startup evidence must be fresh before probe setup and compiled spawn'
+			);
+		}
+		const parent = pipeline.scriptBlock(code, 'if ($launchOwner.identity_qualified) {');
+		if (
+			!parent.some(
+				(line) =>
+					line.trim() ===
+					'$startupEvidence.native_parent.observed_executable = $launchOwner.expected_executable'
+			)
+		) {
+			problems.push('Windows failure evidence must disclose only the qualified owned executable');
+		}
+		for (const statement of [
+			'$startupEvidence.native_parent.pid = $launchOwner.pid',
+			'$startupEvidence.native_parent.start_utc = $launchOwner.start_utc',
+			'$startupEvidence.native_parent.identity_qualified = $launchOwner.identity_qualified',
+			'pid = $receipt.pid',
+			'parent_pid = $receipt.parent_pid',
+			'created_utc = $receipt.created_utc',
+			'lineage_qualified = $receipt.lineage_qualified',
+			'same_executable = $receipt.same_executable',
+			'depth = $receipt.depth'
+		]) {
+			if (!trimmed.includes(statement))
+				problems.push(`Windows closed native observation lost ${statement}`);
+		}
+		if (
+			trimmed.some((line) =>
+				/\$startupEvidence.*(?:CommandLine|\.Exception\.Message|\$tail|\$stdout|\$stderr|ready\s*=\s*\$true)/.test(
+					line
+				)
+			)
+		) {
+			problems.push('Windows failure evidence must not copy private output or authorize readiness');
+		}
+		const failure = pipeline.scriptBlock(code, WINDOWS_SMOKE_VERDICT).map((line) => line.trim());
+		const saves = failure
+			.map((line, index) => (line === 'Save-StartupFailureEvidence' ? index : -1))
+			.filter((index) => index >= 0);
+		const diagnostics = failure.indexOf('Write-LaunchDiagnostics $proc $seconds $stagingSeconds');
+		const stop = failure.indexOf('Stop-LaunchedApp $proc');
+		const error = failure.findIndex((line) => line.startsWith('Write-Error '));
+		if (
+			saves.length !== 2 ||
+			diagnostics < 0 ||
+			stop < 0 ||
+			error < 0 ||
+			saves[0] >= diagnostics ||
+			saves[1] <= stop ||
+			saves[1] >= error
+		) {
+			problems.push(
+				'Windows failure receipt must precede diagnostics and retain observations before its original error'
+			);
+		}
+		for (const statement of [
+			"$startupEvidence.failures = @('startup_guard_failed')",
+			"$startupEvidence.failure_phase = 'verdict'",
+			'$startupEvidence.marker_seen = $markerSeen',
+			'$startupEvidence.crashed_early = $crashedEarly',
+			'$startupEvidence.native_exit_code = $exitCode',
+			'$startupEvidence.elapsed_seconds = [math]::Round($seconds, 3)',
+			'$startupEvidence.staging_seconds = $stagingSeconds',
+			'$startupEvidence.dialog_seen = $dialogSeen'
+		]) {
+			if (!failure.includes(statement))
+				problems.push(`Windows failed startup evidence lost ${statement}`);
+		}
+	} catch (error) {
+		problems.push(`Windows startup failure evidence is absent or ambiguous: ${error.message}`);
+	}
+	return problems;
+}
+
+let windowsLaunchUpload = null;
+try {
+	const found = pipeline.findStep('Upload mandatory launch evidence');
+	if (found.file !== WINDOWS_BOX || found.job !== 'launch-windows') {
+		errors.push('Windows mandatory launch evidence must belong to its actual launch job');
+	} else windowsLaunchUpload = found.body;
+} catch (error) {
+	errors.push(`Windows mandatory launch evidence is missing: ${error.message}`);
+}
+if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
+	errors.push(...windowsFailureEvidenceProblems(windowsSmokeStep, windowsLaunchUpload));
+	for (const [name, before, after, target] of [
+		['implicit success upload', '        if: always()\n', '', 'upload'],
+		['conditional failure upload', '        if: always()\n', '        if: failure()\n', 'upload'],
+		['conditional success upload', '        if: always()\n', '        if: success()\n', 'upload'],
+		[
+			'forgiven evidence publication',
+			'        uses: actions/upload-artifact@v4',
+			'        continue-on-error: true\n        uses: actions/upload-artifact@v4',
+			'upload'
+		],
+		[
+			'unowned raw payload upload',
+			'${{ runner.temp }}/evidence.json',
+			'${{ runner.temp }}/*',
+			'upload'
+		],
+		[
+			'success-only evidence',
+			'          Save-StartupFailureEvidence\n\n          # Compiled',
+			'\n          # Compiled',
+			'smoke'
+		],
+		[
+			'positive incomplete receipt',
+			"failures = @('startup_incomplete')",
+			'failures = @()',
+			'smoke'
+		],
+		['lost failure publication', '              Save-StartupFailureEvidence\n', '', 'smoke'],
+		[
+			'guessed parent qualification',
+			'$startupEvidence.native_parent.identity_qualified = $launchOwner.identity_qualified',
+			'$startupEvidence.native_parent.identity_qualified = $true',
+			'smoke'
+		],
+		[
+			'lost native exit',
+			'$startupEvidence.native_exit_code = $exitCode',
+			'$startupEvidence.native_exit_code = 0',
+			'smoke'
+		],
+		[
+			'copied foreign executable',
+			'$startupEvidence.native_parent.observed_executable = $launchOwner.expected_executable',
+			'$startupEvidence.native_parent.observed_executable = $actualLaunchPath',
+			'smoke'
+		],
+		['private argv receipt', 'pid = $receipt.pid', 'pid = $receipt.CommandLine', 'smoke'],
+		[
+			'private publication exception',
+			"Write-Warning 'Startup failure evidence publication failed (detail omitted).'",
+			'Write-Warning $_.Exception.Message',
+			'smoke'
+		],
+		[
+			'claimed readiness',
+			'readiness_acknowledged = $false',
+			'readiness_acknowledged = $true',
+			'smoke'
+		]
+	]) {
+		const original = target === 'upload' ? windowsLaunchUpload : windowsSmokeStep;
+		const changed = original.replaceAll(before, after);
+		const problems =
+			target === 'upload'
+				? windowsFailureEvidenceProblems(windowsSmokeStep, changed)
+				: windowsFailureEvidenceProblems(changed, windowsLaunchUpload);
+		if (changed === original || problems.length === 0)
+			errors.push(`Windows failure-artifact guard missed ${name}`);
+	}
+}
+
+// The actual aggregate must reject incomplete/failed receipts even if a caller
+// incorrectly supplies green jobs or observes a same-executable descendant.
+{
+	const assert = require('node:assert/strict');
+	const desktop = require('./desktop-ci-evidence.cjs');
+	const needs = Object.fromEntries(
+		['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'].map((name) => [
+			name,
+			{ result: 'success' }
+		])
+	);
+	const sha = 'a'.repeat(40);
+	const positive = {
+		schema_version: 1,
+		platform: 'windows',
+		sha,
+		runner: 'windows-latest',
+		scenario: 'startup',
+		package_sha256: 'b'.repeat(64),
+		marker_seen: true,
+		crashed_early: false,
+		marker_seconds: 1,
+		failures: [],
+		native_startup: {
+			nonce: 'c'.repeat(32),
+			pid: 42,
+			executable: 'C:\\private\\ErgoptiPlus.exe',
+			launched_sha256: 'b'.repeat(64),
+			exit_code: 0,
+			log_files: 1,
+			logged_errors: [],
+			receipt: {
+				schema_version: 1,
+				nonce: 'c'.repeat(32),
+				pid: 42,
+				executable: 'C:\\private\\ErgoptiPlus.exe',
+				compiled: true,
+				build_commit: sha,
+				bundle_identity: '0.0.0-dev\n' + sha,
+				phase: 'ready',
+				driver_ready: true,
+				menu_ready: true,
+				logs_flushed: true
+			}
+		}
+	};
+	const verify = (record, jobs = needs) =>
+		desktop.verify({
+			platform: 'windows',
+			needs: jobs,
+			evidence: [record],
+			sha,
+			scenarios: [],
+			release: false
+		});
+	assert.doesNotThrow(() => verify(positive), 'the complete successful receipt still passes');
+	const missingReadiness = structuredClone(positive);
+	delete missingReadiness.native_startup;
+	assert.throws(
+		() => verify(missingReadiness),
+		/Missing native Windows readiness evidence/,
+		'an extraction marker cannot replace the native readiness receipt'
+	);
+	for (const record of [
+		{
+			...positive,
+			marker_seen: false,
+			crashed_early: null,
+			failures: ['startup_incomplete'],
+			failure_phase: 'probe_setup',
+			native_exit_code: null
+		},
+		{
+			...positive,
+			marker_seen: false,
+			crashed_early: true,
+			failures: ['startup_guard_failed'],
+			native_exit_code: 0,
+			native_descendant_observations: [
+				{ pid: 2, parent_pid: 1, lineage_qualified: true, same_executable: true }
+			],
+			readiness_acknowledged: false
+		},
+		{ ...positive, marker_seen: false, dialog_seen: true, failures: ['startup_guard_failed'] },
+		{ ...positive, marker_seen: false, elapsed_seconds: 120, failures: ['startup_guard_failed'] },
+		{
+			...positive,
+			marker_seen: false,
+			crashed_early: true,
+			failures: [],
+			native_descendant_observations: [{ lineage_qualified: true, same_executable: true }],
+			readiness_acknowledged: true
+		},
+		{ ...positive, package_sha256: null, marker_seen: false, failures: ['startup_incomplete'] }
+	])
+		assert.throws(
+			() => verify(record),
+			'actual mandatory aggregate refuses failed/incomplete native observations'
+		);
+	assert.throws(
+		() => verify(positive, { ...needs, 'launch-windows': { result: 'failure' } }),
+		/launch-windows did not succeed/,
+		'an artifact cannot override the original failed launch job'
+	);
+}
+
+// CI_ARCHIVE_WORKFLOW_TESTS_BEGIN
+{
+	const assert = require('node:assert/strict');
+	const ownerPipeline = require('./ci-pipeline.cjs');
+	/** Require the consumed CI policy, separate source authority and installed evidence. */
+	function ciArchiveWorkflowProblems(text) {
+		const problems = [];
+		const jobs = ownerPipeline.jobsOfText(text);
+		const job = (id) => {
+			const matches = jobs.filter((candidate) => candidate.id === id);
+			assert.equal(matches.length, 1);
+			return matches[0].body;
+		};
+		const packageJob = job('package-macos'),
+			launchJob = job('launch');
+		const step = (body, name) => ownerPipeline.step(body, name);
+		const script = (body, name) => ownerPipeline.runOf(step(body, name)).join('\n');
+		const packageSteps = ownerPipeline.steps(packageJob).map((candidate) => candidate.name);
+		const ordered = [
+			'Build ErgoptiPlus.app',
+			'Record signed CI archive source',
+			'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
+			'Upload the independent CI archive source',
+			'Upload the package'
+		];
+		if (
+			ordered.some(
+				(name, index) =>
+					packageSteps.indexOf(name) < 0 ||
+					(index > 0 && packageSteps.indexOf(name) <= packageSteps.indexOf(ordered[index - 1]))
+			)
+		)
+			problems.push('source_order');
+		const source = step(packageJob, 'Record signed CI archive source');
+		if (
+			ownerPipeline.stepField(source, 'if') !== null ||
+			ownerPipeline.stepField(source, 'continue-on-error') !== null ||
+			!script(packageJob, 'Record signed CI archive source')
+				.replace(/\s+/g, ' ')
+				.includes('--ci-receipt "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"')
+		)
+			problems.push('source_owner');
+		const smoke = script(packageJob, 'Smoke test built ErgoptiPlus.app (crash-on-launch guard)');
+		if (
+			!smoke.includes('--ci-install "$PWD/build/macos" /Applications') ||
+			smoke.includes('ditto -x -k') ||
+			!smoke.includes('test ! -e /Applications/ErgoptiPlus.app')
+		)
+			problems.push('package_install');
+		const sourceUpload = step(packageJob, 'Upload the independent CI archive source');
+		if (
+			!sourceUpload.includes('name: ci-macos-archive-source') ||
+			!sourceUpload.includes('if-no-files-found: error') ||
+			!sourceUpload.includes('path: build/macos/ErgoptiPlus.app.ci-receipt.json') ||
+			step(packageJob, 'Upload the package').includes('.ci-receipt.json')
+		)
+			problems.push('ci_only_authority');
+		const sourceDownload = step(launchJob, 'Download the independent CI archive source');
+		if (
+			!sourceDownload.includes('name: ci-macos-archive-source') ||
+			!sourceDownload.includes('path: ${{ runner.temp }}/package')
+		)
+			problems.push('source_download');
+		const launchSteps = ownerPipeline.steps(launchJob).map((candidate) => candidate.name);
+		if (
+			launchSteps.indexOf('Download the independent CI archive source') >=
+			launchSteps.indexOf('Install the package the way a user does')
+		)
+			problems.push('download_order');
+		const install = script(launchJob, 'Install the package the way a user does');
+		if (
+			!install.includes('--ci-install "$RUNNER_TEMP/package" /Applications "$stamp"') ||
+			install.includes('ditto -x -k') ||
+			!install.includes(
+				"process.stdout.write('MACOS_INSTALL_ARCHIVE=' + receipt.archive + '\\n')"
+			) ||
+			!install.includes('test ! -e /Applications/ErgoptiPlus.app')
+		)
+			problems.push('launch_install');
+		const evidence = script(launchJob, 'Record mandatory launch evidence');
+		if (!evidence.includes('"$MACOS_INSTALL_ARCHIVE"') || evidence.includes('ErgoptiPlus.app.zip'))
+			problems.push('installed_evidence');
+		return problems;
+	}
+	const workflow = ownerPipeline.file('.github/workflows/ci-macos.yml');
+	assert.deepEqual(ciArchiveWorkflowProblems(workflow), []);
+	const faults = [
+		[
+			'source_owner',
+			'"$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"',
+			'"$PWD/build/macos/Foreign.app" "$PWD/build/macos"'
+		],
+		[
+			'package_install',
+			'--ci-install "$PWD/build/macos" /Applications',
+			'ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications'
+		],
+		[
+			'launch_install',
+			'--ci-install "$RUNNER_TEMP/package" /Applications "$stamp"',
+			'ditto -x -k "$zip" /Applications'
+		],
+		[
+			'installed_evidence',
+			'"$MACOS_INSTALL_ARCHIVE"',
+			'"$RUNNER_TEMP/package/ErgoptiPlus.app.zip"'
+		],
+		[
+			'source_download',
+			'name: ci-macos-archive-source\n          path: ${{ runner.temp }}/package',
+			'name: foreign-source\n          path: ${{ runner.temp }}/package'
+		],
+		[
+			'ci_only_authority',
+			'path: build/macos/ErgoptiPlus.app.ci-receipt.json',
+			'path: build/macos/foreign.json'
+		]
+	];
+	for (const [expected, before, after] of faults) {
+		assert.ok(workflow.includes(before), expected + ' mutation must change the actual source');
+		assert.ok(
+			ciArchiveWorkflowProblems(workflow.replace(before, after)).includes(expected),
+			expected
+		);
+	}
+	console.log(`CI installed-archive workflow cases: ${faults.length + 1}`);
+}
+// CI_ARCHIVE_WORKFLOW_TESTS_END
+
+// CI_ARCHIVE_OWNED_TESTS_BEGIN
+{
+	const assert = require('node:assert/strict');
+	const os = require('node:os');
+	const owner = require('../build/macos-release-archives.cjs');
+	const defaults = JSON.parse(
+		fs.readFileSync(require('../lib/paths.cjs').shared('modules/updater/defaults.json'), 'utf8')
+	);
+	const bindings = owner.resolveArchives(defaults);
+	const basename = bindings[0].name.slice(0, -'.tar.xz'.length);
+	let cases = 0;
+	const fixture = (body) => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-archive-owned-'));
+		try {
+			const app = path.join(root, basename),
+				input = path.join(root, 'archives'),
+				destination = path.join(root, 'installed');
+			for (const dir of [app, input, destination]) fs.mkdirSync(dir);
+			fs.writeFileSync(path.join(app, 'independent.txt'), 'Independent source bytes: café\n', {
+				mode: 0o751
+			});
+			fs.symlinkSync('independent.txt', path.join(app, 'relative-link'));
+			for (const item of bindings)
+				fs.writeFileSync(path.join(input, item.name), Buffer.from('source-' + item.format));
+			const calls = [];
+			let fault;
+			const execute = (executable, args) => {
+				calls.push({ executable, args: [...args] });
+				if (fault) {
+					const reason = fault(executable, args);
+					if (reason) throw Error(reason);
+				}
+				if (args[0] === '-d')
+					return { stdout: '', stderr: '# designated => identifier "independent-source"\n' };
+				if (executable.endsWith('/tar') || executable.endsWith('/ditto')) {
+					const target = args.at(-1);
+					fs.cpSync(app, path.join(target, basename), { recursive: true, verbatimSymlinks: true });
+				}
+				return { stdout: '', stderr: '' };
+			};
+			const options = { defaults, execute };
+			const context = {
+				app,
+				input,
+				destination,
+				calls,
+				options,
+				setFault: (value) => {
+					fault = value;
+				},
+				receipt: path.join(input, basename + '.ci-receipt.json')
+			};
+			body(context);
+			cases++;
+		} finally {
+			fs.rmSync(root, { recursive: true });
+		}
+	};
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const receipt = JSON.parse(fs.readFileSync(c.receipt));
+		assert.equal(receipt.requirement, 'identifier "independent-source"');
+		assert.equal(c.calls[0].executable, '/usr/bin/codesign');
+		assert.deepEqual(c.calls[0].args.slice(0, 3), ['--verify', '--deep', '--strict']);
+		const result = owner.installCIArchive(c.input, c.destination, c.options);
+		assert.equal(
+			result.format,
+			'tar.xz',
+			'the actual CI owner selects XZ instead of the old ZIP install'
+		);
+		assert.equal(path.basename(result.archive), bindings[0].name);
+		assert.equal(fs.readFileSync(result.archive, 'utf8'), 'source-tar.xz');
+		assert.equal(
+			fs.readFileSync(path.join(c.destination, basename, 'independent.txt'), 'utf8'),
+			'Independent source bytes: café\n'
+		);
+		assert.equal(
+			fs.readlinkSync(path.join(c.destination, basename, 'relative-link')),
+			'independent.txt'
+		);
+		const verifier = c.calls.find((call) => call.args.includes('-R'));
+		assert.ok(verifier, 'the restored app must use the independent signed source requirement');
+		assert.equal(verifier.args[verifier.args.indexOf('-R') + 1], '=' + receipt.requirement);
+		assert.equal(c.calls.filter((call) => call.executable.endsWith('/ditto')).length, 0);
+	});
+	fixture((c) => {
+		fs.unlinkSync(path.join(c.input, bindings[0].name));
+		owner.createCIReceipt(c.app, c.input, c.options);
+		assert.equal(owner.installCIArchive(c.input, c.destination, c.options).format, 'zip');
+		assert.equal(c.calls.filter((call) => call.executable.endsWith('/tar')).length, 0);
+	});
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const result = owner.installCIArchive(c.input, c.destination, {
+			...c.options,
+			quarantine: 'controlled-quarantine'
+		});
+		const stamp = c.calls.find((call) => call.executable.endsWith('/xattr'));
+		const extract = c.calls.find((call) => call.executable.endsWith('/tar'));
+		assert.ok(stamp);
+		assert.deepEqual(stamp.args, [
+			'-w',
+			'com.apple.quarantine',
+			'controlled-quarantine',
+			result.archive
+		]);
+		assert.ok(c.calls.indexOf(stamp) < c.calls.indexOf(extract));
+	});
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const before = c.calls.length;
+		assert.throws(() =>
+			owner.installCIArchive(c.input, c.destination, { ...c.options, quarantine: 'invalid\nstamp' })
+		);
+		assert.equal(c.calls.length, before);
+		assert.equal(
+			fs.readdirSync(c.input).some((name) => name.startsWith('.ci-install-')),
+			false
+		);
+	});
+	for (const kind of ['empty', 'directory', 'symlink', 'digest', 'unrecorded'])
+		fixture((c) => {
+			owner.createCIReceipt(c.app, c.input, c.options);
+			const preferred = path.join(c.input, bindings[0].name);
+			if (kind === 'empty') fs.writeFileSync(preferred, '');
+			if (kind === 'directory' || kind === 'symlink') fs.unlinkSync(preferred);
+			if (kind === 'directory') fs.mkdirSync(preferred);
+			if (kind === 'symlink') fs.symlinkSync(path.join(c.input, bindings[1].name), preferred);
+			if (kind === 'digest') fs.writeFileSync(preferred, 'changed');
+			if (kind === 'unrecorded') {
+				const receipt = JSON.parse(fs.readFileSync(c.receipt));
+				receipt.archives.shift();
+				fs.writeFileSync(c.receipt, JSON.stringify(receipt));
+			}
+			const before = c.calls.length;
+			assert.throws(() => owner.installCIArchive(c.input, c.destination, c.options));
+			assert.equal(
+				c.calls.length,
+				before,
+				'present refused XZ cannot acquire native extraction or fallback'
+			);
+			assert.equal(fs.existsSync(path.join(c.destination, basename)), false);
+		});
+	for (const kind of [
+		'extract',
+		'signature',
+		'readback',
+		'verified-bundle-race',
+		'payload-race',
+		'destination-race'
+	])
+		fixture((c) => {
+			owner.createCIReceipt(c.app, c.input, c.options);
+			let extracts = 0;
+			c.setFault((executable, args) => {
+				if (executable.endsWith('/tar')) {
+					extracts++;
+					if (kind === 'extract') return 'native extraction refused';
+				}
+				if (args.includes('-R')) {
+					if (kind === 'signature') return 'native signing refused';
+					if (kind === 'verified-bundle-race')
+						fs.writeFileSync(
+							path.join(args.at(-1), 'independent.txt'),
+							'foreign after native verify'
+						);
+					if (kind === 'readback') fs.writeFileSync(path.join(c.app, 'independent.txt'), 'changed');
+					if (kind === 'payload-race')
+						fs.writeFileSync(
+							c.calls.find((call) => call.executable.endsWith('/tar')).args[1],
+							'changed after extraction'
+						);
+					if (kind === 'destination-race') fs.mkdirSync(path.join(c.destination, basename));
+				}
+				return null;
+			});
+			if (kind === 'readback')
+				c.setFault((executable) => {
+					if (executable.endsWith('/tar')) {
+						extracts++;
+						fs.writeFileSync(path.join(c.app, 'independent.txt'), 'changed');
+					}
+					return null;
+				});
+			assert.throws(() => owner.installCIArchive(c.input, c.destination, c.options));
+			assert.equal(extracts, 1);
+			assert.equal(c.calls.filter((call) => call.executable.endsWith('/ditto')).length, 0);
+			assert.equal(
+				fs.readdirSync(c.input).some((name) => name.startsWith('.ci-install-')),
+				false
+			);
+			assert.equal(
+				fs.existsSync(path.join(c.destination, basename)),
+				kind === 'destination-race',
+				'an independently acquired destination survives the refused install'
+			);
+		});
+	for (const kind of [
+		'missing',
+		'malformed',
+		'foreign-bundle',
+		'unknown-fields',
+		'duplicate-binding'
+	])
+		fixture((c) => {
+			owner.createCIReceipt(c.app, c.input, c.options);
+			const receipt = JSON.parse(fs.readFileSync(c.receipt));
+			if (kind === 'missing') fs.unlinkSync(c.receipt);
+			else {
+				if (kind === 'foreign-bundle') receipt.bundle = 'Foreign.app';
+				if (kind === 'unknown-fields') receipt.extra = true;
+				if (kind === 'duplicate-binding') receipt.archives.push(receipt.archives[0]);
+				fs.writeFileSync(c.receipt, kind === 'malformed' ? '[' : JSON.stringify(receipt));
+			}
+			const before = c.calls.length;
+			assert.throws(() => owner.installCIArchive(c.input, c.destination, c.options));
+			assert.equal(c.calls.length, before);
+		});
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const originalOpen = fs.openSync;
+		let ownedRefusals = 0;
+		let refused = false;
+		try {
+			fs.openSync = (filename, ...args) => {
+				if (filename === path.join(c.input, bindings[0].name)) {
+					ownedRefusals++;
+					const error = Error('controlled read refusal');
+					error.code = 'EACCES';
+					throw error;
+				}
+				return originalOpen(filename, ...args);
+			};
+			try {
+				owner.installCIArchive(c.input, c.destination, c.options);
+			} catch {
+				refused = true;
+			}
+		} finally {
+			fs.openSync = originalOpen;
+		}
+		assert.equal(refused, true);
+		assert.equal(ownedRefusals, 1);
+		assert.equal(
+			c.calls.filter(
+				(call) => call.executable.endsWith('/tar') || call.executable.endsWith('/ditto')
+			).length,
+			0
+		);
+		assert.equal(
+			fs.readdirSync(c.input).some((name) => name.startsWith('.ci-install-')),
+			false
+		);
+	});
+	fixture((c) => {
+		c.setFault(() => 'independent source signature refused');
+		assert.throws(() => owner.createCIReceipt(c.app, c.input, c.options));
+		assert.equal(fs.existsSync(c.receipt), false);
+	});
+	console.log(`CI archive native-owner portable cases: ${cases}`);
+}
+// CI_ARCHIVE_OWNED_TESTS_END
 
 if (errors.length > 0) {
 	console.error('[ERROR] Release packaging workflow is unsafe:');

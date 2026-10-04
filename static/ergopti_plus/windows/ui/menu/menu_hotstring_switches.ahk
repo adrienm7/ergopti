@@ -58,6 +58,22 @@ _HS_ScopeAllOn(Gates, Paths) {
 ; ===========================
 ; ===========================
 
+/**
+ * Builds the declared file command through its existing native opening owner.
+ * @param {String} TomlPath Captured category source.
+ * @param {Func|Integer} OpenFn Native opening callback, or 0 for Run.
+ * @returns {Map} Shared command provider data.
+ */
+_HS_CategoryFileRow(TomlPath, OpenFn := 0) {
+	if OpenFn is Integer && OpenFn == 0
+		OpenFn := _MakeOpenFileFn(TomlPath)
+	if !HasMethod(OpenFn, "Call")
+		return false
+	return MenuRenderer_CommandRow("hotstring_file_commands", "hotstring_file_open",
+		Map("hotstring_file_open", OpenFn),
+		Map("hotstring_file_ready", (*) => FileExist(TomlPath) != ""))
+}
+
 ; The « all sections » checkbox of one scope. A click switches everything to the
 ; other side through ``Apply(Bool)``, the scope's batched writer. Every write
 ; rebuilds the tray, so the state captured here is the one the click acts on.
@@ -83,7 +99,7 @@ _HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeAppl
 		"hotstring_category_disable_all", (*) => Apply([V1Cat], false))
 	Providers := Map(
 		"hotstring_category_file", (*) => FileExist(TomlPath)
-			? [Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath))] : [],
+			? [_HS_CategoryFileRow(TomlPath)] : [],
 		"hotstring_category_sections", (*) => Sections)
 	return MenuRenderer_Build("hotstring_category_menu", "Hotstrings", "", "", Providers, Commands, "",
 		IsSet(TargetMenu) ? TargetMenu : unset)

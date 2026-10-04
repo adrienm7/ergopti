@@ -91,7 +91,13 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
 			package.loaded["infra.i18n"] = {get = function(key) return key end}
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.manifest_menu"] = {render_rows = function(rows) return rows end}
+			package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+				platform = "hs",
+				manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+				json_decode = function(raw) return require("json").decode(raw) end,
+				i18n = {get = function(key) return key end, section = function(key) return key end},
+				logger = package.loaded["infra.logger"],
+			}))
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = {llm_debounce = 0.2},
 			}
@@ -106,13 +112,13 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 				settings_mgr = {},
 			})
 			helpers.assert_true(#rows > 0, "the trigger submenu must still draw its rows")
-			helpers.assert_eq(rows[1].label, "menu.llm.debounce_label",
+			helpers.assert_eq(rows[1].title, "menu.llm.debounce_label",
 				"the debounce row now opens the trigger submenu")
 			for _, row in ipairs(rows) do
-				helpers.assert_true(row.label ~= "menu.llm.trigger_shortcut_label",
+				helpers.assert_true(row.title ~= "menu.llm.trigger_shortcut_label",
 					"no row may prompt for a dedicated trigger shortcut")
-				if type(row.action) == "function" and row.label ~= "menu.llm.debounce_label" then
-					row.action()
+				if type(row.fn) == "function" and row.title ~= "menu.llm.debounce_label" then
+					row.fn()
 				end
 			end
 			helpers.assert_eq(prompts, 0, "no row may open the shortcut prompt")

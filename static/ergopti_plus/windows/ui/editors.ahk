@@ -377,13 +377,28 @@ MagicKeySourceMenuRows() {
 	for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
 		if (Code == Automatic)
 			continue
-		Items.Push(Map("label", _MagicKeySourceLabel(Code, Keycodes, Hkl),
-			"checked", Current == Code,
+		Reason := MagicKeySourceChoiceReason(Code)
+		Label := _MagicKeySourceLabel(Code, Keycodes, Hkl)
+		if Reason != ""
+			Label .= " — " . t(Reason)
+		Items.Push(Map("label", Label, "checked", Current == Code, "disabled", Reason != "",
 			"action", ((Chosen) => (*) => ModifyMagicKeySource(Chosen))(Code)))
 	}
 	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
 		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
 	return [Map("label", t("menu.layout.magic_key_source") . " : " . Shown, "items", Items)]
+}
+
+; The refusal reason of a candidate already owned by a configured tap action.
+; @param {String} Value Candidate or automatic source.
+; @returns {String} Locale reason key, or empty when there is no conflict.
+MagicKeySourceChoiceReason(Value) {
+	if Value == ManifestDefaultFor("hotstrings.magic_key_source")
+		return ""
+	Scan := LayoutRegistry_KeyScan(Value, LayoutRegistry_Keycodes())
+	if TapKeyAssignedToScan(Integer("0x" . SubStr(Scan, 3))) != ""
+		return "menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment"
+	return ""
 }
 
 ; What the OS layout types on a candidate key, then its KeyboardEvent.code, which
@@ -473,6 +488,14 @@ ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 		Critical("Off")
 		try return ModifyMagicKeySource(Value, WriterFn, NotifyFn, ReloadFn)
 		finally Critical(InheritedCritical)
+	}
+	Reason := MagicKeySourceChoiceReason(Value)
+	if Reason != "" {
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Reason)
+		else
+			Ui_MsgBox(t(Reason), t("dialog.magic_key_source.title"), "Icon!")
+		return false
 	}
 	if !_EditorWriteToml(ConfigurationFile, "the physical magic key",
 			_EditorBuildMagicKeySourcePlan.Bind(Value), WriterFn, NotifyFn)

@@ -240,6 +240,31 @@ function validate(features) {
 		if (f.cleared !== undefined && ![false, 'none', ''].includes(f.cleared)) {
 			throw new Error(`feature ${f.path}: "cleared" must be an off value (false, "none" or "")`);
 		}
+		if (f.choice_values !== undefined) {
+			if (
+				f.type !== 'number' ||
+				!Array.isArray(f.choice_values) ||
+				f.choice_values.length < 2 ||
+				f.choice_values.some(
+					(value, index) =>
+						!Number.isSafeInteger(value) || (index > 0 && value !== f.choice_values[index - 1] + 1)
+				)
+			) {
+				throw new Error(
+					`feature ${f.path}: choice_values must be an ordered contiguous integer catalogue on a number feature`
+				);
+			}
+			for (const platform of f.platforms) {
+				if (
+					!f.choice_values.includes(resolveDefault(f, platform)) ||
+					!f.choice_values.includes(resolveRecommended(f, platform))
+				) {
+					throw new Error(
+						`feature ${f.path}: numeric choices must contain default and recommended values`
+					);
+				}
+			}
+		}
 		if (f.type === 'enum' && (!f.enum_values || f.enum_values.length === 0)) {
 			throw new Error(`feature ${f.path} has type=enum but no enum_values`);
 		}
@@ -373,6 +398,7 @@ function renderAhkManifest(manifest, sections, features) {
 			input_altering: f.input_altering
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
+		if (f.choice_values) entry.choice_values = f.choice_values;
 		if (f.superseded_reason_key) entry.superseded_reason_key = f.superseded_reason_key;
 		if (f.cleared !== undefined) entry.cleared = f.cleared;
 		return `        ${ahkLiteral(entry)}`;
@@ -481,6 +507,7 @@ function renderLuaManifest(manifest, sections, features, platform) {
 			input_altering: f.input_altering
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
+		if (f.choice_values) entry.choice_values = f.choice_values;
 		if (f.cleared !== undefined) entry.cleared = f.cleared;
 		// Emit each feature compactly: opening brace, all fields on one line, then
 		// the closing brace. ~3 lines/feature instead of ~9, while keeping the

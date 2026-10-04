@@ -22,6 +22,133 @@ local existing_config = support.existing_config
 local with_fixture = support.with_fixture
 
 helpers.describe("Karabiner generator historical ownership", function()
+	for _, reference in ipairs({ "tap", "hold", "chord", "combo_tap", "combo_hold", "none" }) do
+		for _, profile_index in ipairs({ 1, 2 }) do
+			helpers.it(string.format(
+				"refuses a complete historical %s graph referencing an ambiguous action in profile %d",
+				reference, profile_index), function()
+				with_fixture(function(fixture)
+					fixture.install_legacy_static_fixtures()
+					local old_state, actions, keys = legacy_layout_scenario("q", "logical_escape")
+					-- Released matchers use placeholders for layout-dependent output.
+					-- This fixture emits an actual native q graph instead, so the
+					-- positive control proves it is genuinely migratable.
+					for _, action in ipairs(actions) do
+						action.logical_char = nil
+						action.karabiner_modifiers = nil
+					end
+					local combos = {}
+					if reference == "hold" then
+						old_state.tap_hold_config.left_shift = { tap = "none", hold = "logical_escape" }
+					elseif reference == "none" then
+						old_state.tap_hold_config.left_shift.hold = "none"
+					elseif reference == "chord" or reference == "combo_tap" or reference == "combo_hold" then
+						combos = {{
+							id = "modifier_pair", label = "Modifier pair",
+							from = { simultaneous = {{ key_code = "a" }, { key_code = "b" }},
+								simultaneous_options = { key_down_order = "strict" } },
+						}}
+						old_state.mod_combos_config.modifier_pair = {
+							tap = "none", hold = "none", combo = "none",
+						}
+						local slot = reference == "chord" and "combo"
+							or reference == "combo_tap" and "tap" or "hold"
+						old_state.mod_combos_config.modifier_pair[slot] = "logical_escape"
+					end
+					local generated, detail, legacy, context = fixture.build_with(old_state, actions, keys, combos)
+					helpers.assert_not_nil(generated, detail)
+					local proof_context = deep_copy(context)
+					for name, anchor in pairs(context.static_anchors) do proof_context[name] = anchor end
+					local historical = assert(support.LegacyReleaseSchemas.build_normal_candidate(
+						"v0.0.0-dev.75-v0.0.0-dev.107", old_state, false, proof_context))
+					-- This is a complete immutable-release graph, not a fabricated
+					-- description. The new catalogue adds a different native output
+					-- under its referenced label; the exact-safe alias stays present.
+					local existing = existing_config({ personal_rule("Selected personal rule") })
+					existing.profiles[profile_index].complex_modifications.rules = historical
+					existing.profiles[profile_index].complex_modifications.parameters = {
+						["basic.to_if_alone_timeout_milliseconds"] = 200,
+						["basic.simultaneous_threshold_milliseconds"] = 100,
+					}
+					local path = "/merge/referenced-ambiguous-action.json"
+					local original = _G.hs.json.encode(existing)
+					fixture.file_data[path] = original
+					local proven, proven_error = fixture.Generator.merge_into_existing_config(
+						generated, path, legacy, context)
+					helpers.assert_not_nil(proven, "the independent complete graph must first prove ownership: "
+						.. tostring(proven_error))
+					helpers.assert_eq(fixture.file_data[path], original, "classification does not publish")
+					context.available_actions[#context.available_actions + 1] = reference == "none"
+						and { id = "none_alias", label = "None", karabiner_to = {} }
+						or { id = "different_output", label = "Logical escape",
+							karabiner_to = {{ key_code = "f17" }} }
+					-- The reserved none action never coalesces with an ordinary
+					-- empty-output alias, even when all other fields agree.
+					local merged, merge_error, _, _, refusal = fixture.Generator.merge_into_existing_config(
+						generated, path, legacy, context)
+					helpers.assert_nil(merged, "neither an active nor inactive ambiguous legacy graph is owned")
+					helpers.assert_true(merge_error:find("ambiguous legacy", 1, true) ~= nil, merge_error)
+					helpers.assert_eq(refusal.kind, fixture.Generator.REFUSAL_LEGACY_CONFLICTS)
+					helpers.assert_true(refusal.count > 0, "existing exact/private signatures still fence publication")
+					local deployed = fixture.Generator.merge_and_deploy_config(generated, path, legacy, context)
+					helpers.assert_eq(deployed, false, "publication must obey the same full-profile refusal")
+					helpers.assert_eq(#fixture.file_writes, 0, "no WAL publication occurs on an ambiguous reference")
+					helpers.assert_eq(fixture.file_data[path], original, "all source bytes remain unchanged")
+				end)
+			end)
+		end
+	end
+
+	helpers.it("keeps an unmarked personal chord despite an ambiguous descriptive action label", function()
+		with_fixture(function(fixture)
+			fixture.install_legacy_static_fixtures()
+			local generated, detail, legacy, context = fixture.build(TOKEN)
+			helpers.assert_not_nil(generated, detail)
+			context.available_actions[#context.available_actions + 1] = {
+				id = "first", label = "Shared description", karabiner_to = {{ key_code = "tab" }},
+			}
+			context.available_actions[#context.available_actions + 1] = {
+				id = "second", label = "Shared description", karabiner_to = {{ key_code = "f17" }},
+			}
+			context.mod_combos = {{
+				id = "modifier_pair", label = "Modifier pair",
+				from = { simultaneous = {{ key_code = "a" }, { key_code = "b" }} },
+			}}
+			local personal = personal_rule("Modifier pair: Shared description [chord]")
+			local path = "/merge/personal-unmarked-chord.json"
+			fixture.file_data[path] = _G.hs.json.encode(existing_config({ personal }))
+			local merged, merge_error = fixture.Generator.merge_into_existing_config(generated, path, legacy, context)
+			helpers.assert_not_nil(merged, merge_error)
+			helpers.assert_true(helpers.deep_equal(merged.profiles[2].complex_modifications.rules[1], personal),
+				"description alone must never claim or erase a user's marker-free chord")
+		end)
+	end)
+
+	for _, invalid in ipairs({ "action_label", "action_id", "action_array", "key_label", "combo_label", "anchors" }) do
+		helpers.it("rejects malformed legacy context before unrelated personal publication: " .. invalid, function()
+			with_fixture(function(fixture)
+				fixture.install_legacy_static_fixtures()
+				local generated, detail, legacy, context = fixture.build(TOKEN)
+				helpers.assert_not_nil(generated, detail)
+				if invalid == "action_label" then context.available_actions[1].label = ""
+				elseif invalid == "action_id" then
+					context.available_actions[2] = deep_copy(context.available_actions[1])
+				elseif invalid == "action_array" then context.available_actions[3] = deep_copy(context.available_actions[1])
+				elseif invalid == "anchors" then context.static_anchors.layer_keys = nil
+				elseif invalid == "key_label" then
+					context.tap_hold_keys = {{id="first",label="Same"},{id="second",label="Same"}}
+				else context.mod_combos = {{id="first",label="Same"},{id="second",label="Same"}} end
+				local path = "/merge/invalid-context-personal.json"
+				local original = _G.hs.json.encode(existing_config({ personal_rule("User rule") }))
+				fixture.file_data[path] = original
+				local merged = fixture.Generator.merge_into_existing_config(generated, path, legacy, context)
+				helpers.assert_nil(merged, "only unused descriptive action ambiguity may be deferred")
+				helpers.assert_eq(fixture.file_data[path], original)
+				helpers.assert_eq(#fixture.file_writes, 0)
+			end)
+		end)
+	end
+
 	helpers.it("migrates the immutable v0.0.0-dev.74 chord graph without rebuilding it through today's generator", function()
 		with_fixture(function(fixture)
 			local Generator = fixture.Generator

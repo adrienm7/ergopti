@@ -45,6 +45,11 @@ M.HAS_ASYNC = luv ~= nil
 -- =========================================
 
 local _active = {}
+-- Logical activity preserves the historical boolean port. Owned requests retain
+-- a separate exact operation until process exit AND every native close callback.
+local _owned = {}
+local settle_owned
+local retry_owned_cleanup
 
 --- Resolves a stable request owner without allowing an empty table key.
 --- @param owner any
@@ -55,8 +60,26 @@ end
 
 --- Closes a libuv handle once.
 --- @param handle any
-local function close_handle(handle)
-	if not handle or not luv then return end
+local function close_handle(handle, request)
+	if not handle or not luv then return false end
+	if request and request.operation then
+		local receipt = request.handles[handle]
+		if not receipt then return false end
+		if receipt.state == "closed" or receipt.state == "closing" then return true end
+		local ok_closing, closing = pcall(luv.is_closing, handle)
+		-- Another actor's scheduled close is not our closure acknowledgment.
+		if not ok_closing or closing then return false end
+		receipt.state = "closing"
+		local ok, accepted, err = pcall(luv.close, handle, function()
+			receipt.state = "closed"
+			settle_owned(request)
+		end)
+		if not ok or accepted == false or err ~= nil then
+			if receipt.state ~= "closed" then receipt.state = "open" end
+			return false
+		end
+		return true
+	end
 	local closing = false
 	if type(luv.is_closing) == "function" then
 		local ok, value = pcall(luv.is_closing, handle)
@@ -70,8 +93,7 @@ end
 local function close_timer(request)
 	if not request.timer then return end
 	pcall(luv.timer_stop, request.timer)
-	close_handle(request.timer)
-	request.timer = nil
+	if close_handle(request.timer, request) or not request.operation then request.timer = nil end
 end
 
 --- Stops and closes one captured stream.
@@ -81,16 +103,49 @@ local function close_stream(request, field)
 	local stream = request[field]
 	if not stream then return end
 	if type(luv.read_stop) == "function" then pcall(luv.read_stop, stream) end
-	close_handle(stream)
-	request[field] = nil
+	if close_handle(stream, request) or not request.operation then request[field] = nil end
 end
 
 --- Closes the process handle after libuv has reported its exit.
 --- @param request table
 local function close_process(request)
 	if not request.process or not request.exited then return end
-	close_handle(request.process)
-	request.process = nil
+	if close_handle(request.process, request) or not request.operation then request.process = nil end
+end
+
+--- Releases an owned operation only after physical exit and native close ACKs.
+--- @param request table
+settle_owned = function(request)
+	local operation = request.operation
+	if not operation or operation._settled or not request.terminal then return end
+	if request.spawned and not request.exited then return end
+	for _, receipt in pairs(request.handles) do
+		if receipt.state ~= "closed" then return end
+	end
+	operation._settled = true
+	if _owned[request.owner] == operation then _owned[request.owner] = nil end
+	local result = request.result
+	if not operation._cancelled and not request.suppress_callback and type(request.on_done) == "function" then
+		local ok, err = pcall(request.on_done, result)
+		if not ok then Logger.error(LOG, "Owned HTTP terminal callback raised: %s.", tostring(err)) end
+	end
+	local listeners = operation._listeners
+	operation._listeners = {}
+	for _, listener in ipairs(listeners) do
+		local ok, err = pcall(listener)
+		if not ok then Logger.error(LOG, "Owned HTTP settlement callback raised: %s.", tostring(err)) end
+	end
+end
+
+--- Retries only this request's exact native handles after a close refusal.
+--- @param request table
+retry_owned_cleanup = function(request)
+	close_timer(request)
+	close_stream(request, "stdin")
+	close_stream(request, "stdout")
+	close_stream(request, "stderr")
+	close_process(request)
+	settle_owned(request)
 end
 
 --- Publishes one terminal result and makes all stale callbacks inert.
@@ -100,6 +155,8 @@ end
 local function finish(request, result, suppress_callback)
 	if request.terminal then return end
 	request.terminal = true
+	request.result = result
+	request.suppress_callback = suppress_callback == true
 	if _active[request.owner] == request then _active[request.owner] = nil end
 	close_timer(request)
 	close_stream(request, "stdin")
@@ -110,6 +167,10 @@ local function finish(request, result, suppress_callback)
 		Logger.debug(LOG, "HTTP request completed (status=%d).", result.status or 0)
 	elseif result.error ~= "cancelled" then
 		Logger.error(LOG, "HTTP request failed: %s.", tostring(result.error))
+	end
+	if request.operation then
+		settle_owned(request)
+		return
 	end
 	if not suppress_callback and type(request.on_done) == "function" then
 		local ok, err = pcall(request.on_done, result)
@@ -297,8 +358,9 @@ end
 --- @param on_chunk function|nil
 --- @param on_done function
 --- @return boolean
-local function start_request(url, headers, body, options, on_chunk, on_done)
+local function start_request(url, headers, body, options, on_chunk, on_done, operation)
 	local function reject(message)
+		if operation then operation._settled = true end
 		local result = { ok = false, status = 0, body = "", error = message }
 		if type(on_done) == "function" then
 			local ok, err = pcall(on_done, result)
@@ -341,14 +403,18 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 	}
 	-- Metadata refusal is transactional too: an invalid replacement must not
 	-- retire a valid owner or leave timers/pipes behind after composition raises.
-	local composed, argv, config = pcall(curl_args, url, headers, body, request_options)
-	if not composed then
-		Logger.error(LOG, "Cannot compose curl configuration; request refused.")
-		return reject("curl configuration refused")
+	local composed, argv, config
+	if not operation then
+		composed, argv, config = pcall(curl_args, url, headers, body, request_options)
+		if not composed then
+			Logger.error(LOG, "Cannot compose curl configuration; request refused.")
+			return reject("curl configuration refused")
+		end
+		local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
+		if argv_refusal ~= "" then return reject("curl argument vector refused: " .. argv_refusal) end
 	end
-	local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
-	if argv_refusal ~= "" then return reject("curl argument vector refused: " .. argv_refusal) end
 	local owner = request_owner(options.owner)
+	if _owned[owner] then return reject("previous request cleanup pending") end
 	if _active[owner] and not M.cancel(owner) then
 		return reject("previous request cancellation failed")
 	end
@@ -358,6 +424,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 
 	local request = {
 		owner = owner,
+		operation = operation,
+		handles = {},
+		spawned = false,
 		buffered = options.buffered == true,
 		max_body_bytes = tonumber(options.max_body_bytes),
 		on_chunk = on_chunk,
@@ -372,10 +441,28 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		exited = false,
 		terminal = false,
 	}
-	local handles_ok, stdin, stdout, stderr, timer = pcall(function()
-		return luv.new_pipe(false), luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
-	end)
-	request.stdin, request.stdout, request.stderr, request.timer = stdin, stdout, stderr, timer
+	local handles_ok
+	if operation then
+		operation._request = request
+		_owned[owner] = operation
+		-- Capture each allocation immediately: a later constructor throw must not
+		-- discard earlier handles or turn cleanup debt into a settled refusal.
+		handles_ok = pcall(function()
+			for _, field in ipairs({ "stdin", "stdout", "stderr", "timer" }) do
+				local handle
+				if field == "timer" then handle = luv.new_timer() else handle = luv.new_pipe(false) end
+				if not handle then error("native handle allocation refused") end
+				request[field] = handle
+				request.handles[handle] = { state = "open" }
+			end
+		end)
+	else
+		local stdin, stdout, stderr, timer
+		handles_ok, stdin, stdout, stderr, timer = pcall(function()
+			return luv.new_pipe(false), luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
+		end)
+		request.stdin, request.stdout, request.stderr, request.timer = stdin, stdout, stderr, timer
+	end
 	if not handles_ok or not request.stdin or not request.stdout or not request.stderr or not request.timer then
 		finish(request, { ok = false, status = 0, body = "", error = "libuv handle allocation failed" })
 		return false
@@ -391,6 +478,21 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		return false
 	end
 
+	-- Owned requests retain the new cleanup contract when construction raises
+	-- after allocation; ordinary replacements complete preflight beforehand.
+	if operation then
+		local built
+		built, argv, config = pcall(curl_args, url, headers, body, request_options)
+		if not built then
+			finish(request, { ok = false, status = 0, body = "", error = "curl request construction failed" })
+			return false
+		end
+		local owned_refusal = ShellRunner.validate_spawn_args("curl", argv)
+		if owned_refusal ~= "" then
+			finish(request, { ok = false, status = 0, body = "", error = "curl argument vector refused: " .. owned_refusal })
+			return false
+		end
+	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
 		args = argv,
 		stdio = { request.stdin, request.stdout, request.stderr },
@@ -401,6 +503,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		request.exit_signal = signal
 		maybe_complete(request)
 		close_process(request)
+		settle_owned(request)
 	end)
 	if not spawn_ok or not process or not pid then
 		finish(request, {
@@ -411,6 +514,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 	end
 	request.process = process
 	request.pid = pid
+	request.spawned = true
+	if operation then request.handles[process] = { state = "open" } end
 
 	local write_ok, write_result = pcall(luv.write, request.stdin, config, function(write_err)
 		if write_err and not request.terminal then
@@ -524,6 +629,54 @@ function M.get(url, headers, options, callback)
 	request_options.method = "GET"
 	return start_request(url, type(headers) == "table" and headers or {}, nil,
 		request_options, nil, callback)
+end
+
+--- Starts a buffered GET with retained physical cleanup ownership.
+--- The existing get/cancel booleans remain logical dispatch/signal receipts.
+--- This optional operation supplies the stronger contract needed by discovery:
+--- cancellation fences delivery immediately, while successors wait for actual
+--- process exit and all owned native handle close callbacks.
+--- @param url string
+--- @param headers table
+--- @param options table|nil
+--- @param callback function
+--- @return table Operation { started, cancel, is_settled, on_settled }.
+function M.get_owned(url, headers, options, callback)
+	local operation = { started = false, _settled = false, _cancelled = false, _listeners = {} }
+	function operation:is_settled() return self._settled end
+	function operation:on_settled(listener)
+		if type(listener) ~= "function" then return false end
+		if self._settled then
+			local ok, err = pcall(listener)
+			if not ok then Logger.error(LOG, "Owned HTTP settlement callback raised: %s.", tostring(err)) end
+		else
+			self._listeners[#self._listeners + 1] = listener
+		end
+		return true
+	end
+	function operation:cancel()
+		self._cancelled = true
+		if self._settled then return true end
+		local request = self._request
+		if not request then return false end
+		if not request.terminal then
+			if not terminate_group(request) then return false end
+			finish(request, { ok = false, status = 0, body = "", error = "cancelled" }, true)
+		else
+			if request.spawned and not request.exited and not terminate_group(request) then return false end
+			retry_owned_cleanup(request)
+		end
+		return self._settled
+	end
+	local request_options = {}
+	if type(options) == "table" then
+		for key, value in pairs(options) do request_options[key] = value end
+	end
+	request_options.buffered = true
+	request_options.method = "GET"
+	operation.started = start_request(url, type(headers) == "table" and headers or {}, nil,
+		request_options, nil, callback, operation)
+	return operation
 end
 
 --- Downloads one response body directly to a caller-owned temporary file.

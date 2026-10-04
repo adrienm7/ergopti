@@ -166,6 +166,46 @@ _SSDB_SendFailureRestoresCriticalAndFailsSafe() {
 		"when the OS send throws, pre-invalidating both buffers is the safe direction — stale buffers could delete unrelated text on the next expansion")
 }
 
+_SSDB_FailedBackspaceClearsUnknownContext() {
+	global HSE_StartIsWordBoundary
+	HSE_TestReset()
+	try {
+		HSE_Register("*?", "ac", (*) => true, Map("Replacement", "expanded", "OnlyText", true))
+		Pair := _SSDB_BufferAfter("ab", () => TextPressKey("BackSpace", []), true)
+		AssertFalse(Pair.actionResult, "a throwing Backspace sender must report failure")
+		AssertEqual(0, Pair.afterCritical, "failure must restore the caller's Critical state")
+		_SSDB_AssertBoth("", Pair, "a failed deletion leaves the actual caret text unknown")
+		AssertFalse(HSE_StartIsWordBoundary, "an unsuccessful edit cannot establish a word boundary")
+		AssertFalse(IsObject(HSE_FeedChar("c")), "the next character must not expand a phantom shortened trigger")
+	} finally {
+		HSE_TestReset()
+	}
+}
+
+_SSDB_TransactionSendVerdicts() {
+	global HSE_Buffer, _PrefixBuffer
+	for Verdict in [false, "", "0", true] {
+		HSE_TestReset()
+		try {
+			HSE_Buffer := "ab"
+			_PrefixSetBuffer("ab")
+			Returned := HS_RunSyntheticInputTransaction("{BackSpace}", _SSDB_ReturnSendVerdict.Bind(Verdict))
+			AssertEqual(Type(Verdict), Type(Returned), "the transaction preserves the sender's result type")
+			AssertEqual(Verdict, Returned, "the transaction preserves the sender's result")
+			Expected := ((Verdict is Integer) and Verdict == 0) ? "" : "a"
+			AssertEqual(Expected, HSE_Buffer, "only an explicit integer failure invalidates the engine")
+			AssertEqual(Expected, _PrefixBuffer, "both buffer models share the same failure verdict")
+			AssertEqual(0, A_IsCritical, "every verdict restores Critical")
+		} finally {
+			HSE_TestReset()
+		}
+	}
+}
+
+_SSDB_ReturnSendVerdict(SendVerdict) {
+	return SendVerdict
+}
+
 
 
 
@@ -213,3 +253,7 @@ Test("synthetic sends: a failed OS send restores Critical and invalidates safely
 	_SSDB_SendFailureRestoresCriticalAndFailsSafe)
 Test("synthetic sends: the declaration and send share one canonical transaction (synthetic-sends-declare-buffer-effect)",
 	_SSDB_DeclarationLivesAtTheFunnel)
+Test("synthetic sends: failed Backspace cannot leave a phantom trigger (synthetic-send-failure-context)",
+	_SSDB_FailedBackspaceClearsUnknownContext)
+Test("synthetic sends: failure and void success preserve their verdict contracts (synthetic-send-failure-context)",
+	_SSDB_TransactionSendVerdicts)

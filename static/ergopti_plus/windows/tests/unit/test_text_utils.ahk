@@ -69,3 +69,67 @@ _SU_DecodesRealisticFileUrlSegment() {
 	Assert(StrLen(Result) > 0, "Expected non-empty decoded result")
 }
 Test("UriDecode: decodes a realistic file URL path segment", _SU_DecodesRealisticFileUrlSegment)
+
+
+/** Independent character vectors pin native key counts and internal spans. */
+_SU_UnicodeEraseAndReplaySpans() {
+	Vectors := [[], ["a"], [Chr(0x1F600)], ["a", Chr(0x1F600), "b"],
+		[Chr(0x1F600), Chr(0x10400), "x", Chr(0x1F642)],
+		["e", Chr(0x301), Chr(0x1F600)], [Chr(0xD800)], [Chr(0xDC00)]]
+	for Expected in Vectors {
+		Text := ""
+		for Char in Expected
+			Text .= Char
+		AssertEqual(Expected.Length, _TextCodepointLength(Text))
+		Actual := _TextCodepoints(Text)
+		AssertEqual(Expected.Length, Actual.Length, "replay keeps complete pairs and every independent character")
+		for Index, Char in Expected
+			AssertEqual(Char, Actual[Index], "replay must preserve the exact original units")
+		Loop Expected.Length + 3 {
+			Count := A_Index - 1
+			Erased := 0
+			Loop Min(Count, Expected.Length)
+				Erased += StrLen(Expected[Expected.Length - A_Index + 1])
+			AssertEqual(Erased, _TextTailCodeUnits(Text, Count),
+				"native erasure clamps to available whole characters")
+		}
+	}
+	AssertThrows(() => _TextCodepointLength(42), "counting rejects a non-string")
+	AssertThrows(() => _TextCodepoints(42), "replay rejects a non-string")
+	AssertThrows(() => _TextTailCodeUnits("a", -1), "erasure rejects a negative count")
+	AssertThrows(() => _TextTailCodeUnits("a", 1.5), "erasure rejects a fractional count")
+	AssertThrows(() => _TextTailCodeUnits(42, 1), "erasure rejects a non-string")
+}
+Test("text utils: Unicode replay and erasure preserve independent character spans (unicode-erase)",
+	_SU_UnicodeEraseAndReplaySpans)
+
+_UCAP_TextTailBudget() {
+	Text := "A" . Chr(0x1F600) . "bc"
+	Expected := ["", "c", "bc", "bc", Chr(0x1F600) . "bc", Text]
+	for Value in Expected {
+		Capacity := A_Index - 1
+		Actual := _TextTailWithinUnits(Text, Capacity)
+		AssertEqual(Value, Actual, "literal suffix for budget " . Capacity)
+		Assert(StrLen(Actual) <= Capacity, "whole pairs never exceed the unit budget")
+	}
+	AssertEqual("", _TextTailWithinUnits("A" . Chr(0x1F600), 1))
+	AssertEqual(Chr(0x1F600), _TextTailWithinUnits("A" . Chr(0x1F600), 2))
+	AssertEqual("A" . Chr(0xD800), _TextTailWithinUnits("A" . Chr(0xD800), 2),
+		"isolated legacy units retain their original representation")
+	AssertEqual(Chr(0xDC00), _TextTailWithinUnits("A" . Chr(0xDC00), 1))
+}
+Test("text unicode-context-cap: every unit budget preserves the exact complete suffix", _UCAP_TextTailBudget)
+
+_TestTextPenultimateCodepoint() {
+	for Row in [["", ""], ["a", ""], [Chr(0x1F601), ""], ["ab", "a"],
+		["a" . Chr(0x1F601), "a"], [Chr(0x1F601) . "a", Chr(0x1F601)],
+		[Chr(0x1F600) . Chr(0x1F601), Chr(0x1F600)],
+		[Chr(0xD801) . "a", Chr(0xD801)], ["a" . Chr(0xDC01), "a"]]
+		AssertEqual(Row[2], _TextPenultimateCodepoint(Row[1]), "exact complete prior scalar")
+	Caught := 0
+	try _TextPenultimateCodepoint(42)
+	catch as Err
+		Caught := Err
+	AssertTrue(Caught is TypeError, "invalid text is refused explicitly")
+}
+Test("text_utils unicode-time-gate: prior scalar lookup covers short and supplementary spans", _TestTextPenultimateCodepoint)

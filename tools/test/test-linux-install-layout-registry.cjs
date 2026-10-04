@@ -145,6 +145,9 @@ try {
 	const lib = path.join(sandbox, 'lib', 'ergopti');
 	const replay = bash([
 		'set -euo pipefail',
+		// Force the GNU binary marker on every host, including Linux CI.
+		'sha256sum() { command sha256sum --binary "$@"; }',
+		'export -f sha256sum',
 		`source ${shellQuote(bashPath(HELPER))}`,
 		`SRC_REGISTRY="$(layout_registry_source ${shellQuote(bashPath(DRIVER))} ${shellQuote(bashPath(DRIVERS))})"`,
 		`install -d ${shellQuote(bashPath(path.join(lib, 'linux')))} ${shellQuote(bashPath(path.join(lib, '_shared')))}`,
@@ -193,9 +196,25 @@ try {
 			);
 		} else {
 			const probe = path.join(sandbox, 'probe.lua');
+			// Native Windows Lua owns cmd.exe pipes. Keep production shell commands
+			// intact but execute their exact bytes through the same real Bash.
+			const shellBridge =
+				process.platform === 'win32'
+					? [
+							`local bash = ${JSON.stringify(bashExecutable().replaceAll('\\', '/'))}`,
+							`local command_file = ${JSON.stringify(path.join(sandbox, 'command.sh').replaceAll('\\', '/'))}`,
+							'local native_popen = io.popen',
+							'io.popen = function(command, mode)',
+							'  local file = assert(io.open(command_file, "wb"))',
+							'  assert(file:write(command .. "\\n")); assert(file:close())',
+							`  return native_popen('""' .. bash .. '" -s < "' .. command_file .. '""', mode)`,
+							'end'
+						]
+					: [];
 			fs.writeFileSync(
 				probe,
 				[
+					...shellBridge,
 					'local root = arg[1]',
 					'package.path = root .. "/linux/?.lua;" .. root .. "/linux/?/init.lua;"',
 					'	.. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path',
@@ -223,7 +242,8 @@ try {
 			);
 			const home = path.join(sandbox, 'home');
 			fs.mkdirSync(home);
-			const run = childProcess.spawnSync(lua, [probe, bashPath(lib)], {
+			// Native Lua receives host paths; MSYS paths belong only to Bash.
+			const run = childProcess.spawnSync(lua, [probe, path.resolve(lib).replaceAll('\\', '/')], {
 				cwd: path.join(lib, 'linux'),
 				encoding: 'utf8',
 				env: {

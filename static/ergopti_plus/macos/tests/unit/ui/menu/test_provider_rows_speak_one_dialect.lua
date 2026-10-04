@@ -149,46 +149,56 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	end)
 
 	helpers.it("nested personal files retain their sorted native command subtrees", function()
-		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
-		local asked = {}
-		local ctx = {
-			paused = false,
-			state = { hotstrings = {}, trigger_char = "★" },
-			hotfiles = { "personal.toml", "personal_ext_tools__zeta.toml", "personal_ext_tools__alpha.toml" },
-			get_group_name = function(path) return path:gsub("%.toml$", "") end,
-			applyTriggerChar = function(value) return value end,
-			hotstring_editor = { open = function() end },
-			keymap = {
-				is_group_enabled = function() return false end,
-				is_section_enabled = function() return true end,
-				get_sections = function(group)
-					if group:sub(1, 13) == "personal_ext_" then
-						return { { name = "part", description = "Part", count = 1 } }
-					end
-				end,
-				set_category_scope_enabled = function(names, enabled, publish)
-					asked[#asked + 1] = { names = names, enabled = enabled }
-					return publish()
-				end,
-			},
-			save_prefs = function() return true end,
-			updateMenu = function() end,
-		}
-		local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
-		local folder
-		for _, row in ipairs(rows) do if row.title == "tools (2)" then folder = row end end
-		helpers.assert_true(folder ~= nil, "a folder with two personal files must survive rendering")
-		helpers.assert_eq(#folder.menu, 2)
-		helpers.assert_eq(folder.menu[1].title, "alpha (1)")
-		helpers.assert_eq(folder.menu[2].title, "zeta (1)")
-		for _, file in ipairs(folder.menu) do
-			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
-			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
-			helpers.assert_eq(file.menu[3].title, "-")
-			helpers.assert_eq(file.menu[4].title, "Part (1)")
-		end
-		helpers.assert_eq(folder.menu[2].menu[1].fn(), true)
-		helpers.assert_eq(asked, { { names = { "personal_ext_tools__zeta" }, enabled = true } })
+		helpers.with_stub_scope({ "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+			-- This projection fixture owns a synthetic acknowledged group. Actual
+			-- provenance, native route and refusal behavior have their own owner test.
+			local bindings = 0
+			package.loaded["infra.personal_file_scope"] = { bind = function()
+				bindings = bindings + 1
+				return function() return true end
+			end }
+			local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+			local asked = {}
+			local ctx = {
+				paused = false,
+				state = { hotstrings = {}, trigger_char = "★" },
+				hotfiles = { "personal.toml", "personal_ext_tools__zeta.toml", "personal_ext_tools__alpha.toml" },
+				get_group_name = function(path) return path:gsub("%.toml$", "") end,
+				applyTriggerChar = function(value) return value end,
+				hotstring_editor = { open = function() end },
+				keymap = {
+					is_group_enabled = function() return false end,
+					is_section_enabled = function() return true end,
+					get_sections = function(group)
+						if group:sub(1, 13) == "personal_ext_" then
+							return { { name = "part", description = "Part", count = 1 } }
+						end
+					end,
+					set_category_scope_enabled = function(names, enabled, publish)
+						asked[#asked + 1] = { names = names, enabled = enabled }
+						return publish()
+					end,
+				},
+				save_prefs = function() return true end,
+				updateMenu = function() end,
+			}
+			local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
+			local folder
+			for _, row in ipairs(rows) do if row.title == "tools (2)" then folder = row end end
+			helpers.assert_true(folder ~= nil, "a folder with two personal files must survive rendering")
+			helpers.assert_eq(#folder.menu, 2)
+			helpers.assert_eq(folder.menu[1].title, "alpha (1)")
+			helpers.assert_eq(folder.menu[2].title, "zeta (1)")
+			for _, file in ipairs(folder.menu) do
+				helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
+				helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
+				helpers.assert_eq(file.menu[3].title, "-")
+				helpers.assert_eq(file.menu[4].title, "Part (1)")
+			end
+			helpers.assert_eq(folder.menu[2].menu[1].fn(), true)
+			helpers.assert_eq(asked, { { names = { "personal_ext_tools__zeta" }, enabled = true } })
+			helpers.assert_eq(bindings, 2, "one native admission binding per rendered file")
+		end)
 	end)
 
 	helpers.it("the About submenu keeps its version header and native update action", function()

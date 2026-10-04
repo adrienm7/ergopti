@@ -208,10 +208,14 @@
 			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
 		{
-			"id": "reload"
+			"type": "command",
+			"id": "reload",
+			"i18n": "menu.global.reload"
 		},
 		{
-			"id": "quit"
+			"type": "command",
+			"id": "quit",
+			"i18n": "menu.global.quit"
 		},
 		{
 			"id": "debug"
@@ -356,6 +360,19 @@
 			]
 		}
 	],
+	"llm_live_controls": [
+		{
+			"type": "check",
+			"id": "llm_live_mode_off",
+			"i18n": "menu.llm.live_mode_off",
+			"checked_when": [
+				"llm_live_is_off"
+			],
+			"disabled_when": [
+				"llm_live_off_ready"
+			]
+		}
+	],
 	"about_update_channel_menu": [
 		{
 			"type": "choice",
@@ -374,6 +391,58 @@
 					"value": "dev",
 					"i18n": "updater.channel.dev_menu",
 					"current_i18n": "updater.channel.dev"
+				}
+			]
+		}
+	],
+	"about_update_frequency_menu": [
+		{
+			"type": "choice",
+			"id": "update_check_interval",
+			"path": "updater.check_interval_seconds",
+			"i18n": "menu.about.frequency_menu",
+			"show_current_choice": true,
+			"current_choice_suffix": ": {1}",
+			"choices": [
+				{
+					"value": 300,
+					"i18n": "menu.about.frequency.5m"
+				},
+				{
+					"value": 1800,
+					"i18n": "menu.about.frequency.30m"
+				},
+				{
+					"value": 3600,
+					"i18n": "menu.about.frequency.1h"
+				},
+				{
+					"value": 21600,
+					"i18n": "menu.about.frequency.6h"
+				},
+				{
+					"value": 43200,
+					"i18n": "menu.about.frequency.12h"
+				},
+				{
+					"value": 86400,
+					"i18n": "menu.about.frequency.1d"
+				},
+				{
+					"value": 259200,
+					"i18n": "menu.about.frequency.3d"
+				},
+				{
+					"value": 604800,
+					"i18n": "menu.about.frequency.1w"
+				},
+				{
+					"value": 2592000,
+					"i18n": "menu.about.frequency.1mo"
+				},
+				{
+					"value": 0,
+					"i18n": "menu.about.frequency.never"
 				}
 			]
 		}
@@ -417,6 +486,63 @@
 			"disabled_reason_key": "menu.about.source_run_reason"
 		}
 	],
+	"llm_trigger_menu": [
+		{
+			"type": "list",
+			"id": "llm_trigger_leading"
+		},
+		{
+			"type": "check",
+			"id": "llm_instant_on_word_end",
+			"i18n": "menu.llm.instant_on_word_end",
+			"checked_when": [
+				"llm_instant_on_word_end_enabled"
+			],
+			"disabled_when": [
+				"llm_trigger_ready"
+			]
+		},
+		{
+			"type": "check",
+			"id": "llm_after_hotstring",
+			"i18n": "menu.llm.after_hotstring",
+			"checked_when": [
+				"llm_after_hotstring_enabled"
+			],
+			"disabled_when": [
+				"llm_trigger_ready"
+			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "check",
+			"id": "llm_url_bar_filter",
+			"i18n": "menu.llm.disable_url_bars",
+			"checked_when": [
+				"llm_url_bar_filter_enabled"
+			],
+			"disabled_when": [
+				"llm_url_bar_filter_ready"
+			]
+		},
+		{
+			"type": "check",
+			"id": "llm_secure_field_filter",
+			"i18n": "menu.llm.disable_password_fields",
+			"checked_when": [
+				"llm_secure_field_filter_enabled"
+			],
+			"disabled_when": [
+				"llm_secure_field_filter_ready"
+			]
+		},
+		{
+			"type": "list",
+			"id": "llm_trigger_remaining"
+		}
+	],
 	"llm_display_menu": [
 		{
 			"type": "list",
@@ -436,6 +562,129 @@
 		{
 			"type": "list",
 			"id": "llm_display_remaining"
+		},
+		{
+			"type": "check",
+			"id": "llm_token_streaming",
+			"i18n": "menu.llm.show_streaming",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.token_streaming_transport_missing",
+			"checked_when": [
+				"llm_token_streaming_enabled"
+			],
+			"disabled_when": [
+				"llm_token_streaming_ready"
+			]
+		},
+		{
+			"type": "check",
+			"id": "llm_show_all",
+			"i18n": "menu.llm.show_all_at_once",
+			"checked_when": [
+				"llm_show_all_enabled"
+			],
+			"disabled_when": [
+				"llm_show_all_ready"
+			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "choice",
+			"id": "llm_indentation",
+			"path": "llm.display.pred_indent",
+			"i18n": "menu.llm.indent_label",
+			"show_current_choice": true,
+			"current_choice_suffix": ": {1}",
+			"disabled_when": [
+				"llm_indentation_ready"
+			],
+			"choices": [
+				{
+					"value": -7,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-7 "
+				},
+				{
+					"value": -6,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-6 "
+				},
+				{
+					"value": -5,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-5 "
+				},
+				{
+					"value": -4,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-4 "
+				},
+				{
+					"value": -3,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-3 "
+				},
+				{
+					"value": -2,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "-2 "
+				},
+				{
+					"value": -1,
+					"i18n": "menu.llm.indent_space",
+					"label_prefix": "-1 "
+				},
+				{
+					"value": 0,
+					"i18n": "menu.llm.indent_none",
+					"label_prefix": ""
+				},
+				{
+					"value": 1,
+					"i18n": "menu.llm.indent_space",
+					"label_prefix": "+1 "
+				},
+				{
+					"value": 2,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+2 "
+				},
+				{
+					"value": 3,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+3 "
+				},
+				{
+					"value": 4,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+4 "
+				},
+				{
+					"value": 5,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+5 "
+				},
+				{
+					"value": 6,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+6 "
+				},
+				{
+					"value": 7,
+					"i18n": "menu.llm.indent_spaces",
+					"label_prefix": "+7 "
+				}
+			]
+		},
+		{
+			"type": "list",
+			"id": "llm_display_trailing"
 		}
 	],
 	"llm_generation_menu": [
@@ -500,6 +749,19 @@
 			"type": "dynamic",
 			"id": "agent_disabled_apps",
 			"i18n": "menu.agent.disabled_apps"
+		}
+	],
+	"agent_system_controls": [
+		{
+			"type": "check",
+			"id": "agent_system_off",
+			"i18n": "menu.agent.off",
+			"checked_when": [
+				"agent_system_is_off"
+			],
+			"disabled_when": [
+				"agent_system_off_ready"
+			]
 		}
 	],
 	"apps_menu": [
@@ -826,6 +1088,23 @@
 		{
 			"type": "list",
 			"id": "extensions_shortcuts"
+		}
+	],
+	"selection_caps_word_control": [
+		{
+			"type": "check",
+			"id": "selection_caps_word",
+			"i18n": "sg_actions.caps_word",
+			"checked_when": [
+				"selection_caps_word_active"
+			],
+			"disabled_when": [
+				"selection_caps_word_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
 		}
 	],
 	"key_combinations_group": [
@@ -1358,12 +1637,8 @@
 			"reason_key": "platform_reason.base_layout_is_the_linux_decode_table"
 		},
 		{
-			"type": "feature",
-			"path": "layout.direct_access_digits",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"type": "list",
+			"id": "number_row_policy"
 		},
 		{
 			"type": "group",
@@ -1530,6 +1805,16 @@
 			"reason_key": "platform_reason.only_linux_rereads_its_catalogue"
 		}
 	],
+	"personal_hotstring_commands": [
+		{
+			"type": "command",
+			"id": "personal_hotstring_open_editor",
+			"i18n": "menu.hotstrings.open_editor",
+			"disabled_when": [
+				"personal_hotstring_editor_ready"
+			]
+		}
+	],
 	"word_expanders_menu": [
 		{
 			"type": "command",
@@ -1561,6 +1846,24 @@
 		{
 			"type": "list",
 			"id": "word_expander_entries"
+		}
+	],
+	"word_expander_custom_menu": [
+		{
+			"type": "command",
+			"id": "word_expander_delete",
+			"i18n": "menu.hotstrings.delete_delimiter",
+			"disabled_when": [
+				"word_expanders_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "word_expander_add",
+			"i18n": "menu.hotstrings.add_delimiter",
+			"disabled_when": [
+				"word_expanders_ready"
+			]
 		}
 	],
 	"hotstrings_params_group": [
@@ -1603,6 +1906,90 @@
 			"checked_when": [
 				"hotstrings_repeat_enabled"
 			]
+		}
+	],
+	"hotstrings_delays_menu": [
+		{
+			"type": "command",
+			"id": "hotstrings_config_window",
+			"i18n": "menu.hotstrings.config_item",
+			"disabled_when": [
+				"hotstrings_config_ready"
+			]
+		}
+	],
+	"preview_colored_control": [
+		{
+			"type": "check",
+			"id": "preview_colored_tooltips",
+			"i18n": "menu.hotstrings.tooltip_colored",
+			"checked_when": [
+				"hotstrings.preview_colored_tooltips"
+			],
+			"disabled_when": [
+				"preview_colored_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		}
+	],
+	"preview_magic_control": [
+		{
+			"type": "check",
+			"id": "preview_star_enabled",
+			"i18n": "menu.hotstrings.tooltip_magic",
+			"checked_when": [
+				"hotstrings.preview_star_enabled"
+			],
+			"disabled_when": [
+				"preview_magic_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		}
+	],
+	"preview_presence_controls": [
+		{
+			"type": "check",
+			"id": "preview_autocorrect_enabled",
+			"i18n": "menu.hotstrings.tooltip_autocorrect",
+			"checked_when": [
+				"hotstrings.preview_autocorrect_enabled"
+			],
+			"disabled_when": [
+				"preview_presence_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		},
+		{
+			"type": "check",
+			"id": "preview_ai_enabled",
+			"i18n": "menu.hotstrings.tooltip_ai",
+			"checked_when": [
+				"hotstrings.preview_ai_enabled"
+			],
+			"disabled_when": [
+				"preview_presence_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
 		}
 	],
 	"gestures_menu": [
@@ -1811,6 +2198,145 @@
 				"ahk",
 				"hs",
 				"linux"
+			]
+		}
+	],
+	"llm_model_commands": [
+		{
+			"type": "command",
+			"id": "llm_browse_models",
+			"i18n": "menu.llm.browse_models_entry",
+			"disabled_when": [
+				"llm_model_browser_ready"
+			]
+		}
+	],
+	"about_source_menu": [
+		{
+			"type": "command",
+			"id": "about_source_check",
+			"i18n": "menu.about.check_for_updates",
+			"disabled_when": [
+				"about_source_release_ready"
+			],
+			"disabled_reason_key": "menu.about.source_run_reason"
+		}
+	],
+	"llm_profile_commands": [
+		{
+			"type": "command",
+			"id": "llm_profile_create",
+			"i18n": "menu.profiles.create_profile",
+			"disabled_when": [
+				"llm_profile_create_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "llm_profile_clone",
+			"i18n": "menu.profiles.clone_builtin",
+			"disabled_when": [
+				"llm_profile_clone_ready"
+			]
+		}
+	],
+	"hotstring_file_commands": [
+		{
+			"type": "command",
+			"id": "hotstring_file_open",
+			"i18n": "menu.hotstrings.open_file",
+			"disabled_when": [
+				"hotstring_file_ready"
+			]
+		}
+	],
+	"llm_api_active_commands": [
+		{
+			"type": "command",
+			"id": "api_test_active",
+			"i18n": "menu.llm.api_test_entry",
+			"disabled_when": [
+				"llm_api_active_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "api_remove_active",
+			"i18n": "menu.llm.api_remove_entry",
+			"disabled_when": [
+				"llm_api_active_ready"
+			]
+		}
+	],
+	"selection_case_commands": [
+		{
+			"type": "command",
+			"id": "uppercase_selection",
+			"i18n": "menu.shortcuts.to_uppercase",
+			"disabled_when": [
+				"uppercase_selection_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "selection_lowercase",
+			"i18n": "menu.shortcuts.to_lowercase",
+			"disabled_when": [
+				"selection_lowercase_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "titlecase_selection",
+			"i18n": "menu.shortcuts.to_titlecase",
+			"disabled_when": [
+				"titlecase_selection_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_navigation_rows": [
+		{
+			"type": "list",
+			"id": "llm_nav_modifiers",
+			"i18n": "menu.llm.nav_label"
+		},
+		{
+			"type": "list",
+			"id": "llm_val_modifiers",
+			"i18n": "menu.llm.val_label"
+		}
+	],
+	"number_row_policy_rows": [
+		{
+			"type": "choice",
+			"id": "number_row_mode",
+			"path": "layout.direct_access_digits",
+			"i18n": "menu.layout.number_row",
+			"choices": [
+				{
+					"value": "native",
+					"i18n": "menu.layout.number_row_native"
+				},
+				{
+					"value": "digits",
+					"i18n": "menu.layout.number_row_digits"
+				},
+				{
+					"value": "symbols",
+					"i18n": "menu.layout.number_row_symbols"
+				}
 			]
 		}
 	]

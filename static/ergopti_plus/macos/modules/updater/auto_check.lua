@@ -138,6 +138,15 @@ local function stored_interval(state, timing)
 	return seconds
 end
 
+--- Exposes the existing snapped preference for source-run menu captions.
+--- @param state table Menu state holding update_check_interval_seconds.
+--- @param config table|nil Existing load_config() result.
+--- @return number seconds The effective preset interval.
+function M.stored_interval(state, config)
+	if type(state) ~= "table" then error("the stored check interval needs the menu state", 2) end
+	return stored_interval(state, (config or M.load_config()).timing)
+end
+
 --- The preset code of the interval a menu state stores, for a driver that
 --- starts no owner: a local version names the preset on its greyed row.
 --- @param state table Menu state (holds update_check_interval_seconds).

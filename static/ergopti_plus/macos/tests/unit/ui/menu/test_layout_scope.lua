@@ -4,11 +4,15 @@ local helpers = require("tests.helpers")
 local Codec = require("toml_codec")
 local FileSystem = require("adapters.file_system")
 
-local function fixture()
+local function fixture(number_row_source, complete_source)
 	package.loaded["adapters.file_system"] = FileSystem
 	local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 	local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti+" }
 	local original = '[layout]\npause_switch_enabled = true\non_pause = "French"\non_resume = "Ergopti+"\nfuture = { preserve = 7 }\n[llm]\nenabled = true\n[metrics]\nenabled = true\n'
+	if complete_source ~= nil then original = complete_source end
+	if number_row_source then
+		original = original:gsub("%[layout%]\n", "[layout]\ndirect_access_digits = " .. number_row_source .. " # retained personal intent\n", 1)
+	end
 	local files, controls, writes = { config = original }, {}, 0
 	local adapter = {
 		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
@@ -39,7 +43,7 @@ local function fixture()
 			admission = function(_, callback) return callback() end,
 			paused = function() return false end,
 			runtime = {
-				capture = function() return Layout.capture_scope(state) end,
+				capture = function(_, source) return Layout.capture_scope(state, source) end,
 				apply = function(_, rows) return Layout.apply_scope(state, rows) end,
 				restore = function(snapshot) return Layout.restore_scope(state, snapshot) end,
 			},
@@ -253,3 +257,49 @@ helpers.describe("macOS scoped preferences under a composition", function()
 	end)
 end)
 
+
+
+helpers.describe("Number-row keyboard-layout scope ownership", function()
+	helpers.it("keeps native restoration inert and sparse", function()
+		local owner, Layout, state, files, _, _, _, _, original = fixture()
+		helpers.assert_eq(Layout.DEFAULT_STATE.layout_number_row_mode, "native")
+		helpers.assert_eq(owner.apply("recommended"), true)
+		helpers.assert_eq(state.layout_number_row_mode, "native")
+		helpers.assert_eq(files.config:find("direct_access_digits", 1, true), nil)
+		helpers.assert_eq(owner.revert(), true)
+		helpers.assert_eq(files.config, original)
+	end)
+	helpers.it("does not claim unsupported personal intent during a whole layout clear", function()
+		for _, value in ipairs({ '"future-mode"', 'true', 'false', '0', '"true"', '{ future = 7 }', '["native"]' }) do
+			for _, mode in ipairs({ "clear", "recommended" }) do
+				local owner, _, state, files, _, _, _, writes, original = fixture(value)
+				local previous = { layout_pause_switch_enabled = state.layout_pause_switch_enabled,
+					layout_on_pause = state.layout_on_pause, layout_on_resume = state.layout_on_resume }
+				helpers.assert_eq(owner.apply(mode), false)
+				helpers.assert_eq(writes(), 0)
+				helpers.assert_eq(files.config, original)
+				helpers.assert_eq(files.backup, nil)
+				helpers.assert_eq(state, previous, "refusal never reaches native scope application")
+			end
+		end
+	end)
+	helpers.it("restores all known choices to native without acquiring an emitter", function()
+		for _, value in ipairs({ "native", "digits", "symbols" }) do
+			local owner, Layout, state, files, _, _, _, _, original = fixture('"' .. value .. '"')
+			helpers.assert_eq(owner.apply("recommended"), true)
+			helpers.assert_eq(state.layout_number_row_mode, "native")
+			helpers.assert_eq(files.config:find("direct_access_digits", 1, true), nil)
+			helpers.assert_eq(Layout.scope_pending(), false)
+			helpers.assert_eq(owner.revert(), true)
+			helpers.assert_eq(files.config, original)
+		end
+	end)
+	helpers.it("does not mistake absence in an existing file for a false legacy switch", function()
+		local source = '[future]\nkeep = 9 # exact unrelated owner\n'
+		local owner, _, state, files = fixture(nil, source)
+		helpers.assert_eq(owner.apply("clear"), true)
+		helpers.assert_eq(state.layout_number_row_mode, "native")
+		helpers.assert_eq(files.config, source)
+	end)
+
+end)

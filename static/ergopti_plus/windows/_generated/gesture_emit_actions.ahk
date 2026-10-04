@@ -27,8 +27,6 @@ GestureEmitActionsData() {
 		"arrow_right", { Key: "Right", Mods: [] },
 		"arrow_up", { Key: "Up", Mods: [] },
 		"backspace", { Key: "BackSpace", Mods: [] },
-		"brightness_down", { Key: "Brightness_Down", Mods: [] },
-		"brightness_up", { Key: "Brightness_Up", Mods: [] },
 		"close_window", { Key: "F4", Mods: ["Alt"] },
 		"copy", { Key: "c", Mods: ["Ctrl"] },
 		"ctrl_backspace", { Key: "BackSpace", Mods: ["Ctrl"] },

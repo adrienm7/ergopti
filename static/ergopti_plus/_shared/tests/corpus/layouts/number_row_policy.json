@@ -1,0 +1,292 @@
+{
+	"capabilities": [
+		{
+			"platform": "ahk",
+			"mode": "native",
+			"symbols": false,
+			"expected": true
+		},
+		{
+			"platform": "ahk",
+			"mode": "native",
+			"symbols": true,
+			"expected": true
+		},
+		{
+			"platform": "ahk",
+			"mode": "digits",
+			"symbols": false,
+			"expected": true
+		},
+		{
+			"platform": "ahk",
+			"mode": "digits",
+			"symbols": true,
+			"expected": true
+		},
+		{
+			"platform": "ahk",
+			"mode": "symbols",
+			"symbols": false,
+			"expected": false
+		},
+		{
+			"platform": "ahk",
+			"mode": "symbols",
+			"symbols": true,
+			"expected": true
+		},
+		{
+			"platform": "hs",
+			"mode": "native",
+			"symbols": false,
+			"expected": true
+		},
+		{
+			"platform": "hs",
+			"mode": "native",
+			"symbols": true,
+			"expected": true
+		},
+		{
+			"platform": "hs",
+			"mode": "digits",
+			"symbols": false,
+			"expected": false
+		},
+		{
+			"platform": "hs",
+			"mode": "digits",
+			"symbols": true,
+			"expected": false
+		},
+		{
+			"platform": "hs",
+			"mode": "symbols",
+			"symbols": false,
+			"expected": false
+		},
+		{
+			"platform": "hs",
+			"mode": "symbols",
+			"symbols": true,
+			"expected": false
+		},
+		{
+			"platform": "linux",
+			"mode": "native",
+			"symbols": false,
+			"expected": true
+		},
+		{
+			"platform": "linux",
+			"mode": "native",
+			"symbols": true,
+			"expected": true
+		},
+		{
+			"platform": "linux",
+			"mode": "digits",
+			"symbols": false,
+			"expected": false
+		},
+		{
+			"platform": "linux",
+			"mode": "digits",
+			"symbols": true,
+			"expected": false
+		},
+		{
+			"platform": "linux",
+			"mode": "symbols",
+			"symbols": false,
+			"expected": false
+		},
+		{
+			"platform": "linux",
+			"mode": "symbols",
+			"symbols": true,
+			"expected": false
+		}
+	],
+	"symbols": [
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "!"
+			},
+			"supported": true,
+			"shift": true
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "text",
+				"Text": "&"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"supported": true,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "dead",
+				"Action": "circumflex",
+				"State": "circumflex",
+				"Text": "^"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"supported": true,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"shifted": {
+				"Kind": "dead",
+				"Action": "dead-circumflex",
+				"State": "circumflex",
+				"Text": "^"
+			},
+			"supported": true,
+			"shift": true
+		},
+		{
+			"digit": "0",
+			"plain": {
+				"Kind": "text",
+				"Text": "0"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": ")"
+			},
+			"supported": true,
+			"shift": true
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"supported": false,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "text",
+				"Text": "&"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "!"
+			},
+			"supported": false,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "text",
+				"Text": ""
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"supported": false,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "dead",
+				"Action": "",
+				"State": "circumflex",
+				"Text": "^"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"supported": false,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "TEXT",
+				"Text": "1"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "!"
+			},
+			"supported": false,
+			"shift": false
+		},
+		{
+			"digit": "10",
+			"plain": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "!"
+			},
+			"supported": false,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "action",
+				"Action": "circumflex"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"supported": false,
+			"shift": false
+		},
+		{
+			"digit": "1",
+			"plain": {
+				"Kind": "dead",
+				"Action": "row_dead",
+				"State": "",
+				"Text": "^"
+			},
+			"shifted": {
+				"Kind": "text",
+				"Text": "1"
+			},
+			"supported": false,
+			"shift": false
+		}
+	],
+	"invalid_modes": [false, true, 0, 1, 2, "", "Native", "DIGITS", "symbols ", "future", {}, []]
+}

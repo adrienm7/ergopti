@@ -263,6 +263,19 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		helpers.assert_nil(slots.vertical[1], "a tap/hold handler has no stroke to send per notch")
 	end)
 
+	helpers.it("routes brightness wheel turns and keys through genuine native media producers", function()
+		local bindings = bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n'
+			.. '"WheelUp" = "brightness_up"\n"WheelDown" = "brightness_down"\n"KeyJ" = "brightness_up"\n')
+		local slots = NavLayer.wheel_slots(bindings, ctx.registry)
+		helpers.assert_eq(slots.vertical[1].strokes, { { system = "BRIGHTNESS_UP" } })
+		helpers.assert_eq(slots.vertical[-1].strokes, { { system = "BRIGHTNESS_DOWN" } })
+		local rule = NavLayer.build_rule(bindings, ctx.registry)
+		helpers.assert_eq(#rule.manipulators, 1)
+		helpers.assert_eq(rule.manipulators[1].to, { { consumer_key_code = "display_brightness_increment" } })
+		helpers.assert_eq(rule.manipulators[1].conditions,
+			{ { type = "variable_if", name = "layer_active", value = 1 } })
+	end)
+
 	helpers.it("implements every macOS call handler the vocabulary declares", function()
 		local declared = ctx.vocabulary.call_handlers.macos
 		helpers.assert_true(#declared >= 1, "the vocabulary declares macOS call handlers")

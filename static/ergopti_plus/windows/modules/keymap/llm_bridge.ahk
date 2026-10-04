@@ -111,24 +111,15 @@ _LLM_Bridge_ApplyBufferEdit(DeleteFromEnd := unset, InsertedText := "") {
 	global LLM_BRIDGE_BUFFER_MAX_CHARS
 	DeleteAll := !IsSet(DeleteFromEnd)
 	DeleteCount := DeleteAll ? 0 : Max(0, DeleteFromEnd)
-	InsertedTail := InsertedText
-	if (StrLen(InsertedTail) > LLM_BRIDGE_BUFFER_MAX_CHARS)
-		InsertedTail := SubStr(InsertedTail, -LLM_BRIDGE_BUFFER_MAX_CHARS)
 	PreviousCritical := Critical("On")
 	try {
 		RemainingLen := DeleteAll ? 0
 			: Max(0, StrLen(_LLM_Bridge_Buffer) - DeleteCount)
 		Remaining := RemainingLen > 0
 			? SubStr(_LLM_Bridge_Buffer, 1, RemainingLen) : ""
-		Available := LLM_BRIDGE_BUFFER_MAX_CHARS - StrLen(InsertedTail)
-		if (Available <= 0) {
-			KeptTail := ""
-		} else if (StrLen(Remaining) > Available) {
-			KeptTail := SubStr(Remaining, -Available)
-		} else {
-			KeptTail := Remaining
-		}
-		_LLM_Bridge_Buffer := KeptTail . InsertedTail
+		; Cap the complete edited suffix once so a discarded pair cannot expose
+		; older text that was no longer contiguous with the retained insertion.
+		_LLM_Bridge_Buffer := _TextTailWithinUnits(Remaining . InsertedText, LLM_BRIDGE_BUFFER_MAX_CHARS)
 		_LLM_Bridge_ContentGeneration += 1
 		return _LLM_Bridge_Buffer
 	} finally {
@@ -753,8 +744,8 @@ LLM_Tooltip_ScheduleSlotAcceptance(Record, Surface, SlotIdx) {
 			"record", Record, "surface", Surface, "slot", SlotIdx,
 			"poll_ms", TimingsGet("llm", "val_chord_release_poll_ms"),
 			"delay_ms", TimingsGet("llm", "val_chord_insert_delay_ms"),
-			"deadline", A_TickCount
-				+ TimingsGet("llm", "val_chord_release_timeout_ms"))
+			"started_at", A_TickCount,
+			"timeout_ms", TimingsGet("llm", "val_chord_release_timeout_ms"))
 	} finally Critical(PreviousCritical)
 	SetTimer(_LLM_SlotAccept_Tick.Bind(State), -State["poll_ms"])
 	return true
@@ -764,9 +755,11 @@ LLM_Tooltip_ScheduleSlotAcceptance(Record, Surface, SlotIdx) {
 _LLM_SlotAccept_Step(State, CurrentGeneration, ModifierDown, Now) {
 	if !(State is Map) || State["generation"] != CurrentGeneration
 		return "drop"
+	if TickExpired(State["started_at"], State["timeout_ms"], Now)
+		return "drop"
 	if !ModifierDown
 		return "insert"
-	return (Now - State["deadline"]) >= 0 ? "drop" : "wait"
+	return "wait"
 }
 
 _LLM_SlotAccept_Tick(State) {
@@ -782,7 +775,7 @@ _LLM_SlotAccept_Tick(State) {
 	}
 	if Step == "drop" {
 		if State is Map && State["generation"] == _LLM_SlotAccept_Generation
-			try LoggerWarn("LLM", "Validation chord did not insert prediction {1}: a modifier was still held at the deadline.", State["slot"])
+			try LoggerWarn("LLM", "Validation chord expired before prediction {1} could be inserted.", State["slot"])
 		return
 	}
 	SetTimer(_LLM_SlotAccept_Insert.Bind(State), -State["delay_ms"])
@@ -1109,10 +1102,11 @@ _LLM_Bridge_RunPrefixObserver(Owner) {
  * @param {boolean} IsPhysicalEvent - True only for the I1-filtered prefix hook.
  */
 LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
+	global _LLM_Bridge_AgentBuffer
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) {
 		; Predictions are off: only the AI agent's typing observer listens
 		if (vk = 0x08)
-			_LLM_Bridge_ObserveAgentTyping(1, "")
+			_LLM_Bridge_ObserveAgentTyping(_TextTailCodeUnits(_LLM_Bridge_AgentBuffer, 1), "")
 		else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
 			LLM_Bridge_MirrorAgentEdit(0, "", true)
 		return
@@ -1330,7 +1324,7 @@ LLM_Bridge_OnBackspace() {
 	if !_LLM_Bridge_Active
 		return
 
-	_LLM_Bridge_ApplyBufferEdit(1, "")
+	_LLM_Bridge_ApplyBufferEdit(_TextTailCodeUnits(_LLM_Bridge_Buffer, 1), "")
 	if IsSet(LLM_Agent_OnTyping)
 		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 
@@ -1428,8 +1422,7 @@ LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText := "", ClearAll := false)
 		Edited := SubStr(_LLM_Bridge_AgentBuffer, 1, KeptLen) . InsertedText
 		; The same ceiling as the prediction context: the agent reads only the
 		; current sentence, but an unbroken typing run must not grow forever
-		if (StrLen(Edited) > LLM_BRIDGE_BUFFER_MAX_CHARS)
-			Edited := SubStr(Edited, -LLM_BRIDGE_BUFFER_MAX_CHARS)
+		Edited := _TextTailWithinUnits(Edited, LLM_BRIDGE_BUFFER_MAX_CHARS)
 		_LLM_Bridge_AgentBuffer := Edited
 		return true
 	} finally {

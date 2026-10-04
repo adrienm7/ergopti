@@ -1,0 +1,20 @@
+{
+	"section": "preview_colored_control",
+	"row": {
+		"id": "preview_colored_tooltips",
+		"type": "check",
+		"i18n": "menu.hotstrings.tooltip_colored",
+		"checked_when": ["hotstrings.preview_colored_tooltips"],
+		"disabled_when": ["preview_colored_ready"],
+		"platforms": ["hs", "linux"],
+		"unavailable": "grey",
+		"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+	},
+	"siblings": [
+		"menu.hotstrings.tooltip_magic",
+		"menu.hotstrings.tooltip_autocorrect",
+		"menu.hotstrings.tooltip_ai"
+	],
+	"colored_position": 5,
+	"separator_position": 4
+}

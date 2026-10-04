@@ -50,7 +50,7 @@ _LMT_Menu() {
 	MenuState["model"] := "live-model"
 	MenuState["user_profiles"] := [Map("id", "user_one",
 		"label", "Live label", "system_single", "Live prompt",
-		"batch", false)]
+		"system_multi", "", "batch", false)]
 	MenuState["profile_id"] := "user_one"
 	MenuState["nav_modifiers"] := ""
 	MenuState["disabled_apps"] := []
@@ -427,6 +427,12 @@ _LMT_ApiSerialize(CandidateMenu) {
 		? '[{"Id":"api_new"}]' : "[]"
 }
 
+; The source authority is a complete canonical API entry, so new source admission
+; still tests actual second-target refusal and compensation rather than malformed input.
+_LMT_ApiOldImage() {
+	return '[{"Id":"api_old","Name":"Old","Provider":"openai","BaseUrl":"https://old.invalid","Token":"old","Model":"old-model"}]'
+}
+
 _LMT_ApiMutate(Candidate) {
 	Candidate["enabled"] := true
 	return _LLM_Menu_UpsertApiEntryCandidate(Candidate,
@@ -475,7 +481,7 @@ _LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 		if WriteFn.Call(ConfigPath,
 				'[llm]`nenabled = false`napi_entry_id = "api_old"`n') != 1
 			throw Error("Cannot create initial LLM fixture file: " . ConfigPath)
-		if WriteFn.Call(ApiPath, '[{"Id":"api_old"}]') != 1
+		if WriteFn.Call(ApiPath, _LMT_ApiOldImage()) != 1
 			throw Error("Cannot create initial LLM fixture file: " . ApiPath)
 		CandidateFeatures := _LMT_Features()
 		CandidateMenu := _LMT_Menu()
@@ -558,7 +564,7 @@ _LMT_ApiSecondTargetFailureRollsEverythingOld() {
 		AssertContains(FSReadUtf8Exact(ConfigurationFile),
 			'api_entry_id = "api_old"',
 			"the first target must roll back when the second target fails")
-		AssertEqual('[{"Id":"api_old"}]', FSReadUtf8Exact(_LMT_ApiPath))
+		AssertEqual(_LMT_ApiOldImage(), FSReadUtf8Exact(_LMT_ApiPath))
 		AssertEqual("api_old", _LLM_Menu["api_entry_id"],
 			"failed multi-target durability must leave live authority old")
 		AssertFalse(_LLM_Menu["enabled"])
@@ -912,9 +918,14 @@ _LMT_InfoBarCallback(Built, Position := 0) {
 }
 
 _LMT_SharedInfoBarNativeOwner() {
-	global _LLM_Menu, LLM_MENU_INDENT_OPTIONS, _LMT_WriterResult
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile, LLM_MENU_INDENT_OPTIONS, _LMT_WriterResult
 	global _LMT_WriterCalls, _LMT_ApplyCalls
 	Previous := _LMT_InstallFixture()
+	PreviousEngine := _LLM_Engine
+	PreviousSuspend := A_IsSuspended
+	Suspend(false)
+	Path := _LMT_InfoBarPrivatePath()
+	ConfigurationFile := Path
 	HadIndent := IsSet(LLM_MENU_INDENT_OPTIONS)
 	PreviousIndent := HadIndent ? LLM_MENU_INDENT_OPTIONS : 0
 	; The unit graph omits _index.ahk; provide its independent accepted range
@@ -925,6 +936,7 @@ _LMT_SharedInfoBarNativeOwner() {
 		AssertEqual(2, Corpus["states"].Length)
 		for Selected in Corpus["states"] {
 			_LLM_Menu["show_info_bar"] := Selected
+			_LMT_InfoBarAdmitFixture(Path, Selected)
 			_LMT_WriterCalls := 0
 			_LMT_ApplyCalls := 0
 			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle)
@@ -944,9 +956,10 @@ _LMT_SharedInfoBarNativeOwner() {
 		OriginalLabel := InfoRow["i18n"]
 		try {
 			InfoRow["i18n"] := Corpus["alternate_i18n"]
-			Definitions[2] := SavedDefinitions[3]
-			Definitions[3] := SavedDefinitions[2]
+			Definitions.RemoveAt(2)
+			Definitions.Push(InfoRow)
 			_LLM_Menu["show_info_bar"] := true
+			_LMT_InfoBarAdmitFixture(Path, true)
 			_LMT_WriterResult := false
 			_LMT_WriterCalls := 0
 			_LMT_ApplyCalls := 0
@@ -971,6 +984,10 @@ _LMT_SharedInfoBarNativeOwner() {
 			LLM_MENU_INDENT_OPTIONS := PreviousIndent
 		else
 			LLM_MENU_INDENT_OPTIONS := unset
+		Suspend(PreviousSuspend)
+		_LLM_Engine := PreviousEngine
+		if FileExist(Path)
+			FileDelete(Path)
 		_LMT_RestoreFixture(Previous)
 	}
 }
@@ -1077,3 +1094,1543 @@ _LMT_SharedAutoTemperatureOwner() {
 	} finally _LMT_RestoreFixture(Previous)
 }
 Test("LLM generation: shared temperature diversity retains native receipts and current count", _LMT_SharedAutoTemperatureOwner)
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 4/ Show-All Projection =======
+; ======================================
+; ======================================
+
+_LMT_ShowAllCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\show_all_control.json"))
+}
+
+_LMT_ShowAllCollect(CandidateFeatures, CandidateMenu) {
+	return [{ Section: "llm.display", Key: "streaming_multi",
+		Value: CandidateFeatures["llm"]["display"]["streaming_multi"] }]
+}
+
+_LMT_ShowAllToggle(Writer := 0, *) {
+	if !IsObject(Writer)
+		Writer := _LMT_Writer
+	return LLM_Menu_CommitMutation("the native Show-all control",
+		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "show_all_at_once"),
+		_LMT_Apply, Writer, _LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_ShowAllCollect)
+}
+
+_LMT_ShowAllThrowWriter(Path, Updates) {
+	global _LMT_WriterCalls
+	_LMT_WriterCalls += 1
+	throw Error("The owned Show-all writer refused.")
+}
+
+_LMT_ShowAllPosition(Built, Label) {
+	Count := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
+	Loop Count {
+		Position := A_Index - 1
+		if _CTC_LabelAt(Built, Position) == Label
+			return Position
+	}
+	throw Error("The actual display menu omitted the shared Show-all check.")
+}
+
+_LMT_SharedShowAllNativeOwner() {
+	global _LLM_Menu, Features, _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["enabled"] := true
+		Features["llm"]["enabled"] := true
+		Corpus := _LMT_ShowAllCorpus()
+		AssertEqual(2, Corpus["states"].Length)
+		for Expected in Corpus["states"] {
+			for Count in Corpus["prediction_counts"] {
+				_LLM_Menu["show_all_at_once"] := Expected["show_all"]
+				_LLM_Menu["n_predictions"] := Count
+				Features["llm"]["display"]["streaming_multi"] := Expected["progressive"]
+				Features["llm"]["profiles"]["num_predictions"] := Count
+				_LMT_WriterCalls := 0
+				_LMT_ApplyCalls := 0
+				Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+				try {
+					Position := _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"]))
+					AssertEqual(Expected["show_all"], _CTC_IsChecked(Built, Position))
+					Flags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+					Assert(Flags != 0xFFFFFFFF)
+					AssertEqual(Count < 2, !!(Flags & 0x3))
+					Callback := _LMT_InfoBarCallback(Built, Position)
+					AssertEqual(Count >= 2, Callback.Call())
+					AssertEqual(Count >= 2 ? !Expected["show_all"] : Expected["show_all"], _LLM_Menu["show_all_at_once"])
+					if Count >= 2
+						AssertEqual(!Expected["progressive"], Features["llm"]["display"]["streaming_multi"])
+					AssertEqual(Count >= 2 ? 1 : 0, _LMT_WriterCalls)
+					AssertEqual(Count >= 2 ? 1 : 0, _LMT_ApplyCalls)
+				} finally _CTC_ReleaseMenu(Built)
+			}
+		}
+		_LLM_Menu["n_predictions"] := 2
+		_LLM_Menu["show_all_at_once"] := false
+		Features["llm"]["display"]["streaming_multi"] := true
+		Features["llm"]["profiles"]["num_predictions"] := 2
+		_LMT_WriterCalls := 0
+		Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+		try {
+			Callback := _LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"])))
+			_LLM_Menu["n_predictions"] := 1
+			AssertFalse(Callback.Call(), "a delayed click cannot own a withdrawn second slot")
+			AssertFalse(_LLM_Menu["show_all_at_once"])
+			AssertEqual(0, _LMT_WriterCalls)
+		} finally _CTC_ReleaseMenu(Built)
+		_LLM_Menu["n_predictions"] := 2
+		SavedSuspend := A_IsSuspended
+		Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+		try {
+			Callback := _LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"])))
+			Suspend(true)
+			AssertFalse(Callback.Call(), "a held command cannot publish across a native pause")
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertFalse(_LLM_Menu["show_all_at_once"])
+		} finally {
+			Suspend(SavedSuspend)
+			_CTC_ReleaseMenu(Built)
+		}
+		for Refusal in [false, "", Map()] {
+			_LMT_WriterResult := Refusal
+			_LMT_WriterCalls := 0
+			_LMT_ApplyCalls := 0
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+			try {
+				Position := _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"]))
+				AssertFalse(_LMT_InfoBarCallback(Built, Position).Call())
+				AssertFalse(_LLM_Menu["show_all_at_once"])
+				AssertEqual(1, _LMT_WriterCalls)
+				AssertEqual(0, _LMT_ApplyCalls)
+			} finally _CTC_ReleaseMenu(Built)
+		}
+		_LMT_WriterCalls := 0
+		_LMT_ApplyCalls := 0
+		Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle.Bind(_LMT_ShowAllThrowWriter))
+		try {
+			Position := _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"]))
+			AssertFalse(_LMT_InfoBarCallback(Built, Position).Call())
+			AssertFalse(_LLM_Menu["show_all_at_once"])
+			AssertEqual(1, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
+		} finally _CTC_ReleaseMenu(Built)
+		Definitions := _MR_GetManifestRoot()["llm_display_menu"]
+		SavedDefinitions := Definitions.Clone()
+		CheckIndex := 0
+		for Index, Definition in Definitions {
+			if Definition.Get("id", "") == "llm_show_all" {
+				CheckIndex := Index
+				break
+			}
+		}
+		Assert(CheckIndex > 0, "the shared Show-all declaration must exist before its placement mutation")
+		CheckRow := Definitions[CheckIndex]
+		OriginalLabel := CheckRow["i18n"]
+		try {
+			CheckRow["i18n"] := Corpus["alternate_i18n"]
+			Definitions.RemoveAt(CheckIndex)
+			Definitions.InsertAt(1, CheckRow)
+			_LLM_Menu["n_predictions"] := 2
+			_LMT_WriterResult := false
+			_LMT_WriterCalls := 0
+			_LMT_ApplyCalls := 0
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+			try {
+				AssertEqual(t(Corpus["alternate_i18n"]), _CTC_LabelAt(Built, 0))
+				AssertFalse(_LMT_InfoBarCallback(Built).Call())
+				AssertFalse(_LLM_Menu["show_all_at_once"])
+				AssertEqual(1, _LMT_WriterCalls)
+				AssertEqual(0, _LMT_ApplyCalls)
+			} finally _CTC_ReleaseMenu(Built)
+		} finally {
+			CheckRow["i18n"] := OriginalLabel
+			for Index, Row in SavedDefinitions
+				Definitions[Index] := Row
+		}
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM display: shared Show-all checks keep the native receipt and canonical polarity",
+	_LMT_SharedShowAllNativeOwner)
+
+/** Captures the real dispatcher's retry without starting an ambient timer. */
+_LMT_ShowAllArmRetry(State, Callback, DelayMs) {
+	State["timers"].Push(Map("callback", Callback, "delay", DelayMs))
+	return true
+}
+
+_LMT_ShowAllRetryBusy(State) {
+	return State["busy"]
+}
+
+_LMT_ShowAllSetMaster(Value) {
+	return LLM_Menu_CommitMutation("the Show-all fixture master",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "enabled", Value),
+		_LMT_Apply, _LMT_Writer, _LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Collect)
+}
+
+_LMT_ShowAllMasterRevokesHeldAndDeferred() {
+	global _LLM_Menu, Features, _LMT_WriterCalls, _LMT_ApplyCalls
+	global MENU_COMMAND_DEFERRAL_RETRY_MS, _MenuStartupCommands
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	SavedStartupCommands := _MenuStartupCommands
+	try {
+		Suspend(false)
+		_MenuStartupCommands := 0
+		_LLM_Menu["enabled"] := true
+		Features["llm"]["enabled"] := true
+		_LLM_Menu["n_predictions"] := 2
+		Features["llm"]["profiles"]["num_predictions"] := 2
+		_LLM_Menu["show_all_at_once"] := false
+		Features["llm"]["display"]["streaming_multi"] := true
+		for Deferred in [false, true] {
+			AssertTrue(_LMT_ShowAllSetMaster(true))
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle)
+			try {
+				Callback := _LMT_InfoBarCallback(Built,
+					_LMT_ShowAllPosition(Built, t(_LMT_ShowAllCorpus()["row"]["i18n"])))
+				State := Map("busy", true, "timers", [])
+				if Deferred {
+					Writes := _LMT_WriterCalls
+					AssertEqual("", MenuCommandRun(Callback, [], 0,
+						_LMT_ShowAllRetryBusy.Bind(State), _LMT_ShowAllArmRetry.Bind(State)))
+					AssertEqual(Writes, _LMT_WriterCalls)
+					AssertEqual(1, State["timers"].Length)
+					AssertEqual(MENU_COMMAND_DEFERRAL_RETRY_MS, State["timers"][1]["delay"])
+				}
+				AssertTrue(_LMT_ShowAllSetMaster(false), "the real master owner acknowledges withdrawal")
+				AssertFalse(_LLM_Menu["enabled"])
+				AssertFalse(Features["llm"]["enabled"])
+				_LMT_WriterCalls := 0
+				_LMT_ApplyCalls := 0
+				if Deferred {
+					State["busy"] := false
+					State["timers"][1]["callback"].Call()
+					AssertEqual(1, State["timers"].Length, "no competing retry is armed after the lease releases")
+				} else {
+					AssertFalse(Callback.Call(), "a retained native callback refuses the disabled master")
+				}
+				AssertEqual(0, _LMT_WriterCalls, "held and dispatcher-deferred delivery publish no display setting")
+				AssertEqual(0, _LMT_ApplyCalls)
+				AssertFalse(_LLM_Menu["show_all_at_once"])
+				AssertTrue(Features["llm"]["display"]["streaming_multi"])
+			} finally _CTC_ReleaseMenu(Built)
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_MenuStartupCommands := SavedStartupCommands
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: master withdrawal fences held and real dispatcher-deferred Show-all commands",
+	_LMT_ShowAllMasterRevokesHeldAndDeferred)
+
+_LMT_ShowAllCanonicalBoundaries() {
+	global _LLM_Menu, Features, LLM_Defaults, _LLM_Engine
+	Previous := _LMT_InstallFixture()
+	SavedDefaults := LLM_Defaults
+	SavedEngine := _LLM_Engine
+	try {
+		for Expected in _LMT_ShowAllCorpus()["states"] {
+			LLM_Defaults := Map("llm_streaming_multi", Expected["progressive"])
+			_LLM_Engine := SavedEngine.Clone()
+			LLM_Engine_ApplySharedDefaults()
+			AssertEqual(Expected["show_all"], _LLM_Engine["show_all_at_once"],
+				"the real engine default loader projects canonical progressive display")
+			Features["llm"]["display"]["streaming_multi"] := Expected["progressive"]
+			Opts := LLM_Menu_BuildSavedOpts()
+			AssertEqual(Expected["show_all"], Opts["show_all_at_once"],
+				"both raw stored polarities load without rewriting historical bytes")
+			_LLM_Menu["show_all_at_once"] := Expected["show_all"]
+			AssertTrue(_LLM_Menu_SyncToFeatures())
+			AssertEqual(Expected["progressive"], Features["llm"]["display"]["streaming_multi"],
+				"the acknowledged writer receives canonical progressive display")
+		}
+	} finally {
+		LLM_Defaults := SavedDefaults
+		_LLM_Engine := SavedEngine
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: shared defaults and saved values invert only at native boundaries",
+	_LMT_ShowAllCanonicalBoundaries)
+
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 8/ Automatic Triggers =======
+; =====================================
+; =====================================
+
+_LMT_TriggerCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\automatic_trigger_controls.json"))
+}
+
+_LMT_TriggerCollect(Key, CandidateFeatures, CandidateMenu) {
+	return [{ Section: "llm.trigger", Key: Key, Value: CandidateFeatures["llm"]["trigger"][Key] }]
+}
+
+_LMT_TriggerToggle(Key, Writer := 0, *) {
+	if !IsObject(Writer)
+		Writer := _LMT_Writer
+	return LLM_Menu_CommitMutation("the native trigger fixture",
+		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, Key),
+		_LMT_Apply, Writer, _LMT_Notify, _LMT_Acquire, _LMT_Settle,
+		_LMT_TriggerCollect.Bind(Key))
+}
+
+_LMT_TriggerBuilder(Writer := 0) {
+	return LLM_Menu_BuildTriggerMenu(_LMT_TriggerToggle.Bind("instant_on_word_end", Writer),
+		_LMT_TriggerToggle.Bind("after_hotstring", Writer))
+}
+
+_LMT_SharedTriggerOwner() {
+	global _LLM_Menu, Features, _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	try {
+		Suspend(false)
+		Corpus := _LMT_TriggerCorpus()
+		AssertEqual(4, Corpus["states"].Length)
+		_LLM_Menu["enabled"] := true
+		Features["llm"]["enabled"] := true
+		for States in Corpus["states"] {
+			for Count in Corpus["prediction_counts"] {
+				for Index, Expected in Corpus["rows"] {
+					_LLM_Menu["instant_on_word_end"] := States[1]
+					_LLM_Menu["after_hotstring"] := States[2]
+					_LLM_Menu["n_predictions"] := Count
+					Features["llm"]["trigger"]["instant_on_word_end"] := States[1]
+					Features["llm"]["trigger"]["after_hotstring"] := States[2]
+					Features["llm"]["profiles"]["num_predictions"] := Count
+					_LMT_WriterCalls := 0
+					_LMT_ApplyCalls := 0
+					_LMT_WriterResult := 1
+					Built := _LMT_TriggerBuilder()
+					try {
+						Position := _LMT_ShowAllPosition(Built, t(Expected["i18n"]))
+						AssertEqual(States[Index], _CTC_IsChecked(Built, Position))
+						AssertTrue(_LMT_InfoBarCallback(Built, Position).Call())
+						AssertEqual(!States[Index], _LLM_Menu[Expected["native"]])
+						AssertEqual(!States[Index], Features["llm"]["trigger"][Expected["native"]])
+						Sibling := Index == 1 ? 2 : 1
+						AssertEqual(States[Sibling], _LLM_Menu[Corpus["rows"][Sibling]["native"]])
+						AssertEqual(States[Sibling], Features["llm"]["trigger"][Corpus["rows"][Sibling]["native"]])
+						AssertEqual(1, _LMT_WriterCalls)
+						AssertEqual(1, _LMT_ApplyCalls)
+					} finally _CTC_ReleaseMenu(Built)
+				}
+			}
+		}
+		for Expected in Corpus["rows"] {
+			_LMT_WriterResult := 1
+			_LLM_Menu[Expected["native"]] := false
+			Features["llm"]["trigger"][Expected["native"]] := false
+			Built := _LMT_TriggerBuilder()
+			try {
+				Callback := _LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Expected["i18n"])))
+				AssertTrue(Callback.Call())
+				_LLM_Menu["n_predictions"] := 1
+				Features["llm"]["profiles"]["num_predictions"] := 1
+				AssertTrue(Callback.Call(), "variant count does not own a trigger switch")
+				AssertFalse(_LLM_Menu[Expected["native"]])
+				Writes := _LMT_WriterCalls
+				Suspend(true)
+				AssertFalse(Callback.Call())
+				Suspend(false)
+				_LLM_Menu["enabled"] := false
+				Features["llm"]["enabled"] := false
+				AssertFalse(Callback.Call())
+				AssertEqual(Writes, _LMT_WriterCalls)
+				_LLM_Menu["enabled"] := true
+				Features["llm"]["enabled"] := true
+			} finally _CTC_ReleaseMenu(Built)
+			for Refusal in [false, "", Map()] {
+				_LMT_WriterResult := Refusal
+				_LMT_WriterCalls := 0
+				_LMT_ApplyCalls := 0
+				Built := _LMT_TriggerBuilder()
+				try {
+					AssertFalse(_LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Expected["i18n"]))).Call())
+					AssertFalse(_LLM_Menu[Expected["native"]])
+					AssertEqual(1, _LMT_WriterCalls)
+					AssertEqual(0, _LMT_ApplyCalls)
+				} finally _CTC_ReleaseMenu(Built)
+			}
+			Built := _LMT_TriggerBuilder(_LMT_ShowAllThrowWriter)
+			try {
+				AssertFalse(_LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Expected["i18n"]))).Call())
+				AssertFalse(_LLM_Menu[Expected["native"]])
+			} finally _CTC_ReleaseMenu(Built)
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM trigger: shared bool pairs preserve native lease refusal and live admission", _LMT_SharedTriggerOwner)
+
+_LMT_SharedTriggerDeclaration() {
+	global _LLM_Menu, Features, _LMT_WriterResult
+	Previous := _LMT_InstallFixture()
+	Definitions := _MR_GetManifestRoot()["llm_trigger_menu"]
+	SavedDefinitions := Definitions.Clone()
+	Row := Definitions[2]
+	SavedLabel := Row["i18n"]
+	try {
+		_LLM_Menu["enabled"] := true
+		Features["llm"]["enabled"] := true
+		_LMT_WriterResult := false
+		Row["i18n"] := _LMT_TriggerCorpus()["alternate_i18n"]
+		Definitions.RemoveAt(2)
+		Definitions.InsertAt(1, Row)
+		Built := _LMT_TriggerBuilder()
+		try {
+			AssertEqual(t(Row["i18n"]), _CTC_LabelAt(Built, 0))
+			AssertFalse(_LMT_InfoBarCallback(Built).Call())
+		} finally _CTC_ReleaseMenu(Built)
+	} finally {
+		Row["i18n"] := SavedLabel
+		for Index, Entry in SavedDefinitions
+			Definitions[Index] := Entry
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM trigger: native command placement follows the shared label and order", _LMT_SharedTriggerDeclaration)
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 6/ Shared Token Streaming =======
+; =========================================
+; =========================================
+
+_LMT_StreamingCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\token_streaming_control.json"))
+}
+
+_LMT_StreamingPolicyContract() {
+	Corpus := _LMT_StreamingCorpus()
+	AssertEqual(9, Corpus["capabilities"].Length)
+	AssertEqual(15, Corpus["cases"].Length)
+	for Vector in Corpus["capabilities"] {
+		AssertEqual(Vector["capable"], LLM_DisplayStreamingCapable(Vector["platform"], Vector["backend"]),
+			"actual shared capability matches the independent native transport inventory")
+	}
+	for Vector in Corpus["cases"] {
+		Expected := Corpus["base"].Clone()
+		Current := Corpus["base"].Clone()
+		for Key, Value in Vector.Get("expected", Map())
+			Expected[Key] := Value
+		for Key, Value in Vector["current"]
+			Current[Key] := Value
+		Decision := LLM_DisplayStreamingIntent(Expected, Current)
+		AssertEqual(Vector["admitted"], Decision["admitted"], Vector["id"])
+		if Vector["admitted"]
+			AssertEqual(Vector["value"], Decision["value"], Vector["id"])
+	}
+}
+Test("LLM display: shared token streaming replays independent capabilities and stale intents", _LMT_StreamingPolicyContract)
+
+_LMT_StreamingNativeRefusal() {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	try {
+		Corpus := _LMT_StreamingCorpus()
+		Definitions := _MR_GetManifestRoot()["llm_display_menu"]
+		StreamingRow := 0
+		for Definition in Definitions {
+			if Definition.Get("id", "") == Corpus["row"]["id"]
+				StreamingRow := Definition
+		}
+		Assert(StreamingRow is Map, "the actual shared declaration must own the streaming row")
+		AssertEqual("grey", StreamingRow["unavailable"])
+		AssertEqual("platform_reason.token_streaming_transport_missing", StreamingRow["reason_key"])
+		for Backend in ["ollama", "api", "mlx"] {
+			_LLM_Menu["backend"] := Backend
+			_LLM_Menu["enabled"] := true
+			_LLM_Menu["streaming"] := true
+			_LLM_Menu["show_all_at_once"] := false
+			State := Map("calls", 0)
+			Command := (*) => State["calls"] += 1
+			Expected := _LLM_Menu_StreamingSnapshot()
+			AssertFalse(LLM_BackendCapabilities(Backend)["streaming"], "Windows has no partial-frame transport")
+			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "an unsupported click cannot reach a writer")
+			Suspend(true)
+			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "a retained click remains refused under native pause")
+			Suspend(SavedSuspend)
+			_LLM_Menu := _LLM_Menu.Clone()
+			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "an old row cannot claim a replacement map owner")
+			AssertEqual(0, State["calls"])
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
+			AssertTrue(_LLM_Menu["streaming"], "unavailable native rendering does not strip historical stored intent")
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, Command)
+			try {
+				Count := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
+				Matches := 0
+				Loop Count {
+					Position := A_Index - 1
+					Label := _CTC_LabelAt(Built, Position)
+					if InStr(Label, t(Corpus["row"]["i18n"])) == 1 {
+						Matches += 1
+						Assert(Label != t(Corpus["row"]["i18n"]), "the disabled native row explains why it cannot stream")
+						AssertContains(Label, "Windows")
+						NativeState := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+						Assert(NativeState & 0x3, "the real Win32 row is greyed")
+						AssertFalse(_CTC_IsChecked(Built, Position), "a buffered transport never reports effective token streaming")
+					}
+				}
+				AssertEqual(1, Matches, "the native menu projects exactly one shared streaming declaration")
+			} finally _CTC_ReleaseMenu(Built)
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: the real Windows streaming row remains truthful and cannot reach a writer", _LMT_StreamingNativeRefusal)
+
+
+_LMT_StreamingCountCommand(State) {
+	State["calls"] += 1
+	return true
+}
+
+_LMT_StreamingSparseOwnerRefusal() {
+	global _LLM_Menu, _LLM_Engine, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	HadEngine := IsSet(_LLM_Engine)
+	SavedEngine := HadEngine ? _LLM_Engine : 0
+	try {
+		Suspend(false)
+		_LLM_Menu["backend"] := "ollama"
+		_LLM_Menu["enabled"] := true
+		_LLM_Menu["streaming"] := true
+		_LLM_Menu["show_all_at_once"] := false
+		_LLM_Menu["future_streaming_neighbor"] := "preserve"
+		Owners := [Map("id", "unset"), Map("id", "non-map", "owner", 0),
+			Map("id", "empty", "owner", Map()),
+			Map("id", "retired debounce", "owner", Map("timer_active", false)),
+			Map("id", "missing enabled", "owner", Map("backend", "ollama")),
+			Map("id", "missing backend", "owner", Map("enabled", true))]
+		for Vector in Owners {
+			if Vector.Has("owner")
+				_LLM_Engine := Vector["owner"]
+			else
+				_LLM_Engine := unset
+			Failure := ""
+			Snapshot := 0
+			try {
+				Snapshot := _LLM_Menu_StreamingSnapshot()
+			} catch as Err {
+				Failure := Err.Message
+			}
+			AssertEqual("", Failure, Vector["id"] . ": a missing runtime owner is a refusal, never an exception")
+			Assert(Snapshot is Map, Vector["id"] . ": the real owner returns an admission snapshot")
+			AssertTrue(Snapshot["blocked"], Vector["id"] . ": incomplete engine state is unavailable")
+			AssertFalse(LLM_DisplayStreamingReady(Snapshot), Vector["id"] . ": unavailable state cannot enable a shared row")
+			State := Map("calls", 0)
+			Command := _LMT_StreamingCountCommand.Bind(State)
+			AssertFalse(_LLM_Menu_StreamingCommand(Snapshot, Command), Vector["id"] . ": unavailable state cannot reach the setting owner")
+			AssertEqual(0, State["calls"])
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, Command)
+			try {
+				Matches := 0
+				Loop DllCall("GetMenuItemCount", "ptr", Built.Handle, "int") {
+					Position := A_Index - 1
+					if InStr(_CTC_LabelAt(Built, Position), t("menu.llm.show_streaming")) == 1 {
+						Matches += 1
+						NativeState := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+						Assert(NativeState & 0x3, Vector["id"] . ": the actual Win32 row remains disabled")
+						AssertFalse(_CTC_IsChecked(Built, Position))
+					}
+				}
+				AssertEqual(1, Matches, Vector["id"] . ": the shared declaration remains visible exactly once")
+			} finally _CTC_ReleaseMenu(Built)
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
+			AssertTrue(_LLM_Menu["streaming"], "refusal preserves historical stored intent")
+			AssertEqual("preserve", _LLM_Menu["future_streaming_neighbor"])
+		}
+	} finally {
+		if HadEngine
+			_LLM_Engine := SavedEngine
+		else
+			_LLM_Engine := unset
+		Suspend(SavedSuspend)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: sparse or retired engine owners refuse streaming without writes or missing-key exceptions", _LMT_StreamingSparseOwnerRefusal)
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= Shared Indentation Choice =======
+; =========================================
+; =========================================
+
+_LMT_IndentCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\indentation_control.json"))
+}
+
+; The production writer still owns its lease/source fence; only the terminal
+; native write is injected for refusal cases, like the other setting fixtures.
+_LMT_IndentCommit(Value, Expected, WriterFn := 0, Seen := 0) {
+	if !(Seen is Map)
+		return LLM_Menu_CommitMutation("the native indentation regression",
+			(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", Value),
+			_LMT_Apply, (Path, Updates) => _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn),
+			_LMT_Notify, _LMT_Acquire, _LMT_Settle)
+	return LLM_Menu_CommitMutation("the native indentation regression",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", Value),
+		_LMT_Apply, _LMT_IndentObserveWrite.Bind(Seen, Expected, WriterFn),
+		_LMT_IndentObserveNotify.Bind(Seen), _LMT_Acquire, _LMT_Settle,
+		_LMT_IndentObserveCollect.Bind(Seen))
+}
+
+_LMT_IndentObservedCommit(WriterFn, Seen, Value, Expected) {
+	return _LMT_IndentCommit(Value, Expected, WriterFn, Seen)
+}
+
+; Observers delegate to the unchanged full collector and borrowed writer. Closed
+; stage facts distinguish a pre-writer refusal without printing source or errors.
+_LMT_IndentObserveCollect(Seen, CandidateFeatures, CandidateMenu) {
+	Seen["collector_entered"] := true
+	try {
+		Updates := _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
+		Seen["collector_returned"] := true
+		Seen["collector_array"] := Updates is Array
+		return Updates
+	} catch as Err {
+		Seen["collector_threw"] := true
+		throw Err
+	}
+}
+
+_LMT_IndentObserveWrite(Seen, Expected, WriterFn, Path, Updates) {
+	Seen["borrowed_writer_entered"] := true
+	Current := _LLM_Menu_IndentSnapshot()
+	Seen["snapshot_blocked"] := Current["blocked"]
+	Seen["source_matches"] := _LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+	Seen["intent_admitted"] := LLM_DisplayIndentIntent(Expected, Current,
+		Expected["indentation"], LLM_MENU_INDENT_OPTIONS)["admitted"]
+	Owned := 0
+	for Update in Updates {
+		if Update.Section == "llm.display" && Update.Key == "pred_indent"
+			Owned += 1
+	}
+	Seen["single_owned_leaf"] := Owned == 1
+	try {
+		Result := _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn)
+		Seen["borrowed_writer_returned"] := true
+		Seen["borrowed_writer_ack"] := (Result is Integer) && Result == 1
+		return Result
+	} catch as Err {
+		Seen["borrowed_writer_threw"] := true
+		throw Err
+	}
+}
+
+_LMT_IndentObserveNotify(Seen, Message, Options) {
+	Seen["notified"] := true
+	return _LMT_Notify(Message, Options)
+}
+
+; Values outside the fixed Boolean observation contract are never interpolated.
+_LMT_IndentObservation(Seen) {
+	Summary := ""
+	for Field in ["collector_entered", "collector_returned", "collector_array", "collector_threw",
+			"borrowed_writer_entered", "snapshot_blocked", "source_matches", "intent_admitted",
+			"single_owned_leaf", "borrowed_writer_returned", "borrowed_writer_ack",
+			"borrowed_writer_threw", "notified"] {
+		Value := Seen.Get(Field, "")
+		Summary .= (Summary == "" ? "" : ";") . Field . "="
+			. ((Value is Integer) && (Value == 0 || Value == 1) ? Value : "unobserved")
+	}
+	return Summary
+}
+
+_LMT_IndentChild(Built) {
+	Prefix := t("menu.llm.indent_label")
+	Count := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
+	Loop Count {
+		Position := A_Index - 1
+		if InStr(_CTC_LabelAt(Built, Position), Prefix) == 1 {
+			Handle := _MCR_SubMenuAt(Built, Position)
+			AssertEqual(15, DllCall("GetMenuItemCount", "ptr", Handle, "int"))
+			return {Handle: Handle, Position: Position}
+		}
+	}
+	throw Error("The actual native indentation submenu is absent.")
+}
+
+_LMT_IndentWriteMode(Mode, Seen, Path, Updates) {
+	return _LMT_IndentWriteObserved(Path, Updates, Mode, Seen)
+}
+
+_LMT_IndentWriteObserved(Path, Updates, Mode, Seen) {
+	Seen["calls"] += 1
+	Seen["updates"] := LLM_Menu_DeepClone(Updates)
+	if Mode == "throw"
+		throw Error("native indentation writer refused")
+	if Mode == "nil"
+		return ""
+	if Mode == "false"
+		return false
+	if Mode == "truthy integer"
+		return 2
+	if Mode == "truthy string"
+		return "ack"
+	return TOML_BatchWrite(Path, Updates)
+}
+
+; Uses the actual Win32 menu, native dispatcher, configuration lease and strict
+; TOML writer. Private file ownership is retired in finally, even on assertions.
+_LMT_IndentNativeOwners() {
+	global ConfigurationFile, _LLM_Menu, _LLM_Engine, _LMT_ApplyCalls, _MenuDispatchCallbacks
+	Previous := _LMT_InstallFixture()
+	PreviousEngine := _LLM_Engine
+	SavedSuspend := A_IsSuspended
+	Path := A_Temp . "\ergopti-indent-choice-" . DllCall("GetCurrentProcessId", "uint") . "-" . A_TickCount . ".toml"
+	AssertFalse(FileExist(Path), "this fixture must acquire a new private path")
+	ConfigurationFile := Path
+	try {
+		Corpus := _LMT_IndentCorpus()
+		AssertEqual(15, Corpus["choices"].Length)
+		for Mode in ["false", "nil", "throw", "truthy integer", "truthy string", "ack"] {
+			for Position in [0, 7, 14] {
+				_LLM_Menu := _LMT_Menu()
+				_LLM_Menu["enabled"] := true
+				_LLM_Menu["n_predictions"] := 3
+				_LLM_Menu["pred_indent"] := 1
+				_LLM_Menu["show_all_at_once"] := false
+				_LLM_Engine := LLM_Menu_DeepClone(_LLM_Menu)
+				Initial := '[llm]`nenabled = true`n[llm.models]`nselected = "ollama"`n'
+					. "[llm.profiles]`nnum_predictions = 3`n[llm.display]`npred_indent = 1`nstreaming_multi = true`n"
+					. "[llm.generation]`ntemperature = 0.9`n[private]`nfuture = 42`n"
+				if FileExist(Path)
+					FileDelete(Path)
+				FileAppend(Initial, Path, "UTF-8-RAW")
+				Seen := Map("calls", 0)
+				Writer := _LMT_IndentWriteMode.Bind(Mode, Seen)
+				Command := _LMT_IndentObservedCommit.Bind(Writer, Seen)
+				Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, (*) => false, Command)
+				try {
+					Child := _LMT_IndentChild(Built)
+					State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Child.Position, "uint", 0x400, "uint")
+					Assert(State != 0xFFFFFFFF, "the actual native indentation row must exist")
+					AssertEqual(0, State & 0x3, "an admitted indentation row is enabled")
+					for Index, Choice in Corpus["choices"] {
+						AssertEqual(Choice["prefix"] . t(Choice["i18n"]), _CTC_LabelAt(Child, Index - 1))
+						AssertEqual(Choice["value"] == 1, _CTC_IsChecked(Child, Index - 1))
+					}
+					Id := DllCall("GetMenuItemID", "ptr", Child.Handle, "int", Position, "uint")
+					Assert(_MenuDispatchCallbacks.Has(Id), "the actual native choice must own its dispatcher callback")
+					Callback := _MenuDispatchCallbacks[Id]
+					_LMT_ApplyCalls := 0
+					AssertEqual(Mode == "ack", Callback.Call())
+					AssertEqual(1, Seen["calls"], "closed native stages: " . _LMT_IndentObservation(Seen))
+					AssertEqual(1, Seen["updates"].Length, "the native choice may own only one leaf")
+					AssertEqual("llm.display", Seen["updates"][1].Section)
+					AssertEqual("pred_indent", Seen["updates"][1].Key)
+					Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+					AssertEqual(42, Document["private"]["future"])
+					AssertEqual(0.9, Document["llm"]["generation"]["temperature"], "one display leaf cannot overwrite a foreign temperature")
+					Value := Corpus["choices"][Position + 1]["value"]
+					if Mode == "ack" {
+						AssertEqual(Value, _LLM_Menu["pred_indent"])
+						Read := _TOML_DocumentLookup(Document, ["llm", "display", "pred_indent"])
+						AssertEqual(Value, Read["found"] ? Read["value"] : ManifestDefaultFor("llm.display.pred_indent"))
+						AssertEqual(1, _LMT_ApplyCalls)
+						AssertFalse(Callback.Call(), "published menu identity retires the held choice")
+						AssertEqual(1, Seen["calls"])
+					} else {
+						AssertEqual(1, _LLM_Menu["pred_indent"])
+						AssertEqual(Initial, FSReadUtf8Exact(Path))
+						AssertEqual(0, _LMT_ApplyCalls)
+					}
+				} finally _CTC_ReleaseMenu(Built)
+			}
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_LLM_Engine := PreviousEngine
+		if FileExist(Path)
+			FileDelete(Path)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: actual native indentation choices retain source, strict ACK and numeric boundaries", _LMT_IndentNativeOwners)
+
+
+_LMT_IndentPolicyCorpus() {
+	Corpus := _LMT_IndentCorpus()
+	Owner := Map()
+	Other := Map()
+	Values := [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
+	for Vector in Corpus["cases"] {
+		Expected := LLM_Menu_DeepClone(Corpus["base"])
+		Current := LLM_Menu_DeepClone(Corpus["base"])
+		for Field, Value in Vector.Get("expected", Map())
+			Expected[Field] := Value
+		for Field, Value in Vector["current"]
+			Current[Field] := Value
+		Expected["owner"] := Expected["owner"] == "owned" ? Owner : Other
+		Current["owner"] := Current["owner"] == "owned" ? Owner : Other
+		Decision := LLM_DisplayIndentIntent(Expected, Current, Vector["value"], Values)
+		AssertEqual(Vector["admitted"], Decision["admitted"], Vector["id"])
+		if Vector["admitted"]
+			AssertEqual(Vector["value"], Decision["value"], Vector["id"])
+	}
+}
+Test("LLM display: shared indentation policy replays independent admission vectors", _LMT_IndentPolicyCorpus)
+
+_LMT_IndentRetainedOwners() {
+	global ConfigurationFile, _LLM_Menu, _LLM_Engine, _LMT_ApplyCalls, _MenuDispatchCallbacks
+	Previous := _LMT_InstallFixture()
+	PreviousEngine := _LLM_Engine
+	SavedSuspend := A_IsSuspended
+	Path := A_Temp . "\ergopti-indent-held-" . DllCall("GetCurrentProcessId", "uint") . "-" . A_TickCount . ".toml"
+	AssertFalse(FileExist(Path), "this fixture must acquire a new private path")
+	ConfigurationFile := Path
+	try {
+		for Condition in ["paused", "master", "count", "sparse runtime", "runtime mismatch", "source", "retired owner"] {
+			_LLM_Menu := _LMT_Menu()
+			_LLM_Menu["enabled"] := true
+			_LLM_Menu["n_predictions"] := 3
+			_LLM_Menu["pred_indent"] := 1
+			_LLM_Menu["show_all_at_once"] := false
+			_LLM_Engine := LLM_Menu_DeepClone(_LLM_Menu)
+			Initial := '[llm]`nenabled = true`n[llm.models]`nselected = "ollama"`n'
+				. "[llm.profiles]`nnum_predictions = 3`n[llm.display]`npred_indent = 1`nstreaming_multi = true`n"
+				. "[llm.generation]`ntemperature = 0.9`n[private]`nfuture = 42`n"
+			if FileExist(Path)
+				FileDelete(Path)
+			FileAppend(Initial, Path, "UTF-8-RAW")
+			Seen := Map("calls", 0)
+			Writer := (Target, Updates) => _LMT_IndentWriteObserved(Target, Updates, "ack", Seen)
+			Command := (Value, Expected) => _LMT_IndentCommit(Value, Expected, Writer)
+			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, (*) => false, Command)
+			try {
+				Child := _LMT_IndentChild(Built)
+				Id := DllCall("GetMenuItemID", "ptr", Child.Handle, "int", 0, "uint")
+				Assert(_MenuDispatchCallbacks.Has(Id))
+				Callback := _MenuDispatchCallbacks[Id]
+				if Condition == "paused"
+					Suspend(true)
+				if Condition == "master"
+					_LLM_Menu["enabled"] := false
+				if Condition == "count"
+					_LLM_Menu["n_predictions"] := 1
+				if Condition == "sparse runtime"
+					_LLM_Engine := Map("timer_active", false)
+				if Condition == "runtime mismatch"
+					_LLM_Engine["pred_indent"] := 2
+				if Condition == "source" {
+					FileDelete(Path)
+					FileAppend(StrReplace(Initial, "temperature = 0.9", "temperature = 0.8"), Path, "UTF-8-RAW")
+				}
+				if Condition == "retired owner"
+					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+				Physical := FSReadUtf8Exact(Path)
+				_LMT_ApplyCalls := 0
+				AssertFalse(Callback.Call(), Condition)
+				AssertEqual(0, Seen["calls"], Condition . " refuses before the native writer")
+				AssertEqual(0, _LMT_ApplyCalls, Condition)
+				AssertEqual(Physical, FSReadUtf8Exact(Path), Condition . " preserves exact physical bytes")
+			} finally {
+				Suspend(SavedSuspend)
+				_CTC_ReleaseMenu(Built)
+			}
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_LLM_Engine := PreviousEngine
+		if FileExist(Path)
+			FileDelete(Path)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: held native indentation choices refuse withdrawn or stale owners before write", _LMT_IndentRetainedOwners)
+
+
+_LMT_IndentCanonicalTypes() {
+	global ConfigurationFile, _LLM_Menu, _LLM_Engine
+	Previous := _LMT_InstallFixture()
+	PreviousEngine := _LLM_Engine
+	SavedSuspend := A_IsSuspended
+	Path := A_Temp . "\ergopti-indent-types-" . DllCall("GetCurrentProcessId", "uint") . "-" . A_TickCount . ".toml"
+	AssertFalse(FileExist(Path))
+	ConfigurationFile := Path
+	try {
+		Suspend(false)
+		_LLM_Menu["enabled"] := true
+		_LLM_Menu["n_predictions"] := 3
+		_LLM_Menu["pred_indent"] := 1
+		_LLM_Menu["show_all_at_once"] := false
+		_LLM_Engine := LLM_Menu_DeepClone(_LLM_Menu)
+		Initial := '[llm]`nenabled = true`n[llm.models]`nselected = "ollama"`n'
+			. "[llm.profiles]`nnum_predictions = 3`n[llm.display]`npred_indent = 1`nstreaming_multi = true`n"
+		for Vector in [
+			Map("before", "enabled = true", "after", "enabled = 1", "admitted", false),
+			Map("before", "streaming_multi = true", "after", "streaming_multi = 1", "admitted", false),
+			Map("before", "num_predictions = 3", "after", 'num_predictions = "3"', "admitted", false),
+			Map("before", "pred_indent = 1", "after", 'pred_indent = "1"', "admitted", false),
+			Map("before", "pred_indent = 1", "after", "pred_indent = 1.0", "admitted", true)] {
+			Physical := StrReplace(Initial, Vector["before"], Vector["after"])
+			Assert(Physical != Initial, "each canonical type vector must change the real source")
+			if FileExist(Path)
+				FileDelete(Path)
+			FileAppend(Physical, Path, "UTF-8-RAW")
+			Snapshot := _LLM_Menu_IndentSnapshot()
+			AssertEqual(Vector["admitted"], LLM_DisplayIndentReady(Snapshot), Vector["after"])
+			AssertEqual(Physical, FSReadUtf8Exact(Path), "admission observation never changes source bytes")
+		}
+	} finally {
+		Suspend(SavedSuspend)
+		_LLM_Engine := PreviousEngine
+		if FileExist(Path)
+			FileDelete(Path)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: native indentation source requires real scalar types without numeric string coercion", _LMT_IndentCanonicalTypes)
+
+
+_LMT_IndentObservationIsClosed() {
+	Seen := Map("collector_entered", true, "source_matches", false,
+		"collector_threw", "private-error-marker", "unknown_future_stage", "private-future-marker")
+	Summary := _LMT_IndentObservation(Seen)
+	Assert(InStr(Summary, "collector_entered=1") > 0)
+	Assert(InStr(Summary, "source_matches=0") > 0)
+	Assert(InStr(Summary, "collector_threw=unobserved") > 0)
+	AssertFalse(InStr(Summary, "private-error-marker"))
+	AssertFalse(InStr(Summary, "private-future-marker"))
+	AssertFalse(InStr(Summary, "unknown_future_stage"))
+}
+Test("LLM display: indentation owner diagnostics retain only closed stage facts", _LMT_IndentObservationIsClosed)
+
+
+; The full collector serializes stored profiles, not just scalar menu choices.
+; Its fixture must satisfy the same required fields as the actual boot owner.
+_LMT_FullCollectorOwnsCompleteProfile() {
+	global Features, _LLM_Menu
+	Previous := _LMT_InstallFixture()
+	try {
+		Profiles := _LLM_Menu["user_profiles"]
+		AssertEqual(1, Profiles.Length)
+		AssertTrue(Profiles[1].Has("system_multi"),
+			"the common transaction fixture must carry every stored profile prompt")
+		AssertEqual("", Profiles[1]["system_multi"])
+		Payload := _LLM_Menu_SerializeUserProfiles(Profiles)
+		AssertTrue(Payload is String,
+			"the actual stored-profile owner must accept the common fixture")
+		Parsed := _LLM_Menu_DeserializeUserProfiles(Payload)
+		AssertTrue(Parsed is Array,
+			"the actual stored-profile decoder must admit the encoded fixture")
+		AssertEqual("user_one", Parsed[1]["id"])
+		AssertEqual("Live label", Parsed[1]["label"])
+		AssertEqual("Live prompt", Parsed[1]["system_single"])
+		AssertEqual("", Parsed[1]["system_multi"])
+		AssertEqual(false, Parsed[1]["batch"])
+
+		Updates := _ConfigCollectFullSaveUpdates(Features, _LLM_Menu)
+		AssertTrue(Updates is Array,
+			"the actual full collector must reach its returned update image")
+		Found := 0
+		for Update in Updates {
+			if Update.Section == "llm" && Update.Key == "user_profiles" {
+				Found += 1
+				AssertEqual(Payload, Update.Value)
+			}
+		}
+		AssertEqual(1, Found,
+			"one actual full-save update owns the complete stored profile payload")
+
+		Incomplete := LLM_Menu_DeepClone(_LLM_Menu)
+		Incomplete["user_profiles"][1].Delete("system_multi")
+		AssertFalse(_LLM_Menu_SerializeUserProfiles(Incomplete["user_profiles"]),
+			"an incomplete profile must still be refused by its actual owner")
+		AssertFalse(_LLM_Menu_AppendPersistedUpdates([], Incomplete))
+		Refused := false
+		try _ConfigCollectFullSaveUpdates(Features, Incomplete)
+		catch {
+			Refused := true
+		}
+		AssertTrue(Refused,
+			"the actual full collector must retain its incomplete-profile refusal")
+		AssertTrue(_LLM_Menu["user_profiles"][1].Has("system_multi"))
+		AssertEqual(Payload, _LLM_Menu_SerializeUserProfiles(_LLM_Menu["user_profiles"]),
+			"the negative detached candidate must not mutate the live fixture")
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM transaction: actual full collector requires a complete stored profile",
+	_LMT_FullCollectorOwnsCompleteProfile)
+
+_LMT_InfoBarPrivatePath() {
+	Path := A_Temp . "\ergopti-info-bar-" . DllCall("GetCurrentProcessId", "uint") . "-" . A_TickCount . ".toml"
+	AssertFalse(FileExist(Path), "this test must acquire an absent private source")
+	return Path
+}
+
+_LMT_InfoBarAdmitFixture(Path, Selected) {
+	global _LLM_Menu, _LLM_Engine
+	_LLM_Menu["enabled"] := true
+	_LLM_Menu["n_predictions"] := 1
+	_LLM_Engine := LLM_Menu_DeepClone(_LLM_Menu)
+	Initial := '[llm]`nenabled = true`n[llm.models]`nselected = "ollama"`n[llm.display]`nshow_info_bar = '
+		. (Selected ? "true" : "false") . '`n[llm.generation]`ntemperature = 0.9`n[private]`nfuture = 42`n'
+	if FileExist(Path)
+		FileDelete(Path)
+	FileAppend(Initial, Path, "UTF-8-RAW")
+	return Initial
+}
+
+_LMT_InfoBarLeaseWrite(Expected, Writer, Path, Updates) {
+	return _LLM_Menu_InfoBarWrite(Expected, Path, Updates, Writer)
+}
+
+_LMT_InfoBarCommit(Writer, Value, Expected) {
+	return LLM_Menu_CommitMutation("the actual retained Info Bar owner",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "show_info_bar", Value),
+		_LMT_Apply, _LMT_InfoBarLeaseWrite.Bind(Expected, Writer), _LMT_Notify,
+		_LMT_Acquire, _LMT_Settle, _LMT_InfoBarCollect)
+}
+
+_LMT_InfoBarWriter(Mode, Seen, Path, Updates, Content, Presence) {
+	Seen["calls"] += 1
+	Seen["updates"] := LLM_Menu_DeepClone(Updates)
+	if Mode == "throw"
+		throw Error("Info Bar writer refused")
+	if Mode == "nil"
+		return ""
+	if Mode == "false"
+		return false
+	if Mode == "source race" {
+		Foreign := StrReplace(Content, "temperature = 0.9", "temperature = 0.8")
+		Seen["source_race_changed"] := Foreign != Content
+		Assert(Foreign != Content, "the terminal port must create an actual different valid source")
+		FileDelete(Path)
+		FileAppend(Foreign, Path, "UTF-8-RAW")
+	}
+	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+}
+
+_LMT_InfoBarRetainedReceipts() {
+	global ConfigurationFile, _LLM_Menu, _LLM_Engine, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	PreviousEngine := _LLM_Engine
+	PreviousSuspend := A_IsSuspended
+	Path := _LMT_InfoBarPrivatePath()
+	ConfigurationFile := Path
+	try {
+		for Condition in ["ack", "false", "nil", "throw", "source race", "paused", "master", "source", "runtime", "sparse", "retired"] {
+			_LLM_Menu := _LMT_Menu()
+			Initial := _LMT_InfoBarAdmitFixture(Path, true)
+			Seen := Map("calls", 0)
+			Mode := Condition == "false" || Condition == "nil" || Condition == "throw" || Condition == "source race" ? Condition : "ack"
+			Command := _LMT_InfoBarCommit.Bind(_LMT_InfoBarWriter.Bind(Mode, Seen))
+			Built := LLM_Menu_BuildDisplayMenu(Command)
+			try {
+				Callback := _LMT_InfoBarCallback(Built)
+				if Condition == "paused"
+					Suspend(true)
+				if Condition == "master"
+					_LLM_Menu["enabled"] := false
+				if Condition == "source" {
+					FileDelete(Path)
+					FileAppend(StrReplace(Initial, "temperature = 0.9", "temperature = 0.8"), Path, "UTF-8-RAW")
+				}
+				if Condition == "runtime"
+					_LLM_Engine["show_info_bar"] := false
+				if Condition == "sparse"
+					_LLM_Engine := Map("timer_active", false)
+				if Condition == "retired"
+					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+				Before := FSReadUtf8Exact(Path)
+				_LMT_ApplyCalls := 0
+				AssertEqual(Condition == "ack", Callback.Call(), Condition)
+				if Condition == "source race"
+					AssertEqual(true, Seen.Get("source_race_changed", false), "the actual terminal port must change the source outside the production-caught callback")
+				AssertEqual(Condition == "ack" || Condition == "false" || Condition == "nil" || Condition == "throw" || Condition == "source race" ? 1 : 0, Seen["calls"], Condition)
+				AssertEqual(Condition == "ack" ? 1 : 0, _LMT_ApplyCalls, Condition)
+				if Condition == "ack" {
+					AssertEqual(1, Seen["updates"].Length)
+					AssertEqual("llm.display", Seen["updates"][1].Section)
+					AssertEqual("show_info_bar", Seen["updates"][1].Key)
+					AssertFalse(_LLM_Menu["show_info_bar"])
+					Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+					AssertEqual(42, Document["private"]["future"])
+					AssertEqual(0.9, Document["llm"]["generation"]["temperature"])
+					AssertFalse(Callback.Call(), "the acknowledged publication retires its old menu identity")
+					AssertEqual(1, Seen["calls"])
+				} else {
+					AssertTrue(_LLM_Menu["show_info_bar"])
+					AssertEqual(Condition == "source race" ? StrReplace(Before, "temperature = 0.9", "temperature = 0.8") : Before,
+						FSReadUtf8Exact(Path), "refusal preserves exact foreign bytes")
+				}
+			} finally {
+				Suspend(PreviousSuspend)
+				_CTC_ReleaseMenu(Built)
+			}
+		}
+	} finally {
+		Suspend(PreviousSuspend)
+		_LLM_Engine := PreviousEngine
+		if FileExist(Path)
+			FileDelete(Path)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM display: real Info Bar commands require retained source and strict leased publication", _LMT_InfoBarRetainedReceipts)
+
+_LMT_InfoBarPolicyCorpus() {
+	Corpus := _LMT_InfoBarCorpus()
+	Owner := Map()
+	Other := Map()
+	AssertEqual(15, Corpus["cases"].Length)
+	for Vector in Corpus["cases"] {
+		Expected := LLM_Menu_DeepClone(Corpus["base"])
+		Current := LLM_Menu_DeepClone(Corpus["base"])
+		for Field, Value in Vector.Get("expected", Map())
+			Expected[Field] := Value
+		for Field, Value in Vector["current"]
+			Current[Field] := Value
+		Expected["owner"] := Expected["owner"] == "owned" ? Owner : Other
+		Current["owner"] := Current["owner"] == "owned" ? Owner : Other
+		Decision := LLM_DisplayInfoBarIntent(Expected, Current)
+		AssertEqual(Vector["admitted"], Decision["admitted"], Vector["id"])
+		if Vector["admitted"]
+			AssertEqual(Vector["value"], Decision["value"], Vector["id"])
+	}
+}
+Test("LLM display: Info Bar owner policy replays independent source admission vectors", _LMT_InfoBarPolicyCorpus)
+
+
+
+/** Reads independently authored privacy states and native identities. */
+_LMT_PrivacyCorpus() {
+	global _SharedDir
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\privacy_trigger_controls.json"))
+}
+
+_LMT_PrivacyFixture(States, Body) {
+	global _LLM_Menu, _LLM_Engine, Features, ConfigurationFile
+	PreviousEngine := _LLM_Engine
+	Previous := _LMT_InstallFixture()
+	SavedSuspend := A_IsSuspended
+	Dir := A_Temp . "\ergopti_privacy_" . A_TickCount . "_" . Random(10000, 99999)
+	DirCreate(Dir)
+	try {
+		Suspend(false)
+		ConfigurationFile := Dir . "\config.toml"
+		_LLM_Menu["enabled"] := true
+		Features["llm"]["enabled"] := true
+		_LLM_Menu["disable_url_bars"] := States[1]
+		_LLM_Menu["disable_password_fields"] := States[2]
+		Features["llm"]["trigger"]["url_bar_filter_enabled"] := States[1]
+		Features["llm"]["trigger"]["secure_filter_enabled"] := States[2]
+		_LLM_Engine := Map("enabled", true, "backend", "ollama",
+			"disable_url_bars", States[1], "disable_password_fields", States[2])
+		Image := "# independent native privacy fixture`n[llm]`nenabled = true`n[llm.models]`n"
+			. 'selected = "ollama"' . "`n[llm.trigger]`nurl_bar_filter_enabled = "
+			. (States[1] ? "true" : "false") . "`nsecure_filter_enabled = "
+			. (States[2] ? "true" : "false") . "`n[foreign]`n"
+			. 'future = "keep exact" # retained neighbour' . "`n"
+		FileAppend(Image, ConfigurationFile, "UTF-8-RAW")
+		Body.Call()
+	} finally {
+		Suspend(SavedSuspend)
+		_LLM_Engine := PreviousEngine
+		_LMT_RestoreFixture(Previous)
+		DirDelete(Dir, true)
+	}
+}
+
+_LMT_PrivacyPhysicalWrite(Expected, Path, Updates, Content, Presence) {
+	global _LMT_WriterResult, _LMT_WriterCalls
+	_LMT_WriterCalls += 1
+	if _LMT_WriterResult is String && _LMT_WriterResult == "source race" {
+		Foreign := StrReplace(Content, '"keep exact"', '"foreign preserved"')
+		Expected["observation"]["source_race_changed"] := Foreign != Content
+		FileDelete(Path)
+		FileAppend(Foreign, Path, "UTF-8-RAW")
+	} else if !((_LMT_WriterResult is Integer) && _LMT_WriterResult == 1) {
+		return _LMT_WriterResult
+	}
+	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Content, Presence)
+}
+
+_LMT_PrivacyLeaseWrite(Expected, Key, Path, Updates) {
+	return _LLM_Menu_PrivacyWrite(Expected, Key, Path, Updates, _LMT_PrivacyPhysicalWrite.Bind(Expected))
+}
+
+_LMT_PrivacyApply(Candidate) {
+	global _LLM_Engine
+	_LLM_Engine["disable_url_bars"] := Candidate["disable_url_bars"]
+	_LLM_Engine["disable_password_fields"] := Candidate["disable_password_fields"]
+	return _LMT_Apply(Candidate)
+}
+
+_LMT_PrivacyCollect(Key, CandidateFeatures, CandidateMenu) {
+	NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
+	Owned := ManifestValuesEqual(CandidateMenu[Key], ManifestDefaultFor("llm.trigger." . NativeKey))
+		? {Section: "llm.trigger", Key: NativeKey, Delete: true}
+		: {Section: "llm.trigger", Key: NativeKey, Value: TOML_Bool(CandidateMenu[Key])}
+	return [Owned, {Section: "foreign", Key: "future", Value: "must not publish"}]
+}
+
+_LMT_PrivacyRequest(Observed, Key, Value, Expected) {
+	Expected["observation"] := Observed
+	return LLM_Menu_CommitMutation("the native privacy fixture",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, Key, Value),
+		_LMT_PrivacyApply, _LMT_PrivacyLeaseWrite.Bind(Expected, Key), _LMT_Notify,
+		_LMT_Acquire, _LMT_Settle, _LMT_PrivacyCollect.Bind(Key))
+}
+
+_LMT_PrivacyBuilder(Observed := 0) {
+	Observed := Observed is Map ? Observed : Map()
+	Command := _LMT_PrivacyRequest.Bind(Observed)
+	return LLM_Menu_BuildTriggerMenu(_LMT_TriggerToggle.Bind("instant_on_word_end"),
+		_LMT_TriggerToggle.Bind("after_hotstring"), Map("disable_url_bars", Command,
+			"disable_password_fields", Command))
+}
+
+_LMT_PrivacyReplayBody(Expected, Selected, Neighbor, NeighborSelected) {
+	global _LLM_Menu, _LLM_Engine, _LMT_WriterCalls, _LMT_ApplyCalls, ConfigurationFile
+	Built := _LMT_PrivacyBuilder()
+	try {
+		Position := _LMT_ShowAllPosition(Built, t(Expected["i18n"]))
+		AssertEqual(Selected, _CTC_IsChecked(Built, Position))
+		Callback := _LMT_InfoBarCallback(Built, Position)
+		AssertTrue(Callback.Call())
+		AssertEqual(!Selected, _LLM_Menu[Expected["ahk"]])
+		AssertEqual(!Selected, _LLM_Engine[Expected["ahk"]])
+		AssertEqual(NeighborSelected, _LLM_Menu[Neighbor["ahk"]])
+		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Actual := _TOML_DocumentLookup(Document, StrSplit(Expected["path"], "."))
+		if (!Selected) == Expected["neutral"] {
+			AssertFalse(Actual["found"])
+		} else {
+			AssertTrue(Actual["value"] is TOML_Bool)
+			AssertEqual(!Selected, Actual["value"].Value)
+		}
+		AssertContains(FSReadUtf8Exact(ConfigurationFile), 'future = "keep exact" # retained neighbour')
+		AssertEqual(1, _LMT_WriterCalls)
+		AssertEqual(1, _LMT_ApplyCalls)
+		AssertFalse(Callback.Call())
+		AssertEqual(1, _LMT_WriterCalls)
+	} finally _CTC_ReleaseMenu(Built)
+}
+
+_LMT_SharedPrivacyReplay() {
+	Corpus := _LMT_PrivacyCorpus()
+	AssertEqual(4, Corpus["states"].Length)
+	for States in Corpus["states"] {
+		for Index, Expected in Corpus["rows"] {
+			Other := Index == 1 ? 2 : 1
+			_LMT_PrivacyFixture(States, _LMT_PrivacyReplayBody.Bind(Expected, States[Index], Corpus["rows"][Other], States[Other]))
+		}
+	}
+}
+Test("LLM privacy: shared independent bools publish through exact native source lease", _LMT_SharedPrivacyReplay)
+
+_LMT_PrivacyRefusalBody(Expected, Condition) {
+	global _LLM_Menu, _LLM_Engine, _LMT_WriterCalls, _LMT_ApplyCalls, _LMT_WriterResult, ConfigurationFile
+	Observed := Map()
+	Built := _LMT_PrivacyBuilder(Observed)
+	try {
+		Position := _LMT_ShowAllPosition(Built, t(Expected["i18n"]))
+		Callback := _LMT_InfoBarCallback(Built, Position)
+		Before := FSReadUtf8Exact(ConfigurationFile)
+		if Condition == "paused"
+			Suspend(true)
+		if Condition == "master withdrawn" {
+			_LLM_Menu["enabled"] := false
+			_LLM_Engine["enabled"] := false
+		}
+		if Condition == "missing runtime" {
+			_LLM_Engine := Map()
+		}
+		if Condition == "runtime disagreement"
+			_LLM_Engine[Expected["ahk"]] := true
+		if Condition == "foreign source" {
+			FileAppend("# independently retained foreign edit`n", ConfigurationFile, "UTF-8-RAW")
+			Before := FSReadUtf8Exact(ConfigurationFile)
+		}
+		if Condition == "writer refused"
+			_LMT_WriterResult := false
+		if Condition == "writer source race"
+			_LMT_WriterResult := "source race"
+		AssertFalse(Callback.Call())
+		AssertEqual(false, _LLM_Menu[Expected["ahk"]])
+		if Condition == "writer source race" {
+			AssertTrue(Observed.Get("source_race_changed", false),
+				"the actual terminal writer must create a real different source before canonical reading")
+			AssertEqual(StrReplace(Before, '"keep exact"', '"foreign preserved"'), FSReadUtf8Exact(ConfigurationFile))
+		} else {
+			AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile))
+		}
+		AssertEqual(Condition == "writer refused" || Condition == "writer source race" ? 1 : 0, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_ApplyCalls)
+	} finally _CTC_ReleaseMenu(Built)
+}
+
+_LMT_SharedPrivacyRefusal() {
+	for Expected in _LMT_PrivacyCorpus()["rows"] {
+		for Condition in ["paused", "master withdrawn", "missing runtime", "runtime disagreement", "foreign source", "writer refused", "writer source race"]
+			_LMT_PrivacyFixture([false, false], _LMT_PrivacyRefusalBody.Bind(Expected, Condition))
+	}
+}
+Test("LLM privacy: retained callbacks refuse stale masters pause source runtime and native writer", _LMT_SharedPrivacyRefusal)
+
+
+_LMT_SharedPrivacyPolicy() {
+	Corpus := _LMT_PrivacyCorpus()
+	for Vector in Corpus["vectors"] {
+		Expected := Corpus["snapshot"].Clone()
+		Expected["owner"] := Map()
+		Current := Expected.Clone()
+		for Key, Value in Vector.Get("current", Map())
+			Current[Key] := Value
+		for Key in Vector.Get("missing", [])
+			Current.Delete(Key)
+		if Vector.Get("new_owner", false)
+			Current["owner"] := Map()
+		Actual := LLM_TriggerPrivacyIntent(Expected, Current)
+		AssertEqual(Vector["admitted"], Actual["admitted"], Vector["name"])
+		if Vector.Has("value")
+			AssertEqual(Vector["value"], Actual["value"], Vector["name"])
+		else
+			AssertFalse(Actual.Has("value"), Vector["name"])
+	}
+}
+Test("LLM privacy: shared strict source intent rejects malformed booleans and identities", _LMT_SharedPrivacyPolicy)
+
+_LMT_ProfileCreateCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\profile_create_command.json"))
+	Assert(Corpus is Map, "the independent profile command corpus must be readable")
+	return Corpus
+}
+
+_LMT_ProfileCreatePaused(Seen) {
+	return Seen["paused"]
+}
+
+_LMT_ProfileCreateOpen(Seen) {
+	Seen["opens"] += 1
+	return Seen["result"]
+}
+
+_LMT_SharedCreateProfileCommand() {
+	Corpus := _LMT_ProfileCreateCorpus()
+	Seen := Map("paused", 0, "opens", 0, "result", 1)
+	Row := _LLM_Menu_CreateProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+		_LMT_ProfileCreatePaused.Bind(Seen))
+	Assert(Row is Map, "the native profile owner must consume the declared row")
+	AssertEqual(t(Corpus["i18n"]), Row["label"])
+	AssertEqual(1, Row["action"].Call())
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 1
+	AssertEqual(false, Row["action"].Call(), "a held callback rechecks the exact pause owner")
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 0
+	Seen["result"] := 0
+	AssertEqual(0, Row["action"].Call(), "native editor refusal must remain refusal")
+	AssertEqual(2, Seen["opens"])
+	for Unknown in ["0", "false", Map(), 2] {
+		Seen["paused"] := Unknown
+		AssertEqual(false, Row["action"].Call(), "unknown pause receipts cannot open an editor")
+		AssertEqual(2, Seen["opens"])
+	}
+}
+Test("LLM profiles: shared Create command keeps native pause and editor refusal", _LMT_SharedCreateProfileCommand)
+
+_LMT_SharedCreateProfileLabelOwner() {
+	global _MM_MANIFEST_ROOT_CACHE
+	Corpus := _LMT_ProfileCreateCorpus()
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the actual manifest must be loaded before mutation")
+	Declaration := Root[Corpus["section"]][1]
+	AssertEqual(Corpus["id"], Declaration["id"])
+	AssertEqual(Corpus["ready"], Declaration["disabled_when"][1])
+	SavedKey := Declaration["i18n"]
+	try {
+		Declaration["i18n"] := "button.cancel"
+		Seen := Map("paused", 0, "opens", 0, "result", 1)
+		Row := _LLM_Menu_CreateProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+			_LMT_ProfileCreatePaused.Bind(Seen))
+		AssertEqual(t("button.cancel"), Row["label"], "the declaration alone owns the native label")
+		AssertEqual(1, Row["action"].Call())
+		AssertEqual(1, Seen["opens"])
+	} finally Declaration["i18n"] := SavedKey
+}
+Test("LLM profiles: actual Create provider follows a changed shared label", _LMT_SharedCreateProfileLabelOwner)
+
+_LMT_ProfileCloneCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\profile_clone_command.json"))
+	Assert(Corpus is Map, "the independent Clone command corpus must be readable")
+	return Corpus
+}
+
+_LMT_SharedCloneProfileCommand() {
+	Corpus := _LMT_ProfileCloneCorpus()
+	Seen := Map("paused", 0, "opens", 0, "result", 1)
+	Row := _LLM_Menu_CloneProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+		_LMT_ProfileCreatePaused.Bind(Seen))
+	Assert(Row is Map, "the real native Clone row owner must consume its declaration")
+	AssertEqual(t(Corpus["i18n"]), Row["label"])
+	AssertEqual(1, Row["action"].Call())
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 1
+	AssertEqual(false, Row["action"].Call(), "held Clone callbacks re-read the exact pause owner")
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 0
+	Seen["result"] := 0
+	AssertEqual(0, Row["action"].Call(), "transactional clone refusal stays refusal")
+	AssertEqual(2, Seen["opens"])
+	for Unknown in ["0", "false", Map(), 2] {
+		Seen["paused"] := Unknown
+		AssertEqual(false, Row["action"].Call(), "unknown pause receipts cannot reach the clone owner")
+		AssertEqual(2, Seen["opens"])
+	}
+}
+Test("LLM profiles: shared Clone command retains native pause and refusal", _LMT_SharedCloneProfileCommand)
+
+_LMT_SharedCloneProfileLabelOwner() {
+	Corpus := _LMT_ProfileCloneCorpus()
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the actual manifest must be initialized before controlled mutation")
+	Declaration := 0
+	for Row in Root[Corpus["section"]] {
+		if StrCompare(Row["id"], Corpus["id"], true) == 0
+			Declaration := Row
+	}
+	Assert(Declaration is Map, "the native Clone declaration must be present")
+	AssertEqual(Corpus["ready"], Declaration["disabled_when"][1])
+	SavedKey := Declaration["i18n"]
+	try {
+		Declaration["i18n"] := "button.cancel"
+		Seen := Map("paused", 0, "opens", 0, "result", 1)
+		Row := _LLM_Menu_CloneProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+			_LMT_ProfileCreatePaused.Bind(Seen))
+		AssertEqual(t("button.cancel"), Row["label"], "the actual shared declaration owns the native Clone label")
+		AssertEqual(1, Row["action"].Call())
+		AssertEqual(1, Seen["opens"])
+	} finally Declaration["i18n"] := SavedKey
+}
+Test("LLM profiles: actual Clone row follows a changed shared declaration", _LMT_SharedCloneProfileLabelOwner)
+
+_LMT_SharedApiActiveCommandRows() {
+	global _LLM_Menu, _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\api_active_commands.json"))
+	Assert(Corpus is Map, "the independent active API commands corpus must be readable")
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the real shared menu must be present")
+	Declarations := Root[Corpus["section"]]
+	AssertEqual(2, Declarations.Length)
+	SavedTestKey := Declarations[1]["i18n"]
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["api_entries"] := [_LMT_ApiEntry("active")]
+		_LLM_Menu["api_entry_id"] := "active"
+		Declarations[1]["i18n"] := "button.cancel"
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AssertEqual(t("button.cancel"), Rows[Rows.Length - 2]["label"],
+			"the actual provider reads the canonical Test caption")
+		AssertEqual(t("menu.llm.api_edit_entry"), Rows[Rows.Length - 1]["label"],
+			"the existing native Edit action stays immediately before removal")
+		AssertEqual(t(Corpus["rows"][2]["i18n"]), Rows[Rows.Length]["label"])
+		for Index, Expected in Corpus["rows"] {
+			AssertEqual(Expected["id"], Declarations[Index]["id"])
+			AssertEqual(Corpus["ready"], Declarations[Index]["disabled_when"][1])
+		}
+		HeldTest := Rows[Rows.Length - 2]["action"]
+		HeldRemove := Rows[Rows.Length]["action"]
+		_LLM_Menu["api_entry_id"] := ""
+		AssertEqual(false, HeldTest.Call(), "a revoked active owner cannot acquire a test request")
+		AssertEqual(false, HeldRemove.Call(), "a revoked active owner cannot open the removal dialog")
+		AssertEqual(1, _LLM_Menu["api_entries"].Length)
+	} finally {
+		Declarations[1]["i18n"] := SavedTestKey
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM API: actual shared active commands preserve Edit and refuse revoked owners",
+	_LMT_SharedApiActiveCommandRows)
+
+
+_LMT_SharedNavigationDeclarationOwner() {
+	global _LLM_Menu, _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\llm_navigation_rows.json"))
+	Root := _MR_GetManifestRoot()
+	SavedDefinitions := Root["llm_navigation_rows"]
+	Previous := _LMT_InstallFixture()
+	try {
+		AssertEqual(2, SavedDefinitions.Length)
+		for Index, Expected in Corpus["rows"] {
+			AssertEqual(Expected["id"], SavedDefinitions[Index]["id"])
+			AssertEqual(Expected["type"], SavedDefinitions[Index]["type"])
+			AssertEqual(Expected["i18n"], SavedDefinitions[Index]["i18n"])
+		}
+		_LLM_Menu["nav_modifiers"] := ""
+		_LLM_Menu["val_modifiers"] := ""
+		for Vector in Corpus["prediction_ranges"] {
+			_LLM_Menu["n_predictions"] := Vector["count"]
+			Rows := _LLM_Menu_NavRows()
+			AssertEqual(2, Rows.Length)
+			AssertEqual(t("menu.llm.nav_label") . " — " . t("menu.llm.arrows_only"), Rows[1]["label"])
+			AssertEqual(StrReplace(t("menu.llm.val_label"), "%s", Vector["range"]) . " — " . t("menu.llm.digits_only"), Rows[2]["label"])
+			AssertEqual(Vector["disabled"], Rows[1]["disabled"])
+			AssertEqual(Vector["disabled"], Rows[2]["disabled"])
+			Assert(HasMethod(Rows[1]["action"], "Call"))
+			Built := LLM_Menu_BuildNavMenu()
+			try {
+				AssertEqual(Rows[1]["label"], _CTC_LabelAt(Built, 0))
+				AssertEqual(Rows[2]["label"], _CTC_LabelAt(Built, 1))
+			} finally _CTC_ReleaseMenu(Built)
+		}
+		Changed := [SavedDefinitions[2].Clone(), SavedDefinitions[1].Clone()]
+		Changed[1]["i18n"] := "button.cancel"
+		Root["llm_navigation_rows"] := Changed
+		Rows := _LLM_Menu_NavRows()
+		AssertEqual(StrReplace(t("button.cancel"), "%s", "1-0") . " — " . t("menu.llm.digits_only"), Rows[1]["label"])
+		AssertEqual(t("menu.llm.nav_label") . " — " . t("menu.llm.arrows_only"), Rows[2]["label"])
+		Root["llm_navigation_rows"] := []
+		AssertEqual(0, _LLM_Menu_NavRows().Length, "absence is never repaired by native fallback rows")
+		Changed[1]["i18n"] := 2
+		Root["llm_navigation_rows"] := Changed
+		AssertEqual(1, _LLM_Menu_NavRows().Length)
+	} finally {
+		Root["llm_navigation_rows"] := SavedDefinitions
+		_LMT_RestoreFixture(Previous)
+	}
+	AssertTrue(Root["llm_navigation_rows"] == SavedDefinitions, "the exact canonical cache identity is restored")
+}
+Test("LLM navigation: actual child declaration owns label order presence and native prompts", _LMT_SharedNavigationDeclarationOwner)

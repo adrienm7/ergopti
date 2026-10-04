@@ -284,3 +284,216 @@ _PCA_ProductionUsesOnlyRamPrefeed() {
 }
 Test("prefix: production pre-feed and live reissue exclude ancillary work (prefix-char-admission)",
 	_PCA_ProductionUsesOnlyRamPrefeed)
+
+
+/** Replay one already-visible native InputHook chunk through actual admission. */
+_PCA_DeadKeyChunk(Scenario) {
+	global CategoryEnabled, Features, ScriptInformation, _SendHook
+	global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixVisibleFireDecisions
+	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _KLLastShownSuggestion
+	global _HSResolveCache, _HSResolveGen, LastSentCharacterKeyTime
+	global HSE_Buffer, HSE_LastEndChar, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	global HSE_RepeatEnabled, HSE_PersonalInfoCombosEnabled
+	Saved := { Categories: CategoryEnabled, Features: Features, Script: ScriptInformation,
+		Send: _SendHook, Prefix: _PrefixBuffer, Focus: _PrefixFocusedControlToken,
+		Decisions: _PrefixVisibleFireDecisions, Active: _LLM_Bridge_Active,
+		Agent: _LLM_Bridge_AgentFeeding, Suggestion: _KLLastShownSuggestion,
+		Resolver: _HSResolveCache, Times: LastSentCharacterKeyTime,
+		Terminators: HSE_WORD_TERMINATORS, Consumed: HSE_CONSUMED_DELIMITERS,
+		Repeat: HSE_RepeatEnabled, Combos: HSE_PersonalInfoCombosEnabled }
+	Window := Gui()
+	EditControl := Window.AddEdit(, Scenario.Initial . Scenario.Chunk)
+	Window.Show("Hide")
+	SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+	Payloads := []
+	Observed := []
+	Capture(Name, Args*) {
+		AssertEqual("SendFinalResult", Name, "one complete burst owns the already-visible chunk")
+		Payloads.Push(Args[1])
+		return true
+	}
+	Prefeed(Char) => Observed.Push(Char)
+	try {
+		HSE_TestReset()
+		SimulateRegularApp()
+		CategoryEnabled := Map("Hotstrings", true)
+		Features := Map()
+		ScriptInformation := Scenario.HasOwnProp("Magic") ? Map("MagicKey", Scenario.Magic) : Map()
+		if Scenario.HasOwnProp("Magic") {
+			HSE_RepeatEnabled := true
+			HSE_PersonalInfoCombosEnabled := false
+		}
+		_LLM_Bridge_Active := false
+		_LLM_Bridge_AgentFeeding := false
+		_PrefixBuffer := Scenario.Initial
+		_PrefixFocusedControlToken := 1
+		_PrefixVisibleFireDecisions := []
+		_KLLastShownSuggestion := ""
+		_HSResolveCache := Map("_chunk_probe|native", {
+			gen: _HSResolveGen, val: { ShowTooltip: false } })
+		LastSentCharacterKeyTime := Map()
+		HSE_WORD_TERMINATORS := Saved.Terminators . Chr(0x1F600)
+		if Scenario.HasOwnProp("Consume") && Scenario.Consume
+			HSE_CONSUMED_DELIMITERS := Saved.Consumed . "."
+		_SendHook := Capture
+		if Scenario.Trigger != "" {
+			Options := Map("Category", "_chunk_probe", "Section", "native",
+				"TimeActivationSeconds", Scenario.HasOwnProp("Timed") && Scenario.Timed ? 1 : 0)
+			if Scenario.HasOwnProp("Conform") && Scenario.Conform
+				CreateCaseSensitiveHotstrings(Scenario.Flags, Scenario.Trigger, Scenario.Replacement, Options)
+			else
+				CreateHotstring(Scenario.Flags, Scenario.Trigger, Scenario.Replacement, Options)
+			if Scenario.HasOwnProp("ExtraEnd") && Scenario.ExtraEnd
+				CreateHotstring("?C", "foo´", "SHORT", Options)
+		}
+		HSE_Buffer := Scenario.Initial
+		_PCA_Call(Scenario.Chunk, Prefeed)
+		_PrefixCancelRender()
+		AssertEqual(1, Observed.Length, "prefeed receives one physical callback")
+		AssertEqual(Scenario.Chunk, Observed[1], "prefeed preserves the exact chunk")
+		AssertEqual(Scenario.Sends, Payloads.Length, "a chunk can own at most one suffix expansion")
+		AssertEqual(Scenario.End, HSE_LastEndChar, "only the final complete scalar frames END matching")
+		for Payload in Payloads
+			ControlSend(Payload, EditControl)
+		Sleep(30)
+		AssertEqual(Scenario.Expected, EditControl.Value, "native output preserves the complete visible batch")
+		AssertEqual(Scenario.Expected, HSE_Buffer, "the canonical buffer agrees with native output")
+		if Scenario.HasOwnProp("Prefix")
+			AssertEqual(Scenario.Prefix, _PrefixBuffer, "the preview keeps only the final word")
+		if Scenario.HasOwnProp("Timed") && Scenario.Timed {
+			Keys := Scenario.HasOwnProp("TimedKeys") ? Scenario.TimedKeys : ["´", "."]
+			AssertTrue(Keys.Length >= 2, "the fixture must inspect actual delivered scalars")
+			for Key in Keys {
+				AssertTrue(LastSentCharacterKeyTime.Has(Key), "each complete scalar owns its timestamp")
+				AssertEqual(LastSentCharacterKeyTime[Keys[1]], LastSentCharacterKeyTime[Key],
+					"one physical chunk has one observed timestamp")
+			}
+		}
+	} finally {
+		_PrefixInvalidateDeferredEffects()
+		HSE_TestReset()
+		Window.Destroy()
+		CategoryEnabled := Saved.Categories
+		Features := Saved.Features
+		ScriptInformation := Saved.Script
+		_SendHook := Saved.Send
+		_PrefixSetBuffer(Saved.Prefix)
+		_PrefixFocusedControlToken := Saved.Focus
+		_PrefixVisibleFireDecisions := Saved.Decisions
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Bridge_AgentFeeding := Saved.Agent
+		_KLLastShownSuggestion := Saved.Suggestion
+		_HSResolveCache := Saved.Resolver
+		LastSentCharacterKeyTime := Saved.Times
+		HSE_WORD_TERMINATORS := Saved.Terminators
+		HSE_CONSUMED_DELIMITERS := Saved.Consumed
+		HSE_RepeatEnabled := Saved.Repeat
+		HSE_PersonalInfoCombosEnabled := Saved.Combos
+	}
+}
+
+Test("prefix dead-key-chunk: END strips only the final delimiter", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "´.", Flags: "?C", Trigger: "foo´",
+		Replacement: "BAR", Expected: "ABAR.", Sends: 1, End: "." }))
+Test("prefix dead-key-chunk: consumed delimiter preserves the complete trigger", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "´.", Flags: "?C", Trigger: "foo´",
+		Replacement: "BAR", Expected: "ABAR", Sends: 1, End: ".", Consume: true }))
+Test("prefix dead-key-chunk: a different body cannot borrow the whole chunk", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "´.", Flags: "?C", Trigger: "foo",
+		Replacement: "BAR", Expected: "Afoo´.", Sends: 0, End: "", Prefix: "" }))
+Test("prefix dead-key-chunk: STAR matches the complete physical suffix", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "´.", Flags: "*?C", Trigger: "foo´.",
+		Replacement: "LONG", Expected: "ALONG", Sends: 1, End: "", ExtraEnd: true }))
+Test("prefix dead-key-chunk: an interior STAR cannot erase already-visible trailing text", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "´.", Flags: "*?C", Trigger: "foo´",
+		Replacement: "BAR", Expected: "Afoo´.", Sends: 0, End: "", Prefix: "" }))
+Test("prefix dead-key-chunk: boundary followed by text starts a fresh preview", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: ".a", Flags: "", Trigger: "",
+		Replacement: "", Expected: "foo.a", Sends: 0, End: "", Prefix: "a" }))
+Test("prefix dead-key-chunk: supplementary completion remains one native key", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "´" . Chr(0x1F600), Flags: "?C", Trigger: "foo´",
+		Replacement: "BAR", Expected: "ABAR" . Chr(0x1F600), Sends: 1, End: Chr(0x1F600) }))
+Test("prefix dead-key-chunk: time-gated STAR admits every scalar in the batch", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "´.", Flags: "*?C", Trigger: "foo´.",
+		Replacement: "BAR", Expected: "ABAR", Sends: 1, End: "", Timed: true }))
+
+Test("prefix dead-key-chunk: a distinct supplementary scalar is never half a delimiter", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: Chr(0x1F601), Flags: "", Trigger: "",
+		Replacement: "", Expected: "foo" . Chr(0x1F601), Sends: 0, End: "", Prefix: "foo" . Chr(0x1F601) }))
+Test("prefix dead-key-chunk: a boundary before a supplementary scalar keeps the full tail", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: "." . Chr(0x1F601), Flags: "", Trigger: "",
+		Replacement: "", Expected: "foo." . Chr(0x1F601), Sends: 0, End: "", Prefix: Chr(0x1F601) }))
+
+_UCAP_PrefixDecision(Capacity, Expected) {
+	Effect := { ClearAll: false, KnownBoundaryAfter: false }
+	Decision := _PrefixPostFireDecision(Effect, "A" . Chr(0x1F600) . "bc", Capacity)
+	AssertEqual(Expected, Decision.Buffer, "post-fire preview is a complete contiguous suffix")
+	AssertEqual(Expected == "", Decision.Reset)
+	AssertEqual(Expected != "", Decision.Schedule)
+}
+Test("prefix unicode-context-cap: post-fire truncation preserves complete pairs", (*) =>
+	_UCAP_PrefixDecision(3, "bc"))
+Test("prefix unicode-context-cap: zero capacity clears and retires the preview", (*) =>
+	_UCAP_PrefixDecision(0, ""))
+
+_UCAP_PrefixTail() {
+	global _MAX_BUFFER_LEN
+	Saved := _MAX_BUFFER_LEN
+	try {
+		_MAX_BUFFER_LEN := 3
+		AssertEqual("bc", _PrefixWordTail("A" . Chr(0x1F601) . "bc"),
+			"the final word remains bounded without cutting a supplementary scalar")
+	} finally {
+		_MAX_BUFFER_LEN := Saved
+	}
+}
+Test("prefix unicode-context-cap: final-word lookup keeps a pair-safe suffix", _UCAP_PrefixTail)
+
+_UCAP_PrefixAppend() {
+	global _MAX_BUFFER_LEN
+	Saved := _MAX_BUFFER_LEN
+	try {
+		_MAX_BUFFER_LEN := 3
+		_PCA_DeadKeyChunk({ Initial: "A" . Chr(0x1F601) . "b", Chunk: "c",
+			Trigger: "", Flags: "", Replacement: "", Sends: 0, End: "",
+			Expected: "A" . Chr(0x1F601) . "bc", Prefix: "bc" })
+	} finally {
+		_MAX_BUFFER_LEN := Saved
+	}
+}
+Test("prefix unicode-context-cap: actual printable callback caps the native preview", _UCAP_PrefixAppend)
+
+Test("prefix unicode-boundary-owner: replacement sharing only a low surrogate keeps its preview", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "★", Flags: "*?C", Trigger: "foo★",
+		Replacement: Chr(0x1FA00), Expected: "A" . Chr(0x1FA00), Sends: 1, End: "",
+		Prefix: "A" . Chr(0x1FA00) }))
+Test("prefix unicode-boundary-owner: STAR cannot use half of a configured delimiter", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1FA00) . "th", Chunk: "e", Flags: "*C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1FA00) . "the", Sends: 0, End: "" }))
+Test("prefix unicode-boundary-owner: END cannot use half of a configured delimiter", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1FA00) . "the", Chunk: ".", Flags: "C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1FA00) . "the.", Sends: 0, End: "" }))
+Test("prefix unicode-boundary-owner: the actual supplementary delimiter licenses STAR", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1F600) . "th", Chunk: "e", Flags: "*C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1F600) . "THE", Sends: 1, End: "" }))
+Test("prefix unicode-boundary-owner: the actual supplementary delimiter licenses END", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1F600) . "the", Chunk: ".", Flags: "C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1F600) . "THE.", Sends: 1, End: "." }))
+
+Test("prefix unicode-boundary-owner: repeat dispatch agrees with actual native Unicode output", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "a" . Chr(0x1F601), Chunk: "★", Magic: "★",
+		Flags: "", Trigger: "", Replacement: "", Expected: "a" . Chr(0x1F601) . Chr(0x1F601),
+		Sends: 1, End: "", Prefix: "a" . Chr(0x1F601) . Chr(0x1F601) }))
+
+Test("prefix unicode-time-gate: supplementary penultimate scalar admits timed STAR", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F601) . "★", Flags: "*?C",
+		Trigger: "a" . Chr(0x1F601) . "★", Replacement: "BAR", Expected: "ABAR", Sends: 1,
+		End: "", Timed: true, TimedKeys: [Chr(0x1F601), "★"] }))
+Test("prefix unicode-time-gate: supplementary completion key preserves the preceding scalar", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F600) . Chr(0x1F601), Flags: "*?C",
+		Trigger: "a" . Chr(0x1F600) . Chr(0x1F601), Replacement: "BAR", Expected: "ABAR", Sends: 1,
+		End: "", Timed: true, TimedKeys: [Chr(0x1F600), Chr(0x1F601)] }))
+Test("prefix unicode-time-gate: case-conform live dispatch uses complete typed timing identity", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F601) . "★", Flags: "*?C", Magic: "★",
+		Trigger: "a" . Chr(0x1F601) . "★", Replacement: "bar", Expected: "Abar", Sends: 1,
+		End: "", Timed: true, TimedKeys: [Chr(0x1F601), "★"], Conform: true }))

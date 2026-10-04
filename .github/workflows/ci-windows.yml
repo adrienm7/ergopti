@@ -88,6 +88,10 @@ jobs:
           node-version-file: '.node-version'
           cache: 'npm'
 
+      - name: Run reporter lifecycle self-tests
+        shell: pwsh
+        run: node tools/test/test-report.cjs
+
       - run: npm ci
         shell: pwsh
 
@@ -182,7 +186,7 @@ jobs:
           # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
           # blocks when AHK runs without an inherited console handle, so the
           # file is the only reliable output channel in CI).
-          # Tail-read the results file while AHK runs for real-time CI log output.
+          # FileAppend owns an exclusive handle; read the transcript only after exit.
           # /ErrorStdOut routes load-time (parse / nonexistent-function / missing
           # #Include) errors to stderr and exits non-zero instead of popping a modal
           # dialog that no one can dismiss headlessly — which otherwise hangs the
@@ -190,32 +194,9 @@ jobs:
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
-          $fstream = $null
-          $reader  = $null
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
           while (-not $proc.HasExited) {
-              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                  try {
-                      $fstream = [System.IO.FileStream]::new($resultsFile,
-                          [System.IO.FileMode]::Open,
-                          [System.IO.FileAccess]::Read,
-                          [System.IO.FileShare]::ReadWrite)
-                      $reader = [System.IO.StreamReader]::new($fstream)
-                  } catch {
-                      # AHK may still hold an exclusive write lock; retry next tick
-                      Start-Sleep -Milliseconds 100
-                  }
-              }
-              if ($null -ne $reader) {
-                  $line = $reader.ReadLine()
-                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-              } else {
-                  Start-Sleep -Milliseconds 100
-              }
-          }
-          if ($null -ne $reader) {
-              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-              $reader.Close(); $fstream.Close()
+              Start-Sleep -Milliseconds 100
           }
           $proc.WaitForExit()
           $exit = $proc.ExitCode
@@ -228,6 +209,7 @@ jobs:
           if (-not (Test-Path $resultsFile)) {
               Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
           }
+          Get-Content -LiteralPath $resultsFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
           $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
           Write-Host $summary
           $manifestFile = "$env:RUNNER_TEMP\windows-ahk-execution-manifest.json"
@@ -242,7 +224,7 @@ jobs:
               Write-Error "Test suite failed (exit $exit)."; exit $exit
           }
 
-      # The two isolated LLM suites. They cannot join run_all.ahk: each installs
+      # The isolated LLM suites. They cannot join run_all.ahk: each installs
       # its own global stubs (a WebView2 stand-in, a fake model index) that would
       # collide with the shared harness, which is why they were written as
       # separate runners in the first place. They were then referenced by
@@ -258,7 +240,7 @@ jobs:
           if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
           $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
           $failed = 0
-          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk")) {
+          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk", "run_llm_pointer_dismiss.ahk")) {
               $runner = Join-Path $tests $name
               if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
               $out = "$env:TEMP\$name.out"
@@ -349,6 +331,17 @@ jobs:
           node tools/test/test-ahk-full-startup-smoke.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Test fresh Git clone bootstrap and warm startup
+        shell: pwsh
+        timeout-minutes: 24
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { throw "AutoHotkey64.exe not found." }
+          $env:ERGOPTI_AHK_EXE = $ahk
+          node tools/test/test-ahk-fresh-clone-startup.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   e2e-ahk:
     name: 'E2E tests (engine)'
     needs: [test-ahk]
@@ -413,34 +406,14 @@ jobs:
           Write-Host "------------------------------------------------------------"
           # Same approach as the unit test suite: AHK writes TAP output to
           # test_results.txt (FileAppend to "*" blocks without a console handle).
-          # Tail-read the file for real-time CI log output.
+          # FileAppend owns an exclusive handle; read the transcript only after exit.
           # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
           # hanging on an undismissable modal dialog in the headless runner.
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
-          $fstream = $null; $reader = $null
           while (-not $proc.HasExited) {
-              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                  try {
-                      $fstream = [System.IO.FileStream]::new($resultsFile,
-                          [System.IO.FileMode]::Open,
-                          [System.IO.FileAccess]::Read,
-                          [System.IO.FileShare]::ReadWrite)
-                      $reader = [System.IO.StreamReader]::new($fstream)
-                  } catch {
-                      # AHK may still hold an exclusive write lock; retry next tick
-                      Start-Sleep -Milliseconds 100
-                  }
-              }
-              if ($null -ne $reader) {
-                  $line = $reader.ReadLine()
-                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-              } else { Start-Sleep -Milliseconds 100 }
-          }
-          if ($null -ne $reader) {
-              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-              $reader.Close(); $fstream.Close()
+              Start-Sleep -Milliseconds 100
           }
           $proc.WaitForExit()
           $exit = $proc.ExitCode
@@ -453,10 +426,17 @@ jobs:
           if (-not (Test-Path $resultsFile)) {
               Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
           }
+          Get-Content -LiteralPath $resultsFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
           if ($exit -ne 0) {
               Write-Host "::error::AHK E2E native process failed (exit $exit)."
               Write-Error "E2E suite failed (exit $exit)."; exit $exit
           }
+
+      - name: Validate complete native E2E corpus execution
+        shell: pwsh
+        run: |
+          node tools/test/validate-ahk-e2e-manifest.cjs --input "$env:GITHUB_WORKSPACE/static/ergopti_plus/windows/tests/e2e/test_results.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   # ─────────────────────────────────────────────────
   # 3) Build the executable once; sign releases
@@ -526,7 +506,7 @@ jobs:
           $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
           $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
           $text = $text.Replace("__BUNDLE_COMMIT__",      "${{ github.sha }}")
-          Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
+          [IO.File]::WriteAllText($bundlePath, $text, [Text.UTF8Encoding]::new($true))
           Write-Host "BUNDLE_COMMIT      stamped: ${{ github.sha }}"
           Write-Host "BUNDLE_VERSION     stamped: $version"
           Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
@@ -699,19 +679,23 @@ jobs:
           name: assets-windows
           path: ${{ runner.temp }}/package
 
+      - name: Test native compiled startup admission
+        shell: pwsh
+        timeout-minutes: 3
+        run: node tools/test/test-desktop-ci-evidence.cjs
+
       - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
         # The unit test suite (test-ahk job) runs against source .ahk files with
         # A_IsCompiled == false, so it never exercises compiled-mode-only code
         # paths like Bundle_Init(). That gap let a 100%-reproducible startup
         # crash (unassigned A_LocalAppData — not a real AHK v2 built-in) ship
         # through fully-green CI. This step launches the actual compiled exe
-        # and proves it gets past first-launch bundle extraction instead of
-        # dying on the very first line of the auto-execute section.
+        # and requires a nonce/PID/build-bound receipt after input/menu readiness,
+        # durable error-free logs and the disposable probe's native exit code 0.
         #
-        # The wait ends on what it observes: the marker of the extracted bundle
-        # (pass), the process exiting (crash), or a dialog window of the process,
-        # the blocking MsgBox a runtime error raises (fail at once, with its
-        # text). Elapsed time is no verdict. The first launch expands about 550
+        # The wait ends on process exit or a runtime error dialog. The bundle
+        # marker is diagnostic only; it must never admit an incomplete boot.
+        # Elapsed time is no verdict. The first launch expands about 550
         # files through Windows PowerShell while Defender scans each of them,
         # and this step took 8-19 s on the green runs 582-613, so the former
         # 20 s deadline read the slow end of a healthy extraction as a dialog
@@ -721,14 +705,64 @@ jobs:
         timeout-minutes: 5
         run: |
           $exe = "$env:RUNNER_TEMP\package\ergopti_plus\windows\ErgoptiPlus.exe"
+          $launchRoot = Join-Path $env:RUNNER_TEMP ("ergopti-compiled-" + [guid]::NewGuid().ToString('N'))
+          $env:LOCALAPPDATA = Join-Path $launchRoot 'local-app-data'
+          $env:ERGOPTI_STARTUP_SMOKE_DIR = Join-Path $launchRoot 'startup'
+          $env:ERGOPTI_STARTUP_SMOKE_NONCE = [guid]::NewGuid().ToString('N')
+          New-Item -ItemType Directory -Path $env:LOCALAPPDATA, $env:ERGOPTI_STARTUP_SMOKE_DIR -Force | Out-Null
+          $receiptFile = Join-Path $env:ERGOPTI_STARTUP_SMOKE_DIR 'ready.json'
           $ergoptiDir = "$env:LOCALAPPDATA\Ergopti"
           $bundleDir = "$ergoptiDir\bundle"
           $markerFile = "$bundleDir\.bundle-version"
-          Remove-Item $bundleDir -Recurse -Force -ErrorAction SilentlyContinue
-          $stdout = "$env:TEMP\ergopti_smoke_stdout.txt"
-          $stderr = "$env:TEMP\ergopti_smoke_stderr.txt"
+          $stdout = Join-Path $launchRoot 'stdout.txt'
+          $stderr = Join-Path $launchRoot 'stderr.txt'
           # Six times the slowest green smoke measured when this bound was set.
           $hangBoundSeconds = 120
+
+          # A failed or incomplete launch must leave fresh negative evidence;
+          # diagnostic publication never changes the original native verdict.
+          $startupEvidence = [ordered]@{
+              schema_version = 1
+              platform = 'windows'
+              sha = $env:GITHUB_SHA
+              runner = 'windows-latest'
+              scenario = 'startup'
+              package_sha256 = $null
+              marker_seen = $false
+              crashed_early = $null
+              marker_seconds = $null
+              failures = @('startup_incomplete')
+              failure_phase = 'probe_setup'
+              native_exit_code = $null
+              elapsed_seconds = $null
+              staging_seconds = $null
+              dialog_seen = $null
+              readiness_acknowledged = $false
+              native_parent = [ordered]@{
+                  pid = $null
+                  expected_executable = [IO.Path]::GetFullPath($exe)
+                  observed_executable = $null
+                  start_utc = $null
+                  identity_qualified = $false
+              }
+              native_descendant_observations = @()
+              native_observer_status = 'not_observed'
+          }
+          function Save-StartupFailureEvidence {
+              try {
+                  $startupEvidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8
+              } catch {
+                  # Retain the primary native exception/exit; do not copy private
+                  # filesystem errors into a failure artifact or its annotation.
+                  Write-Warning 'Startup failure evidence publication failed (detail omitted).' -WarningAction Continue
+              }
+          }
+          try {
+              $startupEvidence.package_sha256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          } catch {
+              # Unavailable remains null and cannot pass the mandatory verdict.
+          }
+          Save-StartupFailureEvidence
 
           # Compiled before the launch, so its one-off cost stays out of the timings.
           Add-Type -TypeDefinition @'
@@ -856,14 +890,26 @@ jobs:
                               $sameExecutable = $null -ne $row.ExecutablePath -and [string]::Equals($row.ExecutablePath, $launchOwner.expected_executable, [StringComparison]::OrdinalIgnoreCase)
                               $receipt = [ordered]@{ pid = [int]$row.ProcessId; parent_pid = [int]$row.ParentProcessId; created_utc = $created; executable = $observedPath; lineage_qualified = [bool]$qualified; same_executable = [bool]$sameExecutable; depth = $depth + 1 }
                               Write-Host ($receipt | ConvertTo-Json -Compress)
+                              # Closed observations are not native handoff or
+                              # readiness acknowledgements; omit foreign paths.
+                              $startupEvidence.native_descendant_observations += [ordered]@{
+                                  pid = $receipt.pid
+                                  parent_pid = $receipt.parent_pid
+                                  created_utc = $receipt.created_utc
+                                  lineage_qualified = $receipt.lineage_qualified
+                                  same_executable = $receipt.same_executable
+                                  depth = $receipt.depth
+                              }
                               $next += [pscustomobject]@{ Id = [int]$row.ProcessId; Created = $created; Until = [DateTime]::UtcNow; Qualified = $qualified }
                           }
                       }
                       $frontier = $next
                   }
                   if ($frontier.Count -gt 0) { $truncated = $true }
+                  $startupEvidence.native_observer_status = 'observed'
                   Write-Host (@{ descendant_observations = $observed; truncated = $truncated; status = 'observed' } | ConvertTo-Json -Compress)
               } catch {
+                  $startupEvidence.native_observer_status = 'unavailable'
                   Write-Host (@{ status = 'unavailable'; cause = (Format-StartupEvidenceText $_.Exception.Message) } | ConvertTo-Json -Compress)
               }
               Write-Host "---- native startup log bytes; bounded tails never prove readiness ----"
@@ -872,7 +918,11 @@ jobs:
                   $catalogJson = & python -c 'import json,pathlib,sys,tomllib; c=tomllib.loads(pathlib.Path(sys.argv[1]).read_text()); w=c["logs"]["windows"]; f=c["logs"]["files"]; print(json.dumps({"base":w["base"],"segments":[v.replace("{app}",c["app"]["folder_name"]) for v in w["segments"]],"prefix":f["unified_prefix"],"extension":f["extension"]}))' "$env:GITHUB_WORKSPACE\static\ergopti_plus\_shared\modules\paths\app_dirs.toml"
                   if ($LASTEXITCODE -ne 0) { throw "The native log catalogue could not be read (python exit $LASTEXITCODE)." }
                   $catalog = $catalogJson | ConvertFrom-Json -ErrorAction Stop
-                  $logsDir = [Environment]::GetEnvironmentVariable($catalog.base)
+                  $logsDir = if (-not [string]::IsNullOrEmpty($env:ERGOPTI_STARTUP_SMOKE_DIR)) {
+                      $env:ERGOPTI_STARTUP_SMOKE_DIR
+                  } else {
+                      [Environment]::GetEnvironmentVariable($catalog.base)
+                  }
                   if ([string]::IsNullOrEmpty($logsDir)) { throw "The native log base environment is unavailable." }
                   foreach ($segment in $catalog.segments) { $logsDir = Join-Path $logsDir $segment }
                   $logNames = @('bootstrap.log', ($catalog.prefix + (Get-Date -Format 'yyyy-MM-dd') + $catalog.extension))
@@ -962,9 +1012,10 @@ jobs:
 
           # /ErrorStdOut only routes LOAD-time errors (parse / missing include)
           # to stderr; a RUNTIME error like the one this step guards against
-          # still pops a blocking MsgBox, so the real signal below is
-          # behavioural (marker file written / dialog / early exit), not the exit code.
+          # may raise a blocking dialog. Require the native ready receipt AND a
+          # clean exit after boot; a bundle marker is only extraction diagnostics.
           $clock = [System.Diagnostics.Stopwatch]::StartNew()
+          $launchedDigest = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
           $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -WindowStyle Hidden -PassThru `
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr
           # Holding the handle keeps ExitCode readable once the process has exited.
@@ -979,9 +1030,19 @@ jobs:
               $launchOwner.identity_error = Format-StartupEvidenceText $_.Exception.Message
           }
 
+          $startupEvidence.failure_phase = 'wait'
+          $startupEvidence.native_parent.pid = $launchOwner.pid
+          $startupEvidence.native_parent.start_utc = $launchOwner.start_utc
+          $startupEvidence.native_parent.identity_qualified = $launchOwner.identity_qualified
+          if ($launchOwner.identity_qualified) {
+              $startupEvidence.native_parent.observed_executable = $launchOwner.expected_executable
+          }
+          Save-StartupFailureEvidence
+
           $markerSeen = $false
           $dialogSeen = $false
           $stagingSeconds = $null
+          try {
           while ($clock.Elapsed.TotalSeconds -lt $hangBoundSeconds) {
               # The moment Bundle_Init creates its staging directory splits the
               # launch time into interpreter start-up and the extraction itself.
@@ -989,47 +1050,62 @@ jobs:
                   $stagingSeconds = $clock.Elapsed.TotalSeconds
               }
               if ($proc.HasExited) { break }
-              if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true; break }
+              if (Test-Path -LiteralPath $markerFile) { $markerSeen = $true }
               if ([SmokeWindows]::HasDialog($proc.Id)) { $dialogSeen = $true; break }
               Start-Sleep -Milliseconds 250
           }
           $seconds = $clock.Elapsed.TotalSeconds
-          $crashedEarly = $proc.HasExited
           $exitCode = $null
-          if ($crashedEarly) { $exitCode = $proc.ExitCode }
+          if ($proc.HasExited) { $exitCode = $proc.ExitCode }
+          $markerSeen = Test-Path -LiteralPath $markerFile
+          $crashedEarly = -not (Test-Path -LiteralPath $receiptFile) -or $exitCode -ne 0
 
-          if ($crashedEarly -or -not $markerSeen) {
+          if (-not $proc.HasExited -or $crashedEarly -or -not $markerSeen -or $dialogSeen) {
+              $startupEvidence.failure_phase = 'verdict'
+              $startupEvidence.failures = @('startup_guard_failed')
+              $startupEvidence.marker_seen = $markerSeen
+              $startupEvidence.crashed_early = $crashedEarly
+              $startupEvidence.native_exit_code = $exitCode
+              $startupEvidence.elapsed_seconds = [math]::Round($seconds, 3)
+              $startupEvidence.staging_seconds = $stagingSeconds
+              $startupEvidence.dialog_seen = $dialogSeen
+              Save-StartupFailureEvidence
               Write-LaunchDiagnostics $proc $seconds $stagingSeconds
               Stop-LaunchedApp $proc
-              if ($crashedEarly) {
-                  Write-Error "ErgoptiPlus.exe exited during startup (code $exitCode) — see output above."
-              } elseif ($dialogSeen) {
-                  Write-Error "ErgoptiPlus.exe raised a dialog before extracting its runtime bundle (crash-on-launch) — its text is above."
-              } else {
-                  Write-Error "ErgoptiPlus.exe neither extracted its runtime bundle nor raised a dialog within ${hangBoundSeconds}s — see the diagnostics above."
-              }
-              exit 1
+              Save-StartupFailureEvidence
+              Write-Error "ErgoptiPlus.exe did not complete native readiness (exit=$exitCode, dialog=$dialogSeen) within ${hangBoundSeconds}s — see the diagnostics above."
+              throw "ErgoptiPlus.exe did not complete native readiness (exit=$exitCode, dialog=$dialogSeen) within ${hangBoundSeconds}s."
           }
-          Stop-LaunchedApp $proc
           $markerSeconds = [math]::Round($seconds, 1)
-          $stagingNote = 'not observed'
-          if ($null -ne $stagingSeconds) { $stagingNote = "$([math]::Round($stagingSeconds, 1)) s" }
-          Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile after $markerSeconds s (staging directory seen after $stagingNote)"
-          $evidence = @{
-              schema_version = 1
-              platform = 'windows'
-              sha = $env:GITHUB_SHA
-              runner = 'windows-latest'
-              scenario = 'startup'
-              package_sha256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $logs = @(Get-ChildItem -LiteralPath $env:ERGOPTI_STARTUP_SMOKE_DIR -Recurse -File -Filter '*.log')
+          $loggedErrors = @($logs | Select-String -Pattern '\[(ERROR|FATAL)\]|the error window for' |
+              ForEach-Object { "$($_.Path): $($_.Line)" })
+          $observation = @{
               marker_seen = $markerSeen
               crashed_early = $crashedEarly
               marker_seconds = $markerSeconds
-              failures = @()
+              native_startup = @{
+                  nonce = $env:ERGOPTI_STARTUP_SMOKE_NONCE
+                  pid = $proc.Id
+                  executable = [IO.Path]::GetFullPath($exe)
+                  launched_sha256 = $launchedDigest
+                  exit_code = $exitCode
+                  log_files = $logs.Count
+                  logged_errors = $loggedErrors
+                  receipt = Get-Content -LiteralPath $receiptFile -Raw -Encoding utf8 | ConvertFrom-Json
+              }
           }
-          $evidence | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8
+          $observationFile = Join-Path $launchRoot 'observation.json'
+          [IO.File]::WriteAllText($observationFile, ($observation | ConvertTo-Json -Depth 6) + "`n", [Text.UTF8Encoding]::new($false))
+          node tools/test/desktop-ci-evidence.cjs record-windows $observationFile $exe "$env:RUNNER_TEMP/evidence.json"
+          if ($LASTEXITCODE -ne 0) { throw 'The native compiled startup evidence was refused.' }
+          Write-Host "OK: the exact packaged ErgoptiPlus.exe reached input/menu readiness and exited cleanly after $markerSeconds s."
+          } finally {
+              Stop-LaunchedApp $proc
+          }
 
       - name: Upload mandatory launch evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-launch-evidence

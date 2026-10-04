@@ -35,6 +35,7 @@ local Paths       = require("infra.paths")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
 local ShellRunner = require("adapters.shell_runner")
+local Archives    = require("updater.release_assets")
 
 local LOG = "updater.release_installer"
 
@@ -62,29 +63,10 @@ M._getenv = os.getenv
 M.EXIT_DOWNLOAD = 10
 M.EXIT_VERIFY_FIRST = 20
 
---- Downloads, verifies and extracts one release archive.
---- Arguments: url, sha256, staging folder, expected version, running app.
-M.STAGE_SCRIPT = table.concat({
-	"set -u",
-	'url=$1; digest=$2; dir=$3; version=$4; running=$5',
-	"umask 077",
-	'/bin/mkdir -p "$dir" || exit 10',
-	'zip="$dir/release.zip"',
-	"/usr/bin/curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https'"
-		.. ' --max-time 900 --output "$zip" "$url" || exit 10',
-	'actual=$(/usr/bin/shasum -a 256 "$zip") || exit 20',
-	'actual=${actual%% *}',
-	'[ "$actual" = "$digest" ] || exit 21',
-	'/usr/bin/ditto -x -k "$zip" "$dir/app" || exit 22',
-	'app="$dir/app/' .. APP_NAME .. '"',
-	'[ -d "$app" ] || exit 23',
-	"found=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \"$app/Contents/Info.plist\") || exit 24",
-	'[ "$found" = "$version" ] || exit 25',
-	"requirement=$(/usr/bin/codesign -d -r- \"$running\" 2>/dev/null | /usr/bin/sed -n 's/^designated => //p')",
-	'[ -n "$requirement" ] || exit 26',
-	'/usr/bin/codesign --verify --deep --strict -R "=$requirement" "$app" || exit 27',
-	"printf 'READY %s\\n' \"$app\"",
-}, "\n")
+--- The native extraction owner, captured once through the source-layout resolver.
+local stage_path = Paths.shared("../macos/adapters/release_stage.sh")
+M.STAGE_SCRIPT = type(stage_path) == "string" and FileSystem.read(stage_path) or nil
+assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native release staging script is unavailable")
 
 --- Replaces the installed app once the launcher has quit.
 --- Arguments: launcher pid, installed app, verified app, previous-app path.
@@ -123,46 +105,25 @@ local DETACH_SCRIPT = 'nohup /bin/sh -c "$1" swap "$2" "$3" "$4" "$5" >>"$6" 2>&
 -- ====================================
 -- ====================================
 
---- The shared updater defaults: repository and the macOS archive name.
---- @return table|nil identity { owner, repo, asset }
+--- Resolves the ordered native archive bindings from the shared updater defaults.
+--- @return table|nil identity Result of Archives.resolve().
 local function identity()
 	local path = Paths.shared("modules/updater/defaults.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
-	local github = type(decoded) == "table" and decoded.github or nil
-	local assets = type(decoded) == "table" and decoded.release_assets or nil
-	if type(github) ~= "table" or type(assets) ~= "table" or type(assets.macos_bundle) ~= "string"
-		or type(github.owner) ~= "string" or type(github.repo) ~= "string" then
-		Logger.error(LOG, "The shared updater defaults name no macOS release archive.")
-		return nil
-	end
-	return { owner = github.owner, repo = github.repo, asset = assets.macos_bundle }
+	local resolved, reason = Archives.resolve(decoded)
+	if not resolved then Logger.error(LOG, "The shared release archive policy refused: %s.", reason) end
+	return resolved
 end
 
---- Finds the authenticated macOS archive of one release of the GitHub API list:
---- its exact repository URL and the SHA-256 GitHub publishes for it.
---- @param release table One decoded release object.
---- @param ids table|nil { owner, repo, asset }; the shared defaults when nil.
---- @return table|nil asset { tag, version, url, digest }
+--- Selects the first declared present archive without bypassing a failed integrity check.
+--- @param release table One decoded GitHub release.
+--- @param ids table|nil Archives.resolve() result; the actual defaults when omitted.
+--- @return table|nil asset { tag, version, url, digest, format }
 function M.find_asset(release, ids)
-	ids = ids or identity()
-	if type(release) ~= "table" or type(ids) ~= "table" then return nil end
-	local tag = release.tag_name
-	if type(tag) ~= "string" or not tag:match("^v?[%w%.%-]+$") then return nil end
-	local expected = string.format("https://github.com/%s/%s/releases/download/%s/%s",
-		ids.owner, ids.repo, tag, ids.asset)
-	if type(release.assets) ~= "table" then return nil end
-	for _, asset in ipairs(release.assets) do
-		if type(asset) == "table" and asset.name == ids.asset then
-			local digest = type(asset.digest) == "string" and asset.digest:match("^sha256:(%x+)$") or nil
-			if asset.browser_download_url ~= expected or not digest or #digest ~= 64 then
-				Logger.error(LOG, "Release %s names its macOS archive without its exact URL or SHA-256.", tag)
-				return nil
-			end
-			return { tag = tag, version = (tag:gsub("^v", "")), url = expected, digest = digest:lower() }
-		end
-	end
-	return nil
+	local asset, reason = Archives.select(release, ids or identity())
+	if not asset and reason ~= "absent-archive" then Logger.error(LOG, "The release archive selection refused: %s.", reason) end
+	return asset
 end
 
 
@@ -215,10 +176,14 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot stage %s: this is not a packaged ErgoptiPlus.", tostring(asset and asset.tag))
 		return false
 	end
+	if type(asset) ~= "table" or not Archives.supports(asset.format) then
+		Logger.error(LOG, "Cannot stage a release without its declared native archive format.")
+		return false
+	end
 	local stage_dir = (tmp:gsub("/+$", "")) .. "/ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
-		stage_dir, asset.version, app }, function(exit_code, stdout, stderr)
+		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)
 		local staged = exit_code == 0 and type(stdout) == "string"
 			and stdout:gsub("%s+$", ""):match("^READY (/.+)$") or nil
 		if staged then

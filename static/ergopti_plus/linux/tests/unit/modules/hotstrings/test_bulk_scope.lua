@@ -18,3 +18,8 @@ assert(file:close())
 local corpus = assert(Json.decode(content))
 
 require("test.hotstring_bulk_scope_contract").run(helpers, planner, corpus)
+
+local admission_file = assert(io.open(path:gsub("bulk_scope_vectors.json$", "personal_scope_admission.json"), "r"))
+local admission_content = assert(admission_file:read("*a"))
+assert(admission_file:close())
+require("test.personal_scope_contract").run(helpers, require("hotstrings.personal_scope"), assert(Json.decode(admission_content)))

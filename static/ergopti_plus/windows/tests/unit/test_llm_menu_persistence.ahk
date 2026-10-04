@@ -260,6 +260,7 @@ _LLM_Persist_RunOneEntry(entry, FeaturesBase) {
 	ahk := entry["ahk"]
 	trayKey := ahk["tray_key"]
 	sample := ahk["sample"]
+	WireSample := ahk.Get("persisted_sample", sample)
 
 	Features := _LLM_Persist_CloneFeatures(FeaturesBase)
 	_LLM_Menu := _LLM_Persist_MakeDefaultTray()
@@ -276,7 +277,7 @@ _LLM_Persist_RunOneEntry(entry, FeaturesBase) {
 			Assert(_LLM_Persist_ValuesEqual(_LLM_Menu_ModifiersStringToArray(sample), got, ahk),
 				entry["id"] . " Features val_modifiers array")
 		} else
-			AssertEqual(sample, got, entry["id"] . " Features sync")
+			AssertEqual(WireSample, got, entry["id"] . " Features sync")
 	}
 
 	updates := _LLM_Persist_CollectUpdates()
@@ -284,7 +285,7 @@ _LLM_Persist_RunOneEntry(entry, FeaturesBase) {
 	for u in updates {
 		if (u.Section = ahk["section"] and u.Key = ahk["key"]) {
 			found := true
-			Assert(_LLM_Persist_ValuesEqual(sample, u.Value, ahk),
+			Assert(_LLM_Persist_ValuesEqual(WireSample, u.Value, ahk),
 				entry["id"] . " collect update value")
 			break
 		}
@@ -298,7 +299,7 @@ _LLM_Persist_RunOneEntry(entry, FeaturesBase) {
 	cache := ParseTomlFile(path)
 	raw := _LLM_Persist_ReadTomlEntry(cache, ahk["section"], ahk["key"])
 	Assert(raw != "_", entry["id"] . " must exist in written TOML")
-	Assert(_LLM_Persist_ValuesEqual(sample, _LLM_Persist_NormalizeTomlValue(raw, ahk), ahk),
+	Assert(_LLM_Persist_ValuesEqual(WireSample, _LLM_Persist_NormalizeTomlValue(raw, ahk), ahk),
 		entry["id"] . " TOML round-trip")
 
 	opts := LLM_Menu_BuildSavedOpts(cache)

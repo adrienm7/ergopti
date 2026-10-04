@@ -151,3 +151,101 @@ helpers.describe("common autocorrection historical reference", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("common autocorrection interleaved source order", function()
+	local function interleaved()
+		local handle = assert(io.open(helpers.shared("tests/corpus/hotstrings/source_order_entries.json"), "r"))
+		local text = handle:read("*a"); assert(handle:close())
+		return Json.decode(text)
+	end
+
+	local function actual_registry(category, caps_only, bound_mode)
+		local expected = interleaved()
+		local path = os.tmpname()
+		local handle = assert(io.open(path, "w")); assert(handle:write(expected.source)); assert(handle:close())
+		local bound_path = path .. ".bound"
+		if bound_mode then
+			handle = assert(io.open(bound_path, "w")); assert(handle:write(expected.bound_source)); assert(handle:close())
+		end
+		local ok, failure = pcall(function()
+			helpers.with_stub_scope({
+				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+				"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
+				"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+			}, function()
+				package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
+				local State = helpers.load_with_stubs("modules.keymap.state")
+				local Registry = helpers.load_with_stubs("modules.keymap.registry")
+				local Storage = require("adapters.storage")
+				local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+				helpers.assert_true(Registry.init(state))
+				for _, section in ipairs(expected.sections) do
+					helpers.assert_true(Storage.set("hotstrings_section_" .. category .. "_" .. section,
+						section ~= "unknown" and (not caps_only or section == "caps")))
+				end
+				local sources = bound_mode and { { path = bound_path, sections = { "caps" } } } or nil
+				if bound_mode == "missing" then
+					assert(os.remove(bound_path))
+					helpers.assert_eq(Registry.load_toml(category, path, sources), false)
+					helpers.assert_eq(#state.mappings, 0, "an unavailable bound owner cannot fall through to bundled caps")
+					return
+				end
+				helpers.assert_true(Registry.load_toml(category, path, sources))
+				local ordered = {}
+				for _, mapping in ipairs(state.mappings) do ordered[mapping.seq] = mapping.trigger end
+				local wanted = bound_mode and (caps_only and expected.bound_caps_order or expected.bound_declared_order)
+					or caps_only and expected.caps_order
+					or (category == "autocorrection" and expected.admitted_source_order or expected.declared_order)
+				helpers.assert_eq(ordered, wanted, "native Seq must follow the category's actual order policy")
+				local counts = {}
+				for _, section in ipairs(state.groups[category].sections) do counts[section.name] = section.count end
+				local wanted_counts = {}
+				for key, value in pairs(expected.counts) do wanted_counts[key] = value end
+				if bound_mode then wanted_counts.caps = 4 end
+				helpers.assert_eq(counts, wanted_counts, "disabled sections keep their menu metadata")
+				for _, mapping in ipairs(state.mappings) do
+					helpers.assert_true(mapping.trigger ~= "unknownx", "an unknown disabled section cannot become admitted")
+					if mapping.trigger == "secondx" then
+						helpers.assert_eq(mapping.match_mode, "exact"); helpers.assert_eq(mapping.priority, 44)
+					elseif mapping.trigger == "firstx" then
+						helpers.assert_eq(mapping.priority, 10); helpers.assert_eq(mapping.final_result, true)
+					end
+				end
+			end)
+		end)
+		assert(os.remove(path))
+		if bound_mode and bound_mode ~= "missing" then assert(os.remove(bound_path)) end
+		if not ok then error(failure, 0) end
+	end
+
+	helpers.it("(source-ordered-autocorrection) registers the actual common registry across interleaved sections", function()
+		actual_registry("autocorrection", false)
+	end)
+	helpers.it("(source-ordered-autocorrection) preserves French declared order and the existing caps-only admission", function()
+		actual_registry("french_autocorrection", false)
+		actual_registry("autocorrection", true)
+	end)
+	helpers.it("(source-ordered-autocorrection) preserves actual bound section order and refuses missing bound sources", function()
+		actual_registry("autocorrection", false, "bound")
+		actual_registry("autocorrection", true, "bound")
+		actual_registry("autocorrection", true, "missing")
+	end)
+	helpers.it("(source-ordered-autocorrection) reparses old grouped cache documents before claiming source order", function()
+		local path = helpers.shared("modules/hotstrings/autocorrection.toml")
+		local reader = helpers.load_with_stubs("toml_codec.reader")
+		local old, accepted = reader.parse(path)
+		helpers.assert_true(accepted); old.source_entries = nil
+		local stored, observed_count = 0, nil
+		reader.set_cache_provider({
+			load = function() return old end, capture_source = function() return "owned" end,
+			store = function(_, parsed) stored = stored + 1; observed_count = #parsed.source_entries end,
+		})
+		local parsed, committed = reader.parse(path)
+		reader.set_cache_provider(nil)
+		helpers.assert_true(committed)
+		helpers.assert_eq(#parsed.source_entries, 140, "old section-grouped cache cannot manufacture physical order")
+		helpers.assert_eq(stored, 1)
+		helpers.assert_eq(observed_count, 140, "cache observations are asserted outside the protected callback")
+	end)
+end)

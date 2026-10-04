@@ -61,12 +61,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LuaJIT
+      - name: Install LuaJIT and native event dependencies
         # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
         # back to io.popen("find") when lfs is unavailable — no luarocks needed.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit sqlite3
+          sudo apt-get install -y luajit lua-luv sqlite3
+          luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
 
       - name: Verify native metrics aggregation equivalence
         run: python3 tools/test/test-linux-metrics-aggregation-native.py
@@ -730,6 +731,7 @@ jobs:
       - name: Update to the newest release and restart
         if: ${{ !cancelled() }}
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: ${{ runner.temp }}/linux-updater-live
         run: |
           sudo apt-get install -y --no-install-recommends lua-luv

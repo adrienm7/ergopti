@@ -241,7 +241,7 @@ end
 function M.ask_parameter_value(gestures, action, spec, title, prior)
 	local prompt = gestures.parameter_prompt(action)
 	if spec == "app" then
-		return dialog.choose_application(prompt)
+		return dialog.choose_application(prompt, title)
 	end
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt,

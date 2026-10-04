@@ -141,16 +141,22 @@ try {
 	for (const rel of DECLARED) {
 		const abs = path.join(ROOT, rel);
 		const before = snapshots.get(rel);
+		let needsRecovery = true;
 		try {
 			const exists = fs.existsSync(abs);
+			needsRecovery =
+				before === undefined ? exists : !exists || !before.equals(fs.readFileSync(abs));
 			if (before === undefined) {
 				if (exists) created.push(rel);
-			} else if (!exists || !before.equals(fs.readFileSync(abs))) drifted.push(rel);
+			} else if (needsRecovery) drifted.push(rel);
 		} catch (error) {
 			restorationErrors.push(`${rel}: comparison failed: ${error.message}`);
 		}
 		// Comparison failure must not prevent restoration, nor may one refused
 		// target prevent other originals from being recovered.
+		// Identical files need no write: rewriting them needlessly contends with
+		// native readers and replaces their modification time.
+		if (!needsRecovery) continue;
 		try {
 			if (before !== undefined) fs.writeFileSync(abs, before);
 			else if (fs.existsSync(abs)) fs.unlinkSync(abs);

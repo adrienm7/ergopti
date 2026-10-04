@@ -28,6 +28,7 @@
 
 #Requires Autohotkey v2.0+
 
+#Include ../../infra/tick_count.ahk
 #Include keylogger_prefetch_seed.ahk
 
 
@@ -1441,7 +1442,8 @@ class KLPFRebuildPublisher {
 		static MIN_PARTIAL_INTERVAL_MS := 10000
 		static PARTIAL_COST_FACTOR := 4
 
-		__New(metrics_dir) {
+		__New(metrics_dir, ClockFn := unset) {
+				this.clock := IsSet(ClockFn) ? ClockFn : () => A_TickCount
 				this.metrics_dir := metrics_dir
 				this.last_partial := 0
 				this.partial_cost := 0
@@ -1459,14 +1461,14 @@ class KLPFRebuildPublisher {
 		PublishProgress(Info) {
 				Final := Info.Get("final", false)
 				if !Final && this.last_progress
-								&& (A_TickCount - this.last_progress) < KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
+								&& TickElapsed64(this.last_progress, this.clock.Call()) < KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
 						return false
 				Progress := KLPF_RebuildProgress(Info)
 				Progress["pid"] := KLPFWorker.process_id
 				; A missed update only delays the bar; the next report rewrites it.
 				if !KLPF_WriteAtomic(KLPF_RebuildProgressPath(this.metrics_dir), KL_JsonEncode(Progress))
 						return false
-				this.last_progress := A_TickCount
+				this.last_progress := this.clock.Call()
 				this.progress_written := true
 				return true
 		}
@@ -1475,11 +1477,11 @@ class KLPFRebuildPublisher {
 				Oldest := Info["oldest_complete"]
 				if (Oldest = "") || (Oldest = this.published_oldest)
 						return false
-				if this.last_partial && (A_TickCount - this.last_partial)
+				if this.last_partial && TickElapsed64(this.last_partial, this.clock.Call())
 								< Max(KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS,
 										KLPFRebuildPublisher.PARTIAL_COST_FACTOR * this.partial_cost)
 						return false
-				Tick := A_TickCount
+				Tick := this.clock.Call()
 				Partial := Map("oldest", Oldest, "newest", Info["newest_complete"])
 				for which in ["typing", "apps"] {
 						; A missed partial only delays the preview; the rebuild goes on.
@@ -1487,8 +1489,8 @@ class KLPFRebuildPublisher {
 										KLPF_BuildPartialJson(which, Info["db"], Partial))
 								return false
 				}
-				this.partial_cost := A_TickCount - Tick
-				this.last_partial := A_TickCount
+				this.partial_cost := TickElapsed64(Tick, this.clock.Call())
+				this.last_partial := this.clock.Call()
 				this.published_oldest := Oldest
 				return true
 		}

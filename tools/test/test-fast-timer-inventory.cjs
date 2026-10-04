@@ -170,6 +170,130 @@ for (const key of Object.keys(INVENTORY)) {
 	}
 }
 
+// A configured brightness worker is a required suspend owner. Its fast poll is
+// bounded by the canonical shared policy, including while retirement is pending.
+const brightnessFiles = {
+	adapter: 'adapters/screen_brightness.ahk',
+	registry: 'infra/lifecycle_transition.ahk',
+	lifecycle: 'infra/lifecycle.ahk',
+	meta: 'tests/meta/test_fast_timer_inventory.ahk'
+};
+const brightnessSources = Object.fromEntries(
+	Object.entries(brightnessFiles).map(([key, rel]) => [
+		key,
+		fs.readFileSync(path.join(DRIVER, rel), 'utf8')
+	])
+);
+const brightnessPolicy = JSON.parse(
+	fs.readFileSync(
+		path.join(DRIVER, '..', '_shared', 'modules', 'actions', 'brightness.json'),
+		'utf8'
+	)
+);
+function brightnessInventoryErrors(sources, policy) {
+	const faults = [];
+	const suspend = sources.registry.match(/"suspend",\s*\[([\s\S]*?)\]/)?.[1] || '';
+	if ((suspend.match(/"screen-brightness"/g) || []).length !== 1)
+		faults.push('screen-brightness must be registered exactly once as a required suspend owner');
+	if (
+		!/_LifecycleRunRequiredStep\(Transition,\s*"screen-brightness",\s*\(\) => ScreenBrightnessCancel\("suspended"\),\s*true\)/.test(
+			sources.lifecycle
+		)
+	)
+		faults.push('screen-brightness suspend must require actual native retirement acknowledgement');
+	const timerArgs = [
+		...sources.adapter.matchAll(/SetTimer\(ScreenBrightnessPoll,\s*([^\r\n]+)\)/g)
+	].map((match) => match[1]);
+	const arms = timerArgs.filter((expression) => expression !== '0');
+	if (
+		arms.length !== 2 ||
+		arms.some((expression) => expression !== 'ScreenBrightnessData()["worker_poll_ms"]')
+	)
+		faults.push(
+			'both brightness worker and retirement-debt poll arms must read the canonical shared period'
+		);
+	if (
+		!sources.adapter.includes(
+			'Data := JsonParse(FileRead(_SharedDir . "\\modules\\actions\\brightness.json", "UTF-8"))'
+		)
+	)
+		faults.push('brightness period getter must load the actual canonical policy');
+	if (!Number.isInteger(policy.worker_poll_ms) || policy.worker_poll_ms !== 50)
+		faults.push('reviewed brightness fast-poll period changed from 50 ms');
+	if (!/"ScreenBrightnessPoll",\s*"50"/.test(sources.meta))
+		faults.push('native fast-timer inventory must explicitly review the 50 ms brightness poll');
+	if (
+		!sources.meta.includes(`if Expr == 'ScreenBrightnessData()["worker_poll_ms"]'`) ||
+		!sources.meta.includes('Period := Policy.Get("worker_poll_ms", 0)') ||
+		!sources.meta.includes('!(Period is Integer) || Period <= 0')
+	)
+		faults.push(
+			'native fast-timer resolver must read and validate the canonical brightness period'
+		);
+	return faults;
+}
+errors.push(...brightnessInventoryErrors(brightnessSources, brightnessPolicy));
+const brightnessMutations = [
+	[
+		'missing owner',
+		{
+			...brightnessSources,
+			registry: brightnessSources.registry.replace('"screen-brightness", ', '')
+		},
+		brightnessPolicy
+	],
+	[
+		'missing acknowledgement',
+		{
+			...brightnessSources,
+			lifecycle: brightnessSources.lifecycle.replace(
+				'ScreenBrightnessCancel("suspended"), true)',
+				'ScreenBrightnessCancel("suspended"))'
+			)
+		},
+		brightnessPolicy
+	],
+	[
+		'unknown runtime period',
+		{
+			...brightnessSources,
+			adapter: brightnessSources.adapter.replaceAll(
+				'ScreenBrightnessData()["worker_poll_ms"]',
+				'Data["worker_poll_ms"]'
+			)
+		},
+		brightnessPolicy
+	],
+	[
+		'missing native inventory',
+		{
+			...brightnessSources,
+			meta: brightnessSources.meta.replace(
+				'"ScreenBrightnessPoll",          "50",',
+				'"ForeignBrightnessPoll",         "50",'
+			)
+		},
+		brightnessPolicy
+	],
+	['shortened period', brightnessSources, { ...brightnessPolicy, worker_poll_ms: 25 }],
+	['unreadable policy', brightnessSources, { ...brightnessPolicy, worker_poll_ms: '50' }],
+	[
+		'unknown policy origin',
+		{
+			...brightnessSources,
+			adapter: brightnessSources.adapter.replace(
+				'\\modules\\actions\\brightness.json',
+				'\\modules\\actions\\foreign.json'
+			)
+		},
+		brightnessPolicy
+	]
+];
+for (const [name, sources, policy] of brightnessMutations) {
+	if (brightnessInventoryErrors(sources, policy).length === 0)
+		errors.push(`brightness timer/lifecycle negative mutation was not rejected: ${name}`);
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Fast repeating-timer inventory is out of date:\x1b[0m');
 	for (const e of errors) console.error('    ' + e);

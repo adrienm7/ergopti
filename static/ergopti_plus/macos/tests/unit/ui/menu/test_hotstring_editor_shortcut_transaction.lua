@@ -289,3 +289,88 @@ helpers.describe("personal hotstring editor shortcut is transactional", function
 		end)
 	end)
 end)
+
+
+--- Exercises the real personal provider and retained one-shot owner.
+--- @param vector table Independent command vector.
+--- @param deferred_pause boolean|nil Pause after scheduling but before delivery.
+--- @param timer_result boolean|nil Actual scheduler receipt.
+--- @return table observation Recorded native admissions.
+local function editor_observation(vector, deferred_pause, timer_result, label_key)
+	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "adapters.timer_scheduler", "infra.manifest_menu", "infra.paths", "infra.i18n" }, function()
+		local calls, scheduled, callback = 0, 0, nil
+		local current = vector.initial_paused
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_delay, work)
+				scheduled = scheduled + 1
+				if timer_result == false then return nil, false end
+				callback = work
+				return {}, true
+			end,
+		}
+		package.loaded["infra.deferred_work"] = nil
+		package.loaded["ui.menu.menu_hotstrings_custom"] = nil
+		local Custom = require("ui.menu.menu_hotstrings_custom")
+		local ctx = {
+			paused = false, state = { keymap = false, hotstrings = {}, trigger_char = "★" },
+			hotfiles = {}, hotstring_editor = {}, script_control = {},
+			get_group_name = function() return "personal" end,
+			applyTriggerChar = function(value) return value end,
+			keymap = { get_sections = function() return {} end, is_group_enabled = function() return false end },
+			save_prefs = function() error("opening an editor cannot write preferences") end,
+			updateMenu = function() error("opening an editor cannot redraw settings") end,
+		}
+		if vector.opener then ctx.hotstring_editor.open = function() calls = calls + 1 end end
+		if vector.pause_receipt ~= "missing" then ctx.script_control.is_paused = function()
+			if vector.pause_receipt == "throw" then error("injected pause owner failure") end
+			if vector.pause_receipt == "nil" then return nil end
+			return current
+		end end
+		if label_key then
+			local declaration = require("infra.manifest_menu").get_array("personal_hotstring_commands")
+			assert(#declaration == 1, "the actual shared child must have exactly one editor command")
+			declaration[1].i18n = label_key
+		end
+		local built = Custom.build_custom(ctx, { group_counts = {} })
+		local wanted = require("infra.i18n").get(label_key or "menu.hotstrings.open_editor")
+		local found
+		for _, row in ipairs(built.submenu) do if row.title == wanted then found = row end end
+		assert(found, "the shared personal editor command must be reachable")
+		local enabled = not found.disabled
+		current = vector.delivered_paused
+		local result = found.fn and found.fn()
+		if deferred_pause ~= nil then current = deferred_pause end
+		if callback then callback() end
+		return { calls = calls, scheduled = scheduled, enabled = enabled, result = result }
+	end)
+end
+
+helpers.describe("shared personal editor command", function()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	local vectors = assert(require("adapters.json_codec").decode(text)).vectors
+	for _, vector in ipairs(vectors) do
+		helpers.it("shared-personal-editor: " .. vector.name, function()
+			local observed = editor_observation(vector)
+			helpers.assert_eq(observed.enabled, vector.enabled)
+			helpers.assert_eq(observed.calls, vector.calls)
+		end)
+	end
+	helpers.it("shared-personal-editor: the actual personal provider follows a changed shared label", function()
+		local observed = editor_observation(vectors[1], false, nil, "menu.hotstrings.shortcut_none")
+		helpers.assert_eq(observed.calls, 1)
+		helpers.assert_eq(observed.enabled, true)
+	end)
+	helpers.it("shared-personal-editor: rechecks pause after its deferred admission", function()
+		local observed = editor_observation(vectors[1], true)
+		helpers.assert_eq(observed.scheduled, 1)
+		helpers.assert_eq(observed.calls, 0)
+	end)
+	helpers.it("shared-personal-editor: refuses an unacknowledged native timer", function()
+		local observed = editor_observation(vectors[1], false, false)
+		helpers.assert_eq(observed.result, false)
+		helpers.assert_eq(observed.scheduled, 1)
+		helpers.assert_eq(observed.calls, 0)
+	end)
+end)

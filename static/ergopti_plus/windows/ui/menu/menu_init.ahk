@@ -191,6 +191,7 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
 ; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
 _MI_StageLayout() {
 	LayoutListProviders := Map(
+		"number_row_policy",      (*) => _LAY_NumberRowRows(),
 		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
@@ -412,12 +413,26 @@ _MI_StageSuspend() {
 
 
 _MI_StageReload() {
-	TrayMenuStage_AddAction(t("menu.global.reload"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
+	Row := MenuRenderer_CommandRow("top_level", "reload",
+		Map("reload", MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
+	if Row is Map && Row.Has("action") {
+		; Keep lifecycle admission explicit after the shared provider wraps its callback.
+		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		if Row.Get("disabled", false)
+			TrayMenuStage_Disable(Row["label"])
+	}
 }
 
 
 _MI_StageQuit() {
-	TrayMenuStage_AddAction(t("menu.global.quit"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
+	Row := MenuRenderer_CommandRow("top_level", "quit",
+		Map("quit", MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
+	if Row is Map && Row.Has("action") {
+		; Keep lifecycle admission explicit after the shared provider wraps its callback.
+		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		if Row.Get("disabled", false)
+			TrayMenuStage_Disable(Row["label"])
+	}
 }
 
 
@@ -479,7 +494,7 @@ _MI_BuildAboutMenu(StartupCommand := 0, StartupState := 0) {
 ; checkout has neither the check row nor the frequency picker: it has no release
 ; to update from.
 _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel,
-		IdentityFn := Updater_BuildIdentity) {
+		IdentityFn := Updater_BuildIdentity, SetIntervalFn := 0) {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 	Rows := []
 
@@ -502,16 +517,21 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	; The preset in force, which both the live picker and its greyed stand-in name
 	; (a live value outside the presets reads as its nearest preset, the one a
 	; reload would load).
-	CurrentCode := UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Code
-	FrequencyLabel := t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . CurrentCode)
+	FrequencyRow := _MI_FrequencyPickerRow(SetIntervalFn)
 
 	if IsLocal {
 		; A local version has no installation to update, so it checks for nothing.
 		; The two rows are still drawn, greyed with the reason: left out, nobody
 		; could tell whether the automatic update exists.
-		for _, Label in [t("menu.about.check_for_updates"), FrequencyLabel]
-			Rows.Push(Map("label", Label, "disabled", true,
-				"disabled_reason_key", "menu.about.source_run_reason"))
+		SourceRow := MenuRenderer_CommandRow("about_source_menu", "about_source_check",
+			Map("about_source_check", (*) => false),
+			Map("about_source_release_ready", () => !IsLocal))
+		if SourceRow is Map
+			Rows.Push(SourceRow)
+		FrequencyRow.Delete("items")
+		FrequencyRow["disabled"] := true
+		FrequencyRow["disabled_reason_key"] := "menu.about.source_run_reason"
+		Rows.Push(FrequencyRow)
 		return Rows
 	}
 
@@ -520,19 +540,18 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		"action",   Updater_OneClickUpdate,
 		"disabled", (Updater_GetUpdateState() == "checking")))
 
-	; Same shape for the shared check-frequency presets: one nested row per
-	; preset, the tick and the parent label on the preset in force.
-	FreqRows := []
-	for _, Preset in UpdateSchedule_Presets() {
-		FreqRows.Push(Map(
-			"label",   t("menu.about.frequency." . Preset["code"]),
-			"action",  _MakeFreqSetter(Preset["seconds"]),
-			"checked", (Preset["code"] == CurrentCode)))
-	}
-	Rows.Push(Map(
-		"label", FrequencyLabel,
-		"items", FreqRows))
+	Rows.Push(FrequencyRow)
 	return Rows
+}
+
+/** Supplies the registered cadence row to its acknowledged native owner. */
+_MI_FrequencyPickerRow(SetIntervalFn := 0) {
+	global UPDATER_CHECK_INTERVAL
+	if !IsObject(SetIntervalFn)
+		SetIntervalFn := Updater_SetCheckInterval
+	return MenuRenderer_ChoiceRow("about_update_frequency_menu", "update_check_interval",
+		Map("update_check_interval", SetIntervalFn),
+		Map("updater.check_interval_seconds", () => UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Seconds))
 }
 
 ; The channel picker: one submenu titled with the subscribed channel's registry

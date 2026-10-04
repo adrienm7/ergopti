@@ -13,6 +13,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
+local DisplayPolicy = require("llm.display_policy")
 
 local LOG = "modules.llm.display_settings"
 local PREF_PREFIX = "llm.display."
@@ -21,8 +22,6 @@ local DEFINITIONS = {
 	pred_indent = {
 		path = "llm.display.pred_indent",
 		type = "number",
-		min = -7,
-		max = 7,
 	},
 	show_info_bar = { path = "llm.display.show_info_bar", type = "boolean" },
 	streaming = { path = "llm.display.streaming", type = "boolean" },
@@ -55,7 +54,8 @@ local function valid(name, value)
 	local def = definition(name)
 	if not def or type(value) ~= def.type then return false end
 	if def.type == "number" then
-		return value == math.floor(value) and value >= def.min and value <= def.max
+		for _, accepted in ipairs(M.indent_values()) do if value == accepted then return true end end
+		return false
 	end
 	return true
 end
@@ -85,8 +85,9 @@ end
 --- Persists before publishing one live display setting.
 --- @param name string
 --- @param value number|boolean
+--- @param expected_source table|nil Exact canonical snapshot for guarded menu commands.
 --- @return boolean
-function M.set(name, value)
+function M.set(name, value, expected_source)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then
 		Logger.error(LOG, "Refused invalid display setting %s=%s.", tostring(name), tostring(value))
@@ -97,7 +98,12 @@ function M.set(name, value)
 		Logger.error(LOG, "No storage; display setting '%s' was not changed.", name)
 		return false
 	end
-	local persisted = Storage.set(PREF_PREFIX .. name, value)
+	local persisted
+	if expected_source ~= nil then
+		persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source)
+	else
+		persisted = Storage.set(PREF_PREFIX .. name, value)
+	end
 	if persisted ~= true then
 		Logger.error(LOG, "Display setting '%s' could not be persisted; live state is unchanged.", name)
 		return false
@@ -119,11 +125,7 @@ end
 --- Returns the accepted indentation range.
 --- @return table
 function M.indent_values()
-	local values = {}
-	for value = DEFINITIONS.pred_indent.min, DEFINITIONS.pred_indent.max do
-		values[#values + 1] = value
-	end
-	return values
+	return DisplayPolicy.indentation_values(Manifest.find_entry_by_path(DEFINITIONS.pred_indent.path))
 end
 
 --- Test seam: forgets cached reads.

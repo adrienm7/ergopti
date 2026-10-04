@@ -339,8 +339,8 @@ helpers.describe("tray (linux): published About channel choices", function()
 				local changed = { count = 0 }
 				local row = submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT]
 				local accepted, result = pcall(row.menu[2].fn)
-				helpers.assert_eq(accepted, refusal ~= "throw")
-				if accepted then helpers.assert_eq(result, nil) end
+				helpers.assert_eq(accepted, true, "the native owner exception is a refused callback")
+				helpers.assert_eq(result, false, "the native receipt must be exact true")
 				helpers.assert_eq(requests.set, { "dev" })
 				helpers.assert_eq(up.get_channel(), "main")
 				helpers.assert_eq(changed.count, 0)
@@ -350,4 +350,313 @@ helpers.describe("tray (linux): published About channel choices", function()
 		package.loaded["ui.changelog.bridge"] = previous_bridge
 		if not ok then error(detail, 0) end
 	end)
+end)
+
+
+--- Reads independent numeric values and snapped caption expectations.
+local function frequency_corpus()
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/update_check_frequency.json", "rb"))
+	local raw = assert(handle:read("*a"))
+	assert(handle:close())
+	return assert(require("json").decode(raw))
+end
+
+--- Exercises the actual manager and menu around durable writer and timer ports.
+local function with_frequency_owner(refusal, body)
+	local names = {"adapters.timer_scheduler", "adapters.storage", "modules.updater.manager"}
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	local writer = require("toml_codec.writer")
+	local previous_write = writer.batch_write
+	local Installation = require("infra.installation")
+	local previous_source_run = Installation.is_source_run
+	Installation.is_source_run = function() return false end
+	local obs = {timers = {}, cancels = 0, writes = 0, redraws = {count = 0}, requests = 0}
+	local path = os.tmpname()
+	local original = "[updater]\ncheck_interval_seconds = 3600\nfuture_interval_option = 42\n"
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(original)); assert(file:close())
+	package.loaded["adapters.timer_scheduler"] = {
+		HAS_ASYNC = true,
+		after = function(delay, fn)
+			local handle = {delay = delay, fn = fn, armed = true}
+			obs.timers[#obs.timers + 1] = handle
+			return handle
+		end,
+		cancel = function(handle) obs.cancels = obs.cancels + 1; handle.armed = false; return true end,
+	}
+	package.loaded["adapters.storage"] = require("tests.fakes").storage({initial = {}})
+	package.loaded["modules.updater.manager"] = nil
+	local up = require("modules.updater.manager")
+	up._now = function() return 1700000000 end
+	up.current_version = function() return "1.0.0" end
+	up.check_for_updates = function() obs.requests = obs.requests + 1; return false end
+	local ok, detail = pcall(function()
+		up.init({config_path = path, is_paused = function() return false end})
+		writer.batch_write = function(...)
+			obs.writes = obs.writes + 1
+			if refusal == "throw" then error("The cadence writer refused.") end
+			if refusal == "false" then return false end
+			if refusal == "nil" then return nil end
+			return previous_write(...)
+		end
+		body(up, obs, path, original)
+	end)
+	up.stop_background_checks()
+	writer.batch_write = previous_write
+	Installation.is_source_run = previous_source_run
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	os.remove(path)
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("shared updater frequency choices (Linux)", function()
+	helpers.it("projects independent presets and actual snap values into real menu rows (shared-update-frequency)", function()
+		local corpus = frequency_corpus()
+		helpers.assert_eq(#corpus.choices, 10)
+		for _, expected in ipairs(corpus.snapped_states) do
+			local up = fake_updater("dev")
+			up.get_check_interval = function() return expected.stored end
+			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
+			local i18n = require("infra.i18n")
+			helpers.assert_eq(row.title, i18n.get(corpus.i18n) .. ": " .. i18n.get("menu.about.frequency." .. expected.code))
+			helpers.assert_eq(#row.menu, #corpus.choices)
+			for index, choice in ipairs(corpus.choices) do
+				helpers.assert_eq(row.menu[index].title, i18n.get(choice.i18n))
+				helpers.assert_eq(row.menu[index].checked, choice.value == expected.value)
+			end
+		end
+	end)
+
+	helpers.it("keeps durable bytes runtime cadence timer and redraw on actual writer refusal (shared-update-frequency)", function()
+		for _, refusal in ipairs({"false", "nil", "throw"}) do
+			with_frequency_owner(refusal, function(up, obs, path, original)
+				local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
+				local timers, cancels = #obs.timers, obs.cancels
+				local current_timer = obs.timers[#obs.timers]
+				helpers.assert_true(current_timer ~= nil and current_timer.armed, "the native schedule must be owned before refusal")
+				local result = row.menu[1].fn()
+				helpers.assert_eq(up.get_check_interval(), 3600)
+				local file = assert(io.open(path, "rb"))
+				local bytes = assert(file:read("*a")); assert(file:close())
+				helpers.assert_eq(bytes, original)
+				helpers.assert_eq(obs.writes, 1)
+				helpers.assert_true(current_timer.armed, "a refused preference cannot retire the owned timer")
+				helpers.assert_eq(obs.cancels, cancels, "a refused write cannot release the current timer")
+				helpers.assert_eq(#obs.timers, timers, "a refused write cannot restart the background schedule")
+				helpers.assert_eq(obs.redraws.count, 0)
+				helpers.assert_eq(result, false)
+			end)
+		end
+	end)
+
+	helpers.it("returns acknowledged writes preserves unknown preferences and replays absolute held selections (shared-update-frequency)", function()
+		with_frequency_owner(nil, function(up, obs, path)
+			local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
+			local selected = frequency_corpus().choices[1].value
+			local held = row.menu[1].fn
+			local result = held()
+			helpers.assert_eq(up.get_check_interval(), selected)
+			helpers.assert_eq(obs.writes, 1)
+			helpers.assert_eq(obs.redraws.count, 1)
+			local file = assert(io.open(path, "rb"))
+			local bytes = assert(file:read("*a")); assert(file:close())
+			helpers.assert_true(bytes:find("future_interval_option = 42", 1, true) ~= nil)
+			helpers.assert_true(bytes:find("check_interval_seconds = " .. selected, 1, true) ~= nil)
+			helpers.assert_eq(result, true)
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(obs.writes, 1, "an acknowledged absolute selection does not need another write")
+		end)
+	end)
+
+	helpers.it("consumes the published labels order and numeric mutation values (shared-update-frequency)", function()
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local previous = root.about_update_frequency_menu
+		local corpus, choices = frequency_corpus(), {}
+		for index = #corpus.choices, 1, -1 do
+			local source = corpus.choices[index]
+			choices[#choices + 1] = {value = source.value, i18n = source.i18n}
+		end
+		choices[1].i18n = corpus.alternate_i18n
+		root.about_update_frequency_menu = {{type = "choice", id = corpus.id, path = corpus.path,
+			i18n = corpus.i18n, show_current_choice = true, current_choice_suffix = corpus.suffix,
+			choices = choices}}
+		local ok, detail = pcall(function()
+			local up, calls = fake_updater("dev"), {}
+			up.set_check_interval = function(value) calls[#calls + 1] = value; return true end
+			up.stop_background_checks = function() return true end
+			up.start_background_checks = function() return true end
+			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
+			helpers.assert_eq(#row.menu, #choices)
+			for index, choice in ipairs(choices) do
+				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				row.menu[index].fn()
+				helpers.assert_eq(calls[index], choice.value)
+			end
+		end)
+		root.about_update_frequency_menu = previous
+		if not ok then error(detail, 0) end
+	end)
+end)
+
+
+--- Exercises the real About provider with unrelated tray surfaces isolated.
+--- @param alternative boolean True to independently replace the declaration's label and reason.
+local function with_source_command(alternative, callback)
+	local names = { "ui.menu.menu_builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
+		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
+		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
+		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
+		"llm.trigger_policy", "infra.version", "infra.installation", "ui.menu.start_at_login" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
+	local ok, err = xpcall(function()
+		local seen = { effects = 0 }
+		local function effect() seen.effects = seen.effects + 1; return false end
+		local labels = { ["menu.about.source_run_reason"] = "Source checkout: use an installed release.",
+			["common.restore_recommended"] = "Canonical alternate label",
+			["common.clear_to_system"] = "Canonical alternate reason: inert control." }
+		package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+			section = function(key) return labels[key] or key end }
+		local source = debug.getinfo(1, "S").source:gsub("^@", "")
+		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
+		package.loaded["infra.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
+		package.loaded["infra.version"] = { identity = function()
+			return {kind = "local", version = "", commit = "known"}
+		end }
+		package.loaded["infra.installation"] = { is_source_run = function() return true end }
+		package.loaded["ui.menu.start_at_login"] = { enabled = function() return false end }
+		package.loaded["infra.manifest_menu"] = nil
+		local renderer = require("infra.manifest_menu")
+		package.loaded["infra.manifest_menu"] = setmetatable({ get_array = function(key)
+			if key == "top_level" then return {{id = "about"}} end
+			return renderer.get_array(key)
+		end }, { __index = renderer })
+		local declaration = renderer.get_array("about_source_menu")
+		helpers.assert_eq(#declaration, 1)
+		if alternative then
+			declaration[1].i18n = "common.restore_recommended"
+			declaration[1].disabled_reason_key = "common.clear_to_system"
+		end
+		local handle = assert(io.open(driver .. "/../_shared/modules/updater/defaults.json", "rb"))
+		local timing = require("json").decode(assert(handle:read("*a"))).timing
+		assert(handle:close())
+		local up = { get_channel = function() return "dev" end, set_channel = effect,
+			get_check_interval = function() return timing.default_check_interval_sec end,
+			TIMING = timing, get_menu_label = function() error("A source checkout has no live update label.") end,
+			get_state = function() return "idle" end,
+			check_for_updates = effect, install = effect, get_cached_release = function() return nil end }
+		package.loaded["ui.menu.menu_builder"] = nil
+		local rows = require("ui.menu.menu_builder").build({ updater = up, on_quit = effect,
+			on_menu_changed = effect, webview = { show = effect } })
+		local title = alternative and labels["common.restore_recommended"] or "menu.about.check_for_updates"
+		local reason = alternative and "Canonical alternate reason" or "Source checkout"
+		local function find(items)
+			for _, row in ipairs(items or {}) do
+				if row.title == title .. " — " .. reason then return row end
+				local nested = find(row.menu)
+				if nested then return nested end
+			end
+		end
+		callback(find(rows), seen)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("About source check shared command", function()
+	helpers.it("keeps the original disabled reason without native update window install or redraw effects (about-source-command)", function()
+		with_source_command(false, function(row, seen)
+			helpers.assert_type(row, "table")
+			helpers.assert_eq(row.disabled, true)
+			helpers.assert_nil(row.fn)
+			helpers.assert_nil(row.menu)
+			helpers.assert_nil(row.checked)
+			helpers.assert_eq(seen.effects, 0)
+		end)
+	end)
+
+	helpers.it("uses the actual declared label and reason instead of native source-only literals (about-source-command)", function()
+		with_source_command(true, function(row, seen)
+			helpers.assert_type(row, "table")
+			helpers.assert_eq(row.disabled, true)
+			helpers.assert_nil(row.fn)
+			helpers.assert_nil(row.menu)
+			helpers.assert_nil(row.checked)
+			helpers.assert_eq(seen.effects, 0)
+		end)
+	end)
+end)
+
+
+helpers.describe("Linux About channel durable receipts", function()
+	for _, outcome in ipairs({"false", "nil", "number", "throw", "true"}) do
+		helpers.it("publishes menu and Versions effects only after exact native ACK (channel-ack " .. outcome .. ")", function()
+			local previous_bridge = package.loaded["ui.changelog.bridge"]
+			local pushes, calls = 0, 0
+			package.loaded["ui.changelog.bridge"] = {push_subscribed_channel = function() pushes = pushes + 1 end}
+			local ok, detail = xpcall(function()
+				local up = fake_updater("main")
+				up.set_channel = function()
+					calls = calls + 1
+					if outcome == "throw" then error("The native owner refused.") end
+					if outcome == "number" then return 2 end
+					if outcome == "nil" then return nil end
+					return outcome == "true"
+				end
+				local changed = {count = 0}
+				local held = submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT].menu[2].fn
+				local protected, accepted = pcall(held)
+				helpers.assert_eq(protected, true)
+				helpers.assert_eq(accepted, outcome == "true")
+				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(changed.count, outcome == "true" and 1 or 0)
+				helpers.assert_eq(pushes, outcome == "true" and 1 or 0)
+			end, debug.traceback)
+			package.loaded["ui.changelog.bridge"] = previous_bridge
+			if not ok then error(detail, 0) end
+		end)
+	end
+
+	for _, outcome in ipairs({"false", "nil", "number", "throw"}) do
+		helpers.it("retries actual updater persistence after refusal without changing canonical bytes (channel-ack durable " .. outcome .. ")", function()
+			with_frequency_owner(nil, function(up, obs, path, original)
+				local writer = require("toml_codec.writer")
+				local previous_write = writer.batch_write
+				local refusing, writes = true, 0
+				writer.batch_write = function(...)
+					writes = writes + 1
+					if refusing then
+						if outcome == "throw" then error("The canonical writer refused.") end
+						if outcome == "number" then return 2 end
+						if outcome == "false" then return false end
+						return nil
+					end
+					return previous_write(...)
+				end
+				local initial = up.get_channel()
+				local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT]
+				local target = initial == "main" and "dev" or "main"
+				local held = row.menu[target == "main" and 1 or 2].fn
+				local accepted = held()
+				local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); assert(file:close())
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(bytes, original)
+				helpers.assert_eq(up.get_channel(), initial)
+				helpers.assert_eq(obs.redraws.count, 0)
+				helpers.assert_eq(writes, 1)
+				refusing = false
+				helpers.assert_eq(held(), true)
+				local saved = assert(io.open(path, "rb")); local committed = saved:read("*a"); assert(saved:close())
+				helpers.assert_true(committed:find('channel = "' .. target .. '"', 1, true) ~= nil)
+				helpers.assert_true(committed:find("future_interval_option = 42", 1, true) ~= nil)
+				helpers.assert_eq(up.get_channel(), target)
+				helpers.assert_eq(obs.redraws.count, 1)
+				helpers.assert_eq(writes, 2)
+				helpers.assert_eq(held(), true)
+				helpers.assert_eq(writes, 2)
+			end)
+		end)
+	end
 end)

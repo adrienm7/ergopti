@@ -224,6 +224,15 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "local API discovery",
+			stop = function()
+				local servers = package.loaded["modules.llm.local_servers"]
+				if servers and servers.shutdown() ~= true then
+					Logger.warn("shutdown", "Local API discovery still owns native cleanup debt.")
+				end
+			end,
+		},
+		{
 			name = "AI agent files",
 			stop = function()
 				-- The calendar files handed to xdg-open, and the learnt thresholds.
@@ -765,6 +774,10 @@ local function main()
 			TapHold.set_paused(paused)
 			-- A pause turns the AI's live mode off; resuming leaves it off.
 			if prediction_engine then prediction_engine.on_pause_change(paused) end
+			local servers = package.loaded["modules.llm.local_servers"]
+			if paused and servers and servers.cancel() ~= true then
+				Logger.warn("pause", "Local API discovery still owns native cleanup debt.")
+			end
 			if rebuild_tray_menu then rebuild_tray_menu() end
 		end,
 	})
@@ -1395,7 +1408,6 @@ local function main()
 					if native[id] == code and key.enabled ~= false then return false end
 				end
 			end
-			if magic_remapped then return true end
 			if shortcuts and shortcuts.is_enabled() and not script_actions.is_paused() then
 				for _, key in ipairs(tap_keys.keys()) do
 					if key.linux == code and tap_keys.get_action(key.id) ~= "none" then return false end

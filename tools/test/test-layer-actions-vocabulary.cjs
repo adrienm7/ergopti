@@ -404,6 +404,26 @@ for (const [id, action] of Object.entries(actions)) {
 			);
 	}
 }
+const brightness = JSON.parse(
+	fs.readFileSync(shared('modules', 'actions', 'brightness.json'), 'utf8')
+);
+for (const id of ['brightness_up', 'brightness_down']) {
+	if (catalogue[id].emit_ahk_key !== undefined)
+		fail(`${id} must use the native backlight owner, not an unsupported AutoHotkey Send key`);
+	if (!actions[id]) {
+		fail(`${id} is missing from the shared layer vocabulary`);
+		continue;
+	}
+	if (KEYSYM_TO_EVDEV[brightness.actions[id].linux_key] !== brightness.actions[id].linux_code)
+		fail(`${id} must preserve the existing native evdev emitter identity`);
+	for (const os of OSES) {
+		if (resolutionFor(actions[id], os) !== `call:${id}`)
+			fail(`${id} on ${os} must resolve to the same native brightness action`);
+	}
+	if (brightness.linux_program !== 'brightnessctl' || brightness.linux_class !== 'backlight')
+		fail(`${id} must qualify the screen backlight class rather than keyboard LEDs`);
+}
+
 if (pins < MIN_CATALOGUE_PINS)
 	fail(`only ${pins} catalogue keystrokes compared (floor ${MIN_CATALOGUE_PINS})`);
 

@@ -207,3 +207,78 @@ _NRP_EndCharRowSurvivesBesideDoubling() {
 }
 Test("hotstrings: the end-character row survives beside a withheld doubling (no-repeat-preview)",
 	_NRP_EndCharRowSurvivesBesideDoubling)
+
+/** Exercise the real repeat owner using literal complete-scalar expectations. */
+_NRP_UnicodeRepeat(Buffer, Expected, KnownStart := true, Magic := "★") {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+	Saved := _NRP_Setup()
+	SavedTerminators := HSE_WORD_TERMINATORS
+	try {
+		HSE_WORD_TERMINATORS := SavedTerminators . Chr(0x1F600)
+		HSE_Buffer := Buffer . Magic
+		HSE_StartIsWordBoundary := KnownStart
+		Spec := HSE_TryRepeatKey(Magic)
+		if Expected == "" {
+			AssertEqual("", Spec, "no confirmed second character means no repeat")
+			return
+		}
+		AssertTrue(IsObject(Spec), "a complete non-boundary predecessor permits the real fallback")
+		AssertEqual(Expected, Spec.Replacement, "repeat exactly the complete preceding scalar")
+		AssertEqual(SubStr(Expected, 1, StrLen(Expected) // 2) . Magic, Spec.Trigger,
+			"the transient trigger must erase the complete original suffix")
+		AssertEqual(StrLen(Spec.Trigger), Spec.Length, "internal match spans remain UTF16 units")
+	} finally {
+		HSE_WORD_TERMINATORS := SavedTerminators
+		_NRP_Teardown(Saved)
+	}
+}
+Test("repeat unicode-boundary-owner: supplementary scalar at word start never doubles", (*) =>
+	_NRP_UnicodeRepeat(Chr(0x1F601), ""))
+Test("repeat unicode-boundary-owner: supplementary non-delimiter repeats completely", (*) =>
+	_NRP_UnicodeRepeat("a" . Chr(0x1F601), Chr(0x1F601) . Chr(0x1F601)))
+Test("repeat unicode-boundary-owner: actual supplementary delimiter refuses the first letter", (*) =>
+	_NRP_UnicodeRepeat(Chr(0x1F600) . "a", ""))
+Test("repeat unicode-boundary-owner: sharing only the delimiter low surrogate permits doubling", (*) =>
+	_NRP_UnicodeRepeat(Chr(0x1FA00) . "a", "aa"))
+Test("repeat unicode-boundary-owner: supplementary first predecessor retains unknown-start refusal", (*) =>
+	_NRP_UnicodeRepeat(Chr(0x1F601) . "a", "", false))
+Test("repeat unicode-boundary-owner: known supplementary predecessor allows doubling", (*) =>
+	_NRP_UnicodeRepeat(Chr(0x1FA00) . "a", "aa", true))
+Test("repeat unicode-boundary-owner: supplementary magic key keeps the complete trigger span", (*) =>
+	_NRP_UnicodeRepeat("ab", "bb", true, Chr(0x1F601)))
+
+
+/** Check the shared STAR/END and repeat boundary owner without dispatching output. */
+_NRP_UnicodeBoundary(Prefix, Repeating, Expected, KnownStart := true) {
+	global HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+	SavedStart := HSE_StartIsWordBoundary
+	SavedTerminators := HSE_WORD_TERMINATORS
+	try {
+		HSE_StartIsWordBoundary := KnownStart
+		HSE_WORD_TERMINATORS := SavedTerminators . Chr(0x1F600)
+		Spec := { Length: 3, InWord: Repeating, IsRepeat: Repeating }
+		AssertEqual(Expected, _HSE_WordBoundaryAllows(Prefix . "the", Spec),
+			"boundary admission compares a complete preceding character")
+	} finally {
+		HSE_StartIsWordBoundary := SavedStart
+		HSE_WORD_TERMINATORS := SavedTerminators
+	}
+}
+Test("boundary unicode-boundary-owner: a shared low surrogate cannot license a word", (*) =>
+	_NRP_UnicodeBoundary(Chr(0x1FA00), false, false))
+Test("boundary unicode-boundary-owner: an actual supplementary delimiter licenses a word", (*) =>
+	_NRP_UnicodeBoundary(Chr(0x1F600), false, true))
+Test("boundary unicode-boundary-owner: a shared low surrogate cannot refuse a repeat", (*) =>
+	_NRP_UnicodeBoundary(Chr(0x1FA00), true, true))
+Test("boundary unicode-boundary-owner: an actual supplementary delimiter refuses a repeat", (*) =>
+	_NRP_UnicodeBoundary(Chr(0x1F600), true, false))
+Test("boundary unicode-boundary-owner: empty predecessor retains known-start admission", (*) =>
+	_NRP_UnicodeBoundary("", false, true))
+Test("boundary unicode-boundary-owner: empty predecessor retains unknown-start refusal", (*) =>
+	_NRP_UnicodeBoundary("", false, false, false))
+Test("boundary unicode-boundary-owner: ordinary punctuation retains word admission", (*) =>
+	_NRP_UnicodeBoundary(".", false, true))
+Test("repeat unicode-boundary-owner: an unpaired low surrogate retains unit semantics", (*) =>
+	_NRP_UnicodeRepeat("a" . Chr(0xDC01), Chr(0xDC01) . Chr(0xDC01)))
+Test("repeat unicode-boundary-owner: an unpaired high surrogate retains unit semantics", (*) =>
+	_NRP_UnicodeRepeat("a" . Chr(0xD801), Chr(0xD801) . Chr(0xD801)))

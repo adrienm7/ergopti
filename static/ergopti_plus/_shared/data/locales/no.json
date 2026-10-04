@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Fjern Ergopti fra Karabiner",
 	"menu.global.restore_touchpad_gestures": "Gjenopprett Windows-styreflatebevegelser",
 	"dialog.start_at_login.failed": "Kunne ikke endre automatisk oppstart. Kontroller systemets oppstartsinnstillinger.",
-	"onboarding.error.open_failed": "Kunne ikke åpne oppsettsveiviseren. Se loggene, og prøv igjen fra menyen."
+	"onboarding.error.open_failed": "Kunne ikke åpne oppsettsveiviseren. Se loggene, og prøv igjen fra menyen.",
+	"platform_reason.token_streaming_transport_missing": "Ikke på Windows: Windows kan ennå ikke vise forslag token for token. Dette alternativet forblir inaktivt.",
+	"menu.layout.number_row": "Tallrekke",
+	"menu.layout.number_row_native": "Systemets rekkefølge",
+	"menu.layout.number_row_digits": "Tall først",
+	"menu.layout.number_row_symbols": "Symboler først",
+	"platform_reason.number_row_override_unsupported": "Ikke støttet: Denne driveren beholder systemets tallrekke; tall og symboler kan ikke tvinges fram.",
+	"platform_reason.number_row_source_unavailable": "Utilgjengelig: Symboler først krever et aktivt emulert oppsett med gyldige tall- og symbolnivåer på hver plass i tallrekken."
 }

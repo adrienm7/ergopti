@@ -13,9 +13,10 @@
  * @param start_date Inclusive lower date bound, or an empty string.
  * @param end_date Inclusive upper date bound, or an empty string.
  * @param Index Receives date/application membership only, never partial metrics.
+ * @param Now Optional native monotonic tick for the live foreground projection.
  * @returns {String} Complete manifest JSON; the ordinary Map cache is untouched.
  */
-KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset) {
+KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset, Now := unset) {
 		Index := Map()
 		if !db
 				return "{}"
@@ -28,7 +29,7 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset) {
 				for Day, Apps in Series
 						for App in Apps
 								KLR_GetCell(Manifest, Day, App)
-		KLR_AddLiveForegroundTime(Manifest, start_date, end_date)
+		KLR_AddLiveForegroundTime(Manifest, start_date, end_date, Now?)
 		Output := "{"
 		for Day, Apps in Manifest {
 				Index[Day] := Map()

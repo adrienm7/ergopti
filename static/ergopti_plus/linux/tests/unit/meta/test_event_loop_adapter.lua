@@ -12,7 +12,11 @@
 ---    callback exceptions don't crash the loop.
 
 local helpers = require("tests.helpers")
-local el      = helpers.load_module("adapters.event_loop")
+local native_ok, native_luv = pcall(require, "luv")
+local function load_pump_loop()
+  return helpers.load_module_with_dependency("adapters.event_loop", "luv", false)
+end
+local el = load_pump_loop()
 
 --- Models libuv stop admission while an independently owned handle stays live.
 local function stop_fixture(source)
@@ -112,8 +116,7 @@ helpers.describe("event_loop adapter", function()
       helpers.assert_true(not el.sleep_ms("1"), "non-numeric waits must be rejected")
     end)
 
-    helpers.it("HAS_LUV is false when luv is not installed (CI/Windows)", function()
-      -- On CI and the maintainer's Windows machine, luv is absent.
+    helpers.it("HAS_LUV is false when the dependency is explicitly unavailable", function()
       helpers.assert_true(el.HAS_LUV == false, "HAS_LUV is false (luv absent)")
     end)
   end)
@@ -298,7 +301,7 @@ helpers.describe("event_loop adapter", function()
 
     helpers.it("pumps registered idle handlers every tick even under clock starvation", function()
       -- Fresh module instance so no handler leaks in from or out to other tests.
-      local elx = helpers.load_module("adapters.event_loop")
+      local elx = load_pump_loop()
 
       -- Register the GTK-context pump BEFORE touching the clock: if the API is
       -- missing (the pre-fix regression) this line raises and the frozen clock
@@ -333,7 +336,7 @@ helpers.describe("event_loop adapter", function()
     end)
 
     helpers.it("rejects a non-function handler (fail-fast) without crashing", function()
-      local elx = helpers.load_module("adapters.event_loop")
+      local elx = load_pump_loop()
       -- A no-op means the handler is not REGISTERED. One that stored 42 and called
       -- it on the next tick would crash the loop a frame later, far from here.
       elx.add_idle_handler(42)
@@ -342,4 +345,46 @@ helpers.describe("event_loop adapter", function()
     end)
   end)
 
+end)
+
+helpers.describe("event loop backend isolation", function()
+  helpers.it("dependency fixtures restore cached and preload values after success", function()
+    local loaded, preload = package.loaded.luv, package.preload.luv
+    local native = helpers.load_module_with_dependency("adapters.event_loop", "luv", {})
+    helpers.assert_true(native.HAS_LUV, "present dependency selects the native backend")
+    helpers.assert_true(package.loaded.luv == loaded, "restore the exact original cache")
+    helpers.assert_true(package.preload.luv == preload, "restore the exact original loader")
+    helpers.assert_true(not load_pump_loop().HAS_LUV, "absent dependency selects polling independently")
+    helpers.assert_true(package.loaded.luv == loaded, "polling must not conceal installed luv")
+  end)
+
+  helpers.it("dependency fixtures restore values and preserve a throwing module error", function()
+    local name = "tests.fixture_backend_load_failure"
+    local old_loaded, old_preload = package.loaded[name], package.preload[name]
+    local loaded, preload = package.loaded.luv, package.preload.luv
+    package.preload[name] = function()
+      require("luv")
+      error("backend fixture load failure")
+    end
+    local ok, err = pcall(helpers.load_module_with_dependency, name, "luv", {})
+    package.loaded[name], package.preload[name] = old_loaded, old_preload
+    helpers.assert_true(not ok, "module failure must propagate")
+    helpers.assert_contains(tostring(err), "backend fixture load failure")
+    helpers.assert_true(package.loaded.luv == loaded, "restore cache after a failed require")
+    helpers.assert_true(package.preload.luv == preload, "restore loader after a failed require")
+  end)
+
+  -- The isolated child uses the POSIX transport of this Linux driver.
+  if native_ok and package.config:sub(1, 1) == "/" then
+    helpers.it("installed luv dispatches idle and periodic callbacks and closes its handles", function()
+      -- libuv's default loop is process-wide: other tests may own active handles.
+      local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
+      local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop.lua"
+      local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+      local result = os.execute(quote(executable) .. " " .. quote(fixture))
+      helpers.assert_true(result == true or result == 0, "isolated native loop fixture must succeed")
+    end)
+  else
+    print("  [native luv POSIX integration unavailable; explicit backend fixtures still run]")
+  end
 end)

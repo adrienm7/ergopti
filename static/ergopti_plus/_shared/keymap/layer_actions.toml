@@ -100,9 +100,9 @@ reason_key = "platform_reason.layer_pointer_source_is_not_linux"
 
 # Driver-native handlers a `call:` resolution may name, per OS.
 [call_handlers]
-windows = ["maximize_window"]
-macos = ["tap_escape_hold_option_shift"]
-linux = []
+windows = ["maximize_window", "brightness_up", "brightness_down"]
+macos = ["tap_escape_hold_option_shift", "brightness_up", "brightness_down"]
+linux = ["brightness_up", "brightness_down"]
 
 # The layer editor's picker groups, in display order. Each heading reads the
 # locale key layer_editor.group.<id>; the actions of a group keep the order
@@ -434,6 +434,18 @@ macos = "keystroke:ctrl+alt+meta+ArrowRight"
 # ======= 6. Media =======
 # ========================
 # ========================
+
+[actions.brightness_up]
+group = "media"
+catalogue = true
+repeatable = false
+all = "call:brightness_up"
+
+[actions.brightness_down]
+group = "media"
+catalogue = true
+repeatable = false
+all = "call:brightness_down"
 
 [actions.vol_up]
 group = "media"

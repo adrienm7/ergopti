@@ -241,6 +241,66 @@ check(Http.cancel("native-cancel") == true and not Http.isActive("native-cancel"
 	"native streaming cancellation releases the exact request owner")
 check(cancel_terminals == 0, "cancellation suppresses the terminal callback")
 
+
+-- Discovery needs a stronger receipt than the historical signal-accepted bool.
+-- This uses the same actual curl/native process and retains exact cleanup
+-- ownership until its process exit and every libuv close callback acknowledge.
+local owned_receipt, owned_callbacks, settled_callbacks = nil, 0, 0
+response = { status = 200, body = '{"data":[{"id":"owned:first"},{"id":"owned:second"}]}' }
+local owned = Http.get_owned(base_url .. "/api/chat", {},
+	{ owner = "native-owned", timeout_ms = 2000, max_body_bytes = 65536 }, function(value)
+		owned_receipt = value
+		owned_callbacks = owned_callbacks + 1
+	end)
+check(owned.started == true and not owned:is_settled(), "owned native GET returns before actual response/cleanup")
+owned:on_settled(function() settled_callbacks = settled_callbacks + 1 end)
+check(run_until(function() return owned:is_settled() end), "owned native GET receives process-exit and handle-close ACKs")
+check(owned_receipt and owned_receipt.ok and owned_receipt.status == 200
+	and owned_receipt.body == response.body and owned_callbacks == 1 and settled_callbacks == 1,
+	"the complete actual 200/body publishes exactly once after physical settlement")
+
+owned_receipt = nil
+response = { status = 401, body = '{"error":"authentication required"}' }
+owned = Http.get_owned(base_url .. "/api/chat", {}, { owner = "native-owned", timeout_ms = 2000 },
+	function(value) owned_receipt = value end)
+check(run_until(function() return owned:is_settled() end), "owned native authentication refusal physically settles")
+check(owned_receipt and not owned_receipt.ok and owned_receipt.status == 401
+	and owned_receipt.error_body == response.body, "owned GET retains the real 401 receipt and complete error body")
+
+owned_receipt = nil
+response = { status = 200, body = '{"data":[]}', incomplete = true }
+owned = Http.get_owned(base_url .. "/api/chat", {}, { owner = "native-owned", timeout_ms = 2000 },
+	function(value) owned_receipt = value end)
+check(run_until(function() return owned:is_settled() end), "owned native incomplete 200 physically settles")
+check(owned_receipt and not owned_receipt.ok and owned_receipt.status == 200
+	and owned_receipt.body == "", "an actual interrupted 200 cannot publish a complete models receipt")
+
+local cancelled_callbacks = 0
+owned = Http.get_owned(base_url .. "/slow", {}, { owner = "native-owned", timeout_ms = 2000 },
+	function() cancelled_callbacks = cancelled_callbacks + 1 end)
+check(run_until(function() return requests[#requests] and requests[#requests].path == "/slow" end),
+	"owned cancellation reaches a real pending curl process")
+check(owned:cancel() == false and not owned:is_settled(),
+	"accepted native cancellation remains unsettled until the event loop observes actual exit/close")
+local blocked_receipt
+check(Http.get(base_url .. "/api/chat", {}, { owner = "native-owned" }, function(value) blocked_receipt = value end) == false
+	and blocked_receipt and blocked_receipt.error == "previous request cleanup pending",
+	"a logical legacy GET cannot acquire over a retained owned native cancellation")
+local blocked = Http.get_owned(base_url .. "/api/chat", {}, { owner = "native-owned" }, function() end)
+check(blocked.started == false and blocked:is_settled(), "a second owned GET acquires no process while cleanup is pending")
+check(run_until(function() return owned:is_settled() end) and owned:cancel() == true,
+	"cancelled native ownership retires only after physical process and handle settlement")
+check(cancelled_callbacks == 0, "native late completion remains fenced after cancellation")
+
+owned_receipt = nil
+response = { status = 200, body = '{"data":[]}' }
+local successor = Http.get_owned(base_url .. "/api/chat", {}, { owner = "native-owned", timeout_ms = 2000 },
+	function(value) owned_receipt = value end)
+check(successor.started == true and run_until(function() return successor:is_settled() end),
+	"a fresh owned GET can acquire after the exact predecessor physically settles")
+check(owned_receipt and owned_receipt.ok and owned_receipt.body == response.body,
+	"post-cancellation retry receives its own real HTTP body")
+
 Http.cancel()
 for _, owner in ipairs({ "native-status", "native-partial", "native-bounded", "native-cancel" }) do Http.cancel(owner) end
 Offer._reset_for_test()

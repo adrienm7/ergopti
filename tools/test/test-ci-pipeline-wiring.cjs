@@ -202,6 +202,7 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
 	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],
 	[
@@ -1404,6 +1405,230 @@ for (const [what, rel, from, to] of [
 	]
 ]) {
 	mustCatch(what, rel, from, to, namingProblems);
+}
+
+/** Keeps the approved root group as the pipeline's only concurrency owner. */
+function concurrencyProblems(files) {
+	const problems = [];
+	const expected =
+		"group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}\n" +
+		'  cancel-in-progress: true';
+	for (const entry of files) {
+		const text = codeOf(entry.text);
+		// Top-level keys and job fields have fixed columns. Text inside run: |
+		// remains more deeply indented and must never acquire YAML ownership.
+		const roots = [...text.matchAll(/^(?:concurrency|'concurrency'|"concurrency")[ \t]*:/gm)];
+		if (entry.rel === ENTRY) {
+			const header = text.split('\njobs:')[0];
+			const blocks = [...header.matchAll(/^concurrency:\n((?: {2}[^\n]*\n|[ \t]*\n)*)/gm)];
+			if (roots.length !== 1 || blocks.length !== 1 || blocks[0][1].trim() !== expected)
+				problems.push(
+					'manual CI must have one unique run group; automatic branch runs must still supersede each other'
+				);
+		} else if (roots.length !== 0) {
+			problems.push(`${entry.rel}: a called workflow must not add its own concurrency group`);
+		}
+		for (const job of pipeline.jobsOfText(entry.text, entry.rel)) {
+			if (/^ {4}(?:concurrency|'concurrency'|"concurrency")[ \t]*:/m.test(codeOf(job.body)))
+				problems.push(
+					`${entry.rel} job ${job.id}: a job must not add a concurrency group that cancels an independent manual run`
+				);
+		}
+	}
+	return problems;
+}
+
+// A caller or called lane can otherwise cancel one OS of an independent run.
+for (const [what, rel, from, to] of [
+	[
+		'Windows caller concurrency collision',
+		ENTRY,
+		"  windows:\n    name: 'Windows'",
+		"  windows:\n    concurrency:\n      group: ci-windows-${{ github.ref }}\n      cancel-in-progress: true\n    name: 'Windows'"
+	],
+	[
+		'called macOS workflow concurrency collision',
+		MACOS_BOX,
+		'jobs:\n',
+		'concurrency:\n  group: ci-macos-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n'
+	],
+	[
+		'called Linux job concurrency collision',
+		LINUX_BOX,
+		'  linux-ok:\n',
+		'  linux-ok:\n    concurrency:\n      group: ci-linux-${{ github.ref }}\n      cancel-in-progress: true\n'
+	],
+	[
+		'quoted caller concurrency collision',
+		ENTRY,
+		"  windows:\n    name: 'Windows'",
+		"  windows:\n    'concurrency':\n      group: ci-windows-${{ github.ref }}\n      cancel-in-progress: true\n    name: 'Windows'"
+	]
+]) {
+	mustCatch(what, rel, from, to, concurrencyProblems);
+}
+
+const rootConcurrencyBlock = pipeline
+	.file(ENTRY)
+	.match(/^concurrency:\n(?: {2}[^\n]*\n|[ \t]*\n)*/m)?.[0];
+if (rootConcurrencyBlock === undefined) {
+	errors.push(
+		'the approved root concurrency block is missing; self-check fixtures have no source owner'
+	);
+} else {
+	mustCatch('missing root concurrency', ENTRY, rootConcurrencyBlock, '', concurrencyProblems);
+	mustCatch(
+		'duplicate root concurrency',
+		ENTRY,
+		rootConcurrencyBlock,
+		rootConcurrencyBlock + rootConcurrencyBlock,
+		concurrencyProblems
+	);
+}
+
+// A shell body may legitimately print or write this text. Scan YAML fields,
+// rather than interpreting a script's embedded content as another group.
+const concurrencyScriptAnchor = '      - name: Install Lua 5.4 + luarocks\n        run: |\n';
+const concurrencyScriptSource = pipeline.file(MACOS_BOX);
+if (concurrencyScriptSource.split(concurrencyScriptAnchor).length - 1 !== 1) {
+	errors.push('the actual macOS run block must uniquely own the script-text concurrency fixture');
+} else {
+	const scriptFixture = pipeline.files().map((entry) =>
+		entry.rel === MACOS_BOX
+			? {
+					rel: entry.rel,
+					text: entry.text.replace(
+						concurrencyScriptAnchor,
+						concurrencyScriptAnchor +
+							'          concurrency:\n            group: literal-script-content\n            cancel-in-progress: true\n'
+					)
+				}
+			: entry
+	);
+	if (concurrencyProblems(scriptFixture).length !== 0)
+		errors.push('a run block containing concurrency text must not be scanned as a YAML group');
+}
+
+errors.push(...concurrencyProblems(pipeline.files()));
+for (const [what, from, to] of [
+	[
+		'manual branch collision',
+		"-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}",
+		''
+	],
+	['manual duplicate-SHA collision', '&& github.run_id', '&& github.sha'],
+	['automatic runs never supersede', "|| 'automatic'", '|| github.run_id'],
+	['automatic cancellation disabled', 'cancel-in-progress: true', 'cancel-in-progress: false']
+]) {
+	mustCatch(what, ENTRY, from, to, concurrencyProblems);
+}
+
+/** Requires real reporter subprocess regressions on each native host before product units. */
+function reporterLifecycleProblems(files) {
+	const problems = [];
+	for (const [rel, id, host, product, shell] of [
+		[WINDOWS_BOX, 'test-ahk', 'windows-', 'Run AHK test suite', 'pwsh'],
+		[MACOS_BOX, 'package-macos', 'macos-', 'Build release launcher', null]
+	]) {
+		const entry = files.find((candidate) => candidate.rel === rel);
+		const job =
+			entry && pipeline.jobsOfText(entry.text, rel).find((candidate) => candidate.id === id);
+		if (!job || !(pipeline.field(job.body, 'runs-on') ?? '').startsWith(host)) {
+			problems.push(`${rel} ${id} must qualify the reporter on its actual native host`);
+			continue;
+		}
+		const steps = pipeline.steps(job.body);
+		const matches = steps.filter((candidate) => candidate.name === REPORTER_STEP);
+		const nodes = steps.filter(
+			(candidate) => pipeline.stepField(candidate.body, 'uses') === 'actions/setup-node@v4'
+		);
+		const node = nodes[0];
+		const unit = steps.findIndex((candidate) => candidate.name === product);
+		const report = steps.findIndex((candidate) => candidate.name === REPORTER_STEP);
+		if (
+			matches.length !== 1 ||
+			nodes.length !== 1 ||
+			unit < 0 ||
+			report <= steps.indexOf(node) ||
+			report >= unit
+		) {
+			problems.push(
+				`${rel} ${id} must run exactly one reporter self-test after Node and before product units`
+			);
+			continue;
+		}
+		if (
+			!node.body.includes("          node-version-file: '.node-version'") ||
+			pipeline.stepField(node.body, 'if') !== null ||
+			pipeline.stepField(node.body, 'continue-on-error') !== null
+		) {
+			problems.push(`${rel} ${id} must unconditionally prepare the repository Node runtime`);
+		}
+		const test = matches[0];
+		if (
+			(pipeline.runOf(test.body) ?? []).join('\n').trim() !== REPORTER_COMMAND ||
+			pipeline.stepField(test.body, 'if') !== null ||
+			pipeline.stepField(test.body, 'continue-on-error') !== null ||
+			pipeline.stepField(test.body, 'shell') !== shell ||
+			pipeline.stepField(test.body, 'working-directory') !== null
+		) {
+			problems.push(
+				`${rel} ${id} reporter self-tests must run the exact command and propagate failure on every profile`
+			);
+		}
+	}
+	return problems;
+}
+
+const REPORTER_STEP = 'Run reporter lifecycle self-tests';
+const REPORTER_COMMAND = 'node tools/test/test-report.cjs';
+errors.push(...reporterLifecycleProblems(pipeline.files()));
+for (const [rel, shell] of [
+	[WINDOWS_BOX, '        shell: pwsh\n'],
+	[MACOS_BOX, '']
+]) {
+	const block = `      - name: ${REPORTER_STEP}\n${shell}        run: ${REPORTER_COMMAND}\n`;
+	for (const [what, replacement] of [
+		['missing native reporter self-test', ''],
+		[
+			'manual-only native reporter self-test',
+			block.replace(
+				`${shell}        run:`,
+				`${shell}        if: github.event_name == 'workflow_dispatch'\n        run:`
+			)
+		],
+		[
+			'forgiven native reporter self-test',
+			block.replace(`${shell}        run:`, `${shell}        continue-on-error: true\n        run:`)
+		],
+		[
+			'swallowed native reporter exit',
+			block.replace(REPORTER_COMMAND, REPORTER_COMMAND + ' || true')
+		],
+		['duplicate native reporter self-test', block + '\n' + block],
+		[
+			'renamed native reporter command',
+			block.replace(REPORTER_COMMAND, 'node tools/test/report.cjs --help')
+		]
+	]) {
+		mustCatch(what, rel, block, replacement, reporterLifecycleProblems);
+	}
+	const steps = pipeline.steps(
+		pipeline
+			.jobsOfText(pipeline.files().find((candidate) => candidate.rel === rel).text, rel)
+			.find((candidate) => candidate.id === (rel === WINDOWS_BOX ? 'test-ahk' : 'package-macos'))
+			.body
+	);
+	const node = steps.find(
+		(candidate) => pipeline.stepField(candidate.body, 'uses') === 'actions/setup-node@v4'
+	).body;
+	mustCatch(
+		'reporter before Node setup',
+		rel,
+		node + '\n\n' + block,
+		block + '\n' + node + '\n',
+		reporterLifecycleProblems
+	);
 }
 
 if (errors.length > 0) {

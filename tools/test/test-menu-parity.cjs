@@ -81,12 +81,20 @@ const SEPARATOR = '---';
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
 const OPENS_SUBMENU = {
+	selection_operations: ['selection_caps_word_control', 'selection_case_commands'],
+	// Every native live-mode provider renders the shared fixed Off choice.
+	llm_live_mode: 'llm_live_controls',
+	agent_system1: 'agent_system_controls',
+	agent_system2: 'agent_system_controls',
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',
 	metrics: 'metrics_menu',
 	keyboard_layout: 'layout_menu',
+	number_row_policy: 'number_row_policy_rows',
 	hotstrings: 'hotstrings_menu',
+	// The personal provider renders the shared editor command head on every driver.
+	hotstring_personal: 'personal_hotstring_commands',
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
 	gestures: 'gestures_menu',
@@ -101,7 +109,29 @@ const OPENS_SUBMENU = {
 	accented_letters: 'accented_letters_group',
 	hotstrings_params: 'hotstrings_params_group',
 	word_expanders: 'word_expanders_menu',
+	// The native delay providers open the same declared configuration command.
+	delays_colors: 'hotstrings_delays_menu',
+	// Both Lua preview providers consume the same declared coloured checkbox.
+	preview_bubbles: [
+		'preview_magic_control',
+		'preview_presence_controls',
+		'preview_colored_control'
+	],
+	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
+	word_expander_entries: 'word_expander_custom_menu',
+	// The model provider publishes its fixed browser command on every driver.
+	llm_models: 'llm_model_commands',
+	// The backend/model providers render the active API-entry command head.
+	llm_backend: 'llm_api_active_commands',
+	llm_model: 'llm_api_active_commands',
+	// All three profile providers render the shared Create/Clone command head.
+	llm_profile: 'llm_profile_commands',
+	// Optional category-file providers return this declared opening command.
+	hotstring_category_file: 'hotstring_file_commands',
 	llm_display: 'llm_display_menu',
+	// Native prediction modifier providers consume the shared child records.
+	llm_navigation: 'llm_navigation_rows',
+	llm_trigger: 'llm_trigger_menu',
 	llm_generation_settings: 'llm_generation_menu',
 	// Linux uses the same generation child inline, through its dynamic handler.
 	llm_generation: 'llm_generation_menu',
@@ -117,7 +147,7 @@ const OPENS_SUBMENU = {
 	// rows: Linux folded its top-level Updates submenu into it in 2026-09.
 	about: 'about_menu',
 	// The About updater provider renders the registry-backed channel choice.
-	about_updates: 'about_update_channel_menu',
+	about_updates: ['about_update_channel_menu', 'about_update_frequency_menu', 'about_source_menu'],
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six
@@ -127,10 +157,55 @@ const OPENS_SUBMENU = {
 	agent: 'agent_menu'
 };
 
+/**
+ * The native personal provider must actually consume its declared command head.
+ * A graph edge alone would conceal a provider that stopped rendering the row.
+ * @param {string} text Native provider source.
+ * @param {string} driver Host source syntax.
+ * @returns {boolean}
+ */
+function personalCommandReference(text, driver) {
+	const method = driver === 'windows' ? 'MenuRenderer_CommandRow' : 'ManifestMenu\\.command_row';
+	return new RegExp(
+		method + '\\(\\s*"personal_hotstring_commands"\\s*,\\s*"personal_hotstring_open_editor"\\s*,'
+	).test(text.replace(/^\s*(?:;|--).*$/gm, ''));
+}
+
+// Independent call shapes also reject the right command under the wrong head.
+for (const [driver, method] of [
+	['windows', 'MenuRenderer_CommandRow'],
+	['macos', 'ManifestMenu.command_row'],
+	['linux', 'ManifestMenu.command_row']
+]) {
+	const call = `${method}("personal_hotstring_commands", "personal_hotstring_open_editor", commands)`;
+	if (!personalCommandReference(call, driver))
+		throw new Error(`Missed ${driver} command reference.`);
+	for (const broken of [
+		call.replace('personal_hotstring_commands', 'another_menu'),
+		call.replace('personal_hotstring_open_editor', 'another_command'),
+		call.replace(method, 'UnownedCommandRow'),
+		(driver === 'windows' ? '; ' : '-- ') + call
+	]) {
+		if (personalCommandReference(broken, driver))
+			throw new Error(`Admitted broken ${driver} reference.`);
+	}
+}
+
 const errors = [];
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const MENU_KEYS = Object.keys(manifest).filter((k) => Array.isArray(manifest[k]));
+
+for (const [driver, relative] of [
+	['windows', 'windows/ui/menu/menu_hotstrings.ahk'],
+	['macos', 'macos/ui/menu/menu_hotstrings_custom.lua'],
+	['linux', 'linux/ui/menu/menu_builder.lua']
+]) {
+	if (!personalCommandReference(fs.readFileSync(path.join(SP, relative), 'utf8'), driver))
+		errors.push(
+			`${driver}: the personal provider no longer renders its shared editor command head.`
+		);
+}
 
 // Floors. A parse that silently yielded nothing would make every comparison
 // below vacuously true, and the suite would go green on an empty menu.
@@ -240,21 +315,23 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 		const parentVisibility = reachableOn[menuKey];
 		if (!parentVisibility) continue;
 		for (const row of manifest[menuKey]) {
-			const opened = OPENS_SUBMENU[row.id];
-			if (!opened) continue;
-			// A string names the menu the row opens wherever it is visible; an object
-			// also names the platforms where it opens that menu.
-			const target = typeof opened === 'string' ? opened : opened.menu;
-			const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
-			const effective = PLATFORMS.filter(
-				(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
-			);
-			const before = (reachableOn[target] || []).join(',');
-			if (before !== effective.join(',')) {
-				reachableOn[target] = effective;
-				changed = true;
+			const published = OPENS_SUBMENU[row.id];
+			if (!published) continue;
+			// One provider can publish multiple independently declared children.
+			// Every existing platform restriction still applies to its own edge.
+			for (const opened of Array.isArray(published) ? published : [published]) {
+				const target = typeof opened === 'string' ? opened : opened.menu;
+				const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
+				const effective = PLATFORMS.filter(
+					(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
+				);
+				const before = (reachableOn[target] || []).join(',');
+				if (before !== effective.join(',')) {
+					reachableOn[target] = effective;
+					changed = true;
+				}
+				openedBy[target] = `${menuKey}/${row.id}`;
 			}
-			openedBy[target] = `${menuKey}/${row.id}`;
 		}
 	}
 	if (!changed) break;
@@ -559,7 +636,8 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // Explicit hotstring category commands and section lists now have one shared head.
 // The three Word Expander controls now share one declared child menu.
 // The common AI Info Bar check delegates to a shared display child menu.
-const RENDERED_THROUGH_SHARED = { hs: 21, linux: 18 };
+// Linux 19 → 20: navigation and validation now use their declared list providers.
+const RENDERED_THROUGH_SHARED = { hs: 22, linux: 20 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 
@@ -583,6 +661,134 @@ function driverSource(root) {
 	};
 	walk(root);
 	return out;
+}
+
+/** Resolve only the actual read-only number-row provider's shared getter owner. */
+function numberRowGetterSource(source) {
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const contains = (text, expected) => {
+		const tokens = scriptTokens(text, '.lua').map((token) => `${token.kind}:${token.value}`);
+		return tokens.some((_, index) =>
+			expected.every((value, offset) => tokens[index + offset] === value)
+		);
+	};
+	if (
+		!contains(source, [
+			'identifier:local',
+			'identifier:NumberRowPolicy',
+			'symbol:=',
+			'identifier:require',
+			'symbol:(',
+			'string:layout.number_row_policy',
+			'symbol:)'
+		]) ||
+		!contains(source, [
+			'identifier:NumberRowPolicy',
+			'symbol:.',
+			'identifier:native_rows',
+			'symbol:(',
+			'identifier:ManifestMenu',
+			'symbol:,',
+			'identifier:render_ctx',
+			'symbol:.',
+			'identifier:commands',
+			'symbol:)'
+		])
+	)
+		return '';
+	if (
+		!contains(source, [
+			'identifier:render_ctx',
+			'symbol:.',
+			'identifier:commands',
+			'symbol:[',
+			'string:number_row_mode',
+			'symbol:]',
+			'symbol:=',
+			'identifier:function',
+			'symbol:(',
+			'symbol:)',
+			'identifier:return',
+			'identifier:false',
+			'identifier:end'
+		])
+	)
+		return '';
+	const sharedSource = fs.readFileSync(
+		path.join(SP, '_shared/lua/layout/number_row_policy.lua'),
+		'utf8'
+	);
+	if (
+		!contains(sharedSource, [
+			'identifier:function',
+			'identifier:M',
+			'symbol:.',
+			'identifier:native_rows',
+			'symbol:(',
+			'identifier:renderer',
+			'symbol:,',
+			'identifier:commands',
+			'symbol:)'
+		]) ||
+		!contains(sharedSource, [
+			'identifier:renderer',
+			'symbol:.',
+			'identifier:choice_row',
+			'symbol:(',
+			'string:number_row_policy_rows',
+			'symbol:,',
+			'string:number_row_mode',
+			'symbol:,',
+			'identifier:commands',
+			'symbol:,'
+		]) ||
+		!contains(sharedSource, [
+			'symbol:[',
+			'string:layout.direct_access_digits',
+			'symbol:]',
+			'symbol:=',
+			'identifier:function',
+			'symbol:(',
+			'symbol:)',
+			'identifier:return',
+			'string:native',
+			'identifier:end'
+		])
+	)
+		return '';
+	return sharedSource;
+}
+
+// Independent literal controls pin the new dependency boundary without changing
+// any existing getter checks or menu floors. Comments and quoted code are inert.
+{
+	const assert = require('node:assert/strict');
+	const binding = 'local NumberRowPolicy = require("layout.number_row_policy")';
+	const call = 'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)';
+	const command = 'render_ctx.commands["number_row_mode"] = function() return false end';
+	assert(
+		numberRowGetterSource(binding + '\n' + command + '\n' + call).includes(
+			'layout.direct_access_digits'
+		)
+	);
+	for (const source of [
+		binding,
+		call,
+		binding + '\n' + call,
+		binding + '\n' + command.replace('return false', 'return true') + '\n' + call,
+		binding + '\n' + command + '\n' + call.replace('render_ctx.commands', 'other_commands'),
+		'-- ' + binding + '\n' + call,
+		binding + '\n-- ' + call,
+		'local x = [[' + binding + '\n' + call + ']]',
+		binding.replace('number_row_policy', 'other_policy') + '\n' + call,
+		binding + '\n' + call.replace('ManifestMenu', 'OtherRenderer')
+	]) {
+		assert.equal(
+			numberRowGetterSource(source),
+			'',
+			'a missing actual shared port cannot borrow its getter'
+		);
+	}
 }
 
 const renderedCounts = {};
@@ -609,7 +815,8 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 			if (row.type === 'choice' && typeof row.path === 'string') needed.add(row.path);
 		}
 	}
-	const absent = [...needed].filter((key) => !src.includes(key));
+	const getterSource = src + numberRowGetterSource(src);
+	const absent = [...needed].filter((key) => !getterSource.includes(key));
 	if (absent.length > 0) {
 		errors.push(
 			`${DRIVER_OF[driver]} names no getter for ${absent.length} state key(s) the manifest requires ` +

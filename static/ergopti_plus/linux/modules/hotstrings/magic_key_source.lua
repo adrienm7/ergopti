@@ -132,6 +132,20 @@ function M.evdev_code()
 	return _code
 end
 
+--- The refusal reason for a source reserved by a configured tap assignment.
+--- @param value string Candidate or automatic value.
+--- @return string|nil reason_key
+function M.choice_reason(value)
+	local resolver = M.resolver()
+	if value == resolver.automatic then return nil end
+	if not resolver.is_candidate(value) then return "dialog.magic_key_source.not_a_candidate" end
+	local TapKeys = require("modules.shortcuts.tap_keys")
+	if Shared.tap_conflict(resolver, value, TapKeys.keys(), "linux", TapKeys.get_action) then
+		return Shared.TAP_CONFLICT_REASON
+	end
+	return nil
+end
+
 --- Stores a new value; the next press follows it, nothing is re-registered.
 --- A key is refused while the layout cannot type the magic key with key
 --- presses: it would keep typing its own character, and say nothing.
@@ -144,6 +158,11 @@ function M.set(value)
 	if value ~= resolver.automatic and not resolver.is_candidate(value) then
 		Logger.warn(LOG, "Refused physical magic key '%s': no candidate key has that code.", tostring(value))
 		return false, "dialog.magic_key_source.not_a_candidate"
+	end
+	local conflict = M.choice_reason(value)
+	if conflict ~= nil then
+		Logger.warn(LOG, "Refused physical magic key '%s': a configured tap action owns its key.", tostring(value))
+		return false, conflict
 	end
 	if value ~= resolver.automatic and _deps.can_type(_deps.magic_key()) ~= true then
 		Logger.warn(LOG, "Refused physical magic key '%s': the layout cannot type the magic key '%s' with key presses.",
@@ -394,6 +413,7 @@ function M.on_key(detail)
 	if code == nil or detail.code ~= code then return false end
 	if not Shared.unmodified(detail.mods) then return false end
 	if _deps.is_active() ~= true or _deps.replace_on() ~= true then return false end
+	if _deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true then return false end
 	local magic = _deps.magic_key()
 	if type(magic) ~= "string" or magic == "" then return false end
 	if _deps.can_type(magic) ~= true then

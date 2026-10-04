@@ -206,9 +206,18 @@ exit 0
 
 function runFixture(bash, fixture, args = ['', fixture.installDir]) {
 	const bashArgs = args.map((arg) => (arg === '' ? '' : toBashPath(arg)));
-	return spawnSync(bash, [toBashPath(fixture.scriptPath), ...bashArgs], {
+	const fixturePath = `${toBashPath(fixture.fakeBin)}:/usr/bin:/bin`;
+	// Git's bin/bash wrapper prepends real system tools to inherited PATH.
+	// Set the private transport path after that wrapper has finished startup.
+	return spawnSync(bash, ['-s', '--', fixturePath, toBashPath(fixture.scriptPath), ...bashArgs], {
+		input:
+			'export PATH="$1"; shift\n' +
+			'expected="${PATH%%:*}/curl"\n' +
+			'if [ "$(command -v curl)" != "$expected" ]; then echo "Private curl transport is missing." >&2; exit 78; fi\n' +
+			'exec bash "$@"\n',
 		cwd: fixture.fixtureRoot,
 		encoding: 'utf8',
+		timeout: 30000,
 		maxBuffer: 16 * 1024 * 1024,
 		env: {
 			...process.env,
@@ -227,6 +236,21 @@ function cleanupFixture(fixture) {
 }
 
 const bash = bashExecutable();
+
+const missingTransport = createFixture('flaky', 'good');
+try {
+	fs.unlinkSync(path.join(missingTransport.fakeBin, 'curl'));
+	const run = runFixture(bash, missingTransport);
+	test(
+		'a missing private transport fails before any real network command',
+		run.status === 78 &&
+			/Private curl transport is missing/.test(run.stderr) &&
+			readCount(missingTransport.curlCountPath) === 0,
+		runDetail(run)
+	);
+} finally {
+	cleanupFixture(missingTransport);
+}
 
 const flaky = createFixture('flaky', 'good');
 try {

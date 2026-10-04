@@ -138,6 +138,28 @@ _THR_ThresholdIsAHold() {
 Test("tap-hold roll: both keys still down at the threshold are the hold (tap-hold-roll-is-a-tap-2026-10-01)",
 	_THR_ThresholdIsAHold)
 
+_THR_ThresholdAcrossTickWrap() {
+	World := _THR_World()
+	World.Now := 0xFFFFFFF0
+	Inside(W) {
+		W.Down[0x10] := true
+		W.Script := [(X) => X.Now := 0xF0, _THR_WrapThresholdMissed]
+		TapHoldRollOtherKey("*SC010", W.KeyPorts())
+	}
+	Result := _THR_Run(World, Inside, false)
+	AssertEqual("press replay:10 own:pressed", World.Joined(),
+		"256 elapsed milliseconds across wrap must press the hold and replay exactly once")
+	AssertEqual("hold", Result["decision"])
+	AssertTrue(Result["activated"])
+	AssertFalse(TapHoldRollUndecided(), "a wrapped clock must not leave a key waiting")
+}
+
+_THR_WrapThresholdMissed(*) {
+	throw Error("the roll threshold must resolve before another poll after tick rollover")
+}
+Test("tap-hold roll: hold threshold survives unsigned tick rollover (tap-hold-roll-tick-wrap)",
+	_THR_ThresholdAcrossTickWrap)
+
 ; Space down, a down, b down: a second key before either came up is typing.
 _THR_SecondKeyIsTyping() {
 	World := _THR_World()

@@ -50,6 +50,13 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-personal-file-descriptors.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/hotstrings/personal_files.lua',
+			'static/ergopti_plus/windows/_generated/personal_file_descriptors.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-window-titles.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/window_titles.lua',
@@ -110,6 +117,10 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-touchpad-registry.cjs',
 		outputs: ['static/ergopti_plus/windows/_generated/touchpad_registry.ahk']
+	},
+	{
+		script: 'codegen/codegen-brightness-actions.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/brightness_actions_data.lua']
 	},
 	{
 		script: 'codegen/codegen-layer-editor-data-js.cjs',

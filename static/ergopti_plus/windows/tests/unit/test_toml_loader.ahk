@@ -776,3 +776,268 @@ TestTL_MetadataHeadersAcceptInlineComments() {
 }
 Test("toml metadata: inline-commented headers parse in both readers",
 	TestTL_MetadataHeadersAcceptInlineComments)
+
+
+; Explicit factory ownership must remain distinct from source provenance.
+_TestTL_FactoryGroupOption(Factory) {
+	global _HotstringRegistrar, HSE_RegistryByGroup, HSE_SeqCounter
+	SavedRegistrar := _HotstringRegistrar
+	_HotstringRegistrar := 0
+	try {
+		for AuthorityRecord in [
+			{ Supplied: true, Value: "default", Expected: "default" },
+			{ Supplied: true, Value: "future: Équipe / source", Expected: "future: Équipe / source" },
+			{ Supplied: true, Value: "", Expected: "" },
+			{ Supplied: false, Value: "", Expected: "provenance.owned" }
+		] {
+			HSE_RegistryClear()
+			Options := Map("Category", "provenance", "Section", "owned", "Priority", 77)
+			if AuthorityRecord.Supplied
+				Options["Group"] := AuthorityRecord.Value
+			switch Factory {
+				case "literal": CreateHotstring("*?", "pvx", "owned", Options)
+				case "conform": CreateCaseSensitiveHotstrings("*?", "pvx", "owned", Options)
+				case "variants": CreateCaseSensitiveHotstrings("?", "pvx", "owned", Options)
+				case "raw": CreateRawCallbackHotstring("*?", "pvx", () => 0, Options)
+				default: throw Error("Unknown factory fixture")
+			}
+			AssertTrue(HSE_RegistryByGroup.Has(AuthorityRecord.Expected), "the factory must transport the explicit owner")
+			AssertEqual(1, HSE_RegistryByGroup.Count, "provenance must not add a second activation group")
+			Specs := HSE_RegistryByGroup[AuthorityRecord.Expected]
+			ExpectedCount := Factory == "variants" ? 3 : 1
+			AssertEqual(ExpectedCount, Specs.Length, "factory case families retain their original size")
+			for Position, OwnedSpec in Specs {
+				AssertEqual("provenance", OwnedSpec.Category)
+				AssertEqual("owned", OwnedSpec.Section)
+				AssertEqual(AuthorityRecord.Expected, OwnedSpec.Group)
+				AssertEqual(77, OwnedSpec.Priority)
+				AssertEqual(Position, OwnedSpec.Seq)
+				if Factory == "conform"
+					AssertTrue(OwnedSpec.CaseConform)
+				if Factory == "raw"
+					AssertTrue(OwnedSpec.RawCallback)
+			}
+			HSE_FeedReset(true)
+			for Char in StrSplit(Factory == "variants" ? "pvx " : "pvx")
+				Match := HSE_FeedChar(Char, true)
+			AssertTrue(Match == Specs[1], "the original lower-case spec remains active")
+			HSE_DisableGroup(AuthorityRecord.Expected)
+			HSE_FeedReset(true)
+			for Char in StrSplit(Factory == "variants" ? "pvx " : "pvx")
+				Match := HSE_FeedChar(Char, true)
+			AssertEqual("", Match, "only the transported native owner disables the family")
+			AssertEqual(0, HSE_MappingsForTail("X").Length, "the real live index is empty while the owner is disabled")
+			HSE_EnableGroup(AuthorityRecord.Expected)
+			HSE_EnableGroup(AuthorityRecord.Expected)
+			HSE_FeedReset(true)
+			for Char in StrSplit(Factory == "variants" ? "pvx " : "pvx")
+				Match := HSE_FeedChar(Char, true)
+			AssertTrue(Match == Specs[1], "enable restores the same native spec")
+			AssertEqual(ExpectedCount, Specs.Length)
+			AssertEqual(ExpectedCount, HSE_MappingsForTail("X").Length, "repeated enable cannot duplicate live specs")
+			AssertEqual(ExpectedCount, HSE_SeqCounter, "toggling never allocates replacement registrations")
+		}
+	} finally {
+		HSE_RegistryClear()
+		HSE_FeedReset(true)
+		_HotstringRegistrar := SavedRegistrar
+	}
+}
+Test("hotstring factories: literal group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("literal"))
+Test("hotstring factories: conform group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("conform"))
+Test("hotstring factories: variant group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("variants"))
+Test("hotstring factories: raw callback group option preserves provenance and native toggles", (*) => _TestTL_FactoryGroupOption("raw"))
+
+TestTL_SelectedExtensionKeepsResolvedOwner() {
+	global _HotstringRegistrar, _HotstringsOverrides, HotstringGroupConfig, HSE_RegistryByGroup
+	Root := A_Temp . "\ergopti_selected_provenance_" . A_TickCount
+	DirCreate(Root)
+	SavedRegistrar := _HotstringRegistrar
+	SavedOverrides := _HotstringsOverrides
+	SavedGroupConfig := HotstringGroupConfig
+	try {
+		FileAppend('[rolls.ct]`ndelay = 0.25`npriority = 67`n', Root . "\overrides.toml", "UTF-8")
+		FileAppend('[[ct]]`n"slx" = { output = "literal", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true, priority = 81 }`n'
+			. 'simple = "value"`n[[foreign]]`nforeign = "untouched"`n', Root . "\source.toml", "UTF-8")
+		_HotstringsOverrides := _ParseOverrides(Root . "\overrides.toml")
+		HotstringGroupConfig := Map()
+		HotstringsResolveBumpGen()
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(2, LoadExtTomlFile(Root . "\source.toml", "rolls", "ct"))
+		AssertEqual(1, HSE_RegistryByGroup.Count)
+		AssertTrue(HSE_RegistryByGroup.Has("rolls.ct"), "selected official sections retain their derived owner")
+		Specs := HSE_RegistryByGroup["rolls.ct"]
+		AssertEqual(4, Specs.Length, "the literal plus three simple variants remain registered")
+		for Position, OwnedSpec in Specs {
+			AssertEqual("rolls", OwnedSpec.Category)
+			AssertEqual("ct", OwnedSpec.Section)
+			AssertEqual("rolls.ct", OwnedSpec.Group)
+			AssertEqual(0.25, OwnedSpec.TimeActivationSeconds)
+			AssertEqual(Position == 1 ? 81 : 67, OwnedSpec.Priority)
+			AssertEqual(Position, OwnedSpec.Seq)
+		}
+		HSE_DisableGroup("default")
+		HSE_FeedReset(true)
+		for Char in StrSplit("slx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[1], "the whole-file owner cannot silence an official selected section")
+		HSE_DisableGroup("rolls.ct")
+		HSE_FeedReset(true)
+		for Char in StrSplit("slx")
+			Match := HSE_FeedChar(Char, true)
+		AssertEqual("", Match)
+		HSE_EnableGroup("rolls.ct")
+		HSE_FeedReset(true)
+		for Char in StrSplit("slx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[1], "the original selected spec returns without registration drift")
+	} finally {
+		_HotstringRegistrar := SavedRegistrar
+		_HotstringsOverrides := SavedOverrides
+		HotstringGroupConfig := SavedGroupConfig
+		HotstringsResolveBumpGen()
+		HSE_RegistryClear()
+		HSE_FeedReset(true)
+		DirDelete(Root, true)
+	}
+}
+Test("LoadExtTomlFile: selected official sections keep delay priority and derived activation ownership", TestTL_SelectedExtensionKeepsResolvedOwner)
+
+
+; A comment is not part of a simple assignment's quoted output value.
+_TestTL_SimpleEntryComments(Suffix) {
+	global _HotstringRegistrar, HSE_RegistryByGroup, HSE_PRIORITY_PACKAGE
+	Root := A_Temp . "\ergopti_simple_comment_" . ProcessExist() . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the fixture requires an unowned temporary path")
+	DirCreate(Root)
+	Path := Root . "\source.toml"
+	SavedRegistrar := _HotstringRegistrar
+	try {
+		FileAppend('[[chosen]]`n"cmtx" = "quoted#value"' . Suffix
+			. '`n[_meta]`ndescription = "excluded"' . Suffix
+			. '`n[[foreign]]`nforeign = "untouched"`n', Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Descriptor := PersonalFileDescribe(["source.toml"])
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(2, LoadExtTomlFile(Path, "owned", "", Descriptor), "both actual source assignments register")
+		AssertEqual(1, HSE_RegistryByGroup.Count, "the pack retains its single activation owner")
+		Specs := HSE_RegistryByGroup["default"]
+		AssertEqual(6, Specs.Length, "each simple source assignment retains its three case variants")
+		for Position, Spec in Specs {
+			AssertEqual(Position <= 3 ? "chosen" : "foreign", Spec.Section)
+			if Position == 1 || Position == 4
+				AssertEqual(Position == 1 ? "quoted#value" : "untouched", Spec.Replacement)
+			AssertEqual(HSE_PRIORITY_PACKAGE, Spec.Priority)
+			AssertEqual(Descriptor["id"], Spec.PersonalSource["id"], "comments preserve exact native source identity")
+		}
+		AssertEqual(1, CountTomlSection("owned", "chosen", Path), "the actual counter retains the commented assignment")
+		AssertEqual(0, CountTomlSection("owned", "_meta", Path), "metadata stays excluded")
+		Index := Map(), TriggerSet := Map()
+		AssertEqual(2, _RegisterExtPackTriggers(Path, "owned", Index, TriggerSet, "", Descriptor))
+		AssertEqual("quoted#value", Index["cmtx"][1].Output)
+		AssertEqual(Descriptor["id"], TriggerSet["cmtx"].PersonalSource["id"])
+		SelectedIndex := Map(), SelectedSet := Map()
+		AssertEqual(1, _RegisterExtPackTriggers(Path, "owned", SelectedIndex, SelectedSet, "chosen", Descriptor))
+		AssertTrue(SelectedSet.Has("cmtx"), "selection retains its source row")
+		AssertFalse(SelectedSet.Has("foreign"), "another declared section stays excluded")
+	} finally {
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		finally {
+			_HotstringRegistrar := SavedRegistrar
+			HSE_RegistryClear()
+			HSE_FeedReset(true)
+			Assert(InStr(Root, RTrim(A_Temp, "\/") . "\ergopti_simple_comment_" . ProcessExist() . "_") == 1, "cleanup stays inside the process-owned root")
+			DirDelete(Root, true)
+		}
+	}
+}
+for _TestTL_SimpleSuffix in [" # note", '# note with "quotes"', "#comment", ""]
+	Test("TOML simple entry retains trailing comment: " . _TestTL_SimpleSuffix . " (simple-entry-comments)", _TestTL_SimpleEntryComments.Bind(_TestTL_SimpleSuffix))
+
+
+; Only actual inline members own registration options, never quoted output text.
+_TestTL_EntryPriorityLexical(RawOutput, PrioritySuffix, ExpectedPriority, Comment := "") {
+	global _HotstringRegistrar, HSE_RegistryByGroup
+	Root := A_Temp . "\ergopti_entry_priority_" . ProcessExist() . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the fixture requires an unowned temporary path")
+	DirCreate(Root)
+	Path := Root . "\source.toml"
+	SavedRegistrar := _HotstringRegistrar
+	try {
+		Line := '"prlx" = { output = "' . RawOutput . '", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false' . PrioritySuffix . ' }' . Comment
+		FileAppend('[[chosen]]`n' . Line . '`n[_meta]`ndescription = "excluded"`n', Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Descriptor := PersonalFileDescribe(["source.toml"])
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(1, LoadExtTomlFile(Path, "owned", "", Descriptor))
+		AssertEqual(1, HSE_RegistryByGroup.Count)
+		Specs := HSE_RegistryByGroup["default"]
+		AssertEqual(1, Specs.Length)
+		Spec := Specs[1]
+		AssertEqual(ExpectedPriority, Spec.Priority, "only the structural member may override the package fallback")
+		AssertEqual(UnescapeTomlString(RawOutput), Spec.Replacement, "the real factory retains the quoted output")
+		AssertTrue(Spec.IsWord, "quoted option-like text cannot change word matching")
+		AssertFalse(Spec.Star, "quoted option-like text cannot enable auto expansion")
+		AssertFalse(Spec.FinalResult, "quoted option-like text cannot change final result")
+		AssertEqual("chosen", Spec.Section)
+		AssertEqual(Descriptor["id"], Spec.PersonalSource["id"])
+		Index := Map(), TriggerSet := Map()
+		AssertEqual(1, _RegisterExtPackTriggers(Path, "owned", Index, TriggerSet, "", Descriptor))
+		AssertEqual(ExpectedPriority, TriggerSet["prlx"].Priority, "catalogue and actual registration share structural priority")
+		AssertEqual(UnescapeTomlString(RawOutput), TriggerSet["prlx"].Output)
+		AssertEqual(Descriptor["id"], TriggerSet["prlx"].PersonalSource["id"])
+	} finally {
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		finally {
+			_HotstringRegistrar := SavedRegistrar
+			HSE_RegistryClear()
+			HSE_FeedReset(true)
+			Assert(InStr(Root, RTrim(A_Temp, "\/") . "\ergopti_entry_priority_" . ProcessExist() . "_") == 1, "cleanup stays inside the process-owned root")
+			DirDelete(Root, true)
+		}
+	}
+}
+Test("TOML priority ignores comma in output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical(", priority = 80", "", 30))
+Test("TOML priority ignores brace in output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("{ priority = 80", "", 30))
+Test("TOML priority ignores escaped quote in output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical('\" , priority = 80', "", 30))
+Test("TOML priority ignores trailing comment (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", "", 30, " # , priority = 80"))
+Test("TOML true priority wins after deceptive output (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical(", priority = 80", ", priority = 67", 67))
+Test("TOML quoted options preserve real flags (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical(", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = true, priority = 80", "", 30))
+Test("TOML structural field casing stays admitted (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", PrIoRiTy = 67", 67))
+Test("TOML priority zero remains valid (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", priority = 0", 0))
+Test("TOML priority maximum remains valid (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", priority = 100", 100))
+Test("TOML invalid priority keeps source default (entry-priority-lexical)", (*) => _TestTL_EntryPriorityLexical("plain", ", priority = 101", 30))
+
+
+; Invalid priority source types retain inheritance without string-coercing maps.
+_TestTL_PrioritySourceType(RawTable, Fallback, Expected) {
+	Fields := TOML_ParseInlineTable(RawTable, (Raw) => Raw)
+	AssertTrue(Fields is Map, "the source is valid structural TOML")
+	AssertEqual(Expected, _ParseEntryPriority('"owned" = ' . RawTable, Fallback),
+		"only an integer priority source token may override its inherited default")
+}
+for _TestTL_PrioritySourceCase in [
+	{Name: "dotted map", Raw: "{ priority.note = 80 }", Fallback: 30, Expected: 30},
+	{Name: "casefold dotted map", Raw: "{ PrIoRiTy.note = 80 }", Fallback: 30, Expected: 30},
+	{Name: "dotted map preserves unset override", Raw: "{ priority.note = 80 }", Fallback: "", Expected: ""},
+	{Name: "basic string", Raw: '{ priority = "80" }', Fallback: 30, Expected: 30},
+	{Name: "literal string", Raw: "{ priority = '80' }", Fallback: 30, Expected: 30},
+	{Name: "array", Raw: "{ priority = [80] }", Fallback: 30, Expected: 30},
+	{Name: "nested table", Raw: "{ priority = { note = 80 } }", Fallback: 30, Expected: 30},
+	{Name: "float", Raw: "{ priority = 80.5 }", Fallback: 30, Expected: 30},
+	{Name: "boolean", Raw: "{ priority = true }", Fallback: 30, Expected: 30},
+	{Name: "negative", Raw: "{ priority = -1 }", Fallback: 30, Expected: 30},
+	{Name: "out of bounds", Raw: "{ priority = 101 }", Fallback: 30, Expected: 30},
+	{Name: "integer overflow", Raw: "{ priority = 9223372036854775808 }", Fallback: 30, Expected: 30},
+	{Name: "quoted key", Raw: '{ "priority" = 67 }', Fallback: 30, Expected: 67},
+	{Name: "zero", Raw: "{ priority = 0 }", Fallback: 30, Expected: 0},
+	{Name: "maximum", Raw: "{ priority = 100 }", Fallback: 30, Expected: 100},
+	{Name: "missing key", Raw: '{ output = "quoted#value" }', Fallback: 30, Expected: 30}
+] {
+	Test("TOML priority source type: " . _TestTL_PrioritySourceCase.Name . " (priority-source-type)",
+		_TestTL_PrioritySourceType.Bind(_TestTL_PrioritySourceCase.Raw,
+			_TestTL_PrioritySourceCase.Fallback, _TestTL_PrioritySourceCase.Expected))
+}

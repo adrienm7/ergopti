@@ -331,3 +331,146 @@ _AMCR_CapturedChannelStates() {
 	}
 }
 Test("About menu: the independent two-channel states remain unchanged", _AMCR_CapturedChannelStates)
+
+
+/** Reads the independently captured ten cadence values and label keys. */
+_AMCR_FrequencyCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\update_check_frequency.json", "UTF-8"))
+}
+
+_AMCR_FrequencyIdentity() {
+	return Map("kind", "release", "version", "0.0.0-dev.140", "commit", "c3005e0b9")
+}
+
+/** Observes scalar delivery before the injected durable acknowledgement. */
+_AMCR_RecordFrequency(State, Seconds) {
+	global UPDATER_CHECK_INTERVAL
+	State["calls"].Push(Seconds)
+	if !State["acknowledged"]
+		return false
+	UPDATER_CHECK_INTERVAL := Seconds
+	return true
+}
+
+_AMCR_FrequencyRows(State, IsLocal := false) {
+	return _MI_AboutUpdateRows(IsLocal, _AMCR_RecordChannel.Bind({ Calls: [] }),
+		_AMCR_FrequencyIdentity, _AMCR_RecordFrequency.Bind(State))
+}
+
+_AMCR_FrequencyIndependentProjection() {
+	global UPDATER_CHECK_INTERVAL
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	try {
+		Corpus := _AMCR_FrequencyCorpus()
+		AssertEqual(10, Corpus["choices"].Length)
+		for Expected in Corpus["snapped_states"] {
+			UPDATER_CHECK_INTERVAL := Expected["stored"]
+			State := Map("calls", [], "acknowledged", true)
+			Rows := _AMCR_FrequencyRows(State)
+			Frequency := Rows[Rows.Length]
+			AssertEqual(t(Corpus["i18n"]) . ": " . t("menu.about.frequency." . Expected["code"]), Frequency["label"])
+			AssertEqual(10, Frequency["items"].Length)
+			AssertEqual(Expected["stored"], UPDATER_CHECK_INTERVAL, "rendering must not rewrite historical stored seconds")
+			for Index, Choice in Corpus["choices"] {
+				Row := Frequency["items"][Index]
+				AssertEqual(t(Choice["i18n"]), Row["label"])
+				AssertEqual(Choice["value"] == Expected["value"], Row["checked"])
+				AssertTrue(Row["action"].Call())
+				AssertEqual(Choice["value"], State["calls"][Index], "the shared renderer binds this row's numeric interval")
+				AssertEqual(Choice["value"], UPDATER_CHECK_INTERVAL)
+			}
+		}
+	} finally UPDATER_CHECK_INTERVAL := SavedInterval
+}
+Test("About menu: shared frequency goldens keep numeric values labels and snapped current captions",
+	_AMCR_FrequencyIndependentProjection)
+
+_AMCR_FrequencyHeldRefusal() {
+	global UPDATER_CHECK_INTERVAL
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	try {
+		UPDATER_CHECK_INTERVAL := 3600
+		State := Map("calls", [], "acknowledged", false)
+		Rows := _AMCR_FrequencyRows(State)
+		Callback := Rows[Rows.Length]["items"][1]["action"]
+		AssertFalse(Callback.Call())
+		AssertEqual(3600, UPDATER_CHECK_INTERVAL, "a refused native owner cannot publish the selected cadence")
+		AssertEqual(1, State["calls"].Length)
+		State["acknowledged"] := true
+		AssertTrue(Callback.Call())
+		Selected := _AMCR_FrequencyCorpus()["choices"][1]["value"]
+		AssertEqual(Selected, UPDATER_CHECK_INTERVAL)
+		UPDATER_CHECK_INTERVAL := 86400
+		AssertTrue(Callback.Call(), "a held absolute selection keeps its published scalar")
+		AssertEqual(Selected, UPDATER_CHECK_INTERVAL)
+		AssertEqual(3, State["calls"].Length)
+	} finally UPDATER_CHECK_INTERVAL := SavedInterval
+}
+Test("About menu: frequency callbacks retain the native refusal and absolute held selection receipt",
+	_AMCR_FrequencyHeldRefusal)
+
+_AMCR_FrequencyPublishedOrder() {
+	global UPDATER_CHECK_INTERVAL
+	Root := _MR_GetManifestRoot()
+	Previous := Root["about_update_frequency_menu"]
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	try {
+		Corpus := _AMCR_FrequencyCorpus()
+		Choices := []
+		Loop Corpus["choices"].Length {
+			Choice := Corpus["choices"][Corpus["choices"].Length - A_Index + 1]
+			Choices.Push(Map("value", Choice["value"], "i18n", Choice["i18n"]))
+		}
+		Choices[1]["i18n"] := Corpus["alternate_i18n"]
+		Root["about_update_frequency_menu"] := [Map("type", "choice", "id", Corpus["id"],
+			"path", Corpus["path"], "i18n", Corpus["i18n"], "show_current_choice", true,
+			"current_choice_suffix", Corpus["suffix"], "choices", Choices)]
+		UPDATER_CHECK_INTERVAL := 3600
+		State := Map("calls", [], "acknowledged", true)
+		Rows := _AMCR_FrequencyRows(State)
+		Frequency := Rows[Rows.Length]
+		AssertEqual(10, Frequency["items"].Length)
+		for Index, Choice in Choices {
+			Row := Frequency["items"][Index]
+			AssertEqual(t(Choice["i18n"]), Row["label"])
+			AssertTrue(Row["action"].Call())
+			AssertEqual(Choice["value"], State["calls"][Index], "no private preset loop may replace the published choices")
+		}
+	} finally {
+		Root["about_update_frequency_menu"] := Previous
+		UPDATER_CHECK_INTERVAL := SavedInterval
+	}
+}
+Test("About menu: frequency provider consumes the published order and alternate translated label",
+	_AMCR_FrequencyPublishedOrder)
+
+
+; The source-only row follows its declaration without gaining an update action.
+_AMCR_SourceCheckSharedCommand() {
+	global _AMCR_PICKER_AT
+	Root := _MR_GetManifestRoot()
+	Assert(Root.Has("about_source_menu"), "the shared source-only check must be declared")
+	Original := Root["about_source_menu"]
+	try {
+		for Labels in [Map("i18n", "menu.about.check_for_updates", "reason", "menu.about.source_run_reason"),
+			Map("i18n", "common.restore_recommended", "reason", "common.clear_to_system")] {
+			Declaration := Original[1].Clone()
+			Declaration["i18n"] := Labels["i18n"]
+			Declaration["disabled_reason_key"] := Labels["reason"]
+			Root["about_source_menu"] := [Declaration]
+			State := { Calls: [] }
+			Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind(State))
+			Row := Rows[_AMCR_PICKER_AT + 1]
+			AssertEqual(t(Labels["i18n"]), Row["label"], "the declared caption owns the source check")
+			AssertEqual(Labels["reason"], Row.Get("disabled_reason_key", ""),
+				"the source-only reason comes from the same shared declaration")
+			AssertEqual(true, Row.Get("disabled", false))
+			AssertFalse(Row.Has("action"), "a source checkout exposes no native update command")
+			AssertFalse(Row.Has("items"), "a source checkout opens no update window")
+			AssertFalse(Row.Has("checked"), "the source check cannot toggle settings")
+			AssertEqual(0, State.Calls.Length, "building a source row cannot mutate its channel")
+		}
+	} finally Root["about_source_menu"] := Original
+}
+Test("About source check: canonical disabled label reason and zero native effects", _AMCR_SourceCheckSharedCommand)

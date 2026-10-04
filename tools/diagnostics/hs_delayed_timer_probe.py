@@ -4,17 +4,23 @@
 import base64
 import json
 import math
+import os
 from pathlib import Path
 import plistlib
 import re
 import secrets
+import stat
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 
 CONTRACT = json.loads(Path(__file__).with_name("hs_delayed_timer_contract.json").read_text())
 APPLE_SCRIPT_KEY = "HSAppleScriptEnabledKey"
 SCRIPTING_TIMEOUT_SECONDS = 10
+# Leave the existing deadline margin for JXA construction and status receipt delivery.
+NO_PROMPT_NATIVE_TIMEOUT_SECONDS = 8
 SCRIPT_SAMPLE_SECONDS = 1
 SCRIPT_CLEANUP_TIMEOUT_SECONDS = 2
 SCRIPT_SAMPLE_READ_LIMIT = 65536
@@ -369,6 +375,1191 @@ class AppleScriptPreference:
             raise RuntimeError("The native scripting preference did not acknowledge restoration")
 
 
+SUPPLEMENTAL_RECEIPT_LIMIT = 2048
+SUPPLEMENTAL_SENDER_STAGES = (
+    "constructed",
+    "send_entered",
+    "send_returned",
+    "error_decode_entered",
+    "error_decode_complete",
+    "reply_decode_complete",
+)
+
+
+SUPPLEMENTAL_SCALAR_STAGES = (
+    "nserror_construct_entered",
+    "nserror_construct_returned",
+    "nserror_code_entered",
+    "nserror_code_returned",
+    "nserror_domain_entered",
+    "nserror_domain_returned",
+    "descriptor_construct_entered",
+    "descriptor_construct_returned",
+    "descriptor_int32_entered",
+    "descriptor_int32_returned",
+    "nil_ref_entered",
+    "nil_ref_returned",
+    "absent_errn_entered",
+    "absent_errn_returned",
+)
+SUPPLEMENTAL_DECODER_STAGES = {
+    "send": (
+        "reference_entered",
+        "reference_returned",
+        "code_entered",
+        "code_returned",
+        "domain_entered",
+        "domain_returned",
+    ),
+    "handler": ("errn_entered", "errn_returned", "int32_entered", "int32_returned"),
+}
+SUPPLEMENTAL_PRIMITIVE_TYPES = {
+    "undefined",
+    "object",
+    "boolean",
+    "number",
+    "string",
+    "function",
+    "symbol",
+    "bigint",
+}
+
+
+SUPPLEMENTAL_CALIBRATION_STAGES = (
+    "data_entered",
+    "data_returned",
+    "ref_call_entered",
+    "ref_call_returned",
+    "ref_read_entered",
+    "ref_read_returned",
+    "object_call_entered",
+    "object_call_returned",
+    "object_read_entered",
+    "object_read_returned",
+    "nullable_entered",
+    "nullable_returned",
+)
+
+
+class NoPromptDiagnosticScope:
+    """Own fresh server witnesses and sender stages without admitting a control."""
+
+    def __init__(self, output, nonce, pid, executable, bundle_id):
+        self.path = Path(tempfile.mkdtemp(prefix="no-prompt-", dir=output))
+        self.identity = {
+            "nonce": nonce,
+            "pid": pid,
+            "executable": str(executable),
+            "bundle_id": bundle_id,
+        }
+        self.sender_pid = None
+        self.allowed_names = {
+            "entry.json",
+            "completion.json",
+            "sender.json",
+            "scalar.json",
+            "decoder.json",
+            "calibration.json",
+            "getter.json",
+        }
+        self.allowed_names |= {name + ".pending" for name in self.allowed_names}
+        self.directory_identity = (self.path.stat().st_dev, self.path.stat().st_ino)
+
+    def bind_sender(self, pid):
+        """Bind the stage writer to the actual owned Popen child, not its target."""
+        if type(pid) is not int or pid <= 0 or self.sender_pid is not None:
+            raise RuntimeError("Supplemental sender identity is invalid or already bound")
+        self.sender_pid = pid
+
+    def _check_directory(self):
+        """Refuse a replaced scope before reading or removing any named receipt."""
+        info = self.path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or (info.st_dev, info.st_ino) != self.directory_identity:
+            raise RuntimeError("The supplemental receipt scope changed identity")
+
+    def read(self, name):
+        """Read one bounded regular owned inode; an absent witness is an observation."""
+        self._check_directory()
+        path = self.path / name
+        try:
+            named = path.lstat()
+        except FileNotFoundError:
+            return None
+        if not stat.S_ISREG(named.st_mode) or named.st_size > SUPPLEMENTAL_RECEIPT_LIMIT:
+            raise ValueError("A supplemental receipt is nonregular or exceeds its bound")
+        descriptor = os.open(
+            path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        )
+        with os.fdopen(descriptor, "rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (
+                named.st_dev,
+                named.st_ino,
+            ):
+                raise ValueError("A supplemental receipt changed inode")
+            raw = handle.read(SUPPLEMENTAL_RECEIPT_LIMIT + 1)
+            current = path.lstat()
+            if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (
+                opened.st_dev,
+                opened.st_ino,
+            ):
+                raise ValueError("A supplemental receipt changed before admission")
+        if len(raw) > SUPPLEMENTAL_RECEIPT_LIMIT or not raw.endswith(b"\n") or b"\n" in raw[:-1]:
+            raise ValueError("A supplemental receipt is not one bounded JSON line")
+        try:
+            result = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
+        except (UnicodeError, ValueError):
+            # Supplemental receipts are private files, including malformed key text.
+            raise ValueError("A supplemental receipt failed closed JSON decoding") from None
+        if not isinstance(result, dict):
+            raise ValueError("A supplemental receipt is not an object")
+        return result
+
+    def _owned_packet(self, name, contract, extra):
+        packet = self.read(name)
+        if packet is None:
+            return None
+        if type(self.sender_pid) is not int or self.sender_pid <= 0:
+            raise ValueError("A present supplemental packet has no actual bound sender")
+        expected = {
+            "schema_version": 1,
+            "contract": contract,
+            "nonce": self.identity["nonce"],
+            "target_pid": self.identity["pid"],
+            "sender_pid": self.sender_pid,
+        }
+        if set(packet) != set(expected) | set(extra) or any(
+            type(packet[key]) is not type(value) or packet[key] != value
+            for key, value in expected.items()
+        ):
+            raise ValueError("A supplemental scalar packet differs from its actual owner")
+        return packet
+
+    @staticmethod
+    def _fact(fact, field):
+        if (
+            not isinstance(fact, dict)
+            or set(fact) != {"type", field}
+            or not isinstance(fact["type"], str)
+            or fact["type"] not in SUPPLEMENTAL_PRIMITIVE_TYPES
+        ):
+            raise ValueError("A supplemental scalar fact is not a closed primitive")
+        value = fact[field]
+        if field == "integer":
+            if fact["type"] != "number" or (value is not None and type(value) is not int):
+                raise ValueError("A supplemental scalar integer has the wrong type")
+        elif type(value) is not bool:
+            raise ValueError("A supplemental scalar flag has the wrong type")
+
+    @staticmethod
+    def _descriptor_fact(fact):
+        """Admit only a native nullable projection, retaining its raw bridge type."""
+        if (
+            not isinstance(fact, dict)
+            or set(fact) != {"raw_type", "type", "native_absent", "absent"}
+            or type(fact["raw_type"]) is not str
+            or fact["raw_type"] not in {"object", "function"}
+            or type(fact["native_absent"]) is not bool
+            or type(fact["absent"]) is not bool
+            or fact["native_absent"] != fact["absent"]
+            or fact["type"] != ("object" if fact["absent"] else fact["raw_type"])
+        ):
+            raise ValueError("A supplemental descriptor projection is not a closed native fact")
+
+    @staticmethod
+    def _fact_summary(facts, constructors=False):
+        """Retain only closed getter facts, never raw domains or unexpected integers."""
+        observations = []
+        for key in ("code", "domain", "int32", "nil_ref", "absent_errn", "errn"):
+            if key not in facts:
+                continue
+            fact = facts[key]
+            if key in {"code", "int32"}:
+                value = fact["integer"]
+                if value is None:
+                    summary = "unavailable"
+                elif not constructors:
+                    summary = "present"
+                elif value == (-1712 if key == "code" else -50):
+                    summary = "-1712" if key == "code" else "-50"
+                else:
+                    summary = "unexpected_integer"
+                field = "integer"
+            else:
+                field = (
+                    ("matches" if constructors else "recognized") if key == "domain" else "absent"
+                )
+                summary = "true" if fact[field] else "false"
+            observations.append(f"{key}(type={fact['type']},{field}={summary})")
+            if "raw_type" in fact:
+                observations.append(
+                    f"{key}_bridge(raw_type={fact['raw_type']},native_absent={str(fact['native_absent']).lower()})"
+                )
+        return "; ".join(observations) if observations else "not_observed"
+
+    def getter_evidence(self):
+        """Observe native integer getter provenance without admitting converted statuses."""
+        packet = self._owned_packet("getter.json", "hs.applescript.integer-getter", {"facts"})
+        if packet is None:
+            return "not_observed"
+        facts = packet["facts"]
+        if (
+            not isinstance(facts, dict)
+            or not facts
+            or not set(facts) <= {"calibration", "constructor", "send"}
+        ):
+            raise ValueError("Supplemental integer getter names are not closed")
+        fields = {
+            "raw_type",
+            "owner_native",
+            "converted_integer",
+            "box_native",
+            "box_raw_type",
+            "box_integer",
+            "box_matches",
+            "control_matches",
+        }
+        summaries = []
+        for name in ("calibration", "constructor", "send"):
+            if name not in facts:
+                continue
+            fact = facts[name]
+            if not isinstance(fact, dict) or set(fact) != fields:
+                raise ValueError("Supplemental integer getter facts are not closed")
+            for key in ("raw_type", "box_raw_type"):
+                if type(fact[key]) is not str or fact[key] not in SUPPLEMENTAL_PRIMITIVE_TYPES:
+                    raise ValueError("Supplemental integer getter type is not closed")
+            for key in fields - {"raw_type", "box_raw_type", "control_matches"}:
+                if type(fact[key]) is not bool:
+                    raise ValueError("Supplemental integer getter flag is not Boolean")
+            if (name == "send" and fact["control_matches"] is not None) or (
+                name != "send" and type(fact["control_matches"]) is not bool
+            ):
+                raise ValueError("Supplemental integer getter control is not closed")
+            if fact["box_matches"] and not (
+                fact["box_native"] and fact["box_integer"] and fact["converted_integer"]
+            ):
+                raise ValueError("Supplemental integer getter match has no typed provenance")
+            summaries.append(
+                name
+                + "("
+                + ",".join(
+                    key
+                    + "="
+                    + (
+                        "not_applicable"
+                        if fact[key] is None
+                        else str(fact[key]).lower()
+                        if type(fact[key]) is bool
+                        else fact[key]
+                    )
+                    for key in (
+                        "raw_type",
+                        "owner_native",
+                        "converted_integer",
+                        "box_native",
+                        "box_raw_type",
+                        "box_integer",
+                        "box_matches",
+                        "control_matches",
+                    )
+                )
+                + ")"
+            )
+        return "; ".join(summaries)
+
+    def calibration_evidence(self):
+        """Qualify a separate Cocoa out-slot without authorizing any AppleEvent."""
+        packet = self._owned_packet(
+            "calibration.json", "hs.applescript.nserror-calibration", {"stages", "facts", "outcome"}
+        )
+        if packet is None:
+            return "not_observed"
+        stages, facts, outcome = packet["stages"], packet["facts"], packet["outcome"]
+        if (
+            not isinstance(stages, list)
+            or not stages
+            or stages != list(SUPPLEMENTAL_CALIBRATION_STAGES[: len(stages)])
+            or not isinstance(facts, dict)
+            or type(outcome) is not str
+            or outcome not in {"pending", "completed", "refused"}
+            or (outcome == "completed" and len(stages) != len(SUPPLEMENTAL_CALIBRATION_STAGES))
+        ):
+            raise ValueError("Supplemental NSError calibration is outside its closed protocol")
+        expected = {
+            name
+            for name, stage in (
+                ("ref", "ref_read_returned"),
+                ("object", "object_read_returned"),
+                ("nullable", "nullable_returned"),
+            )
+            if stage in stages
+        }
+        if set(facts) != expected:
+            raise ValueError("Supplemental NSError facts differ from completed reads")
+        summaries = []
+        admitted = {}
+        for name in ("ref", "object"):
+            if name not in facts:
+                continue
+            fact = facts[name]
+            if (
+                not isinstance(fact, dict)
+                or set(fact) != {"nil_result", "nserror", "code", "domain"}
+                or type(fact["nil_result"]) is not bool
+                or type(fact["nserror"]) is not bool
+            ):
+                raise ValueError("Supplemental NSError identity facts are not closed")
+            self._fact(fact["code"], "integer")
+            self._fact(fact["domain"], "matches")
+            admitted[name] = (
+                fact["nil_result"]
+                and fact["nserror"]
+                and fact["code"] == {"type": "number", "integer": 3840}
+                and fact["domain"] == {"type": "string", "matches": True}
+            )
+            value = fact["code"]["integer"]
+            code = (
+                "3840"
+                if value == 3840
+                else "unavailable"
+                if value is None
+                else "unexpected_integer"
+            )
+            summaries.append(
+                f"{name}(nil={str(fact['nil_result']).lower()},nserror={str(fact['nserror']).lower()},"
+                f"code_type={fact['code']['type']},code={code},domain_type={fact['domain']['type']},"
+                f"matches={str(fact['domain']['matches']).lower()})"
+            )
+        nullable_ok = False
+        if "nullable" in facts:
+            fact = facts["nullable"]
+            if (
+                not isinstance(fact, dict)
+                or set(fact) != {"raw_type", "type", "native_absent", "absent"}
+                or type(fact["raw_type"]) is not str
+                or fact["raw_type"] not in SUPPLEMENTAL_PRIMITIVE_TYPES
+                or type(fact["type"]) is not str
+                or fact["type"] not in SUPPLEMENTAL_PRIMITIVE_TYPES
+                or type(fact["native_absent"]) is not bool
+                or type(fact["absent"]) is not bool
+            ):
+                raise ValueError("Supplemental nullable descriptor facts are not closed")
+            nullable_ok = (
+                fact["raw_type"] in {"object", "function"}
+                and fact["type"] == "object"
+                and fact["native_absent"]
+                and fact["absent"]
+            )
+            summaries.append(
+                f"nullable(raw_type={fact['raw_type']},type={fact['type']},"
+                f"native_absent={str(fact['native_absent']).lower()},absent={str(fact['absent']).lower()})"
+            )
+        qualified = outcome == "completed" and admitted.get("object", False) and nullable_ok
+        return f"stage={stages[-1]}; outcome={outcome}; qualified={str(qualified).lower()}; " + (
+            "; ".join(summaries) if summaries else "not_observed"
+        )
+
+    def calibration_javascript(self):
+        """Exercise native NSError** holders using inert malformed UTF-8 JSON."""
+        return (
+            r"""
+function calibrateOwnedNSError(event) {
+    var stages = [], facts = {};
+    function publish(outcome) {
+        var data = {schema_version:1,contract:'hs.applescript.nserror-calibration',
+            nonce:__NONCE__,target_pid:__PID__,
+            sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),
+            stages:stages,facts:facts,outcome:outcome};
+        var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\n').dataUsingEncoding($.NSUTF8StringEncoding);
+        if (!encoded || encoded.isNil()) throw new Error('Supplemental calibration encoding refused');
+        var size = Number(encoded.length);
+        if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__PATH__, true))
+            throw new Error('Supplemental calibration write refused');
+    }
+    function stage(name, key, fact) {
+        var expected = __STAGES__;
+        if (name !== expected[stages.length]) throw new Error('Supplemental calibration stage refused');
+        stages.push(name);
+        if (key !== undefined) facts[key] = fact;
+        publish('pending');
+    }
+    function inspect(result, error, observationName) {
+        var absent = result.isNil() === true;
+        var identified = error !== undefined && error !== null
+            && typeof error.isNil === 'function' && error.isNil() === false
+            && typeof error.isKindOfClass === 'function' && error.isKindOfClass($.NSError) === true;
+        var raw = identified ? error.code : undefined;
+        var code = identified ? Number(raw) : NaN;
+        if (observationName !== undefined) observeOwnedIntegerGetter(observationName, error, raw, 3840);
+        var domain = identified ? ObjC.unwrap(error.domain) : undefined;
+        return {nil_result:absent,nserror:identified,code:integerFact(code),
+            domain:{type:typeof domain,matches:domain === 'NSCocoaErrorDomain'}};
+    }
+    function projectNullable(descriptor) {
+        // The bridge validates provenance; a JavaScript function with isNil is not an ObjC object.
+        ObjC.castObjectToRef(descriptor);
+        if (descriptor.isNil() !== true) throw new Error('Supplemental native nil descriptor refused');
+        return null;
+    }
+    try {
+        stage('data_entered');
+        var data = $.NSString.stringWithString('[').dataUsingEncoding($.NSUTF8StringEncoding);
+        if (data.isNil()) throw new Error('Supplemental inert JSON data refused');
+        stage('data_returned');
+        var raw = Ref();
+        stage('ref_call_entered');
+        var refResult = $.NSJSONSerialization.JSONObjectWithDataOptionsError(data, 0, raw);
+        stage('ref_call_returned');
+        stage('ref_read_entered');
+        var refFact = inspect(refResult, raw[0]);
+        stage('ref_read_returned', 'ref', refFact);
+        var object = $();
+        stage('object_call_entered');
+        var objectResult = $.NSJSONSerialization.JSONObjectWithDataOptionsError(data, 0, object);
+        stage('object_call_returned');
+        stage('object_read_entered');
+        var objectFact = inspect(objectResult, object, 'calibration');
+        stage('object_read_returned', 'object', objectFact);
+        stage('nullable_entered');
+        var descriptor = event.paramDescriptorForKeyword(0x6572726e);
+        var normalized = projectNullable(descriptor);
+        stage('nullable_returned', 'nullable', {raw_type:typeof descriptor,type:typeof normalized,
+            native_absent:descriptor.isNil() === true,absent:normalized === null});
+        publish('completed');
+    } catch (error) {
+        // A calibration refusal remains separate; the original AppleEvent still runs.
+        try { publish('refused'); } catch (writeError) { /* No acknowledged calibration is available. */ }
+    }
+}
+""".replace("__NONCE__", json.dumps(self.identity["nonce"]))
+            .replace("__PID__", str(self.identity["pid"]))
+            .replace("__PATH__", json.dumps(str(self.path / "calibration.json")))
+            .replace("__STAGES__", json.dumps(list(SUPPLEMENTAL_CALIBRATION_STAGES)))
+        )
+
+    def scalar_evidence(self, terminal=False, native=None):
+        """Retain decoder boundaries independently of the original native status verdict."""
+        scalar = self._owned_packet(
+            "scalar.json", "hs.applescript.scalar-controls", {"stages", "facts"}
+        )
+        scalar_stage = "not_observed"
+        scalar_qualified = False
+        scalar_facts, decoder_facts = "not_observed", "not_observed"
+        if scalar is not None:
+            stages, facts = scalar["stages"], scalar["facts"]
+            if (
+                not isinstance(stages, list)
+                or not stages
+                or stages != list(SUPPLEMENTAL_SCALAR_STAGES[: len(stages)])
+                or not isinstance(facts, dict)
+            ):
+                raise ValueError("Supplemental scalar stages are not a closed prefix")
+            specifications = {
+                "code": ("nserror_code_returned", "integer", -1712),
+                "domain": ("nserror_domain_returned", "matches", True),
+                "int32": ("descriptor_int32_returned", "integer", -50),
+                "nil_ref": ("nil_ref_returned", "absent", True),
+                "absent_errn": ("absent_errn_returned", "absent", True),
+            }
+            keys = {key for key, (stage, _, _) in specifications.items() if stage in stages}
+            if set(facts) != keys:
+                raise ValueError("Supplemental scalar facts differ from completed reads")
+            for key in keys:
+                if key == "absent_errn":
+                    self._descriptor_fact(facts[key])
+                else:
+                    self._fact(facts[key], specifications[key][1])
+            scalar_facts = self._fact_summary(facts, constructors=True)
+            scalar_stage = stages[-1]
+            scalar_qualified = (
+                len(stages) == len(SUPPLEMENTAL_SCALAR_STAGES)
+                and all(
+                    type(facts[key][field]) is type(value) and facts[key][field] == value
+                    for key, (_, field, value) in specifications.items()
+                )
+                and facts["domain"]["type"] == "string"
+                and all(
+                    facts[key]["type"] in {"object", "undefined"}
+                    for key in ("nil_ref", "absent_errn")
+                )
+            )
+        decoder = self._owned_packet(
+            "decoder.json", "hs.applescript.decoder-boundaries", {"branch", "stages", "facts"}
+        )
+        branch, boundary = "not_observed", "not_observed"
+        if decoder is not None:
+            branch, stages, facts = decoder["branch"], decoder["stages"], decoder["facts"]
+            if (
+                not isinstance(branch, str)
+                or branch not in SUPPLEMENTAL_DECODER_STAGES
+                or not isinstance(stages, list)
+                or not stages
+                or not isinstance(facts, dict)
+            ):
+                raise ValueError("A supplemental decoder branch is outside its closed protocol")
+            absent_route = ["errn_entered", "errn_returned", "absent_errn"]
+            route = SUPPLEMENTAL_DECODER_STAGES[branch]
+            if stages != list(route[: len(stages)]) and not (
+                branch == "handler" and stages == absent_route
+            ):
+                raise ValueError("Supplemental decoder boundaries are not a closed prefix")
+            specifications = (
+                {
+                    "code": ("code_returned", "integer"),
+                    "domain": ("domain_returned", "recognized"),
+                }
+                if branch == "send"
+                else {
+                    "errn": ("errn_returned", "absent"),
+                    "int32": ("int32_returned", "integer"),
+                }
+            )
+            keys = {key for key, (stage, _) in specifications.items() if stage in stages}
+            if set(facts) != keys:
+                raise ValueError("Supplemental decoder facts differ from completed reads")
+            for key in keys:
+                if key == "errn":
+                    self._descriptor_fact(facts[key])
+                else:
+                    self._fact(facts[key], specifications[key][1])
+            decoder_facts = self._fact_summary(facts)
+            boundary = stages[-1]
+            if terminal:
+                expected_branch = "send" if native["error_origin"] == "send" else "handler"
+                if (
+                    branch != expected_branch
+                    or (branch == "send" and stages != list(route))
+                    or (branch == "handler" and stages not in (list(route), absent_route))
+                ):
+                    raise ValueError("The terminal native decoder branch did not complete")
+                key = "code" if branch == "send" else "int32"
+                if key in facts:
+                    if (
+                        type(facts[key]["integer"]) is not int
+                        or facts[key]["integer"] != native["status"]
+                    ):
+                        raise ValueError(
+                            "Supplemental scalar status differs from the native receipt"
+                        )
+                elif native["status"] != 0 or not facts["errn"]["absent"]:
+                    raise ValueError("An absent handler status differs from the native receipt")
+                if branch == "send" and (
+                    facts["domain"]["type"]
+                    != ("string" if isinstance(native["error_domain"], str) else "object")
+                    or facts["domain"]["recognized"]
+                    != (native["error_domain"] == "NSOSStatusErrorDomain")
+                ):
+                    raise ValueError("The supplemental native domain differs from its receipt")
+                if branch == "handler" and facts["errn"]["absent"] != (stages == absent_route):
+                    raise ValueError("The handler descriptor presence differs from its read route")
+        if terminal and (not scalar_qualified or decoder is None):
+            raise ValueError("The supplemental native scalar controls did not qualify")
+        return {
+            "scalar_stage": scalar_stage,
+            "scalar_qualified": scalar_qualified,
+            "decoder_branch": branch,
+            "decoder_boundary": boundary,
+            "scalar_facts": scalar_facts,
+            "decoder_facts": decoder_facts,
+        }
+
+    def sender_stages(self):
+        """Read the same exact child-owned monotonic stage prefix during sampling."""
+        sender = self.read("sender.json")
+        stages = []
+        if sender is not None:
+            expected = {
+                "schema_version": 1,
+                "contract": "hs.applescript.sender-stages",
+                "nonce": self.identity["nonce"],
+                "target_pid": self.identity["pid"],
+                "sender_pid": self.sender_pid,
+            }
+            if set(sender) != set(expected) | {"stages"} or any(
+                type(sender[key]) is not type(value) or sender[key] != value
+                for key, value in expected.items()
+            ):
+                raise ValueError("Supplemental sender stages differ from the actual owned child")
+            stages = sender["stages"]
+            if (
+                not isinstance(stages, list)
+                or not stages
+                or stages != list(SUPPLEMENTAL_SENDER_STAGES[: len(stages)])
+            ):
+                raise ValueError("Supplemental sender stages are not a monotonic closed prefix")
+        return stages
+
+    def observe(self, require_completion=False, terminal=False, native=None):
+        """Keep execution and sender evidence separate from the native send status."""
+        present = []
+        for name, phase in (("entry.json", "entry"), ("completion.json", "completion")):
+            receipt = self.read(name)
+            if receipt is None:
+                continue
+            expected = dict(
+                self.identity,
+                schema_version=1,
+                contract="hs.applescript.server-witness",
+                phase=phase,
+            )
+            if set(receipt) != set(expected) or any(
+                type(receipt[key]) is not type(value) or receipt[key] != value
+                for key, value in expected.items()
+            ):
+                raise ValueError("A supplemental server witness differs from its exact owner")
+            present.append(phase)
+        if present == ["completion"]:
+            raise ValueError("A completion witness has no preceding owned entry")
+        if require_completion and present != ["entry", "completion"]:
+            raise ValueError("The no-prompt nonce reply has incomplete server witnesses")
+        stages = self.sender_stages()
+        required_stages = list(
+            SUPPLEMENTAL_SENDER_STAGES if require_completion else SUPPLEMENTAL_SENDER_STAGES[:-1]
+        )
+        if (terminal or require_completion) and stages != required_stages:
+            raise ValueError("The no-prompt native receipt lacks terminal sender stages")
+        return {
+            **self.scalar_evidence(terminal=terminal, native=native),
+            "nserror_calibration": self.calibration_evidence(),
+            "integer_getter": self.getter_evidence(),
+            "server": "completed"
+            if len(present) == 2
+            else "entered"
+            if present
+            else "not_observed",
+            "sender_stage": stages[-1] if stages else "not_observed",
+        }
+
+    def early_lua_journal_stage(self):
+        """Observe an attempted journal write before later payload prerequisites."""
+        return (
+            "pcall(function() local info=type(hs)=='table' and hs.processInfo or nil; "
+            "local pid=type(info)=='table' and info.processID or nil; "
+            "if type(pid)~='number' or pid<=0 or pid>=2^53 or pid~=math.floor(pid) "
+            "or pid~={pid} then return end; "
+            "local loaded=type(package)=='table' and package.loaded or nil; "
+            "local journal=type(loaded)=='table' and loaded['adapters.boot_journal'] or nil; "
+            "if type(journal)~='table' or type(journal.append)~='function' then return end; "
+            "journal.append('INFO',string.format('Native scripting Lua body stage: "
+            "phase=received_lua_body; pid=%.0f; nonce=%s.',pid,{nonce})); end); "
+        ).format(pid=self.identity["pid"], nonce=json.dumps(self.identity["nonce"]))
+
+    def lua_parts(self):
+        """Use only actual processInfo fields already qualified by the native timer."""
+        identity = self.identity
+        entry = json.dumps(str(self.path / "entry.json"))
+        completion = json.dumps(str(self.path / "completion.json"))
+        prefix = (
+            "return (function() " + self.early_lua_journal_stage() + "local i=hs.processInfo; "
+        ) + (
+            "assert(i.processID=={pid} and i.executablePath=={exe} and i.bundleID=={bundle}, "
+            "'Supplemental native owner differs'); local function publish(path,phase) "
+            "local text=hs.json.encode({{schema_version=1,contract='hs.applescript.server-witness',"
+            "nonce={nonce},pid=i.processID,executable=i.executablePath,bundle_id=i.bundleID,phase=phase}}); "
+            "assert(type(text)=='string' and #text<2048,'Supplemental witness encoding refused'); "
+            "local f=io.open(path..'.pending','wb'); assert(f,'Supplemental witness open refused'); "
+            "local wrote=f:write(text..'\\n'); local closed=f:close(); "
+            "assert(wrote and closed,'Supplemental witness write refused'); "
+            "assert(os.rename(path..'.pending',path),'Supplemental witness commit refused'); end; "
+            "publish({entry},'entry'); local function body() "
+        ).format(
+            pid=identity["pid"],
+            exe=json.dumps(identity["executable"]),
+            bundle=json.dumps(identity["bundle_id"]),
+            nonce=json.dumps(identity["nonce"]),
+            entry=entry,
+        )
+        suffix = (
+            "\nend; local result=body(); assert(result=="
+            + json.dumps(identity["nonce"])
+            + (
+                ",'Supplemental body nonce differs'); publish("
+                + completion
+                + ",'completion'); return result end)()"
+            )
+        )
+        return prefix, suffix
+
+    def javascript_prelude(self):
+        """Check each atomic stage write before any subsequent native bridge call."""
+        prefix, suffix = self.lua_parts()
+        return (
+            """
+var ownedStages = [];
+function recordOwnedStage(stage) {
+    var expected = __STAGES__;
+    if (stage !== expected[ownedStages.length]) throw new Error('Supplemental stage order refused');
+    ownedStages.push(stage);
+    var data = {schema_version:1,contract:'hs.applescript.sender-stages',nonce:__NONCE__,
+        target_pid:__PID__,sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),stages:ownedStages};
+    var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\\n').dataUsingEncoding($.NSUTF8StringEncoding);
+    if (!encoded || encoded.isNil()) throw new Error('Supplemental stage encoding refused');
+    var size = Number(encoded.length);
+    if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__PATH__, true))
+        throw new Error('Supplemental stage write refused');
+}
+
+var scalarStages = [], scalarFacts = {}, decoderStages = [], decoderFacts = {}, decoderBranch = null;
+function publishOwnedPacket(name, contract, stages, facts, branch) {
+    var data = {schema_version:1,contract:contract,nonce:__NONCE__,target_pid:__PID__,
+        sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),stages:stages,facts:facts};
+    if (branch !== undefined) data.branch = branch;
+    var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\\n').dataUsingEncoding($.NSUTF8StringEncoding);
+    if (!encoded || encoded.isNil()) throw new Error('Supplemental packet encoding refused');
+    var size = Number(encoded.length);
+    if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__ROOT__ + '/' + name, true))
+        throw new Error('Supplemental packet write refused');
+}
+var getterFacts = {};
+function observeOwnedIntegerGetter(name, owner, raw, expected) {
+    // This diagnostic never authorizes a converted status or invokes a callable getter.
+    var fact = {raw_type:typeof raw,owner_native:false,converted_integer:false,
+        box_native:false,box_raw_type:'undefined',box_integer:false,box_matches:false,
+        control_matches:expected === null ? null : false};
+    var converted, boxed;
+    try {
+        ObjC.castObjectToRef(owner);
+        fact.owner_native = owner.isNil() === false && owner.isKindOfClass($.NSError) === true;
+        converted = Number(raw);
+        fact.converted_integer = Number.isInteger(converted);
+        if (expected !== null) fact.control_matches = fact.converted_integer && converted === expected;
+        var box = $.NSNumber.numberWithInteger(raw);
+        ObjC.castObjectToRef(box);
+        fact.box_native = box.isNil() === false && box.isKindOfClass($.NSNumber) === true;
+        if (fact.box_native) {
+            var boxRaw = box.integerValue;
+            fact.box_raw_type = typeof boxRaw;
+            boxed = Number(boxRaw);
+            fact.box_integer = Number.isInteger(boxed);
+            fact.box_matches = fact.converted_integer && fact.box_integer && boxed === converted;
+        }
+    } catch (error) { /* Preserve a closed failed projection; do not admit the original status. */ }
+    getterFacts[name] = fact;
+    try {
+        var data = {schema_version:1,contract:'hs.applescript.integer-getter',nonce:__NONCE__,
+            target_pid:__PID__,sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),facts:getterFacts};
+        var encoded = $.NSString.stringWithString(JSON.stringify(data) + '\\n').dataUsingEncoding($.NSUTF8StringEncoding);
+        if (!encoded || encoded.isNil()) throw new Error('Supplemental getter encoding refused');
+        var size = Number(encoded.length);
+        if (!Number.isInteger(size) || size <= 0 || size > 2048 || !encoded.writeToFileAtomically(__ROOT__ + '/getter.json', true))
+            throw new Error('Supplemental getter write refused');
+    } catch (writeError) { /* An absent observation cannot authorize the AppleEvent. */ }
+}
+function projectOwnedNSErrorInteger(owner, rawCode) {
+    ObjC.castObjectToRef(owner);
+    if (owner.isNil() !== false || owner.isKindOfClass($.NSError) !== true || owner.code !== rawCode)
+        throw new Error('Native NSError integer owner refused');
+    if (typeof rawCode !== 'number' || !Number.isInteger(rawCode)) {
+        if (typeof rawCode !== 'string' || !/^-?(?:0|[1-9][0-9]*)$/.test(rawCode))
+            throw new Error('Native NSError integer representation refused');
+        var converted = Number(rawCode);
+        if (!Number.isSafeInteger(converted)) throw new Error('Native NSError integer precision refused');
+        var box = $.NSNumber.numberWithInteger(rawCode);
+        ObjC.castObjectToRef(box);
+        if (box.isNil() !== false || box.isKindOfClass($.NSNumber) !== true)
+            throw new Error('Native NSNumber integer owner refused');
+        var rawBox = box.integerValue;
+        if ((typeof rawBox !== 'number' && typeof rawBox !== 'string')
+            || (typeof rawBox === 'string' && !/^-?(?:0|[1-9][0-9]*)$/.test(rawBox)))
+            throw new Error('Native NSNumber integer representation refused');
+        var boxed = Number(rawBox);
+        if (!Number.isSafeInteger(boxed) || boxed !== converted || owner.code !== rawCode)
+            throw new Error('Native NSNumber integer match refused');
+        return boxed;
+    }
+    if (!Number.isSafeInteger(rawCode)) throw new Error('Native NSError integer precision refused');
+    return rawCode;
+}
+function integerFact(value) { return {type:typeof value,integer:Number.isInteger(value) ? value : null}; }
+function projectOwnedDescriptor(descriptor) {
+    ObjC.castObjectToRef(descriptor);
+    var absent = descriptor.isNil();
+    if (absent === true) return null;
+    if (absent !== false || descriptor.isKindOfClass($.NSAppleEventDescriptor) !== true)
+        throw new Error('Supplemental native descriptor identity refused');
+    return descriptor;
+}
+function descriptorFact(raw, projected) {
+    return {raw_type:typeof raw,type:typeof projected,native_absent:raw.isNil() === true,absent:projected === null};
+}
+function recordScalar(stage, key, fact) {
+    var expected = __SCALAR_STAGES__;
+    if (stage !== expected[scalarStages.length]) throw new Error('Supplemental scalar order refused');
+    scalarStages.push(stage);
+    if (key !== undefined) scalarFacts[key] = fact;
+    publishOwnedPacket('scalar.json','hs.applescript.scalar-controls',scalarStages,scalarFacts);
+}
+function qualifyOwnedScalars(reply) {
+    recordScalar('nserror_construct_entered');
+    var nativeError = $.NSError.errorWithDomainCodeUserInfo('NSOSStatusErrorDomain', -1712, $());
+    recordScalar('nserror_construct_returned');
+    recordScalar('nserror_code_entered');
+    var constructorRawCode = nativeError.code;
+    var code = Number(constructorRawCode);
+    recordScalar('nserror_code_returned','code',integerFact(code));
+    observeOwnedIntegerGetter('constructor', nativeError, constructorRawCode, -1712);
+    recordScalar('nserror_domain_entered');
+    var domain = ObjC.unwrap(nativeError.domain);
+    recordScalar('nserror_domain_returned','domain',{type:typeof domain,matches:domain === 'NSOSStatusErrorDomain'});
+    recordScalar('descriptor_construct_entered');
+    var errorNumber = $.NSAppleEventDescriptor.descriptorWithInt32(-50);
+    recordScalar('descriptor_construct_returned');
+    recordScalar('descriptor_int32_entered');
+    var number = Number(errorNumber.int32Value);
+    recordScalar('descriptor_int32_returned','int32',integerFact(number));
+    recordScalar('nil_ref_entered');
+    var reference = Ref(), missing = reference[0];
+    recordScalar('nil_ref_returned','nil_ref',{type:typeof missing,absent:!missing || missing.isNil()});
+    recordScalar('absent_errn_entered');
+    var absent = reply.paramDescriptorForKeyword(0x6572726e);
+    var projected = projectOwnedDescriptor(absent);
+    recordScalar('absent_errn_returned','absent_errn',descriptorFact(absent, projected));
+}
+function recordDecoderBoundary(branch, stage, key, fact) {
+    var routes = __DECODER_STAGES__;
+    if (decoderBranch !== null && decoderBranch !== branch) throw new Error('Supplemental decoder branch changed');
+    decoderBranch = branch;
+    var expected = routes[branch];
+    if (!expected || (stage !== expected[decoderStages.length] && !(branch === 'handler' && stage === 'absent_errn' && decoderStages.length === 2 && decoderFacts.errn.absent)))
+        throw new Error('Supplemental decoder order refused');
+    decoderStages.push(stage);
+    if (key !== undefined) decoderFacts[key] = fact;
+    publishOwnedPacket('decoder.json','hs.applescript.decoder-boundaries',decoderStages,decoderFacts,branch);
+}
+function ownedWitnessSource(source, pid, nonce) {
+    if (pid !== __PID__ || nonce !== __NONCE__) throw new Error('Supplemental source owner refused');
+    return __PREFIX__ + source + __SUFFIX__;
+}
+""".replace("__STAGES__", json.dumps(list(SUPPLEMENTAL_SENDER_STAGES)))
+            .replace("__SCALAR_STAGES__", json.dumps(list(SUPPLEMENTAL_SCALAR_STAGES)))
+            .replace("__DECODER_STAGES__", json.dumps(SUPPLEMENTAL_DECODER_STAGES))
+            .replace("__ROOT__", json.dumps(str(self.path)))
+            .replace("__NONCE__", json.dumps(self.identity["nonce"]))
+            .replace("__PID__", str(self.identity["pid"]))
+            .replace("__PATH__", json.dumps(str(self.path / "sender.json")))
+            .replace("__PREFIX__", json.dumps(prefix))
+            .replace("__SUFFIX__", json.dumps(suffix))
+        )
+
+    def cleanup(self):
+        """Acknowledge removal only inside the still-owned fresh receipt directory."""
+        self._check_directory()
+        names = {entry.name for entry in self.path.iterdir()}
+        if not names <= self.allowed_names:
+            raise RuntimeError("Supplemental scope cleanup has an unknown neighbour")
+        for name in names:
+            path = self.path / name
+            info = path.lstat()
+            if stat.S_ISDIR(info.st_mode):
+                raise RuntimeError("Supplemental scope cleanup has a foreign directory")
+            path.unlink()
+            if path.exists() or path.is_symlink():
+                raise RuntimeError("Supplemental receipt removal was not acknowledged")
+        self.path.rmdir()
+        if self.path.exists() or self.path.is_symlink():
+            raise RuntimeError("Supplemental scope removal was not acknowledged")
+
+
+class NoPromptServerSample:
+    """Own one sampler thread/process; never detach it or admit a late sample."""
+
+    def __init__(self, scope, pid, sample):
+        self.scope = scope
+        self.pid = pid
+        self.sample = sample
+        self.stop = threading.Event()
+        self.thread = threading.Thread(
+            target=self._run, name="owned-no-prompt-sample", daemon=False
+        )
+        self.started = False
+        self.process = None
+        self.interval_qualified = False
+        self.reason = "send_not_observed"
+
+    def start(self):
+        self.thread.start()
+        self.started = True
+
+    def _run(self):
+        try:
+            deadline = time.monotonic() + SCRIPTING_TIMEOUT_SECONDS
+            while not self.stop.is_set() and time.monotonic() < deadline:
+                stages = self.scope.sender_stages()
+                if stages == list(SUPPLEMENTAL_SENDER_STAGES[:2]):
+                    if self.sample.exists() or self.sample.is_symlink():
+                        self.reason = "sample_path_not_fresh"
+                        return
+                    # The stage packet is bound to the actual sender PID and scope.
+                    # Sampling has no pipes that could block its retirement.
+                    self.process = subprocess.Popen(
+                        [
+                            "/usr/bin/sample",
+                            str(self.pid),
+                            str(SCRIPT_SAMPLE_SECONDS),
+                            "-file",
+                            str(self.sample),
+                        ],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    starting_stages = self.scope.sender_stages()
+                    deadline = time.monotonic() + SCRIPT_CLEANUP_TIMEOUT_SECONDS
+                    while not self.stop.is_set() and time.monotonic() < deadline:
+                        try:
+                            self.process.wait(timeout=0.02)
+                            break
+                        except subprocess.TimeoutExpired:
+                            continue
+                    if self.process.returncode is None:
+                        self.reason = "sampler_cancelled_or_timed_out"
+                        return
+                    ending_stages = self.scope.sender_stages()
+                    self.interval_qualified = (
+                        not self.stop.is_set()
+                        and type(self.process.returncode) is int
+                        and self.process.returncode == 0
+                        and starting_stages == stages
+                        and ending_stages == stages
+                    )
+                    self.reason = (
+                        "inflight_interval"
+                        if self.interval_qualified
+                        else "sampler_refused_or_send_interval_changed"
+                    )
+                    return
+                if len(stages) > 2:
+                    self.reason = "send_already_returned"
+                    return
+                self.stop.wait(0.02)
+        except Exception:
+            # Never project arbitrary worker exceptions, receipt text or arguments.
+            self.reason = "sampler_observation_refused"
+        finally:
+            if self.process is not None and self.process.returncode is None:
+                try:
+                    self.process.kill()
+                    self.process.wait(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                    if self.process.returncode is None:
+                        raise RuntimeError("Owned sampler exit was not acknowledged")
+                except Exception:
+                    self.reason = "owned_sampler_retirement_unacknowledged"
+
+    def finish(self):
+        """Refuse progress while this exact sampler or worker retains physical debt."""
+        self.stop.set()
+        if self.started:
+            self.thread.join(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+            if self.thread.is_alive():
+                raise RuntimeError("Owned no-prompt sampler worker has not retired")
+        if self.process is not None and self.process.returncode is None:
+            # A previous bounded retirement failure may be retried by restore().
+            self.process.kill()
+            self.process.wait(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+            if self.process.returncode is None:
+                raise RuntimeError("Owned no-prompt sampler process has not retired")
+        return self.interval_qualified
+
+
+class ManagedLaunchObservation:
+    """Own one concurrent AppKit read; its result never admits AppleEvents."""
+
+    CONTRACT = "hs.managed.public-launch-state"
+
+    def __init__(self, pid, executable, domain, nonce, processes):
+        self.pid, self.executable, self.domain = pid, executable, domain
+        self.nonce, self.processes = nonce, processes
+        self.process = None
+        self.thread = None
+        self.packet = None
+        self.failure = "unobserved"
+        self.created = time.monotonic()
+        self.query_begin = self.query_end = None
+        self.control_begin = self.control_end = None
+        self.stop = threading.Event()
+
+    @staticmethod
+    def script():
+        # Native getters are deliberately not coerced: native calibration owns their ABI.
+        return """ObjC.import('AppKit');
+ObjC.import('Foundation');
+function run(argv) {
+    try {
+        var pid = Number(argv[0]);
+        if (!Number.isSafeInteger(pid) || pid <= 0) throw Error('identity');
+        var app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(pid);
+        ObjC.castObjectToRef(app);
+        if (app.isNil() !== false || app.isKindOfClass($.NSRunningApplication) !== true)
+            throw Error('class');
+        var observedPid = app.processIdentifier;
+        var terminated = app.isTerminated;
+        var finished = app.isFinishedLaunching;
+        var path = ObjC.unwrap(app.executableURL.path);
+        var bundle = ObjC.unwrap(app.bundleIdentifier);
+        if (typeof observedPid !== 'number' || observedPid !== pid
+            || typeof terminated !== 'boolean' || terminated !== false
+            || typeof finished !== 'boolean' || typeof path !== 'string'
+            || typeof bundle !== 'string' || path !== argv[1] || bundle !== argv[2])
+            throw Error('identity');
+        return JSON.stringify({schema_version:1,contract:'hs.managed.public-launch-state',
+            nonce:argv[3],pid:observedPid,
+            sender_pid:Number($.NSProcessInfo.processInfo.processIdentifier),
+            executable:path,bundle_id:bundle,native_class:true,terminated:terminated,
+            raw_type:typeof finished,finished_launching:finished});
+    } catch (_) { throw Error('Managed public AppKit observation refused'); }
+}
+"""
+
+    def start(self):
+        if self.thread is not None:
+            raise RuntimeError("Managed public observer already started")
+        self.thread = threading.Thread(target=self._observe, daemon=True)
+        self.thread.start()
+        return self
+
+    def _observe(self):
+        try:
+            if self.processes(self.executable) != [self.pid] or self.stop.is_set():
+                self.failure = "identity-refused"
+                return
+            self.query_begin = time.monotonic()
+            self.process = subprocess.Popen(
+                [
+                    "/usr/bin/osascript",
+                    "-l",
+                    "JavaScript",
+                    "-e",
+                    self.script(),
+                    str(self.pid),
+                    str(self.executable),
+                    self.domain,
+                    self.nonce,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if self.stop.is_set():
+                self.process.kill()
+            stdout, _ = self.process.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)
+            if self.process.returncode != 0 or len(stdout) > 16384:
+                self.failure = "query-refused"
+                return
+            packet = json.loads(stdout, object_pairs_hook=unique_object)
+            if not self.valid_packet(packet) or self.processes(self.executable) != [self.pid]:
+                self.failure = "identity-refused"
+                return
+            self.packet = packet
+            self.query_end = time.monotonic()
+            self.failure = None
+        except subprocess.TimeoutExpired:
+            self.failure = "query-timeout"
+        except Exception:
+            # Arbitrary Cocoa errors, stderr, source and private paths are never diagnostic text.
+            self.failure = "query-refused"
+        finally:
+            if self.process is not None and self.process.returncode is None:
+                try:
+                    self.process.kill()
+                    self.process.communicate(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                except Exception:
+                    self.failure = "cleanup-unsettled"
+
+    def valid_packet(self, packet):
+        return (
+            type(packet) is dict
+            and set(packet)
+            == {
+                "schema_version",
+                "contract",
+                "nonce",
+                "pid",
+                "sender_pid",
+                "executable",
+                "bundle_id",
+                "native_class",
+                "terminated",
+                "raw_type",
+                "finished_launching",
+            }
+            and type(packet["schema_version"]) is int
+            and packet["schema_version"] == 1
+            and packet["contract"] == self.CONTRACT
+            and packet["nonce"] == self.nonce
+            and type(packet["pid"]) is int
+            and packet["pid"] == self.pid
+            and self.process is not None
+            and type(packet["sender_pid"]) is int
+            and packet["sender_pid"] == self.process.pid
+            and packet["executable"] == str(self.executable)
+            and packet["bundle_id"] == self.domain
+            and packet["native_class"] is True
+            and packet["terminated"] is False
+            and packet["raw_type"] == "boolean"
+            and type(packet["finished_launching"]) is bool
+        )
+
+    def mark_control_entry(self):
+        self.control_begin = time.monotonic()
+
+    def mark_control_exit(self):
+        self.control_end = time.monotonic()
+
+    def finish(self):
+        try:
+            if self.thread is not None:
+                remaining = max(0, self.created + SCRIPTING_TIMEOUT_SECONDS - time.monotonic())
+                self.thread.join(timeout=remaining)
+                if self.thread.is_alive() or (
+                    self.process is not None and self.process.returncode is None
+                ):
+                    self.stop.set()
+                    if self.process is not None and self.process.returncode is None:
+                        self.process.kill()
+                    self.thread.join(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                if (
+                    not self.thread.is_alive()
+                    and self.process is not None
+                    and self.process.returncode is None
+                ):
+                    self.process.communicate(timeout=SCRIPT_CLEANUP_TIMEOUT_SECONDS)
+                if self.thread.is_alive() or (
+                    self.process is not None and self.process.returncode is None
+                ):
+                    raise RuntimeError("Managed public observer cleanup has not settled")
+        except Exception:
+            # Keep owned debt and close exception text: TimeoutExpired embeds argv and nonce.
+            raise RuntimeError("Managed public observer cleanup has not settled") from None
+        timing = "unknown"
+        if (
+            self.packet is not None
+            and self.query_begin is not None
+            and self.query_end is not None
+            and self.control_begin is not None
+            and self.control_end is not None
+        ):
+            if self.query_end <= self.control_begin:
+                timing = "before_path"
+            elif self.query_begin >= self.control_end:
+                timing = "after_path"
+            else:
+                timing = "overlaps_path"
+        return {
+            "contract": self.CONTRACT,
+            "observation": "observed" if self.packet else "unobserved",
+            "finished_launching": self.packet["finished_launching"] if self.packet else None,
+            "timing": timing,
+            "query_begin": self.query_begin,
+            "query_end": self.query_end,
+            "control_begin": self.control_begin,
+            "control_end": self.control_end,
+            "failure": self.failure,
+            "qualified": False,
+            "readiness": "unobserved",
+        }
+
+
 class NativeDelayedTimerProbe:
     """Use the launch gate's signed embedded runtime without starting another process."""
 
@@ -384,6 +1575,18 @@ class NativeDelayedTimerProbe:
         self.scripting_command_number = 0
         self.diagnostic_receipts = []
         self.runtime_owner = None
+        self.no_prompt_scope = None
+        self.server_sample_workers = []
+        self.no_prompt_sample_diagnostics = []
+        self.managed_launch_observation = None
+
+    def start_managed_launch_observation(self, pid, processes):
+        if self.managed_launch_observation is not None:
+            raise RuntimeError("Managed public observer already has an owner")
+        self.managed_launch_observation = ManagedLaunchObservation(
+            pid, self.executable, self.domain, self.nonce, processes
+        ).start()
+        return self.managed_launch_observation
 
     @staticmethod
     def executable_path(app):
@@ -413,7 +1616,7 @@ class NativeDelayedTimerProbe:
         """Require the owned reply; PID addressing is exclusive to its diagnostic."""
         if phase not in SCRIPTING_PHASES:
             raise ValueError("The native scripting phase is unknown")
-        if self.scripting_commands:
+        if self.scripting_commands or self.server_sample_workers:
             raise RuntimeError("The prior native scripting command has not settled")
         script = (
             "on run argv\n"
@@ -439,6 +1642,8 @@ class NativeDelayedTimerProbe:
                 "pid_control": self.pid_control_script,
                 "pid_no_prompt": self.no_prompt_script,
             }[phase]()
+            if phase == "pid_no_prompt" and self.no_prompt_scope is not None:
+                script = self.no_prompt_script(self.no_prompt_scope)
             arguments = ["/usr/bin/osascript", "-l", "JavaScript", "-e", script, str(pid), source]
             if phase in ("constructor", "pid_no_prompt"):
                 arguments.append(self.nonce)
@@ -452,9 +1657,25 @@ class NativeDelayedTimerProbe:
         )
         self.scripting_commands.append(command)
         self.scripting_command_number += 1
+        worker = None
+        primary_error = None
         try:
+            if phase == "pid_no_prompt" and self.no_prompt_scope is not None:
+                self.no_prompt_scope.bind_sender(command.pid)
+                self.no_prompt_sample_diagnostics = []
+                worker = NoPromptServerSample(
+                    self.no_prompt_scope,
+                    pid,
+                    self.output
+                    / f"sample-hammerspoon-no-prompt-{self.scripting_command_number}.txt",
+                )
+                self.server_sample_workers.append(worker)
+                worker.start()
             stdout, stderr = command.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)
         except Exception as primary:
+            primary_error = primary
+            if worker is not None:
+                worker.stop.set()
             diagnostics = []
             if isinstance(primary, subprocess.TimeoutExpired):
                 try:
@@ -481,6 +1702,47 @@ class NativeDelayedTimerProbe:
                 f"Native scripting command failed: {type(primary).__name__}: {primary}"
                 + (f"; {detail}" if detail else "")
             ) from primary
+        finally:
+            if worker is not None:
+                try:
+                    qualified_interval = worker.finish()
+                except Exception as cleanup:
+                    if primary_error is not None:
+                        raise RuntimeError(
+                            "Native scripting command failed: "
+                            + type(primary_error).__name__
+                            + "; owned no-prompt sampler cleanup has not settled"
+                        ) from primary_error
+                    # The existing PID helper classifies a TimeoutExpired cause as
+                    # sender debt. A sampler-only timeout must not impersonate it.
+                    raise RuntimeError("Owned no-prompt sampler cleanup has not settled") from None
+                self.server_sample_workers.remove(worker)
+                prefix = "native server sample phase=pid_no_prompt command=" + str(
+                    self.scripting_command_number
+                )
+                if qualified_interval:
+                    try:
+                        messages = self.read_native_runtime_sample(worker.sample, pid, processes)
+                    except Exception:
+                        # Supplemental admission must neither replace the primary
+                        # sender failure nor expose private native exception text.
+                        messages = [
+                            "native Hammerspoon server sample unqualified: sample admission refused"
+                        ]
+                    owner_state = (
+                        "qualified"
+                        if messages[0].startswith("native Hammerspoon server sample retained:")
+                        else "unqualified"
+                    )
+                    self.no_prompt_sample_diagnostics = [
+                        prefix
+                        + " send_interval=observed worker=retired sample_owner="
+                        + owner_state
+                    ] + messages
+                else:
+                    self.no_prompt_sample_diagnostics = [
+                        prefix + " send_interval=unqualified worker=retired reason=" + worker.reason
+                    ]
         if command.returncode is None:
             raise RuntimeError(
                 "The native scripting command did not acknowledge actual process exit"
@@ -512,23 +1774,32 @@ class NativeDelayedTimerProbe:
 
     def control(self, pid, processes):
         """Test the same live AppleEvent handler with an exact owned nonce line."""
-        self.bind_runtime(pid, processes)
-        acknowledgement = self.execute("return " + json.dumps(self.nonce), phase="control")
-        if type(acknowledgement) is not str or acknowledgement != self.nonce:
-            raise RuntimeError("The native AppleEvent control owner did not acknowledge its nonce")
-        if processes(self.executable) != [pid]:
-            raise RuntimeError(
-                "The native AppleEvent control process changed before receipt admission"
-            )
-        return {
-            "schema_version": 1,
-            "contract": CONTROL_CONTRACT,
-            "phase": "control",
-            "acknowledged": True,
-            "nonce": self.nonce,
-            "pid": pid,
-            "executable": str(self.executable),
-        }
+        observer = self.managed_launch_observation
+        if observer is not None:
+            observer.mark_control_entry()
+        try:
+            self.bind_runtime(pid, processes)
+            acknowledgement = self.execute("return " + json.dumps(self.nonce), phase="control")
+            if type(acknowledgement) is not str or acknowledgement != self.nonce:
+                raise RuntimeError(
+                    "The native AppleEvent control owner did not acknowledge its nonce"
+                )
+            if processes(self.executable) != [pid]:
+                raise RuntimeError(
+                    "The native AppleEvent control process changed before receipt admission"
+                )
+            return {
+                "schema_version": 1,
+                "contract": CONTROL_CONTRACT,
+                "phase": "control",
+                "acknowledged": True,
+                "nonce": self.nonce,
+                "pid": pid,
+                "executable": str(self.executable),
+            }
+        finally:
+            if observer is not None:
+                observer.mark_control_exit()
 
     @staticmethod
     def pid_event_constructor():
@@ -573,9 +1844,9 @@ function run(argv) {
         )
 
     @staticmethod
-    def no_prompt_script():
+    def no_prompt_script(scope=None):
         """Discriminate native admission without prompting or changing permission."""
-        return (
+        script = (
             NativeDelayedTimerProbe.pid_event_constructor()
             + """
 function run(argv) {
@@ -583,7 +1854,7 @@ function run(argv) {
     var pid = Number(argv[0]);
     var event = constructOwnedEvent(pid, argv[1]);
     var error = Ref();
-    var reply = event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __SCRIPTING_TIMEOUT_SECONDS__, error);
+    var reply = event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __NO_PROMPT_NATIVE_TIMEOUT_SECONDS__, error);
     var status = 0, result = null, origin = 'none', domain = null;
     if (!reply || reply.isNil()) {
         var nativeError = error[0];
@@ -607,26 +1878,180 @@ function run(argv) {
         status:status, result:result, error_origin:origin, error_domain:domain});
 }
 """.replace("__NO_PROMPT_OPTIONS__", str(NO_PROMPT_SEND_OPTIONS)).replace(
-                "__SCRIPTING_TIMEOUT_SECONDS__", str(SCRIPTING_TIMEOUT_SECONDS)
+                "__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",
+                str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS),
             )
         )
 
+        if scope is None:
+            return script
+        script = script.replace(
+            "function run(argv) {",
+            scope.javascript_prelude() + scope.calibration_javascript() + "\nfunction run(argv) {",
+            1,
+        )
+        script = script.replace(
+            "constructOwnedEvent(pid, argv[1])",
+            "constructOwnedEvent(pid, ownedWitnessSource(argv[1], pid, argv[2]))",
+            1,
+        )
+        script = script.replace(
+            "    var error = Ref();",
+            "    recordOwnedStage('constructed');\n    calibrateOwnedNSError(event);\n    qualifyOwnedScalars(event);\n    var error = $();\n    recordOwnedStage('send_entered');",
+            1,
+        )
+        script = script.replace(
+            "    var status = 0,",
+            "    recordOwnedStage('send_returned');\n    recordOwnedStage('error_decode_entered');\n    var status = 0,",
+            1,
+        )
+        script = script.replace(
+            "        origin = 'send';",
+            "        origin = 'send';\n        recordOwnedStage('error_decode_complete');",
+            1,
+        )
+        script = script.replace(
+            "        if (status !== 0) origin = 'handler';",
+            "        recordOwnedStage('error_decode_complete');\n        if (status !== 0) origin = 'handler';",
+            1,
+        )
+        script = script.replace(
+            "            result = ObjC.unwrap(direct.stringValue);",
+            "            result = ObjC.unwrap(direct.stringValue);\n            recordOwnedStage('reply_decode_complete');",
+            1,
+        )
+
+        script = script.replace(
+            "        var nativeError = error[0];",
+            "        recordDecoderBoundary('send', 'reference_entered');\n        var nativeError = error;\n        ObjC.castObjectToRef(nativeError);\n        if (nativeError.isNil() !== false || nativeError.isKindOfClass($.NSError) !== true)\n            throw new Error('Native NSError identity unavailable');\n        recordDecoderBoundary('send', 'reference_returned');",
+            1,
+        )
+        script = script.replace(
+            "        status = Number(nativeError.code);",
+            "        recordDecoderBoundary('send', 'code_entered');\n        var rawCode = nativeError.code;\n        status = Number(rawCode);\n        recordDecoderBoundary('send', 'code_returned', 'code', integerFact(status));\n        observeOwnedIntegerGetter('send', nativeError, rawCode, null);",
+            1,
+        )
+        script = script.replace(
+            "        domain = ObjC.unwrap(nativeError.domain);",
+            "        recordDecoderBoundary('send', 'domain_entered');\n        domain = ObjC.unwrap(nativeError.domain);\n        recordDecoderBoundary('send', 'domain_returned', 'domain', {type:typeof domain,recognized:domain === 'NSOSStatusErrorDomain'});\n        status = projectOwnedNSErrorInteger(nativeError, rawCode);\n        if (typeof domain !== 'string' || domain.length === 0)\n            throw new Error('Native NSError domain unavailable');",
+            1,
+        )
+        script = script.replace(
+            "        var errorNumber = reply.paramDescriptorForKeyword(0x6572726e);",
+            "        recordDecoderBoundary('handler', 'errn_entered');\n        var rawErrorNumber = reply.paramDescriptorForKeyword(0x6572726e);\n        var errorNumber = projectOwnedDescriptor(rawErrorNumber);\n        recordDecoderBoundary('handler', 'errn_returned', 'errn', descriptorFact(rawErrorNumber, errorNumber));",
+            1,
+        )
+        script = script.replace(
+            "        if (!errorNumber.isNil()) status = Number(errorNumber.int32Value);",
+            "        if (errorNumber !== null) {\n            recordDecoderBoundary('handler', 'int32_entered');\n            var rawInt32 = errorNumber.int32Value;\n            status = Number(rawInt32);\n            recordDecoderBoundary('handler', 'int32_returned', 'int32', integerFact(status));\n            if (typeof rawInt32 !== 'number' || !Number.isInteger(rawInt32))\n                throw new Error('Native descriptor integer unavailable');\n        } else recordDecoderBoundary('handler', 'absent_errn');",
+            1,
+        )
+        return script
+
     def control_pid_no_prompt(self, pid, processes):
-        """Retain one supplemental native admission result after exact settlement."""
+        """Retain execution witnesses separately from actual native admission status."""
         self.bind_runtime(pid, processes)
-        result = self.execute(
-            "return " + json.dumps(self.nonce), phase="pid_no_prompt", _target_pid=pid
+        if self.no_prompt_scope is not None:
+            raise RuntimeError("Prior supplemental receipt cleanup has not settled")
+        scope = NoPromptDiagnosticScope(self.output, self.nonce, pid, self.executable, self.domain)
+        self.no_prompt_scope = scope
+        receipt_owner = None
+        try:
+            try:
+                result = self.execute(
+                    "return " + json.dumps(self.nonce), phase="pid_no_prompt", _target_pid=pid
+                )
+                receipt_owner = processes(self.executable)
+                if receipt_owner != [pid]:
+                    raise RuntimeError(
+                        "The no-prompt native process changed before receipt admission"
+                    )
+                evidence = scope.observe(
+                    require_completion=result["status"] == 0, terminal=True, native=result
+                )
+            except Exception as primary:
+                if scope.sender_pid is not None:
+                    if receipt_owner is None:
+                        receipt_owner = processes(self.executable)
+                    if receipt_owner != [pid]:
+                        raise RuntimeError(
+                            "The supplemental server owner changed before witness observation"
+                        ) from primary
+                evidence = scope.observe()
+                self.retain_diagnostics(
+                    [
+                        *self.no_prompt_sample_diagnostics,
+                        f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
+                        f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
+                        f"Supplemental constructor scalars: {evidence['scalar_facts']}",
+                        f"Supplemental decoder scalars: {evidence['decoder_facts']}",
+                        f"Supplemental NSError calibration: {evidence['nserror_calibration']}",
+                        f"Supplemental integer getter: {evidence['integer_getter']}",
+                    ],
+                    "pid_no_prompt",
+                )
+                raise
+            result["executable"] = str(self.executable)
+            self.retain_diagnostics(
+                [
+                    *self.no_prompt_sample_diagnostics,
+                    f"Exact owned no-prompt AppleEvent {result['outcome']}: "
+                    f"status {result['status']}, origin {result['error_origin']}",
+                    f"Supplemental server witness: {evidence['server']}; sender stage: {evidence['sender_stage']}",
+                    f"Supplemental scalar stage: {evidence['scalar_stage']}; qualified: {str(evidence['scalar_qualified']).lower()}; decoder branch: {evidence['decoder_branch']}; boundary: {evidence['decoder_boundary']}",
+                    f"Supplemental constructor scalars: {evidence['scalar_facts']}",
+                    f"Supplemental decoder scalars: {evidence['decoder_facts']}",
+                    f"Supplemental NSError calibration: {evidence['nserror_calibration']}",
+                    f"Supplemental integer getter: {evidence['integer_getter']}",
+                ],
+                "pid_no_prompt",
+            )
+            return result
+        finally:
+            if not self.scripting_commands and not self.server_sample_workers:
+                scope.cleanup()
+                self.no_prompt_scope = None
+
+    def observe_early_lua_stage(self, journal):
+        """A complete line observes attempted publication, never its acknowledgement."""
+        result = {
+            "phase": "received_lua_body",
+            "body_stage": "unobserved",
+            "publication_ack": "unobserved",
+            "timing": "unknown",
+            "qualified": False,
+        }
+        if self.runtime_owner is None or self.scripting_commands or self.server_sample_workers:
+            return result
+        pid, _ = self.runtime_owner
+        if (
+            type(pid) is not int
+            or pid <= 0
+            or type(self.nonce) is not str
+            or re.fullmatch(r"[0-9a-f]{32}", self.nonce) is None
+            or type(journal) is not str
+            or len(journal) > SCRIPT_SAMPLE_READ_LIMIT
+        ):
+            return result
+        expected = (
+            r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] \[init\] "
+            r"Native scripting Lua body stage: phase=received_lua_body; pid="
+            + re.escape(str(pid))
+            + "; nonce="
+            + re.escape(self.nonce)
+            + r"\."
         )
-        if processes(self.executable) != [pid]:
-            raise RuntimeError("The no-prompt native process changed before receipt admission")
-        result["executable"] = str(self.executable)
-        self.retain_diagnostics(
-            [
-                f"Exact owned no-prompt AppleEvent {result['outcome']}: "
-                f"status {result['status']}, origin {result['error_origin']}"
-            ],
-            "pid_no_prompt",
-        )
+        # Flush/close may refuse after writing a complete LF record. Even one
+        # exact fresh line never acknowledges append(), or entry before timeout.
+        matches = [
+            line
+            for line in journal.splitlines(keepends=True)
+            if line.endswith("\n")
+            and not line.endswith("\r\n")
+            and re.fullmatch(expected, line[:-1]) is not None
+        ]
+        if len(matches) == 1:
+            result["body_stage"] = "observed"
         return result
 
     @staticmethod
@@ -932,8 +2357,14 @@ function run(argv) {
             return [
                 f"native Hammerspoon server sample refused (exit {result.returncode}): {result.stderr.strip()[:1000]}"
             ]
+        return self.read_native_runtime_sample(sample, pid, processes)
+
+    def read_native_runtime_sample(self, sample, pid, processes):
+        """Use identical native owner/header/closed-frame admission for both samplers."""
         if processes(self.executable) != [pid]:
             return ["native Hammerspoon server sample unqualified: owner changed before admission"]
+        if not sample.is_file() or sample.is_symlink():
+            return ["native Hammerspoon server sample unqualified: owned output unavailable"]
         with sample.open(encoding="utf-8", errors="replace") as handle:
             sample_text = handle.read(SCRIPT_SAMPLE_READ_LIMIT)
         header = sample_text.split("Call graph:", 1)[0]
@@ -1056,6 +2487,14 @@ function run(argv) {
 
     def restore(self):
         """Restore the scripting key after ordinary Quit or exact process cleanup."""
+        if self.managed_launch_observation is not None:
+            self.managed_launch_observation.finish()
         for command in list(self.scripting_commands):
             self.retire_scripting_command(command)
+        for worker in list(self.server_sample_workers):
+            worker.finish()
+            self.server_sample_workers.remove(worker)
         self.preference.restore()
+        if self.no_prompt_scope is not None:
+            self.no_prompt_scope.cleanup()
+            self.no_prompt_scope = None

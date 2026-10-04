@@ -73,17 +73,34 @@ _LLM_Menu_ApiEntriesRows() {
 	if (Type(entries) == "Array" and entries.Length > 0) {
 		; Management rows: most frequent first, destructive delete last.
 		Rows.Push(Map("separator", true))
-		Rows.Push(Map(
-			"label",  t("menu.llm.api_test_entry"),
-			"action", (*) => _LLM_Menu_TestActiveApiEntry()))
-		Rows.Push(Map(
-			"label",  t("menu.llm.api_edit_entry"),
-			"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
-		Rows.Push(Map(
-			"label",  t("menu.llm.api_remove_entry"),
-			"action", (*) => _LLM_Menu_RemoveActiveApiEntry()))
+		Commands := Map("api_test_active", (*) => _LLM_Menu_TestActiveApiEntry(),
+			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
+		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)
+		for Declaration in _MR_GetMenuDef("llm_api_active_commands") {
+			; Keep the existing native Edit action immediately before removal.
+			if Declaration["id"] == "api_remove_active"
+				Rows.Push(Map(
+					"label",  t("menu.llm.api_edit_entry"),
+					"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
+			Row := MenuRenderer_CommandRow("llm_api_active_commands", Declaration["id"], Commands, Getters)
+			if Row is Map
+				Rows.Push(Row)
+		}
 	}
 	return Rows
+}
+
+/**
+ * Reads the existing active API owner before a retained menu command runs.
+ * @returns {Boolean} Whether the current entry is available to the configuration command.
+ */
+_LLM_Menu_ActiveApiCommandsReady() {
+	global _LLM_Menu
+	if !_LLM_Menu.Has("api_entry_id") || !(_LLM_Menu["api_entry_id"] is String)
+			|| _LLM_Menu["api_entry_id"] == ""
+			|| !_LLM_Menu.Has("api_entries") || !(_LLM_Menu["api_entries"] is Array)
+		return false
+	return _LLM_Menu_ApiEntryIdCount(_LLM_Menu["api_entries"], _LLM_Menu["api_entry_id"]) == 1
 }
 
 ; The host an entry sends to, with its port, lowercase: "https://api.x.ai/v1"
@@ -278,7 +295,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		try return _LLM_Menu_PromptApiEntry(EditId)
 		finally Critical(InheritedCritical)
 	}
-	global _LLM_Menu, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER
+	global _LLM_Menu, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_API_SERVERS
 	existing := ""
 	if (EditId != "") {
 		for e in _LLM_Menu["api_entries"] {
@@ -319,7 +336,9 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
 	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
-	ib := Ui_InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_window_title"),
+	KeyPrompt := LocalServerAuthTokenAllowed(provider_id, "", LLM_LOCAL_API_SERVERS)
+		? Format(t("dialog.local_servers.key_prompt"), provider["Label"]) : t("menu.llm.api_prompt_token")
+	ib := Ui_InputBox(KeyPrompt, t("menu.llm.api_window_title"),
 		"w520 h130 Password", def_token)
 	if (ib.Result != "OK")
 		return
@@ -611,13 +630,13 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 ; Progress tick: fills the bar with the elapsed share of the budget and
 ; refreshes the label. Never throws into the timer thread; a missing state
 ; just stops meaning anything.
-_LLM_Menu_ApiTestProgressTick() {
+_LLM_Menu_ApiTestProgressTick(NowTick?) {
 	global _LLM_Menu_ApiTestProgress
 	if !(_LLM_Menu_ApiTestProgress is Map)
 		|| !_LLM_Menu_ApiTestProgress.Has("entry")
 		return
 	State := _LLM_Menu_ApiTestProgress
-	Elapsed := Max(0, A_TickCount - State["start"])
+	Elapsed := TickElapsed64(State["start"], NowTick?)
 	Budget := State.Get("budget", 0)
 	if State.Has("label")
 		try State["label"].Text := _LLM_Menu_ApiTestProgressText(
@@ -850,7 +869,7 @@ _LLM_Menu_ApiTestServerLine(Info) {
 ; flow — a late verdict must never relabel another entry.
 ; @return boolean True when the verdict was surfaced.
 _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
-		NotifyFn := 0, Info := "") {
+		NotifyFn := 0, Info := "", NowTick?) {
 	global _LLM_Menu, _LLM_Menu_ApiTestProgress
 	; The progress belongs to this Owner reference: hide it before every
 	; exit, including stale and suspended ones, so no window ever lingers.
@@ -871,7 +890,7 @@ _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 	}
 	if (Matches != 1 || !LLM_AuxFinish(Owner))
 		return false
-	Ms := Max(0, A_TickCount - StartedTick)
+	Ms := TickElapsed64(StartedTick, NowTick?)
 	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info)
 	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
 		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)
@@ -1063,6 +1082,33 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	return true
 }
 
+; Unknown entry fields cannot be serialized losslessly by this six-field writer.
+; Refuse replacement rather than interpreting future fields or losing their bytes.
+_LLM_Menu_ApiEntriesFieldsOwned(Entry) {
+	if !(Entry is Map)
+		return false
+	for Field in Entry {
+		if !(Field is String) || !RegExMatch(Field, "^(Id|Name|Provider|BaseUrl|Token|Model)$")
+			return false
+	}
+	return _LLM_Menu_ApiEntryFieldsAreSafe(Entry)
+}
+
+_LLM_Menu_ApiSourceOwned(Raw) {
+	global LLM_API_PROVIDERS
+	try Entries := JsonParse(Raw)
+	catch
+		return false
+	if !(Entries is Array) || !_LLM_Menu_ApiEntryIdsAreUnique(Entries)
+		return false
+	for Entry in Entries {
+		if !_LLM_Menu_ApiEntriesFieldsOwned(Entry)
+				|| !LLM_API_PROVIDERS.Has(Entry["Provider"])
+			return false
+	}
+	return true
+}
+
 ; Builds the exact api_entries.json image for a detached menu candidate. Token
 ; encryption therefore happens before the WAL captures either new target; no
 ; CRUD action ever writes this sibling store independently of config.toml.
@@ -1073,6 +1119,8 @@ _LLM_Menu_SerializeApiEntries(MenuState, EncryptFn := 0) {
 	entries := MenuState["api_entries"]
 	lines := []
 	for e in entries {
+		if !_LLM_Menu_ApiEntriesFieldsOwned(e)
+			return false
 		fields := []
 		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
 			val := _LLM_MenuApiEntryGet(e, field, "")

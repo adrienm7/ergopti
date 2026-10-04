@@ -56,7 +56,7 @@ const LAYER_EDITOR_DATA = {
 		{"id":"selection","label_key":"layer_editor.group.selection","actions":["sel_up","sel_down","sel_left","sel_right","sel_word_prev","sel_word_next","sel_line_start","sel_line_end","sel_para_prev","sel_para_next","sel_doc_start","sel_doc_end"]},
 		{"id":"editing","label_key":"layer_editor.group.editing","actions":["move_line_up","move_line_down","duplicate_line_up","duplicate_line_down","new_line_below","backspace","delete","enter","tab","escape","escape_or_option_shift"]},
 		{"id":"window","label_key":"layer_editor.group.window","actions":["maximize","snap_left","snap_right","window_to_monitor_left","window_to_monitor_right"]},
-		{"id":"media","label_key":"layer_editor.group.media","actions":["vol_up","vol_down","mute"]},
+		{"id":"media","label_key":"layer_editor.group.media","actions":["brightness_up","brightness_down","vol_up","vol_down","mute"]},
 		{"id":"system","label_key":"layer_editor.group.system","actions":["spotlight"]}
 	],
 	"actions": {
@@ -101,6 +101,8 @@ const LAYER_EDITOR_DATA = {
 		"snap_right": {"label_key":"sg_actions.snap_right","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":false},
 		"window_to_monitor_left": {"label_key":"layer_actions.window_to_monitor_left","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":false},
 		"window_to_monitor_right": {"label_key":"layer_actions.window_to_monitor_right","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":false},
+		"brightness_up": {"label_key":"sg_actions.brightness_up","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":false},
+		"brightness_down": {"label_key":"sg_actions.brightness_down","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":false},
 		"vol_up": {"label_key":"sg_actions.vol_up","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":true},
 		"vol_down": {"label_key":"sg_actions.vol_down","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":true},
 		"mute": {"label_key":"sg_actions.mute","platforms":["windows","macos","linux"],"reason_key":null,"repeatable":false},

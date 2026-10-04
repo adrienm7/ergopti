@@ -3,4 +3,4 @@ description = "Explicit legacy disable survives the contextual editor rollout."
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 8
-to_version = 9
+to_version = 10

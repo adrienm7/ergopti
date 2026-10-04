@@ -309,7 +309,7 @@ M.features = {
 		path = "llm.agent_disabled_apps", id = "agent_disabled_apps", section = "llm", default = {  }, type = "array", description_key = "menu.agent.disabled_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
 	},
 	{
-		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false,
+		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false, choice_values = { -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7 },
 	},
 	{
 		path = "llm.display.show_info_bar", id = "show_info_bar", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.show_info_bar", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
@@ -568,6 +568,9 @@ M.features = {
 	},
 	{
 		path = "gestures.tap_5", id = "tap_5", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_5", platforms = { "hs", "linux" }, recommended = "none", input_altering = true,
+	},
+	{
+		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", input_altering = true, enum_values = { "native", "digits", "symbols" },
 	},
 	{
 		path = "tap_holds.enabled", id = "enabled", section = "tap_holds", default = false, type = "boolean", description_key = "menu.tap_holds", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
@@ -997,9 +1000,6 @@ M.unavailable = {
 	},
 	{
 		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "layout.direct_access_digits", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },

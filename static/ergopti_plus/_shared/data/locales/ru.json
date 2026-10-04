@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Удалить Ergopti из Karabiner",
 	"menu.global.restore_touchpad_gestures": "Восстановить жесты сенсорной панели Windows",
 	"dialog.start_at_login.failed": "Не удалось изменить автозапуск. Проверьте настройки автозапуска системы.",
-	"onboarding.error.open_failed": "Не удалось открыть мастер настройки. Проверьте журналы и повторите попытку через меню."
+	"onboarding.error.open_failed": "Не удалось открыть мастер настройки. Проверьте журналы и повторите попытку через меню.",
+	"platform_reason.token_streaming_transport_missing": "Не в Windows: Windows пока не может показывать предложения токен за токеном. Этот параметр остаётся неактивным.",
+	"menu.layout.number_row": "Цифровой ряд",
+	"menu.layout.number_row_native": "Системный порядок",
+	"menu.layout.number_row_digits": "Сначала цифры",
+	"menu.layout.number_row_symbols": "Сначала символы",
+	"platform_reason.number_row_override_unsupported": "Не поддерживается: Этот драйвер сохраняет системный цифровой ряд; принудительный вывод цифр и символов недоступен.",
+	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Сначала символы» требует активной эмулируемой раскладки с допустимыми уровнями цифр и символов на каждой позиции ряда."
 }

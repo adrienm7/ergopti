@@ -62,6 +62,27 @@ function M.load_module(module_name)
 	return require(module_name)
 end
 
+--- Loads a fresh module with one dependency explicitly present or unavailable.
+--- Restores the dependency cache and preload even when the module raises.
+--- @param module_name string Module whose captured dependency is under test.
+--- @param dependency_name string Dependency to isolate while loading.
+--- @param dependency any Dependency value, or false to refuse its require.
+--- @return any The module's return value.
+function M.load_module_with_dependency(module_name, dependency_name, dependency)
+	local loaded = package.loaded[dependency_name]
+	local preload = package.preload[dependency_name]
+	package.loaded[dependency_name] = nil
+	package.preload[dependency_name] = function()
+		if dependency == false then error("fixture dependency unavailable: " .. dependency_name) end
+		return dependency
+	end
+	local ok, result = pcall(M.load_module, module_name)
+	package.loaded[dependency_name] = loaded
+	package.preload[dependency_name] = preload
+	if not ok then error(result, 0) end
+	return result
+end
+
 
 -- ==================================
 -- ==================================

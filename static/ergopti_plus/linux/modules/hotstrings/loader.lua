@@ -46,6 +46,7 @@ local Priority = require("hotstring_priority")
 local Paths  = require("infra.paths")
 local Shell  = require("adapters.shell_runner")
 local CatalogueFiles = require("hotstrings.catalogue_files")
+local PersonalFiles = require("hotstrings.personal_files")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -201,6 +202,11 @@ function M.load_catalogue(paths, options)
 		local path = type(source) == "table" and source.path or source
 		local forced_group = type(source) == "table" and source.category or nil
 		local extension = type(source) == "table" and source.extension or nil
+		local personal_source = type(source) == "table" and source.personal_source or nil
+		if personal_source ~= nil then
+			assert(PersonalFiles.is_descriptor(personal_source), "invalid personal source descriptor")
+			personal_source = PersonalFiles.copy(personal_source)
+		end
 		-- A layout extension may supply some sections of a bundled category: its
 		-- file loads only those (only_sections) and the bundled file loads the
 		-- rest (skip_sections). The category record, and so its metadata, comes
@@ -234,6 +240,7 @@ function M.load_catalogue(paths, options)
 			local category = categories[group] or {
 				id             = group,
 				path           = path,
+				personal_source = personal_source and PersonalFiles.copy(personal_source) or nil,
 				description    = type(meta.description) == "table" and meta.description or {},
 				delay          = tonumber(meta.delay),
 				show_tooltip   = meta.show_tooltip,
@@ -265,16 +272,18 @@ function M.load_catalogue(paths, options)
 				end
 			end
 
+			local registrations = {}
 			for _, sec_name in ipairs(data.sections_order or {}) do
 				local section = data.sections[sec_name]
 				local selected = (not only_sections or only_sections[sec_name])
 					and not (skip_sections and skip_sections[sec_name])
 				if selected and section and type(section.entries) == "table" then
 					local entry_count = 0
-					for _, entry in ipairs(section.entries) do
+					registrations[sec_name] = {}
+					for index, entry in ipairs(section.entries) do
 						if type(entry.trigger) == "string" and type(entry.output) == "string" then
 							entry_count = entry_count + 1
-							mappings[#mappings + 1] = {
+							registrations[sec_name][index] = {
 								trigger           = configured_magic_trigger(entry.trigger, options),
 								replacement       = entry.output,
 								is_word           = entry.is_word           or false,
@@ -308,6 +317,7 @@ function M.load_catalogue(paths, options)
 								_catalogue_priority = true,
 								_declared_priority  = type(entry.priority) == "number" and entry.priority or nil,
 								group             = group,
+								personal_source   = personal_source and PersonalFiles.copy(personal_source) or nil,
 								section           = sec_name,
 							}
 						end
@@ -327,6 +337,11 @@ function M.load_catalogue(paths, options)
 					}
 					category.count = category.count + entry_count
 				end
+			end
+			for _, record in ipairs(Reader.registration_order(data, group)) do
+				local section = registrations[record.section]
+				local mapping = section and section[record.index]
+				if mapping then mappings[#mappings + 1] = mapping end
 			end
 		end
 	end

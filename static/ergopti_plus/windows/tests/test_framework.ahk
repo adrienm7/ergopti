@@ -204,7 +204,7 @@ _Enumerate(arr, n) {
 }
 
 ; Reads the ENTIRE driver source — every .ahk under the windows/ root except the
-; tests/, vendor/ and _generated/ trees — concatenated into one string, so
+; tests/, vendor/, build/ and _generated/ trees — concatenated into one string, so
 ; source-introspection tests find a function regardless of which infra/ or ui/ file
 ; the entrypoint decomposition (the entry-point decomposition) moved it into. Function names are unique in
 ; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
@@ -213,7 +213,7 @@ _Enumerate(arr, n) {
 ; One ownership rule for source censuses and include-graph audits. Both path
 ; separators are accepted so generated user code never changes their scope.
 _DriverIsProductionSource(Path) {
-	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|_generated)/")
+	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|build|_generated)/")
 }
 
 _DriverSourceConcat() {
@@ -613,17 +613,23 @@ _TestCallSite(StackText) {
 
 ; Path of the TAP results file. CI/tooling can provide a unique destination so
 ; parallel suites never validate another process's canonical result file.
-global TEST_RESULTS_CANONICAL := EnvGet("ERGOPTI_AHK_RESULTS_FILE") != ""
-	? EnvGet("ERGOPTI_AHK_RESULTS_FILE")
-	: A_Temp . "\ergopti_test_results.txt"
+; One receipt selection policy serves ordinary and E2E runner owners.
+; @param DefaultPath Legacy destination when no explicit request is present.
+; @returns {String} Exact requested path or the owner's default destination.
+_TestResultsPath(DefaultPath) {
+	Requested := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	return Requested != "" ? Requested : DefaultPath
+}
+
+global TEST_RESULTS_CANONICAL := _TestResultsPath(A_Temp . "\ergopti_test_results.txt")
 global TEST_RESULTS_FILE := TEST_RESULTS_CANONICAL
 
-; Append one TAP line. FileAppend per line avoids a suite-wide exclusive handle
-; that blocked when two AutoHotkey.exe instances targeted the same path.
+; Persist each observation before optional console output. A refused disk write
+; must stop the runner instead of publishing a successful but incomplete receipt.
 _TestPrint(Line) {
 	global TEST_RESULTS_FILE
+	FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 	try FileAppend(Line . "`r`n", "*")
-	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 }
 
 ; Execute every registered test, print TAP-style results and exit with
@@ -642,8 +648,9 @@ RunTests() {
 		_AHK_DRY_RUN := false
 	if !IsSet(_AHK_ONLY_FILTER)
 		_AHK_ONLY_FILTER := ""
-	; Per-process results path unless a runner already chose a custom file (e2e).
-	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL) {
+	; An explicit launch path owns live progress as well as terminal results.
+	; Legacy ordinary runs still publish through their per-process sidecar.
+	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL && EnvGet("ERGOPTI_AHK_RESULTS_FILE") = "") {
 		TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results_"
 			. DllCall("GetCurrentProcessId") . ".txt"
 	}
@@ -677,11 +684,16 @@ RunTests() {
 		StartedMs := _TestClockMs()
 		try {
 			try TestEntry.callback.Call()
-			finally DurationMs := _TestClockMs() - StartedMs
-            if (A_IsCritical != 0) {
-                Critical("Off") ; Reset for the next tests
-                throw Error("Test LEAKED Critical: " . TestEntry.name)
-            }
+			finally {
+				; A throwing callback must release its thread-scoped Critical state
+				; before reporting failure or running any following test/timer.
+				LeakedCritical := A_IsCritical != 0
+				if LeakedCritical
+					Critical("Off")
+				DurationMs := _TestClockMs() - StartedMs
+			}
+			if LeakedCritical
+				throw Error("Test LEAKED Critical: " . TestEntry.name)
 		} catch as e {
 			Status := "not ok"
 			; Point [file:line] at the test's own call site, not the assert helper

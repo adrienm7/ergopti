@@ -146,3 +146,24 @@ for (const file of files) {
 		`${file}: the removed dedicated shortcut UI has no orphan labels`
 	);
 }
+
+// Maintained target-schema examples must not recommend a retired binding owner.
+// Parse each real table header: these drafts contain unrelated duplicate scalar
+// examples, so this does not pretend to validate their whole-document grammar.
+for (const file of ['ahk_config.example.toml', 'hs_config.example.toml']) {
+	const source = fs.readFileSync(path.join(shared, 'core/config_schema/examples', file), 'utf8');
+	const headers = source
+		.split('\n')
+		.filter((line) => /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/.test(line));
+	assert.ok(headers.length > 0, `${file}: actual draft sections must be present`);
+	let metricsFound = false;
+	for (const header of headers) {
+		const declared = TOML.parse(header + '\n');
+		if (Object.hasOwn(declared, 'metrics')) metricsFound = true;
+		assert.ok(
+			!Object.hasOwn(declared.metrics || {}, 'shortcuts'),
+			`${file}: the draft must not revive dedicated Metrics-window shortcuts`
+		);
+	}
+	assert.ok(metricsFound, `${file}: actual Metrics draft sections remain`);
+}

@@ -37,6 +37,10 @@ local function fake_checks(code, latest)
 	return {
 		presets = function() return list end,
 		interval_code = function() return code end,
+		interval = function()
+			for _, preset in ipairs(list) do if preset.code == code then return preset.seconds end end
+			error("The fixture names no preset.")
+		end,
 		set_interval = function(seconds) calls[#calls + 1] = seconds; return true end,
 		latest = function() return latest end,
 	}, calls
@@ -170,5 +174,138 @@ helpers.describe("menu_about: the check frequency (macOS)", function()
 			helpers.assert_true(type(row.title) ~= "string" or row.title:find(head, 1, true) == nil,
 				"an installed build greys no row for this reason: " .. tostring(row.title))
 		end
+	end)
+end)
+
+
+--- Reads independent numeric values, translated labels and snap expectations.
+local function frequency_corpus()
+	local handle = assert(io.open(helpers.shared("tests/corpus/menus/update_check_frequency.json"), "rb"))
+	local raw = assert(handle:read("*a"))
+	assert(handle:close())
+	return assert(Json.decode(raw))
+end
+
+--- Builds the actual cadence owner around observable durable and timer ports.
+local function actual_checks(refusal, interval)
+	local AutoCheck = require("modules.updater.auto_check")
+	local config = AutoCheck.load_config()
+	local stored = interval == nil and 3600 or interval
+	local obs = {state = {[AutoCheck.STATE_KEY] = stored, future_setting = 42}, durable = stored,
+		saves = 0, timers = {}, cancels = 0, requests = 0, paused = false}
+	obs.owner = AutoCheck.new({
+		state = obs.state,
+		save = function()
+			obs.saves = obs.saves + 1
+			if refusal == "throw" then error("The cadence writer refused.") end
+			if refusal == "false" then return false end
+			if refusal == "nil" then return nil end
+			obs.durable = obs.state[AutoCheck.STATE_KEY]
+			return true
+		end,
+		channel = function() return "dev" end,
+		is_paused = function() return obs.paused end,
+		on_available = function() error("Changing cadence cannot announce a release.") end,
+		config = config,
+		timer = {
+			after = function(delay, fn)
+				local handle = {delay = delay, fn = fn, armed = true}
+				obs.timers[#obs.timers + 1] = handle
+				return handle, true
+			end,
+			cancel = function(handle) obs.cancels = obs.cancels + 1; handle.armed = false; return true end,
+		},
+		storage = {get = function(_, default) return default end, set = function() return true end},
+		http = {get = function() obs.requests = obs.requests + 1; return false end},
+		now = function() return 1700000000 end,
+		current_version = function() return "0.0.0-dev.140" end,
+		installed_channel = function() return "dev" end,
+	})
+	helpers.assert_eq(obs.owner.start(), true)
+	return obs
+end
+
+helpers.describe("shared updater frequency choices (macOS)", function()
+	helpers.it("projects independent presets and snapped captions into real menu rows (shared-update-frequency)", function()
+		local corpus = frequency_corpus()
+		helpers.assert_eq(#corpus.choices, 10)
+		for _, expected in ipairs(corpus.snapped_states) do
+			local obs = actual_checks(nil, expected.stored)
+			local row = assert(picker(build(obs.owner)))
+			helpers.assert_eq(#row.menu, #corpus.choices)
+			local i18n = require("infra.i18n")
+			helpers.assert_eq(row.title, i18n.get(corpus.i18n) .. ": " .. i18n.get("menu.about.frequency." .. expected.code))
+			for index, choice in ipairs(corpus.choices) do
+				helpers.assert_eq(row.menu[index].title, i18n.get(choice.i18n))
+				helpers.assert_eq(row.menu[index].checked, choice.value == expected.value)
+			end
+			helpers.assert_eq(obs.saves, 0, "rendering a snapped caption must not rewrite a stored interval")
+			helpers.assert_eq(obs.durable, expected.stored)
+			helpers.assert_eq(obs.owner.stop(), true)
+		end
+	end)
+
+	helpers.it("preserves native and durable cadence plus timer ownership after refused saves (shared-update-frequency)", function()
+		for _, refusal in ipairs({"false", "nil", "throw"}) do
+			local obs = actual_checks(refusal)
+			local row = assert(picker(build(obs.owner)))
+			local held = row.menu[1].fn
+			local timers, cancels = #obs.timers, obs.cancels
+			local result = held()
+			helpers.assert_eq(obs.owner.interval(), 3600)
+			helpers.assert_eq(obs.durable, 3600)
+			helpers.assert_eq(obs.state.future_setting, 42)
+			helpers.assert_eq(#obs.timers, timers)
+			helpers.assert_eq(obs.cancels, cancels)
+			helpers.assert_eq(obs.saves, 1)
+			helpers.assert_eq(result, false, "the actual menu must report a refused durable owner")
+			helpers.assert_eq(obs.owner.stop(), true)
+		end
+	end)
+
+	helpers.it("returns the actual acknowledged owner receipt and keeps absolute held selections (shared-update-frequency)", function()
+		local obs = actual_checks()
+		local row = assert(picker(build(obs.owner)))
+		local held = row.menu[1].fn
+		obs.paused = true
+		local result = held()
+		helpers.assert_eq(obs.owner.interval(), frequency_corpus().choices[1].value)
+		helpers.assert_eq(obs.durable, frequency_corpus().choices[1].value)
+		helpers.assert_eq(obs.saves, 1)
+		helpers.assert_eq(obs.requests, 0, "pausing still fences background requests")
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(held(), true)
+		helpers.assert_eq(obs.saves, 1, "replaying an acknowledged absolute selection does not write again")
+		helpers.assert_eq(obs.owner.stop(), true)
+	end)
+end)
+
+
+helpers.describe("published updater frequency choices (macOS)", function()
+	helpers.it("consumes the published label order and numeric command values (shared-update-frequency)", function()
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local previous = root.about_update_frequency_menu
+		local corpus, choices = frequency_corpus(), {}
+		for index = #corpus.choices, 1, -1 do
+			local source = corpus.choices[index]
+			choices[#choices + 1] = {value = source.value, i18n = source.i18n}
+		end
+		choices[1].i18n = corpus.alternate_i18n
+		root.about_update_frequency_menu = {{type = "choice", id = corpus.id, path = corpus.path,
+			i18n = corpus.i18n, show_current_choice = true, current_choice_suffix = corpus.suffix,
+			choices = choices}}
+		local ok, detail = pcall(function()
+			local checks, calls = fake_checks("1d")
+			local row = assert(picker(build(checks)))
+			helpers.assert_eq(#row.menu, #choices)
+			for index, choice in ipairs(choices) do
+				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				row.menu[index].fn()
+				helpers.assert_eq(calls[index], choice.value, "the published seconds reach the existing owner")
+			end
+		end)
+		root.about_update_frequency_menu = previous
+		if not ok then error(detail, 0) end
 	end)
 end)

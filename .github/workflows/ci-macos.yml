@@ -155,6 +155,9 @@ jobs:
         with:
           node-version-file: '.node-version'
 
+      - name: Run reporter lifecycle self-tests
+        run: node tools/test/test-report.cjs
+
       - name: Cache SwiftPM dependencies
         uses: actions/cache@v4
         with:
@@ -216,7 +219,16 @@ jobs:
       # Once per run instead of once per launch leg: the verdict and the
       # scenario profiles are plain Python, identical on every runner.
       - name: Self-test the launch verdict
-        run: python3 tools/diagnostics/macos_launch_gate_test.py
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          set -euo pipefail
+          brew install lua@5.4 luajit
+          diagnostic_lua54="$(brew --prefix lua@5.4)/bin/lua"
+          diagnostic_luajit="$(brew --prefix luajit)/bin/luajit"
+          test -x "$diagnostic_lua54"
+          test -x "$diagnostic_luajit"
+          ERGOPTI_DIAGNOSTIC_LUA54="$diagnostic_lua54" ERGOPTI_DIAGNOSTIC_LUAJIT="$diagnostic_luajit" python3 tools/diagnostics/macos_launch_gate_test.py
 
       # The build no longer downloads Karabiner-Elements: onboarding fetches the
       # pinned DMG on a user's first run. Validating the pin here makes a bad
@@ -277,6 +289,12 @@ jobs:
           fi
           bash tools/build/build_macos_app.sh
 
+      - name: Record signed CI archive source
+        shell: bash
+        run: >
+          node tools/build/macos-release-archives.cjs --ci-receipt
+          "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"
+
       # The only launch on macos-latest (macOS 26): every launch leg runs on
       # macos-15 or macos-15-intel.
       - name: Smoke test built ErgoptiPlus.app (crash-on-launch guard)
@@ -288,7 +306,8 @@ jobs:
         run: |
           python3 tools/diagnostics/macos_release_launch_test.py
           test ! -e /Applications/ErgoptiPlus.app
-          ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications
+          node tools/build/macos-release-archives.cjs --ci-install "$PWD/build/macos" /Applications \
+              > "$RUNNER_TEMP/release-install.json"
           python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
 
       - name: Retain packaged application startup evidence
@@ -358,10 +377,19 @@ jobs:
           (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
           echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
 
-      # One artifact on every run: launch installs its zip, and on a release
-      # run Release attaches all of it. Outside a release only the app zip
-      # exists. Seven days on a release run, so a next-day re-run of failed
-      # jobs still finds the archive this job gated.
+      - name: Upload the independent CI archive source
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: ci-macos-archive-source
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          if-no-files-found: error
+          path: build/macos/ErgoptiPlus.app.ci-receipt.json
+
+      # CI installs the first declared available format from the independently
+      # signed source receipt. Public release assets, Sparkle and Homebrew keep ZIP
+      # until their separate migration. Keep release artifacts for seven days so
+      # a next-day retry can find the archive this job gated.
       - name: Upload the package
         uses: actions/upload-artifact@v4
         with:
@@ -371,6 +399,7 @@ jobs:
           if-no-files-found: error
           path: |
             build/macos/ErgoptiPlus.app.zip
+            build/macos/ErgoptiPlus.app.tar.xz
             build/macos/Ergopti_macOS.zip
             build/macos/_ErgoptiPlus.app.zip.sig
             build/macos/appcast-*.xml
@@ -407,18 +436,28 @@ jobs:
           name: assets-macos
           path: ${{ runner.temp }}/package
 
+      - name: Download the independent CI archive source
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-macos-archive-source
+          path: ${{ runner.temp }}/package
+
       # Reproduce a browser download: the archive and everything unpacked from
       # it carry com.apple.quarantine until the user runs the documented xattr
       # command from the release notes.
       - name: Install the package the way a user does
         run: |
           set -euo pipefail
-          zip="$RUNNER_TEMP/package/ErgoptiPlus.app.zip"
-          test -f "$zip"
           test ! -e /Applications/ErgoptiPlus.app
           stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
-          xattr -w com.apple.quarantine "$stamp" "$zip"
-          ditto -x -k "$zip" /Applications
+          node tools/build/macos-release-archives.cjs --ci-install "$RUNNER_TEMP/package" /Applications "$stamp" \
+              > "$RUNNER_TEMP/package-install.json"
+          node - "$RUNNER_TEMP/package-install.json" >> "$GITHUB_ENV" <<'NODE'
+          const fs = require('node:fs');
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (typeof receipt.archive !== 'string' || /[\r\n]/.test(receipt.archive)) throw Error('Invalid installed archive path');
+          process.stdout.write('MACOS_INSTALL_ARCHIVE=' + receipt.archive + '\n');
+          NODE
           xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
           xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
           if xattr -r /Applications/ErgoptiPlus.app | grep -q com.apple.quarantine; then
@@ -439,7 +478,7 @@ jobs:
         run: >
           node tools/test/desktop-ci-evidence.cjs record-macos
           "$RUNNER_TEMP/launch-gate/result.json"
-          "$RUNNER_TEMP/package/ErgoptiPlus.app.zip"
+          "$MACOS_INSTALL_ARCHIVE"
           "$RUNNER_TEMP/launch-gate/evidence.json"
 
       - name: Retain launch evidence
