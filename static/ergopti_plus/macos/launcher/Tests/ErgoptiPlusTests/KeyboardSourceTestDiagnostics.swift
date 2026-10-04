@@ -72,7 +72,7 @@ final class KeyboardSourceTestDiagnostics {
 	}
 
 	// Closed vocabulary: witnesses contain no identities or native property data.
-	static let observationPhases = [
+	static let observationPhases: [String] = [
 		"original.capture", "target.inventory", "body.before", "body.after",
 		"translation.snapshot", "event.before", "event.after", "probe.before", "probe.after",
 		"probe.snapshot", "probe.refused.invalidArguments", "probe.refused.sourceChanged",
@@ -81,12 +81,24 @@ final class KeyboardSourceTestDiagnostics {
 	] + ["enable", "disable", "select", "restore.inner", "restore.outer"].flatMap {
 		[$0 + ".before", $0 + ".after"]
 	}
-	static let knownWitnessPhases = Set(observationPhases.flatMap {
-		[$0 + ".observe.entered", $0 + ".observe.completed"]
-	} + ["enable", "disable", "select", "restore.inner", "restore.outer", "probe",
-		"original.capture", "target.list", "target.enabledProperty"].flatMap {
-		[$0 + ".call.entered", $0 + ".call.returned"]
-	} + ["probe.call.refused", "probe.terminalID.returned", "unclassified", "overflow"])
+	static let knownWitnessPhases: Set<String> = {
+		// Keep each expansion concrete so Swift can type-check the closed set.
+		var phases = Set<String>()
+		for phase in observationPhases {
+			phases.insert(phase + ".observe.entered")
+			phases.insert(phase + ".observe.completed")
+		}
+		let nativeCalls: [String] = [
+			"enable", "disable", "select", "restore.inner", "restore.outer", "probe",
+			"original.capture", "target.list", "target.enabledProperty",
+		]
+		for phase in nativeCalls {
+			phases.insert(phase + ".call.entered")
+			phases.insert(phase + ".call.returned")
+		}
+		phases.formUnion(["probe.call.refused", "probe.terminalID.returned", "unclassified", "overflow"])
+		return phases
+	}()
 
 	struct Event: Codable {
 		let phase: String

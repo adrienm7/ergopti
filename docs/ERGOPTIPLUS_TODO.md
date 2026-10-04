@@ -1554,8 +1554,12 @@ reads, diagnostic observations and instrumented calls. One failure-only check
 notice exposes the last three known boundaries without changing the original
 assertions, source restoration, deadlines or verdict. The actual CLI preimage
 control preserves exit1 in both versions and proves the old missing notice;
-356 JS checks pass. Native Swift compilation/execution and later package/install
-stages remain mandatory; an observed boundary alone does not explain a fault.
+356 JS checks pass. Native run37243489582 then exposed excessive Swift
+inference complexity in the diagnostic phase-set expression; explicit typed
+expansions preserve the identical closed vocabulary. This fixes a compiler
+boundary, not the earlier native termination. Native Swift compilation/execution
+and later package/install stages remain mandatory; an observed boundary alone
+does not explain a fault.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
