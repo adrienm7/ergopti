@@ -1083,14 +1083,10 @@ These are software implementations; final hardware verification remains below.
   acknowledged writer. The shared wizard trigger choices remain excluded on
   Linux because they do not satisfy its keymap validation policy; the tray
   retains its existing physical-key preference owner.
-- [~] **13.** Complete F2: honor the Karabiner integration switch before leases
-  and guardians; preserve personal rules; back up and restore Windows touchpad
-  registry values through one owner. Remaining: turning the switch off or «
-  Retirer Ergopti de Karabiner » does not unregister a guardian LaunchAgent
-  registered while it was on (needs a headless unregister role in the launcher,
-  verified on a Mac). Legend: `[x]` implemented, reviewed and integrated on
+  Legend: `[x]` implemented, reviewed and integrated on
   `integration-2` (published only once `dev` is pushed); `[~]` integrated with
   the precise remainder recorded in the item or in the overnight handoff.
+
 - [~] **16.** Publish final corrective commits, verify CI and release assets,
   and write the final report with completed scope, limitations and manual test
   results. Published twice on 2026-09-30 (v0.0.0-dev.147, then the morning's
@@ -1656,27 +1652,6 @@ valid duplicate retained after removal may become admitted on a later reload.
 Complete three-OS native qualification remains pending, so item 34 stays partial.
 
 Pending custom-delimiter additions and changes are now admitted through the real reader against the planned preserved list before publication or an empty-plan acknowledgement. A retained duplicate cannot silently mask a new key, character, label or consume choice. Semantic refusal preserves source bytes and leaves the delta available for rollback or retry after explicit cleanup; actual writer source fencing and unknown record/comment preservation remain intact. Linux focused registered tests qualify both Delete→Add cases and changed-record collisions; complete three-OS native qualification remains pending.
-
-- [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
-  is turned OFF or its rules are removed. The same owned transaction now joins
-  STOPPED, exact native unregistration and the persisted OFF/rule removal.
-  Refusal retains the prior preference and a fresh READY recovery; unsettled
-  registration tasks block retirement instead of hiding process debt. Native
-  acknowledgement proves the exact launcher identity, empty durable lease,
-  absent legacy job and ServiceManagement registration status. The hosted
-  signed-helper acceptance lane also checks wrong-inode refusal, successful
-  unregistration and idempotence, retaining primary and cleanup errors.
-  Focused registered macOS tests pass 315 cases and the diagnostic judge passes
-  six regressions. Complete native Swift, helper registration and three-OS
-  qualification remain pending.
-
-Signed-helper acceptance run 37081066757 passed actual native registration,
-unregistration and idempotence without a release. The replacement fixture
-now acknowledges both weak runtime retirement and actual singleton-lock
-release within its existing two-second bound. A retained native ACK callback
-must continue to block replacement until it truly exits; every generation
-and transport assertion remains intact. Native XCTest requalification and
-the complete three-OS checkpoint remain pending.
 
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
