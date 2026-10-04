@@ -1824,6 +1824,18 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
       reserved curl slot declares its transitory tags-owner fields before
       acquisition. Timer delivery/cancellation and the real dispatcher have
       added regressions; the repaired native Windows gate remains pending.
+
+macOS chat and vision requests now bind acknowledged model inventories to the
+canonical server origin and newest joint listing epoch. A changed endpoint,
+forgotten inventory or older independent menu response cannot admit private
+request bytes or replace newer model state. Final checks after parsing,
+logging and native callbacks retain same-endpoint admitted responses. The
+registered independent cases pass 21/0 on Lua 5.4 and LuaJIT; unchanged source
+fails 15 of those cases, and removing only final publication checks fails seven.
+Existing API, agent and HTTP-owner cases pass 38/0, 5/0 and 5/0. Native
+Hammerspoon execution, full packaging/install and desktop acceptance still
+require qualification; item 46 remains partial.
+
 - [~] **47.** **Partial: catalogue-owned optional authentication.** Manually configured
   OpenAI-compatible entries for oMLX, LM Studio, llama-server/LocalAI and Jan
   can use an explicitly empty key on all three drivers. The shared local
