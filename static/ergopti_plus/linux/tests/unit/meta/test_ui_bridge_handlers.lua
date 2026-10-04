@@ -877,6 +877,7 @@ helpers.describe("ui.bridge_handlers", function()
 					list_locales = function() return { "en", "fr" } end,
 					get = function(key) return key end,
 					set_locale = function(value) values.locale = value; return true end,
+					persist_locale = function(value) values.locale = value; return true end,
 				},
 				config_paths = {
 					default_config_dir = function() return default_dir end,
@@ -1381,7 +1382,7 @@ helpers.describe("ui.bridge_handlers", function()
 					state.writer.batch_write = function() return false, "disk full" end
 				end },
 				["refused language"] = { "onboarding.error.locale_persist_failed", function(state)
-					state.i18n.set_locale = function() return false end
+					state.i18n.persist_locale = function() return false end
 				end },
 				["refused folder"] = { "paths_editor.save_failed", function(state)
 					state.config_paths.set_config_dir = function() return false end
@@ -2529,6 +2530,168 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 					helpers.assert_eq(read(c.path), c.original:gsub('first_name = "Ada"', 'first_name = "Grace"', 1))
 				end
 			end)
+		end)
+	end
+end)
+
+helpers.describe("wizard explicit locale acknowledgment", function()
+	local function read(path)
+		local fh = assert(io.open(path, "rb"))
+		local raw = assert(fh:read("*a")); assert(fh:close())
+		return raw
+	end
+
+	local function write(path, raw)
+		local fh = assert(io.open(path, "wb"))
+		assert(fh:write(raw)); assert(fh:close())
+	end
+
+	local function with_real_locale(options)
+		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "adapters.storage" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local root = os.tmpname()
+		os.remove(root)
+		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/ergopti_plus")
+			.. " " .. string.format("%q", root .. "/config"))
+		helpers.assert_true(made == true or made == 0)
+		local storage_path = root .. "/ergopti_plus/storage.json"
+		local config_path = root .. "/config/config.toml"
+		local storage_seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
+		local config_seed = '[gestures]\nenabled = false\n[future]\nvalue = "retained"\n'
+		write(storage_path, storage_seed); write(config_path, config_seed)
+		local original_rename = os.rename
+		local captured = { storage_attempts = 0, writes = 0, hidden = 0, restarts = 0, errors = {} }
+		local observed = nil
+		local ok, err = xpcall(function()
+			package.loaded["infra.config_paths"] = { config_home = function() return root end }
+			package.loaded["infra.locale"] = nil
+			package.loaded["adapters.storage"] = nil
+			package.loaded["infra.i18n"] = nil
+			local i18n = require("infra.i18n")
+			i18n.init()
+			local before_locale = i18n.get_locale()
+			os.rename = function(from, to)
+				if from == storage_path .. ".tmp" and to == storage_path then
+					captured.storage_attempts = captured.storage_attempts + 1
+					if options.rename == "throw" then error("owned locale rename refused") end
+					if options.rename == "false" then return nil, "owned locale rename refused", 13 end
+				end
+				return original_rename(from, to)
+			end
+			if options.receipt then
+				i18n.persist_locale = function()
+					if options.receipt == "throw" then error("locale owner refused") end
+					if options.receipt == "nil" then return nil end
+					if options.receipt == "truthy" then return "unconfirmed" end
+					return false
+				end
+			end
+			if options.missing_owner then i18n.persist_locale = nil end
+			local Writer = require("toml_codec.writer")
+			local state = {
+				i18n = i18n,
+				manifest = require("infra.manifest_reader"),
+				config_paths = {
+					default_config_dir = function() return root .. "/config" end,
+					get_config_dir = function() return root .. "/config" end,
+					set_config_dir = function() return true end,
+				},
+				prepare_destination = function() return true end,
+				writer = { batch_write = function(path, rows)
+					captured.writes = captured.writes + 1
+					if options.config_refusal then return false, "owned configuration refusal" end
+					return Writer.batch_write(path, rows)
+				end },
+				webview_manager = { hide = function() captured.hidden = captured.hidden + 1 end },
+				restart = function() captured.restarts = captured.restarts + 1; return true end,
+				notify_error = function(key) captured.errors[#captured.errors + 1] = key end,
+			}
+			local result = require("ui.onboarding.bridge").on_message({ action = "finish", answers = {
+				locale = options.code or "fr", config_dir = "",
+				operations = { { path = "gestures.enabled", value = true } },
+			} }, state)
+			observed = {
+				result = result, captured = captured, before = before_locale, after = i18n.get_locale(),
+				storage_raw = read(storage_path), config_raw = read(config_path),
+				storage_original = read(storage_path) == storage_seed,
+				config_original = read(config_path) == config_seed,
+			}
+		end, debug.traceback)
+		os.rename = original_rename
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		os.remove(storage_path .. ".tmp"); os.remove(storage_path); os.remove(config_path)
+		os.execute("rmdir " .. string.format("%q", root .. "/ergopti_plus")
+			.. " " .. string.format("%q", root .. "/config"))
+		os.execute("rmdir " .. string.format("%q", root))
+		if not ok then error(err, 0) end
+		return observed
+	end
+
+	local function assert_refused(observed, key)
+		helpers.assert_eq(observed.result.done, false)
+		helpers.assert_eq(observed.before, "fr", "unsupported persisted selection uses the runtime fallback")
+		helpers.assert_eq(observed.after, "fr", "refusal cannot publish a different runtime locale")
+		helpers.assert_eq(observed.captured.writes, 0)
+		helpers.assert_eq(observed.captured.hidden, 0)
+		helpers.assert_eq(observed.captured.restarts, 0)
+		helpers.assert_eq(observed.captured.errors, { key })
+		helpers.assert_true(observed.storage_original)
+		helpers.assert_true(observed.config_original)
+	end
+
+	for _, code in ipairs({ "fr", "en" }) do
+		for _, mode in ipairs({ "false", "throw" }) do
+			helpers.it("(wizard-locale-ack) keeps the wizard open after " .. mode .. " publication of " .. code, function()
+				local observed = with_real_locale({ code = code, rename = mode })
+				assert_refused(observed, "onboarding.error.locale_persist_failed")
+				helpers.assert_eq(observed.captured.storage_attempts, 1)
+			end)
+		end
+	end
+
+	for _, code in ipairs({ "fr", "en" }) do
+		helpers.it("(wizard-locale-ack) completes only after actual locale and configuration readback for " .. code, function()
+			local observed = with_real_locale({ code = code })
+			helpers.assert_eq(observed.result, { done = true, restarted = true })
+			helpers.assert_eq(observed.after, code)
+			helpers.assert_eq(require("json").decode(observed.storage_raw),
+				{ locale = code, future = { retained = true } })
+			helpers.assert_contains(observed.config_raw, "enabled = true")
+			helpers.assert_contains(observed.config_raw, 'value = "retained"')
+			helpers.assert_eq(observed.captured.storage_attempts, 1)
+			helpers.assert_eq(observed.captured.writes, 1)
+			helpers.assert_eq(observed.captured.hidden, 1)
+			helpers.assert_eq(observed.captured.restarts, 1)
+			helpers.assert_eq(observed.captured.errors, {})
+		end)
+	end
+
+	for _, receipt in ipairs({ "false", "nil", "truthy", "throw" }) do
+		helpers.it("(wizard-locale-ack) rejects a " .. receipt .. " explicit owner receipt", function()
+			local observed = with_real_locale({ receipt = receipt })
+			assert_refused(observed, "onboarding.error.locale_persist_failed")
+			helpers.assert_eq(observed.captured.storage_attempts, 0)
+		end)
+	end
+
+	helpers.it("(wizard-locale-ack) refuses a missing explicit owner", function()
+		local observed = with_real_locale({ missing_owner = true })
+		assert_refused(observed, "onboarding.error.locale_persist_failed")
+	end)
+
+	for _, code in ipairs({ "fr", "en" }) do
+		helpers.it("(wizard-locale-ack) retains existing runtime rollback after later config refusal for " .. code, function()
+			local observed = with_real_locale({ code = code, config_refusal = true })
+			helpers.assert_eq(observed.result.done, false)
+			helpers.assert_eq(observed.after, "fr")
+			helpers.assert_eq(observed.captured.hidden, 0)
+			helpers.assert_eq(observed.captured.restarts, 0)
+			helpers.assert_eq(observed.captured.errors, { "onboarding.error.write_failed" })
+			helpers.assert_true(observed.config_original)
+			helpers.assert_eq(require("json").decode(observed.storage_raw),
+				{ locale = "fr", future = { retained = true } },
+				"the existing runtime rollback persists its runtime snapshot, not an invented raw-source transaction")
 		end)
 	end
 end)
