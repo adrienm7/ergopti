@@ -528,6 +528,21 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 			local names = { "infra.config_paths", "modules.gestures.manager", "adapters.file_system" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local owned_backups = {}
+			local publish = s.files.write_if_unchanged
+			s.files.write_if_unchanged = function(path, content, expected)
+				local committed, detail = publish(path, content, expected)
+				if committed == true then
+					for _, source in ipairs({ s.config_path, s.tap_path }) do
+						local prefix = source .. ".tap_holds-"
+						if path:sub(1, #prefix) == prefix and path:sub(-4) == ".bak" then
+							assert(expected.status == "absent", "the public scope backup must be an exclusive creation")
+							owned_backups[path] = content
+						end
+					end
+				end
+				return committed, detail
+			end
 			local Scope = require("infra.tap_hold_scope")
 			Scope._reset_for_test()
 			removal(s, function() return false end)
@@ -554,11 +569,13 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				helpers.assert_eq(Codec.decode(read(s.tap_path)), {}, "the admitted clear persists the neutral empty document")
 			end)
 			Scope._reset_for_test()
+			s.files.write_if_unchanged = publish
 			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-			for name in require("lfs").dir(s.dir) do
-				if name:match("^config%.toml%.tap_holds%-.*%.bak$") or name:match("^tap_hold%.toml%.tap_holds%-.*%.bak$") then
-					assert(os.remove(s.dir .. "/" .. name))
-				end
+			for path, content in pairs(owned_backups) do
+				local observed, status = s.files.read_with_status(path)
+				assert(status == "ok" and observed == content, "the owned backup must retain its exact created bytes")
+				local name = path:sub(#s.dir + 2)
+				assert(os.remove(s.dir .. "/" .. name))
 			end
 			if not ok then error(err, 0) end
 		end)
