@@ -137,6 +137,12 @@ function M.build(db_path, sql, opts)
 		-- required a temporary output file on a path that stages no typed text.
 		command = command .. "printf '\\n" .. EXIT_STATUS_PREFIX .. "%s\\n' \"$?\"\n"
 	end
+	-- Direct popen callers bypass Shell.exec's admission. libc shortens a NUL
+	-- script before the shell sees it and can execute a durable SQL prefix even
+	-- though the terminal receipt is lost. Reuse the native argv boundary before
+	-- returning any executable command, without staging or re-quoting typed SQL.
+	local refusal = Shell.validate_spawn_args("sh", { "-c", command })
+	if refusal ~= "" then return nil, refusal end
 	return command
 end
 
