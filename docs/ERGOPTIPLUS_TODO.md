@@ -1836,6 +1836,11 @@ Existing API, agent and HTTP-owner cases pass 38/0, 5/0 and 5/0. Native
 Hammerspoon execution, full packaging/install and desktop acceptance still
 require qualification; item 46 remains partial.
 
+Windows continuation is explicitly deferred to the maintainer's PC: complete
+steps 1, 10 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md).
+Native model-owner, real-model, E2E, packaging and installation acceptance
+remain required; this deferral is not completion.
+
 - [~] **47.** **Partial: catalogue-owned optional authentication.** Manually configured
   OpenAI-compatible entries for oMLX, LM Studio, llama-server/LocalAI and Jan
   can use an explicitly empty key on all three drivers. The shared local
@@ -1957,6 +1962,22 @@ native-reader refusal on a readable source; the correction retains exact
 descriptor admission and all discovery/count assertions. A fresh hosted
 checkpoint is required to qualify this prerequisite.
 
+Windows continuation is explicitly deferred to the maintainer's PC: the
+[AI Windows handover](handovers/2026-10-04-ai-windows/README.md) records steps
+1 to 5 and 12, with recoverable source/preimage/test packets. Native models
+transport delivery and 41 private publication cases, real controller/WAL composition,
+post-transition panel recovery, URL parity, duplicate native rows and actual
+discovery/chat/restart remain required. Saved inactive preparations are not
+integrated functionality. Item 47 remains partial.
+
+Manual Windows checkpoint [37239438795](https://github.com/adrienm7/ergopti/actions/runs/37239438795)
+at 2f11cf264 ran the 20 new models-owner cases without individual failures.
+The full result was 9073 passed and two failed: the existing personal metadata
+fixture and the new generic repeating callback missing from the strict timer
+inventory. The PC must declare the actual owned callback and period without
+weakening that assertion. Windows E2E, packaging and installation were skipped;
+the later 41 private publication cases were not in this tested source.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
@@ -2010,6 +2031,15 @@ cases pass, and three causal controls reject broken drift, projection and
 registration. This is an installation prerequisite: no official archive,
 owned runtime or model has been downloaded or installed by these checks.
 Item 48 and its native, packaging and physical acceptance remain open.
+
+Windows continuation is explicitly deferred to the maintainer's PC: complete
+steps 6 to 10 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md).
+The versioned file-port/download preparations, independent review blockers,
+inert ZIP fixtures and 25 unexecuted native cases are saved for recovery.
+User-local installation without administrator rights is the chosen scope.
+Native construction receipts, namespace admission, per-user resolver, version
+lease, exact foreground service/readiness, model consent and delivery
+acceptance remain unfinished; Linux runtime composition is also incomplete.
 
 - [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
       reinstalls its own low-level keyboard hook around every SendInput (upstream
@@ -2539,6 +2569,11 @@ pass with all 21 locale catalogues. Full native CI remains required.
   Source and screenshot hashes accompany the receipts. This is headless X11
   appearance evidence, not physical input, Wayland or macOS canvas acceptance;
   item 88 and the interactive obligations in items 16/38 remain open.
+  Windows continuation is explicitly deferred to the maintainer's PC: complete
+  steps 11 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md),
+  preserving native GDI/font/geometry/deletion assertions and actual desktop
+  acceptance. The recoverable Mac canvas probe remains unexecuted; neither
+  this handoff nor headless X11 closes the remaining physical validations.
   Native checkpoint 37069995600 exposed missing typography initialization in
   the headless Windows paint fixture. It now reads the canonical font family
   and size, asserts valid values and restores the prior aliases in finally.
