@@ -6185,3 +6185,10 @@ type = "command"
 id = "llm_profile_create"
 i18n = "menu.profiles.create_profile"
 disabled_when = ["llm_profile_create_ready"]
+
+# Native clone/edit/save owners stay unchanged; only their fixed command is declared here.
+[[menu.llm_profile_commands]]
+type = "command"
+id = "llm_profile_clone"
+i18n = "menu.profiles.clone_builtin"
+disabled_when = ["llm_profile_clone_ready"]

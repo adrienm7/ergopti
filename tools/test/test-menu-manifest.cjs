@@ -1410,9 +1410,10 @@ checkPrivacyTriggerControls();
 		readFileSync(resolve(SHARED, 'tests/corpus/menus/profile_create_command.json'), 'utf8')
 	);
 	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	assert.deepEqual(menu[corpus.section], [
-		{ type: 'command', id: corpus.id, i18n: corpus.i18n, disabled_when: [corpus.ready] }
-	]);
+	assert.deepEqual(
+		menu[corpus.section].filter((row) => row.id === corpus.id),
+		[{ type: 'command', id: corpus.id, i18n: corpus.i18n, disabled_when: [corpus.ready] }]
+	);
 	for (const file of [
 		'windows/ui/menu/menu_llm/menu_profiles.ahk',
 		'macos/ui/menu/menu_llm/profiles_manager.lua',
@@ -1431,4 +1432,42 @@ checkPrivacyTriggerControls();
 		);
 	}
 	console.log('Create Profile: one common declaration and three existing native editor owners.');
+}
+
+// Cloning keeps the existing native activation/edit owners and the Create declaration.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/profile_clone_command.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[corpus.section], [
+		{
+			type: 'command',
+			id: 'llm_profile_create',
+			i18n: 'menu.profiles.create_profile',
+			disabled_when: ['llm_profile_create_ready']
+		},
+		{ type: 'command', id: corpus.id, i18n: corpus.i18n, disabled_when: [corpus.ready] }
+	]);
+	for (const file of [
+		'windows/ui/menu/menu_llm/menu_profiles.ahk',
+		'macos/ui/menu/menu_llm/profiles_manager.lua',
+		'linux/ui/menu/menu_builder.lua'
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		assert(
+			source.includes(`("${corpus.section}", "${corpus.id}"`),
+			`${file}: the actual Clone provider must consume the shared declaration`
+		);
+		assert(
+			!/label\s*=\s*i18n(?:_safe|\.get)\("menu\.profiles\.clone_builtin"\)|"label",\s*t\("menu\.profiles\.clone_builtin"\)/.test(
+				source
+			),
+			`${file}: native providers cannot redeclare the fixed Clone command label`
+		);
+	}
+	console.log(
+		'Clone Profile: one common declaration and existing native activation/editor owners.'
+	);
 }

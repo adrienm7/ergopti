@@ -2154,10 +2154,10 @@ local function _build_llm(ctx)
 				batch = active_builtin.batch == true,
 			}
 			rows[#rows + 1] = { separator = true }
-			rows[#rows + 1] = {
-				label = i18n_safe("menu.profiles.clone_builtin"),
-				action = function() return open_editor(seed, true, { as_new = true }) end,
-			}
+			local clone_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_clone",
+				{ llm_profile_clone = function() return open_editor(seed, true, { as_new = true }, true) end },
+				{ llm_profile_clone_ready = create_ready })
+			if clone_row then rows[#rows + 1] = clone_row end
 		end
 		rows[#rows + 1] = { separator = true }
 		local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
