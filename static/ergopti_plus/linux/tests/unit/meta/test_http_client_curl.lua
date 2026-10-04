@@ -134,6 +134,65 @@ local function fresh_digest(config)
 	return digest, state
 end
 
+helpers.describe("http_client: native POST redirect method selection", function()
+	for _, method in ipairs({ "post", "postStream" }) do
+		for _, body in ipairs({ { name = "nil" }, { name = "empty", value = "" }, { name = "literal", value = "{}" } }) do
+			for _, follows in ipairs({ false, true }) do
+				helpers.it("linux-http-redirect-method: " .. method .. " " .. body.name .. " body uses curl's native POST selection (follow=" .. tostring(follows) .. ")", function()
+					local client, state = fresh_client()
+					local result
+					local options = { follow_redirects = follows }
+					local function complete(value) result = value end
+					if method == "post" then helpers.assert_true(client.post("http://127.0.0.1:9000/", {}, body.value, complete, options))
+					else helpers.assert_true(client.postStream("http://127.0.0.1:9000/", {}, body.value, options, function() end, complete)) end
+					for _, argument in ipairs(state.options.args) do
+						helpers.assert_true(argument ~= "--request", "a custom POST word prevents native redirect method changes")
+					end
+					local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+					helpers.assert_eq(joined:find("\n--location\n", 1, true) ~= nil, follows)
+					helpers.assert_true(state.config:find("data-raw = ", 1, true) ~= nil or state.config:find("data-binary = ", 1, true) ~= nil,
+						"the data option must still select POST for nil and empty bodies")
+					if method == "postStream" then state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n"); state.complete()
+					else state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n") end
+					helpers.assert_true(result and result.ok and result.status == 200)
+				end)
+			end
+		end
+	end
+
+	for _, method in ipairs({ "get", "get_owned", "download" }) do
+		helpers.it("linux-http-redirect-method: " .. method .. " retains explicit GET", function()
+			local client, state = fresh_client()
+			local result
+			local function complete(value) result = value end
+			if method == "download" then helpers.assert_true(client.download("http://127.0.0.1:9000/", {}, "/tmp/unit-redirect-method", {}, complete))
+			elseif method == "get_owned" then helpers.assert_true(client.get_owned("http://127.0.0.1:9000/", {}, {}, complete).started)
+			else helpers.assert_true(client.get("http://127.0.0.1:9000/", {}, {}, complete)) end
+			local count = 0
+			for index, argument in ipairs(state.options.args) do
+				if argument == "--request" then count = count + 1; helpers.assert_eq(state.options.args[index + 1], "GET") end
+			end
+			helpers.assert_eq(count, 1)
+			state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_true(result and result.ok)
+		end)
+	end
+
+	for _, method in ipairs({ "post", "postStream" }) do
+		helpers.it("linux-http-redirect-method: " .. method .. " keeps the synthetic credential redirect fence", function()
+			local client, state = fresh_client()
+			local options = { follow_redirects = true }
+			local headers = { ["X-Api-Key"] = "SyntheticFixtureOnly" }
+			if method == "post" then helpers.assert_true(client.post("http://127.0.0.1:9000/", headers, "{}", function() end, options))
+			else helpers.assert_true(client.postStream("http://127.0.0.1:9000/", headers, "{}", options, function() end, function() end)) end
+			local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+			helpers.assert_nil(joined:find("\n--location\n", 1, true))
+			helpers.assert_nil(joined:find("\n--request\n", 1, true))
+			helpers.assert_eq(options.follow_redirects, true)
+		end)
+	end
+end)
+
 helpers.describe("http_client: asynchronous curl ownership", function()
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
 		for _, follow in ipairs({ false, true }) do
