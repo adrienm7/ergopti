@@ -504,6 +504,15 @@ jobs:
           ERGOPTI_RESTART_TEST_LUA=lua5.4 python3 tests/hardware/run_restart_zombie_receipts.py
         timeout-minutes: 1
 
+      - name: Enforce exact native buffered HTTP body limits
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        env:
+          LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+        run: |
+          luajit tests/hardware/run_http_body_limit_receipts.lua
+        timeout-minutes: 1
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

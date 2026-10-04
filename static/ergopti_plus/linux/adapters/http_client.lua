@@ -291,6 +291,11 @@ local function buffered_result(request)
 	if not status then
 		return { ok = false, status = 0, body = "", error = "missing HTTP status" }
 	end
+	-- The read budget includes room for curl's receipt. Once separated, neither
+	-- successful bytes nor refused HTTP diagnostics may borrow that allowance.
+	if request.max_body_bytes and #body > request.max_body_bytes then
+		return { ok = false, status = 0, body = "", error = "response body exceeds limit" }
+	end
 	local http_success = status >= 200 and status < 300
 	local succeeded = http_success and request.exit_code == 0
 	local failure
