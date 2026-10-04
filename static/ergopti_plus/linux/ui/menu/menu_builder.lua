@@ -2081,7 +2081,13 @@ local function _build_llm(ctx)
 				label = i18n_safe("menu.profiles.auto_detect"),
 				checked = ProfileSettings.get("auto_profile_for_model") == true,
 				action = function()
-					if ProfileSettings.set("auto_profile_for_model", true, current_model) then refresh() end
+					if not create_ready() then return false end
+					local current = ProfileSettings.get("auto_profile_for_model")
+					if type(current) ~= "boolean" or not create_ready() then return false end
+					local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+					if saved ~= true then return false end
+					refresh()
+					return true
 				end,
 			},
 			{ separator = true },
