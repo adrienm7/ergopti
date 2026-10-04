@@ -71,6 +71,8 @@ global _LifecycleShutdownVetoAttempts := 0
 ; Reason of the OnExit call in progress. A veto of a "Reload" close request
 ; refuses the pending reload whose successor sent it.
 global _LifecycleShutdownReason := ""
+; Exact private AI attempt owned by this noninterruptible OnExit call.
+global _LifecycleAiShutdownAttempt := 0
 
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
@@ -849,6 +851,7 @@ LifecycleShutdownVetoHonored() {
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
 _LifecycleRefuseShutdown(Gate) {
 	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
+	global _LifecycleAiShutdownAttempt
 	try UninstallCancel()
 	catch as Err
 		try LoggerError("Lifecycle", "Removal cancellation failed during shutdown refusal: {1}.", Err.Message)
@@ -861,6 +864,10 @@ _LifecycleRefuseShutdown(Gate) {
 		catch as Err
 			try LoggerError("Lifecycle",
 				"Refused reload could not be handed back: {1}.", Err.Message)
+		; Cancellation retires only this exact AI attempt. Existing terminal,
+		; reload and cleanup barriers keep their independent authority.
+		if IsSet(LLM_Menu_ApiPrivateRefuseShutdown)
+			LLM_Menu_ApiPrivateRefuseShutdown(_LifecycleAiShutdownAttempt)
 		return 1
 	}
 	Released := _LifecycleForceReleaseHeldInput()
@@ -873,7 +880,9 @@ _LifecycleRefuseShutdown(Gate) {
 }
 
 Ergopti_OnShutdown(reason, code) {
-		global _LifecycleShutdownReason
+		global _LifecycleShutdownReason, _LifecycleAiShutdownAttempt
+		if IsSet(LLM_Menu_ApiPrivateBeginShutdown)
+			_LifecycleAiShutdownAttempt := LLM_Menu_ApiPrivateBeginShutdown()
 		_LifecycleShutdownReason := reason
 		; Button holds are OS state, so release them before any gate may keep this
 		; process alive. Do not free the WinEvent hook yet: a refused OnExit must
