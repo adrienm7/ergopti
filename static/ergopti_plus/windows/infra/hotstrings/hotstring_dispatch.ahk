@@ -207,7 +207,8 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	try {
 		if Owner["OnlyText"]
 			UpdateLastSentCharacter(SubStr(
-				TrailingText != "" ? TrailingText : InsertedText, -1))
+				TrailingText != "" ? TrailingText : InsertedText,
+		-_TextTailCodeUnits(TrailingText != "" ? TrailingText : InsertedText, 1)))
 		else
 			_LSCResetFrom([])
 	} catch as Err {
@@ -262,7 +263,8 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 		}
 	} finally Critical(BufferCritical)
 	try UpdateLastSentCharacter(SubStr(
-		TrailingText != "" ? TrailingText : InsertedText, -1))
+		TrailingText != "" ? TrailingText : InsertedText,
+		-_TextTailCodeUnits(TrailingText != "" ? TrailingText : InsertedText, 1)))
 	catch as Err
 		try LoggerError("HSE", "Terminal raw last-character publication failed: {1}.", Err.Message)
 	if IsSet(_PrefixCommitPostFireEffect) {
@@ -972,7 +974,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						HotPath_LogIfSlow("HSE.NativeSend", PasteStarted, "branch=paste")
 						if !Fired
 								return false
-						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement, -1))
+						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement,
+							-_TextTailCodeUnits(EndCharEmitted != "" ? EndCharEmitted : Replacement, 1)))
 						SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndCharEmitted
 				} else if IsTerminalApp {
 						; OpenTUI/React-style prompts commit deletion state once per render
@@ -1084,7 +1087,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								return false
 						}
 						if OnlyText
-								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
+								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement,
+									-_TextTailCodeUnits(EndCharPart != "" ? EndCharPart : Replacement, 1)))
 						else
 								_LSCResetFrom([])
 						SentBurst := Burst
