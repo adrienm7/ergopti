@@ -2867,6 +2867,13 @@ The shared Core CI preparation reuses the independently released Group4
 checks. Manual validation still requires the dedicated CI branch and owned
 lock; this prerequisite does not qualify native program execution.
 
+The inactive three-source native publisher handoff is pinned under
+`docs/handovers/2026-10-04-parallel-containers/group3-native-publisher/` for
+separately owned hotstring consumers. Its receipt API and 94 focused composed
+cases have independent source review; real macOS locking/symlinks and full
+product qualification remain pending. Saving this patch does not integrate
+or finish the executable/provider feature.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
