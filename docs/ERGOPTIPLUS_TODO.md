@@ -1557,6 +1557,8 @@ pass with all 21 locale catalogues. Full native CI remains required.
       redundant feature gates and settings through their migration owner, and
       add native regressions for the selected layout without an extra switch.
 
+Added a test-only characterization prerequisite for the legacy Windows Ergopti+ switch: all six historical AltGr descriptors are compared with independently frozen selected-layout neutral outputs, and eight SC012 roll cases execute exact production helper definitions in an owned native child. The reviewed TODO107 test prefix and historical golden remain byte-exact. Shift percent/ligature and whitespace deviations, wrapping requests, and configurable word spacing are recorded without claiming equivalence. Portable source/corpus contracts and scoped convention/encoding/loop checks passed; native AHK interpretation, owned child retirement, physical hotkey precedence, recent-chevron timing and final root verification remain pending. The switch, defaults, settings, migrations and all production/layout data are unchanged; TODO96 remains partial.
+
 - [ ] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
       user-owned entries, empty by default and offering "+ Add". Let a user on
       any keyboard layout choose an action from the shared catalogue or enter

@@ -393,3 +393,182 @@ _EKT_ActionsCase() {
 	AssertThrows(() => ErgoptiLayout_Action(Map("dead", "Unknown"), Tables), "an unknown dead key is refused")
 	AssertThrows(() => ErgoptiLayout_Action(Map("strange", 1), Tables), "an unknown descriptor is refused")
 }
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 7/ Legacy plus output characterization ====
+; ===================================================
+; ===================================================
+
+_EKT_PlusMatrix() => JsonParse(FileRead(_DriverDir . "\tests\fixtures\ergopti_plus_altgr_output_matrix.json", "UTF-8"))
+
+_EKT_PlusPhysicalShift(Shift, Name, Mode) => Shift && Name == "Shift" && Mode == "P"
+
+_EKT_PlusLegacyActionsCase() {
+	global ALTGR_PLUS_OVERRIDES, ALTGR_BASE_ROWS, ALTGR_NUMBER_ROW, CTRL_ALT_NUMPAD, SpaceAroundSymbols
+	global _TapHoldKeyIsDown, _TH_SyntheticHeldKeys, _Stub_SentText, _Stub_RecordedSends, _Stub_LastChars
+	global LastSentCharacterKeyTime, _LSC_RING, _LSC_CURSOR, _LSC_LEN
+	_TestEnsureErgoptiLayout()
+	Saved := [ALTGR_PLUS_OVERRIDES, ALTGR_BASE_ROWS, ALTGR_NUMBER_ROW, SpaceAroundSymbols,
+		_TapHoldKeyIsDown, _TH_SyntheticHeldKeys, _Stub_SentText, _Stub_RecordedSends, _Stub_LastChars,
+		LastSentCharacterKeyTime, _LSC_RING, _LSC_CURSOR, _LSC_LEN, CTRL_ALT_NUMPAD]
+	try {
+		LastSentCharacterKeyTime := LastSentCharacterKeyTime.Clone()
+		_LSC_RING := _LSC_RING.Clone()
+		_BuildAltGrTables()
+		AssertEqual(3, ALTGR_PLUS_OVERRIDES.Count, "the actual published legacy table contains all three keys")
+		Matrix := _EKT_PlusMatrix()
+		AssertEqual(6, Matrix["rows"].Length)
+		Observed := 0
+		for Row in Matrix["rows"] {
+			AssertTrue(ALTGR_PLUS_OVERRIDES.Has(Row["scan"]), "the real table must publish the matrix key")
+			_TapHoldKeyIsDown := _EKT_PlusPhysicalShift.Bind(Row["shift"])
+			_TH_SyntheticHeldKeys := Map()
+			for Spacing in ["", " "] {
+				SpaceAroundSymbols := Spacing
+				_Stub_SentText := []
+				_Stub_RecordedSends := []
+				_Stub_LastChars := []
+				Cb := AltGrLayerEntryCallable(ALTGR_PLUS_OVERRIDES[Row["scan"]])
+				Cb.Call()
+				Descriptor := Row["descriptor"]
+				if Descriptor.Has("wrap") {
+					AssertEqual(1, _Stub_SentText.Length, "the real action requests wrapping once")
+					AssertEqual("wrap", _Stub_SentText[1].kind)
+					AssertEqual(Descriptor["wrap"], _Stub_SentText[1].symbol)
+					AssertEqual(Descriptor["left"], _Stub_SentText[1].left)
+					AssertEqual(Descriptor["right"], _Stub_SentText[1].right)
+				} else {
+					AssertEqual(0, _Stub_SentText.Length, "text and words do not request wrapping")
+					Texts := []
+					for Send in _Stub_RecordedSends
+						if Send.fn == "SendNewResult"
+							Texts.Push(Send.args[1])
+					AssertEqual(1, Texts.Length, "the actual action emits its text exactly once")
+					Expected := Descriptor.Has("word") ? Descriptor["word"] . Spacing : Descriptor["text"]
+					AssertEqual(Expected, Texts[1], "word spacing and explicit Shift deviations remain owned by the legacy action")
+				}
+				Observed += 1
+			}
+		}
+		AssertEqual(12, Observed, "all six actions execute under both spacing settings")
+	} finally {
+		ALTGR_PLUS_OVERRIDES := Saved[1]
+		ALTGR_BASE_ROWS := Saved[2]
+		ALTGR_NUMBER_ROW := Saved[3]
+		SpaceAroundSymbols := Saved[4]
+		_TapHoldKeyIsDown := Saved[5]
+		_TH_SyntheticHeldKeys := Saved[6]
+		_Stub_SentText := Saved[7]
+		_Stub_RecordedSends := Saved[8]
+		_Stub_LastChars := Saved[9]
+		LastSentCharacterKeyTime := Saved[10]
+		_LSC_RING := Saved[11]
+		_LSC_CURSOR := Saved[12]
+		_LSC_LEN := Saved[13]
+		CTRL_ALT_NUMPAD := Saved[14]
+	}
+}
+Test("Ergopti+ matrix: every actual legacy plus action preserves wrap, word spacing and Shift deviations (todo96-output-matrix)",
+	_EKT_PlusLegacyActionsCase)
+
+; layout.ahk registers top-level hotkeys and is outside the headless include
+; graph. Execute its exact production definitions in an owned native child,
+; following the isolated production-helper pattern used by atomic-temp-owner.
+_EKT_PlusRollScript() {
+	Code := "#Requires AutoHotkey v2.0`n"
+	Code .= "#SingleInstance Off`n"
+	Code .= '#Include ' . _DriverDir . '\infra\json.ahk' . "`n"
+	Code .= '#Include ' . _DriverDir . '\adapters\file_system.ahk' . "`n"
+	for Name in ["_RollChevronEqualEmit", "AddRollEqual", "_RollEmitCritical", "AltGrLayerShiftHeld"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "the actual roll definition must exist before constructing the native fixture")
+		Code .= Definition . "`n"
+	}
+	Code .= 'global Features := Map("layout", Map("ergopti_plus", false))' . "`n"
+	Code .= 'global _TH_SyntheticHeldKeys := Map(), _PP_Mode := "none", _PP_Kind := "", _PP_Output := "", _PP_Calls := 0' . "`n"
+	Code .= 'global _TapHoldKeyIsDown := _PP_ShiftQuery' . "`n"
+	Code .= '_PP_ShiftQuery(Name, Mode) => _PP_Mode == "physical" && Name == "Shift" && Mode == "P"' . "`n"
+	Code .= 'GetLastSentCharacterAt(*) => ""' . "`n"
+	Code .= 'HotstringsResolve(*) {`nthrow Error("the neutral roll must not resolve a recent-chevron delay")`n}' . "`n"
+	Code .= 'SendNewResult(Text) {`nglobal _PP_Kind, _PP_Output, _PP_Calls`n_PP_Calls += 1`n_PP_Kind := "text"`n_PP_Output := Text`n}' . "`n"
+	Code .= 'WrapTextIfSelected(Symbol, Left, Right) {`nglobal _PP_Kind, _PP_Output, _PP_Calls`n_PP_Calls += 1`nif Symbol != Left || Symbol != Right`nthrow Error("the real percent wrap must preserve both boundaries")`n_PP_Kind := "wrap"`n_PP_Output := Symbol`n}' . "`n"
+	Code .= 'Rows := JsonParse(FileRead(A_Args[1], "UTF-8"))["roll_rows"]' . "`n"
+	Code .= 'Packet := "["' . "`n"
+	Code .= 'for Row in Rows {`nFeatures["layout"]["ergopti_plus"] := Row["plus"]`n_PP_Mode := Row["shift"]`n_TH_SyntheticHeldKeys := Map()`nif _PP_Mode == "left_hold"`n_TH_SyntheticHeldKeys["LShift"] := 1`nif _PP_Mode == "right_hold"`n_TH_SyntheticHeldKeys["RShift"] := 1`n_PP_Kind := ""`n_PP_Output := ""`n_PP_Calls := 0`n_RollChevronEqualEmit()`nPacket .= (A_Index > 1 ? "," : "") . "[" . JsonStringLiteral(_PP_Kind) . "," . JsonStringLiteral(_PP_Output) . "," . _PP_Calls . "]"`n}' . "`n"
+	Code .= 'Packet .= "]"' . "`n"
+	Code .= 'if !FSWriteCreateDurable(A_Args[2], Packet)`nthrow Error("the owned roll receipt could not become durable")' . "`n"
+	Code .= 'FileAppend("roll-matrix-written", "*")`nExitApp(0)`n'
+	return Code
+}
+
+_EKT_PlusRollCompletion(State, Code, Output, ErrorText) {
+	State.Code := Code
+	State.Output := Output
+	State.ErrorText := ErrorText
+	State.Calls += 1
+}
+
+_EKT_PlusRollNativeCase() {
+	Stem := A_Temp . "\ergopti_plus_roll_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Stem . ".ahk"
+	Receipt := Stem . ".json"
+	AssertFalse(FileExist(Script) || FileExist(Receipt), "the native fixture owns fresh paths")
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _EKT_PlusRollScript()) != 0)
+	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }
+	Handle := 0
+	Primary := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut", Script, _DriverDir . "\tests\fixtures\ergopti_plus_altgr_output_matrix.json", Receipt],
+			_EKT_PlusRollCompletion.Bind(State))
+		AssertTrue(Handle.start(), "the actual source-helper native child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 5000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "the actual owned native child must settle once")
+		AssertTrue(State.Code is Integer, "the native completion must have a typed process status")
+		AssertEqual(0, State.Code, "the exact production roll definitions must finish successfully")
+		AssertEqual("roll-matrix-written", State.Output, "only the fixed native completion acknowledgement is emitted")
+		AssertEqual("", State.ErrorText)
+		Actual := JsonParse(FileRead(Receipt, "UTF-8"))
+		Expected := _EKT_PlusMatrix()["roll_rows"]
+		AssertEqual(8, Expected.Length, "plain, physical Shift and both held Shift sides require both option states")
+		AssertEqual(Expected.Length, Actual.Length, "every actual roll result is admitted")
+		for Row in Expected {
+			AssertEqual(3, Actual[A_Index].Length)
+			AssertEqual(1, Actual[A_Index][3], "the actual production roll emits exactly once")
+			AssertEqual(Row["kind"], Actual[A_Index][1], "the actual roll retains wrap versus text ownership")
+			AssertEqual(Row["output"], Actual[A_Index][2], "the actual SC012 roll retains the independent percent/ligature output")
+		}
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try Retired := !IsObject(Handle) || ((Result := Handle.terminate()) is Integer && Result == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	if Retired {
+		try {
+			FileDelete(Script)
+			if FileExist(Receipt)
+				FileDelete(Receipt)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "receipt paths remain retained unless the exact native tree retires")
+}
+Test("Ergopti+ matrix: the actual native SC012 roll preserves extra percent and ligature outputs (todo96-output-matrix)",
+	_EKT_PlusRollNativeCase)
