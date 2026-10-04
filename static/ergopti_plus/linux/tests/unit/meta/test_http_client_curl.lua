@@ -118,6 +118,29 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "post", "postStream" }) do
+		for index, body in ipairs({ "@/owned/source", "@/owned/missing", "@-", "@", "@@literal", "@literal text" }) do
+			helpers.it("linux-http-literal-body: " .. method .. " sends at-prefixed body " .. index .. " as raw caller bytes", function()
+				local client, state = fresh_client()
+				local result, callbacks, chunks = nil, 0, {}
+				local function complete(value) result = value; callbacks = callbacks + 1 end
+				if method == "post" then helpers.assert_true(client.post("https://example.invalid", {}, body, complete))
+				else helpers.assert_true(client.postStream("https://example.invalid", {}, body, {}, function(bytes) chunks[#chunks + 1] = bytes end, complete)) end
+				helpers.assert_true(state.config:find('data-raw = "' .. body .. '"\n', 1, true) ~= nil,
+					"curl must not interpret caller bytes as a file or stdin reference")
+				helpers.assert_nil(state.config:find("data-binary =", 1, true))
+				for _, argument in ipairs(state.options.args) do helpers.assert_nil(argument:find(body, 1, true)) end
+				if method == "post" then state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+				else state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n"); state.complete() end
+				helpers.assert_true(result and result.ok and result.status == 200)
+				helpers.assert_eq(callbacks, 1)
+				if method == "postStream" then helpers.assert_eq(table.concat(chunks), "abc")
+				else helpers.assert_eq(result.body, "abc") end
+				helpers.assert_eq(client.isActive(), false)
+			end)
+		end
+	end
+
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
 		for index, byte in ipairs({ "\r", "\n", "\r\n", "\0" }) do
 			for _, field in ipairs({ "name", "value" }) do
@@ -612,7 +635,7 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(joined:find("cerebras", 1, true) == nil, "the URL must not be in argv")
 		helpers.assert_true(joined:find("\n--config\n-", 1, true) ~= nil, "curl reads its config from stdin")
 		helpers.assert_true(state.config:find('header = "Authorization: Bearer sk-secret"', 1, true) ~= nil)
-		helpers.assert_true(state.config:find('data-binary = "{\\"q\\":\\"Mon mot de passe \\\\\\"x\\\\\\"\\"}"', 1, true) ~= nil,
+		helpers.assert_true(state.config:find('data-raw = "{\\"q\\":\\"Mon mot de passe \\\\\\"x\\\\\\"\\"}"', 1, true) ~= nil,
 			"quotes and backslashes are escaped for curl's config parser: " .. tostring(state.config))
 		helpers.assert_true(state.config:find('url = "https://api.cerebras.ai/v1/chat/completions"', 1, true) ~= nil)
 	end)
@@ -631,7 +654,7 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_eq(callback_count, 0, "post must return before any network output arrives")
 		helpers.assert_true(client.isActive(), "the adapter owns the live request")
 		helpers.assert_eq(state.timer.timeout_ms, 30000, "timeout is armed before completion")
-		helpers.assert_true(state.config:find([[data-binary = "{'quoted':true}"]], 1, true) ~= nil,
+		helpers.assert_true(state.config:find([[data-raw = "{'quoted':true}"]], 1, true) ~= nil,
 			"the body must reach curl literally")
 		helpers.assert_true(state.options.detached == true,
 			"curl must own a process group that cancellation can target")

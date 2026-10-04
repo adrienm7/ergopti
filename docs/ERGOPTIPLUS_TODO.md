@@ -606,6 +606,19 @@ These are software implementations; final hardware verification remains below.
   Windows async curl source already refuses controls; its synchronous WinHTTP
   COM path and macOS native bridge require the reserved owner's native receipts.
   No reserved driver implementation/gate, physical input or manual CI ran.
+- [~] **L47.** Linux literal HTTP body transport: use curl data-raw for caller
+  bodies. Quoted data-binary config values still interpret leading @ as a local
+  filename or stdin, sending file contents instead of the supplied body.
+  Twelve of twenty-four actual buffered/streaming cases fail before and all
+  pass after on LuaJIT/Lua 5.4. Exact literal @ paths, missing files, @-, empty
+  bodies, Unicode, CR/LF, tabs and quote/backslash escapes retain caller bytes.
+  Twelve new portable cases fail before and pass after; existing escaping and
+  stdin-privacy assertions are retained with the corrected native directive.
+  Actual raw-NUL body refusal remains unchanged. Windows async curl deliberately
+  stages caller bytes in its private body file before using data-binary @path,
+  so it does not interpret the caller's leading @. macOS passes caller bodies
+  directly to its native API. Both are source parity findings, not native
+  cross-OS execution. No reserved source, physical input or manual CI ran.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
