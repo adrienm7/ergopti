@@ -1207,9 +1207,7 @@ _PrefixPostFireDecision(Effect, EngineBuffer, MaxBufferLen) {
 		return { Reset: true, Buffer: "", Schedule: false }
 	if Effect.ClearAll or Effect.KnownBoundaryAfter
 		return { Reset: true, Buffer: "", Schedule: false }
-	NextBuffer := EngineBuffer
-	if StrLen(NextBuffer) > MaxBufferLen
-		NextBuffer := SubStr(NextBuffer, -MaxBufferLen)
+	NextBuffer := _TextTailWithinUnits(EngineBuffer, MaxBufferLen)
 	return {
 		Reset: NextBuffer == "",
 		Buffer: NextBuffer,
@@ -1358,7 +1356,13 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 			; (the neutral layout setting) was never stamped, so every time-gated
 			; hotstring failed closed in _HSE_PrepareDispatchDecision: no expansion
 			; and no preview bubble (hotstring-preview-shows).
-			AppState_TouchLastSentKey(Char)
+			if StrLen(Char) > 1 {
+				ObservedTick := A_TickCount
+				for DeliveredChar in _TextCodepoints(Char)
+					AppState_TouchLastSentKey(DeliveredChar, ObservedTick)
+			} else {
+				AppState_TouchLastSentKey(Char)
+			}
 			; Feed HSE — when HSE_FeedChar reports a match, fire the
 			; expansion right here. HSE_LastEndChar is the authoritative end
 			; character: empty for star (immediate) triggers, the just-typed
@@ -1660,15 +1664,16 @@ _PrefixWordTail(Buf) {
 		return ""
 	Boundaries := _PrefixWordBoundaries()
 	Tail := ""
-	Loop StrLen(Buf) {
-		Ch := SubStr(Buf, -A_Index, 1)
+	Position := StrLen(Buf)
+	while Position > 0 {
+		Start := _TextCodepointStart(Buf, Position)
+		Ch := SubStr(Buf, Start, Position - Start + 1)
 		if InStr(Boundaries, Ch)
 			break
 		Tail := Ch . Tail
+		Position := Start - 1
 	}
-	if (StrLen(Tail) > _MAX_BUFFER_LEN)
-		Tail := SubStr(Tail, -_MAX_BUFFER_LEN)
-	return Tail
+	return _TextTailWithinUnits(Tail, _MAX_BUFFER_LEN)
 }
 
 ; Commit one backspace to both in-memory buffers. The caller owns serialization;
@@ -1684,7 +1689,8 @@ _PrefixCommitBackspace() {
 		; engine tail after its decrement.
 		NextPrefixBuffer := _PrefixWordTailFromEngine()
 	} else {
-		NextPrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - 1)
+		NextPrefixBuffer := SubStr(_PrefixBuffer, 1,
+			StrLen(_PrefixBuffer) - _TextTailCodeUnits(_PrefixBuffer, 1))
 	}
 	ContentGeneration := _PrefixSetBuffer(NextPrefixBuffer)
 	return {
@@ -1752,6 +1758,19 @@ _PrefixFeedBackspace() {
 ; replacement that was never typed.
 _PrefixAppendTypedChar(Char) {
 	global _PrefixBuffer, _MAX_BUFFER_LEN
+	; A callback chunk is already visible in full. Derive its final word
+	; once rather than dispatching edits between virtual character steps.
+	if StrLen(Char) > 1 {
+		Tail := _PrefixWordTail(_PrefixBuffer . Char)
+		if Tail == "" {
+			_ResetPrefixBuffer(false)
+		} else {
+			_PrefixDismissStaleSuggestion("PrefixChanged")
+			_PrefixSetBuffer(Tail)
+		}
+		_PrefixScheduleRender()
+		return
+	}
 	; A boundary character ends the word: nothing typed before it can still be a
 	; live trigger prefix. HSE_Buffer deliberately keeps the terminator (triggers
 	; may contain one as a non-final char); the preview only tracks the current
@@ -1768,9 +1787,7 @@ _PrefixAppendTypedChar(Char) {
 	; invalidate it synchronously through TooltipHide's Win32-only fast teardown;
 	; the replacement remains debounced, so GUI/UIA work never moves onto OnChar.
 	_PrefixDismissStaleSuggestion("PrefixChanged")
-	NextPrefixBuffer := _PrefixBuffer . Char
-	if (StrLen(NextPrefixBuffer) > _MAX_BUFFER_LEN)
-		NextPrefixBuffer := SubStr(NextPrefixBuffer, -_MAX_BUFFER_LEN)
+	NextPrefixBuffer := _TextTailWithinUnits(_PrefixBuffer . Char, _MAX_BUFFER_LEN)
 	_PrefixSetBuffer(NextPrefixBuffer)
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "Render scheduled: buffer_units={1}.", _PrefixLogSafe(_PrefixBuffer))

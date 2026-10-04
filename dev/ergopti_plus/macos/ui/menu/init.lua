@@ -167,8 +167,10 @@ end
 --- Builds the menubar and wires its owners.
 --- @param extension_packs table|nil The boot's extension discovery catalogue, whose
 ---   loaded packs the Hotstrings menu lists under their extension.
+--- @param personal_files table|nil Actual boot-loaded personal source records.
+--- @param personal_root string|nil Configured route that admitted those sources.
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths,
-	extension_packs)
+	extension_packs, personal_files, personal_root)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	-- init.lua initializes only the resolver. The editor owns its reload callback
 	-- and must be initialized here even when ConfigPaths is already ready.
@@ -1340,6 +1342,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return global_scope.apply(mode)
 	end
+	-- This owner enters the global writer fence before touching preview state.
+	-- Its save port is the ordinary transaction itself, avoiding nested admission.
+	local preview_owner = require("ui.menu.preview_transaction").new({
+		state = state, keymap = keymap, admission = run_global_exclusive,
+		paused = function()
+			if type(core_mods.shortcuts_mod) ~= "table"
+				or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+			return core_mods.shortcuts_mod.is_paused()
+		end,
+		save_prefs = transactional_save_prefs,
+	})
 	local ctx = {
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
@@ -1347,6 +1360,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,
+		commit_preview           = preview_owner.toggle,
 		notify_feature           = notify_feature,
 		do_reload                = do_reload,
 		applyTriggerChar         = applyTriggerChar,
@@ -1357,6 +1371,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- The packs this boot discovered and registered; the counter groups their
 		-- loaded categories under each extension from it.
 		extension_packs          = extension_packs,
+		personal_files           = PreferencesTransaction.clone(personal_files or {}),
+		personal_root            = personal_root,
 		module_sections          = module_sections,
 		hotstring_editor         = hotstring_editor,
 		personal_info            = core_mods.dyn_hot_mod,

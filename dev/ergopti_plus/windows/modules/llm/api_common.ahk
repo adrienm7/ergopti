@@ -417,14 +417,15 @@ _LLM_ApiCommon_PredText(pred) {
 
 /**
  * Returns true when the elapsed time since start_tick meets or exceeds timeout_ms.
- * Uses modular subtraction so comparisons remain correct across the 32-bit
- * A_TickCount wrap that occurs after ~49.7 days of uptime.
+ * Preserves the native monotonic counter so long gaps cannot revive an expired
+ * operation by truncating its elapsed duration to a DWORD.
  * @param {Integer} start_tick  - A_TickCount captured when the operation started.
  * @param {Integer} timeout_ms  - Maximum allowed duration in milliseconds.
+ * @param {Integer} now_tick    - Optional deterministic native clock observation.
  * @returns {Integer} 1 (true) when timed out, 0 (false) otherwise.
  */
-_LLM_DeadlineExpired(start_tick, timeout_ms) {
-	return TickExpired(start_tick, timeout_ms)
+_LLM_DeadlineExpired(start_tick, timeout_ms, now_tick := unset) {
+	return TickExpired64(start_tick, timeout_ms, now_tick?)
 }
 
 

@@ -276,11 +276,12 @@ LLM_Menu_BuildModelMenu() {
 	; Visual model browser — exposes the shared models.json catalogue with
 	; params / RAM / speed columns so the user can compare specs before
 	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
-	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", [
-		Map("separator", true),
-		Map("label", t("menu.llm.add_model_entry"),     "action", (*) => LLM_Menu_PromptAddModel()),
-		Map("label", t("menu.llm.browse_models_entry"), "action", (*) => LLM_ModelBrowser_Show())
-	])
+	TailRows := [Map("separator", true),
+		Map("label", t("menu.llm.add_model_entry"), "action", (*) => LLM_Menu_PromptAddModel())]
+	BrowserRow := _LLM_Menu_ModelBrowserRow()
+	if BrowserRow is Map
+		TailRows.Push(BrowserRow)
+	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", TailRows)
 	return m
 }
 
@@ -538,10 +539,6 @@ _LLM_Menu_MakeSetNHandler(n) {
 	return (name, pos, menu) => LLM_Menu_SetN(n)
 }
 
-_LLM_Menu_MakeSetIndentHandler(lvl) {
-	return (name, pos, menu) => LLM_Menu_SetIndent(lvl)
-}
-
 _LLM_Menu_MakeSetBackendHandler(backend_id) {
 	return (name, pos, menu) => LLM_Menu_SetBackend(backend_id)
 }
@@ -709,4 +706,14 @@ _LLM_Menu_PromptDeleteCachedModel(name) {
 		_LLM_Menu_ClearDeleteReconcile(Owner)
 		LLM_AuxFinish(Owner)
 	}
+}
+
+
+; The fixed browser command is provider data; native browser fallback owns presentation.
+_LLM_Menu_ModelBrowserRow(OpenFn := 0) {
+	if !IsObject(OpenFn) && IsSet(LLM_ModelBrowser_Show)
+		OpenFn := LLM_ModelBrowser_Show
+	return MenuRenderer_CommandRow("llm_model_commands", "llm_browse_models",
+		Map("llm_browse_models", OpenFn),
+		Map("llm_model_browser_ready", () => IsObject(OpenFn) && HasMethod(OpenFn, "Call")))
 }

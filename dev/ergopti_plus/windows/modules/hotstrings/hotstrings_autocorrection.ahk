@@ -108,7 +108,7 @@ _HS_RegisterAutocorrection() {
 	; ====================================
 
 	if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "caps", Features["hotstrings"]["autocorrection"]["caps"])
+		LoadHotstringsCategory("autocorrection", Map("caps", Features["hotstrings"]["autocorrection"]["caps"]))
 
 		; For these apps, we only capitalize them when used in context of apps, and not as English words
 		apps := ["excel", "teams", "word", "office"]

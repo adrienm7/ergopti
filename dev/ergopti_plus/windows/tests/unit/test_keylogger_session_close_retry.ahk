@@ -41,17 +41,18 @@ _KLSCR_RetryPartialClose(Mode) {
 		KLWatch.privacy_interrupted := false
 		KLWatch.is_idle := false
 		KLWatch.is_session_active := true
-		KLHook.last_tick := (A_TickCount - KLWatchConst.SESSION_TIMEOUT_MS - 10000) & 0xFFFFFFFF
-		KLHook.app_entered_at := KLHook.last_tick
-		KLHook.title_entered_at := KLHook.last_tick
+		KLHook.last_tick := 1000
+		Observation := KLHook.last_tick + KLWatchConst.SESSION_TIMEOUT_MS + 10000
+		KLHook.app_entered_at := 0
+		KLHook.title_entered_at := 0
 		KLWatch.last_authorized_tick := KLHook.last_tick
-		KLWatch.session_started_at := (KLHook.last_tick - 1000) & 0xFFFFFFFF
+		KLWatch.session_started_at := KLHook.last_tick - 1000
 		Keylogger.initialized := true
 		_Stub_AppendLogRows := []
 		_Stub_AppendLogAccept := true
 		_Stub_AppendLogRejectSuspend := false
 		_Stub_AppendLogHook := _KLSCR_RefuseAfterIdle
-		KL_Watchers_IdleTick()
+		KL_Watchers_IdleTick(Observation)
 		AssertEqual(2, _Stub_AppendLogRows.Length)
 		AssertEqual("idle_start", _Stub_AppendLogRows[1]["type"])
 		AssertEqual("idle_end", _Stub_AppendLogRows[2]["type"])
@@ -59,9 +60,9 @@ _KLSCR_RetryPartialClose(Mode) {
 		_Stub_AppendLogRejectSuspend := false
 		_Stub_AppendLogHook := 0
 		if Mode = "timer"
-			KL_Watchers_IdleTick()
+			KL_Watchers_IdleTick(Observation + 1000)
 		else if Mode = "key"
-			AssertTrue(KL_Watchers_OnKeystroke())
+			AssertTrue(KL_Watchers_OnKeystroke(0, Observation + 1000))
 		else
 			AssertTrue(KL_Watchers_Stop())
 		AssertEqual(Mode = "key" ? 4 : 3, _Stub_AppendLogRows.Length,
@@ -166,8 +167,8 @@ _KLSCR_ShortIdleRetry(Mode) {
 		KLWatch.privacy_interrupted := false
 		KLWatch.session_close := false
 		KLWatch.session_close_draining := false
-		StartedAt := Mode = "wrap" ? 0xFFFFFFF0 : (A_TickCount - 1000) & 0xFFFFFFFF
-		Boundary := (StartedAt + 100) & 0xFFFFFFFF
+		StartedAt := Mode = "native32-boundary" ? 0xFFFFFFF0 : 0
+		Boundary := StartedAt + 100
 		KLWatch.is_idle := true
 		KLWatch.idle_started_at := StartedAt
 		KLWatch.is_session_active := true
@@ -185,18 +186,21 @@ _KLSCR_ShortIdleRetry(Mode) {
 		AssertEqual(0, _Stub_AppendLogRows.Length)
 		_Stub_AppendLogAccept := true
 		if Mode = "timer"
-			KL_Watchers_IdleTick()
-		else if Mode = "stop"
+			KL_Watchers_IdleTick(Boundary + 800)
+		else if Mode = "stop" {
+			; Keep the injected resume boundary authoritative even on a fresh host.
+			KL_Watchers_OnPrivateKeystroke(Boundary)
 			AssertTrue(KL_Watchers_Stop())
+		}
 		else if Mode = "timeout"
 			AssertTrue(KL_Watchers_OnKeystroke(0,
-				(Boundary + KLWatchConst.SESSION_TIMEOUT_MS + 10) & 0xFFFFFFFF))
+				Boundary + KLWatchConst.SESSION_TIMEOUT_MS + 10))
 		else if Mode = "private" {
-			KL_Watchers_OnPrivateKeystroke((Boundary + 100) & 0xFFFFFFFF)
-			AssertTrue(KL_Watchers_OnKeystroke(0, (Boundary + 800) & 0xFFFFFFFF))
+			KL_Watchers_OnPrivateKeystroke(Boundary + 100)
+			AssertTrue(KL_Watchers_OnKeystroke(0, Boundary + 800))
 		}
 		else
-			AssertTrue(KL_Watchers_OnKeystroke(0, (Boundary + 800) & 0xFFFFFFFF))
+			AssertTrue(KL_Watchers_OnKeystroke(0, Boundary + 800))
 		ExpectedCount := Mode = "stop" ? 2 : Mode = "timeout" || Mode = "private" ? 3 : 1
 		AssertEqual(ExpectedCount, _Stub_AppendLogRows.Length)
 		AssertEqual("idle_end", _Stub_AppendLogRows[1]["type"])
@@ -223,6 +227,568 @@ _KLSCR_ShortIdleRetry(Mode) {
 		_Stub_AppendLogHook := SavedHook
 	}
 }
-for Mode in ["key", "timer", "stop", "timeout", "private", "wrap"]
+for Mode in ["key", "timer", "stop", "timeout", "private", "native32-boundary"]
 	Test("keylogger idle: refused resume recovers through " . Mode
 		. " (keylogger-idle-resume-retry)", _KLSCR_ShortIdleRetry.Bind(Mode))
+
+
+; Native A_TickCount is GetTickCount64. A legal long silence must not become
+; recent activity, and accepted close records must retain their full duration.
+_KLSCR_Native64Scope(Run) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
+	Saved := Map()
+	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
+		"session_close", "session_close_draining", "idle_close"]
+		Saved[Name] := KLWatch.%Name%
+	SavedHook := Map()
+	for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+		SavedHook[Name] := KLHook.%Name%
+	SavedInitialized := Keylogger.initialized
+	SavedRows := _Stub_AppendLogRows
+	SavedAccept := _Stub_AppendLogAccept
+	SavedReject := _Stub_AppendLogRejectSuspend
+	SavedAppendHook := _Stub_AppendLogHook
+	try {
+		AssertFalse(KLWatch.HasOwnProp("idle_check_timer"), "the fixture cannot own a live timer")
+		AssertFalse(KLWatch.HasOwnProp("session_msg_handler"), "the fixture cannot own native messages")
+		AssertFalse(KLWatch.HasOwnProp("power_msg_handler"), "the fixture cannot own native messages")
+		for Name in ["is_idle", "is_session_active", "privacy_interrupted", "system_events",
+			"session_close", "session_close_draining", "idle_close"]
+			KLWatch.%Name% := false
+		for Name in ["idle_started_at", "session_started_at", "last_authorized_tick", "privacy_started_at"]
+			KLWatch.%Name% := 0
+		; Session fixtures own no foreground interval to compensate.
+		for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+			KLHook.%Name% := 0
+		Keylogger.initialized := true
+		_Stub_AppendLogRows := []
+		_Stub_AppendLogAccept := true
+		_Stub_AppendLogRejectSuspend := false
+		_Stub_AppendLogHook := 0
+		Run.Call()
+	} finally {
+		for Name, Value in Saved
+			KLWatch.%Name% := Value
+		for Name, Value in SavedHook
+			KLHook.%Name% := Value
+		Keylogger.initialized := SavedInitialized
+		_Stub_AppendLogRows := SavedRows
+		_Stub_AppendLogAccept := SavedAccept
+		_Stub_AppendLogRejectSuspend := SavedReject
+		_Stub_AppendLogHook := SavedAppendHook
+	}
+}
+
+_KLSCR_Native64Key(Origin, LongGap, Offset) {
+	global _Stub_AppendLogRows
+	Gap := (LongGap ? 0x100000000 : 0) + KLWatchConst.SESSION_TIMEOUT_MS + Offset
+	_KL_Watchers_CommitSessionStart(Origin - 1000)
+	KLWatch.last_authorized_tick := Origin
+	AssertTrue(KL_Watchers_OnKeystroke(0, Origin + Gap))
+	Expired := LongGap || Offset >= 0
+	AssertEqual(Expired ? 2 : 0, _Stub_AppendLogRows.Length,
+		"a long native silence cannot leave the old session active")
+	if Expired {
+		AssertEqual("session_end", _Stub_AppendLogRows[1]["type"])
+		AssertEqual(1000, _Stub_AppendLogRows[1]["duration_ms"], "silence cannot count as authorized time")
+		AssertEqual("session_start", _Stub_AppendLogRows[2]["type"])
+		AssertEqual(Origin + Gap, KLWatch.session_started_at)
+	} else
+		AssertEqual(Origin - 1000, KLWatch.session_started_at)
+	AssertEqual(Origin + Gap, KLWatch.last_authorized_tick)
+}
+for _KLSCR_Native64Origin in [100000000, 0xFFFFFFF0] {
+	for _KLSCR_Native64Long in [false, true] {
+		for _KLSCR_Native64Offset in [-1, 0, 1]
+			Test("Keylogger native64: accepted origin=" . _KLSCR_Native64Origin
+				. " long=" . _KLSCR_Native64Long . " expiry=" . _KLSCR_Native64Offset
+				. " (keylogger-watcher-native64)", _KLSCR_Native64Scope.Bind(
+					_KLSCR_Native64Key.Bind(_KLSCR_Native64Origin, _KLSCR_Native64Long, _KLSCR_Native64Offset)))
+	}
+}
+
+_KLSCR_Native64Idle(LongGap, Threshold, Offset) {
+	global _Stub_AppendLogRows
+	Origin := 0xFFFFFFF0
+	Gap := (LongGap ? 0x100000000 : 0) + Threshold + Offset
+	KLHook.last_tick := Origin
+	_KL_Watchers_CommitSessionStart(Origin - 1000)
+	KL_Watchers_IdleTick(Origin + Gap)
+	Expired := LongGap || Gap >= KLWatchConst.SESSION_TIMEOUT_MS
+	Started := Expired || Gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS
+	AssertEqual(Expired ? 3 : Started ? 1 : 0, _Stub_AppendLogRows.Length,
+		"the periodic owner must classify the full physical silence")
+	if Started {
+		AssertEqual("idle_start", _Stub_AppendLogRows[1]["type"])
+		AssertEqual(Origin, KLWatch.idle_started_at)
+	}
+	if Expired {
+		AssertEqual("idle_end", _Stub_AppendLogRows[2]["type"])
+		AssertEqual(Gap, _Stub_AppendLogRows[2]["duration_ms"])
+		AssertEqual("session_end", _Stub_AppendLogRows[3]["type"])
+		AssertEqual(1000, _Stub_AppendLogRows[3]["duration_ms"])
+		AssertFalse(KLWatch.is_session_active)
+		AssertFalse(KLWatch.is_idle)
+	}
+}
+for _KLSCR_Native64Long in [false, true] {
+	for _KLSCR_Native64Threshold in [KLWatchConst.MICRO_IDLE_TIMEOUT_MS, KLWatchConst.SESSION_TIMEOUT_MS] {
+		for _KLSCR_Native64Offset in [-1, 0, 1]
+			Test("Keylogger native64: periodic long=" . _KLSCR_Native64Long
+				. " threshold=" . _KLSCR_Native64Threshold . " offset=" . _KLSCR_Native64Offset
+				. " (keylogger-watcher-native64)", _KLSCR_Native64Scope.Bind(
+					_KLSCR_Native64Idle.Bind(_KLSCR_Native64Long, _KLSCR_Native64Threshold, _KLSCR_Native64Offset)))
+	}
+}
+
+_KLSCR_Native64EndIdle(LongGap, Refuse) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept
+	Origin := 100000000
+	Duration := (LongGap ? 0x100000000 : 0) + 17
+	_KL_Watchers_CommitIdleStart(Origin)
+	_Stub_AppendLogAccept := !Refuse
+	AssertEqual(!Refuse, _KL_Watchers_EndIdle(Origin + Duration))
+	if Refuse {
+		AssertEqual(Duration, KLWatch.idle_close["duration"], "the first refused boundary remains owned")
+		AssertFalse(KLWatch.session_close_draining)
+		_Stub_AppendLogAccept := true
+		AssertTrue(_KL_Watchers_EndIdle(0), "retry consumes the retained record, not a new zero boundary")
+	}
+	AssertEqual(1, _Stub_AppendLogRows.Length)
+	AssertEqual(Duration, _Stub_AppendLogRows[1]["duration_ms"])
+	AssertFalse(KLWatch.is_idle)
+	AssertFalse(IsObject(KLWatch.idle_close))
+}
+for _KLSCR_Native64Long in [false, true] {
+	for _KLSCR_Native64Refuse in [false, true]
+		Test("Keylogger native64: idle record long=" . _KLSCR_Native64Long
+			. " refusal=" . _KLSCR_Native64Refuse . " (keylogger-watcher-native64)",
+			_KLSCR_Native64Scope.Bind(_KLSCR_Native64EndIdle.Bind(_KLSCR_Native64Long, _KLSCR_Native64Refuse)))
+}
+
+_KLSCR_Native64AfterIdle(Mode, Entry) {
+	global _Stub_AppendLogRejectSuspend
+	if Entry["type"] != "idle_end"
+		return
+	if Mode = "partial"
+		_Stub_AppendLogRejectSuspend := true
+	else
+		throw Error("owned failure after idle acceptance")
+}
+
+_KLSCR_Native64Close(LongGap, Mode) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
+	Origin := 100000000
+	Span := LongGap ? 0x100000000 : 0
+	_KL_Watchers_CommitSessionStart(Origin)
+	_KL_Watchers_CommitIdleStart(Origin + 50)
+	_Stub_AppendLogAccept := Mode != "refuse"
+	if Mode = "partial" || Mode = "throw"
+		_Stub_AppendLogHook := _KLSCR_Native64AfterIdle.Bind(Mode)
+	if Mode = "throw" {
+		Caught := false
+		try _KL_Watchers_CloseSession(Origin + Span + 100, Origin + Span + 200)
+		catch Error
+			Caught := true
+		AssertTrue(Caught, "the post-acceptance failure must execute")
+	} else
+		AssertEqual(Mode = "ok", _KL_Watchers_CloseSession(Origin + Span + 100, Origin + Span + 200))
+	AssertFalse(KLWatch.session_close_draining)
+	if Mode != "ok" {
+		AssertTrue(IsObject(KLWatch.session_close))
+		_Stub_AppendLogAccept := true
+		_Stub_AppendLogRejectSuspend := false
+		_Stub_AppendLogHook := 0
+		AssertTrue(_KL_Watchers_CloseSession(0, 0), "retry cannot replace frozen first boundaries")
+	}
+	AssertEqual(2, _Stub_AppendLogRows.Length, "partial acceptance cannot duplicate records")
+	AssertEqual("idle_end", _Stub_AppendLogRows[1]["type"])
+	AssertEqual(Span + 150, _Stub_AppendLogRows[1]["duration_ms"])
+	AssertEqual("session_end", _Stub_AppendLogRows[2]["type"])
+	AssertEqual(Span + 100, _Stub_AppendLogRows[2]["duration_ms"])
+	AssertFalse(IsObject(KLWatch.session_close))
+	AssertFalse(KLWatch.is_session_active)
+	AssertFalse(KLWatch.is_idle)
+}
+for _KLSCR_Native64Long in [false, true] {
+	for _KLSCR_Native64Mode in ["ok", "refuse", "partial", "throw"]
+		Test("Keylogger native64: close records long=" . _KLSCR_Native64Long
+			. " mode=" . _KLSCR_Native64Mode . " (keylogger-watcher-native64)",
+			_KLSCR_Native64Scope.Bind(_KLSCR_Native64Close.Bind(_KLSCR_Native64Long, _KLSCR_Native64Mode)))
+}
+
+_KLSCR_Native64Sql() {
+	global _Stub_AppendLogRows
+	Origin := 100000000
+	_KL_Watchers_CommitSessionStart(Origin)
+	_KL_Watchers_CommitIdleStart(Origin + 50)
+	AssertTrue(_KL_Watchers_CloseSession(Origin + 0x100000000 + 100,
+		Origin + 0x100000000 + 200))
+	Db := _KLRManifest_OpenFixture()
+	SavedDevice := Keylogger._device_id_lit
+	try {
+		Keylogger._device_id_lit := SQLite_Q("owned-watcher-native64")
+		for Index, Entry in _Stub_AppendLogRows {
+			Entry["timestamp"] := "2026-10-04T12:00:00.000"
+			AssertTrue(SQLite_Exec(Db, KL_BuildInsertSession(Entry, Index, Entry["type"])))
+		}
+		Rows := SQLite_Query(Db, "SELECT kind,duration_ms FROM events_session ORDER BY id")
+		AssertEqual(2, Rows.Length)
+		AssertEqual("idle_end", Rows[1]["kind"])
+		AssertEqual(4294967446, Rows[1]["duration_ms"], "the canonical SQL receipt cannot truncate idle time")
+		AssertEqual("session_end", Rows[2]["kind"])
+		AssertEqual(4294967396, Rows[2]["duration_ms"], "the canonical SQL receipt cannot truncate session time")
+	} finally {
+		Keylogger._device_id_lit := SavedDevice
+		SQLite_Close(Db)
+	}
+}
+Test("Keylogger native64: accepted close records survive real SQLite serialization (keylogger-watcher-native64)",
+	_KLSCR_Native64Scope.Bind(_KLSCR_Native64Sql))
+
+_KLSCR_Native64Default(Periodic) {
+	global _Stub_AppendLogRows
+	SavedSynthetic := Keylogger.synth_active
+	try {
+		Keylogger.synth_active := false
+		BeforeStart := A_TickCount
+		KL_Hook_NoteActivity()
+		AfterStart := A_TickCount
+		AssertEqual(1, _Stub_AppendLogRows.Length, "fresh accepted physical activity must initialize the session")
+		AssertEqual("session_start", _Stub_AppendLogRows[1]["type"])
+		Origin := KLWatch.session_started_at
+		AssertTrue(BeforeStart <= Origin && Origin <= AfterStart,
+			"the accepted owner must publish its fresh native sample")
+		AssertEqual(Origin, KLWatch.last_authorized_tick)
+		AssertEqual(Origin, KLHook.last_tick, "the physical and accepted owners share that native sample")
+		_Stub_AppendLogRows := []
+		Before := A_TickCount
+		if Periodic
+			KL_Watchers_IdleTick()
+		else
+			AssertTrue(KL_Watchers_OnKeystroke())
+		After := A_TickCount
+		if !Periodic {
+			Observed := KLWatch.last_authorized_tick
+			AssertTrue(Before <= Observed && Observed <= After,
+				"omitting Now must observe a fresh native tick at any uptime")
+			Expired := Observed - Origin >= KLWatchConst.SESSION_TIMEOUT_MS
+			AssertEqual(Expired ? 2 : 0, _Stub_AppendLogRows.Length)
+			if Expired {
+				AssertEqual("session_end", _Stub_AppendLogRows[1]["type"])
+				AssertEqual(0, _Stub_AppendLogRows[1]["duration_ms"])
+				AssertEqual("session_start", _Stub_AppendLogRows[2]["type"])
+			}
+			return
+		}
+		; A physical zero is deliberately absent even when the accepted session
+		; owns a genuine zero origin. Otherwise bracket the private final sample.
+		if Origin = 0 {
+			AssertEqual(0, _Stub_AppendLogRows.Length)
+			return
+		}
+		Lower := Before - Origin
+		Upper := After - Origin
+		LowerCount := Lower >= KLWatchConst.SESSION_TIMEOUT_MS ? 3
+			: Lower >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS ? 1 : 0
+		UpperCount := Upper >= KLWatchConst.SESSION_TIMEOUT_MS ? 3
+			: Upper >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS ? 1 : 0
+		AssertTrue(_Stub_AppendLogRows.Length = 0 || _Stub_AppendLogRows.Length = 1 || _Stub_AppendLogRows.Length = 3,
+			"only no transition, idle start or the complete ordered close is valid")
+		AssertTrue(LowerCount <= _Stub_AppendLogRows.Length && _Stub_AppendLogRows.Length <= UpperCount,
+			"native periodic classification must remain inside the observation bracket")
+		if _Stub_AppendLogRows.Length {
+			AssertEqual("idle_start", _Stub_AppendLogRows[1]["type"])
+			AssertEqual(Origin, KLWatch.idle_started_at)
+		}
+		if _Stub_AppendLogRows.Length = 3 {
+			AssertEqual("idle_end", _Stub_AppendLogRows[2]["type"])
+			Duration := _Stub_AppendLogRows[2]["duration_ms"]
+			AssertTrue(Lower <= Duration && Duration <= Upper)
+			AssertEqual("session_end", _Stub_AppendLogRows[3]["type"])
+			AssertEqual(0, _Stub_AppendLogRows[3]["duration_ms"])
+			AssertFalse(KLWatch.is_session_active)
+		}
+	} finally Keylogger.synth_active := SavedSynthetic
+}
+for _KLSCR_Native64Periodic in [false, true]
+	Test("Keylogger native64: omitted native clock periodic=" . _KLSCR_Native64Periodic
+		. " (keylogger-watcher-native64)", _KLSCR_Native64Scope.Bind(_KLSCR_Native64Default.Bind(_KLSCR_Native64Periodic)))
+
+_KLSCR_Native64Refusal(Mode) {
+	global _Stub_AppendLogRows
+	Origin := 100000000
+	_KL_Watchers_CommitSessionStart(Origin)
+	KLHook.last_tick := Mode = "synthetic-zero" ? 0 : Origin
+	if Mode = "inactive"
+		Keylogger.initialized := false
+	else if Mode = "private"
+		KL_Watchers_OnPrivateKeystroke(Origin + 17)
+	else if Mode = "draining"
+		KLWatch.session_close_draining := true
+	KL_Watchers_IdleTick(Origin + 0x100000000 + 300001)
+	AssertEqual(0, _Stub_AppendLogRows.Length)
+	AssertTrue(KLWatch.is_session_active, "absence or privacy cannot acquire closing authority")
+}
+for _KLSCR_Native64Mode in ["synthetic-zero", "inactive", "private", "draining"]
+	Test("Keylogger native64: periodic refusal=" . _KLSCR_Native64Mode . " (keylogger-watcher-native64)",
+		_KLSCR_Native64Scope.Bind(_KLSCR_Native64Refusal.Bind(_KLSCR_Native64Mode)))
+
+_KLSCR_Native64Invalid(Mode) {
+	global _Stub_AppendLogRows
+	_KL_Watchers_CommitSessionStart(100)
+	_KL_Watchers_CommitIdleStart(150)
+	Rejected := false
+	try {
+		if Mode = "idle"
+			_KL_Watchers_EndIdle(149)
+		else if Mode = "close"
+			_KL_Watchers_CloseSession(99, 200)
+		else {
+			KLHook.last_tick := 100
+			KL_Watchers_IdleTick(99)
+		}
+	} catch ValueError {
+		Rejected := true
+	}
+	AssertTrue(Rejected, "the canonical clock owner must reject a backwards observation with ValueError")
+	AssertEqual(0, _Stub_AppendLogRows.Length, "invalid clocks cannot publish a successful record")
+	AssertFalse(KLWatch.session_close_draining, "invalid arithmetic must release the drain claim")
+	AssertFalse(IsObject(KLWatch.session_close))
+	AssertFalse(IsObject(KLWatch.idle_close))
+	AssertTrue(KLWatch.is_session_active)
+	AssertTrue(KLWatch.is_idle)
+}
+for _KLSCR_Native64Mode in ["idle", "close", "periodic"]
+	Test("Keylogger native64: invalid backwards boundary=" . _KLSCR_Native64Mode
+		. " (keylogger-watcher-native64-invalid)", _KLSCR_Native64Scope.Bind(_KLSCR_Native64Invalid.Bind(_KLSCR_Native64Mode)))
+
+; Source order is a policy proof, not an atomic cross-field snapshot or timer race.
+; Capture identities are derived from executable assignments so comments and
+; quoted examples cannot replace the authority read before the final sample.
+_KLSCR_Native64SourceMatch(Code, Pattern, Message) {
+	AssertTrue(Code != "", "the watcher owner must be defined")
+	Position := RegExMatch(Code, Pattern, &Found)
+	AssertTrue(Position > 0, Message)
+	AssertEqual(0, RegExMatch(Code, Pattern, , Position + StrLen(Found[0])),
+		"each watcher authority assignment must be unique")
+	return Found
+}
+
+; Count every write to a captured local, including compound assignments,
+; increment/decrement and an output reference. A different RHS cannot hide it.
+_KLSCR_Native64LocalWrites(Code, Name) {
+	Pattern := "i)(?<![\w.])" . Name . "\h*(?::=|\+=|-=|\*=|/=|//=|\*\*=|<<=|>>=|>>>=|&=|\|=|\^=|\.=|\+\+|--)"
+		. "|(?<![\w.])(?:\+\+|--)\h*" . Name . "\b|(?<!&)&\h*" . Name . "\b"
+	Writes := []
+	; A default parameter declaration is not a body rebinding.
+	Position := InStr(Code, "{") + 1
+	while RegExMatch(Code, Pattern, &Found, Position) {
+		Writes.Push(Found)
+		Position := Found.Pos + Found.Len
+	}
+	return Writes
+}
+
+_KLSCR_Native64PrivacyBody(Code) {
+	Branch := _KLSCR_Native64SourceMatch(Code,
+		"im)^\h*if\h+KLWatch\.privacy_interrupted\h*\{\h*$", "the privacy reset must have one owning branch")
+	Open := InStr(Code, "{", , Branch.Pos)
+	Depth := 1
+	Loop StrLen(Code) - Open {
+		Position := Open + A_Index
+		Char := SubStr(Code, Position, 1)
+		if Char = "{"
+			Depth += 1
+		else if Char = "}"
+			Depth -= 1
+		if Depth = 0
+			return Map("body", SubStr(Code, Open + 1, Position - Open - 1), "offset", Open)
+	}
+	throw Error("the privacy reset branch must close")
+}
+
+_KLSCR_Native64SourceOrder(Body, Periodic) {
+	AssertTrue(Body != "", "the watcher timing owner must be readable")
+	Body := _DriverMaskNonCode(&Body)
+	Authority := Periodic ? "KLHook\.last_tick" : "KLWatch\.last_authorized_tick"
+	Capture := _KLSCR_Native64SourceMatch(Body,
+		"im)^\h*(\w+)\h*:=\h*" . Authority . "\h*$", "the actual origin must be captured")
+	Clock := _KLSCR_Native64SourceMatch(Body,
+		"im)^\h*(\w+)\h*:=\h*IsSet\(Now\)\h*\?\h*Now\h*:\h*A_TickCount\h*$",
+		"the unchanged omitted clock must remain native")
+	Gap := _KLSCR_Native64SourceMatch(Body,
+		"im)^\h*(\w+)\h*:=\h*TickElapsed64\(" . Capture[1] . ",\h*" . Clock[1] . "\)\h*$",
+		"elapsed time must consume the captured authority and final sample")
+	AssertTrue(Capture.Pos < Clock.Pos && Clock.Pos < Gap.Pos,
+		"the native sample must follow the authority lookup")
+	Names := Map()
+	for Assignment in [Capture, Clock, Gap] {
+		Name := StrLower(Assignment[1])
+		AssertFalse(Names.Has(Name), "origin, clock and elapsed require distinct locals")
+		Names[Name] := true
+		Writes := _KLSCR_Native64LocalWrites(Body, Name)
+		AssertEqual(!Periodic && Assignment = Capture ? 2 : 1, Writes.Length,
+			"captured locals cannot acquire another write, irrespective of case or RHS")
+		AssertTrue(Assignment.Pos <= Writes[1].Pos && Writes[1].Pos < Assignment.Pos + Assignment.Len,
+			"the first local write must be the captured assignment")
+	}
+	if !Periodic {
+		Privacy := _KLSCR_Native64PrivacyBody(Body)
+		Reset := _KLSCR_Native64SourceMatch(Privacy["body"],
+			"im)^\h*" . Capture[1] . "\h*:=\h*0\h*$", "only the owned privacy branch may reset authorization")
+		Writes := _KLSCR_Native64LocalWrites(Body, Capture[1])
+		ResetPosition := Privacy["offset"] + Reset.Pos
+		AssertTrue(ResetPosition <= Writes[2].Pos && Writes[2].Pos < ResetPosition + Reset.Len,
+			"the second local write must be the actual privacy reset")
+		AssertTrue(Clock.Pos < ResetPosition && ResetPosition < Gap.Pos,
+			"the privacy reset must precede elapsed classification after sampling")
+	}
+	if Periodic {
+		AssertEqual(0, RegExMatch(SubStr(Body, Clock.Pos), "i)KLHook\.last_tick"),
+			"publication cannot retarget a new physical origin after sampling")
+		_KLSCR_Native64SourceMatch(Body,
+			"im)^\h*_KL_Watchers_CommitIdleStart\.Bind\(" . Capture[1] . "\)\)\h*$",
+			"idle publication must use the same captured origin")
+		_KLSCR_Native64SourceMatch(Body,
+			"im)^\h*return\h+_KL_Watchers_CloseSession\(" . Capture[1] . ",\h*" . Clock[1] . "\)\h*$",
+			"session close must use the same captured origin and sample")
+	}
+}
+
+_KLSCR_Native64Order(Periodic) {
+	_KLSCR_Native64SourceOrder(_DriverFuncBody(Periodic ? "KL_Watchers_IdleTick" : "KL_Watchers_OnKeystroke"), Periodic)
+}
+for _KLSCR_Native64Periodic in [false, true]
+	Test("Keylogger native64: capture protocol periodic=" . _KLSCR_Native64Periodic
+		. " (keylogger-watcher-native64-order)", _KLSCR_Native64Order.Bind(_KLSCR_Native64Periodic))
+
+; Mutation controls must fail the source assertion, not an unset closure variable.
+_KLSCR_Native64Rejected(Body, Periodic) {
+	Rejected := false
+	try _KLSCR_Native64SourceOrder(Body, Periodic)
+	catch Error as Failure {
+		AssertEqual("Error", Type(Failure), "the actual source assertion must reject the mutation")
+		Rejected := true
+	}
+	AssertTrue(Rejected, "a source mutation cannot satisfy the capture protocol")
+}
+
+_KLSCR_Native64OrderMutations(Periodic) {
+	Body := _DriverFuncBody(Periodic ? "KL_Watchers_IdleTick" : "KL_Watchers_OnKeystroke")
+	_KLSCR_Native64SourceOrder(Body, Periodic)
+	Code := _DriverMaskNonCode(&Body)
+	Authority := Periodic ? "KLHook\.last_tick" : "KLWatch\.last_authorized_tick"
+	Capture := _KLSCR_Native64SourceMatch(Code,
+		"im)^\h*(\w+)\h*:=\h*" . Authority . "\h*$", "the capture mutation owner must exist")
+	ClockAssignment := _KLSCR_Native64SourceMatch(Code,
+		"im)^\h*(\w+)\h*:=\h*IsSet\(Now\)\h*\?\h*Now\h*:\h*A_TickCount\h*$",
+		"the clock mutation owner must exist")
+	Line := Trim(SubStr(Body, Capture.Pos, Capture.Len), " `t`r`n")
+	Clock := Trim(SubStr(Body, ClockAssignment.Pos, ClockAssignment.Len), " `t`r`n")
+	StrReplace(Body, Line, "", false, &LineCount)
+	StrReplace(Body, Clock, "", false, &ClockCount)
+	AssertEqual(1, LineCount)
+	AssertEqual(1, ClockCount)
+	Spoofs := ["Ignored := '" . Line . "'", "Ignored := 1 `; " . Line,
+		"/*`n" . Line . "`n*/", Line . "`n" . Line]
+	for Spoof in Spoofs {
+		Changed := StrReplace(Body, Line, Spoof)
+		_KLSCR_Native64Rejected(Changed, Periodic)
+	}
+	Changed := StrReplace(Body, Clock, "")
+	Changed := Clock . "`n" . Changed
+	_KLSCR_Native64Rejected(Changed, Periodic)
+	Changed := StrReplace(Body, Clock, Clock . "`n" . Clock)
+	_KLSCR_Native64Rejected(Changed, Periodic)
+	for Name in [Capture[1], StrUpper(Capture[1]), ClockAssignment[1], StrUpper(ClockAssignment[1])] {
+		for Operation in [" := 0", " += 1", "++"] {
+			Changed := StrReplace(Body, Clock, Clock . "`n" . Name . Operation)
+			_KLSCR_Native64Rejected(Changed, Periodic)
+		}
+	}
+	Changed := StrReplace(Body, Clock, Clock . "`nIgnored(&" . Capture[1] . ")")
+	_KLSCR_Native64Rejected(Changed, Periodic)
+	if !Periodic {
+		Reset := Capture[1] . " := 0"
+		StrReplace(Body, Reset, "", false, &ResetCount)
+		AssertEqual(1, ResetCount)
+		for Replacement in [Capture[1] . " := 1", "Ignored := '" . Reset . "'", "Ignored := 1 `; " . Reset] {
+			Changed := StrReplace(Body, Reset, Replacement)
+			_KLSCR_Native64Rejected(Changed, Periodic)
+		}
+		Changed := StrReplace(Body, Reset, "")
+		Changed := StrReplace(Changed, Clock, Clock . "`n" . Reset)
+		_KLSCR_Native64Rejected(Changed, Periodic)
+	}
+	; Prose mentioning the same origin cannot make a valid capture ambiguous.
+	_KLSCR_Native64SourceOrder("/*`n" . Line . "`n*/`n" . Body, Periodic)
+}
+for _KLSCR_Native64Periodic in [false, true]
+	Test("Keylogger native64: capture guards reject decoys periodic=" . _KLSCR_Native64Periodic
+		. " (keylogger-watcher-native64-order)", _KLSCR_Native64OrderMutations.Bind(_KLSCR_Native64Periodic))
+
+; Native physical timing retains high words; zero still means no physical key.
+_KLA64_Activity(Start, Now, Expected, Synthetic := false) {
+	SavedTick := KLHook.last_tick
+	SavedSynth := Keylogger.synth_active
+	SavedAccepted := KLWatch.last_authorized_tick
+	SavedActive := KLWatch.is_session_active
+	try {
+		KLHook.last_tick := Start
+		Keylogger.synth_active := Synthetic
+		KLWatch.last_authorized_tick := 0
+		KLWatch.is_session_active := true
+		Delay := KL_Hook_NoteActivity(true, true, Now)
+		AssertEqual(Expected, Delay, "the actual activity owner must retain the entire physical interval")
+		AssertEqual(Now, KLHook.last_tick, "the accepted sample becomes the next physical origin")
+		AssertEqual(0, KLWatch.last_authorized_tick, "already-noted physical input cannot acquire another accepted origin")
+		AssertTrue(KLWatch.is_session_active, "accepted zero ownership survives independently of the absent physical sentinel")
+	} finally {
+		KLHook.last_tick := SavedTick
+		Keylogger.synth_active := SavedSynth
+		KLWatch.last_authorized_tick := SavedAccepted
+		KLWatch.is_session_active := SavedActive
+	}
+}
+for _KLA64_Row in [[100, 149, 49], [4294967280, 4294967330, 50],
+	[100, 4294967396, 4294967296], [100, 4294967445, 4294967345],
+	[100, 8589934692, 8589934592], [9007199254740992, 9007199254741023, 31],
+	[0, 0, 0], [0, 4294967346, 0]]
+	Test("keylogger activity native64: physical interval " . _KLA64_Row[1] . "/" . _KLA64_Row[2],
+		_KLA64_Activity.Bind(_KLA64_Row*))
+Test("keylogger activity native64: synthetic timing cannot truncate the physical sample",
+	_KLA64_Activity.Bind(100, 4294967445, 4294967345, true))
+
+_KLA64_Invalid(Start, Now) {
+	SavedTick := KLHook.last_tick
+	try {
+		KLHook.last_tick := Start
+		Refused := false
+		try KL_Hook_NoteActivity(true, true, Now)
+		catch ValueError
+			Refused := true
+		AssertTrue(Refused, "invalid physical clocks must fail with ValueError")
+		AssertEqual(Start, KLHook.last_tick, "an invalid sample cannot publish a new physical watermark")
+	} finally KLHook.last_tick := SavedTick
+}
+for _KLA64_Row in [[100, 99], [-1, 100], [0, -1]]
+	Test("keylogger activity native64: rejects invalid origin/end " . _KLA64_Row[1] . "/" . _KLA64_Row[2],
+		_KLA64_Invalid.Bind(_KLA64_Row*))
+
+_KLA64_NativeDefaults() {
+	SavedTick := KLHook.last_tick
+	try {
+		Start := A_TickCount
+		KLHook.last_tick := Start
+		Before := A_TickCount
+		Delay := KL_Hook_NoteActivity(true)
+		After := A_TickCount
+		AssertTrue(KLHook.last_tick >= Before && KLHook.last_tick <= After,
+			"ordinary omitted observations publish a fresh actual native clock")
+		AssertEqual(Start = 0 ? 0 : KLHook.last_tick - Start, Delay,
+			"the returned delay must consume exactly its captured origin and published sample")
+	} finally KLHook.last_tick := SavedTick
+}
+Test("keylogger activity native64: omitted observation retains the actual native clock", _KLA64_NativeDefaults)

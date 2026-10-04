@@ -110,6 +110,139 @@ TestHSE_BackspaceOnEmptyBufferFlipsBoundary() {
 Test("HSE backspace on empty buffer marks unknown context",
     TestHSE_BackspaceOnEmptyBufferFlipsBoundary)
 
+/** Replays the driver's actual burst into an owned hidden native Edit control. */
+TestHSE_UnicodeNativeErase(Paste := false, EndChar := "", Admission := false) {
+	global CategoryEnabled, Features, _PrefixBuffer, _PrefixFocusedControlToken
+	global _HSResolveCache, _HSResolveGen
+	SavedCallback := { Categories: CategoryEnabled, Features: Features,
+		Prefix: _PrefixBuffer, Focus: _PrefixFocusedControlToken, Resolver: _HSResolveCache }
+	global HSE_Buffer, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, _Stub_RecordedSends
+	SavedTerminators := HSE_WORD_TERMINATORS
+	SavedConsumed := HSE_CONSUMED_DELIMITERS
+	ResetHotstringRecorders()
+	if Paste
+		SimulateNotepadActive()
+	else
+		SimulateRegularApp()
+	HSE_TestReset()
+	Emoji := Chr(0x1F600)
+	Trigger := Emoji . "x"
+	Window := Gui()
+	EditControl := Window.AddEdit(, "A" . Trigger . EndChar)
+	Window.Show("Hide")
+	SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+	try {
+		if EndChar != "" {
+			HSE_WORD_TERMINATORS .= EndChar
+			HSE_CONSUMED_DELIMITERS .= EndChar
+		}
+		CreateHotstring(EndChar == "" ? "*?C" : "?C", Trigger, "R",
+			Map("Category", "_unicode_probe", "Section", "native"))
+		if Admission {
+			CategoryEnabled := Map("Hotstrings", true)
+			Features := Map()
+			_PrefixBuffer := ""
+			_PrefixFocusedControlToken := 1
+			_HSResolveCache := Map("_unicode_probe|native", {
+				gen: _HSResolveGen, val: { ShowTooltip: false } })
+			for Char in ["A", Emoji, "x", EndChar] {
+				if Char == ""
+					continue
+				_OnPrefixChar(0, Char, (*) => 0, (*) => true)
+				_PrefixCancelRender()
+			}
+			AssertEqual(1, _Stub_RecordedSends.Length, "the real callback must dispatch exactly once")
+		} else {
+			HSE_FeedChar("A")
+			HSE_FeedChar(Emoji)
+			Match := HSE_FeedChar("x")
+			if EndChar != ""
+				Match := HSE_FeedChar(EndChar)
+			AssertTrue(IsObject(Match), "the non-BMP trigger must match")
+			AssertTrue(HSE_DispatchMatch(Match, EndChar), "the actual dispatcher must send")
+		}
+		if Paste {
+			SendRecord := _Stub_RecordedSends[_Stub_RecordedSends.Length]
+			AssertEqual("SendInstant", SendRecord.fn, "the actual clipboard branch must run")
+			ControlSend(SendRecord.args[2] . "{Text}" . SendRecord.args[1], EditControl)
+		} else
+			ControlSend(_ConformDF_LastBurst(), EditControl)
+		Sleep(30)
+		AssertEqual("AR", EditControl.Value, "native Backspace must preserve the preceding character")
+		AssertEqual(EditControl.Value, HSE_Buffer, "UTF-16 buffer edits must match native output")
+	} finally {
+		Window.Destroy()
+		if Admission
+			_PrefixInvalidateDeferredEffects()
+		CategoryEnabled := SavedCallback.Categories
+		Features := SavedCallback.Features
+		_PrefixBuffer := SavedCallback.Prefix
+		_PrefixFocusedControlToken := SavedCallback.Focus
+		_HSResolveCache := SavedCallback.Resolver
+		HSE_WORD_TERMINATORS := SavedTerminators
+		HSE_CONSUMED_DELIMITERS := SavedConsumed
+		HSE_TestReset()
+	}
+}
+Test("HSE Unicode erase preserves the native preceding character (unicode-erase)",
+	TestHSE_UnicodeNativeErase)
+Test("HSE Unicode paste erase preserves native context (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(true))
+Test("HSE Unicode completion consumes its complete UTF-16 span (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(false, Chr(0x1F600)))
+Test("HSE real input callback preserves supplementary trigger context (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(false, "", true))
+Test("HSE real input callback consumes a whole supplementary completion (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(false, Chr(0x1F600), true))
+
+/** One physical Backspace erases a surrogate pair from both observed buffers. */
+TestHSE_UnicodePhysicalBackspace() {
+	global HSE_Buffer, _PrefixBuffer
+	HSE_TestReset()
+	try {
+		HSE_Buffer := "A" . Chr(0x1F600)
+		_PrefixBuffer := HSE_Buffer
+		_PrefixCommitBackspace()
+		AssertEqual("A", HSE_Buffer, "the canonical buffer must not retain a lone surrogate")
+		AssertEqual("A", _PrefixBuffer, "the preview must erase the same scalar")
+	} finally {
+		_PrefixBuffer := ""
+		HSE_TestReset()
+	}
+}
+Test("HSE physical Backspace erases one Unicode scalar (unicode-erase)",
+	TestHSE_UnicodePhysicalBackspace)
+
+_UnicodeRawApply(EditControl, EndChar) {
+	ControlSend("{BackSpace 2}{Text}R", EditControl)
+	return {Ok: true, Bs: 2, Ins: "R"}
+}
+
+/** The raw callback's native key count must publish a UTF-16 buffer effect. */
+TestHSE_UnicodeRawErase() {
+	global HSE_Buffer
+	HSE_TestReset()
+	HSE_Buffer := "A" . Chr(0x1F600) . "x"
+	Window := Gui()
+	EditControl := Window.AddEdit(, HSE_Buffer)
+	Window.Show("Hide")
+	SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+	try {
+		Spec := {Callback: _UnicodeRawApply.Bind(EditControl)}
+		Effect := 0
+		AssertTrue(_HSE_DispatchRawCallback(Spec, "", &Effect))
+		Sleep(30)
+		AssertEqual("AR", EditControl.Value)
+		AssertEqual(EditControl.Value, HSE_Buffer)
+		AssertEqual(3, Effect.DeleteFromEnd, "two keys erase three UTF-16 units")
+	} finally {
+		Window.Destroy()
+		HSE_TestReset()
+	}
+}
+Test("HSE raw Unicode erase publishes its complete UTF-16 span (unicode-erase)",
+	TestHSE_UnicodeRawErase)
+
 TestHSE_FeedResetClearsBufferAndFlag() {
     HSE_TestReset()
     HSE_FeedChar("x")
@@ -1832,3 +1965,59 @@ TestHSE_MagicCompletionDoesNotOpenWord() {
 }
 Test("HSE magic-completion-word-boundary: completion and word opening have separate roles",
     TestHSE_MagicCompletionDoesNotOpenWord)
+
+_UCAP_WithEngine(Body) {
+	global HSE_MAX_BUFFER_LEN, HSE_WORD_TERMINATORS
+	Saved := { Capacity: HSE_MAX_BUFFER_LEN, Terminators: HSE_WORD_TERMINATORS }
+	try {
+		HSE_TestReset()
+		HSE_MAX_BUFFER_LEN := 3
+		HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+		Body()
+	} finally {
+		HSE_MAX_BUFFER_LEN := Saved.Capacity
+		HSE_WORD_TERMINATORS := Saved.Terminators
+		HSE_TestReset()
+	}
+}
+
+_UCAP_EngineTail(Boundary) {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+	if Boundary
+		HSE_WORD_TERMINATORS .= Chr(0x1F600)
+	for Char in ["A", Chr(0x1F600), "b", "c"]
+		HSE_FeedChar(Char)
+	AssertEqual("bc", HSE_Buffer, "a bounded tail drops the complete oldest pair")
+	AssertEqual(Boundary, HSE_StartIsWordBoundary,
+		"the last discarded complete scalar determines the left boundary")
+}
+Test("HSE unicode-context-cap: typed tail never starts with half a pair", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineTail.Bind(false)))
+Test("HSE unicode-context-cap: discarded supplementary boundary remains known", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineTail.Bind(true)))
+
+_UCAP_EngineFraming() {
+	global HSE_WORD_TERMINATORS, HSE_Buffer, HSE_LastEndChar
+	Delimiter := Chr(0x1F600)
+	HSE_WORD_TERMINATORS .= Delimiter
+	HSE_Register("?C", "abc", (*) => 0)
+	for Char in ["a", "b", "c"]
+		HSE_FeedChar(Char)
+	Match := HSE_FeedChar(Delimiter)
+	AssertEqual("abc" . Delimiter, HSE_Buffer,
+		"the full completion scalar is framing outside the trigger capacity")
+	Assert(IsObject(Match), "the longest admitted END trigger still matches")
+	AssertEqual(Delimiter, HSE_LastEndChar)
+}
+Test("HSE unicode-context-cap: supplementary END framing does not evict trigger text", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineFraming))
+
+_UCAP_EngineReplacement() {
+	global HSE_Buffer
+	Spec := HSE_Register("*?", "x", (*) => 0)
+	HSE_FeedChar("x")
+	HSE_ApplyExpansion(HSE_LastMatch, "A" . Chr(0x1F600) . "bc")
+	AssertEqual("bc", HSE_Buffer, "replacement commits share the pair-safe capacity owner")
+}
+Test("HSE unicode-context-cap: committed replacement retains a valid bounded suffix", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineReplacement))

@@ -97,14 +97,8 @@ Test("Shortcuts/utils: RetrieveScancode honours RemappedList overrides", TestSho
 ; =================================================
 
 TestShortcuts_SearchPath_FileDetection() {
-	; Every branch inside SearchPath() ends in a real Run() (open the file,
-	; RegJump, open a URL, or fire a real web search) — there is no
-	; dependency-injection seam for Run in this module, so calling the live
-	; function with ANY input performs a genuine OS-visible action (this
-	; used to open the machine's actual default browser with a Google
-	; search for the literal test string once AHK-18 routed a shape-matched
-	; but non-existent path to the web-search fallback). Verify the pure
-	; regex-shape contract in isolation instead of invoking the dispatcher.
+	; Retain the historical shape check; the additional dispatcher cases below
+	; use an explicit launch port and verify real routing without OS effects.
 	FilePath := RegExMatch(
 		"C:\Users\test\file.txt",
 		"^[A-Za-z]:[\\/](?:[^<>:" . '"' . "|?*\r\n]+[\\/]?)*$"
@@ -384,3 +378,210 @@ TestShortcuts_KeepAwakeStopRetainsRefusedOwner() {
 }
 Test("Shortcuts: keep-awake retains a refused cancellation hook for retry (AHK-168)",
 	TestShortcuts_KeepAwakeStopRetainsRefusedOwner)
+
+; Execute the real dispatcher through its launch port; no browser or OS action.
+_SPT_AssertRecordingBoundary() {
+	Body := _DriverFuncBody("SearchPath")
+	Code := _DriverMaskNonCode(&Body)
+	AssertTrue(RegExMatch(Code, "i)^\s*SearchPath\(SelectedText, LaunchFn := Run\)"),
+		"the search launch seam must retain its explicit native default")
+	AssertFalse(RegExMatch(Code, "i)\bRun\s*\("), "the recording probe must never reach a raw native launch")
+	Assignments := 0, Calls := 0
+	Position := 1
+	while RegExMatch(Code, "i)\bLaunchFn\s*:=", &Found, Position) {
+		Assignments += 1
+		Position := Found.Pos + Found.Len
+	}
+	AssertEqual(1, Assignments, "the launch parameter must not be retargeted inside the dispatcher")
+	for Line in StrSplit(Code, "`n") {
+		if RegExMatch(Line, "i)\bLaunchFn\.Call\(") {
+			Calls += 1
+			AssertTrue(RegExMatch(Line, "i)^\s*try LaunchFn\.Call\("),
+				"each actual launch port must preserve its exception boundary")
+		}
+	}
+	AssertEqual(5, Calls, "every original launch branch must use the recording boundary")
+}
+
+_SPT_SearchTarget(Input, Expected) {
+	global Features
+	Saved := Features
+	Launches := []
+	Launch := (Target, WorkingDir := "", Options := "") =>
+		Launches.Push(Map("target", Target, "options", Options))
+	try {
+		_SPT_AssertRecordingBoundary()
+		Features := Map("shortcuts", Map("search", Map(
+			"search_engine", "https://search.invalid/",
+			"search_engine_url_query", "https://search.invalid/?q=")))
+		SearchPath(Input, Launch)
+		AssertEqual(1, Launches.Length, "the actual dispatcher must launch exactly once")
+		AssertTrue(Launches[1]["target"] == Expected,
+			"the target must preserve URI delimiters or encode the query component exactly")
+		AssertEqual("", Launches[1]["options"], "web targets keep ordinary launch options")
+	} finally Features := Saved
+}
+for _SPT_VectorIndex, _SPT_Vector in [
+	["https://example.invalid/?a=1&b=2#section", "https://example.invalid/?a=1&b=2#section"],
+	["https://example.invalid/a+b?x=%2f&value=%25#part+2", "https://example.invalid/a+b?x=%2f&value=%25#part+2"],
+	["https://example.invalid/%23%26%2B?q=100%25", "https://example.invalid/%23%26%2B?q=100%25"],
+	["example.invalid/a+b?x=%2f&value=%25#part+2", "https://example.invalid/a+b?x=%2f&value=%25#part+2"],
+	["example.invalid/", "https://example.invalid/"],
+	["100% ready", "https://search.invalid/?q=100%25%20ready"],
+	["literal %2F escape", "https://search.invalid/?q=literal%20%252F%20escape"],
+	["café " . Chr(0x1F600), "https://search.invalid/?q=caf%C3%A9%20%F0%9F%98%80"],
+	['notes & plus+ hash# quote" equals=?', "https://search.invalid/?q=notes%20%26%20plus%2B%20hash%23%20quote%22%20equals%3D%3F"],
+	["first`r`nsecond", "https://search.invalid/?q=first%20second"],
+	["first`nsecond", "https://search.invalid/?q=first%0Asecond"],
+	["first`rsecond", "https://search.invalid/?q=first%0Dsecond"],
+	["", "https://search.invalid/"]
+]
+	Test("Shortcuts/search: exact URI target " . _SPT_VectorIndex . " (search-uri-component)",
+		_SPT_SearchTarget.Bind(_SPT_Vector[1], _SPT_Vector[2]))
+
+; Actual filesystem observations retain the existing path-existence boundary.
+_SPT_SearchFileBoundary() {
+	global Features
+	Saved := Features
+	Root := A_Temp . "\ergopti-search-path-" . A_ScriptHwnd . "-" . Random(100000, 999999)
+	Owned := false
+	try {
+		_SPT_AssertRecordingBoundary()
+		AssertFalse(FileExist(Root), "the search fixture root must be new")
+		if !DllCall("Kernel32\CreateDirectoryW", "Str", Root, "Ptr", 0, "Int")
+			throw OSError(A_LastError, "The search fixture root could not be acquired.")
+		Owned := true
+		Existing := Root . "\existing & #+.txt"
+		FileAppend("owned fixture", Existing, "UTF-8")
+		Features := Map("shortcuts", Map("search", Map(
+			"search_engine", "https://search.invalid/",
+			"search_engine_url_query", "https://search.invalid/?q=")))
+		Launches := []
+		Launch := (Target, WorkingDir := "", Options := "") =>
+			Launches.Push(Map("target", Target, "options", Options))
+		SearchPath(Existing, Launch)
+		AssertEqual(1, Launches.Length)
+		AssertTrue(Launches[1]["target"] == Existing, "an existing file path remains byte-identical")
+		AssertEqual("Max", Launches[1]["options"])
+		Missing := Root . "\missing.txt"
+		SearchPath(Missing, Launch)
+		AssertEqual(2, Launches.Length)
+		AssertTrue(Launches[2]["target"] == "https://search.invalid/?q=" . UriEncode(Missing),
+			"a missing path still falls through to an encoded search")
+		AssertEqual("", Launches[2]["options"])
+	} finally {
+		Features := Saved
+		if Owned
+			DirDelete(Root, true)
+	}
+}
+Test("Shortcuts/search: existing and missing file boundaries (search-uri-component)",
+	_SPT_SearchFileBoundary)
+
+; WinKill calls MsgSleep for its native window delay. Recording that boundary
+; allows a real timer to revoke the command without closing or launching a window.
+_SRCT_CloseBoundary(State, Spec) {
+	State["events"].Push("kill")
+	if State["throw_close"]
+		throw Error("owned close failure")
+	if State["action"] != "none" {
+		State["timer"] := _SRCT_Revoke.Bind(State)
+		SetTimer(State["timer"], -10)
+		Sleep(A_WinDelay)
+	}
+	return State["close_receipt"]
+}
+
+_SRCT_Revoke(State, *) {
+	State["events"].Push("revoke")
+	State["transitions"] += 1
+	switch State["action"] {
+		case "pause": Suspend(true)
+		case "cancel": GetSelectionCancel()
+		case "pause-resume":
+			Suspend(true)
+			; This is the real cancellation authority called by suspend teardown.
+			; The full lifecycle is deliberately not invoked by this passive fixture.
+			GetSelectionCancel()
+			Suspend(false)
+		default: throw Error("Unknown registry continuation fixture action.")
+	}
+}
+
+_SRCT_RecordLaunch(State, Target) {
+	State["events"].Push("run")
+	State["launches"] += 1
+	State["suspended_at_launch"] := A_IsSuspended
+	AssertEqual("Regedit.exe", Target)
+	if State["throw_launch"]
+		throw Error("owned launch failure")
+	return true
+}
+
+_SRCT_Continuation(Scenario) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live selection capture")
+	AssertEqual(0, CBClipboardOwner.active.Count, "fixture refuses active clipboard ownership")
+	AssertFalse(CBClipboardOwner.restore_debt, "fixture refuses an inherited restore debt")
+	PreviousId := _SelectionCaptureNextId
+	PreviousSuspended := A_IsSuspended
+	PreviousWinDelay := A_WinDelay
+	PreviousCritical := Critical("Off")
+	State := Map("events", [], "timer", 0, "transitions", 0, "launches", 0,
+		"suspended_at_launch", false, "action", "none", "exists", true,
+		"write_receipt", true, "close_receipt", true, "throw_close", false, "throw_launch", false)
+	try {
+		AssertFalse(A_IsSuspended, "fixture requires an admitted active command")
+		SetWinDelay(100)
+		switch Scenario {
+			case "pause", "cancel", "pause-resume": State["action"] := Scenario
+			case "absent": State["exists"] := false
+			case "write-refused": State["write_receipt"] := false
+			case "close-refused": State["close_receipt"] := false
+			case "close-throws": State["throw_close"] := true
+			case "launch-throws": State["throw_launch"] := true
+			case "ordinary": State["action"] := "none"
+			default: throw Error("Unknown registry continuation fixture case.")
+		}
+		Write := (Root, Name, Value) => (State["events"].Push("write"), State["write_receipt"])
+		Exists := (Spec) => (State["events"].Push("exists"), State["exists"])
+		Invoke := () => _RegJumpCommit("HKEY_CURRENT_USER\Software\Ergopti",
+			Write, Exists, _SRCT_CloseBoundary.Bind(State), _SRCT_RecordLaunch.Bind(State))
+		if InStr(Scenario, "refused") || InStr(Scenario, "throws") {
+			AssertThrows(Invoke, "a refused or failed effect must keep the established error contract")
+			AssertEqual(Scenario = "write-refused" ? 1 : (Scenario = "launch-throws" ? 4 : 3),
+				State["events"].Length, "failure must stop the exact remaining effects")
+			AssertEqual(Scenario = "launch-throws" ? 1 : 0, State["launches"])
+		} else {
+			Expected := State["action"] = "none"
+			Result := Invoke.Call()
+			if !Expected {
+				AssertEqual(1, State["transitions"], "the actual timer must run inside the window-delay boundary")
+				AssertEqual(Scenario = "pause", A_IsSuspended,
+					"pause-resume must already be active when the old close returns")
+				AssertEqual(PreviousId + (Scenario = "pause" ? 0 : 1), _SelectionCaptureNextId,
+					"the real capture owner must publish each revocation")
+			}
+			AssertEqual(Expected, Result, "a cancelled continuation cannot claim a completed navigation")
+			AssertEqual(Expected ? 1 : 0, State["launches"],
+				"pause or capture revocation during close must suppress the subsequent launch")
+			AssertEqual("write", State["events"][1], "persisting the key remains the first effect")
+			AssertEqual("exists", State["events"][2])
+			if Scenario != "absent"
+				AssertEqual("kill", State["events"][3], "the already admitted close remains owned")
+			if Expected
+				AssertFalse(State["suspended_at_launch"])
+		}
+	} finally {
+		if IsObject(State["timer"])
+			SetTimer(State["timer"], 0)
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+		SetWinDelay(PreviousWinDelay)
+		Critical(PreviousCritical)
+	}
+}
+for _SRCT_Scenario in ["pause", "cancel", "pause-resume", "ordinary", "absent",
+	"write-refused", "close-refused", "close-throws", "launch-throws"]
+	Test("Shortcuts/win: registry continuation " . _SRCT_Scenario . " (regjump-continuation-revocation)",
+		_SRCT_Continuation.Bind(_SRCT_Scenario))

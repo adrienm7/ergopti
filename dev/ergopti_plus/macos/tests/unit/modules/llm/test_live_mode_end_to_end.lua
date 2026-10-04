@@ -582,3 +582,86 @@ helpers.describe("live mode end to end (llm-live-mode)", function()
 		assert_menu_untouched(world)
 	end)
 end)
+
+
+helpers.describe("declared live Off choice", function()
+	local function corpus()
+		local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_live_off.json"), "r"))
+		local value = json.decode(file:read("*a")); file:close(); return value
+	end
+
+	helpers.it("retains the actual bridge and refuses a retained row after admission changes", function()
+		local world = build_world()
+		local Panel = require("ui.menu.menu_llm.live_mode_panel")
+		local calls, redraws = 0, 0
+		local keymap = { get_live_prompt = world.engine.get_live_prompt,
+			set_live_prompt = function(value)
+				calls = calls + 1
+				if value == nil then world.engine.stop_live_prompt("menu", false); return world.engine.get_live_prompt() == nil end
+				return world.engine.start_live_prompt(value)
+			end }
+		local ctx = { llm_mod = world.core, keymap = keymap, count = 1, is_disabled = false,
+			update_menu = function() redraws = redraws + 1 end }
+		helpers.assert_true(world.engine.start_live_prompt("translate_en"))
+		local before = world.engine.get_live_prompt()
+		local row = Panel.build(ctx)[1]
+		helpers.assert_eq(row.checked, false)
+		ctx.is_disabled = true
+		local result = row.fn()
+		helpers.assert_eq(result, false, "the retained declaration rechecks current admission")
+		helpers.assert_eq(calls, 0, "refusal happens before entering the bridge")
+		helpers.assert_eq(redraws, 0)
+		helpers.assert_eq(world.engine.get_live_prompt(), before)
+		ctx.is_disabled = false
+		helpers.assert_eq(row.fn(), true)
+		helpers.assert_eq(calls, 1)
+		helpers.assert_eq(redraws, 1)
+		helpers.assert_nil(world.engine.get_live_prompt())
+		helpers.assert_eq(Panel.build(ctx)[1].checked, true)
+		assert_menu_untouched(world)
+	end)
+
+	helpers.it("uses all actual locale labels and preserves refused bridge state", function()
+		local world = build_world()
+		local Panel = require("ui.menu.menu_llm.live_mode_panel")
+		local i18n = require("infra.i18n")
+		local saved_get = i18n.get
+		local spec = corpus()
+		local calls, redraws, result = 0, 0, false
+		local before = { profile_id = "translate_en" }
+		local ctx = { llm_mod = world.core, count = 1,
+			keymap = { get_live_prompt = function() return before end,
+				set_live_prompt = function(value) calls = calls + 1; return result end },
+			update_menu = function() redraws = redraws + 1 end }
+		local ok, err = xpcall(function()
+			for _, code in ipairs(spec.locales) do
+				local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
+				local catalog = json.decode(file:read("*a")); file:close()
+				i18n.get = function(key) return catalog[key] or key end
+				local row = Panel.build(ctx)[1]
+				helpers.assert_eq(row.title, catalog[spec.label_key], code)
+				helpers.assert_eq(row.checked, false)
+				local observed = row.fn()
+				helpers.assert_eq(observed, false)
+				helpers.assert_eq(ctx.keymap.get_live_prompt(), before)
+			end
+			for _, refusal in ipairs(spec.refusals) do
+				ctx.keymap.set_live_prompt = function()
+					calls = calls + 1
+					if refusal == "throw" then error("owned live refusal") end
+					if refusal == "number" then return 2 end
+					if refusal == "nil" then return nil end
+					return false
+				end
+				local invoked, receipt = pcall(Panel.build(ctx)[1].fn)
+				if refusal == "throw" then helpers.assert_eq(invoked, false)
+				else helpers.assert_eq(invoked, true); helpers.assert_eq(receipt, false) end
+				helpers.assert_eq(ctx.keymap.get_live_prompt(), before)
+			end
+		end, debug.traceback)
+		i18n.get = saved_get
+		helpers.assert_true(ok, err)
+		helpers.assert_eq(calls, 25)
+		helpers.assert_eq(redraws, 24, "existing Mac redraw-on-refusal ABI is retained")
+	end)
+end)

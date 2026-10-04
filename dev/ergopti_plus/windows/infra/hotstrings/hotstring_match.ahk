@@ -136,6 +136,11 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 				return ""
 		}
 
+		; InputHook may publish a failed dead-key composition as one visible
+		; chunk. Only its final scalar frames END matching; STAR still sees
+		; the complete physical suffix and no intermediate edit is emitted.
+		if StrLen(JustTypedChar) > 1
+				JustTypedChar := SubStr(JustTypedChar, -_TextTailCodeUnits(JustTypedChar, 1))
 		BufLen := StrLen(HSE_Buffer)
 		IsTerminator := InStr(HSE_WORD_TERMINATORS, JustTypedChar) > 0
 
@@ -151,7 +156,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		BodyBuf := ""
 		BodyLastChar := ""
 		if IsTerminator {
-				BodyBuf := SubStr(HSE_Buffer, 1, BufLen - 1)
+				BodyBuf := SubStr(HSE_Buffer, 1, BufLen - StrLen(JustTypedChar))
 				BodyLastChar := SubStr(BodyBuf, -1)
 		}
 
@@ -506,7 +511,8 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 						if (BeforeLen < 1) {
 								return false
 						}
-						PredChar := SubStr(Buf, BeforeLen, 1)
+						PredStart := _TextCodepointStart(Buf, BeforeLen)
+						PredChar := SubStr(Buf, PredStart, BeforeLen - PredStart + 1)
 						; Same set as the expansion branch below, tested in the opposite
 						; direction — that is the point. A repeat needs the predecessor to
 						; be mid-word; an expansion needs it to be a boundary. Reading two
@@ -519,7 +525,8 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 		}
 		BeforeLen := StrLen(Buf) - MatchedLength
 		if (BeforeLen >= 1) {
-				BeforeChar := SubStr(Buf, BeforeLen, 1)
+				BeforeStart := _TextCodepointStart(Buf, BeforeLen)
+				BeforeChar := SubStr(Buf, BeforeStart, BeforeLen - BeforeStart + 1)
 				return InStr(Boundaries, BeforeChar) > 0
 		}
 		return HSE_StartIsWordBoundary
@@ -531,8 +538,9 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 ; and the matcher another, and they drifted. Any cache here would need every
 ; writer of HSE_WORD_TERMINATORS to remember to refresh it — and the test suite
 ; proved that assumption false immediately, leaving a stale set behind that made
-; the matcher reject every word boundary. Deriving costs one short concatenation
-; and makes divergence structurally impossible.
+; the matcher reject every word boundary. The catalogue's Unicode magic slot is
+; a completion selector, not punctuation opening another word. Keep whitespace,
+; custom delimiters and quotes independent of whether their output is consumed.
 _HSE_WordBoundarySet() {
 		global HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES, HSE_Terminators
 		Boundaries := HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES

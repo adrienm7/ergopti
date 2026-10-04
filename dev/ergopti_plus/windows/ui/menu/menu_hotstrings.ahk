@@ -103,14 +103,15 @@ _HS_MagicKeyRows() {
 ; `list` since 2026-08-07: the row itself is the renderer's, and the submenu
 ; hanging off it stays a native Menu this function owns and hands over — the same
 ; `submenu` shape the category blocks use while their trees are still built here.
-_HS_DelaysColorsRows() {
+_HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow) {
 	global UI_LLM_TIMEOUT_SEC, DYN_HOTSTRINGS_DEFAULT_DELAY
 	; Nested row DATA since 2026-08-07. This was a native Menu handed over in
 	; `submenu`, so the whole submenu was assembled here; none of these rows
 	; mutates the live menu — each opens a prompt and the tray rebuilds after —
 	; so nothing held them back.
 	Sub := [
-		Map("label", t("menu.hotstrings.config_item"), "action", (*) => OpenHotstringsConfigWindow()),
+		MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window",
+			Map("hotstrings_config_window", (*) => OpenConfigFn.Call()), Map("hotstrings_config_ready", (*) => true)),
 		Map("separator", true),
 		Map("label", _HS_DefaultDelayLabel(), "action", (*) => _HS_PromptDefaultDelay()),
 		Map("label", _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"),
@@ -297,12 +298,14 @@ _HS_WordExpanderRows(Commands := unset) {
 			; Always ticked: a custom delimiter exists only while it is in the
 			; active string, so its presence IS its enabled state.
 			"checked", true,
-			"items", [Map(
-				"label",  t("menu.hotstrings.delete_delimiter"),
-				"action", ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))]))
+			"items", [MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete",
+				Map("word_expander_delete", ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch)),
+				Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 	}
 
-	Rows.Push(Map("label", t("menu.hotstrings.add_delimiter"), "action", (*) => _HS_DelimAddCustom()))
+	Rows.Push(MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_add",
+		Map("word_expander_add", (*) => _HS_DelimAddCustom()),
+		Map("word_expanders_ready", (*) => !A_IsSuspended)))
 
 	if !IsSet(Commands) {
 		Commands := Map(
@@ -400,6 +403,8 @@ global _HS_DelimAddGui := ""
 ; app covered it the dialog this thread waits on could not be reached again.
 _HS_DelimAddCustom() {
 	global _HS_DelimAddGui
+	if A_IsSuspended
+		return false
 	if IsObject(_HS_DelimAddGui) {
 		; Requested again: bring the open dialog back instead of stacking a
 		; second one over it.
@@ -427,8 +432,11 @@ _HS_DelimAddCustom() {
 	try WinWaitClose("ahk_id " . G.Hwnd)
 	finally _HS_DelimAddGui := ""
 
+	; A held native dialog cannot borrow its pre-pause menu admission.
+	if A_IsSuspended
+		return false
 	if (!Result.OK or Result.Char == "") {
-		return
+		return false
 	}
 	return _HS_DelimAddCustomCommit(Result.Char, Result.Consume)
 }
@@ -740,6 +748,24 @@ _HS_PersonalSectionsAllOn(TomlData) {
 	return _HS_ScopeAllOn(["Personal"], Paths)
 }
 
+; The editor has no input-master prerequisite. Its live pause owner admits both
+; the rendered leaf and a callback retained before suspension.
+_HS_PersonalEditorReady(PausedFn) {
+	try {
+		Paused := PausedFn.Call()
+		return (Paused is Integer) && Paused == 0
+	} catch
+		return false
+}
+
+_HS_PersonalEditorRow(OpenFn, PausedFn := 0) {
+	if !IsObject(PausedFn)
+		PausedFn := (*) => A_IsSuspended
+	return MenuRenderer_CommandRow("personal_hotstring_commands", "personal_hotstring_open_editor",
+		Map("personal_hotstring_open_editor", OpenFn),
+		Map("personal_hotstring_editor_ready", _HS_PersonalEditorReady.Bind(PausedFn)))
+}
+
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
 _HS_PersonalRows(Options := unset) {
 	if !IsSet(Options)
@@ -776,7 +802,7 @@ _HS_PersonalRows(Options := unset) {
 		PersonalMenu       := Menu()
 		DefaultSectionMenu := Menu()
 		PersonalRows := []
-		PersonalRows.Push(Map("label", t("menu.hotstrings.open_editor"), "action", (*) => OpenPersonalEditor()))
+		PersonalRows.Push(_HS_PersonalEditorRow((*) => OpenPersonalEditor()))
 		PersonalRows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(PersonalTomlPath)))
 		PersonalRows.Push(Map("separator", true))
 

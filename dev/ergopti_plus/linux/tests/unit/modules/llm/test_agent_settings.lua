@@ -325,3 +325,123 @@ helpers.describe("AI agent menu: a top-level submenu", function()
 		end)
 	end)
 end)
+
+
+--- Replays the independent fixed-system row contract through the actual menu.
+local function system_off_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_off.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("AI agent shared system Off row (agent-system-off)", function()
+	for _, vector in ipairs(system_off_corpus().states) do
+		helpers.it("uses the independent system checks for " .. vector.spec .. " (agent-system-off)", function()
+			Scenario.run({ stored = { ["llm.agent_system1"] = vector.spec, ["llm.agent_system2"] = vector.spec } }, function(world)
+				local corpus = system_off_corpus()
+				local rows = build_menu(world, {})
+				world.restore_prompt()
+				local agent = find(rows, i18n.get("menu.agent.title"))
+				for index in ipairs(corpus.systems) do
+					local off = agent.menu[index + 2].menu[1]
+					helpers.assert_eq(off.title, i18n.get(corpus.label_key))
+					helpers.assert_eq(off.checked == true, vector.checked)
+					helpers.assert_eq(type(off.fn), "function")
+				end
+			end)
+		end)
+	end
+
+	helpers.it("uses the declaration label and exact owner ACK on a retained Off callback (agent-system-off)", function()
+		Scenario.run({ stored = { ["llm.agent_system1"] = "cerebras" } }, function(world)
+			local renderer = require("infra.manifest_menu")
+			local declaration = renderer.get_root().agent_system_controls[1]
+			local old_label = declaration.i18n
+			declaration.i18n = system_off_corpus().mutated_label_key
+			local settings = require("modules.llm.agent_settings")
+			local original = settings.set_spec
+			local ok, err = pcall(function()
+				local rows = build_menu(world, {})
+				world.restore_prompt()
+				local off = find(rows, i18n.get("menu.agent.title")).menu[3].menu[1]
+				helpers.assert_eq(off.title, i18n.get("menu.agent.title"), "the actual shared label controls this child")
+				local observations = {}
+				for _, receipt in ipairs({ false, 2, "ack", {} }) do
+					settings.set_spec = function(system, value)
+						observations[#observations + 1] = { system = system, value = value }
+						return receipt
+					end
+					helpers.assert_eq(off.fn(), false, "truthy values cannot acknowledge a durable system change")
+					helpers.assert_eq(world.redraws or 0, 0)
+				end
+				settings.set_spec = original
+				helpers.assert_eq(#observations, 4)
+				for _, observed in ipairs(observations) do
+					helpers.assert_eq(observed.system, "system1")
+					helpers.assert_eq(observed.value, "")
+				end
+				helpers.assert_eq(world.preferences.get("llm.agent_system1"), "cerebras")
+				helpers.assert_eq(off.fn(), true, "retry uses the actual current owner")
+				helpers.assert_nil(world.preferences.get("llm.agent_system1"), "Off restores the sparse default")
+				helpers.assert_eq(world.redraws, 1)
+				settings.set_spec = nil
+				helpers.assert_eq(off.fn(), false, "a retained callback cannot bypass a missing native owner")
+				helpers.assert_eq(world.redraws, 1)
+				settings.set_spec = original
+			end)
+			settings.set_spec = original
+			declaration.i18n = old_label
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("preserves foreign physical source and refuses an actual scoped writer before Off ACK (agent-system-off)", function()
+		local sandbox = require("test.config_unused_keys_contract").sandbox
+		sandbox.with_config('[llm]\nagent_system1 = "cerebras"\n[future]\nkeep = "initial"\n', function(path)
+			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
+			local previous = {}
+			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+			local ok, err = pcall(function()
+				package.loaded["infra.config_paths"] = { config = function() return path end }
+				local preferences = require("infra.llm_preferences")
+				local changes = 0
+				local menu = require("ui.menu.agent_rows").build({ on_menu_changed = function() changes = changes + 1 end }, {})
+				local off = menu.submenu[3].menu[1]
+				local owner = { pending = function() return false end }
+				helpers.assert_eq(preferences.acquire(owner), true)
+				local initial = sandbox.read_bytes(path)
+				helpers.assert_eq(off.fn(), false)
+				helpers.assert_eq(sandbox.read_bytes(path), initial)
+				helpers.assert_eq(changes, 0)
+				helpers.assert_eq(preferences.release(owner), true)
+				local writer = require("toml_codec.writer")
+				local original_batch = writer.batch_write
+				local foreign = '[llm]\nagent_system1 = "cerebras"\n[future]\nkeep = "external"\n'
+				local observed = {}
+				writer.batch_write = function(target, operations, drop, source)
+					observed.path_matches = target == path
+					observed.source_matches = source.content == initial
+					local file = assert(io.open(path, "wb")); file:write(foreign); file:close()
+					return original_batch(target, operations, drop, source)
+				end
+				local called, acknowledged = pcall(off.fn)
+				writer.batch_write = original_batch
+				helpers.assert_eq(called, true, tostring(acknowledged))
+				helpers.assert_eq(acknowledged, false)
+				helpers.assert_eq(observed.path_matches, true)
+				helpers.assert_eq(observed.source_matches, true)
+				helpers.assert_eq(sandbox.read_bytes(path), foreign, "the real canonical writer refuses the changed source")
+				helpers.assert_eq(changes, 0)
+				helpers.assert_eq(require("modules.llm.agent_settings").get_spec("system1"), "cerebras")
+				helpers.assert_eq(off.fn(), true)
+				local document = require("toml_codec").decode(sandbox.read_bytes(path))
+				helpers.assert_nil(document.llm.agent_system1)
+				helpers.assert_eq(document.future.keep, "external")
+				helpers.assert_eq(changes, 1)
+			end)
+			for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)

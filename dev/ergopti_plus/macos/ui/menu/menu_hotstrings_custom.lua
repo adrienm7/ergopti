@@ -10,6 +10,7 @@
 --- `for k, v in pairs(sub) do M[k] = v end`.
 --- ==============================================================================
 
+local PersonalFileScope = require("infra.personal_file_scope")
 local M = {}
 local hs     = hs
 local i18n   = require("infra.i18n")
@@ -81,9 +82,16 @@ end
 --- @param group_name string Group name.
 --- @param sec_name string Section name.
 --- @param sec_label string Section display label.
+--- @param admission function|nil Current exclusive personal-file owner check.
 --- @return function
-local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
+local function toggleSectionFn(ctx, group_name, sec_name, sec_label, admission)
 	return function()
+		if admission ~= nil then
+			local ok, admitted = pcall(admission)
+			if not ok or admitted ~= true then
+				return KeymapLifecycle.commit_mutation(ctx, "admit personal file section", function() return false end)
+			end
+		end
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
 		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable custom hotstring section") then return end
 		local mutator
@@ -155,8 +163,9 @@ end
 --- @param ctx table Menu context.
 --- @param group_names table Native registry category ids.
 --- @param enabled boolean Explicit requested posture.
+--- @param admission function|nil Current exclusive personal-file owner check.
 --- @return function
-function M.category_scope_fn(ctx, group_names, enabled)
+function M.category_scope_fn(ctx, group_names, enabled, admission)
 	return function()
 		local prior = {}
 		for _, name in ipairs(group_names) do
@@ -166,6 +175,7 @@ function M.category_scope_fn(ctx, group_names, enabled)
 		local committed = KeymapLifecycle.commit_mutation(ctx, "set hotstring category scope", function()
 			local km = ctx.keymap
 			if not km or type(km.set_category_scope_enabled) ~= "function" then return false end
+			if admission ~= nil and admission() ~= true then return false end
 			module_choices = category_module_choices(ctx, group_names)
 			local result = km.set_category_scope_enabled(group_names, enabled, function()
 				if apply_category_modules(module_choices, enabled) ~= true then return false end
@@ -483,7 +493,8 @@ function M.build_custom(ctx, counts)
 	--- @param group_name string "personal" or "custom".
 	--- @param secs table Section list from keymap.get_sections().
 	--- @param group_enabled boolean Whether the group itself is on.
-	local function append_section_rows(target, group_name, secs, group_enabled)
+	--- @param admission function|nil Current exclusive personal-file owner check.
+	local function append_section_rows(target, group_name, secs, group_enabled, admission)
 		if type(secs) ~= "table" then return end
 		local has_real = false
 		for _, sec in ipairs(secs) do
@@ -507,7 +518,7 @@ function M.build_custom(ctx, counts)
 					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 					checked  = sec_on or nil,
 					action       = (group_enabled and not paused)
-							   and toggleSectionFn(ctx, group_name, sec.name, lbl) or nil,
+							   and toggleSectionFn(ctx, group_name, sec.name, lbl, admission) or nil,
 					disabled = not group_enabled or paused or nil,
 				}
 			end
@@ -518,16 +529,23 @@ function M.build_custom(ctx, counts)
 
 	-- =====================
 	-- Assemble menu items
+	local function editor_ready()
+		if ctx.paused == true or type(ctx.hotstring_editor) ~= "table"
+			or type(ctx.hotstring_editor.open) ~= "function"
+			or type(ctx.script_control) ~= "table"
+			or type(ctx.script_control.is_paused) ~= "function" then return false end
+		local ok, current = pcall(ctx.script_control.is_paused)
+		return ok and current == false
+	end
+	local function open_editor()
+		return DeferredWork.after(0, function()
+			if editor_ready() then pcall(ctx.hotstring_editor.open) end
+		end, "menu_hotstrings_custom.open_editor")
+	end
+	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+		{ personal_hotstring_open_editor = open_editor },
+		{ personal_hotstring_editor_ready = editor_ready })
 	local menu_items = {
-		{
-			label    = i18n.get("menu.hotstrings.open_editor"),
-			disabled = paused or nil,
-			action       = not paused and function()
-				DeferredWork.after(0,
-					function() pcall(ctx.hotstring_editor.open) end,
-					"menu_hotstrings_custom.open_editor")
-			end or nil,
-		},
 		{
 			label    = i18n.get("menu.hotstrings.open_file"),
 			disabled = paused or nil,
@@ -552,6 +570,7 @@ function M.build_custom(ctx, counts)
 			disabled = paused or nil,
 		},
 	}
+	if editor_row then table.insert(menu_items, 1, editor_row) end
 	-- An unsupported legacy chord retains its acknowledged owner and editing
 	-- surface until the ordinary-slot migration can prove a replacement.
 	if state.custom_editor_shortcut ~= nil then
@@ -573,7 +592,7 @@ function M.build_custom(ctx, counts)
 				["hotstring_category_sections"] = function() return section_rows end,
 			})
 	end
-	local function file_menu_for_group(gname, rows)
+	local function file_menu_for_group(gname, rows, check)
 		local file_rows = {}
 		local path = toml_path_for_group(ctx, gname)
 		if path then
@@ -582,7 +601,14 @@ function M.build_custom(ctx, counts)
 				action = function() open_toml_path(path) end,
 			}
 		end
-		return scope_menu({ gname }, file_rows, rows)
+		return ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+			{ commands = {
+				["hotstring_category_enable_all"] = M.category_scope_fn(ctx, { gname }, true, check),
+				["hotstring_category_disable_all"] = M.category_scope_fn(ctx, { gname }, false, check),
+			} }, {
+				["hotstring_category_file"] = function() return file_rows end,
+				["hotstring_category_sections"] = function() return rows end,
+			})
 	end
 	local function sorted_keys(tbl)
 		local keys = {}
@@ -630,12 +656,21 @@ function M.build_custom(ctx, counts)
 		end
 	end
 
+	local used_sources = {}
 	-- All personal groups in order: personal first, then extensions alphabetically
 	for _, gname in ipairs(personal_group_names) do
+		local record
+		for index, source in ipairs(ctx.personal_files or {}) do
+			if source.name == gname and not used_sources[index] then
+				record, used_sources[index] = source, true
+				break
+			end
+		end
 		local g_enabled = groupEnabled(ctx, gname)
 		local g_secs    = all_personal_secs_by_group[gname]
 		local g_rows    = {}
-		append_section_rows(g_rows, gname, g_secs, g_enabled)
+		local admission = gname ~= "personal" and PersonalFileScope.bind(ctx, record) or nil
+		append_section_rows(g_rows, gname, g_secs, g_enabled, admission)
 
 		if #g_rows > 0 then
 			if gname == "personal" then
@@ -670,7 +705,7 @@ function M.build_custom(ctx, counts)
 					node.files[#node.files + 1] = {
 						label = file_label,
 						count = g_count,
-						submenu = file_menu_for_group(gname, g_rows),
+						submenu = file_menu_for_group(gname, g_rows, admission),
 					}
 				end
 			end

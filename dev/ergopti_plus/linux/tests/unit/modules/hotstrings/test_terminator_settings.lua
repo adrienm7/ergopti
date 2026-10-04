@@ -13,6 +13,19 @@
 local helpers = require("tests.helpers")
 local Codec = require("toml_codec")
 
+
+--- Reads the independent custom-command identity used by each native provider.
+--- @return table expected Canonical command expectation.
+local function custom_command_expected()
+	local path = require("infra.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
+	local file = assert(io.open(path, "rb"))
+	local text = file:read("*a")
+	file:close()
+	local corpus = assert(require("json").decode(text))
+	assert(#corpus.rows == 1, "every independent custom command must be observed")
+	return corpus.rows[1]
+end
+
 local SOURCE = '[hotstrings]\nunknown = "kept"\n\n[other]\nvalue = 42\n'
 
 --- Runs body with the owner routed to a private config.toml, then puts the
@@ -699,7 +712,11 @@ local function menu_controls(Settings, paused, reordered)
 		manifest_path = function() return paths.shared("modules/menu/menu_manifest.json") end,
 		json_decode = function(raw)
 			local value = assert(require("json").decode(raw))
-			if reordered then
+			if reordered == "config_shared_label" then
+				if type(value.hotstrings_delays_menu) == "table" then value.hotstrings_delays_menu[1].i18n = "button.ok" end
+			elseif reordered == "custom_delete_label" then
+				value.word_expander_custom_menu[1].i18n = "button.delete"
+			elseif reordered then
 				local rows = value.word_expanders_menu
 				rows[1], rows[3] = rows[3], rows[1]
 			end
@@ -739,7 +756,8 @@ local function menu_controls(Settings, paused, reordered)
 	if not passed then error(rows, 0) end
 	local function find(items)
 		for _, row in ipairs(items or {}) do
-			if row.title == i18n.get("menu.hotstrings.word_expanders") then return row.menu end
+			if row.title == i18n.get("menu.hotstrings.delays_colors") then observations.delay_controls = row.menu end
+			if row.title == i18n.get("menu.hotstrings.word_expanders") then observations.controls_found = row.menu end
 			local found = find(row.menu)
 			if found then return found end
 		end
@@ -750,7 +768,8 @@ local function menu_controls(Settings, paused, reordered)
 			observations.hotstrings_submenu = row.menu
 		end
 	end
-	return assert(find(rows) or observations.controls, "the actual word-expander menu must be built"), ctx, observations
+	find(rows)
+	return assert(observations.controls_found or observations.controls, "the actual word-expander menu must be built"), ctx, observations
 end
 
 --- Reads the independent fixed-command and delimiter-state expectations.
@@ -844,6 +863,285 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 			helpers.assert_nil(grey_observed.hotstrings_submenu, "paused native roots strip every feature action")
 			for position = 1, 3 do helpers.assert_eq(grey[position].disabled, true) end
 			helpers.assert_eq(grey_observed.writes, 0)
+		end)
+	end)
+end)
+
+
+--- Finds a command in the actual rendered native control list.
+--- @param rows table Native menu items.
+--- @param key string Independent translation identity.
+--- @return table|nil row
+local function custom_delete_row(rows, key)
+	local text = require("infra.i18n").get(key)
+	for _, row in ipairs(rows or {}) do
+		if type(row.title) == "string" and row.title:gsub("^%s+", "") == text then return row end
+	end
+end
+
+helpers.describe("custom delimiter deletion consumes the shared command declaration", function()
+	helpers.it("the actual provider follows a changed declared label without changing its target", function()
+		with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
+			helpers.assert_true(Settings.load())
+			helpers.assert_true(Terminators.add_custom_terminator("custom_probe", "☃", "Independent snowman", true))
+			helpers.assert_true(Settings.persist())
+			local rows = menu_controls(Settings, false, "custom_delete_label")
+			local row = assert(custom_delete_row(rows, "button.delete"), "the canonical declaration supplies the command label")
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(has_custom(Terminators, "custom_probe"), false)
+			helpers.assert_eq(Codec.decode(sandbox.read_bytes(path)).other.value, 42)
+		end)
+	end)
+
+	for _, verdict in ipairs({ "ack", "false", "nil", "throw", "truthy" }) do
+		helpers.it("the actual Delete callback acknowledges and compensates writer " .. verdict, function()
+			with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
+				helpers.assert_true(Settings.load())
+				helpers.assert_true(Terminators.add_custom_terminator("custom_probe", "☃", "Independent snowman", true))
+				helpers.assert_true(Terminators.set_terminator_enabled("custom_probe", false))
+				helpers.assert_true(Settings.persist())
+				local initial = sandbox.read_bytes(path)
+				local rows, _, observed = menu_controls(Settings, false, false)
+				local row = assert(custom_delete_row(rows, custom_command_expected().i18n))
+				local Writer = require("toml_codec.writer")
+				local native_writer = Writer.batch_write
+				Writer.batch_write = function(...)
+					if verdict == "throw" then error("owned custom-delete writer refused") end
+					if verdict == "nil" then return nil end
+					if verdict == "truthy" then return 2 end
+					if verdict == "false" then return false end
+					return native_writer(...)
+				end
+				local called, committed = pcall(row.fn)
+				Writer.batch_write = native_writer
+				-- Observations follow both the production catch and native publisher.
+				helpers.assert_eq(called, true)
+				helpers.assert_eq(committed, verdict == "ack")
+				helpers.assert_eq(observed.writes, 1)
+				helpers.assert_eq(observed.redraws, verdict == "ack" and 1 or 0)
+				helpers.assert_eq(has_custom(Terminators, "custom_probe"), verdict ~= "ack")
+				if verdict ~= "ack" then
+					helpers.assert_eq(sandbox.read_bytes(path), initial)
+					helpers.assert_eq(Terminators.is_terminator_enabled("custom_probe"), false)
+				end
+				helpers.assert_eq(Codec.decode(sandbox.read_bytes(path)).hotstrings.unknown, "kept")
+			end)
+		end)
+	end
+
+	helpers.it("a held declared Delete cannot act after pause while the custom toggle remains present", function()
+		with_settings(SOURCE, function(Settings, _, _, Terminators)
+			helpers.assert_true(Settings.load())
+			helpers.assert_true(Terminators.add_custom_terminator("custom_probe", "☃", "Independent snowman", false))
+			helpers.assert_true(Settings.persist())
+			local rows, ctx, observed = menu_controls(Settings, false, false)
+			local row = assert(custom_delete_row(rows, custom_command_expected().i18n))
+			local toggle
+			for _, item in ipairs(rows) do
+				if type(item.title) == "string" and item.title:find("Independent snowman", 1, true) then toggle = item end
+			end
+			helpers.assert_type(toggle, "table")
+			helpers.assert_type(toggle.fn, "function", "the existing independent custom activation owner remains reachable")
+			ctx.paused = true
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(observed.writes, 0)
+			helpers.assert_eq(observed.redraws, 0)
+			helpers.assert_eq(has_custom(Terminators, "custom_probe"), true)
+		end)
+	end)
+end)
+
+
+helpers.describe("custom delimiter Delete translations use the shared declaration", function()
+	helpers.it("the actual provider renders the canonical Delete label in every supported locale", function()
+		local locales = { "ar", "cs", "da", "de", "en", "es", "fr", "hi", "he", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
+		local i18n = require("infra.i18n")
+		local previous_get = i18n.get
+		local observed = {}
+		local passed, failure = pcall(function()
+			for _, locale in ipairs(locales) do
+				local path = require("infra.paths").shared("data/locales/" .. locale .. ".json")
+				local file = assert(io.open(path, "rb"))
+				local raw = file:read("*a")
+				file:close()
+				local translations = assert(require("json").decode(raw))
+				i18n.get = function(key) return translations[key] or previous_get(key) end
+				with_settings(SOURCE, function(Settings, _, _, Terminators)
+					assert(Settings.load())
+					assert(Terminators.add_custom_terminator("custom_probe", "☃", "Independent snowman", false))
+					local rows, _, effects = menu_controls(Settings, false)
+					local found = custom_delete_row(rows, custom_command_expected().i18n)
+					observed[#observed + 1] = { locale = locale, expected = translations[custom_command_expected().i18n],
+						label = found and found.title, action = found and type(found.fn), writes = effects.writes }
+				end)
+			end
+		end)
+		i18n.get = previous_get
+		if not passed then error(failure, 0) end
+		helpers.assert_eq(#observed, 21)
+		for _, record in ipairs(observed) do
+			helpers.assert_type(record.expected, "string", record.locale)
+			helpers.assert_eq(record.label, record.expected, record.locale)
+			helpers.assert_eq(record.action, "function", record.locale)
+			helpers.assert_eq(record.writes, 0, record.locale)
+		end
+		helpers.assert_eq(i18n.get, previous_get, "the existing translation owner is restored exactly")
+	end)
+end)
+
+
+--- Reads independent Add identity and custom-record expectations.
+--- @return table corpus
+local function add_command_expected()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/word_expander_add_controls.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+--- Uses the actual native menu and acknowledged TOML owner; only the native
+--- prompt answers and writer refusal are controlled, then restored exactly.
+--- @param mode string Native response/publication scenario.
+--- @return table observed Captured effects, independent of callback catches.
+local function observe_add_command(mode)
+	local corpus = add_command_expected()
+	local result
+	with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
+		assert(Settings.load())
+		local prior_prompt = package.loaded["ui.text_prompt"]
+		local prior_execute = os.execute
+		local Writer = require("toml_codec.writer")
+		local prior_writer = Writer.batch_write
+		local context, effects
+		local observed = { prompts = 0, questions = 0, errors = 0, writes = 0 }
+		package.loaded["ui.text_prompt"] = { ask = function()
+			observed.prompts = observed.prompts + 1
+			if mode == "pause_after_prompt" then context.paused = true end
+			if mode == "input_cancel" then return nil end
+			if mode == "input_empty" then return "" end
+			return corpus.target.char
+		end }
+		os.execute = function(command)
+			if command == "command -v zenity >/dev/null 2>&1" then
+				return mode == "consume_unavailable" and 1 or 0
+			end
+			if command:find("zenity --question", 1, true) == 1 then
+				observed.questions = observed.questions + 1
+				if mode == "pause_after_consume" then context.paused = true end
+				return mode == "consume_no" and 1 or 0
+			end
+			if command:find("zenity --error", 1, true) == 1 then
+				observed.errors = observed.errors + 1
+				return 0
+			end
+			return prior_execute(command)
+		end
+		Writer.batch_write = function(...)
+			observed.writes = observed.writes + 1
+			if mode == "write_false" then return false end
+			if mode == "write_nil" then return nil end
+			if mode == "write_throw" then error("injected Add writer refusal", 0) end
+			if mode == "write_truthy" then return 2 end
+			return prior_writer(...)
+		end
+		local passed, failure = pcall(function()
+			local rows
+			rows, context, effects = menu_controls(Settings, false)
+			local row = assert(custom_delete_row(rows, corpus.i18n), "the actual Add provider must be accessible")
+			if mode == "late_pause" then context.paused = true end
+			observed.result = row.fn()
+			observed.source = sandbox.read_bytes(path)
+			observed.present = has_custom(Terminators, corpus.target.linux_key)
+			observed.redraws = effects.redraws
+			observed.records = require("toml_codec").decode(observed.source)
+		end)
+		package.loaded["ui.text_prompt"] = prior_prompt
+		os.execute = prior_execute
+		Writer.batch_write = prior_writer
+		observed.prompt_restored = package.loaded["ui.text_prompt"] == prior_prompt
+		observed.execute_restored = os.execute == prior_execute
+		observed.writer_restored = Writer.batch_write == prior_writer
+		if not passed then error(failure, 0) end
+		result = observed
+	end)
+	return result
+end
+
+helpers.describe("custom delimiter Add uses shared declaration and native acknowledgement", function()
+	for _, mode in ipairs({ "ack", "consume_no", "write_false", "write_nil", "write_throw", "write_truthy" }) do
+		helpers.it("keeps exact owner publication semantics after " .. mode, function()
+			local observed = observe_add_command(mode)
+			local acknowledged = mode == "ack" or mode == "consume_no"
+			helpers.assert_eq(observed.result, acknowledged)
+			helpers.assert_eq(observed.present, acknowledged)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(observed.redraws, acknowledged and 1 or 0)
+			helpers.assert_eq(observed.records.hotstrings.unknown, "kept")
+			helpers.assert_eq(observed.records.other.value, 42)
+			if not acknowledged then helpers.assert_eq(observed.source, SOURCE) end
+			helpers.assert_eq(observed.prompt_restored, true)
+			helpers.assert_eq(observed.execute_restored, true)
+			helpers.assert_eq(observed.writer_restored, true)
+		end)
+	end
+	for _, mode in ipairs({ "late_pause", "pause_after_prompt", "pause_after_consume", "input_cancel", "input_empty", "consume_unavailable" }) do
+		helpers.it("refuses held native Add without publication after " .. mode, function()
+			local observed = observe_add_command(mode)
+			helpers.assert_eq(observed.present, false)
+			helpers.assert_eq(observed.result, false)
+			helpers.assert_eq(observed.source, SOURCE)
+			helpers.assert_eq(observed.writes, 0)
+			helpers.assert_eq(observed.redraws, 0)
+			if mode == "late_pause" then helpers.assert_eq(observed.prompts, 0) end
+			if mode == "pause_after_prompt" then helpers.assert_eq(observed.questions, 0) end
+			helpers.assert_eq(observed.prompt_restored, true)
+			helpers.assert_eq(observed.execute_restored, true)
+			helpers.assert_eq(observed.writer_restored, true)
+		end)
+	end
+end)
+
+
+--- Reads the independent command and existing native window identity.
+--- @return table corpus Historical command expectation.
+local function delay_settings_command_expected()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
+	local bytes = file:read("*a")
+	file:close()
+	return assert(require("json").decode(bytes))
+end
+
+helpers.describe("declared delay configuration command: actual Linux provider", function()
+	helpers.it("uses the shared command label and preserves existing quick-delay rows", function()
+		with_settings(SOURCE, function(Settings)
+			local _, _, observations = menu_controls(Settings, false, "config_shared_label")
+			local rows = assert(observations.delay_controls)
+			local expected = delay_settings_command_expected()
+			helpers.assert_eq(rows[expected.position].title, require("infra.i18n").get("button.ok"))
+			helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_eq(#rows, 5, "the three existing variable-delay rows stay after the command")
+		end)
+	end)
+
+	helpers.it("dispatches the existing window identity without a preference write", function()
+		with_settings(SOURCE, function(Settings, path, sandbox)
+			local _, ctx, observations = menu_controls(Settings, false, false)
+			local native = { opens = 0 }
+			ctx.webview = { show = function(name) native.opens = native.opens + 1; native.name = name end }
+			assert(observations.delay_controls)[1].fn()
+			helpers.assert_eq(native.opens, 1)
+			helpers.assert_eq(native.name, delay_settings_command_expected().window)
+			helpers.assert_eq(observations.writes, 0)
+			helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+		end)
+	end)
+
+	helpers.it("refuses a missing window owner without saving or redrawing", function()
+		with_settings(SOURCE, function(Settings)
+			local _, _, observations = menu_controls(Settings, false, false)
+			assert(observations.delay_controls)[1].fn()
+			helpers.assert_eq(observations.writes, 0)
+			helpers.assert_eq(observations.redraws, 0)
 		end)
 	end)
 end)

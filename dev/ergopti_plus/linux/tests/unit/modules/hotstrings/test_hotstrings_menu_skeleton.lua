@@ -155,6 +155,7 @@ helpers.describe("hotstrings submenu: the personal-hotstring editor", function()
 		local config = fake_config({})
 		local rows = hotstrings_rows(config, {
 			webview = { show = function(name) asked[name] = true; return true end },
+			is_paused = function() return false end,
 		})
 		helpers.assert_true(rows ~= nil, "the Hotstrings submenu must exist at all")
 
@@ -196,4 +197,73 @@ helpers.describe("hotstrings submenu: the personal-hotstring editor", function()
 				.. "\"Error: app not found\"")
 	end)
 
+end)
+
+
+helpers.describe("shared personal editor command", function()
+	helpers.it("shared-personal-editor: the actual personal provider follows a changed shared label", function()
+		local Menu = require("infra.manifest_menu")
+		local declaration = Menu.get_array("personal_hotstring_commands")
+		helpers.assert_eq(#declaration, 1)
+		local before = declaration[1].i18n
+		local calls, found = 0, nil
+		local ok, err = pcall(function()
+			declaration[1].i18n = "menu.hotstrings.shortcut_none"
+			local rows = hotstrings_rows(fake_config({ all_enabled = false }), {
+				is_paused = function() return false end,
+				webview = { show = function() calls = calls + 1 end },
+			})
+			local expected = require("infra.i18n").get("menu.hotstrings.shortcut_none")
+			local function find(list)
+				for _, row in ipairs(list or {}) do
+					if row.title == expected and not row.menu then found = row end
+					if row.menu then find(row.menu) end
+				end
+			end
+			find(rows)
+			if found and found.fn then found.fn() end
+		end)
+		declaration[1].i18n = before
+		if not ok then error(err, 0) end
+		helpers.assert_type(found, "table")
+		helpers.assert_eq(calls, 1)
+	end)
+
+	local Json = require("json")
+	local Paths = require("infra.paths")
+	local file = assert(io.open(Paths.shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	local vectors = assert(Json.decode(text)).vectors
+	for _, vector in ipairs(vectors) do
+		helpers.it("shared-personal-editor: " .. vector.name, function()
+			local current, calls = vector.initial_paused, 0
+			local config = fake_config({ all_enabled = false })
+			local ctx = { paused = false, webview = {} }
+			if vector.opener then ctx.webview.show = function(name)
+				calls = calls + 1
+				return name == "hotstring_editor"
+			end end
+			if vector.pause_receipt ~= "missing" then ctx.is_paused = function()
+				if vector.pause_receipt == "throw" then error("injected pause owner failure") end
+				if vector.pause_receipt == "nil" then return nil end
+				return current
+			end end
+			local rows = hotstrings_rows(config, ctx)
+			local label = require("infra.i18n").get("menu.hotstrings.open_editor")
+			local found
+			local function find(list)
+				for _, row in ipairs(list or {}) do
+					if row.title == label then found = row end
+					if row.menu then find(row.menu) end
+				end
+			end
+			find(rows)
+			helpers.assert_type(found, "table", "the canonical editor row remains visible")
+			helpers.assert_eq(not found.disabled, vector.enabled)
+			current = vector.delivered_paused
+			if found.fn then found.fn() end
+			helpers.assert_eq(calls, vector.calls)
+		end)
+	end
 end)

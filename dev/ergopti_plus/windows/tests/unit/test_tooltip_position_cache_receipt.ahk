@@ -92,3 +92,39 @@ Test("tooltip position receipt: query composes monitor work-area and DPI (ahk2-1
 	_TPCR_QueryComposesMonitorWorkAreaAndDpi)
 Test("tooltip position receipt: incomplete environments fail closed (ahk2-17)",
 	_TPCR_InvalidEnvironmentFailsClosed)
+
+; The production writer publishes the actual native clock, not a truncated DWORD.
+; Supplied context avoids foreground/monitor queries; restore the exact singleton.
+_TPCR_Native64Age(Elapsed, Expected) {
+	global _TooltipPositionCache
+	Saved := _TooltipPositionCache
+	try {
+		Environment := _TPCR_Receipt(101, -1920, 0, 0, 1040, 120)
+		Context := Map("Control", 8001, "Environment", Environment)
+		Position := { Type: "caret", X: 400, Y: 500, H: 20 }
+		Before := A_TickCount
+		Actual := _TooltipCachePosition(7001, Position, Context)
+		After := A_TickCount
+		Cache := _TooltipPositionCache
+		AssertTrue(Actual == Position, "actual writer returns the exact published coordinate object")
+		AssertTrue(Cache["tick"] >= Before && Cache["tick"] <= After, "actual cache origin is the native clock sample")
+		AssertEqual(8001, Cache["control"], "supplied context retains the exact focused control identity")
+		AssertTrue(Cache["environment"] == Environment, "actual writer retains the exact supplied environment receipt")
+		AssertEqual(400, Cache["x"])
+		AssertEqual(500, Cache["y"])
+		Now := Cache["tick"] + Elapsed
+		AssertEqual(Expected, _TooltipPositionCacheCanReuse(Cache, 7001, Environment, Now, 600, 8001),
+			"a full native age cannot revive a previously expired coordinate receipt")
+		AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, Environment, Now, 600, 8002), "another control cannot use this receipt")
+		AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7002, Environment, Now, 600, 8001), "another window cannot use this receipt")
+		AssertFalse(_TooltipPositionCacheCanReuse(Cache, 7001, _TPCR_Receipt(202), Now, 600, 8001), "another monitor cannot use this receipt")
+	} finally _TooltipPositionCache := Saved
+}
+Test("tooltip position native64: before expiry (tooltip-position-native64)", _TPCR_Native64Age.Bind(599, true))
+Test("tooltip position native64: exact expiry (tooltip-position-native64)", _TPCR_Native64Age.Bind(600, true))
+Test("tooltip position native64: after expiry (tooltip-position-native64)", _TPCR_Native64Age.Bind(601, false))
+Test("tooltip position native64: full cycle (tooltip-position-native64)", _TPCR_Native64Age.Bind(4294967296, false))
+Test("tooltip position native64: cycle before remainder expiry (tooltip-position-native64)", _TPCR_Native64Age.Bind(4294967895, false))
+Test("tooltip position native64: cycle exact remainder expiry (tooltip-position-native64)", _TPCR_Native64Age.Bind(4294967896, false))
+Test("tooltip position native64: cycle after remainder expiry (tooltip-position-native64)", _TPCR_Native64Age.Bind(4294967897, false))
+Test("tooltip position native64: two full cycles (tooltip-position-native64)", _TPCR_Native64Age.Bind(8589934592, false))

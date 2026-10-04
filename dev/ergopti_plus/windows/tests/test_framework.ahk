@@ -613,17 +613,23 @@ _TestCallSite(StackText) {
 
 ; Path of the TAP results file. CI/tooling can provide a unique destination so
 ; parallel suites never validate another process's canonical result file.
-global TEST_RESULTS_CANONICAL := EnvGet("ERGOPTI_AHK_RESULTS_FILE") != ""
-	? EnvGet("ERGOPTI_AHK_RESULTS_FILE")
-	: A_Temp . "\ergopti_test_results.txt"
+; One receipt selection policy serves ordinary and E2E runner owners.
+; @param DefaultPath Legacy destination when no explicit request is present.
+; @returns {String} Exact requested path or the owner's default destination.
+_TestResultsPath(DefaultPath) {
+	Requested := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	return Requested != "" ? Requested : DefaultPath
+}
+
+global TEST_RESULTS_CANONICAL := _TestResultsPath(A_Temp . "\ergopti_test_results.txt")
 global TEST_RESULTS_FILE := TEST_RESULTS_CANONICAL
 
-; Append one TAP line. FileAppend per line avoids a suite-wide exclusive handle
-; that blocked when two AutoHotkey.exe instances targeted the same path.
+; Persist each observation before optional console output. A refused disk write
+; must stop the runner instead of publishing a successful but incomplete receipt.
 _TestPrint(Line) {
 	global TEST_RESULTS_FILE
+	FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 	try FileAppend(Line . "`r`n", "*")
-	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 }
 
 ; Execute every registered test, print TAP-style results and exit with
@@ -642,8 +648,9 @@ RunTests() {
 		_AHK_DRY_RUN := false
 	if !IsSet(_AHK_ONLY_FILTER)
 		_AHK_ONLY_FILTER := ""
-	; Per-process results path unless a runner already chose a custom file (e2e).
-	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL) {
+	; An explicit launch path owns live progress as well as terminal results.
+	; Legacy ordinary runs still publish through their per-process sidecar.
+	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL && EnvGet("ERGOPTI_AHK_RESULTS_FILE") = "") {
 		TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results_"
 			. DllCall("GetCurrentProcessId") . ".txt"
 	}

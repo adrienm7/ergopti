@@ -341,6 +341,22 @@ helpers.describe("personal-file discovery: preserve the existing root overlay an
 					return result
 				end
 				local team_loser = team_winner == "home/team.toml" and "work/team.toml" or "home/team.toml"
+				local Policy = require("hotstrings.personal_scope")
+				local evidence, selected = {}, {}
+				for _, item in ipairs(Config.personal_file_sources()) do
+					local relative = item.path:sub(#root + 2)
+					if relative == team_winner or relative == team_loser then
+						local live = match(files[relative])
+						evidence[#evidence + 1] = { source = item.descriptor, owner = "team", path = item.path,
+							admitted = live ~= nil and live.personal_source_id == item.descriptor.id, exclusive = true }
+						selected[relative] = { source = item.descriptor, owner = "team", path = item.path }
+					end
+				end
+				helpers.assert_eq(#evidence, 2, "both actual sources provide independent admission evidence")
+				local denied, reason = Policy.admit(evidence, selected[team_loser])
+				helpers.assert_nil(denied); helpers.assert_eq(reason, "unadmitted-source")
+				local accepted, refusal = Policy.admit(evidence, selected[team_winner])
+				helpers.assert_nil(refusal); helpers.assert_eq(accepted.source.id, sources[team_winner])
 				helpers.assert_nil(match(files[team_loser]), "the old last same-stem winner remains the only live team source")
 				helpers.assert_nil(match("dottedx"), "this transport prerequisite does not silently change persisted gate addressability")
 				for _, relative in ipairs({ "a__b.toml", "a/b.toml", team_winner, "Équipe/mémoire.toml", "rolls.toml" }) do
@@ -361,5 +377,53 @@ helpers.describe("personal-file discovery: preserve the existing root overlay an
 		for relative in pairs(files) do os.remove(root .. "/" .. relative) end
 		for _, directory in ipairs({ "a", "work", "home", "Équipe", "" }) do os.remove(root .. "/" .. directory) end
 		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("common autocorrection interleaved source order", function()
+	local function actual_catalogue(category, selected)
+		local Paths = require("infra.paths")
+		local handle = assert(io.open(Paths.shared("tests/corpus/hotstrings/source_order_entries.json"), "r"))
+		local expected = require("json").decode(handle:read("*a")); assert(handle:close())
+		local path = os.tmpname()
+		handle = assert(io.open(path, "w")); assert(handle:write(expected.source)); assert(handle:close())
+		local ok, failure = pcall(function()
+			local Loader = helpers.load_module("modules.hotstrings.loader")
+			local result = Loader.load_catalogue({ { path = path, category = category,
+				only_sections = selected, skip_sections = { "unknown" } } })
+			helpers.assert_eq(result.committed, true); helpers.assert_eq(result.errors, 0)
+			local order = {}
+			for _, mapping in ipairs(result.mappings) do
+				order[#order + 1] = mapping.trigger
+				helpers.assert_eq(mapping.group, category)
+				helpers.assert_true(mapping.trigger ~= "unknownx")
+				if mapping.trigger == "secondx" then
+					helpers.assert_eq(mapping.is_case_sensitive_strict, true); helpers.assert_eq(mapping.priority, 44)
+				elseif mapping.trigger == "firstx" then
+					helpers.assert_eq(mapping.final_result, true); helpers.assert_eq(mapping.priority, 10)
+				end
+			end
+			local wanted = selected and expected.caps_order
+				or (category == "autocorrection" and expected.admitted_source_order or expected.declared_order)
+			helpers.assert_eq(order, wanted, "the real catalogue stream supplies native insertion precedence")
+			local category_info = result.categories[category]
+			helpers.assert_eq(category_info.count, #wanted)
+			if not selected then
+				helpers.assert_eq(category_info.sections.caps.count, 3)
+				helpers.assert_eq(category_info.sections.terms.count, 1)
+				helpers.assert_eq(category_info.sections.caps.delay, 0.2)
+				helpers.assert_eq(category_info.sections.terms.delay, 0.3)
+			end
+		end)
+		assert(os.remove(path))
+		if not ok then error(failure, 0) end
+	end
+	helpers.it("(source-ordered-autocorrection) publishes interleaved common entries through the actual loader", function()
+		actual_catalogue("autocorrection")
+	end)
+	helpers.it("(source-ordered-autocorrection) retains French declared order and caps-only filtering", function()
+		actual_catalogue("french_autocorrection")
+		actual_catalogue("autocorrection", { "caps" })
 	end)
 end)

@@ -19,17 +19,26 @@ KL_HostSignature() {
 		return "fallback:" . A_ComputerName
 }
 
-KL_UuidV4() {
+; The first three GUID fields are native integers; Data4 retains byte order.
+; @param CreateGuidFn Optional callable that fills the native 16-byte GUID.
+; @returns {String} Lowercase canonical GUID text for a new device identity.
+KL_UuidV4(CreateGuidFn := unset) {
 		; CoCreateGuid via DllCall, formatted RFC 4122.
 		guid_buf := Buffer(16, 0)
-		DllCall("ole32\CoCreateGuid", "Ptr", guid_buf)
+		Result := IsSet(CreateGuidFn)
+				? CreateGuidFn.Call(guid_buf)
+				: DllCall("ole32\CoCreateGuid", "Ptr", guid_buf, "Int")
+		if !(Result is Integer)
+				throw TypeError("GUID creation must return an integer HRESULT.")
+		if Result != 0
+				throw Error("GUID creation failed (HRESULT " . Format("0x{:08X}", Result & 0xFFFFFFFF) . ").")
 		bytes := []
 		Loop 16
 				bytes.Push(NumGet(guid_buf, A_Index - 1, "UChar"))
 		return Format("{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
-				(bytes[1] << 24) | (bytes[2] << 16) | (bytes[3] << 8) | bytes[4],
-				(bytes[5] << 8) | bytes[6],
-				(bytes[7] << 8) | bytes[8],
+				NumGet(guid_buf, 0, "UInt"),
+				NumGet(guid_buf, 4, "UShort"),
+				NumGet(guid_buf, 6, "UShort"),
 				(bytes[9] << 8) | bytes[10],
 				(bytes[11] << 40) | (bytes[12] << 32) | (bytes[13] << 24) | (bytes[14] << 16) | (bytes[15] << 8) | bytes[16])
 }
@@ -56,67 +65,63 @@ KL_MetricsDirFor(ConfigDir) {
 		return ConfigDir . "metrics"
 }
 
-KL_ResolveDevice(metrics_dir) {
+/**
+ * Recovers one proven local identity after checking the complete device history.
+ * @param {String} metrics_dir Metrics root whose device children are scanned.
+ * @param HostSignatureFn Optional host-signature callable for isolated fixtures.
+ * @param CreateGuidFn Optional native GUID buffer producer for isolated fixtures.
+ * @returns {Map} The complete decoded identity, or a newly generated identity.
+ * @throws {Error} An uncertain candidate or ambiguous local history refuses boot.
+ */
+KL_ResolveDevice(metrics_dir, HostSignatureFn := unset, CreateGuidFn := unset) {
 		md := metrics_dir
 		if !RegExMatch(md, "[\\/]$")
 				md .= "\"
 		by_root := md . "by_device\"
-		KL_MkdirP(by_root)
+		FSEnsureDirectoryStrict(by_root)
+		current_host := IsSet(HostSignatureFn) ? HostSignatureFn.Call() : KL_HostSignature()
+		if !(current_host is String) or current_host == ""
+				throw Error("Device recovery requires a non-empty host signature.", -1, by_root)
 
-		current_host := KL_HostSignature()
-
-		; Scan existing device folders, reuse the one whose host_signature
-		; matches this machine.
-		;
-		; We use a regex over the raw bytes rather than a full JSON parse —
-		; AHK v2 64-bit has no built-in JSON decoder and the COM
-		; ScriptControl bridge we used initially is x86-only, which made
-		; this scan silently fail on 64-bit hosts and mint a new device
-		; folder on every reload. The shape of device.json is fixed (we
-		; write it ourselves), so a targeted regex is both faster and
-		; impervious to the bitness mismatch.
-		if DirExist(by_root) {
-				Loop Files, by_root . "*", "D" {
-						djpath := A_LoopFileFullPath . "\device.json"
-						if FileExist(djpath) {
-								try {
-										raw := FileRead(djpath, "UTF-8")
-										if RegExMatch(raw, '"host_signature"\s*:\s*"([^"]+)"', &m) {
-												if (m[1] = current_host) {
-														; Reconstruct the minimal Map we need from
-														; the same raw blob — same regex trick.
-														obj := Map(
-																"device_id",      "",
-																"name",           "",
-																"os",             "windows",
-																"os_version",     "",
-																"host_signature", current_host,
-																"created_at",     "",
-																"schema_version", KeylogConst.SCHEMA_VERSION
-														)
-														for _, field in ["device_id", "name", "os", "os_version", "created_at"] {
-																if RegExMatch(raw, '"' . field . '"\s*:\s*"([^"]+)"', &mm)
-																		obj[field] := mm[1]
-														}
-														return obj
-												}
-										}
-								}
-						}
-				}
+		; An incomplete child may still own a journal. Never mint a replacement
+		; from uncertain history, and never let directory order hide corruption.
+		matching := 0
+		for DeviceDir in FSListDirectoryStrict(by_root, true) {
+				djpath := DeviceDir . "\device.json"
+				SplitPath(DeviceDir, &DeviceFolder)
+				try raw := FileRead(djpath, "UTF-8")
+				catch as Failure
+						throw Error("Cannot read device identity: " . Failure.Message, -1, djpath)
+				try obj := JsonParse(raw)
+				catch as Failure
+						throw Error("Cannot decode device identity: " . Failure.Message, -1, djpath)
+				if !(obj is Map) or !obj.Has("host_signature")
+						or !(obj["host_signature"] is String) or obj["host_signature"] == ""
+						throw Error("Device identity requires a non-empty top-level host signature.", -1, djpath)
+				; Foreign hosts do not grant authority over their unrelated metadata.
+				if obj["host_signature"] != current_host
+						continue
+				if !obj.Has("device_id") or !(obj["device_id"] is String)
+						or !RegExMatch(obj["device_id"], "i)\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z")
+						throw Error("Local device identity requires a safe GUID.", -1, djpath)
+				if obj["device_id"] != DeviceFolder
+						throw Error("Local device identity does not match its directory.", -1, djpath)
+				if IsObject(matching)
+						throw Error("Multiple device identities match this host.", -1, djpath)
+				matching := obj
 		}
+		if IsObject(matching)
+				return matching
 
-		; Fresh install or clone-from-other-device → mint a new identity.
-		obj := Map(
-				"device_id",      KL_UuidV4(),
-				"name",           A_ComputerName,
-				"os",             "windows",
-				"os_version",     A_OSVersion,
+		return Map(
+				"device_id", KL_UuidV4(CreateGuidFn?),
+				"name", A_ComputerName,
+				"os", "windows",
+				"os_version", A_OSVersion,
 				"host_signature", current_host,
-				"created_at",     KL_NowTimestamp(),
+				"created_at", KL_NowTimestamp(),
 				"schema_version", KeylogConst.SCHEMA_VERSION
 		)
-		return obj
 }
 
 KL_WriteDeviceJson(obj) {

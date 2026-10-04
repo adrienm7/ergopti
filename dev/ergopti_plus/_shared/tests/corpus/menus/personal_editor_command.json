@@ -1,0 +1,67 @@
+{
+	"vectors": [
+		{
+			"name": "opens with the hotstrings master off",
+			"initial_paused": false,
+			"delivered_paused": false,
+			"pause_receipt": "boolean",
+			"opener": true,
+			"enabled": true,
+			"calls": 1
+		},
+		{
+			"name": "starts paused",
+			"initial_paused": true,
+			"delivered_paused": true,
+			"pause_receipt": "boolean",
+			"opener": true,
+			"enabled": false,
+			"calls": 0
+		},
+		{
+			"name": "refuses a callback retained before pause",
+			"initial_paused": false,
+			"delivered_paused": true,
+			"pause_receipt": "boolean",
+			"opener": true,
+			"enabled": true,
+			"calls": 0
+		},
+		{
+			"name": "refuses a missing pause owner",
+			"initial_paused": false,
+			"delivered_paused": false,
+			"pause_receipt": "missing",
+			"opener": true,
+			"enabled": false,
+			"calls": 0
+		},
+		{
+			"name": "refuses an unconfirmed pause read",
+			"initial_paused": false,
+			"delivered_paused": false,
+			"pause_receipt": "nil",
+			"opener": true,
+			"enabled": false,
+			"calls": 0
+		},
+		{
+			"name": "refuses a throwing pause read",
+			"initial_paused": false,
+			"delivered_paused": false,
+			"pause_receipt": "throw",
+			"opener": true,
+			"enabled": false,
+			"calls": 0
+		},
+		{
+			"name": "refuses a missing editor owner",
+			"initial_paused": false,
+			"delivered_paused": false,
+			"pause_receipt": "boolean",
+			"opener": false,
+			"enabled": false,
+			"calls": 0
+		}
+	]
+}

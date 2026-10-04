@@ -666,10 +666,16 @@ function M.generate(ctx, menu_mods, actions)
 		end,
 		["reload"]          = function()
 			-- Strip the leading emoji token — emoji render poorly in native macOS menu bars
-			return { { label = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""), action = actions.reload } }
+			local row = ManifestMenu.command_row("top_level", "reload", { reload = actions.reload })
+			if not row then return {} end
+			row.label = "↺ " .. row.label:gsub("^%S+ ", "")
+			return { row }
 		end,
 		["quit"]            = function()
-			return { { label = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""), action = actions.quit } }
+			local row = ManifestMenu.command_row("top_level", "quit", { quit = actions.quit })
+			if not row then return {} end
+			row.label = "✕ " .. row.label:gsub("^%S+ ", "")
+			return { row }
 		end,
 		["debug"]           = function()
 			-- The manifest declares every row of this submenu and the shared

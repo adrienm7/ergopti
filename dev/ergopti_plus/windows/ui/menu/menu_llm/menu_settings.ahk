@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../../../../_shared/modules/llm/trigger_policy.ahk
 
 
 
@@ -78,20 +79,30 @@ _LLM_Menu_NRows() {
  * URL bar filter, password field filter, and the app-exclusion picker.
  * @returns {Menu} Populated trigger submenu.
  */
-LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset) {
+LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, PrivacyCommands := 0) {
 	global _LLM_Menu
 	if !IsSet(InstantCommand)
 		InstantCommand := LLM_Menu_OnInstantToggle
 	if !IsSet(AfterCommand)
 		AfterCommand := (*) => LLM_Menu_ToggleBool("after_hotstring")
+	UrlSource := _LLM_Menu_PrivacySnapshot("disable_url_bars")
+	SecureSource := _LLM_Menu_PrivacySnapshot("disable_password_fields")
 	return MenuRenderer_Build("llm_trigger_menu", "LLM", "", "",
 		Map("llm_trigger_leading", (*) => _LLM_Menu_TriggerRows("leading"),
 			"llm_trigger_remaining", (*) => _LLM_Menu_TriggerRows("remaining")),
 		Map("llm_instant_on_word_end", (*) => _LLM_Menu_TriggerReady() && InstantCommand.Call(),
-			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call()),
+			"llm_after_hotstring", (*) => _LLM_Menu_TriggerReady() && AfterCommand.Call(),
+			"llm_url_bar_filter", (*) => _LLM_Menu_PrivacyCommand(UrlSource, "disable_url_bars",
+				PrivacyCommands is Map ? PrivacyCommands.Get("disable_url_bars", 0) : 0),
+			"llm_secure_field_filter", (*) => _LLM_Menu_PrivacyCommand(SecureSource, "disable_password_fields",
+				PrivacyCommands is Map ? PrivacyCommands.Get("disable_password_fields", 0) : 0)),
 		Map("llm_instant_on_word_end_enabled", (*) => _LLM_Menu["instant_on_word_end"],
 			"llm_after_hotstring_enabled", (*) => _LLM_Menu["after_hotstring"],
-			"llm_trigger_ready", _LLM_Menu_TriggerReady))
+			"llm_trigger_ready", _LLM_Menu_TriggerReady,
+			"llm_url_bar_filter_enabled", (*) => _LLM_Menu["disable_url_bars"],
+			"llm_secure_field_filter_enabled", (*) => _LLM_Menu["disable_password_fields"],
+			"llm_url_bar_filter_ready", (*) => LLM_TriggerPrivacyReady(UrlSource),
+			"llm_secure_field_filter_ready", (*) => LLM_TriggerPrivacyReady(SecureSource)))
 }
 
 /**
@@ -101,6 +112,60 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset) {
 _LLM_Menu_TriggerReady(*) {
 	global _LLM_Menu
 	return _LLM_Menu["enabled"] && !A_IsSuspended
+}
+
+/** Captures actual privacy runtime and exact canonical file without publication. */
+_LLM_Menu_PrivacySnapshot(Key) {
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile
+	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
+		"backend", _LLM_Menu["backend"], "value", _LLM_Menu.Get(Key, ""),
+		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
+		"blocked", true, "source", 0)
+	if Key != "disable_url_bars" && Key != "disable_password_fields"
+		return Snapshot
+	try {
+		Snapshot["source"] := _LLM_Menu_EnableReadSource()
+		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Snapshot["blocked"] := !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
+			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has(Key)
+			|| !ManifestValuesEqual(_LLM_Engine["enabled"], Snapshot["enabled"])
+			|| !(_LLM_Engine["backend"] is String)
+			|| StrCompare(_LLM_Engine["backend"], Snapshot["backend"], true) != 0
+			|| !ManifestValuesEqual(_LLM_Engine[Key], Snapshot["value"])
+		NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
+		for Field, Path in Map("enabled", "llm.enabled", "backend", "llm.models.selected",
+				"value", "llm.trigger." . NativeKey) {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
+			if Field != "backend" && Read["found"] && !(Value is TOML_Bool)
+				Snapshot["blocked"] := true
+			if Value is TOML_Bool
+				Value := Value.Value
+			if Read["blocked"] || (Field == "backend"
+				? !(Value is String) || StrCompare(Value, Snapshot[Field], true) != 0
+				: !ManifestValuesEqual(Value, Snapshot[Field]))
+				Snapshot["blocked"] := true
+		}
+		if !_LLM_Menu_EnableSourceMatches(Snapshot["source"], _LLM_Menu_EnableReadSource())
+			Snapshot["blocked"] := true
+	} catch as Err {
+		LoggerWarn("LLM", "Privacy row source is unavailable: {1}.", Err.Message)
+		Snapshot["blocked"] := true
+	}
+	return Snapshot
+}
+
+/** Refuses a retained privacy checkbox before the acknowledged native setter. */
+_LLM_Menu_PrivacyCommand(Expected, Key, Command := 0) {
+	Current := _LLM_Menu_PrivacySnapshot(Key)
+	if !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Decision := LLM_TriggerPrivacyIntent(Expected, Current)
+	if !Decision["admitted"]
+		return false
+	return HasMethod(Command, "Call")
+		? Command.Call(Key, Decision["value"], Expected) == true
+		: LLM_Menu_SetPrivacy(Key, Decision["value"], Expected) == true
 }
 
 /**
@@ -125,20 +190,6 @@ _LLM_Menu_TriggerRows(Position := "all") {
 
 	LeadingRows := Rows
 	Rows := []
-
-	Rows.Push(Map("separator", true))
-
-	; URL bar filter
-	Rows.Push(Map(
-		"label",   t("menu.llm.disable_url_bars"),
-		"checked", _LLM_Menu["disable_url_bars"],
-		"action",  (*) => LLM_Menu_ToggleBool("disable_url_bars")))
-
-	; Password field filter
-	Rows.Push(Map(
-		"label",   t("menu.llm.disable_password_fields"),
-		"checked", _LLM_Menu["disable_password_fields"],
-		"action",  (*) => LLM_Menu_ToggleBool("disable_password_fields")))
 
 	; App exclusion picker
 	n := _LLM_Menu["disabled_apps"].Length
@@ -177,12 +228,15 @@ _LLM_Menu_LiveModeRows() {
 	global _LLM_Menu
 	Live := LLM_Engine_LiveOverride()
 	Active := Live is Map
-	Rows := [Map(
-		"label",   t("menu.llm.live_mode_off"),
-		"checked", !Active,
-		"action",  (*) => LLM_Menu_StopLiveMode())]
-	; Labels must be unique within a menu: AHK addresses its rows by label
-	Seen := Map(t("menu.llm.live_mode_off"), 1)
+	Off := MenuRenderer_CheckRow("llm_live_controls", "llm_live_mode_off",
+		Map("llm_live_mode_off", (*) => LLM_Menu_StopLiveMode()),
+		Map("llm_live_is_off", (*) => !(LLM_Engine_LiveOverride() is Map),
+			"llm_live_off_ready", (*) => true))
+	if !(Off is Map)
+		return []
+	Rows := [Off]
+	; AHK addresses rows by their actual rendered label, including shared edits.
+	Seen := Map(Off["label"], 1)
 	for Choice in LLM_Menu_PromptChoices() {
 		Id := Choice["value"]
 		if !LLM_Rewrite_IsRewriteProfile(LLM_FindProfile(Id, _LLM_Menu["user_profiles"]))
@@ -332,19 +386,12 @@ _LLM_Menu_GenerationRows() {
 
 ; This initializer belongs beside the display rows so both the resident entry
 ; and the definitions-only native harness initialize the same catalogue.
-; Indent level options for multi-prediction display. Range mirrors the HS
-; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
-; build_indent_menu): negative values produce a leading deletion of N chars so
-; the prediction lines up at column-N relative to the original cursor, while
-; positive values insert N spaces before each line. Built lazily at startup
-; so the integer array stays a single source of truth.
+; These are visual prefixes of the selected and alternative prediction rows;
+; negative offsets never delete application text. The generated number feature
+; owns the accepted range used by menu selection and runtime normalization.
 global LLM_MENU_INDENT_OPTIONS := _LLMMenuBuildIndentRange()
 _LLMMenuBuildIndentRange() {
-    out := []
-    Loop 15 {
-        out.Push(A_Index - 8)   ; -7, -6, …, 0, …, 6, 7
-    }
-    return out
+	return LLM_DisplayIndentValues(ManifestFindEntryByPath("llm.display.pred_indent"))
 }
 
 /**
@@ -353,21 +400,162 @@ _LLMMenuBuildIndentRange() {
  * @param {Func} InfoCommand Optional acknowledged setting owner for native tests.
  * @returns {Menu} Populated display submenu.
  */
-LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset) {
+LLM_Menu_BuildDisplayMenu(InfoCommand := unset, ShowAllCommand := unset, StreamingCommand := unset, IndentCommand := unset) {
 	global _LLM_Menu
 	if !IsSet(InfoCommand)
-		InfoCommand := (*) => LLM_Menu_ToggleBool("show_info_bar")
+		InfoCommand := LLM_Menu_SetInfoBar
 	if !IsSet(ShowAllCommand)
 		ShowAllCommand := (*) => LLM_Menu_ToggleBool("show_all_at_once")
+	if !IsSet(StreamingCommand)
+		StreamingCommand := (*) => LLM_Menu_ToggleBool("streaming")
+	if !IsSet(IndentCommand)
+		IndentCommand := LLM_Menu_SetIndent
+	IndentSource := _LLM_Menu_IndentSnapshot()
+	StreamingSource := _LLM_Menu_StreamingSnapshot()
+	InfoSource := _LLM_Menu_InfoBarSnapshot()
 	return MenuRenderer_Build("llm_display_menu", "LLM", Map(), Map(),
 		Map("llm_display_leading", (*) => [],
 			"llm_display_remaining", (*) => _LLM_Menu_DisplayRows("remaining"),
 			"llm_display_trailing", (*) => _LLM_Menu_DisplayRows("trailing")),
-		Map("llm_info_bar", InfoCommand, "llm_show_all", (*) =>
+		Map("llm_indentation", (Value) => _LLM_Menu_IndentCommand(IndentSource, Value, IndentCommand),
+			"llm_info_bar", (*) => _LLM_Menu_InfoBarCommand(InfoSource, InfoCommand),
+			"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand),
+			"llm_show_all", (*) =>
 			_LLM_Menu_ShowAllReady() ? ShowAllCommand.Call() : false),
-		Map("llm_info_bar_enabled", (*) => _LLM_Menu["show_info_bar"], "llm_info_bar_ready", (*) => true,
+		Map("llm.display.pred_indent", (*) => IndentSource["indentation"],
+			"llm_indentation_ready", (*) => LLM_DisplayIndentReady(IndentSource),
+			"llm_info_bar_enabled", (*) => InfoSource["info_bar"],
+			"llm_info_bar_ready", (*) => LLM_DisplayInfoBarReady(InfoSource),
 			"llm_show_all_enabled", (*) => _LLM_Menu["show_all_at_once"],
-			"llm_show_all_ready", _LLM_Menu_ShowAllReady))
+			"llm_show_all_ready", _LLM_Menu_ShowAllReady,
+			"llm_token_streaming_enabled", (*) => LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
+			"llm_token_streaming_ready", (*) => LLM_DisplayStreamingReady(StreamingSource)))
+}
+
+/** Captures the live presentation owner and its exact canonical source. */
+_LLM_Menu_InfoBarSnapshot() {
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile
+	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
+		"backend", _LLM_Menu["backend"], "info_bar", _LLM_Menu["show_info_bar"],
+		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
+		"source", 0, "blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
+			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has("show_info_bar")
+			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
+			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
+			|| _LLM_Engine["show_info_bar"] != _LLM_Menu["show_info_bar"])
+	try {
+		Snapshot["source"] := _LLM_Menu_EnableReadSource()
+		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		for Field, Path in Map("enabled", "llm.enabled", "info_bar", "llm.display.show_info_bar",
+				"backend", "llm.models.selected") {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
+			if Read["found"] && (Field == "enabled" || Field == "info_bar") && !(Value is TOML_Bool)
+				Snapshot["blocked"] := true
+			if Value is TOML_Bool
+				Value := Value.Value
+			if Read["blocked"] || !ManifestValuesEqual(Value, Snapshot[Field])
+				Snapshot["blocked"] := true
+		}
+		if !_LLM_Menu_EnableSourceMatches(Snapshot["source"], _LLM_Menu_EnableReadSource())
+			Snapshot["blocked"] := true
+	} catch {
+		Snapshot["blocked"] := true
+	}
+	return Snapshot
+}
+
+/** Refuses stale native commands before their acknowledged setting owner. */
+_LLM_Menu_InfoBarCommand(Expected, Command) {
+	Current := _LLM_Menu_InfoBarSnapshot()
+	if !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Decision := LLM_DisplayInfoBarIntent(Expected, Current)
+	if !Decision["admitted"]
+		return false
+	return Command.Call(Decision["value"], Expected) == true
+}
+
+/** Captures the current menu identity, native agreement and exact file source. */
+_LLM_Menu_IndentSnapshot() {
+	global _LLM_Menu, _LLM_Engine, ConfigurationFile
+	Snapshot := Map("owner", _LLM_Menu, "generation", LLM_AuxGeneration(),
+		"backend", _LLM_Menu["backend"], "indentation", _LLM_Menu["pred_indent"],
+		"progressive", LLM_DisplayProgressive(_LLM_Menu["show_all_at_once"]),
+		"count", _LLM_Menu["n_predictions"], "enabled", _LLM_Menu["enabled"],
+		"paused", A_IsSuspended ? true : false, "source", 0,
+		"blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map) || !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend")
+			|| !_LLM_Engine.Has("pred_indent") || !_LLM_Engine.Has("n_predictions")
+			|| !_LLM_Engine.Has("show_all_at_once")
+			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
+			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
+			|| _LLM_Engine["pred_indent"] != _LLM_Menu["pred_indent"]
+			|| _LLM_Engine["n_predictions"] != _LLM_Menu["n_predictions"]
+			|| _LLM_Engine["show_all_at_once"] != _LLM_Menu["show_all_at_once"])
+	try {
+		Snapshot["source"] := _LLM_Menu_EnableReadSource()
+		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		for Field, Path in Map("enabled", "llm.enabled", "count", "llm.profiles.num_predictions",
+				"indentation", "llm.display.pred_indent", "progressive", "llm.display.streaming_multi",
+				"backend", "llm.models.selected") {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Path)
+			if Read["found"] && (Field == "enabled" || Field == "progressive") && !(Value is TOML_Bool)
+				Snapshot["blocked"] := true
+			if Value is TOML_Bool
+				Value := Value.Value
+			else if (Field == "count" || Field == "indentation") && Value is Float && Value == Integer(Value)
+				Value := Integer(Value)
+			if Read["blocked"] || !ManifestValuesEqual(Value, Snapshot[Field])
+				Snapshot["blocked"] := true
+		}
+		if !_LLM_Menu_EnableSourceMatches(Snapshot["source"], _LLM_Menu_EnableReadSource())
+			Snapshot["blocked"] := true
+	} catch {
+		Snapshot["blocked"] := true
+	}
+	return Snapshot
+}
+
+/** Refuses held commands before their existing acknowledged native setter. */
+_LLM_Menu_IndentCommand(Expected, Value, Command) {
+	Current := _LLM_Menu_IndentSnapshot()
+	if !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
+		return false
+	Decision := LLM_DisplayIndentIntent(Expected, Current, Value, LLM_MENU_INDENT_OPTIONS)
+	if !Decision["admitted"]
+		return false
+	return Command.Call(Decision["value"], Expected) == true
+}
+
+/**
+ * Captures the exact current menu/runtime owner without acquiring input.
+ * @returns {Map} Native token-streaming admission snapshot.
+ */
+_LLM_Menu_StreamingSnapshot() {
+	global _LLM_Menu, _LLM_Engine
+	return Map("owner", _LLM_Menu, "generation", 0, "platform", "ahk",
+		"backend", _LLM_Menu["backend"], "streaming", _LLM_Menu["streaming"],
+		"progressive", LLM_DisplayProgressive(_LLM_Menu["show_all_at_once"]),
+		"enabled", _LLM_Menu["enabled"], "paused", A_IsSuspended ? true : false,
+		"blocked", !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
+			|| !_LLM_Engine.Has("backend") || !_LLM_Engine.Has("enabled")
+			|| _LLM_Engine["backend"] != _LLM_Menu["backend"]
+			|| _LLM_Engine["enabled"] != _LLM_Menu["enabled"]
+			|| !LLM_EffectiveStreaming(_LLM_Menu["backend"], true))
+}
+
+/**
+ * Refuses an obsolete or unsupported checkbox before the canonical transaction.
+ * @param {Map} Expected Exact owner captured during rendering.
+ * @param {Func} Command Existing acknowledged native setting owner.
+ * @returns {Integer} Boolean acknowledgement.
+ */
+_LLM_Menu_StreamingCommand(Expected, Command) {
+	Decision := LLM_DisplayStreamingIntent(Expected, _LLM_Menu_StreamingSnapshot())
+	if !Decision["admitted"]
+		return false
+	return Command.Call() == true
 }
 
 /**
@@ -396,45 +584,9 @@ _LLM_Menu_DisplayRows(Position := "all") {
 
 	Rows.Push(Map("separator", true))
 
-	; Streaming (token-by-token display) — only meaningful when show-all-at-once
-	; (multi) is enabled
-	Rows.Push(Map(
-"label",    t("menu.llm.show_streaming"),
-"checked",  LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
-"disabled", !_LLM_Menu["show_all_at_once"] || !LLM_EffectiveStreaming(_LLM_Menu["backend"], true),
-		"action",   (*) => LLM_Menu_ToggleBool("streaming")))
-
 	LeadingRows := Rows
 	Rows := []
 
-	Rows.Push(Map("separator", true))
-
-	; Indent level submenu — mirrors HS settings_manager.build_indent_menu():
-	;   0           → "Aucun" (special-cased so 0 reads naturally).
-	;   -1 or +1    → singular "espace" (with sign preserved so the user can
-	;                 tell -1 from +1 — HS has a quirk that hides the number
-	;                 for these values; AHK fixes the readability here).
-	;   anything else → "N espaces" (plural, sign preserved for negatives).
-	; Negative values yield a leading deletion of N chars so the predicted
-	; continuation lines up at column-N relative to the original cursor.
-	IndentRows := []
-	for lvl in LLM_MENU_INDENT_OPTIONS {
-		if (lvl == 0) {
-			indent_label := t("menu.llm.indent_none")
-		} else if (lvl == 1 or lvl == -1) {
-			indent_label := lvl . " " . t("menu.llm.indent_space")
-		} else {
-			indent_label := lvl . " " . t("menu.llm.indent_spaces")
-		}
-		IndentRows.Push(Map(
-			"label",   indent_label,
-			"checked", (lvl == _LLM_Menu["pred_indent"]),
-			"action",  _LLM_Menu_MakeSetIndentHandler(lvl)))
-	}
-	Rows.Push(Map(
-		"label",    t("menu.llm.indent_label"),
-		"disabled", (n < 2),
-		"items",    IndentRows))
 	_LLM_MaybeResetRow(Rows,
 		_LLM_Menu["pred_indent"],
 		_LLM_DefaultFor("llm_pred_indent", 0),

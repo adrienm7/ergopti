@@ -41,7 +41,9 @@ local function with_writer_spy(module_name, invoke)
 	local captured = nil
 	-- One fake fits every handler: batch_write (config.toml handlers) and write
 	-- (hotstring group-file handlers) both capture their arguments.
+	local classified_read = require("toml_codec.writer").read_classified
 	local fake = {
+		read_classified = classified_read,
 		batch_write = function(path, updates)
 			captured = { method = "batch_write", path = path, updates = updates }
 			return true
@@ -300,4 +302,127 @@ helpers.describe("shared toml writer preserves file-level tuning (meta-tuning)",
       "no section_delays block without section delays")
   end)
 
+end)
+
+-- A source read/refusal must not be converted into a new empty personal file.
+-- These cases run the actual bridge, codec, staged writer and native files.
+helpers.describe("hotstring editor classified source admission", function()
+	local seed = '# independent file tuning\n[_meta]\ndescription = "Personal"\npriority = 80\ndelay = 0.5\nshow_tooltip = false\nsections_order = ["english"]\n\n[[english]]\n"old" = { output = "previous", is_word = false }\n'
+	local foreign = '# external writer\n[_meta]\ndescription = "Foreign"\nsections_order = []\n'
+	local function observe(mode, initial)
+		local root = os.tmpname()
+		os.remove(root)
+		local made = os.execute('mkdir "' .. root .. '"')
+		assert(made == true or made == 0)
+		local path = root .. "/personal.toml"
+		local native_open, native_rename = io.open, os.rename
+		local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
+		local writer = require("toml_codec.writer")
+		local reader = require("toml_codec.reader")
+		local old_writer, old_reader = package.loaded["toml_codec.writer"], package.loaded["toml_codec.reader"]
+		local obs = { stages = 0, renames = 0, reloads = 0, source = initial }
+		local function put(content)
+			local fh = assert(native_open(path, "w")); assert(fh:write(content)); assert(fh:close())
+		end
+		if initial then put(initial) end
+		local ok, problem = pcall(function()
+			io.open = function(target, access)
+				if target == path and access == "r" then
+					if mode == "open_false" then return nil, "controlled unreadable", 13 end
+					if mode == "open_throw" then error("controlled source open refusal") end
+					local fh, err, code = native_open(target, access)
+					if fh and (mode == "read_nil" or mode == "close_nil" or mode == "close_false") then
+						return {
+							read = function(_, ...) if mode == "read_nil" then return nil end; return fh:read(...) end,
+							lines = function() return fh:lines() end,
+							close = function() local closed = fh:close(); if mode == "close_nil" then return nil end; if mode == "close_false" then return false end; return closed end,
+						}
+					end
+					return fh, err, code
+				end
+				if target == path .. ".tmp" and access == "w" then
+					obs.stages = obs.stages + 1
+					if mode == "stale" or mode == "appeared" then put(foreign); obs.source = foreign end
+				end
+				return native_open(target, access)
+			end
+			os.rename = function(from, to)
+				if to == path then
+					obs.renames = obs.renames + 1
+					if mode == "rename_false" then return false, "controlled publish refusal" end
+					if mode == "rename_nil" then return nil, "controlled publish refusal" end
+					if mode == "rename_throw" then error("controlled publish refusal") end
+				end
+				return native_rename(from, to)
+			end
+			if mode == "parse_false" or mode == "parse_nil" or mode == "parse_truthy" or mode == "parse_throw" or mode == "missing_parse" then
+				local port = {}; for key, value in pairs(reader) do port[key] = value end
+				port.parse_text = function(content)
+					if mode == "parse_throw" then error("controlled parse refusal") end
+					local data = reader.parse_text(content)
+					if mode == "parse_false" then return data, false end
+					if mode == "parse_truthy" then return data, 2 end
+					return data
+				end
+				if mode == "missing_parse" then port.parse_text = nil end
+				package.loaded["toml_codec.reader"] = port
+			end
+			if mode == "missing_classified" or mode == "write_truthy" then
+				local port = {}; for key, value in pairs(writer) do port[key] = value end
+				if mode == "missing_classified" then port.read_classified = nil else port.write = function() return 2 end end
+				package.loaded["toml_codec.writer"] = port
+			end
+			local bridge = helpers.load_module("ui.hotstring_editor.bridge")
+			obs.result = bridge.on_message({ action = "save", data = {
+				sections_order = { "english" }, sections = { english = { entries = { { trigger = "new", output = "next" } } } },
+			} }, { config = { get_config_dir = function() return root end, reload = function() obs.reloads = obs.reloads + 1; return 10 end } })
+		end)
+		io.open, os.rename = native_open, native_rename
+		package.loaded["ui.hotstring_editor.bridge"] = old_bridge
+		package.loaded["toml_codec.writer"], package.loaded["toml_codec.reader"] = old_writer, old_reader
+		local fh = native_open(path, "r"); obs.bytes = fh and fh:read("*a") or nil; if fh then fh:close() end
+		local stage = native_open(path .. ".tmp", "r"); obs.stage_left = stage ~= nil; if stage then stage:close() end
+		os.remove(path); os.remove(path .. ".tmp"); os.remove(root)
+		obs.ok, obs.problem = ok, problem
+		obs.restored = io.open == native_open and os.rename == native_rename
+			and package.loaded["ui.hotstring_editor.bridge"] == old_bridge
+			and package.loaded["toml_codec.writer"] == old_writer and package.loaded["toml_codec.reader"] == old_reader
+		return obs
+	end
+	for _, mode in ipairs({ "malformed", "open_false", "open_throw", "read_nil", "close_nil", "close_false", "parse_false", "parse_nil", "parse_truthy", "parse_throw", "missing_parse", "missing_classified", "stale", "appeared", "rename_false", "rename_nil", "rename_throw", "write_truthy" }) do
+		helpers.it("personal source refusal retains native bytes: " .. mode, function()
+			local initial = mode == "malformed" and '[info\nbroken' or seed
+			if mode == "appeared" then initial = nil end
+			local obs = observe(mode, initial)
+			helpers.assert_true(obs.restored, "every native and module port must be restored before assertions")
+			helpers.assert_true(obs.ok, "source refusal must return a receipt without escaping the handler")
+			helpers.assert_eq(obs.result.saved, false, "a refused source or publication cannot acknowledge saved")
+			helpers.assert_eq(obs.bytes, obs.source, "the exact original or concurrent source must remain on disk")
+			helpers.assert_eq(obs.reloads, 0, "refused publication must not reload the catalogue")
+			helpers.assert_eq(obs.stage_left, false, "the owned stage must be retired on refusal")
+			if mode ~= "stale" and mode ~= "appeared" and not mode:match("^rename_") then
+				helpers.assert_eq(obs.stages, 0, "source admission must refuse before opening the owned stage")
+			end
+		end)
+	end
+	for _, mode in ipairs({ "present", "absent" }) do
+		helpers.it("personal classified source preserves successful replacement: " .. mode, function()
+			local obs = observe(mode, mode == "present" and seed or nil)
+			helpers.assert_true(obs.restored)
+			helpers.assert_true(obs.ok)
+			helpers.assert_eq(obs.result.saved, true)
+			helpers.assert_eq(obs.renames, 1, "one native atomic publication must acknowledge replacement")
+			helpers.assert_eq(obs.reloads, 1)
+			helpers.assert_eq(obs.stage_left, false)
+			local parsed, committed = require("toml_codec.reader").parse_text(obs.bytes)
+			helpers.assert_eq(committed, true)
+			helpers.assert_eq(parsed.sections.english.entries[1].trigger, "new", "the requested whole-model edit must persist")
+			helpers.assert_eq(#parsed.sections.english.entries, 1, "deleted old entries must stay deleted")
+			if mode == "present" then
+				helpers.assert_eq(parsed.meta.priority, 80)
+				helpers.assert_eq(parsed.meta.delay, 0.5)
+				helpers.assert_eq(parsed.meta.show_tooltip, false)
+			end
+		end)
+	end
 end)

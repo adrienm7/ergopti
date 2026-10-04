@@ -232,3 +232,94 @@ helpers.describe("prediction backend: the raise-temperature switch", function()
 	end)
 
 end)
+
+
+helpers.describe("local API configuration uses the ordinary prediction admission owner", function()
+	helpers.it("master OFF permits configuration but pause and retained scope debt refuse it", function()
+		local engine, _, scheduler, restore = load("ollama", nil, { ["llm.enabled"] = false })
+		-- The engine reads the profiles owner, not the storage fixture directly.
+		package.loaded["modules.llm.profiles"].is_enabled = function() return false end
+		local paused, debt = false, true
+		local owner = { pending = function() return debt end }
+		local ok, err = pcall(function()
+			engine.init({ scheduler = scheduler, is_paused = function() return paused end })
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_eq(engine.can_configure_local_servers(), true)
+			paused = true
+			helpers.assert_eq(engine.can_configure_local_servers(), false)
+			paused = false
+			helpers.assert_eq(engine.acquire_configuration(owner), true)
+			helpers.assert_eq(engine.can_configure_local_servers(), false)
+			helpers.assert_eq(engine.release_configuration(owner), false)
+			helpers.assert_eq(engine.can_configure_local_servers(), false)
+			debt = false
+			helpers.assert_eq(engine.release_configuration(owner), true)
+			helpers.assert_eq(engine.can_configure_local_servers(), true)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("backend publication rechecks actual admission after dismissal", function()
+	for _, condition in ipairs({"pause", "foreign source", "admission withdrawn", "unchanged"}) do
+		helpers.it("retains canonical bytes after dismissal: " .. condition .. " (backend-second-admission)", function()
+			local Sandbox = require("test.config_unused_keys_contract").sandbox
+			local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[future]\nvalue = 42 # independently owned\n'
+			Sandbox.with_config(initial, function(path)
+				local engine, _, scheduler, restore = load("ollama", nil)
+				local previous_paths = package.loaded["infra.config_paths"]
+				local ok, err = xpcall(function()
+					package.loaded["infra.config_paths"] = {config = function() return path end}
+					package.loaded["infra.llm_preferences"] = nil
+					local preferences = require("infra.llm_preferences")
+					local _, captured = preferences.get_many({"llm.models.selected"})
+					local paused, allowed, armed = false, true, false
+					local observations = {dismissals = 0, admissions = 0, changed = false}
+					local foreign = initial:gsub("value = 42", "value = 73")
+					engine.init({scheduler = scheduler, is_paused = function() return paused end,
+						overlay = {hide = function()
+							if not armed then return end
+							observations.dismissals = observations.dismissals + 1
+							if condition == "pause" then paused = true end
+							if condition == "admission withdrawn" then allowed = false end
+							if condition == "foreign source" then
+								Sandbox.write_bytes(path, foreign)
+								observations.changed = Sandbox.read_bytes(path) == foreign
+							end
+						end}})
+					armed = true
+					local function admission()
+						observations.admissions = observations.admissions + 1
+						local _, current = preferences.get_many({"llm.models.selected"})
+						return allowed and engine.can_configure_local_servers() == true
+							and preferences.admit() == true and captured.status == current.status
+							and captured.content == current.content
+					end
+					local committed = engine.set_backend("api", admission)
+					armed = false
+					-- Assertions follow the actual dismissal observer; none can be swallowed by production.
+					helpers.assert_eq(observations.dismissals, 1, "the real dismissal must invoke its native overlay port")
+					helpers.assert_eq(committed, condition == "unchanged")
+					local bytes = Sandbox.read_bytes(path)
+					if condition == "unchanged" then
+						local decoded = require("toml_codec").decode(bytes)
+						helpers.assert_eq(decoded.llm.models.selected, "api", "the real preference writer must acknowledge a new canonical backend")
+						helpers.assert_eq(decoded.future.value, 42)
+						package.loaded["infra.llm_preferences"] = nil
+						helpers.assert_eq(require("infra.llm_preferences").get("llm.models.selected"), "api", "a fresh actual reader must observe the durable backend")
+					else
+						helpers.assert_eq(bytes, condition == "foreign source" and foreign or initial)
+						helpers.assert_eq(preferences.get("llm.models.selected"), "ollama")
+						if condition == "foreign source" then helpers.assert_eq(observations.changed, true) end
+					end
+					helpers.assert_eq(observations.admissions, 2, "the existing admission owner is rechecked after real dismissal")
+				end, debug.traceback)
+				package.loaded["infra.config_paths"] = previous_paths
+				restore()
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+end)

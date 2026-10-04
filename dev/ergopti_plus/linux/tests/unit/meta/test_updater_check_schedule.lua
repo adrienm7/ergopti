@@ -45,6 +45,7 @@ local function with_manager(opts, body)
 		handle.armed = false
 		return true
 	end
+	ctx.timer = timer
 	package.loaded["adapters.timer_scheduler"] = timer
 	local initial = {}
 	ctx.state_key = nil
@@ -252,6 +253,135 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 			ctx.M.mark_config_reads(decoded, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
 			helpers.assert_eq(marked, { "updater.check_interval_seconds" },
 				"the unused-key cleanup must not offer the interval")
+		end)
+	end)
+end)
+
+helpers.describe("updater automatic schedule publication ownership", function()
+	local function dispatch_due(ctx)
+		ctx.clock.now = ctx.clock.now + last_timer(ctx).delay
+		fire(ctx)
+		return ctx.dispatches[#ctx.dispatches]
+	end
+
+	helpers.it("a stopped schedule rejects its held and duplicate completion", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			local held = dispatch_due(ctx)
+			local before = record(ctx)
+			helpers.assert_true(ctx.M.stop_background_checks())
+			held(true, { tag = "v1.4.0" }, nil)
+			held(true, { tag = "v1.4.0" }, nil)
+			helpers.assert_eq(record(ctx), before, "a stopped owner cannot record an old check")
+			helpers.assert_eq(ctx.available, {}, "a stopped owner cannot announce its result")
+		end)
+	end)
+
+	helpers.it("restart rejects the predecessor and admits its own completion once", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			local old = dispatch_due(ctx)
+			helpers.assert_true(ctx.M.stop_background_checks())
+			helpers.assert_true(ctx.M.start_background_checks())
+			local current = dispatch_due(ctx)
+			helpers.assert_eq(#ctx.dispatches, 2)
+			local before = record(ctx)
+			old(true, { tag = "v9.0.0" }, nil)
+			helpers.assert_eq(record(ctx), before)
+			helpers.assert_eq(ctx.available, {})
+			current(true, { tag = "v1.4.0" }, nil)
+			local acknowledged = record(ctx)
+			helpers.assert_eq(ctx.available, { "v1.4.0" })
+			helpers.assert_eq(acknowledged.last_notified_tag, "v1.4.0")
+			current(true, { tag = "v1.5.0" }, nil)
+			old(true, { tag = "v9.0.0" }, nil)
+			helpers.assert_eq(record(ctx), acknowledged, "duplicate and predecessor callbacks cannot replace the current receipt")
+			helpers.assert_eq(ctx.available, { "v1.4.0" })
+		end)
+	end)
+
+	for _, refusal in ipairs({ "false", "nil", "text" }) do
+		helpers.it("failed native timer cancellation revokes publication but retains cleanup: " .. refusal, function()
+			with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+				local held = dispatch_due(ctx)
+				local owned = last_timer(ctx)
+				local native_cancel = ctx.timer.cancel
+				local observed = {}
+				ctx.timer.cancel = function(handle)
+					observed[#observed + 1] = handle
+					if refusal == "false" then return false end
+					if refusal == "text" then return "refused" end
+					return nil
+				end
+				local stopped = ctx.M.stop_background_checks()
+				local restarted = ctx.M.start_background_checks()
+				local before = record(ctx)
+				local timer_count, dispatch_count = #ctx.timers, #ctx.dispatches
+				held(true, { tag = "v9.0.0" }, nil)
+				owned.fn()
+				ctx.timer.cancel = native_cancel
+				helpers.assert_eq(stopped, false)
+				helpers.assert_eq(restarted, false, "a retained timer must still refuse replacement")
+				helpers.assert_eq(observed, { owned, owned }, "the same exact timer remains owned through the retry")
+				helpers.assert_true(owned.armed, "logical revocation is not native timer retirement")
+				helpers.assert_eq(record(ctx), before)
+				helpers.assert_eq(ctx.available, {})
+				helpers.assert_eq(#ctx.timers, timer_count, "an old timer cannot arm a successor after refusal")
+				helpers.assert_eq(#ctx.dispatches, dispatch_count)
+				helpers.assert_true(ctx.M.start_background_checks(), "an acknowledged native retirement permits a new owner")
+				helpers.assert_eq(owned.armed, false)
+				local successor = last_timer(ctx)
+				owned.fn()
+				helpers.assert_true(successor.armed, "a retired predecessor cannot detach the new timer")
+			end)
+		end)
+	end
+
+	helpers.it("a retired timer cannot enter the restarted schedule", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			local retired = last_timer(ctx)
+			helpers.assert_true(ctx.M.start_background_checks())
+			local successor = last_timer(ctx)
+			local count = #ctx.timers
+			retired.fn()
+			helpers.assert_eq(#ctx.timers, count)
+			helpers.assert_eq(#ctx.dispatches, 0)
+			helpers.assert_true(successor.armed)
+			dispatch_due(ctx)(true, { tag = "v1.4.0" }, nil)
+			helpers.assert_eq(ctx.available, { "v1.4.0" })
+		end)
+	end)
+
+	helpers.it("same-generation completion publishes exactly once", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			local held = dispatch_due(ctx)
+			local native_set = ctx.storage.set
+			local writes = 0
+			ctx.storage.set = function(...)
+				writes = writes + 1
+				return native_set(...)
+			end
+			held(true, { tag = "v1.4.0" }, nil)
+			held(true, { tag = "v1.5.0" }, nil)
+			ctx.storage.set = native_set
+			helpers.assert_eq(writes, 2, "one check record and one accepted notification receipt")
+			helpers.assert_eq(record(ctx).last_notified_tag, "v1.4.0")
+			helpers.assert_eq(ctx.available, { "v1.4.0" })
+		end)
+	end)
+
+	helpers.it("notification reentry cannot stamp a retired owner's receipt", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			local observed = { notifications = 0 }
+			helpers.assert_true(ctx.M.start_background_checks(nil, nil, function()
+				observed.notifications = observed.notifications + 1
+				observed.stopped = ctx.M.stop_background_checks()
+				return true
+			end))
+			local held = dispatch_due(ctx)
+			held(true, { tag = "v1.4.0" }, nil)
+			helpers.assert_eq(observed.notifications, 1)
+			helpers.assert_eq(observed.stopped, true)
+			helpers.assert_nil(record(ctx).last_notified_tag, "a callback that retires its owner cannot publish the subsequent stamp")
+			helpers.assert_eq(record(ctx).last_check_at, ctx.clock.now, "the completed check was recorded before legitimate retirement")
 		end)
 	end)
 end)

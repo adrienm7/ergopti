@@ -931,7 +931,9 @@ _Updater_BeginDeferredChannelReload(BoundaryOwner, ReloadFn := 0,
 	return State
 }
 
-_Updater_RunDeferredChannelReload(State, ArmEpoch := unset, NowTick := unset) {
+_Updater_RunDeferredChannelReload(State, ArmEpoch := unset, NowTick := unset,
+	FailFn := _Updater_FailDeferredChannelReload,
+	ArmFn := _Updater_ArmDeferredChannelReload) {
 	global _UpdaterChannelReloadTransition
 	if !IsObject(State)
 		return false
@@ -954,15 +956,16 @@ _Updater_RunDeferredChannelReload(State, ArmEpoch := unset, NowTick := unset) {
 	if !Current
 		return false
 	if !_Updater_ChannelReloadQuiescent() {
+		StartedTick := State.StartTick
 		if !IsSet(NowTick)
 			NowTick := A_TickCount
-		if TickExpired(State.StartTick, State.TimeoutMs, NowTick) {
+		if TickExpired64(StartedTick, State.TimeoutMs, NowTick) {
 			_Updater_RetireDeferredChannelReload(State)
-			_Updater_FailDeferredChannelReload(State,
+			FailFn.Call(State,
 				"channel reload quiescence timed out")
 			return false
 		}
-		_Updater_ArmDeferredChannelReload(State)
+		ArmFn.Call(State)
 		return false
 	}
 	; Retire before Reload so a yielding handoff cannot rearm this exact state.
@@ -975,12 +978,12 @@ _Updater_RunDeferredChannelReload(State, ArmEpoch := unset, NowTick := unset) {
 	catch as Err
 		ReloadErr := Err
 	if IsObject(ReloadErr) {
-		_Updater_FailDeferredChannelReload(
+		FailFn.Call(
 			State, "Reload raised an exception", ReloadErr)
 		return false
 	}
 	if !_Updater_ResultSucceeded(ReloadResult) {
-		_Updater_FailDeferredChannelReload(State, "Reload returned false")
+		FailFn.Call(State, "Reload returned false")
 		return false
 	}
 	; The launched reload owns the configuration bundle until OnExit, so only

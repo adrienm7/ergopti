@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Fjern Ergopti fra Karabiner",
 	"menu.global.restore_touchpad_gestures": "Gendan Windows-touchpadbevægelser",
 	"dialog.start_at_login.failed": "Automatisk start kunne ikke ændres. Kontrollér systemets startindstillinger.",
-	"onboarding.error.open_failed": "Opsætningsguiden kunne ikke åbnes. Se logfilerne, og prøv igen fra menuen."
+	"onboarding.error.open_failed": "Opsætningsguiden kunne ikke åbnes. Se logfilerne, og prøv igen fra menuen.",
+	"platform_reason.token_streaming_transport_missing": "Ikke på Windows: Windows kan endnu ikke vise forslag token for token. Denne indstilling forbliver inaktiv."
 }

@@ -462,7 +462,9 @@ local function merge_section_sources(data, section_sources, toml_reader)
 			end
 		end
 	end
-	return { meta = meta, sections = sections, sections_order = order }
+	-- Bound files retain the existing binding owner's declared section order.
+	-- This is ephemeral provenance, never a TOML metadata or preference field.
+	return { meta = meta, sections = sections, sections_order = order, registration_order = "sections" }
 end
 
 --- Loads and parses mappings from a TOML configuration file.
@@ -513,6 +515,7 @@ function M.load_toml(name, path, section_sources, personal_source)
 	local mappings_before = #_state.mappings
 	_state.current_group = name
 	local sections_info  = {}
+	local registrations = {}
 
 	-- Collision-priority cascade inputs (individual > section > file > source).
 	-- The shared user-override file (hotstrings_config.toml) sits ABOVE the TOML
@@ -605,8 +608,9 @@ function M.load_toml(name, path, section_sources, personal_source)
 				and sec_meta.priority or nil
 			local override_priority = user_priority(sec_name) or file_user_priority
 				or sec_meta_priority or file_meta_priority
-			for _, entry in ipairs(entries) do
-				_callbacks.add(entry.trigger, entry.output, {
+			registrations[sec_name] = {}
+			for index, entry in ipairs(entries) do
+				registrations[sec_name][index] = { entry = entry, options = {
 					is_word           = entry.is_word,
 					auto_expand       = entry.auto_expand,
 					is_case_sensitive = entry.is_case_sensitive,
@@ -615,7 +619,7 @@ function M.load_toml(name, path, section_sources, personal_source)
 					section           = sec_name,
 					personal_source   = owned_source,
 					priority          = _callbacks.resolve_priority(entry.priority, override_priority, nil, name),
-				})
+				} }
 			end
 		else
 			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", name, sec_name)
@@ -628,6 +632,14 @@ function M.load_toml(name, path, section_sources, personal_source)
 		})
 
 		::continue_sec::
+	end
+
+	for _, record in ipairs(require("toml_codec.reader").registration_order(data, name, registrations)) do
+		local section = registrations[record.section]
+		local registration = section and section[record.index]
+		if registration then
+			_callbacks.add(registration.entry.trigger, registration.entry.output, registration.options)
+		end
 	end
 
 	_state.current_group = nil
@@ -804,6 +816,17 @@ end
 --- @return boolean
 function M.is_group_enabled(name)
 	return _state and _state.groups[name] ~= nil and _state.groups[name].enabled or false
+end
+
+--- Captures one actual TOML owner without exposing its mutable group record.
+--- @param name string Registered native group identity.
+--- @return table|nil binding Owned provenance and current-owner predicate.
+function M.personal_file_scope_binding(name)
+	if not require_state("personal_file_scope_binding") then return nil end
+	local group = _state.groups[name]
+	if not group or group.kind ~= "toml" or not PersonalFiles.is_descriptor(group.personal_source) then return nil end
+	return { source = PersonalFiles.copy(group.personal_source), path = group.path,
+		current = function() return _state.groups[name] == group end }
 end
 
 --- Returns a flat table of {name → enabled} for all registered groups.

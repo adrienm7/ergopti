@@ -470,7 +470,7 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 }
 
 ; Renders the same declared command/check in full and native-built menus.
-_MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+_MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 	ItemType := _MR_Get(Item, "type")
 	Id := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
@@ -479,23 +479,67 @@ _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 		CmdId := Id
 	if Id == "" || I18nKey == "" || !(Commands is Map) || !Commands.Has(CmdId) {
 		try LoggerError("MenuRenderer", "Missing declaration or command for '{1}.{2}'.", ManifestKey, Id)
-		return 0
+		return false
 	}
 	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
-	; Greyed by disabled_when with the reason it declares, the row is drawn as
-	; the same stand-in as a row this platform has not yet ported, « label —
-	; head of the reason », with nothing to run: the two differ only in how the
-	; condition is evaluated.
 	ReasonKey := _MR_Get(Item, "disabled_reason_key")
 	if Disabled && ReasonKey != ""
-		return _MR_RenderGreyedStandIn(ResultMenu,
-			Map("id", Id, "i18n", I18nKey, "reason_key", ReasonKey), ManifestKey)
+		return Map("label", t(I18nKey), "disabled", true, "disabled_reason_key", ReasonKey)
 	Row := Map("label", t(I18nKey), "action", Commands[CmdId])
 	if Disabled
 		Row["disabled"] := true
 	if ItemType == "check"
 		Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
-	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+	return Row
+}
+
+_MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Row := _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters)
+	if !(Row is Map)
+		return 0
+	; Keep the existing native stand-in owner and its untracked inert callback.
+	if Row.Has("disabled_reason_key")
+		return _MR_RenderGreyedStandIn(ResultMenu,
+			Map("id", _MR_Get(Item, "id"), "i18n", _MR_Get(Item, "i18n"),
+				"reason_key", Row["disabled_reason_key"]), ManifestKey)
+	return _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1)
+}
+
+; Provider callbacks use the same current declaration as the drawn row.
+_MR_CommandProviderDelivery(ManifestKey, CommandId, Action, Getters, *) {
+	if MenuRenderer_ResolveDisabledWhen(ManifestKey, CommandId, Getters)
+		return false
+	return Action.Call()
+}
+
+/**
+ * Supplies one declared command as provider data for a caller-owned menu.
+ * @param {String} ManifestKey Owning shared menu declaration.
+ * @param {String} CommandId Declared command identifier.
+ * @param {Map} Commands Native callbacks indexed by command identifier.
+ * @param {Map} StateGetters Native state readers.
+ * @returns {Map|false} Canonical provider row or a refused declaration.
+ */
+_MR_DeclaredProviderRow(ManifestKey, CommandId, Commands, StateGetters, ExpectedType) {
+	Item := _MR_FindItemById(ManifestKey, CommandId)
+	if !(Item is Map) || _MR_Get(Item, "type") != ExpectedType || !_MR_IsForAhk(Item)
+		return false
+	Getters := IsSet(StateGetters) ? StateGetters : Map()
+	Row := _MR_CommandRowData(Item, ManifestKey, Commands, Getters)
+	if Row is Map && Row.Has("action")
+		Row["action"] := _MR_CommandProviderDelivery.Bind(ManifestKey, CommandId, Row["action"], Getters)
+	return Row
+}
+
+; A checked command uses the same declaration and retained readiness policy.
+MenuRenderer_CommandRow(ManifestKey, CommandId, Commands, StateGetters := unset) {
+	return _MR_DeclaredProviderRow(ManifestKey, CommandId, Commands,
+		IsSet(StateGetters) ? StateGetters : Map(), "command")
+}
+
+MenuRenderer_CheckRow(ManifestKey, CheckId, Commands, StateGetters := unset) {
+	return _MR_DeclaredProviderRow(ManifestKey, CheckId, Commands,
+		IsSet(StateGetters) ? StateGetters : Map(), "check")
 }
 
 /**
@@ -595,6 +639,7 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 		ChoiceLabel := _MR_Get(Choice, "label")
 		if ChoiceLabel == ""
 			ChoiceLabel := t(_MR_Get(Choice, "i18n"))
+		ChoiceLabel := _MR_Get(Choice, "label_prefix") . ChoiceLabel
 		if HasCurrent and Current == Value {
 			CurrentI18n := _MR_Get(Choice, "current_i18n")
 			CurrentLabel := CurrentI18n == "" ? ChoiceLabel : t(CurrentI18n)

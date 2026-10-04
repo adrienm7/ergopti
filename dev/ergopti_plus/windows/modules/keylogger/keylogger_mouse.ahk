@@ -613,7 +613,7 @@ _KL_Mouse_ProcessParkSample(State, mx, my, Now, Suspended, Filtered, Initialized
 		return
 	}
 
-	still_ms := (Now - State.park_still_since) & 0xFFFFFFFF
+	still_ms := TickElapsed64(State.park_still_since, Now)
 	if (still_ms < KLMouseConst.PARK_IDLE_MS)
 		return
 
@@ -623,7 +623,7 @@ _KL_Mouse_ProcessParkSample(State, mx, my, Now, Suspended, Filtered, Initialized
 		fdy := my - State.park_fired_y
 		fire_dist := Sqrt(fdx*fdx + fdy*fdy)
 		if (fire_dist < KLMouseConst.PARK_MIN_MOVE_PX
-				&& ((Now - State.park_fired_at) & 0xFFFFFFFF) < 30000)
+				&& TickElapsed64(State.park_fired_at, Now) < 30000)
 			return
 	}
 

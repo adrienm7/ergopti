@@ -67,8 +67,18 @@ local function with_profiles_fixture(options, body)
 			onSettled = function(handle, callback) handle.on_settled = callback; return true end,
 			cancel = function(handle) handle.timer = nil; if handle.on_settled then handle.on_settled() end; return true end,
 		}
+		local renderer = assert(require("menu.renderer").new({
+			platform = "hs",
+			manifest_path = function()
+				return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+			end,
+			json_decode = require("json").decode,
+			i18n = package.loaded["infra.i18n"],
+			logger = package.loaded["infra.logger"],
+		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
+			command_row = renderer.command_row,
 		}
 		package.loaded["infra.notifications"] = {notify = function()
 			notification_count = notification_count + 1

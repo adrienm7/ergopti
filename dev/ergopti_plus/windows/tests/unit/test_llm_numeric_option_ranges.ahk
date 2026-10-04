@@ -301,12 +301,21 @@ _LNR_DisplayIndentCatalogueOwnsItsReader() {
 			_LLM_Menu["pred_indent"] := Selected
 			IndentRows := []
 			Groups := 0
-			for Row in _LLM_Menu_DisplayRows() {
-				if Row.Has("items") && Row["label"] == t("menu.llm.indent_label") {
-					IndentRows := Row["items"]
+			; The declaration owns this choice after the raw provider was retired.
+			; Count the real published declarations independently of the row lookup.
+			for Item in _MR_GetMenuDef("llm_display_menu") {
+				if _MR_Get(Item, "type") == "choice" && _MR_Get(Item, "id") == "llm_indentation"
 					Groups += 1
-				}
 			}
+			Seen := []
+			Row := MenuRenderer_ChoiceRow("llm_display_menu", "llm_indentation",
+				Map("llm_indentation", (Value) => Seen.Push(Value)),
+				Map("llm.display.pred_indent", (*) => _LLM_Menu["pred_indent"],
+					"llm_indentation_ready", (*) => true))
+			Assert(Row is Map && Row.Has("items"), "the actual shared renderer supplies the indent picker")
+			AssertEqual(1, InStr(Row["label"], t("menu.llm.indent_label")),
+				"the shared picker keeps its translated heading before the current choice")
+			IndentRows := Row["items"]
 			AssertEqual(1, Groups, "the actual display provider keeps one indent picker")
 			AssertEqual(ExpectedCount, IndentRows.Length)
 			Checked := 0
@@ -318,6 +327,9 @@ _LNR_DisplayIndentCatalogueOwnsItsReader() {
 					Checked += 1
 				AssertTrue(IsObject(Row["action"]),
 					"every rendered indent choice retains its existing command")
+				Row["action"].Call()
+				AssertEqual(Index, Seen.Length, "each choice dispatches exactly one command")
+				AssertEqual(Value, Seen[Index], "the shared command receives the exact signed choice")
 			}
 			AssertEqual(1, Checked)
 		}

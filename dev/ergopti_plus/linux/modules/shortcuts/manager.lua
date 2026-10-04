@@ -330,12 +330,16 @@ function M.is_caps_word_active()
 end
 
 --- Toggles CapsWord on/off via the menu.
+--- @return boolean True only after runtime state publication.
 function M.toggle_caps_word()
 	if _configuration_owner ~= nil then return false end
 	record("caps_word")
+	-- Metric delivery is protected external code and can reserve configuration.
+	if _configuration_owner ~= nil then return false end
 	_caps_word_active = not _caps_word_active
 	_caps_word_triggered = false
 	Logger.info(LOG, "CapsWord: %s", _caps_word_active and "ON" or "OFF")
+	return true
 end
 
 --- Processes a character for CapsWord.
@@ -381,6 +385,8 @@ end
 local function transform_selection(action, transform)
 	if _configuration_owner ~= nil then return false end
 	record(action)
+	-- Metric delivery can reserve configuration before clipboard ownership begins.
+	if _configuration_owner ~= nil then return false end
 	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
 	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
 	return ok
@@ -537,11 +543,11 @@ function M.set_enabled(enabled)
 			Logger.error(LOG, "Shortcut state cannot be persisted — nothing changed.")
 			return false
 		end
-		local ok, err = TomlWriter.batch_write(_config_path, {
+		local called, committed, err = pcall(TomlWriter.batch_write, _config_path, {
 			{ section = CONFIG_SECTION, key = "enabled", value = enabled },
 		})
-		if not ok then
-			Logger.error(LOG, "Could not persist shortcut state: %s.", tostring(err))
+		if not called or committed ~= true then
+			Logger.error(LOG, "Could not persist shortcut state: %s.", tostring(called and err or committed))
 			return false
 		end
 	end

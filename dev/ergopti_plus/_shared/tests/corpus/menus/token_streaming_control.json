@@ -1,0 +1,177 @@
+{
+	"schema": 1,
+	"row": {
+		"id": "llm_token_streaming",
+		"i18n": "menu.llm.show_streaming"
+	},
+	"alternate_i18n": "menu.llm.display_menu_title",
+	"base": {
+		"owner": "native-owner",
+		"generation": 1,
+		"platform": "linux",
+		"backend": "ollama",
+		"enabled": true,
+		"paused": false,
+		"blocked": false,
+		"progressive": true,
+		"streaming": false
+	},
+	"cases": [
+		{
+			"id": "enable-admitted",
+			"current": {},
+			"admitted": true,
+			"value": true
+		},
+		{
+			"id": "disable-admitted",
+			"expected": {
+				"streaming": true
+			},
+			"current": {
+				"streaming": true
+			},
+			"admitted": true,
+			"value": false
+		},
+		{
+			"id": "pause",
+			"current": {
+				"paused": true
+			},
+			"admitted": false
+		},
+		{
+			"id": "master-off",
+			"current": {
+				"enabled": false
+			},
+			"admitted": false
+		},
+		{
+			"id": "scope-held",
+			"current": {
+				"blocked": true
+			},
+			"admitted": false
+		},
+		{
+			"id": "show-all",
+			"current": {
+				"progressive": false
+			},
+			"admitted": false
+		},
+		{
+			"id": "buffered-api",
+			"current": {
+				"backend": "api"
+			},
+			"admitted": false
+		},
+		{
+			"id": "unknown-backend",
+			"current": {
+				"backend": "unknown"
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed-generation",
+			"current": {
+				"generation": 2
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed-owner",
+			"current": {
+				"owner": "another-owner"
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed-streaming",
+			"current": {
+				"streaming": true
+			},
+			"admitted": false
+		},
+		{
+			"id": "invalid-generation",
+			"current": {
+				"generation": -1
+			},
+			"admitted": false
+		},
+		{
+			"id": "fractional-generation",
+			"current": {
+				"generation": 1.5
+			},
+			"admitted": false
+		},
+		{
+			"id": "unknown-driver",
+			"current": {
+				"platform": "unknown"
+			},
+			"admitted": false
+		},
+		{
+			"id": "invalid-streaming",
+			"current": {
+				"streaming": "true"
+			},
+			"admitted": false
+		}
+	],
+	"capabilities": [
+		{
+			"platform": "ahk",
+			"backend": "ollama",
+			"capable": false
+		},
+		{
+			"platform": "ahk",
+			"backend": "mlx",
+			"capable": false
+		},
+		{
+			"platform": "ahk",
+			"backend": "api",
+			"capable": false
+		},
+		{
+			"platform": "hs",
+			"backend": "ollama",
+			"capable": true
+		},
+		{
+			"platform": "hs",
+			"backend": "mlx",
+			"capable": true
+		},
+		{
+			"platform": "hs",
+			"backend": "api",
+			"capable": false
+		},
+		{
+			"platform": "linux",
+			"backend": "ollama",
+			"capable": true
+		},
+		{
+			"platform": "linux",
+			"backend": "mlx",
+			"capable": false
+		},
+		{
+			"platform": "linux",
+			"backend": "api",
+			"capable": false
+		}
+	],
+	"writer_modes": ["true", "false", "nil", "throw"]
+}

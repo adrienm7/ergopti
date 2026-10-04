@@ -107,6 +107,10 @@ _GestureMakeSystemRunner(ActionId, ActionFn, Sys := 0) {
 ; containment has returned, so a failure is contained and logged here rather
 ; than escaping the timer thread into the global error handler.
 _GestureRunSystemAction(ActionId, ActionFn) {
+	if A_IsSuspended {
+		LoggerInfo("gestures", "System action '{1}' was cancelled before its deferred execution: the script is suspended.", ActionId)
+		return false
+	}
 	try {
 		ActionFn.Call()
 	} catch as Err {
@@ -114,6 +118,44 @@ _GestureRunSystemAction(ActionId, ActionFn) {
 	}
 }
 
+; Only the native confirmed actions opt in to this explicit target port.
+; Ordinary action extensions still receive their established zero arguments.
+_GestureMakeConfirmedSystemRunner(ActionId, ActionFn) {
+	return (Target, Sys) => _GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys)
+}
+
+_GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+	Sys := _GestureSys(Sys)
+	try {
+		Sys.Defer(_GestureRunConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys))
+		if IsObject(Target) && Target.HasOwnProp("ProcessLease")
+			Target.ProcessLeaseDeferred := true
+		return true
+	} catch {
+		_GestureReleaseProcessTarget(Target, Sys)
+		throw
+	}
+}
+
+; The second callback owns cleanup even when the ordinary runner refuses pause
+; before invoking its action, or contains an exception from native validation.
+_GestureRunConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+	try return _GestureRunSystemAction(ActionId,
+		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys))
+	finally _GestureReleaseProcessTarget(Target, Sys)
+}
+
+_GestureInvokeConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+	if !_GestureConfirmedTargetIsLive(Target, Sys) {
+		LoggerWarn("gestures", "Confirmed system action '{1}' was refused before execution: its original window target is no longer owned.", ActionId)
+		return false
+	}
+	if A_IsSuspended {
+		LoggerInfo("gestures", "Confirmed system action '{1}' was cancelled after ownership validation: the script is suspended.", ActionId)
+		return false
+	}
+	return ActionFn.Call(Sys, Target)
+}
 for _SysActionId, _SysActionFn in Map(
 	"sleep_displays", GestureSysSleepDisplays,
 	"toggle_dark_mode", GestureSysToggleDarkMode,
@@ -127,7 +169,10 @@ for _SysActionId, _SysActionFn in Map(
 	"unblock_file_selection", GestureSysUnblockFileSelection,
 	"open_terminal_here", GestureSysOpenTerminalHere,
 	"new_text_file_here", GestureSysNewTextFileHere) {
-	GESTURE_ACTIONS[_SysActionId] := { Fn: _GestureMakeSystemRunner(_SysActionId, _SysActionFn) }
+	_SysActionEntry := { Fn: _GestureMakeSystemRunner(_SysActionId, _SysActionFn) }
+	if _SysActionId == "force_quit_frontmost" || _SysActionId == "unblock_file_selection"
+		_SysActionEntry.ConfirmedFn := _GestureMakeConfirmedSystemRunner(_SysActionId, _SysActionFn)
+	GESTURE_ACTIONS[_SysActionId] := _SysActionEntry
 }
 
 ; Not deferred: Launch returns as soon as the shell accepted the target, and the
@@ -156,6 +201,10 @@ GestureSysSleepDisplays(Sys := 0) {
 }
 
 _GestureSysPowerOffDisplays(Sys) {
+	if A_IsSuspended {
+		LoggerInfo("gestures", "Display sleep was cancelled before its delayed execution: the script is suspended.")
+		return false
+	}
 	global GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF
 	if Sys.PostBroadcast(GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF)
 		LoggerInfo("gestures", "Displays put to sleep.")
@@ -172,6 +221,10 @@ GestureSysToggleDarkMode(Sys := 0) {
 		Light := Sys.ReadDword(GESTURE_SYS_PERSONALIZE_KEY, "AppsUseLightTheme")
 		; Absent is Windows' own default, the light theme.
 		NewLight := (Light = "" || Light != 0) ? 0 : 1
+		if A_IsSuspended {
+			LoggerInfo("gestures", "toggle_dark_mode was cancelled before its theme change: the script is suspended.")
+			return false
+		}
 		Sys.WriteDword(GESTURE_SYS_PERSONALIZE_KEY, "AppsUseLightTheme", NewLight)
 		Sys.WriteDword(GESTURE_SYS_PERSONALIZE_KEY, "SystemUsesLightTheme", NewLight)
 		if !Sys.BroadcastSettingChange(GESTURE_SYS_COLOR_SETTING_AREA)
@@ -187,6 +240,10 @@ GestureSysMicMuteToggle(Sys := 0) {
 	Sys := _GestureSys(Sys)
 	try {
 		Muted := !Sys.CaptureMuted()
+		if A_IsSuspended {
+			LoggerInfo("gestures", "mic_mute_toggle was cancelled before its endpoint change: the script is suspended.")
+			return false
+		}
 		Sys.SetCaptureMuted(Muted)
 		LoggerInfo("gestures", Muted ? "Microphone muted." : "Microphone unmuted.")
 	} catch as Err {
@@ -219,6 +276,10 @@ GestureSysCenterMouse(Sys := 0) {
 	Sys := _GestureSys(Sys)
 	Position := Sys.MousePosition()
 	Center := GestureSysMonitorCenter(Position.X, Position.Y, Sys.Monitors())
+	if A_IsSuspended {
+		LoggerInfo("gestures", "center_mouse was cancelled before moving the pointer: the script is suspended.")
+		return false
+	}
 	if !IsObject(Center) {
 		LoggerError("gestures", "center_mouse: no monitor holds the pointer at {1},{2}.", Position.X, Position.Y)
 		return
@@ -293,6 +354,10 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 		return
 	}
 	if GestureSysIsSharedHost(Active, Sys.ShellPid()) {
+		if A_IsSuspended {
+			LoggerInfo("gestures", "quit_frontmost_app was cancelled before its shared window close: the script is suspended.")
+			return false
+		}
 		if Sys.PostClose(Active.Hwnd)
 			LoggerInfo("gestures", "Asked the active window of shared process {1} to close.", Active.Pid)
 		else
@@ -300,8 +365,13 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 		return
 	}
 	Closed := 0
-	for Hwnd in Sys.WindowsOfProcess(Active.Pid)
+	for Hwnd in Sys.WindowsOfProcess(Active.Pid) {
+		if A_IsSuspended {
+			LoggerInfo("gestures", "quit_frontmost_app was cancelled before a process window close: the script is suspended.")
+			return false
+		}
 		Closed += Sys.PostClose(Hwnd) ? 1 : 0
+	}
 	LoggerInfo("gestures", "Asked process {1} to close its {2} window(s).", Active.Pid, Closed)
 }
 
@@ -321,21 +391,57 @@ GestureSysForceQuitTarget(Active, Sys) {
 	AppPid := Sys.FramedAppPid(Active.Hwnd)
 	if !AppPid
 		return { Pid: 0, Refusal: "the packaged app behind its frame could not be found" }
+	if (AppPid = Sys.OwnPid())
+		return { Pid: 0, Refusal: "it is ErgoptiPlus itself (use its Quit command)" }
+	if (AppPid = Sys.ShellPid())
+		return { Pid: 0, Refusal: "its process also runs the desktop and the taskbar" }
 	return { Pid: AppPid, Refusal: "" }
 }
 
 ; Terminates the active application at once, unsaved work included.
-GestureSysForceQuitFrontmost(Sys := 0) {
+; @param {Object|Integer} Sys The SystemControl adapter, or 0 for the native one.
+; @param {Object|Integer} ConfirmedTarget The approved window and TargetPid, or
+;   0 for direct execution against the current foreground window.
+GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 	Sys := _GestureSys(Sys)
-	Target := GestureSysForceQuitTarget(Sys.ActiveWindow(), Sys)
+	if IsObject(ConfirmedTarget) && (!ConfirmedTarget.HasOwnProp("TargetPid") || !ConfirmedTarget.HasOwnProp("ProcessLease")) {
+		LoggerWarn("gestures", "force_quit_frontmost refused: a confirmed target requires its already-owned process lease.")
+		return false
+	}
+	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
+		LoggerWarn("gestures", "force_quit_frontmost refused: its original window target is no longer owned.")
+		return false
+	}
+	Target := GestureSysForceQuitTarget(IsObject(ConfirmedTarget) ? ConfirmedTarget : Sys.ActiveWindow(), Sys)
 	if (Target.Refusal != "") {
 		LoggerWarn("gestures", "force_quit_frontmost refused: {1}.", Target.Refusal)
 		return
 	}
-	if Sys.CloseProcess(Target.Pid)
-		LoggerInfo("gestures", "Process {1} terminated.", Target.Pid)
-	else
-		LoggerError("gestures", "Process {1} could not be terminated.", Target.Pid)
+	if IsObject(ConfirmedTarget) && Target.Pid != ConfirmedTarget.TargetPid {
+		LoggerWarn("gestures", "force_quit_frontmost refused: the resolved process differs from its approved target.")
+		return false
+	}
+	OwnsLease := !IsObject(ConfirmedTarget)
+	Lease := OwnsLease ? Sys.AcquireProcessTarget(Target.Pid) : ConfirmedTarget.ProcessLease
+	try {
+		if !Sys.ProcessTargetIsLive(Lease) || (IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys)) {
+			LoggerWarn("gestures", "force_quit_frontmost refused before termination: its original process target is no longer owned.")
+			return false
+		}
+		if A_IsSuspended {
+			LoggerInfo("gestures", "force_quit_frontmost was cancelled before termination: the script is suspended.")
+			return false
+		}
+		; The native handle remains bound to the acquired process object after exit;
+		; a reused numeric PID can never acquire effect authority here.
+		if Sys.TerminateProcessTarget(Lease)
+			LoggerInfo("gestures", "Process {1} terminated.", Target.Pid)
+		else
+			LoggerError("gestures", "Process {1} could not be terminated.", Target.Pid)
+	} finally {
+		if OwnsLease
+			Sys.ReleaseProcessTarget(Lease)
+	}
 }
 
 ; Empties the Recycle Bin of every drive. Confirmed by GestureInvokeAction.
@@ -355,6 +461,10 @@ GestureSysEjectAllDisks(Sys := 0) {
 	global GESTURE_SYS_CSIDL_DRIVES
 	Sys := _GestureSys(Sys)
 	Letters := Sys.RemovableDrives()
+	if A_IsSuspended {
+		LoggerInfo("gestures", "eject_all_disks was cancelled after its drive query: the script is suspended.")
+		return false
+	}
 	if (Letters = "") {
 		LoggerInfo("gestures", "eject_all_disks: no removable drive.")
 		Sys.Notify(t("system_actions.no_disk_to_eject"))
@@ -364,7 +474,16 @@ GestureSysEjectAllDisks(Sys := 0) {
 	Ejected := 0
 	for Letter in StrSplit(Letters) {
 		try {
-			Computer.ParseName(Letter . ":\").InvokeVerb("Eject")
+			if A_IsSuspended {
+				LoggerInfo("gestures", "eject_all_disks was cancelled before its next drive: the script is suspended.")
+				return false
+			}
+			DriveItem := Computer.ParseName(Letter . ":\")
+			if A_IsSuspended {
+				LoggerInfo("gestures", "eject_all_disks was cancelled before its drive ejection: the script is suspended.")
+				return false
+			}
+			DriveItem.InvokeVerb("Eject")
 			Ejected += 1
 		} catch as Err {
 			LoggerError("gestures", "Drive {1}: could not be ejected: {2}", Letter, Err.Message)
@@ -452,18 +571,34 @@ _GestureSysActiveFolder(Sys) {
 ; Removes the Mark of the Web (the Zone.Identifier stream) from the selected
 ; files, and from every file inside a selected folder. Confirmed by
 ; GestureInvokeAction.
-GestureSysUnblockFileSelection(Sys := 0) {
+GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	Sys := _GestureSys(Sys)
-	Window := _GestureSysActiveExplorer(Sys, Sys.ActiveWindow())
+	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
+		LoggerWarn("gestures", "unblock_file_selection refused: its original window target is no longer owned.")
+		return false
+	}
+	Window := _GestureSysActiveExplorer(Sys, IsObject(ConfirmedTarget) ? ConfirmedTarget : Sys.ActiveWindow())
 	Paths := IsObject(Window) ? GestureSysExplorerSelectedPaths(Window) : ""
+	if A_IsSuspended {
+		LoggerInfo("gestures", "unblock_file_selection was cancelled after selection inspection: the script is suspended.")
+		return false
+	}
 	if !(Paths is Array) || (Paths.Length = 0) {
 		LoggerInfo("gestures", "unblock_file_selection: no file is selected in Explorer.")
 		Sys.Notify(t("system_actions.no_file_selected"))
 		return
 	}
+	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
+		LoggerWarn("gestures", "unblock_file_selection refused before mutation: its original window target is no longer owned.")
+		return false
+	}
 	Removed := 0, Failed := 0
 	for Path in Paths {
 		for Target in (Sys.IsDirectory(Path) ? Sys.FilesUnder(Path) : [Path]) {
+			if A_IsSuspended {
+				LoggerInfo("gestures", "unblock_file_selection was cancelled before file mutation: the script is suspended.")
+				return false
+			}
 			Result := Sys.DeleteZoneIdentifier(Target)
 			if (Result = "removed")
 				Removed += 1
@@ -482,12 +617,20 @@ GestureSysUnblockFileSelection(Sys := 0) {
 GestureSysOpenTerminalHere(Sys := 0) {
 	Sys := _GestureSys(Sys)
 	Here := _GestureSysActiveFolder(Sys)
+	if A_IsSuspended {
+		LoggerInfo("gestures", "open_terminal_here was cancelled after its folder query: the script is suspended.")
+		return false
+	}
 	if (Here.Folder = "") {
 		LoggerInfo("gestures", "open_terminal_here: no Explorer folder is active.")
 		Sys.Notify(t("system_actions.no_folder"))
 		return
 	}
 	Terminal := Sys.WindowsTerminalPath()
+	if A_IsSuspended {
+		LoggerInfo("gestures", "open_terminal_here was cancelled before launching the terminal: the script is suspended.")
+		return false
+	}
 	try {
 		; "-d ." starts in the working directory, so the folder is never quoted
 		; into a command line (a trailing backslash would escape the quote).
@@ -504,6 +647,10 @@ GestureSysCreateTextFile(Folder, BaseName, Sys) {
 	global GESTURE_SYS_NEW_FILE_ATTEMPTS
 	Loop GESTURE_SYS_NEW_FILE_ATTEMPTS {
 		Path := RTrim(Folder, "\") . "\" . BaseName . (A_Index = 1 ? "" : " (" . A_Index . ")") . ".txt"
+		if A_IsSuspended {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before creating its file: the script is suspended.")
+			return ""
+		}
 		Status := Sys.CreateNewFile(Path)
 		if (Status = "created")
 			return Path
@@ -522,6 +669,10 @@ GestureSysNewTextFileHere(Sys := 0) {
 	global GESTURE_SYS_SVSI_RENAME
 	Sys := _GestureSys(Sys)
 	Here := _GestureSysActiveFolder(Sys)
+	if A_IsSuspended {
+		LoggerInfo("gestures", "new_text_file_here was cancelled after its folder query: the script is suspended.")
+		return false
+	}
 	if (Here.Folder = "") {
 		LoggerInfo("gestures", "new_text_file_here: no Explorer folder is active.")
 		Sys.Notify(t("system_actions.no_folder"))
@@ -535,7 +686,17 @@ GestureSysNewTextFileHere(Sys := 0) {
 		return
 	SplitPath(Path, &Name)
 	try {
-		Here.Window.Document.SelectItem(Here.Window.Document.Folder.ParseName(Name), GESTURE_SYS_SVSI_RENAME)
+		if A_IsSuspended {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before preparing its rename: the script is suspended.")
+			return false
+		}
+		Document := Here.Window.Document
+		Item := Document.Folder.ParseName(Name)
+		if A_IsSuspended {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before selecting its created file: the script is suspended.")
+			return false
+		}
+		Document.SelectItem(Item, GESTURE_SYS_SVSI_RENAME)
 	} catch as Err {
 		LoggerWarn("gestures", "The new text file exists but Explorer could not select it: {1}", Err.Message)
 	}

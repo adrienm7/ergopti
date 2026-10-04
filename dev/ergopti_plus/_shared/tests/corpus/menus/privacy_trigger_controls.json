@@ -1,0 +1,184 @@
+{
+	"rows": [
+		{
+			"id": "llm_url_bar_filter",
+			"i18n": "menu.llm.disable_url_bars",
+			"path": "llm.trigger.url_bar_filter_enabled",
+			"ahk": "disable_url_bars",
+			"hs": "llm_url_bar_filter_enabled",
+			"linux": "url_bar_filter_enabled",
+			"neutral": false
+		},
+		{
+			"id": "llm_secure_field_filter",
+			"i18n": "menu.llm.disable_password_fields",
+			"path": "llm.trigger.secure_filter_enabled",
+			"ahk": "disable_password_fields",
+			"hs": "llm_secure_field_filter_enabled",
+			"linux": "secure_filter_enabled",
+			"neutral": true
+		}
+	],
+	"states": [
+		[false, false],
+		[false, true],
+		[true, false],
+		[true, true]
+	],
+	"prediction_counts": [1, 2],
+	"alternate_i18n": "fixture.privacy.declaration_label",
+	"refusals": [
+		"paused",
+		"master_withdrawn",
+		"foreign_source",
+		"runtime_disagreement",
+		"missing_runtime_owner"
+	],
+	"snapshot": {
+		"generation": 7,
+		"backend": "ollama",
+		"value": false,
+		"enabled": true,
+		"paused": false,
+		"blocked": false
+	},
+	"vectors": [
+		{
+			"name": "current complete boolean owner",
+			"current": {},
+			"admitted": true,
+			"value": true
+		},
+		{
+			"name": "variant count is independent",
+			"current": {
+				"count": 1
+			},
+			"admitted": true,
+			"value": true
+		},
+		{
+			"name": "retired revision",
+			"current": {
+				"generation": 8
+			},
+			"admitted": false
+		},
+		{
+			"name": "numeric revision string",
+			"current": {
+				"generation": "7"
+			},
+			"admitted": false
+		},
+		{
+			"name": "negative revision",
+			"current": {
+				"generation": -1
+			},
+			"admitted": false
+		},
+		{
+			"name": "fractional revision",
+			"current": {
+				"generation": 7.5
+			},
+			"admitted": false
+		},
+		{
+			"name": "changed backend",
+			"current": {
+				"backend": "api"
+			},
+			"admitted": false
+		},
+		{
+			"name": "backend case identity",
+			"current": {
+				"backend": "OLLAMA"
+			},
+			"admitted": false
+		},
+		{
+			"name": "empty backend",
+			"current": {
+				"backend": ""
+			},
+			"admitted": false
+		},
+		{
+			"name": "changed intent",
+			"current": {
+				"value": true
+			},
+			"admitted": false
+		},
+		{
+			"name": "string false",
+			"current": {
+				"value": "false"
+			},
+			"admitted": false
+		},
+		{
+			"name": "invalid numeric boolean",
+			"current": {
+				"value": 2
+			},
+			"admitted": false
+		},
+		{
+			"name": "master withdrawn",
+			"current": {
+				"enabled": false
+			},
+			"admitted": false
+		},
+		{
+			"name": "invalid numeric master",
+			"current": {
+				"enabled": 2
+			},
+			"admitted": false
+		},
+		{
+			"name": "paused",
+			"current": {
+				"paused": true
+			},
+			"admitted": false
+		},
+		{
+			"name": "unknown pause",
+			"missing": ["paused"],
+			"admitted": false
+		},
+		{
+			"name": "blocked capability",
+			"current": {
+				"blocked": true
+			},
+			"admitted": false
+		},
+		{
+			"name": "unknown capability",
+			"missing": ["blocked"],
+			"admitted": false
+		},
+		{
+			"name": "missing revision",
+			"missing": ["generation"],
+			"admitted": false
+		},
+		{
+			"name": "missing value",
+			"missing": ["value"],
+			"admitted": false
+		},
+		{
+			"name": "retired owner",
+			"new_owner": true,
+			"admitted": false
+		}
+	]
+}

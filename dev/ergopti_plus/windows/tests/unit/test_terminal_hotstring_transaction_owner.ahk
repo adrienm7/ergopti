@@ -132,7 +132,7 @@ _THTO_MakeOwner(CommitFn := 0) {
 	global _PrefixInputContextGeneration, _PrefixDeferredGeneration
 	global _THTO_Identity, _THTO_NativeState
 	Owner := Map(
-		"Id", 1, "Pending", true, "Backspaces", 7,
+		"Id", 1, "Pending", true, "Backspaces", 7, "EraseUnits", 7,
 		"PlainInsertedText", "XGBoost", "SendPayload", "{Text}XGBoost",
 		"EndCharPart", "", "OnlyText", true, "DelayMs", 20,
 		"EmitFn", _THTO_Emit, "DelayFn", _THTO_NoOp,
@@ -416,6 +416,61 @@ _THTO_ReplayedSecondMatchRunsExactlyOnce() {
 }
 Test("terminal transaction: posted suffix re-enters matching in order exactly once (ahk-001)",
 	_THTO_ReplayedSecondMatchRunsExactlyOnce)
+
+/** Compare paced native erasure with the canonical UTF-16 transaction. */
+_THTO_UnicodeErase(Raw := false) {
+	global HSE_Buffer, _PrefixBuffer, _THTO_NativeState, _THTO_Runner, _THTO_Payloads
+	_THTO_Reset()
+	Emoji := Chr(0x1F600)
+	HSE_Buffer := "A" . Emoji . "x"
+	_PrefixBuffer := HSE_Buffer
+	Window := Gui()
+	EditControl := Window.AddEdit(, HSE_Buffer . Emoji)
+	Window.Show("Hide")
+	SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+	try {
+		if Raw {
+			Callback := (EndChar, PrepareOnly := false) =>
+				{Prepared: PrepareOnly, Ok: true, Bs: 2, Ins: "R"}
+			Spec := {RawCallback: true, Callback: Callback, Trigger: Emoji . "x",
+				Category: "fixture", Section: "fixture", IsPrivate: false}
+			Host := Map("Valid", true, "Hwnd", 701, "Pid", 7001,
+				"Exe", "WindowsTerminal.exe", "Title", "Terminal")
+			Owner := _HSE_DispatchTerminalRawCallback(Spec, "", Host, _THTO_Schedule, _THTO_Emit)
+			AssertTrue(Owner is Map, "the raw constructor must admit the transaction")
+			AssertEqual(2, Owner["Backspaces"])
+			AssertEqual(3, Owner["EraseUnits"])
+		} else {
+			Owner := _THTO_MakeOwner()
+			Owner["Backspaces"] := 2
+			Owner["EraseUnits"] := 3
+			Owner["BufferSnapshot"] := HSE_Buffer
+			Owner["PlainInsertedText"] := "R"
+			Owner["SendPayload"] := "{Text}R"
+			AssertTrue(_HSE_BeginOwnedTerminalTransaction(Owner, _THTO_Schedule) is Map)
+		}
+		Owner["ReplayVisibleFn"] := _THTO_ReplayVisibleChar.Bind(_THTO_NativeState)
+		_THTO_AppendPostedChar(Owner, Emoji)
+		AssertTrue(_THTO_Runner.Call())
+		AssertEqual("AR", _THTO_NativeState["CanonicalBeforeVisibleReplay"],
+			"five UTF-16 units must be removed before suffix replay")
+		AssertEqual("AR" . Emoji, HSE_Buffer)
+		AssertEqual("AR" . Emoji, _PrefixBuffer)
+		AssertEqual(1, _THTO_NativeState["VisibleReplayCalls"])
+		AssertEqual("{BackSpace}{BackSpace}{BackSpace}{Text}R" . Emoji,
+			_THTO_Payloads[1])
+		ControlSend(_THTO_Payloads[1], EditControl)
+		Sleep(30)
+		AssertEqual(HSE_Buffer, EditControl.Value, "paced keys must produce the same native text")
+	} finally {
+		Window.Destroy()
+		_THTO_Reset()
+	}
+}
+Test("terminal Unicode erasure replays the exact visible suffix (unicode-erase)",
+	_THTO_UnicodeErase)
+Test("terminal raw Unicode erasure derives its UTF-16 span (unicode-erase)",
+	_THTO_UnicodeErase.Bind(true))
 
 /** Prepared raw insertion is literal text, including its posted suffix. */
 _THTO_RawLiteralTail() {

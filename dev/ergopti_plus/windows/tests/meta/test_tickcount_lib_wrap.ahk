@@ -130,7 +130,7 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 	Cases := [
 		["_TooltipLifecycleDeadlineBounds", "ExpMs := OriginMs +", "TickRemaining("],
 		["_TooltipUiaProcessIsHostile", "A_TickCount < _TooltipUiaHostileCache", "TickExpired("],
-		["_SFD_UiaProcessIsHostile", "A_TickCount < SFD_UIA_HOSTILE_CACHE", "TickExpired("],
+		["_SFD_UiaProcessIsHostile", "A_TickCount < SFD_UIA_HOSTILE_CACHE", "TickExpired64("],
 		["_UIASW_Request", "Deadline := A_TickCount + UIASW_DEADLINE_MS", "SetTimer(DeadlineFn, -UIASW_DEADLINE_MS)"],
 		["GestureCaptureRegion", '"deadline", A_TickCount +', '"started_tick"'],
 		["GestureDirectCapturePoll", 'A_TickCount < State["deadline"]', "TickExpired("],

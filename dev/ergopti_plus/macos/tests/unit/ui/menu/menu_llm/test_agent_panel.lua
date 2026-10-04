@@ -403,3 +403,60 @@ helpers.describe("AI agent menu (macOS)", function()
 		end)
 	end)
 end)
+
+
+--- Loads the independently authored system Off menu states.
+local function system_off_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_system_off.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+helpers.describe("AI agent shared system Off row (agent-system-off)", function()
+	for _, vector in ipairs(system_off_corpus().states) do
+		helpers.it("uses the independent system checks for " .. vector.spec .. " (agent-system-off)", function()
+			local state = base_state()
+			state.llm_agent_system1, state.llm_agent_system2 = vector.spec, vector.spec
+			with_panel(state, function(build, world)
+				local rows = build().submenu
+				for index in ipairs(system_off_corpus().systems) do
+					local off = rows[index + 2].menu[1]
+					helpers.assert_eq(off.title, world.i18n.get(system_off_corpus().label_key))
+					helpers.assert_eq(off.checked == true, vector.checked)
+					helpers.assert_eq(type(off.fn), "function")
+				end
+			end)
+		end)
+	end
+
+	helpers.it("uses the shared label and refuses the actual owner before mutating either system (agent-system-off)", function()
+		local state = base_state()
+		state.llm_agent_system1 = "cerebras"
+		with_panel(state, function(build, world)
+			local declaration = require("infra.manifest_menu").get_root().agent_system_controls[1]
+			local label = declaration.i18n
+			declaration.i18n = system_off_corpus().mutated_label_key
+			local ok, err = pcall(function()
+				local rows = build().submenu
+				world.refuse_write = true
+				for index, key in ipairs({ "llm_agent_system1", "llm_agent_system2" }) do
+					local off = rows[index + 2].menu[1]
+					helpers.assert_eq(off.title, world.i18n.get("menu.agent.title"))
+					helpers.assert_eq(off.fn(), false)
+					helpers.assert_eq(state[key], "cerebras")
+				end
+				helpers.assert_eq(#world.applied, 0)
+				helpers.assert_eq(world.menu_updates, 0)
+				world.refuse_write = false
+				helpers.assert_eq(rows[3].menu[1].fn(), true)
+				helpers.assert_eq(state.llm_agent_system1, "")
+				helpers.assert_eq(state.llm_agent_system2, "cerebras")
+				helpers.assert_eq(#world.applied, 1)
+				helpers.assert_eq(world.applied[1].runtime_fn, "set_llm_agent_system1")
+			end)
+			declaration.i18n = label
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)

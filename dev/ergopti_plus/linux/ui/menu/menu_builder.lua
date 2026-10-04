@@ -37,6 +37,7 @@ local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
 local TextPrompt = require("ui.text_prompt")
+local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local LOG = "ui.menu.menu_builder"
 
@@ -752,12 +753,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			label   = i18n_safe("menu.hotstrings.enable_all_sections"),
 			checked = all_on,
 			action  = function()
-				if type(config.set_categories_sections) ~= "function" then
-					Logger.error(LOG, "The hotstrings config has no set_categories_sections — "
-						.. "the « all sections » switch did nothing.")
-					return
+				local called, committed = false, false
+				if type(config.set_categories_sections) == "function" then
+					called, committed = pcall(config.set_categories_sections, ids, not all_on)
 				end
-				config.set_categories_sections(ids, not all_on)
+				if called and committed == true then return true end
+				Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
+				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				return false
 			end,
 		}
 	end
@@ -804,7 +807,15 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- they will get back when they switch the category on.
 					disabled = not on,
 					action = function()
-						if config.toggle_section then config.toggle_section(id, name) end
+						local called, committed = pcall(function()
+							if type(config.toggle_section) ~= "function" then return false end
+							return config.toggle_section(id, name)
+						end)
+						if called and committed == true then return true end
+						Logger.error(LOG, "Hotstring section toggle refused for '%s.%s' (%s).", id, name,
+							called and "owner-not-committed" or "owner-error")
+						show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+						return false
 					end,
 				}
 				::continue_section::
@@ -833,9 +844,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			render_ctx, {
 				["hotstring_category_file"] = function()
 					if not category or not category.path then return {} end
-					return { { label = i18n_safe("menu.hotstrings.open_file"), action = function()
-						if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
-					end } }
+					local source = category.path
+					local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+						{ hotstring_file_open = function() return ctx.on_open_file(source) end },
+						{ hotstring_file_ready = function() return type(ctx.on_open_file) == "function" end })
+					return row and { row } or {}
 				end,
 				["hotstring_category_sections"] = function() return sub end,
 			})
@@ -963,6 +976,21 @@ local function _manifest_hotstring_rows(ctx, config)
 		return value / MS_PER_SEC
 	end
 
+	--- Contains the existing durable delay owner's receipt before repainting.
+	--- @param setter function|nil
+	--- @return boolean committed
+	local function commit_delay(setter, ...)
+		local ok, committed = false, false
+		if type(setter) == "function" then ok, committed = pcall(setter, ...) end
+		if not ok or committed ~= true then
+			Logger.error(LOG, "The hotstring delay owner refused publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
+	end
+
 	--- The row for the global default delay — the one every category inherits
 	--- when neither it nor its sections declare one.
 	--- @return table
@@ -985,8 +1013,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
-				if config.set_global_delay then config.set_global_delay(chosen) end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return commit_delay(config.set_global_delay, chosen)
 			end,
 		}
 	end
@@ -1018,8 +1045,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
-				if config.set_override then config.set_override(category, nil, "delay", chosen) end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return commit_delay(config.set_override, category, nil, "delay", chosen)
 			end,
 		}
 	end
@@ -1165,33 +1191,27 @@ local function _manifest_hotstring_rows(ctx, config)
 						end,
 					}
 					if def.custom then
-						sub[#sub + 1] = {
-							label = "    " .. i18n_safe("menu.hotstrings.delete_delimiter"),
-							action    = function()
+						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
+							["word_expander_delete"] = function()
 								local saved = snapshot()
-								if Terminators.remove_custom_terminator(key) then commit(saved) end
+								if Terminators.remove_custom_terminator(key) ~= true then return false end
+								return commit(saved) == true
 							end,
-						}
+						}, { ["word_expanders_ready"] = word_expanders_ready })
+						if delete_row then sub[#sub + 1] = delete_row end
 					end
 				end
 			end
 
 			sub[#sub + 1] = { separator = true }
-			sub[#sub + 1] = {
-				label = i18n_safe("menu.hotstrings.add_delimiter"),
-				-- Asked here, natively, rather than delegated to the settings window.
-				-- The delegation was justified in the daemon by "this driver's only
-				-- text field is the settings window" — but the window it opened did
-				-- not exist, so no custom delimiter could ever be created and the
-				-- "delete" sub-row below was unreachable by construction. The text
-				-- field it claimed not to have is prompt_text, in this same file,
-				-- and the magic-key row two handlers down already uses it.
-				action = function()
+			local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
+				["word_expander_add"] = function()
 					local char = prompt_text(
 						i18n_safe("dialog.hotstrings.new_delimiter_title"),
 						i18n_safe("dialog.hotstrings.new_delimiter_prompt"),
 						"")
-					if char == nil then return end
+					if not word_expanders_ready() then return false end
+					if char == nil then return false end
 
 					-- Codepoints, not bytes: "…" is three bytes and one character, so
 					-- a byte-length check would refuse most of what a user would pick.
@@ -1201,7 +1221,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					end
 					if codepoints ~= 1 then
 						show_error(i18n_safe("dialog.magic_key.error_length"))
-						return
+						return false
 					end
 
 					local consume = ask_yes_no(
@@ -1210,14 +1230,15 @@ local function _manifest_hotstring_rows(ctx, config)
 						i18n_safe("dialog.hotstrings.consume_yes"),
 						i18n_safe("dialog.hotstrings.consume_no"))
 					-- nil is "nobody could be asked", which must not be stored as a No.
-					if consume == nil then return end
+					if not word_expanders_ready() then return false end
+					if consume == nil then return false end
 
 					local saved = snapshot()
-					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) then
-						commit(saved)
-					end
+					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) ~= true then return false end
+					return commit(saved) == true
 				end,
-			}
+			}, { ["word_expanders_ready"] = word_expanders_ready })
+			if add_row then sub[#sub + 1] = add_row end
 
 			local exp_ctx = {
 				commands = {
@@ -1279,9 +1300,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The values were all there; only the prompts were missing.
 			local sub = {}
 
-			sub[#sub + 1] = {
-				label  = i18n_safe("menu.hotstrings.config_item"),
-				action = function()
+			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+				hotstrings_config_window = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
 						return
@@ -1292,7 +1312,8 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- this whole submenu points at had never once opened on Linux.
 					ctx.webview.show("hotstrings_config_window")
 				end,
-			}
+			}, { hotstrings_config_ready = function() return true end })
+			if settings_row then sub[#sub + 1] = settings_row end
 			sub[#sub + 1] = { separator = true }
 			sub[#sub + 1] = global_delay_row()
 
@@ -1425,21 +1446,16 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_languages"] = language_rows,
 		["hotstring_personal"] = function()
 			local rows = {}
-			-- The editor comes first, and until 2026-08-05 it was not here at all:
-			-- `_shared/ui/hotstring_editor/` shipped with this driver, its bridge was
-			-- complete and tested, and no code path anywhere opened it. A Linux user
-			-- could not create, edit or delete a single personal hotstring — the row
-			-- expanded to the same generic category submenu every pack gets.
-			rows[#rows + 1] = {
-				label = i18n_safe("menu.hotstrings.open_editor"),
-				action    = function()
-					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstring editor.")
-						return
-					end
-					ctx.webview.show("hotstring_editor")
-				end,
-			}
+			local function editor_ready()
+				if ctx.paused == true or type(ctx.is_paused) ~= "function"
+					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
+				local ok, current = pcall(ctx.is_paused)
+				return ok and current == false
+			end
+			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
+				{ personal_hotstring_editor_ready = editor_ready })
+			if editor_row then rows[#rows + 1] = editor_row end
 
 			local ok_editor, Editor = pcall(require, "ui.hotstring_editor.bridge")
 			if ok_editor and type(Editor.get_pref) == "function" then
@@ -1577,29 +1593,31 @@ local function _manifest_hotstring_rows(ctx, config)
 			for _, extension_id in ipairs(order) do
 				local packs = by_extension[extension_id]
 				local sub = {}
+				local function commit_gates(enabled)
+					local called, committed = pcall(function()
+						if type(config.set_category_gates_enabled) ~= "function" then return false end
+						return config.set_category_gates_enabled(packs, enabled)
+					end)
+					if called and committed == true then
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return true
+					end
+					Logger.error(LOG, "Extension hotstring gate selection refused (%s).",
+						called and "owner-not-committed" or "owner-error")
+					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					return false
+				end
 
 				-- Turning the extension off means turning off every pack it brought.
 				-- Offered first because it is the action the extension as a unit
 				-- affords; the per-pack rows below are for the user who wants half.
 				sub[#sub + 1] = {
 					label = i18n_safe("menu.hotstrings.check_all"),
-					action    = function()
-						for _, name in ipairs(packs) do
-							if config.is_group_enabled and not config.is_group_enabled(name)
-								and config.toggle_group then config.toggle_group(name) end
-						end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
+					action = function() return commit_gates(true) end,
 				}
 				sub[#sub + 1] = {
 					label = i18n_safe("menu.hotstrings.uncheck_all"),
-					action    = function()
-						for _, name in ipairs(packs) do
-							if config.is_group_enabled and config.is_group_enabled(name)
-								and config.toggle_group then config.toggle_group(name) end
-						end
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
+					action = function() return commit_gates(false) end,
 				}
 				sub[#sub + 1] = { separator = true }
 
@@ -1618,7 +1636,15 @@ local function _manifest_hotstring_rows(ctx, config)
 						-- Greyed while its category is off, like a section row there.
 						disabled = not category_on,
 						action   = function()
-							if config.toggle_section then config.toggle_section(bound.category, bound.section) end
+							local called, committed = pcall(function()
+								if type(config.toggle_section) ~= "function" then return false end
+								return config.toggle_section(bound.category, bound.section)
+							end)
+							if called and committed == true then return true end
+							Logger.error(LOG, "Extension hotstring section toggle refused for '%s.%s' (%s).", bound.category, bound.section,
+								called and "owner-not-committed" or "owner-error")
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+							return false
 						end,
 					}
 				end
@@ -1649,22 +1675,45 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- renderer materialises, rather than a menu tree this driver assembled.
 		["preview_bubbles"] = function()
 			local choices = {}
-			local toggles = PreviewSettings.toggles()
-			for index, toggle in ipairs(toggles) do
-				-- "colored" is a different kind of switch from the three above it —
-				-- they choose WHICH previews appear, it chooses how they look — so it
-				-- is separated, the same way macOS separates it.
-				if index == #toggles then choices[#choices + 1] = { separator = true } end
-				local name = toggle.name
-				choices[#choices + 1] = {
-					label   = i18n_safe(toggle.label),
-					checked = PreviewSettings.get(name),
-					action  = function()
-						PreviewSettings.toggle(name)
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
+			local row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
+				["preview_star_enabled"] = function()
+					if PreviewSettings.toggle("star") ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				["hotstrings.preview_star_enabled"] = function() return PreviewSettings.get("star") == true end,
+				-- Preserve configuration access while the Linux engine is paused.
+				["preview_magic_ready"] = function() return true end,
+			})
+			if row then choices[#choices + 1] = row end
+			local presence_commands, presence_getters = {}, { preview_presence_ready = function() return true end }
+			for key, name in pairs({ preview_autocorrect_enabled = "autocorrect", preview_ai_enabled = "ai" }) do
+				presence_commands[key] = function()
+					if PreviewSettings.toggle(name) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end
+				presence_getters["hotstrings." .. key] = function() return PreviewSettings.get(name) == true end
 			end
+			for _, declaration in ipairs(ManifestMenu.get_array("preview_presence_controls")) do
+				local row = ManifestMenu.check_row("preview_presence_controls", declaration.id, presence_commands, presence_getters)
+				if row then choices[#choices + 1] = row end
+			end
+			choices[#choices + 1] = { separator = true }
+			local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
+				["preview_colored_tooltips"] = function()
+					if PreviewSettings.toggle("colored") ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				["hotstrings.preview_colored_tooltips"] = function() return PreviewSettings.get("colored") == true end,
+				-- Configuring a preview remains allowed while the Linux engine is paused.
+				["preview_colored_ready"] = function() return true end,
+			})
+			if row then choices[#choices + 1] = row end
+
 			return { { label = i18n_safe("menu.hotstrings.preview_bubbles"), items = choices } }
 		end,
 	}
@@ -1885,19 +1934,45 @@ local function _build_llm(ctx)
 		rows[#rows + 1] = { separator = true }
 		local leading_rows = rows
 		rows = {}
-		for _, setting in ipairs({
-			{ name = "url_bar_filter_enabled", key = "menu.llm.disable_url_bars" },
-			{ name = "secure_filter_enabled", key = "menu.llm.disable_password_fields" },
-		}) do
-			local checked = TriggerSettings.get(setting.name)
-			rows[#rows + 1] = {
-				label = i18n_safe(setting.key),
-				checked = checked,
-				action = function()
-					TriggerSettings.set(setting.name, not checked)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
+		local Preferences = require("infra.llm_preferences")
+		local function privacy_snapshot(name)
+			local snapshot = {owner = TriggerSettings, generation = 0,
+				value = TriggerSettings.get(name), enabled = llm.is_enabled(),
+				paused = true, blocked = true}
+			local ok, detail = xpcall(function()
+				local path = "llm.trigger." .. name
+				local values, source = Preferences.get_many({"llm.enabled", "llm.models.selected", path})
+				snapshot.source = source
+				snapshot.preferences_generation = Preferences.generation()
+				if type(llm.streaming_revision) ~= "function" then error("Native admission revision is unavailable") end
+				snapshot.generation = llm.streaming_revision()
+				local revision = snapshot.preferences_generation
+				if type(revision) ~= "number" or revision ~= revision or revision == math.huge
+					or revision < 0 or revision % 1 ~= 0 then error("Invalid preference revision") end
+				snapshot.backend = llm.get_backend()
+				snapshot.paused = ctx.paused == true or ctx.is_paused()
+				snapshot.blocked = Preferences.admit() ~= true
+					or values["llm.enabled"] ~= snapshot.enabled
+					or values["llm.models.selected"] ~= snapshot.backend or values[path] ~= snapshot.value
+			end, debug.traceback)
+			if not ok then
+				Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
+				snapshot.blocked = true
+			end
+			return snapshot
+		end
+		local url_source = privacy_snapshot("url_bar_filter_enabled")
+		local secure_source = privacy_snapshot("secure_filter_enabled")
+		local function privacy_command(expected, name)
+			local current = privacy_snapshot(name)
+			local decision = PrivacyPolicy.intent(expected, current)
+			if expected.preferences_generation ~= current.preferences_generation
+				or decision.admitted ~= true or type(expected.source) ~= "table" or type(current.source) ~= "table"
+				or expected.source.status ~= current.source.status
+				or expected.source.content ~= current.source.content then return false end
+			if TriggerSettings.set(name, decision.value, expected.source) ~= true then return false end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
 		end
 		local function ready()
 			return llm.is_enabled() == true and ctx.paused ~= true
@@ -1911,10 +1986,16 @@ local function _build_llm(ctx)
 		end
 		local trigger_ctx = {
 			commands = {
+				["llm_url_bar_filter"] = function() return privacy_command(url_source, "url_bar_filter_enabled") end,
+				["llm_secure_field_filter"] = function() return privacy_command(secure_source, "secure_filter_enabled") end,
 				["llm_instant_on_word_end"] = function() return toggle("instant_on_word_end") end,
 				["llm_after_hotstring"] = function() return toggle("after_hotstring") end,
 			},
 			state_getters = {
+				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get("url_bar_filter_enabled") end,
+				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get("secure_filter_enabled") end,
+				["llm_url_bar_filter_ready"] = function() return PrivacyPolicy.ready(url_source) end,
+				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
 				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get("instant_on_word_end") end,
 				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get("after_hotstring") end,
 				["llm_trigger_ready"] = ready,
@@ -1945,13 +2026,14 @@ local function _build_llm(ctx)
 		local live = llm.get_live()
 		local count = ProfileSettings.get("num_predictions") or 1
 		local function choose(profile_id)
-			if llm.set_live(profile_id) and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			local committed = llm.set_live(profile_id) == true
+			if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return committed
 		end
-		local rows = { {
-			label = i18n_safe("menu.llm.live_mode_off"),
-			checked = live == nil,
-			action = function() choose(nil) end,
-		} }
+		local rows = { ManifestMenu.check_row("llm_live_controls", "llm_live_mode_off",
+			{ llm_live_mode_off = function() return choose(nil) end },
+			{ llm_live_is_off = function() return llm.get_live() == nil end,
+				llm_live_off_ready = function() return true end }) }
 		local prompts = {}
 		for _, profile in ipairs(ProfileSettings.list_built_in()) do prompts[#prompts + 1] = profile end
 		for _, profile in ipairs(ProfileSettings.list_user()) do prompts[#prompts + 1] = profile end
@@ -1993,7 +2075,13 @@ local function _build_llm(ctx)
 			if saved then refresh() end
 			return saved
 		end
-		local function open_editor(existing, activate, opts)
+		local function create_ready()
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
+			local ok, current = pcall(ctx.is_paused)
+			return ok and current == false
+		end
+		local function open_editor(existing, activate, opts, create)
+			if create and not create_ready() then return false end
 			local ok_editor, Editor = pcall(require, "ui.prompt_editor.bridge")
 			if not ok_editor or type(Editor.open) ~= "function" then
 				Logger.error(LOG, "Prompt editor is unavailable.")
@@ -2009,7 +2097,9 @@ local function _build_llm(ctx)
 				editor_opts.profile_id = ProfileSettings.next_user_profile_id()
 				opts = editor_opts
 			end
+			if create and not create_ready() then return false end
 			return Editor.open(existing, function(profile)
+				if create and not create_ready() then return false end
 				return save_profile(profile, activate, expected_existing)
 			end, opts)
 		end
@@ -2019,7 +2109,13 @@ local function _build_llm(ctx)
 				label = i18n_safe("menu.profiles.auto_detect"),
 				checked = ProfileSettings.get("auto_profile_for_model") == true,
 				action = function()
-					if ProfileSettings.set("auto_profile_for_model", true, current_model) then refresh() end
+					if not create_ready() then return false end
+					local current = ProfileSettings.get("auto_profile_for_model")
+					if type(current) ~= "boolean" or not create_ready() then return false end
+					local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+					if saved ~= true then return false end
+					refresh()
+					return true
 				end,
 			},
 			{ separator = true },
@@ -2105,16 +2201,16 @@ local function _build_llm(ctx)
 				batch = active_builtin.batch == true,
 			}
 			rows[#rows + 1] = { separator = true }
-			rows[#rows + 1] = {
-				label = i18n_safe("menu.profiles.clone_builtin"),
-				action = function() return open_editor(seed, true, { as_new = true }) end,
-			}
+			local clone_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_clone",
+				{ llm_profile_clone = function() return open_editor(seed, true, { as_new = true }, true) end },
+				{ llm_profile_clone_ready = create_ready })
+			if clone_row then rows[#rows + 1] = clone_row end
 		end
 		rows[#rows + 1] = { separator = true }
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.profiles.create_profile"),
-			action = function() return open_editor(nil, true) end,
-		}
+		local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
+			{ llm_profile_create = function() return open_editor(nil, true, nil, true) end },
+			{ llm_profile_create_ready = create_ready })
+		if create_row then rows[#rows + 1] = create_row end
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
@@ -2132,66 +2228,111 @@ local function _build_llm(ctx)
 				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
 				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
 		end
+		local Preferences = require("infra.llm_preferences")
+		local function streaming_snapshot()
+			local paused
+			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
+			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.streaming", "llm.display.streaming_multi" })
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
+			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get("streaming_multi")
+			return {
+				owner = Preferences, source = source,
+				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
+				platform = "linux",
+				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
+				enabled = enabled, paused = paused,
+				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
+					or streaming ~= values["llm.display.streaming"] or progressive ~= values["llm.display.streaming_multi"],
+				progressive = progressive, streaming = streaming,
+			}
+		end
+		local streaming_source = streaming_snapshot()
 		local rows = {}
-		for _, setting in ipairs({
-			{ name = "streaming", key = "menu.llm.show_streaming" },
-		}) do
-			local current = DisplaySettings.get(setting.name)
-			rows[#rows + 1] = {
-				label = i18n_safe(setting.key),
-				checked = current == true,
-				action = function()
-					DisplaySettings.set(setting.name, not current)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
+		local function indentation_snapshot()
+			local snapshot = streaming_snapshot()
+			local values, source = Preferences.get_many({ "llm.profiles.num_predictions", "llm.display.pred_indent" })
+			snapshot.count = ProfileSettings.get("num_predictions")
+			snapshot.indentation = DisplaySettings.get("pred_indent")
+			snapshot.blocked = snapshot.blocked or snapshot.count ~= values["llm.profiles.num_predictions"]
+				or snapshot.indentation ~= values["llm.display.pred_indent"]
+			-- Re-reading the canonical owner advances its revision for every source
+			-- change, including unrelated fields and away/back transitions.
+			snapshot.source = source
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local generation = type(revision) == "number" and Preferences.generation() + revision or nil
+			snapshot.blocked = snapshot.blocked or snapshot.generation ~= generation
+			snapshot.generation = generation
+			return snapshot
+		end
+		local indentation_source = indentation_snapshot()
+		local function info_bar_snapshot()
+			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.show_info_bar" })
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
+			local selected = DisplaySettings.get("show_info_bar")
+			local paused
+			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
+			return {
+				owner = Preferences, source = source,
+				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
+				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
+				info_bar = selected, enabled = enabled, paused = paused,
+				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
+					or selected ~= values["llm.display.show_info_bar"],
 			}
 		end
-		local streaming_rows = rows
-		rows = {}
-		local indent = DisplaySettings.get("pred_indent") or 0
-		local indent_rows = {}
-		for _, value in ipairs(DisplaySettings.indent_values()) do
-			local label = value == 0 and i18n_safe("menu.llm.indent_none")
-				or string.format("%+d", value)
-			indent_rows[#indent_rows + 1] = {
-				label = label,
-				checked = indent == value,
-				action = function()
-					DisplaySettings.set("pred_indent", value)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
-		end
-		rows[#rows + 1] = { separator = true }
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.llm.indent_label") .. " : " .. tostring(indent),
-			items = indent_rows,
-		}
-		local info_bar = DisplaySettings.get("show_info_bar")
+		local info_bar_source = info_bar_snapshot()
 		local display_ctx = {
 			commands = {
+				["llm_indentation"] = function(value)
+					local current = indentation_snapshot()
+					local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, DisplaySettings.indent_values())
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("pred_indent", decision.value, current.source) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
 				["llm_show_all"] = function()
 					if not show_all_ready() then return false end
 					if DisplaySettings.set("streaming_multi", not DisplaySettings.get("streaming_multi")) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
+				["llm_token_streaming"] = function()
+					local current = streaming_snapshot()
+					local decision = DisplayPolicy.streaming_intent(streaming_source, current)
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("streaming", decision.value, current.source) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
 				["llm_info_bar"] = function()
-					if DisplaySettings.set("show_info_bar", not info_bar) ~= true then return false end
+					local current = info_bar_snapshot()
+					local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("show_info_bar", decision.value, current.source) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			},
 			state_getters = {
+				["llm.display.pred_indent"] = function() return indentation_source.indentation end,
+				["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
 				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
 				["llm_show_all_ready"] = show_all_ready,
-				["llm_info_bar_enabled"] = function() return info_bar end,
-				["llm_info_bar_ready"] = function() return true end,
+				["llm_token_streaming_enabled"] = function()
+					return DisplayPolicy.streaming_capable(streaming_source.platform, streaming_source.backend)
+						and streaming_source.streaming == true
+				end,
+				["llm_token_streaming_ready"] = function() return DisplayPolicy.streaming_ready(streaming_source) end,
+				["llm_info_bar_enabled"] = function() return info_bar_source.info_bar end,
+				["llm_info_bar_ready"] = function() return DisplayPolicy.info_bar_ready(info_bar_source) end,
 			},
 		}
 		local display_rows = ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {
 			["llm_display_leading"] = function() return {} end,
-			["llm_display_remaining"] = function() return streaming_rows end,
+			["llm_display_remaining"] = function() return {} end,
 			["llm_display_trailing"] = function() return rows end,
 		})
 		append_rendered_row(target, {
@@ -2267,16 +2408,16 @@ local function _build_llm(ctx)
 			}
 		end
 		if #rows > 0 then rows[#rows + 1] = { separator = true } end
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.llm.browse_models_entry"),
-			action = function()
-				if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-					Logger.error(LOG, "Model browser is unavailable.")
-					return false
-				end
+		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
+			["llm_browse_models"] = function()
 				return ctx.webview.show("model_browser") == true
 			end,
-		}
+		}, {
+			["llm_model_browser_ready"] = function()
+				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
+			end,
+		})
+		if browser_row then rows[#rows + 1] = browser_row end
 		return rows
 	end
 
@@ -2289,7 +2430,7 @@ local function _build_llm(ctx)
 			confirm = function(title, text)
 				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
 			end,
-		}, ctx.on_menu_changed, ollama_model_rows)
+		}, ctx.on_menu_changed, ollama_model_rows, { paused = ctx.paused, is_paused = ctx.is_paused })
 	end
 
 	--- The suggestion count row: a generation parameter, the first one on every
@@ -2935,7 +3076,6 @@ local function _build_shortcuts(ctx)
 	end
 
 	local enabled = sc.is_enabled()
-	local caps_active = sc.is_caps_word_active()
 	local items = {}
 
 	-- The gate row is the manifest's first row and the shared renderer builds it,
@@ -2946,27 +3086,51 @@ local function _build_shortcuts(ctx)
 	-- they were seven rows of a SHARED menu that no manifest described, so no
 	-- gate could compare them with what the other two drivers offer, and the
 	-- renderer had nothing to place.
-	local selection_rows = {
-		{
-			label   = i18n_safe("sg_actions.caps_word"),
-			checked = caps_active,
-			action  = function()
-				sc.toggle_caps_word()
-				Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
-		},
-		{ separator = true },
+	local function caps_word_ready()
+		return type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc.toggle_caps_word) == "function" and type(sc.is_caps_word_active) == "function"
+			and type(sc.is_caps_word_active()) == "boolean"
+	end
+	local selection_rows = {}
+	local caps_row = ManifestMenu.check_row("selection_caps_word_control", "selection_caps_word", {
+		["selection_caps_word"] = function()
+			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
+			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end,
+	}, {
+		["selection_caps_word_active"] = function()
+			return type(sc.is_caps_word_active) == "function" and sc.is_caps_word_active() == true
+		end,
+		["selection_caps_word_ready"] = caps_word_ready,
+	})
+	if caps_row then selection_rows[#selection_rows + 1] = caps_row end
+	selection_rows[#selection_rows + 1] = { separator = true }
+	local case_methods = {
+		uppercase_selection = "transform_uppercase",
+		selection_lowercase = "transform_lowercase",
+		titlecase_selection = "transform_titlecase",
 	}
-	for _, transform in ipairs({
-		{ key = "menu.shortcuts.to_uppercase", run = sc.transform_uppercase },
-		{ key = "menu.shortcuts.to_lowercase", run = sc.transform_lowercase },
-		{ key = "menu.shortcuts.to_titlecase", run = sc.transform_titlecase },
-	}) do
-		selection_rows[#selection_rows + 1] = {
-			label  = i18n_safe(transform.key),
-			action = function() transform.run() end,
-		}
+	local function case_ready(method)
+		return type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc[method]) == "function"
+	end
+	local case_getters = {
+		uppercase_selection_ready = function() return case_ready(case_methods.uppercase_selection) end,
+		selection_lowercase_ready = function() return case_ready(case_methods.selection_lowercase) end,
+		titlecase_selection_ready = function() return case_ready(case_methods.titlecase_selection) end,
+	}
+	for _, command in ipairs(ManifestMenu.get_array("selection_case_commands")) do
+		local id, method = command.id, case_methods[command.id]
+		local ready = assert(case_getters[id .. "_ready"], "Selection case command has no native owner")
+		local row = ManifestMenu.command_row("selection_case_commands", id, {
+			[id] = function()
+				if not ready() or sc[method]() ~= true then return false end
+				return true
+			end,
+		}, case_getters)
+		if row then selection_rows[#selection_rows + 1] = row end
 	end
 	selection_rows[#selection_rows + 1] = { separator = true }
 	for _, helper in ipairs({
@@ -3149,9 +3313,19 @@ local function _build_shortcuts(ctx)
 		chords_ctx.commands = {}
 		for key, value in pairs(ctx.commands or {}) do chords_ctx.commands[key] = value end
 		chords_ctx.commands["script_control_toggle"] = function()
-			local switched = Chords.set_chords_enabled(not chords_on)
-			if switched and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			return switched
+			local read, current = false, nil
+			if type(Chords.chords_enabled) == "function" then read, current = pcall(Chords.chords_enabled) end
+			local called, committed = false, false
+			if read and type(current) == "boolean" and type(Chords.set_chords_enabled) == "function" then
+				called, committed = pcall(Chords.set_chords_enabled, not current)
+			end
+			if not called or committed ~= true then
+				Logger.error(LOG, "The script chord switch did not acknowledge durable publication.")
+				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				return false
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
 		end
 		chords_ctx.commands["scope_restore"] = function() return apply_chords_scope("recommended") end
 		chords_ctx.commands["scope_clear"] = function() return apply_chords_scope("clear") end
@@ -3201,8 +3375,19 @@ local function _build_shortcuts(ctx)
 	sc_ctx.commands["scope_restore"] = function() return apply_shortcuts_scope("recommended") end
 	sc_ctx.commands["scope_clear"] = function() return apply_shortcuts_scope("clear") end
 	sc_ctx.commands["shortcuts_toggle"] = function()
-		sc.toggle()
+		local read, current = false, nil
+		if type(sc.is_enabled) == "function" then read, current = pcall(sc.is_enabled) end
+		local called, committed = false, false
+		if read and type(current) == "boolean" and type(sc.set_enabled) == "function" then
+			called, committed = pcall(sc.set_enabled, not current)
+		end
+		if not called or committed ~= true then
+			Logger.error(LOG, "The shortcuts master did not acknowledge durable publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
 	end
 	sc_ctx.commands["edit_chatgpt_url"] = function()
 		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")
@@ -3237,16 +3422,25 @@ local function _build_shortcuts(ctx)
 	-- own description key, as on Windows.
 	sc_ctx.feature_rows = {}
 	for key, value in pairs(ctx.feature_rows or {}) do sc_ctx.feature_rows[key] = value end
+	local function wrap_on_type_ready()
+		return type(sc.is_enabled) == "function" and sc.is_enabled() == true
+			and type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc.is_wrap_on_type_enabled) == "function" and type(sc.set_wrap_on_type_enabled) == "function"
+	end
 	if type(sc.is_wrap_on_type_enabled) == "function" then
 		sc_ctx.feature_rows["shortcuts.wrap_text_if_selected"] = function()
 			local on = sc.is_wrap_on_type_enabled()
 			return {
 				label = i18n_safe("shortcuts.label_wrap_text"),
-				checked = on,
-				disabled = not enabled,
+				checked = on == true,
+				disabled = not wrap_on_type_ready() or type(on) ~= "boolean",
 				action = function()
-					sc.set_wrap_on_type_enabled(not on)
+					if not wrap_on_type_ready() then return false end
+					local current = sc.is_wrap_on_type_enabled()
+					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
+					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
 				end,
 			}
 		end
@@ -3850,11 +4044,13 @@ local function _about_update_rows(ctx)
 	local frequency_row = _frequency_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
-	out[#out + 1] = source_run and {
-		label = i18n_safe("menu.about.check_for_updates"),
-		disabled = true,
-		disabled_reason_key = "menu.about.source_run_reason",
-	} or {
+	if source_run then
+		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+			["about_source_check"] = function() return false end,
+		}, { ["about_source_release_ready"] = function() return not source_run end })
+		if source_row then out[#out + 1] = source_row end
+	else
+		out[#out + 1] = {
 		label = up.get_menu_label(),
 		disabled = up.get_state() == "checking" or up.get_state() == "downloading"
 			or up.get_state() == "installing",
@@ -3886,6 +4082,7 @@ local function _about_update_rows(ctx)
 			end)
 		end,
 	}
+	end
 
 	-- Only once there is something to install: a permanently visible
 	-- "download" row that does nothing is indistinguishable from a broken one.
@@ -4032,9 +4229,8 @@ end
 --- The daemon owns the reload; the menu asks it to, exactly as the quit item
 --- asks via on_quit. No signal, no subprocess, no PID to get wrong.
 local function _build_reload(ctx)
-	return {
-		label = i18n_safe("menu.global.reload"),
-		action = function()
+	return ManifestMenu.command_row("top_level", "reload", {
+		reload = function()
 			if type(ctx.on_reload) ~= "function" then
 				-- Loudly, not silently: a Reload item that cannot reload is the
 				-- exact failure this replaced.
@@ -4047,18 +4243,17 @@ local function _build_reload(ctx)
 				Logger.error(LOG, "Reload callback raised: %s.", tostring(err))
 			end
 		end,
-	}
+	})
 end
 
 --- Builds the quit item.
 local function _build_quit(ctx)
-	return {
-		label = i18n_safe("menu.global.quit"),
-		action = function()
+	return ManifestMenu.command_row("top_level", "quit", {
+		quit = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
 			if ctx.on_quit then ctx.on_quit() end
 		end,
-	}
+	})
 end
 
 --- Builds the debug submenu from the shared manifest.

@@ -109,7 +109,7 @@ helpers.describe("hotstring priority overrides", function()
 			}
 			io.open = function(path, mode)
 				if path == override_path and mode == "r" then
-					if persisted == nil then return nil end
+					if persisted == nil then return nil, "fixture source absent", 2 end
 					return memory_handle(mode, function() end)
 				end
 				if path == temporary_path and mode == "w" then
@@ -285,5 +285,265 @@ helpers.describe("hotstring priority overrides", function()
 		package.loaded["infra.config_paths"] = previous_paths
 		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
 		if not ok then error(failure, 0) end
+	end)
+end)
+
+
+helpers.describe("hotstring override leaf ownership", function()
+	local function with_owner(content, action, before_init)
+		local root = assert(os.tmpname())
+		assert(os.remove(root))
+		local made = os.execute("mkdir -p '" .. root .. "'")
+		assert(made == true or made == 0)
+		local path = root .. "/hotstrings_overrides.toml"
+		local choices = root .. "/config.toml"
+		local function write(value)
+			local handle = assert(io.open(path, "w"))
+			assert(handle:write(value))
+			assert(handle:close())
+		end
+		local function read()
+			local handle = assert(io.open(path, "r"))
+			local value = assert(handle:read("*a"))
+			assert(handle:close())
+			return value
+		end
+		if content ~= nil then write(content) end
+		assert(assert(io.open(choices, "w")):close())
+		local old_config = package.loaded["modules.hotstrings.hotstrings_config"]
+		local old_open, old_rename, old_remove = io.open, os.rename, os.remove
+		local old_shell = package.loaded["adapters.shell_runner"]
+		local ok, failure = xpcall(function()
+			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			local config = require("modules.hotstrings.hotstrings_config")
+			assert(config._set_override_config_dir_for_test(root))
+			assert(config._set_config_file_for_test(choices))
+			if before_init then before_init(path) end
+			local changes = 0
+			assert(config.init(nil, "/fixture/catalogue.toml", function() changes = changes + 1 end))
+			action(config, path, read, write, function() return changes end)
+		end, debug.traceback)
+		io.open, os.rename, os.remove = old_open, old_rename, old_remove
+		package.loaded["modules.hotstrings.hotstrings_config"] = old_config
+		package.loaded["adapters.shell_runner"] = old_shell
+		os.remove(path .. ".tmp")
+		os.remove(path)
+		os.remove(choices)
+		os.remove(root)
+		if not ok then error(failure, 0) end
+	end
+
+	local source = table.concat({
+		"# Keep this user's introduction.",
+		'["ext:future:pack"."literal.section"]',
+		'future = { enabled = false, note = "keep me" }',
+		"delay = 1.25",
+		'color = "#abcdef"',
+		"show_tooltip = false",
+		"priority = 90",
+		"# Keep this section comment.",
+		"[unrelated]",
+		'future = ["one", "two"]',
+		"delay = 2.5",
+		"",
+	}, "\n")
+
+	helpers.it("preserves unknown records and comments through public set and field clear", function()
+		with_owner(source, function(config, _, read)
+			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 3.5))
+			local changed = source:gsub("delay = 1.25", "delay = 3.5")
+			helpers.assert_eq(read(), changed)
+			helpers.assert_true(config.clear_override("ext:future:pack", "literal.section", "color"))
+			helpers.assert_eq(read(), changed:gsub('color = "#abcdef"\n', ""))
+			helpers.assert_eq(config.get_user_override("ext:future:pack", "literal.section").delay, 3.5)
+			helpers.assert_eq(config.get_user_override("unrelated").delay, 2.5)
+		end)
+	end)
+
+	helpers.it("clears only known leaves of a section and category", function()
+		for _, section in ipairs({ "literal.section", false }) do
+			with_owner(source, function(config, _, read)
+				helpers.assert_true(config.clear_override("ext:future:pack", section or nil))
+				local expected = source:gsub("delay = 1.25\n", ""):gsub('color = "#abcdef"\n', "")
+					:gsub("show_tooltip = false\n", ""):gsub("priority = 90\n", "")
+				helpers.assert_eq(read(), expected)
+				helpers.assert_nil(config.get_user_override("ext:future:pack", "literal.section").delay)
+			end)
+		end
+	end)
+
+	helpers.it("refuses stale loaded bytes before changing RAM or cached resolutions", function()
+		with_owner(source, function(config, _, read, write, changes)
+			local cached = config.resolve("ext:future:pack", "literal.section")
+			local foreign = source .. "# A foreign edit.\n"
+			write(foreign)
+			helpers.assert_eq(config.set_override("ext:future:pack", "literal.section", "delay", 4), false)
+			helpers.assert_eq(config.clear_override("ext:future:pack", "literal.section"), false)
+			helpers.assert_eq(read(), foreign)
+			helpers.assert_true(config.resolve("ext:future:pack", "literal.section") == cached)
+			helpers.assert_eq(changes(), 0)
+		end)
+	end)
+
+	helpers.it("rechecks source after staging before acknowledging a public change", function()
+		with_owner(source, function(config, path, read, write, changes)
+			local cached = config.resolve("ext:future:pack", "literal.section")
+			local old_open = io.open
+			local foreign = source .. "# Edit after staging.\n"
+			io.open = function(name, mode)
+				local handle, detail, code = old_open(name, mode)
+				if name ~= path .. ".tmp" or mode ~= "w" or not handle then return handle, detail, code end
+				return {
+					write = function(_, value) return handle:write(value) end,
+					close = function()
+						local closed = handle:close()
+						write(foreign)
+						return closed
+					end,
+				}
+			end
+			local committed = config.set_override("ext:future:pack", "literal.section", "delay", 4)
+			io.open = old_open
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(read(), foreign)
+			helpers.assert_true(config.resolve("ext:future:pack", "literal.section") == cached)
+			helpers.assert_eq(changes(), 0)
+		end)
+	end)
+
+	helpers.it("distinguishes unreadable source from proven absence and malformed source", function()
+		for _, kind in ipairs({ "read_error", "malformed", "absent" }) do
+			local bytes = kind == "malformed" and "[broken\n" or (kind == "read_error" and source or nil)
+			local old_open = io.open
+			with_owner(bytes, function(config, path, read, _, changes)
+				io.open = old_open
+				if kind == "absent" then
+					helpers.assert_true(config.clear_override("fresh", nil))
+					local handle, _, code = io.open(path, "r")
+					helpers.assert_nil(handle, "an empty clear retains proven absence")
+					helpers.assert_eq(code, 2)
+				end
+				local committed = config.set_override("fresh", nil, "delay", 2)
+				helpers.assert_eq(committed, kind == "absent")
+				helpers.assert_eq(changes(), kind == "absent" and 1 or 0)
+				if kind ~= "absent" then helpers.assert_eq(read(), bytes) end
+			end, function(path)
+				if kind == "read_error" then
+					io.open = function(name, mode)
+						if name == path and mode == "r" then return nil, "owned permission refusal", 13 end
+						return old_open(name, mode)
+					end
+				end
+			end)
+		end
+	end)
+
+	helpers.it("keeps no-op source identity and refuses unaddressable owned inline changes", function()
+		with_owner(source, function(config, path, read, _, changes)
+			local renames = 0
+			local old_rename = os.rename
+			os.rename = function(from, to)
+				if to == path then renames = renames + 1 end
+				return old_rename(from, to)
+			end
+			local committed = config.set_override("ext:future:pack", "literal.section", "delay", 1.25)
+			os.rename = old_rename
+			helpers.assert_true(committed)
+			helpers.assert_eq(read(), source)
+			helpers.assert_eq(renames, 0, "an unchanged file must retain its inode")
+			helpers.assert_eq(changes(), 1)
+		end)
+		with_owner('second = { delay = 2.5, future = "keep" }\n', function(config, _, read)
+			helpers.assert_eq(config.set_override("second", nil, "delay", 4), false)
+			helpers.assert_eq(read(), 'second = { delay = 2.5, future = "keep" }\n')
+			helpers.assert_eq(config.get_user_override("second").delay, 2.5)
+		end)
+	end)
+
+	helpers.it("requires strict stage and publication receipts before invalidating RAM", function()
+		for _, fault in ipairs({ "open", "write_nil", "write_false", "write_throw", "close", "rename" }) do
+			with_owner(source, function(config, path, read, _, changes)
+				local cached = config.resolve("ext:future:pack", "literal.section")
+				local old_open, old_rename = io.open, os.rename
+				io.open = function(name, mode)
+					if name ~= path .. ".tmp" or mode ~= "w" then return old_open(name, mode) end
+					if fault == "open" then return nil, "owned open refusal" end
+					local handle = assert(old_open(name, mode))
+					return {
+						write = function(_, value)
+							if fault == "write_nil" then return nil end
+							if fault == "write_false" then return false end
+							if fault == "write_throw" then error("owned write refusal") end
+							return handle:write(value)
+						end,
+						close = function()
+							local closed = handle:close()
+							if fault == "close" then return false end
+							return closed
+						end,
+					}
+				end
+				os.rename = function(from, to)
+					if to == path and fault == "rename" then return false, "owned rename refusal" end
+					return old_rename(from, to)
+				end
+				local committed = config.set_override("ext:future:pack", "literal.section", "delay", 4)
+				io.open, os.rename = old_open, old_rename
+				helpers.assert_eq(committed, false, fault)
+				helpers.assert_eq(read(), source, fault)
+				helpers.assert_true(config.resolve("ext:future:pack", "literal.section") == cached, fault)
+				helpers.assert_eq(changes(), 0, fault)
+			end)
+		end
+	end)
+
+	helpers.it("keeps source authority across held scope publication and exact restoration", function()
+		with_owner(source, function(config, path, read)
+			local writer = require("toml_codec.writer")
+			local original = config.configuration_snapshot()
+			local owner = {}
+			local candidate = source:gsub("delay = 1.25", "delay = 8.5")
+			-- The scope's runtime catalogue port is controlled; both file boundaries
+			-- and all public leaf operations still use the actual writer.
+			config.load_all = function() return {}, true end
+			helpers.assert_true(config.acquire(owner))
+			helpers.assert_true(config.apply_configuration(owner, {}, candidate, { status = "ok", content = candidate }))
+			helpers.assert_eq(config.set_override("ext:future:pack", "literal.section", "delay", 4), false)
+			helpers.assert_true(writer.publish_if_unchanged(path, candidate, nil, original.override_source))
+			helpers.assert_true(config.release(owner))
+			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 9.5))
+			helpers.assert_eq(read(), source:gsub("delay = 1.25", "delay = 9.5"))
+			local applied = config.configuration_snapshot()
+			helpers.assert_true(config.acquire(owner))
+			helpers.assert_true(writer.publish_if_unchanged(path, source, nil, applied.override_source))
+			helpers.assert_true(config.restore_configuration(owner, original))
+			helpers.assert_true(config.release(owner))
+			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 2.5))
+			helpers.assert_eq(read(), source:gsub("delay = 1.25", "delay = 2.5"))
+		end)
+	end)
+
+	helpers.it("retains the actual absent or present-empty scope target before ordinary setters", function()
+		for _, content in ipairs({ false, "" }) do
+			local initial = content
+			if content == false then initial = nil end
+			with_owner(initial, function(config, path, read)
+				local owner = {}
+				local participant = require("config_scope_file").new({ path = path,
+					backup_path = path .. ".backup", remove = os.remove })
+				config.load_all = function() return {}, true end
+				helpers.assert_true(participant.prepare({}))
+				local target = participant.target()
+				helpers.assert_eq(target.status, content == false and "absent" or "ok")
+				helpers.assert_true(config.acquire(owner))
+				helpers.assert_true(config.apply_configuration(owner, {}, participant.candidate(), target))
+				helpers.assert_true(participant.publish())
+				helpers.assert_true(config.release(owner))
+				helpers.assert_eq(config.configuration_snapshot().override_source.status, target.status)
+				helpers.assert_true(config.set_override("fresh", nil, "delay", 2.5))
+				helpers.assert_contains(read(), "delay = 2.5")
+			end)
+		end
 	end)
 end)

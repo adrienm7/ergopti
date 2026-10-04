@@ -1,0 +1,6 @@
+{
+	"section": "llm_profile_commands",
+	"id": "llm_profile_clone",
+	"i18n": "menu.profiles.clone_builtin",
+	"ready": "llm_profile_clone_ready"
+}

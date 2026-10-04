@@ -134,3 +134,64 @@ _LBMD_RowsUseDisplayHelpers() {
 }
 Test("llm menu: parent rows route through display helpers (llm-menu-label-wiring)",
 	_LBMD_RowsUseDisplayHelpers)
+
+
+; A callable native browser port returns its own presentation receipt unchanged.
+_LBMD_ModelBrowserOpen(Seen) {
+	Seen["calls"] += 1
+	return Seen["result"]
+}
+
+_LBMD_ModelBrowserSharedCommand() {
+	Body := _DriverFuncBody("_LLM_Menu_ModelBrowserRow")
+	Assert(Body != "", "the actual browser provider must exist")
+	AssertContains(Body, 'MenuRenderer_CommandRow("llm_model_commands", "llm_browse_models"',
+		"the fixed browser row must use its shared declaration")
+	Seen := Map("calls", 0, "result", "owned-browser-receipt")
+	Row := _LLM_Menu_ModelBrowserRow(_LBMD_ModelBrowserOpen.Bind(Seen))
+	Assert(Row is Map, "the browser provider must return row data")
+	AssertEqual(t("menu.llm.browse_models_entry"), Row["label"],
+		"the browser caption is the canonical translated command")
+	Assert(!Row.Has("checked"), "browser presentation does not toggle a setting")
+	AssertEqual("owned-browser-receipt", Row["action"].Call(),
+		"the existing native browser owns its presentation receipt")
+	AssertEqual(1, Seen["calls"], "the command reaches one native browser owner")
+	Seen["result"] := false
+	AssertEqual(false, Row["action"].Call(), "native browser refusal must be retained")
+	AssertEqual(2, Seen["calls"], "refusal cannot retry another browser owner")
+}
+Test("models browser: fixed command uses shared metadata and native presentation receipts",
+	_LBMD_ModelBrowserSharedCommand)
+
+_LBMD_ModelBrowserUnavailablePort() {
+	Row := _LLM_Menu_ModelBrowserRow(Map("future", true))
+	Assert(!IsObject(Row) || Row.Get("disabled", false),
+		"an object without a callable browser cannot become an enabled command")
+	if Row is Map && Row.Has("action")
+		AssertEqual(false, Row["action"].Call(),
+			"the shared command must refuse a retained unavailable browser port")
+}
+Test("models browser: unavailable native presentation ports fail closed",
+	_LBMD_ModelBrowserUnavailablePort)
+
+; The definitions-only runner has no native WebView browser implementation.
+_LBMD_ModelBrowserAbsentDefaultPort() {
+	Assert(!IsSet(LLM_ModelBrowser_Show),
+		"the real definitions-only graph must not inject a native browser stand-in")
+	Row := _LLM_Menu_ModelBrowserRow()
+	Assert(Row is Map, "an unavailable native browser retains the declared row")
+	AssertEqual(true, Row.Get("disabled", false),
+		"an absent default browser cannot produce an enabled command")
+	AssertEqual(false, Row["action"].Call(),
+		"a retained command must refuse the missing actual native browser")
+	Seen := Map("calls", 0, "result", "supplied-native-browser-receipt")
+	Supplied := _LLM_Menu_ModelBrowserRow(_LBMD_ModelBrowserOpen.Bind(Seen))
+	AssertEqual(false, Supplied.Get("disabled", false),
+		"an explicitly supplied callable retains its availability")
+	AssertEqual(0, Seen["calls"], "building a callable row must not open the browser")
+	AssertEqual("supplied-native-browser-receipt", Supplied["action"].Call(),
+		"the supplied native port retains its exact presentation receipt")
+	AssertEqual(1, Seen["calls"], "only the supplied native browser is invoked")
+}
+Test("models browser: an absent default native port refuses without hiding supplied capability",
+	_LBMD_ModelBrowserAbsentDefaultPort)

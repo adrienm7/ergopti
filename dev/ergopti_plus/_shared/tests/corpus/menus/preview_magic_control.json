@@ -1,0 +1,46 @@
+{
+	"section": "preview_magic_control",
+	"row": {
+		"id": "preview_star_enabled",
+		"i18n": "menu.hotstrings.tooltip_magic",
+		"checked_when": ["hotstrings.preview_star_enabled"],
+		"disabled_when": ["preview_magic_ready"]
+	},
+	"native_linux_name": "star",
+	"position": 1,
+	"siblings": [
+		"menu.hotstrings.tooltip_magic",
+		"menu.hotstrings.tooltip_autocorrect",
+		"menu.hotstrings.tooltip_ai",
+		"-",
+		"menu.hotstrings.tooltip_colored"
+	],
+	"unavailable": {
+		"platform": "ahk",
+		"mode": "grey",
+		"reason": "platform_reason.preview_bubbles_are_lua_previews"
+	},
+	"locales": [
+		"ar",
+		"cs",
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"he",
+		"hi",
+		"it",
+		"ja",
+		"ko",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"ru",
+		"sv",
+		"tr",
+		"uk",
+		"zh"
+	]
+}

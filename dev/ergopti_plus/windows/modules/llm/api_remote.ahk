@@ -42,6 +42,7 @@
 ; plus (optionally) a new Format branch in _LLMRemoteBuildPayload /
 ; _LLMRemoteParseResponse.
 global LLM_API_PROVIDERS := Map()
+global LLM_LOCAL_API_SERVERS := Map()
 global LLM_API_PROVIDER_ORDER := []
 
 ; The formats a catalogue provider may declare, each with what it serves:
@@ -1085,7 +1086,7 @@ _LLMRemote_TrimAsyncRegistry() {
 ; model / unknown provider) so the caller can fail cleanly on a single
 ; check instead of repeating the same six guards everywhere.
 _LLMRemoteResolveEntry(Entry) {
-    global LLM_API_PROVIDERS
+    global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
     ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
     if !LLM_API_PROVIDERS.Has(ProviderId)
         return ""
@@ -1094,10 +1095,10 @@ _LLMRemoteResolveEntry(Entry) {
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
         BaseUrl := Provider["BaseUrl"]
-    if (BaseUrl == "")
+    if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteEntryGet(Entry, "Token", "")
-    if (Token == "")
+    if !LocalServerAuthTokenAllowed(ProviderId, Token, LLM_LOCAL_API_SERVERS)
         return ""
     Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
     if (Model == "")
@@ -1151,7 +1152,7 @@ _LLMRemote_CompleteReady(Owner, on_result, reachable) {
 }
 
 LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0) {
-    global LLM_API_PROVIDERS
+    global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
     global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
 
     ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
@@ -1168,13 +1169,19 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0) {
         return Owner
     }
     Provider := LLM_API_PROVIDERS[ProviderId]
-    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", Provider["BaseUrl"])
+    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
+    if (BaseUrl == "")
+        BaseUrl := Provider["BaseUrl"]
     Token    := _LLMRemoteEntryGet(Entry, "Token", "")
-    if (BaseUrl == "" or Token == "") {
+    if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
+            || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
+            || !LocalServerAuthTokenAllowed(ProviderId, Token, LLM_LOCAL_API_SERVERS)
+            || !_LLMRemote_ConfigScalarIsSafe(Token) {
         _LLMRemote_CompleteReady(Owner, on_result, false)
         return Owner
     }
 
+    Owner["local_server"] := LocalServerAuthTokenAllowed(ProviderId, "", LLM_LOCAL_API_SERVERS)
     ProvFmt := Provider["Format"]
     PingUrl := ""
     if (ProvFmt == "openai" or ProvFmt == "anthropic") {
@@ -1244,6 +1251,13 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms, Owner := 0) {
     }
     status := 0
     try status := Http.Status
+    if (Owner is Map) && Owner.Get("local_server", false) {
+        Body := ""
+        try Body := Http.ResponseText
+        Models := LocalServerAuthModelsReceipt(Map("ok", status == 200, "status", status, "body", Body))
+        _LLMRemote_CompleteReady(Owner, on_result, Models is Array)
+        return
+    }
     _LLMRemote_CompleteReady(Owner, on_result, status >= 200 and status < 300)
 }
 
@@ -1673,6 +1687,7 @@ _LLMRemote_CatalogDecisionsTestIsValid(Section) {
 
 _LLMRemote_LoadCatalog() {
     global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
+    global LLM_LOCAL_API_SERVERS
     global LLM_REMOTE_DECISIONS_TEST
     path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
@@ -1723,6 +1738,18 @@ _LLMRemote_LoadCatalog() {
                 desc.Has("model_extras") ? desc["model_extras"] : Map()))
         candidateOrder.Push(pid)
     }
+
+    LocalCatalogue := Map("order", [], "servers", Map())
+    try LocalCatalogue := LocalServerAuthCatalogue(JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json")), candidateProviders)
+    catch as Err
+        try LoggerError("LLM.remote", "The local API catalogue is unavailable; optional authentication is refused.")
+    for Id in LocalCatalogue["order"] {
+        Desc := LocalCatalogue["servers"][Id]
+        candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
+            "DefaultModel", "", "Format", "openai", "ModelExtras", Map())
+        candidateOrder.Push(Id)
+    }
+    LLM_LOCAL_API_SERVERS := LocalCatalogue["servers"]
 
     candidatePrices := Map()
     for model, row in prices {

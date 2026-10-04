@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Karabiner से Ergopti हटाएँ",
 	"menu.global.restore_touchpad_gestures": "Windows टचपैड जेस्चर पुनर्स्थापित करें",
 	"dialog.start_at_login.failed": "स्वचालित स्टार्टअप नहीं बदला जा सका। सिस्टम की स्टार्टअप सेटिंग जाँचें।",
-	"onboarding.error.open_failed": "सेटअप विज़ार्ड नहीं खुल सका। लॉग जाँचें और मेनू से फिर प्रयास करें।"
+	"onboarding.error.open_failed": "सेटअप विज़ार्ड नहीं खुल सका। लॉग जाँचें और मेनू से फिर प्रयास करें।",
+	"platform_reason.token_streaming_transport_missing": "Windows पर नहीं: Windows अभी सुझावों को टोकन दर टोकन नहीं दिखा सकता। यह विकल्प निष्क्रिय रहता है।"
 }

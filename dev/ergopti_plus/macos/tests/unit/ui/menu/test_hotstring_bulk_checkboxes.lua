@@ -261,23 +261,114 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		end
 	end
 	helpers.it("a personal file submenu owns only its group and keeps shared command order", function()
-		local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
-		local ctx, batches = context(false, false, { "personal.toml", "personal_ext_work.toml" })
-		ctx.state.trigger_char = "★"
-		ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
-		ctx.hotstring_editor = { open = function() end }
-		local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
-		local file
-		for _, row in ipairs(rows) do if row.title == "work" then file = row end end
-		helpers.assert_true(file ~= nil, "the personal file must survive native subtree rendering")
-		helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
-		helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
-		helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
-		helpers.assert_eq(file.menu[4].title, "-")
-		helpers.assert_eq(file.menu[5].title, "one")
-		helpers.assert_eq(file.menu[1].fn(), true)
-		helpers.assert_eq(batches, { { names = { "personal_ext_work" }, enabled = true } })
-		helpers.assert_eq(ctx.state.hotstrings, { personal_ext_work = true }, "sibling choices remain absent")
+		helpers.with_stub_scope({ "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+			-- This projection fixture owns a synthetic acknowledged group. Actual
+			-- provenance, native route and refusal behavior have their own owner test.
+			local bindings = 0
+			package.loaded["infra.personal_file_scope"] = { bind = function()
+				bindings = bindings + 1
+				return function() return true end
+			end }
+			local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+			local ctx, batches = context(false, false, { "personal.toml", "personal_ext_work.toml" })
+			ctx.state.trigger_char = "★"
+			ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
+			ctx.hotstring_editor = { open = function() end }
+			local rows = custom.build_custom(ctx, { group_counts = {} }).submenu
+			local file
+			for _, row in ipairs(rows) do if row.title == "work" then file = row end end
+			helpers.assert_true(file ~= nil, "the personal file must survive native subtree rendering")
+			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
+			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
+			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
+			helpers.assert_eq(file.menu[4].title, "-")
+			helpers.assert_eq(file.menu[5].title, "one")
+			helpers.assert_eq(file.menu[1].fn(), true)
+			helpers.assert_eq(batches, { { names = { "personal_ext_work" }, enabled = true } })
+			helpers.assert_eq(ctx.state.hotstrings, { personal_ext_work = true }, "sibling choices remain absent")
+			helpers.assert_eq(bindings, 1, "one native admission binding per rendered file")
+		end)
 	end)
 
+end)
+
+
+--- Exercises real command rendering and DeferredWork; only the native timer is injected.
+--- @param committed boolean Native scheduling acknowledgement.
+--- @param body function Real category callback observations.
+local function with_category_file(committed, body, change_label)
+	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
+		"adapters.timer_scheduler", "modules.keymap", "modules.dynamic_hotstrings",
+		"ui.menu.menu_hotstrings" }, function()
+		-- Category file opening neither starts nor inspects these unrelated engines.
+		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
+		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
+		local callbacks, launches = {}, {}
+		package.loaded["adapters.timer_scheduler"] = { after = function(_, callback)
+			callbacks[#callbacks + 1] = callback
+			return {}, committed
+		end }
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		hs.execute = function(command) launches[#launches + 1] = command; return "", true end
+		package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+			platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			json_decode = function(bytes)
+				local document = hs.json.decode(bytes)
+				if change_label then document.hotstring_file_commands[1].i18n = "fixture.category.file.command" end
+				return document
+			end,
+			i18n = { get = function(key) return key end, section = function(key) return key end },
+			logger = require("infra.logger"),
+		}))
+		package.loaded["ui.menu.menu_hotstrings"] = nil
+		hotstrings = require("ui.menu.menu_hotstrings")
+		body(hotstrings, callbacks, launches)
+	end)
+end
+
+helpers.describe("shared category file command", function()
+	helpers.it("shared category file: consumes the actual declared label", function()
+		with_category_file(true, function(hotstrings)
+			local ctx = context(true, true)
+			ctx.hotfile_paths = { alpha = "/user/a.toml" }
+			helpers.assert_eq(hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3].title,
+				"fixture.category.file.command")
+		end, true)
+	end)
+	for _, committed in ipairs({ true, false }) do
+		helpers.it("shared category file: returns the native deferred scheduling acknowledgement " .. tostring(committed), function()
+			with_category_file(committed, function(hotstrings, callbacks, launches)
+				local ctx = context(false, false)
+				ctx.paused = true
+				ctx.hotfile_paths = { alpha = "/user/category file.toml" }
+				local saves = 0
+				ctx.save_prefs = function() saves = saves + 1; return true end
+				local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
+				helpers.assert_eq(command.title, "menu.hotstrings.open_file")
+				helpers.assert_true(command.disabled ~= true, "configuration remains available under pause")
+				ctx.hotfile_paths.alpha = "/foreign/replaced.toml"
+				helpers.assert_eq(command.fn(), committed)
+				helpers.assert_eq(#callbacks, 1)
+				helpers.assert_eq(#launches, 0, "the deferred native owner has not delivered yet")
+				if committed then callbacks[1]() end
+				helpers.assert_eq(#launches, committed and 1 or 0)
+				if committed then
+					helpers.assert_eq(launches[1], "open " .. require("infra.text_utils").shell_quote("/user/category file.toml"))
+				end
+				helpers.assert_eq(saves, 0)
+			end)
+		end)
+	end
+	helpers.it("shared category file: refuses a held callback after the native execute port is withdrawn", function()
+		with_category_file(true, function(hotstrings, callbacks, launches)
+			local ctx = context(true, true)
+			ctx.hotfile_paths = { alpha = "/user/a.toml" }
+			local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
+			hs.execute = nil
+			helpers.assert_eq(command.fn(), false)
+			helpers.assert_eq(#callbacks, 0)
+			helpers.assert_eq(#launches, 0)
+			helpers.assert_eq(hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3].disabled, true)
+		end)
+	end)
 end)

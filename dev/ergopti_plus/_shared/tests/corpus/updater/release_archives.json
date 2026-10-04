@@ -1,0 +1,290 @@
+{
+	"description": "Independently authored exact release records and ordered archive-selection expectations; no production-derived expectations.",
+	"cases": [
+		{
+			"name": "historical ZIP release",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"expected": {
+				"tag": "v1.2.3",
+				"version": "1.2.3",
+				"url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+				"digest": "abababababababababababababababababababababababababababababababab",
+				"format": "zip"
+			},
+			"refused": false
+		},
+		{
+			"name": "preferred XZ release",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"expected": {
+				"tag": "v1.2.3",
+				"version": "1.2.3",
+				"url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+				"digest": "abababababababababababababababababababababababababababababababab",
+				"format": "tar.xz"
+			},
+			"refused": false
+		},
+		{
+			"name": "ZIP listed first still prefers XZ",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					},
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"expected": {
+				"tag": "v1.2.3",
+				"version": "1.2.3",
+				"url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+				"digest": "abababababababababababababababababababababababababababababababab",
+				"format": "tar.xz"
+			},
+			"refused": false
+		},
+		{
+			"name": "XZ listed first wins",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"expected": {
+				"tag": "v1.2.3",
+				"version": "1.2.3",
+				"url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+				"digest": "abababababababababababababababababababababababababababababababab",
+				"format": "tar.xz"
+			},
+			"refused": false
+		},
+		{
+			"name": "unknown future asset is independent",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "future-format.bin"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"expected": {
+				"tag": "v1.2.3",
+				"version": "1.2.3",
+				"url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+				"digest": "abababababababababababababababababababababababababababababababab",
+				"format": "zip"
+			},
+			"refused": false
+		},
+		{
+			"name": "missing preferred digest",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"reason": "invalid-archive-integrity",
+			"refused": true
+		},
+		{
+			"name": "foreign preferred URL",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://foreign.example/ErgoptiPlus.app.tar.xz",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"reason": "invalid-archive-integrity",
+			"refused": true
+		},
+		{
+			"name": "wrong preferred digest algorithm",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+						"digest": "md5:abababababababababababababababababababababababababababababababab"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"reason": "invalid-archive-integrity",
+			"refused": true
+		},
+		{
+			"name": "short preferred digest",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+						"digest": "sha256:abcd"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"reason": "invalid-archive-integrity",
+			"refused": true
+		},
+		{
+			"name": "duplicate preferred refuses",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					},
+					{
+						"name": "ErgoptiPlus.app.tar.xz",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.tar.xz",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"reason": "ambiguous-archive",
+			"refused": true
+		},
+		{
+			"name": "duplicate historical ZIP refuses",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					},
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"reason": "ambiguous-archive",
+			"refused": true
+		},
+		{
+			"name": "absent declared archives",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "other.bin"
+					}
+				]
+			},
+			"reason": "absent-archive",
+			"refused": true
+		},
+		{
+			"name": "missing historical digest",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip"
+					}
+				]
+			},
+			"reason": "invalid-archive-integrity",
+			"refused": true
+		},
+		{
+			"name": "malformed list cannot mean preferred absence",
+			"release": {
+				"tag_name": "v1.2.3",
+				"assets": [
+					false,
+					{
+						"name": "ErgoptiPlus.app.zip",
+						"browser_download_url": "https://github.com/adrienm7/ergopti/releases/download/v1.2.3/ErgoptiPlus.app.zip",
+						"digest": "sha256:abababababababababababababababababababababababababababababababab"
+					}
+				]
+			},
+			"reason": "invalid-release-assets",
+			"refused": true
+		}
+	]
+}

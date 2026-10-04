@@ -365,7 +365,7 @@ if Features["shortcuts"]["search"]["enabled"] {
 				SearchPath(SelectedText)
 		}
 
-		SearchPath(SelectedText) {
+		SearchPath(SelectedText, LaunchFn := Run) {
 				; The result of each of those regexes is a boolean
 
 				; Detects Windows file paths like C:/ or D:\ (supports forward and backward slashes)
@@ -400,7 +400,7 @@ if Features["shortcuts"]["search"]["enabled"] {
 				; selected-but-non-existent path string falls through to the web-search branch
 				; instead of throwing an OSError that escalates to the crash-report error net.
 				if (FilePath and FileExist(SelectedText)) {
-						try Run(SelectedText, , "Max")
+						try LaunchFn.Call(SelectedText, , "Max")
 						catch as SearchError {
 								LoggerWarn("Search", "Could not open path '{1}': {2}.", SelectedText, SearchError.Message)
 						}
@@ -410,30 +410,26 @@ if Features["shortcuts"]["search"]["enabled"] {
 								LoggerWarn("Search", "Could not jump to registry path '{1}': {2}.", SelectedText, SearchError.Message)
 						}
 				} else {
-						; Modify some characters that screw up the URL
-						SelectedText := StrReplace(SelectedText, "`r`n", " ")
-						SelectedText := StrReplace(SelectedText, "#", "%23")
-						SelectedText := StrReplace(SelectedText, "&", "%26")
-						SelectedText := StrReplace(SelectedText, "+", "%2b")
-						SelectedText := StrReplace(SelectedText, '"', "%22")
-
+						; Complete URIs retain their delimiters and existing escapes.
 						if URLPath {
-								try Run(SelectedText)
+								try LaunchFn.Call(SelectedText)
 								catch as SearchError {
 										LoggerWarn("Search", "Could not open URL '{1}': {2}.", SelectedText, SearchError.Message)
 								}
 						} else if (WebsitePath) {
-								try Run("https://" . SelectedText)
+								try LaunchFn.Call("https://" . SelectedText)
 								catch as SearchError {
 										LoggerWarn("Search", "Could not open website '{1}': {2}.", SelectedText, SearchError.Message)
 								}
 						} else if (SelectedText == "") { ; If nothing was copied
-								try Run(Features["shortcuts"]["search"]["search_engine"])
+								try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine"])
 								catch as SearchError {
 										LoggerWarn("Search", "Could not open search engine: {1}.", SearchError.Message)
 								}
 						} else {
-								try Run(Features["shortcuts"]["search"]["search_engine_url_query"] . SelectedText)
+								; Preserve the existing CRLF-to-space selection policy, then encode one component.
+								Query := UriEncode(StrReplace(SelectedText, "`r`n", " "))
+								try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine_url_query"] . Query)
 								catch as SearchError {
 										LoggerWarn("Search", "Could not open search URL: {1}.", SearchError.Message)
 								}
@@ -473,6 +469,8 @@ if Features["shortcuts"]["search"]["enabled"] {
 		}
 
 		_RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
+				global _SelectionCaptureNextId
+				SelectionId := _SelectionCaptureNextId
 				; Persist first so a refused registry write cannot destroy the user's
 				; currently open Registry Editor session and then reopen a stale key.
 				if !WriteFn.Call("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit",
@@ -480,6 +478,13 @@ if Features["shortcuts"]["search"]["enabled"] {
 						throw Error("Regedit LastKey registry write was refused")
 				if ExistsFn.Call("Registry Editor") && !KillFn.Call("Registry Editor")
 						throw Error("existing Registry Editor window could not be closed")
+				; WinKill pumps messages during its native window delay. A completed
+				; close cannot authorize a new launch after pause or command revocation.
+				if A_IsSuspended || _SelectionCaptureNextId != SelectionId {
+						LoggerInfo("Search", "Registry navigation cancelled before launch: {1}.",
+								A_IsSuspended ? "driver paused" : "selection command superseded")
+						return false
+				}
 				RunFn.Call("Regedit.exe")
 				return true
 		}

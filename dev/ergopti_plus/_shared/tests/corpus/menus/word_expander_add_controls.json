@@ -1,0 +1,19 @@
+{
+	"schema_version": 1,
+	"section": "word_expander_custom_menu",
+	"id": "word_expander_add",
+	"i18n": "menu.hotstrings.add_delimiter",
+	"ready": "word_expanders_ready",
+	"target": {
+		"char": "☂",
+		"linux_key": "custom_☂",
+		"macos_key": "custom_1"
+	},
+	"foreign": {
+		"custom": "custom_delete_probe",
+		"char": "☃",
+		"metadata": {
+			"keep": 17
+		}
+	}
+}

@@ -309,7 +309,7 @@ M.features = {
 		path = "llm.agent_disabled_apps", id = "agent_disabled_apps", section = "llm", default = {  }, type = "array", description_key = "menu.agent.disabled_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
 	},
 	{
-		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false,
+		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false, choice_values = { -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7 },
 	},
 	{
 		path = "llm.display.show_info_bar", id = "show_info_bar", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.show_info_bar", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,

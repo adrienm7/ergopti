@@ -187,12 +187,13 @@ end
 --- Builds a fresh engine from a loaded configuration; the old one stays until
 --- the caller publishes the result and calls _apply().
 --- @param loaded table Config.load() or Config.load_document() result.
+--- @param boot boolean|nil Whether this is the initial daemon load.
 --- @return table loaded, table one_shot, table engine
-local function _build(loaded)
+local function _build(loaded, boot)
 	_check_catalog(loaded.catalog)
 	local one_shot = _read_one_shot()
 	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
-	local nav_layer = NavLayer.load({ shared_root = Paths.shared_root(), config_dir = config_dir })
+	local nav_layer = NavLayer.load({ shared_root = Paths.shared_root(), config_dir = config_dir, boot = boot == true })
 	_warn_unsupported_taps(loaded)
 	local count = 0
 	for _, key in pairs(loaded.keys) do
@@ -216,8 +217,9 @@ local function _build(loaded)
 end
 
 --- Reads the files and builds a fresh engine; the old one stays until _apply().
-local function _load()
-	_loaded, _one_shot, _engine = _build(Config.load(_defaults_path, _user_path))
+--- @param boot boolean|nil Whether this is the initial daemon load.
+local function _load(boot)
+	_loaded, _one_shot, _engine = _build(Config.load(_defaults_path, _user_path), boot)
 end
 
 local function _require_init()
@@ -262,7 +264,7 @@ function M.init(opts)
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
-	_load()
+	_load(true)
 	_initialized = true
 	_apply()
 	Logger.success(LOG, "Tap-holds initialised (%s).", _active() and "active" or "inactive")
