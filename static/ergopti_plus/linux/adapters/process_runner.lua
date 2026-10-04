@@ -190,7 +190,7 @@ function M.run(program, args, options, callback)
 	run.process = process
 	run.pid = pid
 
-	local timer_ok = pcall(NativeTimer.start, luv, run.timer, timeout_ms, 0, function()
+	local timer_ok, timer_started = pcall(NativeTimer.start, luv, run.timer, timeout_ms, 0, function()
 		if run.terminal then return end
 		terminate_group(run)
 		finish(run, { exit_code = -1, stdout = run.stdout_text, stderr = run.stderr_text,
@@ -211,13 +211,16 @@ function M.run(program, args, options, callback)
 			run[field] = run[field] .. chunk
 		end
 	end
-	local out_ok = pcall(luv.read_start, run.stdout, function(err, chunk)
+	local out_ok, stdout_started = pcall(luv.read_start, run.stdout, function(err, chunk)
 		consume("stdout_text", "stdout_eof", err, chunk)
 	end)
-	local err_ok = pcall(luv.read_start, run.stderr, function(err, chunk)
+	local err_ok, stderr_started = pcall(luv.read_start, run.stderr, function(err, chunk)
 		consume("stderr_text", "stderr_eof", err, chunk)
 	end)
-	if not timer_ok or not out_ok or not err_ok then
+	-- Libuv returns nil/error on native refusal without raising. Its successful
+	-- zero receipt is truthy in Lua; pcall status alone admits unsupervised runs.
+	if not timer_ok or not timer_started or not out_ok or not stdout_started
+		or not err_ok or not stderr_started then
 		terminate_group(run)
 		finish(run, { exit_code = -1, stdout = "", stderr = "", error = "process supervision could not start" })
 		return false

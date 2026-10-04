@@ -1160,6 +1160,20 @@ These are software implementations; final hardware verification remains below.
   follow-up proposal for the principal owner. Windows uses its native Write/Close
   exception boundary by source. Foreign native suites and hosted CI are deferred.
   No new writer policy or reserved configuration/diagnostic gate was introduced.
+- [~] **L86.** Linux process supervision admission: require the returned
+  native timer/stdout/stderr start receipts as well as their protected call
+  status. Libuv returns nil/error without raising; pcall success previously
+  admitted an unsupervised process. Refusal now terminates the owned group,
+  retires handles and publishes one failure, while native zero remains success.
+  Three of four component checks fail before and all pass after: the fixture
+  explicitly simulates invalidation of an actual timer or pipe before its
+  genuine EINVAL start receipt. Child processes, group termination, reaping and
+  handle cleanup are real; ordinary production invalidation is not claimed.
+  Six unit cases simulate nil/false receipt forms and preserve the existing
+  clock, argv, output and late-callback assertions. The native clock helper
+  remains in use. Windows uses native process/SetTimer paths and macOS hs.task
+  by source; their native admission behavior remains unqualified and deferred.
+  No reserved source or public process API changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -15,11 +15,11 @@
 local helpers = require("tests.helpers")
 
 --- Creates the minimum libuv process/pipe/timer surface the runner uses.
---- @param config table|nil { spawn_error? }
+--- @param config table|nil { spawn_error?, refuse?, refusal?, refresh_error? }
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, spawns = {} }
+	local state = { kills = {}, spawns = {}, reads = 0 }
 	local fake = {}
 
 	local function handle(kind)
@@ -35,12 +35,21 @@ local function fake_luv(config)
 		return state.timer
 	end
 	function fake.timer_start(timer, timeout_ms, repeat_ms, callback)
+		if options.refuse == "timer" then return options.refusal, "simulated timer refusal", "EINVAL" end
 		timer.timeout_ms = timeout_ms
 		timer.callback = callback
-		return true
+		return 0
 	end
 	function fake.timer_stop(timer) timer.stopped = true; return true end
-	function fake.read_start(pipe, callback) pipe.read_callback = callback; return true end
+	function fake.read_start(pipe, callback)
+		state.reads = state.reads + 1
+		if (options.refuse == "stdout" and state.reads == 1)
+			or (options.refuse == "stderr" and state.reads == 2) then
+			return options.refusal, "simulated stream refusal", "EINVAL"
+		end
+		pipe.read_callback = callback
+		return 0
+	end
 	function fake.read_stop(pipe) pipe.read_stopped = true; return true end
 	function fake.is_closing(value) return value.closing end
 	function fake.close(value) value.closing = true end
@@ -91,6 +100,27 @@ local function start(runner, program, args, options)
 end
 
 helpers.describe("process_runner: asynchronous argv processes", function()
+	for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
+		for _, receipt in ipairs({ "nil", "false" }) do
+			helpers.it("linux-process-supervision: returned " .. receipt .. " from " .. operation .. " refuses dispatch once", function()
+				local config = { refuse = operation }
+				if receipt == "false" then config.refusal = false end
+				local runner, state = fresh_runner(config)
+				local dispatched, results = start(runner, "python3", {}, { timeout_ms = 100 })
+				helpers.assert_eq(dispatched, false)
+				helpers.assert_eq(#results, 1)
+				helpers.assert_eq(results[1].exit_code, -1)
+				helpers.assert_eq(results[1].error, "process supervision could not start")
+				helpers.assert_eq(state.kills, { { pid = -7001, signal = "sigterm" }, { pid = -7001, signal = "sigkill" } })
+				helpers.assert_true(state.timer.closing)
+				helpers.assert_true(state.options.stdio[2].closing)
+				helpers.assert_true(state.options.stdio[3].closing)
+				state.exit_callback(0, 0)
+				helpers.assert_eq(#results, 1, "late exit must not publish the refusal twice")
+			end)
+		end
+	end
+
 	helpers.it("linux-relative-clock: simulated refresh exception retires the owned child and handles", function()
 		local runner, state = fresh_runner({ refresh_error = true })
 		local dispatched, results = start(runner, "python3", { "slow.py" }, {})
