@@ -102,6 +102,33 @@ end)
 -- =====================================
 -- =====================================
 
+describe("linux-version-read-admission", function()
+	local Version = require("infra.version")
+	local FileSystem = require("adapters.file_system")
+	for _, case in ipairs({
+		{ "regular release bytes", "version=1.2.3\n", "1.2.3", "build" },
+		{ "refused native source", false, "local", "local" },
+		{ "empty regular bytes", "", "unknown", "unknown" },
+		{ "malformed regular bytes", "version=broken\n", "unknown", "unknown" },
+	}) do
+		it("linux-version-read-admission: uses the admitted native read port for " .. case[1], function()
+			local original, calls, observed = FileSystem.read, 0, nil
+			FileSystem.read = function(path)
+				calls, observed = calls + 1, path
+				if case[2] ~= false then return case[2] end
+				return nil
+			end
+			local ok, version, source = pcall(Version.resolve, { shared_root = SHARED })
+			FileSystem.read = original
+			assert_true(ok, tostring(version))
+			assert_eq(1, calls, "the native adapter must own version-stamp admission")
+			assert_eq(STAMP, observed)
+			assert_eq(case[3], version)
+			assert_eq(case[4], source)
+		end)
+	end
+end)
+
 describe("Driver version: infra/version.lua resolves the stamp", function()
 	local Version = require("infra.version")
 
