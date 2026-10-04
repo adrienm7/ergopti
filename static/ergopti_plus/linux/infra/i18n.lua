@@ -208,12 +208,12 @@ function M.get_locale()
 	return _locale
 end
 
---- Switches to the given locale and persists the choice.
+--- Persists an explicit wizard selection before adopting its locale.
+--- Unlike the ordinary menu setter, a same-locale choice needs a storage ACK.
 --- @param code string Locale code (must be in _available).
---- @return boolean True only when the requested locale is durably active.
-function M.set_locale(code)
+--- @return boolean True only after storage confirms the explicit selection.
+function M.persist_locale(code)
 	if type(code) ~= "string" or code == "" then return false end
-	if code == _locale then return true end
 
 	-- Verify the locale is available.
 	local found = false
@@ -233,6 +233,15 @@ function M.set_locale(code)
 	locale_mod.set_locale(code)
 	Logger.info(LOG, "Locale set to '%s' (persisted).", code)
 	return true
+end
+
+--- Switches to the given locale and persists a changed choice.
+--- An unchanged menu selection preserves the legitimate absent-default no-op.
+--- @param code string Locale code (must be in _available).
+--- @return boolean True when the active locale needs no change or was persisted.
+function M.set_locale(code)
+	if code == _locale then return true end
+	return M.persist_locale(code)
 end
 
 --- Returns the list of available locale codes for the language menu.

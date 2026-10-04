@@ -154,8 +154,11 @@ These are software implementations; final hardware verification remains below.
   every writer refuses to import over the latter and backs up the file it
   replaces. Published in the second 2026-09-30 release. Remaining: a real-device
   re-run of the wizard on each OS (Windows was verified by CI only), and Linux
-  still applies its hotstring sections through hotstrings_config (storage.json)
-  and leaves the trigger to its tray.
+  trigger selection in the wizard. Linux already writes its hotstring section
+  choices into the selected config.toml through the shared answer planner and
+  acknowledged writer. The shared wizard trigger choices remain excluded on
+  Linux because they do not satisfy its keymap validation policy; the tray
+  retains its existing physical-key preference owner.
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
   registry values through one owner. Remaining: turning the switch off or «
@@ -1338,6 +1341,11 @@ Linux Shortcuts master menu now reads the current typed runtime posture and requ
 The fixed Off checkbox in both AI Agent system submenus now comes from one shared declaration on Windows, macOS and Linux. The three providers retain their backend/model choices and existing setting transactions, checked states, pause policy and Windows already-Off no-op. Linux refreshes only after the current system owner returns an exact true acknowledgement. The independent shared-state/label tests include refusal and retry; the Linux test additionally exercises the actual canonical writer against a reserved owner and changed physical source, preserving foreign data. The canonical menu generator reproduces its exact shared parent. After Wrap/Bulk/Delay/Master, the native-row owner preserves the raw Wrap baseline as its patch preimage, separately normalizes only its stale site offsets against the actual latest parent sources, and reproduces that normalized checkpoint under source inversion with byte-exact repeated output; this tranche measures Windows 98 → 98, macOS 155 → 154 and Linux 99 → 99, crediting only its one macOS retirement. Focused macOS Lua and Linux LuaJIT tests pass; native Windows/UI execution and full integrated verification remain required. TODO54/81 remains partial.
 
 Linux shared script-management chord switch now reads the current typed native state at click time, protects the existing setter call, and accepts only literal true before repainting. Refused, missing, malformed or throwing ports use the existing localized keyboard-released failure dialog. Native chord writer, configuration reservation, dispatch generation, global pause policy, defaults and sparse deletion remain unchanged. Actual private source/slot/comment/future-field preservation, both directions, default deletion, refusal and held callback after independent real publication qualify; all Master4 old test bytes remain exact. Final existing registered menu67/0; exact original36/29 plus added real held0/2 causal RED and three meaningful mutations retained. Actual native predicate95/95 (delta0), no generated outputs or locale/declaration/schema changes. Windows existing current-state commit/reload was source-audited; macOS captured-state/full-save compensation/runtime receipt gap is a separate unfinished tranche. Entire shortcut/menu TODO and physical UI remain unqualified until root selected and hosted native gates.
+
+Linux onboarding now calls the existing i18n storage owner through explicit `persist_locale` and requires its exact true acknowledgment before writing wizard answers, completing, hiding or requesting restart. An invalid stored locale can fall back to French; explicitly selecting French must still acknowledge storage. Ordinary same-locale menu choices keep their existing no-op/default policy. This partial fix adds no schema, default flush or cross-owner transaction. Original production fails nine of thirteen new real wizard cases; the candidate passes all 13, plus 8 new locale-owner cases and the 44 selected onboarding/21 locale registered cases. Actual private JSON/TOML bytes and future neighbors are checked; native UI/Windows/macOS and full-root qualification remain pending. Existing runtime rollback after a later configuration refusal is retained, without claiming raw invalid-source restoration.
+Ordered after the reviewed active-hotstring editor and personal-editor reload fixtures: their complete test assertions and source changes are retained by an exact whole-parent inverse; author focused receipts remain for the original four-source cohort. Root must qualify the final composed bytes.
+
+The ordered cohort preserves the corrected PersonalReload joint-result assertion (510e478) as a complete prefix before the unchanged Wizard regression append. Source composition introduces no new behavior; full root and native qualification remain required.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
