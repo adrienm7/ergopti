@@ -2325,6 +2325,25 @@ Mac About retained-release callbacks now detach the displayed release tag and ch
       the `network.failure.*` keys). The Windows and Linux work stayed
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
+
+Windows remote API readiness and generation now reserve their actual request
+owner before asynchronous system-proxy admission. Native WinHTTP resolves the
+complete destination through configured PAC or WPAD, distinguishes acknowledged
+DIRECT from lookup refusal, and preserves exact child retirement and the
+original total admission budget. Environment selection follows the destination
+scheme. Strict requests do not reuse the application's PAC cache; changed system
+settings require a fresh lookup. Legacy updater behavior remains unchanged in
+this prerequisite.
+
+The registered native fixture serves controlled localhost PAC scripts and invokes
+the actual private-input production worker. Nine newly registered tests cover
+native receipt admission and that fixture; Windows execution, E2E, packaging and
+installation remain pending. Explicit unsupported relay lists are refused rather
+than silently truncated; successful WPAD, integrated authentication and enterprise
+certificate acceptance are not yet qualified. Linux routing, installer/server
+children, updater/rollback and usable shared failure actions remain required.
+Item 62 remains open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
