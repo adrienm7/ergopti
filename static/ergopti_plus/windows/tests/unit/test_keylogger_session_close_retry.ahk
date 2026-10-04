@@ -728,3 +728,67 @@ _KLSCR_Native64OrderMutations(Periodic) {
 for _KLSCR_Native64Periodic in [false, true]
 	Test("Keylogger native64: capture guards reject decoys periodic=" . _KLSCR_Native64Periodic
 		. " (keylogger-watcher-native64-order)", _KLSCR_Native64OrderMutations.Bind(_KLSCR_Native64Periodic))
+
+; Native physical timing retains high words; zero still means no physical key.
+_KLA64_Activity(Start, Now, Expected, Synthetic := false) {
+	SavedTick := KLHook.last_tick
+	SavedSynth := Keylogger.synth_active
+	SavedAccepted := KLWatch.last_authorized_tick
+	SavedActive := KLWatch.is_session_active
+	try {
+		KLHook.last_tick := Start
+		Keylogger.synth_active := Synthetic
+		KLWatch.last_authorized_tick := 0
+		KLWatch.is_session_active := true
+		Delay := KL_Hook_NoteActivity(true, true, Now)
+		AssertEqual(Expected, Delay, "the actual activity owner must retain the entire physical interval")
+		AssertEqual(Now, KLHook.last_tick, "the accepted sample becomes the next physical origin")
+		AssertEqual(0, KLWatch.last_authorized_tick, "already-noted physical input cannot acquire another accepted origin")
+		AssertTrue(KLWatch.is_session_active, "accepted zero ownership survives independently of the absent physical sentinel")
+	} finally {
+		KLHook.last_tick := SavedTick
+		Keylogger.synth_active := SavedSynth
+		KLWatch.last_authorized_tick := SavedAccepted
+		KLWatch.is_session_active := SavedActive
+	}
+}
+for _KLA64_Row in [[100, 149, 49], [4294967280, 4294967330, 50],
+	[100, 4294967396, 4294967296], [100, 4294967445, 4294967345],
+	[100, 8589934692, 8589934592], [9007199254740992, 9007199254741023, 31],
+	[0, 0, 0], [0, 4294967346, 0]]
+	Test("keylogger activity native64: physical interval " . _KLA64_Row[1] . "/" . _KLA64_Row[2],
+		_KLA64_Activity.Bind(_KLA64_Row*))
+Test("keylogger activity native64: synthetic timing cannot truncate the physical sample",
+	_KLA64_Activity.Bind(100, 4294967445, 4294967345, true))
+
+_KLA64_Invalid(Start, Now) {
+	SavedTick := KLHook.last_tick
+	try {
+		KLHook.last_tick := Start
+		Refused := false
+		try KL_Hook_NoteActivity(true, true, Now)
+		catch ValueError
+			Refused := true
+		AssertTrue(Refused, "invalid physical clocks must fail with ValueError")
+		AssertEqual(Start, KLHook.last_tick, "an invalid sample cannot publish a new physical watermark")
+	} finally KLHook.last_tick := SavedTick
+}
+for _KLA64_Row in [[100, 99], [-1, 100], [0, -1]]
+	Test("keylogger activity native64: rejects invalid origin/end " . _KLA64_Row[1] . "/" . _KLA64_Row[2],
+		_KLA64_Invalid.Bind(_KLA64_Row*))
+
+_KLA64_NativeDefaults() {
+	SavedTick := KLHook.last_tick
+	try {
+		Start := A_TickCount
+		KLHook.last_tick := Start
+		Before := A_TickCount
+		Delay := KL_Hook_NoteActivity(true)
+		After := A_TickCount
+		AssertTrue(KLHook.last_tick >= Before && KLHook.last_tick <= After,
+			"ordinary omitted observations publish a fresh actual native clock")
+		AssertEqual(Start = 0 ? 0 : KLHook.last_tick - Start, Delay,
+			"the returned delay must consume exactly its captured origin and published sample")
+	} finally KLHook.last_tick := SavedTick
+}
+Test("keylogger activity native64: omitted observation retains the actual native clock", _KLA64_NativeDefaults)
