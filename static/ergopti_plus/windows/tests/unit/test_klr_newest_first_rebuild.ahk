@@ -203,3 +203,136 @@ _KLRNF_ReplacedLedgerDiscardsCheckpoint() {
 }
 Test("KLR rebuild: a replaced ledger discards the checkpoint (klr-rebuild-resume)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_ReplacedLedgerDiscardsCheckpoint))
+; A scriptable clock advances at the second decision, or at the first completed
+; round's observer, while all reads, transactions and rollups remain real SQLite.
+class _KLRNFClock {
+	__New(Base, Delta, AdvanceAt) {
+		this.OriginTick := Base
+		this.Delta := Delta
+		this.AdvanceAt := AdvanceAt
+		this.Calls := 0
+	}
+	Call() {
+		this.Calls += 1
+		return this.Calls < this.AdvanceAt ? this.OriginTick : (this.OriginTick + this.Delta) & 0xFFFFFFFF
+	}
+}
+
+_KLRNF_ClockScenario(Kind, Base, Delta) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Saved := [KLRRebuild.min_ledger_bytes, KLRRebuild.chunk_bytes,
+		KLRRebuild.round_interval_ms, KLRRebuild.checkpoint_interval_ms,
+		KLRRebuild.stop_after_rounds, KLRRebuild.observer, KLRRebuild.now_fn]
+	Candidate := 0
+	try {
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		ReferenceDb := _KLRNF_Build(false)
+		Reference := _KLRDC_DerivedFingerprint(ReferenceDb)
+		CachePath := KLR_CachePath(_KLRDC_Root())
+		CacheBytes := FileRead(CachePath, "RAW")
+		Progress := []
+		FailObserver := Kind == "error"
+		Observe(Info) {
+			Progress.Push(Info.Clone())
+			if FailObserver
+				throw Error("Owned rebuild observer failure.")
+		}
+		KLRRebuild.min_ledger_bytes := 0
+		KLRRebuild.chunk_bytes := 700
+		KLRRebuild.round_interval_ms := KLRRebuildConst.ROUND_INTERVAL_MS
+		KLRRebuild.checkpoint_interval_ms := KLRRebuildConst.CHECKPOINT_INTERVAL_MS
+		KLRRebuild.stop_after_rounds := Kind == "checkpoint" ? 1 : 0
+		KLRRebuild.observer := Observe
+		Clock := _KLRNFClock(Base, Delta, Kind == "round" ? 7 : 4)
+		KLRRebuild.now_fn := Clock
+		Built := KLR_BuildColdSegmented(_KLRDC_Root(), "", [_KLRDC_LedgerPath()])
+		Candidate := Built["db"]
+		AssertTrue(Clock.Calls >= (Kind == "round" ? 7 : Kind == "error" ? 4 : 6), "the actual owner must consume the controlled decision clock")
+		AssertTrue(Progress.Length > 0)
+		AssertEqual(1, Progress[1]["round"], "first round is unconditional")
+		AssertFalse(Progress[1]["final"], "first round cannot claim final completion")
+		Checkpoint := KLR_RebuildCheckpointPath(_KLRDC_Root())
+		if Kind == "round" {
+			AssertTrue(Built["ok"])
+			AssertTrue(Progress.Length >= 3, "the fixture must exercise another step and final round")
+			Due := Delta >= KLRRebuildConst.ROUND_INTERVAL_MS
+			AssertEqual(Due, Progress[2].Has("db"), "only an eligible second round publishes its private database")
+			AssertEqual(Due ? 2 : 1, Progress[2]["round"], "before/equal/after threshold retains the >= policy")
+			AssertEqual(Delta, Progress[2]["elapsed_ms"], "actual progress elapsed crosses rollover without becoming negative")
+			Last := Progress[Progress.Length]
+			AssertTrue(Last["final"] && Last["done_bytes"] == Last["total_bytes"])
+			AssertEqual(Reference, _KLRDC_DerivedFingerprint(Candidate), "scheduled rounds still end at the reference fingerprint")
+			AssertFalse(FSExists(Checkpoint), "a round interval does not authorize an early checkpoint")
+		} else if Kind == "error" {
+			AssertFalse(Built["ok"], "an observer exception cannot certify a completed build")
+			AssertEqual(0, Candidate, "the failed owner releases its private database")
+			AssertEqual(1, Progress.Length, "a failed round cannot publish final completion")
+			AssertFalse(FSExists(Checkpoint), "a failed round cannot authorize a new checkpoint")
+			FailObserver := false
+			KLRRebuild.now_fn := 0
+			Progress := []
+			Recovered := KLR_BuildColdSegmented(_KLRDC_Root(), "", [_KLRDC_LedgerPath()])
+			Candidate := Recovered["db"]
+			AssertTrue(Recovered["ok"], "failure must release the exclusive guard for the next owner")
+			AssertTrue(Progress[Progress.Length]["final"])
+			AssertEqual(Reference, _KLRDC_DerivedFingerprint(Candidate), "recovery retains the reference SQLite fingerprint")
+		} else {
+			AssertFalse(Built["ok"], "the owned stop seam cannot turn interruption into success")
+			AssertEqual(0, Candidate)
+			AssertEqual(1, Progress.Length, "interruption after the first round publishes no final observation")
+			Due := Delta >= KLRRebuildConst.CHECKPOINT_INTERVAL_MS
+			AssertEqual(Due, FSExists(Checkpoint), "checkpoint requires its exact elapsed threshold after a completed round")
+			AssertEqual(Delta, Progress[1]["elapsed_ms"], "completed-round progress reports the actual nonnegative elapsed time")
+			if Due {
+				Stored := SQLite_Open(Checkpoint, SQLiteConst.OPEN_RO)
+				AssertTrue(Stored != 0)
+				try {
+					AssertTrue(SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM klr_rebuild_ledger;")[1]["n"] == 1,
+						"the real checkpoint stores the consumed ledger's resume authority")
+				} finally SQLite_Close(Stored)
+				KLRRebuild.now_fn := 0
+				KLRRebuild.stop_after_rounds := 0
+				KLRRebuild.round_interval_ms := 0
+				Progress := []
+				Resumed := KLR_BuildColdSegmented(_KLRDC_Root(), "", [_KLRDC_LedgerPath()])
+				Candidate := Resumed["db"]
+				AssertTrue(Resumed["ok"])
+				AssertTrue(Progress[1]["done_bytes"] > Progress[1]["run_bytes"], "resume must actually adopt the checkpoint")
+				AssertEqual(Reference, _KLRDC_DerivedFingerprint(Candidate), "a wrapped interrupted rebuild resumes to the exact SQLite fingerprint")
+			}
+		}
+		AssertEqual(ReferenceDb, KLRCache.db, "private candidates cannot replace the last-good resident handle")
+		CurrentCache := FileRead(CachePath, "RAW")
+		AssertEqual(CacheBytes.Size, CurrentCache.Size)
+		AssertEqual(CacheBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", CacheBytes, "Ptr", CurrentCache,
+			"UPtr", CacheBytes.Size, "UPtr"), "the last-good published image remains byte-exact")
+		AssertEqual(Reference, _KLRDC_DerivedFingerprint(ReferenceDb), "failure or completion cannot mutate the prior live database")
+	} finally {
+		if Candidate
+			SQLite_Close(Candidate)
+		KLRRebuild.min_ledger_bytes := Saved[1]
+		KLRRebuild.chunk_bytes := Saved[2]
+		KLRRebuild.round_interval_ms := Saved[3]
+		KLRRebuild.checkpoint_interval_ms := Saved[4]
+		KLRRebuild.stop_after_rounds := Saved[5]
+		KLRRebuild.observer := Saved[6]
+		KLRRebuild.now_fn := Saved[7]
+		_KLRDC_Cleanup()
+	}
+}
+
+for _KLRNFClockKind in ["round", "checkpoint"] {
+	_KLRNFClockThreshold := _KLRNFClockKind == "round"
+		? KLRRebuildConst.ROUND_INTERVAL_MS : KLRRebuildConst.CHECKPOINT_INTERVAL_MS
+	for _KLRNFClockBase in [100000, 0xFFFFFFF0] {
+		for _KLRNFClockDelta in [_KLRNFClockThreshold - 1, _KLRNFClockThreshold, _KLRNFClockThreshold + 1] {
+			Test("KLR rebuild: " . _KLRNFClockKind . " interval " . _KLRNFClockDelta . " from " . _KLRNFClockBase . " (klr-segmented-clock)",
+				_KLRDC_CheckTeardown.Bind(_KLRNF_ClockScenario.Bind(_KLRNFClockKind, _KLRNFClockBase, _KLRNFClockDelta)))
+		}
+	}
+}
+
+for _KLRNFClockErrorBase in [100000, 0xFFFFFFF0]
+	Test("KLR rebuild: observer failure releases ownership from " . _KLRNFClockErrorBase . " (klr-segmented-clock)",
+		_KLRDC_CheckTeardown.Bind(_KLRNF_ClockScenario.Bind("error", _KLRNFClockErrorBase, KLRRebuildConst.CHECKPOINT_INTERVAL_MS)))

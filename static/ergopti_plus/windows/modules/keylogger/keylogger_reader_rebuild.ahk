@@ -32,6 +32,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include ../../infra/tick_count.ahk
 
 
 
@@ -81,6 +82,18 @@ class KLRRebuild {
 	static stop_after_rounds := 0
 	; Called after each rollup round with a progress Map; see _KLR_RebuildNotify.
 	static observer := 0
+	; Optional owner-local monotonic clock for real disk rebuild regressions.
+	static now_fn := 0
+}
+
+; Production samples the native clock; tests retain the complete rebuild owner.
+_KLR_RebuildNow() {
+	Clock := KLRRebuild.now_fn
+	if Clock is Integer && Clock == 0
+		return A_TickCount
+	if !HasMethod(Clock, "Call")
+		throw TypeError("The rebuild clock must be callable or the native default.")
+	return Clock.Call()
 }
 
 class KLRRebuildRefusal extends Error {
@@ -154,7 +167,7 @@ KLR_BuildColdCandidateAuto(md, logPath) {
 ; @returns {Map} ok, db, sizes, snapshots.
 KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 	Failed := Map("ok", false, "db", 0, "sizes", Map())
-	StartTick := A_TickCount
+	StartTick := _KLR_RebuildNow()
 	; One rebuild per store: two dashboards opening together would otherwise
 	; each spend the whole rebuild and overwrite each other's checkpoint.
 	Guard := _KLR_RebuildAcquire(md, logPath, &Waited)
@@ -184,20 +197,20 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 		try LoggerStart("KLReader", "Newest-first metrics rebuild of {1} byte(s) in {2} ledger(s), {3} byte(s) resumed.",
 			State["total_bytes"], LedgerPaths.Length, State["resumed_bytes"])
 		LastRound := 0
-		LastCheckpoint := A_TickCount
+		LastCheckpoint := _KLR_RebuildNow()
 		loop {
 			Ledger := _KLR_RebuildNextLedger(State)
 			if !IsObject(Ledger)
 				break
 			_KLR_RebuildStep(State, Ledger)
-			if !LastRound || (A_TickCount - LastRound) >= KLRRebuild.round_interval_ms {
+			if !LastRound || TickElapsed(LastRound, _KLR_RebuildNow()) >= KLRRebuild.round_interval_ms {
 				_KLR_RebuildRound(State, false)
-				LastRound := A_TickCount
+				LastRound := _KLR_RebuildNow()
 				; Checkpoint only right after a round: every completed day is then
 				; rolled up, so the stored boundary is exact.
-				if (A_TickCount - LastCheckpoint) >= KLRRebuild.checkpoint_interval_ms {
+				if TickElapsed(LastCheckpoint, _KLR_RebuildNow()) >= KLRRebuild.checkpoint_interval_ms {
 					_KLR_RebuildCheckpoint(State)
-					LastCheckpoint := A_TickCount
+					LastCheckpoint := _KLR_RebuildNow()
 				}
 				if KLRRebuild.stop_after_rounds && State["rounds"] >= KLRRebuild.stop_after_rounds
 					throw KLRRebuildRefusal("stopped by the test seam")
@@ -219,8 +232,8 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 			Snapshots[Ledger["path"]] := Ledger["snapshot"]
 		}
 		KLW_ResetBatch()
-		KLR_PrefetchDebug(logPath, "KLR newest-first rebuild in " . (A_TickCount - StartTick) . "ms")
-		try LoggerSuccess("KLReader", "Newest-first metrics rebuild finished in {1} ms.", A_TickCount - StartTick)
+		KLR_PrefetchDebug(logPath, "KLR newest-first rebuild in " . TickElapsed(StartTick, _KLR_RebuildNow()) . "ms")
+		try LoggerSuccess("KLReader", "Newest-first metrics rebuild finished in {1} ms.", TickElapsed(StartTick, _KLR_RebuildNow()))
 		Owned := false
 		return Map("ok", true, "db", db, "sizes", Sizes, "snapshots", Snapshots,
 			"checkpoint", KLR_RebuildCheckpointPath(md))
@@ -273,7 +286,7 @@ _KLR_RebuildNewState(db, LedgerPaths) {
 			"frontier", KLRRebuildConst.NO_DAY_COMPLETE, "finished", Snapshot["size"] = 0))
 		Total += Snapshot["size"]
 	}
-	return Map("db", db, "ledgers", Ledgers, "total_bytes", Total, "run_start", A_TickCount,
+	return Map("db", db, "ledgers", Ledgers, "total_bytes", Total, "run_start", _KLR_RebuildNow(),
 		"resumed_bytes", 0, "done_boundary", KLRRebuildConst.NO_DAY_COMPLETE,
 		"oldest_complete", "", "newest_complete", "", "dirty", Map(), "nul_bytes", 0, "rounds", 0)
 }
@@ -570,7 +583,7 @@ _KLR_RebuildNotify(State, Final, AfterRound := true) {
 		"total_bytes", _KLR_RebuildTotalBytes(State),
 		"done_bytes", Done,
 		"run_bytes", Done - State["resumed_bytes"],
-		"elapsed_ms", A_TickCount - State["run_start"],
+		"elapsed_ms", TickElapsed(State["run_start"], _KLR_RebuildNow()),
 		"oldest_complete", State["oldest_complete"],
 		"newest_complete", State["newest_complete"])
 	if AfterRound
@@ -595,7 +608,7 @@ _KLR_RebuildCheckpoint(State) {
 	md := State["md"]
 	Path := KLR_RebuildCheckpointPath(md)
 	Stage := Path . ".stage." . A_ScriptHwnd . "." . A_TickCount
-	Tick := A_TickCount
+	Tick := _KLR_RebuildNow()
 	Dest := SQLite_Open(Stage)
 	if !Dest {
 		try FSDelete(Stage)
@@ -630,7 +643,7 @@ _KLR_RebuildCheckpoint(State) {
 		try LoggerWarn("KLReader", "Metrics rebuild checkpoint could not be written; the rebuild continues.")
 		return false
 	}
-	KLR_PrefetchDebug(State["log"], "KLR rebuild checkpoint in " . (A_TickCount - Tick) . "ms at "
+	KLR_PrefetchDebug(State["log"], "KLR rebuild checkpoint in " . TickElapsed(Tick, _KLR_RebuildNow()) . "ms at "
 		. _KLR_RebuildDoneBytes(State) . " byte(s)")
 	return true
 }
