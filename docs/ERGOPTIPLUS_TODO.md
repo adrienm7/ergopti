@@ -3248,6 +3248,14 @@ retain their cleanup debt. This independent prerequisite does not implement
 cursor-display switching or qualify the prepared native adapters. The Linux
 packet, full composed gates and native display acceptance remain pending.
 
+The shared worker timer retirement now separates each native close admission
+from its callback receipt. A synchronous callback waits for its own admission;
+callbacks from rejected or older attempts cannot release retained debt.
+Four original controls and ten independent delayed/synchronous refusal controls
+pass on Lua5.4 and LuaJIT; seven of the new controls fail on the prior source.
+These injected callback cases do not qualify physical timer APIs or complete
+item111; finite default deadlines and the native display requirements remain.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

@@ -57,16 +57,23 @@ function M.new(capture, ports)
 				if entry.timer_closing then return end
 				entry.timer_closing = true
 				local timer = entry.timer
-				local close_ok, receipt = pcall(native.close, timer, function()
-					if current ~= entry or entry.timer ~= timer then return end
+				local attempt = { admitted = false, callback_seen = false }
+				entry.timer_close_attempt = attempt
+				local close_ok, receipt, close_error = pcall(native.close, timer, function()
+					if current ~= entry or entry.timer ~= timer or entry.timer_close_attempt ~= attempt then return end
+					attempt.callback_seen = true
+					-- Synchronous callbacks cannot borrow admission from an earlier close call.
+					if not attempt.admitted then return end
 					entry.timer_retired = true
-					if entry.timer_close_admitted then settled(entry) end
+					settled(entry)
 				end)
-				if not close_ok or not (receipt == nil or receipt == 0 or receipt == true) then
-					entry.timer_closing, entry.timer_retired = false, false
+				if not close_ok or close_error ~= nil or not (receipt == nil or receipt == 0 or receipt == true) then
+					-- Rejected callbacks lose authority before a later attempt can be admitted.
+					entry.timer_close_attempt, entry.timer_closing = nil, false
 					return
 				end
-				entry.timer_close_admitted = true
+				attempt.admitted = true
+				entry.timer_retired = attempt.callback_seen
 				if not entry.timer_retired then return end
 			end
 			entry.timer = nil
