@@ -219,7 +219,16 @@ jobs:
       # Once per run instead of once per launch leg: the verdict and the
       # scenario profiles are plain Python, identical on every runner.
       - name: Self-test the launch verdict
-        run: python3 tools/diagnostics/macos_launch_gate_test.py
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          set -euo pipefail
+          brew install lua@5.4 luajit
+          diagnostic_lua54="$(brew --prefix lua@5.4)/bin/lua"
+          diagnostic_luajit="$(brew --prefix luajit)/bin/luajit"
+          test -x "$diagnostic_lua54"
+          test -x "$diagnostic_luajit"
+          ERGOPTI_DIAGNOSTIC_LUA54="$diagnostic_lua54" ERGOPTI_DIAGNOSTIC_LUAJIT="$diagnostic_luajit" python3 tools/diagnostics/macos_launch_gate_test.py
 
       # The build no longer downloads Karabiner-Elements: onboarding fetches the
       # pinned DMG on a user's first run. Validating the pin here makes a bad

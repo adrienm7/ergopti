@@ -948,5 +948,133 @@ def load_tests(loader, tests, pattern):
     return tests
 
 
+class EarlyLuaJournalObservationTests(unittest.TestCase):
+    """Early location evidence cannot change any mandatory launch verdict."""
+
+    def test_actual_run_reads_only_its_owned_journal_after_original_refusals(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, output, home = root / "app", root / "evidence", root / "home"
+            child = timer_probe.NativeDelayedTimerProbe.executable_path(app)
+            for executable in (app / "Contents/MacOS/ErgoptiPlus", child):
+                executable.parent.mkdir(parents=True, exist_ok=True)
+                executable.write_text("inert native fixture executable")
+            with (app / "Contents/Info.plist").open("wb") as handle:
+                plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
+            output.mkdir()
+            logs = gate.logs_folder(home)
+            logs.mkdir(parents=True)
+            owner = timer_probe.NativeDelayedTimerProbe(app, output, gate.HS_DOMAIN)
+            owner.nonce = "a" * 32
+            live = {"started": False}
+
+            def processes(executable):
+                return [42 if executable == child else 41] if live["started"] else []
+
+            def native_run(arguments, **options):
+                if arguments[0] == "open":
+                    live["started"] = True
+                    (logs / gate.LAUNCHER_LOG_NAME).write_text(HEALTHY["launcher_log"])
+                    (logs / gate.FALLBACK_BOOT_LOG_NAME).write_text(
+                        "2026-10-04 00:00:00 [INFO] [init] Native scripting Lua body stage: "
+                        "phase=received_lua_body; pid=42; nonce=" + owner.nonce + ".\n"
+                    )
+                return subprocess.CompletedProcess(arguments, 0, "arm64", "")
+
+            def refuse_feature(pid, resolve):
+                owner.bind_runtime(pid, resolve)
+                raise RuntimeError("original feature refused")
+
+            def quit_owned(*arguments):
+                live["started"] = False
+                return 0.5
+
+            with (
+                mock.patch.object(gate.Path, "home", return_value=home),
+                mock.patch.object(gate, "seed", return_value={"logs_dir": logs}),
+                mock.patch.object(gate, "NativeDelayedTimerProbe", return_value=owner),
+                mock.patch.object(owner, "enable"),
+                mock.patch.object(
+                    owner, "control", side_effect=RuntimeError("original control refused")
+                ),
+                mock.patch.object(
+                    owner, "constructor_control", return_value={"constructed": "only"}
+                ),
+                mock.patch.object(
+                    owner, "control_pid", side_effect=RuntimeError("original PID refused")
+                ),
+                mock.patch.object(owner, "control_pid_no_prompt", return_value={"status": -1712}),
+                mock.patch.object(owner, "observe", side_effect=refuse_feature),
+                mock.patch.object(owner, "restore"),
+                mock.patch.object(gate, "processes", side_effect=processes),
+                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
+                mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
+                mock.patch.object(gate, "check_state", return_value=[]),
+                mock.patch.object(gate, "quit_application", side_effect=quit_owned),
+                mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
+                mock.patch.object(
+                    gate.SupplementaryNativeBootstrap,
+                    "observe",
+                    side_effect=RuntimeError("supplement refused"),
+                ),
+            ):
+                report = gate.run(app, output, "clean", "")
+            stage = report["supplementary_received_lua_stage"]
+            self.assertEqual(stage["body_stage"], "observed")
+            self.assertFalse(stage["qualified"])
+            self.assertEqual(stage["publication_ack"], "unobserved")
+            self.assertEqual(stage["timing"], "unknown")
+            self.assertTrue(
+                any("original control refused" in error for error in report["failures"])
+            )
+            self.assertTrue(
+                any("original feature refused" in error for error in report["failures"])
+            )
+            self.assertEqual(report["quit_seconds"], 0.5)
+
+    def test_closed_plain_output_carries_no_journal_payload_and_never_qualifies(self):
+        with io.StringIO() as output, contextlib.redirect_stdout(output):
+            gate.print_native_probe_diagnostics(
+                {
+                    "supplementary_received_lua_stage": {
+                        "body_stage": "observed",
+                        "publication_ack": "unobserved",
+                        "timing": "unknown",
+                        "qualified": False,
+                        "private": "PRIVATE_SHOULD_NOT_PRINT",
+                    }
+                }
+            )
+            printed = output.getvalue()
+        self.assertIn(
+            "stage=observed; publication_ack=unobserved; timing=unknown; qualified=false",
+            printed,
+        )
+        self.assertNotIn("PRIVATE_SHOULD_NOT_PRINT", printed)
+
+    def test_observed_stage_cannot_satisfy_transport_feature_or_cleanup(self):
+        for scenario in ("clean", "karabiner_config"):
+            before = observe(
+                native_delayed_timer=None,
+                native_karabiner_config=None,
+                native_transport_control_error="controlled native transport refusal",
+            )
+            expected = gate.evaluate(scenario, before)
+            self.assertTrue(expected)
+            after = dict(
+                before,
+                supplementary_received_lua_stage={
+                    "body_stage": "observed",
+                    "publication_ack": "unobserved",
+                    "timing": "unknown",
+                    "qualified": False,
+                },
+            )
+            self.assertEqual(gate.evaluate(scenario, after), expected)
+            after["quit_seconds"] = None
+            self.assertTrue(gate.evaluate(scenario, after))
+
+
 if __name__ == "__main__":
     unittest.main()
