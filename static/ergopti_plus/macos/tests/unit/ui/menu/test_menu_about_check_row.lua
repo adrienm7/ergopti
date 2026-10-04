@@ -172,3 +172,159 @@ helpers.describe("About source check shared command", function()
 		end)
 	end)
 end)
+
+
+--- Runs a retained real About callback and restores its recorded native ports.
+--- @param offer table Initially displayed release.
+--- @param callback function Test observations outside the protected action.
+local function with_retained_offer(offer, callback)
+	local recorded = build(offer)
+	local ok, err = pcall(callback, recorded)
+	recorded.restore()
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("About retained release consent", function()
+	helpers.it("acknowledges the unchanged actual offer only after the launcher accepts", function()
+		with_retained_offer({ tag = "v0.0.0-dev.150", channel = "dev" }, function(recorded)
+			local accepted = recorded.row.fn()
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(recorded.requests, { "dev" })
+			helpers.assert_eq(#recorded.opens, 0)
+		end)
+	end)
+
+	for _, change in ipairs({ "channel", "cleared", "replaced", "borrowed_tag", "borrowed_channel" }) do
+		helpers.it("retires the held callback after its offer changes: " .. change, function()
+			local offer = { tag = "v0.0.0-dev.150", channel = "dev" }
+			with_retained_offer(offer, function(recorded)
+				if change == "channel" then
+					recorded.owner.get = function() return "main" end
+				elseif change == "cleared" then
+					recorded.checks.latest = function() return nil end
+				elseif change == "replaced" then
+					recorded.checks.latest = function() return { tag = "v0.0.0-dev.151", channel = "dev" } end
+				elseif change == "borrowed_tag" then
+					offer.tag = "v0.0.0-dev.151"
+				else
+					offer.channel = "main"
+					recorded.owner.get = function() return "main" end
+				end
+				local accepted = recorded.row.fn()
+				helpers.assert_eq(#recorded.requests, 0, "a retired offer never chooses a Sparkle feed")
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(#recorded.opens, 0)
+			end)
+		end)
+	end
+
+	for _, invalid in ipairs({ "owner_missing", "owner_throw", "channel_number", "checks_missing", "checks_throw",
+		"offer_number", "tag_missing", "tag_number", "channel_missing", "channel_boolean" }) do
+		helpers.it("refuses missing or malformed current owner data: " .. invalid, function()
+			with_retained_offer({ tag = "v0.0.0-dev.150", channel = "dev" }, function(recorded)
+				if invalid == "owner_missing" then recorded.owner.get = nil
+				elseif invalid == "owner_throw" then recorded.owner.get = function() error("inert owner refusal") end
+				elseif invalid == "channel_number" then recorded.owner.get = function() return 1 end
+				elseif invalid == "checks_missing" then recorded.checks.latest = nil
+				elseif invalid == "checks_throw" then recorded.checks.latest = function() error("inert check refusal") end
+				else
+					local current = { tag = "v0.0.0-dev.150", channel = "dev" }
+					if invalid == "offer_number" then current = 1
+					elseif invalid == "tag_missing" then current.tag = nil
+					elseif invalid == "tag_number" then current.tag = 150
+					elseif invalid == "channel_missing" then current.channel = nil
+					else current.channel = true end
+					recorded.checks.latest = function() return current end
+				end
+				local accepted = recorded.row.fn()
+				helpers.assert_eq(#recorded.requests, 0)
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(#recorded.opens, 0)
+			end)
+		end)
+	end
+
+	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw" }) do
+		helpers.it("returns strict refusal from the actual launcher port: " .. outcome, function()
+			with_retained_offer({ tag = "v0.0.0-dev.150", channel = "dev" }, function(recorded)
+				package.loaded["adapters.update_launcher"].request_check = function(channel)
+					recorded.requests[#recorded.requests + 1] = channel
+					if outcome == "throw" then error("inert launcher refusal") end
+					if outcome == "number" then return 1 end
+					if outcome == "text" then return "accepted" end
+					if outcome == "false" then return false end
+					return nil
+				end
+				local accepted = recorded.row.fn()
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(recorded.requests, { "dev" })
+				helpers.assert_eq(#recorded.opens, 0)
+			end)
+		end)
+	end
+end)
+
+
+--- Uses the real channel and automatic-check owners to replace or retire an offer.
+--- @param mutation string Public owner operation exercised before the held click.
+local function public_owner_retirement(mutation)
+	helpers.with_stub_scope({ "modules.updater.channel", "modules.updater.auto_check" }, function()
+		with_retained_offer({ tag = "v0.0.0-dev.150", channel = "dev" }, function(recorded)
+			local state, values, saved, tag = { update_channel = "dev" }, {}, {}, "v0.0.0-dev.150"
+			local channel = require("modules.updater.channel").new({ state = state, save = function()
+				saved[#saved + 1] = state.update_channel; return true
+			end })
+			local AutoCheck = require("modules.updater.auto_check")
+			local checks = AutoCheck.new({
+				state = state, save = function() return true end, channel = channel.get,
+				is_paused = function() return false end, on_available = function() return true end,
+				config = AutoCheck.load_config(), now = function() return 1700000000 end,
+				current_version = function() return "0.0.0-dev.140" end,
+				installed_channel = function() return "dev" end,
+				timer = { after = function() error("inactive public owner must not arm a timer") end,
+					cancel = function() return true end },
+				storage = { get = function(key, default) return values[key] or default end,
+					set = function(key, value) values[key] = value; return true end },
+				http = { get = function(url, headers, callback)
+					callback({ ok = true, status = 200, headers = {}, body =
+						'[{"tag_name":"' .. tag .. '","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]}]' })
+					return true
+				end },
+			})
+			local answers = {}
+			local dispatched = checks.check_now("dev", function(result) answers[#answers + 1] = result end)
+			helpers.assert_eq(dispatched, true)
+			helpers.assert_eq(answers[1].state, "available")
+			helpers.assert_eq(checks.latest().tag, "v0.0.0-dev.150")
+			recorded.owner.get, recorded.checks.latest = channel.get, checks.latest
+			channel.subscribe("retained_about_offer", checks.on_channel_changed)
+			if mutation == "channel" then
+				local committed = channel.set("main")
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(saved, { "main" })
+				helpers.assert_nil(checks.latest(), "actual subscription publication retires the old offer")
+			elseif mutation == "cleared" then
+				local retired = checks.on_channel_changed()
+				helpers.assert_eq(retired, true)
+				helpers.assert_nil(checks.latest())
+			else
+				tag = "v0.0.0-dev.151"
+				local replaced = checks.check_now("dev", function(result) answers[#answers + 1] = result end)
+				helpers.assert_eq(replaced, true)
+				helpers.assert_eq(checks.latest().tag, "v0.0.0-dev.151")
+			end
+			local accepted = recorded.row.fn()
+			helpers.assert_eq(#recorded.requests, 0, "public retirement cannot be bypassed by a retained native row")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(#recorded.opens, 0)
+		end)
+	end)
+end
+
+helpers.describe("About actual public owner retirement", function()
+	for _, mutation in ipairs({ "channel", "cleared", "replaced" }) do
+		helpers.it("preserves actual owner retirement before held native installation: " .. mutation, function()
+			public_owner_retirement(mutation)
+		end)
+	end
+end)
