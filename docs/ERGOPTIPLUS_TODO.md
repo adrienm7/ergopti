@@ -1100,6 +1100,23 @@ These are software implementations; final hardware verification remains below.
   changes reload into a new logger session; Windows reloads and acquires files
   per batch rather than retaining this pair by source. Their native suites
   remain deferred. Reserved persistence and paths-editor production are unchanged.
+- [~] **L82.** Linux SQLite event ID reservation: replace the process-local
+  cursor with one BEGIN IMMEDIATE reservation acknowledged only after COMMIT.
+  Interleaved actual collector processes previously reused IDs and silently lost
+  accepted raw typing through INSERT OR IGNORE. Validate serialized positive
+  decimal cursors and keep the entire reserved range within the shared Lua
+  exact-integer policy; malformed or exhausted metadata refuses without mutation
+  and retains pending typing for recovery. Seven of twelve native interleaving,
+  trigger rollback and held-reader COMMIT cases fail before; thirty of thirty-four
+  native cursor, recovery and boundary cases fail before; all pass after. These
+  execute genuine SQLite/process paths with synthetic software key events, not
+  physical keyboard input. Four registered native unit regressions and a shared
+  policy source guard cover the same boundaries. Packaged graphical startup has
+  its own single-instance flock; independent collector/CLI connections remain
+  supported by this reservation. macOS also caches a Lua cursor and has separate
+  numeric-bound/independent-writer debt by source; Windows uses native integer
+  IDs and a journal recovery ledger. Their native suites and hosted CI remain
+  deferred. Database schema, encryption format and reserved UI are unchanged.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

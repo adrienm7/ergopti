@@ -36,6 +36,7 @@ local M = {}
 local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
 local TextCipher    = require("modules.keylogger.text_cipher")
+local EventIdPolicy = require("sqlite.event_id_policy")
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -60,10 +61,6 @@ local _available = nil
 
 -- Whether the schema has been bootstrapped for the current db_path.
 local _bootstrapped = false
-
--- Monotonic per-device event IDs. Stored in meta so a daemon restart cannot
--- reuse an ID and silently overwrite a previously persisted raw event.
-local _next_event_id = nil
 
 
 -- =========================================
@@ -165,22 +162,34 @@ local function _query_scalar(sql)
 	return output:match("^([^\n]*)")
 end
 
---- Reserves consecutive event IDs transactionally within this writer process.
+--- Reserves consecutive event IDs durably across independent writer processes.
 --- @param count number Number of IDs required.
---- @return number|nil First reserved ID.
+--- @return number|nil First reserved ID after the transaction commits.
 local function _reserve_event_ids(count)
 	count = math.max(1, math.floor(tonumber(count) or 1))
 	if not M.is_available() then return nil end
-	if not _next_event_id then
-		_exec("INSERT OR IGNORE INTO meta (key, value) VALUES ('linux_next_event_id', '1');")
-		_next_event_id = tonumber(_query_scalar("SELECT value FROM meta WHERE key = 'linux_next_event_id';")) or 1
-	end
-	local first = _next_event_id
-	_next_event_id = first + count
-	if not _exec(string.format("UPDATE meta SET value = '%d' WHERE key = 'linux_next_event_id';", _next_event_id)) then
-		_next_event_id = first
-		return nil
-	end
+	-- Read and advance the shared cursor under one native write lock. A cached
+	-- cursor reused another collector's IDs, and INSERT OR IGNORE then silently
+	-- discarded acknowledged raw rows. The exit receipt also covers COMMIT:
+	-- an emitted SELECT result alone never acknowledges the reservation.
+	-- SQLite CAST accepts numeric prefixes and clamps overflowing integers. Admit
+	-- decimal positive cursor text before casting, and keep the advanced cursor
+	-- within Lua's exact integer range. A rejected UPDATE emits no allocated ID.
+	local first = tonumber(_query_scalar(string.format([[
+BEGIN IMMEDIATE;
+INSERT OR IGNORE INTO meta (key, value) VALUES ('linux_next_event_id', '1');
+UPDATE meta SET value = CAST(value AS INTEGER) + %d
+WHERE key = 'linux_next_event_id'
+  AND instr(value, char(0)) = 0
+  AND trim(value) <> '' AND trim(value) NOT GLOB '*[^0-9]*'
+  AND CAST(value AS INTEGER) > 0
+  AND typeof(CAST(value AS INTEGER) + %d) = 'integer'
+  AND CAST(value AS INTEGER) <= %d - %d;
+SELECT CAST(value AS INTEGER) - %d FROM meta
+WHERE key = 'linux_next_event_id' AND changes() = 1;
+COMMIT;
+]], count, count, EventIdPolicy.MAX_EXACT_LUA_CURSOR, count, count)))
+	if not first then Logger.error(LOG, "Event ID reservation was not acknowledged.") end
 	return first
 end
 
@@ -265,7 +274,6 @@ function M.open_db(db_path)
 	if not _check_sqlite3() then return false end
 
 	_db_path = db_path
-	_next_event_id = nil
 
 	-- Ensure the parent directory exists.
 	local dir = db_path:match("^(.*)[/\\]") or "."
@@ -314,7 +322,6 @@ end
 function M.close_db()
 	_db_path = nil
 	_bootstrapped = false
-	_next_event_id = nil
 	Logger.debug(LOG, "SQLite database closed.")
 end
 
