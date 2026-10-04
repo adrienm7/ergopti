@@ -229,3 +229,45 @@ _TD64_NativeDefaults() {
 		"default remaining retains the full native monotonic origin")
 }
 Test("tick64: optional current ticks retain actual native defaults (native-tick64)", _TD64_NativeDefaults)
+
+
+; The real LLM deadline owner must retain native time, independently of the
+; DWORD compatibility vectors above. No transport or request lifecycle runs.
+_TDLLM64_Deadline(Start, Duration, Now, Expected) {
+	AssertEqual(Expected, _LLM_DeadlineExpired(Start, Duration, Now),
+		"the actual LLM deadline must preserve the native monotonic interval")
+}
+for Row in [[100, 50, 149, false], [100, 50, 150, true],
+	[100, 50, 151, true], [4294967280, 50, 4294967330, true],
+	[100, 50, 4294967396, true], [100, 50, 4294967445, true],
+	[100, 50, 8589934692, true], [0, 0, 0, true],
+	[0, 4294967346, 4294967345, false],
+	[0, 4294967346, 4294967346, true],
+	[0x7FFFFFFFFFFFFFF8, 7, 0x7FFFFFFFFFFFFFFF, true]]
+	Test("llm-native64: actual deadline at " . Row[3] . " for budget " . Row[2],
+		_TDLLM64_Deadline.Bind(Row*))
+
+_TDLLM64_DefaultClock() {
+	Started := A_TickCount
+	AssertTrue(_LLM_DeadlineExpired(Started, 0),
+		"ordinary two-argument calls retain the actual native current clock")
+	Before := A_TickCount
+	Observed := _LLM_DeadlineExpired(0, 0x7FFFFFFFFFFFFFFF)
+	After := A_TickCount
+	Assert(Before <= After && After < 0x7FFFFFFFFFFFFFFF,
+		"the bounded native observation must fit the maximum supported duration")
+	AssertFalse(Observed, "the omitted current tick must not invent a native maximum expiry")
+}
+Test("llm-native64: existing arity uses the actual native current tick", _TDLLM64_DefaultClock)
+
+_TDLLM64_Invalid(Start, Duration, Now) {
+	Failure := 0
+	try _LLM_DeadlineExpired(Start, Duration, Now)
+	catch as Err
+		Failure := Err
+	AssertTrue(Failure is ValueError,
+		"the actual LLM owner rejects invalid native observations with ValueError")
+}
+for Row in [[100, 50, 99], [-1, 50, 100], [0, -1, 100]]
+	Test("llm-native64: refuses invalid native clock or budget " . Row[1] . "/" . Row[2] . "/" . Row[3],
+		_TDLLM64_Invalid.Bind(Row*))
