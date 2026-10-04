@@ -1746,6 +1746,10 @@ The registered category module passes 37/0, including four actual conditional-wr
 
 The final ordered sibling also retains all OpenFile12 category-file cases and assertions. Its registered module passes 43/0; whole source inverses recover the complete OpenFile test and the original ACK2 candidate independently. The earlier standalone preimage did not include those future OpenFile tests and remains preserved as historical proof, not the final queue preimage.
 
+Linux extension-bound hotstring section callbacks now acknowledge only the actual canonical owner's boolean `true`. Missing, refusing or throwing owners return `false` and show the existing localized save-failure notice through the keyboard-release modal owner. The extension's direct section row retains its captured category/section identity, checkbox and disabled-category policy; its preference writer and runtime compensation remain unchanged.
+
+The registered category module passes 55/0: all 43 corrected OpenFile/Wrap/category-ACK parent cases plus twelve extension-owner cases. The same tests against the actual previous extension callback fail 43/12; truthy and silent-refusal controls fail 53/2 and 45/10. Actual private-file publication refusals preserve every source byte and active engine choice without success notification; true publication is reread from disk. All parent assertions and complete test prefix remain exact, and the canonical native-row scanner measures zero added sites. This is a separate TODO102 prerequisite. Extension bulk callbacks and other remaining dynamic-menu ownership work stay open; root-wide integration and hosted native UI qualification remain pending.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue

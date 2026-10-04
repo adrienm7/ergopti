@@ -1621,7 +1621,15 @@ local function _manifest_hotstring_rows(ctx, config)
 						-- Greyed while its category is off, like a section row there.
 						disabled = not category_on,
 						action   = function()
-							if config.toggle_section then config.toggle_section(bound.category, bound.section) end
+							local called, committed = pcall(function()
+								if type(config.toggle_section) ~= "function" then return false end
+								return config.toggle_section(bound.category, bound.section)
+							end)
+							if called and committed == true then return true end
+							Logger.error(LOG, "Extension hotstring section toggle refused for '%s.%s' (%s).", bound.category, bound.section,
+								called and "owner-not-committed" or "owner-error")
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+							return false
 						end,
 					}
 				end
