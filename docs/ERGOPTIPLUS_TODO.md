@@ -79,7 +79,7 @@ These are software implementations; final hardware verification remains below.
   the broader window-title family; configured action values replace placeholders.
 - Bundled keyboard-layout catalogue and manager on three OSes, installation
   owners, Ergo-L support, and independent base/Shift versus AltGr emulation.
-  Extension geometry and physical magic-key completion remain in L4.
+  Physical magic-key completion remains in item 30.
 - Manifest-driven menus, category masters and retained child choices;
   configuration schema/migration infrastructure; substantial neutral-state and
   transactional recommended/clear machinery. W1 is explicitly incomplete.
@@ -137,9 +137,6 @@ These are software implementations; final hardware verification remains below.
   validation remains pending. Recommended-delay native verification and
   editable handwritten [[hotstrings.terminators]] support remain open under
   item 34.
-- [~] **6.** Complete L4 extension layout geometry and physical magic-key
-  behavior. Keep independent base/Shift, AltGr/ShiftAltGr and number-row
-  emulation. The physical magic-key setting is item 30.
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -589,6 +586,19 @@ The macOS registered Tap Keys callback now retires positive and negative AX sele
 An acknowledged chosen Linux magic-key press now owns its auto-repeats through a strict per-source/key callback receipt. Its published native-origin and active-XKB epochs, preference generation, pause, modifiers, capture and injection acknowledgement must remain valid. An initial Compose-cancellation refusal retires optional repeats while preserving the consumed first output. A refused or stale repeat stays suppressed until physical release; ordinary tap and capture consumers remain once-only. Completed initial keyboard startup publishes native-origin admission before the first eligible press, without per-repeat device rescans. Independent actual-daemon screen/receipt cases reproduce the former behavior. Separate watchdog recovery gaps, real-device three-OS acceptance and the magic-source/tap-action collision remain pending.
 
 Completed Linux keyboard recovery publishes its actual native origin before the first eligible fresh press. Retained consumed source/key owners keep suppression through reopening and successive reacquisitions while their previous repeat callbacks are retired. A conclusive native released-key snapshot also retires debt when the release event was lost while the descriptor was closed; an unreadable query acknowledges no release and retains suppression until an observed key-up. One snapshot per indebted retained source covers multiple keys, without per-key or per-repeat queries. Added and retired sources keep separate ownership for the same key code, and warm acquisitions reuse already-qualified native origin. Independent real start/pump/watchdog regressions reproduce the missing epoch, raw-repeat leak and swallowed fresh press. Physical hotplug/manual Windows/macOS/Linux parity remains pending.
+
+Completed L4 layout scope: the [Ergopti manifest](../static/layouts/registry/ergopti/manifest.toml)
+and [shared extension owner](../static/ergopti_plus/_shared/lua/layouts/extension.lua)
+route geometry-dependent sections; Windows keeps base/Shift, AltGr/ShiftAltGr
+and number-row choices independent. Existing
+[Windows registry tests](../static/ergopti_plus/windows/tests/unit/test_keylayout_emulation.ahk),
+[Linux geometry tests](../static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_extension_geometry_routing.lua)
+and [macOS binding tests](../static/ergopti_plus/macos/tests/unit/modules/keymap/test_registry_bound_sections.lua)
+have named passing cases at [checkpoint 37216141887](https://github.com/adrienm7/ergopti/actions/runs/37216141887),
+with their audited sources and independent corpus unchanged. Item 6's layout
+requirements are complete. All unresolved magic-key ownership, watchdog
+recovery, native freshness and real-device requirements above remain in item 30.
+Hosted Lua owner tests do not qualify physical input.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
