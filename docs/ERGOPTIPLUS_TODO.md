@@ -1554,9 +1554,10 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   as a whole still stops the daemon, Windows sites 32, 34, 36, 37-60 and its
   whole-file installed.json refusal, and the macOS boot-time unread-entries
   scan cost (36-56 ms on the
-  main thread). Two maintainer decisions are pending: config_migrate's
-  fail-closed guard for invalid stamps (site 108) and a migrations.toml
-  exception for key removals handled by the cleanup (site 112).
+  main thread). Maintainer decisions are resolved: invalid schema stamps
+  retain strict boot and session-write refusal (site 108); retired keys
+  reported for explicit cleanup are exempt from automatic deletion migrations
+  and remain on disk until that cleanup (site 112).
 
   Windows tap_hold.toml now reports each obsolete entry once per exact file,
   rendered path and reason during the process, through the shared warning
@@ -1574,6 +1575,19 @@ The Linux daemon now isolates only the existing shared loader’s classified who
 After the classified-read prerequisite, Linux TapHold ordinary setters and recommended imports now require an acknowledged temporary-file write and close before rename or reload. Genuine LuaJIT/Lua5.1 Boolean true and Lua5.4 same-file write receipts are both accepted; nil, false, wrong objects/strings and exceptions refuse. Refused candidates are cleaned only at the owned temporary path; cleanup refusal still leaves the original source and runtime untouched. Unknown fields and existing post-publication reload semantics are preserved. All 39 prior registered cases remain exact; 13 added controls give old 40 passes / 12 failures and corrected 52 / 0 on both Lua runtimes. Windows and macOS already require their native staging writer acknowledgements. Full selected/hosted native qualification remains pending; TODO33 stays partial.
 
 The Linux hotstring editor now reads one classified save-time source snapshot, validates those exact bytes with the canonical TOML codec, and requires the hotstring projection’s explicit commit receipt before preserving tuning and replacing its owned model. Publication carries the existing exact-source precondition; malformed/unreadable sources and observed concurrent replacements refuse without reloading or reporting saved. The five old persistence cases, ten existing editor cases, twenty native-file admission cases, five deployed TOML dialects, and three causal mutations were checked privately. The independent 140-rule corpus is unchanged. This is a TODO33 preservation prerequisite; opening-time stale-page ownership, unknown fields/comments, other data-file writers, TODO104 fanout migration, and complete native/root CI remain open.
+
+Shipped retirement-only migrations now advance the schema stamp without deleting
+gestures.space_wrap, any retired AI trigger-shortcut spelling, or
+shortcuts.keys.layer_scroll. Independent expected models retain each value and
+its siblings, including a false shortcut, on all named drivers; the generic
+delete interpreter contract is unchanged. ADR-009 records the explicit-cleanup
+exception. Focused JS replay passes 72 cases / 174 driver replays and 37
+registry defects; isolated shared Lua contracts pass 81 Linux-ID cases on
+LuaJIT and 85 macOS-ID cases on Lua 5.4. The original registry fails five
+macOS preservation vectors. Real-file shared boot, exact backup, restart and
+ordinary-save preservation controls pass on both runtimes. Complete selected
+verification, native Windows and native three-OS qualification remain required;
+TODO33 stays partial.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -1728,7 +1742,8 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
   the batch cannot address the destination without ambiguous TOML keys » —
-  maintainer decision: may an ordinary save overwrite a value flagged outdated?
+  maintainer decision: preserve outdated scalars until explicit cleanup; an
+  ordinary save must refuse a colliding new subtree without replacing them.
   The shared macOS/Linux decoder now resolves hand-written dotted assignments
   (`a.b = 1`) as semantic nested keys while quoted dots remain literal keys.
   Windows document/config dotted assignments remain unsupported; its existing
@@ -1744,7 +1759,8 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   the fix. Local gates passed (349 JS, 4607 Linux unit and 143 Linux E2E
   checks). Full three-OS checkpoint 37033032620 at `6275cac35` passed unit,
   E2E, packaging and installation gates with release skipped. The scalar
-  migration decision and Windows document dotted-key reader remain open.
+  preservation policy is settled; Windows document dotted-key reader remains
+  open.
 
 The shared dotted-key reader now uses the existing strict key-path owner for
 root, section-relative, multiline and inline assignments, including independent
@@ -1781,6 +1797,11 @@ Native Windows checkpoint 37104220317 executes the independent 40 document and i
 TODO 42 remains partial. The Windows ordinary and detached writers now compare their fresh flat source model against the typed semantic document before staging: a genuine no-op preserves an unrepresentable dotted/root/table-array source verbatim, while changes that would lose its namespaces refuse. Exact source readback fences concurrent preparation and staged publication; ordinary source drift invalidates stale reader cache without mutating prior cache objects. Existing canonical output remains for representable sources. Seven registered native cases cover detached/ordinary no-ops, changed/deleted/unrelated leaves, quoted literal dots, duplicate aliases, hidden-root and exact-subtree deletes, and actual concurrent native file mutation. Portable verification: AHK BOM/LF + 353 JS checks passed; native Windows unit/include/E2E qualification pending CI. Bootstrap/cache semantic consumption, full-save physical comment preservation and the scalar migration decision remain pending.
 
 Native Windows checkpoint 37116696443 passed 7,978 unit cases; two historical tests still required the previous serializer to discard unowned comments. Those test contracts now pin independently handwritten complete source images and decode the actual detached/published candidates through the typed document reader, distinguishing Boolean true/false from numeric zero/one. Canonical rendering still owns explicitly changed assignments; unchanged source order, comments and values remain exact. No production writer, parser or scalar migration policy changes in this test alignment. Portable selected verification and a new native Windows checkpoint are required before qualification.
+
+The maintainer resolved the scalar collision policy: obsolete entries remain
+until explicit cleanup. Ordinary saves cannot replace an outdated scalar with a
+new subtree. This decision preserves the existing strict batch-writer refusal;
+it does not qualify the remaining Windows bootstrap or physical-source gaps.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
