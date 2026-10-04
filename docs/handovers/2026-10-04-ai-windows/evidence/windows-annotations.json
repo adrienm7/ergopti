@@ -1,0 +1,98 @@
+[
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 3,
+		"start_column": null,
+		"end_line": 3,
+		"end_column": null,
+		"annotation_level": "warning",
+		"title": "",
+		"message": "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache@v4, actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/",
+		"raw_details": ""
+	},
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 21,
+		"start_column": null,
+		"end_line": 21,
+		"end_column": null,
+		"annotation_level": "failure",
+		"title": "",
+		"message": "Process completed with exit code 1.",
+		"raw_details": ""
+	},
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 18,
+		"start_column": null,
+		"end_line": 18,
+		"end_column": null,
+		"annotation_level": "notice",
+		"title": "windows-ahk",
+		"message": "windows-ahk: 9\u202f073 passed, 2 failed",
+		"raw_details": ""
+	},
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 14,
+		"start_column": null,
+		"end_line": 14,
+		"end_column": null,
+		"annotation_level": "notice",
+		"title": "windows-ahk all failures",
+		"message": "2 failure details:\n1. personal-opening-source: own image preserves all four file and section metadata neighbors \u2014 Item has no value. [test_personal_toml_live_transactions.ahk:948]\n2. meta timers: no sub-second repeating timer exists outside the inventory \u2014 a repeating timer fires every unreadable interval on the keystroke-dispatch thread and is not in the inventory: Callback. Add it with its period and a one-line justification, or make it a one-shot. Every poller here is a periodic stall inserted into typing [test_fast_timer_inventory.ahk:245]\n",
+		"raw_details": ""
+	},
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 13,
+		"start_column": null,
+		"end_line": 13,
+		"end_column": null,
+		"annotation_level": "failure",
+		"title": "windows-ahk test failed",
+		"message": "meta timers: no sub-second repeating timer exists outside the inventory \u2014 a repeating timer fires every unreadable interval on the keystroke-dispatch thread and is not in the inventory: Callback. Add it with its period and a one-line justification, or make it a one-shot. Every poller here is a periodic stall inserted into typing [test_fast_timer_inventory.ahk:245]",
+		"raw_details": ""
+	},
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 12,
+		"start_column": null,
+		"end_line": 12,
+		"end_column": null,
+		"annotation_level": "failure",
+		"title": "windows-ahk test failed",
+		"message": "personal-opening-source: own image preserves all four file and section metadata neighbors \u2014 Item has no value. [test_personal_toml_live_transactions.ahk:948]",
+		"raw_details": ""
+	},
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 61974,
+		"start_column": null,
+		"end_line": 61974,
+		"end_column": null,
+		"annotation_level": "failure",
+		"title": "",
+		"message": "Process completed with exit code 1.",
+		"raw_details": ""
+	},
+	{
+		"path": ".github",
+		"blob_href": "https://github.com/adrienm7/ergopti/blob/2f11cf2642a85da986d1ab0905fc94f3699f2c0f/.github",
+		"start_line": 61972,
+		"start_column": null,
+		"end_line": 61972,
+		"end_column": null,
+		"annotation_level": "failure",
+		"title": "",
+		"message": "AHK native process failed (exit 1).",
+		"raw_details": ""
+	}
+]

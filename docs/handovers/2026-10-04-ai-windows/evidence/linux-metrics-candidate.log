@@ -1,0 +1,24 @@
+/workspace/.native/root/usr/bin/luajit: .../ergopti/tools/test/linux-metrics-aggregation-native.lua:22: native SQLite must return JSON rows
+stack traceback:
+	[C]: in function 'assert'
+	.../ergopti/tools/test/linux-metrics-aggregation-native.lua:22: in function 'read'
+	...c/ergopti_plus/linux/modules/keylogger/sqlite_reader.lua:59: in function 'read_rows'
+	...c/ergopti_plus/linux/modules/keylogger/sqlite_reader.lua:437: in function 'read_ngrams'
+	.../ergopti/tools/test/linux-metrics-aggregation-native.lua:45: in function 'workload'
+	.../ergopti/tools/test/linux-metrics-aggregation-native.lua:52: in main chunk
+	[C]: at 0x5607117ab390
+Traceback (most recent call last):
+  File "/workspace/ergopti/tools/test/test-linux-metrics-aggregation-native.py", line 87, in <module>
+    subprocess.run(
+    ~~~~~~~~~~~~~~^
+        [
+        ^
+    ...<6 lines>...
+        timeout=90,
+        ^^^^^^^^^^^
+    )
+    ^
+  File "/usr/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['luajit', '/workspace/ergopti/tools/test/linux-metrics-aggregation-native.lua', '/workspace/ergopti', '/var/tmp/ergopti-ai-validation/ergopti-aggregation-regression-3xa92zqx/fixture.sqlite']' returned non-zero exit status 1.
