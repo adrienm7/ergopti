@@ -118,6 +118,55 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	local invalid_preflight = {
+		{ name = "NUL compare path", options = { etag_compare = "/owned/etag\0private-suffix" } },
+		{ name = "NUL save path", options = { etag_save = "/owned/etag\0private-suffix" } },
+		{ name = "NUL download path", download = "/owned/download\0private-suffix" },
+		{ name = "numeric compare path", options = { etag_compare = 42 } },
+		{ name = "numeric save path", options = { etag_save = 42 } },
+		{ name = "mixed header names", headers = { [1] = "literal", ["X-Native"] = "literal" } },
+		{ name = "numeric URL", url = 42 },
+		{ name = "empty URL", url = "" },
+		{ name = "raising header value", headers = { ["X-Native"] = setmetatable({}, {
+			__tostring = function() error("Synthetic private header value") end,
+		}) } },
+	}
+	for _, case in ipairs(invalid_preflight) do
+		for _, existing in ipairs({ false, true }) do
+			helpers.it("linux-http-preflight: " .. case.name .. " refuses before ownership/allocation (existing=" .. tostring(existing) .. ")", function()
+				local client, state = fresh_client()
+				local good, bad, good_callbacks, bad_callbacks = nil, nil, 0, 0
+				if existing then
+					helpers.assert_true(client.get("https://example.invalid/held", {}, { owner = "kept" }, function(value)
+						good = value; good_callbacks = good_callbacks + 1
+					end))
+				end
+				local handles, requests = #state.handles, #state.requests
+				local options = { owner = "kept" }
+				for key, value in pairs(case.options or {}) do options[key] = value end
+				local function complete(value) bad = value; bad_callbacks = bad_callbacks + 1 end
+				local protected, dispatched = pcall(function()
+					if case.download then return client.download("https://example.invalid/direct", {}, case.download, options, complete) end
+					return client.get(case.url or "https://example.invalid/direct", case.headers or {}, options, complete)
+				end)
+				helpers.assert_true(protected and dispatched == false, "invalid configuration must not escape or dispatch")
+				helpers.assert_eq(bad_callbacks, 1)
+				helpers.assert_true(bad and bad.ok == false and bad.status == 0 and type(bad.error) == "string")
+				helpers.assert_nil(bad.error:find("private-suffix", 1, true))
+				helpers.assert_nil(bad.error:find("Synthetic private header value", 1, true))
+				helpers.assert_eq(#state.handles, handles, "preflight must precede timer/pipe allocation")
+				helpers.assert_eq(#state.requests, requests)
+				helpers.assert_eq(#state.kills, 0, "invalid replacement must not kill its predecessor")
+				helpers.assert_eq(client.isActive("kept"), existing)
+				if existing then
+					state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+					helpers.assert_true(good and good.ok and good.body == "abc")
+					helpers.assert_eq(good_callbacks, 1)
+				end
+			end)
+		end
+	end
+
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
 		for _, scheme in ipairs({ "https", "HTTPS" }) do
 			helpers.it("linux-http-tls-redirect: " .. method .. " keeps " .. scheme .. " on every native hop", function()

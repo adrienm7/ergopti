@@ -579,6 +579,20 @@ These are software implementations; final hardware verification remains below.
   to Hammerspoon without a source NUL fence; its actual native bridge remains
   unvalidated and reserved. Windows uses AHK UTF-16 strings rather than Lua
   binary strings. No native cross-OS check, manual CI or physical input ran.
+- [~] **L45.** Linux HTTP replacement preflight: compose and validate native
+  curl config/argv before cancelling a previous owner or acquiring timers/pipes.
+  Invalid ETag/download arguments previously refused only after killing a
+  valid request; config-format exceptions also escaped with allocated handles.
+  Nine of twelve native held-response cases fail before; all twelve now pass,
+  including real ETag compare/save, valid supersession and independent owners.
+  Eighteen portable cases cover invalid paths/types/formatting with and without
+  an active owner, no allocation/cancellation and exact completion ownership.
+  Native formatting exceptions become bounded failures without caller bytes.
+  macOS prepares/cancels a generation before native dispatch, and Windows's
+  synchronous HTTPPost cancels its active request before native URL/header
+  validation, both source concerns reserved for their native owner. Windows's
+  async curl class is a separate path. No cross-driver source, native cross-OS
+  gate, physical input or manual CI was changed or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
