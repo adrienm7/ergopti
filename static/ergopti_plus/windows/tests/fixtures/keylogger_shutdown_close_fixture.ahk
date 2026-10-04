@@ -204,6 +204,8 @@ _KLSCF_PreparePublication() {
 		"publication getters must preserve exact timestamp and lifecycle scalars")
 	_KLSCF_Check(Publication.Entry is Map && HasMethod(Publication.CommitFn, "Call"),
 		"publication getters must preserve the exact entry and trusted callback objects")
+	_KLSCF_Check(Publication.Entry["duration_ms"] is Integer && Publication.Entry["duration_ms"] = 150,
+		"direct indexed reads must reach the frozen scalar instead of the entry Map")
 	return Publication
 }
 
@@ -363,7 +365,7 @@ _KLSCF_Main() {
 		FileAppend("frozen-close-chain: passed`n", "*", "UTF-8-RAW")
 		ExitApp(0)
 	} catch as Failure {
-		FileAppend("frozen-close-chain: failed: " . Failure.Message . "`n", "**", "UTF-8-RAW")
+		FileAppend("frozen-close-chain: failed: " . Failure.Message . "`n" . Failure.Stack . "`n", "**", "UTF-8-RAW")
 		ExitApp(1)
 	}
 }

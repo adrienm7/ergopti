@@ -52,9 +52,9 @@ class KLSessionCloseAuthority {
 		_KL_SessionCloseAuthorityReceipt(this, , , , true)
 	}
 
-	; Static methods still receive implicit this. Bind the class before the
-	; frozen value, then ignore the instance passed by the property getter.
-	static ReadOnly(Value, *) {
+	; Bind the static class receiver and frozen value, leaving only the property
+	; receiver. No variadic parameters: indexed reads must reach the returned Map.
+	static ReadOnly(Value, GetterInstance) {
 		return Value
 	}
 
