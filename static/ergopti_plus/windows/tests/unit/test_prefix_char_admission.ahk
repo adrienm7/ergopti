@@ -293,12 +293,14 @@ _PCA_DeadKeyChunk(Scenario) {
 	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _KLLastShownSuggestion
 	global _HSResolveCache, _HSResolveGen, LastSentCharacterKeyTime
 	global HSE_Buffer, HSE_LastEndChar, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	global HSE_RepeatEnabled, HSE_PersonalInfoCombosEnabled
 	Saved := { Categories: CategoryEnabled, Features: Features, Script: ScriptInformation,
 		Send: _SendHook, Prefix: _PrefixBuffer, Focus: _PrefixFocusedControlToken,
 		Decisions: _PrefixVisibleFireDecisions, Active: _LLM_Bridge_Active,
 		Agent: _LLM_Bridge_AgentFeeding, Suggestion: _KLLastShownSuggestion,
 		Resolver: _HSResolveCache, Times: LastSentCharacterKeyTime,
-		Terminators: HSE_WORD_TERMINATORS, Consumed: HSE_CONSUMED_DELIMITERS }
+		Terminators: HSE_WORD_TERMINATORS, Consumed: HSE_CONSUMED_DELIMITERS,
+		Repeat: HSE_RepeatEnabled, Combos: HSE_PersonalInfoCombosEnabled }
 	Window := Gui()
 	EditControl := Window.AddEdit(, Scenario.Initial . Scenario.Chunk)
 	Window.Show("Hide")
@@ -316,7 +318,11 @@ _PCA_DeadKeyChunk(Scenario) {
 		SimulateRegularApp()
 		CategoryEnabled := Map("Hotstrings", true)
 		Features := Map()
-		ScriptInformation := Map()
+		ScriptInformation := Scenario.HasOwnProp("Magic") ? Map("MagicKey", Scenario.Magic) : Map()
+		if Scenario.HasOwnProp("Magic") {
+			HSE_RepeatEnabled := true
+			HSE_PersonalInfoCombosEnabled := false
+		}
 		_LLM_Bridge_Active := false
 		_LLM_Bridge_AgentFeeding := false
 		_PrefixBuffer := Scenario.Initial
@@ -375,6 +381,8 @@ _PCA_DeadKeyChunk(Scenario) {
 		LastSentCharacterKeyTime := Saved.Times
 		HSE_WORD_TERMINATORS := Saved.Terminators
 		HSE_CONSUMED_DELIMITERS := Saved.Consumed
+		HSE_RepeatEnabled := Saved.Repeat
+		HSE_PersonalInfoCombosEnabled := Saved.Combos
 	}
 }
 
@@ -448,3 +456,25 @@ _UCAP_PrefixAppend() {
 	}
 }
 Test("prefix unicode-context-cap: actual printable callback caps the native preview", _UCAP_PrefixAppend)
+
+Test("prefix unicode-boundary-owner: replacement sharing only a low surrogate keeps its preview", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "Afoo", Chunk: "★", Flags: "*?C", Trigger: "foo★",
+		Replacement: Chr(0x1FA00), Expected: "A" . Chr(0x1FA00), Sends: 1, End: "",
+		Prefix: "A" . Chr(0x1FA00) }))
+Test("prefix unicode-boundary-owner: STAR cannot use half of a configured delimiter", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1FA00) . "th", Chunk: "e", Flags: "*C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1FA00) . "the", Sends: 0, End: "" }))
+Test("prefix unicode-boundary-owner: END cannot use half of a configured delimiter", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1FA00) . "the", Chunk: ".", Flags: "C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1FA00) . "the.", Sends: 0, End: "" }))
+Test("prefix unicode-boundary-owner: the actual supplementary delimiter licenses STAR", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1F600) . "th", Chunk: "e", Flags: "*C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1F600) . "THE", Sends: 1, End: "" }))
+Test("prefix unicode-boundary-owner: the actual supplementary delimiter licenses END", (*) =>
+	_PCA_DeadKeyChunk({ Initial: Chr(0x1F600) . "the", Chunk: ".", Flags: "C", Trigger: "the",
+		Replacement: "THE", Expected: Chr(0x1F600) . "THE.", Sends: 1, End: "." }))
+
+Test("prefix unicode-boundary-owner: repeat dispatch agrees with actual native Unicode output", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "a" . Chr(0x1F601), Chunk: "★", Magic: "★",
+		Flags: "", Trigger: "", Replacement: "", Expected: "a" . Chr(0x1F601) . Chr(0x1F601),
+		Sends: 1, End: "", Prefix: "a" . Chr(0x1F601) . Chr(0x1F601) }))

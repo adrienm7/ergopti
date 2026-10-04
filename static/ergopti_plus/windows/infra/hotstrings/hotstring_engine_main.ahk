@@ -948,7 +948,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 				; The replacement itself may nevertheless end at a real boundary, so
 				; publish the actual final inserted character rather than the selector.
 				KnownBoundaryAfter: !ClearAll and InsertedText != ""
-						and InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -1)) > 0
+						and InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0
 		}
 		; Send-key syntax can move the caret, change focus, or emit text that is
 		; intentionally different from the payload (for example '""{Left}'). The
@@ -1019,8 +1019,9 @@ HSE_TryRepeatKey(MagicKey) {
 				return ""
 		}
 		; The char being repeated is immediately before the magic key.
-		RepeatCharPos := BufLen - MkLen
-		RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, 1)
+		RepeatCharEnd := BufLen - MkLen
+		RepeatCharPos := _TextCodepointStart(HSE_Buffer, RepeatCharEnd)
+		RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, RepeatCharEnd - RepeatCharPos + 1)
 		; Refuse to repeat whitespace or terminators.
 		if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
 				return ""
@@ -1033,19 +1034,20 @@ HSE_TryRepeatKey(MagicKey) {
 				; we cannot confirm it is mid-word.
 				return ""
 		}
-		PredChar := SubStr(HSE_Buffer, PredPos, 1)
+		PredStart := _TextCodepointStart(HSE_Buffer, PredPos)
+		PredChar := SubStr(HSE_Buffer, PredStart, PredPos - PredStart + 1)
 		; Boundary set, not terminator set: after an opening quote the char is the
 		; FIRST letter of its word, so doubling it is meaningless and the real
 		; expansion must be allowed to win instead.
 		if (InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
 				return ""
 		}
-		; When PredChar sits at position 1 of the buffer (PredPos == 1) and the buffer
+		; When PredChar starts at position 1 of the buffer (PredStart == 1) and the buffer
 		; start context is unknown (HSE_StartIsWordBoundary = false), we cannot confirm
 		; RepeatChar is truly the 2nd+ letter of a word — refuse to avoid false-positive
 		; doubling when a registered text-expansion with the same suffix happens to fail
 		; its own word-boundary check.
-		if (PredPos == 1 and !HSE_StartIsWordBoundary) {
+		if (PredStart == 1 and !HSE_StartIsWordBoundary) {
 				return ""
 		}
 		; All checks passed — build a transient Spec and fire.

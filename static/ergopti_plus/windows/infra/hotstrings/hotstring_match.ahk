@@ -511,7 +511,8 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 						if (BeforeLen < 1) {
 								return false
 						}
-						PredChar := SubStr(Buf, BeforeLen, 1)
+						PredStart := _TextCodepointStart(Buf, BeforeLen)
+						PredChar := SubStr(Buf, PredStart, BeforeLen - PredStart + 1)
 						; Same set as the expansion branch below, tested in the opposite
 						; direction — that is the point. A repeat needs the predecessor to
 						; be mid-word; an expansion needs it to be a boundary. Reading two
@@ -524,7 +525,8 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 		}
 		BeforeLen := StrLen(Buf) - MatchedLength
 		if (BeforeLen >= 1) {
-				BeforeChar := SubStr(Buf, BeforeLen, 1)
+				BeforeStart := _TextCodepointStart(Buf, BeforeLen)
+				BeforeChar := SubStr(Buf, BeforeStart, BeforeLen - BeforeStart + 1)
 				return InStr(Boundaries, BeforeChar) > 0
 		}
 		return HSE_StartIsWordBoundary
