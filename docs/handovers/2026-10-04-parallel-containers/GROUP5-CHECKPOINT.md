@@ -6,8 +6,13 @@ This is a partial feature checkpoint, not group completion or integration into
 `dev`. The maintainer subsequently requested integration of prepared corrections
 with explicit Windows PC follow-ups; unfinished macOS and Karabiner requirements
 stay open in the TODO rather than being claimed complete.
-The inspected base is `689d30293704093feab2e3caa077604e88560eb6` from the actual
-`origin/dev`; no old handover patch belongs to this group.
+The initial inspected base was `689d30293704093feab2e3caa077604e88560eb6`.
+Current synchronization targets actual dev
+`460e984529c18d06dfca9672456f4aa67c7de31b`, preserving the Group7 integration.
+No old handover patch belongs to this group. This clone tracks main only:
+fetch dev with `git fetch origin refs/heads/dev:refs/remotes/origin/dev` and
+compare `git ls-remote --heads origin dev` with the tracking ref. A plain
+`git fetch origin dev` can refresh only FETCH_HEAD and leave origin/dev stale.
 
 ## Pushed changes
 
@@ -196,8 +201,13 @@ The maintainer now allows feature test CI in parallel: group5 exclusively uses
 lock `e163741159149c2987f9db0a868d3b09b316c127` after this policy change and
 owns no current lock. Its already-running manual CI was left to completion.
 
-Group4's released shared Core provisioning correction is reused byte-for-byte;
-stock Lua5.4 receives lua-luv without changes to assertions or release policy.
+Group4's released Core provisioning correction was reused for the earlier
+checkpoint. Current-dev synchronization preserves the exact released Group7
+ci.yml image, with the same stock Lua5.4/lua-luv prerequisite. Only comments and
+package order differ; assertions, lane selection and release policy stay intact.
+The TODO merge preserves every Group5 block and Group7 block exactly before the
+owned explanatory update. No upstream Windows source or artifact was rewritten;
+its native qualification stays in the maintainer's preserved PC follow-ups.
 
 The native keyboard diagnostic slice emits bounded closed phase witnesses
 before initial capture/inventory/property calls and before diagnostic Carbon

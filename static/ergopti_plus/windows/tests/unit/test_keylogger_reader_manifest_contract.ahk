@@ -269,7 +269,7 @@ _KLRManifest_Abandonment(Scenario, Consumer := "") {
 	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick"]
 		HookSaved[Name] := KLHook.%Name%
 	WatchSaved := Map()
-	for Name in ["is_session_active", "session_started_at", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
+	for Name in ["is_session_active", "session_started_at", "session_generation", "idle_generation", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
 		WatchSaved[Name] := KLWatch.%Name%
 	KeyloggerSaved := Map()
 	for Name in ["initialized", "session_app", "session_title", "synth_active", "synth_type", "synth_private", "buffer_events", "buffer_text"]
@@ -427,7 +427,7 @@ _KLRManifest_Native64(Scenario, Consumer := "projection") {
 	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick"]
 		HookSaved[Name] := KLHook.%Name%
 	WatchSaved := Map()
-	for Name in ["is_session_active", "session_started_at", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
+	for Name in ["is_session_active", "session_started_at", "session_generation", "idle_generation", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
 		WatchSaved[Name] := KLWatch.%Name%
 	KeyloggerSaved := Map()
 	for Name in ["initialized", "session_app", "session_title", "synth_active", "synth_type", "synth_private", "buffer_events", "buffer_text"]

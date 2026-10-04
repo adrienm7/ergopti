@@ -1454,6 +1454,17 @@ native three-OS qualification remains pending.
   installed-layout visibility and French suffix/magic-key placement decisions;
   item 104 separately tracks the common-autocorrection section split.
 
+Windows PC acceptance, delegated to the maintainer:
+
+1. Record the tested commit, Windows 10/11 build, monitor scale and layout.
+2. Open prediction and hotstring tooltips, then close/reopen and move them
+   near each screen edge. Verify the pooled border remains above the content,
+   corners have no white pixels, and redraw/reuse does not leave stale rings.
+3. Repeat at the available DPI scales on both Windows versions. Keep screenshots
+   and exact reproduction steps for any deviation; remove item 19 only after
+   visual acceptance. The integrated rendering fix must not be repeated without
+   a demonstrated regression.
+
 - [~] **24.** macOS tap-hold outage: a not-ready remap guardian held every
   Karabiner regeneration forever and pinned the first bulk edit (Restore
   defaults), refusing later edits and Reload. Fixed, with a Tap-Hold menu row
@@ -1830,8 +1841,10 @@ still require an exact-candidate manual CI checkpoint.
 The shared Core runner provisioning now reuses the released Group4 workflow
 correction b57a948029: stock Lua5.4 receives lua-luv for the unchanged exact
 native file-admission registry probe. The workflow image matches that owner
-correction byte-for-byte; original registry assertions, native lane selection
-and release policy remain unchanged. Hosted run37238984667 passes shared Core and macOS stubbed units/E2E; its
+correction byte-for-byte at that checkpoint. Synchronization with current dev
+460e98452 adopts the released Group7 workflow image, retaining the same stock
+lua-luv prerequisite; original registry assertions, native lane selection and
+release policy remain unchanged. Hosted run37238984667 passes shared Core and macOS stubbed units/E2E; its
 Package stops at an incomplete native keyboard XCTest. Remaining package,
 installation and Karabiner launch qualification uses the group-owned test CI
 branch, with final integrated qualification reserved exclusively.
@@ -2040,17 +2053,50 @@ checks thirteen legal, typed, multiline, comment and literal controls. Selected
 portable gates pass; the repaired include graph, native notice lifecycle and
 semantic TOML corpus still require the next non-release Windows execution.
 
-- [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
-      reinstalls its own low-level keyboard hook around every SendInput (upstream
-      `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
-      hook runs before the native arbiter's. Windows guarantees no order anyway: a
-      program that hooks later runs first, and a hook that exceeds
-      `LowLevelHooksTimeout` is dropped. The prediction navigation no longer depends
-      on it (`llm-nav-cycle-windows`), but the paced expansion terminal capture
-      still assumes the native hook runs first (the comment above
-      `LLM_NavEventOwner_EnsureStarted()` in `ErgoptiPlus.ahk`). Audit every native
-      arbiter route, make each one order-independent, and test both hook orders like
-      `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
+- [~] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
+  reinstalls its own low-level keyboard hook around every SendInput (upstream
+  `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
+  hook runs before the native arbiter's. Windows guarantees no order anyway: a
+  program that hooks later runs first, and a hook that exceeds
+  `LowLevelHooksTimeout` is dropped. The prediction navigation no longer depends
+  on it (`llm-nav-cycle-windows`), but the paced expansion terminal capture
+  still assumes the native hook runs first (the comment above
+  `LLM_NavEventOwner_EnsureStarted()` in `ErgoptiPlus.ahk`). Audit every native
+  arbiter route, make each one order-independent, and test both hook orders like
+  `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
+
+Delivered prerequisite: terminal replay has one exclusive native release owner
+across the unlocked SendInput boundary. Reentrant and concurrent attempts retain
+the FIFO; final acknowledgement and ownership retirement are atomic. Overflow
+preserves its original fault/error while consuming only the accepted prefix.
+All 929 original assertion expressions remain byte-identical. The official
+MSVC generator refreshed the DLL/manifest; source/recipe, x64 PE, ASLR, DEP,
+CFG, 24 exports and absence of a dynamic compiler runtime are verified.
+Native run 37237868670 (source 2d31eee37) passes all 33 C cases. Run
+37232550379 also demonstrates both expected original-production failures at
+the independently specified first assertions.
+
+Windows PC implementation and acceptance, delegated to the maintainer:
+
+1. Record the actual installed-hook order before and after a real SendInput
+   rehook. Exercise native-first and AHK-first orders with physical input;
+   hook-free C events and injected keys do not establish physical provenance.
+2. Audit terminal capture against KLE/layout/dead-key consumers, digit/profile
+   routes, tap-holds, key combinations and script shortcuts. Include down,
+   repeat and up, owner changes while held, and pause/reload transitions.
+3. Implement the remaining event-specific capture/replay and effective-modifier
+   ownership protocol. AutoHotkey criteria do not expose low-level flags or
+   extra-info for each event: a blanket capture guard or replay exemption cannot
+   distinguish simultaneous physical input from native replay. Retain exact
+   FIFO-prefix acknowledgement, partial-send retry and overflow debt.
+4. Verify captured layout/dead-key state, modifier transformations, balanced
+   releases and menu masking in both orders, including physical typing during
+   paced expansion, failure/retry and secure-desktop transitions.
+5. Add registered regressions for the observed routes, regenerate native
+   artifacts through their owner, then run the full Windows unit, E2E, startup,
+   packaging and installation gates. Keep this item open until the complete
+   hook-order audit and physical acceptance pass.
+
 - [ ] **50.** Measure SendEvent against SendInput on Windows. While the native
       arbiter's low-level hook is installed, SendInput is interruptible anyway,
       which is the only reason AutoHotkey removes its own hook, so SendInput now
@@ -2059,6 +2105,21 @@ semantic TOML corpus still require the next non-release Windows execution.
       `config_io.ahk` still call SendInput. Measure long expansions, pastes and
       accepted predictions (latency, dropped or interleaved keys) before switching;
       not before the demo.
+
+Windows PC measurement steps, delegated to the maintainer:
+
+1. Record the commit, Windows build, app, layout/emulation state, arbiter state,
+   payload length and configured send delays for every measurement.
+2. Compare SendEvent and SendInput on identical long expansions, pastes and
+   accepted predictions, with the native arbiter actually installed. Retain
+   exact expected output and repeated elapsed-time samples for each mode.
+3. Repeat with simultaneous physical typing and modifier presses. Count
+   missing, duplicated and interleaved characters/edges; record the actual
+   rehook/order behavior from item 49 rather than inferring it from timings.
+4. Report latency distributions and correctness together. Change send policy
+   only when the measurements justify it, then add regressions and complete
+   the native pipeline. No send-mode change is included in this cloud slice.
+
 - [ ] **51.** Windows checks on a real machine for the 2026-09-30 evening fixes
       (AutoHotkey cannot run in the Linux sessions): the four arrows (↑/← back, ↓/→
       forward) and the left and right Shift+Tab over a multi-slot AI prediction move
@@ -2076,6 +2137,21 @@ semantic TOML corpus still require the next non-release Windows execution.
       and lists it as `provider/model`; the layer editor shows the emulated
       Ergopti legends and each action; « Revenir à cette version » rolls back
       with a backup; « Désinstaller » is greyed on a source run.
+
+Windows PC execution steps, delegated to the maintainer:
+
+1. Record the tested commit, Windows build, installation/source mode and layout.
+   Run every behavior listed above after a cold start and again after reload.
+2. Repeat navigation with both Shift keys, ctrl navigation modifiers and
+   Shift plus a tap-hold Tab. Record slot indices, wrap, caret position and the
+   inserted result; verify each physical press produces exactly one action.
+3. Repeat expansion, prediction insertion and clipboard checks with emulation
+   disabled and enabled. Check the AltGr action switch in both positions.
+4. Check versions, AI menus, layer legends, rollback backup and source-run
+   uninstall availability. Record each case as passed, failed or not executed,
+   with diagnostics and reproduction steps for failures.
+5. Remove item 51 only after the entire matrix passes. Automated unit results
+   do not substitute for these real-machine observations.
 
 ## Maintainer requests on the evening of 2026-09-30
 
@@ -2626,9 +2702,54 @@ Added a test-only characterization prerequisite for the legacy Windows Ergopti+ 
       key and output chosen by the user: any keyboard position and arbitrary
       character, including choosing no star at all. Integrate with item 97's
       shared user-owned shortcut model rather than another fixed-layout switch.
-- [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
-      shutdown debt (watchers=0). Keep privacy filtering fail-closed;
-      distinguish measured stalls from causes before changing tooltip/hook code.
+- [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
+  shutdown debt (watchers=0). Keep privacy filtering fail-closed;
+  distinguish measured stalls from causes before changing tooltip/hook code.
+
+Delivered prerequisite: Windows closing records retain an exact accepted
+interval owner through producer teardown. Only content-free `idle_end` and
+`session_end` records can use that authority; ordinary telemetry still uses
+the current fail-closed privacy predicate. Non-variadic frozen getters preserve
+scalar and indexed access. Queue/commit identity, generation and lifecycle are
+rechecked after yielding preparation, and refusal retains the original close.
+The registered native child exercises the production focus-stop, privacy and
+queue chain through controlled native ports, including replacement, mutation
+and receipt-retirement scenarios.
+
+Standard non-release run 37237868670 tested the exact source tree of
+`2d31eee374353823032e4f231b98f4f08655a2b0` at CI commit
+`2fc31dc9ff1eff3ea9b52783364c6c3bc5dd7652`: all 9038 AHK cases executed
+and were timed, with 9037 passes and the pre-existing item 102 failure. The
+owned shutdown-close child, 33 native C cases, 356 JS checks, 27 property
+checks and 72 browser checks passed. E2E, isolated LLM suites, startup,
+packaging and installation were skipped after the item 102 failure. The Core
+runner now installs lua-luv so Lua 5.4 can use the actual Linux regular-file
+reader; its fail-closed reader and existing assertions remain intact.
+
+Windows PC follow-up, delegated to the maintainer:
+
+1. The original diagnostic has been lost, as confirmed by the maintainer.
+   Capture a new diagnostic and reproducible steps on the current integrated
+   build if shutdown debt recurs; record Windows/build version, configuration,
+   foreground application, privacy context and the complete watcher/debt state.
+   Do not attribute the old `watchers=0` report to a historical cause without
+   new evidence.
+2. With real UIA and foreground transitions, exercise focus loss, session stop,
+   reload and shutdown after an accepted interval. Check that certified
+   content-free closes are recorded once, that refusal retains retryable debt,
+   and that ordinary telemetry stays refused in excluded or secure contexts.
+3. Check replacement/reload during a pending close and repeated teardown on
+   the real app: stale owners must not authorize records, retries must not
+   duplicate accepted closes, and pending watcher retirement must remain
+   observable until acknowledgement.
+4. Measure any stall separately from its cause. Collect timings and relevant
+   diagnostic evidence before proposing tooltip or keyboard-hook changes;
+   controlled native ports do not prove physical/UIA responsiveness.
+5. After the item 102 owner fixes the unrelated native unit failure, complete
+   the standard Windows unit, E2E, startup, packaging and installation gates.
+   Keep this item open until the live investigation and its acceptance steps
+   are complete; retain the independent cross-cutting requirements of items
+   16 and 38.
 
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
 rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all
