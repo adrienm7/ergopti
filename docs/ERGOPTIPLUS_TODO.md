@@ -2502,6 +2502,15 @@ pass with all 21 locale catalogues. Full native CI remains required.
   widths and painted geometry. Focused portable checks passed; full integration
   and native Windows CI remain pending. The Mac/Linux visual acceptance remains
   under this item.
+  Real production Linux GTK/cairo/Pango appearance is now qualified on
+  ea6e849df82f2a67e321b1ca7aa885f145101b93 in an isolated Xvfb X11 session:
+  twelve untouched native-window captures retain canonical gray/green/orange,
+  inactive corrected/next emphasis, both selections and indentation
+  0, +2, -1 and -3. Actual glyph pixels confirm the aligned -3 origins and
+  greater bold than regular ink; native mapped/focus-free flags are observed.
+  Source and screenshot hashes accompany the receipts. This is headless X11
+  appearance evidence, not physical input, Wayland or macOS canvas acceptance;
+  item 88 and the interactive obligations in items 16/38 remain open.
   Native checkpoint 37069995600 exposed missing typography initialization in
   the headless Windows paint fixture. It now reads the canonical font family
   and size, asserts valid values and restores the prior aliases in finally.
