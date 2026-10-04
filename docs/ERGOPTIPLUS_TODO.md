@@ -2753,6 +2753,16 @@ All existing test bodies and assertions are retained. Twenty-two additional case
 
 Windows personal opening-source checks now compare the exact String image returned by their existing classified read. The previous calls passed TOML text to a helper whose first parameter is a file path, causing present-file saves and retained resyncs to refuse before reaching publication. The retained durable-image String guard, configured path/session/lease checks and native journal remain authoritative. Two metadata fixture replacements now pass the native limit in the sixth argument, leaving the fifth OutputVar argument omitted. All existing native assertions remain intact. Native run 37221758669 supplied the seven failures; corrected native Windows execution is still required. TODO 102 remains partial, including additional-file gate ownership.
 
+Windows run 37223727872 at `2476b0b2a` completed with 9,036 passed and one
+failed native case; E2E, packaging and installation were skipped. The remaining
+opening-source metadata fixture attempted to replace a section-override header
+that the neutral seed writer correctly omitted. Its seed now inserts that table
+before the first actual alpha entry, verifies both insertion counts, and checks
+all eight metadata values before opening the editor. Every existing final-save,
+source-consent, transaction and metadata assertion remains intact. This is a
+fixture correction, not additional personal-file gate completion. Native
+execution and complete qualification of the corrected fixture remain pending.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
