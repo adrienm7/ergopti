@@ -129,7 +129,7 @@ end
 
 --- Loads the store from disk into _cache.
 local function _load()
-	local ok_open, fh, _, open_errno = pcall(io.open, _STORE_PATH, "r")
+	local ok_open, fh, _, open_errno = pcall(require("infra.regular_file_reader").open, _STORE_PATH)
 	if not ok_open or not fh then
 		_cache = {}
 		if ok_open and open_errno == ENOENT then return end

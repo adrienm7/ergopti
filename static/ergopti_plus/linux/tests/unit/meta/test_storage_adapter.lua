@@ -250,6 +250,58 @@ helpers.describe("storage backup path inspection", function()
 	end
 end)
 
+helpers.describe("storage regular-source descriptor receipts", function()
+	local cases = {
+		{ kind = "file", accepted = true },
+		{ kind = "fifo" },
+		{ kind = "directory" },
+		{ kind = "socket" },
+		{ stat_throws = true },
+		{ open_throws = true, kind = "file" },
+		{ close_refused = true, kind = "file" },
+		{ missing = true },
+		{},
+	}
+	for number, case in ipairs(cases) do
+		helpers.it("linux-storage-special-source: descriptor receipt " .. number, function()
+			local Reader = require("infra.regular_file_reader")
+			local real_uv, real_open = package.loaded.luv, io.open
+			local closes, stream_opens, stream_closes = 0, 0, 0
+			local stream = { close = function() stream_closes = stream_closes + 1; return true end }
+			package.loaded.luv = {
+				fs_open = function(path, flags)
+					helpers.assert_eq(path, "/synthetic/storage.json")
+					helpers.assert_true(flags % 4096 >= 2048, "native open must not wait on a FIFO")
+					helpers.assert_true(math.floor(flags / 524288) % 2 == 1, "the owned descriptor must not survive exec")
+					if case.missing then return nil, "absent", "ENOENT" end
+					return 42
+				end,
+				fs_fstat = function(fd)
+					helpers.assert_eq(fd, 42)
+					if case.stat_throws then error("native metadata raised") end
+					return case.kind and { type = case.kind } or nil
+				end,
+				fs_close = function(fd) helpers.assert_eq(fd, 42); closes = closes + 1; return not case.close_refused end,
+			}
+			io.open = function(path, mode)
+				helpers.assert_eq(path, "/proc/self/fd/42", "reopen the pinned inode, not a replaceable filename")
+				helpers.assert_eq(mode, "r")
+				stream_opens = stream_opens + 1
+				if case.open_throws then error("native stream open raised") end
+				return stream
+			end
+			local ok, opened, _, errno = pcall(Reader.open, "/synthetic/storage.json")
+			package.loaded.luv, io.open = real_uv, real_open
+			helpers.assert_true(ok, tostring(opened))
+			if case.accepted then helpers.assert_eq(opened, stream) else helpers.assert_nil(opened) end
+			helpers.assert_eq(closes, case.missing and 0 or 1)
+			helpers.assert_eq(stream_opens, case.kind == "file" and 1 or 0)
+			helpers.assert_eq(stream_closes, case.close_refused and 1 or 0)
+			if case.missing then helpers.assert_eq(errno, 2) end
+		end)
+	end
+end)
+
 helpers.describe("storage native open receipts", function()
 	for _, receipt in ipairs({ 13, 1, 20, 5, 24, 40, "unknown", "throw" }) do
 		helpers.it("linux-storage-read-receipts: blocks mutation after " .. receipt, function()
@@ -265,7 +317,7 @@ helpers.describe("storage native open receipts", function()
 				return real_getenv(name)
 			end
 			io.open = function(target, mode)
-				if target == path and mode == "r" then
+				if mode == "r" and (target == path or target:match("^/proc/self/fd/%d+$")) then
 					if receipt == "throw" then error("native open raised") end
 					return nil, "native open refused", type(receipt) == "number" and receipt or nil
 				end
