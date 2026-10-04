@@ -159,7 +159,7 @@ module.exports = function checkWindowsStartupLogRuntime() {
 					env: {
 						...process.env,
 						GITHUB_WORKSPACE: pipeline.ROOT,
-						[catalog.logs.windows.base]: defaultRoot,
+						[catalog.base]: defaultRoot,
 						ERGOPTI_STARTUP_SMOKE_DIR: smoke ? smokeRoot : ''
 					}
 				});
