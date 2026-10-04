@@ -1895,6 +1895,15 @@ Partial: the Linux prediction engine now has causal coverage for its second loca
 
 A registered Linux regression now observes the existing native private-file owner when quarantine of malformed API registry bytes is refused. It preserves the exact foreign source, refuses publication and acknowledgement, and leaves no staged replacement or RAM entry. The original defective quarantine branch reproduces the failure; the delivered source publisher and corrected local-server admission keep the full owner suite green. This additional native-file proof is independent of the real-engine second-admission regression. Complete hosted qualification and the remaining Windows local-server UI keep item47 partial.
 
+The Windows logical discovery controller now ports the shared policy against
+the unchanged independent eight-trace corpus. Registered native cases also
+cover superseding dispatch, detached observers, exact model/address identity,
+reentrant clocks and caller Critical restoration. Small atomic publication
+claims fence AHK timer interruption; logical tickets never acknowledge native
+HTTP/process retirement. This is a prerequisite only: Windows asynchronous
+models transport, menu integration and complete native qualification remain
+unfinished. No model or server installation is claimed.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
