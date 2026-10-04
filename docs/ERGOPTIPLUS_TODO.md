@@ -646,6 +646,22 @@ These are software implementations; final hardware verification remains below.
   owner needs native personal-config receipts and the equivalent first flag.
   macOS uses Hammerspoon HTTP rather than this curl path. No reserved native
   implementation/gate, physical input or manual CI was changed or exercised.
+- [~] **L50.** Linux JSON staging ownership: create storage.json.tmp exclusively
+  and keep its original descriptor through write/close. Existing regular files,
+  symlinks, hardlinks, dangling links, devices and FIFOs must not be truncated,
+  renamed, unlinked or opened for blocking I/O. Foreign staging deliberately
+  blocks mutation until reconciled; never auto-remove it. LuaJIT uses native
+  C11 wx stdio; stock Lua uses libuv wx descriptors and completes partial writes
+  before publication. A stock Lua installation lacking luv refuses unsafe writes.
+  Seven of eleven real native cases fail before (including a blocked FIFO);
+  all pass after on LuaJIT/Lua 5.4. Kernel RLIMIT_FSIZE exercises actual buffered
+  and partial-write failure, preserving durable bytes/cache and cleaning only
+  owned staging. Sixteen unit regressions cover all four mutation methods and
+  four foreign aliases; existing failure spies retain their assertions at the
+  exclusive mode boundary. Windows Registry and macOS hs.settings use different
+  native stores and have no corresponding temporary JSON file by source. No
+  TOML persistence, reserved source, native cross-OS gate, hardware input or
+  manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
