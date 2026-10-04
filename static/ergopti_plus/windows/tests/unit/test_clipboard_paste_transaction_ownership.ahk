@@ -82,10 +82,11 @@ Test("clipboard: every paste producer pair is exclusive before snapshot (clipboa
 Test("clipboard: stale terminal cannot release owner or admit third producer (clipboard-paste-transaction-ownership)",
 	_CPT_StaleTerminalCannotAdmitThirdProducer)
 
-_CPT_CrossFamilyOwnersRemainExclusive() {
+_CPT_CrossFamilyOwnersRemainExclusive(AfterGenericOwnerFn?) {
 	GenericToken := CB_TryBeginOwnedTransaction("text_sender", true)
 	PasteToken := 0
 	try {
+		Assert(GenericToken > 0, "the first generic owner must acquire the idle clipboard lease")
 		PasteToken := CB_TryBeginPasteTransaction("hotstring_send_instant")
 		AssertEqual(0, PasteToken,
 			"a paste producer must not snapshot over a generic clipboard owner")
@@ -95,9 +96,14 @@ _CPT_CrossFamilyOwnersRemainExclusive() {
 		CB_EndOwnedTransaction(GenericToken)
 	}
 
+	; Tests may inject an actual competing lease between these separate transactions.
+	if IsSet(AfterGenericOwnerFn)
+		AfterGenericOwnerFn.Call()
+
 	PasteToken := CB_TryBeginPasteTransaction("hotstring_send_instant")
 	GenericToken := 0
 	try {
+		Assert(PasteToken > 0, "the first paste owner must acquire the idle clipboard lease")
 		GenericToken := CB_TryBeginOwnedTransaction("text_sender", true)
 		AssertEqual(0, GenericToken,
 			"a generic clipboard owner must not snapshot over a paste producer")
@@ -278,3 +284,113 @@ _CPT_InactiveObserverOwnsNoNotificationFifo() {
 
 Test("clipboard: inactive observer cannot accumulate notification ownership",
 	_CPT_InactiveObserverOwnsNoNotificationFifo)
+
+
+
+
+
+; ==============================================================================
+; ==============================================================================
+; ======= Cross-family oracle requires an acquired first clipboard owner =======
+; ==============================================================================
+; ==============================================================================
+
+_CPT_CrossFamilyOracleRejectsForeignOwner(UsePasteOwner) {
+	ForeignToken := UsePasteOwner ? CB_TryBeginPasteTransaction("cpt_foreign_paste_fixture")
+		: CB_TryBeginOwnedTransaction("cpt_foreign_generic_fixture", true)
+	Assert(ForeignToken > 0, "the oracle fixture must acquire its own foreign lease")
+	try {
+		ForeignActive := CBClipboardOwner.active
+		ForeignRecord := ForeignActive[ForeignToken]
+		ForeignGeneration := CBClipboardOwner.generation
+		ForeignPasteSlot := CBClipboardOwner.paste_transaction
+		ForeignSource := ForeignRecord["source"]
+		ForeignSuppressPaste := ForeignRecord["suppress_paste"]
+		ForeignPreserve := ForeignRecord["preserve_provenance"]
+		Caught := 0
+		try _CPT_CrossFamilyOwnersRemainExclusive()
+		catch as Failure
+			Caught := Failure
+
+		; The callback must diagnose refusal without releasing or replacing another owner.
+		Assert(CBClipboardOwner.active == ForeignActive,
+			"the tested callback must preserve the exact foreign owner map")
+		AssertEqual(1, CBClipboardOwner.active.Count,
+			"a refused cross-family callback must neither clear nor admit an owner")
+		Assert(CBClipboardOwner.active.Has(ForeignToken),
+			"the fixture's preexisting foreign token must remain live")
+		Assert(CBClipboardOwner.active[ForeignToken] == ForeignRecord,
+			"the fixture's exact foreign record must remain unchanged")
+		AssertEqual(ForeignGeneration, CBClipboardOwner.generation,
+			"refusal must not mint a hidden cross-family lease")
+		AssertEqual(ForeignPasteSlot, CBClipboardOwner.paste_transaction,
+			"refusal must preserve the existing foreign paste slot")
+		AssertEqual(ForeignSource, ForeignRecord["source"])
+		AssertEqual(ForeignSuppressPaste, ForeignRecord["suppress_paste"])
+		AssertEqual(ForeignPreserve, ForeignRecord["preserve_provenance"])
+		Assert(Caught is Error,
+			"the cross-family callback must fail when its first generic lease is refused")
+		AssertEqual("Error", Type(Caught),
+			"an unrelated runtime exception must not satisfy the acquisition oracle")
+		AssertEqual("the first generic owner must acquire the idle clipboard lease", Caught.Message,
+			"the actual callback must name its first acquisition failure")
+	} finally {
+		; Release only this fixture's acquired identity; never reset shared foreign state.
+		if !CB_EndOwnedTransaction(ForeignToken)
+			throw Error("The oracle fixture's exact foreign lease could not be released.")
+	}
+}
+
+Test("clipboard: cross-family oracle rejects a preexisting generic owner",
+	_CPT_CrossFamilyOracleRejectsForeignOwner.Bind(false))
+Test("clipboard: cross-family oracle rejects a preexisting paste owner",
+	_CPT_CrossFamilyOracleRejectsForeignOwner.Bind(true))
+
+
+_CPT_AdmitForeignOwnerBetweenFamilies(State) {
+	AssertEqual(0, State.Calls, "the competing-owner seam must run exactly once")
+	State.Calls += 1
+	State.Token := CB_TryBeginOwnedTransaction("cpt_between_families_fixture", true)
+	Assert(State.Token > 0, "the between-family fixture must acquire its own competing lease")
+	State.Active := CBClipboardOwner.active
+	State.Record := State.Active[State.Token]
+	State.Generation := CBClipboardOwner.generation
+	State.PasteSlot := CBClipboardOwner.paste_transaction
+}
+
+_CPT_CrossFamilyOracleRejectsSecondOwnerRefusal() {
+	State := {Calls: 0, Token: 0, Active: 0, Record: 0, Generation: 0, PasteSlot: 0}
+	Caught := 0
+	try {
+		try _CPT_CrossFamilyOwnersRemainExclusive(_CPT_AdmitForeignOwnerBetweenFamilies.Bind(State))
+		catch as Failure
+			Caught := Failure
+		AssertEqual(1, State.Calls,
+			"the first real generic owner must finish before the competing lease is admitted")
+		Assert(State.Token > 0, "the second-branch fixture must retain its actual competing token")
+		Assert(CBClipboardOwner.active == State.Active,
+			"the second refusal must preserve the exact competing owner map")
+		AssertEqual(1, CBClipboardOwner.active.Count)
+		Assert(CBClipboardOwner.active.Has(State.Token),
+			"the second refusal must not release the competing lease")
+		Assert(CBClipboardOwner.active[State.Token] == State.Record,
+			"the second refusal must preserve the exact competing owner record")
+		AssertEqual(State.Generation, CBClipboardOwner.generation)
+		AssertEqual(State.PasteSlot, CBClipboardOwner.paste_transaction)
+		AssertEqual("cpt_between_families_fixture", State.Record["source"])
+		AssertTrue(State.Record["suppress_paste"])
+		AssertTrue(State.Record["preserve_provenance"])
+		Assert(Caught is Error,
+			"the cross-family callback must fail when its first paste lease is refused")
+		AssertEqual("Error", Type(Caught),
+			"an unrelated second-branch exception must not satisfy the acquisition oracle")
+		AssertEqual("the first paste owner must acquire the idle clipboard lease", Caught.Message,
+			"the actual callback must name its second acquisition failure")
+	} finally {
+		if State.Token && !CB_EndOwnedTransaction(State.Token)
+			throw Error("The second-branch fixture's exact competing lease could not be released.")
+	}
+}
+
+Test("clipboard: cross-family oracle rejects a competing owner between transactions",
+	_CPT_CrossFamilyOracleRejectsSecondOwnerRefusal)
