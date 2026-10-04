@@ -1083,14 +1083,10 @@ These are software implementations; final hardware verification remains below.
   acknowledged writer. The shared wizard trigger choices remain excluded on
   Linux because they do not satisfy its keymap validation policy; the tray
   retains its existing physical-key preference owner.
-- [~] **13.** Complete F2: honor the Karabiner integration switch before leases
-  and guardians; preserve personal rules; back up and restore Windows touchpad
-  registry values through one owner. Remaining: turning the switch off or «
-  Retirer Ergopti de Karabiner » does not unregister a guardian LaunchAgent
-  registered while it was on (needs a headless unregister role in the launcher,
-  verified on a Mac). Legend: `[x]` implemented, reviewed and integrated on
+  Legend: `[x]` implemented, reviewed and integrated on
   `integration-2` (published only once `dev` is pushed); `[~]` integrated with
   the precise remainder recorded in the item or in the overnight handoff.
+
 - [~] **16.** Publish final corrective commits, verify CI and release assets,
   and write the final report with completed scope, limitations and manual test
   results. Published twice on 2026-09-30 (v0.0.0-dev.147, then the morning's
@@ -1536,11 +1532,73 @@ Hosted Lua owner tests do not qualify physical input.
   Karabiner instances" option, WP7 owned configuration, WP8 native acceptance,
   WP9 real-Mac acceptance (internal keyboard: verify the ISO 0x35/0x64
   assumption and fn/globe), WP10 enable and retire. Open: an identity for media
-  keys without a macOS keycode (play/pause, track skips, brightness), and a
-  VirtualHIDDevice version-skew policy. About 30-40 agent-days plus maintainer
+  keys without a macOS keycode (play/pause, track skips, brightness).
+  VirtualHIDDevice version skew must block the incompatible runtime with an
+  explicit explanation and offer an update only after confirmation (maintainer
+  decision, 2026-10-04); implementation and native acceptance remain pending.
+  About 30-40 agent-days plus maintainer
   hardware time.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
+
+WP3 remains partial. An explicitly initialized, dormant physical-capture session
+owner now composes the real accounting policy, delivery receiver and transport.
+It verifies the caller's pinned executable requirement asynchronously, waits for
+both completion and exact task settlement before opening the stream, admits only
+complete coverage, and fences cancellation and successor startup until native
+ownership retires. Unsupported opening or baseline versions carry typed refusal
+metadata and produce one unavailable WARNING without retry, acknowledgement or
+credit; malformed input retains its error verdict. Opening v1 and baseline v2
+remain unchanged. The version regression failed all three cases against the old
+transport; 60 focused portable cases pass with explicit native task doubles.
+Default startup does not load or activate this session owner. Trusted artifact
+provisioning, clock/prepare/status startup, retained production privacy/time
+context, log-sink binding and physical holds, bounded recovery, controlled async
+shutdown, native and real-Mac acceptance are still required before completing
+WP3 or enabling the owned runtime.
+
+WP3 sink acceptance now requires exact true before a delivery batch can be
+acknowledged. The real LogManager copies validated physical presses into its
+ordered outbox under the exact admitted capture; stop revokes new admission
+before native cleanup while retaining accepted work for storage retry. Retained
+event-time privacy, application and timestamp remain authoritative even when
+current state has changed. Two causal regressions fail against the preimage;
+108 focused portable Lua cases and 14 diagnostic Python cases pass. Outbox
+ownership is not durable storage, full production history wiring or native
+acceptance. The capture owner remains dormant and TODO31 remains partial.
+
+The dormant startup now runs the real `--hs274-clock` command after pinned
+identity verification. It transfers a validated copied timebase and immutable
+tick converter to an explicitly injected context owner only after successful
+native start, completion and exact settlement; that owner must acknowledge
+before capture opens. Cancellation retains the exact clock task and fences
+successors. Native prepare/status/open remain inside the existing single capture
+process. This prerequisite does not connect production history, enable default
+startup, align producer coverage or qualify native execution. TODO31 remains
+partial. Five causal preimage failures and 37 passing focused portable cases
+cover this prerequisite; the source-selected gate and native qualification
+must cover the final slice.
+
+WP4 remains partial. The diagnostic producer now retains usage page in its
+internal inventory, reconciliation and immutable snapshots. A changed page on
+an admitted element cookie faults the exact state and interrupts its lease;
+an unrelated auxiliary cookie remains auxiliary. Its native acquisition still
+filters page 7, and baseline v1 refuses non-page-7 snapshots rather than losing
+identity on serialization. Existing wire fields, fixture-only coverage and the
+independent native JSON corpora are unchanged. Two actual C++ regressions failed
+against the original producer; six complete matching programs pass under both
+C++17 and C++23 with warnings treated as errors. Native probe/producer compilation
+and per-device keyboard-type classification remain pending. The consumer still
+requires baseline v2 and the native contract continues to refuse that mismatch;
+this prerequisite does not enable consumer or physical acceptance.
+
+The cheap baseline preflight now also checks the actual CLI transfer boundary.
+A handwritten consumer-v2/producer-v2/Python-v2 tree with a CLI-v1 reader passed
+the original gate incorrectly; it now refuses with the existing named reason
+and exit3. Aligned controls pass, while duplicate or missing declarations fail
+closed. The current producer, CLI and Python reader remain v1, and the consumer
+remains v2: native consumer admission is still deliberately refused. Independent
+native JSON corpora and all live wire versions are unchanged.
 
 ## Remaining work after the 2026-09-30 releases
 
@@ -1638,27 +1696,6 @@ Complete three-OS native qualification remains pending, so item 34 stays partial
 
 Pending custom-delimiter additions and changes are now admitted through the real reader against the planned preserved list before publication or an empty-plan acknowledgement. A retained duplicate cannot silently mask a new key, character, label or consume choice. Semantic refusal preserves source bytes and leaves the delta available for rollback or retry after explicit cleanup; actual writer source fencing and unknown record/comment preservation remain intact. Linux focused registered tests qualify both Delete→Add cases and changed-record collisions; complete three-OS native qualification remains pending.
 
-- [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
-  is turned OFF or its rules are removed. The same owned transaction now joins
-  STOPPED, exact native unregistration and the persisted OFF/rule removal.
-  Refusal retains the prior preference and a fresh READY recovery; unsettled
-  registration tasks block retirement instead of hiding process debt. Native
-  acknowledgement proves the exact launcher identity, empty durable lease,
-  absent legacy job and ServiceManagement registration status. The hosted
-  signed-helper acceptance lane also checks wrong-inode refusal, successful
-  unregistration and idempotence, retaining primary and cleanup errors.
-  Focused registered macOS tests pass 315 cases and the diagnostic judge passes
-  six regressions. Complete native Swift, helper registration and three-OS
-  qualification remain pending.
-
-Signed-helper acceptance run 37081066757 passed actual native registration,
-unregistration and idempotence without a release. The replacement fixture
-now acknowledges both weak runtime retirement and actual singleton-lock
-release within its existing two-second bound. A retained native ACK callback
-must continue to block replacement until it truly exits; every generation
-and transport assertion remains intact. Native XCTest requalification and
-the complete three-OS checkpoint remain pending.
-
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
@@ -1723,6 +1760,34 @@ The five-file source slice has 22 portable native-owner cases, seven actual work
 The packaged macOS launch matrix now contains a Karabiner configuration scenario. It uses the real Hammerspoon JSON runtime and production build, merge and conditional atomic-file owners for eight default/recommended and switch vectors in a runner-owned private destination, preserves foreign profiles and personal rules, proves independent codec trees, and restores exact original bytes. It acquires no remap lease and installs no driver. The selected local gates pass 353 JS checks and 13,074 portable macOS cases, including five registered publication/restoration lifecycle regressions; 65 Python judges pass. Actual signed native execution remains pending and the existing scripting transport deadline is blocking, so TODO40 stays partial until that proof is green.
 
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
+
+The launch CLI now exposes existing observations in one bounded failure-only
+notice so their closed scalar values remain accessible when raw Actions logs
+or artifacts cannot be downloaded. It retains the exact-PID boot-journal
+scripting witness, managed launch state/timing, no-prompt native status/origin,
+received-Lua stage and supplementary bootstrap outcome without treating any of
+them as original admission. All errors, failure exit status, deadlines and
+feature assertions are unchanged. Two actual CLI regressions fail against the
+original source; 225 portable Python tests pass, with one native AppKit test
+skipped on Linux. Live macOS observations and the original AppleEvent admission
+still require an exact-candidate manual CI checkpoint.
+
+The shared Core runner provisioning now reuses the released Group4 workflow
+correction b57a948029: stock Lua5.4 receives lua-luv for the unchanged exact
+native file-admission registry probe. The workflow image matches that owner
+correction byte-for-byte; original registry assertions, native lane selection
+and release policy remain unchanged. Fresh hosted macOS qualification is still
+pending the exclusive CI phase.
+
+The existing owned-sample reader now preserves observed file-read and native
+task-termination frames with their bounded thread ancestry. The pinned
+Hammerspoon1.1.1 task implementation performs synchronous pipe reads on the main
+queue before its Lua completion callback; the original observer could omit the
+read descendant. Three independent controls cover the omission, separate
+branches/threads, redaction and foreign owners. The portable probe suite passes
+140 cases, with one native AppKit calibration skipped on Linux. No extra probe,
+deadline, handler-admission or timeout-cause claim is introduced; exact-candidate
+native observations remain pending.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
@@ -1929,31 +1994,6 @@ semantic TOML corpus still require the next non-release Windows execution.
       `LLM_NavEventOwner_EnsureStarted()` in `ErgoptiPlus.ahk`). Audit every native
       arbiter route, make each one order-independent, and test both hook orders like
       `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
-
-Partial: terminal replay now has one exclusive native release owner across the
-unlocked SendInput boundary. Reentrant and concurrent release attempts retain
-the FIFO; final acknowledgement and ownership retirement are atomic. A capture
-overflow during sending preserves its fault and original error while consuming
-only the accepted prefix. Independent native C regressions cover nested release,
-second-thread admission, retry, teardown and overflow. The original 929 native
-assertions remain unchanged; test and production DLL cross-compilation pass.
-The first MSVC generation run (37231707811) refused a signed/unsigned enum
-comparison in a new expected-phase assertion under /W4 /WX. The expected phase
-now uses the snapshot field's explicit unsigned type, preserving the assertion
-and warnings-as-errors policy. Native retry and generated artifacts are pending.
-Native retry 37232550379 passed all 33 C cases with MSVC /W4 /WX, retained
-the historical assertions, and demonstrated both expected original-production
-failures against the same new regressions. The official generator produced
-the x64 DLL and provenance manifest, verifying ASLR, DEP, CFG, all 24 exports
-and absence of a dynamic compiler runtime. Run 37235031474 reproduced those
-results in an isolated owned worktree. The generated bytes were recovered
-with exact lengths and SHA-256 receipts and independently checked against
-the unchanged source/recipe inputs before updating the two tracked artifacts.
-The standard CI gate must now qualify those tracked bytes on the final source.
-KLE-first physical capture, event-specific
-layout replay, digit/profile routes and modifier/hold balancing still require
-the full hook-order audit; this prerequisite does not complete item 49.
-
 - [ ] **50.** Measure SendEvent against SendInput on Windows. While the native
       arbiter's low-level hook is installed, SendInput is interruptible anyway,
       which is the only reason AutoHotkey removes its own hook, so SendInput now
@@ -2532,62 +2572,6 @@ Added a test-only characterization prerequisite for the legacy Windows Ergopti+ 
 - [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
       shutdown debt (watchers=0). Keep privacy filtering fail-closed;
       distinguish measured stalls from causes before changing tooltip/hook code.
-
-Partial: Windows closing records now carry an exact accepted interval owner
-through producer teardown. Only content-free `idle_end` and `session_end`
-records can use that authority; ordinary telemetry keeps the current privacy
-predicate. Frozen boundaries, queue/commit identity and generation are checked
-again after yielding preparation, with refusal retaining the original close.
-A registered native child exercises the actual focus-stop, privacy and queue
-chain through controlled native ports, including replacement and mutation
-refusals. A complete native pass and full Windows qualification remain pending.
-The maintainer confirmed that the original supplied diagnostic is no longer
-available; this mechanism does not establish its historical live cause.
-
-First Windows qualification (run 37228466168, candidate 45d5c2d) executed
-all 9038 AHK cases: 9036 passed and two failed. The new owned child reported
-local/global name warnings because its terminal loop and catch ran at top
-level; that block now runs inside its own function, retaining Warn All and
-every stdout, stderr, exit and scenario assertion. The complete child log also
-exposed a frozen-getter binding error: AHK static methods bind their implicit
-class receiver before the accepted scalar. Both issued-authority getters now
-bind that receiver explicitly. Independent typed-preimage assertions exercise
-the accepted owner and publication boundaries before the shutdown chain.
-Native retry is pending.
-The next native run (37232550379, candidate 2f836cac0) passed both frozen
-scalar-preimage probes but exposed a later Number/Map type failure: a variadic
-property getter consumed the row index instead of forwarding it to Map.\_\_Item.
-The frozen getter now consumes exactly its instance receiver, preserving normal
-indexed reads and writes. An independent indexed-duration assertion checks the
-expected scalar before every mutation scenario. Failure receipts also include
-the native stack. All central admission and privacy assertions remain intact;
-the exact old/new native regression and full-suite retry are pending.
-
-The next native probe (37235031474, candidate b51a2f565) confirmed that
-changing the bound target's signature is insufficient: AHK BoundFunc always
-exposes variadic metadata. The unchanged independent indexed-duration guard
-fails on both the older Map-valued getter and that candidate's excessive
-arguments. Each frozen getter now comes from a separate factory invocation
-returning a real one-parameter closure, preserving the exact captured value
-and descriptor receipt. Source review and all existing privacy/refusal checks
-are retained; actual native execution and full qualification remain pending.
-Standard native run 37236435190 (source 5576e4dfa) completed all 9038 AHK
-cases with 9036 passes and two failures. The owned child now exits 0 after
-all frozen-close, refusal and receipt-retirement scenarios; its parent then
-incorrectly compares raw LF-terminated output with the real ShellRunner
-callback, which strips terminal CR/LF. The test now requires the exact callback
-marker without LF, retaining exit, complete-content, warning and scenario
-assertions. The standard 33-case C gate, 356 JS checks, 27 property checks
-and 72 browser checks passed. Native unit retry is required; E2E, packaging,
-startup and installation remain skipped after the unit failure.
-The other failure is the pre-existing personal-TOML metadata case (item 102).
-E2E, packaging and installation were skipped after the unit failure.
-
-The same qualification also exposed one shared-core CI prerequisite failure:
-Lua 5.4 could not use the installed Linux regular-file reader without lua-luv.
-The Core runner now installs that native dependency. This changes only runner
-prerequisites; the fail-closed reader and its assertions remain unchanged.
-The exact installed-registry probe is checked with Lua 5.4 before retrying CI.
 
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
 rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all

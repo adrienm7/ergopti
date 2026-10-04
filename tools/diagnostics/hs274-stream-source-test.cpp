@@ -15,8 +15,8 @@ std::uint64_t acquisition_time() { return 1000; }
 
 bool start(source::monitor& monitor) {
   const source::sample samples[] = {
-      {41, 41, {true, false, true, 1, 32, 0, 1}, 0, true, 41, 0, 0, 0, 0},
-      {44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 0, 0, 0, 0}};
+      {7, 41, 41, {true, false, true, 1, 32, 0, 1}, 0, true, 41, 0, 0, 0, 0},
+      {7, 44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 0, 0, 0, 0}};
   return monitor.started(samples, 2, true, false);
 }
 
@@ -173,6 +173,7 @@ void baseline_page_cases() {
   require(first.at("rows").size() == 2 && first.at("next") == 2 && first.at("total") == 4);
   require(first.at("rows").at(0).at("kind") == "device");
   require(first.at("rows").at(0).at("elements") == 2);
+  require(first.at("rows").at(1).size() == 6 && !first.at("rows").at(1).contains("page"));
   keyboard.append({41, 101, 1, true, true, 7, 44, 0, true, 44});
   const auto second = frozen.read(2);
   require(second.at("complete") == true && second.at("next") == 4);
@@ -192,7 +193,7 @@ void baseline_page_cases() {
   using pages = hs274_stream_protocol::baseline_pages<64, 2, 1024>;
   std::vector<pages::element> keys;
   for (std::uint32_t cookie = 0; cookie < 1024; ++cookie) {
-    keys.push_back({255, UINT32_MAX - cookie, UINT64_MAX, true});
+    keys.push_back({7, 255, UINT32_MAX - cookie, UINT64_MAX, true});
   }
   const pages maximum(UINT64_MAX, {{UINT64_MAX, true, keys}, {UINT64_MAX - 1, true, keys}});
   std::size_t offset = 0, count = 0;
@@ -207,6 +208,11 @@ void baseline_page_cases() {
     if (page.at("complete") == true) break;
   }
   require(count == 2050 && offset == count);
+  for (const auto page : {0u, 12u, 0xff01u}) {
+    auto changed = keys[0];
+    changed.page = page;
+    rejects([&] { pages invalid(UINT64_MAX, {{1, true, {changed}}}); });
+  }
   rejects([&] { pages invalid(100, {}); });
   rejects([&] { pages invalid(UINT64_MAX, {{1, true, keys}, {1, true, keys}}); });
   rejects([&] { pages invalid(UINT64_MAX, {{1, false, keys}}); });
@@ -428,7 +434,7 @@ void sampled_state_cases() {
   source owner("sampled-state", acquisition_time);
   auto first = owner.attach(41, true);
   auto second = owner.attach(42, true);
-  const source::sample held{44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 1, 0, 0, 0};
+  const source::sample held{7, 44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 1, 0, 0, 0};
   require(first.started(&held, 1, true, false));
   require(first.key_down(44));
   first.append({41, 1, 0, true, true, 7, 44, 0, true, 44});
@@ -472,7 +478,18 @@ void sampled_state_cases() {
   require(mixed.request(7, pull_request(opened)).at("reason") == "interrupted");
 }
 
+void changed_page_cases() {
+  source owner("changed-page", acquisition_time);
+  auto monitor = owner.attach(41, true);
+  require(start(monitor));
+  const auto opened = open_ready(owner, prepare(owner));
+  monitor.append({41, 1001, 1, true, true, 12, 44, 0, true, 44});
+  require(owner.request(7, pull_request(opened)).at("reason") == "interrupted");
+  rejects([&] { monitor.key_down(44); });
+}
+
 int main() {
+  changed_page_cases();
   baseline_client_cases();
   baseline_session_cases();
   baseline_page_cases();

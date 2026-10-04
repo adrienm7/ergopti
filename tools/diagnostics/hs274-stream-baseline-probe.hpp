@@ -68,7 +68,7 @@ inline inventory_observation capture_inventory(IOHIDDeviceRef device, std::uint6
           IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)};
       const auto sample = read(device, element, kIOHIDDeviceGetValueWithoutUpdate);
       const bool valid = sample.at("status") == 0 && sample.at("returned_value") == true;
-      const inventory_type::sample initial{usage, cookie, descriptor, sample.at("status").get<std::int32_t>(),
+      const inventory_type::sample initial{page, usage, cookie, descriptor, sample.at("status").get<std::int32_t>(),
           sample.at("returned_value").get<bool>(), valid ? sample.at("value_cookie").get<std::uint32_t>() : 0,
           valid ? std::stoll(sample.at("value").get<std::string>()) : 0,
           valid ? std::stoull(sample.at("timestamp").get<std::string>()) : 0,

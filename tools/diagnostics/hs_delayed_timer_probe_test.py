@@ -2032,6 +2032,119 @@ lua_pcallk image only
         self.assertIn("lua_pcallk", contexts[1])
         self.assertNotIn("image only", "\n".join(contexts))
 
+    def test_server_sample_keeps_main_task_file_read_beyond_generic_loop_ancestors(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(
+                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+            )
+            owner.bind_runtime(42, lambda _: [42])
+
+            def sample(arguments, **options):
+                # Hammerspoon 1.1.1 create_task's termination block dispatches
+                # these file reads on the main queue before invoking Lua.
+                Path(arguments[-1]).write_text(
+                    f"Process: Hammerspoon [42]\nPath: {owner.executable}\nCall graph:\n"
+                    "9 Thread_1 DispatchQueue_1: com.apple.main-thread (serial)\n"
+                    "+ 9 NSApplicationMain (in AppKit) + 1\n"
+                    "+ ! 9 CFRunLoopRunSpecific (in CoreFoundation) + 2\n"
+                    "+ ! : 9 _dispatch_main_queue_callback_4CF (in libdispatch.dylib) + 3\n"
+                    "+ ! : | 9 __create_task_block_invoke_2 (in libtask.so) + 4 "
+                    "(source /Users/private/task source.m)\n"
+                    "+ ! : | + 9 -[NSConcreteFileHandle readDataToEndOfFile] (in Foundation) + 5\n"
+                    "+ ! : | + ! 9 __read_nocancel (in libsystem_kernel.dylib) + 6\n"
+                    "9 Thread_2 DispatchQueue_2: com.apple.CFNetwork (serial)\n"
+                    "+ 9 _dispatch_semaphore_wait_slow (in libdispatch.dylib) + 7\n"
+                    "Binary Images:\nTCC PRIVATE_IMAGE_ONLY\n"
+                )
+                return subprocess.CompletedProcess(arguments, 0, "", "")
+
+            with mock.patch.object(probe.subprocess, "run", side_effect=sample) as native:
+                messages = owner.sample_native_runtime()
+            self.assertEqual(len(messages), 3)
+            self.assertIn("Thread_1 DispatchQueue_1: com.apple.main-thread", messages[1])
+            self.assertIn("-[NSConcreteFileHandle readDataToEndOfFile]", messages[1])
+            self.assertIn("__create_task_block_invoke_2", messages[1])
+            self.assertNotIn("semaphore", messages[1])
+            self.assertIn("Thread_2 DispatchQueue_2: com.apple.CFNetwork", messages[2])
+            self.assertNotIn("readDataToEndOfFile", messages[2])
+            self.assertEqual(native.call_args.args[0][2], "1")
+            self.assertEqual(native.call_args.kwargs["timeout"], 2)
+            for private in ("/Users/private", "task source.m", "PRIVATE_IMAGE_ONLY"):
+                self.assertNotIn(private, "\n".join(messages))
+
+    def test_task_file_read_context_keeps_sibling_branches_and_background_ownership(self):
+        for queue in ("com.apple.main-thread", "com.apple.background"):
+            with self.subTest(queue=queue), tempfile.TemporaryDirectory() as folder:
+                owner = probe.NativeDelayedTimerProbe(
+                    Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+                )
+                sample = Path(folder) / "owned.txt"
+                sample.write_text(
+                    f"Process: Hammerspoon [42]\nPath: {owner.executable}\nCall graph:\n"
+                    f"9 Thread_1 DispatchQueue_1: {queue} (serial)\n"
+                    "+ 9 root (in Hammerspoon) + 1\n"
+                    "+ ! 3 __create_task_block_invoke_2 (in libtask.so) + 2\n"
+                    "+ ! : 3 unrelatedTaskDescendant (in libtask.so) + 3\n"
+                    "+ ! 6 separateReader (in Foundation) + 4\n"
+                    "+ ! : 6 -[NSConcreteFileHandle readDataToEndOfFile] (in Foundation) + 5\n"
+                    "9 Thread_2\n"
+                    "+ 9 -[NSFileHandle readDataToEndOfFile] (in Foundation) + 6\n"
+                    "Binary Images:\n__create_task_block_invoke_2 PRIVATE_IMAGE_ONLY\n"
+                )
+                messages = owner.read_native_runtime_sample(sample, 42, lambda _: [42])
+                self.assertEqual(len(messages), 3)
+                self.assertIn(f"Thread_1 DispatchQueue_1: {queue}", messages[1])
+                self.assertIn("+ ! 3 __create_task_block_invoke_2", messages[1])
+                self.assertIn("+ ! 6 separateReader", messages[1])
+                self.assertIn("+ ! : 6 -[NSConcreteFileHandle readDataToEndOfFile]", messages[1])
+                self.assertNotIn("unrelatedTaskDescendant", messages[1])
+                self.assertIn("Thread_2", messages[2])
+                self.assertIn("-[NSFileHandle readDataToEndOfFile]", messages[2])
+                self.assertNotIn("create_task", messages[2])
+                self.assertNotIn("separateReader", messages[2])
+                if queue == "com.apple.background":
+                    self.assertNotIn("com.apple.main-thread", "\n".join(messages))
+                self.assertNotIn("PRIVATE_IMAGE_ONLY", "\n".join(messages))
+
+    def test_task_file_read_markers_require_executing_frames_and_exact_server_owner(self):
+        for variant in ("header_images", "foreign_process", "foreign_path", "changed_owner"):
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as folder:
+                owner = probe.NativeDelayedTimerProbe(
+                    Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+                )
+                sample = Path(folder) / "owned.txt"
+                process = "Hammerspoon [43]" if variant == "foreign_process" else "Hammerspoon [42]"
+                path = "/foreign/Hammerspoon" if variant == "foreign_path" else owner.executable
+                stack = (
+                    "+ ! 9 CFRunLoopRunSpecific (in CoreFoundation) + 2\n"
+                    if variant == "header_images"
+                    else "+ ! 9 __create_task_block_invoke_2 (in libtask.so) + 2\n"
+                    "+ ! : 9 -[NSFileHandle readDataToEndOfFile] (in Foundation) + 3\n"
+                )
+                sample.write_text(
+                    f"Process: {process}\nPath: {path}\n"
+                    "Source: __create_task_block_invoke_2 readDataToEndOfFile PRIVATE_HEADER\n"
+                    "Call graph:\n9 Thread_1 DispatchQueue_1: com.apple.main-thread\n"
+                    "+ 9 NSApplicationMain (in AppKit) + 1\n"
+                    + stack
+                    + "Binary Images:\n__create_task_block_invoke_2 readDataToEndOfFile PRIVATE_IMAGE\n"
+                )
+                messages = owner.read_native_runtime_sample(
+                    sample, 42, lambda _: [43] if variant == "changed_owner" else [42]
+                )
+                observed = "\n".join(messages)
+                if variant == "header_images":
+                    self.assertIn("sample retained", messages[0])
+                else:
+                    self.assertIn("unqualified", messages[0])
+                for unobserved in (
+                    "create_task",
+                    "readDataToEndOfFile",
+                    "PRIVATE_HEADER",
+                    "PRIVATE_IMAGE",
+                ):
+                    self.assertNotIn(unobserved, observed)
+
     def test_native_thread_contexts_are_bounded_without_losing_the_selected_wait(self):
         lines = ["Call graph:", "9 Thread_1 DispatchQueue_1: com.apple.main-thread (serial)"]
         lines.extend(

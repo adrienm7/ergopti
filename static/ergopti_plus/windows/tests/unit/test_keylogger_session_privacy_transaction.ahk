@@ -32,8 +32,6 @@ _KLSPT_Append(kind, duration_ms := unset, CommitFn := 0) {
 
 
 _KLSPT_ResetWatcher() {
-	KLWatch.session_generation := 0
-	KLWatch.idle_generation := 0
 	KLWatch.idle_close := false
 	KLWatch.session_close := false
 	KLWatch.session_close_draining := false
@@ -107,7 +105,6 @@ _KLSPT_StopAtPrivacyBoundary(Wrap) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
 		"session_close", "session_close_draining", "idle_close"]
@@ -163,7 +160,6 @@ for Wrap in [false, true]
 _KLSPT_PauseClosesAuthorizedSession(Callback) {
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"session_close", "session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%
@@ -205,7 +201,6 @@ Test("keylogger watcher: paused power callback owns session boundary (keylogger-
 _KLSPT_ZeroTickScope(Run) {
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "session_close",
 		"session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%

@@ -91,6 +91,7 @@ CONFIGURED_MARKER = "embedded Hammerspoon bootstrap logger configured"
 STARTUP_TIMEOUT_SECONDS = 90
 ALIVE_WINDOW_SECONDS = 15
 QUIT_TIMEOUT_SECONDS = 10
+NATIVE_FAILURE_NOTICE_CHARACTER_LIMIT = 1024
 HS_DOMAIN = "com.ergoptiplus.app.hammerspoon"
 OLD_PERSONAL_SHORTCUTS = "static/ergopti_plus/macos/lib/personal_shortcuts.lua"
 OLD_PERSONAL_INFO = "static/ergopti_plus/shared/config_schema/examples/personal_info.example.toml"
@@ -643,6 +644,107 @@ def print_native_probe_diagnostics(report):
         )
 
 
+def native_scripting_journal_summary(journal, pid):
+    """Observe one exact-PID boot line without admitting handler entry or publication."""
+    unknown = {"getter": "unknown", "allowed": "unknown", "bridge": "unknown"}
+    if (
+        type(pid) is not int
+        or not 0 < pid < 2**53
+        or type(journal) is not str
+        or len(journal) > 65536
+    ):
+        return unknown
+    pattern = (
+        r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] \[init\] "
+        r"Native scripting server: pid="
+        + str(pid)
+        + r"; getter=(missing|error|malformed|boolean); allowed=(unknown|true|false); "
+        r"bridge=(missing|callable); handler_registration=unobserved; handler_entry=unobserved\.\n"
+    )
+    matches = [re.fullmatch(pattern, line) for line in journal.splitlines(keepends=True)]
+    matches = [match for match in matches if match is not None]
+    if len(matches) != 1:
+        return unknown
+    getter, allowed, bridge = matches[0].groups()
+    if (getter == "boolean") != (allowed in ("true", "false")):
+        return unknown
+    return {"getter": getter, "allowed": allowed, "bridge": bridge}
+
+
+def escape_workflow_annotation(value):
+    """Escape workflow data without changing the original diagnostic text."""
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def native_failure_notice(scenario, report):
+    """Expose closed observed scalars; supplementary evidence never admits the original gate."""
+
+    def record(name):
+        value = report.get(name)
+        return value if type(value) is dict else {}
+
+    def choice(value, allowed, default="unknown"):
+        return value if type(value) is str and value in allowed else default
+
+    scripting = record("native_scripting_journal")
+    managed = record("managed_launch_observation")
+    received = record("supplementary_received_lua_stage")
+    native = record("native_pid_no_prompt_control")
+    finished = managed.get("finished_launching")
+    finished = str(finished).lower() if type(finished) is bool else "unknown"
+    status = native.get("status")
+    status = str(status) if type(status) is int and -(2**31) <= status < 2**31 else "unknown"
+    bootstrap = record("supplementary_native_bootstrap")
+    bootstrap_error = report.get("supplementary_native_bootstrap_error")
+    bootstrap_state = "unobserved"
+    if bootstrap or bootstrap_error:
+        bootstrap_state = "unknown"
+        if not bootstrap and type(bootstrap_error) is str and bootstrap_error:
+            bootstrap_state = "refused"
+        elif (
+            not bootstrap_error
+            and bootstrap.get("contract") == "hs.startup.supplementary-feature"
+            and bootstrap.get("qualification")
+            == "installed native feature only; no managed boot or AppleEvent admission"
+            and bootstrap.get("feature") in ("delayed_timer", "karabiner_config")
+            and all(
+                bootstrap.get(key) is True
+                for key in ("cleanup_acknowledged", "process_retired", "preference_restored")
+            )
+        ):
+            bootstrap_state = "feature_only"
+    message = (
+        "Native launch observations: scenario="
+        + choice(scenario, ("clean", "karabiner_config"))
+        + "; getter="
+        + choice(scripting.get("getter"), ("missing", "error", "malformed", "boolean"))
+        + "; allowed="
+        + choice(scripting.get("allowed"), ("true", "false"))
+        + "; bridge="
+        + choice(scripting.get("bridge"), ("missing", "callable"))
+        + "; journal_publication_ack=unobserved; handler_entry=unobserved"
+        + "; finished_launching="
+        + finished
+        + "; launch_timing="
+        + choice(managed.get("timing"), ("before_path", "overlaps_path", "after_path"))
+        + "; received_lua="
+        + choice(received.get("body_stage"), ("observed", "unobserved"), "unobserved")
+        + "; no_prompt_status="
+        + status
+        + "; no_prompt_origin="
+        + choice(native.get("error_origin"), ("none", "send", "handler"))
+        + "; no_prompt_outcome="
+        + choice(native.get("outcome"), ("acknowledged", "consent_required", "denied", "refused"))
+        + "; supplementary_bootstrap="
+        + bootstrap_state
+        + "; diagnostics_admit_original=false"
+    )
+    notice = "::notice::" + escape_workflow_annotation(message)
+    if len(notice) > NATIVE_FAILURE_NOTICE_CHARACTER_LIMIT:
+        return "::notice::Native launch observations unavailable; diagnostics_admit_original=false"
+    return notice
+
+
 def print_tails(output):
     """Print the relevant log tails into the job log so a red gate is readable."""
     for name in (LAUNCHER_LOG_NAME, FALLBACK_BOOT_LOG_NAME):
@@ -850,6 +952,13 @@ def run(app, output, scenario, seed_tag):
                         previous + "; " if previous else ""
                     ) + f"preference restoration failed: {error}"
     if native_probe:
+        runtime_owner = native_probe.runtime_owner
+        bound_pid = (
+            runtime_owner[0] if type(runtime_owner) is tuple and len(runtime_owner) == 2 else None
+        )
+        report["native_scripting_journal"] = native_scripting_journal_summary(
+            observation.get("boot_log", ""), bound_pid
+        )
         report["managed_launch_observation"] = observation.get("managed_launch_observation")
         if observation.get("managed_launch_observation_error"):
             report["managed_launch_observation_error"] = observation[
@@ -916,12 +1025,8 @@ def matrix_line(profile):
 
 def failure_annotations(scenario, failures):
     """Retain native refusal causes in GitHub annotations when artifacts are unavailable."""
-
-    def escape(value):
-        return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-
-    return [f"::error::macOS launch gate [{escape(scenario)}] failed"] + [
-        "::error::" + escape(failure) for failure in failures
+    return [f"::error::macOS launch gate [{escape_workflow_annotation(scenario)}] failed"] + [
+        "::error::" + escape_workflow_annotation(failure) for failure in failures
     ]
 
 
@@ -981,6 +1086,8 @@ def main(argv=None):
     if report["failures"]:
         for annotation in failure_annotations(args.scenario, report["failures"]):
             print(annotation)
+        if args.scenario in ("clean", "karabiner_config"):
+            print(native_failure_notice(args.scenario, report))
         print_native_probe_diagnostics(report)
         print_tails(output)
         return 1
