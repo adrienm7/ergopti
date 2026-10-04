@@ -1535,6 +1535,17 @@ macOS feature integration):
       not change the source or tap assignment. Exercise held/deferred input across
       layout changes and verify the real tap-to-UIA freshness transition.
 
+Native macOS keyboard qualification remains pending. Manual run37238984667
+built the release launcher but ended during the actual selected-source
+punctuation/dead-accent test, before a complete XCTest receipt. The keyboard
+fixtures now publish bounded closed phase witnesses before their initial native
+reads, diagnostic observations and instrumented calls. One failure-only check
+notice exposes the last three known boundaries without changing the original
+assertions, source restoration, deadlines or verdict. The actual CLI preimage
+control preserves exit1 in both versions and proves the old missing notice;
+356 JS checks pass. Native Swift compilation/execution and later package/install
+stages remain mandatory; an observed boundary alone does not explain a fault.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -1820,8 +1831,10 @@ The shared Core runner provisioning now reuses the released Group4 workflow
 correction b57a948029: stock Lua5.4 receives lua-luv for the unchanged exact
 native file-admission registry probe. The workflow image matches that owner
 correction byte-for-byte; original registry assertions, native lane selection
-and release policy remain unchanged. Fresh hosted macOS qualification is still
-pending the exclusive CI phase.
+and release policy remain unchanged. Hosted run37238984667 passes shared Core and macOS stubbed units/E2E; its
+Package stops at an incomplete native keyboard XCTest. Remaining package,
+installation and Karabiner launch qualification uses the group-owned test CI
+branch, with final integrated qualification reserved exclusively.
 
 The existing owned-sample reader now preserves observed file-read and native
 task-termination frames with their bounded thread ancestry. The pinned

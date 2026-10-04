@@ -65,6 +65,29 @@ struct KeyboardSourceTestState: Codable {
 }
 
 final class KeyboardSourceTestDiagnostics {
+	struct PhaseWitness: Codable {
+		let version: Int
+		let sequence: Int
+		let phase: String
+	}
+
+	// Closed vocabulary: witnesses contain no identities or native property data.
+	static let observationPhases = [
+		"original.capture", "target.inventory", "body.before", "body.after",
+		"translation.snapshot", "event.before", "event.after", "probe.before", "probe.after",
+		"probe.snapshot", "probe.refused.invalidArguments", "probe.refused.sourceChanged",
+		"probe.refused.unavailableLayout", "probe.refused.translationFailed",
+		"probe.refused.invalidUnicode", "probe.refused.unclassified",
+	] + ["enable", "disable", "select", "restore.inner", "restore.outer"].flatMap {
+		[$0 + ".before", $0 + ".after"]
+	}
+	static let knownWitnessPhases = Set(observationPhases.flatMap {
+		[$0 + ".observe.entered", $0 + ".observe.completed"]
+	} + ["enable", "disable", "select", "restore.inner", "restore.outer", "probe",
+		"original.capture", "target.list", "target.enabledProperty"].flatMap {
+		[$0 + ".call.entered", $0 + ".call.returned"]
+	} + ["probe.call.refused", "probe.terminalID.returned", "unclassified", "overflow"])
+
 	struct Event: Codable {
 		let phase: String
 		let uptime: TimeInterval
@@ -85,10 +108,33 @@ final class KeyboardSourceTestDiagnostics {
 	}
 
 	private let test: KeyboardSourceTestIdentity
+	private let writeWitness: (Data) -> Void
+	private var witnessCount = 0
 	private(set) var events: [Event] = []
 	private(set) var omittedEvents = 0
 
-	init(_ test: String) { self.test = .bounded(test) }
+	init(_ test: String, writeWitness: @escaping (Data) -> Void = { FileHandle.standardOutput.write($0) }) {
+		self.test = .bounded(test)
+		self.writeWitness = writeWitness
+	}
+
+	func witness(_ phase: String) {
+		guard witnessCount <= 128 else { return }
+		let known = Self.knownWitnessPhases.contains(phase) ? phase : "unclassified"
+		let published = witnessCount == 128 ? "overflow" : known
+		witnessCount += 1
+		let record = PhaseWitness(version: 1, sequence: witnessCount, phase: published)
+		Self.writeFramedRecord(prefix: "TIS_TEST_PHASE ", encode: { try JSONEncoder().encode(record) },
+			write: writeWitness)
+	}
+
+	// Publication precedes collection, which may block inside a native read.
+	// The injected collector permits causal ordering controls without Carbon.
+	func observe(_ phase: String, collect: () -> Event) {
+		witness(phase + ".observe.entered")
+		append(collect())
+		witness(phase + ".observe.completed")
+	}
 
 	func append(_ event: Event) {
 		guard events.count < 64 else { omittedEvents += 1; return }
@@ -97,18 +143,22 @@ final class KeyboardSourceTestDiagnostics {
 
 	func record(_ phase: String, original: TISInputSource? = nil, target: TISInputSource? = nil,
 		status: OSStatus? = nil, snapshot: KeyboardSourceSnapshot? = nil) {
-		let uptime = ProcessInfo.processInfo.systemUptime
-		let current = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
-		append(Event(phase: phase, uptime: uptime, status: status,
-			original: .read(original), target: .read(target), current: .read(current),
-			snapshotID: snapshot.map { .bounded($0.sourceID) }, keyboardType: snapshot?.keyboardType,
-			unicodeDataBytes: snapshot?.data.map { CFDataGetLength($0) }))
+		observe(phase) {
+			let uptime = ProcessInfo.processInfo.systemUptime
+			let current = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
+			return Event(phase: phase, uptime: uptime, status: status,
+				original: .read(original), target: .read(target), current: .read(current),
+				snapshotID: snapshot.map { .bounded($0.sourceID) }, keyboardType: snapshot?.keyboardType,
+				unicodeDataBytes: snapshot?.data.map { CFDataGetLength($0) })
+		}
 	}
 
 	func nativeCall(_ phase: String, original: TISInputSource, target: TISInputSource? = nil,
 		_ call: () -> OSStatus) -> OSStatus {
 		record(phase + ".before", original: original, target: target)
+		witness(phase + ".call.entered")
 		let status = call()
+		witness(phase + ".call.returned")
 		record(phase + ".after", original: original, target: target, status: status)
 		return status
 	}
@@ -116,9 +166,10 @@ final class KeyboardSourceTestDiagnostics {
 	func probe(_ invocation: KeyboardSourceProbeInvocation,
 		readCurrentID: (() throws -> String)? = nil) throws -> KeyboardSourceProbeReceipt {
 		record("probe.before")
+		witness("probe.call.entered")
 		defer { record("probe.after") }
 		do {
-			return try probeSelectedKeyboardSource(invocation, readSnapshot: {
+			let receipt = try probeSelectedKeyboardSource(invocation, readSnapshot: {
 				let snapshot = try captureSelectedKeyboardSource()
 				self.record("probe.snapshot", snapshot: snapshot)
 				return snapshot
@@ -132,9 +183,13 @@ final class KeyboardSourceTestDiagnostics {
 				self.append(Event(phase: "probe.terminalID", uptime: ProcessInfo.processInfo.systemUptime,
 					status: nil, original: nil, target: nil, current: nil, snapshotID: .bounded(identifier),
 					keyboardType: nil, unicodeDataBytes: nil))
+				self.witness("probe.terminalID.returned")
 				return identifier
 			})
+			witness("probe.call.returned")
+			return receipt
 		} catch {
+			witness("probe.call.refused")
 			let phase: String
 			if let known = error as? KeyboardSourceProbeError {
 				switch known {
@@ -161,10 +216,14 @@ final class KeyboardSourceTestDiagnostics {
 	// A single FileHandle call does not promise global atomicity across producers.
 	static func writeRecord(encode: () throws -> Data,
 		write: (Data) -> Void = { FileHandle.standardOutput.write($0) }) {
+		writeFramedRecord(prefix: "TIS_TEST_EVIDENCE ", encode: encode, write: write)
+	}
+
+	private static func writeFramedRecord(prefix: String, encode: () throws -> Data, write: (Data) -> Void) {
 		let payload: Data
 		do { payload = try encode() }
 		catch { payload = Data("{\"version\":1,\"diagnosticEncodingRefused\":true}".utf8) }
-		var record = Data("TIS_TEST_EVIDENCE ".utf8)
+		var record = Data(prefix.utf8)
 		record.append(payload)
 		record.append(0x0A)
 		write(record)
@@ -220,6 +279,72 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 // Pure framing controls use the same emitter as the native tests. They do not
 // call Carbon, change a source, or relax the strict XCTest receipt reader.
 extension KeyboardSourceTestDiagnosticsTests {
+	func testInitialNativeCallWitnessesPreserveExactBoundaries() throws {
+		var writes: [Data] = []
+		let recorder = KeyboardSourceTestDiagnostics("controlled", writeWitness: { writes.append($0) })
+		let expected = [
+			"original.capture.call.entered", "original.capture.call.returned",
+			"target.list.call.entered", "target.list.call.returned",
+			"target.enabledProperty.call.entered", "target.enabledProperty.call.returned",
+		]
+		for phase in expected { recorder.witness(phase) }
+		let prefix = Data("TIS_TEST_PHASE ".utf8)
+		let observed = try writes.map { data in
+			try JSONDecoder().decode(KeyboardSourceTestDiagnostics.PhaseWitness.self,
+				from: Data(data.dropFirst(prefix.count).dropLast())).phase
+		}
+		XCTAssertEqual(observed, expected)
+	}
+
+	func testPhaseWitnessIsPublishedBeforeObservationCollection() throws {
+		var writes: [Data] = []
+		let recorder = KeyboardSourceTestDiagnostics("private.identity", writeWitness: { writes.append($0) })
+		let event = KeyboardSourceTestDiagnostics.Event(phase: "select.before", uptime: 1, status: nil,
+			original: nil, target: nil, current: nil, snapshotID: .bounded("private.source"),
+			keyboardType: nil, unicodeDataBytes: nil)
+		recorder.observe("select.before") {
+			XCTAssertEqual(writes.count, 1, "The native collector must not run before the entered witness is written")
+			XCTAssertTrue(recorder.events.isEmpty)
+			return event
+		}
+		XCTAssertEqual(recorder.events.count, 1)
+		XCTAssertEqual(writes.count, 2)
+		let prefix = Data("TIS_TEST_PHASE ".utf8)
+		let phases = try writes.map { data -> KeyboardSourceTestDiagnostics.PhaseWitness in
+			XCTAssertTrue(data.starts(with: prefix))
+			XCTAssertEqual(data.filter { $0 == 0x0A }.count, 1)
+			XCTAssertEqual(data.last, 0x0A)
+			XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("private"))
+			return try JSONDecoder().decode(KeyboardSourceTestDiagnostics.PhaseWitness.self,
+				from: Data(data.dropFirst(prefix.count).dropLast()))
+		}
+		XCTAssertEqual(phases.map(\.phase), ["select.before.observe.entered", "select.before.observe.completed"])
+		XCTAssertEqual(phases.map(\.sequence), [1, 2])
+	}
+
+	func testPhaseVocabularyOverflowAndPrivacyAreBounded() throws {
+		var writes: [Data] = []
+		let recorder = KeyboardSourceTestDiagnostics("private.identity", writeWitness: { writes.append($0) })
+		recorder.witness("/Users/private/TOKEN%\n::error::inert")
+		for _ in 0..<132 { recorder.witness("select.call.entered") }
+		XCTAssertEqual(writes.count, 129, "One final overflow witness bounds all subsequent writes")
+		let prefix = Data("TIS_TEST_PHASE ".utf8)
+		let phases = try writes.map { data -> KeyboardSourceTestDiagnostics.PhaseWitness in
+			XCTAssertLessThanOrEqual(data.count - prefix.count - 1, 256)
+			XCTAssertEqual(data.filter { $0 == 0x0A }.count, 1)
+			XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("TOKEN"))
+			let object = try XCTUnwrap(JSONSerialization.jsonObject(with:
+				Data(data.dropFirst(prefix.count).dropLast())) as? [String: Any])
+			XCTAssertEqual(Set(object.keys), Set(["version", "sequence", "phase"]))
+			return try JSONDecoder().decode(KeyboardSourceTestDiagnostics.PhaseWitness.self,
+				from: Data(data.dropFirst(prefix.count).dropLast()))
+		}
+		XCTAssertEqual(phases.first?.phase, "unclassified")
+		XCTAssertEqual(phases.last?.phase, "overflow")
+		XCTAssertEqual(phases.last?.sequence, 129)
+		XCTAssertTrue(recorder.events.isEmpty, "Immediate witnesses do not rewrite full receipt events")
+	}
+
 	func testEvidenceWritesOneCompleteUTF8RecordBeforeFollowingReceipt() throws {
 		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity")
 		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,

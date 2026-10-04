@@ -19,16 +19,25 @@ final class KeyboardSourceProbeTests: XCTestCase {
 			"Input-source switching is restricted to disposable CI hosts")
 		let diagnostics = KeyboardSourceTestDiagnostics(name + ":" + identifier)
 		defer { diagnostics.emit() }
-		let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+		diagnostics.witness("original.capture.call.entered")
+		let captured = TISCopyCurrentKeyboardInputSource()
+		diagnostics.witness("original.capture.call.returned")
+		let original = captured!.takeRetainedValue()
 		diagnostics.record("original.capture", original: original)
 		defer {
 			let status = diagnostics.nativeCall("restore.outer", original: original) { TISSelectInputSource(original) }
 			XCTAssertEqual(status, noErr)
 		}
 		let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
-		let sources = TISCreateInputSourceList(filter, true).takeRetainedValue() as! [TISInputSource]
+		diagnostics.witness("target.list.call.entered")
+		let inventory = TISCreateInputSourceList(filter, true)
+		diagnostics.witness("target.list.call.returned")
+		let sources = inventory!.takeRetainedValue() as! [TISInputSource]
 		let source = try XCTUnwrap(sources.first, "Missing native fixture: \(identifier)")
-		let pointer = try XCTUnwrap(TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled))
+		diagnostics.witness("target.enabledProperty.call.entered")
+		let enabledProperty = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled)
+		diagnostics.witness("target.enabledProperty.call.returned")
+		let pointer = try XCTUnwrap(enabledProperty)
 		let wasEnabled = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(pointer).takeUnretainedValue())
 		diagnostics.record("target.inventory", original: original, target: source)
 		if !wasEnabled {

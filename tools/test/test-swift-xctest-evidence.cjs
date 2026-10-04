@@ -14,7 +14,8 @@ const { spawnSync } = require('node:child_process');
 const {
 	annotation,
 	cleanTranscript,
-	evaluate
+	evaluate,
+	keyboardPhases
 } = require('../diagnostics/swift_xctest_evidence.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
@@ -148,6 +149,81 @@ assert.equal(
 	'::error title=Swift XCTest failure,file=a%2Cb.swift,line=7::Échec %25%0A::warning::inert%0Dnext'
 );
 
+// Hand-authored boundary witnesses are independent of the Swift producer.
+const phaseLine = (phase, sequence = 1) =>
+	'TIS_TEST_PHASE ' + JSON.stringify({ version: 1, sequence, phase });
+const initialBoundaries = [
+	'original.capture.call.entered',
+	'original.capture.call.returned',
+	'target.list.call.entered',
+	'target.list.call.returned',
+	'target.enabledProperty.call.entered',
+	'target.enabledProperty.call.returned'
+];
+assert.deepEqual(
+	keyboardPhases(initialBoundaries.map((phase, index) => phaseLine(phase, index + 1))),
+	{
+		accepted: 6,
+		refused: 0,
+		count_saturated: false,
+		last: [
+			'target.list.call.returned',
+			'target.enabledProperty.call.entered',
+			'target.enabledProperty.call.returned'
+		]
+	}
+);
+const phaseTranscript = [
+	phaseLine('select.before.observe.entered', 1),
+	phaseLine('select.before.observe.completed', 2),
+	phaseLine('select.call.entered', 3),
+	phaseLine('select.call.returned', 4)
+].join('\n');
+assert.deepEqual(keyboardPhases(phaseTranscript.split('\n')), {
+	accepted: 4,
+	refused: 0,
+	count_saturated: false,
+	last: ['select.before.observe.completed', 'select.call.entered', 'select.call.returned']
+});
+const foreign = 'PRIVATE_PATH_/Users/foreign/TOKEN%\n::error::not-a-command';
+const refusedPhases = [
+	'TIS_TEST_PHASE {',
+	'TIS_TEST_PHASE null',
+	'TIS_TEST_PHASE []',
+	phaseLine(foreign),
+	phaseLine('select.call.entered', 0),
+	phaseLine('select.call.entered', 130),
+	phaseLine('select.call.entered', 1.5),
+	phaseLine('select.call.entered', '1'),
+	'TIS_TEST_PHASE ' + JSON.stringify({ version: 2, sequence: 1, phase: 'select.call.entered' }),
+	'TIS_TEST_PHASE ' +
+		JSON.stringify({ version: 1, sequence: 1, phase: 'select.call.entered', secret: foreign }),
+	'TIS_TEST_PHASE {"version":1,"sequence":1,"sequence":2,"phase":"select.call.entered"}',
+	'TIS_TEST_PHASE {"version":1,"sequence":1,"phase":true}',
+	'TIS_TEST_PHASE {"ver\\u0073ion":1,"sequence":1,"phase":"select.call.entered"}',
+	'TIS_TEST_PHASE ' + ' '.repeat(257) + '{}'
+].join('\n');
+assert.deepEqual(keyboardPhases(refusedPhases.split('\n')), {
+	accepted: 0,
+	refused: 14,
+	count_saturated: false,
+	last: []
+});
+for (const [text, script, tee] of [
+	[failed, 0, 0],
+	[passed, 42, 0],
+	[passed, 0, 17],
+	[passed, 0, 0]
+]) {
+	const original = evaluate(text, script, tee);
+	const observed = evaluate(text + '\n' + phaseTranscript + '\n' + refusedPhases, script, tee);
+	assert.equal(observed.exit_status, original.exit_status);
+	assert.equal(observed.complete, original.complete);
+	assert.deepEqual(observed.failures, original.failures);
+	assert.deepEqual(observed.completed_tests, original.completed_tests);
+	assert.deepEqual(observed.summary, original.summary);
+}
+
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-swift-evidence-'));
 try {
 	const log = path.join(root, 'native.log');
@@ -161,6 +237,47 @@ try {
 	);
 	assert.match(result.stdout, /Échec %25 native/);
 	assert.equal(JSON.parse(fs.readFileSync(json, 'utf8')).complete, false);
+
+	// Actual CLI: the old reader emitted no accessible witness for this causal
+	// incomplete-case transcript. Witnesses cannot make that case complete.
+	const incomplete = [
+		"Test Suite 'All tests' started at 2026-10-02 01:00:00.000.",
+		"Test Case '-[ErgoptiPlusTests.KeyboardSourceProbeTests testActualSelectedSourcesProveDirectPunctuationAndRejectDeadAccent]' started.",
+		phaseTranscript,
+		refusedPhases
+	].join('\n');
+	fs.writeFileSync(log, incomplete);
+	result = spawnSync(process.execPath, [owner, log, '0', '0', json], { encoding: 'utf8' });
+	assert.equal(result.status, 1);
+	assert.match(result.stdout, /XCTest case did not complete: .*testActualSelectedSources/);
+	assert.match(result.stdout, /complete successful suite summary and every test-case receipt/);
+	const notices = result.stdout.split('\n').filter((line) => line.startsWith('::notice '));
+	assert.equal(
+		notices.length,
+		1,
+		'one accessible failure annotation survives error annotation limits'
+	);
+	assert.ok(notices[0].length < 512, 'visible evidence stays bounded');
+	assert.match(notices[0], /cause remains unqualified/);
+	assert.match(notices[0], /accepted=4; refused=14/);
+	assert.match(
+		notices[0],
+		/last=select.before.observe.completed, select.call.entered, select.call.returned$/
+	);
+	assert.doesNotMatch(notices[0], /PRIVATE_PATH|TOKEN|Users|::error|%0A|%0D/);
+	assert.deepEqual(
+		JSON.parse(fs.readFileSync(json, 'utf8')).keyboard_phase_witnesses,
+		keyboardPhases((phaseTranscript + '\n' + refusedPhases).split('\n'))
+	);
+	fs.writeFileSync(log, incomplete.slice(0, incomplete.indexOf('TIS_TEST_PHASE')));
+	result = spawnSync(process.execPath, [owner, log, '42', '17', json], { encoding: 'utf8' });
+	assert.equal(result.status, 42);
+	assert.match(result.stdout, /accepted=0; refused=0; countSaturated=false; last=unobserved/);
+	fs.writeFileSync(log, passed + '\n' + phaseTranscript + '\n' + refusedPhases);
+	result = spawnSync(process.execPath, [owner, log, '0', '0', json], { encoding: 'utf8' });
+	assert.equal(result.status, 0);
+	assert.doesNotMatch(result.stdout, /::notice|::error|PRIVATE_PATH|TOKEN/);
+
 	result = spawnSync(process.execPath, [owner, path.join(root, 'missing.log'), '42', '0', json], {
 		encoding: 'utf8'
 	});

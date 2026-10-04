@@ -119,6 +119,10 @@ expectations without crediting another press. Original sink and aggregate
 preimages fail; a disabled path-confinement guard fails its independent control.
 This prerequisite does not implement matched delivery or activate the runtime.
 
+The registered diagnostic composition passes 230 portable Python cases, with
+one native AppKit calibration skipped on Linux (231 discovered tests). This
+includes both real SQLite persistence/confinement cases after source formatting.
+
 The retained interval prerequisite passes all 11 focused context cases; its
 preimage passes the original four and fails the seven new cases. Any forbidden
 observation between inclusive original HID endpoints cancels the whole duration.
@@ -132,7 +136,9 @@ TODO13/35 closure reuses inspected native receipts:
 - Run37081066757 at `c47624171d2594785f1590a7f0fd7a6e460810fa` passed actual
   signed helper registration, wrong-inode refusal, unregistration and idempotence.
   Its guardian ownership and receipt-judge sources match the current feature.
-- The entire launcher matches `38e4ec1c410f2ac3a076b1f71bcbf74a96d03320`;
+- The production launcher sources match
+  `38e4ec1c410f2ac3a076b1f71bcbf74a96d03320`; keyboard-test diagnostics are
+  subsequently extended without changing their original assertions.
   run37220040009 passed native Swift tests and macOS packaging. That run's
   clean/Karabiner AppleEvent failures remain blocking under TODO40.
 - Windows F2 touchpad ownership paths match `6275cac35`, qualified in the complete
@@ -192,6 +198,18 @@ owns no current lock. Its already-running manual CI was left to completion.
 
 Group4's released shared Core provisioning correction is reused byte-for-byte;
 stock Lua5.4 receives lua-luv without changes to assertions or release policy.
+
+The native keyboard diagnostic slice emits bounded closed phase witnesses
+before initial capture/inventory/property calls and before diagnostic Carbon
+reads or instrumented native calls. The reader publishes one failure-only
+notice retaining the last three allowlisted phases. Original full receipts,
+assertions, restoration, strict XCTest completion and pipeline statuses stay
+mandatory. Its actual CLI preimage control keeps exit1 in both versions and
+proves missing/present accessible evidence. Pure Swift ordering/framing/privacy
+controls are registered but require native macOS execution. The final frozen
+source passes formatter and all 356 JS checks; native Swift is explicitly
+deferred on Linux. Independent final five-file review found no blocking issue.
+This diagnostic evidence cannot identify a cause or qualify completion by itself.
 
 ## Coordination and setup
 

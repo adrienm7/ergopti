@@ -39,6 +39,103 @@ function exitStatus(value) {
 	return Number(value);
 }
 
+// Independent closed vocabulary. Native identities/properties are deliberately
+// absent: a phase is an observation boundary, never a diagnosis or completion.
+const observationPhases = [
+	'original.capture',
+	'target.inventory',
+	'body.before',
+	'body.after',
+	'translation.snapshot',
+	'event.before',
+	'event.after',
+	'probe.before',
+	'probe.after',
+	'probe.snapshot',
+	'probe.refused.invalidArguments',
+	'probe.refused.sourceChanged',
+	'probe.refused.unavailableLayout',
+	'probe.refused.translationFailed',
+	'probe.refused.invalidUnicode',
+	'probe.refused.unclassified',
+	...['enable', 'disable', 'select', 'restore.inner', 'restore.outer'].flatMap((phase) => [
+		phase + '.before',
+		phase + '.after'
+	])
+];
+const witnessPhases = new Set([
+	...observationPhases.flatMap((phase) => [
+		phase + '.observe.entered',
+		phase + '.observe.completed'
+	]),
+	...[
+		'enable',
+		'disable',
+		'select',
+		'restore.inner',
+		'restore.outer',
+		'probe',
+		'original.capture',
+		'target.list',
+		'target.enabledProperty'
+	].flatMap((phase) => [phase + '.call.entered', phase + '.call.returned']),
+	'probe.call.refused',
+	'probe.terminalID.returned',
+	'unclassified',
+	'overflow'
+]);
+
+/** Retains three closed scalar witnesses, never arbitrary native JSON/text. */
+function keyboardPhases(lines) {
+	const result = { accepted: 0, refused: 0, count_saturated: false, last: [] };
+	const count = (key) => {
+		if (result[key] < 1_000_000) result[key]++;
+		else result.count_saturated = true;
+	};
+	for (const line of lines) {
+		if (!line.startsWith('TIS_TEST_PHASE ')) continue;
+		const payload = line.slice('TIS_TEST_PHASE '.length);
+		let record;
+		try {
+			if (Buffer.byteLength(payload, 'utf8') > 256) throw new Error('bounded');
+			record = JSON.parse(payload);
+			if (
+				!record ||
+				Array.isArray(record) ||
+				typeof record !== 'object' ||
+				Object.keys(record).sort().join(',') !== 'phase,sequence,version' ||
+				['phase', 'sequence', 'version'].some(
+					(key) => (payload.match(new RegExp('"' + key + '"\\s*:', 'g')) || []).length !== 1
+				) ||
+				record.version !== 1 ||
+				!Number.isInteger(record.sequence) ||
+				record.sequence < 1 ||
+				record.sequence > 129 ||
+				typeof record.phase !== 'string' ||
+				!witnessPhases.has(record.phase)
+			)
+				throw new Error('closed');
+		} catch {
+			count('refused');
+			continue;
+		}
+		count('accepted');
+		result.last.push(record.phase);
+		if (result.last.length > 3) result.last.shift();
+	}
+	return result;
+}
+
+/** One accessible failure-only notice; every displayed value is allowlisted. */
+function phaseAnnotation(evidence) {
+	const message =
+		'Keyboard diagnostic boundaries observed; cause remains unqualified. ' +
+		`accepted=${evidence.accepted}; refused=${evidence.refused}; ` +
+		`countSaturated=${evidence.count_saturated}; last=` +
+		(evidence.last.length ? evidence.last.join(', ') : 'unobserved');
+	return '::notice title=Native keyboard phase witness::' + escapeData(message);
+}
+
 /** Judges the serial, unfiltered XCTest transcript independently of process zero. */
 function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dirname, '../..')) {
 	const script = exitStatus(scriptStatus);
@@ -126,6 +223,7 @@ function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dir
 		summary: rootSummary,
 		completed_tests: completed,
 		failures,
+		keyboard_phase_witnesses: keyboardPhases(lines),
 		exit_status: script || tee || (failures.length ? 1 : 0)
 	};
 }
@@ -142,6 +240,7 @@ function main(args = process.argv.slice(2), log = console.log) {
 		const result = evaluate(fs.readFileSync(args[0], 'utf8'), script, tee);
 		fs.writeFileSync(args[3], JSON.stringify(result, null, '\t') + '\n');
 		for (const failure of result.failures) log(annotation(failure));
+		if (result.exit_status !== 0) log(phaseAnnotation(result.keyboard_phase_witnesses));
 		log(
 			`[Swift XCTest] ${result.completed_tests.length} completed test(s); script=${script}; capture=${tee}; verdict=${result.exit_status}.`
 		);
@@ -152,5 +251,5 @@ function main(args = process.argv.slice(2), log = console.log) {
 	}
 }
 
-module.exports = { annotation, cleanTranscript, evaluate, main };
+module.exports = { annotation, cleanTranscript, evaluate, keyboardPhases, phaseAnnotation, main };
 if (require.main === module) process.exitCode = main();

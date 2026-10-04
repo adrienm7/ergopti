@@ -18,7 +18,10 @@ final class KeyboardCharacterMappingTests: XCTestCase {
 			"The layout-switching probe is restricted to disposable CI hosts")
 		let diagnostics = KeyboardSourceTestDiagnostics(name)
 		defer { diagnostics.emit() }
-		let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+		diagnostics.witness("original.capture.call.entered")
+		let captured = TISCopyCurrentKeyboardInputSource()
+		diagnostics.witness("original.capture.call.returned")
+		let original = captured!.takeRetainedValue()
 		diagnostics.record("original.capture", original: original)
 		defer {
 			let status = diagnostics.nativeCall("restore.outer", original: original) { TISSelectInputSource(original) }
@@ -30,9 +33,15 @@ final class KeyboardCharacterMappingTests: XCTestCase {
 			("com.apple.keylayout.French", "q", "Q"),
 		] {
 			let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
-			let inputs = TISCreateInputSourceList(filter, true).takeRetainedValue() as! [TISInputSource]
+			diagnostics.witness("target.list.call.entered")
+			let inventory = TISCreateInputSourceList(filter, true)
+			diagnostics.witness("target.list.call.returned")
+			let inputs = inventory!.takeRetainedValue() as! [TISInputSource]
 			let input = try XCTUnwrap(inputs.first, "Missing fixture layout: \(identifier)")
-			let enabledPointer = try XCTUnwrap(TISGetInputSourceProperty(input, kTISPropertyInputSourceIsEnabled))
+			diagnostics.witness("target.enabledProperty.call.entered")
+			let enabledProperty = TISGetInputSourceProperty(input, kTISPropertyInputSourceIsEnabled)
+			diagnostics.witness("target.enabledProperty.call.returned")
+			let enabledPointer = try XCTUnwrap(enabledProperty)
 			let wasEnabled = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(enabledPointer).takeUnretainedValue())
 			diagnostics.record("target.inventory", original: original, target: input)
 			if !wasEnabled {
