@@ -1060,7 +1060,6 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	if !Parsed["ok"]
 		return _LLM_Menu_ReportApiEntriesLoadFailure(Parsed["reason"], ReportFn)
 	entries := Parsed["entries"]
-	_LLM_Menu["api_entries"] := entries
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.
@@ -1078,7 +1077,16 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	}
 	if (active == "" and entries.Length > 0)
 		active := entries[1]["Id"]
-	_LLM_Menu["api_entry_id"] := active
+	; Parsing and anchoring precede this bounded native authority publication.
+	; Equal reload remains semantically current for existing general receipts;
+	; only a final transaction claim pins this narrow publication revision.
+	global _LLM_Menu_ApiPrivateAuthorityGeneration
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_Menu["api_entries"] := entries
+		_LLM_Menu["api_entry_id"] := active
+		_LLM_Menu_ApiPrivateAuthorityGeneration += 1
+	} finally Critical(PreviousCritical)
 	return true
 }
 
@@ -1216,4 +1224,686 @@ _LLM_MenuJoin(arr, sep) {
 
 _LLM_MenuApiJsonEscape(s) {
 	return JsonStringContents(s)
+}
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 5/ Private Local Server Authority =======
+; =================================================
+; =================================================
+
+global _LLM_Menu_ApiPrivateAuthorityGeneration := 0
+
+; Lifecycle registers OnExit before this include's auto-execute initialization.
+; Lazy private state cannot be re-zeroed by a later top-level assignment.
+_LLM_Menu_ApiPrivateLifecycleState() {
+	static State := Map("generation", 0, "attempt", 0)
+	return State
+}
+
+/** @returns {Integer} Exact positive attempt; beginning also revokes old receipts. */
+LLM_Menu_ApiPrivateBeginShutdown() {
+	PreviousCritical := Critical("On")
+	try {
+		State := _LLM_Menu_ApiPrivateLifecycleState()
+		State["generation"] += 1
+		State["attempt"] := State["generation"]
+		return State["attempt"]
+	} finally Critical(PreviousCritical)
+}
+
+/** @returns {Boolean} True only for the exact active attempt canceled by a veto. */
+LLM_Menu_ApiPrivateRefuseShutdown(ExactAttempt) {
+	PreviousCritical := Critical("On")
+	try {
+		State := _LLM_Menu_ApiPrivateLifecycleState()
+		if !(ExactAttempt is Integer) || ExactAttempt <= 0 || State["attempt"] != ExactAttempt
+			return false
+		State["generation"] += 1
+		State["attempt"] := 0
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+; Opaque receipts carry no source bytes or credentials into shared discoveries.
+; Pointer-indexed storage does not retain the receipt itself; dropping the last
+; native view releases its private snapshots rather than retaining every sweep.
+_LLM_Menu_ApiPrivateSourceReceipts() {
+	static Receipts := Map()
+	return Receipts
+}
+
+/** Opaque native authority token; its private record is released with its last owner. */
+class LLM_Menu_ApiPrivateSourceReceipt {
+	__Delete() {
+		Receipts := _LLM_Menu_ApiPrivateSourceReceipts()
+		if Receipts.Has(ObjPtr(this))
+			Receipts.Delete(ObjPtr(this))
+	}
+}
+
+/** Private durable-candidate token; ordinary source receipts never inherit its authority. */
+class LLM_Menu_ApiPrivateCandidateReceipt {
+	__Delete() {
+		Receipts := _LLM_Menu_ApiPrivateSourceReceipts()
+		if Receipts.Has(ObjPtr(this))
+			Receipts.Delete(ObjPtr(this))
+	}
+}
+
+/**
+ * Retains both exact private files and their effective native API authority.
+ * @param {Map} Options Optional existing native I/O and transaction test seams.
+ */
+class LLM_Menu_ApiPrivateSourceOwner {
+	__New(Options := unset) {
+		if IsSet(Options) && !(Options is Map)
+			throw TypeError("Private API ownership requires a native options Map.")
+		this.Options := IsSet(Options) ? Options.Clone() : Map()
+		this.Port := _ConfigTransitionRuntimePort(this.Options.Get("port", 0))
+		this.Bundle := 0
+		this.BoundReceipt := 0
+		this.Writing := false
+	}
+
+	/** Returns native ports without exporting private snapshots through the receipt. */
+	Ports() {
+		return Map("capture_source", ObjBindMethod(this, "Capture"),
+			"source_current", ObjBindMethod(this, "Current"),
+			"entry", ObjBindMethod(this, "Entry"),
+			"admit", ObjBindMethod(this, "Admit"),
+			"apply", ObjBindMethod(this, "Apply"))
+	}
+
+	/** Refuses paused, incomplete, transitioning and foreign-owned configuration. */
+	Admit() {
+		PreviousCritical := Critical("Off")
+		try return this._AdmitNonCritical()
+		finally Critical(PreviousCritical)
+	}
+
+	_AdmitNonCritical() {
+		global _LLM_Menu_Loaded, _LifecycleLatestTransition
+		if A_IsSuspended || !ConfigFullStateCanPersist()
+				|| !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
+				|| ReloadTerminalHandoffActive()
+				|| _LLM_Menu_ApiPrivateLifecycleState()["attempt"] != 0
+			return false
+		if IsSet(_LifecycleLatestTransition) && (_LifecycleLatestTransition is Object)
+				&& !_LifecycleLatestTransition.finished
+			return false
+		if !_ConfigWriteTerminalIsActive()
+			return !ConfigWriteLeaseBusy()
+		global ConfigurationFile
+		return (this.Bundle is Object)
+			&& _ConfigWriteLeaseState().terminal == this.Bundle
+			&& (_ConfigWriteLeaseSelectOwner(this.Bundle, ConfigurationFile) is Object)
+			&& (_ConfigWriteLeaseSelectOwner(this.Bundle, _LLM_Menu_ApiEntriesPath()) is Object)
+	}
+
+	/** Mints authority only after decoded disk entries agree with ordered native RAM. */
+	Capture() {
+		PreviousCritical := Critical("Off")
+		try return this._CaptureNonCritical()
+		finally Critical(PreviousCritical)
+	}
+
+	_CaptureNonCritical() {
+		global ConfigurationFile, _PathsFile, Features, _LLM_Menu
+		global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS, LLM_Defaults
+		if !this.Admit() || !IsSet(Features) || !(Features is Map)
+				|| !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+				|| !IsSet(LLM_Defaults) || !(LLM_Defaults is Map)
+				|| !IsSet(LLM_API_PROVIDERS) || !(LLM_API_PROVIDERS is Map)
+				|| !IsSet(LLM_LOCAL_API_SERVERS) || !(LLM_LOCAL_API_SERVERS is Map)
+				|| !IsSet(_PathsFile) || !(_PathsFile is String) || _PathsFile == ""
+				|| !IsSet(ConfigurationFile) || !(ConfigurationFile is String) || ConfigurationFile == ""
+			return false
+		if !(_LLM_Menu.Get("api_entries", 0) is Array)
+				|| !(_LLM_Menu.Get("backend", 0) is String)
+				|| !(_LLM_Menu.Get("api_entry_id", 0) is String)
+				|| !LLM_Defaults.Has("llm_backend")
+			return false
+		Lifecycle := _LLM_Menu_ApiPrivateLifecycleState()
+		Held := Map("owner", this, "lifecycle", Lifecycle, "lifecycle_generation", Lifecycle["generation"],
+			"features", Features, "menu", _LLM_Menu,
+			"config_path", ConfigurationFile, "api_path", _LLM_Menu_ApiEntriesPath(),
+			"locator", _PathsFile, "providers", LLM_API_PROVIDERS,
+			"servers", LLM_LOCAL_API_SERVERS, "defaults", LLM_Defaults,
+			"default_backend", LLM_Defaults["llm_backend"],
+			"backend", _LLM_Menu["backend"], "active_id", _LLM_Menu["api_entry_id"],
+			"entries", LLM_Menu_DeepClone(_LLM_Menu["api_entries"]))
+		if !this._NativeCurrent(Held)
+			return false
+		try {
+			ConfigImage := this._Snapshot(Held["config_path"])
+			if !(ConfigImage is Map) || !this._NativeCurrent(Held)
+				return false
+			ApiImage := this._Snapshot(Held["api_path"])
+			if !(ApiImage is Map) || !this._NativeCurrent(Held)
+				return false
+			if ApiImage["present"] {
+				if !_LLM_Menu_ApiSourceOwned(ApiImage["content"])
+					return false
+				Parsed := _LLM_Menu_ParseAndValidateApiEntries(ApiImage["content"],
+					Held["providers"], this.Options.Get("decrypt", 0))
+				if !Parsed["ok"] || !this._EntriesEqual(Parsed["entries"], Held["entries"])
+					return false
+			} else if Held["entries"].Length
+				return false
+			if !this._ConfigAuthorityMatches(ConfigImage, Held)
+				return false
+			Held["config"] := ConfigImage
+			Held["api"] := ApiImage
+			if !this._ImagesCurrent(Held)
+				return false
+		} catch {
+			; Decoder and native I/O errors can contain private input. Refuse without
+			; forwarding their messages to diagnostics or a shared discovery result.
+			try LoggerWarn("LLM", "Private API source acquisition was refused.")
+			return false
+		}
+		Receipt := LLM_Menu_ApiPrivateSourceReceipt()
+		_LLM_Menu_ApiPrivateSourceReceipts()[ObjPtr(Receipt)] := Held
+		return Receipt
+	}
+
+	/** Rechecks exact files and complete relevant RAM without trusting a fresh disk hash. */
+	Current(Receipt) {
+		PreviousCritical := Critical("Off")
+		try return this._CurrentNonCritical(Receipt)
+		finally Critical(PreviousCritical)
+	}
+
+	_CurrentNonCritical(Receipt) {
+		Held := this._Held(Receipt)
+		if !(Held is Map)
+			return false
+		try return this._ImagesCurrent(Held)
+		catch {
+			try LoggerWarn("LLM", "Private API source revalidation was refused.")
+			return false
+		}
+	}
+
+	/** Returns detached active-first matching authority; false means proved absence. */
+	Entry(ProviderId) {
+		PreviousCritical := Critical("Off")
+		try return this._EntryNonCritical(ProviderId)
+		finally Critical(PreviousCritical)
+	}
+
+	_EntryNonCritical(ProviderId) {
+		Receipt := this.Capture()
+		if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+			throw Error("The private API source authority is unavailable.")
+		Held := this._Held(Receipt)
+		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+			throw ValueError("The requested local server is outside the native catalogue.")
+		Entry := this._EntryFrom(Held, ProviderId)
+		if !this.Current(Receipt)
+			throw Error("The private API source authority changed during resolution.")
+		return Entry is Map ? LLM_Menu_DeepClone(Entry) : false
+	}
+
+	/** Applies exact configured fields through the existing joint WAL and native lifecycle. */
+	Apply(ProviderId, Fields, Receipt, AdmissionFn, SelectModel) {
+		PreviousCritical := Critical("Off")
+		try return this._ApplyNonCritical(ProviderId, Fields, Receipt, AdmissionFn, SelectModel)
+		finally Critical(PreviousCritical)
+	}
+
+	_ApplyNonCritical(ProviderId, Fields, Receipt, AdmissionFn, SelectModel) {
+		if this.Writing || !(Fields is Map) || !HasMethod(AdmissionFn, "Call")
+				|| !((SelectModel is Integer) && (SelectModel == 0 || SelectModel == 1))
+				|| !this.Current(Receipt)
+			return false
+		Held := this._Held(Receipt)
+		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+			return false
+		for Key in ["base_url", "token", "model"] {
+			if !Fields.Has(Key) || !(Fields[Key] is String)
+					|| !_LLMRemote_ConfigScalarIsSafe(Fields[Key])
+				return false
+		}
+		if Fields.Count != 3 || Trim(Fields["model"]) == ""
+				|| !RegExMatch(Fields["base_url"], "i)^https?://[^[:space:]]+$")
+				|| !LocalServerAuthTokenAllowed(ProviderId, Fields["token"], Held["servers"])
+			return false
+		OldEntry := this._EntryFrom(Held, ProviderId)
+		if !SelectModel && (!(OldEntry is Map) || !(Fields["model"] == OldEntry["Model"]))
+			return false
+		EditId := OldEntry is Map ? OldEntry["Id"] : ""
+		NewEntry := OldEntry is Map ? LLM_Menu_DeepClone(OldEntry)
+			: Map("Id", _LLM_Menu_NewApiId(), "Name", ProviderId . "/" . Fields["model"],
+				"Provider", ProviderId, "BaseUrl", "", "Token", "", "Model", "")
+		NewEntry["BaseUrl"] := Fields["base_url"]
+		NewEntry["Token"] := Fields["token"]
+		NewEntry["Model"] := Fields["model"]
+		this.Writing := true
+		try {
+			Committed := LLM_Menu_CommitApiEntriesMutation("the local AI server selection",
+				(Candidate) => this._Mutate(Candidate, NewEntry, EditId, SelectModel),
+				this.Options.Get("apply", _LLM_Menu_ApplyApiEntriesCommitted), this.Port,
+				this.Options.Get("notify", 0), this.Options.Get("acquire", 0),
+				this.Options.Get("settle", 0), this.Options.Get("collect", 0),
+				this.Options.Get("build_config", 0), this.Options.Get("serialize", 0),
+				this.Options.Get("pause", 0), Receipt, this, AdmissionFn)
+			if !((Committed is Integer) && Committed == 1)
+				return false
+			Acknowledged := this.Capture()
+			if !(Acknowledged is LLM_Menu_ApiPrivateSourceReceipt)
+				return false
+			Published := this._Held(Acknowledged)
+			Actual := this._EntryFrom(Published, ProviderId)
+			if !(Actual is Map) || !this._EntriesEqual([Actual], [NewEntry])
+					|| (SelectModel && (Published["backend"] != "api" || Published["active_id"] != NewEntry["Id"]))
+					|| !this.Current(Acknowledged)
+				return false
+			return Map("saved", true, "entry_id", NewEntry["Id"], "selected", SelectModel == 1)
+		} finally this.Writing := false
+	}
+
+	/** Binds only the exact acquired terminal bundle; foreign barriers remain refused. */
+	BindBundle(Receipt, Bundle) {
+		Held := this._Held(Receipt)
+		if !(Held is Map) || (this.Bundle is Object) || !(Bundle is Object)
+				|| _ConfigWriteLeaseState().terminal != Bundle
+				|| !(_ConfigWriteLeaseSelectOwner(Bundle, Held["config_path"]) is Object)
+				|| !(_ConfigWriteLeaseSelectOwner(Bundle, Held["api_path"]) is Object)
+			return false
+		this.Bundle := Bundle
+		this.BoundReceipt := Receipt
+		return true
+	}
+
+	/** Releases permission to bypass only this owner's admitted terminal lease. */
+	UnbindBundle(Bundle) {
+		if this.Bundle == Bundle {
+			this.Bundle := 0
+			this.BoundReceipt := 0
+		}
+	}
+
+	/** Returns detached original expected images; receipt validation owns their provenance. */
+	Expected(Receipt) {
+		Held := this._Held(Receipt)
+		if !(Held is Map) || !this.Current(Receipt)
+			return false
+		return Map("config", Map("present", Held["config"]["present"], "hash", Held["config"]["hash"]),
+			"api", Map("present", Held["api"]["present"], "hash", Held["api"]["hash"]))
+	}
+
+	/**
+	 * Captures only this transaction's exact durable-new files and retained old RAM.
+	 * @param {Object} Receipt Original opaque source receipt.
+	 * @param {Object} Bundle Exact admitted joint transaction bundle.
+	 * @param {String} ConfigContent Acknowledged candidate configuration image.
+	 * @param {String} ApiContent Acknowledged candidate API image.
+	 * @returns {Object|Integer} Distinct private capability, or false on drift.
+	 */
+	CaptureCandidate(Receipt, Bundle, ConfigContent, ApiContent) {
+		PreviousCritical := Critical("Off")
+		try return this._CaptureCandidateNonCritical(Receipt, Bundle, ConfigContent, ApiContent)
+		finally Critical(PreviousCritical)
+	}
+
+	_CaptureCandidateNonCritical(Receipt, Bundle, ConfigContent, ApiContent) {
+		Held := this._Held(Receipt)
+		if !(Held is Map) || this.BoundReceipt != Receipt || this.Bundle != Bundle || !(Bundle is Object)
+				|| !this._NativeCurrent(Held)
+			return false
+		try {
+			ConfigExpected := ConfigTransitionExpectedOld(1, ConfigContent, this.Port)
+			ApiExpected := ConfigTransitionExpectedOld(1, ApiContent, this.Port)
+			if !(ConfigExpected is Map) || !(ApiExpected is Map)
+					|| !this._NativeCurrent(Held)
+				return false
+			Candidate := Map("owner", this, "source", Receipt, "bundle", Bundle,
+				"config", ConfigExpected, "api", ApiExpected)
+			if !this._ImagesCurrent(Held, Candidate)
+				return false
+		} catch {
+			try LoggerWarn("LLM", "Private durable API candidate validation was refused.")
+			return false
+		}
+		Capability := LLM_Menu_ApiPrivateCandidateReceipt()
+		_LLM_Menu_ApiPrivateSourceReceipts()[ObjPtr(Capability)] := Candidate
+		return Capability
+	}
+
+	/** Revalidates a distinct transaction capability without granting old source authority. */
+	CandidateCurrent(Capability) {
+		PreviousCritical := Critical("Off")
+		try return this._CandidateCurrentNonCritical(Capability)
+		finally Critical(PreviousCritical)
+	}
+
+	_CandidateCurrentNonCritical(Capability) {
+		if !(Capability is LLM_Menu_ApiPrivateCandidateReceipt)
+			return false
+		Candidate := _LLM_Menu_ApiPrivateSourceReceipts().Get(ObjPtr(Capability), 0)
+		if !(Candidate is Map) || Candidate["owner"] != this || this.Bundle != Candidate["bundle"]
+				|| this.BoundReceipt != Candidate["source"]
+			return false
+		Held := this._Held(Candidate["source"])
+		if !(Held is Map)
+			return false
+		try return this._ImagesCurrent(Held, Candidate)
+		catch {
+			try LoggerWarn("LLM", "Private durable API candidate revalidation was refused.")
+			return false
+		}
+	}
+
+	/** Validates the originating logical view with a distinct durable-candidate contract. */
+	CandidateAdmitted(Capability, AdmissionFn) {
+		PreviousCritical := Critical("Off")
+		try return this._CandidateAdmittedNonCritical(Capability, AdmissionFn)
+		finally Critical(PreviousCritical)
+	}
+
+	_CandidateAdmittedNonCritical(Capability, AdmissionFn) {
+		if !HasMethod(AdmissionFn, "Call") || !this.CandidateCurrent(Capability)
+			return false
+		try Admitted := AdmissionFn.Call("committed", Capability)
+		catch {
+			try LoggerWarn("LLM", "Private durable API view admission was refused.")
+			return false
+		}
+		return (Admitted is Integer) && Admitted == 1 && this.CandidateCurrent(Capability)
+	}
+
+	/** Publishes after all I/O/scans, then claims only bounded native owner state. */
+	PublishCandidate(CandidateFeatures, CandidateMenu, Capability, AdmissionFn) {
+		PreviousCritical := Critical("Off")
+		try return this._PublishCandidateNonCritical(CandidateFeatures, CandidateMenu, Capability, AdmissionFn)
+		finally Critical(PreviousCritical)
+	}
+
+	_PublishCandidateNonCritical(CandidateFeatures, CandidateMenu, Capability, AdmissionFn) {
+		global Features, _LLM_Menu, _LLM_Menu_ApiPrivateAuthorityGeneration
+		if !(CandidateFeatures is Map) || !(CandidateMenu is Map)
+				|| !(Capability is LLM_Menu_ApiPrivateCandidateReceipt)
+			return false
+		Candidate := _LLM_Menu_ApiPrivateSourceReceipts().Get(ObjPtr(Capability), 0)
+		if !(Candidate is Map) || Candidate["owner"] != this
+				|| !(Candidate["bundle"] is Object) || this.Bundle != Candidate["bundle"]
+				|| this.BoundReceipt != Candidate["source"]
+			return false
+		Held := this._Held(Candidate["source"])
+		if !(Held is Map)
+			return false
+		; Capture BEFORE all final semantic/admission/file validation. Never pin a
+		; fresh native revision after an earlier source or model proof.
+		Stamp := this._CaptureNativeClaim(Held, Candidate)
+		; This private mutation owns API fields only. Establish unchanged picker
+		; selections outside Critical; the ordinary publisher's no-change branch
+		; has exactly the two native Map assignments performed below.
+		if !(Stamp is Map) || !AppPicker_SelectionsEqual(Held["menu"].Get("disabled_apps", []),
+				CandidateMenu.Get("disabled_apps", []))
+				|| !this.CandidateAdmitted(Capability, AdmissionFn)
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if !this._NativeClaimCurrent(Stamp)
+				return false
+			; Native composition supplies a pure bounded claim: no I/O, paths,
+			; logging, model scans or effects, preserving inherited Critical.
+			try Claimed := AdmissionFn.Call("claim", Capability)
+			catch
+				return false
+			if !((Claimed is Integer) && Claimed == 1) || !this._NativeClaimCurrent(Stamp)
+				return false
+			Features := CandidateFeatures
+			_LLM_Menu := CandidateMenu
+			_LLM_Menu_ApiPrivateAuthorityGeneration += 1
+			return true
+		} finally Critical(PreviousCritical)
+	}
+
+	; Capture BEFORE complete validation. Never stamp a new publication revision
+	; onto an earlier semantic scan. Real writers publish detached owners; loading
+	; publishes a fresh array/id with the revision. General receipts still inspect
+	; all six fields and refuse arbitrary in-place semantic changes.
+	_CaptureNativeClaim(Held, Candidate) {
+		global Features, _LLM_Menu, _LLM_Menu_ApiPrivateAuthorityGeneration
+		global _LifecycleLatestTransition, _ReloadTerminalHandoff
+		global _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+		Llm := Features.Get("llm", 0), Models := Llm is Map ? Llm.Get("models", 0) : 0
+		if !(Llm is Map) || !(Models is Map)
+			return false
+		LeaseState := _ConfigWriteLeaseState()
+		ConfigToken := _ConfigWriteLeaseSelectOwner(Candidate["bundle"], Held["config_path"])
+		ApiToken := _ConfigWriteLeaseSelectOwner(Candidate["bundle"], Held["api_path"])
+		LocatorToken := _ConfigWriteLeaseSelectOwner(Candidate["bundle"], Held["locator"])
+		if !(ConfigToken is Object) || !(ApiToken is Object) || !(LocatorToken is Object)
+			return false
+		Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Held["config_path"])
+		Stamp := Map("generation", _LLM_Menu_ApiPrivateAuthorityGeneration,
+			"lifecycle", Held["lifecycle"], "lifecycle_generation", Held["lifecycle_generation"],
+			"held", Held, "source", Candidate["source"], "bundle", Candidate["bundle"],
+			"llm", Llm, "models", Models, "entries", _LLM_Menu.Get("api_entries", 0),
+			"disabled_apps", _LLM_Menu.Get("disabled_apps", 0),
+			"lease_state", LeaseState, "lease_owners", LeaseState.owners,
+			"config_token", ConfigToken, "api_token", ApiToken, "locator_token", LocatorToken,
+			"refusals", Refusals, "refusal_key", RefusalKey,
+			"transition", _LifecycleLatestTransition, "handoff", _ReloadTerminalHandoff)
+		; Logging/path helpers and ordered semantic scans are allowed only here,
+		; before the final Critical. Native claim then rechecks this exact stamp.
+		if !this._NativeCurrent(Held) || !this._NativeClaimCurrent(Stamp)
+			return false
+		return Stamp
+	}
+
+	; Pure, fixed-size native comparisons. No filesystem, path helpers, logging,
+	; acquisition, ordered collections or callback execution belongs here.
+	_NativeClaimCurrent(Stamp) {
+		global ConfigurationFile, _PathsFile, Features, _LLM_Menu
+		global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS, LLM_Defaults, _LLM_Menu_Loaded
+		global _LLM_Menu_ApiPrivateAuthorityGeneration, _LifecycleLatestTransition
+		global _ReloadTerminalHandoff
+		global _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+		Held := Stamp["held"], State := Stamp["lease_state"]
+		Transition := Stamp["transition"], Handoff := Stamp["handoff"]
+		return !A_IsSuspended && _LLM_Menu_Loaded && !_ConfigBootReadFailed && !_ConfigBootRejectedOverrides
+			&& Stamp["lifecycle"]["attempt"] == 0
+			&& Stamp["lifecycle"]["generation"] == Stamp["lifecycle_generation"]
+			&& _LifecycleLatestTransition == Transition
+			&& (!(Transition is Object) || Transition.finished)
+			&& _ReloadTerminalHandoff == Handoff && (!(Handoff is Map) || Handoff["state"] == "cancel_failed")
+			&& Stamp["refusals"].Get(Stamp["refusal_key"], "") == ""
+			&& _LLM_Menu_ApiPrivateAuthorityGeneration == Stamp["generation"]
+			&& this.Bundle == Stamp["bundle"] && this.BoundReceipt == Stamp["source"]
+			&& State.terminal == Stamp["bundle"] && State.owners == Stamp["lease_owners"]
+			&& State.owners.Get(Stamp["config_token"].key, 0) == Stamp["config_token"]
+			&& State.owners.Get(Stamp["api_token"].key, 0) == Stamp["api_token"]
+			&& State.owners.Get(Stamp["locator_token"].key, 0) == Stamp["locator_token"]
+			&& Features == Held["features"] && _LLM_Menu == Held["menu"]
+			&& Features.Get("llm", 0) == Stamp["llm"] && Stamp["llm"].Get("models", 0) == Stamp["models"]
+			&& Stamp["models"].Get("selected", 0) == Held["backend"]
+			&& ConfigurationFile == Held["config_path"] && _PathsFile == Held["locator"]
+			&& LLM_API_PROVIDERS == Held["providers"] && LLM_LOCAL_API_SERVERS == Held["servers"]
+			&& LLM_Defaults == Held["defaults"] && LLM_Defaults.Get("llm_backend", 0) == Held["default_backend"]
+			&& _LLM_Menu.Get("backend", 0) == Held["backend"] && _LLM_Menu.Get("api_entry_id", 0) == Held["active_id"]
+			&& _LLM_Menu.Get("api_entries", 0) == Stamp["entries"]
+			&& _LLM_Menu.Get("disabled_apps", 0) == Stamp["disabled_apps"]
+	}
+
+	_Held(Receipt) {
+		if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+			return false
+		Held := _LLM_Menu_ApiPrivateSourceReceipts().Get(ObjPtr(Receipt), 0)
+		return (Held is Map) && Held["owner"] == this ? Held : false
+	}
+
+	_NativeCurrent(Held) {
+		global ConfigurationFile, _PathsFile, Features, _LLM_Menu
+		global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS, LLM_Defaults
+		Llm := Features.Get("llm", 0)
+		if !(Llm is Map) || !(Llm.Get("models", 0) is Map)
+				|| !(Llm["models"].Get("selected", 0) == Held["backend"])
+			return false
+		return this.Admit() && Features == Held["features"] && _LLM_Menu == Held["menu"]
+			&& ConfigurationFile == Held["config_path"] && _PathsFile == Held["locator"]
+			&& _LLM_Menu_ApiEntriesPath() == Held["api_path"]
+			&& LLM_API_PROVIDERS == Held["providers"] && LLM_LOCAL_API_SERVERS == Held["servers"]
+			&& LLM_Defaults == Held["defaults"] && LLM_Defaults.Get("llm_backend", 0) == Held["default_backend"]
+			&& _LLM_Menu.Get("backend", 0) == Held["backend"]
+			&& _LLM_Menu.Get("api_entry_id", 0) == Held["active_id"]
+			&& this._EntriesEqual(_LLM_Menu.Get("api_entries", 0), Held["entries"])
+			&& Held["lifecycle"]["attempt"] == 0
+			&& Held["lifecycle"]["generation"] == Held["lifecycle_generation"]
+	}
+
+	_Snapshot(Path) {
+		Result := _ConfigTransitionReadSnapshot(this.Port, Path)
+		return ConfigTransitionResultIs(Result, "snapshot") ? Result["snapshot"] : false
+	}
+
+	_ImagesCurrent(Held, Expected := unset) {
+		; Classified second reads fence mutations during snapshot/hash/decrypt. This
+		; is current-at-check authority; the WAL owns the final expected-image claim.
+		Images := IsSet(Expected) ? Expected : Held
+		loop 2 {
+			if !this._NativeCurrent(Held)
+				return false
+			for Key in ["config", "api"] {
+				Observed := this._Snapshot(Held[Key . "_path"])
+				if !(Observed is Map) || !this._NativeCurrent(Held)
+						|| !_ConfigTransitionSnapshotMatches(Observed, Images[Key]["present"], Images[Key]["hash"])
+					return false
+			}
+		}
+		return this._NativeCurrent(Held)
+	}
+
+	_EntriesEqual(Left, Right) {
+		if !(Left is Array) || !(Right is Array) || Left.Length != Right.Length
+				|| !_LLM_Menu_ApiEntryIdsAreUnique(Left) || !_LLM_Menu_ApiEntryIdsAreUnique(Right)
+			return false
+		for Index, Entry in Left {
+			if !_LLM_Menu_ApiEntriesFieldsOwned(Entry) || !_LLM_Menu_ApiEntriesFieldsOwned(Right[Index])
+				return false
+			for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+				if !(Entry[Field] == Right[Index][Field])
+					return false
+		}
+		return true
+	}
+
+	_ConfigAuthorityMatches(Image, Held) {
+		Document := TOML_ParseDocument(Image["content"], &Records, &Physical)
+		for Record in Physical {
+			if Record.Kind == "opaque"
+				return false
+		}
+		; The actual legacy loader uses flat case-insensitive sections. Never stamp
+		; an ignored semantic alias with a fresh hash beside stale default RAM.
+		; Only canonical physical spelling is supported by this bounded projection;
+		; config_scope remains the owner of normalization outside this AI port.
+		if !this._ConfigProjectionCanonical(Document, Records)
+			return false
+		Meta := Document.Get("_meta", Map())
+		if !(Meta is Map) || (Meta.Has("schema_version")
+				&& (!_ConfigMigrateIsVersion(Meta["schema_version"])
+				|| Meta["schema_version"] > ConfigMigrateCurrentVersion()))
+			return false
+		Llm := Document.Get("llm", Map())
+		if !(Llm is Map)
+			return false
+		Models := Llm.Get("models", Map())
+		if !(Models is Map)
+			return false
+		Backend := Models.Get("selected", Held["default_backend"])
+		if !(Backend is String) || !LLM_Option_TryNormalize("backend", Backend, &Normalized)
+				|| !(Normalized == Held["backend"])
+			return false
+		ActiveId := Llm.Get("api_entry_id", "")
+		if !(ActiveId is String) || !_LLMRemote_ConfigScalarIsSafe(ActiveId)
+			return false
+		if ActiveId != "" && _LLM_Menu_ApiEntryIdCount(Held["entries"], ActiveId) != 1
+			ActiveId := ""
+		if ActiveId == "" && Held["entries"].Length
+			ActiveId := Held["entries"][1]["Id"]
+		return ActiveId == Held["active_id"]
+	}
+
+	_ConfigProjectionCanonical(Document, Records) {
+		for Key in Document {
+			if (StrLower(Key) == "llm" && !(Key == "llm"))
+					|| (StrLower(Key) == "_meta" && !(Key == "_meta"))
+				return false
+		}
+		for Pair in [["llm", "models"], ["llm", "api_entry_id"], ["_meta", "schema_version"]] {
+			Table := Document.Get(Pair[1], Map())
+			if !(Table is Map)
+				return false
+			for Key in Table {
+				if StrLower(Key) == Pair[2] && !(Key == Pair[2])
+					return false
+			}
+		}
+		Llm := Document.Get("llm", Map())
+		Models := Llm.Get("models", Map())
+		if !(Models is Map)
+			return false
+		for Key in Models {
+			if StrLower(Key) == "selected" && !(Key == "selected")
+				return false
+		}
+		for Record in Records {
+			Path := Record.Path
+			if Path.Length == 0
+				continue
+			if Path[1] == "llm" {
+				if Path.Length == 1 && Record.Value is Map
+						&& (Record.Value.Has("models") || Record.Value.Has("api_entry_id"))
+					return false
+				if Path.Length >= 2 && Path[2] == "models" {
+					if Path.Length < 3 || (Path[3] == "selected"
+							&& (!(Record.NativeSection == "llm.models") || !(Record.NativeKey == "selected")))
+						return false
+				}
+				if Path.Length >= 2 && Path[2] == "api_entry_id"
+						&& (!(Record.NativeSection == "llm") || !(Record.NativeKey == "api_entry_id"))
+					return false
+			}
+			if Path[1] == "_meta" {
+				if Path.Length == 1 && Record.Value is Map && Record.Value.Has("schema_version")
+					return false
+				if Path.Length >= 2 && Path[2] == "schema_version"
+						&& (!(Record.NativeSection == "_meta") || !(Record.NativeKey == "schema_version"))
+					return false
+			}
+		}
+		return true
+	}
+
+	_EntryFrom(Held, ProviderId) {
+		First := false
+		for Entry in Held["entries"] {
+			if Entry["Provider"] != ProviderId
+				continue
+			if Entry["Id"] == Held["active_id"]
+				return Entry
+			if !(First is Map)
+				First := Entry
+		}
+		return First
+	}
+
+	_Mutate(Candidate, NewEntry, EditId, SelectModel) {
+		OldActive := Candidate.Get("api_entry_id", "")
+		if !_LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId)
+			return false
+		Candidate["api_entry_id"] := SelectModel ? NewEntry["Id"] : OldActive
+		if SelectModel
+			Candidate["backend"] := "api"
+		return true
+	}
 }
