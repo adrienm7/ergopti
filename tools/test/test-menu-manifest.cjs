@@ -1471,3 +1471,33 @@ checkPrivacyTriggerControls();
 		'Clone Profile: one common declaration and existing native activation/editor owners.'
 	);
 }
+
+// Optional category sources share the ordinary command and keep native opening owners.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/hotstring_file_command.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[corpus.section], [
+		{
+			type: 'command',
+			id: corpus.id,
+			i18n: corpus.i18n,
+			disabled_when: [corpus.ready]
+		}
+	]);
+	assert.equal(menu.hotstring_category_menu[corpus.position - 1].id, corpus.provider);
+	for (const file of [
+		'windows/ui/menu/menu_hotstring_switches.ahk',
+		'macos/ui/menu/menu_hotstrings.lua',
+		'linux/ui/menu/menu_builder.lua'
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		assert(
+			source.includes(`("${corpus.section}", "${corpus.id}"`),
+			`${file}: actual category opening provider consumes the declaration`
+		);
+	}
+	console.log('Category file: one shared opening command and three existing native owners.');
+}

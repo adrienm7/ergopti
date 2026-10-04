@@ -1,0 +1,9 @@
+{
+	"section": "hotstring_file_commands",
+	"id": "hotstring_file_open",
+	"i18n": "menu.hotstrings.open_file",
+	"ready": "hotstring_file_ready",
+	"provider": "hotstring_category_file",
+	"position": 3,
+	"pause_policy": "configuration remains available; no persistence or engine action"
+}

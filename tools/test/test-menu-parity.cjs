@@ -119,6 +119,8 @@ const OPENS_SUBMENU = {
 	llm_models: 'llm_model_commands',
 	// All three profile providers render the shared Create/Clone command head.
 	llm_profile: 'llm_profile_commands',
+	// Optional category-file providers return this declared opening command.
+	hotstring_category_file: 'hotstring_file_commands',
 	llm_display: 'llm_display_menu',
 	llm_trigger: 'llm_trigger_menu',
 	llm_generation_settings: 'llm_generation_menu',

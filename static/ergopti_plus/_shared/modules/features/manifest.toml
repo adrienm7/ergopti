@@ -6225,3 +6225,10 @@ type = "command"
 id = "llm_profile_clone"
 i18n = "menu.profiles.clone_builtin"
 disabled_when = ["llm_profile_clone_ready"]
+
+# Optional native file providers keep their captured source and opening owner.
+[[menu.hotstring_file_commands]]
+type = "command"
+id = "hotstring_file_open"
+i18n = "menu.hotstrings.open_file"
+disabled_when = ["hotstring_file_ready"]
