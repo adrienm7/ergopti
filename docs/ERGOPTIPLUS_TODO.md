@@ -1299,6 +1299,23 @@ These are software implementations; final hardware verification remains below.
   atomic publication or recovery from ambiguous raw-close errors is added.
   Register all three native backend runs without launching hosted CI.
 
+- [~] **L95.** Linux ProcessRunner partial allocation: capture stdout, stderr
+  and timer immediately inside the existing protected constructor block.
+  A later raised constructor previously hid one or two earlier native handles
+  from terminal cleanup. Two of four actual-handle controls fail before and all
+  pass after; nil/raised constructor receipts are explicitly simulated while
+  preceding libuv handles, foreign timer isolation, later real child output,
+  reaping and zero final handles are native. Seven registered regressions retain
+  all previous assertions, exactly one allocation-error callback and no spawn
+  or extra constructors after refusal. No OS memory-pressure, descriptor
+  exhaustion or new kill/close-refusal debt behavior is claimed. macOS's
+  hs.task and Windows's shell/native collaborators have no equivalent Linux
+  three-constructor frame by source; foreign runtime gates remain deferred.
+  The native fixture uses genuine handle ownership without recent-only libuv
+  introspection so current and verified Ubuntu 22.04 bindings are exercised;
+  stock Lua 5.4's actual native backend also passes. No caller, shared API,
+  reserved feature or hosted CI changed.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
