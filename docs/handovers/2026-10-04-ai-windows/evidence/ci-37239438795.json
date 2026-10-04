@@ -1,0 +1,1293 @@
+{
+	"run_id": 37239438795,
+	"head_sha": "2f11cf2642a85da986d1ab0905fc94f3699f2c0f",
+	"event": "workflow_dispatch",
+	"status": "completed",
+	"conclusion": "failure",
+	"html_url": "https://github.com/adrienm7/ergopti/actions/runs/37239438795",
+	"jobs": [
+		{
+			"id": 111544986330,
+			"name": "Validate / Checks and plan",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-python@v5",
+					"conclusion": "success"
+				},
+				{
+					"name": "Prepare plan validation",
+					"conclusion": "success"
+				},
+				{
+					"name": "Select native OS lanes",
+					"conclusion": "success"
+				},
+				{
+					"name": "Check hotstring TOML files are sorted and formatted",
+					"conclusion": "success"
+				},
+				{
+					"name": "Deepen history for the release plan",
+					"conclusion": "success"
+				},
+				{
+					"name": "Load the Linux release artifact contract",
+					"conclusion": "success"
+				},
+				{
+					"name": "Compute tag and version",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Prepare plan validation",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/setup-python@v5",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111545150499,
+			"name": "Core / properties",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-python@v5",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run npm ci",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install native validation tools",
+					"conclusion": "success"
+				},
+				{
+					"name": "Check formatting",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run shared validation suite",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install shared UI browsers",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Test shared layer editor rendering",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/setup-python@v5",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111545150542,
+			"name": "macOS / Unit tests (stubbed)",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install Lua 5.4 + luarocks",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install luacheck + luafilesystem",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run luacheck (non-blocking)",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run unit + meta tests",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111545150549,
+			"name": "Core / js",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-python@v5",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run npm ci",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install native validation tools",
+					"conclusion": "success"
+				},
+				{
+					"name": "Check formatting",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run shared validation suite",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install shared UI browsers",
+					"conclusion": "success"
+				},
+				{
+					"name": "Test shared layer editor rendering",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/setup-python@v5",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111545150560,
+			"name": "Linux / Unit tests",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install LuaJIT and native event dependencies",
+					"conclusion": "success"
+				},
+				{
+					"name": "Verify native metrics aggregation equivalence",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Verify native cross-driver histogram multiplicity",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Run the driver unit test suite",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Record mandatory unit evidence",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Upload mandatory unit evidence",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111545150695,
+			"name": "Windows / Unit tests",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Build and test native navigation event owner",
+					"conclusion": "success"
+				},
+				{
+					"name": "Read AutoHotkey runtime contract",
+					"conclusion": "success"
+				},
+				{
+					"name": "Cache AutoHotkey runtime",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run reporter lifecycle self-tests",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run npm ci",
+					"conclusion": "success"
+				},
+				{
+					"name": "Build features manifest",
+					"conclusion": "success"
+				},
+				{
+					"name": "Manifest parity (AHK \u2194 HS codegen equivalence)",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download AutoHotkey v2 runtime",
+					"conclusion": "success"
+				},
+				{
+					"name": "Verify AHK source encoding (UTF-8 BOM + LF)",
+					"conclusion": "success"
+				},
+				{
+					"name": "Disable Windows Defender real-time scanning for AHK tests",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the shipped Kana layout for real probes",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run AHK test suite",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Run isolated AHK LLM suites",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Annotate AHK results",
+					"conclusion": "success"
+				},
+				{
+					"name": "Publish AHK execution manifest",
+					"conclusion": "success"
+				},
+				{
+					"name": "Check for AHK compiler warnings",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Run the full-driver startup smoke",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Test fresh Git clone bootstrap and warm startup",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/setup-node@v4",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Cache AutoHotkey runtime",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111545219396,
+			"name": "Linux / E2E tests",
+			"conclusion": "skipped",
+			"steps": []
+		},
+		{
+			"id": 111545219448,
+			"name": "Linux / Verdict",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download assertion evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Assert all mandatory subjects ran and passed",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Post Run actions/setup-node@v4",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111545219922,
+			"name": "Linux / Package",
+			"conclusion": "skipped",
+			"steps": []
+		},
+		{
+			"id": 111545220096,
+			"name": "Linux / Install and launch \u00b7 ${{ matrix.label }}",
+			"conclusion": "skipped",
+			"steps": []
+		},
+		{
+			"id": 111546071374,
+			"name": "macOS / E2E tests (stubbed)",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the E2E interpreter",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run virtual-keyboard harness (stubbed hs.* \u2014 no real Hammerspoon)",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111546318202,
+			"name": "macOS / Package",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Prepare Node for native policy fixtures and XCTest evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run reporter lifecycle self-tests",
+					"conclusion": "success"
+				},
+				{
+					"name": "Cache SwiftPM dependencies",
+					"conclusion": "success"
+				},
+				{
+					"name": "Report Swift toolchain",
+					"conclusion": "success"
+				},
+				{
+					"name": "Lint remap guardian LaunchAgent",
+					"conclusion": "success"
+				},
+				{
+					"name": "Build release launcher",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run Swift launcher tests",
+					"conclusion": "success"
+				},
+				{
+					"name": "Upload Swift launcher failure transcript",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Remove the launcher log the Swift tests wrote",
+					"conclusion": "success"
+				},
+				{
+					"name": "Self-test the launch verdict",
+					"conclusion": "success"
+				},
+				{
+					"name": "Validate the Karabiner-Elements pin onboarding downloads",
+					"conclusion": "success"
+				},
+				{
+					"name": "Resolve the launch-gate scenario profile",
+					"conclusion": "success"
+				},
+				{
+					"name": "Build ErgoptiPlus.app",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record signed CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Smoke test built ErgoptiPlus.app (crash-on-launch guard)",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Retain packaged application startup evidence",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Install Sparkle signing tool",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Sign zip with Sparkle EdDSA key",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Generate Sparkle appcast",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Package latest keylayout bundle",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Upload the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Upload the package",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Cache SwiftPM dependencies",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Prepare Node for native policy fixtures and XCTest evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547156904,
+			"name": "Windows / E2E tests (engine)",
+			"conclusion": "skipped",
+			"steps": []
+		},
+		{
+			"id": 111547157132,
+			"name": "Windows / Verdict",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Verify mandatory jobs and launch scenarios",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Post Run actions/setup-node@v4",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547157413,
+			"name": "Windows / Package",
+			"conclusion": "skipped",
+			"steps": []
+		},
+		{
+			"id": 111547157489,
+			"name": "Windows / Install and launch",
+			"conclusion": "skipped",
+			"steps": []
+		},
+		{
+			"id": 111547263489,
+			"name": "macOS / Install and launch \u00b7 karabiner_config \u00b7 macos-15",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263498,
+			"name": "macOS / Install and launch \u00b7 clean \u00b7 macos-15",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263505,
+			"name": "macOS / Install and launch \u00b7 symlink_logs_dir \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263510,
+			"name": "macOS / Install and launch \u00b7 configured_symlink \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263519,
+			"name": "macOS / Install and launch \u00b7 upgraded \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263528,
+			"name": "macOS / Install and launch \u00b7 symlink_hammerspoon \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263530,
+			"name": "macOS / Install and launch \u00b7 symlink_config \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263551,
+			"name": "macOS / Install and launch \u00b7 dangling_logs \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263554,
+			"name": "macOS / Install and launch \u00b7 symlink_logs \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263561,
+			"name": "macOS / Install and launch \u00b7 tilde_paths \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547263573,
+			"name": "macOS / Install and launch \u00b7 plain_open \u00b7 macos-15",
+			"conclusion": "success",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Fetch the older release whose files seed the user state",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the package built by this run",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download the independent CI archive source",
+					"conclusion": "success"
+				},
+				{
+					"name": "Install the package the way a user does",
+					"conclusion": "success"
+				},
+				{
+					"name": "Launch over the user state and judge it",
+					"conclusion": "success"
+				},
+				{
+					"name": "Record mandatory launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Retain launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547849196,
+			"name": "macOS / Verdict",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Download launch evidence",
+					"conclusion": "success"
+				},
+				{
+					"name": "Verify mandatory jobs and launch scenarios",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Post Run actions/setup-node@v4",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547906367,
+			"name": "Validate / Selected OS verdict",
+			"conclusion": "failure",
+			"steps": [
+				{
+					"name": "Set up job",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Run actions/setup-node@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Assert selected lanes completed",
+					"conclusion": "failure"
+				},
+				{
+					"name": "Post Run actions/setup-node@v4",
+					"conclusion": "skipped"
+				},
+				{
+					"name": "Post Run actions/checkout@v4",
+					"conclusion": "success"
+				},
+				{
+					"name": "Complete job",
+					"conclusion": "success"
+				}
+			]
+		},
+		{
+			"id": 111547907539,
+			"name": "Release / Publish",
+			"conclusion": "skipped",
+			"steps": []
+		}
+	]
+}

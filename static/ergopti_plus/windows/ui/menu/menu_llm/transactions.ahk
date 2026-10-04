@@ -114,7 +114,7 @@ _LLM_Menu_ApplyAppPickerSelection(Candidate, Selected, Receipt) {
 }
 
 _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
-	global Features, _LLM_Menu
+	global Features, _LLM_Menu, _LLM_Menu_ApiPrivateAuthorityGeneration
 	if !(CandidateFeatures is Map) || !(CandidateMenu is Map)
 		return false
 	DisabledAppsChanged := _LLM_Menu.Has("disabled_apps")
@@ -125,6 +125,7 @@ _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
 	try {
 		Features := CandidateFeatures
 		_LLM_Menu := CandidateMenu
+		_LLM_Menu_ApiPrivateAuthorityGeneration += 1
 		if DisabledAppsChanged
 			AppPicker_AdvanceOwner("llm:disabled_apps")
 		return true
@@ -337,17 +338,17 @@ _LLM_Menu_ReportApiTransitionFailure(Context, Result, NotifyFn := 0,
 LLM_Menu_CommitApiEntriesMutation(Context, MutateFn, ApplyFn := 0,
 		Port := 0, NotifyFn := 0, AcquireFn := 0, SettleFn := 0,
 		CollectFn := 0, BuildConfigFn := 0, SerializeFn := 0,
-		PauseFn := 0) {
+		PauseFn := 0, SourceReceipt := 0, SourceOwner := 0, AdmissionFn := 0) {
 	PreviousCritical := Critical("Off")
 	try return _LLM_Menu_CommitApiEntriesMutationNonCritical(Context,
 		MutateFn, ApplyFn, Port, NotifyFn, AcquireFn, SettleFn, CollectFn,
-		BuildConfigFn, SerializeFn, PauseFn)
+		BuildConfigFn, SerializeFn, PauseFn, SourceReceipt, SourceOwner, AdmissionFn)
 	finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 		Port, NotifyFn, AcquireFn, SettleFn, CollectFn, BuildConfigFn,
-		SerializeFn, PauseFn) {
+		SerializeFn, PauseFn, SourceReceipt, SourceOwner, AdmissionFn) {
 	global _PathsFile, ConfigurationFile, Features, _LLM_Menu
 	if !ConfigFullStateCanPersist()
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
@@ -355,6 +356,16 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 	if !(Context is String) || Context == "" || !HasMethod(MutateFn, "Call")
 		return ConfigReportPersistenceFailure("the LLM API-entry mutation",
 			NotifyFn, "the candidate mutation contract is invalid")
+	RetainedSource := !((SourceReceipt is Integer) && SourceReceipt == 0)
+	if RetainedSource {
+		if !(SourceOwner is LLM_Menu_ApiPrivateSourceOwner) || !HasMethod(AdmissionFn, "Call")
+				|| !_LLM_Menu_ApiRetainedSourceAdmitted(SourceReceipt, SourceOwner, AdmissionFn)
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"the originating private API source or model view is no longer current")
+	} else if !((SourceOwner is Integer) && SourceOwner == 0)
+			|| !((AdmissionFn is Integer) && AdmissionFn == 0)
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			"private API source admission requires its exact originating receipt")
 	if !IsSet(_PathsFile) || !(_PathsFile is String) || _PathsFile == ""
 			|| !IsSet(ConfigurationFile) || !(ConfigurationFile is String)
 			|| ConfigurationFile == "" || !IsSet(Features) || !(Features is Map)
@@ -370,13 +381,13 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 	try ResolvedPort := _ConfigTransitionRuntimePort(Port)
 	catch as Err {
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
-			"the transition filesystem port raised: " . Err.Message)
+			"the transition filesystem port raised: " . _LLM_Menu_ApiTransactionError(Err, RetainedSource))
 	}
 	try AcquireResult := ConfigTransitionAcquireLifecycleBundle(_PathsFile,
 		[ConfigurationFile, ApiPath], ResolvedPort, AcquireFn, SettleFn)
 	catch as Err {
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
-			"terminal transition admission raised: " . Err.Message)
+			"terminal transition admission raised: " . _LLM_Menu_ApiTransactionError(Err, RetainedSource))
 	}
 	if !ConfigTransitionResultIs(AcquireResult, "bundle_acquired")
 		return _LLM_Menu_ReportApiTransitionFailure(Context, AcquireResult,
@@ -384,17 +395,26 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 	Bundle := AcquireResult["bundle"]
 	ReleaseBundle := true
 	try {
+		if RetainedSource {
+			if !SourceOwner.BindBundle(SourceReceipt, Bundle)
+					|| !_LLM_Menu_ApiRetainedSourceAdmitted(SourceReceipt, SourceOwner, AdmissionFn)
+				return ConfigReportPersistenceFailure(Context, NotifyFn,
+					"the originating private source changed during terminal admission")
+		}
 		CandidateFeatures := LLM_Menu_DeepClone(Features)
 		CandidateMenu := LLM_Menu_DeepClone(_LLM_Menu)
 		try Mutated := MutateFn.Call(CandidateMenu)
 		catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"candidate construction raised: " . Err.Message)
+				"candidate construction raised: " . _LLM_Menu_ApiTransactionError(Err, RetainedSource))
 		}
 		if !((Mutated is Integer) && Mutated == 1) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"candidate construction was refused")
 		}
+		if RetainedSource && !_LLM_Menu_ApiRetainedSourceAdmitted(SourceReceipt, SourceOwner, AdmissionFn)
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"the originating private source changed during candidate construction")
 		if !_LLM_Menu_SyncToFeatures(CandidateFeatures, CandidateMenu) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"the detached LLM state could not be reconciled into Features")
@@ -404,12 +424,15 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 			: _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
 		catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"candidate serialization raised: " . Err.Message)
+				"candidate serialization raised: " . _LLM_Menu_ApiTransactionError(Err, RetainedSource))
 		}
 		if !(Updates is Array) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"candidate serialization returned no update batch")
 		}
+		if RetainedSource && !_LLM_Menu_ApiRetainedSourceAdmitted(SourceReceipt, SourceOwner, AdmissionFn)
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"the originating private source changed during configuration collection")
 
 		try {
 			Updates := _ConfigPrepareTypedUpdates(Updates)
@@ -418,7 +441,7 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 				: TOML_BuildUpdatedContent(ConfigurationFile, Updates)
 		} catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"config.toml rendering raised: " . Err.Message)
+				"config.toml rendering raised: " . _LLM_Menu_ApiTransactionError(Err, RetainedSource))
 		}
 		if !(ConfigBuild is Map) || !ConfigBuild.Has("status")
 				|| !ConfigBuild.Has("kind") || !ConfigBuild.Has("content")
@@ -432,17 +455,23 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml could not be rendered from its exact old image")
 		}
+		if RetainedSource && !_LLM_Menu_ApiRetainedSourceAdmitted(SourceReceipt, SourceOwner, AdmissionFn)
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"the originating private source changed during configuration rendering")
 		try ApiContent := HasMethod(SerializeFn, "Call")
 			? SerializeFn.Call(CandidateMenu)
 			: _LLM_Menu_SerializeApiEntries(CandidateMenu)
 		catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
-				"api_entries.json serialization raised: " . Err.Message)
+				"api_entries.json serialization raised: " . _LLM_Menu_ApiTransactionError(Err, RetainedSource))
 		}
 		if !(ApiContent is String) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"api_entries.json serialization was refused")
 		}
+		if RetainedSource && !_LLM_Menu_ApiRetainedSourceAdmitted(SourceReceipt, SourceOwner, AdmissionFn)
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"the originating private source changed during API serialization")
 
 		ConfigExpected := ConfigTransitionExpectedOld(
 			ConfigBuild["source_present"], ConfigBuild["source_content"],
@@ -465,6 +494,19 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 		}
 		ApiExpected := Map("present", ApiSnapshot["present"],
 			"hash", ApiSnapshot["hash"])
+		if RetainedSource {
+			OriginalExpected := SourceOwner.Expected(SourceReceipt)
+			if !(OriginalExpected is Map)
+					|| !_ConfigTransitionSnapshotMatches(ConfigExpected,
+						OriginalExpected["config"]["present"], OriginalExpected["config"]["hash"])
+					|| !_ConfigTransitionSnapshotMatches(ApiExpected,
+						OriginalExpected["api"]["present"], OriginalExpected["api"]["hash"])
+					|| !_LLM_Menu_ApiRetainedSourceAdmitted(SourceReceipt, SourceOwner, AdmissionFn)
+				return ConfigReportPersistenceFailure(Context, NotifyFn,
+					"the final private file images differ from the retained source")
+			ConfigExpected := OriginalExpected["config"]
+			ApiExpected := OriginalExpected["api"]
+		}
 		TargetSpecs := [
 			ConfigTransitionPresentTarget(ConfigurationFile,
 				ConfigBuild["content"], ConfigExpected),
@@ -480,6 +522,11 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 			return _LLM_Menu_ReportApiTransitionFailure(Context, CommitResult,
 				NotifyFn)
 		}
+		if RetainedSource
+			return _LLM_Menu_FinishRetainedApiCandidate(Context, CandidateFeatures,
+				CandidateMenu, ConfigBuild["content"], ApiContent, SourceReceipt,
+				SourceOwner, AdmissionFn, ApplyFn, Bundle, ResolvedPort,
+				NotifyFn, &ReleaseBundle)
 
 		; This action keeps running, unlike a paths change followed by Reload.
 		; Resolve committed-new now so no discoverable WAL or artifact survives
@@ -508,7 +555,7 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 			catch as Err {
 				return ConfigReportPersistenceFailure(Context, NotifyFn,
 					"both files are durable but live application raised: "
-					. Err.Message, false)
+					. _LLM_Menu_ApiTransactionError(Err, RetainedSource), false)
 			}
 			if !((Applied is Integer) && Applied == 1) {
 				return ConfigReportPersistenceFailure(Context, NotifyFn,
@@ -517,7 +564,97 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 		}
 		return true
 	} finally {
+		if RetainedSource
+			SourceOwner.UnbindBundle(Bundle)
 		if ReleaseBundle
 			_ConfigWriteTerminalRelease(Bundle)
 	}
+}
+
+; The admission callback may cross native boundaries. Bracket it with the
+; privately owned receipt so source and model/view provenance both survive.
+_LLM_Menu_ApiRetainedSourceAdmitted(Receipt, Owner, AdmissionFn) {
+	if !(Owner is LLM_Menu_ApiPrivateSourceOwner) || !HasMethod(AdmissionFn, "Call")
+			|| !Owner.Current(Receipt)
+		return false
+	try Admitted := AdmissionFn.Call()
+	catch {
+		try LoggerWarn("LLM", "Retained private API admission was refused.")
+		return false
+	}
+	return (Admitted is Integer) && Admitted == 1 && Owner.Current(Receipt)
+}
+
+; Private decoder/native error messages can include source bytes or credentials.
+_LLM_Menu_ApiTransactionError(Err, RetainedSource) {
+	return RetainedSource ? "the retained private operation raised" : Err.Message
+}
+
+; Keep the original WAL until the distinct final view/source claim publishes
+; RAM. A refused claim can still conditionally restore both exact old images.
+_LLM_Menu_FinishRetainedApiCandidate(Context, CandidateFeatures, CandidateMenu,
+		ConfigContent, ApiContent, SourceReceipt, SourceOwner, AdmissionFn,
+		ApplyFn, Bundle, Port, NotifyFn, &ReleaseBundle) {
+	global _PathsFile
+	try {
+		Capability := SourceOwner.CaptureCandidate(SourceReceipt, Bundle, ConfigContent, ApiContent)
+		Admitted := (Capability is LLM_Menu_ApiPrivateCandidateReceipt)
+			&& SourceOwner.CandidateAdmitted(Capability, AdmissionFn)
+	} catch {
+		Admitted := false
+		try LoggerWarn("LLM", "Private API durable candidate admission was refused.")
+	}
+	if !Admitted
+		return _LLM_Menu_RefuseRetainedApiCandidate(Context, Bundle, Port, NotifyFn, &ReleaseBundle, SourceReceipt, SourceOwner)
+	try Published := _LLM_Menu_PublishApiEntriesCandidate(CandidateFeatures, CandidateMenu,
+		(FeatureState, MenuState) => SourceOwner.PublishCandidate(FeatureState,
+			MenuState, Capability, AdmissionFn))
+	catch {
+		try LoggerWarn("LLM", "Private API candidate publication was refused.")
+		Published := false
+	}
+	if !((Published is Integer) && Published == 1)
+		return _LLM_Menu_RefuseRetainedApiCandidate(Context, Bundle, Port, NotifyFn, &ReleaseBundle, SourceReceipt, SourceOwner)
+	if HasMethod(ApplyFn, "Call") {
+		try Applied := ApplyFn.Call(CandidateMenu)
+		catch {
+			Applied := false
+			try LoggerWarn("LLM", "Private API candidate application was refused.")
+		}
+		if !((Applied is Integer) && Applied == 1) {
+			ReleaseBundle := false
+			ConfigTransitionRetainBarrier(Bundle)
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"both files are durable but native application was refused", false)
+		}
+	}
+	try CleanupResult := ConfigTransitionRecoverOwned(_PathsFile, Bundle, Port)
+	catch {
+		CleanupResult := Map("status", "fatal", "kind", "private_cleanup_refused")
+		try LoggerWarn("LLM", "Private API candidate cleanup was refused.")
+	}
+	if !ConfigTransitionResultIs(CleanupResult, "recovered_new") {
+		ReleaseBundle := false
+		ConfigTransitionRetainBarrier(Bundle)
+		return _LLM_Menu_ReportApiTransitionFailure(Context, CleanupResult, NotifyFn, false)
+	}
+	return true
+}
+
+; Conditional native recovery retains unknown foreign bytes and its exact
+; barrier. A durable-new refusal never becomes synthetic saved success.
+_LLM_Menu_RefuseRetainedApiCandidate(Context, Bundle, Port, NotifyFn, &ReleaseBundle, SourceReceipt, SourceOwner) {
+	global _PathsFile
+	try RolledBack := ConfigTransitionRollbackOwned(_PathsFile, Bundle, Port)
+	catch {
+		RolledBack := Map("status", "fatal", "kind", "private_rollback_refused")
+		try LoggerWarn("LLM", "Private API candidate rollback was refused.")
+	}
+	if ConfigTransitionResultIs(RolledBack, "recovered_old")
+			|| (ConfigTransitionResultIs(RolledBack, "absent") && SourceOwner.Current(SourceReceipt))
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			"the final private source or model view was refused; both original images were restored")
+	ReleaseBundle := false
+	ConfigTransitionRetainBarrier(Bundle)
+	return _LLM_Menu_ReportApiTransitionFailure(Context, RolledBack, NotifyFn, false)
 }

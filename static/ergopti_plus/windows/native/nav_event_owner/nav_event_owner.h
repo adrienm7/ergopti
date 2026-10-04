@@ -610,6 +610,25 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetOsModifierKeys(
 /** Enables public terminal-capture APIs without installing a hook. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetRunning(uint8_t running);
 
+/** Callback invoked by the deterministic replay sink before accepting input. */
+typedef void (*ErgoptiNav_TerminalReplayObserver)(void *context);
+
+/**
+ * Drives the production replay loop while observing its unlocked send boundary.
+ *
+ * The observer may re-enter native APIs, modelling concurrent callers while
+ * SendInput is in flight. No real hook or keyboard input is installed or sent.
+ */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCaptureObserved(
+	uint64_t token,
+	uint32_t release_kind,
+	uint32_t send_limit,
+	ErgoptiNav_TestEvent *out_events,
+	uint32_t event_capacity,
+	uint32_t *out_event_count,
+	ErgoptiNav_TerminalReplayObserver observer,
+	void *observer_context);
+
 /**
  * Releases a capture through the production replay loop and a deterministic
  * SendInput sink. send_limit is the maximum accepted prefix, or UINT32_MAX.
