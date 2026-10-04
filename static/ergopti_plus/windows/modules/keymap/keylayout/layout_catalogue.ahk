@@ -272,7 +272,8 @@ _LayoutCatalogueJson(Value) {
 /**
  * The installed layouts: registry id -> the index entry its local copy was
  * verified against. A missing record is empty; a damaged one throws, so it can
- * never make installed layouts look absent.
+ * never make installed layouts look absent. Outdated entries warn once and are
+ * excluded from this Map; private source metadata retains their original JSON.
  * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir.
  * @returns {Map}
  */
@@ -293,12 +294,22 @@ LayoutCatalogue_ReadInstalled(LocalDir) {
 		throw Error("The installed-layouts record has an unknown schema version: " . Path)
 	if !Record.Has("layouts") || !(Record["layouts"] is Map)
 		throw Error("The installed-layouts record has no layouts table: " . Path)
+	Installed := Map()
+	Source := { path: Path, text: Text, top_members: JsonObjectMemberSpans(Text),
+		layout_members: JsonObjectMemberSpans(Text, ["layouts"]), original: Map() }
 	for Id, Entry in Record["layouts"] {
-		if !LayoutRegistry_IsValidId(Id) || !(Entry is Map) || !Entry.Has("id") || (Entry["id"] !== Id)
-				|| !Entry.Has("sha256") || !Entry.Has("version") || !Entry.Has("size")
-			throw Error("The installed-layouts record has an invalid entry '" . Id . "': " . Path)
+		Problem := _LayoutCatalogueInstalledEntryProblem(Id, Entry)
+		if Problem != "" {
+			ConfigOutdatedReportInFile(Path, "layouts[" . JsonStringLiteral(Id) . "]", Problem,
+				(Message, Args*) => LoggerWarn("LayoutCatalogue", Message, Args*))
+			continue
+		}
+		Installed[Id] := Entry
+		Source.original[Id] := JsonParse(Source.layout_members[Id]["text"])
 	}
-	return Record["layouts"]
+	; Object properties never enumerate as layouts and cannot reserve a user's id.
+	Installed._LayoutCatalogueRecordSource := Source
+	return Installed
 }
 
 /**
@@ -308,8 +319,102 @@ LayoutCatalogue_ReadInstalled(LocalDir) {
  */
 LayoutCatalogue_WriteInstalled(LocalDir, Installed) {
 	global LAYOUT_CATALOGUE_INSTALLED_SCHEMA
-	Record := Map("schema_version", LAYOUT_CATALOGUE_INSTALLED_SCHEMA, "layouts", Installed)
-	_LayoutCatalogueWriteText(LocalDir . LayoutRegistry_Settings()["installed_file"], _LayoutCatalogueJson(Record))
+	Path := LocalDir . LayoutRegistry_Settings()["installed_file"]
+	if !Installed.HasOwnProp("_LayoutCatalogueRecordSource") {
+		Record := Map("schema_version", LAYOUT_CATALOGUE_INSTALLED_SCHEMA, "layouts", Installed)
+		_LayoutCatalogueWriteText(Path, _LayoutCatalogueJson(Record))
+		return
+	}
+	Source := Installed._LayoutCatalogueRecordSource
+	if !(Path == Source.path) || FSReadBounded(Path, LayoutRegistry_Settings()["max_file_bytes"]) !== Source.text
+		throw Error("The installed-layouts record changed before publication: " . Path)
+	Layouts := ""
+	for Id, Span in Source.layout_members {
+		if Source.original.Has(Id)
+			continue
+		; An explicit installation of the same id replaces its obsolete entry.
+		if !Installed.Has(Id)
+			Layouts .= (Layouts != "" ? "," : "") . Span["member_text"]
+	}
+	for Id, Entry in Installed {
+		if Source.original.Has(Id) && _LayoutCatalogueSameValue(Entry, Source.original[Id]) {
+			Layouts .= (Layouts != "" ? "," : "") . Source.layout_members[Id]["member_text"]
+			continue
+		}
+		Text := Source.original.Has(Id)
+			? _LayoutCatalogueOverlayEntry(Entry, Source.original[Id], Source.layout_members[Id]["text"])
+			: _LayoutCatalogueJson(Entry)
+		Layouts .= (Layouts != "" ? "," : "") . JsonStringLiteral(Id) . ":" . Text
+	}
+	Text := '{"schema_version":' . LAYOUT_CATALOGUE_INSTALLED_SCHEMA . ',"layouts":{' . Layouts . "}"
+	for Key, Span in Source.top_members {
+		if Key !== "schema_version" && Key !== "layouts"
+			Text .= "," . Span["member_text"]
+	}
+	_LayoutCatalogueWriteText(Path, Text . "}")
+}
+
+; Classify one entry without turning a stale row into a damaged whole document.
+; Keep this driver's established membership validation separate from preservation.
+_LayoutCatalogueInstalledEntryProblem(Id, Entry) {
+	if !LayoutRegistry_IsValidId(Id)
+		return "the key is not a layout id"
+	if !(Entry is Map)
+		return "the entry is not an object"
+	if !Entry.Has("id") || Entry["id"] !== Id
+		return "its id field does not name this entry"
+	if !Entry.Has("sha256") || !Entry.Has("version") || !Entry.Has("size")
+		return "it has no verified checksum, version or size"
+	return ""
+}
+
+; Retain source tokens for unchanged values, including JSON Boolean/null/float
+; identities that the existing minimal native record writer cannot re-encode.
+_LayoutCatalogueSameValue(Left, Right) {
+	if Type(Left) != Type(Right)
+		return false
+	if Left is Map {
+		if Left.Count != Right.Count
+			return false
+		for Key, Value in Left
+			if !Right.Has(Key) || !_LayoutCatalogueSameValue(Value, Right[Key])
+				return false
+		return true
+	}
+	if Left is Array {
+		if Left.Length != Right.Length
+			return false
+		for Index, Value in Left
+			if !_LayoutCatalogueSameValue(Value, Right[Index])
+				return false
+		return true
+	}
+	return Left == Right
+}
+
+; A catalogue update owns the current index fields; future members remain raw.
+_LayoutCatalogueOverlayEntry(Entry, Original, OriginalText) {
+	global LAYOUT_CATALOGUE_RECORD_FIELDS
+	Members := JsonObjectMemberSpans(OriginalText)
+	Owned := Map("extension", true)
+	for Field in LAYOUT_CATALOGUE_RECORD_FIELDS
+		Owned[Field] := true
+	Text := ""
+	for Field, Span in Members {
+		if !Entry.Has(Field) {
+			if !Owned.Has(Field)
+				Text .= (Text != "" ? "," : "") . Span["member_text"]
+			continue
+		}
+		Member := _LayoutCatalogueSameValue(Entry[Field], Original[Field])
+			? Span["member_text"] : JsonStringLiteral(Field) . ":" . _LayoutCatalogueJson(Entry[Field])
+		Text .= (Text != "" ? "," : "") . Member
+	}
+	for Field, Value in Entry {
+		if !Members.Has(Field)
+			Text .= (Text != "" ? "," : "") . JsonStringLiteral(Field) . ":" . _LayoutCatalogueJson(Value)
+	}
+	return "{" . Text . "}"
 }
 
 ; The record keeps the fields LAYOUT_CATALOGUE_RECORD_FIELDS names.

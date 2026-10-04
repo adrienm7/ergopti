@@ -1678,6 +1678,27 @@ and 101 macOS E2E checks (one host-specific scenario skipped). Hosted native
 qualification and broader binding-parent/repair-intent work remain pending;
 TODO33 is not complete.
 
+A bounded Windows installed-layout record candidate partitions obsolete entries
+from usable neighbors and routes process-lifetime warnings through the shared
+file-entry reporter. A narrow native JSON member-span owner preserves obsolete
+Boolean/null/number spellings, future record members and unchanged valid entry
+values while install/uninstall retain their current native owners. Original
+syntax/header refusal assertions remain; independent native source/receipt,
+warning-once, install/uninstall and public span regressions are registered but
+not executed in this Linux container. Case-sensitive record-member exclusions
+preserve future `Layouts`/`SCHEMA_VERSION` siblings; handwritten native controls
+cover ordinary save, in-place updates and explicit obsolete-id replacement.
+Programmatic NUL-containing path segments refuse before native Map lookup,
+without borrowing a truncated prefix or exposing source data. Eight new native
+cases retain all earlier assertions and corpus bytes. The new refusal-loop
+callbacks bind each source explicitly so unrelated unset-variable errors cannot
+satisfy their assertions. Selected local verification passed formatting, 1,814
+AHK BOM/LF files, all 356 JS checks, 13,981 portable macOS unit cases and
+6,586 Linux unit cases. Windows native unit, compile and E2E were not executed
+on this Linux host; native CI and packaging/installation remain required. Shared Lua
+record writes still need qualification of top-level future fields and
+default-decoder null/array identity; this prerequisite does not complete TODO33.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
