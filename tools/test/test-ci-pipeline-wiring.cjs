@@ -41,8 +41,9 @@
  * 1. Derived, not listed: every plan output must come from a plan step that
  *    writes it, every caller input must be the plan output of the same name,
  *    and release must wait, directly or through a lane, on every other job of
- *    ci.yml. No job of ci.yml sets continue-on-error, and only release sets a
- *    job-level if, exactly its own.
+ *    ci.yml except the dispatch-only verdict. No job forgives failure; OS callers
+ *    consume exact selection outputs. Release and the manual verdict retain
+ *    their separate event guards.
  * 2. Private secrets reach a lane only on a release run, through one exact
  *    expression; the public Sparkle key is the only allow-listed exception.
  *    Every pipeline file reads contents only; release alone may write.
@@ -72,6 +73,9 @@
 'use strict';
 
 const pipeline = require('./ci-pipeline.cjs');
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const manual = require('../ci/manual-ci-lanes.cjs');
 
 const ENTRY = pipeline.ENTRY_REL;
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
@@ -84,6 +88,8 @@ const ROOT = 'validate';
 const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF = `github.event_name == 'push' && needs.${ROOT}.outputs.release == 'true'`;
 const NOT_CANCELLED = '${{ !cancelled() }}';
+const MANUAL_VERDICT_IF = "always() && github.event_name == 'workflow_dispatch'";
+const LANE_IF = (os) => `needs.${ROOT}.outputs.lane_${os} == 'true'`;
 // Public by design: SUPublicEDKey ships inside every app, and a CI package
 // without it cannot pass the launch gate.
 const PUBLIC_SECRETS = new Set(['SPARKLE_PUBLIC_KEY']);
@@ -484,7 +490,10 @@ for (const [key, value] of planOutputs) {
 	);
 	if (!owner) {
 		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which ${ROOT} does not have`);
-	} else if (!new RegExp(`\\bemit ${key} |"${key}=`).test(codeOf(owner.body))) {
+	} else if (
+		!(source[1] === 'lanes' && ['lane_windows', 'lane_macos', 'lane_linux'].includes(key)) &&
+		!new RegExp(`\\bemit ${key} |"${key}=`).test(codeOf(owner.body))
+	) {
 		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which never writes ${key}`);
 	}
 }
@@ -540,7 +549,10 @@ function rootProblems(files) {
 		}
 	}
 	const setupAt = rootSteps.findIndex((candidate) => candidate.name === VALIDATE_SETUP);
-	const after = setupAt < 0 ? [] : rootSteps.slice(setupAt + 1);
+	const after =
+		setupAt < 0
+			? []
+			: rootSteps.slice(setupAt + 1).filter((step) => step.name !== 'Select native OS lanes');
 	const expected = [...VALIDATE_CHECKS.map(([name]) => name), DEEPEN_STEP, ...PLAN_STEPS];
 	if (JSON.stringify(after.map((candidate) => candidate.name)) !== JSON.stringify(expected)) {
 		problems.push(
@@ -712,8 +724,8 @@ if (/^\s*secrets:\s*inherit\b/m.test(pipeline.text())) {
 	);
 }
 
-// Release publishes only when every other job of ci.yml succeeded, reached
-// directly or through a lane's needs.
+// Release waits for every original job. The dispatch-only verdict cannot run
+// on a release push and is checked independently below.
 const topJobs = pipeline.jobs(ENTRY);
 const needsById = new Map(
 	topJobs.map((candidate) => [candidate.id, pipeline.needsOf(candidate.body)])
@@ -727,7 +739,11 @@ while (pending.length > 0) {
 	pending.push(...(needsById.get(id) ?? []));
 }
 for (const candidate of topJobs) {
-	if (candidate.id !== 'release' && !awaited.has(candidate.id)) {
+	if (
+		candidate.id !== 'release' &&
+		candidate.id !== 'manual-verdict' &&
+		!awaited.has(candidate.id)
+	) {
 		errors.push(`release can publish without waiting for ${candidate.id}`);
 	}
 }
@@ -777,6 +793,25 @@ function graphProblems(files) {
 		problems.push(
 			`release must need exactly the root and the three lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`
 		);
+	}
+	const verdict = topLevel.find((candidate) => candidate.id === 'manual-verdict');
+	if (
+		!verdict ||
+		JSON.stringify(pipeline.needsOf(verdict.body)) !==
+			JSON.stringify([ROOT, 'core', 'macos', 'windows', 'linux'])
+	) {
+		problems.push('the manual verdict must wait for the root, shared core and every OS result');
+	}
+	if (
+		topLevel.length !== 7 ||
+		topLevel.some(
+			(job) =>
+				!['validate', 'core', 'macos', 'windows', 'linux', 'manual-verdict', 'release'].includes(
+					job.id
+				)
+		)
+	) {
+		problems.push('ci.yml must contain only the original jobs and the manual verdict');
 	}
 	for (const rel of BOXES) {
 		const entry = files.find((candidate) => candidate.rel === rel);
@@ -909,7 +944,14 @@ function topJobProblems(files) {
 	const problems = [];
 	const jobs = pipeline.jobsOfText(files.find((entry) => entry.rel === ENTRY).text, ENTRY);
 	for (const candidate of jobs) {
-		const expected = candidate.id === 'release' ? RELEASE_IF : null;
+		const expected =
+			candidate.id === 'release'
+				? RELEASE_IF
+				: candidate.id === 'manual-verdict'
+					? MANUAL_VERDICT_IF
+					: ['windows', 'macos', 'linux'].includes(candidate.id)
+						? LANE_IF(candidate.id)
+						: null;
 		const condition = pipeline.field(candidate.body, 'if');
 		if (condition !== expected) {
 			problems.push(
@@ -1629,6 +1671,230 @@ for (const [rel, shell] of [
 		block + '\n' + node + '\n',
 		reporterLifecycleProblems
 	);
+}
+
+/** Pins the real workflow ports of the callable manual selector. */
+function manualLaneProblems(files) {
+	const problems = [];
+	const text = files.find((entry) => entry.rel === ENTRY).text;
+	const jobs = pipeline.jobsOfText(text, ENTRY);
+	const root = jobs.find((job) => job.id === ROOT);
+	const verdict = jobs.find((job) => job.id === 'manual-verdict');
+	const expectedInput = `  workflow_dispatch:
+    inputs:
+      os_lanes:
+        description: Native OS lanes to validate (shared checks always run)
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - windows
+          - macos
+          - linux
+          - windows+macos
+          - windows+linux
+          - macos+linux
+`;
+	if (text.split(expectedInput).length !== 2)
+		problems.push('manual CI must expose exactly seven validated choices with default all');
+	const selects = root
+		? pipeline.steps(root.body).filter((step) => step.name === 'Select native OS lanes')
+		: [];
+	if (
+		selects.length !== 1 ||
+		pipeline.stepField(selects[0].body, 'id') !== 'lanes' ||
+		pipeline.stepField(selects[0].body, 'run') !==
+			'node tools/ci/manual-ci-lanes.cjs select >> "$GITHUB_OUTPUT"' ||
+		pipeline.stepField(selects[0].body, 'env') !==
+			'CI_EVENT: ${{ github.event_name }} CI_OS_SELECTION: ${{ inputs.os_lanes }}'
+	) {
+		problems.push('the plan must call the actual selector with event and manual choice');
+	}
+	const steps = root ? pipeline.steps(root.body) : [];
+	const selectedAt = steps.findIndex((step) => step.name === 'Select native OS lanes');
+	const preparedAt = steps.findIndex((step) => step.name === VALIDATE_SETUP);
+	const checkedAt = steps.findIndex((step) => step.name === VALIDATE_CHECKS[0][0]);
+	if (!(preparedAt >= 0 && selectedAt === preparedAt + 1 && checkedAt === selectedAt + 1)) {
+		problems.push(
+			'selection must run after the checked-out Node setup and before the existing checks'
+		);
+	}
+	for (const os of ['windows', 'macos', 'linux']) {
+		if (
+			!root ||
+			!root.body.includes('      lane_' + os + ': ${{ steps.lanes.outputs.lane_' + os + ' }}\n')
+		) {
+			problems.push(`the plan must forward the actual ${os} selection output`);
+		}
+		const lane = jobs.find((job) => job.id === os);
+		if (!lane || pipeline.field(lane.body, 'if') !== LANE_IF(os))
+			problems.push(`the ${os} caller must consume its exact selection`);
+	}
+	const check =
+		verdict &&
+		pipeline.steps(verdict.body).filter((step) => step.name === 'Assert selected lanes completed');
+	if (
+		!check ||
+		check.length !== 1 ||
+		pipeline.stepField(check[0].body, 'run') !== 'node tools/ci/manual-ci-lanes.cjs verdict' ||
+		pipeline.stepField(check[0].body, 'env') !==
+			'CI_EVENT: ${{ github.event_name }} CI_OS_SELECTION: ${{ inputs.os_lanes }} CI_JOB_RESULTS: ${{ toJSON(needs) }}'
+	) {
+		problems.push(
+			'the manual verdict must pass the actual complete needs receipt to the same selector owner'
+		);
+	}
+	if (!verdict || pipeline.field(verdict.body, 'if') !== MANUAL_VERDICT_IF)
+		problems.push('manual verdict must run after failed or skipped dependencies only on dispatch');
+	return problems;
+}
+
+errors.push(...manualLaneProblems(pipeline.files()));
+for (const [from, to] of [
+	['        default: all\n', '        default: linux\n'],
+	['          - windows+linux\n', '          - windows+macos+linux\n'],
+	['node tools/ci/manual-ci-lanes.cjs select', 'echo lane_windows=true'],
+	['CI_EVENT: ${{ github.event_name }}', 'CI_EVENT: workflow_dispatch'],
+	['CI_JOB_RESULTS: ${{ toJSON(needs) }}', 'CI_JOB_RESULTS: {}'],
+	[`    if: ${MANUAL_VERDICT_IF}\n`, '    if: always()\n'],
+	["    if: needs.validate.outputs.lane_windows == 'true'\n", ''],
+	[
+		"    if: needs.validate.outputs.lane_macos == 'true'\n",
+		"    if: needs.validate.outputs.lane_linux == 'true'\n"
+	]
+]) {
+	// The event binding belongs to two ports; mutate just the plan occurrence.
+	const source = pipeline.file(ENTRY);
+	const mutated = pipeline
+		.files()
+		.map((entry) =>
+			entry.rel === ENTRY ? { ...entry, text: source.replace(from, () => to) } : entry
+		);
+	assert.ok(source.includes(from), 'the actual workflow owns each manual selection mutation');
+	assert.ok(manualLaneProblems(mutated).length > 0, 'manual selection mutation must refuse');
+}
+
+// Expected masks are independently declared; no expected status is derived from the resolver.
+const choices = [
+	['all', [true, true, true]],
+	['windows', [true, false, false]],
+	['macos', [false, true, false]],
+	['linux', [false, false, true]],
+	['windows+macos', [true, true, false]],
+	['windows+linux', [true, false, true]],
+	['macos+linux', [false, true, true]]
+];
+const nativeKeys = ['windows', 'macos', 'linux'];
+for (const [choice, mask] of choices) {
+	assert.deepEqual(Object.values(manual.selectLanes('workflow_dispatch', choice)), mask);
+	const jobs = { validate: { result: 'success', outputs: {} }, core: { result: 'success' } };
+	for (const [index, os] of nativeKeys.entries()) {
+		jobs[os] = { result: mask[index] ? 'success' : 'skipped' };
+		jobs.validate.outputs[`lane_${os}`] = String(mask[index]);
+	}
+	assert.equal(manual.verifyManualJobs('workflow_dispatch', choice, jobs), true);
+	for (const job of ['validate', 'core', ...nativeKeys]) {
+		for (const result of ['failure', 'cancelled', 'skipped', 'success', '', null, true, 0, {}]) {
+			if (result === jobs[job].result) continue;
+			const altered = structuredClone(jobs);
+			altered[job].result = result;
+			assert.throws(() => manual.verifyManualJobs('workflow_dispatch', choice, altered));
+		}
+		const missing = structuredClone(jobs);
+		delete missing[job];
+		assert.throws(() => manual.verifyManualJobs('workflow_dispatch', choice, missing));
+	}
+	for (const os of nativeKeys) {
+		for (const value of [undefined, true, false, '', 'unknown', 'TRUE', 'false', 'true']) {
+			if (value === jobs.validate.outputs[`lane_${os}`]) continue;
+			const altered = structuredClone(jobs);
+			altered.validate.outputs[`lane_${os}`] = value;
+			assert.throws(() => manual.verifyManualJobs('workflow_dispatch', choice, altered));
+		}
+	}
+	const extra = structuredClone(jobs);
+	extra.validate.outputs.lane_other = 'false';
+	assert.throws(() => manual.verifyManualJobs('workflow_dispatch', choice, extra));
+	const env = {
+		...process.env,
+		CI_EVENT: 'workflow_dispatch',
+		CI_OS_SELECTION: choice,
+		CI_JOB_RESULTS: JSON.stringify(jobs)
+	};
+	const selected = spawnSync(
+		process.execPath,
+		[require.resolve('../ci/manual-ci-lanes.cjs'), 'select'],
+		{ env, encoding: 'utf8', timeout: 5000 }
+	);
+	assert.equal(selected.error, undefined);
+	assert.equal(selected.signal, null);
+	assert.equal(selected.status, 0);
+	assert.equal(selected.stderr, '');
+	assert.equal(
+		selected.stdout,
+		nativeKeys.map((os, index) => `lane_${os}=${mask[index]}\n`).join('')
+	);
+	const verified = spawnSync(
+		process.execPath,
+		[require.resolve('../ci/manual-ci-lanes.cjs'), 'verdict'],
+		{ env, encoding: 'utf8', timeout: 5000 }
+	);
+	assert.equal(verified.error, undefined);
+	assert.equal(verified.signal, null);
+	assert.equal(verified.status, 0);
+	assert.equal(verified.stderr, '');
+	assert.equal(verified.stdout, '[OK] Shared checks and selected native OS lanes passed.\n');
+}
+assert.deepEqual(manual.selectLanes('workflow_dispatch'), {
+	windows: true,
+	macos: true,
+	linux: true
+});
+for (const invalid of [
+	'',
+	'ALL',
+	'windows,linux',
+	'macos+windows',
+	'all+linux',
+	' windows',
+	'linux\n',
+	null,
+	false,
+	[],
+	{},
+	'__proto__'
+]) {
+	assert.throws(() => manual.selectLanes('workflow_dispatch', invalid));
+	for (const event of ['push', 'pull_request']) {
+		assert.deepEqual(manual.selectLanes(event, invalid), {
+			windows: true,
+			macos: true,
+			linux: true
+		});
+	}
+}
+for (const event of ['push', 'pull_request'])
+	assert.throws(() => manual.verifyManualJobs(event, 'all', {}));
+for (const input of ['{', 'null', '[]', '{}']) {
+	const result = spawnSync(
+		process.execPath,
+		[require.resolve('../ci/manual-ci-lanes.cjs'), 'verdict'],
+		{
+			env: {
+				...process.env,
+				CI_EVENT: 'workflow_dispatch',
+				CI_OS_SELECTION: 'windows',
+				CI_JOB_RESULTS: input
+			},
+			encoding: 'utf8',
+			timeout: 5000
+		}
+	);
+	assert.equal(result.error, undefined);
+	assert.equal(result.signal, null);
+	assert.equal(result.status, 1);
+	assert.equal(result.stdout, '');
 }
 
 if (errors.length > 0) {
