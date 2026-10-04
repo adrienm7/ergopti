@@ -302,7 +302,9 @@ _HS_WordExpanderRows(Commands := unset) {
 				Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 	}
 
-	Rows.Push(Map("label", t("menu.hotstrings.add_delimiter"), "action", (*) => _HS_DelimAddCustom()))
+	Rows.Push(MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_add",
+		Map("word_expander_add", (*) => _HS_DelimAddCustom()),
+		Map("word_expanders_ready", (*) => !A_IsSuspended)))
 
 	if !IsSet(Commands) {
 		Commands := Map(
@@ -400,6 +402,8 @@ global _HS_DelimAddGui := ""
 ; app covered it the dialog this thread waits on could not be reached again.
 _HS_DelimAddCustom() {
 	global _HS_DelimAddGui
+	if A_IsSuspended
+		return false
 	if IsObject(_HS_DelimAddGui) {
 		; Requested again: bring the open dialog back instead of stacking a
 		; second one over it.
@@ -427,8 +431,11 @@ _HS_DelimAddCustom() {
 	try WinWaitClose("ahk_id " . G.Hwnd)
 	finally _HS_DelimAddGui := ""
 
+	; A held native dialog cannot borrow its pre-pause menu admission.
+	if A_IsSuspended
+		return false
 	if (!Result.OK or Result.Char == "") {
-		return
+		return false
 	}
 	return _HS_DelimAddCustomCommit(Result.Char, Result.Consume)
 }

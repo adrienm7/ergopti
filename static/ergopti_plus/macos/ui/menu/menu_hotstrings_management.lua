@@ -238,10 +238,8 @@ function M.build_management(ctx)
 		::continue_ct::
 	end
 
-	exp_sub[#exp_sub + 1] = {
-		label    = i18n.get("menu.hotstrings.add_custom"),
-		disabled = paused or nil,
-		action       = not paused and function()
+	local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
+		["word_expander_add"] = function()
 			local existing_keys = {}
 			for _, d in ipairs(defs) do
 				if d.key then existing_keys[d.key] = true end
@@ -253,12 +251,15 @@ function M.build_management(ctx)
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
+				if not word_expanders_ready() then return false end
+				local accept_label, cancel_label = i18n.get("button.ok"), i18n.get("button.cancel")
 				local ok_p, btn, char_raw = pcall(dialog.text_prompt,
 					i18n.get("dialog.hotstrings.new_title"),
 					i18n.get("dialog.hotstrings.new_prompt"),
-					"", i18n.get("button.ok"), i18n.get("button.cancel")
+					"", accept_label, cancel_label
 				)
-				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
+				if not word_expanders_ready() then return false end
+				if not ok_p or btn ~= accept_label or type(char_raw) ~= "string" then return false end
 				local valid, reason = Terminators.validate_custom_terminator(
 					key, char_raw, char_raw, false)
 				if valid then
@@ -274,13 +275,17 @@ function M.build_management(ctx)
 			end
 
 			-- 2. Ask consume behaviour (default: non consommé)
+			local consume_no_label = i18n.get("dialog.hotstrings.consume_no")
+			local consume_yes_label = i18n.get("dialog.hotstrings.consume_yes")
 			local consume_res = dialog.block_alert(
 				i18n.get("dialog.hotstrings.consume_title"),
 				i18n.get("dialog.hotstrings.consume_body"),
-				i18n.get("dialog.hotstrings.consume_no"), i18n.get("dialog.hotstrings.consume_yes"), i18n.get("button.cancel")
+				consume_no_label, consume_yes_label, i18n.get("button.cancel")
 			)
-			if consume_res == i18n.get("button.cancel") then return end
-			local consume = (consume_res == i18n.get("dialog.hotstrings.consume_yes"))
+			if not word_expanders_ready() then return false end
+			if consume_res ~= consume_no_label
+				and consume_res ~= consume_yes_label then return false end
+			local consume = (consume_res == consume_yes_label)
 
 			local label = char .. " : " .. (consume and i18n.get("hotstrings.custom_terminator_consumed") or i18n.get("hotstrings.custom_terminator"))
 
@@ -303,8 +308,9 @@ function M.build_management(ctx)
 			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 			return true
-		end or nil,
-	}
+		end,
+	}, { ["word_expanders_ready"] = word_expanders_ready })
+	if add_row then exp_sub[#exp_sub + 1] = add_row end
 
 	local exp_ctx = {
 		commands = {

@@ -984,3 +984,115 @@ helpers.describe("custom delimiter Delete translations use the shared declaratio
 		helpers.assert_eq(i18n.get, previous_get, "the existing translation owner is restored exactly")
 	end)
 end)
+
+
+--- Reads independent Add identity and custom-record expectations.
+--- @return table corpus
+local function add_command_expected()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/word_expander_add_controls.json"), "rb"))
+	local raw = file:read("*a")
+	file:close()
+	return assert(require("json").decode(raw))
+end
+
+--- Uses the actual native menu and acknowledged TOML owner; only the native
+--- prompt answers and writer refusal are controlled, then restored exactly.
+--- @param mode string Native response/publication scenario.
+--- @return table observed Captured effects, independent of callback catches.
+local function observe_add_command(mode)
+	local corpus = add_command_expected()
+	local result
+	with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
+		assert(Settings.load())
+		local prior_prompt = package.loaded["ui.text_prompt"]
+		local prior_execute = os.execute
+		local Writer = require("toml_codec.writer")
+		local prior_writer = Writer.batch_write
+		local context, effects
+		local observed = { prompts = 0, questions = 0, errors = 0, writes = 0 }
+		package.loaded["ui.text_prompt"] = { ask = function()
+			observed.prompts = observed.prompts + 1
+			if mode == "pause_after_prompt" then context.paused = true end
+			if mode == "input_cancel" then return nil end
+			if mode == "input_empty" then return "" end
+			return corpus.target.char
+		end }
+		os.execute = function(command)
+			if command == "command -v zenity >/dev/null 2>&1" then
+				return mode == "consume_unavailable" and 1 or 0
+			end
+			if command:find("zenity --question", 1, true) == 1 then
+				observed.questions = observed.questions + 1
+				if mode == "pause_after_consume" then context.paused = true end
+				return mode == "consume_no" and 1 or 0
+			end
+			if command:find("zenity --error", 1, true) == 1 then
+				observed.errors = observed.errors + 1
+				return 0
+			end
+			return prior_execute(command)
+		end
+		Writer.batch_write = function(...)
+			observed.writes = observed.writes + 1
+			if mode == "write_false" then return false end
+			if mode == "write_nil" then return nil end
+			if mode == "write_throw" then error("injected Add writer refusal", 0) end
+			if mode == "write_truthy" then return 2 end
+			return prior_writer(...)
+		end
+		local passed, failure = pcall(function()
+			local rows
+			rows, context, effects = menu_controls(Settings, false)
+			local row = assert(custom_delete_row(rows, corpus.i18n), "the actual Add provider must be accessible")
+			if mode == "late_pause" then context.paused = true end
+			observed.result = row.fn()
+			observed.source = sandbox.read_bytes(path)
+			observed.present = has_custom(Terminators, corpus.target.linux_key)
+			observed.redraws = effects.redraws
+			observed.records = require("toml_codec").decode(observed.source)
+		end)
+		package.loaded["ui.text_prompt"] = prior_prompt
+		os.execute = prior_execute
+		Writer.batch_write = prior_writer
+		observed.prompt_restored = package.loaded["ui.text_prompt"] == prior_prompt
+		observed.execute_restored = os.execute == prior_execute
+		observed.writer_restored = Writer.batch_write == prior_writer
+		if not passed then error(failure, 0) end
+		result = observed
+	end)
+	return result
+end
+
+helpers.describe("custom delimiter Add uses shared declaration and native acknowledgement", function()
+	for _, mode in ipairs({ "ack", "consume_no", "write_false", "write_nil", "write_throw", "write_truthy" }) do
+		helpers.it("keeps exact owner publication semantics after " .. mode, function()
+			local observed = observe_add_command(mode)
+			local acknowledged = mode == "ack" or mode == "consume_no"
+			helpers.assert_eq(observed.result, acknowledged)
+			helpers.assert_eq(observed.present, acknowledged)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(observed.redraws, acknowledged and 1 or 0)
+			helpers.assert_eq(observed.records.hotstrings.unknown, "kept")
+			helpers.assert_eq(observed.records.other.value, 42)
+			if not acknowledged then helpers.assert_eq(observed.source, SOURCE) end
+			helpers.assert_eq(observed.prompt_restored, true)
+			helpers.assert_eq(observed.execute_restored, true)
+			helpers.assert_eq(observed.writer_restored, true)
+		end)
+	end
+	for _, mode in ipairs({ "late_pause", "pause_after_prompt", "pause_after_consume", "input_cancel", "input_empty", "consume_unavailable" }) do
+		helpers.it("refuses held native Add without publication after " .. mode, function()
+			local observed = observe_add_command(mode)
+			helpers.assert_eq(observed.present, false)
+			helpers.assert_eq(observed.result, false)
+			helpers.assert_eq(observed.source, SOURCE)
+			helpers.assert_eq(observed.writes, 0)
+			helpers.assert_eq(observed.redraws, 0)
+			if mode == "late_pause" then helpers.assert_eq(observed.prompts, 0) end
+			if mode == "pause_after_prompt" then helpers.assert_eq(observed.questions, 0) end
+			helpers.assert_eq(observed.prompt_restored, true)
+			helpers.assert_eq(observed.execute_restored, true)
+			helpers.assert_eq(observed.writer_restored, true)
+		end)
+	end
+end)

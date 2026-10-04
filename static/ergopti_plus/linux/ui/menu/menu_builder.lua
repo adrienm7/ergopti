@@ -1181,21 +1181,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 
 			sub[#sub + 1] = { separator = true }
-			sub[#sub + 1] = {
-				label = i18n_safe("menu.hotstrings.add_delimiter"),
-				-- Asked here, natively, rather than delegated to the settings window.
-				-- The delegation was justified in the daemon by "this driver's only
-				-- text field is the settings window" — but the window it opened did
-				-- not exist, so no custom delimiter could ever be created and the
-				-- "delete" sub-row below was unreachable by construction. The text
-				-- field it claimed not to have is prompt_text, in this same file,
-				-- and the magic-key row two handlers down already uses it.
-				action = function()
+			local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
+				["word_expander_add"] = function()
 					local char = prompt_text(
 						i18n_safe("dialog.hotstrings.new_delimiter_title"),
 						i18n_safe("dialog.hotstrings.new_delimiter_prompt"),
 						"")
-					if char == nil then return end
+					if not word_expanders_ready() then return false end
+					if char == nil then return false end
 
 					-- Codepoints, not bytes: "…" is three bytes and one character, so
 					-- a byte-length check would refuse most of what a user would pick.
@@ -1205,7 +1198,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					end
 					if codepoints ~= 1 then
 						show_error(i18n_safe("dialog.magic_key.error_length"))
-						return
+						return false
 					end
 
 					local consume = ask_yes_no(
@@ -1214,14 +1207,15 @@ local function _manifest_hotstring_rows(ctx, config)
 						i18n_safe("dialog.hotstrings.consume_yes"),
 						i18n_safe("dialog.hotstrings.consume_no"))
 					-- nil is "nobody could be asked", which must not be stored as a No.
-					if consume == nil then return end
+					if not word_expanders_ready() then return false end
+					if consume == nil then return false end
 
 					local saved = snapshot()
-					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) then
-						commit(saved)
-					end
+					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) ~= true then return false end
+					return commit(saved) == true
 				end,
-			}
+			}, { ["word_expanders_ready"] = word_expanders_ready })
+			if add_row then sub[#sub + 1] = add_row end
 
 			local exp_ctx = {
 				commands = {

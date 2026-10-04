@@ -702,3 +702,92 @@ _HSDT_CustomProviderOwnsDeclaredDelete() {
 }
 Test("custom word expanders: actual provider consumes its shared Delete declaration",
 	_HSDT_CustomProviderOwnsDeclaredDelete)
+
+
+_HSDT_CustomAddCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\word_expander_add_controls.json"))
+	Assert(Corpus is Map, "the independent Add command corpus must be readable")
+	return Corpus
+}
+
+_HSDT_DeclaredCustomAddReceipts() {
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
+	Corpus := _HSDT_CustomAddCorpus()
+	Saved := _HSDT_SaveState()
+	try {
+		for Mode in ["ack", "refused", "paused"] {
+			_HSDT_Seed("declared-custom-add-" . Mode)
+			Ready := Map("value", true)
+			Writer := Mode == "refused" ? _HSDT_FalseWriter : _HSDT_AcceptWriter
+			Command := _HS_DelimAddCustomCommit.Bind(Corpus["target"]["char"], true,
+				Writer, _HSDT_AcceptReplace, _HSDT_Notify)
+			Row := MenuRenderer_CommandRow(Corpus["section"], Corpus["id"],
+				Map(Corpus["id"], Command), Map(Corpus["ready"], (*) => Ready["value"]))
+			Assert(Row is Map, "the Add declaration supplies an actual native command row")
+			AssertEqual(t(Corpus["i18n"]), Row["label"])
+			if Mode == "paused"
+				Ready["value"] := false
+			Committed := Row["action"].Call()
+			AssertEqual(Mode == "ack", Committed)
+			AssertEqual(Mode == "ack" ? "A" . Corpus["target"]["char"] : "A", _HotstringsWordDelimiters)
+			AssertEqual(_HotstringsWordDelimiters, _HotstringsConsumedDelimiters)
+			AssertEqual(Mode == "paused" ? 0 : 1, _HSDT_WriteCalls)
+			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_ReplaceCalls)
+			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_NotifyCalls)
+		}
+	} finally _HSDT_Restore(Saved)
+}
+Test("custom word expanders: declared Add retains native ACK, refusal and held pause",
+	_HSDT_DeclaredCustomAddReceipts)
+
+_HSDT_PausedNativeAddOpensNoDialog() {
+	global _HS_DelimAddGui, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	Entry := _DriverFuncBody("_HS_DelimAddCustom")
+	Assert(Entry != "", "the actual modal owner must exist before native delivery")
+	PauseGatePosition := RegExMatch(Entry, "m)^\s*if A_IsSuspended\s*$")
+	FirstGui := InStr(Entry, "if IsObject(_HS_DelimAddGui)")
+	Assert(PauseGatePosition > 0 && FirstGui > PauseGatePosition,
+		"the exact early native admission must precede any existing-dialog access")
+	Assert(InStr(Entry, "Gui_Create") > PauseGatePosition,
+		"the native owner must refuse before constructing a dialog")
+	Saved := _HSDT_SaveState()
+	WasSuspended := A_IsSuspended
+	PreviousGui := _HS_DelimAddGui
+	try {
+		_HSDT_Seed("paused-native-add")
+		Suspend(true)
+		Result := _HS_DelimAddCustom()
+		Observed := Map("result", Result, "gui", _HS_DelimAddGui,
+			"word", _HotstringsWordDelimiters, "consumed", _HotstringsConsumedDelimiters)
+	} finally {
+		Suspend(WasSuspended)
+		_HSDT_Restore(Saved)
+	}
+	AssertFalse(Observed["result"])
+	AssertEqual(PreviousGui, Observed["gui"], "the paused native owner must not create, present or retire a dialog")
+	AssertEqual("A", Observed["word"])
+	AssertEqual("A", Observed["consumed"])
+	AssertEqual(WasSuspended, A_IsSuspended, "the actual native suspension owner is restored exactly")
+}
+Test("custom word expanders: actual suspended Add entry keeps its native dialog owner inert",
+	_HSDT_PausedNativeAddOpensNoDialog)
+
+_HSDT_CustomAddProviderKeepsPostModalAdmission() {
+	Provider := _DriverFuncBody("_HS_WordExpanderRows")
+	Owner := _DriverFuncBody("_HS_DelimAddCustom")
+	Assert(Provider != "" && Owner != "", "the actual provider and modal owner must both exist")
+	Assert(InStr(Provider, 'MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_add"'))
+	AssertFalse(InStr(Provider, 'Map("label", t("menu.hotstrings.add_delimiter")'),
+		"the native provider must not replace the canonical Add label")
+	CloseReceipt := InStr(Owner, 'finally _HS_DelimAddGui := ""')
+	LatePause := InStr(Owner, "if A_IsSuspended", true, CloseReceipt)
+	Commit := InStr(Owner, "return _HS_DelimAddCustomCommit")
+	Assert(CloseReceipt > 0 && LatePause > CloseReceipt && Commit > LatePause,
+		"a completed native dialog must recheck its actual pause owner before acquiring the transaction")
+	Assert(InStr(Owner, "!Result.OK or Result.Char ==") > LatePause,
+		"cancelled and empty native results must remain unpublished")
+}
+Test("custom word expanders: actual Add dialog rechecks admission after its native close receipt",
+	_HSDT_CustomAddProviderKeepsPostModalAdmission)
