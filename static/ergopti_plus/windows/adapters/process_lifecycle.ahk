@@ -253,6 +253,16 @@ PLC_CloseNativeHandle(Handle) {
 		return false
 }
 
+; Returns the native current process identity without a failure sentinel.
+; @return {Integer} This process's positive DWORD identifier.
+; @throws {Error} The native call fails or returns an invalid identifier.
+PLC_CurrentProcessIdStrict() {
+	ProcessId := DllCall("kernel32\GetCurrentProcessId", "UInt")
+	if ProcessId <= 0
+		throw Error("The current process identifier is invalid.")
+	return ProcessId
+}
+
 PLC_CurrentProcessId() {
 	try return DllCall("Kernel32\GetCurrentProcessId", "UInt")
 	catch
