@@ -26,13 +26,33 @@ process.on('uncaughtException', (error) => {
 
 // A completed TAP receipt cannot compensate for a missing native exit receipt.
 // Start-Process without -Wait must retain its handle before the child exits.
+// Reading the live receipt conflicts with AutoHotkey's exclusive FileAppend.
+// Require the actual workflow to retire its child before any transcript reader.
+function assertPostExitTranscript(script, name) {
+	const code = script.replace(/^\s*#.*$/gm, '');
+	const launch = code.indexOf('$proc = Start-Process');
+	const joined = code.indexOf('$proc.WaitForExit()', launch);
+	assert.ok(launch >= 0 && joined > launch, `${name}: join the owned writer before reading`);
+	assert.doesNotMatch(
+		code.slice(0, joined),
+		/Get-Content|FileStream|StreamReader|ReadLine|ReadAll|OpenRead/i,
+		`${name}: no transcript reader may own the live receipt`
+	);
+	assert.match(
+		code.slice(joined),
+		/Get-Content -LiteralPath \$resultsFile -Encoding utf8 \| ForEach-Object \{ Write-Host \$_ \}/,
+		`${name}: publish the complete UTF-8 transcript after native exit`
+	);
+}
+
 const processReceipts = [];
 for (const [job, name] of [
 	['test-ahk', 'Run AHK test suite'],
 	['e2e-ahk', 'Run E2E suite (Strategy A — pure engine injection)']
 ]) {
 	const script = pipeline.runOf(pipeline.step(pipeline.job(job), name)).join('\n');
-	const start = /\$proc = Start-Process[^\n]+\n([\s\S]*?)\$fstream =/.exec(script);
+	const start =
+		/\$proc = Start-Process[^\n]+\n([\s\S]*?)(?=\s*while \(-not \$proc\.HasExited\))/.exec(script);
 	assert.ok(start, `${name}: asynchronous process start must exist`);
 	assert.match(
 		start[1],
@@ -41,7 +61,8 @@ for (const [job, name] of [
 	);
 	const finish = /\$proc\.WaitForExit\(\)\s*\n\s*\$exit = \$proc\.ExitCode/.exec(script);
 	assert.ok(finish, `${name}: join the process before reading its exit receipt`);
-	processReceipts.push({ name, start: start[0].replace(/\$fstream =$/, ''), finish: finish[0] });
+	assertPostExitTranscript(script, name);
+	processReceipts.push({ name, start: start[0], finish: finish[0] });
 }
 
 // Isolated runners must not overwrite the main suite's canonical TAP receipt.
@@ -64,6 +85,35 @@ assert.match(
 	'isolated native exits also require complete execution receipts'
 );
 
+for (const [job, name] of [
+	['test-ahk', 'Run AHK test suite'],
+	['e2e-ahk', 'Run E2E suite (Strategy A — pure engine injection)']
+]) {
+	const script = pipeline.runOf(pipeline.step(pipeline.job(job), name)).join('\n');
+	for (const reader of [
+		'Get-Content -LiteralPath $resultsFile',
+		'$reader = [System.IO.FileStream]::new($resultsFile)'
+	]) {
+		for (const boundary of ['$proc = Start-Process', '$proc.WaitForExit()']) {
+			const mutated = script.replace(boundary, `${reader}\n${boundary}`);
+			assert.throws(
+				() => assertPostExitTranscript(mutated, name),
+				/no transcript reader may own the live receipt/,
+				'a restored live reader must fail the actual workflow contract'
+			);
+		}
+	}
+	assert.throws(
+		() =>
+			assertPostExitTranscript(
+				script.replace('Get-Content -LiteralPath $resultsFile', 'Write-Host $resultsFile'),
+				name
+			),
+		/publish the complete UTF-8 transcript/,
+		'retiring the writer cannot silently drop its transcript'
+	);
+}
+
 const ahkIndex = process.argv.indexOf('--ahk');
 if (ahkIndex >= 0) {
 	assert.equal(process.platform, 'win32', 'native exit receipt probes require Windows');
@@ -72,6 +122,74 @@ if (ahkIndex >= 0) {
 	const probeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-exit-'));
 	const quote = (value) => `'${value.replaceAll("'", "''")}'`;
 	try {
+		// The real exclusive FileAppend must refuse the former held reader and
+		// succeed once the workflow waits for native exit before reading.
+		for (const receipt of processReceipts) {
+			for (const heldReader of [true, false]) {
+				const resultPath = path.join(probeRoot, `append-${heldReader}.txt`);
+				const runner = path.join(probeRoot, `append-${heldReader}.ahk`);
+				const literal = resultPath.replaceAll('`', '``').replaceAll('"', '`"');
+				const line = 'owned Unicode receipt é🙂\r\n';
+				fs.writeFileSync(resultPath, '');
+				fs.writeFileSync(
+					runner,
+					[
+						'\uFEFF#Requires AutoHotkey v2.0',
+						'#NoTrayIcon',
+						'#SingleInstance Off',
+						`try FileAppend("owned Unicode receipt é🙂\`r\`n", "${literal}", "UTF-8")`,
+						'catch OSError as failure {',
+						' if failure.Number = 32',
+						'  ExitApp(32)',
+						' throw failure',
+						'}',
+						'ExitApp(0)',
+						''
+					].join('\n')
+				);
+				const command = [
+					"$ErrorActionPreference = 'Stop'",
+					`$ahk = ${quote(ahk)}; $runner = ${quote(runner)}; $resultsFile = ${quote(resultPath)}`,
+					'$proc = $null; $reader = $null',
+					'try {',
+					...(heldReader
+						? [
+								'$reader = [IO.FileStream]::new($resultsFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)'
+							]
+						: []),
+					receipt.start,
+					'$clock = [Diagnostics.Stopwatch]::StartNew()',
+					'while (-not $proc.HasExited) { if ($clock.ElapsedMilliseconds -ge 5000) { throw "Owned append child did not retire" }; Start-Sleep -Milliseconds 10 }',
+					receipt.finish,
+					`if ($null -eq $exit -or $exit -ne ${heldReader ? 32 : 0}) { throw "Exclusive append ownership verdict was refused" }`,
+					...(heldReader
+						? [
+								'if ([IO.FileInfo]::new($resultsFile).Length -ne 0) { throw "Refused append changed the receipt" }'
+							]
+						: [
+								`if ([IO.File]::ReadAllText($resultsFile, [Text.Encoding]::UTF8) -cne ${quote(line)}) { throw "Retired append lost UTF-8 or CRLF bytes" }`
+							]),
+					'Write-Output "OWNED_APPEND_CONTRACT_PASS"',
+					'} finally {',
+					' if ($null -ne $reader) { $reader.Dispose() }',
+					' if ($null -ne $proc) {',
+					'  try { if (-not $proc.HasExited) { $proc.Kill(); if (-not $proc.WaitForExit(5000)) { throw "Owned append child cleanup was refused" } } } finally { $proc.Dispose() }',
+					' }',
+					'}'
+				].join('\n');
+				const probe = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+					encoding: 'utf8',
+					timeout: 30000
+				});
+				assert.equal(
+					probe.status,
+					0,
+					`${receipt.name}: native append ownership ${probe.stderr || probe.error || probe.stdout}`
+				);
+				assert.equal(probe.stderr, '', 'the exact owned native append control must emit no errors');
+				assert.equal(probe.stdout.trim(), 'OWNED_APPEND_CONTRACT_PASS');
+			}
+		}
 		for (const receipt of processReceipts) {
 			for (const expected of [0, 7]) {
 				const runner = path.join(probeRoot, `exit-${expected}.ahk`);
