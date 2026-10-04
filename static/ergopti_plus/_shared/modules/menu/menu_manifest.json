@@ -2344,6 +2344,33 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_key_native_commands": [
+		{
+			"type": "command",
+			"id": "tap_hold_key_native",
+			"i18n": "tap_hold.action.disable",
+			"disabled_when": [
+				"tap_hold_key_configured"
+			],
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "tap_hold_key_no_action",
+			"i18n": "menu.tapholds.nothing_tap_hold",
+			"disabled_when": [
+				"tap_hold_key_configured"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_navigation_rows": [
 		{
 			"type": "list",
