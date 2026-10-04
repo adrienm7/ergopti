@@ -2631,7 +2631,7 @@ _SR_CaptureSettle(Claim, Refusal, Owner, NowTick := unset) {
 	if !Refusal {
 		if Claim.Has("CaptureLockSince")
 			_SR_LogAt("Debug", "{1} capture removed {2} ms after another process first held it (Win32 {3}).",
-				Owner, TickElapsed(Claim["CaptureLockSince"], NowTick), Claim["CaptureLockCode"])
+				Owner, TickElapsed64(Claim["CaptureLockSince"], NowTick), Claim["CaptureLockCode"])
 		return "done"
 	}
 	if !Claim.Has("CaptureLockSince") {
@@ -2641,7 +2641,7 @@ _SR_CaptureSettle(Claim, Refusal, Owner, NowTick := unset) {
 			Owner, Refusal, SR_CAPTURE_LOCK_BUDGET_MS)
 		return "retry"
 	}
-	local held_ms := TickElapsed(Claim["CaptureLockSince"], NowTick)
+	local held_ms := TickElapsed64(Claim["CaptureLockSince"], NowTick)
 	if held_ms < SR_CAPTURE_LOCK_BUDGET_MS
 		return "retry"
 	local capture_dir := Claim.Get("CaptureDir", "")
