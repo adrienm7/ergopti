@@ -730,6 +730,40 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(not client.isActive())
 	end)
 
+	helpers.it("enforces the exact buffered body limit after separating the curl receipt", function()
+		for _, status in ipairs({ 200, 401 }) do
+			for _, size in ipairs({ 3, 4, 5, 13 }) do
+				for _, split in ipairs({ false, true }) do
+					local client, state = fresh_client()
+					local result, callbacks = nil, 0
+					client.get("https://api.github.com/releases", {}, { max_body_bytes = 4 }, function(value)
+						result, callbacks = value, callbacks + 1
+					end)
+					local body = string.rep("x", size)
+					local receipt = "\nERGOPTI_HTTP_STATUS:" .. status .. "\n"
+					if split then
+						state.stdout(body)
+						for index = 1, #receipt do state.stdout(receipt:sub(index, index)) end
+					else state.stdout(body .. receipt) end
+					state.complete(status == 200 and 0 or 22)
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_true(not client.isActive())
+					if size > 4 then
+						helpers.assert_eq(result.ok, false)
+						helpers.assert_eq(result.status, 0)
+						helpers.assert_eq(result.error, "response body exceeds limit")
+						helpers.assert_eq(result.body, "")
+						helpers.assert_nil(result.error_body, "oversized refusal bytes must not be published")
+					else
+						helpers.assert_eq(result.status, status)
+						helpers.assert_eq(result.ok, status == 200)
+						helpers.assert_eq(status == 200 and result.body or result.error_body, body)
+					end
+				end
+			end
+		end
+	end)
+
 	helpers.it("keeps requests from independent owners alive concurrently", function()
 		local client, state = fresh_client()
 		local default_result = nil

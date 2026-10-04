@@ -1052,6 +1052,17 @@ These are software implementations; final hardware verification remains below.
   underlying interruption behavior cannot be established in this container.
   Their native suites remain deferred. The separate reserved injector wait
   has an analogous source diagnosis and remains unchanged for its owner.
+- [~] **L78.** Linux buffered HTTP body bounds: enforce the exact caller body
+  limit after separating curl's status trailer. The transport read budget
+  reserves trailer space; response bytes previously borrowed that allowance
+  and exposed oversized success or refusal bodies. Thirty of 84 actual local
+  curl/libuv checks fail before and all pass after across GET, POST and owned
+  GET, Content-Length/chunked framing, HTTP 200/401, small boundaries and the
+  updater's 2 MiB boundary. Requests and sockets are real; no native result is
+  simulated. Registered unit controls preserve split-trailer handling and
+  single completion. Windows uses its native response budget/file path and
+  macOS its native HTTP callback rather than this Linux trailer allowance;
+  their runtime suites remain deferred. Existing shared size policy is retained.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
