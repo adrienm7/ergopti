@@ -299,7 +299,8 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 		last := 0
 	}
 
-	if (last > 0) {
+	; Accepted session ownership also initializes a valid zero-valued tick.
+	if (last > 0 || KLWatch.is_session_active) {
 		gap := (now - last) & 0xFFFFFFFF
 		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
 			KL_Hook_AdvanceContextWatermarks(gap)
