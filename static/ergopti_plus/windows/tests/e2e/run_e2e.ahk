@@ -40,9 +40,8 @@ global _AHK_DRY_RUN := false
 
 ; Load the test framework first so Assert / Test / RunTests are available.
 #Include ../test_framework.ahk
-; Override the default A_Temp path so CI finds the results file next to this
-; script (the workflow step looks for test_results.txt in tests/e2e/).
-global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
+; Explicit launch receipts remain private; ordinary CI keeps its sibling file.
+global TEST_RESULTS_FILE := _TestResultsPath(A_ScriptDir . "\test_results.txt")
 ; The shared app-context simulators publish into KLHook, just as the main
 ; runner does. Load the definition here so E2E never depends on ambient state.
 #Include ../../modules/keylogger/keylogger_hook.ahk
