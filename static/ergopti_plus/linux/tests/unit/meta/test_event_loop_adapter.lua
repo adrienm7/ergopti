@@ -376,7 +376,7 @@ helpers.describe("event loop backend isolation", function()
 
   -- The isolated child uses the POSIX transport of this Linux driver.
   if native_ok and package.config:sub(1, 1) == "/" then
-    helpers.it("installed luv dispatches idle and periodic callbacks and closes its handles", function()
+    helpers.it("installed luv dispatches callbacks, closes its handles and waits through child exits", function()
       -- libuv's default loop is process-wide: other tests may own active handles.
       local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
       local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop.lua"
