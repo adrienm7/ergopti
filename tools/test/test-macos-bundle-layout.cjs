@@ -226,329 +226,357 @@ for (const mutate of [
 // Execute the actual producer with a recording native tool boundary. This
 // checks argument identity, publication, refusal and source preservation;
 // native XCTest supplies real Mac extraction, signatures and metadata proof.
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ErgoptiNativeArchiveContracts-'));
-try {
-	const app = path.join(scratch, 'ErgoptiPlus.app');
-	const resources = path.join(app, 'Contents', 'Resources');
-	fs.mkdirSync(resources, { recursive: true });
-	fs.writeFileSync(path.join(resources, 'données.txt'), 'Independent Unicode bytes: café 😀\n');
-	fs.chmodSync(path.join(resources, 'données.txt'), 0o751);
-	fs.symlinkSync('données.txt', path.join(resources, 'owned-link'));
-	const native = (events, mutation) => (executable, args, cwd) => {
-		assert.equal(cwd, mutation.output);
-		if (executable === '/usr/bin/codesign') {
-			if (args[0] === '-d') {
-				events.push('requirement');
-				if (mutation.displayFailure) throw new Error('owned native requirement display refusal');
-				if (mutation.display) return mutation.display;
-				return { stdout: 'designated => identifier "com.owned.fixture"\n', stderr: '' };
+function verifyArchiveProducerContracts(fs, Archives) {
+	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ErgoptiNativeArchiveContracts-'));
+	try {
+		const app = path.join(scratch, 'ErgoptiPlus.app');
+		const resources = path.join(app, 'Contents', 'Resources');
+		fs.mkdirSync(resources, { recursive: true });
+		fs.writeFileSync(path.join(resources, 'données.txt'), 'Independent Unicode bytes: café 😀\n');
+		fs.chmodSync(path.join(resources, 'données.txt'), 0o751);
+		fs.symlinkSync('données.txt', path.join(resources, 'owned-link'));
+		const native = (events, mutation) => (executable, args, cwd) => {
+			assert.equal(cwd, mutation.output);
+			if (executable === '/usr/bin/codesign') {
+				if (args[0] === '-d') {
+					events.push('requirement');
+					if (mutation.displayFailure) throw new Error('owned native requirement display refusal');
+					if (mutation.display) return mutation.display;
+					return { stdout: 'designated => identifier "com.owned.fixture"\n', stderr: '' };
+				}
+				assert.deepEqual(args.slice(0, 3), ['--verify', '--deep', '--strict']);
+				if (args.includes('-R')) {
+					if (mutation.requirement) assert.equal(args[4], '=' + mutation.requirement);
+					else assert.equal(args[4], '=identifier "com.owned.fixture"');
+					events.push('verify-restored');
+				} else {
+					assert.equal(args[3], app);
+					events.push('verify-source');
+				}
+				return { stdout: '', stderr: '' };
 			}
-			assert.deepEqual(args.slice(0, 3), ['--verify', '--deep', '--strict']);
-			if (args.includes('-R')) {
-				if (mutation.requirement) assert.equal(args[4], '=' + mutation.requirement);
-				else assert.equal(args[4], '=identifier "com.owned.fixture"');
-				events.push('verify-restored');
+			const zip = executable === '/usr/bin/ditto';
+			assert(
+				zip || executable === '/usr/bin/tar',
+				'No alternate native archive process is admitted'
+			);
+			const create = args[0] === '-c' || args[0] === '-cJf';
+			if (create) {
+				if (zip)
+					assert.deepEqual(args.slice(0, 7), [
+						'-c',
+						'-k',
+						'--sequesterRsrc',
+						'--keepParent',
+						'--zlibCompressionLevel',
+						'9',
+						app
+					]);
+				else {
+					assert.deepEqual(
+						args.slice(2, 4),
+						['--options', 'xz:compression-level=9'],
+						'The actual native producer must request the maximum exposed Apple libarchive XZ preset'
+					);
+					assert.deepEqual(args.slice(4), ['-C', scratch, '--', 'ErgoptiPlus.app']);
+				}
+				events.push(zip ? 'create-zip' : 'create-xz');
+				fs.writeFileSync(zip ? args[7] : args[1], zip ? 'owned ZIP bytes' : 'owned XZ bytes');
 			} else {
-				assert.equal(args[3], app);
-				events.push('verify-source');
+				assert.equal(
+					args[0],
+					zip ? '-x' : '-xJpf',
+					'Tar must restore permissions independently of umask'
+				);
+				if (zip) assert.equal(args[1], '-k');
+				else assert.equal(args[2], '-C');
+				events.push(zip ? 'extract-zip' : 'extract-xz');
+				const restored = path.join(args[3], 'ErgoptiPlus.app');
+				fs.cpSync(app, restored, { recursive: true, verbatimSymlinks: true });
+				if (mutation.kind === 'bytes')
+					fs.appendFileSync(path.join(restored, 'Contents', 'Resources', 'données.txt'), 'foreign');
+				if (mutation.kind === 'mode')
+					fs.chmodSync(path.join(restored, 'Contents', 'Resources', 'données.txt'), 0o700);
+				if (mutation.kind === 'link') {
+					fs.unlinkSync(path.join(restored, 'Contents', 'Resources', 'owned-link'));
+					fs.symlinkSync('foreign', path.join(restored, 'Contents', 'Resources', 'owned-link'));
+				}
 			}
 			return { stdout: '', stderr: '' };
-		}
-		const zip = executable === '/usr/bin/ditto';
-		assert(zip || executable === '/usr/bin/tar', 'No alternate native archive process is admitted');
-		const create = args[0] === '-c' || args[0] === '-cJf';
-		if (create) {
-			if (zip)
-				assert.deepEqual(args.slice(0, 7), [
-					'-c',
-					'-k',
-					'--sequesterRsrc',
-					'--keepParent',
-					'--zlibCompressionLevel',
-					'9',
-					app
-				]);
-			else {
-				assert.deepEqual(
-					args.slice(2, 4),
-					['--options', 'xz:compression-level=9'],
-					'The actual native producer must request the maximum exposed Apple libarchive XZ preset'
-				);
-				assert.deepEqual(args.slice(4), ['-C', scratch, '--', 'ErgoptiPlus.app']);
-			}
-			events.push(zip ? 'create-zip' : 'create-xz');
-			fs.writeFileSync(zip ? args[7] : args[1], zip ? 'owned ZIP bytes' : 'owned XZ bytes');
-		} else {
-			assert.equal(
-				args[0],
-				zip ? '-x' : '-xJpf',
-				'Tar must restore permissions independently of umask'
-			);
-			if (zip) assert.equal(args[1], '-k');
-			else assert.equal(args[2], '-C');
-			events.push(zip ? 'extract-zip' : 'extract-xz');
-			const restored = path.join(args[3], 'ErgoptiPlus.app');
-			fs.cpSync(app, restored, { recursive: true, verbatimSymlinks: true });
-			if (mutation.kind === 'bytes')
-				fs.appendFileSync(path.join(restored, 'Contents', 'Resources', 'données.txt'), 'foreign');
-			if (mutation.kind === 'mode')
-				fs.chmodSync(path.join(restored, 'Contents', 'Resources', 'données.txt'), 0o700);
-			if (mutation.kind === 'link') {
-				fs.unlinkSync(path.join(restored, 'Contents', 'Resources', 'owned-link'));
-				fs.symlinkSync('foreign', path.join(restored, 'Contents', 'Resources', 'owned-link'));
-			}
-		}
-		return { stdout: '', stderr: '' };
-	};
-	const output = path.join(scratch, 'valid');
-	fs.mkdirSync(output);
-	const events = [];
-	const produced = Archives.createArchives(app, output, {
-		defaults,
-		execute: native(events, { output })
-	});
-	assert.deepEqual(events, [
-		'verify-source',
-		'requirement',
-		'create-xz',
-		'extract-xz',
-		'verify-restored',
-		'create-zip',
-		'extract-zip',
-		'verify-restored'
-	]);
-	assert.deepEqual(
-		produced.map(({ name, format }) => ({ name, format })),
-		Archives.resolveArchives(defaults)
-	);
-	assert.equal(
-		fs.readFileSync(path.join(output, 'ErgoptiPlus.app.tar.xz'), 'utf8'),
-		'owned XZ bytes'
-	);
-	assert.equal(
-		fs.readFileSync(path.join(output, 'ErgoptiPlus.app.zip'), 'utf8'),
-		'owned ZIP bytes'
-	);
-	assert.deepEqual(
-		fs.readdirSync(output).sort(),
-		['ErgoptiPlus.app.tar.xz', 'ErgoptiPlus.app.zip'],
-		'Successful producer retires only its own temporary directory'
-	);
-	// The native Mac display packet uses this exact commented prefix. Execute
-	// the real archive owner so parsing must reach both strict -R readbacks.
-	const ownedRequirement =
-		'cdhash H"f4b0db2f3ac57d0549d20a3881cd297234fd2e55" or cdhash H"f486f124189b5b56aadf11f0c157456d93c0b6cd"';
-	const bareDesignation = 'designated => ' + ownedRequirement + '\n';
-	const commentedDesignation = '# designated => ' + ownedRequirement + '\n';
-	const displayCases = [
-		['bare-stdout', { stdout: bareDesignation, stderr: '' }, true],
-		['bare-stderr', { stdout: '', stderr: bareDesignation }, true],
-		['commented-stdout', { stdout: commentedDesignation, stderr: '' }, true],
-		['commented-stderr', { stdout: '', stderr: commentedDesignation }, true],
-		['missing', { stdout: 'owned unrelated output\n', stderr: '' }, false],
-		['empty-bare', { stdout: 'designated => \n', stderr: '' }, false],
-		['empty-commented', { stdout: '# designated => \n', stderr: '' }, false],
-		['duplicate-bare', { stdout: bareDesignation + bareDesignation, stderr: '' }, false],
-		[
-			'duplicate-commented',
-			{ stdout: commentedDesignation + commentedDesignation, stderr: '' },
-			false
-		],
-		['mixed-duplicate', { stdout: bareDesignation, stderr: commentedDesignation }, false],
-		[
-			'trailing-empty-commented',
-			{ stdout: bareDesignation + '# designated => \n', stderr: '' },
-			false
-		],
-		[
-			'trailing-empty-bare',
-			{ stdout: commentedDesignation + 'designated => \n', stderr: '' },
-			false
-		],
-		[
-			'unknown-prefix',
-			{ stdout: '## designated => ' + ownedRequirement + '\n', stderr: '' },
-			false
-		],
-		[
-			'indented-comment',
-			{ stdout: ' # designated => ' + ownedRequirement + '\n', stderr: '' },
-			false
-		],
-		[
-			'missing-separator',
-			{ stdout: '#designated => ' + ownedRequirement + '\n', stderr: '' },
-			false
-		]
-	];
-	for (const [name, display, accepted] of displayCases) {
-		const target = path.join(scratch, 'designation-' + name);
-		fs.mkdirSync(target);
-		const seen = [];
-		const invoke = () =>
-			Archives.createArchives(app, target, {
-				defaults,
-				execute: native(seen, { output: target, display, requirement: ownedRequirement })
-			});
-		if (accepted) {
-			assert.deepEqual(
-				invoke().map(({ name, format }) => ({ name, format })),
-				Archives.resolveArchives(defaults)
-			);
-			assert.deepEqual(
-				seen,
-				events,
-				name + ' preserves every native signature/archive/readback phase'
-			);
-			assert.deepEqual(fs.readdirSync(target).sort(), [
-				'ErgoptiPlus.app.tar.xz',
-				'ErgoptiPlus.app.zip'
-			]);
-		} else {
-			assert.throws(invoke, /no unique designated requirement/, name);
-			assert.deepEqual(
-				seen,
-				['verify-source', 'requirement'],
-				name + ' refuses before creating archives'
-			);
-			assert.deepEqual(fs.readdirSync(target), [], name + ' publishes no output');
-		}
-	}
-	const refusedDisplay = path.join(scratch, 'designation-native-refusal');
-	fs.mkdirSync(refusedDisplay);
-	const displayEvents = [];
-	assert.throws(
-		() =>
-			Archives.createArchives(app, refusedDisplay, {
-				defaults,
-				execute: native(displayEvents, {
-					output: refusedDisplay,
-					displayFailure: true,
-					display: { stdout: commentedDesignation, stderr: '' }
-				})
-			}),
-		/owned native requirement display refusal/
-	);
-	assert.deepEqual(displayEvents, ['verify-source', 'requirement']);
-	assert.deepEqual(
-		fs.readdirSync(refusedDisplay),
-		[],
-		'Native display failure cannot authorize comment parsing'
-	);
-	for (const kind of ['bytes', 'mode', 'link']) {
-		const refused = path.join(scratch, kind);
-		fs.mkdirSync(refused);
-		assert.throws(
-			() =>
-				Archives.createArchives(app, refused, {
-					defaults,
-					execute: native([], { output: refused, kind })
-				}),
-			/changed bundle/,
-			kind
+		};
+		const output = path.join(scratch, 'valid');
+		fs.mkdirSync(output);
+		const events = [];
+		const produced = Archives.createArchives(app, output, {
+			defaults,
+			execute: native(events, { output })
+		});
+		assert.deepEqual(events, [
+			'verify-source',
+			'requirement',
+			'create-xz',
+			'extract-xz',
+			'verify-restored',
+			'create-zip',
+			'extract-zip',
+			'verify-restored'
+		]);
+		assert.deepEqual(
+			produced.map(({ name, format }) => ({ name, format })),
+			Archives.resolveArchives(defaults)
+		);
+		assert.equal(
+			fs.readFileSync(path.join(output, 'ErgoptiPlus.app.tar.xz'), 'utf8'),
+			'owned XZ bytes'
+		);
+		assert.equal(
+			fs.readFileSync(path.join(output, 'ErgoptiPlus.app.zip'), 'utf8'),
+			'owned ZIP bytes'
 		);
 		assert.deepEqual(
-			fs.readdirSync(refused),
-			[],
-			'Neither archive is published when native readback changes source semantics'
+			fs.readdirSync(output).sort(),
+			['ErgoptiPlus.app.tar.xz', 'ErgoptiPlus.app.zip'],
+			'Successful producer retires only its own temporary directory'
 		);
-	}
-	for (const kind of ['dangling-link', 'directory']) {
-		const collision = path.join(scratch, 'collision-' + kind);
-		fs.mkdirSync(collision);
-		const held = path.join(collision, 'ErgoptiPlus.app.tar.xz');
-		if (kind === 'dangling-link') fs.symlinkSync('foreign-absent', held);
-		else fs.mkdirSync(held);
-		let started = false;
+		// The native Mac display packet uses this exact commented prefix. Execute
+		// the real archive owner so parsing must reach both strict -R readbacks.
+		const ownedRequirement =
+			'cdhash H"f4b0db2f3ac57d0549d20a3881cd297234fd2e55" or cdhash H"f486f124189b5b56aadf11f0c157456d93c0b6cd"';
+		const bareDesignation = 'designated => ' + ownedRequirement + '\n';
+		const commentedDesignation = '# designated => ' + ownedRequirement + '\n';
+		const displayCases = [
+			['bare-stdout', { stdout: bareDesignation, stderr: '' }, true],
+			['bare-stderr', { stdout: '', stderr: bareDesignation }, true],
+			['commented-stdout', { stdout: commentedDesignation, stderr: '' }, true],
+			['commented-stderr', { stdout: '', stderr: commentedDesignation }, true],
+			['missing', { stdout: 'owned unrelated output\n', stderr: '' }, false],
+			['empty-bare', { stdout: 'designated => \n', stderr: '' }, false],
+			['empty-commented', { stdout: '# designated => \n', stderr: '' }, false],
+			['duplicate-bare', { stdout: bareDesignation + bareDesignation, stderr: '' }, false],
+			[
+				'duplicate-commented',
+				{ stdout: commentedDesignation + commentedDesignation, stderr: '' },
+				false
+			],
+			['mixed-duplicate', { stdout: bareDesignation, stderr: commentedDesignation }, false],
+			[
+				'trailing-empty-commented',
+				{ stdout: bareDesignation + '# designated => \n', stderr: '' },
+				false
+			],
+			[
+				'trailing-empty-bare',
+				{ stdout: commentedDesignation + 'designated => \n', stderr: '' },
+				false
+			],
+			[
+				'unknown-prefix',
+				{ stdout: '## designated => ' + ownedRequirement + '\n', stderr: '' },
+				false
+			],
+			[
+				'indented-comment',
+				{ stdout: ' # designated => ' + ownedRequirement + '\n', stderr: '' },
+				false
+			],
+			[
+				'missing-separator',
+				{ stdout: '#designated => ' + ownedRequirement + '\n', stderr: '' },
+				false
+			]
+		];
+		for (const [name, display, accepted] of displayCases) {
+			const target = path.join(scratch, 'designation-' + name);
+			fs.mkdirSync(target);
+			const seen = [];
+			const invoke = () =>
+				Archives.createArchives(app, target, {
+					defaults,
+					execute: native(seen, { output: target, display, requirement: ownedRequirement })
+				});
+			if (accepted) {
+				assert.deepEqual(
+					invoke().map(({ name, format }) => ({ name, format })),
+					Archives.resolveArchives(defaults)
+				);
+				assert.deepEqual(
+					seen,
+					events,
+					name + ' preserves every native signature/archive/readback phase'
+				);
+				assert.deepEqual(fs.readdirSync(target).sort(), [
+					'ErgoptiPlus.app.tar.xz',
+					'ErgoptiPlus.app.zip'
+				]);
+			} else {
+				assert.throws(invoke, /no unique designated requirement/, name);
+				assert.deepEqual(
+					seen,
+					['verify-source', 'requirement'],
+					name + ' refuses before creating archives'
+				);
+				assert.deepEqual(fs.readdirSync(target), [], name + ' publishes no output');
+			}
+		}
+		const refusedDisplay = path.join(scratch, 'designation-native-refusal');
+		fs.mkdirSync(refusedDisplay);
+		const displayEvents = [];
 		assert.throws(
 			() =>
-				Archives.createArchives(app, collision, {
+				Archives.createArchives(app, refusedDisplay, {
+					defaults,
+					execute: native(displayEvents, {
+						output: refusedDisplay,
+						displayFailure: true,
+						display: { stdout: commentedDesignation, stderr: '' }
+					})
+				}),
+			/owned native requirement display refusal/
+		);
+		assert.deepEqual(displayEvents, ['verify-source', 'requirement']);
+		assert.deepEqual(
+			fs.readdirSync(refusedDisplay),
+			[],
+			'Native display failure cannot authorize comment parsing'
+		);
+		for (const kind of ['bytes', 'mode', 'link']) {
+			const refused = path.join(scratch, kind);
+			fs.mkdirSync(refused);
+			assert.throws(
+				() =>
+					Archives.createArchives(app, refused, {
+						defaults,
+						execute: native([], { output: refused, kind })
+					}),
+				/changed bundle/,
+				kind
+			);
+			assert.deepEqual(
+				fs.readdirSync(refused),
+				[],
+				'Neither archive is published when native readback changes source semantics'
+			);
+		}
+		for (const kind of ['dangling-link', 'directory']) {
+			const collision = path.join(scratch, 'collision-' + kind);
+			fs.mkdirSync(collision);
+			const held = path.join(collision, 'ErgoptiPlus.app.tar.xz');
+			if (kind === 'dangling-link') fs.symlinkSync('foreign-absent', held);
+			else fs.mkdirSync(held);
+			let started = false;
+			assert.throws(
+				() =>
+					Archives.createArchives(app, collision, {
+						defaults,
+						execute: () => {
+							started = true;
+						}
+					}),
+				/already exists/
+			);
+			assert.equal(started, false, 'A foreign output never starts a native writer');
+			assert.equal(fs.lstatSync(held).isSymbolicLink(), kind === 'dangling-link');
+		}
+		const aliased = path.join(scratch, 'foreign-root.app');
+		fs.symlinkSync(app, aliased);
+		assert.throws(
+			() =>
+				Archives.createArchives(aliased, output, {
 					defaults,
 					execute: () => {
-						started = true;
+						throw new Error('No native tool may start');
+					}
+				}),
+			/physical directory/
+		);
+		const rejectedSignature = path.join(scratch, 'rejected-signature');
+		fs.mkdirSync(rejectedSignature);
+		assert.throws(
+			() =>
+				Archives.createArchives(app, rejectedSignature, {
+					defaults,
+					execute: () => {
+						throw new Error('owned native signature refusal');
+					}
+				}),
+			/owned native signature refusal/
+		);
+		assert.deepEqual(
+			fs.readdirSync(rejectedSignature),
+			[],
+			'Input signature refusal creates no archive or extraction stage'
+		);
+		const racedOutput = path.join(scratch, 'raced-publication');
+		fs.mkdirSync(racedOutput);
+		const raceEvents = [];
+		const runRace = native(raceEvents, { output: racedOutput });
+		assert.throws(
+			() =>
+				Archives.createArchives(app, racedOutput, {
+					defaults,
+					execute: (...args) => {
+						const result = runRace(...args);
+						if (raceEvents.filter((event) => event === 'verify-restored').length === 2)
+							fs.writeFileSync(
+								path.join(racedOutput, 'ErgoptiPlus.app.zip'),
+								'foreign publication'
+							);
+						return result;
+					}
+				}),
+			{ code: 'EEXIST' },
+			'Publication cannot replace a foreign file created after preflight'
+		);
+		assert.equal(
+			fs.readFileSync(path.join(racedOutput, 'ErgoptiPlus.app.zip'), 'utf8'),
+			'foreign publication'
+		);
+		const preexisting = path.join(output, 'ErgoptiPlus.app.zip');
+		const held = fs.readFileSync(preexisting);
+		assert.throws(
+			() =>
+				Archives.createArchives(app, output, {
+					defaults,
+					execute: () => {
+						throw new Error('Native process must not start');
 					}
 				}),
 			/already exists/
 		);
-		assert.equal(started, false, 'A foreign output never starts a native writer');
-		assert.equal(fs.lstatSync(held).isSymbolicLink(), kind === 'dangling-link');
+		assert.deepEqual(
+			fs.readFileSync(preexisting),
+			held,
+			'The producer never replaces an existing output'
+		);
+		assert.equal(
+			fs.readFileSync(path.join(resources, 'données.txt'), 'utf8'),
+			'Independent Unicode bytes: café 😀\n'
+		);
+		assert.equal(fs.lstatSync(path.join(resources, 'données.txt')).mode & 0o777, 0o751);
+		assert.equal(fs.readlinkSync(path.join(resources, 'owned-link')), 'données.txt');
+	} finally {
+		fs.rmSync(scratch, { recursive: true });
 	}
-	const aliased = path.join(scratch, 'foreign-root.app');
-	fs.symlinkSync(app, aliased);
-	assert.throws(
-		() =>
-			Archives.createArchives(aliased, output, {
-				defaults,
-				execute: () => {
-					throw new Error('No native tool may start');
-				}
-			}),
-		/physical directory/
+}
+
+const {
+	ArchiveContractFilesystem,
+	loadArchiveProducer,
+	verifyArchiveFilesystemModel
+} = require('./fixtures/archive-contract-filesystem.cjs');
+verifyArchiveFilesystemModel(os.tmpdir());
+const ContractFilesystem = new ArchiveContractFilesystem(os.tmpdir());
+const ProducerPath = path.join(ROOT, 'tools', 'build', 'macos-release-archives.cjs');
+verifyArchiveProducerContracts(
+	ContractFilesystem,
+	loadArchiveProducer(ProducerPath, ContractFilesystem)
+);
+if (process.platform !== 'win32') {
+	verifyArchiveProducerContracts(fs, Archives);
+} else {
+	console.log(
+		'[INFO] Physical POSIX archive filesystem checks require POSIX; mandatory model contracts passed.'
 	);
-	const rejectedSignature = path.join(scratch, 'rejected-signature');
-	fs.mkdirSync(rejectedSignature);
-	assert.throws(
-		() =>
-			Archives.createArchives(app, rejectedSignature, {
-				defaults,
-				execute: () => {
-					throw new Error('owned native signature refusal');
-				}
-			}),
-		/owned native signature refusal/
-	);
-	assert.deepEqual(
-		fs.readdirSync(rejectedSignature),
-		[],
-		'Input signature refusal creates no archive or extraction stage'
-	);
-	const racedOutput = path.join(scratch, 'raced-publication');
-	fs.mkdirSync(racedOutput);
-	const raceEvents = [];
-	const runRace = native(raceEvents, { output: racedOutput });
-	assert.throws(
-		() =>
-			Archives.createArchives(app, racedOutput, {
-				defaults,
-				execute: (...args) => {
-					const result = runRace(...args);
-					if (raceEvents.filter((event) => event === 'verify-restored').length === 2)
-						fs.writeFileSync(path.join(racedOutput, 'ErgoptiPlus.app.zip'), 'foreign publication');
-					return result;
-				}
-			}),
-		{ code: 'EEXIST' },
-		'Publication cannot replace a foreign file created after preflight'
-	);
-	assert.equal(
-		fs.readFileSync(path.join(racedOutput, 'ErgoptiPlus.app.zip'), 'utf8'),
-		'foreign publication'
-	);
-	const preexisting = path.join(output, 'ErgoptiPlus.app.zip');
-	const held = fs.readFileSync(preexisting);
-	assert.throws(
-		() =>
-			Archives.createArchives(app, output, {
-				defaults,
-				execute: () => {
-					throw new Error('Native process must not start');
-				}
-			}),
-		/already exists/
-	);
-	assert.deepEqual(
-		fs.readFileSync(preexisting),
-		held,
-		'The producer never replaces an existing output'
-	);
-	assert.equal(
-		fs.readFileSync(path.join(resources, 'données.txt'), 'utf8'),
-		'Independent Unicode bytes: café 😀\n'
-	);
-	assert.equal(fs.lstatSync(path.join(resources, 'données.txt')).mode & 0o777, 0o751);
-	assert.equal(fs.readlinkSync(path.join(resources, 'owned-link')), 'données.txt');
-} finally {
-	fs.rmSync(scratch, { recursive: true });
 }
 
 if (errors.length > 0) {
