@@ -2268,6 +2268,29 @@ Partial: the existing macOS native install diagnostic now owns a bounded sampler
 
 TODO 109 remains partial. The managed macOS bootstrap now records the public hs.allowAppleScript() getter, a validated in-process PID and the callable Lua bridge through the existing synchronous boot journal before onboarding can defer boot. Getter observation uses no setter argument and preserves bridge identity; malformed, thrown or missing getters remain unknown. Exact Boolean publication ACK is required, and refusal cannot gain boot authority. Portable registered journal/lifecycle tests pass 16/0 and 9/0; original-source and five behavioral mutations fail. Actual managed macOS observations are pending CI. Callable Lua bridge state does not prove native AppleEvent handler registration or entry, and the existing strict send/timeout/cleanup assertions remain unchanged. The previously observed clean/Karabiner no-prompt -1712 boundary is still unresolved.
 
+- [ ] **111.** Provide two distinct, explicitly labelled shared window-switching
+      actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
+      (the native equivalent on macOS), and switching only among windows on the display
+      containing the **current mouse cursor**. Resolve that display at invocation; never
+      substitute the active window's display or silently fall back to the global
+      switcher. Reuse existing action identities where their contracts match, preserving
+      saved bindings and current native window/lifecycle policies. Native adapters own
+      window eligibility, monitor geometry and activation; define the existing placement
+      rule for windows spanning displays. Offer a translated unavailability reason where
+      the desktop/compositor cannot provide the scoped operation. Do not add a
+      monitor-selection setting. Test cursor and active window on different displays,
+      moved cursors, spanning/minimized/closed windows, activation refusal and
+      unsupported display access through the real action providers, then qualify actual
+      two-display behavior on each supported OS.
+
+Windows already has `app_switcher` (native Alt+Tab) and `alt_tab_monitor`
+(current pointer display, candidate-window centre filtering); verify that the
+picker exposes both intended contracts clearly. macOS has cursor-display
+window cycling, while the native system switcher is currently unavailable.
+Linux currently emits global Alt+Tab for `alt_tab_monitor`: this alias does not
+fulfil the scoped contract and must be implemented or explicitly unavailable.
+Existing distinct action labels already have all 21 translations.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
