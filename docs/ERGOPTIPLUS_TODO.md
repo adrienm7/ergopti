@@ -1085,12 +1085,22 @@ These are software implementations; final hardware verification remains below.
   The global participant retains the successful scope receipt and restores that
   sibling on a later category refusal; a failed parent inverse restores its own
   removed import before compiling the pre-inverse settings. Observed source changes
-  refuse cleanup; the native unlink boundary still needs cooperative locking.
+  refuse cleanup; conditional unlink now shares the native cooperative lease.
   Native recovery alone cannot acknowledge the parent's
   still-owed inverse. Portable actual-owner tests control filesystem, Karabiner
   and later-category boundaries; they do not qualify physical macOS input.
   Full native units, E2E, packaging, installation and real-device validation
   remain required with the final shared layer-removal prerequisite.
+
+  Conditional macOS removal now rechecks exact source bytes and the resolved
+  route while holding the canonical writer lease. A refused unlock or close
+  retains its exact cleanup capability in the layer, generic scope transaction
+  and remap cohort; neither absence nor a no-effect inverse can acknowledge
+  release debt. Existing assertions remain intact, and real-file cooperating
+  writer, refusal and final-parent regressions fail against the original owners.
+  An editor ignoring the advisory lease can still replace a path between source
+  comparison and unlink. Full selected and hosted native qualification remain
+  required; this bounded correction does not complete item 5.
 
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
