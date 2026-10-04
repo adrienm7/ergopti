@@ -970,6 +970,18 @@ These are software implementations; final hardware verification remains below.
   their native FileSystem ports by source; their native gates remain with the
   principal agent. Shared commit parsing, reserved TOML persistence, window
   titles and autostart placement were not modified.
+- [~] **L73.** Linux checked command capture: require a completion trailer after
+  successful stdout transmission, preserve read/close refusals, and close/reap
+  the pipe even when reading raises. A complete leading status/length frame
+  previously certified success after its native transmitter exited nonzero;
+  LuaJIT pclose can hide that exit. One of seven native-process cases fails
+  before and all pass after. The failure case uses a controlled native utility
+  that calls real cat then exits 17; this is a simulated utility failure, not a
+  hardware fault. Five simulated libc regression cases cover read/close errors,
+  exceptions and the absent trailer; existing process-status fixtures carry the
+  new completion frame with their assertions intact. macOS and Windows use
+  different native process-capture mechanisms without this temporary-file
+  transmitter protocol. Their native suites and reserved subjects were untouched.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -97,5 +97,29 @@ check("native nonzero completion preserves its status without copying stdout int
 	for _, line in ipairs(Logger.ring_buffer_snapshot()) do assert(not line:find(CANARY, 1, true)) end
 end)
 
+check("native receipt transmitter failure cannot certify complete stdout", function()
+	-- This controlled native utility emits all bytes through the real cat and
+	-- then exits 17. No Lua pipe is mocked: LuaJIT discards that child's status,
+	-- so a complete leading frame alone cannot certify capture completion.
+	local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-capture-receipt-XXXXXX"))
+	local path = directory .. "/cat"
+	local descriptor = assert(uv.fs_open(path, "w", 448))
+	assert(uv.fs_write(descriptor, '#!/bin/sh\n/bin/cat "$@" || exit $?\nexit 17\n', 0))
+	assert(uv.fs_close(descriptor))
+	local previous_path = assert(os.getenv("PATH"))
+	assert(uv.os_setenv("PATH", directory .. ":" .. previous_path))
+	local ok, err = xpcall(function()
+		local accepted, output, reason = fresh_shell().exec_checked("printf '%s' " .. CANARY)
+		assert(not accepted, "failed native receipt transmitter certified success")
+		assert(output == CANARY, "completed caller bytes were lost on transmitter failure")
+		assert(type(reason) == "string" and reason ~= "", "transmitter failure lost its diagnostic")
+		assert(not reason:find(CANARY, 1, true), "transmitter failure exposed caller bytes")
+	end, debug.traceback)
+	assert(uv.os_setenv("PATH", previous_path))
+	assert(uv.fs_unlink(path))
+	assert(uv.fs_rmdir(directory))
+	assert(ok, err)
+end)
+
 print(string.format("Native shell capture error receipts: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

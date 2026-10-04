@@ -55,6 +55,9 @@ local QUOTE_ESCAPE = "'\\''"
 -- the boolean true from Lua 5.2 onwards. Both spellings must be accepted.
 local EXIT_SUCCESS = 0
 
+-- Written only after the stdout transmitter succeeds, beyond caller bytes.
+local CHECKED_CAPTURE_TRAILER = "\nERGOPTI_CAPTURE_COMPLETE\n"
+
 -- Default opening token of a stdin heredoc for this driver. The framing itself
 -- lives in _shared/lua/shell/heredoc.lua.
 local HEREDOC_BASE_TOKEN = "ERGOPTI_STDIN"
@@ -251,8 +254,9 @@ function M.exec_checked(cmd, options)
 		-- LuaJIT's io.popen handle does not preserve a child's non-zero status on
 		-- every libc/runtime combination. Run the caller's command in a nested
 		-- shell, buffer stdout in an atomically-created file, and frame the result
-		-- with an unambiguous status/byte-count header. The length check makes a
-		-- failed or truncated cat an explicit failure too.
+		-- with an unambiguous status/byte-count header and completion trailer.
+		-- A cat can emit every byte and still fail; only its successful completion
+		-- admits the trailer, even when LuaJIT drops the outer shell's exit code.
 		-- An owner with a selected runtime directory can stage its receipt there,
 		-- independently of a different TMPDIR that may be unavailable.
 		local wrapper = table.concat({
@@ -262,7 +266,8 @@ function M.exec_checked(cmd, options)
 			"status=$?",
 			"byte_count=$(wc -c <\"$output\") || exit 125",
 			"printf '%s %s\\n' \"$status\" \"$byte_count\"",
-			"cat -- \"$output\"",
+			"cat -- \"$output\" || exit 125",
+			"printf '%s' " .. M.quote(CHECKED_CAPTURE_TRAILER),
 		}, "\n")
 		local framed_command = "sh -c " .. M.quote(wrapper)
 			.. " ergopti-exec-checked " .. M.quote(cmd)
@@ -274,17 +279,31 @@ function M.exec_checked(cmd, options)
 			local code = type(open_errno) == "number" and tostring(open_errno) or "unavailable"
 			return false, "", "pipe open failed (errno " .. code .. ")"
 		end
-		local framed = pipe:read("*a")
-		pipe:close()
-		local status, byte_count, content
+		-- Close even when reading raises: pclose also reaps the native child.
+		-- Native error text may contain the command, so retain only fixed reasons.
+		local read_ok, framed, read_error = pcall(pipe.read, pipe, "*a")
+		local close_ok, closed = pcall(pipe.close, pipe)
+		if not read_ok or read_error ~= nil or type(framed) ~= "string" then
+			return false, "", "native pipe read failed"
+		end
+		local status, byte_count, payload
 		if type(framed) == "string" then
-			status, byte_count, content = framed:match("^(%d+) (%d+)\n(.*)$")
+			status, byte_count, payload = framed:match("^(%d+) (%d+)\n(.*)$")
 		end
 		if not status then
 			return false, "", "checked command did not return a status frame"
 		end
-		if #content ~= tonumber(byte_count) then
+		local count = tonumber(byte_count)
+		local content = payload:sub(1, count)
+		if #content ~= count then
 			return false, content, "checked command output was truncated"
+		end
+		if not close_ok then return false, "", "native pipe close failed" end
+		if closed ~= true and closed ~= EXIT_SUCCESS then
+			return false, content, "native pipe close failed"
+		end
+		if payload:sub(count + 1) ~= CHECKED_CAPTURE_TRAILER then
+			return false, content, "checked command capture did not complete"
 		end
 		if tonumber(status) ~= EXIT_SUCCESS then
 			return false, content, "command exited with status " .. status
