@@ -180,6 +180,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_openssl_exit_receipts.lua
         timeout-minutes: 2
 
+      - name: Reject unsuccessful native process supervision receipts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_supervision_receipts.lua
+        timeout-minutes: 1
+
       - name: Refuse incomplete native diagnostics exports
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
