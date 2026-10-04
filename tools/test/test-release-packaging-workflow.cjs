@@ -1013,7 +1013,7 @@ const macosSmokeStep = releaseStep(
 if (macosSmokeStep !== null) {
 	for (const token of [
 		'python3 tools/diagnostics/macos_release_launch_test.py',
-		'ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications',
+		'node tools/build/macos-release-archives.cjs --ci-install',
 		'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app'
 	]) {
 		if (!macosSmokeStep.includes(token)) {
@@ -1022,16 +1022,18 @@ if (macosSmokeStep !== null) {
 	}
 }
 
-// The zip is smoked, then signed, and the appcast embeds that signature; the
+// The preferred archive is smoked, then the historical ZIP is signed; the
 // upload must follow every file it carries. A signature or keylayout step
 // moved past the upload leaves its file out, and the release preflight then
 // stops the whole release after every box has run.
 const MACOS_ORDER = [
 	'Build ErgoptiPlus.app',
+	'Record signed CI archive source',
 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
 	'Install Sparkle signing tool',
 	'Sign zip with Sparkle EdDSA key',
 	'Generate Sparkle appcast',
+	'Upload the independent CI archive source',
 	'Upload the package'
 ];
 const packageMacosSteps = pipeline
@@ -1410,6 +1412,398 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 		'an artifact cannot override the original failed launch job'
 	);
 }
+
+// CI_ARCHIVE_WORKFLOW_TESTS_BEGIN
+{
+	const assert = require('node:assert/strict');
+	const ownerPipeline = require('./ci-pipeline.cjs');
+	/** Require the consumed CI policy, separate source authority and installed evidence. */
+	function ciArchiveWorkflowProblems(text) {
+		const problems = [];
+		const jobs = ownerPipeline.jobsOfText(text);
+		const job = (id) => {
+			const matches = jobs.filter((candidate) => candidate.id === id);
+			assert.equal(matches.length, 1);
+			return matches[0].body;
+		};
+		const packageJob = job('package-macos'),
+			launchJob = job('launch');
+		const step = (body, name) => ownerPipeline.step(body, name);
+		const script = (body, name) => ownerPipeline.runOf(step(body, name)).join('\n');
+		const packageSteps = ownerPipeline.steps(packageJob).map((candidate) => candidate.name);
+		const ordered = [
+			'Build ErgoptiPlus.app',
+			'Record signed CI archive source',
+			'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
+			'Upload the independent CI archive source',
+			'Upload the package'
+		];
+		if (
+			ordered.some(
+				(name, index) =>
+					packageSteps.indexOf(name) < 0 ||
+					(index > 0 && packageSteps.indexOf(name) <= packageSteps.indexOf(ordered[index - 1]))
+			)
+		)
+			problems.push('source_order');
+		const source = step(packageJob, 'Record signed CI archive source');
+		if (
+			ownerPipeline.stepField(source, 'if') !== null ||
+			ownerPipeline.stepField(source, 'continue-on-error') !== null ||
+			!script(packageJob, 'Record signed CI archive source')
+				.replace(/\s+/g, ' ')
+				.includes('--ci-receipt "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"')
+		)
+			problems.push('source_owner');
+		const smoke = script(packageJob, 'Smoke test built ErgoptiPlus.app (crash-on-launch guard)');
+		if (
+			!smoke.includes('--ci-install "$PWD/build/macos" /Applications') ||
+			smoke.includes('ditto -x -k') ||
+			!smoke.includes('test ! -e /Applications/ErgoptiPlus.app')
+		)
+			problems.push('package_install');
+		const sourceUpload = step(packageJob, 'Upload the independent CI archive source');
+		if (
+			!sourceUpload.includes('name: ci-macos-archive-source') ||
+			!sourceUpload.includes('if-no-files-found: error') ||
+			!sourceUpload.includes('path: build/macos/ErgoptiPlus.app.ci-receipt.json') ||
+			step(packageJob, 'Upload the package').includes('.ci-receipt.json')
+		)
+			problems.push('ci_only_authority');
+		const sourceDownload = step(launchJob, 'Download the independent CI archive source');
+		if (
+			!sourceDownload.includes('name: ci-macos-archive-source') ||
+			!sourceDownload.includes('path: ${{ runner.temp }}/package')
+		)
+			problems.push('source_download');
+		const launchSteps = ownerPipeline.steps(launchJob).map((candidate) => candidate.name);
+		if (
+			launchSteps.indexOf('Download the independent CI archive source') >=
+			launchSteps.indexOf('Install the package the way a user does')
+		)
+			problems.push('download_order');
+		const install = script(launchJob, 'Install the package the way a user does');
+		if (
+			!install.includes('--ci-install "$RUNNER_TEMP/package" /Applications "$stamp"') ||
+			install.includes('ditto -x -k') ||
+			!install.includes(
+				"process.stdout.write('MACOS_INSTALL_ARCHIVE=' + receipt.archive + '\\n')"
+			) ||
+			!install.includes('test ! -e /Applications/ErgoptiPlus.app')
+		)
+			problems.push('launch_install');
+		const evidence = script(launchJob, 'Record mandatory launch evidence');
+		if (!evidence.includes('"$MACOS_INSTALL_ARCHIVE"') || evidence.includes('ErgoptiPlus.app.zip'))
+			problems.push('installed_evidence');
+		return problems;
+	}
+	const workflow = ownerPipeline.file('.github/workflows/ci-macos.yml');
+	assert.deepEqual(ciArchiveWorkflowProblems(workflow), []);
+	const faults = [
+		[
+			'source_owner',
+			'"$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"',
+			'"$PWD/build/macos/Foreign.app" "$PWD/build/macos"'
+		],
+		[
+			'package_install',
+			'--ci-install "$PWD/build/macos" /Applications',
+			'ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications'
+		],
+		[
+			'launch_install',
+			'--ci-install "$RUNNER_TEMP/package" /Applications "$stamp"',
+			'ditto -x -k "$zip" /Applications'
+		],
+		[
+			'installed_evidence',
+			'"$MACOS_INSTALL_ARCHIVE"',
+			'"$RUNNER_TEMP/package/ErgoptiPlus.app.zip"'
+		],
+		[
+			'source_download',
+			'name: ci-macos-archive-source\n          path: ${{ runner.temp }}/package',
+			'name: foreign-source\n          path: ${{ runner.temp }}/package'
+		],
+		[
+			'ci_only_authority',
+			'path: build/macos/ErgoptiPlus.app.ci-receipt.json',
+			'path: build/macos/foreign.json'
+		]
+	];
+	for (const [expected, before, after] of faults) {
+		assert.ok(workflow.includes(before), expected + ' mutation must change the actual source');
+		assert.ok(
+			ciArchiveWorkflowProblems(workflow.replace(before, after)).includes(expected),
+			expected
+		);
+	}
+	console.log(`CI installed-archive workflow cases: ${faults.length + 1}`);
+}
+// CI_ARCHIVE_WORKFLOW_TESTS_END
+
+// CI_ARCHIVE_OWNED_TESTS_BEGIN
+{
+	const assert = require('node:assert/strict');
+	const os = require('node:os');
+	const owner = require('../build/macos-release-archives.cjs');
+	const defaults = JSON.parse(
+		fs.readFileSync(require('../lib/paths.cjs').shared('modules/updater/defaults.json'), 'utf8')
+	);
+	const bindings = owner.resolveArchives(defaults);
+	const basename = bindings[0].name.slice(0, -'.tar.xz'.length);
+	let cases = 0;
+	const fixture = (body) => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-archive-owned-'));
+		try {
+			const app = path.join(root, basename),
+				input = path.join(root, 'archives'),
+				destination = path.join(root, 'installed');
+			for (const dir of [app, input, destination]) fs.mkdirSync(dir);
+			fs.writeFileSync(path.join(app, 'independent.txt'), 'Independent source bytes: café\n', {
+				mode: 0o751
+			});
+			fs.symlinkSync('independent.txt', path.join(app, 'relative-link'));
+			for (const item of bindings)
+				fs.writeFileSync(path.join(input, item.name), Buffer.from('source-' + item.format));
+			const calls = [];
+			let fault;
+			const execute = (executable, args) => {
+				calls.push({ executable, args: [...args] });
+				if (fault) {
+					const reason = fault(executable, args);
+					if (reason) throw Error(reason);
+				}
+				if (args[0] === '-d')
+					return { stdout: '', stderr: '# designated => identifier "independent-source"\n' };
+				if (executable.endsWith('/tar') || executable.endsWith('/ditto')) {
+					const target = args.at(-1);
+					fs.cpSync(app, path.join(target, basename), { recursive: true, verbatimSymlinks: true });
+				}
+				return { stdout: '', stderr: '' };
+			};
+			const options = { defaults, execute };
+			const context = {
+				app,
+				input,
+				destination,
+				calls,
+				options,
+				setFault: (value) => {
+					fault = value;
+				},
+				receipt: path.join(input, basename + '.ci-receipt.json')
+			};
+			body(context);
+			cases++;
+		} finally {
+			fs.rmSync(root, { recursive: true });
+		}
+	};
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const receipt = JSON.parse(fs.readFileSync(c.receipt));
+		assert.equal(receipt.requirement, 'identifier "independent-source"');
+		assert.equal(c.calls[0].executable, '/usr/bin/codesign');
+		assert.deepEqual(c.calls[0].args.slice(0, 3), ['--verify', '--deep', '--strict']);
+		const result = owner.installCIArchive(c.input, c.destination, c.options);
+		assert.equal(
+			result.format,
+			'tar.xz',
+			'the actual CI owner selects XZ instead of the old ZIP install'
+		);
+		assert.equal(path.basename(result.archive), bindings[0].name);
+		assert.equal(fs.readFileSync(result.archive, 'utf8'), 'source-tar.xz');
+		assert.equal(
+			fs.readFileSync(path.join(c.destination, basename, 'independent.txt'), 'utf8'),
+			'Independent source bytes: café\n'
+		);
+		assert.equal(
+			fs.readlinkSync(path.join(c.destination, basename, 'relative-link')),
+			'independent.txt'
+		);
+		const verifier = c.calls.find((call) => call.args.includes('-R'));
+		assert.ok(verifier, 'the restored app must use the independent signed source requirement');
+		assert.equal(verifier.args[verifier.args.indexOf('-R') + 1], '=' + receipt.requirement);
+		assert.equal(c.calls.filter((call) => call.executable.endsWith('/ditto')).length, 0);
+	});
+	fixture((c) => {
+		fs.unlinkSync(path.join(c.input, bindings[0].name));
+		owner.createCIReceipt(c.app, c.input, c.options);
+		assert.equal(owner.installCIArchive(c.input, c.destination, c.options).format, 'zip');
+		assert.equal(c.calls.filter((call) => call.executable.endsWith('/tar')).length, 0);
+	});
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const result = owner.installCIArchive(c.input, c.destination, {
+			...c.options,
+			quarantine: 'controlled-quarantine'
+		});
+		const stamp = c.calls.find((call) => call.executable.endsWith('/xattr'));
+		const extract = c.calls.find((call) => call.executable.endsWith('/tar'));
+		assert.ok(stamp);
+		assert.deepEqual(stamp.args, [
+			'-w',
+			'com.apple.quarantine',
+			'controlled-quarantine',
+			result.archive
+		]);
+		assert.ok(c.calls.indexOf(stamp) < c.calls.indexOf(extract));
+	});
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const before = c.calls.length;
+		assert.throws(() =>
+			owner.installCIArchive(c.input, c.destination, { ...c.options, quarantine: 'invalid\nstamp' })
+		);
+		assert.equal(c.calls.length, before);
+		assert.equal(
+			fs.readdirSync(c.input).some((name) => name.startsWith('.ci-install-')),
+			false
+		);
+	});
+	for (const kind of ['empty', 'directory', 'symlink', 'digest', 'unrecorded'])
+		fixture((c) => {
+			owner.createCIReceipt(c.app, c.input, c.options);
+			const preferred = path.join(c.input, bindings[0].name);
+			if (kind === 'empty') fs.writeFileSync(preferred, '');
+			if (kind === 'directory' || kind === 'symlink') fs.unlinkSync(preferred);
+			if (kind === 'directory') fs.mkdirSync(preferred);
+			if (kind === 'symlink') fs.symlinkSync(path.join(c.input, bindings[1].name), preferred);
+			if (kind === 'digest') fs.writeFileSync(preferred, 'changed');
+			if (kind === 'unrecorded') {
+				const receipt = JSON.parse(fs.readFileSync(c.receipt));
+				receipt.archives.shift();
+				fs.writeFileSync(c.receipt, JSON.stringify(receipt));
+			}
+			const before = c.calls.length;
+			assert.throws(() => owner.installCIArchive(c.input, c.destination, c.options));
+			assert.equal(
+				c.calls.length,
+				before,
+				'present refused XZ cannot acquire native extraction or fallback'
+			);
+			assert.equal(fs.existsSync(path.join(c.destination, basename)), false);
+		});
+	for (const kind of [
+		'extract',
+		'signature',
+		'readback',
+		'verified-bundle-race',
+		'payload-race',
+		'destination-race'
+	])
+		fixture((c) => {
+			owner.createCIReceipt(c.app, c.input, c.options);
+			let extracts = 0;
+			c.setFault((executable, args) => {
+				if (executable.endsWith('/tar')) {
+					extracts++;
+					if (kind === 'extract') return 'native extraction refused';
+				}
+				if (args.includes('-R')) {
+					if (kind === 'signature') return 'native signing refused';
+					if (kind === 'verified-bundle-race')
+						fs.writeFileSync(
+							path.join(args.at(-1), 'independent.txt'),
+							'foreign after native verify'
+						);
+					if (kind === 'readback') fs.writeFileSync(path.join(c.app, 'independent.txt'), 'changed');
+					if (kind === 'payload-race')
+						fs.writeFileSync(
+							c.calls.find((call) => call.executable.endsWith('/tar')).args[1],
+							'changed after extraction'
+						);
+					if (kind === 'destination-race') fs.mkdirSync(path.join(c.destination, basename));
+				}
+				return null;
+			});
+			if (kind === 'readback')
+				c.setFault((executable) => {
+					if (executable.endsWith('/tar')) {
+						extracts++;
+						fs.writeFileSync(path.join(c.app, 'independent.txt'), 'changed');
+					}
+					return null;
+				});
+			assert.throws(() => owner.installCIArchive(c.input, c.destination, c.options));
+			assert.equal(extracts, 1);
+			assert.equal(c.calls.filter((call) => call.executable.endsWith('/ditto')).length, 0);
+			assert.equal(
+				fs.readdirSync(c.input).some((name) => name.startsWith('.ci-install-')),
+				false
+			);
+			assert.equal(
+				fs.existsSync(path.join(c.destination, basename)),
+				kind === 'destination-race',
+				'an independently acquired destination survives the refused install'
+			);
+		});
+	for (const kind of [
+		'missing',
+		'malformed',
+		'foreign-bundle',
+		'unknown-fields',
+		'duplicate-binding'
+	])
+		fixture((c) => {
+			owner.createCIReceipt(c.app, c.input, c.options);
+			const receipt = JSON.parse(fs.readFileSync(c.receipt));
+			if (kind === 'missing') fs.unlinkSync(c.receipt);
+			else {
+				if (kind === 'foreign-bundle') receipt.bundle = 'Foreign.app';
+				if (kind === 'unknown-fields') receipt.extra = true;
+				if (kind === 'duplicate-binding') receipt.archives.push(receipt.archives[0]);
+				fs.writeFileSync(c.receipt, kind === 'malformed' ? '[' : JSON.stringify(receipt));
+			}
+			const before = c.calls.length;
+			assert.throws(() => owner.installCIArchive(c.input, c.destination, c.options));
+			assert.equal(c.calls.length, before);
+		});
+	fixture((c) => {
+		owner.createCIReceipt(c.app, c.input, c.options);
+		const originalOpen = fs.openSync;
+		let ownedRefusals = 0;
+		let refused = false;
+		try {
+			fs.openSync = (filename, ...args) => {
+				if (filename === path.join(c.input, bindings[0].name)) {
+					ownedRefusals++;
+					const error = Error('controlled read refusal');
+					error.code = 'EACCES';
+					throw error;
+				}
+				return originalOpen(filename, ...args);
+			};
+			try {
+				owner.installCIArchive(c.input, c.destination, c.options);
+			} catch {
+				refused = true;
+			}
+		} finally {
+			fs.openSync = originalOpen;
+		}
+		assert.equal(refused, true);
+		assert.equal(ownedRefusals, 1);
+		assert.equal(
+			c.calls.filter(
+				(call) => call.executable.endsWith('/tar') || call.executable.endsWith('/ditto')
+			).length,
+			0
+		);
+		assert.equal(
+			fs.readdirSync(c.input).some((name) => name.startsWith('.ci-install-')),
+			false
+		);
+	});
+	fixture((c) => {
+		c.setFault(() => 'independent source signature refused');
+		assert.throws(() => owner.createCIReceipt(c.app, c.input, c.options));
+		assert.equal(fs.existsSync(c.receipt), false);
+	});
+	console.log(`CI archive native-owner portable cases: ${cases}`);
+}
+// CI_ARCHIVE_OWNED_TESTS_END
 
 if (errors.length > 0) {
 	console.error('[ERROR] Release packaging workflow is unsafe:');
