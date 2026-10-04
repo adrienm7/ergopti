@@ -201,6 +201,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_schema_receipts.lua
         timeout-minutes: 1
 
+      - name: Preserve native SQLite device registration and refused transactions
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_registration_receipts.lua
+        timeout-minutes: 1
+
       - name: Preserve SQLite event IDs across native collectors and invalid cursors
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

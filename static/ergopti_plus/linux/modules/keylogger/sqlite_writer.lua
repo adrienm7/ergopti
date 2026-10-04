@@ -343,13 +343,22 @@ end
 --- @param os_name        string "linux".
 --- @param os_version     string Kernel version or distro name.
 --- @param host_signature string Host-specific fingerprint.
+--- @return boolean True only when the native registration write is acknowledged.
 function M.register_device(device_id, device_name, os_name, os_version, host_signature)
-	if not M.is_available() then return end
+	if not M.is_available() then return false end
 
 	local now = os.date("!%Y-%m-%dT%H:%M:%SZ")
 	local sql = string.format([[
-INSERT OR REPLACE INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at)
-VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s');
+BEGIN IMMEDIATE;
+INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at)
+VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s')
+ON CONFLICT(device_id) DO UPDATE SET
+  name = excluded.name,
+  os = excluded.os,
+  os_version = excluded.os_version,
+  host_signature = excluded.host_signature,
+  updated_at = excluded.updated_at;
+COMMIT;
 ]],
 		_sql_escape(device_id),
 		_sql_escape(device_name or device_id),
@@ -358,8 +367,14 @@ VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s');
 		_sql_escape(host_signature or device_id),
 		now, now
 	)
-	_exec(sql)
-	Logger.debug(LOG, "Device '%s' registered.", device_id)
+	-- Refresh host metadata without replacing creation/import fields or schema
+	-- extensions this registration does not own. REPLACE deleted that history.
+	-- FAIL in an AFTER trigger can retain a partial autocommit update. Keep the
+	-- registration in one explicit transaction; -bail closes and rolls it back
+	-- after a refused statement or COMMIT, before the terminal receipt returns.
+	local accepted = _exec(sql)
+	if accepted then Logger.debug(LOG, "Device '%s' registered.", device_id) end
+	return accepted
 end
 
 --- Inserts a batch of keystroke events into the events_typing table.
