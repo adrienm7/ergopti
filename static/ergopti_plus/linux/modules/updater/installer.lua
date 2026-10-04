@@ -65,7 +65,7 @@ end
 
 local function normalise_path(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	path = path:gsub("\\", "/"):gsub("/+", "/")
+	path = Paths.normalize_native_separators(path):gsub("/+", "/")
 	if path:sub(1, 1) ~= "/" then
 		local cwd = os.getenv("PWD")
 		if type(cwd) ~= "string" or cwd == "" then

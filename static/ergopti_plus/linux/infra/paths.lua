@@ -78,6 +78,16 @@ local function current_dir()
 	return out ~= "" and out or nil
 end
 
+--- Normalises native separators without rewriting POSIX filename bytes.
+--- The bootstrap and updater share this boundary; backslash is data on Linux.
+--- @param path string
+--- @return string
+function M.normalize_native_separators(path)
+	assert(type(path) == "string", "native path must be a string")
+	if package.config:sub(1, 1) == "\\" then return (path:gsub("\\", "/")) end
+	return path
+end
+
 --- Anchors a path to the working directory when it is relative.
 ---
 --- A relative root is not a local inconvenience: every path built from it is
@@ -91,18 +101,18 @@ local function absolute(path)
 	if path:sub(1, 1) == "/" or path:match("^%a:/") then return path end
 	local cwd = current_dir()
 	if not cwd then return path end
-	cwd = cwd:gsub("\\", "/"):gsub("/+$", "")
+	cwd = M.normalize_native_separators(cwd):gsub("/+$", "")
 	if path == "." then return cwd end
 	local relative = path:gsub("^%./", "")
 	return cwd .. "/" .. relative
 end
 
 --- The driver root (…/static/ergopti_plus/linux), derived from this file.
---- @return string Absolute path, forward slashes, no trailing slash.
+--- @return string Absolute native path with no trailing slash.
 local function driver_root()
 	local src = debug.getinfo(1, "S").source
 	if src:sub(1, 1) == "@" then src = src:sub(2) end
-	src = src:gsub("\\", "/")
+	src = M.normalize_native_separators(src)
 	-- src is <driver root>/infra/paths.lua
 	return absolute(src:match("^(.*)/infra/paths%.lua$") or ".")
 end

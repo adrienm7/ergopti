@@ -139,6 +139,31 @@ local function resolver_source()
 	return (src:gsub("\\", "/"))
 end
 
+helpers.describe("native path separator policy", function()
+	local cases = {
+		{ separator = "/", prefix = "/synthetic/literal\\backslash", expected = "/synthetic/literal\\backslash" },
+		{ separator = "/", prefix = "/synthetic/double\\\\backslash", expected = "/synthetic/double\\\\backslash" },
+		{ separator = "/", prefix = "/synthetic/\\leading", expected = "/synthetic/\\leading" },
+		{ separator = "\\", prefix = "C:\\synthetic", expected = "C:/synthetic" },
+		{ separator = "\\", prefix = "\\\\server\\share", expected = "//server/share" },
+	}
+	for number, case in ipairs(cases) do
+		helpers.it("linux-native-path-literal: source metadata separator case " .. number, function()
+			local file = assert(io.open(resolver_source(), "rb"))
+			local content = assert(file:read("*a")); assert(file:close())
+			local separator = case.separator
+			local source = "@" .. case.prefix .. separator .. "linux" .. separator .. "infra" .. separator .. "paths.lua"
+			local chunk = assert((loadstring or load)(content, source))
+			local real_config = package.config
+			package.config = separator .. real_config:sub(2)
+			local ok, result = pcall(chunk)
+			package.config = real_config
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.driver_root(), case.expected .. "/linux")
+		end)
+	end
+end)
+
 --- Stages a throwaway driver root holding a copy of the real resolver, plus
 --- whichever shared trees the requested layout calls for, and loads that copy.
 --- @param case string Fixture sub-directory; each case owns its own tree.
