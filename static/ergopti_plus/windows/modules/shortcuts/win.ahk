@@ -469,6 +469,8 @@ if Features["shortcuts"]["search"]["enabled"] {
 		}
 
 		_RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
+				global _SelectionCaptureNextId
+				SelectionId := _SelectionCaptureNextId
 				; Persist first so a refused registry write cannot destroy the user's
 				; currently open Registry Editor session and then reopen a stale key.
 				if !WriteFn.Call("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit",
@@ -476,6 +478,13 @@ if Features["shortcuts"]["search"]["enabled"] {
 						throw Error("Regedit LastKey registry write was refused")
 				if ExistsFn.Call("Registry Editor") && !KillFn.Call("Registry Editor")
 						throw Error("existing Registry Editor window could not be closed")
+				; WinKill pumps messages during its native window delay. A completed
+				; close cannot authorize a new launch after pause or command revocation.
+				if A_IsSuspended || _SelectionCaptureNextId != SelectionId {
+						LoggerInfo("Search", "Registry navigation cancelled before launch: {1}.",
+								A_IsSuspended ? "driver paused" : "selection command superseded")
+						return false
+				}
 				RunFn.Call("Regedit.exe")
 				return true
 		}
