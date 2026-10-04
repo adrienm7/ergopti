@@ -222,8 +222,10 @@ function M.build(ctx, actions)
 		-- out, nobody could tell whether the automatic update exists.
 		local state = type(ctx) == "table" and type(ctx.state) == "table" and ctx.state or {}
 		local seconds = require("modules.updater.auto_check").stored_interval(state)
-		table.insert(menu_items, { label = i18n.get("menu.about.check_for_updates"), disabled = true,
-			disabled_reason_key = "menu.about.source_run_reason" })
+		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+			["about_source_check"] = function() return false end,
+		}, { ["about_source_release_ready"] = function() return not local_src end })
+		if source_row then table.insert(menu_items, source_row) end
 		local frequency_row = frequency_picker(nil, seconds)
 		frequency_row.items = nil
 		frequency_row.disabled = true
