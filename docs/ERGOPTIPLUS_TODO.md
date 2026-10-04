@@ -1567,6 +1567,18 @@ current state has changed. Two causal regressions fail against the preimage;
 ownership is not durable storage, full production history wiring or native
 acceptance. The capture owner remains dormant and TODO31 remains partial.
 
+The dormant startup now runs the real `--hs274-clock` command after pinned
+identity verification. It transfers a validated copied timebase and immutable
+tick converter to an explicitly injected context owner only after successful
+native start, completion and exact settlement; that owner must acknowledge
+before capture opens. Cancellation retains the exact clock task and fences
+successors. Native prepare/status/open remain inside the existing single capture
+process. This prerequisite does not connect production history, enable default
+startup, align producer coverage or qualify native execution. TODO31 remains
+partial. Five causal preimage failures and 37 passing focused portable cases
+cover this prerequisite; the source-selected gate and native qualification
+must cover the final slice.
+
 WP4 remains partial. The diagnostic producer now retains usage page in its
 internal inventory, reconciliation and immutable snapshots. A changed page on
 an admitted element cookie faults the exact state and interrupts its lease;

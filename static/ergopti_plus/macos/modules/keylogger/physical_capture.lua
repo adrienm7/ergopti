@@ -2,8 +2,9 @@
 
 --- Owns one dormant physical capture session and its exact native task lifetime.
 --- A trusted owned-runtime caller must explicitly initialize and start this port.
---- Default boot does not require it. Clock, preparation, retained context and
---- recovery belong to the future runtime owner; this session never retries.
+--- Default boot does not require it. The context owner explicitly accepts the
+--- native clock; preparation/status/open remain in one capture process. Retained
+--- context and recovery belong to the future runtime owner; this never retries.
 local M = {}
 local Logger = require("infra.logger")
 local Accounting = require("modules.keylogger.physical_accounting_mode")
@@ -11,6 +12,7 @@ local Delivery = require("modules.keylogger.physical_delivery")
 local Transport = require("modules.keylogger.physical_transport")
 local Protocol = require("modules.keylogger.physical_protocol")
 local Wire = require("modules.keylogger.physical_wire")
+local Clock = require("modules.keylogger.physical_clock")
 local LOG = "keylogger.physical_capture"
 local OWNER = "modules.keylogger.physical_capture"
 local dependencies, session
@@ -50,9 +52,10 @@ end
 ---@return boolean settled
 local function finish_stop(candidate)
 	if not current(candidate) or not candidate.stop_requested or candidate.acquiring
-		or candidate.accounting_transition then return false end
+		or candidate.accounting_transition or candidate.clock_starting or candidate.clock_publishing then return false end
 	if candidate.state == "stopped" then return true end
 	if candidate.verifier and not candidate.verifier_settled then return false end
+	if candidate.clock and not candidate.clock_settled then return false end
 	if candidate.transport and not candidate.transport.isSettled() then return false end
 	if candidate.accounting_owned then
 		if accounting_transition(candidate, Accounting.release, OWNER) ~= true then return false end
@@ -92,20 +95,11 @@ local function unavailable(candidate, code, message)
 	failed(candidate, message, failure)
 end
 
---- Creates and starts the stream only after verified native identity settlement.
+--- Creates the one native prepare/status/open process after clock ownership.
 ---@param candidate table Captured session identity.
 local function start_stream(candidate)
 	if not current(candidate) or candidate.stop_requested or candidate.failure then return end
-	if not candidate.verifier_observed or not candidate.verifier_settled
-		or candidate.verifier_start_accepted ~= true or candidate.verifier_starting then return end
-	if not candidate.verifier_completed then
-		unavailable(candidate, "identity_verification_incomplete", "Owned identity task settled without a completion verdict")
-		return
-	end
-	if candidate.verification_exit ~= 0 then
-		unavailable(candidate, "identity_verification_refused", "Owned capture executable identity was refused")
-		return
-	end
+	if candidate.clock_published ~= true then return end
 	if candidate.transport then return end
 	candidate.state = "opening"
 	candidate.transport = Transport.new({ receiver = candidate.receiver,
@@ -125,6 +119,113 @@ local function guarded(candidate, operation)
 	if not ok then failed(candidate, tostring(failure), failure) end
 end
 
+--- Transfers a validated timebase only after the exact successful worker retires.
+---@param candidate table Captured session identity.
+local function publish_clock(candidate)
+	if not current(candidate) or candidate.stop_requested or candidate.failure or candidate.clock_published
+		or candidate.clock_publishing or candidate.acquiring or candidate.clock_starting then return end
+	if not candidate.clock_observed or not candidate.clock_settled or candidate.clock_start_accepted ~= true then return end
+	if not candidate.clock_completed then
+		unavailable(candidate, "clock_incomplete", "Native clock task settled without a completion verdict")
+		return
+	end
+	if candidate.clock_exit ~= 0 then
+		unavailable(candidate, "clock_command_refused", "Owned capture executable could not provide its native clock")
+		return
+	end
+	local ok, information, convert = pcall(function()
+		assert(type(candidate.clock_output) == "string" and #candidate.clock_output <= 1024,
+			"Invalid physical clock output")
+		local receipt, decode_error = dependencies.decode(candidate.clock_output)
+		assert(decode_error == nil and type(receipt) == "table", decode_error or "Invalid physical clock JSON")
+		Protocol.require_version("clock", receipt.version, 1)
+		Wire.fields(receipt, { "version", "domain", "numer", "denom" })
+		local snapshot = { version = receipt.version, domain = receipt.domain, numer = receipt.numer, denom = receipt.denom }
+		return snapshot, Clock.new(snapshot)
+	end)
+	if not ok then
+		if Protocol.is_unavailable(information) then failed(candidate, tostring(information), information)
+		else unavailable(candidate, "invalid_clock", tostring(information)) end
+		return
+	end
+	if candidate.stop_requested then finish_stop(candidate); return end
+	if not current(candidate) or candidate.failure then return end
+	-- External context publication may request stop. Keep accounting ownership
+	-- until the callback unwinds, and revalidate before granting stream authority.
+	candidate.clock_publishing = true
+	local published, accepted = pcall(dependencies.clock_ready, information, convert)
+	candidate.clock_publishing = false
+	if candidate.stop_requested then finish_stop(candidate); return end
+	if not current(candidate) or candidate.failure then return end
+	if not published or accepted ~= true then
+		unavailable(candidate, "clock_context_refused", "Context owner refused the validated native clock")
+		return
+	end
+	candidate.clock_published = true
+	start_stream(candidate)
+end
+
+--- Observes exact retirement independently of the clock's success callback.
+---@param candidate table Captured session identity.
+local function observe_clock(candidate)
+	if candidate.clock_observed then return end
+	local accepted = candidate.clock.onSettled(function()
+		if not current(candidate) or candidate.clock_settled then return end
+		candidate.clock_settled = true
+		guarded(candidate, function()
+			if candidate.stop_requested then finish_stop(candidate) else publish_clock(candidate) end
+		end)
+	end)
+	assert(accepted == true, "Physical clock settlement observer refused")
+	candidate.clock_observed = true
+end
+
+--- Starts the existing clock CLI only after pinned identity success and retirement.
+---@param candidate table Captured session identity.
+local function start_clock(candidate)
+	if not current(candidate) or candidate.stop_requested or candidate.failure then return end
+	if not candidate.verifier_observed or not candidate.verifier_settled
+		or candidate.verifier_start_accepted ~= true or candidate.verifier_starting then return end
+	if not candidate.verifier_completed then
+		unavailable(candidate, "identity_verification_incomplete", "Owned identity task settled without a completion verdict")
+		return
+	end
+	if candidate.verification_exit ~= 0 then
+		unavailable(candidate, "identity_verification_refused", "Owned capture executable identity was refused")
+		return
+	end
+	if candidate.clock_attempted then return end
+	candidate.clock_attempted, candidate.acquiring, candidate.state = true, true, "clocking"
+	local ok, failure = pcall(function()
+		candidate.clock = dependencies.spawn(candidate.options.executable, { "--hs274-clock" }, function(code, stdout)
+			if not current(candidate) or candidate.clock_completed then return end
+			candidate.clock_completed, candidate.clock_exit, candidate.clock_output = true, code, stdout
+			guarded(candidate, function() publish_clock(candidate) end)
+		end)
+		candidate.acquiring = false
+		assert(type(candidate.clock) == "table", "Physical clock task was not created")
+		observe_clock(candidate)
+		if candidate.stop_requested then
+			if not candidate.clock_settled then candidate.clock.terminate() end
+			finish_stop(candidate)
+			return
+		end
+		assert(not candidate.clock_settled, "Physical clock task settled before start")
+		candidate.clock_starting = true
+		local started = candidate.clock.start()
+		candidate.clock_start_accepted = started == true
+		candidate.clock_starting = false
+		assert(started == true, "Physical clock task start failed")
+		if candidate.stop_requested then finish_stop(candidate) else publish_clock(candidate) end
+	end)
+	candidate.acquiring, candidate.clock_starting = false, false
+	if not ok then
+		unavailable(candidate, "clock_start_refused", tostring(failure))
+		if candidate.clock and not candidate.clock_settled then pcall(candidate.clock.terminate) end
+		if candidate.stop_requested then finish_stop(candidate) end
+	end
+end
+
 --- Registers one settlement observer, independently of native completion status.
 ---@param candidate table Captured session identity.
 local function observe_verifier(candidate)
@@ -133,7 +234,7 @@ local function observe_verifier(candidate)
 		if not current(candidate) or candidate.verifier_settled then return end
 		candidate.verifier_settled = true
 		guarded(candidate, function()
-			if candidate.stop_requested then finish_stop(candidate) else start_stream(candidate) end
+			if candidate.stop_requested then finish_stop(candidate) else start_clock(candidate) end
 		end)
 	end)
 	assert(accepted == true, "Physical identity settlement observer refused")
@@ -166,13 +267,15 @@ end
 
 --- Binds the native ports once without acquiring tasks or changing accounting.
 --- The caller owns retained privacy/time context and the acknowledged log sink.
----@param ports table spawn, decode, encode, context, keycode and emit callbacks.
+--- clock_ready(information, convert) must return literal true after accepting the
+--- native timebase; context still resolves original ticks through that owner.
+---@param ports table spawn, decode, encode, clock_ready, context, keycode and emit callbacks.
 ---@return boolean initialized
 function M.init(ports)
 	if dependencies then return false end
 	assert(type(ports) == "table", "Missing physical capture native ports")
 	local snapshot = {}
-	for _, name in ipairs({ "spawn", "decode", "encode", "context", "keycode", "emit" }) do
+	for _, name in ipairs({ "spawn", "decode", "encode", "clock_ready", "context", "keycode", "emit" }) do
 		assert(type(ports[name]) == "function", "Missing physical capture port: " .. name)
 		snapshot[name] = ports[name]
 	end
@@ -182,7 +285,7 @@ function M.init(ports)
 	return true
 end
 
---- Starts one explicit session after asynchronous pinned-identity verification.
+--- Starts one explicit session with asynchronous pinned identity and native clock.
 --- The requirement must come from the trusted runtime artifact owner, not user input.
 ---@param options table Executable, arguments, requirement, batch_limit and frame_limit.
 ---@return boolean accepted False while an earlier owner or native task is retained.
@@ -243,7 +346,7 @@ function M.start(options)
 			function(code)
 				if not current(candidate) or candidate.verifier_completed then return end
 				candidate.verifier_completed, candidate.verification_exit = true, code
-				guarded(candidate, function() start_stream(candidate) end)
+				guarded(candidate, function() start_clock(candidate) end)
 			end)
 		candidate.acquiring = false
 		assert(type(candidate.verifier) == "table", "Physical identity task was not created")
@@ -259,7 +362,7 @@ function M.start(options)
 		candidate.verifier_start_accepted = started == true
 		candidate.verifier_starting = false
 		assert(started == true, "Physical identity task start failed")
-		start_stream(candidate)
+		start_clock(candidate)
 	end)
 	candidate.acquiring = false
 	if not ok then
@@ -268,7 +371,8 @@ function M.start(options)
 			pcall(candidate.verifier.terminate)
 		elseif candidate.stop_requested then finish_stop(candidate) end
 	end
-	return candidate.state == "verifying" or candidate.state == "opening" or candidate.state == "capturing"
+	return candidate.state == "verifying" or candidate.state == "clocking"
+		or candidate.state == "opening" or candidate.state == "capturing"
 end
 
 --- Revokes delivery immediately; accepted termination alone cannot release ownership.
@@ -283,10 +387,14 @@ function M.stop()
 		Logger.start(LOG, "Stopping physical capture session…")
 	end
 	if candidate.receiver then candidate.receiver.stop() end
-	if candidate.accounting_transition or candidate.acquiring then return false, "pending" end
+	if candidate.accounting_transition or candidate.acquiring or candidate.clock_publishing then return false, "pending" end
 	if revoke(candidate) ~= true then return false, "settlement_refused" end
 	local ok, failure = pcall(function()
 		if candidate.transport and not candidate.transport.isSettled() then candidate.transport.stop() end
+		if candidate.clock and not candidate.clock_settled then
+			observe_clock(candidate)
+			candidate.clock.terminate()
+		end
 		if candidate.verifier and not candidate.verifier_settled then
 			observe_verifier(candidate)
 			candidate.verifier.terminate()
@@ -302,7 +410,9 @@ end
 function M.status()
 	if not session then return { state = dependencies and "idle" or "uninitialized", settled = true } end
 	local settled = not session.acquiring and not session.accounting_transition
+		and not session.clock_starting and not session.clock_publishing
 		and (not session.verifier or session.verifier_settled == true)
+		and (not session.clock or session.clock_settled == true)
 		and (not session.transport or session.transport.isSettled())
 	return { state = session.state, reason = session.reason, settled = settled }
 end
