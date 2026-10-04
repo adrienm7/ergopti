@@ -38,3 +38,41 @@ _TRFE_HandlesWindowsPathWithSpaces() {
 		"_TestCallSite must handle a Windows path containing spaces - got <" . Got . ">")
 }
 Test("runner failure: call site parses a path containing spaces", _TRFE_HandlesWindowsPathWithSpaces)
+
+; A terminal stdout receipt cannot compensate for a dropped disk observation.
+_TRFE_ResultWrite(Locked) {
+	global TEST_RESULTS_FILE
+	Saved := TEST_RESULTS_FILE
+	Directory := A_Temp . "\ergopti-tap-write-" . DllCall("GetCurrentProcessId", "UInt") . "-" . A_TickCount
+	if !DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int")
+		throw OSError(A_LastError, "Cannot acquire the owned TAP write fixture")
+	Receipt := Directory . "\receipt.tap"
+	Handle := 0
+	try {
+		TEST_RESULTS_FILE := Receipt
+		if Locked {
+			Handle := FileOpen(Receipt, "w-rwd", "UTF-8")
+			Thrown := false
+			try _TestPrint("# owned locked receipt")
+			catch OSError
+				Thrown := true
+			AssertTrue(Thrown, "a rejected disk write must escape the progress printer")
+			Handle.Close()
+			Handle := 0
+			AssertEqual("", FileRead(Receipt, "UTF-8"), "a denied write must not fabricate disk progress")
+		} else {
+			Line := "# owned Unicode receipt " . Chr(0xE9) . Chr(0x1F642)
+			_TestPrint(Line)
+			AssertEqual(Line . Chr(13) . Chr(10), FileRead(Receipt, "UTF-8"), "the actual printer preserves a complete Unicode line")
+		}
+	} finally {
+		TEST_RESULTS_FILE := Saved
+		if IsObject(Handle)
+			Handle.Close()
+		if FileExist(Receipt)
+			FileDelete(Receipt)
+		DirDelete(Directory)
+	}
+}
+Test("runner receipt write: disk failure escapes (receipt-write)", _TRFE_ResultWrite.Bind(true))
+Test("runner receipt write: complete Unicode disk line (receipt-write)", _TRFE_ResultWrite.Bind(false))
