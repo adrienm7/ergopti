@@ -40,7 +40,8 @@ _TextSenderReadClipboardDiagnosticState() {
 	Pid := Hwnd ? WinGetPID("ahk_id " . Hwnd) : 0
 	ProcessName := Hwnd ? WinGetProcessName("ahk_id " . Hwnd) : ""
 	WindowClass := Hwnd ? WinGetClass("ahk_id " . Hwnd) : ""
-	Control := Hwnd ? ControlGetFocus("ahk_id " . Hwnd) : ""
+	FocusedControlHwnd := Hwnd ? ControlGetFocus("ahk_id " . Hwnd) : 0
+	ControlClass := FocusedControlHwnd ? WinGetClass(FocusedControlHwnd) : ""
 	Logical := 0
 	Physical := 0
 	for Index, Key in ["Ctrl", "Shift", "Alt"] {
@@ -51,7 +52,7 @@ _TextSenderReadClipboardDiagnosticState() {
 	}
 	ClipboardText := CB_Read()
 	return Map("hwnd", Hwnd, "pid", Pid, "process_name", ProcessName, "window_class", WindowClass,
-		"control_class", Control, "logical", Logical, "physical", Physical,
+		"control_class", ControlClass, "logical", Logical, "physical", Physical,
 		"sequence", CB_GetSequenceNumber(), "clipboard_units",
 		(ClipboardText is String) ? StrLen(ClipboardText) : -1,
 		"observed_tick", DllCall("GetTickCount64", "UInt64"))
@@ -74,11 +75,14 @@ _TextSenderClipboardDiagnostic(Stage, TextUnits, EraseCount, Generation,
 		return
 	}
 	State := ReadFn.Call()
-	InfoFn.Call("TextSender", "Clipboard injection {1}: mode=clipboard, generation={2}, owned_sequence={3}, current_sequence={4}, payload_units={5}, erase_before={6}, hwnd={7}, pid={8}, process_name={9}, window_class={10}, control_class={11}, logical_modifiers={12}, physical_modifiers={13}, clipboard_units={14}, primitive_returned={15}, observed_tick={16}.",
+	; Stage and generation changes are the news, so the central repeat key
+	; must contain the formatted body (logger spec section 4.2).
+	Message := Format("Clipboard injection {1}: mode=clipboard, generation={2}, owned_sequence={3}, current_sequence={4}, payload_units={5}, erase_before={6}, hwnd={7}, pid={8}, process_name={9}, window_class={10}, control_class={11}, logical_modifiers={12}, physical_modifiers={13}, clipboard_units={14}, primitive_returned={15}, observed_tick={16}.",
 		Stage, Generation, OwnedSequence, State["sequence"], TextUnits, EraseCount,
 		State["hwnd"], State["pid"], State["process_name"], State["window_class"], State["control_class"],
 		State["logical"], State["physical"], State["clipboard_units"], Emitted,
 		State["observed_tick"])
+	InfoFn.Call("TextSender", Message)
 }
 
 ; Diagnostic failures are explicit but cannot turn an emitted edit into a retry.
