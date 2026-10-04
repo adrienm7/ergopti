@@ -742,6 +742,7 @@ _HSCS_FileOpened(Observations, Path, Receipt, *) {
 }
 
 _HSCS_FileCommand(Receipt) {
+	global _MenuDispatchCallbacks
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\hotstring_file_command.json", "UTF-8"))
 	Definition := _MR_GetMenuDef(Corpus["section"])
 	AssertEqual(1, Definition.Length)
@@ -751,28 +752,50 @@ _HSCS_FileCommand(Receipt) {
 	AssertEqual(Corpus["ready"], Item["disabled_when"][1])
 	Label := Item["i18n"]
 	Path := A_Temp . "\ergopti-category-command-" . A_TickCount . ".toml"
-	Observations := []
+	Observations := [], Native := 0, Released := true
 	try {
 		Assert(FSWriteDurable(Path, "# owned category opening fixture`n"))
 		AssertEqual(false, _HS_CategoryFileRow(Path, Map()), "an unknown supplied opening owner must refuse")
-		Item["i18n"] := "menu.hotstrings.scope_disable_all"
+		Item["i18n"] := "menu.hotstrings.open_editor"
 		Row := _HS_CategoryFileRow(Path, _HSCS_FileOpened.Bind(Observations, Path, Receipt))
 		Assert(Row is Map, "the actual provider must admit the shared command")
-		AssertEqual(t("menu.hotstrings.scope_disable_all"), Row["label"],
+		AssertEqual(t("menu.hotstrings.open_editor"), Row["label"],
 			"native opening data comes from the declaration, not a private label")
 		AssertEqual(Receipt, Row["action"].Call())
 		AssertEqual(1, Observations.Length)
 		AssertEqual(Path, Observations[1], "the actual opening owner receives its captured category source")
+		Assert(Row["label"] != "", "the replacement declaration must name a native item")
+		for Key in ["menu.hotstrings.scope_enable_all", "menu.hotstrings.scope_disable_all"]
+			Assert(StrCompare(Row["label"], t(Key), false) != 0,
+				"the file command must not replace an existing category caption")
 		Native := _HS_CategoryMenu("Rolls", Path, [], (*) => false)
+		AssertEqual(3, TrayMenuItemCount(Native), "two scope commands and the admitted file command are distinct native rows")
+		AssertEqual(t("menu.hotstrings.scope_enable_all"), _SGM_LabelAt(Native, 0))
+		AssertEqual(t("menu.hotstrings.scope_disable_all"), _SGM_LabelAt(Native, 1))
+		EnableId := DllCall("GetMenuItemID", "Ptr", Native.Handle, "Int", 0, "UInt")
+		DisableId := DllCall("GetMenuItemID", "Ptr", Native.Handle, "Int", 1, "UInt")
+		FileId := DllCall("GetMenuItemID", "Ptr", Native.Handle, "Int", 2, "UInt")
+		Assert(FileId != 0 && FileId != 0xFFFFFFFF && FileId != EnableId && FileId != DisableId,
+			"the file command must own a separate native leaf identity")
+		Assert(_MenuDispatchCallbacks.Has(FileId), "the real renderer must register that actual native command")
 		AssertEqual(Row["label"], _SGM_LabelAt(Native, 2), "the actual category provider renders the same declaration")
 		FileDelete(Path)
+		AssertFalse(_MenuDispatchCallbacks[FileId].Call(), "the drawn native command rechecks its withdrawn category source")
 		AssertEqual(false, Row["action"].Call(), "a held callback rechecks the native source before opening")
 		AssertEqual(1, Observations.Length, "withdrawn source cannot launch its opening owner")
 	} finally {
 		Item["i18n"] := Label
+		if Native is Menu {
+			Released := false
+			try {
+				_CTC_ReleaseMenu(Native)
+				Released := true
+			}
+		}
 		if FileExist(Path)
 			FileDelete(Path)
 	}
+	AssertTrue(Released, "the owned native category menu must be released without masking a primary failure")
 }
 
 for _HSCS_FileReceipt in [true, false]
