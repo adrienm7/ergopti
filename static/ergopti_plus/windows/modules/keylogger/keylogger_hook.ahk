@@ -113,6 +113,10 @@ global KLHOOK_SPECIAL := Map(
 ; ===============================
 
 class KLHook {
+		static capture_queue := []
+		static capture_owner := false
+		static capture_generation := 1
+		static capture_stopping := false
 		static ih := unset           ; the live InputHook object
 		static flush_timer := unset  ; bound function reference for SetTimer
 		static context_timer := unset  ; bound ref for the memory-only context projection
@@ -293,34 +297,37 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 ;                             this physical key to the watcher.
 ; @param authorized bool      Whether privacy classification accepted this key.
 ; @param Now Integer          Callback-entry tick captured before classification.
-KL_Hook_NoteActivity(already_called := false, authorized := true, Now := unset) {
-		; Do NOT drive the session/idle watcher for SYNTHETIC (auto-typed) keystrokes.
-		; Hotstring expansion and LLM inline-autotype flow through this same InputHook
-		; tagged s=1; without this guard the first synthetic char of a burst reaches
-		; KL_Watchers_OnKeystroke with the real pre-idle last_tick and fabricates an
-		; idle_end / session_start from pure machine output, corrupting the
-		; active-time and idle/session aggregates. Mirrors the ergo/ROI/WPM synth
-		; guard in KL_Hook_OnChar (session-watcher-fed-synthetic). The watermark still
-		; advances below; OnChar/OnKeyDown zero it for synthetic so the next real key
-		; restarts the typing clock.
-		;
-		; Skip when already_called is true — the shortcut branch already fired the
-		; watcher for this same physical keydown; a second call here would duplicate
-		; session/idle accounting for chords that are also special keys (H-01 fix).
+KL_Hook_NoteActivity(already_called := false, authorized := true, Now := unset,
+	Synthetic := unset, GuardFn := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
 		LastTick := KLHook.last_tick
 		now := IsSet(Now) ? Now : A_TickCount
 		delay := TickElapsed64(LastTick, now)
 		if LastTick = 0
-				delay := 0
-		if !Keylogger.synth_active and !already_called {
-				if authorized {
-						try KL_Watchers_OnKeystroke(0, now)
-				} else {
-						try KL_Watchers_OnPrivateKeystroke(now)
-				}
+			delay := 0
+		IsSynthetic := IsSet(Synthetic) ? Synthetic : Keylogger.synth_active
+	} finally Critical(PreviousCritical)
+	if !IsSynthetic && !already_called {
+		if authorized {
+			if IsSet(GuardFn) {
+				try KL_Watchers_OnKeystroke(0, now, GuardFn)
+			} else {
+				try KL_Watchers_OnKeystroke(0, now)
+			}
+		} else {
+			try KL_Watchers_OnPrivateKeystroke(now, GuardFn?)
 		}
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
 		KLHook.last_tick := now
-		return delay
+	} finally Critical(PreviousCritical)
+	return delay
 }
 
 
@@ -332,6 +339,301 @@ KL_Hook_NoteActivity(already_called := false, authorized := true, Now := unset) 
 ; ======= 4/ InputHook callbacks =======
 ; ======================================
 ; ======================================
+
+; Serial capture has two phases: enqueue before any query, then classify on the
+; original callback thread. A ready nested receipt cannot pass an older head.
+KL_Hook_HasPendingInput() {
+	PreviousCritical := Critical("On")
+	try return KLHook.capture_queue.Length > 0 || IsObject(KLHook.capture_owner)
+	finally Critical(PreviousCritical)
+}
+
+KL_Hook_InvalidateCapture(Stopping := false) {
+	PreviousCritical := Critical("On")
+	try {
+		KLHook.capture_generation += 1
+		if Stopping
+			KLHook.capture_stopping := true
+	}
+	finally Critical(PreviousCritical)
+}
+
+_KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended
+			return false
+		if Kind = "key" {
+			if IsNumber(vk)
+				KLHook.last_vk := vk
+			if IsNumber(sc)
+				KLHook.last_sc := sc
+		}
+		if !Keylogger.initialized || Keylogger._shutting_down || KLHook.capture_stopping
+			return false
+		Tick := IsSet(NowTick) ? NowTick : A_TickCount
+		TickElapsed64(0, Tick)
+		Intent := {
+			kind: Kind, character: Character, vk: vk, sc: sc, tick: Tick,
+			arrival_vk: KLHook.last_vk, arrival_sc: KLHook.last_sc,
+			synth_active: Keylogger.synth_active, synth_type: Keylogger.synth_type,
+			synth_private: Keylogger.synth_private,
+			lifecycle: Keylogger.lifecycle_generation,
+			generation: KLHook.capture_generation,
+			entry_privacy: _KL_CaptureLlmJournalPrivacy(),
+			entry_focus: KLPasswordCache.focus_generation,
+			privacy: false, ready: false, cancelled: true, filtered: true,
+			shortcut: "", activity: Kind = "char",
+			filter_fn: IsSet(FilterFn) ? FilterFn : 0,
+			ergo_fn: IsSet(ErgoFn) ? ErgoFn : 0
+		}
+		KLHook.capture_queue.Push(Intent)
+		return Intent
+	} finally Critical(PreviousCritical)
+}
+
+_KL_Hook_InputLifecycleCurrent(Intent) {
+	return Keylogger.initialized && !Keylogger._shutting_down && !A_IsSuspended
+		&& !KLHook.capture_stopping
+		&& Intent.lifecycle = Keylogger.lifecycle_generation
+		&& Intent.generation = KLHook.capture_generation
+}
+
+; Classification may legitimately publish a new password verdict. The entry
+; focus and configuration must remain stable; the final verdict is captured below.
+_KL_Hook_PrepareInput(Intent) {
+	PreviousCritical := Critical("On")
+	try {
+		Entry := Intent.entry_privacy
+		if !_KL_Hook_InputLifecycleCurrent(Intent)
+			return false
+		if Intent.entry_focus != KLPasswordCache.focus_generation
+				|| Entry["focus_generation"] != MetricsFocusCache.generation
+				|| Entry["disabled_apps_ptr"] != ObjPtr(MetricsFilters.disabled_apps)
+				|| Entry["private_browsing"] != MetricsFilters.private_browsing
+				|| Entry["secure_field"] != MetricsFilters.secure_field
+				|| Entry["system_auth"] != MetricsFilters.system_auth
+			Intent.filtered := true
+		Intent.privacy := _KL_CaptureLlmJournalPrivacy()
+		Intent.cancelled := false
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_KL_Hook_InputCurrent(Intent) {
+	return !Intent.cancelled && _KL_Hook_InputLifecycleCurrent(Intent)
+		&& (Intent.filtered || _KL_LlmJournalPrivacyStillCurrent(Intent.privacy))
+}
+
+; Tab invalidates the source field before this callback returns. Only that exact
+; own invalidation may update this receipt; a later focus owner still revokes it.
+_KL_Hook_InvalidateTabInput(Intent) {
+	PreviousCritical := Critical("On")
+	try {
+		Current := IsObject(Intent) && _KL_Hook_InputCurrent(Intent)
+		KL_InvalidatePasswordFocus()
+		if Current
+			Intent.privacy["password_generation"] := KLPasswordCache.generation
+	} finally Critical(PreviousCritical)
+}
+
+_KL_Hook_FinishInput(Intent) {
+	PreviousCritical := Critical("On")
+	try {
+		Intent.ready := true
+	} finally Critical(PreviousCritical)
+	_KL_Hook_DrainInput()
+}
+
+; A failed completion retires only its own receipt; already-ready successors retain
+; their admission and can still drain. Failures remain visible through the logger.
+_KL_Hook_CompleteInput(Intent) {
+	try _KL_Hook_FinishInput(Intent)
+	catch as FinishErr {
+		try LoggerError("keylogger_hook", "Physical input completion failed: {1}.", FinishErr.Message)
+		try {
+			PreviousCritical := Critical("On")
+			try {
+				for Index, Queued in KLHook.capture_queue {
+					if Queued = Intent {
+						KLHook.capture_queue.RemoveAt(Index)
+						break
+					}
+				}
+			} finally Critical(PreviousCritical)
+			_KL_Hook_DrainInput()
+		} catch as RecoveryErr
+			try LoggerError("keylogger_hook", "Physical input completion retirement failed: {1}.", RecoveryErr.Message)
+		return false
+	}
+	return true
+}
+
+_KL_Hook_DrainInput() {
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(KLHook.capture_owner) || KLHook.capture_queue.Length = 0
+				|| !KLHook.capture_queue[1].ready
+			return
+		Owner := {}
+		KLHook.capture_owner := Owner
+	} finally Critical(PreviousCritical)
+	try {
+		loop {
+			PreviousCritical := Critical("On")
+			try {
+				if KLHook.capture_owner != Owner
+					throw Error("Physical input drain ownership changed.")
+				if KLHook.capture_queue.Length = 0 || !KLHook.capture_queue[1].ready {
+					KLHook.capture_owner := false
+					return
+				}
+				Next := KLHook.capture_queue.RemoveAt(1)
+			} finally Critical(PreviousCritical)
+			try _KL_Hook_CommitInput(Next)
+			catch as Err
+				try LoggerError("keylogger_hook", "Ordered physical input failed: {1}.", Err.Message)
+		}
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if KLHook.capture_owner = Owner
+				KLHook.capture_owner := false
+		} finally Critical(PreviousCritical)
+	}
+}
+
+_KL_Hook_CommitInput(Intent) {
+	if Intent.cancelled || !_KL_Hook_InputLifecycleCurrent(Intent) || !Intent.activity
+		return false
+	if !Intent.filtered && !_KL_LlmJournalPrivacyStillCurrent(Intent.privacy)
+		Intent.filtered := true
+	GuardFn := _KL_Hook_InputCurrent.Bind(Intent)
+	delay := KL_Hook_NoteActivity(false, !Intent.filtered, Intent.tick,
+		Intent.synth_active, GuardFn)
+	if !GuardFn.Call() {
+		if !_KL_Hook_InputLifecycleCurrent(Intent)
+			return false
+		Intent.filtered := true
+		delay := KL_Hook_NoteActivity(false, false, Intent.tick,
+			Intent.synth_active, GuardFn)
+		if !GuardFn.Call()
+			return false
+	}
+	if Intent.filtered {
+		KL_RecordPrivacyHit()
+		return true
+	}
+	if Intent.shortcut != ""
+		try KL_LogShortcut(Intent.shortcut, Keylogger.session_app, GuardFn)
+	Token := Intent.kind = "char" ? Intent.character
+		: (KLHOOK_SPECIAL.Has(Intent.vk) ? KLHOOK_SPECIAL[Intent.vk] : "")
+	Recorded := KL_Hook_RecordedChar(Token, Intent.synth_private)
+	PreviousCritical := Critical("On")
+	try {
+		if !GuardFn.Call()
+			return false
+		if Intent.kind = "key" && !KLHOOK_SPECIAL.Has(Intent.vk)
+			return true
+		if Intent.kind = "key"
+			meta := Map("kc", Intent.vk, "sk", Intent.sc)
+		else {
+			meta := Map()
+			if Intent.arrival_vk > 0
+				meta["kc"] := Intent.arrival_vk
+			if Intent.arrival_sc > 0
+				meta["sk"] := Intent.arrival_sc
+		}
+		if Intent.synth_active {
+			meta["s"] := 1
+			meta["st"] := Intent.synth_type
+		}
+		Keylogger.buffer_events.Push([Recorded, delay, meta])
+		if Intent.kind = "char"
+			Keylogger.buffer_text .= Recorded
+		else {
+			switch Intent.vk {
+				case 0x08:
+					if StrLen(Keylogger.buffer_text) > 0
+						Keylogger.buffer_text := SubStr(Keylogger.buffer_text, 1, StrLen(Keylogger.buffer_text) - 1)
+				case 0x0D: Keylogger.buffer_text .= Chr(10)
+				case 0x09: Keylogger.buffer_text .= Chr(9)
+			}
+		}
+		if Intent.synth_active
+			KLHook.last_tick := 0
+	} finally Critical(PreviousCritical)
+	if !Intent.synth_active {
+		try {
+			ErgoFn := HasMethod(Intent.ergo_fn, "Call") ? Intent.ergo_fn : KL_Ergo_OnKeystroke
+			if Intent.kind = "char"
+				ErgoFn.Call(delay, Intent.arrival_vk, Intent.arrival_sc)
+			else
+				ErgoFn.Call(delay, Intent.vk, Intent.sc, Intent.vk = 0x08)
+		}
+		if Intent.kind = "char" {
+			try KL_Roi_OnChar(Intent.character)
+			try WPMWidget_Push(false, false)
+		}
+	}
+	return true
+}
+
+KL_Hook_OnChar(ih, c, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
+	if A_IsSuspended || !Keylogger.initialized
+		return
+	Intent := false
+	_hpKlIngest := HotPath_Now()
+	try {
+		Intent := _KL_Hook_CaptureInput("char", c, 0, 0, FilterFn?, NowTick?, ErgoFn?)
+		if !IsObject(Intent)
+			return
+		try Intent.filtered := HasMethod(Intent.filter_fn, "Call")
+			? Intent.filter_fn.Call() : MF_ShouldFilter()
+		catch as FilterErr
+			try LoggerWarn("keylogger_hook", "Character privacy classification failed closed: {1}.", FilterErr.Message)
+		_KL_Hook_PrepareInput(Intent)
+	} catch as kl_err {
+		try LoggerError("keylogger_hook", "KL_Hook_OnChar unhandled exception — hook kept alive: {1}", kl_err.Message)
+	} finally {
+		if IsObject(Intent)
+			_KL_Hook_CompleteInput(Intent)
+		HotPath_LogIfSlow("KL.Ingest", _hpKlIngest, "")
+	}
+}
+
+KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn := unset, ErgoFn := unset) {
+	if A_IsSuspended
+		return
+	Intent := false
+	PotentialFocusMove := vk = 0x09
+	try {
+		Intent := _KL_Hook_CaptureInput("key", "", vk, sc, FilterFn?, NowTick?, ErgoFn?)
+		if !IsObject(Intent)
+			return
+		try Intent.shortcut := IsSet(ShortcutFn)
+			? ShortcutFn.Call(vk, sc) : KL_Watchers_DetectShortcut(vk, sc)
+		Intent.activity := Intent.shortcut != "" || KLHOOK_SPECIAL.Has(vk)
+		if Intent.activity {
+			try Intent.filtered := HasMethod(Intent.filter_fn, "Call")
+				? Intent.filter_fn.Call() : MF_ShouldFilter()
+			catch as FilterErr
+				try LoggerWarn("keylogger_hook", "Key/Shortcut privacy classification failed closed: {1}.", FilterErr.Message)
+		}
+		_KL_Hook_PrepareInput(Intent)
+	} catch as kl_err {
+		try LoggerError("keylogger_hook", "KL_Hook_OnKeyDown unhandled exception — hook kept alive: {1}", kl_err.Message)
+	} finally {
+		try {
+			if PotentialFocusMove
+				_KL_Hook_InvalidateTabInput(Intent)
+		} catch as FocusErr
+			try LoggerError("keylogger_hook", "Physical Tab invalidation failed: {1}.", FocusErr.Message)
+		if IsObject(Intent)
+			_KL_Hook_CompleteInput(Intent)
+	}
+}
+
 
 ; What the typing row is allowed to KEEP of a captured token.
 ;
@@ -351,10 +653,10 @@ KL_Hook_NoteActivity(already_called := false, authorized := true, Now := unset) 
 ; Linux states for [BS].
 ; @param token {String} The character, or the bracket marker, about to be recorded.
 ; @return {String} The token, or a length-preserving redaction of it.
-KL_Hook_RecordedChar(token) {
+KL_Hook_RecordedChar(token, Private := unset) {
 		; One boolean read on the ordinary keystroke path — nothing else runs
 		; unless the driver is mid-expansion of the user's own data.
-		if !Keylogger.synth_private
+		if !(IsSet(Private) ? Private : Keylogger.synth_private)
 				return token
 		if (Type(token) != "String" or token == "")
 				return token
@@ -363,212 +665,9 @@ KL_Hook_RecordedChar(token) {
 		return PersonalInfoRedactForLog(token)
 }
 
-KL_Hook_OnChar(ih, c) {
-		; The keylogger records nothing while the script is paused — its InputHook is
-		; separate from HookDispatcher, so it needs its own guard.
-		if A_IsSuspended
-				return
-		if !Keylogger.initialized
-				return
 
-		; The keylogger ingest closes the per-keystroke budget alongside the hook
-		; fan-out and had no segment. Two QPC reads; the log line is gated by the
-		; profiler floor, so ordinary typing prints nothing.
-		_hpKlIngest := HotPath_Now()
 
-		; An uncaught exception inside an InputHook callback silently disables the
-		; hook permanently. Wrap the entire body so any runtime error is logged and
-		; swallowed — subsequent keystrokes must continue to reach the callback
-		; (keylogger-hook-global-try fix).
-		try {
-				ActivityTick := A_TickCount
-				filtered := true
-				try filtered := MF_ShouldFilter()
-				catch as FilterErr
-						try LoggerWarn("keylogger_hook",
-								"Character privacy classification failed closed: {1}.",
-								FilterErr.Message)
-				delay := KL_Hook_NoteActivity(false, !filtered, ActivityTick)
-				if filtered {
-						KL_RecordPrivacyHit()
-						return
-				}
 
-				; Per-keystroke metadata. The walker reads ``kc`` for ergonomic
-				; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
-				; scancode used by the Windows heatmap.
-				meta := Map()
-				try {
-						if (KLHook.last_vk > 0)
-								meta["kc"] := KLHook.last_vk
-						; ``sk`` (scan-key) — hardware scancode. Distinct from ``sc``
-						; which the walker reserves for "shortcut key" identifiers.
-						if (KLHook.last_sc > 0)
-								meta["sk"] := KLHook.last_sc
-				}
-
-				; Stamp the synthetic source while the script is auto-typing (hotstring
-				; expansion / LLM acceptance) so this keystroke is kept out of the manual
-				; `chars` count and attributed correctly in the n-gram source histogram.
-				if Keylogger.synth_active {
-						meta["s"] := 1
-						meta["st"] := Keylogger.synth_type
-				}
-
-				; The meta above says the character was auto-typed; it never said
-				; the character itself may be persisted. Both sinks below take the
-				; RECORDED form, because both are written verbatim into the typing
-				; row (``events`` and ``text``) and redacting one of them leaves the
-				; secret in the other column.
-				recorded := KL_Hook_RecordedChar(c)
-				Keylogger.buffer_events.Push([recorded, delay, meta])
-				Keylogger.buffer_text .= recorded
-				if !Keylogger.synth_active {
-						try KL_Ergo_OnKeystroke(delay, KLHook.last_vk, KLHook.last_sc)
-						try KL_Roi_OnChar(c)
-						; Feed the real-time WPM widget with each accepted manual keystroke.
-						try WPMWidget_Push(false, false)
-				} else {
-						KLHook.last_tick := 0
-				}
-		} catch as kl_err {
-				try LoggerError("keylogger_hook", "KL_Hook_OnChar unhandled exception — hook kept alive: {1}", kl_err.Message)
-		}
-		HotPath_LogIfSlow("KL.Ingest", _hpKlIngest, "")
-}
-
-KL_Hook_OnKeyDown(ih, vk, sc) {
-		if A_IsSuspended
-				return
-		PotentialFocusMove := (vk = 0x09)
-
-		; An uncaught exception inside an InputHook callback silently disables the
-		; hook permanently. Wrap the entire body so any runtime error is logged and
-		; swallowed — subsequent keystrokes must continue to reach the callback
-		; (keylogger-hook-global-try fix).
-		try {
-				ActivityTick := A_TickCount
-				; Always stash (vk, sc) for the next OnChar callback — printable
-				; characters reach OnChar after this fires, and we need the sc to
-				; populate the heatmap. Wrap defensively: an uncaught error inside
-				; an InputHook callback silently disables the hook.
-				try {
-						if IsNumber(vk)
-								KLHook.last_vk := vk
-						if IsNumber(sc)
-								KLHook.last_sc := sc
-				}
-
-				; Shortcut detection runs BEFORE the special-keys early return so
-				; chords on letter / digit / function keys are caught — those VKs
-				; are not in KLHOOK_SPECIAL because OnChar handles their printable
-				; output, but with modifiers held they are shortcuts to log.
-				;
-				; activity_already_noted tracks whether KL_Watchers_OnKeystroke was
-				; already called in the shortcut branch so KL_Hook_NoteActivity can
-				; skip it and avoid a double invocation for chords that are also
-				; special keys (e.g. Ctrl+Left, Ctrl+BS) (H-01 fix).
-				activity_already_noted := false
-				activity_delay := 0
-				filtered := true
-				if Keylogger.initialized {
-						sk := ""
-						try sk := KL_Watchers_DetectShortcut(vk, sc)
-						if (sk != "") {
-								try filtered := MF_ShouldFilter()
-								catch as FilterErr
-										try LoggerWarn("keylogger_hook",
-												"Shortcut privacy classification failed closed: {1}.",
-												FilterErr.Message)
-								activity_delay := KL_Hook_NoteActivity(
-										false, !filtered, ActivityTick)
-								activity_already_noted := true
-								if !filtered
-										try KL_LogShortcut(sk, Keylogger.session_app)
-								; A shortcut counts as user activity. Drive the session/idle
-								; machine and bump last_tick so a stream of Ctrl+S / Ctrl+C
-								; presses (which most apps consume before OnChar can fire)
-								; doesn't fall back to the SESSION_TIMEOUT_MS clock and have
-								; its own session_start re-fire on every chord.
-								; Guard: skip entirely during synthetic auto-type so hotstring
-								; expansions never corrupt the session/idle aggregates (H-02 fix).
-						}
-				}
-
-				; Special keys only — printable chars are handled by OnChar above.
-				if !KLHOOK_SPECIAL.Has(vk) {
-						if activity_already_noted && filtered
-								KL_RecordPrivacyHit()
-						return
-				}
-
-				if !Keylogger.initialized
-						return
-
-				; Advance the activity watermark + drive the session/idle machine BEFORE the
-				; privacy filter, for the same reason as OnChar: a filtered special key was
-				; still physically pressed, so the timing watermark must not lag behind it.
-				; Pass the flag so KL_Hook_NoteActivity skips the watcher when the shortcut
-				; branch already called it for this same physical keydown (H-01 fix).
-				if activity_already_noted {
-						delay := activity_delay
-				} else {
-						try filtered := MF_ShouldFilter()
-						catch as FilterErr
-								try LoggerWarn("keylogger_hook",
-										"Key privacy classification failed closed: {1}.",
-										FilterErr.Message)
-						delay := KL_Hook_NoteActivity(false, !filtered, ActivityTick)
-				}
-				if filtered {
-						KL_RecordPrivacyHit()
-						return
-				}
-
-				bracket := KLHOOK_SPECIAL[vk]
-				meta := Map("kc", vk, "sk", sc)
-				; Synthetic backspaces emitted by an expansion correcting its own output
-				; carry the source too, so the walker can net them out of hs/llm chars.
-				if Keylogger.synth_active {
-						meta["s"] := 1
-						meta["st"] := Keylogger.synth_type
-				}
-
-				; Same funnel as OnChar. A bracket marker survives it unchanged (it
-				; carries no content), but routing it through the one helper is what
-				; keeps the answer to « may this be persisted? » in a single place
-				; rather than re-decided per call site.
-				Keylogger.buffer_events.Push([KL_Hook_RecordedChar(bracket), delay, meta])
-				if !Keylogger.synth_active {
-						try KL_Ergo_OnKeystroke(delay, vk, sc, vk = 0x08)
-				} else {
-						KLHook.last_tick := 0
-				}
-
-				; Mirror text-buffer mutations the user just performed so the
-				; flush's ``buffer_text`` stays meaningful for downstream display.
-				switch vk {
-						case 0x08:  ; BS — drop the last UTF-16 unit if any.
-								n := StrLen(Keylogger.buffer_text)
-								if (n > 0)
-										Keylogger.buffer_text := SubStr(Keylogger.buffer_text, 1, n - 1)
-						case 0x0D:
-								Keylogger.buffer_text .= "`n"
-						case 0x09:
-								Keylogger.buffer_text .= "`t"
-								; Arrow keys, Esc, F-keys etc. do not insert any character so
-								; we leave buffer_text untouched.
-				}
-		} catch as kl_err {
-				try LoggerError("keylogger_hook", "KL_Hook_OnKeyDown unhandled exception — hook kept alive: {1}", kl_err.Message)
-		} finally {
-				; The application processes Tab only after this observer returns. Retire
-				; any source-field verdict after the optional [TAB] privacy check, so a
-				; delayed EVENT_OBJECT_FOCUS still cannot expose the destination field.
-				if PotentialFocusMove
-						KL_InvalidatePasswordFocus()
-		}
-}
 
 
 
@@ -635,12 +734,18 @@ KL_Hook_Start() {
 		; collapses one per-keystroke hook callback into the shared fan-out.
 		; Dispatch gates on A_IsSuspended, so the handlers stay silent under pause
 		; exactly as the standalone hook's own guard did.
+		; Seed before subscription: an admitted callback must not be overwritten by Start.
+		PreviousCritical := Critical("On")
+		try {
+			KLHook.capture_generation += 1
+			KLHook.capture_stopping := false
+			KLHook.last_tick := A_TickCount
+		} finally Critical(PreviousCritical)
 		KLHook.cb_char := KL_Hook_OnChar.Bind()
 		KLHook.cb_down := KL_Hook_OnKeyDown.Bind()
 		HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
 		HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
 		KLHook.registered := true
-		KLHook.last_tick := A_TickCount
 
 		; Bind the flush callback once and keep the reference around so
 		; SetTimer(…, 0) can stop it cleanly later.
@@ -656,6 +761,7 @@ KL_Hook_Start() {
 }
 
 KL_Hook_Stop() {
+		KL_Hook_InvalidateCapture(true)
 		KL_PasswordFocusTrackingStop()
 		if KLHook.HasOwnProp("flush_timer") && IsObject(KLHook.flush_timer) {
 				try SetTimer(KLHook.flush_timer, 0)
