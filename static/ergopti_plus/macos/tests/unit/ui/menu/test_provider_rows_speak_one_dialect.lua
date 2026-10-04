@@ -212,7 +212,17 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 			"the Sparkle command must remain a visible provider row")
 		helpers.assert_true(src:find('require("ui.update_check").open(', 1, true) ~= nil,
 			"the visible check row must open the update-check window")
-		helpers.assert_true(src:find("UpdateLauncher.request_check(latest.channel)", 1, true) ~= nil,
+		helpers.assert_true(src:find("UpdateLauncher.request_check(offered_channel) == true", 1, true) ~= nil,
 			"a row naming a found release must retain its native Sparkle action")
+
+		local detached = src:find("local offered_tag, offered_channel = latest.tag, latest.channel", 1, true)
+		local current = src:find("local current_channel, current_offer = owner.get(), checks.latest()", 1, true)
+		local refused = src:find("current_offer.tag ~= offered_tag or current_offer.channel ~= offered_channel then return false end", 1, true)
+		local native = src:find("return UpdateLauncher.request_check(offered_channel) == true", 1, true)
+		helpers.assert_true(detached ~= nil and current ~= nil and refused ~= nil and native ~= nil
+			and detached < current and current < refused and refused < native,
+			"the native release action must follow detached consent and fresh offer validation")
+		helpers.assert_true(src:find('current_channel ~= offered_channel or type(current_offer) ~= "table"', 1, true) ~= nil,
+			"the retained release must also match the actual current channel before native dispatch")
 	end)
 end)
