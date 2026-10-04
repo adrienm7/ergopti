@@ -348,6 +348,38 @@ FSListDirectoryStrict(Path, Directories := false) {
 	return Entries
 }
 
+/**
+ * Resolves an existing directory to an absolute long path without recasing it.
+ * @param {String} Path - Existing directory without wildcard characters.
+ * @returns {String} Absolute long path; volume roots keep their final separator.
+ * @throws {Error|OSError} Missing directories or incomplete native resolution.
+ */
+FSResolveDirectoryPath(Path) {
+	if Path == "" || InStr(Path, "*") || InStr(Path, "?")
+		throw Error("Startup working directory cannot be resolved")
+	if !DirExist(Path)
+		throw Error("Startup working directory does not exist")
+	Size := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Size
+		throw OSError(A_LastError, A_ThisFunc)
+	Full := Buffer(Size * 2)
+	Written := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", Size,
+		"Ptr", Full, "Ptr", 0, "UInt")
+	if !Written || Written >= Size
+		throw Error("Startup working directory resolution did not complete")
+	Size := DllCall("kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", 0, "UInt", 0, "UInt")
+	if !Size
+		throw OSError(A_LastError, A_ThisFunc)
+	Long := Buffer(Size * 2)
+	Written := DllCall("kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", Long, "UInt", Size, "UInt")
+	if !Written || Written >= Size
+		throw Error("Startup working directory long-name resolution did not complete")
+	Resolved := StrGet(Long)
+	if RegExMatch(Resolved, "i)^[a-z]:\\$")
+		return Resolved
+	return RTrim(Resolved, "\")
+}
+
 ; Creates one directory exclusively, without adopting existing paths or parents.
 ; @param Path {String} Non-empty directory path with an existing parent.
 ; @return {Boolean} True only after native exclusive creation succeeds.
