@@ -155,10 +155,16 @@ function M.run(program, args, options, callback)
 		exited = false,
 		terminal = false,
 	}
-	local handles_ok, stdout, stderr, timer = pcall(function()
-		return luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
+	local handles_ok = pcall(function()
+		-- Capture ownership immediately: later constructor exceptions must not
+		-- hide earlier handles from the terminal cleanup path.
+		run.stdout = luv.new_pipe(false)
+		if not run.stdout then error("stdout allocation refused", 0) end
+		run.stderr = luv.new_pipe(false)
+		if not run.stderr then error("stderr allocation refused", 0) end
+		run.timer = luv.new_timer()
+		if not run.timer then error("timer allocation refused", 0) end
 	end)
-	run.stdout, run.stderr, run.timer = stdout, stderr, timer
 	if not handles_ok or not run.stdout or not run.stderr or not run.timer then
 		finish(run, { exit_code = -1, stdout = "", stderr = "", error = "libuv handle allocation failed" })
 		return false

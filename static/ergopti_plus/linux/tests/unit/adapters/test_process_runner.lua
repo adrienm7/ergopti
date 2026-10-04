@@ -19,11 +19,15 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, spawns = {}, reads = 0 }
+	local state = { kills = {}, spawns = {}, reads = 0, handles = {} }
 	local fake = {}
 
 	local function handle(kind)
-		return { kind = kind, closing = false }
+		if options.allocation_nil_at == #state.handles + 1 then return nil end
+		if options.allocation_failure_at == #state.handles + 1 then error("simulated allocation exception") end
+		local value = { kind = kind, closing = false }
+		state.handles[#state.handles + 1] = value
+		return value
 	end
 
 	function fake.new_pipe() return handle("pipe") end
@@ -100,6 +104,37 @@ local function start(runner, program, args, options)
 end
 
 helpers.describe("process_runner: asynchronous argv processes", function()
+	if pcall(require, "luv") and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-process-allocation: actual partial handles retire before refusal returns", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_process_allocations.lua"
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native process allocation fixture must pass")
+		end)
+	end
+	for _, mode in ipairs({ "raised", "nil" }) do
+		for slot = 1, 3 do
+			helpers.it("linux-process-allocation: " .. mode .. " constructor at " .. slot .. " releases prior handles", function()
+				local config = {}
+				config[mode == "raised" and "allocation_failure_at" or "allocation_nil_at"] = slot
+				local runner, state = fresh_runner(config)
+				local dispatched, results = start(runner, "python3", {}, {})
+				helpers.assert_eq(dispatched, false)
+				helpers.assert_eq(#results, 1)
+				helpers.assert_eq(results[1].exit_code, -1)
+				helpers.assert_eq(results[1].stdout, "")
+				helpers.assert_eq(results[1].stderr, "")
+				helpers.assert_eq(results[1].error, "libuv handle allocation failed")
+				helpers.assert_true(results[1].not_found ~= true)
+				helpers.assert_eq(#state.spawns, 0)
+				helpers.assert_eq(state.reads, 0)
+				helpers.assert_eq(#state.kills, 0)
+				helpers.assert_eq(#state.handles, slot - 1)
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing, "partial allocation must close") end
+			end)
+		end
+	end
+
 	for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 		for _, receipt in ipairs({ "nil", "false" }) do
 			helpers.it("linux-process-supervision: returned " .. receipt .. " from " .. operation .. " refuses dispatch once", function()
