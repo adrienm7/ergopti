@@ -88,10 +88,20 @@ function M.build_management(ctx)
 
 	table.insert(bubble_sub, { separator = true })
 
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_colored"),
-		"preview_colored_tooltips",
-		i18n.get("menu.hotstrings.notify_bubble_colored")))
+	local colored_row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
+		["preview_colored_tooltips"] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview("preview_colored_tooltips") ~= true then
+				return false
+			end
+			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_colored"), state.preview_colored_tooltips)
+			ctx.updateMenu()
+			return true
+		end,
+	}, {
+		["hotstrings.preview_colored_tooltips"] = function() return state.preview_colored_tooltips == true end,
+		["preview_colored_ready"] = function() return not ctx.paused end,
+	})
+	if colored_row then table.insert(bubble_sub, colored_row) end
 
 	bubble_item = { label = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, items = bubble_sub }
 

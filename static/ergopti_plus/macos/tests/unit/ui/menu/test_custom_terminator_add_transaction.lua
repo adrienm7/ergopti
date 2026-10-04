@@ -117,6 +117,7 @@ local function with_fixture(outcome, callback, locale)
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = command_renderer.command_row,
+			check_row = command_renderer.check_row,
 			build = function(section, _, _, _, _, providers)
 				if section == "word_expanders_menu" then return providers.word_expander_entries() end
 				local rows = providers.word_expanders()

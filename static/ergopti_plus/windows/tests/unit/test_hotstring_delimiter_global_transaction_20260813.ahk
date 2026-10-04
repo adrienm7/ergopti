@@ -832,3 +832,25 @@ _HSDT_DelayConfigKeepsNativeWindowAndRefreshOwner() {
 }
 Test("hotstrings delay settings: ordinary entry keeps the existing native config window",
 	_HSDT_DelayConfigKeepsNativeWindowAndRefreshOwner)
+
+
+_HSDT_ColoredPreviewDeclaredCapability() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\preview_colored_control.json"))
+	Root := _MR_GetManifestRoot()
+	Rows := Root[Corpus["section"]]
+	AssertEqual(1, Rows.Length)
+	Row := Rows[1]
+	for Key in ["id", "type", "i18n", "unavailable", "reason_key"]
+		AssertEqual(Corpus["row"][Key], Row[Key])
+	for Key in ["checked_when", "disabled_when", "platforms"] {
+		AssertEqual(Corpus["row"][Key].Length, Row[Key].Length)
+		for Index, Value in Corpus["row"][Key]
+			AssertEqual(Value, Row[Key][Index])
+	}
+	AssertFalse(_MR_IsForAhk(Row), "Windows must not publish a Lua preview mutation owner")
+	AssertEqual("grey", Row["unavailable"])
+	Assert(t(Row["reason_key"]) != Row["reason_key"], "the native unavailable reason is translated")
+}
+Test("preview coloured checkbox: shared declaration keeps Windows capability truthful",
+	_HSDT_ColoredPreviewDeclaredCapability)

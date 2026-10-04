@@ -1879,6 +1879,25 @@
 			]
 		}
 	],
+	"preview_colored_control": [
+		{
+			"type": "check",
+			"id": "preview_colored_tooltips",
+			"i18n": "menu.hotstrings.tooltip_colored",
+			"checked_when": [
+				"hotstrings.preview_colored_tooltips"
+			],
+			"disabled_when": [
+				"preview_colored_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		}
+	],
 	"gestures_menu": [
 		{
 			"type": "toggle",

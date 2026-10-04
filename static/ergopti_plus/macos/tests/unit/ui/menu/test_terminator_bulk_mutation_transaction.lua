@@ -98,6 +98,7 @@ local function run_action(label, outcome, options)
 	local command_row = require("infra.manifest_menu").command_row
 	package.loaded["infra.manifest_menu"] = {
 		command_row = command_row,
+		check_row = native_renderer.check_row,
 		build = function(section, category, handlers, groups, ctx, providers)
 			return native_renderer.build(section, category, handlers, groups, ctx, providers)
 		end,

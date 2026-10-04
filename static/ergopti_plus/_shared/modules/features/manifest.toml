@@ -5370,6 +5370,18 @@ id = "preview_bubbles"
 platforms = ["hs", "linux"]
 reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
+# The coloured-preview checkbox is a fixed shared row. The other preview
+# presence switches still arrive as provider data at their existing positions.
+[[menu.preview_colored_control]]
+type = "check"
+id = "preview_colored_tooltips"
+i18n = "menu.hotstrings.tooltip_colored"
+checked_when = ["hotstrings.preview_colored_tooltips"]
+disabled_when = ["preview_colored_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
 # Unrestricted with the feature above, and for the same reason: macOS built this
 # row by hand while the manifest said it was Windows-only, which is why the
 # handler-bijection ratchet counted it as one of the rows macOS never wired.
