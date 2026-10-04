@@ -920,11 +920,14 @@ _LSCResetFrom(Chars) {
 ; through the OS layout is timed too (hotstring-preview-shows). Pruning keeps
 ; the map size bounded across a long session.
 ; @param Character {String} The character that reached the screen.
-AppState_TouchLastSentKey(Character) {
+; @param NowTick {Integer|unset} One observed tick shared by a physical chunk.
+AppState_TouchLastSentKey(Character, NowTick := unset) {
 		global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
-		LastSentCharacterKeyTime[Character] := A_TickCount
+		if !IsSet(NowTick)
+				NowTick := A_TickCount
+		LastSentCharacterKeyTime[Character] := NowTick
 		if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
-				Now := A_TickCount
+				Now := NowTick
 				for k, ts in LastSentCharacterKeyTime.Clone() {
 						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now)
 								LastSentCharacterKeyTime.Delete(k)
