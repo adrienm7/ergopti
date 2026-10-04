@@ -144,6 +144,11 @@ end
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
 local Boot               = require("infra.boot_profiler")
 local BootJournal        = require("adapters.boot_journal")
+-- Observe the in-process getter before onboarding can defer the rest of boot.
+local scripting_observed, scripting_written = pcall(BootJournal.record_native_scripting_state, hs)
+if scripting_observed ~= true or scripting_written ~= true then
+	BootJournal.append("INFO", "Native scripting server witness publication unacknowledged.")
+end
 Boot.begin()
 
 --- Records one boot fact in the log and in the synchronous boot journal, which
