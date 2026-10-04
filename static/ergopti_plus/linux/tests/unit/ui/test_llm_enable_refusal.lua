@@ -74,6 +74,9 @@ helpers.describe("AI refusal notice", function()
 				helpers.assert_eq(retry, false)
 				helpers.assert_eq(chosen, opaque)
 				helpers.assert_eq(world.order, { "release", "dialog", "restore" })
+				helpers.assert_eq(world.captions, { "Ollama is not answering" })
+				local title_flag = tool == "zenity" and "--title=" or "--title "
+				helpers.assert_true(world.commands[1]:find(title_flag .. Shell.quote(world.composed_title), 1, true) ~= nil)
 				helpers.assert_true(world.commands[1]:find(Shell.quote(label), 1, true) ~= nil)
 				world.restore_ok = false
 				local _, _, refused = world.notice.show("http://127.0.0.1:11434", { { label = label, value = opaque } })

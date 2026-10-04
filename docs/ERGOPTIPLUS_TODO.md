@@ -1961,6 +1961,16 @@ failures. Native dialogs, physical keyboard restoration, owned runtime
 start/install and complete qualification remain unfinished. Item 48 stays
 partial.
 
+Linux replacement and retry dialogs now retain one native caption site per
+installed dialog tool, with replacement controls asserting the actual composed
+and quoted title. The unchanged independent caption inventory is preserved;
+21 focused UI/caption cases pass. The real X11/WebKit full candidate passes
+6514 cases with two GTK-absence fixture failures; unchanged origin/dev under
+the identical graphical environment reproduces both (6487 passed, two failed).
+These failures are retained and routed to the Linux fixture owner, not counted
+as successful qualification. Native dialogs and physical acceptance remain
+required.
+
 - [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
       reinstalls its own low-level keyboard hook around every SendInput (upstream
       `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
