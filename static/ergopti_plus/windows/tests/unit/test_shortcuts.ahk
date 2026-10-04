@@ -477,3 +477,111 @@ _SPT_SearchFileBoundary() {
 }
 Test("Shortcuts/search: existing and missing file boundaries (search-uri-component)",
 	_SPT_SearchFileBoundary)
+
+; WinKill calls MsgSleep for its native window delay. Recording that boundary
+; allows a real timer to revoke the command without closing or launching a window.
+_SRCT_CloseBoundary(State, Spec) {
+	State["events"].Push("kill")
+	if State["throw_close"]
+		throw Error("owned close failure")
+	if State["action"] != "none" {
+		State["timer"] := _SRCT_Revoke.Bind(State)
+		SetTimer(State["timer"], -10)
+		Sleep(A_WinDelay)
+	}
+	return State["close_receipt"]
+}
+
+_SRCT_Revoke(State, *) {
+	State["events"].Push("revoke")
+	State["transitions"] += 1
+	switch State["action"] {
+		case "pause": Suspend(true)
+		case "cancel": GetSelectionCancel()
+		case "pause-resume":
+			Suspend(true)
+			; This is the real cancellation authority called by suspend teardown.
+			; The full lifecycle is deliberately not invoked by this passive fixture.
+			GetSelectionCancel()
+			Suspend(false)
+		default: throw Error("Unknown registry continuation fixture action.")
+	}
+}
+
+_SRCT_RecordLaunch(State, Target) {
+	State["events"].Push("run")
+	State["launches"] += 1
+	State["suspended_at_launch"] := A_IsSuspended
+	AssertEqual("Regedit.exe", Target)
+	if State["throw_launch"]
+		throw Error("owned launch failure")
+	return true
+}
+
+_SRCT_Continuation(Scenario) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live selection capture")
+	AssertEqual(0, CBClipboardOwner.active.Count, "fixture refuses active clipboard ownership")
+	AssertFalse(CBClipboardOwner.restore_debt, "fixture refuses an inherited restore debt")
+	PreviousId := _SelectionCaptureNextId
+	PreviousSuspended := A_IsSuspended
+	PreviousWinDelay := A_WinDelay
+	PreviousCritical := Critical("Off")
+	State := Map("events", [], "timer", 0, "transitions", 0, "launches", 0,
+		"suspended_at_launch", false, "action", "none", "exists", true,
+		"write_receipt", true, "close_receipt", true, "throw_close", false, "throw_launch", false)
+	try {
+		AssertFalse(A_IsSuspended, "fixture requires an admitted active command")
+		SetWinDelay(100)
+		switch Scenario {
+			case "pause", "cancel", "pause-resume": State["action"] := Scenario
+			case "absent": State["exists"] := false
+			case "write-refused": State["write_receipt"] := false
+			case "close-refused": State["close_receipt"] := false
+			case "close-throws": State["throw_close"] := true
+			case "launch-throws": State["throw_launch"] := true
+			case "ordinary": State["action"] := "none"
+			default: throw Error("Unknown registry continuation fixture case.")
+		}
+		Write := (Root, Name, Value) => (State["events"].Push("write"), State["write_receipt"])
+		Exists := (Spec) => (State["events"].Push("exists"), State["exists"])
+		Invoke := () => _RegJumpCommit("HKEY_CURRENT_USER\Software\Ergopti",
+			Write, Exists, _SRCT_CloseBoundary.Bind(State), _SRCT_RecordLaunch.Bind(State))
+		if InStr(Scenario, "refused") || InStr(Scenario, "throws") {
+			AssertThrows(Invoke, "a refused or failed effect must keep the established error contract")
+			AssertEqual(Scenario = "write-refused" ? 1 : (Scenario = "launch-throws" ? 4 : 3),
+				State["events"].Length, "failure must stop the exact remaining effects")
+			AssertEqual(Scenario = "launch-throws" ? 1 : 0, State["launches"])
+		} else {
+			Expected := State["action"] = "none"
+			Result := Invoke.Call()
+			if !Expected {
+				AssertEqual(1, State["transitions"], "the actual timer must run inside the window-delay boundary")
+				AssertEqual(Scenario = "pause", A_IsSuspended,
+					"pause-resume must already be active when the old close returns")
+				AssertEqual(PreviousId + (Scenario = "pause" ? 0 : 1), _SelectionCaptureNextId,
+					"the real capture owner must publish each revocation")
+			}
+			AssertEqual(Expected, Result, "a cancelled continuation cannot claim a completed navigation")
+			AssertEqual(Expected ? 1 : 0, State["launches"],
+				"pause or capture revocation during close must suppress the subsequent launch")
+			AssertEqual("write", State["events"][1], "persisting the key remains the first effect")
+			AssertEqual("exists", State["events"][2])
+			if Scenario != "absent"
+				AssertEqual("kill", State["events"][3], "the already admitted close remains owned")
+			if Expected
+				AssertFalse(State["suspended_at_launch"])
+		}
+	} finally {
+		if IsObject(State["timer"])
+			SetTimer(State["timer"], 0)
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+		SetWinDelay(PreviousWinDelay)
+		Critical(PreviousCritical)
+	}
+}
+for _SRCT_Scenario in ["pause", "cancel", "pause-resume", "ordinary", "absent",
+	"write-refused", "close-refused", "close-throws", "launch-throws"]
+	Test("Shortcuts/win: registry continuation " . _SRCT_Scenario . " (regjump-continuation-revocation)",
+		_SRCT_Continuation.Bind(_SRCT_Scenario))
