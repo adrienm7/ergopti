@@ -1280,6 +1280,25 @@ These are software implementations; final hardware verification remains below.
   macOS uses hs.hash and Windows Get-FileHash by source, without this libuv
   allocation frame; foreign runtime suites remain deferred. No caller, shared
   API, reserved surface or hosted CI changed.
+- [~] **L94.** Linux file write/append endpoint admission: pin a writable
+  nonblocking descriptor without truncation, require native regular-file
+  metadata, then reopen that exact inode for buffered overwrite or append.
+  FIFOs with or without readers, directories and sockets refuse without
+  blocking or emitting bytes. Regular symlinks, creation/umask and exact NUL/
+  UTF-8/CRLF bytes remain supported. Actual RLIMIT_FSIZE failures exercise
+  partial write and buffered close receipts; simulated path-edit timing and
+  metadata refusal are explicitly labeled over real native resources.
+  Twenty-four checks have ten original failures per FFI/luv backend and pass
+  after; Lua 5.4's actual luv backend also passes all twenty-four. Each case
+  checks descriptor retirement. Thirty-four simulated units and one native
+  matrix registration preserve existing write/close assertions. macOS's current
+  atomic overwrite already rejects nonregular destinations by source, while
+  its direct append still needs equivalent native admission; that reserved
+  native work and Windows runtime checks remain with the principal agent.
+  Windows FileOpen is not this Linux POSIX FIFO implementation. No claim of
+  atomic publication or recovery from ambiguous raw-close errors is added.
+  Register all three native backend runs without launching hosted CI.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
