@@ -310,7 +310,9 @@ local function buffered_result(request)
 		status = status,
 		body = succeeded and body or "",
 		-- A refused request explains itself in its body ("invalid API key").
-		error_body = not http_success and body or nil,
+		-- Curl's fail-with-body exit 22 still proves a completed HTTP rejection;
+		-- other exits can leave a valid JSON prefix before transport truncation.
+		error_body = not http_success and (request.exit_code == 0 or request.exit_code == 22) and body or nil,
 		error = failure,
 	}
 end
@@ -336,7 +338,8 @@ local function streaming_result(request)
 	end
 	return {
 		ok = succeeded, status = status, body = "",
-		error_body = not http_success and not request.error_body_truncated and request.error_body_text or nil,
+		error_body = not http_success and (request.exit_code == 0 or request.exit_code == 22)
+			and not request.error_body_truncated and request.error_body_text or nil,
 		error = failure,
 	}
 end
