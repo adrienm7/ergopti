@@ -264,6 +264,131 @@ check('an admitted preferred name remains coupled to its independent hash', () =
 	}
 });
 
+check('portable Brew ownership controls remain registered and mandatory', () => {
+	const controls = path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance_test.py');
+	const result = spawnSync(process.platform === 'win32' ? 'python' : 'python3', [controls], {
+		cwd: ROOT,
+		encoding: 'utf8',
+		timeout: 30000,
+		env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+	});
+	assert.ifError(result.error);
+	assert.strictEqual(result.signal, null, result.stderr);
+	assert.strictEqual(result.status, 0, result.stderr);
+	assert.match(result.stderr, /Ran 20 tests in /);
+	assert.match(result.stderr, /\nOK\s*$/);
+	assert.doesNotMatch(result.stderr, /skipped=/);
+});
+
+check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
+	const fixture = fs.readFileSync(
+		path.join(
+			ROOT,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	assert.match(
+		fixture,
+		/func testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState\(\) throws/
+	);
+	assert.match(fixture, /tools\/diagnostics\/macos_brew_archive_acceptance\.py/);
+	assert.match(fixture, /process\.run\(\)/);
+	assert.match(fixture, /process\.terminationStatus == 0/);
+	assert.match(fixture, /attributes: \[\.posixPermissions: 0o700\]/);
+	assert.match(fixture, /Set\(ownership\.keys\) == Set\(\["schema", "helper_pid", "closed"\]\)/);
+	assert.match(fixture, /ownership\["closed"\] as\? Bool == true/);
+	assert.match(fixture, /ownership\["helper_pid"\]/);
+	assert.match(fixture, /func retireInvoker\(\) -> Bool/);
+	assert.doesNotMatch(fixture, /SIGKILL/);
+
+	assert.match(fixture, /receipt\["complete"\] as\? Bool, true/);
+	assert.match(fixture, /receipt\["host_unchanged"\] as\? Bool, true/);
+	assert.match(fixture, /receipt\["fixture_retained"\] as\? Bool, false/);
+	assert.match(fixture, /receipt\["cleanup_errors"\] as\? \[String\], \[\]/);
+	for (const name of [
+		'zip_install',
+		'xz_upgrade',
+		'checksum_refusal_preserved',
+		'checksum_retry',
+		'artifact_refusal_preserved',
+		'artifact_retry'
+	]) {
+		assert.ok(fixture.includes(`"${name}": true`), `Native receipt must acknowledge ${name}`);
+	}
+	assert.doesNotMatch(fixture, /XCTSkip|mock|stub/i);
+});
+
+check('native macOS CI admits the pinned Python nonreaping prerequisites', () => {
+	const pipeline = require('./ci-pipeline.cjs');
+	const job = pipeline.job('package-macos');
+	const setupName = 'Prepare Python for native nonreaping waits';
+	const admissionName = 'Admit native nonreaping Python prerequisites';
+	const setup = pipeline.step(job, setupName);
+	const admission = pipeline.step(job, admissionName);
+	assert.equal(pipeline.stepField(setup, 'uses'), 'actions/setup-python@v5');
+	assert.match(setup, /python-version: '3\.13'/);
+	for (const step of [setup, admission]) {
+		assert.equal(pipeline.stepField(step, 'if'), null);
+		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+	}
+	const order = pipeline.steps(job).map((step) => step.name);
+	assert.ok(order.indexOf(setupName) < order.indexOf(admissionName));
+	assert.ok(order.indexOf(admissionName) < order.indexOf('Run Swift launcher tests'));
+	const lines = pipeline.runOf(admission);
+	assert.equal(lines[0], "python3 - <<'PY'");
+	assert.equal(lines.at(-1), 'PY');
+	const script = lines.slice(1, -1).join('\n');
+	for (const [version, missing, expected] of [
+		[[3, 12, 12], null, 1],
+		[[3, 13, 7], 'waitid', 1],
+		[[3, 13, 7], 'WNOWAIT', 1],
+		[[3, 13, 7], null, 0]
+	]) {
+		// These portable models exercise the actual admission script; native
+		// WNOWAIT behavior remains owned by repeated macOS observations.
+		const preparation =
+			`import os, sys\nsys.platform = "darwin"\nsys.version_info = tuple(${JSON.stringify(version)})\nfor name in ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT", "CLD_EXITED", "CLD_KILLED", "CLD_DUMPED"):\n if not hasattr(os, name): setattr(os, name, None)\n` +
+			(missing
+				? `if hasattr(os, ${JSON.stringify(missing)}): delattr(os, ${JSON.stringify(missing)})\n`
+				: '') +
+			`exec(${JSON.stringify(script)})\n`;
+		const result = spawnSync(
+			process.platform === 'win32' ? 'python' : 'python3',
+			['-c', preparation],
+			{ encoding: 'utf8', timeout: 30000 }
+		);
+		assert.ifError(result.error);
+		assert.equal(result.signal, null, result.stderr);
+		assert.equal(result.status === 0 ? 0 : 1, expected, result.stderr);
+		if (expected === 0) {
+			assert.deepEqual(JSON.parse(result.stdout).version, version);
+			assert.ok(JSON.parse(result.stdout).nonreaping_apis.includes('WNOWAIT'));
+		} else {
+			assert.match(result.stderr, missing ? /Missing native nonreaping APIs/ : /CPython >= 3.13/);
+		}
+	}
+});
+
+check('shared native process ownership controls remain registered and mandatory', () => {
+	const result = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		[path.join(ROOT, 'tools/diagnostics/macos_owned_process_test.py')],
+		{
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+		}
+	);
+	assert.ifError(result.error);
+	assert.strictEqual(result.signal, null, result.stderr);
+	assert.strictEqual(result.status, 0, result.stderr);
+	assert.match(result.stderr, /Ran 15 tests in /);
+	assert.match(result.stderr, /\nOK\s*$/);
+	assert.doesNotMatch(result.stderr, /skipped=/);
+});
+
 if (failures > 0) {
 	console.error(`\n${failures} Homebrew cask check(s) failed.`);
 	process.exit(1);
