@@ -29,7 +29,7 @@ _MATA_ManifestIncludesLiveForegroundInterval() {
 	Assert(Src != "", "KLR_AddLiveForegroundTime must exist")
 	Assert(InStr(Src, 'cell["app_time_ms"] += elapsed') > 0,
 		"live foreground duration must be projected into app_time_ms")
-	Assert(InStr(Src, "date_str < start_date") > 0 && InStr(Src, "date_str > end_date") > 0,
-		"the live interval must respect the manifest date filter")
+	; Inclusive and excluded date bounds are executed against this owner and
+	; both real SQLite consumers by the registered klr-live-date-bounds cases.
 }
 Test("metrics app time: manifest includes the current foreground interval", _MATA_ManifestIncludesLiveForegroundInterval)

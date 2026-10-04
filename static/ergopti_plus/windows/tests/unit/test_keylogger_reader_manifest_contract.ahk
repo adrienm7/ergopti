@@ -175,3 +175,84 @@ _KLRManifest_IdenticalDeviceHistograms(Kind) {
 for Kind in ["burst", "hourly", "minute"]
 	Test("Keylogger reader: identical device histograms " . Kind . " (manifest-identical-histograms)",
 		_KLRManifest_IdenticalDeviceHistograms.Bind(Kind))
+
+_KLRManifest_LiveDateBounds(Scenario) {
+	SavedApp := KLHook.prev_app
+	SavedEntered := KLHook.app_entered_at
+	SavedTick := KLHook.last_tick
+	try {
+		Today := A_YYYY . "-" . A_MM . "-" . A_DD
+		Before := A_TickCount
+		AssertTrue(Before > 75, "the passive date fixture needs a nonzero context origin")
+		KLHook.prev_app := "owned-date-editor.exe"
+		KLHook.app_entered_at := Before - 75
+		KLHook.last_tick := Before
+		Manifest := Map()
+		Cell := KLR_GetCell(Manifest, Today, KLHook.prev_app)
+		Carry := 41
+		Cell["app_time_ms"] := Carry
+		Start := Scenario = "before" ? "9999-12-31" : (Scenario = "after" ? "" : Today)
+		End := Scenario = "after" ? "0001-01-01" : (Scenario = "before" ? "" : Today)
+		KLR_AddLiveForegroundTime(Manifest, Start, End)
+		After := A_TickCount
+		if Scenario = "inclusive" {
+			AssertTrue(Cell["app_time_ms"] >= Carry + 75, "inclusive dates retain the observed foreground interval")
+			AssertTrue(Cell["app_time_ms"] <= Carry + After - KLHook.app_entered_at)
+		} else {
+			AssertEqual(Carry, Cell["app_time_ms"], "a date outside the selected range must preserve stored carry")
+		}
+		AssertEqual(1, Manifest.Count)
+		AssertEqual(1, Manifest[Today].Count)
+	} finally {
+		KLHook.prev_app := SavedApp
+		KLHook.app_entered_at := SavedEntered
+		KLHook.last_tick := SavedTick
+	}
+}
+for _KLRManifest_LiveDateScenario in ["before", "after", "inclusive"]
+	Test("Keylogger live dates: " . _KLRManifest_LiveDateScenario . " (klr-live-date-bounds)",
+		_KLRManifest_LiveDateBounds.Bind(_KLRManifest_LiveDateScenario))
+
+_KLRManifest_LiveDateConsumer(Encoded) {
+	SavedApp := KLHook.prev_app
+	SavedEntered := KLHook.app_entered_at
+	SavedTick := KLHook.last_tick
+	Db := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		Today := A_YYYY . "-" . A_MM . "-" . A_DD
+		Carry := 73
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day (device_id,date,app,app_time_ms) VALUES ('owned-live',"
+			. SQLite_Q(Today) . ",'owned-date-editor.exe'," . Carry . ");"))
+		Before := A_TickCount
+		AssertTrue(Before > 75, "the passive consumer fixture needs a nonzero context origin")
+		KLHook.prev_app := "owned-date-editor.exe"
+		KLHook.app_entered_at := Before - 75
+		KLHook.last_tick := Before
+		Index := Map()
+		if Encoded
+			Manifest := JsonParse(KLR_BuildManifestJson(Db, Today, Today, &Index))
+		else
+			Manifest := KLR_ReadManifest(Db, Today, Today)
+		After := A_TickCount
+		Cell := Manifest[Today]["owned-date-editor.exe"]
+		AssertTrue(Cell["app_time_ms"] >= Carry + 75, "the actual filtered consumer retains persisted carry and live time")
+		AssertTrue(Cell["app_time_ms"] <= Carry + After - KLHook.app_entered_at)
+		AssertEqual(1, Manifest.Count, "the selected date excludes historical fixture rows")
+		AssertEqual(1, Manifest[Today].Count, "the live foreground remains attributed to its app")
+		if Encoded {
+			AssertEqual(1, Index.Count)
+			AssertTrue(Index[Today].Has("owned-date-editor.exe"))
+		}
+	} finally {
+		if Db
+			SQLite_Close(Db)
+		KLHook.prev_app := SavedApp
+		KLHook.app_entered_at := SavedEntered
+		KLHook.last_tick := SavedTick
+	}
+}
+for _KLRManifest_LiveDateEncoded in [false, true]
+	Test("Keylogger live dates: actual " . (_KLRManifest_LiveDateEncoded ? "encoded" : "Map")
+		. " consumer keeps carry (klr-live-date-bounds)",
+		_KLRManifest_LiveDateConsumer.Bind(_KLRManifest_LiveDateEncoded))
