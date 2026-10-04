@@ -13,11 +13,13 @@
 ;     This runs entirely in-process without any OS window and is safe in
 ;     headless CI (GitHub Actions windows-latest).
 ;
-;   Strategy B — Real GUI window injection (optional, skipped in headless CI):
-;     Creates an AHK Gui with an Edit control, sends the trigger via
-;     SendInput, waits for the InputHook to fire, and reads back the control
-;     text via ControlGetText. Enabled only when E2E_REAL_GUI is set to 1
-;     on the command line (e.g. "AutoHotkey.exe run_e2e.ahk 1").
+;   Strategy B — Owned native Windows Edit controls (mandatory):
+;     Feeds the same production registration, matching and dispatch pipeline,
+;     inserts literal text with native Edit messages and forwards actual emitted
+;     atomic payloads to a private hidden Edit. The control's
+;     text is observed independently after every input and expansion. This tier
+;     covers native Unicode erasure and text storage. Physical InputHook and
+;     SendInput delivery remain outside this isolated tier.
 ;
 ; CORPUS:
 ; Every shared vector is replayed through the production registration factories,
@@ -28,8 +30,6 @@
 ;
 ; USAGE (headless CI):
 ;   AutoHotkey64.exe run_e2e.ahk
-; USAGE (real GUI):
-;   AutoHotkey64.exe run_e2e.ahk 1
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -91,10 +91,6 @@ InstallHotstringHooks()
 ; ============================
 ; ============================
 
-; Whether Strategy B (real Gui window injection) is requested.
-; Set to 1 by passing any truthy first argument on the command line.
-global E2E_REAL_GUI := (A_Args.Length >= 1 and A_Args[1] == "1")
-
 ; Magic sentinel used by the engine (mirrors ErgoptiPlus.ahk).
 global E2E_MAGIC_KEY := Chr(0x2605)  ; ★ U+2605
 
@@ -118,8 +114,9 @@ if !(E2E_SCENARIOS is Array) or E2E_SCENARIOS.Length == 0
 
 ; Drive real registration and dispatch while applying captured sends to a virtual
 ; document. Native input hooks and the OS sender are outside this headless tier.
-E2E_RunScenarioPure(Scenario) {
-    global _HotstringRegistrar, HSE_CONSUMED_DELIMITERS
+E2E_RunScenarioPure(Scenario, NativeControl := unset) {
+    global _HotstringRegistrar, HSE_CONSUMED_DELIMITERS, _SendHook
+    SavedSendHook := _SendHook
     SavedRegistrar := _HotstringRegistrar
     SavedConsumed := HSE_CONSUMED_DELIMITERS
     HSE_RegistryClear()
@@ -148,11 +145,17 @@ E2E_RunScenarioPure(Scenario) {
         ; The production factory publishes to HSE directly; the optional
         ; registration recorder is unnecessary. Native output remains intercepted.
         _HotstringRegistrar := 0
+        if IsSet(NativeControl)
+            _SendHook := _E2E_SendToNativeEdit.Bind(NativeControl)
         HSE_RegisterFromTomlFlags(Scenario.Get("is_case_sensitive", false),
             Flags, Trigger, Scenario["replacement"],
             Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON))
         for Char in _TextCodepoints(InputBuffer . Term) {
             Document .= Char
+            if IsSet(NativeControl) {
+                _E2E_InsertNativeText(NativeControl, Char)
+                AssertEqual(Document, NativeControl.Value, "input must reach the owned native Edit")
+            }
             Match := HSE_FeedChar(Char)
             if !IsObject(Match)
                 continue
@@ -160,6 +163,8 @@ E2E_RunScenarioPure(Scenario) {
             AssertTrue(HSE_DispatchMatch(Match, EndChar), "an admitted match must actually dispatch")
             DispatchCount += 1
             EmittedBackspaces := _E2E_ApplyRecordedEdit(&Document, &NextSend)
+            if IsSet(NativeControl)
+                AssertEqual(Document, NativeControl.Value, "native output must match the independently decoded edit")
             ; Windows deletes an already visible end character and replays it
             ; when retained. The shared count excludes only that physical replay.
             ReplayedEnd := EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)
@@ -168,6 +173,7 @@ E2E_RunScenarioPure(Scenario) {
         return Map("matched", DispatchCount > 0, "document", Document,
             "backspace_count", LogicalBackspaces, "dispatch_count", DispatchCount)
     } finally {
+        _SendHook := SavedSendHook
         _HotstringRegistrar := SavedRegistrar
         HSE_CONSUMED_DELIMITERS := SavedConsumed
         HSE_RegistryClear()
@@ -203,41 +209,56 @@ _E2E_ApplyRecordedEdit(&Document, &NextSend) {
 
 ; ==================================================
 ; ==================================================
-; ======= 3/ Strategy B — Real GUI injection =======
+; ======= 3/ Strategy B — Native Edit output =======
 ; ==================================================
 ; ==================================================
 
-; Creates a hidden Gui with an Edit control, sends the trigger string and
-; terminator via SendInput, and reads back the control text. Returns the
-; full text content of the Edit control after the injection.
-;
-; NOTE: This path requires a real WindowServer session and the AHK hotstring
-; engine to be wired to an InputHook listening on the window — it is NOT
-; wired by default in the test harness because InstallHotstringHooks()
-; redirects all sends to the stub recorder. This function is provided as a
-; proof-of-concept scaffold; see PLAN_E2E_REAL_AHK.md for the full unblocking
-; path.
-E2E_RunScenarioGui(Trigger, Terminator) {
-    TestGui := Gui("+AlwaysOnTop", "E2E Target")
-    EditCtrl := TestGui.AddEdit("w400 h100", "")
-    TestGui.Show("x10 y10")
+/** Rejects destroyed, visible or foreign controls before any native message. */
+_E2E_AssertNativeControlOwner(EditControl) {
+    AssertTrue(DllCall("IsWindow", "Ptr", EditControl.Hwnd), "the owned native Edit must remain alive")
+    AssertFalse(DllCall("IsWindowVisible", "Ptr", EditControl.Hwnd), "the owned native Edit must remain hidden")
+    AssertEqual(DllCall("GetCurrentProcessId", "UInt"), WinGetPID(EditControl.Hwnd),
+        "the native Edit must belong to this test process")
+}
 
-    ; Give the window time to appear and become the active target.
-    WinWaitActive("E2E Target",, 3)
-    if ErrorLevel {
-        TestGui.Destroy()
-        return "ERROR: window did not activate"
+/** Inserts literal text through the owned native Edit message boundary. */
+_E2E_InsertNativeText(EditControl, Text) {
+    _E2E_AssertNativeControlOwner(EditControl)
+    SendMessage(0x00C2, 1, StrPtr(Text), EditControl)
+}
+
+/** Applies the production sender payload to one owned native control. */
+_E2E_SendToNativeEdit(EditControl, FnName, Args*) {
+    _E2E_AssertNativeControlOwner(EditControl)
+    AssertEqual("SendFinalResult", FnName, "the native tier must receive the production final sender")
+    AssertTrue(Args.Length == 2 and !Args[2], "the native sender must preserve its command payload")
+    _HOOK_RecordSend(FnName, Args*)
+    AssertTrue(RegExMatch(Args[1], "^\{BackSpace (\d+)\}\{Text\}([\s\S]*)$", &Edit),
+        "the native tier must receive a recognized atomic edit")
+    loop Integer(Edit[1])
+        SendMessage(0x0102, 8, 1, EditControl)
+    _E2E_InsertNativeText(EditControl, Edit[2])
+    return true
+}
+
+/** Replays real registration, matching and output into a hidden Windows Edit. */
+_E2E_RunNativeEditTest(Scenario) {
+    Window := Gui()
+    EditControl := Window.AddEdit("w400 h100 Multi WantTab", "")
+    Window.Show("Hide")
+    try {
+        AssertFalse(DllCall("IsWindowVisible", "Ptr", Window.Hwnd),
+            "the native fixture must remain hidden")
+        AssertEqual(DllCall("GetCurrentProcessId", "UInt"),
+            WinGetPID(Window.Hwnd), "the native fixture must belong to this test process")
+        Result := E2E_RunScenarioPure(Scenario, EditControl)
+        _E2E_AssertScenario(Scenario, Result)
+        AssertEqual(Result["document"], EditControl.Value,
+            "the owned native control must retain the exact final document")
+        return Result
+    } finally {
+        Window.Destroy()
     }
-
-    ControlFocus(EditCtrl, "E2E Target")
-    ; Send the trigger + terminator directly via SendInput.
-    SendInput(Trigger . Terminator)
-    ; Wait for any pending expansion to settle.
-    Sleep(150)
-
-    Result := ControlGetText(EditCtrl, "E2E Target")
-    TestGui.Destroy()
-    return Result
 }
 
 
@@ -254,6 +275,12 @@ E2E_RunScenarioGui(Trigger, Terminator) {
 ; so each Test() callback is bound to a specific scenario via .Bind().
 _E2E_RunPureTest(Sc) {
     Result := E2E_RunScenarioPure(Sc)
+    _E2E_AssertScenario(Sc, Result)
+    return Result
+}
+
+/** Shares verdict assertions while keeping native output independently observed. */
+_E2E_AssertScenario(Sc, Result) {
     Expected := Sc["expected"]
     InputBuffer := Sc.Get("buffer", "")
     Term := Sc.Get("terminator", " ")
@@ -281,37 +308,34 @@ for _Sc in E2E_SCENARIOS {
 
 
 ; Supplementary characters must exercise the same actual sender replay.
-_E2E_UnicodeReplay() {
+_E2E_UnicodeReplay(Runner := _E2E_RunPureTest) {
     global HSE_WORD_TERMINATORS
     Saved := HSE_WORD_TERMINATORS
     Emoji := Chr(0x1F600)
     try {
-        _E2E_RunPureTest(Map("trigger", Emoji . "x", "buffer", "A" . Emoji . "x",
+        Scenario := Map("trigger", Emoji . "x", "buffer", "A" . Emoji . "x",
             "replacement", "R", "terminator", "", "auto_expand", true,
             "is_case_sensitive", true, "is_case_sensitive_strict", true,
-            "expected", Map("matched", true, "replacement", "R", "backspace_count", 2)))
+            "expected", Map("matched", true, "replacement", "R", "backspace_count", 2))
+        _E2E_AssertScenario(Scenario, Runner.Call(Scenario))
         HSE_WORD_TERMINATORS .= Emoji
-        _E2E_RunPureTest(Map("trigger", "xy", "buffer", "Axy", "replacement", "R",
+        Scenario := Map("trigger", "xy", "buffer", "Axy", "replacement", "R",
             "terminator", Emoji, "terminator_consumed", true,
             "is_case_sensitive", true, "is_case_sensitive_strict", true,
-            "expected", Map("matched", true, "replacement", "R", "backspace_count", 3)))
+            "expected", Map("matched", true, "replacement", "R", "backspace_count", 3))
+        _E2E_AssertScenario(Scenario, Runner.Call(Scenario))
     } finally {
         HSE_WORD_TERMINATORS := Saved
     }
 }
 Test("e2e[pure] supplementary trigger and completion preserve native edits (unicode-erase)",
     _E2E_UnicodeReplay)
+Test("e2e[native-edit] supplementary trigger and completion preserve native edits (unicode-erase)",
+    _E2E_UnicodeReplay.Bind(_E2E_RunNativeEditTest))
 
-; Strategy B — real GUI — registered only when E2E_REAL_GUI is set.
-; In that mode the test creates a visible Edit control, types the trigger,
-; and asserts the expansion appeared in the text. Skipped in headless CI.
-if E2E_REAL_GUI {
-    Test("e2e[gui] simple_expansion — btw expands in Edit control", _E2E_RunGuiTest)
-}
-
-_E2E_RunGuiTest() {
-    Text := E2E_RunScenarioGui("btw", " ")
-    AssertEqual("by the way ", Text)
+; The native control tier is mandatory and never activates a user window.
+for _Sc in E2E_SCENARIOS {
+    Test("e2e[native-edit] " . _Sc["id"], _E2E_RunNativeEditTest.Bind(_Sc))
 }
 
 

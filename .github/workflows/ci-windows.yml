@@ -473,6 +473,12 @@ jobs:
               Write-Error "E2E suite failed (exit $exit)."; exit $exit
           }
 
+      - name: Validate complete native E2E corpus execution
+        shell: pwsh
+        run: |
+          node tools/test/validate-ahk-e2e-manifest.cjs --input "$env:GITHUB_WORKSPACE/static/ergopti_plus/windows/tests/e2e/test_results.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   # ─────────────────────────────────────────────────
   # 3) Build the executable once; sign releases
   # ─────────────────────────────────────────────────
