@@ -7,9 +7,9 @@
 --- and names in plain words why it failed: access refused on a named path, a
 --- Mac or a Python that MLX does not support, the developer tools macOS asks
 --- for, a Gatekeeper refusal, a full disk, packages that do not import, or the
---- network, in the classes the managed-network contract shares with the other
---- drivers (certificate, proxy, host_blocked, offline). Every failure also
---- carries the line that proves it.
+--- network. Only a typed native receipt identifies a network cause; unstructured
+--- download stderr remains unknown. Non-network runtime repair diagnoses keep
+--- their existing evidence and wording.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The output is kept while it streams: a task's completion receives only
@@ -20,12 +20,10 @@
 ---    the real cause is searched for in the whole retained tail.
 --- 3. Pure: no native call, so the dependency checker, the import probe of the
 ---    models manager and the tests share one classifier and one wording.
---- 4. A refused connection is the network's: a company filter or firewall that
----    denies the installer network access makes the connection fail with
----    "Operation not permitted", which once read as a file permission and
----    offered to show a folder. With a download failing and no path named,
----    that refusal is host_blocked; a relay asking for credentials is proxy;
----    an unknown certificate issuer (TLS inspection) is certificate.
+--- 4. Generic curl failures, origin HTTP refusals and DNS/timeout text cannot
+---    prove certificate, proxy, firewall or offline causes. The native owner
+---    may supply a shared typed receipt; otherwise retry names the unknown
+---    failure and retains its diagnostic tail without an invented cause.
 --- ==============================================================================
 
 local M = {}
@@ -50,13 +48,13 @@ local MAX_DETAIL_CHARS = 240
 -- matching line wins, so a permission error followed by the retry loop's
 -- network messages is reported as the permission error it is.
 M.KINDS = {
-	"foreign_path", "developer_tools", "unsupported", "gatekeeper", "certificate",
-	"proxy", "host_blocked", "permission", "disk_full", "import_failed", "python", "offline",
+	"foreign_path", "developer_tools", "unsupported", "gatekeeper",
+	"permission", "disk_full", "import_failed", "python",
 }
 
 -- The network classes, as _shared/modules/network/managed_network.json names
--- them for every driver; their sentence is the contract's cause_key.
-M.NETWORK_KINDS = { certificate = true, proxy = true, host_blocked = true, offline = true }
+-- them for every driver; their sentence is the contract's message_key.
+M.NETWORK_KINDS = { certificate = true, proxy = true, host_blocked = true, offline = true, network_unknown = true }
 
 -- Case-insensitive plain substrings proving each kind.
 local SIGNATURES = {
@@ -90,32 +88,18 @@ local SIGNATURES = {
 		"no interpreter found", "bad interpreter", "library not loaded",
 		"symbol not found",
 	},
-	certificate = {
-		"invalid peer certificate", "unknownissuer", "certificate verify failed",
-		"certificate_verify_failed", "ssl certificate problem", "unable to get local issuer certificate",
-		"self signed certificate", "self-signed certificate", "certificate has expired",
-		"certificate signed by unknown authority", "tls: failed to verify certificate",
-		"peer certificate cannot be authenticated", "curl: (60)", "curl: (35)",
-	},
-	-- Never the bare word: a relay host is often named after it.
-	proxy = {
-		"proxy authentication required", "(407)", "http 407", "407 proxy", "proxyconnect",
-		"could not resolve proxy", "couldn't resolve proxy", "curl: (5)", "curl: (97)",
-		"unsuccessful tunnel", "tunnel connection failed",
-	},
-	host_blocked = {
-		"403 forbidden", "(403)", "http 403", "451 unavailable", "(451)", "http 451",
-		"connect error: operation not permitted", "urlopen error [errno 1]",
-	},
-	offline = {
-		"could not resolve", "failed to download", "error sending request",
-		"dns error", "timed out", "connection reset", "connection refused",
-		"network is unreachable", "no route to host", "tcp connect error", "curl: (",
-		"failed to fetch", "could not connect",
-	},
 }
 
--- A download that failed: a refusal met with one of these is the network's.
+-- Activity hints select the unknown download wording; they never establish a cause.
+local NETWORK_ACTIVITY = {
+	"curl:", "http ", "http/", "invalid peer certificate", "certificate verify failed",
+	"unknownissuer", "proxy authentication", "failed to download", "failed to fetch",
+	"error sending request", "could not resolve", "could not connect", "connection refused",
+	"connection reset", "network is unreachable", "no route to host", "tcp connect error",
+	"timed out", "request failed after", "dns error",
+}
+
+-- Retained diagnostic helper; a text hint no longer admits a host_blocked cause.
 local DOWNLOAD_FAILURES = {
 	"error sending request", "failed to download", "request failed after", "tcp connect error",
 	"client error (connect)", "urlopen error", "failed to fetch", "curl: (7)",
@@ -127,7 +111,7 @@ local CONNECTION_REFUSALS = { "operation not permitted", "os error 1)", "errno 1
 local REPAIRABLE = {
 	developer_tools = true, gatekeeper = true, permission = true,
 	disk_full = true, import_failed = true, python = true,
-	certificate = true, proxy = true, host_blocked = true, offline = true,
+	certificate = true, proxy = true, host_blocked = true, offline = true, network_unknown = true,
 	exit = true, venv_not_native = true,
 }
 
@@ -142,6 +126,7 @@ local CAUSE_KEYS = {
 	proxy           = "network.failure.proxy",
 	host_blocked    = "network.failure.host_blocked",
 	offline         = "network.failure.offline",
+	network_unknown = "network.failure.unknown",
 	-- Named before the installer starts (adapters/python_interpreter.lua): its
 	-- fix is a native Python, which ui/python_runtime_offer.lua installs.
 	no_native_python = "mlx.cause_no_native_python",
@@ -289,20 +274,34 @@ end
 --- Names the cause of a failed installation or import probe.
 --- @param lines table Clean lines, oldest first (see new_tail().lines()).
 --- @param exit_code any Exit code of the subprocess.
---- @param context table|nil { platform_supported = boolean|nil, machine = string|nil }
+--- @param context table|nil Platform context and optional network_receipt/network_contract from the native owner.
 --- @return table cause { kind, line, path, exit_code, machine, repairable }
 function M.classify(lines, exit_code, context)
 	lines = type(lines) == "table" and lines or {}
 	context = type(context) == "table" and context or {}
 	local code = tonumber(exit_code)
-	local blocked = M.refused_connection(lines)
-	if blocked then
-		return { kind = "host_blocked", line = blocked, exit_code = code, repairable = true }
+	if context.network_receipt ~= nil then
+		assert(type(context.network_contract) == "table" and type(context.network_contract.classify) == "function",
+			"MLX typed failure needs the initialized shared network contract")
+		local report = context.network_contract.classify(context.network_receipt, {})
+		local kind = report.cause == "unknown" and "network_unknown" or report.cause
+		if kind == "disk" then kind = "disk_full" end
+		return { kind = kind, exit_code = code, repairable = true, network_report = report }
+	end
+	local network_line = nil
+	for index = #lines, 1, -1 do
+		local line = lines[index]
+		if type(line) == "string" then
+			for _, hint in ipairs(NETWORK_ACTIVITY) do
+				if line:lower():find(hint, 1, true) then network_line = network_line or line end
+			end
+		end
 	end
 	for _, kind in ipairs(M.KINDS) do
 		for index = #lines, 1, -1 do
 			local line = lines[index]
-			if type(line) == "string" and line_matches(line, kind) then
+			if type(line) == "string" and line_matches(line, kind)
+				and not (kind == "permission" and network_line ~= nil and path_in(line) == nil) then
 				-- A supported Mac with no wheel for "the current platform" was
 				-- handed a foreign interpreter: the Python is at fault, not the Mac.
 				local resolved = kind
@@ -319,6 +318,9 @@ function M.classify(lines, exit_code, context)
 				}
 			end
 		end
+	end
+	if network_line then
+		return { kind = "network_unknown", line = network_line, exit_code = code, repairable = true }
 	end
 	local last = nil
 	for index = #lines, 1, -1 do
@@ -368,6 +370,9 @@ end
 --- @return string sentence
 function M.cause_sentence(cause)
 	local kind = type(cause) == "table" and cause.kind or "exit"
+	if type(cause) == "table" and type(cause.network_report) == "table" then
+		return i18n().get(cause.network_report.message_key)
+	end
 	if kind == "permission" then
 		if cause.path then return i18n().format("mlx.cause_permission", cause.path) end
 		return i18n().get("mlx.cause_permission_generic")
@@ -427,7 +432,7 @@ function M.describe(cause, opts)
 		paragraphs[#paragraphs + 1] = i18n().get("mlx.cause_unsupported_alternatives")
 	elseif type(cause) == "table" and cause.repairable and type(opts.venv) == "string"
 		-- A network failure's offer carries a retry, not the repair this names.
-		and not M.NETWORK_KINDS[cause.kind] then
+		and not M.NETWORK_KINDS[cause.kind] and type(cause.network_report) ~= "table" then
 		paragraphs[#paragraphs + 1] = i18n().format("mlx.repair_action", opts.venv,
 			i18n().get("mlx.repair_button"))
 	end
