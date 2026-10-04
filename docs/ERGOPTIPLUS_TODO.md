@@ -1933,6 +1933,24 @@ The new models transport was added afterward and still requires native
 qualification. The separate shared-CI native-read dependency failure also
 prevents treating this checkpoint as complete qualification.
 
+Windows private local-server publication now retains exact configuration/API
+images and their decoded native authority through the existing joint WAL.
+Ordinary source receipts never gain permission from newly committed files;
+separate candidate capabilities remain bound to their originating receipt and
+exact transaction. Final publication validates complete images and model state
+before a bounded native generation claim. Missing journals retain cleanup debt
+unless the original images are independently proven restored. Equal ordinary
+reloads preserve source receipts; invalid schema versions remain refused.
+Forty-one actual-file/DPAPI/WAL cases are prepared for Windows execution.
+Six new cases cover exact active shutdown attempts, stale veto tokens, fresh
+authority after an honored veto, terminal debt and final publication epochs.
+The historical OnExit reason remains diagnostic; active private shutdown
+authority and receipt generations remain independent. These additions have
+not executed.
+Independent source review passed; this prerequisite does not yet provide the
+automatic discovery panel or qualify native persistence, packaging or install.
+Item 47 remains partial.
+
 The shared Core CI now provisions Lua 5.4's native luv module for the actual
 installed registry probe. Plain Lua without luv independently reproduces the
 native-reader refusal on a readable source; the correction retains exact
