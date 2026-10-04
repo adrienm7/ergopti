@@ -192,7 +192,22 @@ helpers.describe("category row: its bulk rows", function()
 
 	helpers.it("leaves the enable-all row clickable while the category is off", function()
 		local row = rolls_row(fake_config({ enabled = false }))
-		local enable_row = row.menu[3]
+		local declaration, declarations = nil, 0
+		for _, item in ipairs(require("infra.manifest_menu").get_array("hotstring_category_menu") or {}) do
+			if item.id == "hotstring_category_enable_all" then
+				declaration, declarations = item, declarations + 1
+			end
+		end
+		helpers.assert_eq(declarations, 1, "one canonical enable-all declaration must own the row")
+		helpers.assert_true(type(declaration.i18n) == "string" and declaration.i18n ~= "",
+			"the shared enable-all declaration must supply its translated label")
+		local label = require("infra.i18n").get(declaration.i18n)
+		local enable_row, matches = nil, 0
+		for _, item in ipairs(row.menu or {}) do
+			if item.title == label then enable_row, matches = item, matches + 1 end
+		end
+		helpers.assert_eq(matches, 1, "the canonical enable-all command must render exactly once")
+		helpers.assert_true(type(enable_row.fn) == "function", "the actual enable-all row must be actionable")
 		helpers.assert_true(enable_row ~= nil and enable_row.disabled ~= true,
 			"greying it forced the user to find and click the gate first, then reopen "
 				.. "the menu — on the other two drivers this is one click")

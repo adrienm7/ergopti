@@ -45,3 +45,36 @@ helpers.describe("ui_builder.get_app_geometry: single-sources window size from t
 		helpers.assert_nil(geo, "unknown app id must resolve to nil, never a hardcoded fallback")
 	end)
 end)
+
+helpers.describe("webview factory native capability", function()
+	helpers.it("reports the real creation port without allocating a native window", function()
+		local builder = helpers.load_with_stubs("ui.ui_builder")
+		local native = hs
+		local previous = native.webview
+		local calls = 0
+		native.webview = { new = function() calls = calls + 1; return nil end }
+		local available = builder.can_create_webview()
+		local observed = calls
+		native.webview = previous
+		helpers.assert_eq(available, true)
+		helpers.assert_eq(observed, 0)
+	end)
+
+	helpers.it("refuses missing or invalid native constructors before factory effects", function()
+		local builder = helpers.load_with_stubs("ui.ui_builder")
+		local native = hs
+		local previous = native.webview
+		local observations = {}
+		for _, port in ipairs({ false, {}, { new = true }, { new = "constructor" } }) do
+			native.webview = port
+			local ok, result = pcall(builder.show_webview, { frame = {} })
+			observations[#observations + 1] = { available = builder.can_create_webview(), ok = ok, result = result }
+		end
+		native.webview = previous
+		for _, observation in ipairs(observations) do
+			helpers.assert_eq(observation.available, false)
+			helpers.assert_eq(observation.ok, true)
+			helpers.assert_eq(observation.result, nil)
+		end
+	end)
+end)

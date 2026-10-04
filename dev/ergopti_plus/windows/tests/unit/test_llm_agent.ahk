@@ -1645,6 +1645,48 @@ _LAG_AutomaticMissingModelNotifiesWithoutModal() {
 }
 Test("LLM agent: actual automatic local triage missing-model notice has no modal or pull (todo-46-local-model)",
 	_LAG_AutomaticMissingModelNotifiesWithoutModal)
+/** A native Backspace and its AI admission must erase the same complete scalar. */
+_LAG_UnicodePhysicalBackspace(Active) {
+	Menu := _LAG_Menu(Active ? "off" : "auto", "cerebras", "cerebras", false)
+	_LAG_Run(Menu, _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		_Typing() {
+			global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer, _LLM_Engine
+			Before := _LAG_PredictionSnapshot(Fx)
+			SavedEnabled := _LLM_Engine["enabled"]
+			Window := Gui()
+			EditControl := Window.AddEdit(, "A" . Chr(0x1F600))
+			Window.Show("Hide")
+			SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+			try {
+				_LLM_Bridge_Active := Active
+				if Active
+					_LLM_Bridge_ClearBuffer()
+				_LLM_Engine["enabled"] := false
+				LLM_Bridge_FeedCharIfActive("A")
+				LLM_Bridge_FeedCharIfActive(Chr(0x1F600))
+				ControlSend("{BackSpace}", EditControl)
+				LLM_Bridge_FeedKeyDownIfActive(0x08, true)
+				Sleep(30)
+				AssertEqual("A", EditControl.Value, "one native Backspace removes the complete surrogate pair")
+				Actual := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+				AssertEqual(EditControl.Value, Actual, "the AI must see the exact document after physical erasure")
+				AssertEqual(0, Fx.Remote.Length, "no actual or simulated remote request runs")
+				if !Active
+					_LAG_AssertNoPrediction(Fx, Before)
+			} finally {
+				Window.Destroy()
+				_LLM_Engine["enabled"] := SavedEnabled
+			}
+		}
+		_LAG_WithBridgeOff(_Typing)
+	}
+}
+Test("LLM agent: active prediction context matches native Unicode Backspace (unicode-erase)",
+	_LAG_UnicodePhysicalBackspace.Bind(true))
+Test("LLM agent: agent-only context matches native Unicode Backspace (unicode-erase)",
+	_LAG_UnicodePhysicalBackspace.Bind(false))
+
 
 /** Cache lifetime applies to actual enumerated tools across unsigned tick wrap. */
 _LAG_ToolsCacheLifetime(StartTick) {
@@ -1683,3 +1725,83 @@ Test("LLM agent: tool cache expires at its exact ordinary TTL (tools-cache-wrap)
 	_LAG_ToolsCacheLifetime.Bind(100))
 Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
 	_LAG_ToolsCacheLifetime.Bind(0xFFFFFFF0))
+
+
+; Both native systems consume one independently authored shared Off declaration.
+_LAG_SystemOffCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\agent_system_off.json", "UTF-8"))
+}
+
+; Observe the actual native system submenu and its dispatcher-owned first row.
+_LAG_NativeSystemOffRow(System, Owned) {
+	global _MenuDispatchCallbacks
+	Built := LLM_Agent_MenuBuild()
+	Owned.Push(Built)
+	Position := System == "system1" ? 2 : 3
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr")
+	Assert(Handle != 0, "each actual system owns its native child menu")
+	Sub := MenuFromHandle(Handle)
+	Id := DllCall("GetMenuItemID", "ptr", Handle, "int", 0, "uint")
+	Assert(_MenuDispatchCallbacks.Has(Id), "the actual Off row keeps its native dispatcher")
+	return Map("label", _CTC_LabelAt(Sub, 0), "checked", _CTC_IsChecked(Sub, 0),
+		"action", _MenuDispatchCallbacks[Id])
+}
+
+_LAG_SystemOffSharedRow() {
+	Corpus := _LAG_SystemOffCorpus()
+	for Vector in Corpus["states"] {
+		_LAG_Run(_LAG_Menu("action", Vector["spec"], Vector["spec"]), _LTN_Screen(""), _Body.Bind(Corpus, Vector))
+		_Body(Corpus, Vector, Fx, Lines, Sent) {
+			Owned := []
+			try {
+				for System in Corpus["systems"] {
+					Off := _LAG_NativeSystemOffRow(System, Owned)
+					AssertEqual(t(Corpus["label_key"]), Off["label"], "the same canonical Off label owns both systems")
+					AssertEqual(Vector["checked"], Off["checked"], "native checked state stays unchanged")
+					AssertTrue(HasMethod(Off["action"], "Call"))
+				}
+			} finally {
+				for Built in Owned
+					_CTC_ReleaseMenu(Built)
+			}
+		}
+	}
+}
+Test("LLM agent: shared system Off rows replay independent native states (agent-system-off)", _LAG_SystemOffSharedRow)
+
+_LAG_SystemOffOwnerRefusal() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu, _LLM_Agent_CommitFn
+		Corpus := _LAG_SystemOffCorpus()
+		Declaration := _MR_GetManifestRoot()["agent_system_controls"][1]
+		Label := Declaration["i18n"]
+		Declaration["i18n"] := Corpus["mutated_label_key"]
+		Commit := _LLM_Agent_CommitFn
+		Owned := []
+		try {
+			Off := _LAG_NativeSystemOffRow("system1", Owned)
+			AssertEqual(t(Corpus["mutated_label_key"]), Off["label"], "the actual child follows shared label changes")
+			_LLM_Agent_CommitFn := (*) => false
+			AssertFalse(Off["action"].Call())
+			AssertEqual("cerebras", _LLM_Menu["agent_system1"])
+			AssertEqual("cerebras", _LLM_Menu["agent_system2"])
+			AssertEqual(0, Fx.Commits.Length)
+			AssertEqual(0, Fx.Rebuilds, "a refused transaction cannot refresh as success")
+			_LLM_Agent_CommitFn := Commit
+			AssertTrue(Off["action"].Call(), "the retained callback retries through its actual owner")
+			AssertEqual("", _LLM_Menu["agent_system1"])
+			AssertEqual("cerebras", _LLM_Menu["agent_system2"])
+			AssertEqual(1, Fx.Rebuilds)
+			AssertFalse(Off["action"].Call(), "Windows keeps its existing already-Off no-op policy")
+			AssertEqual(1, Fx.Rebuilds)
+		} finally {
+			Declaration["i18n"] := Label
+			_LLM_Agent_CommitFn := Commit
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
+	}
+}
+Test("LLM agent: shared system Off preserves transaction refusal and no-op (agent-system-off)", _LAG_SystemOffOwnerRefusal)

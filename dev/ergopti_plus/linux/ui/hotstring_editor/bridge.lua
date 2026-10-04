@@ -315,22 +315,52 @@ local function save_all(state, data)
 	-- sections and their entries — deletions must still take effect — but
 	-- the tuning lives outside that model and rebuilding the file without it
 	-- would silently reset it to the shipped defaults.
+	-- Parse the same exact classified bytes the publication will revalidate.
+	-- A failed read is not an empty personal file, and a cached file parse is
+	-- not evidence that it describes this snapshot.
 	local reader = get_reader()
-	if path and reader then
-		local ok_current, current = pcall(reader.parse, path)
-		if ok_current and type(current) == "table" and type(current.meta) == "table" then
-			local file_meta = current.meta
-			if type(file_meta.delay) == "number" then toml.meta.delay = file_meta.delay end
-			if type(file_meta.color) == "string" then toml.meta.color = file_meta.color end
-			if type(file_meta.show_tooltip) == "boolean" then toml.meta.show_tooltip = file_meta.show_tooltip end
-			if type(file_meta.priority) == "number" then toml.meta.priority = file_meta.priority end
-			if type(file_meta.section_delays) == "table" then
-				local delays = {}
-				for name, value in pairs(file_meta.section_delays) do
-					if type(value) == "number" then delays[name] = value end
-				end
-				if next(delays) ~= nil then toml.meta.section_delays = delays end
+	if type(writer.read_classified) ~= "function" or not reader
+		or type(reader.parse_text) ~= "function" then
+		Logger.error(LOG, "Personal save requires classified source and snapshot parser owners.")
+		return false
+	end
+	local read_ok, content, status = pcall(writer.read_classified, path)
+	if not read_ok or (status ~= "ok" and status ~= "absent")
+		or (status == "ok" and type(content) ~= "string") then
+		Logger.error(LOG, "Personal source read refused — nothing saved.")
+		return false
+	end
+	local source = { status = status, content = content }
+	if status == "ok" then
+		-- The hotstring reader projects an already validated TOML snapshot.
+		-- Validate its syntax with the canonical codec before that projection.
+		local codec_ok, codec = pcall(require, "toml_codec")
+		if not codec_ok or type(codec) ~= "table" or type(codec.decode) ~= "function" then
+			Logger.error(LOG, "Personal save requires the canonical TOML decoder.")
+			return false
+		end
+		local decode_ok, decoded = pcall(codec.decode, content)
+		if not decode_ok or type(decoded) ~= "table" then
+			Logger.error(LOG, "Personal source TOML validation refused — nothing saved.")
+			return false
+		end
+		local parse_ok, current, committed = pcall(reader.parse_text, content)
+		if not parse_ok or committed ~= true or type(current) ~= "table"
+			or type(current.meta) ~= "table" then
+			Logger.error(LOG, "Personal source parse refused — nothing saved.")
+			return false
+		end
+		local file_meta = current.meta
+		if type(file_meta.delay) == "number" then toml.meta.delay = file_meta.delay end
+		if type(file_meta.color) == "string" then toml.meta.color = file_meta.color end
+		if type(file_meta.show_tooltip) == "boolean" then toml.meta.show_tooltip = file_meta.show_tooltip end
+		if type(file_meta.priority) == "number" then toml.meta.priority = file_meta.priority end
+		if type(file_meta.section_delays) == "table" then
+			local delays = {}
+			for name, value in pairs(file_meta.section_delays) do
+				if type(value) == "number" then delays[name] = value end
 			end
+			if next(delays) ~= nil then toml.meta.section_delays = delays end
 		end
 	end
 
@@ -360,8 +390,8 @@ local function save_all(state, data)
 		end
 	end
 
-	local ok, err = writer.write(path, toml)
-	if not ok then
+	local ok, err = writer.write(path, toml, nil, nil, source)
+	if ok ~= true then
 		Logger.error(LOG, "Could not write '%s': %s.", path, tostring(err))
 		return false
 	end

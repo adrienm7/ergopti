@@ -348,6 +348,20 @@ FSListDirectoryStrict(Path, Directories := false) {
 	return Entries
 }
 
+; Creates one directory exclusively, without adopting existing paths or parents.
+; @param Path {String} Non-empty directory path with an existing parent.
+; @return {Boolean} True only after native exclusive creation succeeds.
+; @throws {ValueError|OSError} Invalid paths and all native failures are explicit.
+FSCreateDirectoryExclusiveStrict(Path) {
+	if !(Path is String) || Path == ""
+		throw ValueError("Exclusive directory creation requires a non-empty path.")
+	Created := DllCall("kernel32\CreateDirectoryW", "WStr", Path, "Ptr", 0, "Int")
+	ErrorCode := A_LastError
+	if !Created
+		throw OSError(ErrorCode, A_ThisFunc, Path)
+	return true
+}
+
 ; Creates a directory, and its missing parents, when it does not exist.
 ; @param Path {String} Absolute directory path.
 ; @return {Boolean} True when it was created, false when it already existed.

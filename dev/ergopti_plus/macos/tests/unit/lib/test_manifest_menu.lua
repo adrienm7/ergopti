@@ -101,3 +101,61 @@ helpers.describe("ManifestMenu decoding returns independent values (json-shared-
 		helpers.assert_eq(#second, 1, "appending to one menu must leave its twin unchanged")
 	end)
 end)
+
+
+helpers.describe("shared command provider policy", function()
+	local document = [[
+{
+	"editor": [{ "type": "command", "id": "open", "i18n": "menu.hotstrings.open_editor", "disabled_when": ["ready"] }],
+	"reason": [{ "type": "command", "id": "open", "i18n": "menu.hotstrings.open_editor", "disabled_when": ["ready"], "disabled_reason_key": "menu.about.source_run_reason" }],
+	"check": [{ "type": "check", "id": "on", "i18n": "menu.hotstrings.open_editor", "checked_when": ["on"] }]
+}
+]]
+	helpers.it("shared-personal-editor-policy: regular and provider commands retain their native shape", function()
+		fixture.with_manifest(document, nil, function(Menu)
+			local ready, calls = true, 0
+			local action = function() calls = calls + 1 end
+			local commands, getters = { open = action }, { ready = function() return ready end }
+			local normal = Menu.build("editor", "Hotstrings", nil, nil, { commands = commands, state_getters = getters })
+			local data = Menu.command_row("editor", "open", commands, getters)
+			local rendered = Menu.render_rows({ data }, "test_editor")
+			helpers.assert_eq(#normal, 1)
+			helpers.assert_eq(#rendered, 1)
+			helpers.assert_eq(normal[1].title, rendered[1].title)
+			helpers.assert_eq(normal[1].disabled, rendered[1].disabled)
+			helpers.assert_eq(normal[1].checked, nil)
+			helpers.assert_eq(rendered[1].checked, nil)
+			helpers.assert_eq(normal[1].fn, action, "existing build callback identity is unchanged")
+			data.action()
+			helpers.assert_eq(calls, 1)
+			ready = false
+			helpers.assert_eq(data.action(), false)
+			helpers.assert_eq(calls, 1, "held provider delivery rereads the declaration")
+			local grey = Menu.command_row("reason", "open", commands, getters)
+			local normal_grey = Menu.build("reason", "Hotstrings", nil, nil, { commands = commands, state_getters = getters })
+			helpers.assert_eq(grey.label, normal_grey[1].title)
+			helpers.assert_eq(grey.action, nil)
+			helpers.assert_eq(grey.disabled, normal_grey[1].disabled)
+			local check = Menu.build("check", "Hotstrings", nil, nil,
+				{ commands = { on = action }, state_getters = { on = function() return true end } })
+			helpers.assert_eq(check[1].checked, true, "existing checkbox shape is retained")
+		end)
+	end)
+	helpers.it("shared-personal-editor-policy: the canonical label can change without a native row", function()
+		fixture.with_manifest(document, nil, function(Menu)
+			local items = Menu.get_array("editor")
+			items[1].i18n = "menu.hotstrings.open_file"
+			local row = Menu.command_row("editor", "open", { open = function() end }, { ready = function() return true end })
+			helpers.assert_eq(row.label, require("infra.i18n").get("menu.hotstrings.open_file"))
+		end)
+	end)
+	helpers.it("shared-personal-editor-policy: absent declaration or owner refuses provider data", function()
+		fixture.with_manifest(document, nil, function(Menu)
+			helpers.assert_eq(Menu.command_row("editor", "missing", {}, {}), nil)
+			helpers.assert_eq(Menu.command_row("editor", "open", {}, {}), nil)
+			local data = Menu.command_row("editor", "open", { open = function() error("unowned readiness cannot open") end }, {})
+			helpers.assert_eq(data.disabled, true)
+			helpers.assert_eq(data.action(), false)
+		end)
+	end)
+end)

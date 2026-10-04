@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.modules.llm.test_local_server_discovery",
 	"tests.unit.meta.test_combination_labels",
 	"tests.unit.adapters.test_atspi_focus",
 	"tests.unit.adapters.test_clipboard_failure_atomic",
@@ -224,6 +225,7 @@ return {
 	"tests.unit.modules.hotstrings.test_prefix_expansions",
 	"tests.unit.modules.hotstrings.test_priority_override_collision",
 	"tests.unit.modules.hotstrings.test_preview_candidates",
+	"tests.unit.modules.hotstrings.test_preview_colored_menu",
 	"tests.unit.modules.hotstrings.test_preview_masks_secrets",
 	"tests.unit.modules.hotstrings.test_preview_policy_failure",
 	"tests.unit.modules.hotstrings.test_preview_rows",
@@ -255,6 +257,7 @@ return {
 	"tests.unit.modules.llm.test_parser_spacing",
 	"tests.unit.modules.llm.test_api_remote",
 	"tests.unit.modules.llm.test_api_entries",
+	"tests.unit.modules.llm.test_local_server_auth_policy",
 	"tests.unit.modules.llm.test_prediction_backend",
 	"tests.unit.modules.llm.test_model_download",
 	"tests.unit.modules.llm.test_display_settings",
@@ -345,6 +348,7 @@ return {
 	"tests.unit.ui.test_llm_backend_rows",
 	"tests.unit.ui.test_llm_enable_refusal",
 	"tests.unit.ui.test_llm_menu_prediction_count",
+	"tests.unit.ui.test_models_browser_shared_command",
 	"tests.unit.ui.test_llm_overlay_anchor",
 	"tests.unit.ui.test_llm_overlay_lines",
 	"tests.unit.ui.test_webview_page_messages",

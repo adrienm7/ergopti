@@ -499,3 +499,92 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 		if not ok then error(detail, 0) end
 	end)
 end)
+
+
+--- Exercises the real About provider with unrelated tray surfaces isolated.
+--- @param alternative boolean True to independently replace the declaration's label and reason.
+local function with_source_command(alternative, callback)
+	local names = { "ui.menu.menu_builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
+		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
+		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
+		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
+		"llm.trigger_policy", "infra.version", "infra.installation", "ui.menu.start_at_login" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
+	local ok, err = xpcall(function()
+		local seen = { effects = 0 }
+		local function effect() seen.effects = seen.effects + 1; return false end
+		local labels = { ["menu.about.source_run_reason"] = "Source checkout: use an installed release.",
+			["common.restore_recommended"] = "Canonical alternate label",
+			["common.clear_to_system"] = "Canonical alternate reason: inert control." }
+		package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+			section = function(key) return labels[key] or key end }
+		local source = debug.getinfo(1, "S").source:gsub("^@", "")
+		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
+		package.loaded["infra.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
+		package.loaded["infra.version"] = { identity = function()
+			return {kind = "local", version = "", commit = "known"}
+		end }
+		package.loaded["infra.installation"] = { is_source_run = function() return true end }
+		package.loaded["ui.menu.start_at_login"] = { enabled = function() return false end }
+		package.loaded["infra.manifest_menu"] = nil
+		local renderer = require("infra.manifest_menu")
+		package.loaded["infra.manifest_menu"] = setmetatable({ get_array = function(key)
+			if key == "top_level" then return {{id = "about"}} end
+			return renderer.get_array(key)
+		end }, { __index = renderer })
+		local declaration = renderer.get_array("about_source_menu")
+		helpers.assert_eq(#declaration, 1)
+		if alternative then
+			declaration[1].i18n = "common.restore_recommended"
+			declaration[1].disabled_reason_key = "common.clear_to_system"
+		end
+		local handle = assert(io.open(driver .. "/../_shared/modules/updater/defaults.json", "rb"))
+		local timing = require("json").decode(assert(handle:read("*a"))).timing
+		assert(handle:close())
+		local up = { get_channel = function() return "dev" end, set_channel = effect,
+			get_check_interval = function() return timing.default_check_interval_sec end,
+			TIMING = timing, get_menu_label = function() error("A source checkout has no live update label.") end,
+			get_state = function() return "idle" end,
+			check_for_updates = effect, install = effect, get_cached_release = function() return nil end }
+		package.loaded["ui.menu.menu_builder"] = nil
+		local rows = require("ui.menu.menu_builder").build({ updater = up, on_quit = effect,
+			on_menu_changed = effect, webview = { show = effect } })
+		local title = alternative and labels["common.restore_recommended"] or "menu.about.check_for_updates"
+		local reason = alternative and "Canonical alternate reason" or "Source checkout"
+		local function find(items)
+			for _, row in ipairs(items or {}) do
+				if row.title == title .. " — " .. reason then return row end
+				local nested = find(row.menu)
+				if nested then return nested end
+			end
+		end
+		callback(find(rows), seen)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("About source check shared command", function()
+	helpers.it("keeps the original disabled reason without native update window install or redraw effects (about-source-command)", function()
+		with_source_command(false, function(row, seen)
+			helpers.assert_type(row, "table")
+			helpers.assert_eq(row.disabled, true)
+			helpers.assert_nil(row.fn)
+			helpers.assert_nil(row.menu)
+			helpers.assert_nil(row.checked)
+			helpers.assert_eq(seen.effects, 0)
+		end)
+	end)
+
+	helpers.it("uses the actual declared label and reason instead of native source-only literals (about-source-command)", function()
+		with_source_command(true, function(row, seen)
+			helpers.assert_type(row, "table")
+			helpers.assert_eq(row.disabled, true)
+			helpers.assert_nil(row.fn)
+			helpers.assert_nil(row.menu)
+			helpers.assert_nil(row.checked)
+			helpers.assert_eq(seen.effects, 0)
+		end)
+	end)
+end)

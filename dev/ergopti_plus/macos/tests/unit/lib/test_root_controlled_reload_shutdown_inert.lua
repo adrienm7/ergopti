@@ -227,7 +227,19 @@ local function run_isolated(options, assertions)
 				is_complete = function() return false end,
 			},
 			["adapters.boot_journal"] = {
-				append = function() return true end,
+				append = function(_, message)
+					state.boot_journal_messages = state.boot_journal_messages or {}
+					state.boot_journal_messages[#state.boot_journal_messages + 1] = message
+					return true
+				end,
+				record_native_scripting_state = function(runtime)
+					state.scripting_state_calls = (state.scripting_state_calls or 0) + 1
+					state.scripting_state_runtime = runtime
+					if options.scripting_state_mode == "throw" then error("controlled observer refusal") end
+					if options.scripting_state_mode == "nil" then return nil end
+					if options.scripting_state_mode == "truthy" then return 1 end
+					return options.scripting_state_mode ~= "false"
+				end,
 				set_user_log_ready = function() end,
 				describe_path = function() return "folder" end,
 			},
@@ -478,4 +490,27 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 				"the native callback must not reopen the synchronous logger after final ACK/stop")
 		end)
 	end)
+end)
+
+
+helpers.describe("init: supplemental scripting state has no boot authority", function()
+	for _, mode in ipairs({ "true", "false", "nil", "truthy", "throw" }) do
+		helpers.it("keeps the real onboarding and shutdown owner after " .. mode .. " observation", function()
+			run_isolated({ scripting_state_mode = mode }, function(state, hs_stub)
+				helpers.assert_eq(state.scripting_state_calls, 1, "The managed init calls the actual observer contract once")
+				helpers.assert_eq(state.scripting_state_runtime, hs_stub, "The observation receives this exact live runtime")
+				helpers.assert_eq(state.onboarding_runs, 1, "The existing first-run owner remains active")
+				helpers.assert_eq(state.fatal_exit_calls, 0, "A supplemental observation never kills managed boot")
+				local refused = 0
+				for _, message in ipairs(state.boot_journal_messages or {}) do
+					if message == "Native scripting server witness publication unacknowledged." then
+						refused = refused + 1
+					end
+				end
+				helpers.assert_eq(refused, mode == "true" and 0 or 1, "Only strict true acknowledges diagnostic publication")
+				hs_stub.shutdownCallback()
+				helpers.assert_eq(state.revoke_calls, 1, "The unchanged shutdown owner still fences its actual lease")
+			end)
+		end)
+	end
 end)

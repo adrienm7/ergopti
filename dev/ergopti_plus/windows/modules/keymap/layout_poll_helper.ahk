@@ -182,8 +182,12 @@ _LayoutPollReload(Hkl, PreviousHkl, Port) {
 	; tell the poll if it were refused: wait for it to end either way.
 	if (Port["pending"].Call() is Map)
 		return _LayoutPollRestore(PreviousHkl)
-	if (Retry["gave_up"]
-			|| ((Port["now"].Call() - Retry["refused_at"]) & 0xFFFFFFFF) < Retry["wait_ms"])
+	if Retry["gave_up"]
+		return _LayoutPollRestore(PreviousHkl)
+	; Capture the refused attempt before the clock port can dispatch a callback.
+	RefusedAt := Retry["refused_at"]
+	WaitMs := Retry["wait_ms"]
+	if TickElapsed64(RefusedAt, Port["now"].Call()) < WaitMs
 		return _LayoutPollRestore(PreviousHkl)
 	; Past the last honored veto, OnExit lets the exit through whatever gate
 	; refuses it. A user's quit may cross it; an automatic reload never does.

@@ -161,6 +161,13 @@ function M.hotstring_delay_inventory()
 	return Groups.hotstring_delay_inventory()
 end
 
+--- Captures the current native owner used by file-labelled scope callbacks.
+--- @param name string Registered group identity.
+--- @return table|nil binding Detached metadata and an exact owner predicate.
+function M.personal_file_scope_binding(name)
+	return Groups.personal_file_scope_binding(name)
+end
+
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.

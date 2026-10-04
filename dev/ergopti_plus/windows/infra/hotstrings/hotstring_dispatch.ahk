@@ -164,7 +164,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 		return Owner["CommitFn"].Call(Owner, TrailingText)
 	if Owner.Has("RawEffect")
 		return _HSE_CommitTerminalRawOwner(Owner, TrailingText)
-	DeleteCount := Owner["Backspaces"] + StrLen(TrailingText)
+	DeleteCount := Owner["EraseUnits"] + StrLen(TrailingText)
 	; TrailingText was already visible before capture admission.  The paced burst
 	; erases and restores it on screen, but the canonical buffers deliberately
 	; stop at the replacement.  After native release, the exact characters are
@@ -178,7 +178,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 		InsertedText: InsertedText,
 		EndCharEmitted: Owner["EndCharPart"] != "",
 		KnownBoundaryAfter: !ClearAll && InsertedText != ""
-			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -1)) > 0
+			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0
 	}
 	BufferCritical := Critical("On")
 	PreviousBuffer := HSE_Buffer
@@ -207,7 +207,8 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	try {
 		if Owner["OnlyText"]
 			UpdateLastSentCharacter(SubStr(
-				TrailingText != "" ? TrailingText : InsertedText, -1))
+				TrailingText != "" ? TrailingText : InsertedText,
+		-_TextTailCodeUnits(TrailingText != "" ? TrailingText : InsertedText, 1)))
 		else
 			_LSCResetFrom([])
 	} catch as Err {
@@ -240,7 +241,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 		try {
 			BufferLength := StrLen(HSE_Buffer)
 			Backspaces := Max(0, Min(
-				RawEffect.Bs + StrLen(TrailingText), BufferLength))
+				Owner["EraseUnits"] + StrLen(TrailingText), BufferLength))
 			InsertedText := RawEffect.Ins
 			HSE_Buffer := (BufferLength >= Backspaces
 				? SubStr(HSE_Buffer, 1, BufferLength - Backspaces) : "")
@@ -252,7 +253,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 				InsertedText: InsertedText,
 				EndCharEmitted: false,
 				KnownBoundaryAfter: HSE_Buffer != ""
-					&& InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -1)) > 0
+					&& InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))) > 0
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
@@ -262,7 +263,8 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 		}
 	} finally Critical(BufferCritical)
 	try UpdateLastSentCharacter(SubStr(
-		TrailingText != "" ? TrailingText : InsertedText, -1))
+		TrailingText != "" ? TrailingText : InsertedText,
+		-_TextTailCodeUnits(TrailingText != "" ? TrailingText : InsertedText, 1)))
 	catch as Err
 		try LoggerError("HSE", "Terminal raw last-character publication failed: {1}.", Err.Message)
 	if IsSet(_PrefixCommitPostFireEffect) {
@@ -316,6 +318,7 @@ _HSE_DispatchTerminalRawCallback(Spec, EndChar, OutputHost, SchedulerFn := 0,
 		"Id", ++_HSE_TerminalOwnerSerial,
 		"Pending", true,
 		"Backspaces", Prepared.Bs,
+		"EraseUnits", _TextTailCodeUnits(HSE_Buffer, Prepared.Bs),
 		"PlainInsertedText", Prepared.Ins,
 		"SendPayload", "{Text}" . Prepared.Ins,
 		"EndCharPart", "",
@@ -491,7 +494,7 @@ _HSE_RunOwnedTerminalTransaction(Owner) {
 				: Owner["SendPayload"]
 					. (TrailingText != "" ? "{Text}" . TrailingText : "")
 			OutputSucceeded := _HSE_SendTerminalPaced(
-				Owner["Backspaces"] + StrLen(TrailingText),
+				Owner["Backspaces"] + _TextCodepointLength(TrailingText),
 				Tail, Owner["DelayMs"],
 				Owner["EmitFn"], Owner["DelayFn"])
 			if !OutputSucceeded
@@ -662,26 +665,28 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 						if !((EffectOk is Integer) and EffectOk)
 								return false
 						BufLen := StrLen(HSE_Buffer)
-						Bs  := Max(0, Min(Effect.Bs, BufLen))
+						KeyCount := _TextCodepointLength(HSE_Buffer)
+						Bs := Max(0, Min(Effect.Bs, KeyCount))
+						EraseUnits := _TextTailCodeUnits(HSE_Buffer, Bs)
 						if (Bs != Effect.Bs)
-								try LoggerWarn("HSE", "Raw callback returned Bs={1} out of range [0,{2}] — clamped.", Effect.Bs, BufLen)
+								try LoggerWarn("HSE", "Raw callback returned Bs={1} out of range [0,{2}] — clamped.", Effect.Bs, KeyCount)
 						Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
 						; Deleted nothing AND inserted nothing == the callback declined.
 						Fired := (Bs > 0 or Ins != "")
 						if Fired {
 								_BufferCrit := Critical("On")
 								try {
-										HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
+										HSE_Buffer := SubStr(HSE_Buffer, 1, BufLen - EraseUnits) . Ins
 										; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
 										; Ins can never grow the buffer unbounded or drift the boundary flag.
 										_HSE_TrimBufferToCapacity()
 										CanonicalEffect := {
 												ClearAll: false,
-												DeleteFromEnd: Bs,
+												DeleteFromEnd: EraseUnits,
 												InsertedText: Ins,
 												EndCharEmitted: false,
 												KnownBoundaryAfter: HSE_Buffer != ""
-														and InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -1)) > 0
+														and InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))) > 0
 										}
 										_HSE_MirrorCanonicalEffectToLlm(CanonicalEffect)
 										CommittedEffect := CanonicalEffect
@@ -731,7 +736,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 ;   visibly presented. When supplied, the callable is not invoked a second time.
 ; @return Canonical decision object, or "" when dispatch must decline.
 _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
-		TypoNbspStripped := false, FrozenResolvedBase := unset) {
+		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
 		global LastSentCharacterKeyTime
 		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
 				return ""
@@ -755,7 +760,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 						TriggerStart := StrLen(BufferAfterCompletion)
 								- CompletionStripLen - Spec.Length + 1
 						TypedPrev := TriggerStart >= 1
-								? SubStr(BufferAfterCompletion, TriggerStart + Spec.Length - 2, 1)
+								? _TextPenultimateCodepoint(SubStr(BufferAfterCompletion, TriggerStart, Spec.Length))
 								: ""
 						if (TypedPrev != "")
 								PrevKey := TypedPrev
@@ -763,7 +768,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				if !LastSentCharacterKeyTime.Has(PrevKey)
 						return ""
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
-				ElapsedMs := TickElapsed(GateOriginTick)
+				ElapsedMs := TickElapsed(GateOriginTick, NowTick?)
 				; Preserve the engine's existing strict comparison: equality is the last
 				; fireable instant. The renderer separately refuses RemainingMs == 0 so
 				; it never paints a promise with no usable interaction window.
@@ -922,7 +927,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 
 				; +1 for the NNBSP/NBSP that was stripped before matching when the
 				; end-char is a typographic punctuation (``:`` / `` ; ``).
-				BSCount := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
+				EraseUnits := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+				BSCount := _TextCodepointLength(Spec.Trigger . EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
 				BackSpaceSeq := "{BackSpace " . BSCount . "}"
 				; Replacement, casing and OnlyText were frozen by the shared decision
 				; preflight above. Never resolve a callable again here: when the tooltip
@@ -968,7 +974,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						HotPath_LogIfSlow("HSE.NativeSend", PasteStarted, "branch=paste")
 						if !Fired
 								return false
-						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement, -1))
+						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement,
+							-_TextTailCodeUnits(EndCharEmitted != "" ? EndCharEmitted : Replacement, 1)))
 						SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndCharEmitted
 				} else if IsTerminalApp {
 						; OpenTUI/React-style prompts commit deletion state once per render
@@ -991,6 +998,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"Id", ++_HSE_TerminalOwnerSerial,
 									"Pending", true,
 									"Backspaces", BSCount,
+									"EraseUnits", EraseUnits,
 									"PlainInsertedText", Replacement . EndCharPart,
 									"SendPayload", ReplacementPart . EndCharPart,
 									"EndCharPart", EndCharPart,
@@ -1079,7 +1087,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								return false
 						}
 						if OnlyText
-								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
+								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement,
+									-_TextTailCodeUnits(EndCharPart != "" ? EndCharPart : Replacement, 1)))
 						else
 								_LSCResetFrom([])
 						SentBurst := Burst

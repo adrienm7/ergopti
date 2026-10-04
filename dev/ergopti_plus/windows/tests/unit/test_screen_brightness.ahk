@@ -221,24 +221,165 @@ Test("screen brightness: notice refusal preserves exact terminal settlement", ()
 ; =============================================
 ; =============================================
 
+; Observe the exact acquired state without changing native ownership.
+_SBT_ObserveNative(Control, State, Native) {
+	Control["state"] := State
+}
+
+_SBT_DiagnosticFlag(Value) {
+	return (Value is Integer) && (Value == 0 || Value == 1) ? String(Value) : "unavailable"
+}
+
+_SBT_DiagnosticCount(Value) {
+	return (Value is Integer) && Value >= 0 ? String(Value) : "unavailable"
+}
+
+_SBT_DiagnosticWait(ProcessHandle) {
+	Result := DllCall("Kernel32\WaitForSingleObject", "ptr", ProcessHandle, "uint", 0, "uint")
+	return Result == 0 ? "exited" : (Result == 258 ? "running" : "failed")
+}
+
+_SBT_DiagnosticJob(JobHandle) {
+	Diagnostic := ""
+	return _SR_TreeActiveProcessCount(JobHandle, &Diagnostic)
+}
+
+_SBT_DiagnosticSize(Path) {
+	return FileGetSize(Path)
+}
+
+; Closed observations precede finally's mandatory callback detachment. Queries
+; never close handles, retire a task, drain a claim, read output, or wait for work.
+_SBT_NativeDiagnostic(Control, Elapsed, Polls, WaitFn := 0, JobFn := 0, SizeFn := 0) {
+	if !IsObject(WaitFn)
+		WaitFn := _SBT_DiagnosticWait
+	if !IsObject(JobFn)
+		JobFn := _SBT_DiagnosticJob
+	if !IsObject(SizeFn)
+		SizeFn := _SBT_DiagnosticSize
+	Facts := "elapsed_ms=" . _SBT_DiagnosticCount(Elapsed) . ";polls=" . _SBT_DiagnosticCount(Polls)
+		. ";suspended=" . _SBT_DiagnosticFlag(A_IsSuspended)
+	State := Control.Get("state", 0)
+	if !(State is Map)
+		return Facts . ";state=unobserved"
+	Facts .= ";state=observed"
+	PreviousCritical := Critical("On")
+	try {
+		for _, Key in ["Starting", "Started", "RootReaped", "TerminalClaimed", "TreeQuiesced", "FinalizationPending", "Detached"]
+			Facts .= ";" . Key . "=" . _SBT_DiagnosticFlag(State.Get(Key, "unavailable"))
+		Claim := State.Get("TerminalClaim", 0)
+		for _, Key in ["Finished", "CompletionBusy"]
+			Facts .= ";" . Key . "=" . _SBT_DiagnosticFlag((Claim is Map) ? Claim.Get(Key, "unavailable") : "unavailable")
+		Wait := "unavailable", Active := "unavailable", Exit := "unavailable"
+		NativeOwner := (Claim is Map) ? Claim : State
+		ProcessHandle := NativeOwner.Get("ProcessHandle", 0)
+		JobHandle := NativeOwner.Get("JobHandle", 0)
+		if (ProcessHandle is Integer) && ProcessHandle > 0 {
+			try {
+				ObservedWait := WaitFn.Call(ProcessHandle)
+				if (ObservedWait is String) && (StrCompare(ObservedWait, "running", true) == 0
+					|| StrCompare(ObservedWait, "exited", true) == 0 || StrCompare(ObservedWait, "failed", true) == 0)
+					Wait := ObservedWait
+			}
+		}
+		if (JobHandle is Integer) && JobHandle > 0 {
+			try Active := _SBT_DiagnosticCount(JobFn.Call(JobHandle))
+		}
+		if _SBT_DiagnosticFlag(State.Get("RootReaped", "unavailable")) == "1" {
+			Value := State.Get("ExitCode", "unavailable")
+			if Value is Integer
+				Exit := String(Value)
+		}
+		Facts .= ";native_wait=" . Wait . ";job_active=" . Active . ";exit=" . Exit
+		CapturePath := State.Get("TmpFile", "")
+	} finally Critical(PreviousCritical)
+	Bytes := "unavailable"
+	if (CapturePath is String) && CapturePath != "" {
+		try Bytes := _SBT_DiagnosticCount(SizeFn.Call(CapturePath))
+	}
+	return Facts . ";capture_bytes=" . Bytes
+}
+
+_SBT_DiagnosticStates() {
+	State := Map("Starting", false, "Started", true, "RootReaped", false, "TerminalClaimed", false,
+		"TreeQuiesced", false, "FinalizationPending", false, "Detached", false,
+		"ProcessHandle", 17, "JobHandle", 29, "ExitCode", 7, "TmpFile", "private fixture capture")
+	Control := Map()
+	_SBT_ObserveNative(Control, State, Map())
+	WaitCalls := [], JobCalls := [], SizeCalls := []
+	Wait(Handle) {
+		WaitCalls.Push(Handle)
+		return "running"
+	}
+	Job(Handle) {
+		JobCalls.Push(Handle)
+		return 1
+	}
+	Size(Path) {
+		SizeCalls.Push(Path)
+		return 0
+	}
+	Facts := _SBT_NativeDiagnostic(Control, 5000, 41, Wait, Job, Size)
+	AssertEqual(1, WaitCalls.Length)
+	AssertEqual(17, WaitCalls[1], "the observer queries the acquired root handle")
+	AssertEqual(1, JobCalls.Length)
+	AssertEqual(29, JobCalls[1], "the observer queries the acquired job handle")
+	AssertEqual(1, SizeCalls.Length)
+	AssertTrue(InStr(Facts, ";native_wait=running;job_active=1;exit=unavailable") > 0,
+		"a running root cannot project the unacknowledged default exit code")
+	AssertTrue(InStr(Facts, ";capture_bytes=0") > 0)
+	State["RootReaped"] := true
+	State["TerminalClaimed"] := true
+	State["TreeQuiesced"] := true
+	State["ProcessHandle"] := 0
+	State["JobHandle"] := 0
+	State["TerminalClaim"] := Map("Finished", true, "CompletionBusy", false,
+		"ProcessHandle", 0, "JobHandle", 0)
+	Facts := _SBT_NativeDiagnostic(Control, 5000, 42, Wait, Job, Size)
+	AssertTrue(InStr(Facts, ";RootReaped=1;TerminalClaimed=1;TreeQuiesced=1") > 0)
+	AssertTrue(InStr(Facts, ";Finished=1;CompletionBusy=0;native_wait=unavailable;job_active=unavailable;exit=7") > 0)
+	AssertEqual(1, WaitCalls.Length, "an already retired root is not queried through a missing handle")
+	AssertEqual(1, JobCalls.Length)
+	AssertEqual(17, WaitCalls[1], "observing settlement never rewrites the captured handle")
+}
+Test("screen brightness: closed diagnostic distinguishes running and retired native stages", _SBT_DiagnosticStates)
+
+_SBT_DiagnosticPrivacy() {
+	Secret := "PRIVATE_DIAGNOSTIC_BODY"
+	State := Map("Started", "0", "RootReaped", "1", "TerminalClaimed", Map(), "Detached", [],
+		"ProcessHandle", 17, "JobHandle", 29, "ExitCode", Secret, "TmpFile", Secret,
+		"Command", Secret, "Pid", 987654321)
+	Facts := _SBT_NativeDiagnostic(Map("state", State), Secret, -1, (*) => Secret, (*) => Secret, (*) => Secret)
+	AssertEqual(0, InStr(Facts, Secret), "neither malformed values nor native capture paths are public diagnostic facts")
+	AssertEqual(0, InStr(Facts, "987654321"), "native process identity is never printed")
+	AssertTrue(InStr(Facts, "elapsed_ms=unavailable;polls=unavailable") > 0)
+	AssertTrue(InStr(Facts, ";Started=unavailable;RootReaped=unavailable;TerminalClaimed=unavailable") > 0)
+	AssertTrue(InStr(Facts, ";native_wait=unavailable;job_active=unavailable;exit=unavailable;capture_bytes=unavailable") > 0)
+	AssertTrue(InStr(_SBT_NativeDiagnostic(Map(), 0, 0), ";state=unobserved") > 0)
+}
+Test("screen brightness: closed diagnostic refuses malformed private observations", _SBT_DiagnosticPrivacy)
+
+
 _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 		ExpectedStage := "readback", ExpectedPolicyType := "object") {
 	global _DriverDir, _SharedDir, _VendorDir
-	Observed := []
+	Observed := [], Control := Map(), Polls := 0
 	Handle := ShellRunner_SpawnTreeOwned("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-File", _DriverDir . "\tests\fixtures\screen_brightness_provider.ps1",
 		"-Worker", _VendorDir . "\ergopti_brightness_worker.ps1",
 		"-FixturePolicyPath", _SharedDir . "\modules\actions\brightness.json",
 		"-Action", "brightness_up", "-Mode", Mode],
-		(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
+		(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , _SBT_ObserveNative.Bind(Control), 8192)
 	try {
 		AssertTrue(Handle.start(), "the native owned child must really start")
 		Started := A_TickCount
 		while Observed.Length == 0 && !TickExpired(Started, 5000) {
+			Polls++
 			_SR_TreePoll()
 			Sleep(10)
 		}
-		AssertEqual(1, Observed.Length, "the actual native provider worker settles once")
+		Diagnostic := _SBT_NativeDiagnostic(Control, TickElapsed(Started), Polls)
+		AssertEqual(1, Observed.Length, "the actual native provider worker settles once; " . Diagnostic)
 		AssertEqual("", Observed[1]["stderr"], "the real provider fixture exposes no hidden native failure")
 		Receipt := JsonParse(Observed[1]["stdout"])
 		AssertEqual(ExpectedCalls, Receipt["fixture_calls"], "only the exact native WMI writer contributes a call")

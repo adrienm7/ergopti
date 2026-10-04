@@ -272,16 +272,18 @@ function M.load_catalogue(paths, options)
 				end
 			end
 
+			local registrations = {}
 			for _, sec_name in ipairs(data.sections_order or {}) do
 				local section = data.sections[sec_name]
 				local selected = (not only_sections or only_sections[sec_name])
 					and not (skip_sections and skip_sections[sec_name])
 				if selected and section and type(section.entries) == "table" then
 					local entry_count = 0
-					for _, entry in ipairs(section.entries) do
+					registrations[sec_name] = {}
+					for index, entry in ipairs(section.entries) do
 						if type(entry.trigger) == "string" and type(entry.output) == "string" then
 							entry_count = entry_count + 1
-							mappings[#mappings + 1] = {
+							registrations[sec_name][index] = {
 								trigger           = configured_magic_trigger(entry.trigger, options),
 								replacement       = entry.output,
 								is_word           = entry.is_word           or false,
@@ -335,6 +337,11 @@ function M.load_catalogue(paths, options)
 					}
 					category.count = category.count + entry_count
 				end
+			end
+			for _, record in ipairs(Reader.registration_order(data, group)) do
+				local section = registrations[record.section]
+				local mapping = section and section[record.index]
+				if mapping then mappings[#mappings + 1] = mapping end
 			end
 		end
 	end

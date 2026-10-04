@@ -3182,5 +3182,6 @@
 	"menu.global.remove_from_karabiner": "Ergopti'yi Karabiner'dan kaldır",
 	"menu.global.restore_touchpad_gestures": "Windows dokunmatik yüzey hareketlerini geri yükle",
 	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin.",
-	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin."
+	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin.",
+	"platform_reason.token_streaming_transport_missing": "Windows'ta yok: Windows henüz önerileri belirteç belirteç gösteremez. Bu seçenek devre dışı kalır."
 }

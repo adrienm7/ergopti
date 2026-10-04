@@ -353,6 +353,9 @@ load_shared_defaults()
 --- { [category] = { delay, color, show_tooltip, priority, sections = { [name] = { ... } } } }
 local _overrides = {}
 
+--- Exact classified bytes from the last acknowledged override publication.
+local _override_source = { status = "error" }
+
 --- Memoised resolutions, cleared by every writer below. The tooltip preview
 --- resolves once per candidate on every keystroke, so the cascade would
 --- otherwise be walked several times per key on the input path.
@@ -423,21 +426,21 @@ end
 local function load_overrides()
 	_overrides = {}
 	_resolve_cache = {}
+	_override_source = { status = "error" }
 
 	local path = overrides_path()
-	local fh = io.open(path, "r")
-	if not fh then return end
-	local read_ok, content = pcall(fh.read, fh, "*a")
-	local close_ok, closed = pcall(fh.close, fh)
+	local content, status = Writer.read_classified(path)
+	if status == "absent" then
+		_override_source = { status = "absent" }
+		return
+	end
 	local ok, parsed = pcall(parse_override_content, content)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true or not ok then
-		-- Loud, not silent: a malformed override file means the user's delays are
-		-- being ignored, and the only symptom otherwise is "my settings did
-		-- nothing".
-		Logger.error(LOG, "Override file '%s' is malformed — user delays and colours ignored.", path)
+	if status ~= "ok" or not ok then
+		Logger.error(LOG, "Override file '%s' is unreadable or malformed — user delays and colours ignored.", path)
 		return
 	end
 	_overrides = parsed
+	_override_source = { status = "ok", content = content }
 end
 
 --- Copies the override tree for a persistence transaction.
@@ -466,87 +469,57 @@ local function copy_overrides(source)
 	return copy
 end
 
---- Writes a candidate override tree back.
---- @param overrides table
---- @return boolean
+--- Writes only changed owned leaves, retaining every unknown record and comment.
+--- The load checkpoint crosses both preparation and publication; a fresh disk read
+--- cannot authorize replacing a foreign edit or repairing an unreadable source.
+--- @param overrides table Detached candidate tree.
+--- @return boolean committed
 local function save_overrides(overrides)
-	local lines = {
-		"# ~/.config/ergopti/" .. OVERRIDES_FILE,
-		"# Written by the Ergopti+ daemon. Safe to edit by hand.",
-		"",
-	}
-
-	local names = {}
-	for category in pairs(overrides) do names[#names + 1] = category end
-	table.sort(names)
-
-	--- Emits one TOML table, or nothing when it carries no override.
-	--- @param segments table Literal category and optional section identities.
-	--- @param values table
-	local function emit(segments, values)
-		if values.delay == nil and values.color == nil and values.show_tooltip == nil
-			and values.priority == nil
-		then
-			return
+	if _override_source.status ~= "ok" and _override_source.status ~= "absent" then return false end
+	local fields = { "delay", "color", "show_tooltip", "priority" }
+	local rows = {}
+	local function update(segments, previous, candidate)
+		previous, candidate = previous or {}, candidate or {}
+		for _, field in ipairs(fields) do
+			if previous[field] ~= candidate[field] then
+				rows[#rows + 1] = { section = KeyPath.render(segments), key = field,
+					value = candidate[field], delete = candidate[field] == nil and true or nil }
+			end
 		end
-		lines[#lines + 1] = "[" .. KeyPath.render(segments) .. "]"
-		if values.delay ~= nil then
-			lines[#lines + 1] = string.format("delay = %s", tostring(values.delay))
-		end
-		if values.color ~= nil then
-			-- Escaped by hand rather than with string.format("%q"): that is a LUA
-			-- literal quoter, it emits Lua escape sequences a TOML reader does not
-			-- share, and a repo-wide ratchet forbids it outright because the same
-			-- call in a shell command leaves $VAR and `cmd` live.
-			local escaped = tostring(values.color):gsub("\\", "\\\\"):gsub('"', '\\"')
-			lines[#lines + 1] = 'color = "' .. escaped .. '"'
-		end
-		if values.show_tooltip ~= nil then
-			lines[#lines + 1] = string.format("show_tooltip = %s", tostring(values.show_tooltip))
-		end
-		if values.priority ~= nil then
-			lines[#lines + 1] = string.format("priority = %s", tostring(values.priority))
-		end
-		lines[#lines + 1] = ""
 	end
-
-	for _, category in ipairs(names) do
-		local entry = overrides[category]
-		emit({ category }, entry)
+	local categories = {}
+	for category in pairs(_overrides) do categories[category] = true end
+	for category in pairs(overrides) do categories[category] = true end
+	for category in pairs(categories) do
+		local previous, candidate = _overrides[category] or {}, overrides[category] or {}
+		update({ category }, previous, candidate)
 		local sections = {}
-		for name in pairs(entry.sections or {}) do sections[#sections + 1] = name end
-		table.sort(sections)
-		for _, name in ipairs(sections) do
-			emit({ category, name }, entry.sections[name])
+		for section in pairs(previous.sections or {}) do sections[section] = true end
+		for section in pairs(candidate.sections or {}) do sections[section] = true end
+		for section in pairs(sections) do
+			update({ category, section }, (previous.sections or {})[section], (candidate.sections or {})[section])
 		end
 	end
-
+	local path = overrides_path()
+	local prepared, detail, content, source = Writer.prepare_batch(path, rows, nil, _override_source)
+	if prepared ~= true then
+		Logger.error(LOG, "Cannot prepare override leaves: %s.", tostring(detail))
+		return false
+	end
+	-- An empty clear of a proven absent source acknowledges absence without
+	-- creating an empty override file. Preparation already checked its source.
+	if #rows == 0 and source.status == "absent" then return true end
 	local config_dir = override_config_dir()
 	if not Shell.run("mkdir -p " .. Shell.quote(config_dir) .. " 2>/dev/null") then
 		Logger.error(LOG, "Cannot create '%s' — overrides were not changed.", config_dir)
 		return false
 	end
-	local path = overrides_path()
-	local temporary = path .. ".tmp"
-	local open_ok, fh = pcall(io.open, temporary, "w")
-	if not open_ok or not fh then
-		Logger.error(LOG, "Cannot write '%s' — the override will not survive a restart.", path)
+	local committed, refusal = Writer.publish_if_unchanged(path, content, nil, source)
+	if committed ~= true then
+		Logger.error(LOG, "Cannot publish override leaves: %s.", tostring(refusal))
 		return false
 	end
-	local write_ok, written = pcall(fh.write, fh, table.concat(lines, "\n"))
-	local close_ok, closed = pcall(fh.close, fh)
-	if not write_ok or written == nil or written == false or not close_ok or closed ~= true then
-		pcall(os.remove, temporary)
-		Logger.error(LOG, "Cannot stage '%s' — the previous override file was retained.", path)
-		return false
-	end
-	local rename_ok, renamed = pcall(os.rename, temporary, path)
-	if not rename_ok or renamed ~= true then
-		pcall(os.remove, temporary)
-		Logger.error(LOG, "Cannot publish '%s' atomically — the previous override file was retained.", path)
-		return false
-	end
-	Logger.debug(LOG, "Overrides written to %s.", path)
+	_override_source = { status = "ok", content = content }
 	return true
 end
 
@@ -729,7 +702,7 @@ function M.clear_override(category, section, field)
 	end
 	local candidate = copy_overrides(_overrides)
 	local entry = candidate[category]
-	if not entry then return true end
+	if not entry then return save_overrides(candidate) end
 
 	if field ~= nil then
 		if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
@@ -1691,6 +1664,27 @@ function M.set_category_scope_enabled(targets, enabled)
 	return committed, refusal
 end
 
+--- Sets only the selected category gates in one acknowledged choice batch.
+--- Existing section choices and categories outside the scope are retained.
+--- @param targets table Dense discovered category ids.
+--- @param enabled boolean Explicit target state.
+--- @return boolean committed
+--- @return string|nil reason Stable planner or persistence refusal.
+function M.set_category_gates_enabled(targets, enabled)
+	local inventory = {}
+	-- This operation offers category gates only. The existing scope planner
+	-- validates their known identities with no section leaves in this domain.
+	for id in pairs(_categories) do inventory[id] = {} end
+	local changes, reason = BulkScope.plan(inventory, targets, enabled)
+	if not changes then
+		Logger.error(LOG, "Category gate selection refused: %s.", reason)
+		return false, reason
+	end
+	local committed, refusal = commit_choices(changes, "Hotstring category gate selection")
+	if committed then notify_change() end
+	return committed, refusal
+end
+
 --- Rereads the canonical choices and republishes the catalogue with them.
 --- Used after another owner published config.toml; a refusal keeps the previous
 --- choices and catalogue.
@@ -1782,6 +1776,7 @@ end
 function M.configuration_snapshot()
 	if not _choices then return nil end
 	return { choices = copy_choices(_choices), overrides = copy_overrides(_overrides),
+		override_source = { status = _override_source.status, content = _override_source.content },
 		magic_key = _magic_key, canonical_magic_key = _canonical_magic_key }
 end
 
@@ -1790,20 +1785,30 @@ end
 --- @param owner table The acquiring transaction.
 --- @param document table Decoded config.toml candidate.
 --- @param override_content string Override file candidate bytes.
+--- @param override_source table Exact classified target from the scope file owner.
 --- @return boolean applied
-function M.apply_configuration(owner, document, override_content)
+function M.apply_configuration(owner, document, override_content, override_source)
 	if _scope_owner ~= owner then return false end
+	if type(override_source) ~= "table" or type(override_content) ~= "string"
+		or not ((override_source.status == "ok" and override_source.content == override_content)
+			or (override_source.status == "absent" and override_source.content == nil and override_content == "")) then
+		return false
+	end
 	local decoded, choices = pcall(decode_choices, document)
 	local parsed, overrides = pcall(parse_override_content, override_content)
 	if not decoded or not parsed then
 		Logger.error(LOG, "Candidate hotstring configuration refused: %s.", tostring(decoded and overrides or choices))
 		return false
 	end
-	local previous_choices, previous_overrides = _choices, _overrides
+	local previous_choices, previous_overrides, previous_source = _choices, _overrides, _override_source
 	_choices, _overrides, _resolve_cache = choices, overrides, {}
 	local _, committed, reason = M.load_all()
-	if committed == true then return true end
+	if committed == true then
+		_override_source = { status = override_source.status, content = override_source.content }
+		return true
+	end
 	_choices, _overrides, _resolve_cache = previous_choices, previous_overrides, {}
+	_override_source = previous_source
 	local _, restored = M.load_all()
 	Logger.error(LOG, "Candidate hotstring catalogue refused (%s); previous catalogue %s.",
 		tostring(reason), restored == true and "republished" or "NOT republished")
@@ -1817,6 +1822,7 @@ end
 function M.restore_configuration(owner, snapshot)
 	if _scope_owner ~= owner or type(snapshot) ~= "table" then return false end
 	_choices, _overrides, _resolve_cache = copy_choices(snapshot.choices), copy_overrides(snapshot.overrides), {}
+	_override_source = { status = snapshot.override_source.status, content = snapshot.override_source.content }
 	_magic_key, _canonical_magic_key = snapshot.magic_key, snapshot.canonical_magic_key
 	local _, committed = M.load_all()
 	return committed == true

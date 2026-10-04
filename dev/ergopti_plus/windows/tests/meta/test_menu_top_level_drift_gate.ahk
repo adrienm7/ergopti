@@ -191,8 +191,8 @@ global _DG_BUILDER_TITLES := Map(
 	"language",        't("menu.global.language")',
 	"about",           't("menu.about.title")',
 	"suspend",         't("menu.global.suspend")',
-	"reload",          't("menu.global.reload")',
-	"quit",            't("menu.global.quit")',
+	"reload",          'MenuRenderer_CommandRow("top_level", "reload"',
+	"quit",            'MenuRenderer_CommandRow("top_level", "quit"',
 	"debug",           't("menu.debug.title")'
 )
 

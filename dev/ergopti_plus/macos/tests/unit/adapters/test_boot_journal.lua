@@ -79,3 +79,95 @@ helpers.describe("boot journal (boot-stage-trail)", function()
 		helpers.assert_true(not table.concat(present, ","):find("secret", 1, true))
 	end)
 end)
+
+
+--- Uses the real synchronous journal files, never an AppleEvent or getter setter.
+local function native_state_observation(runtime)
+	local fallback = os.tmpname()
+	local launcher = os.tmpname()
+	os.remove(fallback)
+	os.remove(launcher)
+	BootJournal.configure_for_tests({
+		fallback_path = fallback,
+		clock = function() return "T" end,
+		getenv = function(name)
+			if name == BootJournal.LAUNCHER_LOG_ENV then return launcher end
+		end,
+	})
+	local ok, written = pcall(BootJournal.record_native_scripting_state, runtime)
+	BootJournal.configure_for_tests(nil)
+	local fallback_text, launcher_text = read_all(fallback), read_all(launcher)
+	os.remove(fallback)
+	os.remove(launcher)
+	helpers.assert_true(ok, "The readonly diagnostic never raises a native getter refusal")
+	helpers.assert_eq(written, true, "The real synchronous journal acknowledged publication")
+	return fallback_text, launcher_text
+end
+
+helpers.describe("managed native scripting admission (native-scripting-state)", function()
+	for _, value in ipairs({ true, false }) do
+		helpers.it("records the actual boolean " .. tostring(value) .. " getter without enabling scripting", function()
+			local observed = { calls = 0, bridge_calls = 0 }
+			local getter = function(...)
+				observed.calls = observed.calls + 1
+				observed.arguments = select("#", ...)
+				return value
+			end
+			local bridge = function() observed.bridge_calls = observed.bridge_calls + 1 end
+			local runtime = { processInfo = { processID = 42 }, allowAppleScript = getter,
+				__appleScriptRunString = bridge }
+			local fallback, launcher = native_state_observation(runtime)
+			local expected = "Native scripting server: pid=42; getter=boolean; allowed=" .. tostring(value)
+				.. "; bridge=callable; handler_registration=unobserved; handler_entry=unobserved."
+			helpers.assert_eq(fallback, "T [INFO] [init] " .. expected .. "\n")
+			helpers.assert_eq(launcher, "[T] embedded Hammerspoon boot INFO: " .. expected .. "\n")
+			helpers.assert_eq(observed.calls, 1)
+			helpers.assert_eq(observed.arguments, 0, "No setter argument can alter the native preference")
+			helpers.assert_eq(observed.bridge_calls, 0, "A callable bridge is never executed for readiness")
+			helpers.assert_eq(runtime.allowAppleScript, getter)
+			helpers.assert_eq(runtime.__appleScriptRunString, bridge, "The native handler binding is not replaced")
+		end)
+	end
+
+	for _, bad in ipairs({ {}, { value = 1 }, { value = "PRIVATE_GETTER_SECRET" }, { value = {} } }) do
+		helpers.it("refuses a " .. type(bad.value) .. " getter result without fabricating enabled state", function()
+			local fallback = native_state_observation({ processInfo = { processID = 42 },
+				allowAppleScript = function() return bad.value end })
+			helpers.assert_true(fallback:find("getter=malformed; allowed=unknown; bridge=missing;", 1, true) ~= nil)
+			helpers.assert_true(not fallback:find("PRIVATE_GETTER_SECRET", 1, true))
+		end)
+	end
+
+	helpers.it("records a thrown getter with a closed token and no exception payload", function()
+		local fallback = native_state_observation({ processInfo = { processID = 42 },
+			allowAppleScript = function() error("PRIVATE_GETTER_SECRET /private/path") end })
+		helpers.assert_true(fallback:find("getter=error; allowed=unknown;", 1, true) ~= nil)
+		helpers.assert_true(not fallback:find("PRIVATE_GETTER_SECRET", 1, true))
+		helpers.assert_true(not fallback:find("/private/path", 1, true))
+	end)
+
+	helpers.it("records a missing getter and bridge without claiming native registration", function()
+		local fallback = native_state_observation({ processInfo = { processID = 42 } })
+		helpers.assert_true(fallback:find("getter=missing; allowed=unknown; bridge=missing;", 1, true) ~= nil)
+		helpers.assert_true(fallback:find("handler_registration=unobserved; handler_entry=unobserved.", 1, true) ~= nil)
+	end)
+
+	for _, bad in ipairs({ 0, 1.5, math.huge, "42" }) do
+		helpers.it("does not grant owned PID identity from " .. tostring(bad), function()
+			local fallback = native_state_observation({ processInfo = { processID = bad },
+				allowAppleScript = function() return true end, __appleScriptRunString = "PRIVATE_BRIDGE_SECRET" })
+			helpers.assert_true(fallback:find("pid=unknown; getter=boolean; allowed=true; bridge=missing;", 1, true) ~= nil)
+			helpers.assert_true(not fallback:find("PRIVATE_BRIDGE_SECRET", 1, true))
+		end)
+	end
+
+	helpers.it("keeps a refused destination unacknowledged instead of granting a witness", function()
+		BootJournal.configure_for_tests({ fallback_path = "/never", getenv = function() return nil end,
+			open = function() return nil, "owned destination refused" end })
+		local ok, written = pcall(BootJournal.record_native_scripting_state,
+			{ processInfo = { processID = 42 }, allowAppleScript = function() return true end })
+		BootJournal.configure_for_tests(nil)
+		helpers.assert_true(ok)
+		helpers.assert_eq(written, false)
+	end)
+end)

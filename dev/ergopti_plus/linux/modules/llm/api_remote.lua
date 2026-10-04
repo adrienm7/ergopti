@@ -37,6 +37,8 @@ local PromptBuilder = require("llm.prompt_builder")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
+local AuthPolicy = require("llm.local_server_auth")
+local LocalCatalogue = require("modules.llm.local_server_catalogue")
 
 local LOG = "modules.llm.api_remote"
 
@@ -179,6 +181,14 @@ local function catalogue()
 	local text = fh and fh:read("*a") or nil
 	if fh then fh:close() end
 	_catalogue = M.parse_catalogue(text)
+	local order, servers = LocalCatalogue.load(_catalogue.providers)
+	_catalogue.local_servers = servers
+	for _, id in ipairs(order) do
+		local desc = servers[id]
+		_catalogue.providers[id] = { id = id, label = desc.label, base_url = desc.base_url,
+			default_model = "", format = "openai", model_extras = {} }
+		_catalogue.order[#_catalogue.order + 1] = id
+	end
 	return _catalogue
 end
 
@@ -195,6 +205,15 @@ end
 --- @return table|nil
 function M.provider(id)
 	return catalogue().providers[id]
+end
+
+--- Whether an explicit token satisfies the actual provider's capability.
+--- @param provider_id any
+--- @param token any
+--- @return boolean
+function M.token_allowed(provider_id, token)
+	return M.provider(provider_id) ~= nil
+		and AuthPolicy.token_allowed(provider_id, token, catalogue().local_servers)
 end
 
 --- The shared connectivity probe, or nil when the catalogue section is invalid.
@@ -313,8 +332,8 @@ function M.endpoint(entry, model)
 	local base_raw = (type(entry.base_url) == "string" and entry.base_url ~= "") and entry.base_url or provider.base_url
 	local base, reason = M.normalize_base_url(base_raw)
 	if not base then return nil, reason end
-	local token = type(entry.token) == "string" and entry.token or ""
-	if token == "" then return nil, "the API key is empty" end
+	local token = entry.token
+	if not M.token_allowed(entry.provider, token) then return nil, "the API key is missing or invalid" end
 	if type(model) ~= "string" or model == "" then return nil, "no model is configured" end
 
 	local headers = { ["Content-Type"] = "application/json" }
@@ -334,7 +353,7 @@ function M.endpoint(entry, model)
 		headers[Formats.DECISIONS_KEY_HEADER] = Formats.decisions_key_value(token)
 	else
 		url = base .. "/chat/completions"
-		headers["Authorization"] = "Bearer " .. token
+		if token ~= "" then headers["Authorization"] = "Bearer " .. token end
 	end
 	return { url = url, headers = headers, format = provider.format }
 end
@@ -731,6 +750,35 @@ end
 --- @return boolean
 function M.is_active()
 	return _active ~= nil
+end
+
+--- Lists models for a manually configured local API through the existing owner.
+--- @param entry table Provider, configured base URL, token and model identity.
+--- @param on_done function Receives (model_ids, reason).
+--- @return boolean dispatched
+function M.models(entry, on_done)
+	local epoch, done = open_exchange(on_done)
+	if not epoch then return false end
+	local endpoint, reason = M.endpoint(entry, "models-probe")
+	if not endpoint or endpoint.format ~= "openai" then
+		done(nil, reason or "unsupported_models")
+		return false
+	end
+	local captured = {}
+	for _, key in ipairs({ "id", "provider", "base_url", "token", "model" }) do captured[key] = entry[key] end
+	local url = endpoint.url:gsub("/chat/completions$", "/models")
+	local dispatched = HttpClient.get(url, endpoint.headers,
+		{ owner = OWNER, timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms"), follow_redirects = false },
+		function(result)
+			if epoch ~= _epoch then return end
+			for _, key in ipairs({ "id", "provider", "base_url", "token", "model" }) do
+				if entry[key] ~= captured[key] then done(nil, "identity_changed"); return end
+			end
+			local ids, refusal = AuthPolicy.models_receipt(result)
+			done(ids, refusal)
+		end)
+	if dispatched ~= true then done(nil, "HTTP transport unavailable"); return false end
+	return true
 end
 
 --- Sends the connectivity probe with one entry: the shared test_request as a

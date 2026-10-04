@@ -40,6 +40,56 @@
 ; ==================================
 ; ==================================
 
+; Inspect executable code so an async name in prose or quoted data cannot
+; qualify a dispatcher. The selected local may be renamed without changing its
+; default transport authority; require its unique binding and real invocation.
+_InstalledTagsAsyncDispatchIsExecutable(Body) {
+	if Body == ""
+		return false
+	Code := _DriverMaskNonCode(&Body)
+	if RegExMatch(Code, "im)^[ \t]*LLM_OllamaListModels_Async\(")
+		return true
+	Pattern := "im)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*:=[ \t]*IsSet\(DispatchFn\)[ \t]*\?[ \t]*DispatchFn[ \t]*:[ \t]*LLM_OllamaListModels_Async[ \t]*$"
+	if !RegExMatch(Code, Pattern, &Binding)
+		return false
+	Alias := Binding[1]
+	Assignments := 0, Position := 1
+	while RegExMatch(Code, "i)\b" . Alias . "[ \t]*:=", &Found, Position) {
+		Assignments += 1
+		Position := Found.Pos + Found.Len
+	}
+	return Assignments == 1 && RegExMatch(Code, "im)^[ \t]*" . Alias . "\(", , Binding.Pos + Binding.Len) > 0
+}
+
+_MetaInstalledTagsDispatchSourceControls() {
+	Body := _DriverFuncBody("_LLM_Menu_FireInstalledTagsProbe")
+	AssertTrue(Body != "", "the actual installed-tags dispatch owner is required")
+	AssertTrue(_InstalledTagsAsyncDispatchIsExecutable(Body), "the actual default transport is executable async")
+	Code := _DriverMaskNonCode(&Body)
+	AssertTrue(RegExMatch(Code, "m)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*:=[ \t]*IsSet\(DispatchFn\)", &Binding) > 0,
+		"the production injectable dispatcher binding is required for mutation controls")
+	Alias := Binding[1]
+	Renamed := RegExReplace(Body, "\b" . Alias . "\b", "RenamedTransport")
+	AssertTrue(_InstalledTagsAsyncDispatchIsExecutable(Renamed), "renaming the local dispatcher preserves its authority")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(StrReplace(Body, "LLM_OllamaListModels_Async", "LLM_OllamaListModels")), "synchronous default dispatch is rejected")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(StrReplace(Body, Alias . "(", "UnusedTransport(")), "binding without invoking its selected transport is rejected")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(StrReplace(Body, "LLM_OllamaListModels_Async", "")), "missing async authority is rejected")
+	Commented := RegExReplace(Body, "m)^([ \t]*)(" . Alias . "[ \t]*:=.*)$", "$1; $2")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(Commented), "comment-only async authority is rejected")
+	CommentCall := RegExReplace(Body, "m)^([ \t]*)(" . Alias . "\(.*)$", "$1; $2")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(CommentCall), "comment-only selected invocation is rejected")
+	Reassigned := StrReplace(Body, Alias . "(", Alias . " := LLM_OllamaListModels" . "`n" . Alias . "(")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(Reassigned), "later reassignment cannot replace default async authority")
+	MixedCaseReassigned := StrReplace(Body, Alias . "(", StrLower(Alias) . " := LLM_OllamaListModels" . "`n" . Alias . "(")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(MixedCaseReassigned), "AHK case-insensitive reassignment cannot replace async authority")
+	MixedCaseCalled := StrReplace(Body, Alias . "(", StrUpper(Alias) . "(")
+	AssertTrue(_InstalledTagsAsyncDispatchIsExecutable(MixedCaseCalled), "AHK case-insensitive invocation retains the selected transport")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable(""), "an empty owner cannot qualify dispatch")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable("; LLM_OllamaListModels_Async()"), "prose cannot qualify direct async dispatch")
+	AssertFalse(_InstalledTagsAsyncDispatchIsExecutable('Unused := "LLM_OllamaListModels_Async()"'), "quoted data cannot qualify direct async dispatch")
+}
+Test("meta llm: installed-tags dispatch source rejects missing or synchronous authority", _MetaInstalledTagsDispatchSourceControls)
+
 _MetaCheckInstalledTagsNonBlocking() {
 	; (1) The cache READ path must never perform the synchronous /api/tags probe —
 	; that blocking call, run per catalogue row at every rebuild, was the freeze.
@@ -107,7 +157,7 @@ _MetaCheckInstalledTagsNonBlocking() {
 		"actions.ahk must define _LLM_Menu_FireInstalledTagsProbe() under the SAME name "
 		. "the model row calls — a mismatch becomes a runtime unset-variable throw that "
 		. "aborts the build and empties the IA menu")
-	Assert(InStr(FireBody, "LLM_OllamaListModels_Async("),
+	Assert(_InstalledTagsAsyncDispatchIsExecutable(FireBody),
 		"_LLM_Menu_FireInstalledTagsProbe must dispatch the async probe")
 	Assert(InStr(FireBody, "A_IsSuspended"),
 		"_LLM_Menu_FireInstalledTagsProbe must early-return on A_IsSuspended — its rebuild "

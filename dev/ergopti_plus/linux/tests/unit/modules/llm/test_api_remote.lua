@@ -17,6 +17,11 @@ local Json = require("json")
 local function load_remote()
 	local calls = {}
 	package.loaded["adapters.http_client"] = {
+		get = function(url, headers, options, callback)
+			calls.probes = calls.probes or {}
+			calls.probes[#calls.probes + 1] = { url = url, headers = headers, callback = callback, options = options }
+			return true
+		end,
 		post = function(url, headers, body, callback, options)
 			calls[#calls + 1] = { url = url, headers = headers, body = body, callback = callback, options = options }
 			return true
@@ -221,4 +226,83 @@ helpers.describe("api_remote: replies, refusals and cancellation", function()
 		helpers.assert_true(not called)
 	end)
 
+end)
+
+
+helpers.describe("Local API optional authentication: actual requests (local-api-optional-auth) (local-api-optional-auth)", function()
+	helpers.it("dispatches a keyless local chat to its configured address without Authorization (local-api-optional-auth)", function()
+		local remote, calls = load_remote()
+		local observed = {}
+		local accepted = remote.chat({ provider = "lmstudio", token = "", model = "fixture-model",
+			base_url = "http://127.0.0.1:19273/v1" }, "fixture-model", MESSAGES, {}, nil,
+			function(text, reason) observed.text, observed.reason = text, reason end)
+		unload()
+		helpers.assert_eq(accepted, true)
+		helpers.assert_eq(#calls, 1)
+		helpers.assert_eq(calls[1].url, "http://127.0.0.1:19273/v1/chat/completions")
+		helpers.assert_eq(calls[1].headers.Authorization, nil)
+		helpers.assert_eq(Json.decode(calls[1].body).model, "fixture-model")
+	end)
+
+	helpers.it("keeps a provided local key exactly and refuses cloud, generic and unknown empty keys (local-api-optional-auth)", function()
+		local remote = load_remote()
+		local request = remote.build_request({ provider = "lmstudio", token = " leading-and-trailing ",
+			model = "fixture-model", base_url = "http://127.0.0.1:19273/v1" }, MESSAGES, {})
+		local refused = {}
+		for _, provider in ipairs({ "openai", "openai_compat", "unknown-provider" }) do
+			refused[#refused + 1] = remote.build_request({ provider = provider, token = "", model = "fixture-model",
+				base_url = "http://127.0.0.1:19273/v1" }, MESSAGES, {}) == nil
+		end
+		unload()
+		helpers.assert_true(request ~= nil)
+		helpers.assert_eq(request.headers.Authorization, "Bearer  leading-and-trailing ")
+		for _, value in ipairs(refused) do helpers.assert_eq(value, true) end
+	end)
+end)
+
+
+helpers.describe("Local API models transport (local-api-optional-auth)", function()
+	helpers.it("reads an actual models callback and fences changed identity (local-api-optional-auth)", function()
+		local remote, calls = load_remote()
+		local entry = { id = "local", provider = "lmstudio", token = "", model = "fixture-model",
+			base_url = "http://127.0.0.1:19273/v1" }
+		local seen = {}
+		local first = remote.models(entry, function(ids, reason) seen.ids, seen.reason = ids, reason end)
+		local request = calls.probes and calls.probes[1]
+		if request then request.callback({ ok = true, status = 200, body = '{"data":[{"id":"fixture-model"}]}' }) end
+		local second = remote.models(entry, function(ids, reason) seen.stale_ids, seen.stale_reason = ids, reason end)
+		entry.base_url = "http://127.0.0.1:19274/v1"
+		if calls.probes and calls.probes[2] then calls.probes[2].callback({ ok = true, status = 200, body = '{"data":[]}' }) end
+		unload()
+		helpers.assert_eq(first, true)
+		helpers.assert_eq(second, true)
+		helpers.assert_eq(request.url, "http://127.0.0.1:19273/v1/models")
+		helpers.assert_eq(request.headers.Authorization, nil)
+		helpers.assert_eq(request.options.follow_redirects, false)
+		helpers.assert_eq(seen.ids[1], "fixture-model")
+		helpers.assert_eq(seen.stale_ids, nil)
+		helpers.assert_eq(seen.stale_reason, "identity_changed")
+	end)
+
+	helpers.it("refuses 401 and malformed models and suppresses a cancelled result (local-api-optional-auth)", function()
+		local remote, calls = load_remote()
+		local entry = { id = "local", provider = "lmstudio", token = "", model = "fixture-model" }
+		local observations = {}
+		for _, response in ipairs({ { ok = false, status = 401, body = '{}' },
+			{ ok = true, status = 200, body = '{"data":{}}' } }) do
+			remote.models(entry, function(ids, reason) observations[#observations + 1] = { ids = ids, reason = reason } end)
+			calls.probes[#calls.probes].callback(response)
+		end
+		remote.models(entry, function(ids, reason) observations[#observations + 1] = { ids = ids, reason = reason } end)
+		local stale = calls.probes[#calls.probes]
+		local cancelled = remote.cancel()
+		stale.callback({ ok = true, status = 200, body = '{"data":[]}' })
+		unload()
+		helpers.assert_eq(cancelled, true)
+		helpers.assert_eq(#observations, 2)
+		helpers.assert_eq(observations[1].ids, nil)
+		helpers.assert_eq(observations[1].reason, "http_failure")
+		helpers.assert_eq(observations[2].ids, nil)
+		helpers.assert_eq(observations[2].reason, "invalid_models")
+	end)
 end)

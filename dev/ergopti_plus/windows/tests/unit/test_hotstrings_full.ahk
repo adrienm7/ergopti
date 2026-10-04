@@ -19,7 +19,7 @@
 ;   * registration count + trigger-spec shape (CreateHotstring + CreateCaseSensitiveHotstrings)
 ;   * callback closure correctness (driving HotstringHandler through the
 ;     captured callback proves the closure captured Abbr/Repl/options correctly)
-;   * BackSpace count = StrLen(Abbreviation) — the most fragile invariant
+;   * BackSpace count = number of Unicode scalars — the most fragile invariant
 ;   * Replacement and EndChar emitted in the correct order through the
 ;     correct send primitive (SendNewResult vs SendFinalResult)
 ;   * Time-activation guard (typed-too-slowly heuristic) blocks emission
@@ -83,8 +83,8 @@ Test("Hotstrings full: a per-section delay overrides the category and falls back
 
 _TestCallHotstring(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResult := False, TimeActivationSeconds :=
     0) {
-    BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
-    PrevCharKey := SubStr(Abbreviation, -2, 1)
+    BackSpaceSeq := "{BackSpace " . _TextCodepointLength(Abbreviation) . "}"
+    PrevCharKey := _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds).PrevCharKey
     _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds)
 }
 
@@ -1140,3 +1140,152 @@ Test("CreateHotstring: OnlyText=false option propagates to the replacement send"
     TestCH_OptionOnlyTextFalse)
 
 ; Hooks are torn down by run_all.ahk's own teardown if needed.
+
+
+TestHH_UnicodeCallbackReplay() {
+	global _Stub_RecordedSends
+	SimulateRegularApp()
+	ResetHotstringRecorders()
+	_TestCallHotstring(Chr(0x1F600) . "x", "R", "", true, true)
+	AssertEqual("{BackSpace 2}", _Stub_RecordedSends[1].args[1],
+		"the callback fixture must preserve the real registration's native key count")
+}
+Test("Hotstrings full: Unicode callback replay uses native Backspace counts (unicode-erase)",
+	TestHH_UnicodeCallbackReplay)
+
+/** A real registration callback must look up the complete prior character. */
+_TestHH_UnicodeTimingCallback(Trigger, PriorChar) {
+	global LastSentCharacterKeyTime, _Stub_RecordedSends, _Stub_HotstringRegistrations
+	SavedTimes := LastSentCharacterKeyTime
+	try {
+		SimulateRegularApp()
+		ResetHotstringRecorders()
+		LastSentCharacterKeyTime := Map(PriorChar, A_TickCount)
+		CreateHotstring("*?C", Trigger, "BAR", Map("TimeActivationSeconds", 1))
+		AssertEqual(1, _Stub_HotstringRegistrations.Length)
+		Callback := _Stub_HotstringRegistrations[1].callback
+		Callback()
+		AssertEqual(3, _Stub_RecordedSends.Length, "the actual callback passes its recent character gate")
+		AssertEqual("BAR", _Stub_RecordedSends[2].args[1], "the guarded callback emits its own replacement")
+	} finally {
+		LastSentCharacterKeyTime := SavedTimes
+		ResetHotstringRecorders()
+	}
+}
+Test("callback unicode-time-gate: supplementary preceding character has one timestamp identity", (*) =>
+	_TestHH_UnicodeTimingCallback("a" . Chr(0x1F601) . "★", Chr(0x1F601)))
+Test("callback unicode-time-gate: supplementary final key keeps the actual preceding identity", (*) =>
+	_TestHH_UnicodeTimingCallback("ab" . Chr(0x1F601), "b"))
+
+
+/** Verify scalar identity independently from the exact activation deadline. */
+_UTG_ActivationMatrix() {
+	global LastSentCharacterKeyTime
+	Saved := LastSentCharacterKeyTime
+	Prior := Chr(0x1F601)
+	Decoy := Chr(0x1FA01)
+	try {
+		for Origin in [1000, 0xFFFFFFF0] {
+			for Elapsed in [999, 1000, 1001] {
+				Now := (Origin + Elapsed) & 0xFFFFFFFF
+				LastSentCharacterKeyTime := Map(Prior, Origin, Decoy, Now)
+				Spec := _MakeHotstringMeta("bar", "a" . Prior . "★", true, true, 1)
+				AssertEqual(Prior, Spec.PrevCharKey, "metadata carries the complete prior scalar")
+				AssertEqual(Elapsed > 1000, IsTimeActivationExpired(Spec.PrevCharKey, 1, Now),
+					"the native callback gate preserves strict expiry across wrap")
+				for Conform in [false, true] {
+					Spec.CaseConform := Conform
+					Decision := _HSE_PrepareDispatchDecision(Spec, Spec.Trigger, "", false, "bar", Now)
+					if Elapsed > 1000 {
+						AssertEqual("", Decision, "expired real dispatch is refused despite a fresh decoy")
+					} else {
+						AssertTrue(IsObject(Decision), "before and exact expiry remain dispatchable")
+						AssertEqual(Origin, Decision.GateOriginTick, "dispatch uses the actual scalar timestamp")
+						AssertEqual(1000 - Elapsed, Decision.RemainingMs,
+							"equality is fireable but has no remaining renderer interaction window")
+					}
+				}
+			}
+		}
+		LastSentCharacterKeyTime := Map(Decoy, 5000)
+		Spec := _MakeHotstringMeta("bar", "a" . Prior . "★", true, true, 1)
+		AssertTrue(IsTimeActivationExpired(Spec.PrevCharKey, 1, 5000), "a decoy cannot supply a missing timestamp")
+		AssertEqual("", _HSE_PrepareDispatchDecision(Spec, Spec.Trigger, "", false, "bar", 5000))
+		LastSentCharacterKeyTime := Map("b", 1000)
+		Bmp := _MakeHotstringMeta("bar", "ab★", true, true, 1)
+		AssertFalse(IsTimeActivationExpired(Bmp.PrevCharKey, 1, 2000), "ordinary scalar remains live at equality")
+		AssertTrue(IsTimeActivationExpired(Bmp.PrevCharKey, 1, 2001), "ordinary scalar expires strictly afterward")
+		AssertFalse(IsTimeActivationExpired(Prior, 0, 2001), "zero disables the activation gate")
+		for InvalidDuration in ["1", 4294968] {
+			AssertTrue(IsTimeActivationExpired("b", InvalidDuration, 1000),
+				"invalid positive duration retains the canonical clock refusal")
+			Bmp.TimeActivationSeconds := InvalidDuration
+			AssertEqual("", _HSE_PrepareDispatchDecision(Bmp, Bmp.Trigger, "", false, "bar", 1000))
+		}
+		Bmp.TimeActivationSeconds := 1.25
+		AssertFalse(IsTimeActivationExpired("b", 1.25, 2250), "a valid fractional-second duration keeps its exact boundary")
+		AssertTrue(IsTimeActivationExpired("b", 1.25, 2251), "a valid fractional-second duration expires one millisecond later")
+	} finally {
+		LastSentCharacterKeyTime := Saved
+	}
+}
+Test("hotstrings unicode-time-gate: scalar timestamps retain exact and wrapped deadlines", _UTG_ActivationMatrix)
+
+_UTG_TypedCompletionIdentity() {
+	global LastSentCharacterKeyTime
+	Saved := LastSentCharacterKeyTime
+	try {
+		Completion := Chr(0x1F601)
+		Spec := _MakeHotstringMeta("bar", "ab" . Completion, true, true, 1)
+		Spec.CaseConform := true
+		LastSentCharacterKeyTime := Map("B", 1000, "b", 1)
+		Decision := _HSE_PrepareDispatchDecision(Spec, "AB" . Completion, "", false, "bar", 1500)
+		AssertTrue(IsObject(Decision), "supplementary completion preserves the preceding typed case")
+		AssertEqual(1000, Decision.GateOriginTick, "typed B owns the timestamp rather than canonical b")
+		AssertEqual("BAR", Decision.Replacement, "the actual conform owner receives the complete trigger")
+	} finally {
+		LastSentCharacterKeyTime := Saved
+	}
+}
+Test("hotstrings unicode-time-gate: supplementary completion uses the actual typed timestamp", _UTG_TypedCompletionIdentity)
+
+_UTG_RawMetadataIdentity() {
+	global _HotstringRegistrar, HSE_RegistryByGroup
+	Saved := _HotstringRegistrar
+	try {
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		Trigger := "a" . Chr(0x1F601) . "★"
+		CreateRawCallbackHotstring("*?C", Trigger, (*) => 0,
+			Map("Group", "unicode-time-fixture", "Priority", 77, "TimeActivationSeconds", 1))
+		AssertTrue(HSE_RegistryByGroup.Has("unicode-time-fixture"), "real raw registration preserves its owner")
+		Specs := HSE_RegistryByGroup["unicode-time-fixture"]
+		AssertEqual(1, Specs.Length)
+		AssertEqual(Chr(0x1F601), Specs[1].PrevCharKey, "raw metadata uses the same complete scalar identity")
+		AssertEqual(77, Specs[1].Priority, "the transplant retains the priority/provenance contract")
+	} finally {
+		HSE_RegistryClear()
+		_HotstringRegistrar := Saved
+	}
+}
+Test("hotstrings unicode-time-gate: raw registration transports the complete prior key", _UTG_RawMetadataIdentity)
+
+_UTG_RecentDecoyDoesNotRepairCallback() {
+	global LastSentCharacterKeyTime, _Stub_RecordedSends, _Stub_HotstringRegistrations
+	Saved := LastSentCharacterKeyTime
+	try {
+		SimulateRegularApp()
+		ResetHotstringRecorders()
+		Prior := Chr(0x1F601)
+		LastSentCharacterKeyTime := Map(Prior, (A_TickCount - 5000) & 0xFFFFFFFF,
+			Chr(0x1FA01), A_TickCount)
+		CreateHotstring("*?C", "a" . Prior . "★", "BAR", Map("TimeActivationSeconds", 1))
+		AssertEqual(1, _Stub_HotstringRegistrations.Length)
+		_Stub_HotstringRegistrations[1].callback()
+		AssertEqual(0, _Stub_RecordedSends.Length, "a fresh distinct scalar cannot repair the expired actual callback key")
+	} finally {
+		LastSentCharacterKeyTime := Saved
+		ResetHotstringRecorders()
+	}
+}
+Test("callback unicode-time-gate: a recent decoy cannot repair an expired scalar", _UTG_RecentDecoyDoesNotRepairCallback)

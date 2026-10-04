@@ -34,33 +34,6 @@ local LOG               = "menu_hotstrings"
 -- =============================
 -- =============================
 
---- Builds a toggle item for one preview bubble type.
---- @param ctx table Context.
---- @param label string Display label for the toggle item.
---- @param enabled_key string State key for the enabled flag.
---- @param set_enabled_fn string Keymap setter name for the enabled flag.
---- @param notify_label string Label used in the notification.
---- @return table The toggle menu item.
-local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_label)
-	local state  = ctx.state
-	local paused = ctx.paused
-
-	return {
-		label    = label,
-		checked  = state[enabled_key] or nil,
-		disabled = paused or nil,
-		action       = not paused and function()
-			state[enabled_key] = not state[enabled_key]
-			if ctx.keymap and type(ctx.keymap[set_enabled_fn]) == "function" then
-				pcall(ctx.keymap[set_enabled_fn], state[enabled_key])
-			end
-			if ctx.save_prefs() ~= true then return false end
-			ctx.notify_feature(notify_label, state[enabled_key])
-			ctx.updateMenu()
-		end or nil,
-	}
-end
-
 --- Builds the management sub-menu.
 --- @param ctx table Context.
 --- @return table
@@ -73,31 +46,56 @@ function M.build_management(ctx)
 
 	local bubble_sub = {}
 
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_magic"),
-		"preview_star_enabled",
-		"set_preview_star_enabled",
-		i18n.get("menu.hotstrings.notify_bubble_star")))
+	local magic_row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
+		["preview_star_enabled"] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview("preview_star_enabled") ~= true then
+				return false
+			end
+			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_star"), state.preview_star_enabled)
+			ctx.updateMenu()
+			return true
+		end,
+	}, {
+		["hotstrings.preview_star_enabled"] = function() return state.preview_star_enabled == true end,
+		["preview_magic_ready"] = function() return not ctx.paused end,
+	})
+	if magic_row then table.insert(bubble_sub, magic_row) end
 
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_autocorrect"),
-		"preview_autocorrect_enabled",
-		"set_preview_autocorrect_enabled",
-		i18n.get("menu.hotstrings.notify_bubble_autocorrect")))
-
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_ai"),
-		"preview_ai_enabled",
-		"set_preview_ai_enabled",
-		i18n.get("menu.hotstrings.notify_bubble_ai")))
+	local presence_commands = {}
+	local presence_getters = { preview_presence_ready = function() return not ctx.paused end }
+	for key, notify_key in pairs({
+		preview_autocorrect_enabled = "menu.hotstrings.notify_bubble_autocorrect",
+		preview_ai_enabled = "menu.hotstrings.notify_bubble_ai",
+	}) do
+		presence_commands[key] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(key) ~= true then return false end
+			ctx.notify_feature(i18n.get(notify_key), state[key])
+			ctx.updateMenu()
+			return true
+		end
+		presence_getters["hotstrings." .. key] = function() return state[key] == true end
+	end
+	for _, declaration in ipairs(ManifestMenu.get_array("preview_presence_controls")) do
+		local row = ManifestMenu.check_row("preview_presence_controls", declaration.id, presence_commands, presence_getters)
+		if row then table.insert(bubble_sub, row) end
+	end
 
 	table.insert(bubble_sub, { separator = true })
 
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_colored"),
-		"preview_colored_tooltips",
-		"set_preview_colored_tooltips",
-		i18n.get("menu.hotstrings.notify_bubble_colored")))
+	local colored_row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
+		["preview_colored_tooltips"] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview("preview_colored_tooltips") ~= true then
+				return false
+			end
+			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_colored"), state.preview_colored_tooltips)
+			ctx.updateMenu()
+			return true
+		end,
+	}, {
+		["hotstrings.preview_colored_tooltips"] = function() return state.preview_colored_tooltips == true end,
+		["preview_colored_ready"] = function() return not ctx.paused end,
+	})
+	if colored_row then table.insert(bubble_sub, colored_row) end
 
 	bubble_item = { label = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, items = bubble_sub }
 
@@ -199,11 +197,8 @@ function M.build_management(ctx)
 		local consume_sfx = ct.consume and (" (" .. i18n.get("menu.hotstrings.consumed") .. ")") or ""
 		local ct_lbl = ct.char .. " : " .. i18n.get("menu.hotstrings.custom_label") .. consume_sfx
 
-		local ct_sub = {
-			{
-				label    = i18n.get("menu.hotstrings.delete_expander"),
-				disabled = paused or nil,
-				action       = not paused and (function(k) return function()
+		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
+			["word_expander_delete"] = (function(k) return function()
 					local res = dialog.block_alert(
 						i18n.get("dialog.hotstrings.delete_title"),
 						i18n.get("dialog.hotstrings.delete_body"),
@@ -228,9 +223,9 @@ function M.build_management(ctx)
 					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 					return true
-				end end)(ct.key) or nil,
-			},
-		}
+				end end)(ct.key),
+		}, { ["word_expanders_ready"] = word_expanders_ready })
+		local ct_sub = delete_row and { delete_row } or {}
 
 		exp_sub[#exp_sub + 1] = {
 			label    = ct_lbl,
@@ -241,10 +236,8 @@ function M.build_management(ctx)
 		::continue_ct::
 	end
 
-	exp_sub[#exp_sub + 1] = {
-		label    = i18n.get("menu.hotstrings.add_custom"),
-		disabled = paused or nil,
-		action       = not paused and function()
+	local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
+		["word_expander_add"] = function()
 			local existing_keys = {}
 			for _, d in ipairs(defs) do
 				if d.key then existing_keys[d.key] = true end
@@ -256,12 +249,15 @@ function M.build_management(ctx)
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
+				if not word_expanders_ready() then return false end
+				local accept_label, cancel_label = i18n.get("button.ok"), i18n.get("button.cancel")
 				local ok_p, btn, char_raw = pcall(dialog.text_prompt,
 					i18n.get("dialog.hotstrings.new_title"),
 					i18n.get("dialog.hotstrings.new_prompt"),
-					"", i18n.get("button.ok"), i18n.get("button.cancel")
+					"", accept_label, cancel_label
 				)
-				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
+				if not word_expanders_ready() then return false end
+				if not ok_p or btn ~= accept_label or type(char_raw) ~= "string" then return false end
 				local valid, reason = Terminators.validate_custom_terminator(
 					key, char_raw, char_raw, false)
 				if valid then
@@ -277,13 +273,17 @@ function M.build_management(ctx)
 			end
 
 			-- 2. Ask consume behaviour (default: non consommé)
+			local consume_no_label = i18n.get("dialog.hotstrings.consume_no")
+			local consume_yes_label = i18n.get("dialog.hotstrings.consume_yes")
 			local consume_res = dialog.block_alert(
 				i18n.get("dialog.hotstrings.consume_title"),
 				i18n.get("dialog.hotstrings.consume_body"),
-				i18n.get("dialog.hotstrings.consume_no"), i18n.get("dialog.hotstrings.consume_yes"), i18n.get("button.cancel")
+				consume_no_label, consume_yes_label, i18n.get("button.cancel")
 			)
-			if consume_res == i18n.get("button.cancel") then return end
-			local consume = (consume_res == i18n.get("dialog.hotstrings.consume_yes"))
+			if not word_expanders_ready() then return false end
+			if consume_res ~= consume_no_label
+				and consume_res ~= consume_yes_label then return false end
+			local consume = (consume_res == consume_yes_label)
 
 			local label = char .. " : " .. (consume and i18n.get("hotstrings.custom_terminator_consumed") or i18n.get("hotstrings.custom_terminator"))
 
@@ -306,8 +306,9 @@ function M.build_management(ctx)
 			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 			return true
-		end or nil,
-	}
+		end,
+	}, { ["word_expanders_ready"] = word_expanders_ready })
+	if add_row then exp_sub[#exp_sub + 1] = add_row end
 
 	local exp_ctx = {
 		commands = {
@@ -438,10 +439,8 @@ function M.build_management(ctx)
 	-- dedicated configuration window where colors can also be tuned. Categories
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
-	table.insert(delay_menu, {
-		label    = i18n.get("menu.hotstrings.config_item"),
-		disabled = paused or nil,
-		action       = not paused and function()
+	local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+		hotstrings_config_window = function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
 			if not ok or not win or type(win.open) ~= "function" then return end
 			-- make_category_delay_item bakes the resolved delay and the
@@ -454,8 +453,9 @@ function M.build_management(ctx)
 				ctx.updateMenu()
 			end
 			pcall(win.open)
-		end or nil,
-	})
+		end,
+	}, { hotstrings_config_ready = function() return not paused end })
+	if settings_row then table.insert(delay_menu, settings_row) end
 	table.insert(delay_menu, { separator = true })
 	if def_delays then
 		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_ai_acceptance"), "llm_prediction", def_delays.llm_prediction, false))

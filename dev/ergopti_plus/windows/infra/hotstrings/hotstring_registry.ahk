@@ -112,7 +112,8 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "", PathOver
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
-		if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
+		; Match the runtime loader: header comments cannot erase catalogue rows.
+		if RegExMatch(TOML_StripInlineComment(Line), "^\[\[(.+)\]\]$", &SectionMatch) {
 			CurrentSection := StrLower(SectionMatch[1])
 			continue
 		}
@@ -247,7 +248,8 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 		; other bracketed line, so every entry under a single-bracket `[section]`
 		; header was skipped — while LoadExtTomlFile registered them happily. The
 		; pack expanded and could never be previewed.
-		if RegExMatch(Line, HS_TOML_SECTION_HEADER_PATTERN, &SectionMatch) {
+		; Otherwise commented metadata inherits the previous hotstring section.
+		if RegExMatch(TOML_StripInlineComment(Line), HS_TOML_SECTION_HEADER_PATTERN, &SectionMatch) {
 			CurrentSection := StrLower(Trim(SectionMatch[1]))
 			continue
 		}
@@ -273,7 +275,7 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 			IsCaseSensitive := (Match[3] == "true")
 			IsStrict := (Match.Count >= 4 and Match[4] == "true")
 			Individual := _ParseEntryPriority(Line, "")
-		} else if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
+		} else if RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
 			; The engine's second accepted shape: a bare `key = "value"` line, which
 			; LoadExtTomlFile registers through CreateCaseSensitiveHotstrings. The
 			; preview side ignored it entirely, so those entries expanded without

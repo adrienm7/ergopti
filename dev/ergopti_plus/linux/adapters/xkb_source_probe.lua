@@ -165,7 +165,8 @@ local function ordered_aliases(text)
 	local result, sections = text:gsub("(xkb_keycodes[^\n]*{\n)(.-)(\n};)", function(header, body, footer)
 		body = body .. "\n"
 		local aliases = {}
-		local declaration = "\talias <[^<>\n]+> = <[^<>\n]+>;\n"
+		-- Native serializers align alias columns; only horizontal spacing is syntax.
+		local declaration = "\talias[ \t]+<[^<>\n]+>[ \t]+=[ \t]+<[^<>\n]+>;\n"
 		for line in body:gmatch(declaration) do aliases[#aliases + 1] = line end
 		table.sort(aliases)
 		local index = 0

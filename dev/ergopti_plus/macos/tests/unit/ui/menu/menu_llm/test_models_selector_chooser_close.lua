@@ -14,6 +14,7 @@ helpers.describe("models selector fallback chooser ownership", function()
 		helpers.with_fresh_modules({
 			"ui.menu.menu_llm.models_selector", "ui.model_browser", "infra.i18n",
 			"infra.logger", "infra.dialog_util", "infra.deferred_work",
+			"infra.manifest_menu", "infra.paths", "adapters.json_codec",
 			"hs", "tests.stubs.hs",
 		}, function()
 			local controls = {delete_throws = false}
@@ -74,6 +75,7 @@ helpers.describe("models selector fallback chooser ownership", function()
 					get_actual_model_name = function(name) return name end,
 					is_model_installed = function() return false end,
 				},
+				is_paused = function() return false end,
 				switch_model = function() return true end,
 				disable_model = function() return true end,
 				save_prefs = function() return true end,

@@ -18,7 +18,8 @@ local helpers = require("tests.helpers")
 local TAG = "v0.0.0-dev.139"
 local DIGEST = string.rep("ab", 32)
 local URL = "https://github.com/adrienm7/ergopti/releases/download/" .. TAG .. "/ErgoptiPlus.app.zip"
-local IDS = { owner = "adrienm7", repo = "ergopti", asset = "ErgoptiPlus.app.zip" }
+local IDS = { owner = "adrienm7", repo = "ergopti", asset = "ErgoptiPlus.app.zip",
+	archives = { { name = "ErgoptiPlus.app.zip", format = "zip" } } }
 
 --- Runs a shell command and returns its exit status and output.
 --- @param command string
@@ -123,7 +124,7 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 			spawned[#spawned + 1] = { executable = executable, args = args, on_done = on_done }
 			return { start = function() return true end }
 		end
-		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST }
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
 		local results = {}
 		helpers.assert_true(Installer.stage(asset, function(...) results[#results + 1] = { ... } end))
 		local call = spawned[1]
@@ -185,15 +186,18 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 			.. (opts.curl_fails and "exit 22" or "cp " .. quote(payload) .. ' "$out"'))
 		local shasum = fake(tools, "shasum", 'sha256sum "$3"')
 		local ditto = fake(tools, "ditto", 'echo ditto >> ' .. quote(calls) .. '\nmkdir -p "$4/ErgoptiPlus.app/Contents"')
+		local tar = fake(tools, "tar", 'echo tar >> ' .. quote(calls) .. '\n'
+			.. (opts.extract_fails and "exit 1" or 'mkdir -p "$4/ErgoptiPlus.app/Contents"'))
 		local plist = fake(tools, "PlistBuddy", 'echo ' .. quote(opts.version or "0.0.0-dev.139"))
 		local codesign = fake(tools, "codesign", 'echo "codesign $1" >> ' .. quote(calls)
 			.. '\nif [ "$1" = "-d" ]; then echo "designated => identifier \\"com.ergoptiplus.app\\""; exit 0; fi\n'
 			.. (opts.unsigned and "exit 1" or "exit 0"))
 		local script = Installer.STAGE_SCRIPT
 			:gsub("/usr/bin/curl", curl):gsub("/usr/bin/shasum", shasum):gsub("/usr/bin/ditto", ditto)
-			:gsub("/usr/libexec/PlistBuddy", plist):gsub("/usr/bin/codesign", codesign)
+			:gsub("/usr/libexec/PlistBuddy", plist):gsub("/usr/bin/codesign", codesign):gsub("/usr/bin/tar", tar)
 		local status, output = sh("sh -c " .. quote(script) .. " stage " .. quote(URL) .. " " .. quote(digest)
-			.. " " .. quote(dir .. "/stage") .. " 0.0.0-dev.139 /Applications/ErgoptiPlus.app")
+			.. " " .. quote(dir .. "/stage") .. " 0.0.0-dev.139 /Applications/ErgoptiPlus.app "
+			.. quote(opts.format or "zip") .. " " .. quote(opts.bundle or "ErgoptiPlus.app"))
 		local called = read(calls) or ""
 		sh("rm -rf " .. quote(dir))
 		return status, output, called
@@ -204,6 +208,42 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 		helpers.assert_eq(status, 0, output)
 		helpers.assert_true(output:match("^READY /.+/stage/app/ErgoptiPlus%.app") ~= nil, output)
 		helpers.assert_eq(called, "curl\nditto\ncodesign -d\ncodesign --verify\n")
+	end)
+
+	helpers.it("uses only the declared tar extractor after integrity verification", function()
+		local status, output, called = stage({ format = "tar.xz" })
+		helpers.assert_eq(status, 0, output)
+		helpers.assert_true(output:match("^READY /.+/stage/app/ErgoptiPlus%.app") ~= nil, output)
+		helpers.assert_eq(called, "curl\ntar\ncodesign -d\ncodesign --verify\n")
+		local rejected, text, before = stage({ format = "tar.xz", digest = string.rep("0", 64) })
+		helpers.assert_eq(rejected, 21)
+		helpers.assert_true(text:find("READY", 1, true) == nil)
+		helpers.assert_eq(before, "curl\n", "the preferred format does not bypass SHA-256")
+	end)
+
+	helpers.it("refuses tar extraction, version and signing failures without READY", function()
+		for _, case in ipairs({
+			{ options = { format = "tar.xz", extract_fails = true }, status = 22, calls = "curl\ntar\n" },
+			{ options = { format = "tar.xz", version = "0.0.0-dev.138" }, status = 25, calls = "curl\ntar\n" },
+			{ options = { format = "tar.xz", unsigned = true }, status = 27,
+				calls = "curl\ntar\ncodesign -d\ncodesign --verify\n" },
+		}) do
+			local status, output, called = stage(case.options)
+			helpers.assert_eq(status, case.status)
+			helpers.assert_true(output:find("READY", 1, true) == nil)
+			helpers.assert_eq(called, case.calls)
+		end
+	end)
+
+	helpers.it("refuses undeclared formats and foreign bundle paths before download", function()
+		for _, options in ipairs({ { format = "tar.gz" }, { format = "unowned" },
+			{ bundle = "../ErgoptiPlus.app" }, { bundle = "/ErgoptiPlus.app" }, { bundle = "" },
+			{ bundle = "." }, { bundle = "foreign" } }) do
+			local status, output, called = stage(options)
+			helpers.assert_eq(status, 20)
+			helpers.assert_true(output:find("READY", 1, true) == nil)
+			helpers.assert_eq(called, "", "an invalid invocation never acquires network work")
+		end
 	end)
 
 	helpers.it("stops at a failed download", function()
@@ -271,5 +311,70 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		helpers.assert_eq(result.status, 6)
 		helpers.assert_eq(result.app, "installed")
 		helpers.assert_eq(result.opened, result.app_path .. "\n")
+	end)
+end)
+
+
+helpers.describe("release_installer: declared archive preference and historical compatibility", function()
+	local Installer = fresh_installer()
+	local Archives = require("updater.release_assets")
+
+	helpers.it("uses actual shared declarations against independent exact release records", function()
+		local corpus = require("json").decode(assert(read(helpers.shared("tests/corpus/updater/release_archives.json"))))
+		helpers.assert_eq(#corpus.cases, 14, "the independent refusal corpus is complete")
+		for _, case in ipairs(corpus.cases) do
+			local selected = Installer.find_asset(case.release)
+			if case.refused then helpers.assert_nil(selected, case.name)
+			else helpers.assert_eq(selected, case.expected, case.name) end
+			local _, reason = Archives.select(case.release, Installer._identity())
+			helpers.assert_eq(reason, case.reason, case.name)
+		end
+	end)
+
+	helpers.it("preserves other platform assets and requires declared format-key bindings", function()
+		local defaults = require("json").decode(assert(read(helpers.shared("modules/updater/defaults.json"))))
+		helpers.assert_eq(defaults.release_assets.linux_bundle, "ergopti-plus-linux.tar.gz")
+		helpers.assert_eq(defaults.release_assets.macos_bundle, "ErgoptiPlus.app.zip", "current producers retain ZIP")
+		local identity = assert(Archives.resolve(defaults))
+		helpers.assert_eq(identity.archives, {
+			{ name = "ErgoptiPlus.app.tar.xz", format = "tar.xz" },
+			{ name = "ErgoptiPlus.app.zip", format = "zip" },
+		})
+		for _, mutate in ipairs({
+			function(value) value.release_install.macos_archives[1].format = "unowned" end,
+			function(value) value.release_install.macos_archives[1].asset_key = "missing" end,
+			function(value) value.release_install.macos_archives[1].format = "zip" end,
+			function(value) value.release_install.macos_archives[2] = value.release_install.macos_archives[1] end,
+			function(value) value.release_install.macos_archives.future = {} end,
+			function(value) value.github.owner = "../foreign" end,
+		}) do
+			local changed = require("json").decode(assert(read(helpers.shared("modules/updater/defaults.json"))))
+			mutate(changed)
+			helpers.assert_nil(Archives.resolve(changed), "malformed policy never selects a fallback")
+		end
+	end)
+
+	helpers.it("passes the admitted format to the actual native stage and refuses unknown formats before dispatch", function()
+		local environment = {
+			ERGOPTI_LAUNCHER_EXECUTABLE = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			TMPDIR = "/private/tmp/user",
+		}
+		Installer._getenv = function(name) return environment[name] end
+		local calls = {}
+		Installer._spawn = function(executable, args)
+			calls[#calls + 1] = { executable = executable, args = args }
+			return { start = function() return true end }
+		end
+		for _, format in ipairs({ "zip", "tar.xz" }) do
+			local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = format }
+			helpers.assert_eq(Installer.stage(asset, function() end), true)
+			helpers.assert_eq(calls[#calls].args[9], format)
+			helpers.assert_eq(calls[#calls].args[10], "ErgoptiPlus.app")
+		end
+		for _, format in ipairs({ "unowned", false, 2 }) do
+			helpers.assert_eq(Installer.stage({ tag = TAG, format = format }, function() end), false)
+		end
+		helpers.assert_eq(Installer.stage({ tag = TAG }, function() end), false)
+		helpers.assert_eq(#calls, 2, "invalid formats never dispatch native work")
 	end)
 end)

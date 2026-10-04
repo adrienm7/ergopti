@@ -36,6 +36,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local TomlCodec = require("toml_codec")
+local TomlWriter = require("toml_codec.writer")
 local BasicString = require("toml_codec.basic_string")
 local Engine = require("platform.remap.tap_hold_engine")
 local Manifest = require("infra.manifest_reader")
@@ -84,10 +85,9 @@ local _backup_sequence = 0    -- Keeps the wizard import's backups unique.
 --- @param path string
 --- @return table|nil document, string|nil err, string|nil text The file's bytes.
 local function read_document(path)
-	local fh = io.open(path, "r")
-	if not fh then return {} end
-	local text = fh:read("*a")
-	fh:close()
+	local text, status, detail = TomlWriter.read_classified(path)
+	if status == "absent" then return {} end
+	if status ~= "ok" then return nil, detail end
 	local parsed = TomlCodec.decode(text)
 	if type(parsed) ~= "table" then return nil, "malformed" end
 	return parsed, nil, text
@@ -191,8 +191,20 @@ local function write_document(path, document)
 		Logger.error(LOG, "Cannot write '%s' (%s) — the change was not saved.", tmp, tostring(err))
 		return false
 	end
-	fh:write(text)
-	fh:close()
+	local write_ok, written, write_err = pcall(fh.write, fh, text)
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	-- Lua 5.1 returns true from file:write; later Lua returns that same file.
+	local write_ack = write_ok and (written == true or written == fh)
+	if not write_ack or not close_ok or closed ~= true then
+		local removed, remove_err = os.remove(tmp)
+		if not removed then
+			Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(remove_err))
+		end
+		local detail = not write_ok and written or (not write_ack and write_err)
+			or (not close_ok and closed) or close_err or "write or close acknowledgement refused"
+		Logger.error(LOG, "Cannot complete staging file '%s' (%s) — the change was not saved.", tmp, tostring(detail))
+		return false
+	end
 	local ok, rename_err = os.rename(tmp, path)
 	if not ok then
 		os.remove(tmp)

@@ -753,3 +753,81 @@ _LAO_OllamaPortIsLiveSemanticState() {
 }
 Test("[ahk-008-aux-owner] Ollama port changes invalidate live prediction identity",
 	_LAO_OllamaPortIsLiveSemanticState)
+
+_LAO_ProbeClock(Kind, CrossingBoundary, AtExpiry, ExtraElapsed := 0) {
+	global _LLM_Menu, _LLM_InstalledTagsCacheAt, _DriverInputInitPending
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	global LLM_HEALTH_PROBE_THROTTLE_MS, LLM_INSTALLED_CACHE_TTL_MS
+	Saved := { Menu: _LLM_Menu, CacheAt: _LLM_InstalledTagsCacheAt,
+		PendingSet: IsSet(_DriverInputInitPending),
+		Pending: IsSet(_DriverInputInitPending) ? _DriverInputInitPending : false,
+		Generation: _LLM_AuxGeneration, Counter: _LLM_AuxOwnerCounter,
+		Owners: _LLM_AuxOwners, Debt: _LLM_AuxCleanupDebt,
+		DebtCounter: _LLM_AuxCleanupDebtCounter, HealthTTLSet: IsSet(LLM_HEALTH_PROBE_THROTTLE_MS),
+		HealthTTL: IsSet(LLM_HEALTH_PROBE_THROTTLE_MS) ? LLM_HEALTH_PROBE_THROTTLE_MS : 0,
+		TagsTTL: LLM_INSTALLED_CACHE_TTL_MS }
+	Calls := []
+	Dispatch(Callback, Owner) => Calls.Push({ Callback: Callback, Owner: Owner })
+	try {
+		_LAO_ResetOwners()
+		LLM_HEALTH_PROBE_THROTTLE_MS := 1000
+		LLM_INSTALLED_CACHE_TTL_MS := 2000
+		TTL := Kind == "health" ? LLM_HEALTH_PROBE_THROTTLE_MS : LLM_INSTALLED_CACHE_TTL_MS
+		Assert(TTL > 0, "the fixture must exercise an initialized nonzero timing")
+		Origin := CrossingBoundary ? 0xFFFFFFF0 : 100
+		Elapsed := (AtExpiry ? TTL : TTL - 1) + ExtraElapsed
+		Now := Origin + Elapsed
+		_LLM_Menu := Map("enabled", true, "backend", "ollama", "last_health_probe_tick", Origin)
+		_LLM_InstalledTagsCacheAt := Origin
+		_DriverInputInitPending := false
+		if Kind == "health"
+			_LLM_Menu_FireHealthProbe(true, Now, Dispatch)
+		else
+			_LLM_Menu_FireInstalledTagsProbe(Now, Dispatch)
+		AssertEqual(Elapsed >= TTL ? 1 : 0, Calls.Length,
+			"native monotonic observations retain the exact expiry boundary")
+		if Elapsed >= TTL {
+			AssertTrue(LLM_AuxIsCurrent(Calls[1].Owner), "the real auxiliary owner admits the dispatch")
+			if Kind == "health"
+				AssertEqual(Now, _LLM_Menu["last_health_probe_tick"], "publish the same clock observation")
+		}
+	} finally {
+		LLM_AuxInvalidate("probe_clock_test")
+		_LLM_Menu := Saved.Menu
+		_LLM_InstalledTagsCacheAt := Saved.CacheAt
+		_DriverInputInitPending := Saved.PendingSet ? Saved.Pending : unset
+		_LLM_AuxGeneration := Saved.Generation
+		_LLM_AuxOwnerCounter := Saved.Counter
+		_LLM_AuxOwners := Saved.Owners
+		_LLM_AuxCleanupDebt := Saved.Debt
+		_LLM_AuxCleanupDebtCounter := Saved.DebtCounter
+		LLM_HEALTH_PROBE_THROTTLE_MS := Saved.HealthTTLSet ? Saved.HealthTTL : unset
+		LLM_INSTALLED_CACHE_TTL_MS := Saved.TagsTTL
+	}
+}
+Test("menu-probe-clock-native64: health ordinary before expiry", (*) =>
+	_LAO_ProbeClock("health", false, false))
+Test("menu-probe-clock-native64: health ordinary exact expiry", (*) =>
+	_LAO_ProbeClock("health", false, true))
+Test("menu-probe-clock-native64: health DWORD-boundary before expiry", (*) =>
+	_LAO_ProbeClock("health", true, false))
+Test("menu-probe-clock-native64: health DWORD-boundary exact expiry", (*) =>
+	_LAO_ProbeClock("health", true, true))
+Test("menu-probe-clock-native64: tags ordinary before expiry", (*) =>
+	_LAO_ProbeClock("tags", false, false))
+Test("menu-probe-clock-native64: tags ordinary exact expiry", (*) =>
+	_LAO_ProbeClock("tags", false, true))
+Test("menu-probe-clock-native64: tags DWORD-boundary before expiry", (*) =>
+	_LAO_ProbeClock("tags", true, false))
+Test("menu-probe-clock-native64: tags DWORD-boundary exact expiry", (*) =>
+	_LAO_ProbeClock("tags", true, true))
+
+for Kind in ["health", "tags"]
+	for CrossingBoundary in [false, true]
+		for Offset in [-1, 0, 1]
+			Test("menu-probe-clock-native64: long " . Kind . " crossing=" . CrossingBoundary . " offset=" . Offset,
+				_LAO_ProbeClock.Bind(Kind, CrossingBoundary, true, 0x100000000 + Offset))
+for Kind in ["health", "tags"]
+	Test("menu-probe-clock-native64: full cycle " . Kind,
+		_LAO_ProbeClock.Bind(Kind, false, false, 0x100000000))

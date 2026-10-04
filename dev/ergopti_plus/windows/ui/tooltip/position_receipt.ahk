@@ -92,6 +92,6 @@ _TooltipPositionCacheCanReuse(Cache, Hwnd, CurrentEnvironment, NowTick,
 	}
 	return (Cache["hwnd"] == Hwnd
 		and CurrentControl != 0 && Cache.Get("control", 0) == CurrentControl
-		and TickElapsed(Cache["tick"], NowTick) <= MaxAgeMs
+		and TickElapsed64(Cache["tick"], NowTick) <= MaxAgeMs
 		and _TooltipPositionReceiptsEqual(Cache["environment"], CurrentEnvironment))
 }

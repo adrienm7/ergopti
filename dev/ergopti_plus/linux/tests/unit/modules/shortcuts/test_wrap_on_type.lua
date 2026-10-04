@@ -186,3 +186,202 @@ helpers.describe("wrap on type (linux): the tray row", function()
 		helpers.assert_true(shortcuts.get_wrap_pair("(") ~= nil)
 	end)
 end)
+
+--- Exercises the real preference owner and shared feature row on a private file.
+--- @param body function Receives manager, row finder, and external observations.
+local function with_wrap_feature(body)
+	local manager_name, builder_name = "modules.shortcuts.manager", "ui.menu.menu_builder"
+	local previous_manager, previous_builder = package.loaded[manager_name], package.loaded[builder_name]
+	local writer = require("toml_codec.writer")
+	local original_batch = writer.batch_write
+	local sandbox = require("test.config_unused_keys_contract").sandbox
+	local ok, err = pcall(function()
+		sandbox.with_config('[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[foreign]\nvalue = "keep"\n',
+			function(path)
+				local manager = helpers.load_module(manager_name)
+				manager.init({ persist = true, config_path = path })
+				local observed = { changed = 0, setter_calls = 0, path = path,
+					original_bytes = sandbox.read_bytes(path) }
+				local real_setter = manager.set_wrap_on_type_enabled
+				manager.set_wrap_on_type_enabled = function(value)
+					observed.setter_calls = observed.setter_calls + 1
+					observed.desired = value
+					return real_setter(value)
+				end
+				local builder = helpers.load_module(builder_name)
+				local function row()
+					local rows = builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
+						paused = false, is_paused = function() return true end,
+						on_quit = function() end,
+						on_menu_changed = function() observed.changed = observed.changed + 1 end,
+					})
+					local label = require("infra.i18n").get("shortcuts.label_wrap_text")
+					for _, item in ipairs(rows) do
+						for _, child in ipairs(item.menu or {}) do
+							if child.title == label then return child end
+						end
+					end
+				end
+				body(manager, row, observed, sandbox, writer)
+			end)
+	end)
+	writer.batch_write = original_batch
+	package.loaded[manager_name], package.loaded[builder_name] = previous_manager, previous_builder
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("wrap feature callback ownership", function()
+	helpers.it("acknowledges the real durable preference before refresh (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox)
+			local held = row().fn
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
+			helpers.assert_eq(observed.changed, 1)
+			local parsed = require("toml_codec").decode(sandbox.read_bytes(observed.path))
+			helpers.assert_eq(parsed.shortcuts.wrap_text_if_selected, true)
+			helpers.assert_eq(parsed.foreign.value, "keep")
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
+			helpers.assert_eq(observed.changed, 2)
+		end)
+	end)
+
+	helpers.it("toggles fresh external state rather than a held checkmark (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox)
+			local held = row().fn
+			helpers.assert_eq(manager.set_wrap_on_type_enabled(true), true)
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
+			helpers.assert_eq(observed.desired, false)
+			helpers.assert_eq(observed.changed, 1)
+			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(observed.path))
+				.shortcuts.wrap_text_if_selected, false)
+		end)
+	end)
+
+	helpers.it("refuses held callbacks while real configuration is reserved (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox)
+			local held, owner = row().fn, {}
+			helpers.assert_eq(manager.acquire_configuration(owner), true)
+			helpers.assert_eq(row().disabled, true)
+			helpers.assert_eq(held(), false)
+			helpers.assert_eq(observed.setter_calls, 0)
+			helpers.assert_eq(observed.changed, 0)
+			helpers.assert_eq(sandbox.read_bytes(observed.path), observed.original_bytes)
+			helpers.assert_eq(manager.configuration_snapshot(owner).wrap, false)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
+		end)
+	end)
+
+	helpers.it("keeps refusal bytes and runtime when the actual setter cannot publish (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox, writer)
+			local actual_batch, calls = writer.batch_write, 0
+			writer.batch_write = function(path, operations)
+				calls = calls + 1
+				observed.write_path = path
+				observed.operations = operations
+				return false, "controlled publication refusal"
+			end
+			local held = row().fn
+			local result = held()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(observed.write_path, observed.path)
+			helpers.assert_eq(observed.operations, {
+				{ section = "shortcuts", key = "wrap_text_if_selected", value = true } })
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
+			helpers.assert_eq(observed.changed, 0)
+			helpers.assert_eq(sandbox.read_bytes(observed.path), observed.original_bytes)
+			writer.batch_write = actual_batch
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
+			helpers.assert_eq(observed.changed, 1)
+		end)
+	end)
+
+	helpers.it("preserves the existing master gate after its row was retained (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox)
+			local held = row().fn
+			helpers.assert_eq(manager.set_enabled(false), true)
+			local bytes = sandbox.read_bytes(observed.path)
+			helpers.assert_eq(row().disabled, true)
+			helpers.assert_eq(held(), false)
+			helpers.assert_eq(observed.setter_calls, 0)
+			helpers.assert_eq(observed.changed, 0)
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
+			helpers.assert_eq(sandbox.read_bytes(observed.path), bytes)
+		end)
+	end)
+
+	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" },
+		{ name = "numeric", value = 1 }, { name = "truthy", value = "ack" } }) do
+		helpers.it("refuses the setter's " .. receipt.name .. " receipt (wrap-feature-owner)", function()
+			with_wrap_feature(function(manager, row, observed, sandbox)
+				manager.set_wrap_on_type_enabled = function()
+					observed.setter_calls = observed.setter_calls + 1
+					return receipt.value
+				end
+				helpers.assert_eq(row().fn(), false)
+				helpers.assert_eq(observed.setter_calls, 1)
+				helpers.assert_eq(observed.changed, 0)
+				helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
+				helpers.assert_eq(sandbox.read_bytes(observed.path), observed.original_bytes)
+			end)
+		end)
+	end
+
+	helpers.it("rejects missing or malformed live readiness without a setter call (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox)
+			local real_admission, real_enabled = manager.configuration_admitted, manager.is_enabled
+			for _, invalid in ipairs({ {}, { value = false }, { value = function() return 1 end } }) do
+				manager.configuration_admitted = invalid.value
+				local item = row()
+				helpers.assert_eq(item.disabled, true)
+				helpers.assert_eq(item.fn(), false)
+			end
+			manager.configuration_admitted = real_admission
+			manager.is_enabled = function() return 1 end
+			helpers.assert_eq(row().disabled, true)
+			helpers.assert_eq(row().fn(), false)
+			manager.is_enabled = real_enabled
+			manager.set_wrap_on_type_enabled = nil
+			helpers.assert_eq(row().disabled, true)
+			helpers.assert_eq(row().fn(), false)
+			helpers.assert_eq(observed.setter_calls, 0)
+			helpers.assert_eq(observed.changed, 0)
+			helpers.assert_eq(sandbox.read_bytes(observed.path), observed.original_bytes)
+		end)
+	end)
+
+	helpers.it("refuses malformed wrap preference instead of inventing its opposite (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox)
+			local held = row().fn
+			manager.is_wrap_on_type_enabled = function() return "true" end
+			helpers.assert_eq(row().disabled, true)
+			helpers.assert_eq(held(), false)
+			helpers.assert_eq(observed.setter_calls, 0)
+			helpers.assert_eq(observed.changed, 0)
+			helpers.assert_eq(sandbox.read_bytes(observed.path), observed.original_bytes)
+		end)
+	end)
+
+	helpers.it("rechecks reservation acquired by the current preference getter (wrap-feature-owner)", function()
+		with_wrap_feature(function(manager, row, observed, sandbox)
+			local held, owner = row().fn, {}
+			manager.is_wrap_on_type_enabled = function()
+				observed.acquired = manager.acquire_configuration(owner)
+				return false
+			end
+			local result = held()
+			helpers.assert_eq(observed.acquired, true)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(observed.setter_calls, 0)
+			helpers.assert_eq(observed.changed, 0)
+			helpers.assert_eq(sandbox.read_bytes(observed.path), observed.original_bytes)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+		end)
+	end)
+end)

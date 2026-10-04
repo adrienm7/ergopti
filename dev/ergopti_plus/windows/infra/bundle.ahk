@@ -85,6 +85,7 @@ global _BundleDir := ""
 ; Bootstrap errors use OutputDebug because the central logger is not ready yet.
 #Include ../adapters/crypto.ahk
 #Include ../adapters/file_system.ahk
+#Include ../adapters/process_lifecycle.ahk
 #Include *i ../build/bundle_inventory.ahk
 
 
@@ -207,6 +208,52 @@ _Bundle_LiveTreeCanSkip(BundleDir, ExistingMarker, Inventory := unset) {
 	return _Bundle_VerifyStaging(BundleDir, Inventory?)
 }
 
+; Atomically reserve a sibling on the bundle volume. Naming identifies an
+; attempt; only successful native creation grants its cleanup authority.
+_Bundle_AcquireWorkspace(BundleDir, Tick := unset, Pid := unset) {
+	Tick := IsSet(Tick) ? Tick : A_TickCount
+	Pid := IsSet(Pid) ? Pid : PLC_CurrentProcessIdStrict()
+	Root := BundleDir . ".workspace-" . Pid . "-" . Tick
+	FSCreateDirectoryExclusiveStrict(Root)
+	Workspace := Map("root", Root, "owned", true, "staging", Root . "\staging",
+		"rollback", Root . "\rollback", "zip", Root . "\archive.zip")
+	try DirCreate(Workspace["staging"])
+	catch as Err {
+		try _Bundle_CleanupWorkspace(Workspace)
+		catch as CleanupErr {
+			throw Error("Bundle workspace setup failed: " . Err.Message
+				. "; cleanup failed with ownership retained: " . CleanupErr.Message)
+		}
+		throw Err
+	}
+	return Workspace
+}
+
+; A failed commit retains the known-good tree until its native restoration has
+; succeeded. A cleanup failure keeps authority live instead of reporting success.
+_Bundle_CleanupWorkspace(Workspace, Committed := false) {
+	if !(Workspace is Map) or !Workspace.Get("owned", false)
+		throw Error("Bundle cleanup requires an acquired workspace.")
+	if !Committed && DirExist(Workspace["rollback"])
+		throw Error("Bundle recovery bytes must be restored before cleanup: " . Workspace["rollback"])
+	DirDelete(Workspace["root"], true)
+	Workspace["owned"] := false
+}
+
+; Restoration failures preserve the exact recovery tree and expose its path.
+; The caller must not retire its workspace after this owner refuses restoration.
+_Bundle_RestoreRollback(Workspace, BundleDir) {
+	if !(Workspace is Map) or !Workspace.Get("owned", false)
+		throw Error("Bundle restoration requires an acquired workspace.")
+	if !DirExist(Workspace["rollback"])
+		return
+	try DirMove(Workspace["rollback"], BundleDir, 0)
+	catch as Err {
+		throw Error("Bundle restoration failed; recovery bytes retained at "
+			. Workspace["rollback"], , Err.Message)
+	}
+}
+
 ; Runs PowerShell's Expand-Archive synchronously to unzip ``ZipPath`` into
 ; ``DestDir``. Returns true on success, false otherwise. We rely on PowerShell
 ; because AHK v2 has no built-in unzip and adding a COM-based extractor would
@@ -285,37 +332,37 @@ Bundle_Init() {
 
 	; Extract into a sibling staging directory. The live bundle remains intact
 	; until the archive and marker have both been verified.
-	StagingDir := BundleDir . ".staging-" . A_TickCount
-	RollbackDir := BundleDir . ".rollback-" . A_TickCount
-	if DirExist(StagingDir)
-		try DirDelete(StagingDir, true)
-	try DirCreate(StagingDir)
-
-	; Write the zip out of the .exe into a temp location, then unzip it
-	; into BundleDir so static/ and vendor/ end up under it.
-	TmpZip := A_Temp . "\ergopti_bundle_" . A_TickCount . ".zip"
+	try Workspace := _Bundle_AcquireWorkspace(BundleDir)
+	catch as Err {
+		; Fatal pre-boot errors precede i18n: its locale assets require this bundle.
+		Ui_MsgBox("Bundle extraction failed (workspace acquisition): " . Err.Message, "", "Icon!")
+		ExitApp(1)
+	}
+	StagingDir := Workspace["staging"]
+	RollbackDir := Workspace["rollback"]
+	TmpZip := Workspace["zip"]
 	try {
 		; Literal source path — Ahk2Exe scans this token at compile time to
 		; decide what to embed. Do not factor into a variable.
-		FileInstall("build\static_bundle.zip", TmpZip, 1)
+		FileInstall("build\static_bundle.zip", TmpZip, 0)
 	} catch as Err {
-		; If FileInstall fails the exe is unusable — surface a hard error.
+		; The archive is private; a refused write must not adopt existing bytes.
+		_Bundle_CleanupWorkspace(Workspace)
 		Ui_MsgBox("Bundle extraction failed (FileInstall): " . Err.Message,
 			"", "Icon!")
 		ExitApp(1)
 	}
 
 	if !_Bundle_Unzip(TmpZip, StagingDir) {
-		try FileDelete(TmpZip)
-		try DirDelete(StagingDir, true)
+		_Bundle_CleanupWorkspace(Workspace)
 		Ui_MsgBox("Bundle extraction failed (Expand-Archive returned non-zero).",
 			"", "Icon!")
 		ExitApp(1)
 	}
 
-	try FileDelete(TmpZip)
+	FileDelete(TmpZip)
 	if !_Bundle_VerifyStaging(StagingDir) or !_Bundle_WriteMarker(StagingDir) {
-		try DirDelete(StagingDir, true)
+		_Bundle_CleanupWorkspace(Workspace)
 		Ui_MsgBox("Bundle extraction failed (staging verification).", "", "Icon!")
 		ExitApp(1)
 	}
@@ -323,7 +370,7 @@ Bundle_Init() {
 	if DirExist(BundleDir) {
 		try DirMove(BundleDir, RollbackDir, 0)
 		catch as Err {
-			try DirDelete(StagingDir, true)
+			_Bundle_CleanupWorkspace(Workspace)
 			Ui_MsgBox("Bundle extraction failed (could not preserve current bundle): " . Err.Message,
 				"", "Icon!")
 			ExitApp(1)
@@ -331,11 +378,11 @@ Bundle_Init() {
 	}
 	try DirMove(StagingDir, BundleDir, 0)
 	catch as Err {
-		try DirMove(RollbackDir, BundleDir, 0)
+		_Bundle_RestoreRollback(Workspace, BundleDir)
+		_Bundle_CleanupWorkspace(Workspace)
 		Ui_MsgBox("Bundle extraction failed (commit): " . Err.Message, "", "Icon!")
 		ExitApp(1)
 	}
-	if DirExist(RollbackDir)
-		try DirDelete(RollbackDir, true)
+	_Bundle_CleanupWorkspace(Workspace, true)
 	OutputDebug("[bundle] Extracted bundle version '" . BUNDLE_VERSION . "' to " . BundleDir)
 }

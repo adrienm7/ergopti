@@ -412,12 +412,26 @@ _MI_StageSuspend() {
 
 
 _MI_StageReload() {
-	TrayMenuStage_AddAction(t("menu.global.reload"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
+	Row := MenuRenderer_CommandRow("top_level", "reload",
+		Map("reload", MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
+	if Row is Map && Row.Has("action") {
+		; Keep lifecycle admission explicit after the shared provider wraps its callback.
+		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		if Row.Get("disabled", false)
+			TrayMenuStage_Disable(Row["label"])
+	}
 }
 
 
 _MI_StageQuit() {
-	TrayMenuStage_AddAction(t("menu.global.quit"), MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
+	Row := MenuRenderer_CommandRow("top_level", "quit",
+		Map("quit", MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
+	if Row is Map && Row.Has("action") {
+		; Keep lifecycle admission explicit after the shared provider wraps its callback.
+		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		if Row.Get("disabled", false)
+			TrayMenuStage_Disable(Row["label"])
+	}
 }
 
 
@@ -508,9 +522,11 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		; A local version has no installation to update, so it checks for nothing.
 		; The two rows are still drawn, greyed with the reason: left out, nobody
 		; could tell whether the automatic update exists.
-		for _, Label in [t("menu.about.check_for_updates")]
-			Rows.Push(Map("label", Label, "disabled", true,
-				"disabled_reason_key", "menu.about.source_run_reason"))
+		SourceRow := MenuRenderer_CommandRow("about_source_menu", "about_source_check",
+			Map("about_source_check", (*) => false),
+			Map("about_source_release_ready", () => !IsLocal))
+		if SourceRow is Map
+			Rows.Push(SourceRow)
 		FrequencyRow.Delete("items")
 		FrequencyRow["disabled"] := true
 		FrequencyRow["disabled_reason_key"] := "menu.about.source_run_reason"

@@ -10,6 +10,19 @@
 
 local helpers = require("tests.helpers")
 local OutputFixture = require("tests.support.toml_output_fixture")
+
+--- Reads the independent custom-command identity used by each native provider.
+--- @return table expected Canonical command expectation.
+local function custom_command_expected()
+	local path = require("infra.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
+	local file = assert(io.open(path, "rb"))
+	local text = file:read("*a")
+	file:close()
+	local corpus = assert(require("adapters.json_codec").decode(text))
+	assert(#corpus.rows == 1, "every independent custom command must be observed")
+	return corpus.rows[1]
+end
+
 local KEY = "custom_delete_probe"
 local SOURCE = '[hotstrings]\nterminators = [{ key = "custom_delete_probe", char = "☃", label = "Snowman", consume = false, future = { keep = 17 } }]\n'
 	.. '[hotstrings.terminator_states]\ncustom_delete_probe = false\n[foreign]\nkeep = "untouched"\n'
@@ -29,7 +42,7 @@ end
 --- @return table|nil row
 local function find_delete(rows)
 	for _, row in ipairs(rows or {}) do
-		if row.label == "menu.hotstrings.delete_expander" then return row end
+		if row.label == custom_command_expected().i18n then return row end
 		local nested = find_delete(row.items or row.submenu)
 		if nested then return nested end
 	end
@@ -52,7 +65,17 @@ local function with_fixture(outcome, callback)
 		local calls = { removes = 0, writes = 0, saves = 0, updates = 0, notices = 0, rollbacks = 0 }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return "button.delete" end }
+		local command_renderer = assert(require("menu.renderer").new({
+			platform = "hs",
+			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			json_decode = require("adapters.json_codec").decode,
+			i18n = { get = function(key) return key end, section = function(key) return key end },
+			logger = require("infra.logger"),
+		}))
 		package.loaded["infra.manifest_menu"] = {
+			command_row = command_renderer.command_row,
+			check_row = command_renderer.check_row,
+			get_array = command_renderer.get_array,
 			build = function(section, _, _, _, _, providers)
 				if section == "word_expanders_menu" then return providers.word_expander_entries() end
 				return providers.word_expanders()

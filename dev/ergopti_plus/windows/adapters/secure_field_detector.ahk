@@ -78,7 +78,7 @@ global SFD_UIA_IDLE_REQUIRED_MS := 250
 ; roughly once a second, on the thread that also dispatches keystrokes.
 global SFD_UIA_HOSTILE_TTL_MS := 30000
 
-; Process name => wrap-safe {Tick, DurationMs} interval during which probes are skipped.
+; Process name => native monotonic {Tick, DurationMs} interval during which probes are skipped.
 ; Entries expire, so the map cannot grow without bound across a long session.
 global SFD_UIA_HOSTILE_CACHE := Map()
 global SFD_UIA_REQUEST_FN := 0
@@ -141,21 +141,33 @@ SFD_ConfigureUiaWorker(RequestFn, StartFn, ContextMatchFn) {
 ; Positive verdicts may be conservatively reused for the same HWND, but a
 ; negative verdict requires both a live focus invalidator and the UIA RuntimeId
 ; that produced it. Unknown always leaves Secure=true.
-SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure) {
+SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure, NowTick?) {
 	global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
 	Secure := true
-	if (SFD_FIELD_CACHE["hwnd"] != Hwnd
-			or ((A_TickCount - SFD_FIELD_CACHE["at"]) & 0xFFFFFFFF)
-				>= SFD_FIELD_CACHE_TTL_MS)
-		return false
-	if SFD_FIELD_CACHE["secure"] {
-		Secure := true
-		return true
+	; This map is updated in place. Copy the verdict and identity before sampling
+	; native time, so a later callback cannot pair a new origin with an older clock.
+	PreviousCritical := Critical("On")
+	try {
+		CachedHwnd := SFD_FIELD_CACHE["hwnd"]
+		CacheAt := SFD_FIELD_CACHE["at"]
+		CachedSecure := SFD_FIELD_CACHE["secure"]
+		TrackingActive := SFD_FIELD_CACHE["focus_tracking_active"]
+		VerdictGeneration := SFD_FIELD_CACHE["verdict_generation"]
+		CachedElementId := SFD_FIELD_CACHE["element_id"]
+	} finally {
+		Critical(PreviousCritical)
 	}
-	if (!SFD_FIELD_CACHE["focus_tracking_active"]
-			or SFD_FIELD_CACHE["verdict_generation"] != FocusGeneration
+	if (CachedHwnd != Hwnd)
+		return false
+	Now := IsSet(NowTick) ? NowTick : A_TickCount
+	if TickExpired64(CacheAt, SFD_FIELD_CACHE_TTL_MS, Now)
+		return false
+	if CachedSecure
+		return true
+	if (!TrackingActive
+			or VerdictGeneration != FocusGeneration
 			or ElementId == ""
-			or SFD_FIELD_CACHE["element_id"] != ElementId)
+			or CachedElementId != ElementId)
 		return false
 	Secure := false
 	return true
@@ -333,15 +345,20 @@ SFD_DetectNative(Hwnd, &Conclusive) {
 
 SFD_CommitFieldVerdict(Hwnd, Secure, FocusGeneration, ElementId := "") {
 	global SFD_FIELD_CACHE
-	; Publish the key last so concurrent reader callbacks cannot pair a new HWND
-	; with the previous control's verdict.
-	SFD_FIELD_CACHE["secure"] := !!Secure
-	SFD_FIELD_CACHE["at"] := A_TickCount
-	SFD_FIELD_CACHE["verdict_generation"] := FocusGeneration
-	SFD_FIELD_CACHE["element_id"] := ElementId
-	if (FocusGeneration = SFD_FIELD_CACHE["focus_generation"])
-		SFD_FIELD_CACHE["current_element_id"] := ElementId
-	SFD_FIELD_CACHE["hwnd"] := Hwnd
+	PreviousCritical := Critical("On")
+	try {
+		; Verdict, timestamp and identity form one publication. Key-last alone
+		; still exposes the old identity while earlier fields already changed.
+		SFD_FIELD_CACHE["secure"] := !!Secure
+		SFD_FIELD_CACHE["at"] := A_TickCount
+		SFD_FIELD_CACHE["verdict_generation"] := FocusGeneration
+		SFD_FIELD_CACHE["element_id"] := ElementId
+		if (FocusGeneration = SFD_FIELD_CACHE["focus_generation"])
+			SFD_FIELD_CACHE["current_element_id"] := ElementId
+		SFD_FIELD_CACHE["hwnd"] := Hwnd
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Returns the exact delay still needed before a cross-process provider probe is
@@ -395,14 +412,30 @@ _SFD_ClearPendingProbe(Hwnd, FocusGeneration) {
 ; Has this process recently failed to answer a UIA probe? Mirrors the tooltip's
 ; own hostile cache: one timeout must buy a quiet window instead of being
 ; re-paid on every field-cache expiry, i.e. roughly once per second.
-_SFD_UiaProcessIsHostile(ProcName) {
+_SFD_UiaProcessIsHostile(ProcName, NowTick?) {
 	global SFD_UIA_HOSTILE_CACHE
-	if (ProcName == "" or !SFD_UIA_HOSTILE_CACHE.Has(ProcName))
-		return false
-	Entry := SFD_UIA_HOSTILE_CACHE[ProcName]
-	if !TickExpired(Entry.Tick, Entry.DurationMs)
+	PreviousCritical := Critical("On")
+	try {
+		if (ProcName == "" or !SFD_UIA_HOSTILE_CACHE.Has(ProcName))
+			return false
+		Entry := SFD_UIA_HOSTILE_CACHE[ProcName]
+		Started := Entry.Tick
+		DurationMs := Entry.DurationMs
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Now := IsSet(NowTick) ? NowTick : A_TickCount
+	if !TickExpired64(Started, DurationMs, Now)
 		return true
-	SFD_UIA_HOSTILE_CACHE.Delete(ProcName)
+	; A renewal publishes a new object. Expiry owns only the observed entry.
+	PreviousCritical := Critical("On")
+	try {
+		if (SFD_UIA_HOSTILE_CACHE.Has(ProcName)
+				and SFD_UIA_HOSTILE_CACHE[ProcName] == Entry)
+			SFD_UIA_HOSTILE_CACHE.Delete(ProcName)
+	} finally {
+		Critical(PreviousCritical)
+	}
 	return false
 }
 

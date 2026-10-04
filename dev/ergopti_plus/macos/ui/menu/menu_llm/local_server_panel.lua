@@ -29,6 +29,7 @@ local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local llm_mod       = require("modules.llm")
 local ApiPanel      = require("ui.menu.menu_llm.api_panel")
+local ServerMenu    = require("llm.local_server_menu")
 
 local LOG = "menu_llm.local_servers"
 
@@ -63,7 +64,7 @@ end
 --- @param base_url string
 --- @return string
 local function host_of(base_url)
-	return tostring(base_url):match("^%a[%w+.-]*://([^/]+)") or tostring(base_url)
+	return ServerMenu.host_of(base_url)
 end
 
 --- Shows a notice, logging a refusal instead of raising.
@@ -289,45 +290,6 @@ end
 -- =====================================
 -- =====================================
 
---- The submenu of one server that answers.
---- @param ctx table Engine menu context.
---- @param id string Server id.
---- @param verdict table { status, base_url, models }.
---- @param active table|nil The active API entry.
---- @return table rows
-local function server_items(ctx, id, verdict, active)
-	local items = {}
-	local disabled = ctx.paused or nil
-	if verdict.status == servers().STATUS_NEEDS_KEY then
-		items[#items + 1] = {
-			label = i18n.get("menu.llm.local_servers.api_key"), disabled = disabled,
-			action = not ctx.paused and function() return M.prompt_key(ctx, id) end or nil,
-		}
-	elseif #verdict.models == 0 then
-		items[#items + 1] = { label = i18n.get("menu.llm.local_servers.no_models"), disabled = true }
-	end
-	for _, model in ipairs(verdict.models) do
-		items[#items + 1] = {
-			label = model,
-			checked = ctx.state.llm_backend == "api" and active ~= nil and active.provider == id and active.model == model,
-			disabled = disabled,
-			action = not ctx.paused and function() return M.select_model(ctx, id, model) end or nil,
-		}
-	end
-	items[#items + 1] = { separator = true }
-	items[#items + 1] = {
-		label = i18n.format("menu.llm.local_servers.address", host_of(verdict.base_url)), disabled = disabled,
-		action = not ctx.paused and function() return M.prompt_address(ctx, id) end or nil,
-	}
-	if verdict.status == servers().STATUS_UP then
-		items[#items + 1] = {
-			label = i18n.get("menu.llm.local_servers.api_key"), disabled = disabled,
-			action = not ctx.paused and function() return M.prompt_key(ctx, id) end or nil,
-		}
-	end
-	return items
-end
-
 --- The rows of the local servers in the AI engine submenu. Starts a sweep,
 --- without waiting for it, when the verdicts are stale.
 --- @param ctx table { state, paused, keymap, update_menu, WarmupCtrl, activate_api }.
@@ -344,40 +306,19 @@ function M.rows(ctx)
 	-- A paused script sends nothing: the rows keep the last verdicts
 	if not ctx.paused and servers().is_stale() then M.rescan(ctx) end
 
-	local active = remote().get_active_entry()
-	local rows = { { separator = true }, { label = i18n.get("menu.llm.local_servers.header"), disabled = true } }
-	local detected = servers().detected()
-	for _, id in ipairs(detected) do
-		local verdict = servers().result(id)
-		local label = servers().SERVERS[id].label .. " 🖥️ — " .. host_of(verdict.base_url)
-		if verdict.status == servers().STATUS_NEEDS_KEY then
-			label = i18n.format("menu.llm.local_servers.needs_key", label)
-		end
-		rows[#rows + 1] = {
-			label = label,
-			checked = ctx.state.llm_backend == "api" and active ~= nil and active.provider == id,
-			items = server_items(ctx, id, verdict, active),
-		}
-	end
-	if #detected == 0 then
-		local labels = {}
-		for _, id in ipairs(servers().ORDER) do labels[#labels + 1] = servers().SERVERS[id].label end
-		local key = servers().is_sweeping() and "menu.llm.local_servers.searching" or "menu.llm.local_servers.none"
-		rows[#rows + 1] = { label = i18n.format(key, table.concat(labels, ", ")), disabled = true }
-	end
-	rows[#rows + 1] = {
-		label = i18n.get("menu.llm.local_servers.rescan"), disabled = ctx.paused or nil,
-		action = not ctx.paused and function() return M.rescan(ctx) end or nil,
-	}
-	local others = {}
-	for _, id in ipairs(servers().ORDER) do
-		others[#others + 1] = {
-			label = servers().SERVERS[id].label, disabled = ctx.paused or nil,
-			action = not ctx.paused and function() return M.prompt_address(ctx, id) end or nil,
-		}
-	end
-	rows[#rows + 1] = { label = i18n.get("menu.llm.local_servers.other_address"), items = others }
-	return rows
+	local data = servers()
+	return ServerMenu.rows({
+		order = data.ORDER, servers = data.SERVERS, detected = data.detected(),
+		result = data.result, sweeping = data.is_sweeping(), paused = ctx.paused,
+		backend = ctx.state.llm_backend, active = remote().get_active_entry(),
+		tr = i18n.get, format = i18n.format,
+		actions = {
+			select = function(id, model) return M.select_model(ctx, id, model) end,
+			address = function(id) return M.prompt_address(ctx, id) end,
+			key = function(id) return M.prompt_key(ctx, id) end,
+			rescan = function() return M.rescan(ctx) end,
+		},
+	})
 end
 
 return M

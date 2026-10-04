@@ -32,6 +32,8 @@ local Logger         = require("infra.logger")
 local Paths          = require("infra.paths")
 local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
+local AuthPolicy     = require("llm.local_server_auth")
+local Discovery      = require("llm.local_server_discovery")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.local_servers"
@@ -47,9 +49,9 @@ local LOG = "llm.local_servers"
 -- =====================================
 
 -- What a probe found
-M.STATUS_UP        = "up"          -- the models endpoint listed the models
-M.STATUS_NEEDS_KEY = "needs_key"   -- the server answered 401 or 403
-M.STATUS_DOWN      = "down"        -- nothing, or something else, answered
+M.STATUS_UP        = Discovery.STATUS_UP          -- the models endpoint listed the models
+M.STATUS_NEEDS_KEY = Discovery.STATUS_NEEDS_KEY   -- the server answered 401 or 403
+M.STATUS_DOWN      = Discovery.STATUS_DOWN        -- nothing, or something else, answered
 
 -- Why a request to a local server failed
 M.FAILURE_NOT_RUNNING   = "not_running"
@@ -85,18 +87,9 @@ local function load_catalogue()
 		Logger.error(LOG, "local_servers.json is malformed: no local server is detected.")
 		return {}, {}
 	end
-	local order, servers = {}, {}
-	for _, id in ipairs(root.server_order) do
-		local desc = type(id) == "string" and root.servers[id] or nil
-		local valid = type(desc) == "table" and id:match("^[a-z][a-z0-9_]*$") ~= nil and servers[id] == nil
-			and type(desc.label) == "string" and desc.label ~= ""
-			and type(desc.base_url) == "string" and desc.base_url:match("^https?://%S+$") ~= nil
-		if valid then
-			servers[id] = { id = id, label = desc.label, base_url = desc.base_url }
-			order[#order + 1] = id
-		else
-			Logger.error(LOG, "local_servers.json: server '%s' has an invalid descriptor and is skipped.", tostring(id))
-		end
+	local order, servers = AuthPolicy.catalogue(root, {})
+	if #order ~= #root.server_order then
+		Logger.error(LOG, "local_servers.json contains unsupported or duplicate optional-auth descriptors.")
 	end
 	return order, servers
 end
@@ -125,13 +118,7 @@ end
 --- @param body any The answer body.
 --- @return table|nil ids Nil when the body is not a models list.
 function M.models_from_body(body)
-	if type(body) ~= "string" or body == "" then return nil end
-	local ok, decoded = pcall(JsonCodec.decode, body)
-	if not ok or type(decoded) ~= "table" or type(decoded.data) ~= "table" then return nil end
-	local ids = {}
-	for _, model in ipairs(decoded.data) do
-		if type(model) == "table" and type(model.id) == "string" and model.id ~= "" then ids[#ids + 1] = model.id end
-	end
+	local ids = AuthPolicy.models_receipt({ ok = true, status = 200, body = body })
 	return ids
 end
 
@@ -140,14 +127,7 @@ end
 --- @return string status M.STATUS_UP, M.STATUS_NEEDS_KEY or M.STATUS_DOWN.
 --- @return table|nil models The model ids when the server is up.
 function M.classify(response)
-	if type(response) ~= "table" then return M.STATUS_DOWN, nil end
-	local status = tonumber(response.status) or 0
-	if status == 401 or status == 403 then return M.STATUS_NEEDS_KEY, nil end
-	if response.ok ~= true then return M.STATUS_DOWN, nil end
-	local models = M.models_from_body(response.body)
-	-- A 200 that is not a models list is another service on that port
-	if not models then return M.STATUS_DOWN, nil end
-	return M.STATUS_UP, models
+	return Discovery.classify(response)
 end
 
 --- Tells why a request to a local server failed, when the user can fix it.
@@ -178,129 +158,56 @@ end
 -- =====================================
 -- =====================================
 
--- Server id -> { status, base_url, models } of the last completed sweep
-local _results = {}
--- When the last sweep completed, nil before the first one
-local _checked_at = nil
--- Identity of the sweep in flight; an older sweep's answers are dropped
-local _sweep_generation = 0
-local _sweep_active = false
--- Callers waiting for fresh verdicts. A newer sweep drops an older one's
--- answers, not its callers: they hear when the newest sweep completes
-local _waiters = {}
-
---- Tells whether two verdicts differ.
---- @param a table|nil
---- @param b table|nil
---- @return boolean
-local function verdict_changed(a, b)
-	if a == nil or b == nil then return a ~= b end
-	if a.status ~= b.status or a.base_url ~= b.base_url or #a.models ~= #b.models then return true end
-	for index, model in ipairs(a.models) do
-		if b.models[index] ~= model then return true end
-	end
-	return false
-end
+-- Native requests, credentials and persistence stay in their existing owners.
+-- This controller only owns logical generations, snapshots and publication.
+local controller = Discovery.new({
+	order = M.ORDER,
+	clock = function() return TimerScheduler.now() end,
+	max_age = function() return require("infra.timings").sec("llm", "local_server_detection_max_age_ms") end,
+	on_publish = function(results)
+		local found = {}
+		for _, id in ipairs(M.ORDER) do
+			local result = results[id]
+			if result and result.status == M.STATUS_UP then M.report_success(id) end
+			if result and result.status ~= M.STATUS_DOWN then found[#found + 1] = id .. "=" .. result.status end
+		end
+		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")
+	end,
+	on_error = function(kind, detail, id)
+		if kind == "probe" then
+			Logger.warn(LOG, "Local server '%s' was not probed: %s.", tostring(id), tostring(detail))
+		else
+			Logger.error(LOG, "Local server sweep %s callback raised: %s", kind, tostring(detail))
+		end
+	end,
+})
 
 --- Probes every target at once and publishes the verdicts together.
---- @param targets table Array of { id, base_url, … }, one per server.
---- @param probe function (target, settle) -> boolean dispatched; settle(response)
----        receives the HTTP adapter's answer, once.
---- @param on_done function|nil Receives (changed) once every target settled,
----        or once the newer sweep that superseded this one did.
---- @return boolean started
-function M.sweep(targets, probe, on_done)
-	if type(targets) ~= "table" or type(probe) ~= "function" then
-		error("local_servers.sweep: targets and a probe are required")
-	end
-	if on_done ~= nil and type(on_done) ~= "function" then
-		error("local_servers.sweep: on_done must be a function")
-	end
-	_sweep_generation = _sweep_generation + 1
-	local generation = _sweep_generation
-	_sweep_active = true
-	if on_done then _waiters[#_waiters + 1] = on_done end
-	local fresh = {}
-	local pending = #targets
-
-	local function finish()
-		if generation ~= _sweep_generation then return end
-		_sweep_active = false
-		local changed = false
-		for _, id in ipairs(M.ORDER) do
-			if verdict_changed(_results[id], fresh[id]) then changed = true end
-			if fresh[id] and fresh[id].status == M.STATUS_UP then M.report_success(id) end
-		end
-		_results = fresh
-		_checked_at = TimerScheduler.now()
-		local found = {}
-		for _, id in ipairs(M.detected()) do found[#found + 1] = id .. "=" .. _results[id].status end
-		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")
-		local waiters = _waiters
-		_waiters = {}
-		for _, waiter in ipairs(waiters) do
-			local ok, err = xpcall(waiter, debug.traceback, changed)
-			if not ok then Logger.error(LOG, "Local server sweep callback raised: %s", tostring(err)) end
-		end
-	end
-
-	if pending == 0 then
-		finish()
-		return true
-	end
-	for _, target in ipairs(targets) do
-		local settled = false
-		local function settle(response)
-			if settled or generation ~= _sweep_generation then return end
-			settled = true
-			local status, models = M.classify(response)
-			fresh[target.id] = { status = status, base_url = target.base_url, models = models or {} }
-			pending = pending - 1
-			if pending == 0 then finish() end
-		end
-		local ok, dispatched = xpcall(probe, debug.traceback, target, settle)
-		if not ok or dispatched ~= true then
-			Logger.warn(LOG, "Local server '%s' was not probed: %s.", tostring(target.id),
-				ok and "the probe was refused" or tostring(dispatched))
-			settle(nil)
-		end
-	end
-	return true
-end
-
---- The last verdict about one server.
---- @param id string
---- @return table|nil { status, base_url, models }
-function M.result(id)
-	return _results[id]
-end
-
---- The servers that answered the last sweep, in catalogue order.
---- @return table ids
-function M.detected()
-	local ids = {}
-	for _, id in ipairs(M.ORDER) do
-		local verdict = _results[id]
-		if verdict and verdict.status ~= M.STATUS_DOWN then ids[#ids + 1] = id end
-	end
-	return ids
-end
-
---- Tells whether the verdicts are too old to show without a new sweep.
---- @return boolean stale
-function M.is_stale()
-	if _sweep_active then return false end
-	if _checked_at == nil then return true end
-	-- How long a sweep's verdict stands before the menu asks for a new one
-	local max_age = require("infra.timings").sec("llm", "local_server_detection_max_age_ms")
-	return TimerScheduler.now() - _checked_at >= max_age
-end
-
---- Tells whether a sweep is in flight.
+--- Native acquisition and retirement remain the injected probe's responsibility.
+--- @param targets table Array of { id, base_url, ... }.
+--- @param probe function (target, settle) -> boolean dispatched.
+--- @param on_done function|nil Receives changed after the newest sweep completes.
 --- @return boolean
-function M.is_sweeping()
-	return _sweep_active
+function M.sweep(targets, probe, on_done)
+	return controller.sweep(targets, probe, on_done)
 end
+
+--- Returns the last jointly published verdict of a catalogue server.
+--- @param id string
+--- @return table|nil
+function M.result(id) return controller.result(id) end
+
+--- Returns answering servers in catalogue order.
+--- @return table
+function M.detected() return controller.detected() end
+
+--- Returns whether the shared cache age requires a new logical sweep.
+--- @return boolean
+function M.is_stale() return controller.is_stale() end
+
+--- Returns logical activity, never native HTTP/task retirement.
+--- @return boolean
+function M.is_sweeping() return controller.is_sweeping() end
 
 
 

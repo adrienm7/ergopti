@@ -549,10 +549,12 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_api_common.ahk
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
+#Include ..\..\_shared\modules\llm\local_server_auth.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
+#Include unit/test_local_server_auth.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
@@ -869,6 +871,7 @@ global _AhkSubDir := ""
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keylogger/keylogger_event_id.ahk
 #Include unit/test_keylogger_event_id.ahk
+#Include unit/test_keylogger_device_uuid.ahk
 #Include unit/test_keylogger_full_id_recovery.ahk
 ; keylogger_text_cipher.ahk (KL_Enc_* at-rest encryption) is pure definitions
 ; with no top-level hotkeys, and keylogger_sql.ahk now calls it, so it must load
@@ -1064,6 +1067,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_warmup_retry_suspend_guard.ahk
 #Include meta/test_halflife_tick_suspend_guard.ahk
 #Include meta/test_layout_poll_suspend_guard.ahk
+#Include meta/test_layout_poll_native_arming.ahk
 #Include meta/test_lalt_rctrl_accept_suspend_guard.ahk
 #Include meta/test_tap_hold_fire_action_suspend_guard.ahk
 #Include meta/test_tap_hold_native_dispatch_guard.ahk

@@ -246,3 +246,49 @@ _T_LayoutPollWaitsForAPendingReload() {
 }
 Test("ErgoptiPlus: the layout poll waits for a pending reload and retries if it is refused (layout-poll-retry-bounded)",
 	_T_LayoutPollWaitsForAPendingReload)
+
+; Native A_TickCount is monotonic 64-bit. A refused reload must become eligible
+; after its wait even when the process was inactive for whole DWORD periods.
+; The existing lifecycle port records launches without starting a successor.
+_T_LayoutPollNativeRetryCase(Origin, Elapsed, ExpectedAttempts) {
+	global _T_LPR, _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, _LayoutPollRetry
+	SavedPort := _T_LPR
+	SavedLast := _LAST_KEYBOARD_HKL
+	SavedPending := _PENDING_KEYBOARD_HKL
+	SavedRetry := _T_LPR_Begin("accept", 1000)
+	try {
+		_LayoutPollRetry := _LayoutPollNewRetry(0x200)
+		_LayoutPollRetry["attempts"] := 1
+		_LayoutPollRetry["refused_at"] := Origin
+		_LayoutPollRetry["wait_ms"] := 5000
+		_T_LPR["now"] := Origin + Elapsed
+		_PENDING_KEYBOARD_HKL := 0x200
+		Started := LayoutPollTick(0x200, false, false, 0, 0, 5000, false, _T_LPR_Port())
+		AssertEqual(ExpectedAttempts, _T_LPR["attempts"].Length,
+			"the actual poll must honor the entire native retry interval")
+		AssertEqual(ExpectedAttempts != 0, Started, "launch verdict must match the recorded lifecycle call")
+		AssertEqual(ExpectedAttempts ? 2 : 1, _LayoutPollRetry["attempts"],
+			"only an eligible reload spends one attempt")
+		AssertEqual(ExpectedAttempts ? 0x200 : 0x100, _LAST_KEYBOARD_HKL,
+			"waiting must restore the probed layout and launching must advance it")
+		AssertEqual(0, _T_LPR["notices"], "waiting and accepted launch must not notify a refusal")
+	} finally {
+		_LayoutPollRetry := SavedRetry
+		_T_LPR := SavedPort
+		_LAST_KEYBOARD_HKL := SavedLast
+		_PENDING_KEYBOARD_HKL := SavedPending
+	}
+}
+
+Test("Layout poll: retry waits below its native boundary (layout-retry-native64)",
+	_T_LayoutPollNativeRetryCase.Bind(1000, 4999, 0))
+Test("Layout poll: retry launches at its native boundary (layout-retry-native64)",
+	_T_LayoutPollNativeRetryCase.Bind(1000, 5000, 1))
+Test("Layout poll: retry crosses a DWORD boundary (layout-retry-native64)",
+	_T_LayoutPollNativeRetryCase.Bind(0xFFFFFF00, 5000, 1))
+Test("Layout poll: retry retains one full DWORD period (layout-retry-native64)",
+	_T_LayoutPollNativeRetryCase.Bind(1000, 0x100000001, 1))
+Test("Layout poll: retry retains multiple DWORD periods (layout-retry-native64)",
+	_T_LayoutPollNativeRetryCase.Bind(0x100000100, 0x300000002, 1))
+Test("Layout poll: retry retains the maximum native integer interval (layout-retry-native64)",
+	_T_LayoutPollNativeRetryCase.Bind(1, 0x7FFFFFFFFFFFFFFE, 1))

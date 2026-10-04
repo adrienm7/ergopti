@@ -15,10 +15,11 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, handles = {}, requests = {} }
+	local state = { kills = {}, handles = {}, requests = {}, closes = {} }
 	local fake = {}
 
 	local function handle(kind)
+		if options.allocation_failure_at == #state.handles + 1 then error("allocation refused") end
 		local value = { kind = kind, closing = false }
 		state.handles[#state.handles + 1] = value
 		return value
@@ -46,7 +47,22 @@ local function fake_luv(config)
 	end
 	function fake.read_stop(pipe) pipe.read_stopped = true; return true end
 	function fake.is_closing(value) return value.closing end
-	function fake.close(value) value.closing = true end
+	function fake.close(value, callback)
+		if options.close_failure and not state.allow_closes then return nil, "close refused" end
+		value.closing = true
+		if callback then
+			state.closes[#state.closes + 1] = { handle = value, callback = callback }
+			if not options.defer_close then callback() end
+		end
+	end
+	function state.ack_closes()
+		for _, receipt in ipairs(state.closes) do
+			if not receipt.acknowledged then
+				receipt.acknowledged = true
+				receipt.callback()
+			end
+		end
+	end
 	function fake.kill(pid, signal)
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
 		if options.kill_failure and not state.allow_kills then return false end
@@ -604,5 +620,214 @@ helpers.describe("http_client: unavailable async runtime", function()
 		package.loaded["luv"] = previous_luv
 		package.loaded["adapters.http_client"] = previous_client
 		helpers.assert_eq(result.error, "asynchronous HTTP unavailable")
+	end)
+end)
+
+helpers.describe("http_client: cancellation receipt boundary", function()
+	helpers.it("legacy HTTP cancellation is only signal acceptance before native exit and close ACKs", function()
+		local client, state = fresh_client({ defer_close = true })
+		client.get("http://127.0.0.1:9000/v1/models", {}, { owner = "local-api" }, function() end)
+		local exited = false
+		local original_exit = state.exit_callback
+		state.exit_callback = function(...)
+			exited = true
+			original_exit(...)
+		end
+		helpers.assert_true(client.cancel("local-api"))
+		helpers.assert_eq(client.isActive("local-api"), false)
+		helpers.assert_eq(exited, false, "logical cancellation does not acknowledge native process exit")
+		helpers.assert_eq(state.process.closing, false, "the native process handle remains owned until exit")
+		state.exit(0)
+		helpers.assert_true(exited)
+		helpers.assert_true(state.process.closing)
+	end)
+end)
+
+helpers.describe("http_client: retained GET settlement", function()
+	helpers.it("owned GET waits for actual exit and every native close acknowledgment", function()
+		local client, state = fresh_client({ defer_close = true })
+		local terminals, settled, result = 0, 0, nil
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api", timeout_ms = 1500 }, function(value)
+				terminals = terminals + 1; result = value
+			end)
+		helpers.assert_true(operation.started)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_true(operation:on_settled(function() settled = settled + 1 end))
+		state.stdout('{"data":[]}\nERGOPTI_HTTP_STATUS:200\n')
+		state.stdout(nil); state.stderr(nil)
+		state.ack_closes()
+		helpers.assert_eq(terminals, 0, "EOF and pipe closure do not acknowledge process exit")
+		helpers.assert_eq(operation:is_settled(), false)
+		state.exit(0)
+		helpers.assert_eq(terminals, 0, "process exit does not acknowledge pending close callbacks")
+		state.ack_closes()
+		helpers.assert_eq(operation:is_settled(), true)
+		helpers.assert_eq(settled, 1)
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_eq(result.status, 200)
+		helpers.assert_eq(result.body, '{"data":[]}')
+	end)
+
+	helpers.it("owned GET cancellation retains debt and blocks both APIs until physical settlement", function()
+		local client, state = fresh_client({ defer_close = true })
+		local terminals, rejected = 0, nil
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() terminals = terminals + 1 end)
+		helpers.assert_eq(operation:cancel(), false, "SIGTERM acceptance is not a physical exit receipt")
+		helpers.assert_eq(client.isActive("local-api"), false, "the legacy logical activity ABI is unchanged")
+		helpers.assert_eq(client.get("http://127.0.0.1:9000/v1/models", {}, { owner = "local-api" },
+			function(value) rejected = value end), false)
+		helpers.assert_eq(rejected.error, "previous request cleanup pending")
+		local successor = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() end)
+		helpers.assert_eq(successor.started, false)
+		helpers.assert_true(successor:is_settled(), "a refused successor acquires no native resource")
+		helpers.assert_eq(#state.requests, 1)
+		state.ack_closes()
+		helpers.assert_eq(operation:is_settled(), false)
+		state.exit(0)
+		helpers.assert_eq(operation:is_settled(), false)
+		state.ack_closes()
+		helpers.assert_true(operation:cancel())
+		helpers.assert_eq(terminals, 0, "late terminal events cannot publish after cancellation")
+		local fresh = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() end)
+		helpers.assert_true(fresh.started)
+		state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		state.ack_closes()
+		helpers.assert_true(fresh:is_settled())
+		state.exit(0)
+		helpers.assert_eq(terminals, 0)
+	end)
+
+	helpers.it("owned GET fences callbacks on refused termination and keeps independent requests", function()
+		local client, state = fresh_client({ kill_failure = true, defer_close = true })
+		local terminals, independent = 0, nil
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() terminals = terminals + 1 end)
+		client.get("http://127.0.0.1:9001/v1/models", {}, { owner = "prediction" },
+			function(value) independent = value end)
+		helpers.assert_eq(operation:cancel(), false)
+		helpers.assert_true(client.isActive("local-api"))
+		helpers.assert_true(client.isActive("prediction"))
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(terminals, 0, "cancel intent fences delivery even if the signal refuses")
+		state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_true(independent.ok)
+	end)
+
+	helpers.it("owned GET retries refused close and never reports it as settlement", function()
+		local client, state = fresh_client({ close_failure = true, defer_close = true })
+		local receipt
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function(value) receipt = value end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_eq(receipt, nil)
+		helpers.assert_eq(operation:is_settled(), false)
+		state.allow_closes = true
+		helpers.assert_eq(operation:cancel(), false)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(receipt, nil, "cancelling a cleanup retry suppresses its pending success")
+	end)
+
+	helpers.it("owned GET failed spawn settles only after its allocated handles close", function()
+		local client, state = fresh_client({ spawn_failure = true, defer_close = true })
+		local failures = 0
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() failures = failures + 1 end)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(failures, 0)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(failures, 1)
+	end)
+end)
+
+helpers.describe("http_client: owned GET refusal boundaries", function()
+	helpers.it("owned GET captures partial allocations before a later constructor throws", function()
+		local client, state = fresh_client({ allocation_failure_at = 2, defer_close = true })
+		local receipt
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function(value) receipt = value end)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(#state.handles, 1)
+		helpers.assert_eq(receipt, nil)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(receipt.error, "libuv handle allocation failed")
+	end)
+
+	helpers.it("owned GET timeout retains refused termination debt and retries the exact process", function()
+		local client, state = fresh_client({ kill_failure = true, defer_close = true })
+		local terminals = 0
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() terminals = terminals + 1 end)
+		state.timer.callback()
+		state.ack_closes()
+		helpers.assert_eq(client.isActive("local-api"), false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(terminals, 0)
+		helpers.assert_eq(operation:cancel(), false)
+		state.allow_kills = true
+		helpers.assert_eq(operation:cancel(), false)
+		helpers.assert_eq(state.kills[#state.kills].pid, -4321)
+		state.exit(0)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(terminals, 0, "cancel intent must suppress the pending timeout receipt")
+	end)
+
+	helpers.it("owned GET refuses an incomplete 200 and preserves genuine HTTP auth failure", function()
+		for _, case in ipairs({
+			{ status = 200, code = 18, error = "curl exited with code 18" },
+			{ status = 401, code = 22, error = "HTTP 401" },
+		}) do
+			local client, state = fresh_client({ defer_close = true })
+			local result
+			local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+				{ owner = "local-api" }, function(value) result = value end)
+			state.complete_request(1, '{"data":[]}\nERGOPTI_HTTP_STATUS:' .. case.status .. '\n', case.code)
+			state.ack_closes()
+			helpers.assert_true(operation:is_settled())
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.status, case.status)
+			helpers.assert_eq(result.error, case.error)
+		end
+	end)
+
+	helpers.it("owned GET timer activation refusal waits for allocated native handle closure", function()
+		local client, state = fresh_client({ timer_failure = true, defer_close = true })
+		local receipt
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function(value) receipt = value end)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(#state.requests, 0)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(receipt.error, "timeout activation failed")
+	end)
+end)
+
+helpers.describe("http_client: owned GET construction boundary", function()
+	helpers.it("owned GET request construction refusal retains already allocated native handles", function()
+		local client, state = fresh_client({ defer_close = true })
+		local receipt
+		local hostile_header = setmetatable({}, { __tostring = function() error("private header must not appear") end })
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", { Authorization = hostile_header },
+			{ owner = "local-api" }, function(value) receipt = value end)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(#state.requests, 0)
+		helpers.assert_eq(receipt, nil)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(receipt.error, "curl request construction failed")
 	end)
 end)

@@ -101,7 +101,7 @@ end
 --- @param name string
 --- @param value number|boolean
 --- @return boolean
-function M.set(name, value)
+function M.set(name, value, expected_source)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then
 		Logger.error(LOG, "Refused invalid trigger setting %s=%s.", tostring(name), tostring(value))
@@ -112,7 +112,13 @@ function M.set(name, value)
 		Logger.error(LOG, "No storage; trigger setting '%s' was not changed.", name)
 		return false
 	end
-	local persisted = Storage.set(PREF_PREFIX .. name, value)
+	local persisted
+	if expected_source ~= nil then
+		if type(expected_source) ~= "table" or type(Storage.set_many) ~= "function" then return false end
+		persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source)
+	else
+		persisted = Storage.set(PREF_PREFIX .. name, value)
+	end
 	if persisted ~= true then
 		Logger.error(LOG, "Trigger setting '%s' could not be persisted; live state is unchanged.", name)
 		return false

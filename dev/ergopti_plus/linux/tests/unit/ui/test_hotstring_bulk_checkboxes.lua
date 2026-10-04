@@ -233,3 +233,138 @@ helpers.describe("dynamic bulk menu: pause ownership", function()
 		helpers.assert_eq(log.set_enabled, {})
 	end)
 end)
+
+
+--- Records the existing keyboard-released dialog owner and restores all wrappers.
+local function with_bulk_error_receipts(body)
+	local Modal = require("ui.modal")
+	local modal_run, execute = Modal.run, os.execute
+	local inside, notices, releases = false, {}, 0
+	Modal.run = function(callback)
+		releases = releases + 1
+		inside = true
+		local ok, first, second, third = pcall(callback)
+		inside = false
+		if not ok then error(first, 0) end
+		return first, second, third
+	end
+	os.execute = function(command)
+		if type(command) == "string" and command:match("^zenity %-%-error") then
+			notices[#notices + 1] = { command = command, keyboard_released = inside }
+			return 0
+		end
+		return execute(command)
+	end
+	local before_builder = package.loaded["ui.menu.menu_builder"]
+	local ok, err = pcall(body, notices, function() return releases end)
+	Modal.run, os.execute = modal_run, execute
+	package.loaded["ui.menu.menu_builder"] = before_builder
+	if not ok then error(err, 0) end
+end
+
+--- Selects the actual whole-tree command or the actual language-provider row.
+local function aggregate_row(menu, kind)
+	if kind == "tree" then return row_for(menu, "menu.hotstrings.enable_all_sections") end
+	for _, row in ipairs(menu) do
+		if type(row.menu) == "table" and row_for(row.menu, "menu.hotstrings.enable_all_sections") == row.menu[1] then
+			return row.menu[1]
+		end
+	end
+end
+
+helpers.describe("aggregate hotstring checkbox acknowledges the durable owner", function()
+	for _, kind in ipairs({ "tree", "language" }) do
+		for _, verdict in ipairs({ "false", "nil", "throw", "truthy", "true" }) do
+			helpers.it("aggregate " .. kind .. " callback requires exact receipt " .. verdict, function()
+				with_bulk_error_receipts(function(notices, releases)
+					local config = fake_config(false, false)
+					local calls, requested = 0, nil
+					config.set_categories_sections = function(ids, enabled)
+						calls = calls + 1
+						requested = { ids = ids, enabled = enabled }
+						if verdict == "throw" then error("owned aggregate refusal") end
+						if verdict == "nil" then return nil end
+						if verdict == "truthy" then return 2 end
+						return verdict == "true"
+					end
+					local row = assert(aggregate_row(hotstrings_menu(config), kind))
+					local committed = row.fn()
+					-- Observations are asserted after the actual callback/production
+					-- catches and the native dialog callback have both returned.
+					helpers.assert_eq(committed, verdict == "true")
+					helpers.assert_eq(calls, 1)
+					helpers.assert_eq(requested.enabled, true)
+					helpers.assert_eq(row.checked, false, "no optimistic checkbox publication")
+					helpers.assert_eq(#notices, verdict == "true" and 0 or 1)
+					helpers.assert_eq(releases(), verdict == "true" and 0 or 1)
+					if notices[1] then
+						helpers.assert_eq(notices[1].keyboard_released, true)
+						local rendered = notices[1].command:gsub("'\\''", "'")
+						helpers.assert_true(rendered:find(require("infra.i18n").get("dialog.bulk_toggle.save_failed"), 1, true) ~= nil)
+					end
+				end)
+			end)
+		end
+	end
+end)
+
+helpers.describe("aggregate menu preserves actual private choices and native publication", function()
+	for _, kind in ipairs({ "tree", "language" }) do
+		for _, refusal in ipairs({ "false", "nil", "throw", "truthy" }) do
+			helpers.it("aggregate " .. kind .. " retains the actual owner after writer " .. refusal, function()
+				local old_loader = package.loaded["modules.hotstrings.loader"]
+				local old_config = package.loaded["modules.hotstrings.hotstrings_config"]
+				local view = fake_config(false, false)
+				local categories = view.get_categories()
+				package.loaded["modules.hotstrings.loader"] = { load_catalogue = function()
+					return { committed = true, errors = 0, categories = categories, mappings = {
+						{ trigger = "a", replacement = "A", group = "autocorrection", section = "first" },
+						{ trigger = "e", replacement = "E", group = LANGUAGE_CATEGORY, section = "first" },
+					} }
+				end }
+				local ok, err = pcall(function()
+					local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+					local Choices = require("tests.support.hotstring_choices")
+					local source = '[category_enabled]\nhotstrings = false\n[hotstrings]\n'
+						.. 'groups = { autocorrection = false, rolls = false, en_typos = false }\n'
+						.. '[private]\nfuture = "retained foreign source"\n'
+					Choices.with_file(Config, source, function(path)
+						local published = {}
+						Config.init({ load_mappings = function(_, mappings) published[#published+1] = mappings; return true end }, "virtual.toml", nil)
+						local _, initial = Config.load_all()
+						helpers.assert_eq(initial, true)
+						view.set_categories_sections = Config.set_categories_sections
+						view.is_group_enabled = Config.is_group_enabled
+						view.is_section_enabled = Config.is_section_enabled
+						view.is_section_checked = Config.is_section_checked
+						with_bulk_error_receipts(function(notices)
+							local row = assert(aggregate_row(hotstrings_menu(view), kind))
+							local Writer = require("toml_codec.writer")
+							local batch_write, writes = Writer.batch_write, 0
+							Writer.batch_write = function()
+								writes = writes + 1
+								if refusal == "throw" then error("actual writer refusal") end
+								if refusal == "nil" then return nil end
+								if refusal == "truthy" then return 2 end
+								return false
+							end
+							local called, committed = pcall(row.fn)
+							Writer.batch_write = batch_write
+							helpers.assert_eq(called, true)
+							helpers.assert_eq(committed, false)
+							helpers.assert_eq(writes, 1)
+							helpers.assert_eq(Choices.read(path), source)
+							helpers.assert_eq(Config.is_group_enabled("autocorrection"), false)
+							helpers.assert_eq(Config.is_group_enabled(LANGUAGE_CATEGORY), false)
+							helpers.assert_eq(#published[#published], 0, "the retained native catalogue remains empty")
+							helpers.assert_eq(#notices, 1)
+						end)
+					end)
+				end)
+				package.loaded["modules.hotstrings.loader"] = old_loader
+				package.loaded["modules.hotstrings.hotstrings_config"] = old_config
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+end)

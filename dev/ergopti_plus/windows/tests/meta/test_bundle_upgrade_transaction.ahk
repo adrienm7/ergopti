@@ -3,7 +3,8 @@
 
 _BUT_StagesBeforeReplacingLiveBundle() {
 	Body := _DriverFuncBody("Bundle_Init")
-	StagePos := InStr(Body, "StagingDir := BundleDir")
+	Assert(Body != "", "Bundle_Init must exist")
+	StagePos := InStr(Body, "Workspace := _Bundle_AcquireWorkspace(BundleDir)")
 	UnzipPos := InStr(Body, "_Bundle_Unzip(TmpZip, StagingDir)")
 	VerifyPos := InStr(Body, "_Bundle_VerifyStaging(StagingDir)")
 	PreservePos := InStr(Body, "DirMove(BundleDir, RollbackDir")
@@ -12,7 +13,7 @@ _BUT_StagesBeforeReplacingLiveBundle() {
 		"Bundle_Init must stage, verify, preserve the live bundle, then commit the replacement in that order")
 	Assert(InStr(Body, "DirDelete(BundleDir, true)") = 0,
 		"Bundle_Init must never delete the live bundle before staged replacement verification")
-	Assert(InStr(Body, "DirMove(RollbackDir, BundleDir") > CommitPos,
+	Assert(InStr(Body, "_Bundle_RestoreRollback(Workspace, BundleDir)") > CommitPos,
 		"a failed staging commit must restore the preserved live bundle")
 }
 Test("bundle: upgrade stages and rolls back before replacing live runtime (bundle-upgrade-transaction)", _BUT_StagesBeforeReplacingLiveBundle)
@@ -27,3 +28,17 @@ _BUT_MatchingMarkerValidatesLiveTree() {
 }
 Test("AHK-005: Bundle_Init verifies the live tree before its marker fast path",
 	_BUT_MatchingMarkerValidatesLiveTree)
+
+; The allocator belongs to the bootstrap domain; native authority stays in adapters.
+_BUT_WorkspaceRoutesNativeAuthority() {
+	Body := _DriverFuncBody("_Bundle_AcquireWorkspace")
+	DirectoryBody := _DriverFuncBody("FSCreateDirectoryExclusiveStrict")
+	ProcessBody := _DriverFuncBody("PLC_CurrentProcessIdStrict")
+	Assert(Body != "" && DirectoryBody != "" && ProcessBody != "", "allocator and both adapter owners must be readable")
+	AssertFalse(InStr(Body, "DllCall("), "bundle allocation cannot invoke the OS directly")
+	AssertContains(Body, "PLC_CurrentProcessIdStrict()", "the native identity must come from its strict adapter owner")
+	AssertContains(Body, "FSCreateDirectoryExclusiveStrict(Root)", "exclusive acquisition must come from the filesystem owner")
+	AssertContains(DirectoryBody, "CreateDirectoryW", "the directory adapter performs real native exclusive creation")
+	AssertContains(ProcessBody, "GetCurrentProcessId", "the process adapter resolves real native identity")
+}
+Test("bundle: native workspace authority belongs to adapters (bundle-adapter-routing)", _BUT_WorkspaceRoutesNativeAuthority)

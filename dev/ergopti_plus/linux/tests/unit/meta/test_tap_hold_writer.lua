@@ -450,3 +450,219 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 	end)
 
 end)
+
+helpers.describe("tap-hold writer: classified source refusal", function()
+	local original = '# Keep this exact user file on refusal.\n'
+		.. '[tap_hold]\nenabled = true\n'
+		.. '[tap_hold.keys.left_shift]\ntap_action = "copy"\ncustom = "future"\n'
+		.. '[future]\nopaque = ["one", "two"]\n'
+
+	local function observe_refusal(fault, invoke)
+		local writer, path, state = fresh_writer()
+		write_file(path, original)
+		local real_open, real_rename = io.open, os.rename
+		local observed = { reads = 0, closes = 0, writes = 0, staging = 0, renames = 0 }
+		local owned_handle
+		io.open = function(target, mode)
+			if target:sub(1, #path) == path and mode == "w" then observed.writes = observed.writes + 1 end
+			if target == path .. ".tmp" then observed.staging = observed.staging + 1 end
+			if target ~= path or mode ~= "r" then return real_open(target, mode) end
+			observed.reads = observed.reads + 1
+			if fault == "permission" then return nil, "owned source refused", 13 end
+			if fault == "other_errno" then return nil, "owned source refused", 5 end
+			if fault == "no_errno" then return nil, "owned source refused" end
+			if fault == "string_errno" then return nil, "owned source refused", "2" end
+			if fault == "open_raise" then error("owned source open raised") end
+			local handle, err, code = real_open(target, mode)
+			owned_handle = handle
+			if not handle then return nil, err, code end
+			return {
+				read = function(_, format)
+					if fault == "read_nil" then return nil, "owned source read refused" end
+					if fault == "read_raise" then error("owned source read raised") end
+					return owned_handle:read(format)
+				end,
+				close = function()
+					observed.closes = observed.closes + 1
+					local closed = owned_handle:close()
+					if fault == "close_nil" then return nil, "owned source close refused" end
+					if fault == "close_false" then return false, "owned source close refused" end
+					if fault == "close_raise" then error("owned source close raised") end
+					return closed
+				end,
+			}
+		end
+		os.rename = function(from, to)
+			if from == path .. ".tmp" and to == path then observed.renames = observed.renames + 1 end
+			return real_rename(from, to)
+		end
+		local call_ok, accepted = pcall(invoke, writer, path)
+		io.open, os.rename = real_open, real_rename
+		if owned_handle then pcall(owned_handle.close, owned_handle) end
+		local unchanged, staged = read_or_nil(path), read_or_nil(path .. ".tmp")
+		os.remove(path)
+		os.remove(path .. ".tmp")
+		helpers.assert_true(call_ok, "the classified read reports refusal without raising")
+		helpers.assert_eq(accepted, false, "an unreadable source never grants write permission")
+		helpers.assert_eq(observed.reads, 1, "the actual source read was reached")
+		helpers.assert_eq(unchanged, original, "comments, known values and unknown neighbors retain exact bytes")
+		helpers.assert_eq(observed.writes, 0, "neither a backup nor a candidate is opened for writing")
+		helpers.assert_eq(observed.staging, 0, "refusal precedes temporary file creation")
+		helpers.assert_eq(observed.renames, 0, "refusal precedes publication")
+		helpers.assert_nil(staged, "there is no staged candidate")
+		helpers.assert_eq(state.reloads, 0, "runtime reload never sees a refused candidate")
+		if fault:match("^read_") or fault:match("^close_") then
+			helpers.assert_true(owned_handle ~= nil, "the fault reached an actual opened source handle")
+			helpers.assert_eq(observed.closes, 1, "the actual read owner closes its handle")
+		end
+	end
+
+	for _, fault in ipairs({ "permission", "other_errno", "no_errno", "string_errno", "open_raise",
+		"read_nil", "read_raise", "close_nil", "close_false", "close_raise" }) do
+		helpers.it("refuses " .. fault .. " before the ordinary setter stages or reloads", function()
+			observe_refusal(fault, function(writer) return writer.set_tap("left_shift", "paste") end)
+		end)
+	end
+
+	helpers.it("refuses an unreadable source before the recommended import creates a backup", function()
+		observe_refusal("permission", function(writer, path)
+			return writer.import_recommended(path, { "tab" }, Loader.preset_keys(DEFAULTS))
+		end)
+	end)
+
+	helpers.it("admits native ENOENT and publishes the actual missing-file setter", function()
+		local writer, path, state = fresh_writer()
+		local fh, _, code = io.open(path, "r")
+		helpers.assert_nil(fh, "the source is physically absent")
+		helpers.assert_eq(code, 2, "the native missing-file receipt is ENOENT")
+		local accepted = writer.set_tap("left_shift", "paste")
+		local loaded = effective(path)
+		local staged = read_or_nil(path .. ".tmp")
+		os.remove(path)
+		helpers.assert_eq(accepted, true, "absence permits the real writer")
+		helpers.assert_eq(state.reloads, 1, "only the acknowledged publication reloads")
+		helpers.assert_eq(loaded.keys.left_shift.tap_action, "paste", "the real loader reads the published value")
+		helpers.assert_nil(staged, "the actual rename retired its candidate")
+	end)
+
+	helpers.it("keeps unknown neighbors when the classified source read succeeds", function()
+		local writer, path, state = fresh_writer()
+		write_file(path, original)
+		local accepted = writer.set_tap("left_shift", "paste")
+		local document = require("toml_codec").decode(read_file(path))
+		os.remove(path)
+		helpers.assert_eq(accepted, true)
+		helpers.assert_eq(state.reloads, 1)
+		helpers.assert_eq(document.tap_hold.keys.left_shift.tap_action, "paste")
+		helpers.assert_eq(document.tap_hold.keys.left_shift.custom, "future")
+		helpers.assert_eq(document.future.opaque[1], "one")
+		helpers.assert_eq(document.future.opaque[2], "two")
+	end)
+end)
+
+helpers.describe("tap-hold writer: staging write and close acknowledgement", function()
+	local original = '# Preserve the complete source when staging is refused.\n'
+		.. '[tap_hold]\nenabled = true\n'
+		.. '[tap_hold.keys.left_shift]\ntap_action = "copy"\ncustom = "future"\n'
+		.. '[future]\nopaque = ["left", "right"]\n'
+
+	local function observe_staging(fault)
+		local writer, path, state = fresh_writer()
+		write_file(path, original)
+		local real_open, real_rename, real_remove = io.open, os.rename, os.remove
+		local observed = { opens = 0, writes = 0, closes = 0, renames = 0, removals = 0 }
+		local handle, proxy
+		io.open = function(target, mode)
+			if target ~= path .. ".tmp" or mode ~= "w" then return real_open(target, mode) end
+			observed.opens = observed.opens + 1
+			local opened, err, code = real_open(target, mode)
+			handle = opened
+			if not opened then return nil, err, code end
+			proxy = {
+				write = function(self, text)
+					observed.writes = observed.writes + 1
+					local partial = fault:match("^write_") or fault == "cleanup_refused"
+					local payload = partial and text:sub(1, math.floor(#text / 2)) or text
+					local written, write_err, write_code = handle:write(payload)
+					observed.native_write_ack = written == true or written == handle
+					if fault == "write_raise" then error("owned staging write raised") end
+					if fault == "write_nil" or fault == "cleanup_refused" then return nil, "owned staging write refused" end
+					if fault == "write_false" then return false end
+					if fault == "write_table" then return {} end
+					if fault == "write_string" then return "written" end
+					if fault == "write_foreign_handle" then return handle end
+					if written == true then return true end
+					if written ~= handle then return nil, write_err, write_code end
+					return self
+				end,
+				close = function()
+					observed.closes = observed.closes + 1
+					local closed, close_err, close_code = handle:close()
+					observed.native_close_ack = closed == true
+					if fault == "close_raise" then error("owned staging close raised") end
+					if fault == "close_nil" then return nil, "owned staging close refused" end
+					if fault == "close_false" then return false end
+					if fault == "close_string" then return "closed" end
+					if fault == "close_handle" then return handle end
+					return closed, close_err, close_code
+				end,
+			}
+			return proxy
+		end
+		os.rename = function(from, to)
+			if from == path .. ".tmp" and to == path then observed.renames = observed.renames + 1 end
+			return real_rename(from, to)
+		end
+		os.remove = function(target)
+			if target == path .. ".tmp" then
+				observed.removals = observed.removals + 1
+				if fault == "cleanup_refused" then return nil, "owned stage removal refused" end
+			end
+			return real_remove(target)
+		end
+		local call_ok, accepted = pcall(writer.set_tap, "left_shift", "paste")
+		io.open, os.rename, os.remove = real_open, real_rename, real_remove
+		if handle then pcall(handle.close, handle) end
+		local source, staged = read_or_nil(path), read_or_nil(path .. ".tmp")
+		os.remove(path)
+		os.remove(path .. ".tmp")
+		helpers.assert_true(call_ok, "the public setter reports staging refusal without raising")
+		helpers.assert_eq(accepted, false, "a refused staging receipt cannot acknowledge a tray change")
+		helpers.assert_true(handle ~= nil, "the fault reached an actual temporary file handle")
+		helpers.assert_eq(observed.opens, 1)
+		helpers.assert_eq(observed.writes, 1)
+		helpers.assert_eq(observed.native_write_ack, true, "the temporary bytes were written by the native file owner")
+		helpers.assert_eq(observed.closes, 1, "even a raised write closes its actual handle")
+		helpers.assert_eq(observed.native_close_ack, true, "the real file handle was physically closed")
+		helpers.assert_eq(observed.renames, 0, "an unacknowledged stage is never published")
+		helpers.assert_eq(state.reloads, 0, "runtime sees no refused candidate")
+		helpers.assert_eq(source, original, "known fields, comments and unknown neighbors retain exact bytes")
+		helpers.assert_eq(observed.removals, 1, "cleanup concerns only the temporary file the writer opened")
+		if fault == "cleanup_refused" then
+			helpers.assert_type(staged, "string", "refused cleanup leaves its owned candidate, never the user source")
+		else
+			helpers.assert_nil(staged, "acknowledged cleanup retires the refused candidate")
+		end
+	end
+
+	for _, fault in ipairs({ "write_nil", "write_false", "write_table", "write_string", "write_foreign_handle",
+		"write_raise", "close_nil", "close_false", "close_string", "close_handle", "close_raise", "cleanup_refused" }) do
+		helpers.it("refuses " .. fault .. " before publication and reload", function() observe_staging(fault) end)
+	end
+
+	helpers.it("publishes only after the actual file write and close acknowledge their owner", function()
+		local writer, path, state = fresh_writer()
+		write_file(path, original)
+		local accepted = writer.set_tap("left_shift", "paste")
+		local document = require("toml_codec").decode(read_file(path))
+		local staged = read_or_nil(path .. ".tmp")
+		os.remove(path)
+		helpers.assert_eq(accepted, true)
+		helpers.assert_eq(state.reloads, 1)
+		helpers.assert_eq(document.tap_hold.keys.left_shift.tap_action, "paste")
+		helpers.assert_eq(document.tap_hold.keys.left_shift.custom, "future")
+		helpers.assert_eq(document.future.opaque[1], "left")
+		helpers.assert_eq(document.future.opaque[2], "right")
+		helpers.assert_nil(staged)
+	end)
+end)
