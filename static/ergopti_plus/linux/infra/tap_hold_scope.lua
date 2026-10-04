@@ -24,8 +24,7 @@
 ---    none (keymap.layer_preset), before the engine is rebuilt, so the key the
 ---    preset holds on the layer never enters an empty one. An existing
 ---    layers.toml is the user's and stays; a refused or reverted restore
----    removes only the file it created. Refused removal or fence release stays
----    pending on the same owner until explicit recovery acknowledges it.
+---    removes only the file it created.
 --- ==============================================================================
 
 local M = {}
@@ -74,8 +73,7 @@ end
 --- @param files table The owner's file port.
 --- @return boolean undone
 local function undo_layer(import, files)
-	local called, undone, err = pcall(LayerPreset.undo, import, files)
-	if not called then undone, err = false, tostring(undone) end
+	local undone, err = LayerPreset.undo(import, files)
 	if undone ~= true then
 		Logger.error(LOG, "The navigation layer '%s' a refused restore created could not be removed: %s.",
 			tostring(import and import.path), tostring(err))
@@ -99,7 +97,6 @@ function M.new(options)
 	local parameters = options.parameters or require("modules.gestures.manager")
 	local files = options.files or require("adapters.file_system")
 	local owner, held, legacy, source, layer = {}, false, {}, nil, nil
-	local layer_debt = false
 	local preset = loader.preset_keys(manager.defaults_path())
 	local function parameter_domain(path)
 		local key = path:match("^gesture_parameters%.(.+)$")
@@ -129,8 +126,7 @@ function M.new(options)
 	end
 	local function release()
 		if not held then return true end
-		local called, released = pcall(parameters.release_parameter_configuration, owner)
-		if not called or released ~= true then return false end
+		if parameters.release_parameter_configuration(owner) ~= true then return false end
 		held = false
 		return true
 	end
@@ -169,21 +165,9 @@ function M.new(options)
 		end,
 		restore = apply_state,
 	})
-	--- Settles the primary inverse before removing its imported navigation layer.
-	--- A refused removal or fence release remains owned until an exact retry.
-	local function settle_inverse(retry)
-		if transaction.pending() then
-			if retry ~= true or transaction.retry_restore() ~= true then return false end
-		end
-		if layer_debt then
-			if undo_layer(layer, files) ~= true then return false end
-			layer, layer_debt = nil, false
-		end
-		return release()
-	end
-	function owner.pending() return transaction.pending() or layer_debt or held end
+	function owner.pending() return transaction.pending() end
 	function owner.apply(mode)
-		if owner.pending() or (mode ~= "clear" and mode ~= "recommended") or options.is_paused() then return false end
+		if held or (mode ~= "clear" and mode ~= "recommended") or options.is_paused() then return false end
 		if not acquire() then return false, "tap-hold parameters are already owned" end
 		layer = nil
 		if mode == "recommended" then
@@ -195,36 +179,22 @@ function M.new(options)
 			layer = import
 		end
 		local committed, detail = transaction.apply("tap_holds", mode)
-		if committed ~= true then
-			layer_debt = layer ~= nil
-			if settle_inverse() ~= true then return false, "tap-hold rollback remains pending" end
-		elseif release() ~= true then
-			-- A failed fence release cannot report a committed participant: a
-			-- composition retries pending debt instead of requesting its inverse.
-			transaction.revert()
-			layer_debt = layer ~= nil
-			if settle_inverse() ~= true then return false, "tap-hold rollback remains pending" end
-			return false, "tap-hold parameter fence release refused"
-		end
+		if committed ~= true and undo_layer(layer, files) then layer = nil end
+		if not transaction.pending() then release() end
 		return committed, detail
 	end
 	function owner.revert()
-		if owner.pending() then return false, "tap-hold rollback remains pending" end
 		if not acquire() then return false, "tap-hold parameters are already owned" end
-		local retained = transaction.committed()
 		local reverted, detail = transaction.revert()
-		if retained then layer_debt = layer ~= nil end
-		if settle_inverse() ~= true then return false, "tap-hold rollback remains pending" end
+		if reverted == true and undo_layer(layer, files) then layer = nil end
+		if not transaction.pending() then release() end
 		return reverted, detail
 	end
-	function owner.release()
-		if owner.pending() then return false end
-		transaction.release()
-		return true
-	end
+	function owner.release() transaction.release() end
 	function owner.retry_restore()
-		if owner.pending() and not acquire() then return false end
-		return settle_inverse(true)
+		if transaction.pending() and not acquire() then return false end
+		if transaction.retry_restore() ~= true then return false end
+		return release()
 	end
 	return owner
 end

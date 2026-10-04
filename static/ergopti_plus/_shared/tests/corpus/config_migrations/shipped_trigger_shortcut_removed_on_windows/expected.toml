@@ -5,7 +5,6 @@ schema_version = 10
 
 [llm]
 enabled = true
-trigger_shortcut = "Ctrl+Space"
 ollama_port = 11434
 
 [shortcuts.keyboard]

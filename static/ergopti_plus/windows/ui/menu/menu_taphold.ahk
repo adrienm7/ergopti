@@ -89,9 +89,9 @@ _TH_KeyRows(Hand) {
 			"label",   ParentLabel,
 			"checked", IsConfigured,
 			"items", [
-				MenuRenderer_CommandRow("tap_hold_key_native_commands", "tap_hold_key_native",
-					Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId)),
-					Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured))),
+				Map("label",    t("tap_hold.action.disable"),
+					"disabled", !IsConfigured,
+					"action",   _TH_MakeDisableFn(KeyId)),
 				Map("separator", true),
 				Map("label",  StrReplace(t("tap_hold.picker.tap"), "%s", TapLbl),
 					"action", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl)),

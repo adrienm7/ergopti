@@ -625,32 +625,6 @@ const shipped = validateRegistry(readToml(REGISTRY_PATH) || {}, 'migrations.toml
 if (shipped && shipped.steps.length === 0)
 	fail('migrations.toml', 'the registry must hold at least one step');
 
-// Retired settings belong to explicit cleanup, including when a delete targets
-// an ancestor section. The generic delete opcode remains covered independently.
-const RETIRED_CLEANUP_PATHS = [
-	'gestures.space_wrap',
-	'llm.trigger.shortcut',
-	'llm.trigger_shortcut',
-	'shortcuts.keys.layer_scroll'
-];
-if (shipped) {
-	for (const step of shipped.steps) {
-		for (const op of step.ops) {
-			if (op.op !== 'delete') continue;
-			const target = op.key === undefined ? op.section : `${op.section}.${op.key}`;
-			for (const retired of RETIRED_CLEANUP_PATHS) {
-				if (
-					retired === target ||
-					retired.startsWith(`${target}.`) ||
-					target.startsWith(`${retired}.`)
-				) {
-					fail('migrations.toml', `v${step.from}: ${retired} must survive until explicit cleanup`);
-				}
-			}
-		}
-	}
-}
-
 const index = readToml(path.join(CORPUS_DIR, 'cases.toml'));
 const listed = index && index.corpus && Array.isArray(index.corpus.cases) ? index.corpus.cases : [];
 const onDisk = fs

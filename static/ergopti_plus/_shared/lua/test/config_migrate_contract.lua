@@ -391,40 +391,6 @@ local function register_boot(h, driver)
 			end)
 		end)
 
-
-		for _, stamp_value in ipairs({ '"3"', "false", "0", "-1", "1.5", "[]" }) do
-			h.it("refuses an invalid schema stamp " .. stamp_value .. " at boot and on later writes", function()
-				local source = "# keep the invalid stamp for manual repair\n[_meta]\nschema_version = "
-					.. stamp_value .. "\n\n[gestures]\nenabled = true\n"
-				with_config(source, function(path)
-					local logger, lines = recording_logger()
-					local backups, publications = 0, 0
-					local result = Engine.boot({ path = path, driver = driver,
-						registry = registry_from(SCENARIO_REGISTRY), stamp = STAMP, logger = logger,
-						create_backup = function()
-							backups = backups + 1
-							return true
-						end,
-						publish = function()
-							publications = publications + 1
-							return true
-						end })
-					h.assert_eq(result.status, "invalid")
-					h.assert_eq(result.read_only, true)
-					h.assert_eq(backups, 0, "invalid stamps never reach backup creation")
-					h.assert_eq(publications, 0, "invalid stamps never reach publication")
-					h.assert_eq(read_bytes(path), source, "the invalid file keeps every source byte")
-					h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)))
-					h.assert_eq(count_level(lines, "error"), 1, "the strict refusal is logged once")
-					h.assert_true(type(Engine.read_only_reason(path)) == "string")
-					local wrote = TomlWriter.batch_write(path,
-						{ { section = "gestures", key = "enabled", value = false } })
-					h.assert_true(wrote ~= true, "later ordinary saves remain refused for the session")
-					h.assert_eq(read_bytes(path), source, "a later save cannot repair or erase the stamp")
-				end)
-			end)
-		end
-
 		h.it("has nothing to do when the file is absent", function()
 			with_config(nil, function(path)
 				local result = Engine.run({ path = path, driver = driver,

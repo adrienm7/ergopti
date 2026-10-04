@@ -495,7 +495,7 @@ _CMG_BootMigratesBeforeAnyReaderOrWriter() {
 	try Body := FileRead(WindowsDir . "\ErgoptiPlus.ahk", "UTF-8")
 	Assert(Body != "", "ErgoptiPlus.ahk must be readable")
 	Migrate := InStr(Body, "`nConfigMigrateBoot(ConfigurationFile)")
-	Snapshot := InStr(Body, "`nglobal _IniCache := ParseConfigTomlFile(ConfigurationFile)")
+	Snapshot := InStr(Body, "`nglobal _IniCache := ParseTomlFile(ConfigurationFile)")
 	Apply := InStr(Body, "ApplyBootConfigToml(Features,")
 	FullSave := InStr(Body, "_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS")
 	Assert(Migrate > 0 && Snapshot > 0 && Apply > 0 && FullSave > 0,
@@ -646,53 +646,3 @@ _CMG_CurrentSemanticRefusalOwnsBoot() {
 }
 Test("config migrate: current-version boot still requires the exact semantic source proof (config-migrate-dotted-document-boot)",
 	_CMG_CurrentSemanticRefusalOwnsBoot)
-
-_CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
-	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Source := 'hotstrings.trigger_char = "@"`n[_meta]`nschema_version = ' . Literal . "`n"
-	Calls := { Backup: 0, Publish: 0 }
-	Backup(Destination, Content) {
-		Calls.Backup += 1
-		return 1
-	}
-	Publish(Destination, Candidate, Previous) {
-		Calls.Publish += 1
-		return ""
-	}
-	try {
-		AssertTrue(FSWriteDurable(Path, Source))
-		Result := ConfigMigrateRun(Path, 0, "semantic-snapshot", Backup, Publish)
-		AssertEqual(ExpectedStatus, Result["status"])
-		AssertEqual(0, Calls.Backup)
-		AssertEqual(0, Calls.Publish)
-		Cache := ParseConfigTomlFile(Path)
-		AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"),
-			"the reader consumes the admitted setting without inventing stamp authority")
-		if ExpectedStatus == "current" {
-			AssertEqual("", TOML_WriteRefusal(Path))
-			AssertTrue(TOML_BatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "@" }]))
-		} else {
-			AssertEqual(1, Result["read_only"])
-			Reason := TOML_WriteRefusal(Path)
-			Assert(Reason != "", "the actual migration owns the session write refusal")
-			ParseConfigTomlFile(Path)
-			AssertEqual(Reason, TOML_WriteRefusal(Path), "repeated semantic reads never clear invalid/newer stamp refusal")
-			AssertFalse(TOML_BatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "!" }]))
-			Built := TOML_BuildUpdatedContent(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "!" }])
-			AssertEqual("error", Built["status"])
-		}
-		AssertTrue(FSUtf8ExactMatches(Path, Source), "boot consumption must not rewrite any source bytes")
-	} finally DirDelete(Dir, true)
-}
-_CMG_SemanticCurrentSourceConsumesRootSettings() {
-	_CMG_SemanticSnapshotKeepsStampAuthority(String(ConfigMigrateCurrentVersion()), "current")
-}
-_CMG_SemanticInvalidStampsStayReadOnly() {
-	_CMG_SemanticSnapshotKeepsStampAuthority('"10"', "invalid")
-	_CMG_SemanticSnapshotKeepsStampAuthority("false", "invalid")
-	_CMG_SemanticSnapshotKeepsStampAuthority("999", "newer")
-}
-Test("config migrate: a current semantic snapshot consumes root settings without rewriting (config-semantic-snapshot)",
-	_CMG_SemanticCurrentSourceConsumesRootSettings)
-Test("config migrate: semantic readers cannot clear invalid/newer stamp write refusal (config-semantic-snapshot)",
-	_CMG_SemanticInvalidStampsStayReadOnly)

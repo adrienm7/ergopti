@@ -687,7 +687,7 @@ BootProfile_Stamp("Tray reset + onboarding")
 ConfigMigrateBoot(ConfigurationFile)
 BootProfile_Stamp("Configuration migration checked")
 
-global _IniCache := ParseConfigTomlFile(ConfigurationFile)
+global _IniCache := ParseTomlFile(ConfigurationFile)
 BootProfile_Stamp("Configuration TOML snapshot parsed")
 ; Latch the session sentinel SaveFullConfig honours when that parse could not
 ; READ an existing config.toml. This snapshot is taken once and never refreshed,

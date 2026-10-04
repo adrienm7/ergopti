@@ -11,7 +11,7 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
-		"adapters.file_system", "infra.config_paths", "platform.remap", "json" }, function()
+		"adapters.file_system", "infra.config_paths", "platform.remap" }, function()
 		-- Distinctive rule: a wizard that derived the path itself cannot match it.
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/virtual/current/" end,
@@ -49,19 +49,14 @@ local function with_delivery(callback)
 				state.titles[#state.titles + 1] = { view = view, title = title }
 				return true
 			end
-			local Json = require("json")
-			local shared_encode, native_encode = Json.encode, hs.json.encode
-			Json.encode = function(value)
-				if state.encode then return state.encode(value) end
-				return shared_encode(value)
-			end
-			-- Retain the native port so causal controls can model LuaSkin's empty
-			-- table-to-array conversion independently of the production encoder.
+			local stub_encode = hs.json.encode
+			-- Native hs.json.encode checks for a top-level table and raises on
+			-- anything else. A permissive stub hid the wizard's bare string payload.
 			hs.json.encode = function(value)
 				if type(value) ~= "table" then error("hs.json.encode requires a table", 2) end
+				state.payload = value[1]
 				if state.encode then return state.encode(value) end
-				if state.native_encode then return state.native_encode(value, shared_encode) end
-				return native_encode(value)
+				return stub_encode(value)
 			end
 			hs.fs.attributes = function() return {} end
 			hs.fs.symlinkAttributes = function(path)
@@ -88,8 +83,6 @@ local function with_delivery(callback)
 				local function open()
 					helpers.assert_true(onboarding.run("/virtual/config.toml"))
 					state.view.evaluateJavaScript = function(self, code, done)
-						local arguments = code:match("^window%.[%w_]+%((.*)%)$")
-						if arguments then state.payload = Json.decode(arguments) end
 						evaluations[#evaluations + 1] = { code = code, done = done, view = self }
 						if state.submit then return state.submit(self, code, done) end
 						return self

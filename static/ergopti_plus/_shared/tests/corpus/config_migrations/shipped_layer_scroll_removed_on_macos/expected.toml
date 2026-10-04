@@ -7,5 +7,4 @@ schema_version = 10
 enabled = true
 
 [shortcuts.keys]
-layer_scroll = true
 wrap_text_if_selected = true

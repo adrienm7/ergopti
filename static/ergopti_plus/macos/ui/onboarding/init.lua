@@ -113,11 +113,13 @@ local function submit_data(owner, view, method, payload)
 		owner.javascript_failures[key] = true
 		Logger.error(LOG, "Onboarding JavaScript %s (%s; content withheld; repeats suppressed).", category, method)
 	end
-	-- The shared codec preserves the wizard's map-shaped current values:
-	-- LuaSkin would encode an empty Lua map as [], violating the page contract.
-	-- It also accepts the folder picker's scalar string without an array wrapper.
-	local encoded, json = pcall(Json.encode, payload)
-	local arguments = encoded and type(json) == "string" and json or nil
+	-- hs.json.encode accepts only a table at the top level and RAISES on a bare
+	-- string. setConfigDir takes the chosen path as a plain string, so encoding
+	-- it directly failed every time and the picked folder never reached the
+	-- field. Encoding the argument list as a one-element array serializes any
+	-- JSON value; stripping the brackets yields the call's argument list.
+	local encoded, json = pcall(hs.json.encode, { payload })
+	local arguments = encoded and type(json) == "string" and json:match("^%s*%[(.*)%]%s*$") or nil
 	if not arguments or arguments:match("^%s*$") then report("encoding failed"); return false end
 	if not publication_is_current(owner, view) then return false end
 	local admitted, settled, pending, failed = false, false, nil, false

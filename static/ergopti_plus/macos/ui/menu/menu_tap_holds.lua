@@ -463,8 +463,10 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		or  (tap_slbl .. "  /  " .. hold_slbl)
 
 	local key_submenu = {
-		ManifestMenu.command_row("tap_hold_key_native_commands", "tap_hold_key_no_action", {
-			["tap_hold_key_no_action"] = function()
+		{
+			label    = i18n.get("menu.tapholds.nothing_tap_hold"),
+			disabled = (current_tap == "none" and current_hold == "none"),
+			action       = function()
 				return run_bulk_menu_command(
 					karabiner,
 					"clear_tap_hold_binding",
@@ -475,7 +477,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 					kid
 				)
 			end,
-		}, { ["tap_hold_key_configured"] = function() return is_active end }),
+		},
 		{ separator = true },
 		{
 			label = string.format(i18n.get("menu.tapholds.tap_arrow"), tap_slbl),

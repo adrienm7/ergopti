@@ -128,22 +128,6 @@ function M.import_if_absent(opts)
 	return { status = M.IMPORTED, path = path, content = preset.text }
 end
 
---- Settles only the native removal lock retained by a previous undo attempt.
---- Participants call this before any absence shortcut or inverse publication;
---- a cleanup retry never removes or replaces content.
---- @param result table|nil Private import record.
---- @return boolean settled True only after exact native release acknowledgement.
---- @return string|nil err Why cleanup remains pending.
-function M.retry_undo_cleanup(result)
-	if type(result) ~= "table" or result.removal_cleanup == nil then return true end
-	local call_ok, settled, detail = pcall(result.removal_cleanup)
-	if not call_ok or settled ~= true then
-		return false, tostring((call_ok and detail) or settled or "removal cleanup remains pending")
-	end
-	result.removal_cleanup = nil
-	return true
-end
-
 --- Undoes an import: removes the file it created while that file still holds
 --- exactly the preset's bytes. A kept file, or one edited since, stays.
 --- @param result table|nil What import_if_absent() returned.
@@ -152,16 +136,10 @@ end
 --- @return string|nil err Why the created file could not be removed.
 function M.undo(result, file_adapter)
 	if type(result) ~= "table" or result.status ~= M.IMPORTED then return true end
-	local settled, settle_err = M.retry_undo_cleanup(result)
-	if settled ~= true then return false, settle_err end
-	local current, status, detail = TomlWriter.read_classified(result.path, file_adapter)
+	local current, status = TomlWriter.read_classified(result.path, file_adapter)
 	if status == "absent" then return true end
-	if status ~= "ok" then return false, "the imported layer cannot be read: " .. tostring(detail or status) end
-	if current ~= result.content then return true end
-	local removed, remove_err, retry_cleanup = TomlWriter.remove_if_unchanged(
-		result.path, file_adapter, { status = "ok", content = result.content })
-	if type(retry_cleanup) == "function" then result.removal_cleanup = retry_cleanup end
-	return removed, remove_err
+	if status ~= "ok" or current ~= result.content then return true end
+	return TomlWriter.remove_if_unchanged(result.path, file_adapter, { status = "ok", content = result.content })
 end
 
 return M

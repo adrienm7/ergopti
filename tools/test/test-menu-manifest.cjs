@@ -1583,7 +1583,7 @@ checkPrivacyTriggerControls();
 		'utf8'
 	);
 	const start = source.indexOf('local case_methods = {');
-	const end = source.indexOf('local helper_methods = {', start);
+	const end = source.indexOf('for _, helper in ipairs({', start);
 	assert(start >= 0 && end > start, 'the actual case provider must be nonempty');
 	const body = source.slice(start, end);
 	assert(
@@ -1607,46 +1607,6 @@ checkPrivacyTriggerControls();
 	console.log(
 		'Selection case commands: shared trio, strict native receipts and unchanged placement.'
 	);
-}
-
-// Fixed selection helpers retain the existing platform-specific native effects.
-{
-	const assert = require('node:assert/strict');
-	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	const corpus = JSON.parse(
-		readFileSync(
-			resolve(
-				REPO_ROOT,
-				'static/ergopti_plus/_shared/tests/corpus/menus/linux_selection_helpers.json'
-			),
-			'utf8'
-		)
-	);
-	assert.deepEqual(
-		manifest[corpus.section],
-		corpus.commands.map((command) => ({
-			type: 'command',
-			id: command.id,
-			i18n: command.label_key,
-			disabled_when: [command.id + '_ready'],
-			platforms: ['linux'],
-			unavailable: 'hide'
-		})),
-		'the independent helper trio owns captions, order, readiness and placement'
-	);
-	const source = readFileSync(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
-		'utf8'
-	);
-	const start = source.indexOf('local helper_methods = {');
-	const end = source.indexOf('local handlers = {}', start);
-	assert(start >= 0 && end > start, 'the actual helper provider must be nonempty');
-	const body = source.slice(start, end);
-	assert(body.includes('ManifestMenu.get_array("selection_helper_commands")'));
-	assert(body.includes('ManifestMenu.command_row("selection_helper_commands", id'));
-	assert(body.includes('sc[method]() ~= true'), 'native delivery requires exact acknowledgement');
-	assert(!body.includes('i18n_safe('), 'helper captions belong to the shared declaration');
-	console.log('Selection helpers: shared trio, current native ownership and Linux-only placement.');
 }
 
 // Both Agent system providers publish the same declared Off control.
@@ -1781,45 +1741,4 @@ checkPrivacyTriggerControls();
 	console.log(
 		'Number-row choices: one typed declaration, 21 translations and three native providers.'
 	);
-}
-
-// Per-key clearing keeps the established caption and native owner on each platform.
-{
-	const assert = require('node:assert/strict');
-	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
-	const corpus = JSON.parse(
-		readFileSync(
-			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/tests/corpus/menus/tap_hold_key_native.json'),
-			'utf8'
-		)
-	);
-	assert.equal(
-		corpus.variants.length,
-		2,
-		'both established platform caption variants remain independent'
-	);
-	assert.deepEqual(
-		manifest[corpus.section],
-		corpus.variants.map((variant) => ({
-			type: 'command',
-			id: variant.id,
-			i18n: variant.label_key,
-			disabled_when: ['tap_hold_key_configured'],
-			platforms: variant.platforms,
-			unavailable: 'hide'
-		})),
-		'the shared declaration owns each platform caption and per-key availability'
-	);
-	for (const [path, consumer, id] of [
-		['windows/ui/menu/menu_taphold.ahk', 'MenuRenderer_CommandRow', 'tap_hold_key_native'],
-		['macos/ui/menu/menu_tap_holds.lua', 'ManifestMenu.command_row', 'tap_hold_key_no_action'],
-		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.command_row', 'tap_hold_key_native']
-	]) {
-		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', path), 'utf8');
-		assert(
-			source.includes(consumer + '("tap_hold_key_native_commands", "' + id + '"'),
-			path + ' must consume the actual declared clearing command'
-		);
-	}
-	console.log('Tap-Hold key clearing: declared platform captions and unchanged native owners.');
 }

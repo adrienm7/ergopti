@@ -148,8 +148,8 @@ local function driver_state(path)
 	local ok_url, chatgpt_url = pcall(function()
 		return helpers.load_module("modules.shortcuts.chatgpt").get_url()
 	end)
-	-- The runtime reads the canonical trigger through hotstring preferences;
-	-- the setup wizard reads the same leaf when it shows the stored choice.
+	-- The magic key is read from config.toml by the hotstring preferences, not
+	-- by the setup wizard, which leaves the Linux trigger to the tray.
 	package.loaded["infra.hotstring_preferences"] = nil
 	local ok_key, magic_key = pcall(function()
 		return helpers.load_module("modules.hotstrings.magic_key").get()

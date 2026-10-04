@@ -857,15 +857,13 @@ end
 
 --- Removes a file only while it still holds exactly the bytes a caller published.
 --- This restores a proven absence: a created file that was edited since is kept.
---- A conditional adapter owns its final source check and unlink under its native
---- writer lock. Otherwise macOS `remove_exact` or Linux `delete` is used; an
---- explicit adapter with no remover is refused instead of reaching around it.
+--- The macOS adapter exposes `remove_exact`, the Linux one `delete`; an explicit
+--- adapter with neither is refused instead of reaching around it.
 --- @param path string File to remove.
 --- @param file_adapter table|nil Platform file adapter.
 --- @param expected_source table `{ status = "ok", content = string }` precondition.
 --- @return boolean removed
 --- @return string|nil error_message
---- @return function|nil retry_cleanup Exact native release debt, when retained.
 function M.remove_if_unchanged(path, file_adapter, expected_source)
 	if type(path) ~= "string" or path == "" or type(expected_source) ~= "table"
 		or expected_source.status ~= "ok" or type(expected_source.content) ~= "string" then
@@ -874,13 +872,6 @@ function M.remove_if_unchanged(path, file_adapter, expected_source)
 	local refusal = _refused_writes[refusal_key(path)]
 	if refusal then
 		return false, "writes to this file are refused for the session: " .. refusal
-	end
-	if type(file_adapter) == "table" and type(file_adapter.remove_if_unchanged) == "function" then
-		local call_ok, removed, detail, retry_cleanup = pcall(
-			file_adapter.remove_if_unchanged, path, expected_source)
-		if not call_ok then return false, tostring(removed) end
-		if removed == true then return true end
-		return false, tostring(detail or "conditional removal refused"), retry_cleanup
 	end
 	local current, status, detail = read_existing(path, file_adapter)
 	if status ~= "ok" or current ~= expected_source.content then

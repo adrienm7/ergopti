@@ -84,24 +84,6 @@ helpers.describe("onboarding JavaScript delivery", function()
 			end)
 		end)
 	end
-	for _, route in ipairs({ "previewLocale", "ready", "pickConfigDir", "loadExistingConfig" }) do
-		for _, mode in ipairs({ "nil", "false", "empty", "wrong_type" }) do
-			helpers.it("(onboarding-js-delivery) " .. route .. " refuses " .. mode .. " encoding result", function()
-				with_delivery(function(_, state, pending, errors, evaluations)
-					state.encode = function()
-						if mode == "false" then return false end
-						if mode == "empty" then return "  " end
-						if mode == "wrong_type" then return {} end
-					end
-					dispatch(route, state, pending)
-					helpers.assert_eq(#evaluations, 0, "a refused encoding cannot publish JavaScript")
-					helpers.assert_eq(#errors, 1)
-					helpers.assert_true(errors[1]:find("encoding failed", 1, true) ~= nil)
-					helpers.assert_nil(errors[1]:find("/virtual/", 1, true))
-				end)
-			end)
-		end
-	end
 	helpers.it("(onboarding-js-delivery) picked folder reaches setConfigDir as a JSON string", function()
 		with_delivery(function(_, state, pending, errors, evaluations)
 			state.receiver({ body = { action = "pickConfigDir", current = "" } })

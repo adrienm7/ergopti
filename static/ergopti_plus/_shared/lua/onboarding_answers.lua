@@ -113,11 +113,8 @@ function M.load(text, driver)
 			local limit = page.magic_key.max_characters
 			assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0,
 				"the onboarding catalogue gives the trigger character no length limit")
-			local validation = page.magic_key.validation
-			assert(validation == nil or validation == "safe_magic_key",
-				"the onboarding catalogue declares an unsupported trigger validation")
 			claim(page.magic_key.path, { kind = "character", default = page.magic_key.default,
-				max_characters = limit, validation = validation })
+				max_characters = limit })
 		end
 		walk(page.groups, page)
 	end
@@ -166,20 +163,11 @@ local function refusal(entry, value)
 		return "an imported item takes its recommendation or its neutral value"
 	end
 	if type(value) ~= "string" or value:match("^%s*$") or value:find("[%c]") then
-		return "the trigger character must be visible text",
-			entry.validation and "dialog.magic_key.error_empty" or nil
+		return "the trigger character must be visible text"
 	end
 	local length = utf8_length(value)
 	if not length or length > entry.max_characters then
-		return "the trigger character is at most " .. entry.max_characters .. " characters",
-			entry.validation and "dialog.magic_key.error_length" or nil
-	end
-	if entry.validation == "safe_magic_key" then
-		local valid, why = require("keymap.terminators").validate_magic_key(value)
-		if valid ~= true then
-			return "the trigger character is refused: " .. tostring(why),
-				why == "invalid_character" and "dialog.magic_key.error_length" or "dialog.magic_key.error_common"
-		end
+		return "the trigger character is at most " .. entry.max_characters .. " characters"
 	end
 	return nil
 end
@@ -213,8 +201,8 @@ local function split(index, operations, manifest)
 		if not entry then return nil, "operation " .. position .. " names no wizard path" end
 		if seen[path] then return nil, path .. " is answered twice" end
 		seen[path] = true
-		local why, reason_key = refusal(entry, value)
-		if why then return nil, path .. ": " .. why, reason_key end
+		local why = refusal(entry, value)
+		if why then return nil, path .. ": " .. why end
 		if entry.kind == "tap_hold_key" then
 			-- An unchecked key keeps whatever it has: nothing is written for it.
 			if same(value, entry.value) then keys[#keys + 1] = entry.key end
@@ -235,10 +223,9 @@ end
 --- @param manifest table Manifest reader with `sparse_operation(path, value)`.
 --- @return table|nil rows `{ section, key, value | delete }` for the TOML writer.
 --- @return string|nil reason Why the batch was refused.
---- @return string|nil reason_key Existing translated trigger refusal, when applicable.
 function M.rows(index, operations, manifest)
-	local answers, why, reason_key = split(index, operations, manifest)
-	if not answers then return nil, why, reason_key end
+	local answers, why = split(index, operations, manifest)
+	if not answers then return nil, why end
 	return answers.rows
 end
 

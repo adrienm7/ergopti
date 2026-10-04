@@ -3552,7 +3552,7 @@ function M.set_enabled(value, on_done, onboarding_gate)
 	local target_enabled = value == true
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
-		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
 			retry_bulk_settings_recovery()
 		end
 		if _bulk_settings_transaction then
@@ -3934,18 +3934,13 @@ local REGENERATION_REFUSED_BEFORE_DEPLOY = {
 local function finish_bulk_settings_callback(transaction, ok, reason)
 	if transaction.callback_settled then return end
 	transaction.callback_settled = true
-	local receipt = nil
-	if transaction.sibling then
-		transaction.sibling.settled(ok == true)
-		if ok == true then receipt = transaction.sibling.receipt() end
-	end
-	if receipt ~= nil then
-		invoke_public_callback(transaction.label, transaction.on_done, ok == true,
-			reason, transaction.change_count, receipt)
-		return
-	end
-	invoke_public_callback(transaction.label, transaction.on_done, ok == true,
-		reason, transaction.change_count)
+	invoke_public_callback(
+		transaction.label,
+		transaction.on_done,
+		ok == true,
+		reason,
+		transaction.change_count
+	)
 end
 
 --- Settles a bulk transaction whose settings are persisted while their deploy
@@ -4122,20 +4117,8 @@ retry_bulk_settings_recovery = function()
 		) then
 			return false
 		end
-		transaction.phase = "rollback-sibling"
-	end
-	if transaction.phase == "rollback-sibling" then
-		if transaction.sibling then
-			local called, restored, detail = pcall(transaction.sibling.restore)
-			if not called or restored ~= true then
-				Logger.error(LOG, "%s navigation-layer inverse remains pending: %s.",
-					transaction.label, tostring(called and detail or restored))
-				return false
-			end
-		end
-		-- The refused candidate stayed published until its settings inverse,
-		-- so any intervening build may have deployed it. Its sibling must be
-		-- restored before compiling that inverse or acknowledging no deploy.
+		-- The refused candidate stayed published until this save, so any
+		-- build since (Resume, a layout change, lease recovery) deployed it.
 		if transaction.inverse_redeploy_required == false
 			and transaction.refused_deploy_serial == _deploy_serial then
 			settle_bulk_inverse_without_redeploy(transaction)
@@ -4166,7 +4149,7 @@ local function settle_bulk_settings_before_lifecycle(boundary, cancel_reason)
 	save_bulk_edits_retained_by_guardian_wait(cancel_reason)
 	if _bulk_settings_transaction == nil then return true end
 	local phase = transaction.phase
-	if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
+	if phase == "rollback-persistence" or phase == "rollback-regeneration" then
 		retry_bulk_settings_recovery()
 	end
 	if _bulk_settings_transaction == nil then return true end
@@ -4198,11 +4181,12 @@ local function reject_bulk_settings_candidate(transaction, reason, refused_befor
 		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
 		return
 	end
-	transaction.phase = "rollback-sibling"
-	retry_bulk_settings_recovery()
-	if _bulk_settings_transaction == transaction and transaction.phase == "rollback-sibling" then
-		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+	if not transaction.inverse_redeploy_required then
+		settle_bulk_inverse_without_redeploy(transaction)
+		return
 	end
+	transaction.phase = "rollback-regeneration"
+	request_bulk_inverse_regeneration(transaction)
 end
 
 --- Reads the remap file and writes one verified backup of its exact bytes, so a
@@ -4232,10 +4216,9 @@ end
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
 --- @param backup_path string|nil A scope's unique backup: the candidate then
 ---        replaces only the exact bytes that verified backup holds.
---- @param sibling table|nil Navigation-layer participant retained with this bulk owner.
 --- @return boolean accepted True when candidate regeneration was accepted, or
 ---   when the candidate persisted while « Ergopti uses Karabiner » is off.
-local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path, sibling)
+local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt, backup_path)
 	if not require_state(label) then
 		invoke_public_callback(label, on_done, false, "not-initialized", 0)
 		return false
@@ -4259,7 +4242,7 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 	end
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
-		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
 			retry_bulk_settings_recovery()
 		end
 		-- The retry can settle the retained recovery synchronously; refusing
@@ -4299,7 +4282,6 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 		overwrite_corrupt = overwrite_corrupt,
 		phase = "candidate-persistence",
 		callback_settled = false,
-		sibling = sibling,
 	}
 	_bulk_settings_transaction = transaction
 	local expected_source
@@ -4313,25 +4295,9 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 			return false
 		end
 	end
-	if sibling then
-		local prepared, ready, detail = pcall(sibling.prepare)
-		if not prepared or ready ~= true then
-			transaction.failure_reason = type(detail) == "string" and detail or "nav-layer-import-failed"
-			transaction.inverse_redeploy_required = false
-			transaction.refused_deploy_serial = _deploy_serial
-			transaction.phase = "rollback-sibling"
-			retry_bulk_settings_recovery()
-			finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
-			return false
-		end
-	end
 	if not persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source) then
-		transaction.failure_reason = "candidate-persistence-failed"
-		transaction.inverse_redeploy_required = false
-		transaction.refused_deploy_serial = _deploy_serial
-		transaction.phase = "rollback-sibling"
-		retry_bulk_settings_recovery()
-		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+		_bulk_settings_transaction = nil
+		finish_bulk_settings_callback(transaction, false, "candidate-persistence-failed")
 		return false
 	end
 
@@ -4383,7 +4349,7 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 	end
 	if _bulk_settings_transaction then
 		local phase = _bulk_settings_transaction.phase
-		if phase == "rollback-persistence" or phase == "rollback-regeneration" or phase == "rollback-sibling" then
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
 			retry_bulk_settings_recovery()
 		end
 		if _bulk_settings_transaction then
@@ -4980,13 +4946,11 @@ end
 
 --- Restores one captured settings snapshot through the same exact bulk owner.
 --- The enabled flag belongs to the lease transition and must still match; this
---- inverse owns the remaining persisted settings and their regeneration, plus
---- the acknowledged scope import when its exact receipt accompanies the snapshot.
+--- inverse owns only the remaining persisted settings and their regeneration.
 --- @param snapshot table Detached result of `snapshot_settings()`.
 --- @param on_done function|nil Callback fn(ok, reason).
---- @param layer_receipt table|nil Exact import receipt delivered by apply_scope.
 --- @return boolean accepted True only when exact regeneration was accepted.
-function M.restore_settings(snapshot, on_done, layer_receipt)
+function M.restore_settings(snapshot, on_done)
 	local desired = clone_persisted_settings(snapshot)
 	if not desired then
 		invoke_public_callback(
@@ -5008,15 +4972,6 @@ function M.restore_settings(snapshot, on_done, layer_receipt)
 		)
 		return false
 	end
-	local sibling = nil
-	if layer_receipt ~= nil then
-		local detail
-		sibling, detail = require("platform.remap.scope_layer").inverse(layer_receipt)
-		if not sibling then
-			invoke_public_callback("Restore captured settings", on_done, false, detail, 0)
-			return false
-		end
-	end
 	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
 		local restored = clone_persisted_settings(desired)
 		candidate.tap_holds_enabled = restored.tap_holds_enabled
@@ -5028,7 +4983,7 @@ function M.restore_settings(snapshot, on_done, layer_receipt)
 		candidate.simultaneous_threshold_ms = restored.simultaneous_threshold_ms
 		candidate.combo_symmetric = restored.combo_symmetric
 		return 0
-	end, on_done, nil, nil, sibling)
+	end, on_done)
 end
 
 --- Clears both slots for one tap/hold key as one exact transaction.
@@ -5153,11 +5108,10 @@ local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos"
 --- manifest rows; every other table of the file is left untouched. The
 --- tap_holds « recommended » first creates layers.toml from Ergopti's
 --- recommended layer when the folder has none, so the regeneration deploys the
---- layer the preset's key enters. Its exact import receipt joins the settings
---- inverse; a refused cleanup retains debt until absence is acknowledged.
+--- layer the preset's key enters; a refused transaction removes that file.
 --- @param request table `{ scope = "tap_holds"|"shortcuts"|"key_combinations",
 ---   mode = "recommended"|"clear", backup_path = string }`.
---- @param on_done function|nil Callback fn(ok, reason, change_count, layer_receipt).
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
 --- @return boolean accepted True only when exact regeneration was accepted.
 function M.apply_scope(request, on_done)
 	local label = "Remap scope"
@@ -5176,8 +5130,23 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
-	local sibling = request.scope == "tap_holds" and request.mode == "recommended"
-		and require("platform.remap.scope_layer").import() or nil
+	local layer = nil
+	if request.scope == "tap_holds" and request.mode == "recommended" then
+		local import, layer_err = NavLayer.import_recommended()
+		if not import then
+			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
+				label, tostring(layer_err))
+			invoke_public_callback(label, on_done, false, "nav-layer-import-failed", 0)
+			return false
+		end
+		layer = import
+	end
+	local function settle(ok, reason, change_count)
+		if ok ~= true then NavLayer.undo_import(layer) end
+		-- The imported layer binds the wheel: its owner reads the new file.
+		if ok == true and layer then NavLayer.reconcile_wheel(label) end
+		if on_done then return on_done(ok, reason, change_count) end
+	end
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
@@ -5206,7 +5175,7 @@ function M.apply_scope(request, on_done)
 		candidate.tap_hold_timeout_ms = target.tap_hold_timeout_ms
 		candidate.sticky_timeout_ms = target.sticky_timeout_ms
 		return #M.TAP_HOLD_KEYS
-	end, on_done, nil, request.backup_path, sibling)
+	end, settle, nil, request.backup_path)
 end
 
 --- Restores the settings to defaults as one exact transaction: every setting,

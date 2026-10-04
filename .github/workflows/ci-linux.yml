@@ -219,24 +219,39 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          set -euo pipefail
-          profile_user="ergopti_sqlite_${RANDOM}"
-          profile_home=$(mktemp -d "$RUNNER_TEMP/ergopti-sqlite-profile-XXXXXX")
-          sudo useradd --user-group --no-create-home --home-dir "$profile_home" --shell /bin/sh "$profile_user"
-          cleanup() {
-            sudo userdel "$profile_user"
-            sudo rm -rf -- "$profile_home"
-          }
-          trap cleanup EXIT
-          # The fixture owns its source copy; private checkout permissions and
-          # the caller's login home must not be changed for another account.
-          sudo mkdir -p "$profile_home/source"
-          sudo cp -a . "$profile_home/source/linux"
-          sudo cp -a ../_shared "$profile_home/source/_shared"
-          sudo install -m 600 tests/hardware/fixtures/sqlite_profile.conf "$profile_home/.sqliterc"
-          sudo chown -R "$profile_user:$profile_user" "$profile_home"
-          sudo chmod -R u+rwX,go-rwx "$profile_home"
-          sudo runuser -u "$profile_user" -- sh -c 'cd "$1"; exec env TMPDIR="$2" LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_init_receipts.lua' sh "$profile_home/source/linux" "$profile_home"
+          set +e
+          (
+            set -euo pipefail
+            set -euo pipefail
+            profile_user="ergopti_sqlite_${RANDOM}"
+            profile_home=$(mktemp -d "$RUNNER_TEMP/ergopti-sqlite-profile-XXXXXX")
+            sudo useradd --user-group --no-create-home --home-dir "$profile_home" --shell /bin/sh "$profile_user"
+            cleanup() {
+              sudo userdel "$profile_user"
+              sudo rm -rf -- "$profile_home"
+            }
+            trap cleanup EXIT
+            # The fixture owns its source copy; private checkout permissions and
+            # the caller's login home must not be changed for another account.
+            sudo mkdir -p "$profile_home/source"
+            sudo cp -a . "$profile_home/source/linux"
+            sudo cp -a ../_shared "$profile_home/source/_shared"
+            sudo install -m 600 tests/hardware/fixtures/sqlite_profile.conf "$profile_home/.sqliterc"
+            sudo chown -R "$profile_user:$profile_user" "$profile_home"
+            sudo chmod -R u+rwX,go-rwx "$profile_home"
+            sudo runuser -u "$profile_user" -- sh -c 'cd "$1"; exec env TMPDIR="$2" LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_init_receipts.lua' sh "$profile_home/source/linux" "$profile_home"
+          ) 2>&1 | tee "$RUNNER_TEMP/ergopti-native-diagnostic-0.log"
+          native_status=${PIPESTATUS[0]}
+          if [ "$native_status" -ne 0 ]; then
+            python3 - "$RUNNER_TEMP/ergopti-native-diagnostic-0.log" <<'PYDIAGNOSTIC'
+          from pathlib import Path
+          import sys
+          for line in Path(sys.argv[1]).read_text(errors="replace").splitlines()[-35:]:
+              escaped = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error::" + escaped)
+          PYDIAGNOSTIC
+          fi
+          exit "$native_status"
         timeout-minutes: 1
 
       - name: Keep native shell capture failures free of caller text
@@ -419,7 +434,22 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          python3 tests/hardware/run_updater_etag_receipts.py
+          set +e
+          (
+            set -euo pipefail
+            python3 tests/hardware/run_updater_etag_receipts.py
+          ) 2>&1 | tee "$RUNNER_TEMP/ergopti-native-diagnostic-1.log"
+          native_status=${PIPESTATUS[0]}
+          if [ "$native_status" -ne 0 ]; then
+            python3 - "$RUNNER_TEMP/ergopti-native-diagnostic-1.log" <<'PYDIAGNOSTIC'
+          from pathlib import Path
+          import sys
+          for line in Path(sys.argv[1]).read_text(errors="replace").splitlines()[-35:]:
+              escaped = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error::" + escaped)
+          PYDIAGNOSTIC
+          fi
+          exit "$native_status"
         timeout-minutes: 2
 
       - name: Preserve native updater temporary-file ownership
@@ -442,10 +472,25 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales
-          sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8
-          python3 tests/hardware/run_system_audio_locale_receipts.py
-          ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py
+          set +e
+          (
+            set -euo pipefail
+            sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales
+            sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8
+            python3 tests/hardware/run_system_audio_locale_receipts.py
+            ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py
+          ) 2>&1 | tee "$RUNNER_TEMP/ergopti-native-diagnostic-2.log"
+          native_status=${PIPESTATUS[0]}
+          if [ "$native_status" -ne 0 ]; then
+            python3 - "$RUNNER_TEMP/ergopti-native-diagnostic-2.log" <<'PYDIAGNOSTIC'
+          from pathlib import Path
+          import sys
+          for line in Path(sys.argv[1]).read_text(errors="replace").splitlines()[-35:]:
+              escaped = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error::" + escaped)
+          PYDIAGNOSTIC
+          fi
+          exit "$native_status"
         timeout-minutes: 2
 
       - name: Resolve native roots with literal POSIX bytes and the actual cwd
@@ -716,7 +761,23 @@ jobs:
       - name: Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
-        run: python3 tests/hardware/run_atspi_interpreter_receipts.py
+        run: |
+          set +e
+          (
+            set -euo pipefail
+            python3 tests/hardware/run_atspi_interpreter_receipts.py
+          ) 2>&1 | tee "$RUNNER_TEMP/ergopti-native-diagnostic-3.log"
+          native_status=${PIPESTATUS[0]}
+          if [ "$native_status" -ne 0 ]; then
+            python3 - "$RUNNER_TEMP/ergopti-native-diagnostic-3.log" <<'PYDIAGNOSTIC'
+          from pathlib import Path
+          import sys
+          for line in Path(sys.argv[1]).read_text(errors="replace").splitlines()[-35:]:
+              escaped = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error::" + escaped)
+          PYDIAGNOSTIC
+          fi
+          exit "$native_status"
         timeout-minutes: 1
 
       # The program a user starts, started: the real daemon with --tray on a
@@ -893,9 +954,24 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-          ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
+          set +e
+          (
+            set -euo pipefail
+            sudo apt-get install -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
+            export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+            ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
+          ) 2>&1 | tee "$RUNNER_TEMP/ergopti-native-diagnostic-4.log"
+          native_status=${PIPESTATUS[0]}
+          if [ "$native_status" -ne 0 ]; then
+            python3 - "$RUNNER_TEMP/ergopti-native-diagnostic-4.log" <<'PYDIAGNOSTIC'
+          from pathlib import Path
+          import sys
+          for line in Path(sys.argv[1]).read_text(errors="replace").splitlines()[-35:]:
+              escaped = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error::" + escaped)
+          PYDIAGNOSTIC
+          fi
+          exit "$native_status"
         timeout-minutes: 2
 
       - name: The webview push reaches a real WebKit page

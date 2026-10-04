@@ -16,22 +16,9 @@ end
 --- @param files table Classified file adapter.
 --- @return boolean restored
 local function restore_file(file, files)
-	if file.removal_cleanup ~= nil then
-		local call_ok, settled, _, removed = pcall(file.removal_cleanup)
-		if not call_ok or settled ~= true then return false end
-		file.removal_cleanup = nil
-		if removed == true then return true end
-		-- A refused native unlink can still have removed the file. Only a
-		-- later classified absence after its retained lease settles proves the
-		-- inverse target; a changed present source remains refused.
-		local _, status = Writer.read_classified(file.path, files)
-		if status == "absent" then return true end
-	end
 	local expected = { status = "ok", content = file.candidate }
 	if file.source.status == "absent" then
-		local removed, _, retry_cleanup = Writer.remove_if_unchanged(file.path, files, expected)
-		if type(retry_cleanup) == "function" then file.removal_cleanup = retry_cleanup end
-		return removed == true
+		return Writer.remove_if_unchanged(file.path, files, expected) == true
 	end
 	return Writer.publish_if_unchanged(file.path, file.source.content, files, expected) == true
 end
