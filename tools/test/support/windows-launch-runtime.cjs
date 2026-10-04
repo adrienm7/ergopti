@@ -157,10 +157,29 @@ module.exports = function checkWindowsLaunchRuntime() {
 				describeNativeIdentityFailure(identity, fixtureSource)
 		);
 		assert.equal(identity.stderr, '', 'native identity controls must emit no stderr');
-		assert.equal(
-			identity.stdout.trim(),
-			'[OK] Native own-module short alias has independent file identity and exact long-path receipt; foreign and invalid paths are refused.'
+		const identityMessage =
+			'[OK] Native own-module identity and exact long-path receipt; foreign and invalid paths are refused. Short alias capability: ';
+		assert.ok(
+			[identityMessage + 'observed.', identityMessage + 'unavailable.'].includes(
+				identity.stdout.trim()
+			),
+			'the actual native capability must have an exact successful identity receipt'
 		);
+		const noShortAlias = invoke(
+			[
+				'-Command',
+				'& ' +
+					quote(executable) +
+					' --identity-controls-no-short-alias ' +
+					quote(path.join(temporary, 'identity-controls-no-short-alias')) +
+					'; exit $LASTEXITCODE'
+			],
+			{},
+			30000
+		);
+		assert.equal(noShortAlias.status, 0, noShortAlias.stdout + noShortAlias.stderr);
+		assert.equal(noShortAlias.stderr, '');
+		assert.equal(noShortAlias.stdout.trim(), identityMessage + 'unavailable (forced control).');
 		const unknownMode = invoke(
 			['-Command', '& ' + quote(executable) + ' --unknown; exit $LASTEXITCODE'],
 			{},

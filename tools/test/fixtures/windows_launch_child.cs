@@ -94,7 +94,8 @@ public static class WindowsLaunchChild
             }));
             return 0;
         }
-        if (args.Length != 2 || args[0] != "--identity-controls") {
+        if (args.Length != 2 || (args[0] != "--identity-controls"
+            && args[0] != "--identity-controls-no-short-alias")) {
             Console.Error.WriteLine("Unknown native identity control mode.");
             return 9;
         }
@@ -112,8 +113,6 @@ public static class WindowsLaunchChild
         Require(shortSize > 0 && shortSize < shortBuffer.Capacity && shortSize == shortBuffer.Length,
             "The controlled native short alias is unavailable.");
         var alias = shortBuffer.ToString();
-        Require(!String.Equals(alias, expected, StringComparison.OrdinalIgnoreCase),
-            "The native short alias must differ from the long module path.");
         Require(SamePhysicalFile(alias, expected), "The native short alias identifies another file.");
         Require(String.Equals(CanonicalExistingFile(alias), expected, StringComparison.OrdinalIgnoreCase),
             "The native alias does not resolve to the exact controlled module.");
@@ -145,7 +144,12 @@ public static class WindowsLaunchChild
         } finally {
             Environment.CurrentDirectory = priorDirectory;
         }
-        var start = new ProcessStartInfo(alias, "--own-image") {
+        // A successful native API may return its input when no distinct 8.3 alias exists.
+        // Keep real image identity/receipt controls mandatory on that valid capability.
+        var forceNoShortAlias = args[0] == "--identity-controls-no-short-alias";
+        var launchPath = forceNoShortAlias ? expected : alias;
+        var aliasObserved = !String.Equals(launchPath, expected, StringComparison.OrdinalIgnoreCase);
+        var start = new ProcessStartInfo(launchPath, "--own-image") {
             UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
         };
         using (var child = Process.Start(start)) {
@@ -160,7 +164,7 @@ public static class WindowsLaunchChild
                 Require(receipt.Count == 3 && receipt.ContainsKey("canonical") && receipt.ContainsKey("same_file")
                     && receipt.ContainsKey("alias_observed"),
                     "The native alias child receipt is malformed.");
-                Require((bool)receipt["same_file"] && (bool)receipt["alias_observed"]
+                Require((bool)receipt["same_file"] && (bool)receipt["alias_observed"] == aliasObserved
                     && String.Equals((string)receipt["canonical"], expected, StringComparison.OrdinalIgnoreCase),
                     "The actual native alias child did not publish its exact owned long module.");
             } finally {
@@ -170,7 +174,10 @@ public static class WindowsLaunchChild
                 }
             }
         }
-        Console.WriteLine("[OK] Native own-module short alias has independent file identity and exact long-path receipt; foreign and invalid paths are refused.");
+        var capability = aliasObserved ? "observed" : "unavailable";
+        if (forceNoShortAlias) capability += " (forced control)";
+        Console.WriteLine("[OK] Native own-module identity and exact long-path receipt; foreign and invalid paths are refused. Short alias capability: "
+            + capability + ".");
         return 0;
     }
 

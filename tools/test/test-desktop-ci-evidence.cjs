@@ -757,6 +757,10 @@ function checkCompiledFixtureNormalization(source, runtime) {
 		'size == 0 || size >= result.Capacity || size != result.Length',
 		'!File.Exists(canonical) || Directory.Exists(canonical)',
 		'SamePhysicalFile(alias, expected)',
+		'shortSize > 0 && shortSize < shortBuffer.Capacity && shortSize == shortBuffer.Length',
+		'var launchPath = forceNoShortAlias ? expected : alias;',
+		'var aliasObserved = !String.Equals(launchPath, expected, StringComparison.OrdinalIgnoreCase);',
+		'new ProcessStartInfo(launchPath, "--own-image")',
 		'SamePhysicalFile(invalid, expected)',
 		'Environment.CurrentDirectory = priorDirectory;',
 		'new string[] { driveRelative, rootRelative, dotted, parentDotted }',
@@ -766,7 +770,7 @@ function checkCompiledFixtureNormalization(source, runtime) {
 		'GetFileInformationByHandle(second, out b)',
 		'a.Volume == b.Volume && a.IndexHigh == b.IndexHigh && a.IndexLow == b.IndexLow',
 		'SamePhysicalFile(module, canonical)',
-		'(bool)receipt["same_file"] && (bool)receipt["alias_observed"]',
+		'(bool)receipt["same_file"] && (bool)receipt["alias_observed"] == aliasObserved',
 		'String.Equals((string)receipt["canonical"], expected, StringComparison.OrdinalIgnoreCase)',
 		'using (var child = Process.Start(start)) {\n            try {\n                var handle = child.Handle;',
 		'if (!child.HasExited)',
@@ -798,6 +802,10 @@ function checkCompiledFixtureNormalization(source, runtime) {
 	for (const token of [
 		'script.includes(\'-ArgumentList "/ErrorStdOut"\')',
 		' --identity-controls ',
+		' --identity-controls-no-short-alias ',
+		'assert.equal(noShortAlias.status, 0',
+		"assert.equal(noShortAlias.stderr, ''",
+		"assert.equal(noShortAlias.stdout.trim(), identityMessage + 'unavailable (forced control).')",
 		' --unknown; exit $LASTEXITCODE',
 		"assert.equal(identity.stderr, ''",
 		'assert.notEqual(unknownMode.status, 0',
@@ -842,8 +850,18 @@ for (const [from, to] of [
 	['Environment.CurrentDirectory = priorDirectory;', '// restoration omitted'],
 	['size == 0 || size >= result.Capacity || size != result.Length', 'size == 0'],
 	['SamePhysicalFile(alias, expected)', 'true'],
+	['shortSize > 0 && shortSize < shortBuffer.Capacity && shortSize == shortBuffer.Length', 'true'],
+	['var launchPath = forceNoShortAlias ? expected : alias;', 'var launchPath = alias;'],
+	[
+		'var aliasObserved = !String.Equals(launchPath, expected, StringComparison.OrdinalIgnoreCase);',
+		'var aliasObserved = true;'
+	],
+	['new ProcessStartInfo(launchPath, "--own-image")', 'new ProcessStartInfo(expected, "--unused")'],
 	['!SamePhysicalFile(expected, foreign)', 'true'],
-	['(bool)receipt["same_file"] && (bool)receipt["alias_observed"]', '(bool)receipt["same_file"]'],
+	[
+		'(bool)receipt["same_file"] && (bool)receipt["alias_observed"] == aliasObserved',
+		'(bool)receipt["same_file"]'
+	],
 	[
 		'using (var child = Process.Start(start)) {\n            try {\n                var handle = child.Handle;',
 		'using (var child = Process.Start(start)) {\n            var handle = child.Handle;\n            try {'
@@ -862,6 +880,13 @@ for (const [from, to] of [
 	['assert.equal(\n\t\t\tidentity.status,', 'assert.notEqual(\n\t\t\tidentity.status,'],
 	["'foreign-executable'", "'ready'"],
 	[' --identity-controls ', ' --unused '],
+	[' --identity-controls-no-short-alias ', ' --unused '],
+	['assert.equal(noShortAlias.status, 0', 'assert.equal(noShortAlias.status, 1'],
+	["assert.equal(noShortAlias.stderr, ''", "assert.ok(noShortAlias.stderr === ''"],
+	[
+		"assert.equal(noShortAlias.stdout.trim(), identityMessage + 'unavailable (forced control).')",
+		"assert.equal(noShortAlias.stdout.trim(), identityMessage + 'observed.')"
+	],
 	["assert.equal(identity.stderr, ''", "assert.ok(identity.stderr === ''"]
 ]) {
 	assert.ok(compiledRuntime.includes(from), 'the mutation must alter the actual native control');
@@ -878,7 +903,7 @@ for (const [from, to] of [
 		'function',
 		'the actual native status owner must expose its closed classifier'
 	);
-	const known = 'The native short alias must differ from the long module path.';
+	const known = 'The native alias does not resolve to the exact controlled module.';
 	const raw = 'private-error-payload-marker';
 	const native = {
 		stderr:
