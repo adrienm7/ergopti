@@ -218,6 +218,25 @@ _KL_Mouse_ClaimGesture(Button) {
 	}
 }
 
+/**
+ * Measures one claimed gesture without querying the cursor or publishing events.
+ * @param {Object} Gesture - Immutable receipt from the button claim owner.
+ * @param {Integer} X - Observed release coordinate in screen pixels.
+ * @param {Integer} Y - Observed release coordinate in screen pixels.
+ * @param {Integer} NowTick - Optional final tick; the default samples after geometry.
+ * @returns {Object} Distance in pixels and duration in milliseconds.
+ */
+_KL_Mouse_MeasureGesture(Gesture, X, Y, NowTick?) {
+	dx := X - Gesture.x
+	dy := Y - Gesture.y
+	dist := Sqrt(dx*dx + dy*dy)
+	StartTick := Gesture.tick
+	if !IsSet(NowTick)
+		NowTick := A_TickCount
+	duration := TickElapsed64(StartTick, NowTick)
+	return {distance: dist, duration: duration}
+}
+
 KL_Mouse_OnLDown(*) {
 		KL_InvalidatePasswordFocus()
 		KLMouse.lbtn_held := false
@@ -255,10 +274,9 @@ KL_Mouse_OnLUp(*) {
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my, &TargetHwnd)
-				dx       := mx - Gesture.x
-				dy       := my - Gesture.y
-				dist     := Sqrt(dx*dx + dy*dy)
-				duration := (A_TickCount - Gesture.tick) & 0xFFFFFFFF
+				Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)
+				dist := Measurement.distance
+				duration := Measurement.duration
 				filtered := true
 				try filtered := MF_ShouldFilter()
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
@@ -321,10 +339,9 @@ KL_Mouse_OnRUp(*) {
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my, &TargetHwnd)
-				dx       := mx - Gesture.x
-				dy       := my - Gesture.y
-				dist     := Sqrt(dx*dx + dy*dy)
-				duration := (A_TickCount - Gesture.tick) & 0xFFFFFFFF
+				Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)
+				dist := Measurement.distance
+				duration := Measurement.duration
 				filtered := true
 				try filtered := MF_ShouldFilter()
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
@@ -664,8 +681,8 @@ KL_Mouse_LogClick(button, x, y) {
 		))
 }
 
-KL_Mouse_LogDrag(button, x1, y1, x2, y2, dist_px, duration_ms) {
-		KL_AppendLog(Map(
+KL_Mouse_LogDrag(button, x1, y1, x2, y2, dist_px, duration_ms, AppendFn?) {
+		Event := Map(
 				"type",        "mouse_drag",
 				"app",         Keylogger.session_app,
 				"button",      button,
@@ -675,7 +692,11 @@ KL_Mouse_LogDrag(button, x1, y1, x2, y2, dist_px, duration_ms) {
 				"y2",          y2,
 				"dist_px",     dist_px,
 				"duration_ms", duration_ms
-		))
+		)
+		if IsSet(AppendFn)
+				AppendFn.Call(Event)
+		else
+				KL_AppendLog(Event)
 }
 
 
