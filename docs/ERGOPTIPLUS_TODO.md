@@ -1115,12 +1115,32 @@ These are software implementations; final hardware verification remains below.
   at its recommendation checked and one of the user's as kept, locks both, and
   every writer refuses to import over the latter and backs up the file it
   replaces. Published in the second 2026-09-30 release. Remaining: a real-device
-  re-run of the wizard on each OS (Windows was verified by CI only), and Linux
-  trigger selection in the wizard. Linux already writes its hotstring section
-  choices into the selected config.toml through the shared answer planner and
-  acknowledged writer. The shared wizard trigger choices remain excluded on
-  Linux because they do not satisfy its keymap validation policy; the tray
-  retains its existing physical-key preference owner.
+  re-run of the wizard on each OS (Windows was verified by CI only), and final
+  qualification of Linux trigger selection. The shared declaration now filters
+  common-character presets to Windows/macOS; Linux offers its accepted ★ preset
+  and custom symbols through the existing rare-symbol validator. The answer
+  planner refuses unsafe or malformed values with existing translated reasons
+  before language/folder preferences, destination preparation or configuration
+  writes, retaining the wizard for retry. Handwritten page/projection checks and
+  twenty real Linux bridge cases cover refusal, retry, sparse saves, future
+  neighbors, fresh runtime reads and wizard re-run. Existing outdated trigger
+  records are preserved without an explicit trigger choice; touching the
+  Hotstrings question or receiving an old-folder callback grants no replacement
+  intent. A changed folder retires prior values and choices immediately; feature
+  navigation and Finish wait for an exact successful read response, while Back
+  and same-folder retry stay available. Handwritten page cases prove missing,
+  stale, malformed and duplicate replies cannot reuse old-folder intent. The
+  macOS publication uses the shared JSON codec to preserve empty value maps as
+  objects at the native LuaSkin boundary, including initial and changed folders.
+  The original source fails all twenty new native cases. Selected local gates
+  passed 356 JS checks, 13,958 portable macOS and 6,586 Linux unit cases,
+  101 macOS E2E checks (one host-specific scenario skipped) and 188 Linux E2E
+  checks. Actual X11 GTK/WebKit2GTK probes passed the seven-page round trip,
+  delayed folder response, refused concurrent-source save with retry, and
+  untouched obsolete-trigger preservation (24/28/29/33 checks). These probes
+  use real DOM, native bridge and file publication; the restart port is an
+  observer, not a restarted daemon. Hosted native qualification, physical input,
+  Wayland and physical-device wizard re-runs remain pending.
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
   registry values through one owner. Remaining: turning the switch off or «
