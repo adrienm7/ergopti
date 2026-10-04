@@ -118,6 +118,89 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
+		for _, target in ipairs({ "file:///owned/source", "FILE:///owned/source", "file:/owned/source",
+			"ftp://127.0.0.1/native", "ftps://127.0.0.1/native", "gopher://127.0.0.1/native",
+			"data:text/plain,synthetic", "telnet://127.0.0.1/native" }) do
+			helpers.it("linux-http-transport-boundary: " .. method .. " refuses " .. target .. " before native effects", function()
+				local client, state = fresh_client()
+				local result, callbacks, chunks = nil, 0, 0
+				local function complete(value) result = value; callbacks = callbacks + 1 end
+				local dispatched
+				if method == "get" then dispatched = client.get(target, {}, {}, complete)
+				elseif method == "post" then dispatched = client.post(target, {}, "{}", complete)
+				elseif method == "download" then dispatched = client.download(target, {}, "/tmp/unit-transport", {}, complete)
+				else dispatched = client.postStream(target, {}, "{}", {}, function() chunks = chunks + 1 end, complete) end
+				helpers.assert_eq(dispatched, false)
+				helpers.assert_true(result and result.ok == false and result.status == 0 and type(result.error) == "string")
+				helpers.assert_nil(result.error:find("owned/source", 1, true))
+				helpers.assert_eq(callbacks, 1)
+				helpers.assert_eq(chunks, 0)
+				helpers.assert_eq(#state.handles, 0)
+				helpers.assert_eq(#state.requests, 0)
+				helpers.assert_eq(#state.kills, 0)
+				helpers.assert_eq(client.isActive(), false)
+			end)
+		end
+	end
+
+	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
+		for _, case in ipairs({ { name = "HTTP", url = "http://example.invalid", fence = "=http,https" },
+			{ name = "uppercase HTTPS", url = "HTTPS://example.invalid", fence = "=http,https" },
+			{ name = "HTTPS-only", url = "https://example.invalid", fence = "=https", https_only = true } }) do
+			helpers.it("linux-http-transport-options: " .. method .. " fences native " .. case.name .. " protocols", function()
+				local client, state = fresh_client()
+				local result, options = nil, { https_only = case.https_only }
+				local function complete(value) result = value end
+				if method == "get" then helpers.assert_true(client.get(case.url, {}, options, complete))
+				elseif method == "post" then helpers.assert_true(client.post(case.url, {}, "{}", complete, options))
+				elseif method == "download" then helpers.assert_true(client.download(case.url, {}, "/tmp/unit-http-transport", options, complete))
+				else helpers.assert_true(client.postStream(case.url, {}, "{}", options, function() end, complete)) end
+				local fences = 0
+				for index, argument in ipairs(state.options.args) do
+					if argument == "--proto" then fences = fences + 1; helpers.assert_eq(state.options.args[index + 1], case.fence) end
+				end
+				helpers.assert_eq(fences, 1, "one native fence must constrain initial requests and redirects")
+				if method == "postStream" then state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n"); state.complete()
+				else state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n") end
+				helpers.assert_true(result and result.ok and result.status == 200)
+			end)
+		end
+	end
+	for index, policy in ipairs({ {}, { allowed_schemes = {} }, { allowed_schemes = "http,https" },
+		{ allowed_schemes = { 42 } }, { allowed_schemes = { "HTTP" } },
+		{ allowed_schemes = { "http", "http" } }, { allowed_schemes = { http = true } } }) do
+		helpers.it("linux-http-transport-policy: refuses malformed shared inventory " .. index, function()
+			local previous_json, previous_binding = package.loaded["json"], package.loaded["infra.http_transport_policy"]
+			package.loaded["json"] = { decode = function() return policy end }
+			package.loaded["infra.http_transport_policy"] = nil
+			local ok, binding = pcall(require, "infra.http_transport_policy")
+			package.loaded["json"], package.loaded["infra.http_transport_policy"] = previous_json, previous_binding
+			helpers.assert_true(ok and type(binding) == "table" and type(binding.resolve) == "function", tostring(binding))
+			local protocols, err = binding.resolve("https://example.invalid")
+			helpers.assert_nil(protocols)
+			helpers.assert_eq(err, "HTTP transport policy is invalid")
+		end)
+	end
+	helpers.it("linux-http-transport-policy: unavailable shared policy refuses before allocation", function()
+		local previous_paths, previous_binding = package.loaded["infra.paths"], package.loaded["infra.http_transport_policy"]
+		package.loaded["infra.paths"] = { shared = function() return "/nonexistent-ergopti-transport-policy/policy.json" end }
+		package.loaded["infra.http_transport_policy"] = nil
+		local ok, binding = pcall(require, "infra.http_transport_policy")
+		package.loaded["infra.paths"] = previous_paths
+		helpers.assert_true(ok and type(binding) == "table" and type(binding.resolve) == "function", tostring(binding))
+		local client, state = fresh_client()
+		package.loaded["infra.http_transport_policy"] = previous_binding
+		local result, callbacks = nil, 0
+		helpers.assert_eq(client.get("https://example.invalid", {}, {}, function(value) result = value; callbacks = callbacks + 1 end), false)
+		helpers.assert_true(result and result.ok == false and result.status == 0)
+		helpers.assert_eq(result.error, "HTTP transport policy is unavailable")
+		helpers.assert_eq(callbacks, 1)
+		helpers.assert_eq(#state.handles, 0)
+		helpers.assert_eq(#state.requests, 0)
+		helpers.assert_eq(client.isActive(), false)
+	end)
+
 	for _, method in ipairs({ "post", "postStream" }) do
 		for index, body in ipairs({ "@/owned/source", "@/owned/missing", "@-", "@", "@@literal", "@literal text" }) do
 			helpers.it("linux-http-literal-body: " .. method .. " sends at-prefixed body " .. index .. " as raw caller bytes", function()

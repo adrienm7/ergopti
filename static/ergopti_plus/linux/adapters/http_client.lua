@@ -17,6 +17,7 @@ local LibuvExit = require("infra.libuv_exit")
 local ProcessGroup = require("infra.libuv_process_group")
 local RedirectPolicy = require("infra.http_redirect_policy")
 local HeaderPolicy = require("infra.http_header_policy")
+local TransportPolicy = require("infra.http_transport_policy")
 local LOG = "adapters.http_client"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -152,6 +153,7 @@ local function curl_args(url, headers, body, options)
 		"--silent", "--show-error", "--no-buffer", "--fail-with-body",
 		"--max-time", tostring(math.max(1, math.ceil(timeout_ms / 1000))),
 		"--request", options.method,
+		"--proto", options.protocols,
 	}
 	if options.follow_redirects then
 		args[#args + 1] = "--location"
@@ -163,8 +165,6 @@ local function curl_args(url, headers, body, options)
 		end
 	end
 	if options.https_only then
-		args[#args + 1] = "--proto"
-		args[#args + 1] = "=https"
 		args[#args + 1] = "--tlsv1.2"
 	end
 	if options.etag_compare then
@@ -310,6 +310,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		Logger.error(LOG, "Cannot compose curl configuration: request URL contains NUL.")
 		return reject("curl config URL cannot contain NUL")
 	end
+	local protocols, transport_error = TransportPolicy.resolve(url, options.https_only == true)
+	if not protocols then return reject(transport_error) end
 	if options.follow_redirects then
 		local allowed, err = RedirectPolicy.allows_native_follow(headers)
 		if allowed == nil then
@@ -323,6 +325,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 	end
 	local timeout_ms = tonumber(options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request_options = {
+		protocols = protocols,
 		buffered = options.buffered == true,
 		method = options.method or "POST",
 		timeout_ms = timeout_ms,
