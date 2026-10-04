@@ -1983,6 +1983,16 @@ These failures are retained and routed to the Linux fixture owner, not counted
 as successful qualification. Native dialogs and physical acceptance remain
 required.
 
+Ollama v0.24.0 release pins now have one closed shared catalogue for macOS,
+Linux amd64/arm64 and Windows amd64/arm64. The registered generator owns the
+existing macOS shell projection and preserves its exact version, digest and
+size. Independent official-asset expectations cover all five records, strict
+schema and CLI admission, generation and no-write drift refusal; 112 focused
+cases pass, and three causal controls reject broken drift, projection and
+registration. This is an installation prerequisite: no official archive,
+owned runtime or model has been downloaded or installed by these checks.
+Item 48 and its native, packaging and physical acceptance remain open.
+
 - [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
       reinstalls its own low-level keyboard hook around every SendInput (upstream
       `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
