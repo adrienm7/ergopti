@@ -413,7 +413,7 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 		; the keymap module is not loaded (tools/, standalone tests), and there the
 		; unqualified pre-fix behaviour is correct.
 		if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
-				UpdateLastSentCharacter(SubStr(Text, -1))
+				UpdateLastSentCharacter(SubStr(Text, -_TextTailCodeUnits(Text, 1)))
 		}
 		return true
 }
