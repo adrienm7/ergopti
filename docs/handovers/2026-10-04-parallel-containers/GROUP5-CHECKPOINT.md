@@ -18,6 +18,7 @@ The inspected base is `689d30293704093feab2e3caa077604e88560eb6` from the actual
 | `a0b595f09b24abbfcdca9cb7e30418c7ba6dda9b` | Reuse the released Group4 exact-descriptor Core provisioning prerequisite.            |
 | `10486f41de7ed8f20ebfe91220440ccac3dfcb26` | Require exact physical sink acceptance, copied outbox ownership and retained context. |
 | `6aa4121972dd4ed5764ec9b200ac0652d140bfda` | Include the actual CLI baseline version in the cheap admission preflight.             |
+| `c392b57282b8a6ee91d91b29b4774b5ca8f25bf5` | Retain observed owned file-read sample ancestry through bounded closed markers.       |
 
 Default startup does not load the new capture session. Opening v1, consumer
 baseline v2, producer baseline v1, fixture-only coverage and independent JSON
@@ -89,6 +90,18 @@ CLI1 tree that the original script accepted. Current live versions remain
 consumer2, producer1, CLI1 and reader1..1. The deliberate exit3 refusal is not a
 native acceptance result, and frozen native JSON corpora remain unchanged.
 
+The next bounded WP3 slice adds an asynchronous native clock worker after exact
+identity verification and retirement. Only successful start, completion,
+validated clock receipt and exact worker settlement permit an explicit context
+owner to accept the copied timebase and immutable converter. Its exact true
+acknowledgement precedes stream creation. Cancellation retains native debt and
+fences successors; prepare/status/open remain in the existing single capture
+process. Five causal preimage failures cover missing startup/ownership refusal;
+37 focused cases pass (13 startup, 20 existing supervisor and 4 arithmetic).
+The complete source-selected gate remains a prerequisite before committing.
+This port does not bind production context history, activate startup or establish
+native acceptance.
+
 TODO13/35 closure reuses inspected native receipts:
 
 - Run37081066757 at `c47624171d2594785f1590a7f0fd7a6e460810fa` passed actual
@@ -134,8 +147,9 @@ No new group5 native CI has been executed. The existing remote lock
 `0563f0d589a181698bd2b13d75026aec673dbb61` belongs to group7, branch
 `feat/windows-native`, candidate `45d5c2db602ee74711da965ba17207c69b6dcba5`.
 Its first run37228466168 reached terminal failure; the owner subsequently
-continued the same reservation with new manual runs. Run37232550379 completed
-with Windows unit failure; macOS and Release were skipped. Group5 requested the
+continued the same reservation with new manual runs. Run37236435190 completed
+with Windows unit failure at `cb2e62e0a4691ae57a0c05a36a6b998973663879`;
+macOS and Release were skipped. Group5 requested the
 owner's next-phase/release status in issue86. Inspect the current terminal result
 and actual owner release before reserving. Do not take it over or delete it. Group5 has
 not moved `codex/ci-validation` and does not own either CI ref.
