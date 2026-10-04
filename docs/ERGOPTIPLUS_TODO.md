@@ -2622,6 +2622,12 @@ assertions. Native Windows tests and release/install acceptance remain unrun.
 These Windows steps no longer block the requested group-6 merge; item 62 and
 transversal items 16/38 stay open for their remaining validation scope.
 
+The existing actual GTK/WebKit model-pull fixture now sends the progress
+bridge's session/failed-presentation epoch protocol. Its successful retry uses
+that actual owner, and its post-success stale retry reuses the same failed
+token. Every original assertion, native loop deadline and retirement check is
+unchanged. Native Linux execution of this corrected fixture remains required.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
