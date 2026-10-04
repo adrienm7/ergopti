@@ -1740,6 +1740,12 @@ native Windows execution is pending CI.
 
 Linux whole-tree and language hotstring aggregate checkboxes now require an exact durable true acknowledgement from the existing preferences owner. False, nil, exceptions and truthy nonboolean refusals retain the prior native catalogue, private source and checkbox state, and report the existing localized error through the keyboard-released modal owner. The actual callback regression fails against the previous consumer; 35 focused checks pass locally, including eight genuine preferences-writer refusal cases. Remaining personal/dynamic views and complete native three-OS validation are still tracked separately.
 
+Linux category-section menu callbacks now acknowledge only the real preference owner's boolean `true`. A missing, refusing or throwing owner returns `false` and shows the existing localized save-failure notice with the keyboard released. The canonical choices writer remains the sole publisher; failed publication preserves the original source and compensates the active engine before any success notification.
+
+The registered category module passes 37/0, including four actual conditional-writer publication refusals and a durable success followed by real disk reload. The old callback fails the same tests (25/12); truthy-acknowledgement and silent-refusal counterfactuals fail as well. All 25 original cases and 36 original assertion lines remain; the old successful test double now returns the real owner's `true` receipt. The separately approved Wrap changes are preserved by exact two-order composition and whole-file inverse. Actual native row counts do not change. Whole integration and hosted native UI qualification remain pending; this is a TODO102 prerequisite, not complete personal/dynamic-menu retirement.
+
+The final ordered sibling also retains all OpenFile12 category-file cases and assertions. Its registered module passes 43/0; whole source inverses recover the complete OpenFile test and the original ACK2 candidate independently. The earlier standalone preimage did not include those future OpenFile tests and remains preserved as historical proof, not the final queue preimage.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue

@@ -46,6 +46,7 @@ local function fake_config(opts)
 		end,
 		toggle_section = function(id, section)
 			log.sections[#log.sections + 1] = id .. "." .. section
+			return true
 		end,
 		set_category_scope_enabled = function(ids, on)
 			log.bulk[#log.bulk + 1] = table.concat(ids, ",") .. "=" .. tostring(on)
@@ -438,6 +439,163 @@ helpers.describe("shared category file command", function()
 				helpers.assert_true(item.title ~= "menu.hotstrings.open_file")
 			end
 			helpers.assert_true(#row.menu > 2, "the remaining category and section commands still render")
+		end)
+	end)
+end)
+
+helpers.describe("category section callbacks: exact publication acknowledgement", function()
+	local function section_action(config)
+		local row = assert(rolls_row(config), "the actual category provider must remain visible")
+		for _, item in ipairs(row.menu) do
+			if type(item.title) == "string" and item.title:find("hc (", 1, true) then return item.fn end
+		end
+		error("the native hc section row was not rendered")
+	end
+	local function observe_click(action)
+		local execute, modal = os.execute, require("ui.modal")
+		local run, notices, releases = modal.run, {}, 0
+		modal.run = function(callback) releases = releases + 1; return callback() end
+		os.execute = function(command)
+			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			return execute(command)
+		end
+		local called, result = pcall(action)
+		os.execute, modal.run = execute, run
+		return called, result, notices, releases
+	end
+	for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("contains the section owner receipt " .. outcome, function()
+			local config, log = fake_config({})
+			local asked = {}
+			if outcome == "missing" then config.toggle_section = nil
+			else config.toggle_section = function(id, name)
+				asked[#asked + 1] = { id, name }
+				if outcome == "throw" then error("inert native section refusal") end
+				if outcome == "nil" then return nil end
+				if outcome == "number" then return 2 end
+				if outcome == "text" then return "true" end
+				return outcome == "true"
+			end end
+			local called, result, notices, releases = observe_click(section_action(config))
+			helpers.assert_true(called, "a section click contains a refused or throwing owner")
+			helpers.assert_eq(#notices, outcome == "true" and 0 or 1, "a refused owner has a visible failure instead of a silent click")
+			helpers.assert_eq(result, outcome == "true", "only the exact boolean true acknowledges publication")
+			helpers.assert_eq(asked, outcome == "missing" and {} or { { "rolls", "hc" } })
+			helpers.assert_eq(releases, #notices, "the visible refusal releases the keyboard before its modal")
+			helpers.assert_eq(log.toggled, {}, "the category gate remains independently owned")
+			if #notices > 0 then
+				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
+				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+					require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+			end
+		end)
+	end
+
+	local function with_real_section_owner(body)
+		local directory = os.tmpname()
+		assert(os.remove(directory))
+		directory = directory .. "-ergopti-section-ack"
+		local quote = require("adapters.shell_runner").quote
+		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		local path = directory .. "/config.toml"
+		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
+			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
+		local fh = assert(io.open(path, "wb"));assert(fh:write(original));assert(fh:close())
+		local loaded = {}
+		for name, value in pairs(package.loaded) do loaded[name] = value end
+		local Terminators = require("modules.hotstrings.terminator_settings")
+		local catalogue = Terminators.snapshot()
+		local ok, err = pcall(function()
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			package.loaded["modules.hotstrings.loader"] = nil
+			local paths = {}
+			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			-- The private fixture has no external installed layout roots.
+			paths.extension_roots = function() return {} end
+			package.loaded["infra.paths"] = paths
+			local loader = require("modules.hotstrings.loader")
+			local native_find = loader.find_toml_files
+			package.loaded["modules.hotstrings.loader"] = {
+				find_toml_files = native_find, list_subdirs = function() return {} end,
+				read_file = function() return nil end,
+				load_catalogue = function()
+					return { committed = true, errors = 0, categories = {
+						rolls = { id = "rolls", path = directory .. "/rolls.toml", count = 1,
+							description = { en = "Rolls", fr = "Roulements" },
+							extension = { id = "ergopti", name = "Ergopti" },
+							sections_order = { "hc", "sx" }, sections = { hc = { count = 1 }, sx = { count = 0 } } },
+					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
+				end,
+			}
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local changed = 0
+			assert(config._set_config_file_for_test(path))
+			assert(config.init(engine, directory, function() changed = changed + 1 end))
+			local _, loaded = config.load_all();assert(loaded)
+			body({ config = config, engine = engine, path = path, original = original,
+				changed = function() return changed end })
+		end)
+		local restored = Terminators.restore_configuration(catalogue)
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		local removed = os.execute("rm -rf " .. quote(directory))
+		assert(restored, "the exact delimiter catalogue is restored")
+		assert(removed == 0, "the owned private fixture is retired")
+		if not ok then error(err, 0) end
+	end
+	local function read(path)
+		local fh = assert(io.open(path, "rb"));local data = fh:read("*a");assert(fh:close());return data
+	end
+	local function section_fires(engine)
+		engine:reset();engine:on_char("h");local result = engine:on_char("q")
+		return result ~= nil and result.replacement == "section-result"
+	end
+	for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
+		helpers.it("reports a real canonical section publication refusal " .. outcome .. " without repainting", function()
+			with_real_section_owner(function(c)
+				helpers.assert_true(section_fires(c.engine), "the original actual engine mapping fires")
+				local action = section_action(c.config)
+				local rename, publications = os.rename, 0
+				os.rename = function(from, to)
+					if from == c.path .. ".tmp" and to == c.path then
+						publications = publications + 1
+						if outcome == "throw" then error("inert owned publication refusal") end
+						if outcome == "nil" then return nil, "inert owned publication refusal" end
+						if outcome == "number" then return 2 end
+						return false, "inert owned publication refusal"
+					end
+					return rename(from, to)
+				end
+				local called, result, notices, releases = observe_click(action)
+				os.rename = rename
+				helpers.assert_true(called)
+				helpers.assert_eq(publications, 1, "the actual conditional writer attempted its owned staging publication")
+				helpers.assert_eq(#notices, 1, "the actual refused publication is visible to the user")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(c.changed(), 0, "no success notification/repaint is published")
+				helpers.assert_eq(read(c.path), c.original, "every independent source byte survives the refused write")
+				helpers.assert_true(c.config.is_section_checked("rolls", "hc"))
+				helpers.assert_true(section_fires(c.engine), "the actual engine is compensated after failed persistence")
+				helpers.assert_eq(#notices, 1)
+				helpers.assert_eq(releases, 1)
+			end)
+		end)
+	end
+	helpers.it("acknowledges the real section publication and refreshes only after durable success", function()
+		with_real_section_owner(function(c)
+			local called, result, notices, releases = observe_click(section_action(c.config))
+			helpers.assert_true(called)
+			helpers.assert_eq(result, true)
+			helpers.assert_eq(c.changed(), 1)
+			helpers.assert_true(c.config.refresh_choices(), "a real disk reload accepts the committed choice")
+			helpers.assert_eq(c.changed(), 2, "the separate reload owns its own publication notification")
+			helpers.assert_eq(c.config.is_section_checked("rolls", "hc"), false)
+			helpers.assert_eq(section_fires(c.engine), false)
+			local source = read(c.path)
+			helpers.assert_true(source:find('label = "kept"', 1, true) ~= nil)
+			helpers.assert_true(source:find('foreign = true', 1, true) ~= nil)
+			helpers.assert_eq(#notices, 0)
+			helpers.assert_eq(releases, 0)
 		end)
 	end)
 end)
