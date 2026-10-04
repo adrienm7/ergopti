@@ -186,7 +186,7 @@ jobs:
           # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
           # blocks when AHK runs without an inherited console handle, so the
           # file is the only reliable output channel in CI).
-          # Tail-read the results file while AHK runs for real-time CI log output.
+          # FileAppend owns an exclusive handle; read the transcript only after exit.
           # /ErrorStdOut routes load-time (parse / nonexistent-function / missing
           # #Include) errors to stderr and exits non-zero instead of popping a modal
           # dialog that no one can dismiss headlessly — which otherwise hangs the
@@ -194,32 +194,9 @@ jobs:
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
-          $fstream = $null
-          $reader  = $null
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
           while (-not $proc.HasExited) {
-              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                  try {
-                      $fstream = [System.IO.FileStream]::new($resultsFile,
-                          [System.IO.FileMode]::Open,
-                          [System.IO.FileAccess]::Read,
-                          [System.IO.FileShare]::ReadWrite)
-                      $reader = [System.IO.StreamReader]::new($fstream)
-                  } catch {
-                      # AHK may still hold an exclusive write lock; retry next tick
-                      Start-Sleep -Milliseconds 100
-                  }
-              }
-              if ($null -ne $reader) {
-                  $line = $reader.ReadLine()
-                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-              } else {
-                  Start-Sleep -Milliseconds 100
-              }
-          }
-          if ($null -ne $reader) {
-              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-              $reader.Close(); $fstream.Close()
+              Start-Sleep -Milliseconds 100
           }
           $proc.WaitForExit()
           $exit = $proc.ExitCode
@@ -232,6 +209,7 @@ jobs:
           if (-not (Test-Path $resultsFile)) {
               Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
           }
+          Get-Content -LiteralPath $resultsFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
           $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
           Write-Host $summary
           $manifestFile = "$env:RUNNER_TEMP\windows-ahk-execution-manifest.json"
@@ -428,34 +406,14 @@ jobs:
           Write-Host "------------------------------------------------------------"
           # Same approach as the unit test suite: AHK writes TAP output to
           # test_results.txt (FileAppend to "*" blocks without a console handle).
-          # Tail-read the file for real-time CI log output.
+          # FileAppend owns an exclusive handle; read the transcript only after exit.
           # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
           # hanging on an undismissable modal dialog in the headless runner.
           $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
-          $fstream = $null; $reader = $null
           while (-not $proc.HasExited) {
-              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                  try {
-                      $fstream = [System.IO.FileStream]::new($resultsFile,
-                          [System.IO.FileMode]::Open,
-                          [System.IO.FileAccess]::Read,
-                          [System.IO.FileShare]::ReadWrite)
-                      $reader = [System.IO.StreamReader]::new($fstream)
-                  } catch {
-                      # AHK may still hold an exclusive write lock; retry next tick
-                      Start-Sleep -Milliseconds 100
-                  }
-              }
-              if ($null -ne $reader) {
-                  $line = $reader.ReadLine()
-                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-              } else { Start-Sleep -Milliseconds 100 }
-          }
-          if ($null -ne $reader) {
-              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-              $reader.Close(); $fstream.Close()
+              Start-Sleep -Milliseconds 100
           }
           $proc.WaitForExit()
           $exit = $proc.ExitCode
@@ -468,6 +426,7 @@ jobs:
           if (-not (Test-Path $resultsFile)) {
               Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
           }
+          Get-Content -LiteralPath $resultsFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
           if ($exit -ne 0) {
               Write-Host "::error::AHK E2E native process failed (exit $exit)."
               Write-Error "E2E suite failed (exit $exit)."; exit $exit
