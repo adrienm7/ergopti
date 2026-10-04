@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -981,8 +982,20 @@ class SupplementalReadinessTests(unittest.TestCase):
                 raise subprocess.TimeoutExpired(["osascript"], options["timeout"])
 
             child.communicate.side_effect = timed_out
+            spawn = mock.Mock(return_value=child)
+            sample_child = mock.Mock(returncode=2)
+            sample_arguments = []
+
+            def create_owned_child(arguments, **options):
+                if arguments[0] == "/usr/bin/osascript":
+                    return spawn(arguments, **options)
+                if arguments[0] != "/usr/bin/sample":
+                    raise RuntimeError("The fixture refused an unknown child owner")
+                sample_arguments.append(arguments)
+                return sample_child
+
             with (
-                mock.patch.object(probe.subprocess, "Popen", return_value=child) as spawn,
+                mock.patch.object(probe.subprocess, "Popen", side_effect=create_owned_child),
                 mock.patch.object(owner, "sample_scripting_command", return_value=[]),
                 mock.patch.object(owner, "sample_native_runtime", return_value=[]),
             ):
@@ -997,6 +1010,14 @@ class SupplementalReadinessTests(unittest.TestCase):
             retained = (scope.path / "entry.json").read_bytes()
             self.assertEqual(owner.scripting_commands, [child])
             self.assertEqual(spawn.call_count, 1)
+            self.assertEqual(owner.server_sample_workers, [])
+            self.assertIsNotNone(sample_child.returncode)
+            sample_child.kill.assert_not_called()
+            for arguments in sample_arguments:
+                self.assertEqual(arguments[:4], ["/usr/bin/sample", "42", "1", "-file"])
+                self.assertEqual(
+                    arguments[4], str(Path(folder) / "sample-hammerspoon-no-prompt-1.txt")
+                )
             self.assertEqual(
                 child.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
             )
@@ -3167,6 +3188,448 @@ process.stdout.write(JSON.stringify({refused:refused,value:value})+'\n');
                     self.direct_projection(scope, mode), {"refused": True, "value": None}, mode
                 )
             self.assertEqual(scope.observe()["server"], "not_observed")
+            scope.cleanup()
+
+
+class InflightNoPromptSampleTests(unittest.TestCase):
+    """A deterministic process model proves ownership and phase association, not macOS."""
+
+    def owner(self, folder):
+        owner = probe.NativeDelayedTimerProbe(
+            Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
+        )
+        owner.nonce = NONCE
+        return owner
+
+    def sender(self, scope, stages, **overrides):
+        packet = {
+            "schema_version": 1,
+            "contract": "hs.applescript.sender-stages",
+            "nonce": NONCE,
+            "target_pid": 42,
+            "sender_pid": SENDER_PID,
+            "stages": stages,
+        }
+        packet.update(overrides)
+        temporary = scope.path / "sender.json.pending"
+        temporary.write_text(json.dumps(packet) + "\n")
+        os.replace(temporary, scope.path / "sender.json")
+
+    def sampler(self, action=None):
+        process = mock.Mock(returncode=None)
+        observations = []
+
+        def wait(**options):
+            observations.append(("wait", options["timeout"]))
+            if action:
+                action()
+            if process.returncode is None:
+                process.returncode = 0
+            return process.returncode
+
+        def kill():
+            observations.append(("kill", None))
+            process.returncode = -9
+
+        process.wait.side_effect = wait
+        process.kill.side_effect = kill
+        return process, observations
+
+    def test_exact_send_interval_and_native_header_associate_observation_without_admission(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            ended = threading.Event()
+            seen = []
+            native = no_prompt_receipt(-1712, None, "send")
+            child = mock.Mock(pid=SENDER_PID, returncode=0)
+            sample_process, sample_calls = self.sampler()
+            original_worker = getattr(probe, "NoPromptServerSample", object)
+
+            class ObservedWorker(original_worker):
+                def _run(self):
+                    try:
+                        super()._run()
+                    finally:
+                        ended.set()
+
+            def communicate(**options):
+                seen.append(("sender_timeout", options["timeout"]))
+                self.sender(owner.no_prompt_scope, ["constructed", "send_entered"])
+                seen.append(("sampler_completed_before_reply", ended.wait(timeout=2)))
+                publish_supplemental_fixture(owner, SENDER_PID, -1712, "none")
+                return json.dumps(native) + "\n", ""
+
+            child.communicate.side_effect = communicate
+
+            def spawn(arguments, **options):
+                if arguments[0] == "/usr/bin/osascript":
+                    return child
+                seen.append(("sample_arguments", arguments))
+                seen.append(("sample_streams", options))
+                Path(arguments[-1]).write_text(
+                    f"Process: Hammerspoon [42]\nPath: {EXECUTABLE}\nCall graph:\n"
+                    "1 Thread_1 DispatchQueue_1: com.apple.main-thread\n"
+                    " + 1 NSApplicationMain (in AppKit)\n"
+                    " +   1 HSAppleScriptRunString (in Hammerspoon)\n"
+                    "Binary Images:\nTCC PRIVATE_IMAGE_ONLY\n"
+                )
+                return sample_process
+
+            with (
+                mock.patch.object(probe, "NoPromptServerSample", ObservedWorker, create=True),
+                mock.patch.object(probe.subprocess, "Popen", side_effect=spawn),
+            ):
+                result = owner.control_pid_no_prompt(42, lambda _: [42])
+            self.assertIn(("sender_timeout", 10), seen)
+            self.assertIn(("sampler_completed_before_reply", True), seen)
+            self.assertEqual(result["status"], -1712)
+            self.assertEqual(result["outcome"], "refused")
+            expected_sample = [
+                "/usr/bin/sample",
+                "42",
+                "1",
+                "-file",
+                str(Path(folder) / "sample-hammerspoon-no-prompt-1.txt"),
+            ]
+            self.assertIn(("sample_arguments", expected_sample), seen)
+            self.assertIn(
+                (
+                    "sample_streams",
+                    {
+                        "stdin": subprocess.DEVNULL,
+                        "stdout": subprocess.DEVNULL,
+                        "stderr": subprocess.DEVNULL,
+                    },
+                ),
+                seen,
+            )
+            self.assertEqual(sample_calls, [("wait", 0.02)])
+            text = str(owner.diagnostic_receipts)
+            self.assertIn("phase=pid_no_prompt command=1", text)
+            self.assertIn("send_interval=observed worker=retired sample_owner=qualified", text)
+            self.assertIn("HSAppleScriptRunString", text)
+            self.assertIn("status -1712, origin send", text)
+            self.assertNotIn("PRIVATE_IMAGE_ONLY", text)
+            self.assertNotIn(NONCE, text)
+            self.assertNotIn(str(EXECUTABLE), text)
+            self.assertEqual(owner.server_sample_workers, [])
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertIsNone(owner.no_prompt_scope)
+            self.assertFalse(
+                ended.is_set()
+                and any(t.name == "owned-no-prompt-sample" for t in threading.enumerate())
+            )
+
+    def test_late_or_foreign_stage_cannot_spawn_or_claim_an_inflight_sample(self):
+        for stages, overrides in (
+            (["constructed", "send_entered", "send_returned"], {}),
+            (["constructed", "send_entered"], {"sender_pid": SENDER_PID + 1}),
+            (["constructed", "send_entered"], {"target_pid": 43}),
+            (["constructed", "send_entered"], {"nonce": "b" * 32}),
+            (["send_entered"], {}),
+        ):
+            with (
+                self.subTest(stages=stages, overrides=overrides),
+                tempfile.TemporaryDirectory() as folder,
+            ):
+                scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+                scope.bind_sender(SENDER_PID)
+                self.sender(scope, stages, **overrides)
+                worker = probe.NoPromptServerSample(scope, 42, Path(folder) / "owned.txt")
+                with mock.patch.object(probe.subprocess, "Popen") as spawn:
+                    worker._run()
+                    observed = worker.finish()
+                self.assertFalse(observed)
+                spawn.assert_not_called()
+                self.assertFalse(worker.interval_qualified)
+                scope.cleanup()
+
+    def test_interval_change_nonzero_or_untyped_exit_refuses_sample_after_exact_retirement(self):
+        for mode in ("returned", "exit_nonzero", "exit_bool", "cancelled"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+                scope.bind_sender(SENDER_PID)
+                self.sender(scope, ["constructed", "send_entered"])
+                worker = probe.NoPromptServerSample(scope, 42, Path(folder) / "owned.txt")
+
+                def action():
+                    if mode == "returned":
+                        self.sender(scope, ["constructed", "send_entered", "send_returned"])
+                    elif mode == "exit_nonzero":
+                        process.returncode = 2
+                    elif mode == "exit_bool":
+                        process.returncode = False
+                    else:
+                        worker.stop.set()
+
+                process, observations = self.sampler(action)
+                with mock.patch.object(probe.subprocess, "Popen", return_value=process):
+                    worker._run()
+                    result = worker.finish()
+                self.assertFalse(result)
+                self.assertIsNotNone(process.returncode)
+                self.assertTrue(observations)
+                scope.cleanup()
+
+    def test_exact_worker_retirement_failure_retains_debt_and_blocks_restoration(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            scope.bind_sender(SENDER_PID)
+            owner.no_prompt_scope = scope
+            self.sender(scope, ["constructed", "send_entered"])
+            worker = probe.NoPromptServerSample(scope, 42, Path(folder) / "owned.txt")
+            worker.started = True
+            worker.thread = mock.Mock()
+            worker.thread.is_alive.return_value = True
+            owner.server_sample_workers.append(worker)
+            with mock.patch.object(owner.preference, "restore") as restore:
+                with self.assertRaisesRegex(RuntimeError, "worker has not retired"):
+                    owner.restore()
+                restore.assert_not_called()
+            self.assertEqual(owner.server_sample_workers, [worker])
+            self.assertIs(owner.no_prompt_scope, scope)
+            with self.assertRaisesRegex(RuntimeError, "prior native scripting"):
+                owner.execute("return 'foreign-successor'")
+            worker.thread.is_alive.return_value = False
+            with mock.patch.object(owner.preference, "restore") as restore:
+                owner.restore()
+                restore.assert_called_once_with()
+            worker.thread.join.assert_called_with(timeout=2)
+            self.assertEqual(owner.server_sample_workers, [])
+            self.assertIsNone(owner.no_prompt_scope)
+
+    def test_owned_sampler_pending_exit_is_retried_without_touching_unrelated_process(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            scope.bind_sender(SENDER_PID)
+            worker = probe.NoPromptServerSample(scope, 42, Path(folder) / "owned.txt")
+            process = mock.Mock(returncode=None)
+            worker.process = process
+            foreign = mock.Mock()
+            process.wait.side_effect = [subprocess.TimeoutExpired(["sample"], 2), -9]
+            with self.assertRaises(subprocess.TimeoutExpired):
+                worker.finish()
+            self.assertIsNone(process.returncode)
+            process.wait.side_effect = lambda **_: setattr(process, "returncode", -9)
+            self.assertFalse(worker.finish())
+            self.assertEqual(process.kill.call_count, 2)
+            foreign.kill.assert_not_called()
+            scope.cleanup()
+
+    def test_native_sample_header_and_current_server_still_refuse_foreign_frames(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            sample = Path(folder) / "owned.txt"
+            for header, current in (
+                (f"Process: Hammerspoon [43]\nPath: {EXECUTABLE}", [42]),
+                ("Process: Hammerspoon [42]\nPath: /foreign/Hammerspoon", [42]),
+                (f"Process: Hammerspoon [42]\nPath: {EXECUTABLE}", [43]),
+            ):
+                sample.write_text(header + "\nCall graph:\nHSAppleScript PRIVATE_FOREIGN_FRAME\n")
+                text = str(owner.read_native_runtime_sample(sample, 42, lambda _: current))
+                self.assertIn("unqualified", text)
+                self.assertNotIn("PRIVATE_FOREIGN_FRAME", text)
+            sample.unlink()
+            foreign = Path(folder) / "foreign.txt"
+            foreign.write_text("PRIVATE_FOREIGN_FRAME")
+            sample.symlink_to(foreign)
+            text = str(owner.read_native_runtime_sample(sample, 42, lambda _: [42]))
+            self.assertIn("unqualified", text)
+            self.assertNotIn("PRIVATE_FOREIGN_FRAME", text)
+
+    def test_completed_sampler_read_refusal_keeps_primary_sender_timeout(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            owner.bind_runtime(42, lambda _: [42])
+            owner.no_prompt_scope = probe.NoPromptDiagnosticScope(
+                Path(folder), NONCE, 42, EXECUTABLE, DOMAIN
+            )
+            primary = subprocess.TimeoutExpired(["osascript"], 10)
+            child = mock.Mock(pid=SENDER_PID, returncode=None)
+            child.poll.return_value = None
+            child.communicate.side_effect = [primary, ("", "")]
+            child.kill.side_effect = lambda: setattr(child, "returncode", -9)
+            worker = mock.Mock()
+            worker.finish.return_value = True
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=child),
+                mock.patch.object(probe, "NoPromptServerSample", return_value=worker),
+                mock.patch.object(owner, "sample_scripting_command", return_value=[]),
+                mock.patch.object(owner, "sample_native_runtime", return_value=[]),
+                mock.patch.object(
+                    owner,
+                    "read_native_runtime_sample",
+                    side_effect=OSError("PRIVATE_READER_MARKER"),
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "TimeoutExpired") as failure:
+                    owner.execute("return 'owned-source'", phase="pid_no_prompt", _target_pid=42)
+            self.assertIs(failure.exception.__cause__, primary)
+            self.assertNotIn("PRIVATE_READER_MARKER", str(failure.exception))
+            self.assertIn("sample_owner=unqualified", str(owner.no_prompt_sample_diagnostics))
+            self.assertIn("sample admission refused", str(owner.no_prompt_sample_diagnostics))
+            self.assertNotIn("PRIVATE_READER_MARKER", str(owner.no_prompt_sample_diagnostics))
+            self.assertEqual(owner.server_sample_workers, [])
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertEqual(
+                child.communicate.call_args_list, [mock.call(timeout=10), mock.call(timeout=2)]
+            )
+            child.kill.assert_called_once_with()
+            with mock.patch.object(owner.preference, "restore"):
+                owner.restore()
+            self.assertIsNone(owner.no_prompt_scope)
+
+    def test_sample_read_refusal_never_invents_context_or_replaces_mandatory_reply(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            native = no_prompt_receipt()
+            child = supplemental_mock_child(owner, native)
+            worker = mock.Mock()
+            worker.finish.return_value = True
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=child),
+                mock.patch.object(probe, "NoPromptServerSample", return_value=worker),
+                mock.patch.object(
+                    owner,
+                    "read_native_runtime_sample",
+                    side_effect=OSError("PRIVATE_READER_MARKER"),
+                ),
+            ):
+                result = owner.control_pid_no_prompt(42, lambda _: [42])
+            self.assertEqual(result["status"], 0)
+            self.assertEqual(result["result"], NONCE)
+            text = str(owner.diagnostic_receipts)
+            self.assertIn("sample_owner=unqualified", text)
+            self.assertIn("sample admission refused", text)
+            self.assertIn("server witness: completed", text)
+            self.assertNotIn("sample retained:", text)
+            self.assertNotIn("PRIVATE_READER_MARKER", text)
+            self.assertEqual(owner.server_sample_workers, [])
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertIsNone(owner.no_prompt_scope)
+
+    def test_sampler_only_cleanup_timeout_never_impersonates_sender_deadline(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = self.owner(folder)
+            native = no_prompt_receipt()
+            child = supplemental_mock_child(owner, native)
+            child.poll.return_value = 0
+            worker = mock.Mock()
+            worker.finish.side_effect = subprocess.TimeoutExpired(["sample"], 2)
+            with (
+                mock.patch.object(probe.subprocess, "Popen", return_value=child),
+                mock.patch.object(probe, "NoPromptServerSample", return_value=worker),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "sampler cleanup has not settled"
+                ) as failure:
+                    owner.control_pid_no_prompt(42, lambda _: [42])
+            detail = owner.pid_control_error_diagnostic(failure.exception)
+            self.assertIn("sampler cleanup has not settled", detail)
+            self.assertNotIn("PID scripting command exceeded", detail)
+            self.assertIsNone(failure.exception.__cause__)
+            self.assertEqual(owner.server_sample_workers, [worker])
+            self.assertEqual(owner.scripting_commands, [child])
+            self.assertIsNotNone(owner.no_prompt_scope)
+            worker.finish.side_effect = None
+            worker.finish.return_value = False
+            with mock.patch.object(owner.preference, "restore"):
+                owner.restore()
+            self.assertEqual(owner.server_sample_workers, [])
+            self.assertEqual(owner.scripting_commands, [])
+            self.assertIsNone(owner.no_prompt_scope)
+
+    def test_sampler_worker_never_inherits_a_detached_callers_daemon_flag(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            scope.bind_sender(SENDER_PID)
+            workers = []
+
+            def construct():
+                workers.append(probe.NoPromptServerSample(scope, 42, Path(folder) / "owned.txt"))
+
+            caller = threading.Thread(target=construct, daemon=True)
+            caller.start()
+            caller.join(timeout=2)
+            self.assertFalse(caller.is_alive())
+            self.assertEqual(len(workers), 1)
+            self.assertFalse(workers[0].thread.daemon)
+            self.assertFalse(workers[0].finish())
+            scope.cleanup()
+
+    def test_owned_real_python_child_retires_while_unrelated_child_remains_alive(self):
+        """Physical process retirement is measured on Linux, not native macOS sampling."""
+        with tempfile.TemporaryDirectory() as folder:
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            scope.bind_sender(SENDER_PID)
+            self.sender(scope, ["constructed", "send_entered"])
+            worker = probe.NoPromptServerSample(scope, 42, Path(folder) / "owned.txt")
+            native_popen = subprocess.Popen
+            created = threading.Event()
+            children = []
+            foreign = native_popen(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+            def spawn(arguments, **options):
+                child = native_popen(
+                    [sys.executable, "-c", "import time; time.sleep(30)"], **options
+                )
+                children.append((child, arguments))
+                created.set()
+                return child
+
+            try:
+                with mock.patch.object(probe.subprocess, "Popen", side_effect=spawn):
+                    worker.start()
+                    ready = created.wait(timeout=2)
+                    result = worker.finish()
+                self.assertTrue(ready, "The owned physical child was not created")
+                self.assertFalse(result)
+                self.assertEqual(len(children), 1)
+                child, arguments = children[0]
+                self.assertEqual(arguments[:4], ["/usr/bin/sample", "42", "1", "-file"])
+                self.assertEqual(child.returncode, -9)
+                self.assertEqual(child.poll(), -9)
+                self.assertFalse(worker.thread.is_alive())
+                self.assertIsNone(foreign.poll(), "Sampler cleanup stole another process")
+            finally:
+                worker.stop.set()
+                worker.thread.join(timeout=2)
+                for child in [foreign] + [item[0] for item in children]:
+                    if child.poll() is None:
+                        child.kill()
+                    child.wait(timeout=2)
+                scope.cleanup()
+
+    def test_cancelled_sampler_is_killed_and_waited_with_original_cleanup_budget(self):
+        with tempfile.TemporaryDirectory() as folder:
+            scope = probe.NoPromptDiagnosticScope(Path(folder), NONCE, 42, EXECUTABLE, DOMAIN)
+            scope.bind_sender(SENDER_PID)
+            self.sender(scope, ["constructed", "send_entered"])
+            worker = probe.NoPromptServerSample(scope, 42, Path(folder) / "owned.txt")
+            process = mock.Mock(returncode=None)
+            seen = []
+
+            def wait(**options):
+                seen.append(options["timeout"])
+                if options["timeout"] == 0.02:
+                    worker.stop.set()
+                    raise subprocess.TimeoutExpired(["sample"], options["timeout"])
+                process.returncode = -9
+                return -9
+
+            process.wait.side_effect = wait
+            with mock.patch.object(probe.subprocess, "Popen", return_value=process):
+                worker._run()
+                result = worker.finish()
+            self.assertFalse(result)
+            process.kill.assert_called_once_with()
+            self.assertEqual(seen, [0.02, 2])
             scope.cleanup()
 
 

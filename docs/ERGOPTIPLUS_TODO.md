@@ -2120,6 +2120,8 @@ The native application-panel test now exposes only its retired child's bounded e
 
 The native application-panel XCTest child now uses the same owned Swift backtrace environment as archive and title-policy probes, through one test-target owner. Actual run 37173332907 proved that all three prior children exited successfully but emitted the same unsupported privileged-backtrace warning. Strict empty-stderr, caption/filter checks, deadlines, child retirement and owned diagnostic capture remain intact. Actual macOS Package qualification is pending; TODO 109 remains partial, including the unsafe native Windows console caption and unqualified remaining native dialog-title boundaries.
 
+Partial: the existing macOS native install diagnostic now owns a bounded sampler during the exact no-prompt AppleEvent send. Sampling is associated only while the checked sender stage remains send_entered; late, foreign, or unretired observations cannot claim that interval. The native 8-second send, 10-second sender deadline, original caption/installation assertions, and cleanup authority remain unchanged. Portable process/phase tests do not qualify actual macOS transport: clean and Karabiner installation still require native CI evidence.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
