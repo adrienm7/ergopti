@@ -267,3 +267,118 @@ _KLPW_ResidentProbeDelegatesToDisposableWorker() {
 }
 Test("Keylogger password: UIA faults stay inside the disposable worker (password-uia-process-isolation)",
 	_KLPW_ResidentProbeDelegatesToDisposableWorker)
+
+
+; Native producer/lookup qualification; future samples are monotonic, not an
+; actual uptime claim. Every case owns and restores the complete static cache.
+_KLPW_N64Seed(At, Positive, Tracking := true) {
+	KLPasswordCache.focus_generation := 7
+	KLPasswordCache.focus_tracking_active := Tracking
+	KL_CommitPwCache(81, At, Positive, 7, "old")
+}
+
+_KLPW_N64Age(Elapsed, ExpectedKnown, Positive) {
+	SavedCache := _KLPW_CacheSnapshot()
+	SavedCritical := A_IsCritical
+	PriorCritical := Positive ? 17 : 0
+	try {
+		Critical("On")
+		At := A_TickCount
+		_KLPW_N64Seed(At, Positive)
+		AssertEqual(At, KLPasswordCache.last_at,
+			"the actual producer must retain its full native origin")
+		Critical(PriorCritical ? PriorCritical : "Off")
+		Now := At + Elapsed
+		Secure := true
+		Known := KL_TryGetPwCachedVerdict(81, 7, "old", &Secure, Now)
+		AssertEqual(PriorCritical, A_IsCritical,
+			"lookup must restore the exact native critical state")
+		AssertEqual(ExpectedKnown, Known,
+			"cache TTL must use the complete monotonic age with strict expiry")
+		AssertEqual(ExpectedKnown ? Positive : true, Secure,
+			"a stale verdict must remain unknown and secure")
+		Verdict := KL_PwCachedVerdict(81, 7, "old", Now)
+		AssertEqual(ExpectedKnown, Verdict["known"])
+		AssertEqual(ExpectedKnown ? Positive : true, Verdict["secure"])
+		AssertEqual(ExpectedKnown ? "old" : "", Verdict["element_id"])
+		AssertEqual(PriorCritical, A_IsCritical)
+	} finally {
+		Critical("On")
+		_KLPW_RestoreCache(SavedCache)
+		Critical(SavedCritical ? SavedCritical : "Off")
+	}
+}
+
+for AgeCase in [
+	{ Elapsed: 0, Known: true },
+	{ Elapsed: 1999, Known: true },
+	{ Elapsed: 2000, Known: false },
+	{ Elapsed: 2001, Known: false },
+	{ Elapsed: 4294967296, Known: false },
+	{ Elapsed: 4294969295, Known: false },
+	{ Elapsed: 4294969296, Known: false },
+	{ Elapsed: 8589936591, Known: false }
+]
+	for Positive in [false, true]
+		Test("password-native64: age=" . AgeCase.Elapsed . " secure=" . Positive,
+			_KLPW_N64Age.Bind(AgeCase.Elapsed, AgeCase.Known, Positive))
+
+_KLPW_N64Identity(Kind, Positive, ExpectedKnown) {
+	SavedCache := _KLPW_CacheSnapshot()
+	SavedCritical := A_IsCritical
+	try {
+		Critical("On")
+		At := A_TickCount
+		_KLPW_N64Seed(At, Positive, Kind != "tracker")
+		Hwnd := Kind = "hwnd" ? 82 : 81
+		Generation := Kind = "generation" ? 8 : 7
+		Element := Kind = "element" ? "new" : Kind = "empty" ? "" : "old"
+		Critical("Off")
+		Secure := true
+		Known := KL_TryGetPwCachedVerdict(Hwnd, Generation, Element, &Secure, At + 1999)
+		AssertEqual(ExpectedKnown, Known,
+			"time admission cannot replace exact focus identity and tracker authority")
+		AssertEqual(ExpectedKnown ? Positive : true, Secure)
+		AssertEqual(0, A_IsCritical)
+	} finally {
+		Critical("On")
+		_KLPW_RestoreCache(SavedCache)
+		Critical(SavedCritical ? SavedCritical : "Off")
+	}
+}
+for Kind in ["hwnd", "generation", "element", "empty", "tracker"]
+	Test("password-native64: negative identity=" . Kind,
+		_KLPW_N64Identity.Bind(Kind, false, false))
+Test("password-native64: positive verdict retains missing-tracker admission",
+	_KLPW_N64Identity.Bind("tracker", true, true))
+
+_KLPW_N64DefaultClock(Positive) {
+	SavedCache := _KLPW_CacheSnapshot()
+	SavedCritical := A_IsCritical
+	try {
+		Critical("On")
+		At := A_TickCount
+		_KLPW_N64Seed(At, Positive)
+		Before := A_TickCount
+		Critical(17)
+		Secure := true
+		Known := KL_TryGetPwCachedVerdict(81, 7, "old", &Secure)
+		After := A_TickCount
+		Assert(At <= Before && Before <= After && After - At < 2000,
+			"the fresh omitted-clock observation must fit its actual native TTL")
+		AssertEqual(true, Known, "the omitted clock must use the native producer domain")
+		AssertEqual(Positive, Secure)
+		AssertEqual(17, A_IsCritical)
+		Wrapped := KL_PwCachedVerdict(81, 7, "old")
+		AssertEqual(true, Wrapped["known"])
+		AssertEqual(Positive, Wrapped["secure"])
+		AssertEqual(17, A_IsCritical)
+	} finally {
+		Critical("On")
+		_KLPW_RestoreCache(SavedCache)
+		Critical(SavedCritical ? SavedCritical : "Off")
+	}
+}
+for Positive in [false, true]
+	Test("password-native64: omitted native clock secure=" . Positive,
+		_KLPW_N64DefaultClock.Bind(Positive))

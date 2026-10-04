@@ -97,16 +97,21 @@ KL_CommitPwCache(hwnd, at, val, FocusGeneration := unset, ElementId := unset) {
 ; received a verdict for the exact focused element. A negative result requires
 ; the focus hook to be live; losing the invalidator must never turn an
 ; HWND-scoped cache back into policy.
-KL_TryGetPwCachedVerdict(hwnd, FocusGeneration, ElementId, &Secure) {
+; The commit producers publish native A_TickCount64 origins; preserving the
+; complete age prevents an expired verdict becoming fresh after a DWORD cycle.
+KL_TryGetPwCachedVerdict(hwnd, FocusGeneration, ElementId, &Secure, NowTick := unset) {
 		global KLPW_CACHE_TTL_MS
 		Secure := true
 		PreviousCritical := Critical("On")
 		try {
+				CacheAt := KLPasswordCache.last_at
+				if !IsSet(NowTick)
+						NowTick := A_TickCount
 				Matches := (KLPasswordCache.last_hwnd = hwnd
 						and KLPasswordCache.last_focus_generation = FocusGeneration
 						and ElementId != ""
 						and KLPasswordCache.last_element_id == ElementId
-						and ((A_TickCount - KLPasswordCache.last_at) & 0xFFFFFFFF)
+						and TickElapsed64(CacheAt, NowTick)
 								< KLPW_CACHE_TTL_MS)
 				if !Matches
 						return false
@@ -122,9 +127,9 @@ KL_TryGetPwCachedVerdict(hwnd, FocusGeneration, ElementId, &Secure) {
 
 ; Typed wrapper for tests and non-hot-path callers. Unknown remains secure by
 ; construction so callers cannot accidentally treat a cache miss as ordinary.
-KL_PwCachedVerdict(hwnd, FocusGeneration, ElementId) {
+KL_PwCachedVerdict(hwnd, FocusGeneration, ElementId, NowTick := unset) {
 		Secure := true
-		Known := KL_TryGetPwCachedVerdict(hwnd, FocusGeneration, ElementId, &Secure)
+		Known := KL_TryGetPwCachedVerdict(hwnd, FocusGeneration, ElementId, &Secure, NowTick?)
 		return KL_PwVerdict(Known, Secure, Known ? ElementId : "")
 }
 
