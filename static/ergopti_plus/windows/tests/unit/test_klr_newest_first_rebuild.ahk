@@ -214,7 +214,7 @@ class _KLRNFClock {
 	}
 	Call() {
 		this.Calls += 1
-		return this.Calls < this.AdvanceAt ? this.OriginTick : (this.OriginTick + this.Delta) & 0xFFFFFFFF
+		return this.Calls < this.AdvanceAt ? this.OriginTick : (this.OriginTick + this.Delta)
 	}
 }
 
@@ -259,11 +259,12 @@ _KLRNF_ClockScenario(Kind, Base, Delta) {
 			Due := Delta >= KLRRebuildConst.ROUND_INTERVAL_MS
 			AssertEqual(Due, Progress[2].Has("db"), "only an eligible second round publishes its private database")
 			AssertEqual(Due ? 2 : 1, Progress[2]["round"], "before/equal/after threshold retains the >= policy")
-			AssertEqual(Delta, Progress[2]["elapsed_ms"], "actual progress elapsed crosses rollover without becoming negative")
+			AssertEqual(Delta, Progress[2]["elapsed_ms"], "actual observer retains the complete native monotonic duration")
 			Last := Progress[Progress.Length]
 			AssertTrue(Last["final"] && Last["done_bytes"] == Last["total_bytes"])
 			AssertEqual(Reference, _KLRDC_DerivedFingerprint(Candidate), "scheduled rounds still end at the reference fingerprint")
-			AssertFalse(FSExists(Checkpoint), "a round interval does not authorize an early checkpoint")
+			AssertEqual(Delta >= KLRRebuildConst.CHECKPOINT_INTERVAL_MS, FSExists(Checkpoint),
+				"only a completed round with a due checkpoint interval can publish its checkpoint")
 		} else if Kind == "error" {
 			AssertFalse(Built["ok"], "an observer exception cannot certify a completed build")
 			AssertEqual(0, Candidate, "the failed owner releases its private database")
@@ -299,7 +300,7 @@ _KLRNF_ClockScenario(Kind, Base, Delta) {
 				Candidate := Resumed["db"]
 				AssertTrue(Resumed["ok"])
 				AssertTrue(Progress[1]["done_bytes"] > Progress[1]["run_bytes"], "resume must actually adopt the checkpoint")
-				AssertEqual(Reference, _KLRDC_DerivedFingerprint(Candidate), "a wrapped interrupted rebuild resumes to the exact SQLite fingerprint")
+				AssertEqual(Reference, _KLRDC_DerivedFingerprint(Candidate), "an interrupted native-clock rebuild resumes to the exact SQLite fingerprint")
 			}
 		}
 		AssertEqual(ReferenceDb, KLRCache.db, "private candidates cannot replace the last-good resident handle")
@@ -336,3 +337,13 @@ for _KLRNFClockKind in ["round", "checkpoint"] {
 for _KLRNFClockErrorBase in [100000, 0xFFFFFFF0]
 	Test("KLR rebuild: observer failure releases ownership from " . _KLRNFClockErrorBase . " (klr-segmented-clock)",
 		_KLRDC_CheckTeardown.Bind(_KLRNF_ClockScenario.Bind("error", _KLRNFClockErrorBase, KLRRebuildConst.CHECKPOINT_INTERVAL_MS)))
+
+; Complete native monotonic spans remain due and visible to the real observer.
+for _KLRNF64Kind in ["round", "checkpoint"] {
+	_KLRNF64Threshold := _KLRNF64Kind == "round"
+		? KLRRebuildConst.ROUND_INTERVAL_MS : KLRRebuildConst.CHECKPOINT_INTERVAL_MS
+	for _KLRNF64Offset in [-1, 0, 1]
+		Test("KLR rebuild native64: " . _KLRNF64Kind . " long gap offset " . _KLRNF64Offset . " (klr-segmented-native64)",
+			_KLRDC_CheckTeardown.Bind(_KLRNF_ClockScenario.Bind(_KLRNF64Kind,
+				0x100000000 + 100000, 0x100000000 + _KLRNF64Threshold + _KLRNF64Offset)))
+}
