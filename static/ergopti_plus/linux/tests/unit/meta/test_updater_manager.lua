@@ -763,7 +763,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		end
 	end
 
-	helpers.it("downloads, hashes and publishes only a verified archive", function()
+	helpers.it("linux-digest-owner: downloads and hashes a verified archive under the updater owner", function()
 		local real_http = M._http_client
 		local real_digest = M._file_digest
 		local expected = string.rep("cd", 32)
@@ -785,8 +785,9 @@ helpers.describe("modules/updater/manager.lua", function()
 		end
 		function http.cancel() return true end
 		local digest = {
-			sha256 = function(path, _, callback)
+			sha256 = function(path, options, callback)
 				helpers.assert_eq(path, downloaded_part)
+				helpers.assert_eq(options.owner, "updater", "the archive digest must have the same owner as cancellation")
 				callback(expected, nil)
 				return true
 			end,

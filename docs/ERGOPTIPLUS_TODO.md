@@ -1040,7 +1040,7 @@ These are software implementations; final hardware verification remains below.
   no simulated syscall receipts or physical device validation. macOS hashes
   in-process and Windows owns its hashing worker; neither uses this Linux
   singleton admission path. Their native suites remain deferred. Separate
-  caller ownership isolation is still pending.
+  caller ownership isolation is covered separately by L80.
 - [~] **L77.** Linux event-loop wait completion: retry nanosleep with its
   remaining duration after EINTR and reject other native errors. Real libuv
   child exits previously shortened a successful 400 ms wait to about 50 ms.
@@ -1075,6 +1075,19 @@ These are software implementations; final hardware verification remains below.
   existing assertions. Windows publishes curl response bytes only after exit
   zero; macOS suppresses body bytes on negative native network status by source.
   Their native runtime suites remain deferred. Shared model policy is unchanged.
+- [~] **L80.** Linux digest caller ownership: isolate updater and layout-registry
+  requests so an idle updater cancellation cannot terminate a valid layout
+  digest, and one caller's replacement cannot discard another caller's hash.
+  Keep historical unnamed-owner replacement/cancellation and preflight refusal
+  semantics. Six actual native component cases fail before and pass after,
+  using real sha256sum/FIFO processes, updater.cancel_update, and the actual
+  private layout digest collaborator obtained through guarded upvalue lookup.
+  This collaborator check is not a network refresh or installation E2E, and no
+  physical device is involved. Unit controls check archive owner forwarding;
+  the E2E lane registers the native component fixture in addition to its existing
+  scenarios. macOS hashes layouts synchronously and owns its updater child;
+  Windows hashes in its own worker by source, without this Linux singleton.
+  Their native suites remain deferred. No shared hash policy changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

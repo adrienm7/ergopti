@@ -44,6 +44,7 @@ local Extension     = require("layouts.extension")
 local M = {}
 
 local LOG = "layout_registry"
+local REQUEST_OWNER = "layout_registry"
 
 
 
@@ -217,7 +218,7 @@ local function file_sha256(dir, timeout_ms)
 			callback(nil, "cannot stage " .. path)
 			return
 		end
-		FileDigest.sha256(path, { timeout_ms = timeout_ms }, function(digest, err)
+		FileDigest.sha256(path, { timeout_ms = timeout_ms, owner = REQUEST_OWNER }, function(digest, err)
 			FileSystem.delete(path)
 			callback(digest, err)
 		end)
@@ -242,7 +243,7 @@ local function default_deps(settings)
 				local options = {
 					timeout_ms = timeout_ms,
 					max_body_bytes = settings.max_file_bytes,
-					owner = "layout_registry",
+					owner = REQUEST_OWNER,
 					https_only = true,
 					follow_redirects = true,
 				}
