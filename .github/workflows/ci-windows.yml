@@ -246,7 +246,7 @@ jobs:
               Write-Error "Test suite failed (exit $exit)."; exit $exit
           }
 
-      # The two isolated LLM suites. They cannot join run_all.ahk: each installs
+      # The isolated LLM suites. They cannot join run_all.ahk: each installs
       # its own global stubs (a WebView2 stand-in, a fake model index) that would
       # collide with the shared harness, which is why they were written as
       # separate runners in the first place. They were then referenced by
@@ -262,7 +262,7 @@ jobs:
           if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
           $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
           $failed = 0
-          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk")) {
+          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk", "run_llm_pointer_dismiss.ahk")) {
               $runner = Join-Path $tests $name
               if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
               $out = "$env:TEMP\$name.out"

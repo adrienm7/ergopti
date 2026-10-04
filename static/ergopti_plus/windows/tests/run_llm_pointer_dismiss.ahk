@@ -25,7 +25,10 @@ SetWorkingDir(A_ScriptDir)
 global _MMP_Visible  := false
 global _MMP_Loading  := false
 global _MMP_InGrace  := false   ; LLM_Tooltip_InGracePeriod() result (shielded shown prediction)
-global _MMP_HideHits := 0   ; counts LLM_Tooltip_Hide() calls (the dismiss signal)
+global _MMP_HideHits := 0   ; counts completed hides (the dismiss signal)
+global _MMP_StopHits := 0
+global _MMP_ExactHits := 0
+global _MMP_PresentedToken := 0
 
 ; --- Globals the bridge reads ---
 global _LLM_Bridge_Active := true
@@ -36,11 +39,34 @@ LLM_Tooltip_IsVisible()        => _MMP_Visible
 LLM_Tooltip_IsLoading()        => _MMP_Loading
 LLM_Tooltip_InGracePeriod()    => _MMP_InGrace
 LLM_Engine_IsBusy()            => false
-LLM_Engine_StopGeneration()    => ""
+LLM_Tooltip_GetPresentedToken() => _MMP_PresentedToken
+LLM_Tooltip_HideExact(Token, accepted := false) {
+	global _MMP_PresentedToken, _MMP_ExactHits
+	_MMP_ExactHits += 1
+	if !IsObject(Token) || !IsObject(_MMP_PresentedToken)
+		return false
+	SameRecord := ObjPtr(Token) == ObjPtr(_MMP_PresentedToken)
+	SameLifecycle := Token.HasOwnProp("Lifecycle")
+		&& _MMP_PresentedToken.HasOwnProp("Lifecycle")
+		&& IsObject(Token.Lifecycle) && IsObject(_MMP_PresentedToken.Lifecycle)
+		&& ObjPtr(Token.Lifecycle) == ObjPtr(_MMP_PresentedToken.Lifecycle)
+	if !SameRecord && !SameLifecycle
+		return false
+	LLM_Tooltip_Hide(accepted)
+	return true
+}
+LLM_Engine_StopGeneration() {
+	global _MMP_StopHits
+	_MMP_StopHits += 1
+}
 LLM_Tooltip_MarkChainTimingOnly(NowTick) => ""
 LLM_Tooltip_Hide(accepted := false) {
-	global _MMP_HideHits
+	global _MMP_HideHits, _MMP_Visible, _MMP_Loading, _MMP_PresentedToken
 	_MMP_HideHits += 1
+	_MMP_Visible := false
+	_MMP_Loading := false
+	_MMP_PresentedToken := 0
+	return true
 }
 
 #Include ../modules/keymap/llm_bridge.ahk
@@ -59,57 +85,93 @@ SetTimer(_MmpWatchdog, -60000)
 
 
 
+; Pump the actual deferred callback even for absence assertions. A native fence
+; proves timers ran; a fixed observation window also catches a delayed bad hide.
+_MMP_WaitDismiss(Expected) {
+	global _MMP_HideHits
+	Fence := {Done: false}
+	PreviousCritical := Critical("Off")
+	try {
+		SetTimer(() => Fence.Done := true, -1)
+		loop 20
+			Sleep(5)
+		AssertTrue(Fence.Done, "the real native timer queue must progress")
+		AssertEqual(Expected, _MMP_HideHits, "the deferred hide result must settle")
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_MMP_SetState(Visible, Loading, Grace) {
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	global _MMP_StopHits, _MMP_ExactHits, _MMP_PresentedToken
+	_MMP_Visible := Visible
+	_MMP_Loading := Loading
+	_MMP_InGrace := Grace
+	_MMP_HideHits := 0
+	_MMP_StopHits := 0
+	_MMP_ExactHits := 0
+	_MMP_PresentedToken := Visible || Loading ? {Lifecycle: {}} : 0
+}
+
+_MMP_DispatchDeferred() {
+	global _MMP_HideHits
+	PreviousCritical := Critical("On")
+	try {
+		LLM_Bridge_OnPointerActivity()
+		AssertEqual(0, _MMP_HideHits, "hide must stay outside the pointer callback")
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 ; =========================================================
 ; ======= 1/ OnPointerActivity cancels active work ========
 ; =========================================================
 
 _MMP_DismissDuringLoading() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
 	; The user is waiting for a slow model: loading spinner up, no prediction yet.
 	; Per the user's choice + macOS parity, ANY input now cancels it immediately.
-	_MMP_Visible := true
-	_MMP_Loading := true
-	_MMP_InGrace := false
-	_MMP_HideHits := 0
-	LLM_Bridge_OnPointerActivity()
+	_MMP_SetState(true, true, false)
+	_MMP_DispatchDeferred()
+	_MMP_WaitDismiss(1)
+	AssertEqual(1, _MMP_StopHits, "generation cancellation must respect active work and grace")
 	AssertEqual(1, _MMP_HideHits, "pointer activity during generation MUST cancel the spinner (input cancels in-progress work)")
 }
 Test("pointer-dismiss: pointer activity cancels the loading spinner", _MMP_DismissDuringLoading)
 
 _MMP_DismissWhenPredictionShown() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
 	; A real prediction is on screen, past its grace window — pointer dismisses it.
-	_MMP_Visible := true
-	_MMP_Loading := false
-	_MMP_InGrace := false
-	_MMP_HideHits := 0
-	LLM_Bridge_OnPointerActivity()
+	_MMP_SetState(true, false, false)
+	_MMP_DispatchDeferred()
+	_MMP_WaitDismiss(1)
+	AssertEqual(1, _MMP_StopHits, "generation cancellation must respect active work and grace")
 	AssertEqual(1, _MMP_HideHits, "pointer activity over a shown prediction must dismiss it")
 }
 Test("pointer-dismiss: pointer activity dismisses a shown prediction", _MMP_DismissWhenPredictionShown)
 
 _MMP_GraceShieldsShownPrediction() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
 	; A real prediction inside its minimum-display window is shielded: an incidental
 	; click / drift the instant it renders must not kill it before the user sees it.
 	; (The loading spinner has no grace — see _MMP_DismissDuringLoading.)
-	_MMP_Visible := true
-	_MMP_Loading := false
-	_MMP_InGrace := true
-	_MMP_HideHits := 0
+	_MMP_SetState(true, false, true)
 	LLM_Bridge_OnPointerActivity()
+	_MMP_WaitDismiss(0)
+	AssertEqual(0, _MMP_StopHits, "generation cancellation must respect active work and grace")
 	AssertEqual(0, _MMP_HideHits, "a shown prediction in its grace window must NOT be dismissed by pointer activity")
 }
 Test("pointer-dismiss: grace window shields a freshly-shown prediction", _MMP_GraceShieldsShownPrediction)
 
 _MMP_NoWorkNoDismiss() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
 	; Nothing active — pointer activity is a no-op (no wasteful reset / hide).
-	_MMP_Visible := false
-	_MMP_Loading := false
-	_MMP_InGrace := false
-	_MMP_HideHits := 0
+	_MMP_SetState(false, false, false)
 	LLM_Bridge_OnPointerActivity()
+	_MMP_WaitDismiss(0)
+	AssertEqual(0, _MMP_StopHits, "generation cancellation must respect active work and grace")
 	AssertEqual(0, _MMP_HideHits, "pointer activity with no active prediction work must do nothing")
 }
 Test("pointer-dismiss: no active work means no dismiss", _MMP_NoWorkNoDismiss)
@@ -122,7 +184,8 @@ Test("pointer-dismiss: no active work means no dismiss", _MMP_NoWorkNoDismiss)
 ; =========================================================
 
 _MMP_MoveTickGatesOnActiveWork() {
-	body := FileRead(A_ScriptDir . "\..\modules\llm\llm_bridge.ahk", "UTF-8")
+	body := _DriverFuncBody("_LLM_PointerWatch_OnMoveTick")
+	AssertTrue(body != "", "the real movement owner source must exist")
 	; The move watcher gates on HasActivePredictionWork (loading spinner, in-flight
 	; generation, OR a shown prediction) so a deliberate move cancels during loading
 	; too, and drops the baseline while NO work is active so the next cycle starts
@@ -136,7 +199,9 @@ _MMP_MoveTickGatesOnActiveWork() {
 		"move-tick must dismiss only when the cursor moved past the jitter threshold")
 	; The retired _LLM_Bridge_PredictionShown predicate must be fully gone — both the
 	; click handler and the move-tick now gate on HasActivePredictionWork (no dead code).
-	AssertFalse(InStr(body, "_LLM_Bridge_PredictionShown"),
+	Source := _DriverSourceNoComments()
+	AssertTrue(Source != "", "the retired predicate guard must inspect real source")
+	AssertFalse(InStr(Source, "_LLM_Bridge_PredictionShown"),
 		"_LLM_Bridge_PredictionShown must be removed; both gates now use HasActivePredictionWork")
 }
 Test("pointer-dismiss: move-tick gates on active work + resets baseline", _MMP_MoveTickGatesOnActiveWork)
@@ -188,5 +253,39 @@ _MMP_ThresholdBoundary() {
 		"movement one pixel past the threshold must dismiss")
 }
 Test("pointer-threshold: boundary is strict greater-than", _MMP_ThresholdBoundary)
+
+_MMP_StaleHideKeepsReplacement() {
+	global _MMP_PresentedToken, _MMP_ExactHits, _MMP_Visible
+	_MMP_SetState(true, false, false)
+	PreviousCritical := Critical("On")
+	try {
+		_MMP_DispatchDeferred()
+		Replacement := {Lifecycle: {}}
+		_MMP_PresentedToken := Replacement
+	} finally {
+		Critical(PreviousCritical)
+	}
+	_MMP_WaitDismiss(0)
+	AssertEqual(1, _MMP_ExactHits, "the old exact callback must actually execute")
+	AssertTrue(_MMP_Visible, "a stale callback must leave replacement visible")
+	AssertEqual(ObjPtr(Replacement), ObjPtr(_MMP_PresentedToken), "replacement identity must remain active")
+}
+Test("pointer-dismiss: stale deferred hide preserves replacement identity", _MMP_StaleHideKeepsReplacement)
+
+_MMP_HideAllowsSameLifecycle() {
+	global _MMP_PresentedToken, _MMP_ExactHits
+	_MMP_SetState(true, false, false)
+	PreviousCritical := Critical("On")
+	try {
+		Lifecycle := _MMP_PresentedToken.Lifecycle
+		_MMP_DispatchDeferred()
+		_MMP_PresentedToken := {Lifecycle: Lifecycle}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	_MMP_WaitDismiss(1)
+	AssertEqual(1, _MMP_ExactHits, "the exact-record double must preserve production lifecycle continuity")
+}
+Test("pointer-dismiss: same lifecycle accepts the deferred exact hide", _MMP_HideAllowsSameLifecycle)
 
 RunTests()
