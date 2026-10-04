@@ -47,6 +47,7 @@ local M = {}
 
 local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
+local NoReplaceMove = require("infra.no_replace_move")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
@@ -1034,10 +1035,9 @@ local function publish_download(callback, path, err, stage, release, failure_sta
 	if not ok then Logger.error(LOG, "Update download callback raised: %s.", tostring(callback_error)) end
 end
 
---- Removes both sides of a partially published download.
+--- Removes the reserved partial file; the destination is not owned until publish.
 local function remove_partial_download()
 	if _download_part then Fs.delete(_download_part) end
-	if _download_dest then Fs.delete(_download_dest) end
 end
 
 --- Downloads one release's archive and its published checksum, and keeps the
@@ -1053,12 +1053,12 @@ local function start_download(release, download_url, callback, failure_state)
 		if type(callback) == "function" then callback(nil, "temporary path unavailable", "download") end
 		return false
 	end
-	Fs.delete(temp_path)
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_verified_release = nil
 	_download_dest = temp_path .. ".tar.gz"
-	_download_part = _download_dest .. ".part"
-	remove_partial_download()
+	-- os.tmpname reserves a native 0600 inode. Keep it as the download target;
+	-- derived names were never reserved and may belong to another process.
+	_download_part = temp_path
 	_state = "downloading"
 
 	local function fail(message, stage)
@@ -1101,7 +1101,7 @@ local function start_download(release, download_url, callback, failure_state)
 				function(actual, digest_error)
 					if not actual then fail(digest_error or "archive digest failed", "verify"); return end
 					if actual ~= expected then fail("SHA-256 checksum mismatch", "verify"); return end
-					local renamed, rename_error = os.rename(_download_part, _download_dest)
+					local renamed, rename_error = NoReplaceMove.move(_download_part, _download_dest)
 					if not renamed then
 						fail("verified archive publication failed: " .. tostring(rename_error))
 						return
