@@ -24,6 +24,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativeTimer = require("infra.native_timer")
 
 local LOG = "adapters.timer_scheduler"
 
@@ -93,7 +94,7 @@ function M.after(delaySec, fn)
 		local t = assert(luv.new_timer(), "luv.new_timer returned nil")
 		allocated_timer = t
 		local delay_ms = math.max(0, math.floor(delaySec * 1000))
-		local started = luv.timer_start(t, delay_ms, 0, function()
+		local started = NativeTimer.start(luv, t, delay_ms, 0, function()
 			handle.fired = true
 			handle.armed = false
 			_live_timers[handle.id] = nil
@@ -150,7 +151,7 @@ function M.every(intervalSec, fn)
 		local t = assert(luv.new_timer(), "luv.new_timer returned nil")
 		allocated_timer = t
 		local interval_ms = math.max(1, math.floor(intervalSec * 1000))
-		local started = luv.timer_start(t, interval_ms, interval_ms, function()
+		local started = NativeTimer.start(luv, t, interval_ms, interval_ms, function()
 			local ok_fn, err = pcall(fn)
 			if not ok_fn then
 				Logger.error(LOG, "every() callback raised: %s", tostring(err))

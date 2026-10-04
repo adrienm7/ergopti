@@ -1129,6 +1129,22 @@ These are software implementations; final hardware verification remains below.
   remains separate for the principal owner. macOS uses native hs.http without
   curl's glob language by source. Foreign native suites and hosted CI are
   deferred; no URL, endpoint or request ownership policy changed.
+- [~] **L84.** Linux relative native timer arming: refresh libuv's cached clock
+  immediately before arming newly requested delays through one native helper.
+  Blocking work outside or inside a callback previously consumed a new delay:
+  80 ms timers fired in about 0.05 ms and valid 40 ms children lost new 100 ms
+  deadlines. Cover after/every, ProcessRunner, FileDigest, HTTP, ShellRunner and
+  EventLoop admission without changing their start receipts or teardown policy.
+  Seven of eight core and eight of nine sibling native cases fail before; all
+  seventeen pass after with actual timers, FIFO/sha256sum, loopback curl, shell
+  children, process-group termination/reaping and zero retained handles. Five
+  registered unit cases include the two native fixtures, native result-tuple
+  preservation and two explicitly simulated refresh exceptions. Native void-style
+  update_time is accepted; existing test backends now model it faithfully without
+  weakened assertions. These are native component receipts, not keyboard hardware
+  or a physical graphical session. Windows SetTimer and macOS hs.timer/hs.task
+  do not expose this cached Lua/libuv clock by source; their native duration
+  qualification remains deferred. No reserved input, menu or title source changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

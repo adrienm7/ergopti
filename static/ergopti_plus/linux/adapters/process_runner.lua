@@ -22,6 +22,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
+local NativeTimer = require("infra.native_timer")
 local LOG = "adapters.process_runner"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -189,7 +190,7 @@ function M.run(program, args, options, callback)
 	run.process = process
 	run.pid = pid
 
-	local timer_ok = pcall(luv.timer_start, run.timer, timeout_ms, 0, function()
+	local timer_ok = pcall(NativeTimer.start, luv, run.timer, timeout_ms, 0, function()
 		if run.terminal then return end
 		terminate_group(run)
 		finish(run, { exit_code = -1, stdout = run.stdout_text, stderr = run.stderr_text,

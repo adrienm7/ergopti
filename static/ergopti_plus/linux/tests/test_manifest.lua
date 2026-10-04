@@ -59,6 +59,7 @@ return {
 	"tests.unit.infra.test_logs_dir",
 	"tests.unit.infra.test_logger_error_observer",
 	"tests.unit.infra.test_metrics_preferences",
+	"tests.unit.infra.test_native_timer",
 	"tests.unit.infra.test_llm_preferences",
 	"tests.unit.infra.test_llm_scope",
 	"tests.unit.modules.test_brightness_actions",

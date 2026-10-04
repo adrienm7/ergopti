@@ -13,6 +13,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
+local NativeTimer = require("infra.native_timer")
 local ProcessGroup = require("infra.libuv_process_group")
 local LOG = "adapters.file_digest"
 
@@ -200,7 +201,7 @@ function M.sha256(path, options, callback)
 		finish(request, nil, "libuv handle allocation failed")
 		return false
 	end
-	local timer_ok, timer_result = pcall(luv.timer_start, request.timer, timeout_ms, 0, function()
+	local timer_ok, timer_result = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
 		if request.terminal then return end
 		terminate_group(request)
 		finish(request, nil, "timeout")

@@ -43,6 +43,7 @@ local Heredoc = require("shell.heredoc")
 local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
 local LibuvExit = require("infra.libuv_exit")
+local NativeTimer = require("infra.native_timer")
 
 local LOG = "adapters.shell_runner"
 
@@ -504,7 +505,7 @@ function M.run_async(executable, args, options, callback)
 		exited = false, terminal = false, silent = false,
 	}
 	request.stdout, request.stderr, request.timer = luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
-	luv.timer_start(request.timer, timeout_ms, 0, function()
+	NativeTimer.start(luv, request.timer, timeout_ms, 0, function()
 		stop_group(request)
 		finish_async(request, { ok = false, error = "timeout" })
 	end)

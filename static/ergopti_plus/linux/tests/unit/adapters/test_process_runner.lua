@@ -27,6 +27,9 @@ local function fake_luv(config)
 	end
 
 	function fake.new_pipe() return handle("pipe") end
+	function fake.update_time() -- native void-style clock refresh; explicit simulated exception
+		if options.refresh_error then error("simulated clock refresh failure") end
+	end
 	function fake.new_timer()
 		state.timer = handle("timer")
 		return state.timer
@@ -88,6 +91,22 @@ local function start(runner, program, args, options)
 end
 
 helpers.describe("process_runner: asynchronous argv processes", function()
+	helpers.it("linux-relative-clock: simulated refresh exception retires the owned child and handles", function()
+		local runner, state = fresh_runner({ refresh_error = true })
+		local dispatched, results = start(runner, "python3", { "slow.py" }, {})
+		helpers.assert_eq(dispatched, false)
+		helpers.assert_eq(#results, 1)
+		helpers.assert_contains(results[1].error, "supervision could not start")
+		helpers.assert_eq(state.kills, {
+			{ pid = -7001, signal = "sigterm" },
+			{ pid = -7001, signal = "sigkill" },
+		})
+		helpers.assert_true(state.timer.closing)
+		helpers.assert_true(state.options.stdio[2].closing and state.options.stdio[3].closing)
+		state.finish(0)
+		helpers.assert_eq(#results, 1, "late native exit cannot publish twice")
+	end)
+
 	helpers.it("dispatches without waiting and reports the exit code and output once (layout-registry-convert)", function()
 		local runner, state = fresh_runner()
 		local dispatched, results = start(runner, "python3", { "-c", "print(1)" }, { timeout_ms = 5000 })
