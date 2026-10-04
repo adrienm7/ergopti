@@ -126,8 +126,23 @@ _GestureMakeConfirmedSystemRunner(ActionId, ActionFn) {
 
 _GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
 	Sys := _GestureSys(Sys)
-	return Sys.Defer(_GestureRunSystemAction.Bind(ActionId,
-		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys)))
+	try {
+		Sys.Defer(_GestureRunConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys))
+		if IsObject(Target) && Target.HasOwnProp("ProcessLease")
+			Target.ProcessLeaseDeferred := true
+		return true
+	} catch {
+		_GestureReleaseProcessTarget(Target, Sys)
+		throw
+	}
+}
+
+; The second callback owns cleanup even when the ordinary runner refuses pause
+; before invoking its action, or contains an exception from native validation.
+_GestureRunConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+	try return _GestureRunSystemAction(ActionId,
+		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys))
+	finally _GestureReleaseProcessTarget(Target, Sys)
 }
 
 _GestureInvokeConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
@@ -385,6 +400,10 @@ GestureSysForceQuitTarget(Active, Sys) {
 ;   0 for direct execution against the current foreground window.
 GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 	Sys := _GestureSys(Sys)
+	if IsObject(ConfirmedTarget) && (!ConfirmedTarget.HasOwnProp("TargetPid") || !ConfirmedTarget.HasOwnProp("ProcessLease")) {
+		LoggerWarn("gestures", "force_quit_frontmost refused: a confirmed target requires its already-owned process lease.")
+		return false
+	}
 	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
 		LoggerWarn("gestures", "force_quit_frontmost refused: its original window target is no longer owned.")
 		return false
@@ -394,24 +413,31 @@ GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 		LoggerWarn("gestures", "force_quit_frontmost refused: {1}.", Target.Refusal)
 		return
 	}
-	if IsObject(ConfirmedTarget) && (!ConfirmedTarget.HasOwnProp("TargetPid") || Target.Pid != ConfirmedTarget.TargetPid) {
+	if IsObject(ConfirmedTarget) && Target.Pid != ConfirmedTarget.TargetPid {
 		LoggerWarn("gestures", "force_quit_frontmost refused: the resolved process differs from its approved target.")
 		return false
 	}
-	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
-		LoggerWarn("gestures", "force_quit_frontmost refused before termination: its original window target is no longer owned.")
-		return false
+	OwnsLease := !IsObject(ConfirmedTarget)
+	Lease := OwnsLease ? Sys.AcquireProcessTarget(Target.Pid) : ConfirmedTarget.ProcessLease
+	try {
+		if !Sys.ProcessTargetIsLive(Lease) || (IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys)) {
+			LoggerWarn("gestures", "force_quit_frontmost refused before termination: its original process target is no longer owned.")
+			return false
+		}
+		if IsObject(ConfirmedTarget) && A_IsSuspended {
+			LoggerInfo("gestures", "force_quit_frontmost was cancelled before termination: the script is suspended.")
+			return false
+		}
+		; The native handle remains bound to the acquired process object after exit;
+		; a reused numeric PID can never acquire effect authority here.
+		if Sys.TerminateProcessTarget(Lease)
+			LoggerInfo("gestures", "Process {1} terminated.", Target.Pid)
+		else
+			LoggerError("gestures", "Process {1} could not be terminated.", Target.Pid)
+	} finally {
+		if OwnsLease
+			Sys.ReleaseProcessTarget(Lease)
 	}
-	if IsObject(ConfirmedTarget) && A_IsSuspended {
-		LoggerInfo("gestures", "force_quit_frontmost was cancelled before termination: the script is suspended.")
-		return false
-	}
-	; The captured approval remains effect authority even after later reads.
-	Pid := IsObject(ConfirmedTarget) ? ConfirmedTarget.TargetPid : Target.Pid
-	if Sys.CloseProcess(Pid)
-		LoggerInfo("gestures", "Process {1} terminated.", Pid)
-	else
-		LoggerError("gestures", "Process {1} could not be terminated.", Pid)
 }
 
 ; Empties the Recycle Bin of every drive. Confirmed by GestureInvokeAction.

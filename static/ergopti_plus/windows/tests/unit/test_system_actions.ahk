@@ -70,6 +70,10 @@ class _SysActionsFake {
 	CaptureMuted() => this.Muted
 	SetCaptureMuted(Muted) => (this._Log("SetCaptureMuted", Muted), this.Muted := Muted)
 	CloseProcess(Pid) => this._Log("CloseProcess", Pid)
+	AcquireProcessTarget(Pid) => { Pid: Pid, Handle: Pid }
+	ProcessTargetIsLive(Lease) => Lease.Handle != 0
+	TerminateProcessTarget(Lease) => this.CloseProcess(Lease.Pid)
+	ReleaseProcessTarget(Lease) => Lease.Handle := 0
 	OwnPid() => this.OwnPidValue
 	ShellPid() => this.ShellPidValue
 	FramedAppPid(FrameHwnd) => (this._Log("FramedAppPid", FrameHwnd), this.FramedApp)
@@ -988,6 +992,8 @@ _SysActions_ApprovedUwpPidCannotChange() {
 	Fake := _SysActions_AlternatingFrame()
 	Fake.FrameReads := [7001, 7002, 7001]
 	Target := { Hwnd: 0x100, Pid: 812, Class: "ApplicationFrameWindow", TargetPid: 7001 }
+	if Target.HasOwnProp("TargetPid")
+		Target.ProcessLease := Fake.AcquireProcessTarget(Target.TargetPid)
 	Fake.Snapshots[0x100] := Target.Clone()
 	GestureSysForceQuitFrontmost(Fake, Target)
 	AssertEqual(0, _SysActions_CallsNamed(Fake, "CloseProcess").Length,
@@ -999,6 +1005,8 @@ _SysActions_MissingApprovedUwpPidRefuses() {
 	Fake := _SysActionsFake()
 	Fake.FramedApp := 7001
 	Target := { Hwnd: 0x100, Pid: 812, Class: "ApplicationFrameWindow" }
+	if Target.HasOwnProp("TargetPid")
+		Target.ProcessLease := Fake.AcquireProcessTarget(Target.TargetPid)
 	Fake.Snapshots[0x100] := Target.Clone()
 	GestureSysForceQuitFrontmost(Fake, Target)
 	AssertEqual(0, _SysActions_CallsNamed(Fake, "CloseProcess").Length,
@@ -1068,6 +1076,8 @@ _SysActions_ApprovedUwpStillRuns() {
 	Fake := _SysActions_AlternatingFrame()
 	Fake.FrameReads := [7001, 7001, 7001]
 	Target := { Hwnd: 0x100, Pid: 812, Class: "ApplicationFrameWindow", TargetPid: 7001 }
+	if Target.HasOwnProp("TargetPid")
+		Target.ProcessLease := Fake.AcquireProcessTarget(Target.TargetPid)
 	Fake.Snapshots[0x100] := Target.Clone()
 	GestureSysForceQuitFrontmost(Fake, Target)
 	Killed := _SysActions_CallsNamed(Fake, "CloseProcess")
@@ -1114,6 +1124,7 @@ class _QueryShell {
 _QueryPauseCase(At) {
 	Fake := _QueryPauseFake(At)
 	Target := { Hwnd: 0x100, Pid: 812, Class: "Notepad", TargetPid: 812 }
+	Target.ProcessLease := Fake.AcquireProcessTarget(Target.TargetPid)
 	Fake.Snapshots[0x100] := Target.Clone()
 	PriorPause := A_IsSuspended
 	try {
@@ -1129,6 +1140,7 @@ _QueryPauseQuestionCase(At, Forbidden) {
 	Fake := _QueryPauseFake(At)
 	Fake.Answer := "OK"
 	Target := { Hwnd: 0x100, Pid: 812, Class: "Notepad", TargetPid: 812 }
+	Target.ProcessLease := Fake.AcquireProcessTarget(Target.TargetPid)
 	Fake.Snapshots[0x100] := Target.Clone()
 	PriorPause := A_IsSuspended
 	try {
@@ -1161,6 +1173,8 @@ _QueryPausePositive(ActionName) {
 	Target := {Hwnd: 0x100, Pid: 812, Class: IsForce ? "Notepad" : "CabinetWClass"}
 	if IsForce
 		Target.TargetPid := 812
+	if IsForce
+		Target.ProcessLease := Fake.AcquireProcessTarget(Target.TargetPid)
 	Fake.Snapshots[0x100] := Target.Clone()
 	PriorPause := A_IsSuspended
 	try {
@@ -1406,3 +1420,216 @@ for _SysActions_QueryEffectCase in [
 ] {
 	Test(_SysActions_QueryEffectCase.Name . " (system-query-effects)", _QEFF_CaseFactory(_SysActions_QueryEffectCase))
 }
+
+; The native process port has handle authority; the numeric PID registry can
+; change independently while a confirmation or one of its timers is waiting.
+class _SysActions_ProcessLeaseFake extends _SysActionsFake {
+	__New(Mode, Uwp := false) {
+		super.__New()
+		this.Mode := Mode
+		this.Active := { Hwnd: 0x100, Pid: Uwp ? 812 : 7001,
+			Class: Uwp ? "ApplicationFrameWindow" : "Notepad" }
+		this.FramedApp := 7001
+		this.Answer := "OK"
+		this.Instance := "approved-A"
+		this.Leases := []
+		this.Effects := []
+		this.Releases := 0
+		this.DeferCount := 0
+		this.ExtensionCalls := 0
+	}
+	Retire() {
+		this.Instance := "replacement-B"
+		for Lease in this.Leases
+			Lease.Alive := false
+	}
+	AcquireProcessTarget(Pid) {
+		if this.Mode == "acquire_error"
+			throw Error("injected process acquisition failure")
+		if this.Mode == "acquire_window_change" {
+			this.Instance := "replacement-B"
+			this.Snapshots[this.Active.Hwnd] := { Hwnd: this.Active.Hwnd, Pid: 8002, Class: this.Active.Class }
+		}
+		Lease := { Pid: Pid, Handle: 1, Instance: this.Instance, Alive: true }
+		this.Leases.Push(Lease)
+		if this.Mode == "acquire_exit"
+			this.Retire()
+		return Lease
+	}
+	ProcessTargetIsLive(Lease) {
+		if this.Mode == "query_error"
+			throw Error("injected retained process query failure")
+		return Lease.Handle != 0 && Lease.Alive
+	}
+	CloseProcess(Pid) {
+		if this.Mode == "effect_replacement"
+			this.Retire()
+		this.Effects.Push({ Pid: Pid, Instance: this.Instance })
+		return true
+	}
+	TerminateProcessTarget(Lease) {
+		if this.Mode == "effect_replacement"
+			this.Retire()
+		if this.Mode == "effect_error"
+			throw Error("injected retained process effect failure")
+		if this.Mode == "effect_refused"
+			return false
+		if !Lease.Handle || !Lease.Alive
+			return false
+		this.Effects.Push({ Pid: Lease.Pid, Instance: Lease.Instance })
+		return true
+	}
+	ReleaseProcessTarget(Lease) {
+		if !Lease.Handle
+			throw Error("process lease released twice")
+		Lease.Handle := 0
+		this.Releases += 1
+		if this.Mode == "release_error"
+			throw Error("injected process release failure")
+		if this.Mode == "release_reentry"
+			_GestureReleaseProcessTarget(this.CapturedTarget, this)
+	}
+	Ask(Text, Title) {
+		this._Log("Ask", Text, Title)
+		this.ApprovalLeaseCount := this.Leases.Length
+		if this.Mode == "question_replacement"
+			this.Retire()
+		if this.Mode == "question_pause"
+			Suspend(true)
+		if this.Mode == "question_error"
+			throw Error("injected process confirmation failure")
+		return this.Mode == "cancel" ? "Cancel" : "OK"
+	}
+	Activate(Hwnd) {
+		if this.Mode == "activation_refused"
+			return false
+		return super.Activate(Hwnd)
+	}
+	Defer(Fn, Delay := 1) {
+		this.DeferCount += 1
+		if this.Mode == "first_defer_error" || (this.Mode == "second_defer_error" && this.DeferCount == 2)
+			throw Error("injected process scheduling failure")
+		if this.Mode == "defer_reentry"
+			return Fn.Call()
+		return super.Defer(Fn, Delay)
+	}
+}
+
+_SysActions_ProcessLeaseCase(Mode, Uwp := false) {
+	global GESTURE_ACTIONS
+	Fake := _SysActions_ProcessLeaseFake(Mode, Uwp)
+	Saved := _SysActions_InstallOwnedForce(Fake)
+	PriorPause := A_IsSuspended
+	Entries := []
+	LoggerSetTestSink((Entry) => Entries.Push(Entry))
+	try {
+		Suspend(false)
+		if Mode == "extension"
+			GESTURE_ACTIONS["force_quit_frontmost"] := { Fn: () => Fake.ExtensionCalls += 1 }
+		GestureInvokeAction("force_quit_frontmost", "keyboard__process_lease", Fake)
+		if Mode == "pre_question_replacement"
+			Fake.Retire()
+		while Fake.Deferred.Length {
+			if Fake.DeferCount == 2 {
+				if Mode == "second_timer_replacement"
+					Fake.Retire()
+				if Mode == "second_timer_pause"
+					Suspend(true)
+			}
+			Fake.Deferred.RemoveAt(1).Call()
+		}
+		for Effect in Fake.Effects
+			AssertEqual("approved-A", Effect.Instance,
+				"confirmation cannot authorize a replacement process that reused the approved PID")
+		ExpectedEffects := Mode == "unchanged" || Mode == "defer_reentry" || Mode == "release_error" ? 1 : 0
+		AssertEqual(ExpectedEffects, Fake.Effects.Length, "only the originally admitted process can receive the effect")
+		ExpectedLeases := Mode == "acquire_error" ? 0 : 1
+		AssertEqual(ExpectedLeases, Fake.Leases.Length, "acquire one process capability before the question")
+		AssertEqual(ExpectedLeases, Fake.Releases, "every terminal path releases the retained process exactly once")
+		for Lease in Fake.Leases
+			AssertEqual(0, Lease.Handle, "released capabilities cannot be used by later callbacks")
+		if Fake.HasOwnProp("ApprovalLeaseCount")
+			AssertEqual(1, Fake.ApprovalLeaseCount, "the native capability is acquired before destructive approval")
+		if Mode == "acquire_window_change" || Mode == "acquire_exit"
+			AssertEqual(0, _SysActions_CallsNamed(Fake, "Ask").Length,
+				"an acquisition that lost its original window or process never opens confirmation")
+		if Mode == "extension"
+			AssertEqual(1, Fake.ExtensionCalls, "a synchronous extension retains its exact zero-argument contract")
+		if InStr(Mode, "error") {
+			Diagnostics := 0
+			for Entry in Entries
+				if InStr(Entry, "injected process") || InStr(Entry, "injected retained")
+					Diagnostics += 1
+			AssertEqual(1, Diagnostics, "the native failure is contained and reported exactly once")
+		}
+	} finally {
+		Suspend(PriorPause)
+		LoggerClearTestSink()
+		GESTURE_ACTIONS["force_quit_frontmost"] := Saved
+	}
+}
+_SysActions_ProcessLeaseTest(Mode, Uwp) => () => _SysActions_ProcessLeaseCase(Mode, Uwp)
+for _SysActions_ProcessLeaseMode in ["effect_replacement", "question_replacement", "pre_question_replacement",
+	"second_timer_replacement", "unchanged", "cancel", "question_pause", "second_timer_pause",
+	"question_error", "acquire_error", "acquire_exit", "acquire_window_change", "query_error", "first_defer_error",
+	"second_defer_error", "activation_refused", "effect_error", "effect_refused", "release_error",
+	"defer_reentry", "extension"] {
+	Test("system actions: retained process " . _SysActions_ProcessLeaseMode . " (confirmed-process-lease)",
+		_SysActions_ProcessLeaseTest(_SysActions_ProcessLeaseMode, false))
+}
+for _SysActions_ProcessLeaseMode in ["effect_replacement", "question_replacement", "second_timer_replacement", "unchanged"]
+	Test("system actions: retained UWP process " . _SysActions_ProcessLeaseMode . " (confirmed-process-lease)",
+		_SysActions_ProcessLeaseTest(_SysActions_ProcessLeaseMode, true))
+
+_SysActions_BareConfirmedProcessRefuses() {
+	Fake := _SysActions_ProcessLeaseFake("unchanged")
+	Target := { Hwnd: 0x100, Pid: 7001, Class: "Notepad", TargetPid: 7001 }
+	Fake.Snapshots[Target.Hwnd] := Target.Clone()
+	Entries := []
+	LoggerSetTestSink((Entry) => Entries.Push(Entry))
+	try {
+		GestureSysForceQuitFrontmost(Fake, Target)
+		AssertEqual(0, Fake.Effects.Length, "a bare confirmed PID never authorizes a newly opened process")
+		AssertEqual(0, Fake.Leases.Length, "incomplete approval cannot acquire replacement authority")
+		Diagnostics := 0
+		for Entry in Entries
+			if InStr(Entry, "already-owned process lease")
+				Diagnostics += 1
+		AssertEqual(1, Diagnostics, "an incomplete confirmed receipt has an explicit ownership diagnostic")
+	} finally LoggerClearTestSink()
+}
+Test("system actions: bare confirmed process refuses fresh authority (confirmed-process-lease)",
+	_SysActions_BareConfirmedProcessRefuses)
+
+_SysActions_ProcessReleaseReentry() {
+	Fake := _SysActions_ProcessLeaseFake("release_reentry")
+	Target := { Hwnd: 0x100, Pid: 7001, Class: "Notepad", TargetPid: 7001,
+		ProcessLease: Fake.AcquireProcessTarget(7001) }
+	Fake.CapturedTarget := Target
+	_GestureReleaseProcessTarget(Target, Fake)
+	_GestureReleaseProcessTarget(Target, Fake)
+	AssertEqual(1, Fake.Releases, "reentrant cancellation claims the native cleanup debt only once")
+}
+Test("system actions: process release reentry is exactly once (confirmed-process-lease)",
+	_SysActions_ProcessReleaseReentry)
+
+_SysActions_InvalidApprovedLease(Released) {
+	Fake := _SysActions_ProcessLeaseFake("unchanged")
+	Lease := Fake.AcquireProcessTarget(Released ? 7001 : 9000)
+	if Released
+		Fake.ReleaseProcessTarget(Lease)
+	Target := { Hwnd: 0x100, Pid: 7001, Class: "Notepad", TargetPid: 7001, ProcessLease: Lease }
+	Fake.Snapshots[Target.Hwnd] := Target.Clone()
+	try {
+		GestureSysForceQuitFrontmost(Fake, Target)
+		AssertEqual(0, Fake.Effects.Length, "a released or mismatched process capability cannot authorize an effect")
+		AssertEqual(1, Fake.Leases.Length, "invalid approval cannot acquire a new capability")
+	} finally {
+		if Lease.Handle
+			Fake.ReleaseProcessTarget(Lease)
+	}
+}
+Test("system actions: invalid approved lease is already released (confirmed-process-lease)",
+	() => _SysActions_InvalidApprovedLease(true))
+Test("system actions: invalid approved lease belongs to another PID (confirmed-process-lease)",
+	() => _SysActions_InvalidApprovedLease(false))

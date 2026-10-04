@@ -380,6 +380,8 @@ GestureActionDisplayLabel(ActionName, BindingId := "") {
 ; unblock_file_selection, force_quit_frontmost) only asks here, off the hotkey
 ; thread; it runs from the answer. Sys is the SystemControl adapter, a recording double in tests.
 GestureInvokeAction(ActionName, BindingId := "", Sys := 0) {
+		Target := 0
+		Scheduled := false
 		try {
 			global GESTURE_ACTIONS, GESTURE_ACTIONS_ON_ACTIVE_WINDOW
 			if !GESTURE_ACTIONS.Has(ActionName)
@@ -399,15 +401,24 @@ GestureInvokeAction(ActionName, BindingId := "", Sys := 0) {
 											return false
 									}
 									Target.TargetPid := Resolved.Pid
+									Target.ProcessLease := Sys.AcquireProcessTarget(Resolved.Pid)
+									if !_GestureConfirmedTargetIsLive(Target, Sys) {
+											LoggerWarn("gestures", "'{1}' was refused before confirmation: its acquired process target is no longer owned.", ActionName)
+											return false
+									}
 							}
 					}
 					Sys.Defer(_GestureConfirmThenInvoke.Bind(ActionName, BindingId, Target, Sys))
+					Scheduled := true
 					return
 			}
 			return _GestureRunAction(ActionName, BindingId)
 		} catch as Err {
 				LoggerError("gestures", "Action '{1}' failed during confirmation preflight: {2}.", ActionName, Err.Message)
 				return false
+		} finally {
+				if !Scheduled
+						_GestureReleaseProcessTarget(Target, Sys)
 		}
 }
 
@@ -455,12 +466,36 @@ _GestureConfirmedTargetIsLive(Target, Sys) {
 	if !IsObject(Current) || Current.Hwnd != Target.Hwnd || Current.Pid != Target.Pid || !(Current.Class == Target.Class)
 		return false
 	if Target.HasOwnProp("TargetPid") {
+		if !Target.HasOwnProp("ProcessLease") || !IsObject(Target.ProcessLease)
+			|| !Target.ProcessLease.HasOwnProp("Pid") || Target.ProcessLease.Pid != Target.TargetPid
+			|| !Sys.ProcessTargetIsLive(Target.ProcessLease)
+			return false
 		Resolved := GestureSysForceQuitTarget(Target, Sys)
 		if Resolved.Refusal != "" || Resolved.Pid != Target.TargetPid
 			return false
 	}
 	return true
 }
+; Claims the release debt before native cleanup so reentrant cancellation cannot
+; close an already-released handle or a handle later reused by another owner.
+_GestureReleaseProcessTarget(Target, Sys) {
+	if !IsObject(Target)
+		return
+	PreviousCritical := Critical("On")
+	try {
+		if !Target.HasOwnProp("ProcessLease")
+			return
+		Lease := Target.ProcessLease
+		Target.DeleteProp("ProcessLease")
+		if Target.HasOwnProp("ProcessLeaseDeferred")
+			Target.DeleteProp("ProcessLeaseDeferred")
+	} finally Critical(PreviousCritical)
+	try Sys.ReleaseProcessTarget(Lease)
+	catch as Err {
+		LoggerError("gestures", "The confirmed process target could not be released: {1}.", Err.Message)
+	}
+}
+
 _GestureConfirmThenInvoke(ActionName, BindingId, Target, Sys) {
 		try {
 			global GESTURE_ACTIONS_ON_ACTIVE_WINDOW
@@ -518,6 +553,9 @@ _GestureConfirmThenInvoke(ActionName, BindingId, Target, Sys) {
 		} catch as Err {
 				LoggerError("gestures", "Action '{1}' failed during confirmation callback: {2}.", ActionName, Err.Message)
 				return false
+		} finally {
+				if !IsObject(Target) || !Target.HasOwnProp("ProcessLeaseDeferred")
+						_GestureReleaseProcessTarget(Target, Sys)
 		}
 }
 
