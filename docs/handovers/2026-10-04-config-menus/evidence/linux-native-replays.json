@@ -1,0 +1,93 @@
+{
+	"feature_source": "38f2add0df777c1d49f04cb3a09e7ea8450c8b0f",
+	"baseline_dev": "8f4b7ef73e3da1784f25f99f3136763aaee18450",
+	"kind": "real native fixtures in isolated virtual sessions; physical input and full installation are not qualified",
+	"hosted_failure_causes": "pending exact diagnostic annotations; these replays do not replace failed CI",
+	"receipts": [
+		{
+			"fixture": "SQLite personal init",
+			"current_luajit": {
+				"passed": 4,
+				"failed": 0
+			},
+			"dev_luajit": {
+				"passed": 4,
+				"failed": 0
+			},
+			"actual_components": ["SQLite", "libuv", "ordinary UID", "private mounted login home"]
+		},
+		{
+			"fixture": "release-page ETag associations",
+			"current_luajit": {
+				"passed": 6,
+				"failed": 0
+			},
+			"dev_luajit": {
+				"passed": 6,
+				"failed": 0
+			},
+			"actual_components": ["curl", "libuv", "private TLS server"]
+		},
+		{
+			"fixture": "audio locale",
+			"current_luajit": {
+				"passed": 6,
+				"failed": 0
+			},
+			"current_lua54": {
+				"passed": 6,
+				"failed": 0
+			},
+			"dev_luajit": {
+				"passed": 6,
+				"failed": 0
+			},
+			"actual_components": [
+				"PulseAudio 17.0",
+				"private null sink",
+				"native pactl",
+				"real French/German catalogs",
+				"child-only catalog path mapping"
+			]
+		},
+		{
+			"fixture": "AT-SPI interpreter options",
+			"current_luajit": {
+				"passed": 12,
+				"failed": 0
+			},
+			"dev_luajit": {
+				"passed": 12,
+				"failed": 0
+			},
+			"actual_components": [
+				"Xvfb",
+				"GTK",
+				"openbox",
+				"xdotool",
+				"private accessibility bus",
+				"native libatspi",
+				"real bounded helper"
+			]
+		},
+		{
+			"fixture": "notification literal text",
+			"current_luajit": {
+				"passed": 12,
+				"failed": 0
+			},
+			"dev_luajit": {
+				"passed": 12,
+				"failed": 0
+			},
+			"actual_components": ["Dunst 1.12.2", "notify-send 0.8.6", "Gio", "private DBus/Xvfb"]
+		}
+	],
+	"limits": [
+		"Debian package versions differ from hosted Ubuntu",
+		"All assertions retained",
+		"No host package/user/profile or repository runtime change",
+		"Signed package indexes/checksums retained in private replay receipts",
+		"No physical keyboard/sound, Wayland or packaged-daemon acceptance"
+	]
+}

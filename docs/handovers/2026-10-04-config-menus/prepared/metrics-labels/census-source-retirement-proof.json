@@ -1,0 +1,25 @@
+{
+	"windows": {
+		"removed": [],
+		"added": []
+	},
+	"macos": {
+		"removed": [],
+		"added": []
+	},
+	"linux": {
+		"removed": [
+			[
+				"linux/ui/menu/menu_builder.lua",
+				"static",
+				"return { label = i18n_safe(\"menu.metrics.migration_unavailable\"), disabled = true }"
+			],
+			[
+				"linux/ui/menu/menu_builder.lua",
+				"static",
+				"return { label = i18n_safe(\"menu.metrics.migration_idle\"), disabled = true }"
+			]
+		],
+		"added": []
+	}
+}

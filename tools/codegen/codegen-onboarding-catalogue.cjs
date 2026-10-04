@@ -1210,11 +1210,32 @@ function magicKeyFor(id, page, platform, projection, labels) {
 	if (typeof values.default !== 'string' || values.default === '') {
 		throw new Error(`${choice.path} must default to a character`);
 	}
-	const options = choice.options.map((option) => {
-		if (typeof option.value !== 'string' || option.value === '')
-			throw new Error(`${choice.path} option needs a value`);
-		return { value: option.value, label_key: labels.requireKey(option.label_key, choice.path) };
-	});
+	for (const option of choice.options) {
+		if (!isPlainObject(option)) throw new Error(`${choice.path} option must be a table`);
+		if (
+			option.platforms !== undefined &&
+			(!Array.isArray(option.platforms) ||
+				option.platforms.length === 0 ||
+				new Set(option.platforms).size !== option.platforms.length ||
+				option.platforms.some((name) => !choice.platforms.includes(name)))
+		)
+			throw new Error(`${choice.path} option platforms must be a nonempty known subset`);
+	}
+	if (choice.validation !== undefined) {
+		if (!isPlainObject(choice.validation))
+			throw new Error(`${choice.path} validation must be per platform`);
+		for (const [owner, policy] of Object.entries(choice.validation)) {
+			if (owner !== 'linux' || policy !== 'safe_magic_key')
+				throw new Error(`${choice.path} has an unsupported validation policy`);
+		}
+	}
+	const options = choice.options
+		.filter((option) => !option.platforms || option.platforms.includes(platform))
+		.map((option) => {
+			if (typeof option.value !== 'string' || option.value === '')
+				throw new Error(`${choice.path} option needs a value`);
+			return { value: option.value, label_key: labels.requireKey(option.label_key, choice.path) };
+		});
 	if (!options.some((option) => option.value === values.default)) {
 		throw new Error(`${choice.path} options must include its default ${values.default}`);
 	}
@@ -1229,6 +1250,7 @@ function magicKeyFor(id, page, platform, projection, labels) {
 		hint_key: labels.requireKey(choice.hint_key, choice.path),
 		custom_label_key: labels.requireKey(choice.custom_label_key, choice.path),
 		max_characters: choice.max_characters,
+		...(choice.validation?.[platform] ? { validation: choice.validation[platform] } : {}),
 		options
 	};
 }

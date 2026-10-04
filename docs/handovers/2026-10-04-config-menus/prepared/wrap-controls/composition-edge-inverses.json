@@ -1,0 +1,10 @@
+{
+	"wrong-composition-edge-kind": {
+		"exit_status": 1,
+		"actual_existing_clickable_emptiness_assertion_failed": true
+	},
+	"wrong-composition-edge-platform": {
+		"exit_status": 1,
+		"actual_existing_clickable_emptiness_assertion_failed": true
+	}
+}
