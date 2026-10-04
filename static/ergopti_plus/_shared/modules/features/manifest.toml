@@ -6292,6 +6292,32 @@ disabled_when = ["titlecase_selection_ready"]
 platforms = ["linux"]
 unavailable = "hide"
 
+# Linux exposes these immediate selection operations in its tray. The other
+# drivers keep their existing keyboard bindings rather than duplicate rows.
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_select_word"
+i18n = "menu.shortcuts.select_word"
+disabled_when = ["selection_select_word_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_select_line"
+i18n = "sg_actions.select_line"
+disabled_when = ["selection_select_line_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_paste_plain"
+i18n = "sg_actions.paste_plain"
+disabled_when = ["selection_paste_plain_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
 # Native prompts and modifier picker subtrees retain their own settings owners.
 [[menu.llm_navigation_rows]]
 type = "list"

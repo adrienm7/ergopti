@@ -1583,7 +1583,7 @@ checkPrivacyTriggerControls();
 		'utf8'
 	);
 	const start = source.indexOf('local case_methods = {');
-	const end = source.indexOf('for _, helper in ipairs({', start);
+	const end = source.indexOf('local helper_methods = {', start);
 	assert(start >= 0 && end > start, 'the actual case provider must be nonempty');
 	const body = source.slice(start, end);
 	assert(
@@ -1607,6 +1607,46 @@ checkPrivacyTriggerControls();
 	console.log(
 		'Selection case commands: shared trio, strict native receipts and unchanged placement.'
 	);
+}
+
+// Fixed selection helpers retain the existing platform-specific native effects.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(
+				REPO_ROOT,
+				'static/ergopti_plus/_shared/tests/corpus/menus/linux_selection_helpers.json'
+			),
+			'utf8'
+		)
+	);
+	assert.deepEqual(
+		manifest[corpus.section],
+		corpus.commands.map((command) => ({
+			type: 'command',
+			id: command.id,
+			i18n: command.label_key,
+			disabled_when: [command.id + '_ready'],
+			platforms: ['linux'],
+			unavailable: 'hide'
+		})),
+		'the independent helper trio owns captions, order, readiness and placement'
+	);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	const start = source.indexOf('local helper_methods = {');
+	const end = source.indexOf('local handlers = {}', start);
+	assert(start >= 0 && end > start, 'the actual helper provider must be nonempty');
+	const body = source.slice(start, end);
+	assert(body.includes('ManifestMenu.get_array("selection_helper_commands")'));
+	assert(body.includes('ManifestMenu.command_row("selection_helper_commands", id'));
+	assert(body.includes('sc[method]() ~= true'), 'native delivery requires exact acknowledgement');
+	assert(!body.includes('i18n_safe('), 'helper captions belong to the shared declaration');
+	console.log('Selection helpers: shared trio, current native ownership and Linux-only placement.');
 }
 
 // Both Agent system providers publish the same declared Off control.
