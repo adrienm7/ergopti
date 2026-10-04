@@ -135,7 +135,7 @@ platforms = ["ahk", "hs", "linux"]
 description_key = "menu.hotstrings.magic_key"
 platforms = ["ahk", "hs", "linux"]
 
-# French language pack: _shared/modules/hotstrings/french/distancesreduction.toml.
+# Ergopti extension: static/layouts/registry/ergopti/hotstrings/suffixes_a.toml.
 [sections.hotstrings.french_distancesreduction]
 description_key = "menu.hotstrings.distances_reduction"
 platforms = ["ahk", "hs", "linux"]
@@ -3655,7 +3655,7 @@ is_module_placeholder = true
 
 [menu.hotstring_groups]
 standard = ["autocorrection", "magic_key"]
-ergopti = ["distances_reduction", "sfbs_reduction", "rolls"]
+ergopti = ["distances_reduction", "sfbs_reduction", "rolls", "french_distancesreduction"]
 dynamic = ["dynamic_hotstrings"]
 
 [menu.hotstring_category_keys]
@@ -4663,7 +4663,8 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # Every category has explicit commands: neither command depends on its current
 # gate or section posture. Native owners commit the selected gate and sections
-# together while leaving the root engine, other categories and remapping alone.
+# together while preserving the root engine and all unselected categories and
+# section choices, including MagicKey sections outside an extension binding.
 [[menu.hotstring_category_menu]]
 type = "command"
 id = "hotstring_category_enable_all"
@@ -5126,12 +5127,7 @@ id = "layout_switching"
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
-[[menu.layout_menu]]
-type = "feature"
-path = "hotstrings.magic_key.replace"
-i18n = "menu.layout.replace"
-
-# The physical key the replace switch above turns into the magic key
+# The physical key whose replacement choice lives in Hotstrings Ergopti
 # (hotstrings.magic_key_source), on every driver: one row naming the key in
 # effect, whose submenu captures the next key pressed, restores the automatic
 # key or lists every candidate. A `list`, because each candidate is labelled

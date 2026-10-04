@@ -114,7 +114,8 @@
 		"ergopti": [
 			"distances_reduction",
 			"sfbs_reduction",
-			"rolls"
+			"rolls",
+			"french_distancesreduction"
 		],
 		"dynamic": [
 			"dynamic_hotstrings"
@@ -1656,11 +1657,6 @@
 				"hs"
 			],
 			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
-		},
-		{
-			"type": "feature",
-			"path": "hotstrings.magic_key.replace",
-			"i18n": "menu.layout.replace"
 		},
 		{
 			"type": "list",

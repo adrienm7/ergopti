@@ -818,6 +818,16 @@ if (selection && refs) {
 	const mutations = [
 		['drop', `${SHARED_REL}/modules/llm/models.json`, 'a file name passed to a helper'],
 		['drop', 'vendor/sqlite3.dll', 'a root-anchored file'],
+		[
+			'drop',
+			'static/layouts/registry/ergopti/hotstrings/suffixes_a.toml',
+			'the shipped French suffix pack'
+		],
+		[
+			'drop',
+			'static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml',
+			'the shipped MagicKey replacement metadata'
+		],
 		['drop', `${SHARED_REL}/data/locales/fr.json`, 'a dynamic locale path'],
 		['drop', 'static/img/flags/de.png', 'a dynamic flag path'],
 		['drop', 'static/img/flags/de.bmp', 'a native language flag path'],

@@ -353,7 +353,7 @@ function M.set_category_scope_enabled(targets, enabled, publish)
 	for id in pairs(Groups.list_groups()) do
 		inventory[id] = {}
 		for _, section in ipairs(M.get_sections(id) or {}) do
-			if section.name ~= "-" and not section.is_module_placeholder then
+			if Languages.section_actionable(ManifestReader.features(), id, section) then
 				inventory[id][#inventory[id] + 1] = section.name
 			end
 		end

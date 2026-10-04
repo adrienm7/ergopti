@@ -171,6 +171,14 @@
 		{
 			"source": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
 			"dest": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/hotstrings/suffixes_a.toml",
+			"dest": "static/layouts/registry/ergopti/hotstrings/suffixes_a.toml"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml",
+			"dest": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml"
 		}
 	]
 }
