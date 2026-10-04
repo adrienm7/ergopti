@@ -1102,6 +1102,14 @@ These are software implementations; final hardware verification remains below.
   comparison and unlink. Full selected and hosted native qualification remain
   required; this bounded correction does not complete item 5.
 
+The native Linux metrics prerequisite now decodes the existing SQLite exit
+receipt before its instrumentation counts JSON rows, then returns the complete
+original output to production admission. It retains every old assertion and
+adds missing/failed/malformed receipt and malformed JSON controls plus an actual
+failed native SELECT. The untouched dev fixture fails before this correction;
+independent real SQLite replays pass with 648 grouped versus 2,808 raw rows.
+This restores validation coverage, not a new metrics feature or TODO5 completion.
+
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] On Windows, replay the registered neutral/recommended/clear scope and global composition cases with the pinned native runtime. Check verified backups, exact runtime acknowledgement, stale-source refusal and retryable rollback.
