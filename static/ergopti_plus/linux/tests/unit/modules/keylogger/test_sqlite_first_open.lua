@@ -38,6 +38,29 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		helpers.assert_true(tables and tables > 5, "the schema's tables exist: " .. tostring(tables))
 	end)
 
+	helpers.it("reopens the canonical Linux schema without rebuilding the device registry", function()
+		local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local path = dir .. "/metrics.sqlite"
+		local opened = writer.open_db(path)
+		if not HAS_SQLITE then
+			helpers.assert_eq(opened, false, "without sqlite3 opening must be refused")
+			return
+		end
+		local ok, failure = xpcall(function()
+			helpers.assert_true(opened, "native schema must bootstrap")
+			local before = assert(writer.query_rows("PRAGMA schema_version;"))[1]
+			writer.close_db()
+			helpers.assert_true(writer.open_db(path), "existing Linux schema must reopen")
+			local after = assert(writer.query_rows("PRAGMA schema_version;"))[1]
+			helpers.assert_eq(after, before, "opening a current registry must not execute schema migrations")
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("finds sqlite3 on a system that has no `which`", function()
 		-- Arch's base image ships sqlite3 but not `which`; the probe used it and
 		-- disabled SQLite there. Any command starting with it fails here.

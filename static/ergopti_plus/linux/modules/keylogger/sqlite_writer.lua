@@ -213,7 +213,10 @@ end
 --- The raw event tables deliberately have no foreign keys, but registration
 --- must still succeed so the database remains portable across all three OSes.
 local function _ensure_linux_device_schema()
-	local current_sql = _query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';") or ""
+	-- sqlite_master preserves multiline DDL. The scalar helper reads only its
+	-- first line, so it missed the existing Linux CHECK and rebuilt the current
+	-- registry on every start, dropping indexes and requiring a write lock.
+	local current_sql = _query_output("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';") or ""
 	if current_sql:find("linux", 1, true) then return true end
 	return _exec([[
 BEGIN;
