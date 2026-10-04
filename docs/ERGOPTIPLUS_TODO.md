@@ -1117,6 +1117,18 @@ These are software implementations; final hardware verification remains below.
   numeric-bound/independent-writer debt by source; Windows uses native integer
   IDs and a journal recovery ledger. Their native suites and hosted CI remain
   deferred. Database schema, encryption format and reserved UI are unchanged.
+- [~] **L83.** Linux literal HTTP URL admission: disable curl's URL globbing
+  after its required first --disable argument. Brackets and braces in a caller
+  URL previously failed parsing, changed the target or issued multiple requests
+  for one get/get_owned/post/postStream/download operation. Thirty-five of
+  fifty-five actual curl/loopback IPv4 and IPv6 cases fail before and all pass
+  after, checking one exact target, exact POST bytes, response bytes and native
+  retirement. Five registered unit cases pin every request method to the same
+  native builder. Percent-encoded URLs and ordinary requests remain controls.
+  Windows' curl adapter has the same source-level omission; its bounded proposal
+  remains separate for the principal owner. macOS uses native hs.http without
+  curl's glob language by source. Foreign native suites and hosted CI are
+  deferred; no URL, endpoint or request ownership policy changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

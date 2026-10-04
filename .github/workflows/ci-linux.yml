@@ -521,6 +521,13 @@ jobs:
           luajit tests/hardware/run_http_body_limit_receipts.lua
         timeout-minutes: 1
 
+      - name: Preserve literal HTTP targets through every native curl method
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_literal_url_receipts.lua
+        timeout-minutes: 1
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
