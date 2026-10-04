@@ -380,7 +380,7 @@ Test("HealthCheck: real browser failure retains schema-ordered native sections a
 
 /** Replay the actual poll with a deterministic tick and a recording request. */
 _TestHC_ProbeRollover(Started, Elapsed, Completed := false, Cancellation := "", AbortAllowed := true) {
-	Now := Mod(Started + Elapsed, 0x100000000)
+	Now := Started + Elapsed
 	Published := [], Arms := [], Aborts := [], Waits := [], Interpretations := []
 	Request := { Status: 200, ResponseText: "literal-success", WaitForResponse: Wait, Abort: Abort }
 	ProbeRun := { Epoch: 73, Cancelled: Cancellation == "before", Requests: [Request], Publish: Publish }
@@ -431,7 +431,7 @@ _TestHC_ProbeRollover(Started, Elapsed, Completed := false, Cancellation := "", 
 	if Terminal {
 		AssertEqual(Completed ? "ok" : "timeout", Published[1]["state"],
 			"pending expiry stays timeout even when transport cleanup refuses")
-		AssertEqual(Elapsed, Published[1]["ms"], "published duration is exact across unsigned wrap")
+		AssertEqual(Elapsed, Published[1]["ms"], "published duration retains the full native monotonic difference")
 	} else if !InitiallyCancelled && !Overdue {
 		ProbeRun.Cancelled := true
 		_HC_ProbePoll(ProbeRun, "clock-regression", Request, Interpret, Started, 2000, Now, Arm)
@@ -441,8 +441,8 @@ _TestHC_ProbeRollover(Started, Elapsed, Completed := false, Cancellation := "", 
 	}
 }
 
-/** Every finish caller uses the same unsigned duration without changing its result. */
-_TestHC_ProbeFinishRollover(Started) {
+/** Every finish caller retains full native duration without changing its result. */
+_TestHC_ProbeFinishRollover(Started, Elapsed := 80) {
 	Published := []
 	Sections := Map("system", Map("fixture", "unchanged"))
 	Result := Map("state", "error", "detail", "literal-error")
@@ -454,26 +454,42 @@ _TestHC_ProbeFinishRollover(Started) {
 		Published.Push(ActualResult)
 	}
 	_HC_ProbeStarted("clock-finish", "isolated finish duration")
-	_HC_ProbeFinish(ProbeRun, "clock-finish", Started, Result, Sections, Mod(Started + 80, 0x100000000))
+	_HC_ProbeFinish(ProbeRun, "clock-finish", Started, Result, Sections, Started + Elapsed)
 	AssertEqual(1, Published.Length)
-	AssertEqual(80, Result["ms"], "the shared finish owner counts elapsed time across wrap")
+	AssertEqual(Elapsed, Result["ms"], "the shared finish owner retains full native elapsed time")
 	AssertEqual("error", Result["state"], "an elapsed-time fix cannot convert failure into success")
 	AssertEqual("literal-error", Result["detail"])
 }
 
 for _HCClockOrigin in [100, 0xFFFFFFF0] {
-	_HCClockLabel := _HCClockOrigin == 100 ? "ordinary" : "wrapped"
+	_HCClockLabel := _HCClockOrigin == 100 ? "ordinary" : "DWORD-boundary"
 	for _HCClockElapsed in [2999, 3000, 3001]
-		Test("HealthCheck probe-clock-wrap: " . _HCClockLabel . " budget " . _HCClockElapsed,
+		Test("HealthCheck probe-clock-native64: " . _HCClockLabel . " budget " . _HCClockElapsed,
 			_TestHC_ProbeRollover.Bind(_HCClockOrigin, _HCClockElapsed))
-	Test("HealthCheck probe-clock-wrap: " . _HCClockLabel . " observed completion wins",
+	Test("HealthCheck probe-clock-native64: " . _HCClockLabel . " observed completion wins",
 		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 4000, true))
-	Test("HealthCheck probe-clock-wrap: " . _HCClockLabel . " cancelled run drops completion",
+	Test("HealthCheck probe-clock-native64: " . _HCClockLabel . " cancelled run drops completion",
 		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 4000, true, "before"))
-	Test("HealthCheck probe-clock-wrap: " . _HCClockLabel . " abort refusal remains timeout",
+	Test("HealthCheck probe-clock-native64: " . _HCClockLabel . " abort refusal remains timeout",
 		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 4000, false, "", false))
-	Test("HealthCheck probe-clock-wrap: " . _HCClockLabel . " cancellation during abort drops result",
+	Test("HealthCheck probe-clock-native64: " . _HCClockLabel . " cancellation during abort drops result",
 		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 4000, false, "abort"))
-	Test("HealthCheck probe-clock-wrap: " . _HCClockLabel . " shared finish retains failure",
+	Test("HealthCheck probe-clock-native64: " . _HCClockLabel . " shared finish retains failure",
 		_TestHC_ProbeFinishRollover.Bind(_HCClockOrigin))
+}
+
+for _HCClockOrigin in [100, 0x100000064] {
+	for _HCClockElapsed in [0x100000BB7, 0x100000BB8, 0x100000BB9]
+		Test("HealthCheck probe-clock-native64: long budget origin=" . _HCClockOrigin . " elapsed=" . _HCClockElapsed,
+			_TestHC_ProbeRollover.Bind(_HCClockOrigin, _HCClockElapsed))
+	Test("HealthCheck probe-clock-native64: long observed completion origin=" . _HCClockOrigin,
+		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 0x100000FA0, true))
+	Test("HealthCheck probe-clock-native64: long cancelled origin=" . _HCClockOrigin,
+		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 0x100000FA0, true, "before"))
+	Test("HealthCheck probe-clock-native64: long abort refusal origin=" . _HCClockOrigin,
+		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 0x100000FA0, false, "", false))
+	Test("HealthCheck probe-clock-native64: long cancellation during abort origin=" . _HCClockOrigin,
+		_TestHC_ProbeRollover.Bind(_HCClockOrigin, 0x100000FA0, false, "abort"))
+	Test("HealthCheck probe-clock-native64: long shared finish origin=" . _HCClockOrigin,
+		_TestHC_ProbeFinishRollover.Bind(_HCClockOrigin, 0x100000050))
 }
