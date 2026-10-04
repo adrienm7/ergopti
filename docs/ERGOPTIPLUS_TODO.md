@@ -1690,7 +1690,7 @@ The five-file source slice has 22 portable native-owner cases, seven actual work
   Actual metadata-only replacement remains selectable through its declared
   native feature owner. Shared bound-section policy owns extension bulk
   commands and preserves unrelated choices; native menus and preferences
-  consume that policy. The old layout-menu replacement row is removed.
+  consume that policy. The old layout-menu replacement row and retired French source are removed.
   Mac portable units (13,891) and E2E (101), Linux E2E (188), shared JS
   checks (356), and focused selection/registry/menu tests pass. Linux units (6,505) also pass
   with real GUI dependencies and explicit negative GTK premises. Hosted macOS
