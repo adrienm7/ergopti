@@ -90,7 +90,7 @@ _HC_ProbeStarted(Id, Detail) {
 ; @param Result {Map} { state, detail? }
 ; @param Sections {Map} Values the probe filled, by section.
 _HC_ProbeFinish(Run, Id, Started, Result, Sections := 0, NowTick := unset) {
-	Result["ms"] := TickElapsed(Started, NowTick?)
+	Result["ms"] := TickElapsed64(Started, NowTick?)
 	LoggerDone("Healthcheck", "Probe '{1}' answered: {2} ({3} ms).", Id, Result["state"], Result["ms"])
 	if Run.Cancelled
 		return
@@ -167,7 +167,7 @@ _HC_ProbePoll(Run, Id, Request, Interpret, Started, TimeoutMs, NowTick := unset,
 	}
 	; curl's own max-time ends the child first; this bound only covers a child
 	; that never reports back
-	if (TickElapsed(Started, NowTick?) > TimeoutMs + 1000) {
+	if (TickElapsed64(Started, NowTick?) > TimeoutMs + 1000) {
 		if !Request.Abort()
 			LoggerError("Healthcheck", "The timed-out probe '{1}' refused to stop; its cleanup is retained.", Id)
 		_HC_ProbeFinish(Run, Id, Started, Map("state", "timeout"), 0, NowTick?)
