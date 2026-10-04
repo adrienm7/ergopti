@@ -733,3 +733,48 @@ _HSCS_PersonalEditorUntypedPause(Value) {
 for _HSCS_UntypedPause in ["0", "false", "", 0.0]
 	Test("shared-personal-editor: untyped native pause receipt " . Type(_HSCS_UntypedPause) . ":" . _HSCS_UntypedPause,
 		_HSCS_PersonalEditorUntypedPause.Bind(_HSCS_UntypedPause))
+
+
+; Observe the native opening callback outside the renderer's caught delivery.
+_HSCS_FileOpened(Observations, Path, Receipt, *) {
+	Observations.Push(Path)
+	return Receipt
+}
+
+_HSCS_FileCommand(Receipt) {
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\hotstring_file_command.json", "UTF-8"))
+	Definition := _MR_GetMenuDef(Corpus["section"])
+	AssertEqual(1, Definition.Length)
+	Item := Definition[1]
+	AssertEqual(Corpus["id"], Item["id"])
+	AssertEqual(Corpus["i18n"], Item["i18n"])
+	AssertEqual(Corpus["ready"], Item["disabled_when"][1])
+	Label := Item["i18n"]
+	Path := A_Temp . "\ergopti-category-command-" . A_TickCount . ".toml"
+	Observations := []
+	try {
+		Assert(FSWriteDurable(Path, "# owned category opening fixture`n"))
+		AssertEqual(false, _HS_CategoryFileRow(Path, Map()), "an unknown supplied opening owner must refuse")
+		Item["i18n"] := "menu.hotstrings.scope_disable_all"
+		Row := _HS_CategoryFileRow(Path, _HSCS_FileOpened.Bind(Observations, Path, Receipt))
+		Assert(Row is Map, "the actual provider must admit the shared command")
+		AssertEqual(t("menu.hotstrings.scope_disable_all"), Row["label"],
+			"native opening data comes from the declaration, not a private label")
+		AssertEqual(Receipt, Row["action"].Call())
+		AssertEqual(1, Observations.Length)
+		AssertEqual(Path, Observations[1], "the actual opening owner receives its captured category source")
+		Native := _HS_CategoryMenu("Rolls", Path, [], (*) => false)
+		AssertEqual(Row["label"], _SGM_LabelAt(Native, 2), "the actual category provider renders the same declaration")
+		FileDelete(Path)
+		AssertEqual(false, Row["action"].Call(), "a held callback rechecks the native source before opening")
+		AssertEqual(1, Observations.Length, "withdrawn source cannot launch its opening owner")
+	} finally {
+		Item["i18n"] := Label
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+
+for _HSCS_FileReceipt in [true, false]
+	Test("shared category file: native opening receipt " . _HSCS_FileReceipt,
+		_HSCS_FileCommand.Bind(_HSCS_FileReceipt))

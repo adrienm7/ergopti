@@ -343,3 +343,101 @@ helpers.describe("personal category scope parity", function()
 		end
 	end
 end)
+
+
+--- Runs an actual shared renderer over an independently changed command label.
+--- @param body function Real native-provider observations and assertions.
+local function with_file_command(body, change_label)
+	local saved = package.loaded["infra.manifest_menu"]
+	local ok, err = xpcall(function()
+		local path = require("infra.paths").shared("modules/menu/menu_manifest.json")
+		local renderer = assert(require("menu.renderer").new({
+			platform = "linux", manifest_path = function() return path end,
+			json_decode = function(bytes)
+				local document = require("json").decode(bytes)
+				if change_label then document.hotstring_file_commands[1].i18n = "fixture.category.file.command" end
+				return document
+			end,
+			i18n = { get = function(key) return key end, section = function(key) return key end },
+			logger = require("logger.shim"),
+		}))
+		package.loaded["infra.manifest_menu"] = renderer
+		body()
+	end, debug.traceback)
+	package.loaded["infra.manifest_menu"] = saved
+	package.loaded["ui.menu.menu_builder"] = nil
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("shared category file command", function()
+	helpers.it("shared category file: consumes the actual declared label", function()
+		with_file_command(function()
+			local row = rolls_row((fake_config({})), { on_open_file = function() return true end })
+			helpers.assert_eq(row.menu[3].title, "fixture.category.file.command")
+		end, true)
+	end)
+	for _, receipt in ipairs({ "true", "false", "nil" }) do
+		helpers.it("shared category file: keeps the captured source and opening receipt " .. receipt .. " while paused", function()
+			with_file_command(function()
+				local config = fake_config({ enabled = false })
+				local category = config.get_category("rolls")
+				config.get_category = function() return category end
+				local opened, saves = {}, 0
+				local row = rolls_row(config, {
+					is_paused = function() return true end,
+					save_prefs = function() saves = saves + 1 end,
+					on_open_file = function(path)
+						opened[#opened + 1] = path
+						if receipt == "nil" then return nil end
+						return receipt == "true"
+					end,
+				})
+				local command = row.menu[3]
+				helpers.assert_eq(command.title, "menu.hotstrings.open_file")
+				helpers.assert_true(command.disabled ~= true, "file configuration stays available under pause")
+				local original = category.path
+				category.path = "/foreign/replaced.toml"
+				local result = command.fn()
+				if receipt == "nil" then helpers.assert_nil(result)
+				else helpers.assert_eq(result, receipt == "true") end
+				helpers.assert_eq(opened, { original }, "the actual opening owner receives the loader's captured source")
+				helpers.assert_eq(saves, 0, "opening never enters a settings writer")
+			end)
+		end)
+	end
+	helpers.it("shared category file: refuses a held callback after its actual opening owner is withdrawn", function()
+		with_file_command(function()
+			local calls = 0
+			local ctx = { on_open_file = function() calls = calls + 1; return true end }
+			local mb = helpers.load_module("ui.menu.menu_builder")
+			ctx.config = fake_config({})
+			local function find(rows)
+				for _, row in ipairs(rows or {}) do
+					if row.title == "menu.hotstrings.open_file" then return row end
+					local child = find(row.menu)
+					if child then return child end
+				end
+			end
+			local command = find(mb.build(ctx))
+			helpers.assert_true(command ~= nil)
+			ctx.on_open_file = nil
+			helpers.assert_eq(command.fn(), false)
+			helpers.assert_eq(calls, 0)
+			local disabled = find(mb.build(ctx))
+			helpers.assert_eq(disabled.disabled, true)
+		end)
+	end)
+	helpers.it("shared category file: keeps absent category paths out of the native provider", function()
+		with_file_command(function()
+			local config = fake_config({})
+			local category = config.get_category("rolls")
+			category.path = nil
+			config.get_category = function() return category end
+			local row = rolls_row(config)
+			for _, item in ipairs(row.menu) do
+				helpers.assert_true(item.title ~= "menu.hotstrings.open_file")
+			end
+			helpers.assert_true(#row.menu > 2, "the remaining category and section commands still render")
+		end)
+	end)
+end)

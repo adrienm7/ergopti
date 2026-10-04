@@ -836,9 +836,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			render_ctx, {
 				["hotstring_category_file"] = function()
 					if not category or not category.path then return {} end
-					return { { label = i18n_safe("menu.hotstrings.open_file"), action = function()
-						if type(ctx.on_open_file) == "function" then ctx.on_open_file(category.path) end
-					end } }
+					local source = category.path
+					local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+						{ hotstring_file_open = function() return ctx.on_open_file(source) end },
+						{ hotstring_file_ready = function() return type(ctx.on_open_file) == "function" end })
+					return row and { row } or {}
 				end,
 				["hotstring_category_sections"] = function() return sub end,
 			})

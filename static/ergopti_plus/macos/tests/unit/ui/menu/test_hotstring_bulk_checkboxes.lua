@@ -291,3 +291,84 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 	end)
 
 end)
+
+
+--- Exercises real command rendering and DeferredWork; only the native timer is injected.
+--- @param committed boolean Native scheduling acknowledgement.
+--- @param body function Real category callback observations.
+local function with_category_file(committed, body, change_label)
+	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
+		"adapters.timer_scheduler", "modules.keymap", "modules.dynamic_hotstrings",
+		"ui.menu.menu_hotstrings" }, function()
+		-- Category file opening neither starts nor inspects these unrelated engines.
+		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
+		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
+		local callbacks, launches = {}, {}
+		package.loaded["adapters.timer_scheduler"] = { after = function(_, callback)
+			callbacks[#callbacks + 1] = callback
+			return {}, committed
+		end }
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		hs.execute = function(command) launches[#launches + 1] = command; return "", true end
+		package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+			platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			json_decode = function(bytes)
+				local document = hs.json.decode(bytes)
+				if change_label then document.hotstring_file_commands[1].i18n = "fixture.category.file.command" end
+				return document
+			end,
+			i18n = { get = function(key) return key end, section = function(key) return key end },
+			logger = require("infra.logger"),
+		}))
+		package.loaded["ui.menu.menu_hotstrings"] = nil
+		hotstrings = require("ui.menu.menu_hotstrings")
+		body(hotstrings, callbacks, launches)
+	end)
+end
+
+helpers.describe("shared category file command", function()
+	helpers.it("shared category file: consumes the actual declared label", function()
+		with_category_file(true, function(hotstrings)
+			local ctx = context(true, true)
+			ctx.hotfile_paths = { alpha = "/user/a.toml" }
+			helpers.assert_eq(hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3].title,
+				"fixture.category.file.command")
+		end, true)
+	end)
+	for _, committed in ipairs({ true, false }) do
+		helpers.it("shared category file: returns the native deferred scheduling acknowledgement " .. tostring(committed), function()
+			with_category_file(committed, function(hotstrings, callbacks, launches)
+				local ctx = context(false, false)
+				ctx.paused = true
+				ctx.hotfile_paths = { alpha = "/user/category file.toml" }
+				local saves = 0
+				ctx.save_prefs = function() saves = saves + 1; return true end
+				local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
+				helpers.assert_eq(command.title, "menu.hotstrings.open_file")
+				helpers.assert_true(command.disabled ~= true, "configuration remains available under pause")
+				ctx.hotfile_paths.alpha = "/foreign/replaced.toml"
+				helpers.assert_eq(command.fn(), committed)
+				helpers.assert_eq(#callbacks, 1)
+				helpers.assert_eq(#launches, 0, "the deferred native owner has not delivered yet")
+				if committed then callbacks[1]() end
+				helpers.assert_eq(#launches, committed and 1 or 0)
+				if committed then
+					helpers.assert_eq(launches[1], "open " .. require("infra.text_utils").shell_quote("/user/category file.toml"))
+				end
+				helpers.assert_eq(saves, 0)
+			end)
+		end)
+	end
+	helpers.it("shared category file: refuses a held callback after the native execute port is withdrawn", function()
+		with_category_file(true, function(hotstrings, callbacks, launches)
+			local ctx = context(true, true)
+			ctx.hotfile_paths = { alpha = "/user/a.toml" }
+			local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
+			hs.execute = nil
+			helpers.assert_eq(command.fn(), false)
+			helpers.assert_eq(#callbacks, 0)
+			helpers.assert_eq(#launches, 0)
+			helpers.assert_eq(hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3].disabled, true)
+		end)
+	end)
+end)

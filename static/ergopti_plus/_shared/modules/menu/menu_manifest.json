@@ -2213,5 +2213,15 @@
 				"llm_profile_clone_ready"
 			]
 		}
+	],
+	"hotstring_file_commands": [
+		{
+			"type": "command",
+			"id": "hotstring_file_open",
+			"i18n": "menu.hotstrings.open_file",
+			"disabled_when": [
+				"hotstring_file_ready"
+			]
+		}
 	]
 }

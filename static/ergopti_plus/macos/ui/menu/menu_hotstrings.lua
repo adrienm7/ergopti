@@ -79,8 +79,8 @@ M.DEFAULT_STATE = {
 }
 
 local function open_toml_path(path)
-	if type(path) ~= "string" or path == "" then return end
-	DeferredWork.after(0, function()
+	if type(path) ~= "string" or path == "" then return false end
+	return DeferredWork.after(0, function()
 		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 	end, "menu_hotstrings.open_toml")
 end
@@ -467,8 +467,10 @@ function M.build_groups(ctx, only, counts)
 				render_ctx, {
 					["hotstring_category_file"] = function()
 						if not toml_path then return {} end
-						return { { label = i18n.get("menu.hotstrings.open_file"),
-							action = function() open_toml_path(toml_path) end } }
+						local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+							{ hotstring_file_open = function() return open_toml_path(toml_path) end },
+							{ hotstring_file_ready = function() return type(hs.execute) == "function" end })
+						return row and { row } or {}
 					end,
 					["hotstring_category_sections"] = function() return sec_menu end,
 				})
