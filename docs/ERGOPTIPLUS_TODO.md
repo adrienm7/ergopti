@@ -2628,6 +2628,16 @@ that actual owner, and its post-success stale retry reuses the same failed
 token. Every original assertion, native loop deadline and retirement check is
 unchanged. Native Linux execution of this corrected fixture remains required.
 
+The unintegrated Linux HTTP producer is preserved in the
+[Linux continuation](handovers/2026-10-04-group6-linux/README.md), with exact
+sources, preimages, independent controls and patches. Actual diagnostic privacy
+controls pass 12/12 after six causal failures, with eight bounded-diagnostic
+controls passing. Independent review still blocks integration on public owned
+cancellation/activity, admission behind cleanup debt, supported resolver failure
+fallback and total-deadline publication/admission. These preparations do not
+complete Linux enterprise-network coverage; preserve the original assertions,
+refresh native-core ownership and qualify the final composition before delivery.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
