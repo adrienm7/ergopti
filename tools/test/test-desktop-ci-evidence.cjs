@@ -1029,6 +1029,111 @@ for (const [from, to] of [
 	);
 }
 
+// The launch job has no npm install: every native control must load with builtins only.
+{
+	const childProcess = require('node:child_process');
+	const runtimePath = require.resolve('./support/windows-startup-log-runtime.cjs');
+	const result = childProcess.spawnSync(
+		process.execPath,
+		[
+			'-e',
+			`
+		const Module = require('node:module');
+		const originalLoad = Module._load;
+		Module._load = function(request, parent, isMain) {
+			if (!Module.isBuiltin(request) && !request.startsWith('.') && !require('node:path').isAbsolute(request))
+				throw new Error('Third-party modules are unavailable in the native launch job');
+			return originalLoad.call(this, request, parent, isMain);
+		};
+		const runtime = require(process.argv[1]);
+		if (typeof runtime !== 'function' || typeof runtime.readStartupLogCatalog !== 'function')
+			throw new Error('The actual native catalogue owner was not loaded');
+	`,
+			runtimePath
+		],
+		{ encoding: 'utf8', timeout: 10000, windowsHide: true }
+	);
+	assert.ok(
+		!result.error && result.status === 0,
+		'the actual native runtime must load without third-party modules'
+	);
+	assert.equal(result.stderr, '');
+	const readCatalog = require(runtimePath).readStartupLogCatalog;
+	const recipe = pipeline.runOf(
+		pipeline.step(
+			pipeline.job('launch-windows'),
+			'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)'
+		)
+	);
+	const actual = readCatalog(recipe);
+	assert.ok(
+		actual.segments.length > 0,
+		'the real canonical TOML catalogue must be admitted by its native workflow reader'
+	);
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-log-catalog-'));
+	try {
+		const catalogPath = path.join(directory, 'catalog.toml');
+		const command = recipe.find((line) => line.includes('$catalogJson = & python -c '));
+		const fixtureRecipe = [
+			command.replace(
+				/"\$env:GITHUB_WORKSPACE\\[^"\r\n]+"/,
+				'"$env:GITHUB_WORKSPACE\\catalog.toml"'
+			)
+		];
+		fs.writeFileSync(
+			catalogPath,
+			'[app]\nfolder_name="owned-name"\n[logs.windows]\nbase="PRIVATE_ROOT"\nsegments=["{app}","trace"]\n[logs.files]\nunified_prefix="daily_"\nextension=".txt"\n'
+		);
+		assert.deepEqual(
+			readCatalog(fixtureRecipe, directory),
+			{
+				base: 'PRIVATE_ROOT',
+				segments: ['owned-name', 'trace'],
+				prefix: 'daily_',
+				extension: '.txt'
+			},
+			'the existing Python source command must resolve independent TOML fields and the application placeholder'
+		);
+		fs.writeFileSync(catalogPath, '[app\nPRIVATE_CATALOG_ERROR');
+		assert.throws(
+			() => readCatalog(fixtureRecipe, directory),
+			/native log catalogue reader refused/
+		);
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+	const valid = { status: 0, stdout: JSON.stringify(actual), stderr: '' };
+	for (const response of [
+		{ ...valid, status: null, signal: 'SIGTERM' },
+		{ ...valid, status: 1 },
+		{ ...valid, error: new Error('PRIVATE_CATALOG_ERROR') },
+		{ ...valid, stdout: 'PRIVATE_CATALOG_ERROR' },
+		{ ...valid, stderr: 'PRIVATE_CATALOG_ERROR' },
+		{ ...valid, stdout: '{}' },
+		{ ...valid, stdout: JSON.stringify({ ...actual, segments: ['..'] }) },
+		{ ...valid, stdout: JSON.stringify({ ...actual, prefix: false }) }
+	]) {
+		assert.throws(
+			() => readCatalog(recipe, pipeline.ROOT, () => response),
+			(error) => !/PRIVATE_CATALOG_ERROR/.test(error.message),
+			'native reader refusal must not project private streams'
+		);
+	}
+	assert.throws(() => readCatalog([]), /one actual owner/);
+	const command = recipe.find((line) => line.includes('$catalogJson = & python -c '));
+	assert.throws(() => readCatalog([command, command]), /one actual owner/);
+	assert.throws(
+		() =>
+			readCatalog([
+				command.replace(
+					/"\$env:GITHUB_WORKSPACE\\[^"\r\n]+"/,
+					'"$env:GITHUB_WORKSPACE\\..\\catalog.toml"'
+				)
+			]),
+		/inside its repository/
+	);
+}
+
 require('./support/windows-launch-runtime.cjs')();
 
 require('./support/windows-startup-log-runtime.cjs')();
