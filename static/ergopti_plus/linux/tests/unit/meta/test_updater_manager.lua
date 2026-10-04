@@ -930,6 +930,20 @@ helpers.describe("modules/updater/manager.lua", function()
 			".deb, RPM, Flatpak, AppImage and Nix layouts must keep their update owner")
 	end)
 
+	helpers.it("linux-native-cwd: updater shares the actual cwd owner for a relative source", function()
+		local Paths = require("infra.paths")
+		local installer = helpers.load_module("modules.updater.installer")
+		local real_cwd, real_getenv = Paths.current_directory, os.getenv
+		Paths.current_directory = function() return "/synthetic/prefix/lib/ergopti" end
+		os.getenv = function(key) if key == "PWD" then return "/synthetic/stale" end; return real_getenv(key) end
+		local ok, context = pcall(installer.resolve, "linux/modules/updater/manager.lua", function() return true end)
+		Paths.current_directory, os.getenv = real_cwd, real_getenv
+		helpers.assert_true(ok, tostring(context))
+		helpers.assert_eq(context.kind, "standalone")
+		helpers.assert_eq(context.install_root, "/synthetic/prefix/lib/ergopti")
+		helpers.assert_eq(context.wrapper, "/synthetic/prefix/bin/ergopti-hotstrings")
+	end)
+
 	for _, component in ipairs({ "literal\\backslash", "double\\\\backslash", "\\leading" }) do
 		helpers.it("linux-native-path-literal: updater keeps POSIX component " .. component, function()
 			local real_config = package.config
