@@ -131,10 +131,170 @@ def sandbox_profile(root):
     )
 
 
+class PhaseEvidence:
+    """Export constructed bounded facts, never fixture files or raw command streams."""
+
+    case_names = {
+        "zip_install",
+        "xz_upgrade",
+        "checksum_refusal_preserved",
+        "checksum_retry",
+        "artifact_refusal_preserved",
+        "artifact_retry",
+    }
+
+    def __init__(self, directory):
+        self.descriptor = None
+        self.started = time.monotonic()
+        self.sequence = 0
+        self.failed = False
+        self.ownership_closed = False
+        self.previous = None
+        if directory is not None:
+            require(
+                hasattr(os, "O_NOFOLLOW"),
+                "Native phase evidence requires no-follow directory admission",
+            )
+            self.descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                info = os.fstat(self.descriptor)
+                require(
+                    stat.S_ISDIR(info.st_mode)
+                    and stat.S_IMODE(info.st_mode) == 0o700
+                    and info.st_uid == os.getuid(),
+                    "Phase evidence directory is not exclusively owned and private",
+                )
+            except BaseException:
+                try:
+                    self.close()
+                except OSError:
+                    pass  # Preserve the acquisition refusal or interruption.
+                raise
+
+    def record(
+        self,
+        phase,
+        *,
+        status="pending",
+        closed=False,
+        groups=(),
+        cases=None,
+        command=None,
+        debt_kinds=(),
+    ):
+        if self.descriptor is None:
+            return True
+        try:
+            allowed = "abcdefghijklmnopqrstuvwxyz0123456789._-"
+            require(
+                phase and len(phase) <= 64 and all(c in allowed for c in phase),
+                "Invalid native evidence phase",
+            )
+            require(
+                status in ("pending", "refused", "accepted", "cleanup-debt"),
+                "Invalid native evidence status",
+            )
+            packet = {
+                "schema": 1,
+                "owner": "brew-helper",
+                "owner_pid": os.getpid(),
+                "phase": phase,
+                "status": status,
+                "scope": "owned-native-groups",
+                "ownership_closed": bool(closed),
+                "groups": [],
+                "cases": {},
+                "debt_kinds": [],
+            }
+            for group in groups:
+                require(
+                    len(packet["groups"]) < 16 and group.process.pid > 0,
+                    "Native evidence group bound exceeded",
+                )
+                packet["groups"].append({"pid": group.process.pid, "closed": bool(group.reaped)})
+            for key, value in (cases or {}).items():
+                require(
+                    key in self.case_names and type(value) is bool, "Unadmitted native receipt fact"
+                )
+                packet["cases"][key] = value
+            if command is not None:
+                require(
+                    command and len(command) <= 64 and all(c in allowed for c in command.lower()),
+                    "Invalid native command label",
+                )
+                packet["command"] = command
+            allowed_debt = {
+                "process-group",
+                "process-retirement-error",
+                "server-thread",
+                "server-retirement-error",
+                "external-canary",
+            }
+            kinds = sorted(set(debt_kinds))
+            require(
+                len(kinds) <= 5 and all(kind in allowed_debt for kind in kinds),
+                "Unadmitted native cleanup debt",
+            )
+            packet["debt_kinds"] = kinds
+            semantic = json.dumps(packet, sort_keys=True)
+            if semantic == self.previous:
+                return not self.failed
+            packet["elapsed_seconds"] = round(time.monotonic() - self.started, 6)
+            packet["history_omitted"] = max(0, self.sequence + 1 - 256)
+            data = (json.dumps(packet, sort_keys=True) + "\n").encode()
+            require(len(data) <= 4096, "Native phase packet exceeds its safe bound")
+            temporary = ".phase-" + str(uuid.uuid4())
+            descriptor = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=self.descriptor,
+            )
+            try:
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(data)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if self.sequence < 256:
+                    os.link(
+                        temporary,
+                        f"phase-{self.sequence:03}.json",
+                        src_dir_fd=self.descriptor,
+                        dst_dir_fd=self.descriptor,
+                        follow_symlinks=False,
+                    )
+                os.replace(
+                    temporary,
+                    "checkpoint.json",
+                    src_dir_fd=self.descriptor,
+                    dst_dir_fd=self.descriptor,
+                )
+            finally:
+                try:
+                    os.unlink(temporary, dir_fd=self.descriptor)
+                except FileNotFoundError:
+                    pass
+            self.previous = semantic
+            self.sequence += 1
+            self.ownership_closed = bool(closed)
+            return not self.failed
+        except OwnedProcessInterrupted:
+            raise  # Cancellation must reach the native owner, never become a diagnostic omission.
+        except Exception:
+            self.failed = True
+            return False
+
+    def close(self):
+        if self.descriptor is not None:
+            descriptor, self.descriptor = self.descriptor, None
+            os.close(descriptor)
+
+
 class Children:
     """Own process groups and settle descendants before removing their inputs."""
 
-    def __init__(self, root):
+    def __init__(self, root, evidence=None):
+        self.evidence = evidence
         self.root = root
         self.environment = private_environment(root)
         self.active = []
@@ -199,6 +359,8 @@ class Children:
 
     def run(self, arguments, *, check=True, confined=False, timeout=180):
         """Capture into owned files, cap diagnostics, preserve exact exit status."""
+        if self.evidence is not None:
+            self.evidence.record("command.begin", command=Path(arguments[0]).name)
         process = self.start(arguments, confined=confined)
         output, errors = self.captures[process]
         failure = None
@@ -215,6 +377,17 @@ class Children:
                 self.record_debt({"kind": "process-retirement-error", "pid": process.pid})
             if not any(entry.get("pid") == process.pid for entry in self.debt):
                 self.active.remove(process)
+        if self.evidence is not None:
+            self.evidence.record(
+                "command.end",
+                command=Path(arguments[0]).name,
+                status="refused"
+                if failure is not None
+                or process.returncode != 0
+                or any(entry.get("pid") == process.pid for entry in self.debt)
+                else "accepted",
+                groups=[self.groups[child] for child in self.active],
+            )
         if failure is not None:
             raise failure
         require(
@@ -937,11 +1110,28 @@ def host_receipt(source, host, prefix):
     }
 
 
-def observe(repository, output, *, fixture_parent=None):
+def observe(repository, output, *, fixture_parent=None, evidence_directory=None):
+    evidence = PhaseEvidence(evidence_directory)
+    try:
+        evidence.record("candidate.begin")
+        receipt = _observe(repository, output, fixture_parent=fixture_parent, evidence=evidence)
+        require(not evidence.failed, "Native phase evidence could not be safely published")
+        return receipt
+    except Exception:
+        evidence.record("candidate.failed", status="refused", closed=evidence.ownership_closed)
+        raise
+    finally:
+        evidence.close()
+
+
+def _observe(repository, output, *, fixture_parent=None, evidence):
     """Require ZIP install, XZ upgrade, two refusals and recovery with real Brew."""
+    evidence.record("prerequisites.begin")
     source, host, host_prefix = native_preconditions()
     repository = Path(repository).resolve(strict=True)
+    evidence.record("host-observation.begin")
     host_before = host_receipt(source, host, host_prefix)
+    evidence.record("host-observation.end", status="accepted")
     receipt = {
         "kind": "native-homebrew-archive-acceptance",
         "complete": False,
@@ -977,13 +1167,16 @@ def observe(repository, output, *, fixture_parent=None):
         root.chmod(0o700)
         for name in ("home", "temp", "cache", "logs", "apps"):
             (root / name).mkdir()
-        children = Children(root)
+        children = Children(root, evidence=evidence)
         for sig in (signal.SIGTERM, signal.SIGINT):
             previous = signal.getsignal(sig)
             signal.signal(sig, interrupted)
             old_handlers[sig] = previous
+        evidence.record("sandbox.begin")
         admit_sandbox(children)
+        evidence.record("appleevent.begin")
         receipt["appleevent_boundary"] = admit_appleevent_boundary(children, repository)
+        evidence.record("brew-admission.begin")
         brew, tap, receipt["brew"] = admit_brew(children, source, host)
         server = Assets(root, children)
         apps = {version: signed_bundle(children, version) for version in VERSIONS}
@@ -1002,14 +1195,18 @@ def observe(repository, output, *, fixture_parent=None):
         token = "ergopti/acceptance/ergoptiplus"
         command = [str(brew), "install", "--cask", "--appdir=" + str(root / "apps"), token]
         render_cask(children, repository, tap, a, zip_archive)
+        evidence.record("zip-install.begin")
         invoke_brew(children, command)
         verify_installed(children, a, apps[a])
         receipt["cases"]["zip_install"] = True
+        evidence.record("zip-install", status="accepted", cases=receipt["cases"])
         render_cask(children, repository, tap, b, xz_archive)
         upgrade = [str(brew), "upgrade", "--cask", "--appdir=" + str(root / "apps"), token]
+        evidence.record("xz-upgrade.begin")
         invoke_brew(children, upgrade)
         installed = verify_installed(children, b, apps[b])
         receipt["cases"]["xz_upgrade"] = True
+        evidence.record("xz-upgrade", status="accepted", cases=receipt["cases"])
         # Keep the legitimate expected checksum; corrupt only the served bytes.
         good_c = produced[c] / (BUNDLE + ".tar.xz")
         bad_c = root / "corrupt" / good_c.name
@@ -1053,10 +1250,12 @@ def observe(repository, output, *, fixture_parent=None):
             "Checksum refusal changed installed state",
         )
         receipt["cases"]["checksum_refusal_preserved"] = True
+        evidence.record("checksum-refusal-preserved", status="accepted", cases=receipt["cases"])
         server.paths[path_c] = good_c
         invoke_brew(children, upgrade)
         installed = verify_installed(children, c, apps[c])
         receipt["cases"]["checksum_retry"] = True
+        evidence.record("checksum-retry", status="accepted", cases=receipt["cases"])
         # A real signed producer archive renamed under the declared URL has a
         # valid digest, but contains a differently named artifact.
         wrong_root = root / "wrong-artifact"
@@ -1090,12 +1289,14 @@ def observe(repository, output, *, fixture_parent=None):
             "Artifact refusal changed installed state",
         )
         receipt["cases"]["artifact_refusal_preserved"] = True
+        evidence.record("artifact-refusal-preserved", status="accepted", cases=receipt["cases"])
         good_d = produced[d] / (BUNDLE + ".tar.xz")
         server.paths[path_d] = good_d
         render_cask(children, repository, tap, d, good_d)
         invoke_brew(children, upgrade)
         verify_installed(children, d, apps[d])
         receipt["cases"]["artifact_retry"] = True
+        evidence.record("artifact-retry", status="accepted", cases=receipt["cases"])
         require(not server.failures, "Owned TLS transport received undeclared origins")
         require(
             all(path in server.requests for path in server.paths),
@@ -1112,6 +1313,12 @@ def observe(repository, output, *, fixture_parent=None):
                 signal.signal(sig, signal.SIG_IGN)
             except Exception:
                 receipt["cleanup_errors"].append("Owned signal masking failed")
+        evidence.record(
+            "cleanup.begin",
+            groups=[children.groups[child] for child in children.active]
+            if children is not None
+            else [],
+        )
         # Never discard the ledger while its acquired native groups retain debt.
         # Cleanup retries preserve the original operation failure/deadline; a
         # permanently unavailable native census keeps this owner and inputs alive.
@@ -1123,6 +1330,12 @@ def observe(repository, output, *, fixture_parent=None):
             except Exception:
                 retired = False
             if not retired:
+                evidence.record(
+                    "cleanup.debt",
+                    status="cleanup-debt",
+                    groups=[children.groups[child] for child in children.active],
+                    debt_kinds=[entry["kind"] for entry in children.debt],
+                )
                 receipt["complete"] = False
                 receipt["fixture_retained"] = True
                 receipt["fixture"] = str(root)
@@ -1135,6 +1348,7 @@ def observe(repository, output, *, fixture_parent=None):
                     pass  # Failed evidence publication cannot surrender native ownership.
                 time.sleep(0.25)
         receipt["ownership"]["closed"] = True
+        evidence.record("cleanup.closed", status="accepted", closed=True, cases=receipt["cases"])
         receipt["complete"] = operation_complete
         receipt.pop("cleanup_debt", None)
         try:
@@ -1181,9 +1395,15 @@ if __name__ == "__main__":
     parser.add_argument("repository")
     parser.add_argument("receipt")
     parser.add_argument("--fixture-parent")
+    parser.add_argument("--evidence-directory")
     arguments = parser.parse_args()
     try:
-        observe(arguments.repository, arguments.receipt, fixture_parent=arguments.fixture_parent)
+        observe(
+            arguments.repository,
+            arguments.receipt,
+            fixture_parent=arguments.fixture_parent,
+            evidence_directory=arguments.evidence_directory,
+        )
     except (AdmissionError, OSError, ValueError) as error:
         print("Native Brew acceptance failed: " + str(error), file=sys.stderr)
         raise SystemExit(1)

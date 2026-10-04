@@ -190,6 +190,12 @@ const STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'package-macos',
+		'Retain archive diagnostic session',
+		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
 		'Retain closed TIS diagnostic session',
 		"${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}"
 	],
@@ -1222,6 +1228,27 @@ function stepProblems(files) {
 }
 
 errors.push(...stepProblems(pipeline.files()));
+for (const condition of ['', 'false', 'success()']) {
+	const head = '      - name: Retain archive diagnostic session\n';
+	const from =
+		head +
+		"        if: ${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}\n";
+	mustCatch(
+		'archive retained evidence condition ' + condition,
+		MACOS_BOX,
+		from,
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing mandatory archive evidence upload',
+	MACOS_BOX,
+	'      - name: Retain archive diagnostic session\n',
+	'      - name: Omitted archive evidence upload\n',
+	stepProblems
+);
+
 for (const condition of ['', 'false', 'success()']) {
 	const head = '      - name: Retain closed TIS diagnostic session\n';
 	const from =

@@ -20,6 +20,17 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 	}
 
 	func testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState() throws {
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		let evidence = try ArchiveAcceptanceEvidence(owner: .brew)
+		let evidenceDirectory = try evidence.childDirectory()
+		var evidenceRefused = false
+		func checkpoint(_ phase: String, status: String = "pending", closed: Bool = false, pids: [Int32] = [], facts: [String: Bool] = [:]) {
+			if !evidence.record(phase, status: status, closed: closed, ownedPIDs: pids, facts: facts), !evidenceRefused {
+				evidenceRefused = true
+				XCTFail("Safe Brew phase evidence publication refused")
+			}
+		}
+		checkpoint("candidate.begin")
 		let manager = FileManager.default
 		let root = manager.temporaryDirectory.appendingPathComponent("ErgoptiBrewInvoker-" + UUID().uuidString)
 		try manager.createDirectory(at: root, withIntermediateDirectories: false,
@@ -46,7 +57,7 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
 		process.arguments = ["python3", Self.repositoryURL.appendingPathComponent(
 			"tools/diagnostics/macos_brew_archive_acceptance.py").path,
-			Self.repositoryURL.path, receiptURL.path, "--fixture-parent", root.path]
+			Self.repositoryURL.path, receiptURL.path, "--fixture-parent", root.path, "--evidence-directory", evidenceDirectory.path]
 		process.environment = NativeFixtureChildEnvironment.make()
 		process.currentDirectoryURL = root
 		process.standardOutput = output
@@ -93,20 +104,26 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		// A later retry never consumes the completion semaphore twice or kills
 		// the helper that still owns reserved child PIDs and inherited PGIDs.
 		defer {
+			checkpoint("cleanup.begin", pids: process.processIdentifier > 0 ? [process.processIdentifier] : [])
 			if !retireInvoker() {
+				checkpoint("cleanup.debt", status: "cleanup-debt", pids: process.processIdentifier > 0 ? [process.processIdentifier] : [])
 				canRetire = false
 				XCTFail("Brew ownership acknowledgement remains incomplete; retained fixture: \(root.path)")
-			}
+			} else { checkpoint("cleanup.closed", status: "accepted", closed: true, pids: process.processIdentifier > 0 ? [process.processIdentifier] : []) }
+			if evidenceRefused { canRetire = false }
 		}
 		process.terminationHandler = { _ in completed.signal() }
 		do { try process.run(); launched = true }
 		catch { launched = process.processIdentifier > 0; throw error }
+		checkpoint("helper.started", pids: [process.processIdentifier])
 		guard observeExit(900) else {
+			checkpoint("deadline", status: "refused", pids: [process.processIdentifier])
 			_ = retireInvoker()
 			XCTFail("Real Brew acceptance exceeded its deadline; retained fixture: \(root.path)")
 			throw FixtureError.timedOut
 		}
 		guard ownershipClosed() else {
+			checkpoint("ownership.refused", status: "refused")
 			XCTFail("Real Brew helper exited without its exact ownership acknowledgement; retained fixture: \(root.path)")
 			throw FixtureError.refused(process.terminationStatus, "Missing native ownership acknowledgement")
 		}
@@ -137,8 +154,9 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		let brew = try XCTUnwrap(receipt["brew"] as? [String: Any])
 		XCTAssertFalse(try XCTUnwrap(brew["version"] as? String).isEmpty)
 		XCTAssertEqual(try XCTUnwrap(brew["entrypoint_sha256"] as? String).count, 64)
+		checkpoint("receipt.checked", status: testRun?.failureCount == failuresBefore ? "accepted" : "refused", closed: true, pids: [process.processIdentifier], facts: cases)
 		// Cleanup is eligible only after the entire strict receipt was admitted.
-		canRetire = ownershipClosed()
+		canRetire = !evidenceRefused && ownershipClosed()
 			&& receipt["complete"] as? Bool == true
 			&& receipt["fixture_retained"] as? Bool == false
 			&& receipt["host_unchanged"] as? Bool == true

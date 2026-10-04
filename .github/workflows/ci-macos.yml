@@ -223,6 +223,24 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"
           xctest_log="$(mktemp "$RUNNER_TEMP/swift-launcher-evidence/xctest.log.XXXXXX")"
+          export ERGOPTI_ARCHIVE_EVIDENCE_DIR="$(mktemp -d "$RUNNER_TEMP/swift-launcher-evidence/archive-session.XXXXXX")"
+          echo "archive_session_dir=$ERGOPTI_ARCHIVE_EVIDENCE_DIR" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ["ERGOPTI_ARCHIVE_EVIDENCE_DIR"])
+          owner = root / "workflow"
+          owner.mkdir(mode=0o700)
+          temporary = owner / ".workflow-stage"
+          descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+          with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+              json.dump({"schema": 1, "owner": "workflow", "phase": "candidate.begin", "scope": "swift-not-started", "ownership_closed": False, "status": "pending", "elapsed_seconds": 0, "history_omitted": 0}, stream, sort_keys=True)
+              stream.flush()
+              os.fsync(stream.fileno())
+          os.link(temporary, owner / "checkpoint.json", follow_symlinks=False)
+          temporary.unlink()
+          PY
           export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$RUNNER_TEMP/swift-launcher-evidence/tis-session.XXXXXX")"
           echo "tis_session_dir=$ERGOPTI_TIS_EVIDENCE_DIR" >> "$GITHUB_OUTPUT"
           export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
@@ -248,6 +266,18 @@ jobs:
         with:
           name: swift-launcher-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/swift-launcher-evidence
+          if-no-files-found: error
+
+      # Export only constructed bounded JSON from this step's owned archive session.
+      # Its availability is independent of TIS setup and native ownership closure.
+      - name: Retain archive diagnostic session
+        if: ${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-archive-session-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.swift-launcher-tests.outputs.archive_session_dir }}/*/*.json
+            ${{ steps.swift-launcher-tests.outputs.archive_session_dir }}/*/helper/*.json
           if-no-files-found: error
 
       # Preserve only the fresh session acquired by this exact Swift step.

@@ -141,6 +141,28 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		acknowledgement()
 	}
 
+	/// Sparkle parses the untouched production appcast. Route only its exact
+	/// admitted request inside this disposable signed app, before native download.
+	func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, withRequest request: NSMutableURLRequest) {
+		guard let originText = Bundle.main.object(forInfoDictionaryKey: "FixtureArchiveOrigin") as? String,
+			let owner = Bundle.main.object(forInfoDictionaryKey: "FixtureGitHubOwner") as? String,
+			let repository = Bundle.main.object(forInfoDictionaryKey: "FixtureGitHubRepo") as? String,
+			originText == "https://github.com/" + owner + "/" + repository + "/releases/download/v2.0.0/ErgoptiPlus.app.tar.xz",
+			let origin = URL(string: originText), item.fileURL == origin, request.url == origin,
+			request.httpMethod == "GET", item.versionString == "2",
+			let transportText = Bundle.main.object(forInfoDictionaryKey: "FixtureArchiveTransport") as? String,
+			let transport = URL(string: transportText), transport.scheme == "http", transport.host == "localhost",
+			let port = transport.port, (1...65535).contains(port), transport.path == "/archive.tar.xz",
+			transport.user == nil, transport.password == nil, transport.query == nil, transport.fragment == nil,
+			Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String == "http://localhost:" + String(port) + "/feed.xml" else {
+			record("transport-refused-" + String(phase))
+			exit(78) // The native downloader has not started, so no foreign origin is acquired.
+		}
+		request.url = transport
+		request.httpShouldHandleCookies = false
+		record("routed-" + String(phase), details: ["origin": origin.absoluteString, "transport": transport.absoluteString])
+	}
+
 	func showDownloadInitiated(cancellation: @escaping () -> Void) {
 		record("download-" + String(phase))
 	}
