@@ -8,8 +8,75 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const TOML = require('smol-toml');
 const pipeline = require('../ci-pipeline.cjs');
+
+/** Uses the exact standard-library catalogue reader owned by the native workflow. */
+function readStartupLogCatalog(recipe, root = pipeline.ROOT, execute = spawnSync) {
+	assert.ok(
+		Array.isArray(recipe) && recipe.every((line) => typeof line === 'string'),
+		'the native log catalogue reader requires the actual workflow recipe'
+	);
+	const commands = [
+		...recipe
+			.join('\n')
+			.matchAll(
+				/^\s*\$catalogJson = & (python) -c '([^'\r\n]+)' "\$env:GITHUB_WORKSPACE\\([^"\r\n]+)"\s*$/gm
+			)
+	];
+	assert.ok(commands.length === 1, 'the native log catalogue reader must have one actual owner');
+	const [, program, script, relative] = commands[0];
+	const segments = relative.split('\\');
+	assert.ok(
+		segments.every(
+			(segment) => segment !== '' && segment !== '.' && segment !== '..' && !/[/:]/.test(segment)
+		),
+		'the native log catalogue reader must stay inside its repository'
+	);
+	const result = execute(program, ['-c', script, path.join(root, ...segments)], {
+		encoding: 'utf8',
+		timeout: 5000,
+		maxBuffer: 65536,
+		windowsHide: true
+	});
+	assert.ok(
+		result && !result.error && result.status === 0,
+		'the actual native log catalogue reader refused'
+	);
+	assert.ok(
+		result.stderr === '' && typeof result.stdout === 'string',
+		'the actual native log catalogue reader returned an invalid stream'
+	);
+	let catalog;
+	try {
+		catalog = JSON.parse(result.stdout);
+	} catch {
+		throw new Error('the actual native log catalogue reader returned invalid JSON');
+	}
+	assert.ok(
+		catalog &&
+			typeof catalog === 'object' &&
+			!Array.isArray(catalog) &&
+			Object.keys(catalog).sort().join('|') === 'base|extension|prefix|segments',
+		'the actual native log catalogue reader returned an invalid schema'
+	);
+	assert.ok(
+		['base', 'prefix', 'extension'].every(
+			(key) => typeof catalog[key] === 'string' && catalog[key] !== ''
+		) &&
+			Array.isArray(catalog.segments) &&
+			catalog.segments.length > 0 &&
+			catalog.segments.every(
+				(segment) =>
+					typeof segment === 'string' &&
+					segment !== '' &&
+					segment !== '.' &&
+					segment !== '..' &&
+					!/[\\/:]/.test(segment)
+			),
+		'the actual native log catalogue reader returned invalid fields'
+	);
+	return catalog;
+}
 
 module.exports = function checkWindowsStartupLogRuntime() {
 	if (process.platform !== 'win32') {
@@ -29,15 +96,8 @@ module.exports = function checkWindowsStartupLogRuntime() {
 		.map((name) => pipeline.scriptBlock(recipe, name).join('\n'))
 		.join('\n');
 	const initialization = pipeline.scriptBlock(recipe, '$startupEvidence = [ordered]@{').join('\n');
-	const catalog = TOML.parse(
-		fs.readFileSync(
-			path.join(pipeline.ROOT, 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml'),
-			'utf8'
-		)
-	);
-	const relative = catalog.logs.windows.segments.map((segment) =>
-		segment.replaceAll('{app}', catalog.app.folder_name)
-	);
+	const catalog = readStartupLogCatalog(recipe);
+	const relative = catalog.segments;
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-startup-log-roots-'));
 	const quote = (value) => "'" + value.replaceAll("'", "''") + "'";
 	const logs = (root) => path.join(root, ...relative);
@@ -74,9 +134,9 @@ module.exports = function checkWindowsStartupLogRuntime() {
 						'\n' +
 						'$launchOwner = [ordered]@{ pid = $proc.Id; expected_executable = $proc.MainModule.FileName; observed_executable = $proc.MainModule.FileName; start_utc = $proc.StartTime.ToUniversalTime(); identity_qualified = $true; identity_error = $null }\n' +
 						'$name = ' +
-						quote(catalog.logs.files.unified_prefix) +
+						quote(catalog.prefix) +
 						" + (Get-Date -Format 'yyyy-MM-dd') + " +
-						quote(catalog.logs.files.extension) +
+						quote(catalog.extension) +
 						'\n' +
 						'$foreign = Join-Path ' +
 						quote(logs(foreign)) +
@@ -118,9 +178,7 @@ module.exports = function checkWindowsStartupLogRuntime() {
 				assert.equal(observations.filter((row) => row.log === 'bootstrap.log').length, 1);
 				assert.equal(
 					observations.filter(
-						(row) =>
-							row.log.startsWith(catalog.logs.files.unified_prefix) &&
-							row.log.endsWith(catalog.logs.files.extension)
+						(row) => row.log.startsWith(catalog.prefix) && row.log.endsWith(catalog.extension)
 					).length,
 					1
 				);
@@ -172,3 +230,5 @@ module.exports = function checkWindowsStartupLogRuntime() {
 		});
 	}
 };
+
+module.exports.readStartupLogCatalog = readStartupLogCatalog;
