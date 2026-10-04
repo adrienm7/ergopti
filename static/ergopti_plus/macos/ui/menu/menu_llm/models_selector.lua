@@ -20,6 +20,7 @@ local Logger = require("infra.logger")
 local dialog = require("infra.dialog_util")
 local DeferredWork = require("infra.deferred_work")
 local BackendLabels = require("ui.menu.menu_llm.backend_labels")
+local ManifestMenu = require("infra.manifest_menu")
 
 local LOG = "models_selector"
 
@@ -760,6 +761,22 @@ function M.build(ctx)
 			tostring(pcall(function() return chooser:isVisible() end)))
 	end
 
+	--- Retains the existing model-menu pause gate across deferred presentation.
+	--- @return boolean ready The native browser can present in the current pause state.
+	local function model_browser_ready()
+		if paused or type(ctx.is_paused) ~= "function" then return false end
+		local ok, live_paused = xpcall(ctx.is_paused, debug.traceback)
+		if not ok or live_paused ~= false then return false end
+		local ok_factory, factory = pcall(require, "ui.ui_builder")
+		local webview_available = false
+		if ok_factory and type(factory) == "table" and type(factory.can_create_webview) == "function" then
+			local ok_capability, available = pcall(factory.can_create_webview)
+			webview_available = ok_capability and available == true
+		end
+		return webview_available
+			or (type(hs.chooser) == "table" and type(hs.chooser.new) == "function")
+	end
+
 	local function open_model_browser()
 		Logger.info(LOG, "Model browser: open requested (backend=%s).", tostring(active_backend))
 		-- Defer to the next runloop tick so the menubar menu fully closes first: a
@@ -767,6 +784,7 @@ function M.build(ctx)
 		-- silently fail to appear. pcall surfaces any error to the log instead of
 		-- letting the menubar callback swallow it.
 		DeferredWork.after(0, function()
+			if not model_browser_ready() then return false end
 			-- Prefer the shared web table (sortable, filterable, cross-platform);
 			-- fall back to the legacy hs.chooser list when hs.webview is absent
 			-- (headless / stripped builds) so the entry never silently no-ops.
@@ -790,11 +808,10 @@ function M.build(ctx)
 	end
 
 	table.insert(menu, { separator = true })
-	table.insert(menu, {
-		label    = i18n.get("menu.llm.browse_models_entry"),
-		disabled = paused or nil,
-		action       = function() open_model_browser() end,
-	})
+	local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
+		["llm_browse_models"] = open_model_browser,
+	}, { ["llm_model_browser_ready"] = model_browser_ready })
+	if browser_row then table.insert(menu, browser_row) end
 	table.insert(menu, {
 		label    = i18n.get("menu.llm.add_model_entry"),
 		disabled = paused or nil,

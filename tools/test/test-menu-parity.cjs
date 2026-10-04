@@ -107,6 +107,8 @@ const OPENS_SUBMENU = {
 	delays_colors: 'hotstrings_delays_menu',
 	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
 	word_expander_entries: 'word_expander_custom_menu',
+	// The model provider publishes its fixed browser command on every driver.
+	llm_models: 'llm_model_commands',
 	llm_display: 'llm_display_menu',
 	llm_trigger: 'llm_trigger_menu',
 	llm_generation_settings: 'llm_generation_menu',
