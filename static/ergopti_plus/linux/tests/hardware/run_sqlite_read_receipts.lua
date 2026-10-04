@@ -106,6 +106,29 @@ check("large native query output stays complete without a receipt file", functio
 end)
 
 assert(uv.os_setenv("PATH", previous_path))
+for index, method in ipairs({ "read_system_days", "read_manifest", "read_ngrams", "read_range_split_today" }) do
+	for _, alias in ipairs({ false, true }) do
+		check("native " .. method .. " cannot create " .. (alias and "a dangling alias target" or "an absent database"), function()
+			local target = root .. "/absent-" .. index .. "-" .. tostring(alias) .. ".sqlite"
+			local selected = alias and (target .. ".alias") or target
+			local identity
+			if alias then
+				assert(uv.fs_symlink(target, selected))
+				identity = assert(uv.fs_lstat(selected))
+			end
+			local result = Reader[method](selected, "2026-10-03", "2026-10-03", {})
+			assert(type(result) == "table", "absent source lost its stable empty projection contract")
+			assert(not uv.fs_lstat(target), "read-only projection created a phantom database file")
+			assert(not uv.fs_lstat(target .. "-journal") and not uv.fs_lstat(target .. "-wal") and not uv.fs_lstat(target .. "-shm"),
+				"absent-source refusal created native sidecars")
+			if alias then
+				local current = assert(uv.fs_lstat(selected))
+				assert(current.type == "link" and current.dev == identity.dev and current.ino == identity.ino
+					and uv.fs_readlink(selected) == target, "read-only refusal replaced its foreign alias")
+			end
+		end)
+	end
+end
 Writer.close_db()
 for name in uv.fs_scandir_next, assert(uv.fs_scandir(root)) do assert(uv.fs_unlink(root .. "/" .. name)) end
 assert(uv.fs_rmdir(root))

@@ -21,7 +21,7 @@ const html = read('static/ergopti_plus/_shared/ui/metrics_typing/index.html');
 // literal command: the reader must still ask sqlite3 for JSON, and must still
 // go through the audited builder to do it.
 assert.match(reader, /SqliteCommand\.build/);
-assert.match(reader, /flags = \{ "-json" \}/);
+assert.match(reader, /flags = \{ "-readonly", "-json" \}/);
 assert.match(reader, /FROM agg_app_day/);
 // The reader reaches its nine n-gram tables through a code-to-table map now,
 // so the contract is the map's coverage rather than one literal FROM clause.
