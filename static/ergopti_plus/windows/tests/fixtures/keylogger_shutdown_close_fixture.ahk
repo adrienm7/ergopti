@@ -322,14 +322,20 @@ _KLSCF_ReceiptRetirement(Mode) {
 		"success, supersession and retried failure must leave no receipt growth")
 }
 
-try {
-	_KLSCF_Chain()
-	_KLSCF_Refusals()
-	for Mode in ["success", "refused", "exception", "superseded"]
-		_KLSCF_ReceiptRetirement(Mode)
-	FileAppend("frozen-close-chain: passed`n", "*", "UTF-8-RAW")
-	ExitApp(0)
-} catch as Failure {
-	FileAppend("frozen-close-chain: failed: " . Failure.Message . "`n", "**", "UTF-8-RAW")
-	ExitApp(1)
+; Keep runner-loop and failure variables local. Top-level assignments would
+; collide with the same names in the subjects under #Warn All.
+_KLSCF_Main() {
+	try {
+		_KLSCF_Chain()
+		_KLSCF_Refusals()
+		for Mode in ["success", "refused", "exception", "superseded"]
+			_KLSCF_ReceiptRetirement(Mode)
+		FileAppend("frozen-close-chain: passed`n", "*", "UTF-8-RAW")
+		ExitApp(0)
+	} catch as Failure {
+		FileAppend("frozen-close-chain: failed: " . Failure.Message . "`n", "**", "UTF-8-RAW")
+		ExitApp(1)
+	}
 }
+
+_KLSCF_Main()

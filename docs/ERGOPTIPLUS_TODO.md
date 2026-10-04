@@ -2531,6 +2531,14 @@ refusals. Native execution and full Windows qualification remain pending.
 The maintainer confirmed that the original supplied diagnostic is no longer
 available; this mechanism does not establish its historical live cause.
 
+First Windows qualification (run 37228466168, candidate 45d5c2d) executed
+all 9038 AHK cases: 9036 passed and two failed. The new owned child reported
+local/global name warnings because its terminal loop and catch ran at top
+level; that block now runs inside its own function, retaining Warn All and
+every stdout, stderr, exit and scenario assertion. Native retry is pending.
+The other failure is the pre-existing personal-TOML metadata case (item 102).
+E2E, packaging and installation were skipped after the unit failure.
+
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
 rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all
 installation variants. Linux unit passes, but its real accessibility-bus probe
