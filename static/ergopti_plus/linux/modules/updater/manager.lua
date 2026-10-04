@@ -261,6 +261,8 @@ local _state           = "idle"    -- "idle" | "checking" | "available" | "downl
 local _cached_release  = nil       -- { tag, notes, download_url, published_at, prerelease }
 local _list_cache      = {}        -- channel -> the last release list a 200 returned
 local _bg_timer_handle = nil       -- the one armed schedule timer (timer_scheduler handle)
+local _schedule_generation = 0    -- logical publication owner; independent of timer cleanup
+local _schedule_active = false    -- stopped owners cannot publish a held automatic result
 local _check_state     = nil       -- persisted check record (updater.schedule); loaded on first use
 local _started_at      = nil       -- wall clock of the schedule start or of the last detected wake
 local _armed_at        = nil       -- wall clock when the schedule timer was last armed
@@ -815,6 +817,8 @@ end
 --- Stops the schedule timer.
 --- @return boolean stopped False when the timer could not be released.
 function M.stop_background_checks()
+	_schedule_active = false
+	_schedule_generation = _schedule_generation + 1
 	if _bg_timer_handle and Timer then
 		if Timer.cancel(_bg_timer_handle) ~= true then return false end
 		_bg_timer_handle = nil
@@ -822,11 +826,17 @@ function M.stop_background_checks()
 	return true
 end
 
+local function _schedule_current(generation)
+	return _schedule_active == true and generation == _schedule_generation
+end
+
 --- Records one completed background check and announces a new release once.
 --- @param ok boolean Whether GitHub answered with a usable release list.
 --- @param available boolean
 --- @param release table|nil
-local function _complete_background_check(ok, available, release)
+--- @param generation number Captured logical schedule owner.
+local function _complete_background_check(ok, available, release, generation)
+	if not _schedule_current(generation) then return end
 	local state = Schedule.record_check(_load_check_state(), M._now(), ok)
 	_save_check_state(state)
 	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
@@ -838,6 +848,7 @@ local function _complete_background_check(ok, available, release)
 	end
 	local notified = {}
 	for field, value in pairs(state) do notified[field] = value end
+	if not _schedule_current(generation) then return end
 	Logger.info(LOG, "New release available: %s.", release.tag)
 	if type(_on_available) ~= "function" then
 		Logger.error(LOG, "Update notification has no registered handler.")
@@ -852,6 +863,7 @@ local function _complete_background_check(ok, available, release)
 		Logger.error(LOG, "Update notification was not accepted: %s.", tostring(accepted))
 		return
 	end
+	if not _schedule_current(generation) then return end
 	notified.last_notified_tag = release.tag
 	_save_check_state(notified)
 end
@@ -861,6 +873,7 @@ local _arm_schedule
 --- One evaluation of the schedule: re-reads the wall clock, re-arms the one
 --- timer, and dispatches a check only when one is due and the driver runs.
 local function _evaluate_schedule()
+	if _schedule_active ~= true then return end
 	_bg_timer_handle = nil
 	local now = M._now()
 	-- A luv timer does not advance during a suspend: a wall-clock gap longer
@@ -895,8 +908,11 @@ local function _evaluate_schedule()
 		return
 	end
 	Logger.info(LOG, "Background update check due (%s).", reason)
+	local generation, completed = _schedule_generation, false
 	M.check_for_updates(nil, function(available, release, err)
-		_complete_background_check(err == nil, available, release)
+		if completed or not _schedule_current(generation) then return end
+		completed = true
+		_complete_background_check(err == nil, available, release, generation)
 	end)
 end
 
@@ -906,7 +922,10 @@ M._evaluate_schedule = _evaluate_schedule
 --- @param delay_sec number
 --- @return boolean armed
 _arm_schedule = function(delay_sec)
-	local handle = Timer.after(delay_sec, _evaluate_schedule)
+	local generation = _schedule_generation
+	local handle = Timer.after(delay_sec, function()
+		if _schedule_current(generation) then _evaluate_schedule() end
+	end)
 	if type(handle) ~= "table" or handle.armed ~= true then
 		Logger.error(LOG, "The update-check schedule timer could not be armed.")
 		return false
@@ -957,6 +976,7 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		return true
 	end
 
+	_schedule_active = true
 	_started_at = _started_at or M._now()
 	local now = M._now()
 	local due_at, reason = Schedule.next_due({
@@ -967,6 +987,7 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	Logger.start(LOG, "Background checks every %ds on channel '%s' (next evaluation in %ds, %s).",
 		_check_interval, _channel, first_delay, reason)
 	if not _arm_schedule(first_delay) then
+		_schedule_active = false
 		Logger.error(LOG, "Background update checks could not start.")
 		return false
 	end
