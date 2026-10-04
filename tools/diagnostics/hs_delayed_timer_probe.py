@@ -1031,12 +1031,28 @@ function calibrateOwnedNSError(event) {
             "sender_stage": stages[-1] if stages else "not_observed",
         }
 
+    def early_lua_journal_stage(self):
+        """Observe an attempted journal write before later payload prerequisites."""
+        return (
+            "pcall(function() local info=type(hs)=='table' and hs.processInfo or nil; "
+            "local pid=type(info)=='table' and info.processID or nil; "
+            "if type(pid)~='number' or pid<=0 or pid>=2^53 or pid~=math.floor(pid) "
+            "or pid~={pid} then return end; "
+            "local loaded=type(package)=='table' and package.loaded or nil; "
+            "local journal=type(loaded)=='table' and loaded['adapters.boot_journal'] or nil; "
+            "if type(journal)~='table' or type(journal.append)~='function' then return end; "
+            "journal.append('INFO',string.format('Native scripting Lua body stage: "
+            "phase=received_lua_body; pid=%.0f; nonce=%s.',pid,{nonce})); end); "
+        ).format(pid=self.identity["pid"], nonce=json.dumps(self.identity["nonce"]))
+
     def lua_parts(self):
         """Use only actual processInfo fields already qualified by the native timer."""
         identity = self.identity
         entry = json.dumps(str(self.path / "entry.json"))
         completion = json.dumps(str(self.path / "completion.json"))
-        prefix = "return (function() local i=hs.processInfo; " + (
+        prefix = (
+            "return (function() " + self.early_lua_journal_stage() + "local i=hs.processInfo; "
+        ) + (
             "assert(i.processID=={pid} and i.executablePath=={exe} and i.bundleID=={bundle}, "
             "'Supplemental native owner differs'); local function publish(path,phase) "
             "local text=hs.json.encode({{schema_version=1,contract='hs.applescript.server-witness',"
@@ -1779,6 +1795,48 @@ function run(argv) {
             if not self.scripting_commands and not self.server_sample_workers:
                 scope.cleanup()
                 self.no_prompt_scope = None
+
+    def observe_early_lua_stage(self, journal):
+        """A complete line observes attempted publication, never its acknowledgement."""
+        result = {
+            "phase": "received_lua_body",
+            "body_stage": "unobserved",
+            "publication_ack": "unobserved",
+            "timing": "unknown",
+            "qualified": False,
+        }
+        if self.runtime_owner is None or self.scripting_commands or self.server_sample_workers:
+            return result
+        pid, _ = self.runtime_owner
+        if (
+            type(pid) is not int
+            or pid <= 0
+            or type(self.nonce) is not str
+            or re.fullmatch(r"[0-9a-f]{32}", self.nonce) is None
+            or type(journal) is not str
+            or len(journal) > SCRIPT_SAMPLE_READ_LIMIT
+        ):
+            return result
+        expected = (
+            r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] \[init\] "
+            r"Native scripting Lua body stage: phase=received_lua_body; pid="
+            + re.escape(str(pid))
+            + "; nonce="
+            + re.escape(self.nonce)
+            + r"\."
+        )
+        # Flush/close may refuse after writing a complete LF record. Even one
+        # exact fresh line never acknowledges append(), or entry before timeout.
+        matches = [
+            line
+            for line in journal.splitlines(keepends=True)
+            if line.endswith("\n")
+            and not line.endswith("\r\n")
+            and re.fullmatch(expected, line[:-1]) is not None
+        ]
+        if len(matches) == 1:
+            result["body_stage"] = "observed"
+        return result
 
     @staticmethod
     def constructor_script():

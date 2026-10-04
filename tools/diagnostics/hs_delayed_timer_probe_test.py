@@ -8,10 +8,12 @@ import os
 from pathlib import Path
 import plistlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+import textwrap
 import unittest
 from unittest import mock
 
@@ -3631,6 +3633,351 @@ class InflightNoPromptSampleTests(unittest.TestCase):
             process.kill.assert_called_once_with()
             self.assertEqual(seen, [0.02, 2])
             scope.cleanup()
+
+
+class EarlyReceivedLuaStageTests(unittest.TestCase):
+    """Exercise the generated payload and actual physical journal writer."""
+
+    @staticmethod
+    def selected_interpreter(machine):
+        """Use explicit CI keg paths; configured refusal never falls back to PATH."""
+        variable = {"lua5.4": "ERGOPTI_DIAGNOSTIC_LUA54", "luajit": "ERGOPTI_DIAGNOSTIC_LUAJIT"}[
+            machine
+        ]
+        if variable not in os.environ:
+            return machine
+        selected = Path(os.environ[variable])
+        if not selected.is_absolute() or not selected.is_file() or not os.access(selected, os.X_OK):
+            raise ValueError("Configured physical journal interpreter refused")
+        return str(selected)
+
+    def run_lua(self, mode="ok", later="body", pid="42", module="actual", machine="lua5.4"):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            owner = probe.NativeDelayedTimerProbe(root / "app", root, DOMAIN)
+            owner.nonce = NONCE
+            owner.runtime_owner = (42, lambda executable: [])
+            scope = probe.NoPromptDiagnosticScope(root, NONCE, 42, EXECUTABLE, DOMAIN)
+            prefix, suffix = scope.lua_parts()
+            body = "return " + json.dumps(NONCE)
+            if later == "body":
+                body = "error('controlled later body refusal')"
+            code = prefix + body + suffix
+            journal = root / "journal.log"
+            journal_source = (
+                Path(__file__).parents[2] / "static/ergopti_plus/macos/adapters/boot_journal.lua"
+            )
+            version = (
+                "assert(_VERSION=='Lua 5.4','Physical journal Lua version differs')\n"
+                if machine == "lua5.4"
+                else "assert(_VERSION=='Lua 5.1' and type(jit)=='table' and jit.version_num>=20100 and jit.version_num<20200,'Physical journal LuaJIT version differs')\n"
+            )
+            script = (
+                version
+                + r"""
+local journal_path=__JOURNAL__
+package.preload['infra.logger']=function() return {FALLBACK_BOOT_LOG_FILE=journal_path} end
+local actual=dofile(__MODULE__)
+local calls={write=0,flush=0,close=0,append=0}
+local mode=__MODE__
+local function opener(path,flag)
+    local native,err=io.open(path,flag)
+    if not native then return nil,err end
+    return {
+        write=function(_,text)
+            calls.write=calls.write+1
+            local wrote=native:write(text)
+            if mode=='write_false' then return false end
+            if mode=='write_throw' then error('controlled write refusal') end
+            return wrote
+        end,
+        flush=function()
+            calls.flush=calls.flush+1
+            local flushed=native:flush()
+            if mode=='flush_false' then return false end
+            if mode=='flush_throw' then error('controlled flush refusal') end
+            return flushed
+        end,
+        close=function()
+            calls.close=calls.close+1
+            local closed=native:close()
+            if mode=='close_false' then return false end
+            if mode=='close_throw' then error('controlled close refusal') end
+            return closed
+        end,
+    }
+end
+actual.configure_for_tests({open=opener})
+local appended=actual.append
+actual.append=function(...)
+    calls.append=calls.append+1
+    local ack=appended(...)
+    if mode=='ack_false' then return false end
+    if mode=='ack_nil' then return nil end
+    if mode=='ack_throw' then error('controlled append refusal') end
+    return ack
+end
+package.loaded['adapters.boot_journal']=actual
+__MODULE_SHAPE__
+hs={processInfo={processID=__PID__,executablePath=__EXECUTABLE__,bundleID=__DOMAIN__},
+    json={encode=function() __ENCODE__ return '{}' end}}
+local fn,err=load(__CODE__)
+assert(fn,err)
+local completed,result=pcall(fn)
+-- These observations run after the protected production payload has returned.
+print(tostring(completed))
+print(calls.append..','..calls.write..','..calls.flush..','..calls.close)
+print(completed and tostring(result) or 'closed later refusal')
+"""
+            )
+            replacement = {
+                "__JOURNAL__": json.dumps(str(journal)),
+                "__MODULE__": json.dumps(str(journal_source)),
+                "__MODE__": json.dumps(mode),
+                "__MODULE_SHAPE__": {
+                    "actual": "",
+                    "missing": "package.loaded['adapters.boot_journal']=nil",
+                    "malformed": "package.loaded['adapters.boot_journal']={append=true}",
+                }[module],
+                "__PID__": pid,
+                "__EXECUTABLE__": json.dumps("foreign" if later == "identity" else str(EXECUTABLE)),
+                "__DOMAIN__": json.dumps(DOMAIN),
+                "__ENCODE__": "error('controlled later JSON refusal')" if later == "json" else "",
+                "__CODE__": "[====[" + code + "]====]",
+            }
+            for token, value in replacement.items():
+                script = script.replace(token, value)
+            native = subprocess.run(
+                [self.selected_interpreter(machine), "-"],
+                input=script,
+                text=True,
+                capture_output=True,
+                timeout=5,
+            )
+            self.assertEqual(native.returncode, 0, native.stderr)
+            lines = native.stdout.splitlines()
+            self.assertEqual(len(lines), 3)
+            text = journal.read_text() if journal.exists() else ""
+            stage = owner.observe_early_lua_stage(text)
+            scope.cleanup()
+            return stage, text, lines
+
+    def test_actual_generated_stage_precedes_later_identity_json_and_body_refusal(self):
+        for later in ("identity", "json", "body"):
+            with self.subTest(later=later):
+                stage, text, seen = self.run_lua(later=later)
+                self.assertEqual(seen[0], "false")
+                self.assertEqual(stage["body_stage"], "observed")
+                self.assertIn("pid=42; nonce=" + NONCE + ".\n", text)
+                self.assertFalse(stage["qualified"])
+                self.assertEqual(stage["publication_ack"], "unobserved")
+                self.assertEqual(stage["timing"], "unknown")
+
+    def test_actual_generated_stage_preserves_successful_original_nonce_and_receipts(
+        self,
+    ):
+        for machine in ("lua5.4", "luajit"):
+            with self.subTest(machine=machine):
+                stage, text, seen = self.run_lua(later="success", machine=machine)
+                self.assertEqual(seen[0], "true")
+                self.assertEqual(seen[2], NONCE)
+                self.assertEqual(stage["body_stage"], "observed")
+                self.assertFalse(stage["qualified"])
+
+    def test_exact_false_nil_and_throw_append_acknowledgements_never_qualify(self):
+        for mode in ("ack_false", "ack_nil", "ack_throw"):
+            with self.subTest(mode=mode):
+                stage, text, seen = self.run_lua(mode=mode, later="success")
+                self.assertEqual(seen[0], "true")
+                self.assertEqual(seen[2], NONCE)
+                self.assertTrue(text.endswith("\n"))
+                self.assertEqual(stage["publication_ack"], "unobserved")
+                self.assertFalse(stage["qualified"])
+
+    def test_real_write_flush_close_refusal_may_leave_bytes_but_never_success_ack(self):
+        for mode in (
+            "write_false",
+            "write_throw",
+            "flush_false",
+            "flush_throw",
+            "close_false",
+            "close_throw",
+        ):
+            with self.subTest(mode=mode):
+                stage, text, seen = self.run_lua(mode=mode, later="success")
+                self.assertEqual(seen[0], "true")
+                self.assertEqual(seen[2], NONCE)
+                self.assertTrue(text.endswith("\n"))
+                self.assertEqual(seen[1].split(",")[0], "1")
+                self.assertEqual(
+                    seen[1].split(",")[-1],
+                    "1",
+                    "physical file must close even after refusal",
+                )
+                self.assertFalse(stage["qualified"])
+                self.assertEqual(stage["publication_ack"], "unobserved")
+
+    def test_missing_malformed_or_foreign_actual_pid_never_publishes_expected_pid(self):
+        for pid in ("nil", "true", "'42'", "43", "0", "0/0", "math.huge", "42.5"):
+            with self.subTest(pid=pid):
+                stage, text, seen = self.run_lua(pid=pid)
+                self.assertEqual(seen[0], "false")
+                self.assertEqual(seen[1], "0,0,0,0")
+                self.assertEqual(text, "")
+                self.assertEqual(stage["body_stage"], "unobserved")
+
+    def test_missing_or_malformed_loaded_module_preserves_original_payload(self):
+        for module in ("missing", "malformed"):
+            with self.subTest(module=module):
+                stage, text, seen = self.run_lua(module=module, later="success")
+                self.assertEqual(seen[0], "true")
+                self.assertEqual(seen[2], NONCE)
+                self.assertEqual(seen[1], "0,0,0,0")
+                self.assertEqual(stage["body_stage"], "unobserved")
+
+    def test_closed_observer_refuses_stale_foreign_incomplete_and_ambiguous_lines(self):
+        with tempfile.TemporaryDirectory() as folder:
+            owner = probe.NativeDelayedTimerProbe(Path(folder) / "app", Path(folder), DOMAIN)
+            owner.nonce = NONCE
+            owner.runtime_owner = (42, lambda executable: [])
+            valid = (
+                "2026-10-04 00:00:00 [INFO] [init] Native scripting Lua body stage: "
+                "phase=received_lua_body; pid=42; nonce=" + NONCE + ".\n"
+            )
+            self.assertEqual(owner.observe_early_lua_stage(valid)["body_stage"], "observed")
+            for changed in (
+                None,
+                valid.replace(NONCE, "b" * 32),
+                valid.replace("pid=42", "pid=43"),
+                valid.replace("phase=received_lua_body", "phase=completed"),
+                valid[:-1],
+                valid.replace("\n", "\r\n"),
+                valid + valid,
+                "x" * (probe.SCRIPT_SAMPLE_READ_LIMIT + 1),
+            ):
+                with self.subTest(kind=type(changed).__name__):
+                    stage = owner.observe_early_lua_stage(changed)
+                    self.assertEqual(stage["body_stage"], "unobserved")
+                    self.assertFalse(stage["qualified"])
+            owner.scripting_commands.append(object())
+            self.assertEqual(owner.observe_early_lua_stage(valid)["body_stage"], "unobserved")
+            owner.scripting_commands.clear()
+            owner.runtime_owner = (True, lambda executable: [])
+            self.assertEqual(owner.observe_early_lua_stage(valid)["body_stage"], "unobserved")
+
+
+class EarlyLuaInterpreterPrerequisiteTests(unittest.TestCase):
+    """The actual package step selects both real interpreters without PATH guesses."""
+
+    def test_explicit_keg_paths_run_both_physical_journals_and_invalid_paths_refuse(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            environment = {}
+            for machine, variable in (
+                ("lua5.4", "ERGOPTI_DIAGNOSTIC_LUA54"),
+                ("luajit", "ERGOPTI_DIAGNOSTIC_LUAJIT"),
+            ):
+                target = shutil.which(EarlyReceivedLuaStageTests.selected_interpreter(machine))
+                self.assertIsNotNone(target, "Both physical calibration interpreters are mandatory")
+                selected = root / (machine + " selected keg")
+                selected.symlink_to(target)
+                environment[variable] = str(selected)
+            with mock.patch.dict(os.environ, environment):
+                subject = EarlyReceivedLuaStageTests()
+                for machine in ("lua5.4", "luajit"):
+                    stage, text, seen = subject.run_lua(later="success", machine=machine)
+                    self.assertEqual(seen[0], "true")
+                    self.assertEqual(seen[2], NONCE)
+                    self.assertEqual(stage["body_stage"], "observed")
+                    self.assertFalse(stage["qualified"])
+            for invalid in ("", "relative/path", str(root / "missing")):
+                with mock.patch.dict(os.environ, {"ERGOPTI_DIAGNOSTIC_LUA54": invalid}):
+                    with self.assertRaisesRegex(ValueError, "interpreter refused"):
+                        EarlyReceivedLuaStageTests.selected_interpreter("lua5.4")
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "ERGOPTI_DIAGNOSTIC_LUA54": shutil.which(
+                        EarlyReceivedLuaStageTests.selected_interpreter("luajit")
+                    )
+                },
+            ):
+                with self.assertRaises(AssertionError):
+                    EarlyReceivedLuaStageTests().run_lua(later="success", machine="lua5.4")
+
+    def test_actual_package_step_provisions_then_passes_exact_resolved_keg_paths(self):
+        workflow = Path(__file__).parents[2] / ".github/workflows/ci-macos.yml"
+        source = workflow.read_text()
+        step = "      - name: Self-test the launch verdict\n"
+        self.assertEqual(source.count(step), 1)
+        block = source.split(step)[1].split("\n      - name:")[0]
+        self.assertIn("HOMEBREW_NO_AUTO_UPDATE: '1'", block)
+        self.assertEqual(block.count("        run: |\n"), 1)
+        script = textwrap.dedent(block.split("        run: |\n")[1]).rstrip() + "\n"
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            ports, lua_keg, jit_keg = root / "ports", root / "Lua 5.4 keg", root / "LuaJIT keg"
+            ports.mkdir()
+            for keg, name in ((lua_keg, "lua"), (jit_keg, "luajit")):
+                (keg / "bin").mkdir(parents=True)
+                native = shutil.which(
+                    EarlyReceivedLuaStageTests.selected_interpreter(
+                        "lua5.4" if name == "lua" else "luajit"
+                    )
+                )
+                self.assertIsNotNone(native)
+                (keg / "bin" / name).symlink_to(native)
+            receipt = root / "commands.jsonl"
+            brew = ports / "brew"
+            brew.write_text(
+                "#!" + sys.executable + "\n"
+                "import json,sys\n"
+                "from pathlib import Path\n"
+                "args=sys.argv[1:]\n"
+                "with Path("
+                + repr(str(receipt))
+                + ").open('a') as log: log.write(json.dumps(args)+'\\n')\n"
+                "if args==['install','lua@5.4','luajit']: pass\n"
+                "elif args==['--prefix','lua@5.4']: print(" + repr(str(lua_keg)) + ")\n"
+                "elif args==['--prefix','luajit']: print(" + repr(str(jit_keg)) + ")\n"
+                "else: sys.exit(9)\n"
+            )
+            python = ports / "python3"
+            selected_receipt = root / "selected.json"
+            python.write_text(
+                "#!" + sys.executable + "\n"
+                "import json,os,sys,subprocess\n"
+                "from pathlib import Path\n"
+                "assert sys.argv[1:]==['tools/diagnostics/macos_launch_gate_test.py']\n"
+                "names=['ERGOPTI_DIAGNOSTIC_LUA54','ERGOPTI_DIAGNOSTIC_LUAJIT']\n"
+                "selected=[os.environ[name] for name in names]\n"
+                "versions=[\"assert(_VERSION=='Lua 5.4')\",\"assert(_VERSION=='Lua 5.1' and jit.version_num>=20100 and jit.version_num<20200)\"]\n"
+                "for native,check in zip(selected,versions): subprocess.run([native,'-e',check],check=True)\n"
+                "Path(" + repr(str(selected_receipt)) + ").write_text(json.dumps(selected))\n"
+            )
+            for port in (brew, python):
+                port.chmod(0o700)
+            environment = dict(os.environ)
+            for name in ("ERGOPTI_DIAGNOSTIC_LUA54", "ERGOPTI_DIAGNOSTIC_LUAJIT"):
+                environment.pop(name, None)
+            environment["PATH"] = str(ports) + os.pathsep + environment["PATH"]
+            result = subprocess.run(
+                ["/bin/bash", "-c", script],
+                text=True,
+                capture_output=True,
+                env=environment,
+                timeout=5,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            # Assertions are outside all recorded child ports and production protection.
+            self.assertEqual(
+                [json.loads(line) for line in receipt.read_text().splitlines()],
+                [["install", "lua@5.4", "luajit"], ["--prefix", "lua@5.4"], ["--prefix", "luajit"]],
+            )
+            self.assertEqual(
+                json.loads(selected_receipt.read_text()),
+                [str(lua_keg / "bin/lua"), str(jit_keg / "bin/luajit")],
+            )
 
 
 if __name__ == "__main__":

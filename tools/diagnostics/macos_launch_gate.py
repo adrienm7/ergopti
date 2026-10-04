@@ -620,6 +620,14 @@ def print_native_probe_diagnostics(report):
                 f"native probe command{receipt['command']} ({receipt['phase']}): [additional diagnostic commands omitted]"
             )
 
+    stage = report.get("supplementary_received_lua_stage")
+    if stage is not None:
+        print(
+            "native probe supplementary received Lua body: "
+            f"stage={stage['body_stage']}; publication_ack=unobserved; "
+            "timing=unknown; qualified=false"
+        )
+
 
 def print_tails(output):
     """Print the relevant log tails into the job log so a red gate is readable."""
@@ -816,6 +824,9 @@ def run(app, output, scenario, seed_tag):
                     ) + f"preference restoration failed: {error}"
     if native_probe:
         report["native_probe_diagnostics"] = native_probe.diagnostic_receipts
+        report["supplementary_received_lua_stage"] = native_probe.observe_early_lua_stage(
+            observation.get("boot_log", "")
+        )
         report["native_transport_control"] = observation.get("native_transport_control")
         report["native_descriptor_constructor"] = observation.get("native_descriptor_constructor")
         if observation.get("native_descriptor_constructor_error"):
