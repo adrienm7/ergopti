@@ -25,6 +25,25 @@ The supplemental adapter callback body is also preserved, with only the same ind
 
 ## Preparation and deferred commands
 
+## Native CI acceptance follow-up
+
+Manual Linux run [37243798345](https://github.com/adrienm7/ergopti/actions/runs/37243798345) tested `846eb713514b3921b35594dbca92cc3cb5525aef`. Shared JS, properties and Linux unit jobs passed. The actual GTK/WebKit/luv/curl model-pull scenario passed with the corrected session/failed-epoch retry records and every original assertion and retirement requirement unchanged. Six other native E2E steps failed; packaging and installation were skipped. No release ran.
+
+The accessible annotations report only exit status 1. Archived job logs are inaccessible from this container (HTTP 403). Reference run [37242348817](https://github.com/adrienm7/ergopti/actions/runs/37242348817) failed Linux units before E2E, so it cannot prove the six E2E failures are historical. Their fixtures and directly compared production paths match the reference sources, except optional updater download receipt forwarding outside its unchanged release-fetch path. Byte equivalence does not establish runtime causes or rule out transitive regressions.
+
+Before changing assertions or assigning a cause, replay each exact fixture on isolated current dev and candidate sources with equivalent native prerequisites. Capture the first actual failure without credentials, private URLs or raw environment dumps. Coordinate any proven baseline correction with the fix/Linux owner. Keep requirements 16/38 and report passes, failures, skips and unexecuted cases separately.
+
+1. **GTK application operands:** `run_application_operand_receipts.py` under actual GTK/Xvfb and a private D-Bus session. Inspect the native receipts for all four ordinary, option-looking and quoted IDs through the unchanged chooser/gesture APIs.
+2. **Disposable-user SQLite profile:** reproduce the workflow's exact user, login HOME, copy/cd sequence and `.sqliterc`. Distinguish preparation failures from the independent seed, schema acknowledgement, JSON ABI, dashboard and marker checks; retain all four original checks.
+3. **Updater ETag receipts:** `run_updater_etag_receipts.py` as the ordinary fixture user with actual owned TLS/curl/libuv. Identify the failing mode among the six callback/status/ETag association controls. HTTP 304/header-unavailable notices from the separate successful newest-release update step are not this fixture's failure evidence.
+4. **Localized virtual audio:** use the owned PulseAudio null sink and real C/French/German gettext catalogs, first LuaJIT then Lua 5.4 in the original order. Preserve all six mute/time cases per runtime.
+5. **AT-SPI interpreter options:** actual private D-Bus/Xvfb/openbox and text/password GTK windows with all six LuaJIT option variants. Distinguish mapping, accessibility, direct snapshot and helper launch; retain the twelve original cases.
+6. **Desktop notifications:** private D-Bus/Xvfb with owned Dunst and native GIO history. Preserve all twelve literal-text/options cases, exact identity/urgency/timeout checks and daemon retirement.
+
+These are validation follow-ups, not waived assertions or a completed enterprise-network producer. The saved observation-wrapper proposal remains unreviewed/unexecuted scratch and is not part of this delivery.
+
+## Deferred commands
+
 Run `python3 preparation/prepare-native-engine.py --preimage preimages/http_client.lua --output <temporary engine>` and compare against `static/ergopti_plus/linux/adapters/curl_http_client.lua`. The script is a guarded source-extraction preparation tool; the actual core remains maintainable production source.
 
 `run-models.lua` requires `ERGOPTI_NETWORK_PACKET` and `ERGOPTI_MANAGED_HTTP_CANDIDATE` to point to this packet, `ERGOPTI_HTTP_STAGE` to its Linux driver, `ERGOPTI_PROXY_ADAPTER_CANDIDATE` to its exact system_proxy.lua, and `ERGOPTI_HTTP_REPOSITORY` to a matching dependency checkout. These are test loader bindings, never production overrides. The historical helper uses its physical test source to locate the driver; stage that test under a real driver test tree before invoking. These runner/registration bindings are source-only and have not been qualified after relocation.
