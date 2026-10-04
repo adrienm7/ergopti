@@ -15,6 +15,7 @@ local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local ProcessGroup = require("infra.libuv_process_group")
+local RedirectPolicy = require("infra.http_redirect_policy")
 local LOG = "adapters.http_client"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -293,6 +294,17 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 	if type(url) == "string" and url:find("\0", 1, true) then
 		Logger.error(LOG, "Cannot compose curl configuration: request URL contains NUL.")
 		return reject("curl config URL cannot contain NUL")
+	end
+	if options.follow_redirects then
+		local allowed, err = RedirectPolicy.allows_native_follow(headers)
+		if allowed == nil then
+			Logger.error(LOG, "%s.", err)
+			return reject(err)
+		end
+		-- Curl protects Authorization but forwards custom API-key headers.
+		-- Keep the original request and its HTTP receipt; refuse native follow
+		-- until the adapter owns and filters every redirect hop explicitly.
+		options.follow_redirects = allowed
 	end
 	local owner = request_owner(options.owner)
 	if _active[owner] and not M.cancel(owner) then

@@ -1,0 +1,11 @@
+{
+	"sensitive_headers": [
+		"api-key",
+		"authorization",
+		"cookie",
+		"cookie2",
+		"proxy-authorization",
+		"x-api-key",
+		"x-goog-api-key"
+	]
+}

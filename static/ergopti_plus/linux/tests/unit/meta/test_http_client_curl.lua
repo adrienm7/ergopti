@@ -118,6 +118,81 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	local sensitive_headers = { "Api-Key", "Authorization", "Cookie", "Cookie2", "Proxy-Authorization", "X-Api-Key", "X-Goog-Api-Key" }
+	for _, name in ipairs(sensitive_headers) do
+		for _, method in ipairs({ "get", "post", "postStream", "download" }) do
+			helpers.it("linux-http-redirect-credentials: " .. method .. " retains " .. name .. " only at its original hop", function()
+				local client, state = fresh_client()
+				local result, callbacks = nil, 0
+				local headers, options = { [name] = "SyntheticUnitCredential" }, { follow_redirects = true }
+				local function complete(value) result = value; callbacks = callbacks + 1 end
+				local dispatched
+				if method == "get" then dispatched = client.get("https://example.invalid/api", headers, options, complete)
+				elseif method == "post" then dispatched = client.post("https://example.invalid/api", headers, "{}", complete, options)
+				elseif method == "download" then dispatched = client.download("https://example.invalid/api", headers, "/tmp/owned-unit-download", options, complete)
+				else dispatched = client.postStream("https://example.invalid/api", headers, "{}", options, function() end, complete) end
+				helpers.assert_true(dispatched)
+				helpers.assert_eq(options.follow_redirects, true, "caller options are immutable")
+				local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+				helpers.assert_true(joined:find("\n--location\n", 1, true) == nil, "native curl would forward a caller credential")
+				helpers.assert_true(state.config:find(name .. ": SyntheticUnitCredential", 1, true) ~= nil)
+				if method == "postStream" then state.stderr("\nERGOPTI_HTTP_STATUS:302\n"); state.complete()
+				else state.complete_request(1, "\nERGOPTI_HTTP_STATUS:302\n") end
+				helpers.assert_eq(callbacks, 1)
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_eq(result.status, 302)
+				helpers.assert_eq(result.error, "HTTP 302")
+			end)
+		end
+		helpers.it("linux-http-redirect-credentials: recognizes uppercase " .. name, function()
+			local client, state = fresh_client()
+			helpers.assert_true(client.get("https://example.invalid/api", { [name:upper()] = "SyntheticUnitCredential" },
+				{ follow_redirects = true }, function() end))
+			local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+			helpers.assert_true(joined:find("\n--location\n", 1, true) == nil)
+			state.complete_request(1, "\nERGOPTI_HTTP_STATUS:302\n")
+		end)
+	end
+
+	helpers.it("linux-http-redirect-credentials: missing policy refuses before replacing an existing request", function()
+		local previous = package.loaded["infra.http_redirect_policy"]
+		package.loaded["infra.http_redirect_policy"] = {
+			allows_native_follow = function() return nil, "HTTP redirect policy is unavailable" end,
+		}
+		local ok, client, state = pcall(fresh_client)
+		package.loaded["infra.http_redirect_policy"] = previous
+		helpers.assert_true(ok)
+		local good, bad = nil, nil
+		helpers.assert_true(client.get("https://example.invalid/direct", {}, { owner = "kept" }, function(value) good = value end))
+		helpers.assert_eq(client.get("https://example.invalid/redirect", {}, { owner = "kept", follow_redirects = true },
+			function(value) bad = value end), false)
+		helpers.assert_true(bad and bad.ok == false and bad.status == 0)
+		helpers.assert_eq(bad.error, "HTTP redirect policy is unavailable")
+		helpers.assert_eq(#state.requests, 1)
+		helpers.assert_eq(#state.handles, 5)
+		helpers.assert_eq(#state.kills, 0)
+		helpers.assert_true(client.isActive("kept"))
+		state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_true(good.ok and good.body == "abc")
+	end)
+
+	for index, policy in ipairs({ {}, { sensitive_headers = {} }, { sensitive_headers = "authorization" },
+		{ sensitive_headers = { 42 } }, { sensitive_headers = { "AUTHORIZATION" } },
+		{ sensitive_headers = { "authorization", "authorization" } }, { sensitive_headers = { authorization = true } } }) do
+		helpers.it("linux-http-redirect-policy: rejects malformed shared inventory " .. index, function()
+			local previous_json = package.loaded["json"]
+			local previous_policy = package.loaded["infra.http_redirect_policy"]
+			package.loaded["json"] = { decode = function() return policy end }
+			package.loaded["infra.http_redirect_policy"] = nil
+			local ok, binding = pcall(require, "infra.http_redirect_policy")
+			package.loaded["json"] = previous_json
+			package.loaded["infra.http_redirect_policy"] = previous_policy
+			helpers.assert_true(ok and type(binding) == "table" and type(binding.allows_native_follow) == "function", tostring(binding))
+			local allowed, err = binding.allows_native_follow({ Accept = "application/json" })
+			helpers.assert_eq(allowed, nil)
+			helpers.assert_eq(err, "HTTP redirect policy is invalid")
+		end)
+	end
 	for _, method in ipairs({ "get", "post", "download", "postStream" }) do
 		for index, target in ipairs({ "https://example.invalid/api\0private-suffix", "https://example.invalid/api\0", "\0https://example.invalid/api" }) do
 			helpers.it("linux-http-url-nul: refuses " .. method .. " URL byte position " .. index .. " before native allocation", function()
