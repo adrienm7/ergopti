@@ -380,6 +380,64 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		end
 	end
 
+	for _, case in ipairs(invalid_preflight) do
+		helpers.it("owned-http-preflight: " .. case.name .. " retains its regular predecessor", function()
+			local client, state = fresh_client({ defer_close = true })
+			local good, bad, good_callbacks, bad_callbacks = nil, nil, 0, 0
+			helpers.assert_true(client.get("https://example.invalid/held", {}, { owner = "kept" }, function(value)
+				good, good_callbacks = value, good_callbacks + 1
+			end))
+			local handles, requests = #state.handles, #state.requests
+			local options = { owner = "kept" }
+			for key, value in pairs(case.options or {}) do options[key] = value end
+			if case.download then options.output_path = case.download end
+			local operation = client.get_owned(case.url or "https://example.invalid/direct", case.headers or {}, options,
+				function(value) bad, bad_callbacks = value, bad_callbacks + 1 end)
+			helpers.assert_eq(operation.started, false)
+			helpers.assert_true(operation:is_settled(), "invalid replacement has no native cleanup debt")
+			helpers.assert_eq(bad_callbacks, 1)
+			helpers.assert_true(bad and bad.ok == false and bad.status == 0 and type(bad.error) == "string")
+			helpers.assert_nil(bad.error:find("private-suffix", 1, true))
+			helpers.assert_nil(bad.error:find("Synthetic private header value", 1, true))
+			helpers.assert_eq(#state.handles, handles, "owned replacement preflight precedes native allocation")
+			helpers.assert_eq(#state.requests, requests)
+			helpers.assert_eq(#state.kills, 0, "invalid owned replacement cannot terminate its predecessor")
+			helpers.assert_true(client.isActive("kept"))
+			state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_true(good and good.ok and good.body == "abc")
+			helpers.assert_eq(good_callbacks, 1)
+		end)
+	end
+
+	helpers.it("owned-http-preflight: valid replacement composes once and retains physical cleanup ownership", function()
+		local client, state = fresh_client({ defer_close = true })
+		local previous, result, conversions = nil, nil, 0
+		helpers.assert_true(client.get("https://example.invalid/held", {}, { owner = "kept" },
+			function(value) previous = value end))
+		local header = setmetatable({}, { __tostring = function()
+			conversions = conversions + 1
+			return "Synthetic native header"
+		end })
+		local operation = client.get_owned("https://example.invalid/direct", { ["X-Native"] = header }, { owner = "kept" },
+			function(value) result = value end)
+		helpers.assert_true(operation.started)
+		helpers.assert_eq(conversions, 1, "validated metadata must not be constructed again after displacement")
+		helpers.assert_eq(#state.requests, 2)
+		helpers.assert_eq(#state.kills, 2)
+		state.complete_request(2, "abc\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_nil(result, "owned replacement waits for every native close acknowledgment")
+		helpers.assert_true(not operation:is_settled())
+		local blocked
+		helpers.assert_eq(client.get("https://example.invalid/blocked", {}, { owner = "kept" },
+			function(value) blocked = value end), false)
+		helpers.assert_eq(blocked.error, "previous request cleanup pending")
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_true(result and result.ok and result.body == "abc")
+		state.complete_request(1, "old\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_nil(previous, "the displaced ordinary predecessor cannot publish a stale receipt")
+	end)
+
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
 		for _, scheme in ipairs({ "https", "HTTPS" }) do
 			helpers.it("linux-http-tls-redirect: " .. method .. " keeps " .. scheme .. " on every native hop", function()

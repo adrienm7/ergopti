@@ -1220,6 +1220,22 @@ These are software implementations; final hardware verification remains below.
   task on terminate refusal by source; Windows uses native startup/termination
   accounting by source. Foreign runtime suites, hosted CI and physical input
   remain deferred. No caller, shared API or reserved surface changed.
+- [~] **L90.** Linux owned HTTP replacement admission: validate and compose
+  metadata before cancelling an active regular predecessor, then reuse that
+  exact configuration. An invalid owned replacement previously cancelled a
+  still-usable request before rejecting its NUL/type/raising metadata. Seven
+  of twenty-four actual loopback/curl/libuv cases fail before and all pass
+  after. Existing regular preflight, literal ETag/download files, exactly one
+  wire request, valid replacement, single construction and native settlement
+  controls remain. An already-owned slot still refuses before evaluating
+  hostile metadata; first owned construction retains its existing late
+  allocation and physical close-acknowledgment contract. Ten unit cases
+  preserve delayed ACK, predecessor delivery and every incoming owned test.
+  This follows the existing native owner protocol rather than adding an
+  operation API. Windows uses native generation/staging ownership and macOS
+  hs.http/hs.task by source; equivalent replacement behavior remains unqualified
+  without their runtime suites. No foreign source, reserved surface or hosted
+  CI changed; sockets/processes/files are real, not physical keyboard tests.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
