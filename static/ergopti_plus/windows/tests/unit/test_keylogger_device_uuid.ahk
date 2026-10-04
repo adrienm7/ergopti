@@ -58,3 +58,27 @@ _KLDU_DefaultNative() {
 		"the actual supported native producer must retain its UUID version and variant")
 }
 Test("device UUID: default native producer retains version (device-uuid-format)", _KLDU_DefaultNative)
+
+; A failed native producer must not persist zero bytes or an apparently valid ID.
+_KLDU_Failure(Result, Fill) {
+	Create := (Guid) => _KLDU_Refuse(Guid, Result, Fill)
+	Caught := 0
+	try KL_UuidV4(Create)
+	catch as Failure
+		Caught := Failure
+	AssertTrue(IsObject(Caught), "a failed GUID producer must escape before returning an identity")
+	if Result is Integer
+		AssertContains(Caught.Message, Format("0x{:08X}", Result & 0xFFFFFFFF), "the failure preserves its complete HRESULT")
+	else
+		AssertEqual("TypeError", Type(Caught), "invalid producer state must fail explicitly")
+}
+
+_KLDU_Refuse(Guid, Result, Fill) {
+	if Fill
+		_KLDU_Fill(Guid, 0x12345678, 0x9ABC, 0x4DEF, [0x8F, 0xED, 1, 0x23, 0x45, 0x67, 0x89, 0xAB])
+	return Result
+}
+Test("device UUID: negative HRESULT rejects zero identity (device-uuid-failure)", _KLDU_Failure.Bind(-2147024882, false))
+Test("device UUID: failed filled buffer is refused (device-uuid-failure)", _KLDU_Failure.Bind(-2147467259, true))
+Test("device UUID: nonzero success code is not S_OK (device-uuid-failure)", _KLDU_Failure.Bind(1, true))
+Test("device UUID: invalid producer result fails fast (device-uuid-failure)", _KLDU_Failure.Bind("", false))
