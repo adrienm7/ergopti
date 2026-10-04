@@ -2553,6 +2553,15 @@ indexed reads and writes. An independent indexed-duration assertion checks the
 expected scalar before every mutation scenario. Failure receipts also include
 the native stack. All central admission and privacy assertions remain intact;
 the exact old/new native regression and full-suite retry are pending.
+
+The next native probe (37235031474, candidate b51a2f565) confirmed that
+changing the bound target's signature is insufficient: AHK BoundFunc always
+exposes variadic metadata. The unchanged independent indexed-duration guard
+fails on both the older Map-valued getter and that candidate's excessive
+arguments. Each frozen getter now comes from a separate factory invocation
+returning a real one-parameter closure, preserving the exact captured value
+and descriptor receipt. Source review and all existing privacy/refusal checks
+are retained; actual native execution and full qualification remain pending.
 The other failure is the pre-existing personal-TOML metadata case (item 102).
 E2E, packaging and installation were skipped after the unit failure.
 
