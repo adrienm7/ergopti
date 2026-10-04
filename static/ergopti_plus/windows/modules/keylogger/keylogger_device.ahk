@@ -19,17 +19,23 @@ KL_HostSignature() {
 		return "fallback:" . A_ComputerName
 }
 
-KL_UuidV4() {
+; The first three GUID fields are native integers; Data4 retains byte order.
+; @param CreateGuidFn Optional callable that fills the native 16-byte GUID.
+; @returns {String} Lowercase canonical GUID text for a new device identity.
+KL_UuidV4(CreateGuidFn := unset) {
 		; CoCreateGuid via DllCall, formatted RFC 4122.
 		guid_buf := Buffer(16, 0)
-		DllCall("ole32\CoCreateGuid", "Ptr", guid_buf)
+		if IsSet(CreateGuidFn)
+				CreateGuidFn.Call(guid_buf)
+		else
+				DllCall("ole32\CoCreateGuid", "Ptr", guid_buf)
 		bytes := []
 		Loop 16
 				bytes.Push(NumGet(guid_buf, A_Index - 1, "UChar"))
 		return Format("{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
-				(bytes[1] << 24) | (bytes[2] << 16) | (bytes[3] << 8) | bytes[4],
-				(bytes[5] << 8) | bytes[6],
-				(bytes[7] << 8) | bytes[8],
+				NumGet(guid_buf, 0, "UInt"),
+				NumGet(guid_buf, 4, "UShort"),
+				NumGet(guid_buf, 6, "UShort"),
 				(bytes[9] << 8) | bytes[10],
 				(bytes[11] << 40) | (bytes[12] << 32) | (bytes[13] << 24) | (bytes[14] << 16) | (bytes[15] << 8) | bytes[16])
 }
