@@ -1447,8 +1447,22 @@ if (_DriverStartupSmokeDir != "") {
 		; deliberately bypasses production teardown and OnExit callbacks.
 		if IsSet(_DriverStartupSmokeInspect)
 				_DriverStartupSmokeInspect.Call()
-		if !LoggerPrepareShutdown()
+		if !LoggerPrepareShutdown(&_StartupSmokeLoggerRefusal) {
+				; The smoke already retains stdout on failure; never enqueue more debt.
+				try FileAppend("startup-smoke-logger-refusal: phase="
+						. _StartupSmokeLoggerRefusal["phase"]
+						. " flush_active=" . _StartupSmokeLoggerRefusal["flush_active"]
+						. " force_flush_pending=" . _StartupSmokeLoggerRefusal["force_flush_pending"]
+						. " append_owners=" . _StartupSmokeLoggerRefusal["append_owners"]
+						. " append_debts=" . _StartupSmokeLoggerRefusal["append_debts"]
+						. " append_repairs=" . _StartupSmokeLoggerRefusal["append_repairs"]
+						. " main_lines=" . _StartupSmokeLoggerRefusal["main_lines"]
+						. " error_lines=" . _StartupSmokeLoggerRefusal["error_lines"]
+						. " topical_queues=" . _StartupSmokeLoggerRefusal["topical_queues"]
+						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"] . "`n",
+						"*", "UTF-8-RAW")
 				throw Error("The startup smoke could not make its diagnostic logs durable.")
+		}
 		_StartupSmokeNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")
 		if _StartupSmokeNonce != ""
 				StartupSmokePublishReady(_DriverStartupSmokeDir, _StartupSmokeNonce, true)

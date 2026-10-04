@@ -416,6 +416,8 @@ TODO 16 remains partial. The native Windows brightness provider fixture now reta
 
 Windows startup-log fixture now constructs its native environment from the flat catalogue base returned by the workflow-owned strict reader. The entire actual consumer is covered by an isolated four-scenario regression with real temporary files and cleanup; exact old nested access and wrong-key/no-consumer mutations refuse. The production collector, canonical physical-directory owner and compiled C# controls are unchanged. Actual PowerShell/native startup qualification remains pending hosted CI. TODO 16 remains partial.
 
+Added failure-only Windows full-driver startup evidence at the existing logger shutdown refusal. The optional native logger receipt contains only the refusal phase and atomic ownership/queue counters; it never includes log messages, sink names, paths, file objects, handles, or an inferred native error. The existing Boolean preflight, I/O order, durability error, ready publication, and smoke deadlines remain unchanged. The smoke emits the fixed packet on its already captured stdout without adding logger debt. Registered native tests retain the full original sink tests and add active-owner, real sharing-denial, detached-receipt, and primitive privacy checks. Focused source/inverse/encoding/loop checks passed; full selected verification and Windows execution remain pending. This diagnostic does not establish the underlying cause of the observed refusal or complete item 16.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including
