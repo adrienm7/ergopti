@@ -16,6 +16,7 @@ local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local ProcessGroup = require("infra.libuv_process_group")
 local RedirectPolicy = require("infra.http_redirect_policy")
+local HeaderPolicy = require("infra.http_header_policy")
 local LOG = "adapters.http_client"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -197,7 +198,10 @@ local function curl_args(url, headers, body, options)
 	for name in pairs(headers) do names[#names + 1] = name end
 	table.sort(names)
 	for _, name in ipairs(names) do
-		lines[#lines + 1] = "header = " .. config_quote(tostring(name) .. ": " .. tostring(headers[name]))
+		local header_name, header_value = tostring(name), tostring(headers[name])
+		local allowed, err = HeaderPolicy.validate(header_name, header_value)
+		if not allowed then error(err) end
+		lines[#lines + 1] = "header = " .. config_quote(header_name .. ": " .. header_value)
 	end
 	if body ~= nil then lines[#lines + 1] = "data-binary = " .. config_quote(body) end
 	lines[#lines + 1] = "url = " .. config_quote(url)
