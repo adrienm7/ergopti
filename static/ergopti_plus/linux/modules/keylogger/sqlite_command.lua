@@ -146,6 +146,16 @@ function M.build(db_path, sql, opts)
 	return command
 end
 
+--- Encodes content embedded inside a single-quoted SQLite value.
+--- The CLI strips CRLF while reading script lines and libc cannot receive raw
+--- NUL. SQL expressions preserve these bytes without a temporary data file or
+--- changing the caller's value; ordinary quotes retain SQLite's doubled form.
+--- @param value string Content between the caller's literal quotes.
+--- @return string Escaped content with native control bytes expressed in SQL.
+function M.escape_literal(value)
+	return (value:gsub("'", "''"):gsub("\r", "'||char(13)||'"):gsub("%z", "'||char(0)||'"))
+end
+
 --- Decodes the terminal receipt of a capture_exit invocation.
 --- @param output string|nil Complete captured stdout.
 --- @return boolean accepted Whether sqlite3 exited successfully.

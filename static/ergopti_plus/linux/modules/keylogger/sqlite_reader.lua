@@ -38,7 +38,7 @@ local NGRAM_TYPE_TABLE = {
 local NGRAM_CODES = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "w_bg" }
 
 local function sql_quote(value)
-	return "'" .. tostring(value or ""):gsub("'", "''") .. "'"
+	return "'" .. SqliteCommand.escape_literal(tostring(value or "")) .. "'"
 end
 
 local function valid_date(value)

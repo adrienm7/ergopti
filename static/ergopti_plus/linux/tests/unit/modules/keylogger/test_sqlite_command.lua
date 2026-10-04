@@ -260,6 +260,31 @@ helpers.describe("sqlite_command — arguments", function()
 end)
 
 
+helpers.describe("sqlite_command — native literal serialization", function()
+	for _, case in ipairs({
+		{ "plain", "été\t\n $() `literal` " .. string.char(92), "été\t\n $() `literal` " .. string.char(92) },
+		{ "empty", "", "" },
+		{ "quote", "'", "''" },
+		{ "CRLF", "a\r\nb", "a'||char(13)||'\nb" },
+		{ "leading CR", "\ra", "'||char(13)||'a" },
+		{ "trailing CR", "a\r", "a'||char(13)||'" },
+		{ "NUL", "a\0b", "a'||char(0)||'b" },
+		{ "leading NUL", "\0a", "'||char(0)||'a" },
+		{ "trailing NUL", "a\0", "a'||char(0)||'" },
+		{ "mixed", "'\0\r\n'", "''" .. "'||char(0)||'" .. "'||char(13)||'\n''" },
+	}) do
+		helpers.it("linux-sqlite-literal: " .. case[1] .. " keeps exact quoted value semantics", function()
+			local escaped = Cmd.escape_literal(case[2])
+			helpers.assert_eq(escaped, case[3])
+			assert_absent(escaped, "\0", "serialized native SQL must remain representable")
+			assert_absent(escaped, "\r", "CLI line framing must never normalize a literal CR")
+			local command = assert(Cmd.build("/db", "SELECT '" .. escaped .. "';", { capture_exit = true }))
+			helpers.assert_contains(command, "SELECT '" .. escaped .. "';")
+		end)
+	end
+end)
+
+
 helpers.describe("sqlite_command — native command admission", function()
 	for _, field in ipairs({ "database", "script", "flag" }) do
 		for _, position in ipairs({ "first", "middle", "last" }) do

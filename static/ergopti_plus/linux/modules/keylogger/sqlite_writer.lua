@@ -89,12 +89,12 @@ local function _check_sqlite3()
 end
 
 --- Escapes a string value for safe use inside a single-quoted SQL literal.
---- Replaces single quotes with '' (the SQLite escape sequence).
+--- Preserves every text byte across SQLite's native CLI script boundary.
 --- @param s string
 --- @return string
 local function _sql_escape(s)
 	if type(s) ~= "string" then return "" end
-	return (s:gsub("'", "''"))
+	return SqliteCommand.escape_literal(s)
 end
 
 --- Runs a SQL statement against the database via the sqlite3 CLI.

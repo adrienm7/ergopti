@@ -185,6 +185,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_read_receipts.lua
         timeout-minutes: 1
 
+      - name: Preserve actual SQLite metric literals and application filters
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_literal_receipts.lua
+        timeout-minutes: 1
+
       - name: Keep native shell capture failures free of caller text
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

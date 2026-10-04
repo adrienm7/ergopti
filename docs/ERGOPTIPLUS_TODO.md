@@ -717,6 +717,22 @@ These are software implementations; final hardware verification remains below.
   their embedded-NUL bridging remains unvalidated and is documented for their
   native owners. No reserved source, cross-OS native gate, physical input or
   manual CI was modified or exercised.
+- [~] **L55.** Linux metrics SQL literal serialization: share one native CLI
+  encoder between the metrics writer and reader filters. Express CR and NUL
+  as SQLite char() concatenations while retaining ordinary apostrophe escaping;
+  CLI line parsing previously discarded CR from CRLF values and mismatched app
+  filters, and unrepresentable scalar NUL was refused rather than encoded.
+  Fourteen of seventeen genuine SQLite cases fail before and all pass after
+  under LuaJIT/Lua 5.4: twelve byte-exact persisted values and five app filters
+  seeded independently through hex SQL, with an unfiltered baseline control.
+  Ten unit cases cover fragments, quotes, mixed boundaries and ordinary bytes.
+  Existing seventeen write and twenty-two read native receipts remain valid.
+  This encodes owned scalar values; arbitrary raw SQL passed to exec_sql still
+  requires explicit SQL representation of data and retains its NUL refusal.
+  macOS and Windows use native SQLite strings rather than CLI line parsing;
+  their actual embedded-NUL bridges remain unvalidated with their native owners.
+  No schema, encryption format, TOML, reserved menu/title source, cross-OS native
+  gate, physical input or manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
