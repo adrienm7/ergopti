@@ -201,14 +201,15 @@ helpers.describe("sqlite_writer", function()
       local seed = io.open(tmp, "w")
       if seed then seed:write("x") seed:close() end
       os.execute = function() return 0 end
-      io.popen = function()
+      io.popen = function(command)
         return {
           read = function(_, mode)
             if mode == "*l" then
               return "CREATE TABLE devices (os CHECK (os IN ('darwin','windows','linux')))"
             end
-            -- Mirror the shell's actual terminal status, not LuaJIT's pclose.
-            return "\nERGOPTI_SQL_EXIT_STATUS=0\n"
+            -- Mirror the reservation SELECT and the actual terminal status.
+            local body = command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or ""
+            return body .. "\nERGOPTI_SQL_EXIT_STATUS=0\n"
           end,
           close = function() return true end,
         }
