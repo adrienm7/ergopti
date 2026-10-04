@@ -136,6 +136,11 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 				return ""
 		}
 
+		; InputHook may publish a failed dead-key composition as one visible
+		; chunk. Only its final scalar frames END matching; STAR still sees
+		; the complete physical suffix and no intermediate edit is emitted.
+		if StrLen(JustTypedChar) > 1
+				JustTypedChar := SubStr(JustTypedChar, -_TextTailCodeUnits(JustTypedChar, 1))
 		BufLen := StrLen(HSE_Buffer)
 		IsTerminator := InStr(HSE_WORD_TERMINATORS, JustTypedChar) > 0
 

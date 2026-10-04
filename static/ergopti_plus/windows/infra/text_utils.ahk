@@ -165,13 +165,7 @@ _TextTailCodeUnits(Text, Count) {
 	loop Count {
 		if Position == 0
 			break
-		Unit := Ord(SubStr(Text, Position, 1))
-		if Unit >= 0xDC00 && Unit <= 0xDFFF && Position > 1 {
-			Previous := Ord(SubStr(Text, Position - 1, 1))
-			if Previous >= 0xD800 && Previous <= 0xDBFF
-				Position -= 1
-		}
-		Position -= 1
+		Position := _TextCodepointStart(Text, Position) - 1
 	}
 	return Start - Position
 }
@@ -201,4 +195,16 @@ _TextCodepointWidth(Text, Position, Units) {
 			return 2
 	}
 	return 1
+}
+
+
+; Reverse scans use the same complete-pair boundary as native erasure.
+_TextCodepointStart(Text, Position) {
+	Unit := Ord(SubStr(Text, Position, 1))
+	if Unit >= 0xDC00 && Unit <= 0xDFFF && Position > 1 {
+		Previous := Ord(SubStr(Text, Position - 1, 1))
+		if Previous >= 0xD800 && Previous <= 0xDBFF
+			return Position - 1
+	}
+	return Position
 }
