@@ -754,7 +754,7 @@ _LAO_OllamaPortIsLiveSemanticState() {
 Test("[ahk-008-aux-owner] Ollama port changes invalidate live prediction identity",
 	_LAO_OllamaPortIsLiveSemanticState)
 
-_LAO_ProbeClock(Kind, Wrapped, AtExpiry) {
+_LAO_ProbeClock(Kind, CrossingBoundary, AtExpiry, ExtraElapsed := 0) {
 	global _LLM_Menu, _LLM_InstalledTagsCacheAt, _DriverInputInitPending
 	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
 	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
@@ -775,9 +775,9 @@ _LAO_ProbeClock(Kind, Wrapped, AtExpiry) {
 		LLM_INSTALLED_CACHE_TTL_MS := 2000
 		TTL := Kind == "health" ? LLM_HEALTH_PROBE_THROTTLE_MS : LLM_INSTALLED_CACHE_TTL_MS
 		Assert(TTL > 0, "the fixture must exercise an initialized nonzero timing")
-		Origin := Wrapped ? 0xFFFFFFF0 : 100
-		Elapsed := AtExpiry ? TTL : TTL - 1
-		Now := (Origin + Elapsed) & 0xFFFFFFFF
+		Origin := CrossingBoundary ? 0xFFFFFFF0 : 100
+		Elapsed := (AtExpiry ? TTL : TTL - 1) + ExtraElapsed
+		Now := Origin + Elapsed
 		_LLM_Menu := Map("enabled", true, "backend", "ollama", "last_health_probe_tick", Origin)
 		_LLM_InstalledTagsCacheAt := Origin
 		_DriverInputInitPending := false
@@ -785,9 +785,9 @@ _LAO_ProbeClock(Kind, Wrapped, AtExpiry) {
 			_LLM_Menu_FireHealthProbe(true, Now, Dispatch)
 		else
 			_LLM_Menu_FireInstalledTagsProbe(Now, Dispatch)
-		AssertEqual(AtExpiry ? 1 : 0, Calls.Length,
-			"ordinary and wrapped clocks share the exact expiry boundary")
-		if AtExpiry {
+		AssertEqual(Elapsed >= TTL ? 1 : 0, Calls.Length,
+			"native monotonic observations retain the exact expiry boundary")
+		if Elapsed >= TTL {
 			AssertTrue(LLM_AuxIsCurrent(Calls[1].Owner), "the real auxiliary owner admits the dispatch")
 			if Kind == "health"
 				AssertEqual(Now, _LLM_Menu["last_health_probe_tick"], "publish the same clock observation")
@@ -806,19 +806,28 @@ _LAO_ProbeClock(Kind, Wrapped, AtExpiry) {
 		LLM_INSTALLED_CACHE_TTL_MS := Saved.TagsTTL
 	}
 }
-Test("menu-probe-clock-wrap: health ordinary before expiry", (*) =>
+Test("menu-probe-clock-native64: health ordinary before expiry", (*) =>
 	_LAO_ProbeClock("health", false, false))
-Test("menu-probe-clock-wrap: health ordinary exact expiry", (*) =>
+Test("menu-probe-clock-native64: health ordinary exact expiry", (*) =>
 	_LAO_ProbeClock("health", false, true))
-Test("menu-probe-clock-wrap: health wrapped before expiry", (*) =>
+Test("menu-probe-clock-native64: health DWORD-boundary before expiry", (*) =>
 	_LAO_ProbeClock("health", true, false))
-Test("menu-probe-clock-wrap: health wrapped exact expiry", (*) =>
+Test("menu-probe-clock-native64: health DWORD-boundary exact expiry", (*) =>
 	_LAO_ProbeClock("health", true, true))
-Test("menu-probe-clock-wrap: tags ordinary before expiry", (*) =>
+Test("menu-probe-clock-native64: tags ordinary before expiry", (*) =>
 	_LAO_ProbeClock("tags", false, false))
-Test("menu-probe-clock-wrap: tags ordinary exact expiry", (*) =>
+Test("menu-probe-clock-native64: tags ordinary exact expiry", (*) =>
 	_LAO_ProbeClock("tags", false, true))
-Test("menu-probe-clock-wrap: tags wrapped before expiry", (*) =>
+Test("menu-probe-clock-native64: tags DWORD-boundary before expiry", (*) =>
 	_LAO_ProbeClock("tags", true, false))
-Test("menu-probe-clock-wrap: tags wrapped exact expiry", (*) =>
+Test("menu-probe-clock-native64: tags DWORD-boundary exact expiry", (*) =>
 	_LAO_ProbeClock("tags", true, true))
+
+for Kind in ["health", "tags"]
+	for CrossingBoundary in [false, true]
+		for Offset in [-1, 0, 1]
+			Test("menu-probe-clock-native64: long " . Kind . " crossing=" . CrossingBoundary . " offset=" . Offset,
+				_LAO_ProbeClock.Bind(Kind, CrossingBoundary, true, 0x100000000 + Offset))
+for Kind in ["health", "tags"]
+	Test("menu-probe-clock-native64: full cycle " . Kind,
+		_LAO_ProbeClock.Bind(Kind, false, false, 0x100000000))
