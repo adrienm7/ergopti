@@ -1249,6 +1249,24 @@ These are software implementations; final hardware verification remains below.
   redirects to their platforms by source. Foreign runtime suites remain
   deferred. Native regression is registered for Linux CI without launching
   hosted CI; no TLS, credential, owner, shared API or reserved policy changed.
+- [~] **L92.** Linux literal POST body transport: send text through a genuine
+  inherited anonymous pipe instead of curl's size-limited configuration line.
+  Buffered and streaming POST preserve exact large JSON, quotes, leading at
+  signs and escaped JSON NUL. Literal NUL previously reached a truncating
+  parser; it now refuses before replacing an owner. Twelve of twenty actual
+  loopback/curl/libuv controls fail before and all pass after, covering 7/10/12
+  MiB bodies, complete/incomplete refusals, backpressured cancellation and
+  deadlines. Capture stable native handles and original raw descriptor identity
+  before transfer; exceptional close debt fences successors and withholds the
+  result until physical settlement. Fourteen explicitly simulated refusal
+  cases on real pipes/children/descriptor reuse fail before hardening and pass
+  after. Twenty-nine registered units cover delivery and cleanup boundaries.
+  Actual current Ubuntu 22.04 curl/libcurl and luv/libuv packages also pass
+  both fixtures using native pipe2 where luv.pipe is unavailable; remaining
+  runtime/kernel are this container's, not a full Ubuntu session. Request body
+  bytes stay off argv and owned transport files. Windows uses its own staged
+  body and macOS hs.http by source; foreign runtime suites remain deferred.
+  No public/shared API, credential/TLS, reserved surface or hosted CI changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

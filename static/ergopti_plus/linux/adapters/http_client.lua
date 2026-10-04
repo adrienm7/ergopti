@@ -14,6 +14,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
+local BodyPipe = require("infra.http_body_pipe")
 local NativeTimer = require("infra.native_timer")
 local ProcessGroup = require("infra.libuv_process_group")
 local RedirectPolicy = require("infra.http_redirect_policy")
@@ -59,17 +60,27 @@ local function request_owner(owner)
 	return type(owner) == "string" and owner ~= "" and owner or DEFAULT_OWNER
 end
 
+--- Retains exceptional body cleanup in the existing physical settlement owner.
+--- @param request table
+local function retain_body_cleanup(request)
+	if request.operation or not request.body_owner then return end
+	local operation = { _settled = false, _cancelled = false, _listeners = {},
+		_request = request, _body_cleanup = true }
+	request.operation = operation
+	_owned[request.owner] = operation
+end
+
 --- Closes a libuv handle once.
 --- @param handle any
 local function close_handle(handle, request)
 	if not handle or not luv then return false end
-	if request and request.operation then
+	if request and (request.operation or request.body_owner) then
 		local receipt = request.handles[handle]
 		if not receipt then return false end
 		if receipt.state == "closed" or receipt.state == "closing" then return true end
 		local ok_closing, closing = pcall(luv.is_closing, handle)
 		-- Another actor's scheduled close is not our closure acknowledgment.
-		if not ok_closing or closing then return false end
+		if not ok_closing or closing then retain_body_cleanup(request); return false end
 		receipt.state = "closing"
 		local ok, accepted, err = pcall(luv.close, handle, function()
 			receipt.state = "closed"
@@ -77,7 +88,16 @@ local function close_handle(handle, request)
 		end)
 		if not ok or accepted == false or err ~= nil then
 			if receipt.state ~= "closed" then receipt.state = "open" end
+			retain_body_cleanup(request)
 			return false
+		end
+		if request.body_owner and receipt.state ~= "closed" then
+			local state_ok, scheduled = pcall(luv.is_closing, handle)
+			if not state_ok or not scheduled then
+				receipt.state = "open"
+				retain_body_cleanup(request)
+				return false
+			end
 		end
 		return true
 	end
@@ -107,6 +127,33 @@ local function close_stream(request, field)
 	if close_handle(stream, request) or not request.operation then request[field] = nil end
 end
 
+--- Closes one owned anonymous-pipe descriptor before handle transfer/inheritance.
+--- @param request table
+--- @param field string
+--- @return boolean
+local function close_body_descriptor(request, field)
+	local descriptor = request[field]
+	if descriptor == nil then return true end
+	-- An errored close can still retire its FD. Verify the original pipe object
+	-- before retrying a number that another open may already have reused.
+	local stat_ok, stat, _, code = pcall(luv.fs_fstat, descriptor)
+	local identity = request[field .. "_identity"]
+	if stat_ok and (code == "EBADF" or (stat and identity and
+		(stat.dev ~= identity.dev or stat.ino ~= identity.ino or stat.type ~= identity.type))) then
+		request[field] = nil
+		return true
+	end
+	if not stat_ok or type(stat) ~= "table" or not identity then
+		-- Unknown initial metadata cannot become a new ownership claim on retry.
+		retain_body_cleanup(request)
+		return false
+	end
+	local ok, accepted = pcall(luv.fs_close, descriptor)
+	if not ok or accepted == nil or accepted == false then retain_body_cleanup(request); return false end
+	request[field] = nil
+	return true
+end
+
 --- Closes the process handle after libuv has reported its exit.
 --- @param request table
 local function close_process(request)
@@ -120,6 +167,7 @@ settle_owned = function(request)
 	local operation = request.operation
 	if not operation or operation._settled or not request.terminal then return end
 	if request.spawned and not request.exited then return end
+	if request.body_readfd ~= nil or request.body_writefd ~= nil then return end
 	for _, receipt in pairs(request.handles) do
 		if receipt.state ~= "closed" then return end
 	end
@@ -141,8 +189,12 @@ end
 --- Retries only this request's exact native handles after a close refusal.
 --- @param request table
 retry_owned_cleanup = function(request)
+	close_body_descriptor(request, "body_readfd")
+	close_body_descriptor(request, "body_writefd")
 	close_timer(request)
 	close_stream(request, "stdin")
+	close_stream(request, "body_pipe")
+	close_stream(request, "body_reader")
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
 	close_process(request)
@@ -159,8 +211,12 @@ local function finish(request, result, suppress_callback)
 	request.result = result
 	request.suppress_callback = suppress_callback == true
 	if _active[request.owner] == request then _active[request.owner] = nil end
+	close_body_descriptor(request, "body_readfd")
+	close_body_descriptor(request, "body_writefd")
 	close_timer(request)
 	close_stream(request, "stdin")
+	close_stream(request, "body_pipe")
+	close_stream(request, "body_reader")
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
 	close_process(request)
@@ -275,9 +331,10 @@ local function curl_args(url, headers, body, options)
 		if not allowed then error(err) end
 		lines[#lines + 1] = "header = " .. config_quote(header_name .. ": " .. header_value)
 	end
-	-- The port body is literal caller text. data-binary treats leading @ as a
-	-- filename (or stdin), even inside a quoted config value.
-	if body ~= nil then lines[#lines + 1] = "data-raw = " .. config_quote(body) end
+	-- Curl config lines are limited to 10 MB. A separate inherited pipe carries
+	-- admitted caller text without putting it in a config line, argv or a file.
+	-- Only this fixed reference is interpreted as a filename; caller @ is data.
+	if body ~= nil then lines[#lines + 1] = 'data-binary = "@/dev/fd/3"' end
 	lines[#lines + 1] = "url = " .. config_quote(url)
 	return args, table.concat(lines, "\n") .. "\n"
 end
@@ -391,6 +448,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		Logger.error(LOG, "Cannot compose curl configuration: request URL contains NUL.")
 		return reject("curl config URL cannot contain NUL")
 	end
+	-- Curl's previous config parser truncated literal NUL. Refuse it before
+	-- owner replacement; JSON's literal \\u0000 escape remains exact text.
+	if body ~= nil and body:find("\0", 1, true) then return reject("curl request body cannot contain NUL") end
 	local protocols, transport_error = TransportPolicy.resolve(url, options.https_only == true)
 	if not protocols then return reject(transport_error) end
 	if options.follow_redirects then
@@ -442,6 +502,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	local request = {
 		owner = owner,
 		operation = operation,
+		body_owner = body ~= nil,
 		handles = {},
 		spawned = false,
 		buffered = options.buffered == true,
@@ -459,9 +520,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		terminal = false,
 	}
 	local handles_ok
-	if operation then
-		operation._request = request
-		_owned[owner] = operation
+	if operation or request.body_owner then
+		if operation then operation._request = request; _owned[owner] = operation end
 		-- Capture each allocation immediately: a later constructor throw must not
 		-- discard earlier handles or turn cleanup debt into a settled refusal.
 		handles_ok = pcall(function()
@@ -483,6 +543,36 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	if not handles_ok or not request.stdin or not request.stdout or not request.stderr or not request.timer then
 		finish(request, { ok = false, status = 0, body = "", error = "libuv handle allocation failed" })
 		return false
+	end
+	if body ~= nil then
+		local body_ok = pcall(function()
+			request.body_pipe = luv.new_pipe(false)
+			if not request.body_pipe then error("native body handle allocation refused") end
+			request.handles[request.body_pipe] = { state = "open" }
+			request.body_reader = luv.new_pipe(false)
+			if not request.body_reader then error("native body reader allocation refused") end
+			request.handles[request.body_reader] = { state = "open" }
+			local pair = BodyPipe.allocate(luv)
+			if not pair then error("native body pipe allocation refused") end
+			request.body_readfd, request.body_writefd = pair.read, pair.write
+			if type(pair.read) ~= "number" or type(pair.write) ~= "number" then error("invalid native body pipe") end
+			for _, field in ipairs({ "body_readfd", "body_writefd" }) do
+				local stat = assert(luv.fs_fstat(request[field]))
+				request[field .. "_identity"] = { dev = stat.dev, ino = stat.ino, type = stat.type }
+			end
+			-- A spawn-created luv channel is a socketpair, which curl cannot reopen
+			-- through /dev/fd. Inherit a real anonymous pipe's read descriptor.
+			local accepted, err = luv.pipe_open(request.body_reader, pair.read)
+			if accepted == nil or accepted == false or err ~= nil then error("native body reader attachment refused") end
+			request.body_readfd = nil -- The reader handle now owns this descriptor.
+			accepted, err = luv.pipe_open(request.body_pipe, pair.write)
+			if accepted == nil or accepted == false or err ~= nil then error("native body pipe attachment refused") end
+			request.body_writefd = nil -- The tracked handle now owns this descriptor.
+		end)
+		if not body_ok then
+			finish(request, { ok = false, status = 0, body = "", error = "libuv handle allocation failed" })
+			return false
+		end
 	end
 
 	local timer_ok, timer_result = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
@@ -512,7 +602,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
 		args = argv,
-		stdio = { request.stdin, request.stdout, request.stderr },
+		stdio = { request.stdin, request.stdout, request.stderr, request.body_reader },
 		detached = true,
 	}, function(code, signal)
 		request.exited = true
@@ -520,7 +610,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		request.exit_signal = signal
 		maybe_complete(request)
 		close_process(request)
-		settle_owned(request)
+		if request.operation and request.operation._body_cleanup then retry_owned_cleanup(request)
+		else settle_owned(request) end
 	end)
 	if not spawn_ok or not process or not pid then
 		finish(request, {
@@ -532,7 +623,15 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	request.process = process
 	request.pid = pid
 	request.spawned = true
-	if operation then request.handles[process] = { state = "open" } end
+	if operation or request.body_owner then request.handles[process] = { state = "open" } end
+	-- The child inherited its own fd3. Retaining the parent's reader would hide
+	-- a child exit from the writer; release it before asynchronous body delivery.
+	if request.body_reader and not close_handle(request.body_reader, request) then
+		terminate_group(request)
+		finish(request, { ok = false, status = 0, body = "", error = "curl body pipe retirement failed" })
+		return false
+	end
+	request.body_reader = nil
 
 	local write_ok, write_result = pcall(luv.write, request.stdin, config, function(write_err)
 		if write_err and not request.terminal then
@@ -600,6 +699,21 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		terminate_group(request)
 		finish(request, { ok = false, status = 0, body = "", error = "pipe activation failed" })
 		return false
+	end
+	if request.body_pipe then
+		local body_ok, body_result = pcall(luv.write, request.body_pipe, body, function(write_err)
+			if write_err and not request.terminal then
+				terminate_group(request)
+				finish(request, { ok = false, status = 0, body = "", error = "curl body write failed" })
+				return
+			end
+			close_stream(request, "body_pipe")
+		end)
+		if not body_ok or body_result == false or body_result == nil then
+			terminate_group(request)
+			finish(request, { ok = false, status = 0, body = "", error = "curl body write failed" })
+			return false
+		end
 	end
 
 	_active[owner] = request
@@ -746,7 +860,15 @@ end
 --- @return boolean Whether the owned process group accepted termination.
 function M.cancel(owner)
 	local key = request_owner(owner)
-	if not _active[key] then return true end
+	if not _active[key] then
+		local operation = _owned[key]
+		if not operation or not operation._body_cleanup then return true end
+		operation._cancelled = true
+		local retained = operation._request
+		if retained.spawned and not retained.exited and not terminate_group(retained) then return false end
+		retry_owned_cleanup(retained)
+		return operation._settled
+	end
 	local request = _active[key]
 	if not terminate_group(request) then
 		Logger.error(LOG, "HTTP cancellation failed for pid=%s; ownership retained.",
