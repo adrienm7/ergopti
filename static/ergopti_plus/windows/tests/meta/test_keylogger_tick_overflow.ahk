@@ -322,21 +322,26 @@ Test("keylogger: keylogger.ahk ingest and password-cache guards use & 0xFFFFFFFF
 ; =========================================================================
 ; =========================================================================
 
-_KLTO_MouseParkWrapSafe() {
-	Raw := _KLTO_ReadSource("modules/keylogger/keylogger_mouse.ahk")
-	Src := _KLTO_StripComments(Raw)
-	Assert(Src != "", "modules/keylogger/keylogger_mouse.ahk must be readable")
-
-	; park_still_since must be masked before comparison
-	Assert(!InStr(Src, "still_ms := Now - State.park_still_since"),
-		"keylogger_mouse.ahk must not assign still_ms from bare A_TickCount - park_still_since (tickcount-wrap)")
-	Assert(InStr(Src, "still_ms := (Now - State.park_still_since) & 0xFFFFFFFF") > 0,
-		"keylogger_mouse.ahk must mask park_still_since delta with & 0xFFFFFFFF (tickcount-wrap)")
-
-	; park_fired_at dedup guard must be masked
-	Assert(!InStr(Src, "(Now - State.park_fired_at) < 30000"),
-		"keylogger_mouse.ahk must not use bare (A_TickCount - park_fired_at) without & 0xFFFFFFFF mask (tickcount-wrap)")
-	Assert(InStr(Src, "State.park_fired_at) & 0xFFFFFFFF) < 30000") > 0,
-		"keylogger_mouse.ahk must mask park_fired_at dedup guard with & 0xFFFFFFFF (tickcount-wrap)")
+_KLTO_MouseParkOwner(Body) {
+	_KLTO_Native64Calls(Body, 2)
+	_KLTO_UniqueCode(Body, "im)^\h*still_ms\h*:=\h*TickElapsed64\h*\(\h*State\.park_still_since\h*,\h*Now\h*\)\h*$",
+		"park dwell must consume the actual native stillness origin")
+	_KLTO_UniqueCode(Body, "i)TickElapsed64\h*\(\h*State\.park_fired_at\h*,\h*Now\h*\)\h*<\h*30000\b",
+		"same-position dedup must consume the actual native last-fire origin")
 }
-Test("keylogger: keylogger_mouse.ahk park idle and dedup guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_MouseParkWrapSafe)
+
+_KLTO_MouseParkWrapSafe() {
+	Body := _DriverFuncBody("_KL_Mouse_ProcessParkSample")
+	_KLTO_MouseParkOwner(Body)
+	for Replacement in ["TickElapsed", "'TickElapsed64'"] {
+		Changed := StrReplace(Body, "TickElapsed64", Replacement, false, &Count)
+		AssertEqual(2, Count)
+		_KLTO_AssertRefused(_KLTO_MouseParkOwner.Bind(Changed))
+	}
+	Changed := StrReplace(Body, "TickElapsed64(State.park_still_since, Now)",
+		"TickElapsed64(State.park_fired_at, Now)", false, &Count)
+	AssertEqual(1, Count)
+	_KLTO_AssertRefused(_KLTO_MouseParkOwner.Bind(Changed))
+	_KLTO_MouseParkOwner(RegExReplace(Body, "i)\b(?:TickElapsed64|State|Now|still_ms)\b", "$U0"))
+}
+Test("keylogger: mouse park retains native64 dwell and dedup origins (keylogger-mouse-native-clock-guard)", _KLTO_MouseParkWrapSafe)
