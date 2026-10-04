@@ -43,11 +43,7 @@ final class WindowTitlePolicyTests: XCTestCase {
 		let process = Process()
 		process.executableURL = URL(fileURLWithPath: executable)
 		process.arguments = arguments
-		// Private compiler/probe binaries do not carry get-task-allow. Swift refuses
-		// forced crash backtracing for that capability; keep it on for parent XCTest.
-		var environment = ProcessInfo.processInfo.environment
-		environment["SWIFT_BACKTRACE"] = "enable=no"
-		process.environment = environment
+		process.environment = NativeFixtureChildEnvironment.make()
 		process.standardOutput = output
 		process.standardError = errors
 		let completed = DispatchSemaphore(value: 0)
