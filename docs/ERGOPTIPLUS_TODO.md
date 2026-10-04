@@ -2334,6 +2334,19 @@ shipped worker and its real provider behavior are unchanged.
       and debt polls expose the canonical shared 50 ms period to the strict fast-timer
       inventory. Hosted AHK validation of these owner and period cases remains pending.
 
+Windows continuation for item63 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Run the real brightness worker/provider regressions, preserve nested LASTEXITCODE, then qualify WMI readback and exact Job/process retirement. Record supported hardware and unavailable providers; physical luminance remains a separate acceptance step.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
+
 ## Maintainer requests on 2026-10-01
 
 Every request the maintainer makes is written here first and removed once it
@@ -2360,6 +2373,19 @@ Native Windows checkpoint 37107656277 retains 7,958 passing unit cases but expos
 Checkpoint 37116696443 no longer reports the two real full-save retired-Metrics comment failures. Its remaining two Windows assertions concern obsolete comment-removal expectations, which are aligned separately with the approved source-preservation contract using complete-image and typed-value assertions. Linux unit, E2E, package and all 17 installation/run variants passed; macOS unit, E2E, package and nine installation profiles passed, while clean and Karabiner AppleEvent probes remain blocked. Windows downstream package/install gates were skipped after the unit failure; Release/Publish was skipped. Item 71 remains partial pending a complete native three-OS checkpoint.
 
 The maintained AHK and Hammerspoon configuration-schema draft examples no longer recommend the retired dedicated Metrics-window shortcut table. The existing CJS retirement gate checks their actual semantic table headers, including quoted and array-table aliases, while literal-dot foreign table names remain distinct. All other draft consent, color and privacy records remain byte-identical, and the generator registry confirms the examples are separate from generated runtime templates. Whole-document draft schema validation remains separate; item71 still requires a complete native three-OS package/install/launch checkpoint.
+
+Windows continuation for item71 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Run the actual Metrics retirement/full-save regressions and installed upgrade/startup. Preserve unknown retired values and comments, ordinary Metrics actions, consent and compensation; require complete unit/E2E/package/install receipts.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
 
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
@@ -2389,6 +2415,19 @@ historical attribution requirement partial.
 The physical-label contract is independent of the native matrix and stored action
 IDs. Original provider cases fail before the fix; the qualified component suites
 pass with all 21 locale catalogues. Full native CI remains required.
+
+Windows continuation for item73 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Run the complete 182-entry combination matrix and translated native menus in all21 locales. Historical French Magic disabling remains unattributed without contemporaneous private configuration/log evidence; never force-enable it or invent a cause.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
@@ -2481,6 +2520,19 @@ pass with all 21 locale catalogues. Full native CI remains required.
   a real-keyboard check of the order rule (a key held alone, then joined
   by another, must not fire the pair), which rests on AutoHotkey
   recording a key's physical state after its criteria have answered.
+  Windows continuation for item91 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Qualify symmetric chord delay, tap-to-chord copying, key-down hold, both key orders and synthetic AltGr LCtrl ordering with the native hook owner. Existing recommendation/clear semantics and future/unrelated parameters must remain intact.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
+
 - [ ] **93.** Linux: the key combinations of item 91. The tap-hold engine
       binds no combination (`platform/remap/tap_hold_engine.lua` only cancels
       taps when a second tap-hold key goes down) and the Shortcuts menu draws
@@ -2490,6 +2542,19 @@ pass with all 21 locale catalogues. Full native CI remains required.
       `caps_word` and `one_shot_shift` are `ahk`-only catalogue actions
       today. Left out of the 2026-10-01 session on purpose (the maintainer:
       « fais seulement pour Windows »).
+
+Windows continuation for item93 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Run the current native shortcut/category/pause/reload and layout-source regressions on Windows; retain explicit-none, duplicate physical-source and held-input retirement fences. Any modifier-terminal or unavailable source must have an honest platform contract before equivalent mappings are claimed.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
 
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
@@ -2511,6 +2576,19 @@ keys. Occupied layout selections and absent, false or malformed values need
 independent migration vectors. No production switch or migration is retired
 until the actual selected-layout contract is qualified.
 
+Windows continuation for item96 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Prove the real empty-emulated-layout picker handoff, six historical AltGr descriptors and eight independent SC012 roll cases before migration. Verify actual wrap/space/percent/whitespace output without regenerating historical expectations or changing unrelated keys.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
+
 - [ ] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
       user-owned entries, empty by default and offering "+ Add". Let a user on
       any keyboard layout choose an action from the shared catalogue or enter
@@ -2522,10 +2600,36 @@ until the actual selected-layout contract is qualified.
       custom Unicode output, dead-key composition, neutral defaults and refusal
       behavior through automated native and parity suites.
 
+Windows continuation for item97 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Implement the agreed shared empty-by-default physical-key/modifier mapping model, then add/edit/remove and arbitrary Unicode/shared-action native owners. Coordinate shared data/menu/locales; qualify source identity, conflicts, unknown settings and physical-key delivery.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
+
 - [ ] **98.** Replace the fixed "make J the star key" setting with a physical
       key and output chosen by the user: any keyboard position and arbitrary
       character, including choosing no star at all. Integrate with item 97's
       shared user-owned shortcut model rather than another fixed-layout switch.
+      Windows continuation for item98 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Implement the shared mapping model for actual accented output and genuine dead-key composition; existing accented shortcut remaps are not Unicode output. Qualify arbitrary physical keys, modifiers and the star entry without overwriting the layout or fabricating composition.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
+
 - [ ] **101.** Investigate the supplied Windows diagnostic's retained keylogger
       shutdown debt (watchers=0). Keep privacy filtering fail-closed;
       distinguish measured stalls from causes before changing tooltip/hook code.
@@ -2843,18 +2947,38 @@ Linux ordinary hotstring override setters and clears now edit only changed owned
       cover real callback execution, live enable/disable, cancellation and
       suspended/privacy-filtered input with automated cross-driver tests.
 
-- [ ] **106.** Expand the shared gesture/keyboard action catalogue for user
-      automation. Discover and offer Apple Shortcuts on macOS; inventory and
-      expose available Windows/Linux equivalents, installed automation tools,
-      shell/PowerShell scripts, launchers and application actions. Verify each
-      provider's real invocation contract and availability rather than listing
-      unimplemented actions. Let every driver assign a user script, Python file
-      or other executable with explicit parameters. Use the same parameter model,
-      picker and persistence for gestures, keyboard shortcuts and other action
-      consumers; keep discovery and execution in platform adapters, with
-      translated reasons for unavailable OS-specific actions. Test real fixture
-      scripts, paths/arguments with spaces and Unicode, process-start refusal,
-      execution errors, lifecycle/cancellation and cross-consumer parity.
+- [~] **106.** Expand the shared gesture/keyboard action catalogue for user
+  automation. Discover and offer Apple Shortcuts on macOS; inventory and
+  expose available Windows/Linux equivalents, installed automation tools,
+  shell/PowerShell scripts, launchers and application actions. Verify each
+  provider's real invocation contract and availability rather than listing
+  unimplemented actions. Let every driver assign a user script, Python file
+  or other executable with explicit parameters. Use the same parameter model,
+  picker and persistence for gestures, keyboard shortcuts and other action
+  consumers; keep discovery and execution in platform adapters, with
+  translated reasons for unavailable OS-specific actions. Test real fixture
+  scripts, paths/arguments with spaces and Unicode, process-start refusal,
+  execution errors, lifecycle/cancellation and cross-consumer parity.
+
+The recovered executable/argument candidate is being qualified against the
+current `origin/dev`; the saved patch and incomplete review receipt are not
+integration evidence. Independent regressions exposed refused macOS parameter
+transactions, overly broad source admission, Windows shutdown cancellation
+ordering and Linux descendants surviving their original process leader. Their
+bounded fixes retain source/privacy and strict ownership requirements.
+Complete selected gates, hosted native execution, packaging and installation
+remain required. Automation-provider discovery and Apple Shortcuts are still
+outside this executable slice; item106 remains partial.
+
+The actual Linux runner now passes an independent binary argv fixture with
+Unicode executable/script paths, empty arguments, decomposed Unicode, percent
+text, quotes, shell-like literals and newlines. Native stdout/stderr are
+discarded, exit status 37 is observed, and the original process group and
+handles retire completely. This does not qualify Windows or macOS execution.
+Actual private macOS assignment/full-save probes reproduced a pre-existing
+post-rename lock recovery gap. Prepared guarded publication receipts now pass94
+focused composed cases with independent review. Real macOS interprocess locks,
+physical symlinks and complete product qualification remain pending.
 
 The Linux action-catalogue fixture reloads its captured workspace dependencies.
 A deliberate earlier tool provider reproduces the missing-wmctrl assertion
@@ -2873,6 +2997,19 @@ separately owned hotstring consumers. Its receipt API and 94 focused composed
 cases have independent source review; real macOS locking/symlinks and full
 product qualification remain pending. Saving this patch does not integrate
 or finish the executable/provider feature.
+
+Windows continuation for item106 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Qualify the registered basic program action/literal/status/shutdown tests first. Verify and review the inactive constructor-v3 packet against its complete producer preimage before applying; run all12 native HANDLE/Job fault cases and causal controls. Healthy concurrency parity and automation discovery remain separate unfinished scope.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
 
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
@@ -2897,6 +3034,19 @@ TODO107 — tranche préparée, validation native restante : politique partagée
 Composition préparée après Navigation12/DynamicACK2 et BaselineDelay macOS : les133 autres candidats restent identiques à la version initiale ; les sept sorties sont recalculées par leurs générateurs, avec retour exact au parent puis répétition exacte. Les43cas Lua ciblés passent sur la composition. Le census natif réel du parent97/154/98 reste inchangé. Les gardes menu/graph/census ciblées passent ; aucune qualification complète de cette composition ni exécution Windows native n’est revendiquée.
 
 Windows follow-up: the parse-time number-row criterion now retains native input until the actual Layout category map is admitted with an Integer true switch. A contained call publishes symbols capability only after the existing source owner returns exact true; unpublished emulation dependencies cannot escape during Bundle_Init. The AltGr provider was already excluding the global digit-row policy: its stale marker assertion is replaced by actual provider count/order/action and exact single global placement checks, without changing menu production. Existing digit-row tests retain their whole prefix, and all other accented-shortcut assertions remain unchanged. New registered native tests cover unpublished, malformed, missing, false and true sources, model refusal, and a genuine KLE symbols positive. Portable scoped loop, syntax, convention, BOM/LF and source-envelope checks passed; no local AHK execution is claimed. Full selected root qualification and Windows native CI remain required. Existing unsupported native HKL/Lua and physical input requirements remain open.
+
+Windows continuation for item107 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Qualify actual HKL digit-row/symbol output against independent historical vectors, including Shift, AltGr, dead keys, Caps/Nav admission and repeats. Forced-symbol ownership and current-schema migration still require implementation/qualification where absent.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the effective
   physical key that directly types the selected magic character: Ctrl on
@@ -2944,6 +3094,19 @@ existing real US/French Carbon tests remain pending.
 Native CI run 37087943283 exposed six Windows contextual fixture failures. The repair preserves absent global state, uses the actual registrar spelling, separates shifted Digit8 refusal from the direct numpad source, counts the contextual group without an Add row, and keeps the declared editor default behind its closed master. The private native probe retains strict warnings in a local scope. The complete selected local gates pass 353 JS checks; native Windows revalidation remains pending.
 
 The physical magic-key chooser and capture now refuse candidates owned by a configured, recognized tap assignment on Windows, macOS and Linux. The candidate stays visible with the existing translated personal-assignment priority reason; Automatic and explicit none assignments remain available. Canonical physical and tap catalogues resolve native identities, including both existing macOS ISO/ANSI aliases. Refusal preserves source intent, tap action/parameters and unrelated configuration bytes. Previously stored conflicting intent cannot override an acknowledged active tap dispatcher; transient Shortcuts OFF and pause gates retain their established runtime behavior. The actual macOS tap owner retires logical delivery before a refused native stop, while retaining cleanup ownership. Portable real-owner regressions and selected checks pass; Windows native tests, native Hammerspoon ordering and three-OS CI qualification remain pending. This does not complete the physical-hardware acceptance requirements.
+
+Windows continuation for item108 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Qualify the existing editable editor shortcut against actual HKL/effective physical Magic source: direct star/ù, missing source explicit none, personal override, chord edit, conflicts and pause/reload. Preserve existing behavior without a demonstrated regression.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
 
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
@@ -3218,28 +3381,47 @@ Partial: the existing macOS native install diagnostic now owns a bounded sampler
 
 TODO 109 remains partial. The managed macOS bootstrap now records the public hs.allowAppleScript() getter, a validated in-process PID and the callable Lua bridge through the existing synchronous boot journal before onboarding can defer boot. Getter observation uses no setter argument and preserves bridge identity; malformed, thrown or missing getters remain unknown. Exact Boolean publication ACK is required, and refusal cannot gain boot authority. Portable registered journal/lifecycle tests pass 16/0 and 9/0; original-source and five behavioral mutations fail. Actual managed macOS observations are pending CI. Callable Lua bridge state does not prove native AppleEvent handler registration or entry, and the existing strict send/timeout/cleanup assertions remain unchanged. The previously observed clean/Karabiner no-prompt -1712 boundary is still unresolved.
 
-- [ ] **111.** Provide two distinct, explicitly labelled shared window-switching
-      actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
-      (the native equivalent on macOS), and switching only among windows on the display
-      containing the **current mouse cursor**. Resolve that display at invocation; never
-      substitute the active window's display or silently fall back to the global
-      switcher. Reuse existing action identities where their contracts match, preserving
-      saved bindings and current native window/lifecycle policies. Native adapters own
-      window eligibility, monitor geometry and activation; define the existing placement
-      rule for windows spanning displays. Offer a translated unavailability reason where
-      the desktop/compositor cannot provide the scoped operation. Do not add a
-      monitor-selection setting. Test cursor and active window on different displays,
-      moved cursors, spanning/minimized/closed windows, activation refusal and
-      unsupported display access through the real action providers, then qualify actual
-      two-display behavior on each supported OS.
+Windows continuation for item109 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Run all five real native dialog title/filter/selection/cancel policy families, strict UIA results, exact child status/stderr and physical HWND/Job retirement. Variables/KeyHistory still need an identity-safe owner; direct A_ScriptHwnd retitling is withdrawn.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
+
+- [~] **111.** Provide two distinct, explicitly labelled shared window-switching
+  actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
+  (the native equivalent on macOS), and switching only among windows on the display
+  containing the **current mouse cursor**. Resolve that display at invocation; never
+  substitute the active window's display or silently fall back to the global
+  switcher. Reuse existing action identities where their contracts match, preserving
+  saved bindings and current native window/lifecycle policies. Native adapters own
+  window eligibility, monitor geometry and activation; define the existing placement
+  rule for windows spanning displays. Offer a translated unavailability reason where
+  the desktop/compositor cannot provide the scoped operation. Do not add a
+  monitor-selection setting. Test cursor and active window on different displays,
+  moved cursors, spanning/minimized/closed windows, activation refusal and
+  unsupported display access through the real action providers, then qualify actual
+  two-display behavior on each supported OS.
 
 Windows already has `app_switcher` (native Alt+Tab) and `alt_tab_monitor`
 (current pointer display, candidate-window centre filtering); verify that the
 picker exposes both intended contracts clearly. macOS has cursor-display
 window cycling, while the native system switcher is currently unavailable.
-Linux currently emits global Alt+Tab for `alt_tab_monitor`: this alias does not
-fulfil the scoped contract and must be implemented or explicitly unavailable.
-Existing distinct action labels already have all 21 translations.
+The prepared Linux cursor-display implementation replaces the incorrect global
+Alt+Tab alias with an owned asynchronous X11 worker. Shared requirements declare
+X11 and all six native tools; Wayland reports the action unavailable. Independent
+source review and82 focused cases on LuaJIT/Lua5.4 pass. The actual Xvfb/Openbox
+fixture passes34/0/0 against the generated final routing, including stale source,
+focus, pause, transport replacement and composed publication refusal. These two
+RandR monitor regions do not qualify physical evdev grabs or real dual displays.
+Mandatory native CI registration, complete composed gates and physical display
+acceptance remain pending. Existing distinct labels have all21 translations.
 
 The shared native-worker owner now centralizes acquisition, admission, process,
 timer and auxiliary-resource retirement through injected native ports. Strict
@@ -3247,6 +3429,19 @@ completion waits for physical acknowledgements; paused or revoked operations
 retain their cleanup debt. This independent prerequisite does not implement
 cursor-display switching or qualify the prepared native adapters. The Linux
 packet, full composed gates and native display acceptance remain pending.
+
+Windows continuation for item111 (explicitly deferred to the maintainer's PC):
+
+1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
+   the affected Windows/input owners before changing sources.
+2. Qualify separate global and cursor-display switchers on two real displays: independent cursor/active-window movement, spanning/negative/minimized/closed windows and activation refusal. Retain window-centre membership, unavailable reasons and no global fallback.
+3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
+   installation and isolated startup gates. Distinguish failures, skips and
+   nonexecution; retain physical acceptance where required.
+
+Detailed commands, test owners and the inactive prepared packet are in
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
+This deferral does not complete this item or the cross-cutting items16/38.
 
 The shared worker timer retirement now separates each native close admission
 from its callback receipt. A synchronous callback waits for its own admission;
