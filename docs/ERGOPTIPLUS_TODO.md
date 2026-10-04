@@ -1682,6 +1682,28 @@ CI smoke and install/launch now prefer the first available archive declared by t
 
 The five-file source slice has 22 portable native-owner cases, seven actual workflow cases, two actual evidence controls, two original causal failures and six guard-removal failures. The original producer contract passes with closed filesystem and physical POSIX ports. Native extraction/signing/xattr and the two added Swift cases still require hosted macOS CI; root full selected qualification is pending. Item 36 remains partial until public archive migration and native acceptance are complete.
 
+The recovered public-archive cohort now signs and verifies both declared archives,
+binds the preferred tar.xz appcast and Homebrew cask to retained exact bytes,
+and verifies published assets through their REST digest. The CI-only bundle
+snapshot remains separate from public release inputs. The pinned Sparkle tools
+are available to native XCTest without exposing product signing keys on manual
+runs. TIS diagnostic transport preserves the raw XCTest verdict and retains
+its separately acknowledged session; both failures remain blocking.
+
+Appcast publication dates now come from the acknowledged explicit source
+revision rather than the clock. Five causal controls fail against the saved
+candidate and pass with the repair; 26 callable publication cases pass. The
+strict signing-step ownership and both XCTest/TIS status-order guards are
+adapted without dropping key-exposure or failure-retention assertions. The
+19 recovered preimages and candidate hashes match the historical review.
+The recovered cohort passes 13879 portable Lua cases in 1483 modules; these
+are driver tests on Linux, not native macOS archive acceptance. Formatting and
+encoding gates pass, and all 356 JavaScript checks pass after repairing the
+new Windows tests' loop capture and reserved parameter name. Actual Sparkle
+update plus Homebrew ZIP-install/XZ-upgrade acceptance remain pending. Native
+AHK and Swift gates are explicitly deferred to their respective runners.
+Item 36 remains partial.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
