@@ -933,6 +933,19 @@ These are software implementations; final hardware verification remains below.
   path and shared TOML reader still need the principal's coordinated fix; they
   are not covered by this generic port change. No TOML, title, autostart placement,
   physical input, reserved method or manual CI was changed.
+- [~] **L70.** Linux file-read terminal receipts: publish file contents only after
+  both read and close succeed, and close the owned stream even when read raises.
+  FileSystem.read previously returned complete bytes after a failed fclose;
+  its updater read port inherited that false success. Two of six native-process
+  cases fail before and all pass after per LuaJIT/Lua 5.4 runtime. Actual files,
+  interpreters and libc streams execute; strace injects EIO at the verified owned
+  read or stream-close syscall. These failure receipts are simulated syscalls,
+  not real storage-device failures. Six simulated stream unit cases retain
+  healthy/read-refusal controls and reproduce read-exception cleanup and nil/
+  false-close failures. macOS already checks its classified read/close receipts
+  by source; Windows' distinct FileOpen/Close behavior needs native-owner
+  qualification. No reserved read_with_status method, TOML writer, title,
+  autostart placement, physical input or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

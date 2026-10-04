@@ -102,8 +102,20 @@ function M.read(path)
 			Logger.debug(LOG, "read(): cannot open '%s' — %s", path, tostring(err))
 			return nil
 		end
-		local content = fh:read("*a")
-		fh:close()
+		-- A read exception still leaves an owned stream to close. Publish bytes
+		-- only after both operations returned successful native receipts.
+		local read_ok, content, read_err = pcall(fh.read, fh, "*a")
+		local close_ok, closed, close_err = pcall(fh.close, fh)
+		if not read_ok or type(content) ~= "string" then
+			Logger.error(LOG, "read(): native read failed for '%s' — %s", path,
+				tostring(read_ok and read_err or content))
+			return nil
+		end
+		if not close_ok or closed ~= true then
+			Logger.error(LOG, "read(): native close failed for '%s' — %s", path,
+				tostring(close_ok and close_err or closed))
+			return nil
+		end
 		return content
 	end)
 
