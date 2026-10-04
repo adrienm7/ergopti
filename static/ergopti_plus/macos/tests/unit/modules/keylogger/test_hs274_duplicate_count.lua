@@ -197,3 +197,177 @@ helpers.describe("HS-274 duplicate count — gaps never fall back", function()
 		end)
 	end)
 end)
+
+helpers.describe("HS-274 held modifier source settlement (wp3)", function()
+	local sides = { 54, 55, 56, 60, 58, 61, 59, 62 }
+	local side_flags = {
+		[54] = "cmd", [55] = "cmd", [56] = "shift", [60] = "shift",
+		[58] = "alt", [61] = "alt", [59] = "ctrl", [62] = "ctrl",
+	}
+	local function held_flags(keycode) return { [side_flags[keycode]] = true } end
+	for _, keycode in ipairs(sides) do
+		helpers.it("(wp3-held) suppresses the crossing release of legacy modifier " .. keycode, function()
+			Accounting.run(function(scenario)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				helpers.assert_eq(#scenario.system_events, 1)
+				scenario.mode.select_stream(Accounting.STREAM_OWNER)
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				helpers.assert_eq(scenario.state.modifier_suppressed_releases[keycode], true)
+				scenario.mode.admit(Accounting.STREAM_OWNER, Accounting.STREAM_CAPTURE, scenario.mode.COMPLETE_COVERAGE)
+				scenario.mode.interrupt(Accounting.STREAM_OWNER, Accounting.STREAM_CAPTURE)
+				scenario.mode.release(Accounting.STREAM_OWNER)
+				scenario.mode.select_stream("successor")
+				scenario.mode.release("successor")
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 1, "the old release is neither a new press nor a hold")
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				helpers.assert_eq(scenario.state.modifier_suppressed_releases[keycode], nil)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 3)
+				helpers.assert_eq(scenario.system_events[2].action, "modifier_press")
+				helpers.assert_eq(scenario.system_events[3].action, "modifier_hold")
+			end)
+		end)
+		helpers.it("(wp3-held) never credits an orphan gap hold for modifier " .. keycode, function()
+			Accounting.run(function(scenario)
+				scenario.mode.select_stream(Accounting.STREAM_OWNER)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				scenario.mode.release(Accounting.STREAM_OWNER)
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 0)
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 2)
+				helpers.assert_eq(scenario.system_events[1].action, "modifier_press")
+				helpers.assert_eq(scenario.system_events[2].action, "modifier_hold")
+			end)
+		end)
+	end
+	helpers.it("(wp3-held) keeps all eight held sides through admission and interruption", function()
+		Accounting.run(function(scenario)
+			scenario.mode.select_stream(Accounting.STREAM_OWNER)
+			for _, keycode in ipairs(sides) do scenario.flags_changed(keycode, held_flags(keycode)) end
+			scenario.mode.admit(Accounting.STREAM_OWNER, Accounting.STREAM_CAPTURE, scenario.mode.COMPLETE_COVERAGE)
+			scenario.mode.interrupt(Accounting.STREAM_OWNER, Accounting.STREAM_CAPTURE)
+			scenario.mode.release(Accounting.STREAM_OWNER)
+			for _, keycode in ipairs(sides) do scenario.flags_changed(keycode, {}) end
+			helpers.assert_eq(#scenario.system_events, 0)
+			helpers.assert_eq(scenario.state.modifier_down_at, {})
+			helpers.assert_eq(scenario.state.modifier_suppressed_releases, {})
+		end)
+	end)
+	helpers.it("(wp3-held) refuses malformed held state without changing tables or source", function()
+		Accounting.run(function(scenario)
+			local held = { [55] = "unknown timestamp" }
+			local suppressed = scenario.state.modifier_suppressed_releases
+			scenario.state.modifier_down_at = held
+			local accepted, reason = scenario.mode.select_stream(Accounting.STREAM_OWNER)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(reason, "settlement_refused")
+			helpers.assert_true(rawequal(scenario.state.modifier_down_at, held))
+			helpers.assert_true(rawequal(scenario.state.modifier_suppressed_releases, suppressed))
+			helpers.assert_eq(scenario.mode.credit_source(), scenario.mode.SOURCE_LEGACY)
+		end)
+	end)
+	helpers.it("(wp3-held) retires a secure-field crossing release without recording it", function()
+		Accounting.run(function(scenario)
+			scenario.flags_changed(55, { cmd = true })
+			scenario.mode.select_stream(Accounting.STREAM_OWNER)
+			scenario.mode.release(Accounting.STREAM_OWNER)
+			scenario.state.is_secure_field = true
+			scenario.flags_changed(55, {})
+			helpers.assert_eq(scenario.state.modifier_suppressed_releases[55], nil)
+			scenario.state.is_secure_field = false
+			scenario.flags_changed(55, { cmd = true })
+			scenario.flags_changed(55, {})
+			helpers.assert_eq(#scenario.system_events, 3)
+		end)
+	end)
+	helpers.it("(wp3-held) retains one process owner through normal stop and restart", function()
+		Accounting.run(function(scenario)
+			local previous_caffeinate = _G.hs.caffeinate
+			_G.hs.caffeinate = { watcher = { new = function()
+				return {
+					start = function(self) return self end,
+					stop = function(self) return self end,
+				}
+			end } }
+			local called, failure = xpcall(function()
+			local keylogger = package.loaded["modules.keylogger.init"]
+			local paused = false
+			local control = { is_paused = function() return paused end }
+			scenario.state.is_enabled = false
+			helpers.assert_eq(keylogger.start(control), true)
+			for _, timer in ipairs(_G.hs.timer.__timers) do
+				if timer.delay == 0 and timer.running then timer:fire() end
+			end
+			scenario.state.is_secure_field = false
+			scenario.flags_changed(55, { cmd = true })
+			scenario.mode.select_stream(Accounting.STREAM_OWNER)
+			scenario.mode.release(Accounting.STREAM_OWNER)
+			paused = true
+			scenario.flags_changed(55, {})
+			helpers.assert_eq(scenario.state.modifier_suppressed_releases[55], nil)
+			paused = false
+			package.loaded["modules.keylogger.context_tracker"].resync_context = function() return true end
+			helpers.assert_eq(keylogger.resync_context(), true)
+			scenario.flags_changed(55, { cmd = true })
+			scenario.flags_changed(55, {})
+			helpers.assert_eq(#scenario.system_events, 3)
+			helpers.assert_eq(keylogger.stop(), true)
+			helpers.assert_eq(keylogger.start(control), true)
+			helpers.assert_true(rawequal(package.loaded["modules.keylogger.init"], keylogger))
+			helpers.assert_eq(scenario.mode.bind_settlement({}, function() return true end), false)
+			scenario.mode.select_stream(Accounting.STREAM_OWNER)
+			scenario.mode.release(Accounting.STREAM_OWNER)
+			helpers.assert_eq(keylogger.stop(), true)
+			end, debug.traceback)
+			_G.hs.caffeinate = previous_caffeinate
+			if not called then error(failure, 0) end
+		end)
+	end)
+	helpers.it("(wp3-held) restores independent fixture parent and child identities", function()
+		local original_mode = package.loaded["modules.keylogger.physical_accounting_mode"]
+		local original_logger = package.loaded["modules.keylogger.init"]
+		local first_mode, first_state
+		Accounting.run(function(scenario)
+			first_mode, first_state = scenario.mode, scenario.state
+			scenario.flags_changed(55, { cmd = true })
+			scenario.mode.select_stream(Accounting.STREAM_OWNER)
+		end)
+		helpers.assert_true(rawequal(package.loaded["modules.keylogger.physical_accounting_mode"], original_mode))
+		helpers.assert_true(rawequal(package.loaded["modules.keylogger.init"], original_logger))
+		Accounting.run(function(scenario)
+			helpers.assert_true(not rawequal(scenario.mode, first_mode))
+			helpers.assert_true(not rawequal(scenario.state, first_state))
+			helpers.assert_eq(scenario.state.modifier_suppressed_releases, {})
+			scenario.mode.select_stream(Accounting.STREAM_OWNER)
+			scenario.mode.release(Accounting.STREAM_OWNER)
+			scenario.flags_changed(55, { cmd = true })
+			scenario.flags_changed(55, {})
+			helpers.assert_eq(#scenario.system_events, 2)
+		end)
+		helpers.assert_true(rawequal(package.loaded["modules.keylogger.physical_accounting_mode"], original_mode))
+		helpers.assert_true(rawequal(package.loaded["modules.keylogger.init"], original_logger))
+	end)
+	helpers.it("(wp3-held) reloads only the actual keylogger's settlement child", function()
+		local previous_mode = package.loaded["modules.keylogger.physical_accounting_mode"]
+		Accounting.run(function(scenario)
+			scenario.flags_changed(55, { cmd = true })
+			scenario.mode.select_stream(Accounting.STREAM_OWNER)
+			local fixture = require("tests.support.keylogger_provenance_fixture").load_keylogger()
+			local mode = require("modules.keylogger.physical_accounting_mode")
+			helpers.assert_true(not rawequal(mode, scenario.mode))
+			helpers.assert_true(not rawequal(fixture.state, scenario.state))
+			helpers.assert_eq(fixture.state.modifier_suppressed_releases, {})
+			helpers.assert_eq(mode.select_stream(Accounting.STREAM_OWNER), true)
+			helpers.assert_eq(mode.release(Accounting.STREAM_OWNER), true)
+			helpers.load_with_stubs("hs")
+			helpers.assert_true(rawequal(package.loaded["modules.keylogger.physical_accounting_mode"], mode),
+				"an unrelated parent must retain the process bookkeeping owner")
+		end)
+		helpers.assert_true(rawequal(package.loaded["modules.keylogger.physical_accounting_mode"], previous_mode))
+	end)
+end)

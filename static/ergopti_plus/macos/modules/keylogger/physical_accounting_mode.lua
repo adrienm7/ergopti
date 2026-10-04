@@ -66,6 +66,30 @@ local _owner = nil
 -- The admitted capture identity, or nil during a gap.
 local _capture = nil
 
+-- The production keylogger owns one process-lifetime settlement port.
+local _settlement_owner, _settlement = nil, nil
+local _transitioning, _generation = false, 0
+
+--- Refuses reentry before validating or changing a source owner.
+local function require_idle()
+	if _transitioning then error("physical accounting: source transition is pending", 3) end
+end
+
+--- Requires exact settlement before any source-generation publication.
+--- An unbound pure policy has no held native bookkeeping to settle.
+--- @return boolean settled
+local function settle()
+	local generation, owner, capture = _generation, _owner, _capture
+	_transitioning = true
+	local called, accepted = true, true
+	if _settlement then called, accepted = pcall(_settlement) end
+	_transitioning = false
+	if not called or accepted ~= true or _generation ~= generation
+		or _owner ~= owner or _capture ~= capture then return false end
+	_generation = generation + 1
+	return true
+end
+
 
 
 
@@ -109,6 +133,19 @@ end
 -- =============================
 -- =============================
 
+--- Binds the one actual keylogger bookkeeping owner before source selection.
+--- The owner and port remain the same through normal feature stop/restart.
+--- @param owner table Process-lifetime native bookkeeping identity.
+--- @param callback function Plans and swaps its own held state, returning exact true.
+--- @return boolean bound
+function M.bind_settlement(owner, callback)
+	require_idle()
+	if type(owner) ~= "table" or type(callback) ~= "function"
+		or _settlement_owner ~= nil or _owner ~= nil then return false end
+	_settlement_owner, _settlement = owner, callback
+	return true
+end
+
 --- Returns the source that may credit physical keys right now.
 --- @return string source SOURCE_LEGACY, SOURCE_STREAM or SOURCE_GAP.
 function M.credit_source()
@@ -133,12 +170,14 @@ end
 --- Selects the producer stream as the only physical source. From here on the
 --- legacy sources credit nothing; the source is a gap until a capture is admitted.
 --- @param owner string The stream owner's stable identity.
---- @return boolean selected Always true; misuse raises.
+--- @return boolean selected Exact settlement is required; misuse raises.
 function M.select_stream(owner)
+	require_idle()
 	require_identity(owner, "owner")
 	if _owner ~= nil then
 		error("physical accounting: the stream is already selected by '" .. _owner .. "'", 2)
 	end
+	if not settle() then return false, "settlement_refused" end
 	_owner = owner
 	Logger.info(LOG, "Physical accounting source: legacy → gap (stream selected by '%s').", owner)
 	return true
@@ -152,6 +191,7 @@ end
 --- @return boolean admitted
 --- @return string|nil reason Why admission was refused.
 function M.admit(owner, capture, coverage)
+	require_idle()
 	require_owner(owner, "admit")
 	require_identity(capture, "capture")
 	if _capture ~= nil then
@@ -162,6 +202,7 @@ function M.admit(owner, capture, coverage)
 			capture, tostring(coverage))
 		return false, "incomplete_coverage"
 	end
+	if not settle() then return false, "settlement_refused" end
 	_capture = capture
 	Logger.info(LOG, "Physical accounting source: gap → stream (capture '%s' admitted).", capture)
 	return true
@@ -171,13 +212,15 @@ end
 --- source becomes a gap that its owner records until a new capture is admitted.
 --- @param owner string The owner that selected the stream.
 --- @param capture string The capture being ended.
---- @return boolean interrupted Always true; misuse raises.
+--- @return boolean interrupted Exact settlement is required; misuse raises.
 function M.interrupt(owner, capture)
+	require_idle()
 	require_owner(owner, "interrupt")
 	require_identity(capture, "capture")
 	if capture ~= _capture then
 		error("physical accounting: capture '" .. capture .. "' is not the admitted capture", 2)
 	end
+	if not settle() then return false, "settlement_refused" end
 	_capture = nil
 	Logger.warn(LOG, "Physical accounting source: stream → gap (capture '%s' ended).", capture)
 	return true
@@ -187,9 +230,11 @@ end
 --- This is an explicit owner decision (the owner stopped because Tap-Hold was
 --- turned off, for example), never a reaction to a lost capture.
 --- @param owner string The owner that selected the stream.
---- @return boolean released Always true; misuse raises.
+--- @return boolean released Exact settlement is required; misuse raises.
 function M.release(owner)
+	require_idle()
 	require_owner(owner, "release")
+	if not settle() then return false, "settlement_refused" end
 	local previous = M.credit_source()
 	_owner, _capture = nil, nil
 	Logger.info(LOG, "Physical accounting source: %s → legacy (released by '%s').", previous, owner)

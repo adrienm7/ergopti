@@ -598,6 +598,8 @@ Completed Linux keyboard recovery publishes its actual native origin before the 
   VirtualHIDDevice version-skew policy. About 30-40 agent-days plus maintainer
   hardware time.
 
+WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
