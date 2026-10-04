@@ -1647,6 +1647,23 @@ ordinary-save preservation controls pass on both runtimes. Complete selected
 verification, native Windows and native three-OS qualification remain required;
 TODO33 stays partial.
 
+The macOS config_karabiner.toml owner now preserves obsolete timing leaves and
+an obsolete combination switch when an ordinary full-state save carries their
+neutral runtime read results. Load and save classify them through the shared
+warning owner, once per file/path/reason; unrelated binding edits keep the old
+leaf models and foreign neighbors. A carried non-neutral value is not proof of
+an explicit repair: that candidate still refuses with its exact file/path,
+without publication. Manual repair permits a later retry; explicit leaf-intent
+plumbing remains open. All 22 prior selected cases remain unchanged; fourteen
+new real-file controls give original 24/12 and corrected 36/0 on Lua5.4,
+including stale external edits, the existing source fence and malformed-file
+refusal. Portable LuaJIT execution is unavailable because the existing macOS
+harness requires table.pack; no shim was added. Selected root gates passed
+356 JS checks, 13,972 portable macOS unit cases and 101 macOS E2E checks
+(one host-specific scenario skipped). Hosted native macOS E2E/package/install
+qualification and the separate scalar-binding parent refusal remain pending.
+This bounded preservation change does not complete 33.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
