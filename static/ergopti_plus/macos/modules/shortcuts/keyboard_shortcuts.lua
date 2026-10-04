@@ -27,6 +27,7 @@ local Registrar   = require("adapters.hotkey_registrar")
 local FileSystem  = require("adapters.file_system")
 local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
+local OperationReporter = require("diagnostics.operation_reporter")
 local GestActions = nil
 local Codec       = require("toml_codec")
 local Writer      = require("toml_codec.writer")
@@ -192,8 +193,8 @@ end
 --- Reads the canonical source without migrating or consulting legacy storage.
 --- @return table decoded
 --- @return table source Exact classification for conditional publication.
-local function read_config()
-	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem)
+local function read_config(on_error)
+	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem, on_error)
 	assert(status == "ok" or status == "absent", "keyboard configuration unavailable: " .. tostring(detail))
 	local decoded = Codec.decode(content or "")
 	assert(type(decoded) == "table", "keyboard configuration is malformed")
@@ -633,7 +634,7 @@ end
 --- Publishes the canonical sparse assignment only after native admission.
 --- @param slot_id string
 --- @param action_id string
-local function set_action(slot_id, action_id)
+local function set_action(slot_id, action_id, on_error, publication_observer)
 	if type(slot_id) ~= "string" or type(action_id) ~= "string" then
 		Logger.error(LOG, "set_action(): both arguments must be strings.")
 		return false
@@ -648,7 +649,7 @@ local function set_action(slot_id, action_id)
 	if not owned_slots()[slot_id] then return false end
 	ensure_loaded()
 	local old_action = _actions[slot_id] or "none"
-	local _, source = read_config()
+	local _, source = read_config(on_error)
 	local operation = Assignment.operation(slot_id, action_id, function(id)
 		return owned_slots()[id] == true
 	end, action_catalogue().is_assignable)
@@ -681,7 +682,7 @@ local function set_action(slot_id, action_id)
 	local conditional_admitted = refresh_claims() == true
 		and (not _started or start_magic(candidate_magic) == true)
 	if not conditional_admitted
-		or Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source) ~= true then
+		or Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source, on_error, publication_observer) ~= true then
 		restore_conditional()
 		if native_transition == "enabled" then
 			if set_slot_enabled(slot_id, false) ~= true then
@@ -710,12 +711,12 @@ end
 --- @param slot_id string Canonical catalogue slot.
 --- @param action_id string Catalogue action identifier.
 --- @return boolean committed
-function M.set_action(slot_id, action_id)
+function M.set_action(slot_id, action_id, on_error, publication_observer)
 	if _editing then return false end
 	_editing = true
-	local called, committed = xpcall(set_action, debug.traceback, slot_id, action_id)
+	local called, committed = xpcall(set_action, debug.traceback, slot_id, action_id, on_error, publication_observer)
 	_editing = false
-	if not called then Logger.error(LOG, "Keyboard assignment failed: %s.", tostring(committed)) end
+	if not called then OperationReporter.new(on_error, Logger, LOG)("assignment", "error", "Keyboard assignment failed: %s.", tostring(committed)) end
 	return called and committed == true
 end
 

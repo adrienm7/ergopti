@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Сначала цифры",
 	"menu.layout.number_row_symbols": "Сначала символы",
 	"platform_reason.number_row_override_unsupported": "Не поддерживается: Этот драйвер сохраняет системный цифровой ряд; принудительный вывод цифр и символов недоступен.",
-	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Сначала символы» требует активной эмулируемой раскладки с допустимыми уровнями цифр и символов на каждой позиции ряда."
+	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Сначала символы» требует активной эмулируемой раскладки с допустимыми уровнями цифр и символов на каждой позиции ряда.",
+	"sg_actions.run_program": "▶️ Запустить программу [настраиваемое]",
+	"dialog.gestures.param_program": "Выберите абсолютный путь к программе и введите каждый аргумент отдельно. Для скрипта выберите интерпретатор и добавьте путь к скрипту как аргумент.",
+	"dialog.gestures.param_err_program": "Используйте абсолютный путь и текстовые аргументы без интерпретации.",
+	"dialog.action_picker.program_executable": "Исполняемый файл",
+	"dialog.action_picker.program_arguments": "Аргументы (по одному в поле)",
+	"dialog.action_picker.program_add_argument": "Добавить аргумент",
+	"dialog.action_picker.program_remove_argument": "Удалить аргумент",
+	"platform_reason.program_runner_unavailable": "Недоступно: Нативный запуск программ или эта привязка недоступны."
 }

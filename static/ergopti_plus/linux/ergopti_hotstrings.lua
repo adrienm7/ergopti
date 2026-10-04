@@ -205,6 +205,26 @@ local ShutdownCoordinator = require("infra.shutdown_coordinator")
 local shutdown = ShutdownCoordinator.new({
 	pre_wait = {
 		{
+			name = "cursor-display window operations",
+			stop = function()
+				return gestures == nil or gestures.stop_window_switches() == true
+			end,
+			when_settled = function(callback)
+				if gestures == nil then callback(); return true end
+				return gestures.when_window_switches_settled(callback)
+			end,
+		},
+		{
+			name = "user programs",
+			stop = function()
+				return gestures == nil or gestures.stop_programs() == true
+			end,
+			when_settled = function(callback)
+				if gestures == nil then callback(); return true end
+				return gestures.when_programs_settled(callback)
+			end,
+		},
+		{
 			name = "updater background checks",
 			stop = function()
 				if updater and type(updater.stop_background_checks) == "function" then
@@ -442,6 +462,15 @@ end
 --- process to signal itself: the menu now calls this directly.
 --- @param trigger string What asked for the reload, for the log line.
 local function perform_reload(trigger)
+	if gestures and gestures.stop_window_switches() ~= true then
+		Logger.warn(LOG, "Reload postponed while a window operation owns native cleanup debt.")
+		return false
+	end
+	if gestures and gestures.stop_programs() ~= true then
+		Logger.warn(LOG, "Reload postponed while a user program owns native cleanup debt.")
+		return false
+	end
+	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
 	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
 	local ok, count = pcall(function() return hotstrings_config.reload() end)
 	if ok then
@@ -769,6 +798,7 @@ local function main()
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
+			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
 			-- modifier held through the pause is released.
 			TapHold.set_paused(paused)

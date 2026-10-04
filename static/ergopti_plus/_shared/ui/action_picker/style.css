@@ -508,3 +508,14 @@ body {
 	border-color: var(--accent);
 	color: #fff;
 }
+
+#param-program input,
+#param-program textarea {
+	box-sizing: border-box;
+	width: 100%;
+}
+.program-argument {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 8px;
+}

@@ -225,10 +225,10 @@ helpers.describe("raw task launchers: nullable construction and false start are 
 			"ShellRunner must reject a nil native handle")
 		helpers.assert_true(code:find("local ok, started = pcall(function() return task:start() end)", 1, true) ~= nil,
 			"ShellRunner must protect start exceptions and inspect the operational result")
-		helpers.assert_true(code:find("if ok and started then", 1, true) ~= nil
+		helpers.assert_true(code:find("if ok and started and (private ~= true or started == true or started == task) then", 1, true) ~= nil
 			and code:find("_lifecycle = \"start_failed\"", 1, true) ~= nil
 			and code:find("if not ok then", 1, true) ~= nil,
-			"ShellRunner must reject both a thrown and a false native start")
+			"ShellRunner must reject thrown/false starts and require true or the exact task for private admission")
 	end)
 
 	helpers.it("does not relitigate discovery after its ShellRunner migration", function()

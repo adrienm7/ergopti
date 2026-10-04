@@ -42,6 +42,12 @@ local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local LOG = "ui.menu.menu_builder"
 
+--- Keeps private executable/argv data out of persistent menu presentation.
+local function binding_label(label, registry, binding, action)
+	if type(registry.get_action_parameter_spec) == "function" and registry.get_action_parameter_spec(action) == "program" then return label end
+	return ParameterLabel.for_binding(label, registry, binding, action)
+end
+
 -- Delays are stored in seconds and typed in milliseconds: seconds is what the
 -- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
 -- bit longer". The conversion happens only at this boundary.
@@ -182,6 +188,11 @@ end
 local function assign_parameterized_action(ctx, gestures, binding, action, assign, picked)
 	local spec = type(gestures.get_action_parameter_spec) == "function"
 		and gestures.get_action_parameter_spec(action) or nil
+	local bindings = package.loaded["infra.program_binding_transaction"]
+	if spec ~= "program" and type(bindings) == "table" and bindings.pending() then
+		Logger.error(LOG, "Binding edit refused while private user program compensation remains pending.")
+		return false
+	end
 	if not spec then return assign() == true end
 
 	local prior = type(gestures.get_action_parameter) == "function"
@@ -213,6 +224,9 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 			tostring(binding), tostring(action))
 		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
 		return false
+	end
+	if spec == "program" then
+		return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused)
 	end
 	if type(gestures.set_action_parameter) ~= "function"
 		or not gestures.set_action_parameter(binding, action, value)
@@ -3278,7 +3292,7 @@ local function _build_shortcuts(ctx)
 					function(option, picked) return assign_slot(slot, option, picked) end)
 				rows[#rows + 1] = {
 					label = slot_label
-						.. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+						.. " → " .. binding_label(Gestures.get_action_label(bound),
 							Gestures, Keyboard.binding_id(slot), bound),
 					items = choices,
 				}
@@ -3320,7 +3334,7 @@ local function _build_shortcuts(ctx)
 				return assigned
 			end
 			rows[#rows + 1] = {
-				label = name .. " → " .. (bound ~= "none" and ParameterLabel.for_binding(
+				label = name .. " → " .. (bound ~= "none" and binding_label(
 					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
 					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
@@ -3357,7 +3371,7 @@ local function _build_shortcuts(ctx)
 					return assigned
 				end
 				rows[#rows + 1] = {
-					label = name .. " → " .. ParameterLabel.for_binding(Gestures.get_action_label(bound),
+					label = name .. " → " .. binding_label(Gestures.get_action_label(bound),
 						Gestures, Chords.binding_id(slot.id), bound),
 					items = slot_binding_rows(name, bound, Chords.binding_id(slot.id), assign),
 				}

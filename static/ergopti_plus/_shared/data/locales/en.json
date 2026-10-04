@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Digits first",
 	"menu.layout.number_row_symbols": "Symbols first",
 	"platform_reason.number_row_override_unsupported": "Unsupported: This driver keeps the system’s native number row; forced digits and symbols are unavailable.",
-	"platform_reason.number_row_source_unavailable": "Unavailable: Symbols first requires an active emulated layout with valid digit and symbol levels at every number-row position."
+	"platform_reason.number_row_source_unavailable": "Unavailable: Symbols first requires an active emulated layout with valid digit and symbol levels at every number-row position.",
+	"sg_actions.run_program": "▶️ Run a program [configurable]",
+	"dialog.gestures.param_program": "Choose an absolute executable path and enter each argument separately. For a script, choose its interpreter and add the script path as an argument.",
+	"dialog.gestures.param_err_program": "Use an absolute executable path and literal text arguments.",
+	"dialog.action_picker.program_executable": "Executable",
+	"dialog.action_picker.program_arguments": "Arguments (one per field)",
+	"dialog.action_picker.program_add_argument": "Add argument",
+	"dialog.action_picker.program_remove_argument": "Remove argument",
+	"platform_reason.program_runner_unavailable": "Unavailable: The native program runner or this binding is unavailable."
 }

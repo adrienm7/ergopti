@@ -10,6 +10,7 @@
 
 return {
 	"tests.unit.modules.test_native_worker_owner",
+	"tests.unit.modules.test_window_switch_owner",
 	"tests.unit.modules.llm.test_local_server_discovery",
 	"tests.unit.meta.test_combination_labels",
 	"tests.unit.adapters.test_atspi_focus",
@@ -317,6 +318,8 @@ return {
 	"tests.unit.modules.test_open_app_action",
 	"tests.unit.modules.test_system_actions",
 	"tests.unit.modules.test_gesture_dispatch",
+	"tests.unit.modules.test_program_lifecycle",
+	"tests.unit.modules.test_program_literal_native",
 	"tests.unit.modules.test_text_actions_route_through_handlers",
 	"tests.unit.modules.test_gesture_enable_transaction",
 	"tests.unit.modules.test_gesture_pump_chain",
@@ -336,6 +339,7 @@ return {
 	"tests.unit.ui.test_error_dialog_bridge",
 	"tests.unit.ui.test_diagnostics_window_title",
 	"tests.unit.ui.test_configured_gesture_label",
+	"tests.unit.ui.test_program_binding_transaction",
 	"tests.unit.ui.test_healthcheck_last_error_wired",
 	"tests.unit.ui.test_gesture_conflicts",
 	"tests.unit.ui.test_healthcheck_linux_rows",

@@ -651,6 +651,7 @@ function M.build(ctx)
 						disabled = paused or nil,
 						action   = (not paused) and (function(a) return function()
 							local function assign()
+								if a == "run_program" then ctx.updateMenu(); return true end
 								state.script_control_shortcuts[slot_id] = a
 								if type(script_control.set_shortcut_action) == "function" then
 									pcall(script_control.set_shortcut_action, slot_id, a)
@@ -674,7 +675,27 @@ function M.build(ctx)
 									return
 								end
 								DeferredWork.after(0.05, function()
-									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec) then
+									local mutation = spec == "program" and {
+										section = "shortcuts.script_control", key = slot_id,
+										read = function()
+											if type(script_control.get_shortcut_actions) ~= "function" then return nil end
+											local actions = script_control.get_shortcut_actions()
+											return type(actions) == "table" and (actions[slot_id] or "none") or nil
+										end,
+										read_menu = function() return state.script_control_shortcuts[slot_id] or "none" end,
+										apply = function()
+											if type(script_control.set_shortcut_action) ~= "function"
+												or script_control.set_shortcut_action(slot_id, a) ~= true then return false end
+											state.script_control_shortcuts[slot_id] = a
+											return true
+										end,
+										restore = function(previous)
+											state.script_control_shortcuts[slot_id] = previous
+											return script_control.set_shortcut_action(slot_id, previous) == true
+										end,
+									} or nil
+									local transaction = ctx.commit_program_parameter
+									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec, nil, mutation, transaction) then
 										assign()
 									end
 								end, "menu_shortcuts.action_parameter")

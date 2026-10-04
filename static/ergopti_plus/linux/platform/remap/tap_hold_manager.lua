@@ -30,6 +30,7 @@ local Json = require("json")
 local Paths = require("infra.paths")
 local NavLayer = require("platform.remap.nav_layer")
 local Outdated = require("config_outdated")
+local Codec = require("toml_codec")
 
 local LOG = "platform.remap.tap_hold_manager"
 local MS_PER_SECOND = 1000
@@ -53,6 +54,7 @@ local _engine = nil          -- Built from _loaded; nil when there is nothing to
 local _one_shot = nil        -- The shared one-shot Shift results, read with _loaded.
 local _enabled = true        -- The runtime feature switch (« Disable all »).
 local _paused = false        -- The daemon's pause.
+local _generation = 0       -- Revokes queued actions across every runtime installation.
 
 
 -- =========================================
@@ -67,7 +69,8 @@ local _paused = false        -- The daemon's pause.
 --- reaches the hotstring engine, so the daemon is told to reset its buffer, as
 --- after its other injections.
 --- @param action string|table A catalogue action id, or { type_text }.
-local function _run_tap(action)
+--- @param binding string|nil Exact key identity returned with a catalogue tap.
+local function _run_tap(action, binding)
 	if type(action) == "table" then
 		local ok, result = pcall(function()
 			return require("modules.hotstrings.injector").inject(0, action.type_text)
@@ -81,7 +84,7 @@ local function _run_tap(action)
 		return
 	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
-	local ok, err = pcall(_execute_action, action, "tap_hold")
+	local ok, err = pcall(_execute_action, action, binding or "tap_hold")
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
 end
 
@@ -121,6 +124,7 @@ end
 
 --- Installs or removes the engine to match the current state.
 local function _apply()
+	_generation = _generation + 1
 	if _active() then
 		_hook.set_remapper(_engine, _run_tap)
 	else
@@ -366,6 +370,61 @@ end
 function M.keys()
 	_require_init()
 	return _loaded.keys
+end
+
+--- Resolves only an actual enabled key of the currently active engine.
+--- @param key_id string Canonical shared tap-hold key id.
+--- @return string|nil action
+function M.get_tap_action(key_id)
+	if not M.is_active() or type(key_id) ~= "string" then return nil end
+	local code = Engine.KEY_CODES[key_id]
+	local key = code and _engine.by_code[code]
+	return key and key.id == key_id and key.tap or nil
+end
+
+--- Captures the effective native tap and its own canonical configuration source.
+--- @param binding string Exact tap_hold__ key identity transported by the engine.
+--- @param action string Expected native action.
+--- @return function|nil guard
+--- @return string|nil path
+function M.capture_tap_action(binding, action)
+	local key_id = type(binding) == "string" and binding:match("^tap_hold__(.+)$") or nil
+	if key_id == nil or type(action) ~= "string" or action == "" or M.get_tap_action(key_id) ~= action then return nil end
+	local files = require("adapters.file_system")
+	local path, defaults = _user_path, _defaults_path
+	local text, status = files.read_with_status(path)
+	local shipped, shipped_status = files.read_with_status(defaults)
+	if status ~= "ok" or type(text) ~= "string" or shipped_status ~= "ok" or type(shipped) ~= "string" then return nil end
+	local ok, loaded = pcall(function()
+		return Config.load_document(defaults, Codec.decode(text), nil, path)
+	end)
+	if not ok or loaded.enabled ~= _loaded.enabled then return nil end
+	-- The source must describe the whole live configuration, including inherited
+	-- fields; an unpublished scope candidate cannot authorize native execution.
+	local function equal_keys(left, right)
+		for id, fields in pairs(left) do
+			if type(right[id]) ~= "table" then return false end
+			for name, value in pairs(fields) do if right[id][name] ~= value then return false end end
+			for name, value in pairs(right[id]) do if fields[name] ~= value then return false end end
+		end
+		for id in pairs(right) do if left[id] == nil then return false end end
+		return true
+	end
+	if not equal_keys(loaded.keys, _loaded.keys) then return nil end
+	local generation, engine = _generation, _engine
+	local function current_runtime()
+		return generation == _generation and engine == _engine and _user_path == path and _defaults_path == defaults
+			and M.get_tap_action(key_id) == action and equal_keys(loaded.keys, _loaded.keys)
+	end
+	local function guard()
+		if not current_runtime() then return false end
+		local current, current_status = files.read_with_status(path)
+		local current_defaults, defaults_status = files.read_with_status(defaults)
+		return current_status == "ok" and current == text and defaults_status == "ok" and current_defaults == shipped
+			and current_runtime()
+	end
+	if guard() ~= true then return nil end
+	return guard, path
 end
 
 --- The keys the tray lists, in order, each with its hand and label key: the

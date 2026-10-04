@@ -947,6 +947,19 @@ const nativeRecord =
 assert.match(nativeRecord, /xkb_source_assertions=\$\(sed[^\n]+linux-xkb-source\.log/);
 assert.match(nativeRecord, /--subject "xkb-source-qualification=\$xkb_source_assertions"/);
 
+// Native cursor-display receipts include the actual scoped dispatcher.
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['window-switch-receipts'], 34);
+rejects(({ evidence }) => {
+	const document = evidence.find((row) => 'window-switch-receipts' in row.subjects);
+	delete document.subjects['window-switch-receipts'];
+}, /has no evidence for window-switch-receipts/);
+rejects(({ evidence }) => {
+	const document = evidence.find((row) => 'window-switch-receipts' in row.subjects);
+	document.subjects['window-switch-receipts'] = 33;
+}, /window-switch-receipts recorded 33 assertion/);
+assert.match(nativeRecord, /window_switch_assertions=\$\(sed[^\n]+linux-window-switch\.log/);
+assert.match(nativeRecord, /--subject "window-switch-receipts=\$window_switch_assertions"/);
+
 // Every subject the per-job layout proved at ca1a4d64a is still required: the
 // manifest and linux-ok's needs can shrink together, and verify would then
 // accept a box that silently stopped proving something.
@@ -1210,7 +1223,7 @@ for (const boxJob of pipeline.jobs(LINUX_BOX)) {
 	}
 }
 
-// Three subjects are counts, and each must be read from what its suite printed:
+// Native/unit subject counts must be read from what their suites printed:
 // a literal count keeps a floor satisfied by a suite that ran nothing. Every
 // other subject is the literal 1 of a step that passed. That no step before a
 // record can be skipped, or swallow a failure with `|| true` or a `| tee`
@@ -1237,7 +1250,8 @@ const recordScript = [...unitRecord, ...e2eRecord];
 for (const line of [
 	'unit_assertions=$(jq -r \'.passed\' "$RUNNER_TEMP/linux-lua.json")',
 	'e2e_assertions=$(sed -n \'s/^1\\.\\.\\([0-9][0-9]*\\)$/\\1/p\' "$RUNNER_TEMP/linux-e2e.log" | tail -1)',
-	'xkb_source_assertions=$(sed -n \'s/^=== \\([0-9][0-9]*\\) check(s), 0 failure(s) ===$/\\1/p\' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)'
+	'xkb_source_assertions=$(sed -n \'s/^=== \\([0-9][0-9]*\\) check(s), 0 failure(s) ===$/\\1/p\' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)',
+	'window_switch_assertions=$(sed -n \'s/^Native window receipts: \\([0-9][0-9]*\\) passed, 0 failed, 0 skipped$/\\1/p\' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)'
 ]) {
 	assert.ok(
 		recordScript.includes(line),
@@ -1259,7 +1273,9 @@ for (const [, subject, value] of recorded) {
 			unit: '$unit_assertions',
 			'hotstring-e2e': '$e2e_assertions',
 			'xkb-source-qualification': '$xkb_source_assertions',
-			'http-stream-receipts': '$http_stream_assertions'
+			'http-stream-receipts': '$http_stream_assertions',
+			'window-switch-receipts': '$window_switch_assertions',
+			'native-fixture-family': '$native_family_assertions'
 		}[subject] ?? '1';
 	assert.strictEqual(
 		value,

@@ -39,7 +39,10 @@
 #             _shared/data/locale_names.json; rule pinned by
 #             _shared/tests/corpus/llm/translate_vectors.json), or "app" (an
 #             application as the OS launches one, picked in a native chooser;
-#             rule pinned by _shared/tests/corpus/action_parameters/app_vectors.json).
+#             rule pinned by _shared/tests/corpus/action_parameters/app_vectors.json),
+#             or "program" (versioned JSON containing an absolute executable
+#             and literal ordered arguments; rule pinned independently by
+#             _shared/tests/corpus/action_parameters/program_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs. Each
 #             driver's dispatcher asks, off the input thread, and runs the
 #             action only on the explicit answer: macOS execute_single
@@ -792,6 +795,11 @@ platform = "all"
 # no compositor-independent way to warp the pointer.
 platform = "ahk,hs"
 
+[sg_actions.run_program]
+# Versioned absolute executable plus a literal argument vector, owned by the action lifecycle.
+platform = "all"
+parameter = "program"
+
 [sg_actions.open_app]
 # Opens the application stored for the binding: macOS `open -a` (a name or
 # path) or `open -b` (a bundle identifier), Windows the shell's Run (a program,
@@ -1329,17 +1337,14 @@ platform = "hs,ahk"
 emit_hs_key = "f17"
 emit_hs_mods = ["shift"]
 
-# Cycle limité à l'écran sous le curseur. Windows le fait depuis toujours
-# (AltTabMonitor), macOS ne cyclait que globalement : la même touche se
-# comportait différemment sur les deux plateformes sans que rien ne l'écrive.
-# Les deux comportements sont voulus, et chacun est maintenant assignable
-# partout. Ctrl+F17 est le quatrième et dernier accord F17 libre — les trois
-# autres portent déjà cycle_windows_in_app, alt_tab_windows et alt_tab_apps.
+# Cycle windows only on the display under the cursor. Linux delegates to the
+# owned X11 worker instead of emitting the unrelated global Alt+Tab shortcut.
+# Ctrl+F17 keeps the existing macOS watcher route for this distinct action.
 [sg_actions.alt_tab_monitor]
 platform = "all"
 emit_hs_key = "f17"
 emit_hs_mods = ["ctrl"]
-emit_linux = "alt+Tab"
+requires_linux = ["session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop", "tool:xwininfo", "tool:sha256sum"]
 
 [sg_actions.home]
 platform = "hs,linux"
@@ -1680,6 +1685,7 @@ items = [
     "clear_clipboard",
     "center_mouse",
     "open_app",
+    "run_program",
     "quit_frontmost_app",
     "force_quit_frontmost",
     "empty_trash",

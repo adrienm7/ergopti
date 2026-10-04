@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "الأرقام أولًا",
 	"menu.layout.number_row_symbols": "الرموز أولًا",
 	"platform_reason.number_row_override_unsupported": "غير مدعوم: يحتفظ هذا المشغّل بصف الأرقام الأصلي للنظام، ولا يمكن فرض الأرقام أو الرموز.",
-	"platform_reason.number_row_source_unavailable": "غير متاح: تتطلب أولوية الرموز تخطيطًا محاكى نشطًا بمستويات صالحة للأرقام والرموز في كل موضع من صف الأرقام."
+	"platform_reason.number_row_source_unavailable": "غير متاح: تتطلب أولوية الرموز تخطيطًا محاكى نشطًا بمستويات صالحة للأرقام والرموز في كل موضع من صف الأرقام.",
+	"sg_actions.run_program": "▶️ تشغيل برنامج [قابل للضبط]",
+	"dialog.gestures.param_program": "اختر مسارًا مطلقًا للبرنامج وأدخل كل وسيطة على حدة. للبرامج النصية، اختر المفسّر وأضف مسار النص كوسيطة.",
+	"dialog.gestures.param_err_program": "استخدم مسارًا مطلقًا ووسائط نصية حرفية.",
+	"dialog.action_picker.program_executable": "الملف التنفيذي",
+	"dialog.action_picker.program_arguments": "الوسائط (واحدة لكل حقل)",
+	"dialog.action_picker.program_add_argument": "إضافة وسيطة",
+	"dialog.action_picker.program_remove_argument": "إزالة وسيطة",
+	"platform_reason.program_runner_unavailable": "غير متاح: مشغّل البرامج الأصلي أو هذا الربط غير متاح."
 }

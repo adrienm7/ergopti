@@ -116,6 +116,9 @@ function init(data) {
 		el('param-vision-provider-label').textContent = paramStrings.visionProviderLabel || '';
 		el('param-vision-model-label').textContent = paramStrings.visionModelLabel || '';
 		el('param-language-label').textContent = paramStrings.languageLabel || '';
+		el('param-program-executable-label').textContent = paramStrings.programExecutableLabel || '';
+		el('param-program-arguments-label').textContent = paramStrings.programArgumentsLabel || '';
+		el('param-program-add').textContent = paramStrings.programAddLabel || '';
 	}
 	if (editing) closeParamEditor();
 
@@ -464,7 +467,8 @@ const EDITABLE_KINDS = new Set([
 	'shortcut',
 	'llm_prompt',
 	'llm_vision',
-	'llm_language'
+	'llm_language',
+	'program'
 ]);
 const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
@@ -596,6 +600,8 @@ function parseLlmVision(value) {
 // Canonical form of a value, or null when invalid.
 function parseParameter(kind, value) {
 	if (typeof value !== 'string') return null;
+	if (kind === 'program')
+		return ProgramParameter.parse(value, hostPlatform) === null ? null : value;
 	if (kind === 'text') return parseSendText(value);
 	if (kind === 'key') return parseSendKey(value, false);
 	if (kind === 'shortcut') return parseSendShortcut(value);
@@ -663,6 +669,7 @@ function captureShortcut(e) {
 
 function canEdit(entry) {
 	if (!entry || !EDITABLE_KINDS.has(entry.parameter) || paramStrings === null) return false;
+	if (entry.parameter === 'program') return typeof ProgramParameter === 'object';
 	if (entry.parameter === 'llm_prompt')
 		return promptChoices !== null && promptChoices.length > 0 && defaultCount !== null;
 	if (entry.parameter === 'llm_vision') return visionChoices !== null && visionChoices.length > 0;
@@ -764,6 +771,7 @@ function openParamEditor(entry) {
 	const choosing = entry.parameter === 'llm_prompt';
 	const vision = entry.parameter === 'llm_vision';
 	const language = entry.parameter === 'llm_language';
+	const program = entry.parameter === 'program';
 	el('param-title').textContent = entry.label;
 	el('param-prompt').textContent =
 		choosing || vision || language ? '' : (paramStrings.prompts || {})[entry.parameter] || '';
@@ -774,13 +782,23 @@ function openParamEditor(entry) {
 				? paramStrings.captureShortcut
 				: '';
 	el('param-error').hidden = true;
-	el('param-input').hidden = choosing || vision || language;
+	el('param-input').hidden = choosing || vision || language || program;
 	el('param-choice').hidden = !choosing;
 	el('param-vision').hidden = !vision;
 	el('param-language').hidden = !language;
+	el('param-program').hidden = !program;
 	el('param').hidden = false;
 	el('list').hidden = true;
 	el('search-bar').hidden = true;
+	if (program) {
+		const current = ProgramParameter.parse(entry.parameterValue || '', hostPlatform);
+		el('param-program-executable').value = current === null ? '' : current.executable;
+		el('param-program-arguments').replaceChildren();
+		for (const argument of current === null ? [] : current.arguments)
+			appendProgramArgument(argument);
+		el('param-program-executable').focus();
+		return;
+	}
 	if (choosing) {
 		fillPromptChoices(entry.parameterValue);
 		el('param-profile').focus();
@@ -802,6 +820,22 @@ function openParamEditor(entry) {
 	el('param-input').select();
 }
 
+function appendProgramArgument(value) {
+	const row = document.createElement('div');
+	row.className = 'program-argument';
+	const input = document.createElement('textarea');
+	input.value = value;
+	input.spellcheck = false;
+	input.setAttribute('aria-label', paramStrings.programArgumentsLabel || '');
+	const remove = document.createElement('button');
+	remove.type = 'button';
+	remove.textContent = paramStrings.programRemoveLabel || '';
+	remove.addEventListener('click', () => row.remove());
+	row.append(input, remove);
+	el('param-program-arguments').appendChild(row);
+	return input;
+}
+
 function closeParamEditor() {
 	editing = null;
 	el('param').hidden = true;
@@ -813,13 +847,22 @@ function closeParamEditor() {
 function saveParameter() {
 	if (!editing) return;
 	const value =
-		editing.parameter === 'llm_prompt'
-			? promptChoiceValue()
-			: editing.parameter === 'llm_vision'
-				? visionChoiceValue()
-				: editing.parameter === 'llm_language'
-					? el('param-language-select').value
-					: el('param-input').value;
+		editing.parameter === 'program'
+			? ProgramParameter.encode(
+					el('param-program-executable').value,
+					Array.from(
+						el('param-program-arguments').querySelectorAll('textarea'),
+						(input) => input.value
+					),
+					hostPlatform
+				)
+			: editing.parameter === 'llm_prompt'
+				? promptChoiceValue()
+				: editing.parameter === 'llm_vision'
+					? visionChoiceValue()
+					: editing.parameter === 'llm_language'
+						? el('param-language-select').value
+						: el('param-input').value;
 	if (value === null || parseParameter(editing.parameter, value) === null) {
 		el('param-error').textContent = (paramStrings.errors || {})[editing.parameter] || '';
 		el('param-error').hidden = false;
@@ -905,7 +948,12 @@ function onPlainEditorKeydown(e, input) {
 function onParamKeydown(e) {
 	if (!editing) return false;
 	const input = el('param-input');
-	if (editing.parameter === 'key') onKeyCaptureKeydown(e, input);
+	if (editing.parameter === 'program') {
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			closeParamEditor();
+		}
+	} else if (editing.parameter === 'key') onKeyCaptureKeydown(e, input);
 	else if (editing.parameter === 'shortcut') onShortcutCaptureKeydown(e, input);
 	else if (
 		editing.parameter === 'llm_prompt' ||
@@ -939,6 +987,9 @@ document.addEventListener('DOMContentLoaded', function () {
 	});
 	el('param-back').addEventListener('click', function () {
 		closeParamEditor();
+	});
+	el('param-program-add').addEventListener('click', function () {
+		appendProgramArgument('').focus();
 	});
 	el('param-save').addEventListener('click', function () {
 		saveParameter();
