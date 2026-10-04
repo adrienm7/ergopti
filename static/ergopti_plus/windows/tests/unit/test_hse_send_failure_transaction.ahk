@@ -718,3 +718,66 @@ Test("hotstrings: UIA wrapper failure preserves the physical fallback (AHK-04-se
 	_AHK04_UIAWrapperIsLosslessOnFailure)
 Test("hotstrings: fired metrics follow the sender verdict (AHK-04-send-transaction)",
 	_AHK04_FireMetricsFollowTheSendVerdict)
+
+
+/** Exercise each canonical boundary publisher through its real returned effect. */
+_UBP_PublishBoundary(Mode, Text, ExpectedBoundary) {
+	_AHK04_RunIsolated(Body)
+	Body() {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+		global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding
+		SavedTerminators := HSE_WORD_TERMINATORS
+		SavedActive := _LLM_Bridge_Active
+		SavedAgent := _LLM_Bridge_AgentFeeding
+		try {
+			HSE_WORD_TERMINATORS := SavedTerminators . Chr(0x1F600)
+			_LLM_Bridge_Active := false
+			_LLM_Bridge_AgentFeeding := false
+			HSE_Buffer := "ab"
+			HSE_StartIsWordBoundary := true
+			if Mode == "expansion" {
+				Effect := HSE_ApplyExpansion({ Length: 2, OnlyText: true }, Text)
+			} else if Mode == "callback" {
+				Callback(*) => { Ok: true, Bs: 2, Ins: Text }
+				Spec := { Callback: Callback, IsPrivate: false }
+				AssertTrue(_HSE_DispatchRawCallback(Spec, "", &Effect),
+					"the successful recording callback owns its published deletion")
+			} else {
+				Owner := Map("EraseUnits", 2, "OnlyText", true, "PlainInsertedText", Text,
+					"EndCharPart", "", "IsPrivate", false, "Trigger", "ab",
+					"ReplacementForLog", Text, "HType", "star", "Category", "fixture", "Section", "fixture")
+				if Mode == "terminal-raw" {
+					Owner["RawEffect"] := { Ins: Text }
+					Effect := _HSE_CommitTerminalRawOwner(Owner)
+				} else {
+					Effect := _HSE_CommitTerminalOwner(Owner, "")
+				}
+			}
+			AssertTrue(IsObject(Effect), "the actual owner publishes a canonical effect")
+			AssertEqual(Text, HSE_Buffer, "the owner commits exactly the recorded replacement")
+			AssertEqual(Text, Effect.InsertedText, "the transmitted effect retains the complete scalar")
+			AssertEqual(2, Effect.DeleteFromEnd, "the effect retains its actual deletion span")
+			AssertEqual(ExpectedBoundary, Effect.KnownBoundaryAfter,
+				"only a complete configured delimiter proves the resulting boundary")
+			Decision := _PrefixPostFireDecision(Effect, HSE_Buffer, 64)
+			ExpectedReset := ExpectedBoundary || Text == ""
+			AssertEqual(ExpectedReset, Decision.Reset, "the actual preview decision consumes the owner boundary")
+			AssertEqual(ExpectedReset ? "" : Text, Decision.Buffer,
+				"a distinct supplementary scalar keeps its exact cascade context")
+			AssertEqual(!ExpectedReset, Decision.Schedule, "the cascade is admitted only for retained text")
+		} finally {
+			_PrefixCancelRender()
+			HSE_WORD_TERMINATORS := SavedTerminators
+			_LLM_Bridge_Active := SavedActive
+			_LLM_Bridge_AgentFeeding := SavedAgent
+		}
+	}
+}
+for Mode in ["expansion", "terminal", "terminal-raw", "callback"] {
+	Test("publisher unicode-boundary-owner: " . Mode . " rejects a shared low surrogate",
+		_UBP_PublishBoundary.Bind(Mode, Chr(0x1FA00), false))
+	Test("publisher unicode-boundary-owner: " . Mode . " accepts the actual supplementary delimiter",
+		_UBP_PublishBoundary.Bind(Mode, Chr(0x1F600), true))
+	Test("publisher unicode-boundary-owner: " . Mode . " retains the empty short-circuit",
+		_UBP_PublishBoundary.Bind(Mode, "", false))
+}
