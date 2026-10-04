@@ -373,6 +373,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_redirect_receipts.lua
         timeout-minutes: 1
 
+      - name: Preserve native POST redirect method and body semantics
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_http_redirect_method_receipts.py
+        timeout-minutes: 1
+
       - name: Preserve TLS on native HTTP redirect hops
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

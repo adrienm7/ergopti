@@ -1236,6 +1236,19 @@ These are software implementations; final hardware verification remains below.
   hs.http/hs.task by source; equivalent replacement behavior remains unqualified
   without their runtime suites. No foreign source, reserved surface or hosted
   CI changed; sockets/processes/files are real, not physical keyboard tests.
+- [~] **L91.** Linux native POST redirect semantics: let the data option select
+  POST instead of forcing a method word that survives curl's retrieval rewrite.
+  Optional followed 301/302/303 requests now become GET without the original
+  body; 307/308 retain POST and exact bytes. Six of thirty-three actual
+  loopback/curl/libuv cases fail before and all pass after, including direct
+  nil/empty/literal bodies, explicit no-follow, synthetic credential fences,
+  ordinary/owned GET and downloads. Seventeen registered units preserve flag
+  and callback contracts. No active LLM caller is claimed to follow redirects;
+  this fixes the supported optional adapter path. Windows async curl does not
+  enable native following; its synchronous WinHttp and macOS hs.http delegate
+  redirects to their platforms by source. Foreign runtime suites remain
+  deferred. Native regression is registered for Linux CI without launching
+  hosted CI; no TLS, credential, owner, shared API or reserved policy changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

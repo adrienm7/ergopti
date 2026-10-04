@@ -219,9 +219,14 @@ local function curl_args(url, headers, body, options)
 		"--globoff",
 		"--silent", "--show-error", "--no-buffer", "--fail-with-body",
 		"--max-time", tostring(math.max(1, math.ceil(timeout_ms / 1000))),
-		"--request", options.method,
 		"--proto", options.protocols,
 	}
+	-- Data selects POST itself. A custom POST word would survive 303 even
+	-- when curl switches to retrieval and discards the original body.
+	if options.method ~= "POST" then
+		args[#args + 1] = "--request"
+		args[#args + 1] = options.method
+	end
 	if options.follow_redirects then
 		args[#args + 1] = "--location"
 		-- An HTTPS caller keeps TLS on every native-followed hop even without
