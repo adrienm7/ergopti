@@ -874,10 +874,8 @@ _HSDT_DeclaredMagicPreviewUnavailable() {
 	Getters := Map("hotstrings.preview_star_enabled", (*) => true, "preview_magic_ready", (*) => true)
 	Native := MenuRenderer_CheckRow(Corpus["section"], Row["id"], Commands, Getters)
 	AssertFalse(Native is Map, "The real provider refuses to acquire unsupported native work.")
-	Grey := _MR_CommandRowData(Row, Corpus["section"], Commands, Getters)
-	Assert(Grey is Map, "The renderer owns the truthful grey stand-in data.")
-	AssertEqual(Corpus["unavailable"]["reason"], Grey["disabled_reason_key"], "The stand-in retains the actual reason.")
-	AssertFalse(Grey.Has("action"), "An unavailable stand-in has no native mutation callback.")
+	_HSDT_AssertDrawnUnsupportedPreview(Corpus["section"], 0, 1, Row,
+		Corpus["unavailable"]["reason"], Commands, Getters, Called)
 	AssertEqual(0, Called["count"], "Unsupported native work never executes.")
 }
 
@@ -904,11 +902,87 @@ _HSDT_DeclaredPresencePreviewUnavailable() {
 		Getters := Map("hotstrings." . Row["id"], (*) => true, "preview_presence_ready", (*) => true)
 		Native := MenuRenderer_CheckRow(Corpus["section"], Row["id"], Commands, Getters)
 		AssertFalse(Native is Map, "Unsupported native work cannot be acquired.")
-		Grey := _MR_CommandRowData(Row, Corpus["section"], Commands, Getters)
-		Assert(Grey is Map, "The shared renderer supplies a truthful grey stand-in.")
-		AssertEqual(Expected["reason_key"], Grey["disabled_reason_key"])
-		AssertFalse(Grey.Has("action"), "The stand-in has no mutation callback.")
+		_HSDT_AssertDrawnUnsupportedPreview(Corpus["section"], Index - 1, 2, Row,
+			Expected["reason_key"], Commands, Getters, Called)
 		AssertEqual(0, Called["count"], "Unsupported native work never executes.")
 		Assert(t(Row["reason_key"]) != Row["reason_key"], "The existing capability reason is translated.")
 	}
 }
+
+; Read the actual unsupported branch, which renders before command admission.
+_HSDT_AssertDrawnUnsupportedPreview(Section, Position, Count, Row, Reason, Commands, Getters, Called) {
+	global _MenuDispatchCallbacks
+	Built := MenuRenderer_Build(Section, "Hotstrings", Map(), Map(), Map(), Commands, Getters)
+	try {
+		Assert(Built is Menu, "The public renderer supplies the actual grey stand-in menu.")
+		AssertEqual(Count, TrayMenuItemCount(Built), "Every declared unsupported row is drawn exactly once.")
+		ReasonText := t(Reason)
+		Assert(ReasonText != Reason, "The actual capability reason is translated.")
+		Head := Trim(RegExReplace(ReasonText, "[:：].*$", ""))
+		Assert(Head != "", "The stand-in retains a nonempty translated reason.")
+		ExpectedLabel := t(Row["i18n"]) . " — " . Head
+		AssertEqual(ExpectedLabel, _HSDT_NativePreviewLabelAt(Built, Position),
+			"The drawn caption includes the actual canonical label and translated reason.")
+		Flags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF, "The actual native row must exist.")
+		; GetMenuState packs submenu counts above the low byte; only native state flags belong here.
+		Assert((Flags & 0xFF & 0x3) != 0, "The stand-in is natively disabled.")
+		AssertEqual(0, DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr"),
+			"The unsupported preview is a leaf, not a borrowed native submenu.")
+		Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
+		Assert(Id != 0xFFFFFFFF, "The actual native leaf has an item identity.")
+		AssertFalse(_MenuDispatchCallbacks.Has(Id), "The stand-in has no native mutation callback.")
+		AssertEqual(0, Called["count"], "Drawing unsupported native work never executes its supplied command.")
+	} finally {
+		Built.Delete()
+		MenuDispatcher_PruneMenu(Built)
+	}
+}
+
+_HSDT_NativePreviewLabelAt(TargetMenu, Position) {
+	Length := DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+		"ptr", 0, "int", 0, "uint", 0x400, "int")
+	Assert(Length > 0, "The actual native caption must be nonempty.")
+	Text := Buffer((Length + 1) * 2, 0)
+	Read := DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position,
+		"ptr", Text, "int", Length + 1, "uint", 0x400, "int")
+	AssertEqual(Length, Read, "The native caption read must be complete.")
+	return StrGet(Text, "UTF-16")
+}
+
+_HSDT_ObservePreviewCommand(Called, *) {
+	Called["count"] += 1
+}
+
+_HSDT_NativePreviewCallbackPositiveControl() {
+	global _MenuDispatchCallbacks
+	Key := "_test_preview_native_callback_control"
+	Root := _MR_GetManifestRoot()
+	AssertFalse(Root.Has(Key), "The control owns a fresh temporary declaration.")
+	Called := Map("count", 0)
+	Root[Key] := [Map("type", "command", "id", "preview_control", "i18n", "button.ok")]
+	Built := 0
+	try {
+		Built := MenuRenderer_Build(Key, "Hotstrings", Map(), Map(), Map(),
+			Map("preview_control", _HSDT_ObservePreviewCommand.Bind(Called)), Map())
+		AssertEqual(1, TrayMenuItemCount(Built))
+		AssertEqual(t("button.ok"), _HSDT_NativePreviewLabelAt(Built, 0))
+		Flags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF)
+		AssertEqual(0, Flags & 0xFF & 0x3, "A supported control is natively enabled.")
+		Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", 0, "uint")
+		Assert(_MenuDispatchCallbacks.Has(Id), "The positive control observes its actual native registration.")
+		AssertEqual(0, Called["count"], "Rendering a supported control does not invoke it.")
+		_MenuDispatchCallbacks[Id].Call()
+		AssertEqual(1, Called["count"], "The real registered callback makes command effects observable.")
+	} finally {
+		Root.Delete(Key)
+		if Built is Menu {
+			Built.Delete()
+			MenuDispatcher_PruneMenu(Built)
+		}
+	}
+	AssertFalse(Root.Has(Key), "The original manifest is restored.")
+}
+Test("preview unavailable fixture: actual native callback and enabled-state positive control",
+	_HSDT_NativePreviewCallbackPositiveControl)
