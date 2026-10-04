@@ -1649,7 +1649,20 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- is separated, the same way macOS separates it.
 				if index == #toggles then choices[#choices + 1] = { separator = true } end
 				local name = toggle.name
-				if name == "colored" then
+				if name == "star" then
+					local row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
+						["preview_star_enabled"] = function()
+							if PreviewSettings.toggle("star") ~= true then return false end
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							return true
+						end,
+					}, {
+						["hotstrings.preview_star_enabled"] = function() return PreviewSettings.get("star") == true end,
+						-- Preserve configuration access while the Linux engine is paused.
+						["preview_magic_ready"] = function() return true end,
+					})
+					if row then choices[#choices + 1] = row end
+				elseif name == "colored" then
 					local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
 						["preview_colored_tooltips"] = function()
 							if PreviewSettings.toggle("colored") ~= true then return false end

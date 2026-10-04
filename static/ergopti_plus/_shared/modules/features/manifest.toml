@@ -5390,6 +5390,18 @@ platforms = ["hs", "linux"]
 unavailable = "grey"
 reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
+# Preview presence keeps its existing position; native ports supply only the
+# current flag and the acknowledged toggle owner.
+[[menu.preview_magic_control]]
+type = "check"
+id = "preview_star_enabled"
+i18n = "menu.hotstrings.tooltip_magic"
+checked_when = ["hotstrings.preview_star_enabled"]
+disabled_when = ["preview_magic_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
 # Unrestricted with the feature above, and for the same reason: macOS built this
 # row by hand while the manifest said it was Windows-only, which is why the
 # handler-bijection ratchet counted it as one of the rows macOS never wired.

@@ -1911,6 +1911,25 @@
 			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
 		}
 	],
+	"preview_magic_control": [
+		{
+			"type": "check",
+			"id": "preview_star_enabled",
+			"i18n": "menu.hotstrings.tooltip_magic",
+			"checked_when": [
+				"hotstrings.preview_star_enabled"
+			],
+			"disabled_when": [
+				"preview_magic_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		}
+	],
 	"gestures_menu": [
 		{
 			"type": "toggle",
