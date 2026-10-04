@@ -119,6 +119,30 @@ end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
+		for _, follow in ipairs({ false, true }) do
+			helpers.it("linux-http-curlrc: " .. method .. " disables personal config first (follow=" .. tostring(follow) .. ")", function()
+				local client, state = fresh_client()
+				local result, options = nil, { follow_redirects = follow }
+				local function complete(value) result = value end
+				if method == "get" then helpers.assert_true(client.get("https://example.invalid", {}, options, complete))
+				elseif method == "post" then helpers.assert_true(client.post("https://example.invalid", {}, "{}", complete, options))
+				elseif method == "download" then helpers.assert_true(client.download("https://example.invalid", {}, "/tmp/unit-curlrc", options, complete))
+				else helpers.assert_true(client.postStream("https://example.invalid", {}, "{}", options, function() end, complete)) end
+				helpers.assert_eq(state.options.args[1], "--disable", "curl only skips its personal config when disable is the first argument")
+				local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+				-- Download follows public redirects by contract; get/post/stream
+				-- preserve the caller's explicit choice.
+				helpers.assert_eq(joined:find("\n--location\n", 1, true) ~= nil, method == "download" or follow)
+				helpers.assert_true(joined:find("\n--config\n-\n", 1, true) ~= nil, "private stdin request config must remain enabled")
+				if method == "postStream" then state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n"); state.complete()
+				else state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n") end
+				helpers.assert_true(result and result.ok and result.status == 200)
+				helpers.assert_eq(client.isActive(), false)
+			end)
+		end
+	end
+
+	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
 		for _, target in ipairs({ "file:///owned/source", "FILE:///owned/source", "file:/owned/source",
 			"ftp://127.0.0.1/native", "ftps://127.0.0.1/native", "gopher://127.0.0.1/native",
 			"data:text/plain,synthetic", "telnet://127.0.0.1/native" }) do

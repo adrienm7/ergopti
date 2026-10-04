@@ -332,6 +332,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_transport_receipts.lua
         timeout-minutes: 1
 
+      - name: Isolate native HTTP policy from inherited personal curl config
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_http_curlrc_receipts.py
+        timeout-minutes: 4
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
