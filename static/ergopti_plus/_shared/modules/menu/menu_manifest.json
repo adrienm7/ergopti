@@ -1930,6 +1930,42 @@
 			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
 		}
 	],
+	"preview_presence_controls": [
+		{
+			"type": "check",
+			"id": "preview_autocorrect_enabled",
+			"i18n": "menu.hotstrings.tooltip_autocorrect",
+			"checked_when": [
+				"hotstrings.preview_autocorrect_enabled"
+			],
+			"disabled_when": [
+				"preview_presence_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		},
+		{
+			"type": "check",
+			"id": "preview_ai_enabled",
+			"i18n": "menu.hotstrings.tooltip_ai",
+			"checked_when": [
+				"hotstrings.preview_ai_enabled"
+			],
+			"disabled_when": [
+				"preview_presence_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		}
+	],
 	"gestures_menu": [
 		{
 			"type": "toggle",

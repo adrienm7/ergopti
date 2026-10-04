@@ -34,31 +34,6 @@ local LOG               = "menu_hotstrings"
 -- =============================
 -- =============================
 
---- Builds a toggle item for one preview bubble type.
---- @param ctx table Context.
---- @param label string Display label for the toggle item.
---- @param enabled_key string State key for the enabled flag.
---- @param notify_label string Label used in the notification.
---- @return table The toggle menu item.
-local function buildBubbleItem(ctx, label, enabled_key, notify_label)
-	local state  = ctx.state
-	local paused = ctx.paused
-
-	return {
-		label    = label,
-		checked  = state[enabled_key] or nil,
-		disabled = paused or nil,
-		action       = not paused and function()
-			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(enabled_key) ~= true then
-				return false
-			end
-			ctx.notify_feature(notify_label, state[enabled_key])
-			ctx.updateMenu()
-			return true
-		end or nil,
-	}
-end
-
 --- Builds the management sub-menu.
 --- @param ctx table Context.
 --- @return table
@@ -86,15 +61,24 @@ function M.build_management(ctx)
 	})
 	if magic_row then table.insert(bubble_sub, magic_row) end
 
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_autocorrect"),
-		"preview_autocorrect_enabled",
-		i18n.get("menu.hotstrings.notify_bubble_autocorrect")))
-
-	table.insert(bubble_sub, buildBubbleItem(ctx,
-		i18n.get("menu.hotstrings.tooltip_ai"),
-		"preview_ai_enabled",
-		i18n.get("menu.hotstrings.notify_bubble_ai")))
+	local presence_commands = {}
+	local presence_getters = { preview_presence_ready = function() return not ctx.paused end }
+	for key, notify_key in pairs({
+		preview_autocorrect_enabled = "menu.hotstrings.notify_bubble_autocorrect",
+		preview_ai_enabled = "menu.hotstrings.notify_bubble_ai",
+	}) do
+		presence_commands[key] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(key) ~= true then return false end
+			ctx.notify_feature(i18n.get(notify_key), state[key])
+			ctx.updateMenu()
+			return true
+		end
+		presence_getters["hotstrings." .. key] = function() return state[key] == true end
+	end
+	for _, declaration in ipairs(ManifestMenu.get_array("preview_presence_controls")) do
+		local row = ManifestMenu.check_row("preview_presence_controls", declaration.id, presence_commands, presence_getters)
+		if row then table.insert(bubble_sub, row) end
+	end
 
 	table.insert(bubble_sub, { separator = true })
 

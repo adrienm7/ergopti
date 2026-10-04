@@ -880,3 +880,35 @@ _HSDT_DeclaredMagicPreviewUnavailable() {
 	AssertFalse(Grey.Has("action"), "An unavailable stand-in has no native mutation callback.")
 	AssertEqual(0, Called["count"], "Unsupported native work never executes.")
 }
+
+
+Test("Autocorrection and AI previews: shared ordered checkboxes preserve Windows capability", _HSDT_DeclaredPresencePreviewUnavailable)
+
+_HSDT_DeclaredPresencePreviewUnavailable() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\preview_presence_controls.json"))
+	Definition := _MR_GetManifestRoot()[Corpus["section"]]
+	AssertEqual(2, Definition.Length, "The two historical presence flags are declared together.")
+	for Index, Row in Definition {
+		Expected := Corpus["rows"][Index]
+		for Key in ["id", "type", "i18n", "unavailable", "reason_key"]
+			AssertEqual(Expected[Key], Row[Key], "The ordered checkbox identity and canonical caption stay shared.")
+		for Key in ["checked_when", "disabled_when", "platforms"] {
+			AssertEqual(Expected[Key].Length, Row[Key].Length)
+			for ValueIndex, Value in Expected[Key]
+				AssertEqual(Value, Row[Key][ValueIndex])
+		}
+		AssertFalse(_MR_IsForAhk(Row), "Windows still has no native preview bubble owner.")
+		Called := Map("count", 0)
+		Commands := Map(Row["id"], (*) => Called["count"] += 1)
+		Getters := Map("hotstrings." . Row["id"], (*) => true, "preview_presence_ready", (*) => true)
+		Native := MenuRenderer_CheckRow(Corpus["section"], Row["id"], Commands, Getters)
+		AssertFalse(Native is Map, "Unsupported native work cannot be acquired.")
+		Grey := _MR_CommandRowData(Row, Corpus["section"], Commands, Getters)
+		Assert(Grey is Map, "The shared renderer supplies a truthful grey stand-in.")
+		AssertEqual(Expected["reason_key"], Grey["disabled_reason_key"])
+		AssertFalse(Grey.Has("action"), "The stand-in has no mutation callback.")
+		AssertEqual(0, Called["count"], "Unsupported native work never executes.")
+		Assert(t(Row["reason_key"]) != Row["reason_key"], "The existing capability reason is translated.")
+	}
+}

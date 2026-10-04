@@ -5378,8 +5378,7 @@ id = "preview_bubbles"
 platforms = ["hs", "linux"]
 reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
-# The coloured-preview checkbox is a fixed shared row. The other preview
-# presence switches still arrive as provider data at their existing positions.
+# Preview checkbox declarations retain the existing presence/style positions.
 [[menu.preview_colored_control]]
 type = "check"
 id = "preview_colored_tooltips"
@@ -5398,6 +5397,28 @@ id = "preview_star_enabled"
 i18n = "menu.hotstrings.tooltip_magic"
 checked_when = ["hotstrings.preview_star_enabled"]
 disabled_when = ["preview_magic_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
+# Autocorrection and AI presence share one ordered checkbox declaration.
+# Native ports provide only current flags and acknowledged mutation owners.
+[[menu.preview_presence_controls]]
+type = "check"
+id = "preview_autocorrect_enabled"
+i18n = "menu.hotstrings.tooltip_autocorrect"
+checked_when = ["hotstrings.preview_autocorrect_enabled"]
+disabled_when = ["preview_presence_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
+[[menu.preview_presence_controls]]
+type = "check"
+id = "preview_ai_enabled"
+i18n = "menu.hotstrings.tooltip_ai"
+checked_when = ["hotstrings.preview_ai_enabled"]
+disabled_when = ["preview_presence_ready"]
 platforms = ["hs", "linux"]
 unavailable = "grey"
 reason_key = "platform_reason.preview_bubbles_are_lua_previews"

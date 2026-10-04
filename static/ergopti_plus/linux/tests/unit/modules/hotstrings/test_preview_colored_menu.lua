@@ -28,7 +28,7 @@ local function with_preferences(body)
 	if not ok then error(err, 0) end
 end
 
-local function menu_controls(paused, relabel, magic_relabel)
+local function menu_controls(paused, relabel, magic_relabel, presence_options)
 	local paths = require("infra.paths")
 	local i18n = require("infra.i18n")
 	local original = package.loaded["infra.manifest_menu"]
@@ -40,6 +40,11 @@ local function menu_controls(paused, relabel, magic_relabel)
 			local value = assert(require("json").decode(raw))
 			if relabel then value.preview_colored_control[1].i18n = "button.ok" end
 			if magic_relabel and value.preview_magic_control then value.preview_magic_control[1].i18n = "button.ok" end
+			if presence_options and value.preview_presence_controls then
+				local rows = value.preview_presence_controls
+				if presence_options.relabel then rows[1].i18n = "button.ok" end
+				if presence_options.reverse then rows[1], rows[2] = rows[2], rows[1] end
+			end
 			return value
 		end,
 		i18n = i18n,
@@ -295,6 +300,133 @@ helpers.describe("magic preview exact receipt boundary", function()
 			end
 			helpers.assert_eq(Settings.get("star"), false)
 			helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+		end)
+	end)
+end)
+
+
+helpers.describe("declared autocorrection and AI presence receipt", function()
+	for _, name in ipairs({ "autocorrect", "ai" }) do
+		local position = name == "autocorrect" and 2 or 3
+		helpers.it("retains the actual lease and source while " .. name .. " is refused", function()
+			with_preferences(function(Preferences, Settings, path, sandbox)
+				local lease = {}; assert(Preferences.acquire(lease))
+				local rows, _, observations = menu_controls(false)
+				local outcome = rows[position].fn()
+				assert(Preferences.release(lease))
+				helpers.assert_eq(outcome, false)
+				helpers.assert_eq(observations.redraws, 0)
+				helpers.assert_eq(Settings.get(name), false)
+				helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+			end)
+		end)
+		for _, mode in ipairs({ "false", "throw" }) do
+			helpers.it("retains physical " .. name .. " after writer " .. mode, function()
+				with_preferences(function(_, Settings, path, sandbox)
+					local Writer = require("toml_codec.writer"); local original = Writer.batch_write
+					Writer.batch_write = function() if mode == "throw" then error("injected refusal", 0) end; return false end
+					local result, redraws
+					local passed, err = pcall(function()
+						local rows, _, observed = menu_controls(false)
+						local entered, receipt = pcall(rows[position].fn); result = entered and receipt or false; redraws = observed.redraws
+					end)
+					Writer.batch_write = original
+					if not passed then error(err, 0) end
+					helpers.assert_eq(result, false)
+					helpers.assert_eq(redraws, 0)
+					helpers.assert_eq(Settings.get(name), false)
+					helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+				end)
+			end)
+		end
+		helpers.it("requires exact true rather than nil or a truthy number for " .. name, function()
+			with_preferences(function(_, Settings, path, sandbox)
+				local original = Settings.toggle; local observations = {}
+				local passed, err = pcall(function()
+					for _, mode in ipairs({ "nil", "number" }) do
+						Settings.toggle = function(candidate)
+							if candidate ~= name then return original(candidate) end
+							if mode == "nil" then return nil end
+							return 2
+						end
+						local rows, _, observed = menu_controls(false)
+						local entered, receipt = pcall(rows[position].fn)
+						observations[#observations + 1] = { entered = entered, receipt = receipt, redraws = observed.redraws }
+					end
+				end)
+				Settings.toggle = original
+				if not passed then error(err, 0) end
+				helpers.assert_eq(Settings.toggle, original)
+				helpers.assert_eq(#observations, 2)
+				for _, observed in ipairs(observations) do
+					helpers.assert_eq(observed.entered, true)
+					helpers.assert_eq(observed.receipt, false)
+					helpers.assert_eq(observed.redraws, 0)
+				end
+				helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+			end)
+		end)
+		helpers.it("acknowledges, redraws and reloads only " .. name .. " while configuration is paused", function()
+			with_preferences(function(Preferences, Settings, path, sandbox)
+				local rows, ctx, observed = menu_controls(false); ctx.paused = true
+				helpers.assert_eq(rows[position].fn(), true)
+				helpers.assert_eq(observed.redraws, 1)
+				assert(Preferences.refresh())
+				helpers.assert_eq(Settings.get(name), true)
+				local neighbour = name == "ai" and "autocorrect" or "ai"
+				helpers.assert_eq(Settings.get(neighbour), false)
+				helpers.assert_eq(Settings.get("colored"), true)
+				helpers.assert_true(sandbox.read_bytes(path):find('future = "kept" # retained', 1, true) ~= nil)
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("ordered presence provider locale contract", function()
+	helpers.it("uses all twenty-one actual catalogues in canonical and reversed declaration order", function()
+		with_preferences(function()
+			local i18n = require("infra.i18n")
+			local function read_json(path)
+				local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close()
+				return assert(require("json").decode(text))
+			end
+			local Paths = require("infra.paths")
+			local corpus = read_json(Paths.shared("tests/corpus/menus/preview_presence_controls.json"))
+			local observations = {}
+			local passed, err = pcall(function()
+				for _, code in ipairs(corpus.locales) do
+					local catalog = read_json(Paths.shared("data/locales/" .. code .. ".json"))
+					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
+					translated.get = function(key) return catalog[key] or key end
+					package.loaded["infra.i18n"] = translated
+					for _, reverse in ipairs({ false, true }) do
+						observations[#observations + 1] = { rows = menu_controls(false, false, false, { reverse = reverse }), catalog = catalog, reverse = reverse }
+					end
+				end
+			end)
+			package.loaded["infra.i18n"] = i18n
+			if not passed then error(err, 0) end
+			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
+			helpers.assert_eq(#observations, 42)
+			for _, observation in ipairs(observations) do
+				helpers.assert_eq(#observation.rows, 5)
+				for index, expected in ipairs(corpus.rows) do
+					local position = observation.reverse and (4 - index) or (index + 1)
+					helpers.assert_eq(observation.rows[position].title, observation.catalog[expected.i18n])
+					helpers.assert_eq(observation.rows[position].checked, false)
+				end
+				helpers.assert_eq(observation.rows[4].title, "-")
+				helpers.assert_eq(observation.rows[1].title, observation.catalog["menu.hotstrings.tooltip_magic"])
+				helpers.assert_eq(observation.rows[5].title, observation.catalog["menu.hotstrings.tooltip_colored"])
+			end
+		end)
+	end)
+	helpers.it("consumes the current declaration label rather than a cached native caption", function()
+		with_preferences(function()
+			local rows = menu_controls(false, false, false, { relabel = true })
+			helpers.assert_eq(rows[2].title, require("infra.i18n").get("button.ok"))
+			helpers.assert_eq(rows[3].title, require("infra.i18n").get("menu.hotstrings.tooltip_ai"))
 		end)
 	end)
 end)
