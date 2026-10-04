@@ -503,11 +503,16 @@ local function _fetch_releases(channel, callback)
 		return false
 	end
 	local chunks, terminal, all_unchanged = {}, false, true
+	local active_key
 	local cancel
 	-- reason: the updater.check_result reason a failure is shown with
 	local function finish(body, status, err, reason)
 		if terminal then return end
 		terminal = true
+		-- Native etag_save can advance its file before transport/JSON acceptance.
+		-- A failed page must fetch fully next time, never pair that file with its
+		-- older cached body. Successfully accepted pages retain their association.
+		if body == nil and active_key then _list_cache[active_key] = nil end
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
 		callback(body, status, err, reason)
 	end
@@ -517,6 +522,7 @@ local function _fetch_releases(channel, callback)
 	fetch_page = function(page)
 		local url, headers, options = M._build_fetch_request(channel, page)
 		local key = channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE
+		active_key = key
 		local answered = false
 		local sent = M._http_client.get(url, headers, options, function(result)
 			if terminal or answered then return end
