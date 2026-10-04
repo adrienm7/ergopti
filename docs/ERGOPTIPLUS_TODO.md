@@ -1075,10 +1075,22 @@ These are software implementations; final hardware verification remains below.
   cases remain unchanged; 34 added real-file cases give original 15/33 and
   corrected 48/0 on LuaJIT and Lua5.4, including shared-participant global
   recommendation/clear refusal and rejected apply-time fence release before
-  advancing to another category. Local selected and hosted native qualification
-  remain pending. The macOS sibling still discards refused layer cleanup and
-  does not compose a created layer's inverse into global settings restoration;
-  this candidate does not complete item 5 or establish physical-device behavior.
+  advancing to another category. Selected local verification passed 356 JS
+  checks, 13,886 portable macOS and 6,554 Linux unit cases, plus both driver E2E
+  suites. Hosted native and physical-device qualification remain pending.
+
+  The macOS recommended Tap-Hold scope now retains its exact layers.toml
+  import in the remap bulk journal: backup precedes import, inverse cleanup must
+  be acknowledged before regeneration, and failed cleanup remains retryable.
+  The global participant retains the successful scope receipt and restores that
+  sibling on a later category refusal; a failed parent inverse restores its own
+  removed import before compiling the pre-inverse settings. Observed source changes
+  refuse cleanup; the native unlink boundary still needs cooperative locking.
+  Native recovery alone cannot acknowledge the parent's
+  still-owed inverse. Portable actual-owner tests control filesystem, Karabiner
+  and later-category boundaries; they do not qualify physical macOS input.
+  Full native units, E2E, packaging, installation and real-device validation
+  remain required with the final shared layer-removal prerequisite.
 
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
