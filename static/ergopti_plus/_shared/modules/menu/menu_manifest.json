@@ -1813,6 +1813,14 @@
 			"disabled_when": [
 				"word_expanders_ready"
 			]
+		},
+		{
+			"type": "command",
+			"id": "word_expander_add",
+			"i18n": "menu.hotstrings.add_delimiter",
+			"disabled_when": [
+				"word_expanders_ready"
+			]
 		}
 	],
 	"hotstrings_params_group": [

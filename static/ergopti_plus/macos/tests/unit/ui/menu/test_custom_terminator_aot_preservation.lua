@@ -59,7 +59,7 @@ local function with_fixture(callback)
 		local calls = { writes = 0, updates = 0 }
 		package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {
-			text_prompt = function() return "OK", "☂" end,
+			text_prompt = function(_, _, _, accept_label) return accept_label, "☂" end,
 			block_alert = function(_, body)
 				return body == "dialog.hotstrings.consume_body" and "dialog.hotstrings.consume_no" or "button.delete"
 			end,
@@ -162,7 +162,7 @@ helpers.describe("hand-written delimiter records through the management owner", 
 		end)
 	end)
 	for _, action in ipairs({ "add_custom", "delete_expander" }) do
-		local label = action == "delete_expander" and "menu.hotstrings.delete_delimiter" or "menu.hotstrings." .. action
+		local label = action == "delete_expander" and "menu.hotstrings.delete_delimiter" or "menu.hotstrings.add_delimiter"
 		helpers.it("preserves the untouched AoT sibling through " .. action, function()
 			with_fixture(function(fixture)
 				local row = find_row(fixture.rows, label)
