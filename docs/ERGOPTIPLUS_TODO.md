@@ -1557,6 +1557,19 @@ context, log-sink binding and physical holds, bounded recovery, controlled async
 shutdown, native and real-Mac acceptance are still required before completing
 WP3 or enabling the owned runtime.
 
+WP4 remains partial. The diagnostic producer now retains usage page in its
+internal inventory, reconciliation and immutable snapshots. A changed page on
+an admitted element cookie faults the exact state and interrupts its lease;
+an unrelated auxiliary cookie remains auxiliary. Its native acquisition still
+filters page 7, and baseline v1 refuses non-page-7 snapshots rather than losing
+identity on serialization. Existing wire fields, fixture-only coverage and the
+independent native JSON corpora are unchanged. Two actual C++ regressions failed
+against the original producer; six complete matching programs pass under both
+C++17 and C++23 with warnings treated as errors. Native probe/producer compilation
+and per-device keyboard-type classification remain pending. The consumer still
+requires baseline v2 and the native contract continues to refuse that mismatch;
+this prerequisite does not enable consumer or physical acceptance.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
