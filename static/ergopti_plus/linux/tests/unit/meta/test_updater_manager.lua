@@ -733,6 +733,36 @@ helpers.describe("modules/updater/manager.lua", function()
 		end
 	end
 
+	for _, api in ipairs({ "update", "release" }) do
+		for _, wants_callback in ipairs({ true, false }) do
+			helpers.it("linux-updater-temp-allocation: " .. api .. " acknowledges allocator refusal with callback " .. tostring(wants_callback), function()
+				M.cancel_update()
+				local release = { tag = "v4.0.0", download_url = "https://example.invalid/archive",
+					checksum_url = "https://example.invalid/checksum" }
+				M._test_set_cached_release(release)
+				local real_tmpname, real_http = os.tmpname, M._http_client
+				os.tmpname = function() error("synthetic native allocator refusal") end
+				M._http_client = { get = function() error("allocation refusal must precede HTTP") end, cancel = function() return true end }
+				local callbacks, received_error = 0, nil
+				local callback
+				if wants_callback then callback = function(path, err) callbacks = callbacks + 1; received_error = err; helpers.assert_nil(path) end end
+				local ok, err = xpcall(function()
+					local dispatched
+					if api == "update" then dispatched = M.download_update(nil, callback)
+					else dispatched = M.download_release(release, callback) end
+					helpers.assert_eq(dispatched, false)
+					helpers.assert_eq(callbacks, wants_callback and 1 or 0)
+					if wants_callback then helpers.assert_eq(received_error, "temporary path unavailable") end
+					helpers.assert_eq(M.get_state(), "available")
+					helpers.assert_eq(M.get_cached_release().tag, release.tag)
+				end, debug.traceback)
+				os.tmpname, M._http_client = real_tmpname, real_http
+				M.cancel_update()
+				helpers.assert_true(ok, tostring(err))
+			end)
+		end
+	end
+
 	helpers.it("downloads, hashes and publishes only a verified archive", function()
 		local real_http = M._http_client
 		local real_digest = M._file_digest

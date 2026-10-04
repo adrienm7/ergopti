@@ -414,6 +414,14 @@ jobs:
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_ownership_receipts.py
         timeout-minutes: 2
 
+      - name: Acknowledge native updater temporary-allocation refusals
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_updater_temp_allocation_receipts.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_allocation_receipts.py
+        timeout-minutes: 1
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
