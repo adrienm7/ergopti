@@ -39,6 +39,10 @@
  */
 const GENERATORS = [
 	{
+		script: 'codegen/codegen-ollama-release.cjs',
+		outputs: ['static/ergopti_plus/macos/modules/llm/ollama-release.sh']
+	},
+	{
 		script: 'codegen/codegen-linux-native-runtime.cjs',
 		outputs: [
 			'static/ergopti_plus/linux/_generated/native_runtime.lua',
