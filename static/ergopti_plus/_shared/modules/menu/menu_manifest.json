@@ -1077,6 +1077,23 @@
 			"id": "extensions_shortcuts"
 		}
 	],
+	"selection_caps_word_control": [
+		{
+			"type": "check",
+			"id": "selection_caps_word",
+			"i18n": "sg_actions.caps_word",
+			"checked_when": [
+				"selection_caps_word_active"
+			],
+			"disabled_when": [
+				"selection_caps_word_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"key_combinations_group": [
 		{
 			"type": "toggle",

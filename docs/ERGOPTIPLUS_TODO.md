@@ -1310,6 +1310,8 @@ The optional category Open file command now comes from one shared declaration on
 
 The existing Linux category-count/tick fixture now locates the declared enable-all command by its canonical shared ID and current translated label instead of positional file slot 3. All original assertions remain intact; unique/actionable-row checks strengthen the original clickable assertion. The complete existing module fails5/1 with its old selector and passes6/0 with the correction; greying the actual enable-all command still fails5/1. The original12 candidate files and patch prefix are unchanged. Final composed validation and hosted native UI remain pending.
 
+Linux selection operations now consume the shared CapsWord checkbox with its existing translated label, live checked state and intentional Linux-only scope. The callback rechecks the actual configuration reservation and redraws only after the runtime owner returns exactly true. The owner rechecks reservation after protected shortcut-metric delivery, preserving a reservation acquired by a reentrant callback. The current master/pause policies, configuration bytes and Windows/macOS binding owners are unchanged. Actual registered Linux owner/menu tests, independent platform/state corpus and causal original/mutation failures are qualified; complete verify-change and three-OS packaging/install CI remain required.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

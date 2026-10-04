@@ -3045,7 +3045,6 @@ local function _build_shortcuts(ctx)
 	end
 
 	local enabled = sc.is_enabled()
-	local caps_active = sc.is_caps_word_active()
 	local items = {}
 
 	-- The gate row is the manifest's first row and the shared renderer builds it,
@@ -3056,18 +3055,27 @@ local function _build_shortcuts(ctx)
 	-- they were seven rows of a SHARED menu that no manifest described, so no
 	-- gate could compare them with what the other two drivers offer, and the
 	-- renderer had nothing to place.
-	local selection_rows = {
-		{
-			label   = i18n_safe("sg_actions.caps_word"),
-			checked = caps_active,
-			action  = function()
-				sc.toggle_caps_word()
-				Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
-		},
-		{ separator = true },
-	}
+	local function caps_word_ready()
+		return type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc.toggle_caps_word) == "function" and type(sc.is_caps_word_active) == "function"
+			and type(sc.is_caps_word_active()) == "boolean"
+	end
+	local selection_rows = {}
+	local caps_row = ManifestMenu.check_row("selection_caps_word_control", "selection_caps_word", {
+		["selection_caps_word"] = function()
+			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
+			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end,
+	}, {
+		["selection_caps_word_active"] = function()
+			return type(sc.is_caps_word_active) == "function" and sc.is_caps_word_active() == true
+		end,
+		["selection_caps_word_ready"] = caps_word_ready,
+	})
+	if caps_row then selection_rows[#selection_rows + 1] = caps_row end
+	selection_rows[#selection_rows + 1] = { separator = true }
 	for _, transform in ipairs({
 		{ key = "menu.shortcuts.to_uppercase", run = sc.transform_uppercase },
 		{ key = "menu.shortcuts.to_lowercase", run = sc.transform_lowercase },

@@ -330,12 +330,16 @@ function M.is_caps_word_active()
 end
 
 --- Toggles CapsWord on/off via the menu.
+--- @return boolean True only after runtime state publication.
 function M.toggle_caps_word()
 	if _configuration_owner ~= nil then return false end
 	record("caps_word")
+	-- Metric delivery is protected external code and can reserve configuration.
+	if _configuration_owner ~= nil then return false end
 	_caps_word_active = not _caps_word_active
 	_caps_word_triggered = false
 	Logger.info(LOG, "CapsWord: %s", _caps_word_active and "ON" or "OFF")
+	return true
 end
 
 --- Processes a character for CapsWord.

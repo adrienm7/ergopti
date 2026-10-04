@@ -1,0 +1,40 @@
+{
+	"label_key": "sg_actions.caps_word",
+	"section": "selection_caps_word_control",
+	"id": "selection_caps_word",
+	"platforms": [
+		{ "platform": "linux", "rows": 1 },
+		{ "platform": "hs", "rows": 0 },
+		{ "platform": "ahk", "rows": 0 }
+	],
+	"states": [
+		{
+			"name": "off",
+			"active": false,
+			"reserved": false,
+			"checked": false,
+			"disabled": false
+		},
+		{
+			"name": "on",
+			"active": true,
+			"reserved": false,
+			"checked": true,
+			"disabled": false
+		},
+		{
+			"name": "reserved-off",
+			"active": false,
+			"reserved": true,
+			"checked": false,
+			"disabled": true
+		},
+		{
+			"name": "reserved-on",
+			"active": true,
+			"reserved": true,
+			"checked": true,
+			"disabled": true
+		}
+	]
+}

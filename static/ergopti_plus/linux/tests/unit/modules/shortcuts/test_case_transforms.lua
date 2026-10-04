@@ -81,3 +81,203 @@ helpers.describe("shortcut case transforms", function()
 		end)
 	end)
 end)
+
+--- Initializes the real configuration reservation and builds its actual tray row.
+--- Native selection/clipboard ports remain the case fixture's boundaries.
+--- @param body function
+local function with_caps_word_menu(body)
+	with_manager("unused", function(manager)
+		require("test.config_unused_keys_contract").sandbox.with_config(
+			'[shortcuts]\nenabled = false\n[foreign]\nvalue = "keep"\n', function(path)
+				manager.init({ persist = true, config_path = path })
+				local changed = { count = 0 }
+				local builder = helpers.load_module("ui.menu.menu_builder")
+				local function row()
+					local rows = builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
+						paused = false, is_paused = function() return true end,
+						on_quit = function() end,
+						on_menu_changed = function() changed.count = changed.count + 1 end,
+					})
+					local label = require("infra.i18n").get("sg_actions.caps_word")
+					local function find(items)
+						for _, item in ipairs(items or {}) do
+							if item.title == label then return item end
+							local nested = find(item.menu)
+							if nested then return nested end
+						end
+					end
+					return find(rows)
+				end
+				local original = require("test.config_unused_keys_contract").sandbox.read_bytes(path)
+				body(manager, row, changed)
+				helpers.assert_eq(require("test.config_unused_keys_contract").sandbox.read_bytes(path), original,
+					"CapsWord is runtime state and must leave every configuration byte untouched")
+			end)
+	end)
+end
+
+helpers.describe("CapsWord selection checkbox ownership", function()
+	local path = require("infra.paths").shared("tests/corpus/menus/linux_caps_word.json")
+	local file = assert(io.open(path, "rb"))
+	local corpus = require("json").decode(file:read("*a"))
+	file:close()
+
+	for _, vector in ipairs(corpus.states) do
+		helpers.it("renders the shared state " .. vector.name .. " (selection-caps-word)", function()
+			with_caps_word_menu(function(manager, row)
+				if vector.active then manager.toggle_caps_word() end
+				local owner = {}
+				if vector.reserved then helpers.assert_eq(manager.acquire_configuration(owner), true) end
+				local item = row()
+				helpers.assert_type(item, "table", "the declared CapsWord checkbox must remain present")
+				helpers.assert_eq(item.title, require("infra.i18n").get(corpus.label_key))
+				helpers.assert_eq(item.checked, vector.checked)
+				helpers.assert_eq(item.disabled == true, vector.disabled)
+				if vector.reserved then helpers.assert_eq(manager.release_configuration(owner), true) end
+			end)
+		end)
+	end
+
+	helpers.it("returns an exact publication receipt from the actual native owner (selection-caps-word)", function()
+		with_caps_word_menu(function(manager)
+			helpers.assert_eq(manager.toggle_caps_word(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), true)
+			local owner = {}
+			helpers.assert_eq(manager.acquire_configuration(owner), true)
+			helpers.assert_eq(manager.toggle_caps_word(), false)
+			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_active, true)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+			helpers.assert_eq(manager.toggle_caps_word(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), false)
+		end)
+	end)
+
+	helpers.it("acknowledges the published state before menu refresh after live pause while shortcuts are off (selection-caps-word)", function()
+		with_caps_word_menu(function(manager, row, changed)
+			local item = row()
+			helpers.assert_eq(item.disabled == true, false)
+			helpers.assert_eq(item.fn(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), true)
+			helpers.assert_eq(changed.count, 1)
+			helpers.assert_eq(row().checked, true)
+			helpers.assert_eq(row().fn(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), false)
+			helpers.assert_eq(changed.count, 2)
+		end)
+	end)
+
+	helpers.it("toggles the latest published state rather than the retained checkmark (selection-caps-word)", function()
+		with_caps_word_menu(function(manager, row, changed)
+			local held = row().fn
+			helpers.assert_eq(manager.toggle_caps_word(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), true)
+			helpers.assert_eq(held(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), false)
+			helpers.assert_eq(changed.count, 1)
+		end)
+	end)
+
+	helpers.it("refuses a retained callback while the actual configuration owner holds it (selection-caps-word)", function()
+		with_caps_word_menu(function(manager, row, changed)
+			local held = row().fn
+			local owner = {}
+			helpers.assert_eq(manager.acquire_configuration(owner), true)
+			helpers.assert_eq(held(), false)
+			helpers.assert_eq(manager.is_caps_word_active(), false)
+			helpers.assert_eq(changed.count, 0)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+			helpers.assert_eq(row().fn(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), true)
+			helpers.assert_eq(changed.count, 1)
+		end)
+	end)
+
+	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" },
+		{ name = "zero", value = 0 }, { name = "truthy-string", value = "ack" } }) do
+		helpers.it("does not refresh after the native owner's " .. receipt.name .. " receipt (selection-caps-word)", function()
+			with_caps_word_menu(function(manager, row, changed)
+				local calls = 0
+				manager.toggle_caps_word = function() calls = calls + 1; return receipt.value end
+				local returned = row().fn()
+				helpers.assert_eq(returned, false)
+				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(changed.count, 0)
+				helpers.assert_eq(manager.is_caps_word_active(), false)
+			end)
+		end)
+	end
+
+	helpers.it("rechecks a real reservation acquired inside protected metric delivery (selection-caps-word)", function()
+		with_caps_word_menu(function(manager, row, changed)
+			local owner, observed = {}, {}
+			package.loaded["modules.keylogger.keylogger"].record_shortcut = function(_, key)
+				observed.key = key
+				observed.acquired = manager.acquire_configuration(owner)
+			end
+			local returned = row().fn()
+			helpers.assert_eq(observed.key, "caps_word")
+			helpers.assert_eq(observed.acquired, true)
+			helpers.assert_eq(manager.is_caps_word_active(), false)
+			helpers.assert_eq(returned, false)
+			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_triggered, false)
+			helpers.assert_eq(changed.count, 0)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+			package.loaded["modules.keylogger.keylogger"].record_shortcut = function() end
+			helpers.assert_eq(row().fn(), true)
+			helpers.assert_eq(manager.is_caps_word_active(), true)
+		end)
+	end)
+
+	helpers.it("keeps a metric callback's acknowledged reservation even when it throws (selection-caps-word)", function()
+		with_caps_word_menu(function(manager, row, changed)
+			local owner, observed = {}, {}
+			package.loaded["modules.keylogger.keylogger"].record_shortcut = function()
+				observed.acquired = manager.acquire_configuration(owner)
+				error("controlled metric failure after reservation")
+			end
+			local returned = row().fn()
+			helpers.assert_eq(observed.acquired, true)
+			helpers.assert_eq(manager.is_caps_word_active(), false)
+			helpers.assert_eq(returned, false)
+			helpers.assert_eq(changed.count, 0)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+		end)
+	end)
+
+	helpers.it("refuses missing or malformed native readiness instead of borrowing a default (selection-caps-word)", function()
+		with_caps_word_menu(function(manager, row, changed)
+			local calls = 0
+			manager.toggle_caps_word = function() calls = calls + 1; return true end
+			for _, invalid in ipairs({ { value = nil }, { value = false }, { value = function() return 1 end } }) do
+				manager.configuration_admitted = invalid.value
+				local item = row()
+				helpers.assert_eq(item.disabled, true)
+				helpers.assert_type(item.fn, "function", "retained native callbacks remain guarded even when disabled")
+				helpers.assert_eq(item.fn(), false)
+			end
+			helpers.assert_eq(calls, 0)
+			helpers.assert_eq(changed.count, 0)
+		end)
+	end)
+
+	for _, vector in ipairs(corpus.platforms) do
+		helpers.it("keeps the existing " .. vector.platform .. " platform boundary (selection-caps-word)", function()
+			local renderer = assert(require("menu.renderer").new({ platform = vector.platform,
+				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+				json_decode = require("json").decode, i18n = require("infra.i18n"),
+				logger = require("logger.shim"),
+			}))
+			local rows = renderer.build(corpus.section, "CapsWord", nil, nil, {
+				commands = { [corpus.id] = function() return true end },
+				state_getters = { selection_caps_word_active = function() return false end,
+					selection_caps_word_ready = function() return true end },
+			})
+			helpers.assert_eq(#rows, vector.rows)
+			if vector.rows > 0 then
+				helpers.assert_eq(rows[1].title, require("infra.i18n").get(corpus.label_key))
+				helpers.assert_eq(rows[1].checked, false)
+				helpers.assert_type(rows[1].fn, "function")
+			end
+		end)
+	end
+end)
