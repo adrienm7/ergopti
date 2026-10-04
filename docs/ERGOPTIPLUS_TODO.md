@@ -2499,6 +2499,18 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 Added a test-only characterization prerequisite for the legacy Windows Ergopti+ switch: all six historical AltGr descriptors are compared with independently frozen selected-layout neutral outputs, and eight SC012 roll cases execute exact production helper definitions in an owned native child. The reviewed TODO107 test prefix and historical golden remain byte-exact. Shift percent/ligature and whitespace deviations, wrapping requests, and configurable word spacing are recorded without claiming equivalence. Portable source/corpus contracts and scoped convention/encoding/loop checks passed; native AHK interpretation, owned child retirement, physical hotkey precedence, recent-chevron timing and final root verification remain pending. The switch, defaults, settings, migrations and all production/layout data are unchanged; TODO96 remains partial.
 
+Current-owner inspection distinguishes the raw KLE characterization from actual
+picker selection: `LayoutManager_Select` still selects the built-in Ergopti+
+through `ergopti_base`/`ergopti_plus` and an empty `emulated_layout`.
+Removing its separate option therefore also requires a proved picker handoff.
+The frozen matrix records wrapping, configurable word spacing and shifted
+ligature/percent/whitespace differences; these effects are not established as
+redundant. A legacy true value with the base/AltGr gates false can affect only
+three keys, so migrating it blindly to a complete layout would change unrelated
+keys. Occupied layout selections and absent, false or malformed values need
+independent migration vectors. No production switch or migration is retired
+until the actual selected-layout contract is qualified.
+
 - [ ] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
       user-owned entries, empty by default and offering "+ Add". Let a user on
       any keyboard layout choose an action from the shared catalogue or enter
