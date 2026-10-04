@@ -60,7 +60,7 @@ local function with_stubbed_sqlite(responder, body)
 	local previous_reader = package.loaded[reader_name]
 	local previous_popen = io.popen
 
-	local statements = {}
+	local statements, commands = {}, {}
 	local next_body = ""
 
 	package.loaded[command_name] = {
@@ -74,7 +74,9 @@ local function with_stubbed_sqlite(responder, body)
 				next_body = body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n"
 			end
 			-- Preserve the real builder/parser ABI; only the CLI response is fake.
-			return NativeCommand.build(_path, sql, opts)
+			local command, reason = NativeCommand.build(_path, sql, opts)
+			commands[#commands + 1] = command
+			return command, reason
 		end,
 		read_exit_receipt = NativeCommand.read_exit_receipt,
 		sanitise_error = NativeCommand.sanitise_error,
@@ -97,8 +99,25 @@ local function with_stubbed_sqlite(responder, body)
 	package.loaded[command_name] = previous_command
 	package.loaded[reader_name] = previous_reader
 	helpers.assert_true(ok, "the projection must complete: " .. tostring(err))
-	return statements
+	return statements, commands
 end
+
+helpers.describe("linux-sqlite-readonly", function()
+	for _, method in ipairs({ "read_system_days", "read_manifest", "read_ngrams", "read_range_split_today" }) do
+		helpers.it("linux-sqlite-readonly: " .. method .. " opens every source through native readonly JSON", function()
+			local statements, commands = with_stubbed_sqlite(function() return "[]" end, function(reader)
+				local result = reader[method]("/db/metrics.sqlite", "2026-10-03", "2026-10-03", {})
+				helpers.assert_type(result, "table")
+			end)
+			helpers.assert_true(#commands > 0 and #commands == #statements, "the selected public API must actually dispatch every query")
+			for _, command in ipairs(commands) do
+				helpers.assert_contains(command, "'-readonly'", "projection must refuse creation at SQLite open, before SQL executes")
+				helpers.assert_contains(command, "'-json'", "readonly open must retain the real output ABI")
+				helpers.assert_contains(command, "'/db/metrics.sqlite'")
+			end
+		end)
+	end
+end)
 
 helpers.describe("linux-sqlite-read-receipts", function()
 	for _, status in ipairs({ 1, 7, 127, 137, 255 }) do

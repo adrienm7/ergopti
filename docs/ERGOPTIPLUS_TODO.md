@@ -733,6 +733,21 @@ These are software implementations; final hardware verification remains below.
   their actual embedded-NUL bridges remain unvalidated with their native owners.
   No schema, encryption format, TOML, reserved menu/title source, cross-OS native
   gate, physical input or manual CI was modified or exercised.
+- [~] **L56.** Linux dashboard read-only SQLite opens: request native -readonly
+  before querying every source rather than relying on SELECT statements.
+  Each of the four public projection APIs previously created an absent database
+  and followed a dangling alias to create its foreign target. All eight native
+  failures now refuse creation, retain exact link identity/target and preserve
+  stable empty projection envelopes; thirty native read receipts pass on LuaJIT
+  and Lua 5.4 without weakening earlier exit/signal/complete-output controls.
+  Four simulated-CLI unit regressions cover every dispatched query's readonly
+  open and JSON ABI, and the older source assertion now requires both flags.
+  macOS opens its file with default flags before query_only, so its native owner
+  must qualify the same missing-source case and apply open-time readonly if
+  confirmed. Windows intentionally builds private in-memory reader candidates
+  rather than opening this canonical disk store. Existing WAL sidecar behavior
+  is separate from these absent-source checks. No reserved source, TOML,
+  cross-OS native gate, physical input or manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

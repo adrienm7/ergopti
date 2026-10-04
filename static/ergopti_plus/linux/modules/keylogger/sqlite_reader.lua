@@ -50,7 +50,9 @@ local function read_rows(sqlite_path, sql)
 	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {} end
 	-- Same rule as the writer: the script goes on stdin, never through a file in
 	-- a world-writable directory.
-	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-json" }, capture_exit = true })
+	-- Readonly is an open-time property: SELECT alone still creates a missing
+	-- database (or a dangling alias target) under SQLite's default create mode.
+	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-readonly", "-json" }, capture_exit = true })
 	if not cmd then return {} end
 	local pipe = io.popen(cmd, "r")
 	if not pipe then return {} end
