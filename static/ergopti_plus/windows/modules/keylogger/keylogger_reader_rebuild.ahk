@@ -203,12 +203,12 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 			if !IsObject(Ledger)
 				break
 			_KLR_RebuildStep(State, Ledger)
-			if !LastRound || TickElapsed(LastRound, _KLR_RebuildNow()) >= KLRRebuild.round_interval_ms {
+			if !LastRound || TickElapsed64(LastRound, _KLR_RebuildNow()) >= KLRRebuild.round_interval_ms {
 				_KLR_RebuildRound(State, false)
 				LastRound := _KLR_RebuildNow()
 				; Checkpoint only right after a round: every completed day is then
 				; rolled up, so the stored boundary is exact.
-				if TickElapsed(LastCheckpoint, _KLR_RebuildNow()) >= KLRRebuild.checkpoint_interval_ms {
+				if TickElapsed64(LastCheckpoint, _KLR_RebuildNow()) >= KLRRebuild.checkpoint_interval_ms {
 					_KLR_RebuildCheckpoint(State)
 					LastCheckpoint := _KLR_RebuildNow()
 				}
@@ -232,8 +232,8 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 			Snapshots[Ledger["path"]] := Ledger["snapshot"]
 		}
 		KLW_ResetBatch()
-		KLR_PrefetchDebug(logPath, "KLR newest-first rebuild in " . TickElapsed(StartTick, _KLR_RebuildNow()) . "ms")
-		try LoggerSuccess("KLReader", "Newest-first metrics rebuild finished in {1} ms.", TickElapsed(StartTick, _KLR_RebuildNow()))
+		KLR_PrefetchDebug(logPath, "KLR newest-first rebuild in " . TickElapsed64(StartTick, _KLR_RebuildNow()) . "ms")
+		try LoggerSuccess("KLReader", "Newest-first metrics rebuild finished in {1} ms.", TickElapsed64(StartTick, _KLR_RebuildNow()))
 		Owned := false
 		return Map("ok", true, "db", db, "sizes", Sizes, "snapshots", Snapshots,
 			"checkpoint", KLR_RebuildCheckpointPath(md))
@@ -583,7 +583,7 @@ _KLR_RebuildNotify(State, Final, AfterRound := true) {
 		"total_bytes", _KLR_RebuildTotalBytes(State),
 		"done_bytes", Done,
 		"run_bytes", Done - State["resumed_bytes"],
-		"elapsed_ms", TickElapsed(State["run_start"], _KLR_RebuildNow()),
+		"elapsed_ms", TickElapsed64(State["run_start"], _KLR_RebuildNow()),
 		"oldest_complete", State["oldest_complete"],
 		"newest_complete", State["newest_complete"])
 	if AfterRound
@@ -643,7 +643,7 @@ _KLR_RebuildCheckpoint(State) {
 		try LoggerWarn("KLReader", "Metrics rebuild checkpoint could not be written; the rebuild continues.")
 		return false
 	}
-	KLR_PrefetchDebug(State["log"], "KLR rebuild checkpoint in " . TickElapsed(Tick, _KLR_RebuildNow()) . "ms at "
+	KLR_PrefetchDebug(State["log"], "KLR rebuild checkpoint in " . TickElapsed64(Tick, _KLR_RebuildNow()) . "ms at "
 		. _KLR_RebuildDoneBytes(State) . " byte(s)")
 	return true
 }
