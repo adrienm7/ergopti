@@ -16,8 +16,14 @@ final class KeyboardCharacterMappingTests: XCTestCase {
 	func testFreshKeyboardEventsFollowLayoutAndShiftFlags() throws {
 		try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == "true",
 			"The layout-switching probe is restricted to disposable CI hosts")
+		let diagnostics = KeyboardSourceTestDiagnostics(name)
+		defer { diagnostics.emit() }
 		let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-		defer { XCTAssertEqual(TISSelectInputSource(original), noErr) }
+		diagnostics.record("original.capture", original: original)
+		defer {
+			let status = diagnostics.nativeCall("restore.outer", original: original) { TISSelectInputSource(original) }
+			XCTAssertEqual(status, noErr)
+		}
 		let source = try XCTUnwrap(CGEventSource(stateID: .privateState))
 		for (identifier, plain, shifted) in [
 			("com.apple.keylayout.US", "a", "A"),
@@ -28,13 +34,24 @@ final class KeyboardCharacterMappingTests: XCTestCase {
 			let input = try XCTUnwrap(inputs.first, "Missing fixture layout: \(identifier)")
 			let enabledPointer = try XCTUnwrap(TISGetInputSourceProperty(input, kTISPropertyInputSourceIsEnabled))
 			let wasEnabled = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(enabledPointer).takeUnretainedValue())
-			if !wasEnabled { XCTAssertEqual(TISEnableInputSource(input), noErr) }
-			defer {
-				XCTAssertEqual(TISSelectInputSource(original), noErr)
-				if !wasEnabled { XCTAssertEqual(TISDisableInputSource(input), noErr) }
+			diagnostics.record("target.inventory", original: original, target: input)
+			if !wasEnabled {
+				let status = diagnostics.nativeCall("enable", original: original, target: input) { TISEnableInputSource(input) }
+				XCTAssertEqual(status, noErr)
 			}
-			XCTAssertEqual(TISSelectInputSource(input), noErr)
+			defer {
+				let status = diagnostics.nativeCall("restore.inner", original: original, target: input) { TISSelectInputSource(original) }
+				XCTAssertEqual(status, noErr)
+				if !wasEnabled {
+					let disabled = diagnostics.nativeCall("disable", original: original, target: input) { TISDisableInputSource(input) }
+					XCTAssertEqual(disabled, noErr)
+				}
+			}
+			let status = diagnostics.nativeCall("select", original: original, target: input) { TISSelectInputSource(input) }
+			XCTAssertEqual(status, noErr)
 			for (flags, expected) in [(CGEventFlags(), plain), (.maskShift, shifted)] {
+				diagnostics.record("event.before", original: original, target: input)
+				defer { diagnostics.record("event.after", original: original, target: input) }
 				let event = try XCTUnwrap(CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true))
 				event.flags = flags
 				let native = try XCTUnwrap(NSEvent(cgEvent: event))

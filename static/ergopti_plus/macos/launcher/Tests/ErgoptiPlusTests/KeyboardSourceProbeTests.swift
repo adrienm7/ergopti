@@ -14,23 +14,40 @@ import XCTest
 @testable import ErgoptiPlus
 
 final class KeyboardSourceProbeTests: XCTestCase {
-	private func withSelectedSource(_ identifier: String, _ body: () throws -> Void) throws {
+	private func withSelectedSource(_ identifier: String, _ body: (KeyboardSourceTestDiagnostics) throws -> Void) throws {
 		try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == "true",
 			"Input-source switching is restricted to disposable CI hosts")
+		let diagnostics = KeyboardSourceTestDiagnostics(name + ":" + identifier)
+		defer { diagnostics.emit() }
 		let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-		defer { XCTAssertEqual(TISSelectInputSource(original), noErr) }
+		diagnostics.record("original.capture", original: original)
+		defer {
+			let status = diagnostics.nativeCall("restore.outer", original: original) { TISSelectInputSource(original) }
+			XCTAssertEqual(status, noErr)
+		}
 		let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
 		let sources = TISCreateInputSourceList(filter, true).takeRetainedValue() as! [TISInputSource]
 		let source = try XCTUnwrap(sources.first, "Missing native fixture: \(identifier)")
 		let pointer = try XCTUnwrap(TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled))
 		let wasEnabled = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(pointer).takeUnretainedValue())
-		if !wasEnabled { XCTAssertEqual(TISEnableInputSource(source), noErr) }
-		defer {
-			XCTAssertEqual(TISSelectInputSource(original), noErr)
-			if !wasEnabled { XCTAssertEqual(TISDisableInputSource(source), noErr) }
+		diagnostics.record("target.inventory", original: original, target: source)
+		if !wasEnabled {
+			let status = diagnostics.nativeCall("enable", original: original, target: source) { TISEnableInputSource(source) }
+			XCTAssertEqual(status, noErr)
 		}
-		XCTAssertEqual(TISSelectInputSource(source), noErr)
-		try body()
+		defer {
+			let status = diagnostics.nativeCall("restore.inner", original: original, target: source) { TISSelectInputSource(original) }
+			XCTAssertEqual(status, noErr)
+			if !wasEnabled {
+				let disabled = diagnostics.nativeCall("disable", original: original, target: source) { TISDisableInputSource(source) }
+				XCTAssertEqual(disabled, noErr)
+			}
+		}
+		let status = diagnostics.nativeCall("select", original: original, target: source) { TISSelectInputSource(source) }
+		XCTAssertEqual(status, noErr)
+		diagnostics.record("body.before", original: original, target: source)
+		defer { diagnostics.record("body.after", original: original, target: source) }
+		try body(diagnostics)
 	}
 
 	func testActualSelectedSourcesProveDirectPunctuationAndRejectDeadAccent() throws {
@@ -38,8 +55,8 @@ final class KeyboardSourceProbeTests: XCTestCase {
 			("com.apple.keylayout.US", UInt16(41), ";"),
 			("com.apple.keylayout.French", UInt16(39), "ù"),
 		] {
-			try withSelectedSource(identifier) {
-				let receipt = try probeSelectedKeyboardSource(
+			try withSelectedSource(identifier) { diagnostics in
+				let receipt = try diagnostics.probe(
 					KeyboardSourceProbeInvocation(sourceID: identifier, codes: [code]))
 				XCTAssertEqual(receipt.sourceID, identifier)
 				XCTAssertEqual(receipt.levels, [
@@ -47,15 +64,15 @@ final class KeyboardSourceProbeTests: XCTestCase {
 				])
 			}
 		}
-		try withSelectedSource("com.apple.keylayout.French") {
-			let receipt = try probeSelectedKeyboardSource(
+		try withSelectedSource("com.apple.keylayout.French") { diagnostics in
+			let receipt = try diagnostics.probe(
 				KeyboardSourceProbeInvocation(sourceID: "com.apple.keylayout.French", codes: [33, 0]))
 			XCTAssertTrue(receipt.levels[0].dead, "French circumflex enters a native composition state")
 			XCTAssertFalse(receipt.levels[0].direct, "A dead accent cannot recommend Ctrl+the physical key")
 			XCTAssertEqual(receipt.levels[1],
 				KeyboardSourceProbeLevel(code: 0, text: "q", dead: false, direct: true),
 				"Each key must start with independent neutral composition state")
-			let again = try probeSelectedKeyboardSource(
+			let again = try diagnostics.probe(
 				KeyboardSourceProbeInvocation(sourceID: "com.apple.keylayout.French", codes: [0, 33]))
 			XCTAssertEqual(again.levels[0].text, "q", "A previous probe must never affect a successor")
 			XCTAssertTrue(again.levels[1].dead)
@@ -63,8 +80,9 @@ final class KeyboardSourceProbeTests: XCTestCase {
 	}
 
 	func testShiftAndOptionOnlyGlyphsAreAbsentFromDirectReceipt() throws {
-		try withSelectedSource("com.apple.keylayout.US") {
+		try withSelectedSource("com.apple.keylayout.US") { diagnostics in
 			let snapshot = try captureSelectedKeyboardSource()
+			diagnostics.record("translation.snapshot", snapshot: snapshot)
 			let data = try XCTUnwrap(snapshot.data)
 			let bytes = try XCTUnwrap(CFDataGetBytePtr(data))
 			try withExtendedLifetime(data) {
@@ -75,7 +93,7 @@ final class KeyboardSourceProbeTests: XCTestCase {
 				let option = try directKeyboardLevel(layout: layout, code: 19,
 					keyboardType: snapshot.keyboardType, modifiers: UInt32(optionKey >> 8))
 				XCTAssertEqual(option.text, "™")
-				let receipt = try probeSelectedKeyboardSource(
+				let receipt = try diagnostics.probe(
 					KeyboardSourceProbeInvocation(sourceID: "com.apple.keylayout.US", codes: [28, 19]))
 				XCTAssertEqual(receipt.levels.map(\.text), ["8", "2"])
 				XCTAssertFalse(receipt.levels.contains { $0.text == "*" || $0.text == "™" })
@@ -95,9 +113,9 @@ final class KeyboardSourceProbeTests: XCTestCase {
 		XCTAssertThrowsError(try probeSelectedKeyboardSource(invocation, readSnapshot: {
 			KeyboardSourceSnapshot(sourceID: "other.source", data: nil, keyboardType: 0)
 		}))
-		try withSelectedSource("com.apple.keylayout.US") {
+		try withSelectedSource("com.apple.keylayout.US") { diagnostics in
 			let request = KeyboardSourceProbeInvocation(sourceID: "com.apple.keylayout.US", codes: [41])
-			XCTAssertThrowsError(try probeSelectedKeyboardSource(request, readCurrentID: { "changed.source" }))
+			XCTAssertThrowsError(try diagnostics.probe(request, readCurrentID: { "changed.source" }))
 		}
 	}
 
