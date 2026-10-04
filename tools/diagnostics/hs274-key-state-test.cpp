@@ -21,7 +21,7 @@ void rejects(Callback callback) {
 }
 
 state::sample sample(std::uint32_t usage, std::uint32_t cookie, bool down = false) {
-  return {usage, cookie, {true, false, true, 1, 32, 0, 1}, 0, true, cookie,
+  return {7, usage, cookie, {true, false, true, 1, 32, 0, 1}, 0, true, cookie,
           down ? 1 : 0, 100, 100, 100};
 }
 
@@ -74,6 +74,7 @@ void frozen_state_cases() {
   rejects([&] { owner.snapshot(109); });
   const auto initial = owner.snapshot(110);
   require(initial.size() == 2);
+  require(initial[0].page == 7 && initial[1].page == 7);
   require(initial[0].usage == 224 && initial[0].cookie == 24 && !initial[0].down);
   require(initial[1].usage == 224 && initial[1].cookie == 289 && initial[1].down);
   require(initial[0].timestamp == 100 && initial[1].timestamp == 100);
@@ -81,6 +82,7 @@ void frozen_state_cases() {
   require(owner.apply(event(289, 0, 120, 224)) == action::released);
   rejects([&] { owner.snapshot(129); });
   const auto changed = owner.snapshot(130);
+  require(changed[0].page == 7 && changed[1].page == 7);
   require(changed[0].timestamp == 130 && changed[0].down);
   require(changed[1].timestamp == 120 && !changed[1].down);
   require(!initial[0].down && initial[1].down);
@@ -98,8 +100,30 @@ void frozen_state_cases() {
   require(covered[0].timestamp == 100 && covered[0].down);
 }
 
+void page_identity_cases() {
+  const auto observed = sample(44, 109);
+  for (const auto page : {0, 12, 0xff01}) {
+    state owner(41);
+    owner.initialize(&observed, 1, true, false);
+    auto changed = event(109, 1, 120);
+    changed.page = page;
+    // A cookie identifies one exact HID element. A changed page cannot be
+    // dismissed as auxiliary input while that same element remains admitted.
+    require(owner.apply(changed) == action::invalid);
+    require(!owner.healthy() && owner.failure() == fault::element_identity);
+    rejects([&] { owner.snapshot(120); });
+  }
+  state owner(41);
+  owner.initialize(&observed, 1, true, false);
+  auto auxiliary = event(999, 1, 120, 205);
+  auxiliary.page = 12;
+  require(owner.apply(auxiliary) == action::auxiliary && owner.healthy());
+  require(owner.apply(event(109, 1, 130)) == action::pressed);
+}
+
 int main(int argc, char** argv) {
   require(argc == 3);
+  page_identity_cases();
   frozen_state_cases();
   replay_native(argv[1], false);
   replay_native(argv[2], true);
