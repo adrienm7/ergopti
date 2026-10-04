@@ -4,11 +4,11 @@
 ; MODULE: Keylogger Clock Domain Meta Tests
 ; DESCRIPTION:
 ; The supported AutoHotkey v2 runtime publishes A_TickCount through
-; GetTickCount64. Watcher idle/session origins and final observations retain
-; that native domain; narrowing their elapsed time to DWORD loses long gaps.
-; These source guards complement the actual-owner native64 session tests.
+; GetTickCount64. Native watcher/hook/mouse/password age guards retain that
+; domain; narrowing their elapsed time to DWORD loses long gaps.
+; These source guards complement the actual-owner native64 timing tests.
 ;
-; The remaining historical hook/ingest/mouse mask assertions are unchanged.
+; The remaining historical ingest mask assertions are unchanged.
 ; They are not evidence that their native producers have a DWORD contract;
 ; migrating those owners requires separate causal behavioral qualification.
 ; Genuine DWORD consumers keep the original TickElapsed helper unchanged.
@@ -305,13 +305,147 @@ _KLTO_KeyloggerIngestWrapSafe() {
 	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS") > 0,
 		"keylogger.ahk must mask live-push idle guard with & 0xFFFFFFFF (tickcount-wrap)")
 
-	; Password cache TTL must be masked regardless of whether the predicate is
-	; expressed as a fresh (< TTL) or expired (>= TTL) comparison.
-	Assert(InStr(Src, "(A_TickCount - KLPasswordCache.last_at) & 0xFFFFFFFF") > 0
-		and InStr(Src, "KLPW_CACHE_TTL_MS") > 0,
-		"keylogger module must mask password cache TTL with & 0xFFFFFFFF (tickcount-wrap)")
+	; Preserve the historical ingest guards above, but native password origins
+	; need their complete age rather than a modulo32 cache-admission policy.
+	Body := _DriverFuncBody("KL_TryGetPwCachedVerdict")
+	Assert(_KLTO_PasswordNativeAgePolicy(Body),
+		"password cache must snapshot its native origin and enforce strict full64 TTL")
 }
-Test("keylogger: keylogger.ahk ingest and password-cache guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_KeyloggerIngestWrapSafe)
+Test("keylogger: ingest guards and native64 password cache admission (tickcount-wrap)", _KLTO_KeyloggerIngestWrapSafe)
+
+; This structural guard protects native sampling/snapshot placement, which the
+; future-clock behavior cases cannot observe. Strings/comments cannot supply it.
+_KLTO_PasswordUniqueMatch(Code, Pattern) {
+	if !RegExMatch(Code, Pattern, &Found)
+		return false
+	if RegExMatch(Code, Pattern, , Found.Pos + Found.Len)
+		return false
+	return Found
+}
+
+_KLTO_PasswordLocalWriteCount(Code, Name) {
+	Pattern := "i)(?<![\w.])(?:" . Name
+		. "\b\h*(?::=|//=|\*\*=|<<=|>>>=|>>=|[+\-*/|&^.]=|\+\+|--)"
+		. "|(?:\+\+|--)\h*" . Name . "\b)"
+	Position := 1
+	Count := 0
+	while RegExMatch(Code, Pattern, &Found, Position) {
+		Count += 1
+		Position := Found.Pos + Found.Len
+	}
+	return Count
+}
+
+_KLTO_PasswordNativeAgePolicy(Body) {
+	if Body == ""
+		return false
+	Code := _DriverMaskNonCode(&Body)
+	; Default-argument bindings belong to the signature, not mutable body writes.
+	BodyStart := InStr(Code, "{")
+	if !BodyStart
+		return false
+	Code := SubStr(Code, BodyStart + 1)
+	Origin := _KLTO_PasswordUniqueMatch(Code,
+		"im)^\h*(\w+)\h*:=\h*KLPasswordCache\.last_at\h*$")
+	Clock := _KLTO_PasswordUniqueMatch(Code,
+		"im)^\h*(\w+)\h*:=\h*A_TickCount\h*$")
+	Predicate := _KLTO_PasswordUniqueMatch(Code,
+		"ims)^\h*(\w+)\h*:=\h*\(KLPasswordCache\.last_hwnd[^`n]*`n"
+		. ".*?^\h*<\h*KLPW_CACHE_TTL_MS\)\h*$")
+	if !IsObject(Origin) || !IsObject(Clock) || !IsObject(Predicate)
+		return false
+	if Origin.Pos >= Clock.Pos || Clock.Pos >= Predicate.Pos
+		return false
+	if (_KLTO_PasswordLocalWriteCount(Code, Origin[1]) != 1
+		|| _KLTO_PasswordLocalWriteCount(Code, Clock[1]) != 1
+		|| _KLTO_PasswordLocalWriteCount(Code, Predicate[1]) != 1)
+		return false
+	ElapsedPattern := "i)\bTickElapsed64\(\h*" . Origin[1]
+		. "\h*,\h*" . Clock[1] . "\h*\)"
+	if !IsObject(_KLTO_PasswordUniqueMatch(Predicate[0], ElapsedPattern))
+		return false
+	if !IsObject(_KLTO_PasswordUniqueMatch(Code, ElapsedPattern))
+		return false
+	return IsObject(_KLTO_PasswordUniqueMatch(Code,
+		"im)^\h*if\h*!" . Predicate[1] . "\h*$"))
+}
+
+_KLTO_PasswordNativeSourceControls() {
+	Body := _DriverFuncBody("KL_TryGetPwCachedVerdict")
+	Assert(_KLTO_PasswordNativeAgePolicy(Body),
+		"the real password predicate must snapshot before native sampling and use strict full64 age")
+	Renamed := StrReplace(StrReplace(StrReplace(Body, "CacheAt", "CapturedOrigin"),
+		"NowTick", "ObservedTime"), "Matches", "Admitted")
+	Assert(_KLTO_PasswordNativeAgePolicy(Renamed),
+		"coherent local renames must preserve the source policy")
+	Prose := Body . "`n; CacheAt := KLPasswordCache.last_at`n"
+		. '; NowTick := A_TickCount, TickElapsed(CacheAt, NowTick) <= KLPW_CACHE_TTL_MS'
+		. "`n" . 'Ignored := "CacheAt := KLPasswordCache.last_at"' . "`n"
+	Assert(_KLTO_PasswordNativeAgePolicy(Prose),
+		"prose and quoted data must not alter code-only admission")
+}
+Test("password-native64-source: canonical and source-only positive controls",
+	_KLTO_PasswordNativeSourceControls)
+
+_KLTO_PasswordNativeSourceRefusals() {
+	Body := _DriverFuncBody("KL_TryGetPwCachedVerdict")
+	Mutants := [
+		StrReplace(Body, "TickElapsed64(CacheAt, NowTick)", "TickElapsed(CacheAt, NowTick)"),
+		StrReplace(Body, "< KLPW_CACHE_TTL_MS)", "<= KLPW_CACHE_TTL_MS)"),
+		StrReplace(Body, "TickElapsed64(CacheAt, NowTick)", "TickElapsed64(KLPasswordCache.last_at, NowTick)"),
+		StrReplace(Body, "CacheAt := KLPasswordCache.last_at", "; CacheAt := KLPasswordCache.last_at"),
+		StrReplace(Body, "NowTick := A_TickCount", 'Ignored := "NowTick := A_TickCount"'),
+		StrReplace(Body, "CacheAt := KLPasswordCache.last_at", "CacheAt := KLPasswordCache.last_at`n`t`t`t`tCACHEAT := 0"),
+		StrReplace(Body, "NowTick := A_TickCount", "NowTick := A_TickCount`n`t`t`t`tNOWTICK += 1"),
+		StrReplace(Body, "< KLPW_CACHE_TTL_MS)", "< KLPW_CACHE_TTL_MS)`n`t`t`t`tMATCHES := false"),
+		StrReplace(Body, "CacheAt := KLPasswordCache.last_at`n", "")
+	]
+	Moved := StrReplace(Body, "`t`t`t`tCacheAt := KLPasswordCache.last_at`n", "")
+	Moved := StrReplace(Moved, "NowTick := A_TickCount",
+		"NowTick := A_TickCount`n`t`t`t`tCacheAt := KLPasswordCache.last_at")
+	Mutants.Push(Moved)
+	for Index, Variant in Mutants {
+		Assert(Variant !== Body, "each source refusal control must actually change the owner")
+		Assert(!_KLTO_PasswordNativeAgePolicy(Variant),
+			"wrong domain/boundary, missing/deferred/reread or case-alias writes must be refused: " . Index)
+	}
+}
+Test("password-native64-source: wrong clocks, boundaries and spoofed snapshots are rejected",
+	_KLTO_PasswordNativeSourceRefusals)
+
+_KLTO_PasswordInlineSourceRefusals() {
+	Body := _DriverFuncBody("KL_TryGetPwCachedVerdict")
+	Code := _DriverMaskNonCode(&Body)
+	Origin := _KLTO_PasswordUniqueMatch(Code,
+		"im)^\h*(\w+)\h*:=\h*KLPasswordCache\.last_at\h*$")
+	Clock := _KLTO_PasswordUniqueMatch(Code,
+		"im)^\h*(\w+)\h*:=\h*A_TickCount\h*$")
+	Assert(IsObject(Origin) && IsObject(Clock), "real local bindings must exist")
+	OriginAlias := StrUpper(Origin[1])
+	ClockAlias := StrUpper(Clock[1])
+	for Statement in [
+		"Ignored := (" . OriginAlias . " := 0)",
+		"Ignored := (" . ClockAlias . " += 1)",
+		"Ignored := ++" . OriginAlias,
+		"Ignored := " . ClockAlias . "--",
+		"if true`n`t`t`t`t`t" . OriginAlias . " := 0",
+		"Ignored := (" . OriginAlias . " //= 2)"
+	] {
+		Variant := StrReplace(Body, Clock[0], Clock[0] . "`n`t`t`t`t" . Statement)
+		Assert(Variant !== Body, "each valid inline rebind must actually change source")
+		Assert(!_KLTO_PasswordNativeAgePolicy(Variant),
+			"inline, prefix, postfix and nested case aliases must all revoke the snapshot policy")
+	}
+	; Comparisons and a different object's property do not rewrite either local.
+	Controls := Body . "`nIgnored := (" . Origin[1] . " = " . Clock[1] . ")"
+		. "`nOtherObject." . Origin[1] . " := 0`n"
+	Assert(_KLTO_PasswordNativeAgePolicy(Controls),
+		"read-only comparisons and another object's field cannot inflate local write counts")
+}
+Test("password-native64-source: every executable local rebind is rejected",
+	_KLTO_PasswordInlineSourceRefusals)
+
+
 
 
 
