@@ -847,6 +847,22 @@ These are software implementations; final hardware verification remains below.
   reader by source; native audio parity and the ALSA hardware fallback remain
   unqualified here. No schema, product label, reserved source, TOML, macOS/AHK
   suite, physical device or manual CI was modified or exercised.
+- [~] **L64.** Linux literal directory bytes: centralize native separator
+  normalization in the bootstrap resolver and reuse it in updater path handling.
+  Backslash remains filename data on POSIX; Windows separators still normalize
+  when the runtime reports Windows. Previously a legal backslash directory lost
+  its shared data root and was classified as unmanaged by the updater. Twelve
+  of twenty-four native cases fail before and all pass after per LuaJIT/Lua 5.4
+  runtime, using actual copied source localization, cwd, shared locale files and
+  default shell/file probes. Absolute/relative loading and both shared-tree
+  layouts cover backslashes and unchanged space/quote/Unicode/CRLF controls.
+  This is an actual filesystem layout fixture, not a daemon installation; PWD
+  accurately reports its child cwd. Six unit metadata/probe regressions and two
+  simulated Windows separator controls retain their assertions. macOS parent
+  traversal treats both separators specially and needs native qualification;
+  Windows disallows literal backslash in a component. Their native gates remain
+  with the principal owner. No config-path/TOML policy, title, autostart placement,
+  reserved source, physical input, macOS/AHK suite or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

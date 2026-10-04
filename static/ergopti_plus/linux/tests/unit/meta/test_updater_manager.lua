@@ -930,6 +930,21 @@ helpers.describe("modules/updater/manager.lua", function()
 			".deb, RPM, Flatpak, AppImage and Nix layouts must keep their update owner")
 	end)
 
+	for _, component in ipairs({ "literal\\backslash", "double\\\\backslash", "\\leading" }) do
+		helpers.it("linux-native-path-literal: updater keeps POSIX component " .. component, function()
+			local real_config = package.config
+			package.config = "/" .. real_config:sub(2)
+			local prefix = "/synthetic/" .. component
+			local ok, context = pcall(Installer.resolve, prefix .. "/lib/ergopti/linux/modules/updater/manager.lua",
+				function() return true end)
+			package.config = real_config
+			helpers.assert_true(ok, tostring(context))
+			helpers.assert_eq(context.kind, "standalone")
+			helpers.assert_eq(context.install_root, prefix .. "/lib/ergopti")
+			helpers.assert_eq(context.wrapper, prefix .. "/bin/ergopti-hotstrings")
+		end)
+	end
+
 	helpers.it("upgrades the complete standalone root and keeps a verified backup", function()
 		local base = os.tmpname():gsub("\\", "/")
 		os.remove(base)
