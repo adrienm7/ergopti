@@ -368,3 +368,224 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 		end
 	end
 end)
+
+--- Runs the actual dynamic preference and rule owners over private native files.
+local function with_dynamic_family_owners(body)
+	local saved = {}
+	for name, value in pairs(package.loaded) do saved[name] = value end
+	local path = os.tmpname()
+	local personal = path .. ".personal.toml"
+	local source = '[hotstrings.dynamic]\nenabled = true\n[private]\nfuture = "independent retained neighbor"\n'
+	local function write(file_path, bytes)
+		local file = assert(io.open(file_path, "wb"))
+		assert(file:write(bytes)); assert(file:close())
+	end
+	local function read(file_path)
+		local file = assert(io.open(file_path, "rb"))
+		local bytes = assert(file:read("*a")); assert(file:close()); return bytes
+	end
+	write(path, source)
+	write(personal, '[info]\nphone = "0000000000"\n[letters]\np = "phone"\n')
+	local Writer = require("toml_codec.writer")
+	local batch_write = Writer.batch_write
+	local Preferences
+	local called, failure = pcall(function()
+		Preferences = helpers.load_module("infra.hotstring_preferences")
+		assert(Preferences._set_file_for_test(path))
+		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["modules.dynamic_hotstrings.prefix_rules"] = nil
+		local dynamic = helpers.load_module("modules.dynamic_hotstrings.manager")
+		assert(dynamic.init({ personal_info_path = personal, trigger_char = "★" }))
+		assert(dynamic.is_enabled() == true)
+		body({ dynamic = dynamic, preferences = Preferences, writer = Writer,
+			batch_write = batch_write, path = path, source = source, read = read, write = write })
+	end)
+	Writer.batch_write = batch_write
+	if Preferences then Preferences._set_file_for_test(nil) end
+	assert(os.remove(path)); assert(os.remove(personal))
+	os.remove(path .. ".tmp")
+	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(saved) do package.loaded[name] = value end
+	if not called then error(failure, 0) end
+end
+
+--- Finds one real rendered family row and retains its actual menu context.
+local function dynamic_family_row(dynamic, section)
+	local config = fake_config(false, false)
+	local seen = { reloads = 0, refreshes = 0 }
+	config.reload = function() seen.reloads = seen.reloads + 1; return 0, true end
+	local context = { config = config, _version = "9.9.9", dyn_hotstrings = dynamic,
+		paused = false, is_paused = function() return false end,
+		on_menu_changed = function() seen.refreshes = seen.refreshes + 1 end }
+	local builder = helpers.load_module("ui.menu.menu_builder")
+	local title = require("infra.i18n").get("category.dynamic_hotstrings")
+	local label
+	for _, family in ipairs(dynamic.rule_families()) do
+		if family.section == section then label = family.label end
+	end
+	assert(type(label) == "string")
+	local found, matches = nil, 0
+	local function walk(rows)
+		for _, row in ipairs(rows or {}) do
+			if type(row.title) == "string" and row.title:sub(1, #title) == title then
+				for _, child in ipairs(row.menu or {}) do
+					if child.title == label or (type(child.title) == "string"
+						and child.title:sub(1, #label + 2) == label .. " (") then
+						found, matches = child, matches + 1
+					end
+				end
+			end
+			walk(row.menu)
+		end
+	end
+	walk(builder.build(context))
+	assert(matches == 1 and type(found.fn) == "function", "one actual actionable family row is required")
+	return found, seen, context
+end
+
+helpers.describe("dynamic family menu acknowledges its actual owner", function()
+	for _, section in ipairs({ "date", "phoneprefixes" }) do
+		for _, verdict in ipairs({ "false", "nil", "throw", "truthy" }) do
+			helpers.it("dynamic family " .. section .. " preserves source and retries after publisher " .. verdict, function()
+				with_dynamic_family_owners(function(owner)
+					with_bulk_error_receipts(function(notices)
+						local row, seen = dynamic_family_row(owner.dynamic, section)
+						local writes = 0
+						owner.writer.batch_write = function()
+							writes = writes + 1
+							if verdict == "throw" then error("controlled dynamic publisher refusal") end
+							if verdict == "nil" then return nil end
+							if verdict == "truthy" then return 2 end
+							return false
+						end
+						local called, committed = pcall(row.fn)
+						owner.writer.batch_write = owner.batch_write
+						helpers.assert_eq(called, true)
+						helpers.assert_eq(writes, 1)
+						helpers.assert_eq(owner.read(owner.path), owner.source)
+						helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, section), false)
+						helpers.assert_eq(row.checked, false)
+						helpers.assert_eq(seen, { reloads = 0, refreshes = 0 })
+						helpers.assert_eq(committed, false)
+						helpers.assert_eq(#notices, 1)
+						helpers.assert_eq(notices[1].keyboard_released, true)
+						local retry_called, retry_committed = pcall(row.fn)
+						helpers.assert_eq(retry_called, true)
+						helpers.assert_eq(retry_committed, true)
+						helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, section), true)
+						helpers.assert_eq(seen, { reloads = section == "phoneprefixes" and 1 or 0, refreshes = 1 })
+						local document = require("toml_codec").decode(owner.read(owner.path))
+						helpers.assert_eq(document.private.future, "independent retained neighbor")
+						helpers.assert_true(owner.preferences.refresh())
+						helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, section), true, "actual disk reload owns the new choice")
+					end)
+				end)
+			end)
+		end
+	end
+
+	for _, verdict in ipairs({ "number", "text" }) do
+		helpers.it("dynamic family rejects direct truthy owner receipt " .. verdict, function()
+			with_dynamic_family_owners(function(owner)
+				with_bulk_error_receipts(function(notices)
+					local row, seen = dynamic_family_row(owner.dynamic, "phoneprefixes")
+					local calls = 0
+					owner.dynamic.set_rule_enabled = function()
+						calls = calls + 1
+						return verdict == "number" and 2 or "ack"
+					end
+					local called, committed = pcall(row.fn)
+					helpers.assert_eq(called, true)
+					helpers.assert_eq(calls, 1); helpers.assert_eq(seen, { reloads = 0, refreshes = 0 })
+					helpers.assert_eq(committed, false)
+					helpers.assert_eq(owner.read(owner.path), owner.source); helpers.assert_eq(#notices, 1)
+				end)
+			end)
+		end)
+	end
+
+	helpers.it("dynamic family toggles the current choice instead of the captured checkmark", function()
+		with_dynamic_family_owners(function(owner)
+			local row, seen = dynamic_family_row(owner.dynamic, "date")
+			assert(owner.dynamic.set_rule_enabled("date", true))
+			local called, committed = pcall(row.fn)
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(row.checked, false); helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, "date"), false)
+			helpers.assert_eq(committed, true)
+			helpers.assert_eq(seen, { reloads = 0, refreshes = 1 })
+		end)
+	end)
+
+	for _, refusal in ipairs({ "off", "foreign", "missing_setter", "missing_getter", "missing_family", "duplicate_family", "wrong_id", "bad_boolean", "throwing_getter", "reentrant_owner" }) do
+		helpers.it("dynamic family retires held delivery after current owner " .. refusal, function()
+			with_dynamic_family_owners(function(owner)
+				with_bulk_error_receipts(function(notices)
+					local row, seen, context = dynamic_family_row(owner.dynamic, "phoneprefixes")
+					local native_families = owner.dynamic.rule_families
+					if refusal == "off" then owner.dynamic.is_enabled = function() return false end end
+					if refusal == "foreign" then context.dyn_hotstrings = {} end
+					if refusal == "missing_setter" then owner.dynamic.set_rule_enabled = nil end
+					if refusal == "missing_getter" then owner.dynamic.is_rule_enabled = nil end
+					if refusal == "throwing_getter" then owner.dynamic.is_rule_enabled = function() error("controlled getter refusal") end end
+					if refusal == "reentrant_owner" then
+						local native_get = owner.dynamic.is_rule_enabled
+						owner.dynamic.is_rule_enabled = function(group, section)
+							local result = native_get(group, section)
+							context.dyn_hotstrings = {}
+							return result
+						end
+					end
+					if refusal == "missing_family" or refusal == "duplicate_family" or refusal == "wrong_id" or refusal == "bad_boolean" then
+						owner.dynamic.rule_families = function()
+							local rows = native_families()
+							for index, family in ipairs(rows) do
+								if family.section == "phoneprefixes" then
+									if refusal == "missing_family" then table.remove(rows, index) end
+									if refusal == "duplicate_family" then rows[#rows + 1] = family end
+									if refusal == "wrong_id" then family.id = "foreign_family" end
+									if refusal == "bad_boolean" then family.enabled = 2 end
+									break
+								end
+							end
+							return rows
+						end
+					end
+					local called, committed = pcall(row.fn)
+					helpers.assert_eq(called, true)
+					helpers.assert_eq(owner.read(owner.path), owner.source)
+					helpers.assert_eq(seen, { reloads = 0, refreshes = 0 })
+					helpers.assert_eq(committed, false); helpers.assert_eq(#notices, 1)
+				end)
+			end)
+		end)
+	end
+
+	helpers.it("dynamic family validates the live shared declaration before publication", function()
+		with_dynamic_family_owners(function(owner)
+			with_bulk_error_receipts(function(notices)
+				local row, seen = dynamic_family_row(owner.dynamic, "date")
+				local Menu = require("infra.manifest_menu")
+				local get = Menu.get_dynamic_hotstring_families
+				Menu.get_dynamic_hotstring_families = function() return {} end
+				local called, committed = pcall(row.fn)
+				Menu.get_dynamic_hotstring_families = get
+				helpers.assert_eq(called, true)
+				helpers.assert_eq(owner.read(owner.path), owner.source)
+				helpers.assert_eq(seen, { reloads = 0, refreshes = 0 })
+				helpers.assert_eq(committed, false); helpers.assert_eq(#notices, 1)
+			end)
+		end)
+	end)
+
+	helpers.it("dynamic prefix publication remains acknowledged when its later reload refuses", function()
+		with_dynamic_family_owners(function(owner)
+			local row, seen, context = dynamic_family_row(owner.dynamic, "phoneprefixes")
+			context.config.reload = function() seen.reloads = seen.reloads + 1; return 0, false end
+			local called, committed = pcall(row.fn)
+			helpers.assert_eq(called, true); helpers.assert_eq(committed, true, "this receipt owns preference publication, not the separate prefix catalogue")
+			helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, "phoneprefixes"), true)
+			helpers.assert_eq(seen, { reloads = 1, refreshes = 1 })
+			helpers.assert_true(owner.preferences.refresh()); helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, "phoneprefixes"), true)
+		end)
+	end)
+end)
