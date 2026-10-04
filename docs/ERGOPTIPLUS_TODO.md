@@ -2030,6 +2030,23 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
       reserved curl slot declares its transitory tags-owner fields before
       acquisition. Timer delivery/cancellation and the real dispatcher have
       added regressions; the repaired native Windows gate remains pending.
+
+macOS chat and vision requests now bind acknowledged model inventories to the
+canonical server origin and newest joint listing epoch. A changed endpoint,
+forgotten inventory or older independent menu response cannot admit private
+request bytes or replace newer model state. Final checks after parsing,
+logging and native callbacks retain same-endpoint admitted responses. The
+registered independent cases pass 21/0 on Lua 5.4 and LuaJIT; unchanged source
+fails 15 of those cases, and removing only final publication checks fails seven.
+Existing API, agent and HTTP-owner cases pass 38/0, 5/0 and 5/0. Native
+Hammerspoon execution, full packaging/install and desktop acceptance still
+require qualification; item 46 remains partial.
+
+Windows continuation is explicitly deferred to the maintainer's PC: complete
+steps 1, 10 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md).
+Native model-owner, real-model, E2E, packaging and installation acceptance
+remain required; this deferral is not completion.
+
 - [~] **47.** **Partial: catalogue-owned optional authentication.** Manually configured
   OpenAI-compatible entries for oMLX, LM Studio, llama-server/LocalAI and Jan
   can use an explicitly empty key on all three drivers. The shared local
@@ -2101,6 +2118,72 @@ Partial: the Linux prediction engine now has causal coverage for its second loca
 
 A registered Linux regression now observes the existing native private-file owner when quarantine of malformed API registry bytes is refused. It preserves the exact foreign source, refuses publication and acknowledgement, and leaves no staged replacement or RAM entry. The original defective quarantine branch reproduces the failure; the delivered source publisher and corrected local-server admission keep the full owner suite green. This additional native-file proof is independent of the real-engine second-admission regression. Complete hosted qualification and the remaining Windows local-server UI keep item47 partial.
 
+The Windows logical discovery controller now ports the shared policy against
+the unchanged independent eight-trace corpus. Registered native cases also
+cover superseding dispatch, detached observers, exact model/address identity,
+reentrant clocks and caller Critical restoration. Small atomic publication
+claims fence AHK timer interruption; logical tickets never acknowledge native
+HTTP/process retirement. This is a prerequisite only: Windows asynchronous
+models transport, menu integration and complete native qualification remain
+unfinished. No model or server installation is claimed.
+
+The Windows native models-request owner now acquires the existing tree-owned
+curl adapter with a dispatch fence after private-file staging. Provider slots
+retain creator, cancellation, timeout, private-file and timer-stop debts until
+their exact observable owners settle; ShellRunner retains its independent
+capture cleanup. Twenty registered cases exercise typed receipts, source
+order, superseding requests and native locks/handles. Source review and static
+checks pass; native execution, actual HTTP acceptance and production discovery
+menu integration remain required. This transport prerequisite does not close
+item 47.
+
+Windows checkpoint 37227446912 at 02ddf2e18 actually passed all 17 discovery
+policy cases. The full unit result was 9053 passed and one pre-existing personal
+metadata fixture failure; E2E, packaging and installation did not execute.
+The new models transport was added afterward and still requires native
+qualification. The separate shared-CI native-read dependency failure also
+prevents treating this checkpoint as complete qualification.
+
+Windows private local-server publication now retains exact configuration/API
+images and their decoded native authority through the existing joint WAL.
+Ordinary source receipts never gain permission from newly committed files;
+separate candidate capabilities remain bound to their originating receipt and
+exact transaction. Final publication validates complete images and model state
+before a bounded native generation claim. Missing journals retain cleanup debt
+unless the original images are independently proven restored. Equal ordinary
+reloads preserve source receipts; invalid schema versions remain refused.
+Forty-one actual-file/DPAPI/WAL cases are prepared for Windows execution.
+Six new cases cover exact active shutdown attempts, stale veto tokens, fresh
+authority after an honored veto, terminal debt and final publication epochs.
+The historical OnExit reason remains diagnostic; active private shutdown
+authority and receipt generations remain independent. These additions have
+not executed.
+Independent source review passed; this prerequisite does not yet provide the
+automatic discovery panel or qualify native persistence, packaging or install.
+Item 47 remains partial.
+
+The shared Core CI now provisions Lua 5.4's native luv module for the actual
+installed registry probe. Plain Lua without luv independently reproduces the
+native-reader refusal on a readable source; the correction retains exact
+descriptor admission and all discovery/count assertions. A fresh hosted
+checkpoint is required to qualify this prerequisite.
+
+Windows continuation is explicitly deferred to the maintainer's PC: the
+[AI Windows handover](handovers/2026-10-04-ai-windows/README.md) records steps
+1 to 5 and 12, with recoverable source/preimage/test packets. Native models
+transport delivery and 41 private publication cases, real controller/WAL composition,
+post-transition panel recovery, URL parity, duplicate native rows and actual
+discovery/chat/restart remain required. Saved inactive preparations are not
+integrated functionality. Item 47 remains partial.
+
+Manual Windows checkpoint [37239438795](https://github.com/adrienm7/ergopti/actions/runs/37239438795)
+at 2f11cf264 ran the 20 new models-owner cases without individual failures.
+The full result was 9073 passed and two failed: the existing personal metadata
+fixture and the new generic repeating callback missing from the strict timer
+inventory. The PC must declare the actual owned callback and period without
+weakening that assertion. Windows E2E, packaging and installation were skipped;
+the later 41 private publication cases were not in this tested source.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
@@ -2123,6 +2206,46 @@ The existing registered AHK syntax guard rejects this exact original file and
 checks thirteen legal, typed, multiline, comment and literal controls. Selected
 portable gates pass; the repaired include graph, native notice lifecycle and
 semantic TOML corpus still require the next non-release Windows execution.
+
+Linux refusal now offers an explicit replacement from an already answered,
+fresh local-server cache. It publishes the exact private entry before selecting
+the backend and requesting fresh enable admission. Modal restoration admits
+only its own native resynchronization; post-dialog freshness and exact engine
+and preference revisions refuse unrelated cancellation or source drift,
+including same-byte rewrites. The focused owner suites pass 60 cases on each of
+LuaJIT and Lua 5.4; causal mutations reproduce the three corrected admission
+failures. Native dialogs, physical keyboard restoration, owned runtime
+start/install and complete qualification remain unfinished. Item 48 stays
+partial.
+
+Linux replacement and retry dialogs now retain one native caption site per
+installed dialog tool, with replacement controls asserting the actual composed
+and quoted title. The unchanged independent caption inventory is preserved;
+21 focused UI/caption cases pass. The real X11/WebKit full candidate passes
+6514 cases with two GTK-absence fixture failures; unchanged origin/dev under
+the identical graphical environment reproduces both (6487 passed, two failed).
+These failures are retained and routed to the Linux fixture owner, not counted
+as successful qualification. Native dialogs and physical acceptance remain
+required.
+
+Ollama v0.24.0 release pins now have one closed shared catalogue for macOS,
+Linux amd64/arm64 and Windows amd64/arm64. The registered generator owns the
+existing macOS shell projection and preserves its exact version, digest and
+size. Independent official-asset expectations cover all five records, strict
+schema and CLI admission, generation and no-write drift refusal; 112 focused
+cases pass, and three causal controls reject broken drift, projection and
+registration. This is an installation prerequisite: no official archive,
+owned runtime or model has been downloaded or installed by these checks.
+Item 48 and its native, packaging and physical acceptance remain open.
+
+Windows continuation is explicitly deferred to the maintainer's PC: complete
+steps 6 to 10 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md).
+The versioned file-port/download preparations, independent review blockers,
+inert ZIP fixtures and 25 unexecuted native cases are saved for recovery.
+User-local installation without administrator rights is the chosen scope.
+Native construction receipts, namespace admission, per-user resolver, version
+lease, exact foreground service/readiness, model consent and delivery
+acceptance remain unfinished; Linux runtime composition is also incomplete.
 
 - [~] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
   reinstalls its own low-level keyboard hook around every SendInput (upstream
@@ -2748,6 +2871,20 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
   widths and painted geometry. Focused portable checks passed; full integration
   and native Windows CI remain pending. The Mac/Linux visual acceptance remains
   under this item.
+  Real production Linux GTK/cairo/Pango appearance is now qualified on
+  ea6e849df82f2a67e321b1ca7aa885f145101b93 in an isolated Xvfb X11 session:
+  twelve untouched native-window captures retain canonical gray/green/orange,
+  inactive corrected/next emphasis, both selections and indentation
+  0, +2, -1 and -3. Actual glyph pixels confirm the aligned -3 origins and
+  greater bold than regular ink; native mapped/focus-free flags are observed.
+  Source and screenshot hashes accompany the receipts. This is headless X11
+  appearance evidence, not physical input, Wayland or macOS canvas acceptance;
+  item 88 and the interactive obligations in items 16/38 remain open.
+  Windows continuation is explicitly deferred to the maintainer's PC: complete
+  steps 11 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md),
+  preserving native GDI/font/geometry/deletion assertions and actual desktop
+  acceptance. The recoverable Mac canvas probe remains unexecuted; neither
+  this handoff nor headless X11 closes the remaining physical validations.
   Native checkpoint 37069995600 exposed missing typography initialization in
   the headless Windows paint fixture. It now reads the canonical font family
   and size, asserts valid values and restores the prior aliases in finally.
