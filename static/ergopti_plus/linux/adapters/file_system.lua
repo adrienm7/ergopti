@@ -86,7 +86,8 @@ end
 -- ========================================
 -- ========================================
 
---- Reads the entire contents of a file as a string.
+--- Reads the entire contents of a regular file as a string.
+--- Native descriptor admission rejects FIFO/socket sources before stdio can wait.
 --- @param path string Absolute path to the file.
 --- @return string|nil File contents, or nil on any error.
 function M.read(path)
@@ -96,7 +97,7 @@ function M.read(path)
 	end
 
 	local ok, result = pcall(function()
-		local fh, err = io.open(path, "r")
+		local fh, err = require("infra.regular_file_reader").open(path)
 		if not fh then
 			Logger.debug(LOG, "read(): cannot open '%s' — %s", path, tostring(err))
 			return nil

@@ -1,14 +1,79 @@
 --- tests/unit/meta/test_file_system_adapter.lua
 ---
---- Integration tests for the file_system adapter.
---- (lfs + io.open wrapper). Tests ALL methods (read/write/append/exists/delete)
---- against the real filesystem — these tests work on Windows, macOS, and Linux
---- because io.open is platform-agnostic.
+--- Native Linux integration tests for the file_system adapter. Reads admit
+--- regular files through pinned kernel descriptors; the other methods retain
+--- their filesystem receipts. POSIX descriptor tests require a Linux host.
 ---
 --- Uses a temp directory in the system temp folder.
 
 local helpers = require("tests.helpers")
 local fs      = helpers.load_module("adapters.file_system")
+
+helpers.describe("generic file read admission", function()
+	local metadata_cases = {
+		{ mode = 33152, mask = 1, status = 0, accepted = true },
+		{ mode = 4480, mask = 1, status = 0 },
+		{ mode = 33152, mask = 0, status = 0 },
+		{ mode = 33152, mask = 1, status = -1 },
+	}
+	for number, case in ipairs(metadata_cases) do
+		helpers.it("linux-file-read-special: libc descriptor metadata receipt " .. number, function()
+			local Reader = require("infra.regular_file_reader")
+			local original_ffi, original_uv, original_open = package.loaded.ffi, package.loaded.luv, io.open
+			local queries, closes, opens = 0, 0, 0
+			local stream = { close = function() return true end }
+			package.loaded.luv = {}
+			package.loaded.ffi = {
+				os = "Linux", cdef = function() end,
+				new = function() return { mode = case.mode, mask = case.mask } end,
+				sizeof = function() return 256 end, offsetof = function() return 28 end,
+				C = {
+					open = function() return 42 end,
+					close = function(fd) helpers.assert_eq(fd, 42); closes = closes + 1; return 0 end,
+					statx = function(fd, path, flags, mask)
+						helpers.assert_eq(fd, 42); helpers.assert_eq(path, "")
+						helpers.assert_eq(flags, 4096); helpers.assert_eq(mask, 1)
+						queries = queries + 1
+						return case.status
+					end,
+				},
+			}
+			io.open = function(path)
+				helpers.assert_eq(path, "/proc/self/fd/42")
+				opens = opens + 1; return stream
+			end
+			local ok, result = pcall(Reader.open, "/synthetic/source")
+			package.loaded.ffi, package.loaded.luv, io.open = original_ffi, original_uv, original_open
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result, case.accepted and stream or nil)
+			helpers.assert_eq(queries, 1)
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(opens, case.accepted and 1 or 0)
+		end)
+	end
+	for _, kind in ipairs({ "fifo", "directory", "socket" }) do
+		helpers.it("linux-file-read-special: rejects " .. kind .. " before stdio opens", function()
+			local Reader = require("infra.regular_file_reader")
+			local real_reader, real_open = Reader.open, io.open
+			local inspected, opened = 0, 0
+			Reader.open = function(path)
+				inspected = inspected + 1
+				helpers.assert_eq(path, "/synthetic/" .. kind)
+				return nil, "source is not a regular file", 22
+			end
+			io.open = function()
+				opened = opened + 1
+				return { read = function() return "unclassified stream bytes" end, close = function() return true end }
+			end
+			local ok, content = pcall(fs.read, "/synthetic/" .. kind)
+			Reader.open, io.open = real_reader, real_open
+			helpers.assert_true(ok, tostring(content))
+			helpers.assert_nil(content)
+			helpers.assert_eq(inspected, 1)
+			helpers.assert_eq(opened, 0)
+		end)
+	end
+end)
 
 --- Selects a metadata backend while preserving the production adapter itself.
 local function with_exists_backend(backend, result, test)
