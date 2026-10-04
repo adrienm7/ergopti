@@ -1369,6 +1369,16 @@ The existing Script control switch now enters the global action fence before cha
 
 The original registered cases remain intact. Controlled native filesystem publication refusals, canonical sparse default reloads, retained pause/reentry, exact native identity and inverse ordering have portable focused proof. Windows and Linux owners are unchanged. Karabiner sync is asynchronous: this receipt acknowledges the logical native gate, not physical deployment or keyboard capture. Generic whole-feature postpublication rollback remains outside this slice. Shared row migration, hosted Hammerspoon/native CI and complete TODO 54/81 closure remain pending.
 
+About channel callback receipt follow-up: macOS and Linux now protect the actual
+native channel setter and acknowledge only Boolean true. Linux redraws the tray
+and updates an open Versions page only after that receipt; Windows keeps its
+existing direct owner forwarding. Existing channel persistence, declarations,
+labels and native publisher implementations remain unchanged. Private registered
+modules cover rejected receipts, actual durable-owner refusal and retry, unknown
+TOML fields, and a post-publication exception without manufacturing rollback.
+Actual selected/full and native UI acceptance remain pending (TODO16); this does
+not close the remaining TODO54 menu migration or updater ownership work.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
