@@ -339,6 +339,13 @@ jobs:
           python3 tests/hardware/run_http_curlrc_receipts.py
         timeout-minutes: 4
 
+      - name: Refuse foreign JSON staging and preserve kernel write failures
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_storage_temp_receipts.py
+        timeout-minutes: 1
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

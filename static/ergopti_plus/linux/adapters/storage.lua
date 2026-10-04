@@ -140,6 +140,34 @@ local function _load()
 	_preserve_corrupt_store("invalid_json")
 end
 
+--- Creates the staging inode exclusively and retains its original descriptor.
+--- LuaJIT forwards C11 wx to libc; stock Lua rejects that stdio mode, so its
+--- native libuv descriptor supplies the same no-clobber boundary.
+--- @return file*|table|nil handle
+local function _open_owned_temp()
+	if _VERSION == "Lua 5.1" then return io.open(_TMP_PATH, "wx") end
+	local ok, uv = pcall(require, "luv")
+	if not ok or type(uv.fs_open) ~= "function" or type(uv.fs_write) ~= "function" or type(uv.fs_close) ~= "function" then
+		return nil, "exclusive storage staging is unavailable"
+	end
+	local fd, err = uv.fs_open(_TMP_PATH, "wx", 384) -- Native 0600 permission bits.
+	if not fd then return nil, err end
+	return {
+		write = function(_, bytes)
+			local offset = 0
+			while offset < #bytes do
+				local written, failure = uv.fs_write(fd, bytes:sub(offset + 1), offset)
+				if type(written) ~= "number" or written <= 0 or written > #bytes - offset then
+					return nil, failure or "storage write did not commit"
+				end
+				offset = offset + written
+			end
+			return true
+		end,
+		close = function() return uv.fs_close(fd) end,
+	}
+end
+
 --- Persists a staged cache to disk atomically.
 --- @param staged table Candidate store that is not yet published in memory.
 --- @return boolean
@@ -158,7 +186,7 @@ local function _flush(staged)
 		Logger.error(LOG, "_flush(): store could not round-trip through JSON.")
 		return false
 	end
-	local open_ok, fh = pcall(io.open, _TMP_PATH, "w")
+	local open_ok, fh = pcall(_open_owned_temp)
 	if not open_ok or not fh then
 		-- Create the directory only after a direct open proved it is needed. This
 		-- keeps an already-existing directory independent of shell flavour while
@@ -168,7 +196,7 @@ local function _flush(staged)
 			Logger.error(LOG, "_flush(): configuration directory could not be created.")
 			return false
 		end
-		open_ok, fh = pcall(io.open, _TMP_PATH, "w")
+		open_ok, fh = pcall(_open_owned_temp)
 	end
 	if not open_ok or not fh then
 		Logger.error(LOG, "_flush(): temporary file could not be opened.")
