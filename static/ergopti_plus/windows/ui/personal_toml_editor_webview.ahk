@@ -58,6 +58,7 @@ global _HsEdWeb_NavSub     := unset
 ; makes the second call a true no-op instead of reaching that ComCall at all.
 global _HsEdWeb_ResetDone  := false
 global _HsEdWeb_SessionEpoch := 0
+global _HsEdWeb_OpeningSource := false
 
 
 
@@ -242,7 +243,26 @@ _HsEdWeb_SessionCall(SessionEpoch, Callback, Params*) {
 }
 
 _HsEdWeb_PushInitData() {
-	_HsEdWeb_Eval(_HsEdWeb_InitDataJs())
+	global _HsEdWeb_WebView, _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch
+	if !IsSet(_HsEdWeb_WebView) || !IsObject(_HsEdWeb_WebView)
+		return false
+	View := _HsEdWeb_WebView
+	SessionEpoch := _HsEdWeb_SessionEpoch
+	Js := _HsEdWeb_InitDataJs()
+	OpeningSource := _HsEdWeb_OpeningSource
+	if SessionEpoch != _HsEdWeb_SessionEpoch
+		|| !IsSet(_HsEdWeb_WebView) || !IsObject(_HsEdWeb_WebView)
+		|| ObjPtr(View) != ObjPtr(_HsEdWeb_WebView)
+		|| !_PersonalTomlOpeningSessionIdentity(OpeningSource)
+		return false
+	return WebView_RunScriptAsync(View, Js, "HsEditor.init",
+		_HsEdWeb_InitSourceSettled.Bind(OpeningSource))
+}
+
+_HsEdWeb_InitSourceSettled(OpeningSource, Succeeded) {
+	if !_PersonalTomlOpeningSessionIdentity(OpeningSource)
+		return
+	OpeningSource["ready"] := (Succeeded is Integer) && Succeeded == 1
 }
 
 ; Evaluates JS in the page using ExecuteScriptAsync FIRE-AND-FORGET (no .await()):
@@ -285,7 +305,9 @@ _HsEdWeb_ReportSaveFailure() {
 		Map("title", t("editor.hotstrings.save_error"), "level", "error"))
 }
 
-_HsEdWeb_DeferredSaveCompleted(CommitResult) {
+_HsEdWeb_DeferredSaveCompleted(OpeningSource, CommitResult) {
+	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
+		return
 	global PERSONAL_TOML_COMMIT_FAILED
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		if A_IsSuspended {
@@ -302,6 +324,12 @@ _HsEdWeb_DeferredSaveCompleted(CommitResult) {
 }
 
 _HsEdWeb_Save(Data) {
+	global _HsEdWeb_OpeningSource
+	OpeningSource := _HsEdWeb_OpeningSource
+	if !_PersonalTomlOpeningSessionCurrent(OpeningSource) {
+		_HsEdWeb_ShowSaveFailure()
+		return
+	}
 	if A_IsSuspended {
 		_HsEdWeb_ShowSaveFailure()
 		return
@@ -322,7 +350,7 @@ _HsEdWeb_Save(Data) {
 	try LoggerStart("HsEditor", "Saving personal hotstrings ({1} section(s))…", order.Length)
 	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
 	CommitResult := PersonalTomlCommitAndReload(WriteData,
-		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind())
+		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource), 0, OpeningSource)
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		if A_IsSuspended
 			_HsEdWeb_ShowSaveFailure()
@@ -334,6 +362,8 @@ _HsEdWeb_Save(Data) {
 		try LoggerInfo("HsEditor", "Personal-hotstring publication was deferred behind an active writer; the newest full snapshot will be committed next.")
 		return
 	}
+	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
+		return
 	try LoggerSuccess("HsEditor", "Personal hotstrings saved and reloaded.")
 }
 
@@ -384,7 +414,20 @@ _HsEdWeb_Close() {
 ; and emits per-entry priority ONLY when set (absent == inherit), then attaches
 ; the seven UI prefs.
 _HsEdWeb_InitDataJs() {
-	data    := ReadPersonalToml()
+	global _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch, _HsEdWeb_Gui
+	SessionEpoch := _HsEdWeb_SessionEpoch
+	Window := IsSet(_HsEdWeb_Gui) ? _HsEdWeb_Gui : 0
+	OpeningSource := Map()
+	data := ReadPersonalToml(false, OpeningSource)
+	if SessionEpoch == _HsEdWeb_SessionEpoch
+		&& Window is Gui && IsSet(_HsEdWeb_Gui) && _HsEdWeb_Gui is Gui
+		&& ObjPtr(Window) == ObjPtr(_HsEdWeb_Gui) {
+		OpeningSource["kind"] := "webview"
+		OpeningSource["epoch"] := SessionEpoch
+		OpeningSource["window"] := Window
+		OpeningSource["ready"] := false
+		_HsEdWeb_OpeningSource := OpeningSource
+	}
 	order   := data.Has("sections_order") ? data["sections_order"] : []
 	secMap  := data.Has("sections") ? data["sections"] : Map()
 
@@ -504,7 +547,7 @@ _HsEdWeb_OnClose(*) {
 ; a true no-op instead of touching the globals again.
 _HsEdWeb_Reset() {
 	global _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
-	global _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
+	global _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch, _HsEdWeb_OpeningSource
 
 	; A prior Reset() already released remove_WebMessageReceived/remove_NavigationCompleted
 	; against this controller. Re-running the unset lines below would call __Delete's
@@ -516,6 +559,7 @@ _HsEdWeb_Reset() {
 		return
 	_HsEdWeb_ResetDone := true
 	_HsEdWeb_SessionEpoch += 1
+	_HsEdWeb_OpeningSource := false
 
 	; The whole teardown runs under one try: a hard COM access violation can occur
 	; mid-sequence (e.g. if the controller was invalidated by the host Gui already
