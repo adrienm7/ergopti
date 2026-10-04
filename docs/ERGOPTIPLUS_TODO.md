@@ -1682,12 +1682,31 @@ CI smoke and install/launch now prefer the first available archive declared by t
 
 The five-file source slice has 22 portable native-owner cases, seven actual workflow cases, two actual evidence controls, two original causal failures and six guard-removal failures. The original producer contract passes with closed filesystem and physical POSIX ports. Native extraction/signing/xattr and the two added Swift cases still require hosted macOS CI; root full selected qualification is pending. Item 36 remains partial until public archive migration and native acceptance are complete.
 
-- [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
-      should appear only when the layout is really installed (today: always,
-      shipped copy), and whether to move French `suffixes_a` and the magickey
-      `replace` section into the Ergopti extension. Common distance reduction
-      already belongs to the extension; the French distance category remains
-      independent.
+- [~] **37.** Always show the shipped Ergopti hotstring pack, including when
+  its keyboard layout is not installed. Move French `suffixes_a` and magic-key
+  `replace` into that extension without a beta compatibility layer. The runtime
+  relocation and packaging inventories are prepared: all 24 French suffix
+  rules and the existing 21 replacement descriptions remain unchanged.
+  Actual metadata-only replacement remains selectable through its declared
+  native feature owner. Shared bound-section policy owns extension bulk
+  commands and preserves unrelated choices; native menus and preferences
+  consume that policy. The old layout-menu replacement row is removed.
+  Mac portable units (13,891) and E2E (101), Linux E2E (188), shared JS
+  checks (356), and focused selection/registry/menu tests pass. Linux units (6,505) also pass
+  with real GUI dependencies and explicit negative GTK premises. Hosted macOS
+  packaging/installation and deferred Windows acceptance remain required before removing this item. Preserve the real-device
+  acceptance in item 38.
+  Windows continuation is explicitly deferred to the maintainer's PC:
+  - [ ] Run the actual AHK unit/meta and engine E2E suites on the integrated SHA,
+        including extension, language-pack and category-scope cases; retain complete
+        passed/failed/skipped results.
+  - [ ] With no installed Ergopti layout, verify the shipped pack, all 24 suffix
+        rules, metadata-only replacement and physical magic-key repeat/retirement.
+        Check native bulk enable/disable, preserved unrelated choices, refusal and
+        pause recovery, persistence and all 21 translated menu descriptions.
+  - [ ] Build/install/upgrade/uninstall that same Windows source SHA without a
+        release; verify both required extension TOML files, no retired French source
+        fallback, no duplicate Layout row and preserved personal files/preferences.
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings
       (provenance fix), Windows tooltip rendering on 10/11, every new menu row and

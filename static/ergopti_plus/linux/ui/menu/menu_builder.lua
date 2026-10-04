@@ -423,43 +423,6 @@ local function _build_layouts(ctx)
 		return ctx.webview.show("layout_manager")
 	end
 
-	-- The manifest owns this switch and its position before the physical picker.
-	-- The canonical choice owner also owns the runtime publication and redraw.
-	render_ctx.feature_rows = {}
-	for key, value in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[key] = value end
-	local replace_path = "hotstrings.magic_key.replace"
-	for _, declaration in ipairs(ManifestMenu and ManifestMenu.get_array("layout_menu") or {}) do
-		if declaration.type == "feature" and declaration.path == replace_path then
-			render_ctx.feature_rows[replace_path] = function()
-				local config = ctx.config
-				if type(config) ~= "table" or type(config.is_group_enabled) ~= "function"
-					or type(config.is_section_checked) ~= "function" or type(config.toggle_section) ~= "function" then
-					Logger.error(LOG, "No canonical magic replacement choice owner in the layout menu.")
-					return nil
-				end
-				local function admitted()
-					return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
-						and config.is_group_enabled("magickey") == true
-				end
-				local enabled = admitted()
-				return {
-					label = i18n_safe(declaration.i18n),
-					checked = config.is_section_checked("magickey", "replace") == true,
-					disabled = not enabled,
-					action = enabled and function()
-						if not admitted() then return false end
-						local ok, committed = pcall(config.toggle_section, "magickey", "replace")
-						if not ok or committed ~= true then
-							Logger.error(LOG, "Magic replacement choice was not committed: %s.", tostring(committed))
-							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
-							return false
-						end
-						return true
-					end or nil,
-				}
-			end
-		end
-	end
 
 	local providers = {
 		-- The custom layout picker: the registry layouts the layout manager
@@ -1608,7 +1571,8 @@ local function _manifest_hotstring_rows(ctx, config)
 						names[extension.id] = names[extension.id] or extension.name
 						local list = bound_sections[extension.id] or {}
 						bound_sections[extension.id] = list
-						list[#list + 1] = { category = name, section = section, count = record.count or 0 }
+						list[#list + 1] = { category = name, section = section, count = record.count or 0,
+							description = record.description }
 					end
 				end
 			end
@@ -1632,9 +1596,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				local packs = by_extension[extension_id]
 				local sub = {}
 				local function commit_gates(enabled)
+					if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+					local bindings = {}
+					for _, leaf in ipairs(bound_sections[extension_id] or {}) do
+						bindings[#bindings + 1] = { group = leaf.category, section = leaf.section }
+					end
 					local called, committed = pcall(function()
-						if type(config.set_category_gates_enabled) ~= "function" then return false end
-						return config.set_category_gates_enabled(packs, enabled)
+						if type(config.set_extension_sections_enabled) ~= "function" then return false end
+						return config.set_extension_sections_enabled(packs, bindings, enabled)
 					end)
 					if called and committed == true then
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -1668,12 +1637,20 @@ local function _manifest_hotstring_rows(ctx, config)
 					local checked = config.is_section_checked
 						and config.is_section_checked(bound.category, bound.section)
 						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
+					local description = bound.description
+					if type(description) == "table" then
+						local locale = require("infra.i18n").get_locale()
+						description = description[locale] or description.en
+					end
+					if type(description) ~= "string" or description == "" then description = bound.section end
 					sub[#sub + 1] = {
-						label    = string.format("%s (%d)", bound.section, bound.count),
+						label    = string.format("%s (%d)", description, bound.count),
 						checked  = checked and true or false,
 						-- Greyed while its category is off, like a section row there.
-						disabled = not category_on,
-						action   = function()
+						disabled = not category_on or ctx.paused == true,
+						action   = (category_on and ctx.paused ~= true) and function()
+							if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused())
+								or config.is_group_enabled(bound.category) ~= true then return false end
 							local called, committed = pcall(function()
 								if type(config.toggle_section) ~= "function" then return false end
 								return config.toggle_section(bound.category, bound.section)
@@ -1683,7 +1660,7 @@ local function _manifest_hotstring_rows(ctx, config)
 								called and "owner-not-committed" or "owner-error")
 							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 							return false
-						end,
+						end or nil,
 					}
 				end
 

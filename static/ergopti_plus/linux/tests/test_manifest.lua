@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.ui.test_ergopti_extension_selection",
 	"tests.unit.modules.llm.test_local_server_discovery",
 	"tests.unit.meta.test_combination_labels",
 	"tests.unit.adapters.test_atspi_focus",

@@ -93,7 +93,7 @@
 				"uk": "Клавіша ★ та розширення тексту",
 				"zh": "★ 键与文本扩展"
 			},
-			"hotstrings/magickey.toml#replace": {
+			"layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace": {
 				"ar": "تحويل مفتاح إلى مفتاح ★",
 				"cs": "Transformovat klávesu na klávesu ★",
 				"da": "Omdanne en tast til ★-tasten",
@@ -506,52 +506,6 @@
 				"tr": "Yuvarlamalar",
 				"uk": "Перекати",
 				"zh": "连击"
-			},
-			"hotstrings/french/distancesreduction.toml": {
-				"ar": "تقليل المسافات",
-				"cs": "Snížení vzdáleností",
-				"da": "Afstandsreduktion",
-				"de": "Distanzreduktion",
-				"en": "Distance reduction",
-				"es": "Reducción de distancias",
-				"fr": "Réduction des distances",
-				"he": "הפחתת מרחקים",
-				"hi": "दूरी में कमी",
-				"it": "Riduzione delle distanze",
-				"ja": "距離削減",
-				"ko": "거리 감소",
-				"nl": "Afstandsreductie",
-				"no": "Avstandsreduksjon",
-				"pl": "Redukcja odległości",
-				"pt": "Redução de distâncias",
-				"ru": "Уменьшение расстояний",
-				"sv": "Avståndsminskning",
-				"tr": "Mesafe azaltma",
-				"uk": "Зменшення відстаней",
-				"zh": "距离减少"
-			},
-			"hotstrings/french/distancesreduction.toml#suffixes_a": {
-				"ar": "À + حرف يعطي لاحقة: às = ement, àn = ation, àh = ight, …",
-				"cs": "À + písmeno dává příponu: às = ement, àn = ation, àh = ight, …",
-				"da": "À + bogstav giver et suffiks: às = ement, àn = ation, àh = ight, …",
-				"de": "À + Buchstabe ergibt ein Suffix: às = ement, àn = ation, àh = ight, …",
-				"en": "À + letter gives a suffix: às = ement, àn = ation, àh = ight, …",
-				"es": "À + letra da un sufijo: às = ement, àn = ation, àh = ight, …",
-				"fr": "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …",
-				"he": "À + אות נותן סיומת: às = ement, àn = ation, àh = ight, …",
-				"hi": "À + अक्षर एक प्रत्यय देता है: às = ement, àn = ation, àh = ight, …",
-				"it": "À + lettera dà un suffisso: às = ement, àn = ation, àh = ight, …",
-				"ja": "À + 文字がサフィックスを生成：às = ement, àn = ation, àh = ight, …",
-				"ko": "À + 문자가 접미사를 만듦: às = ement, àn = ation, àh = ight, …",
-				"nl": "À + letter geeft een achtervoegsel: às = ement, àn = ation, àh = ight, …",
-				"no": "À + bokstav gir et suffiks: às = ement, àn = ation, àh = ight, …",
-				"pl": "À + litera daje sufiks: às = ement, àn = ation, àh = ight, …",
-				"pt": "À + letra dá um sufixo: às = ement, àn = ation, àh = ight, …",
-				"ru": "À + буква даёт суффикс: às = ement, àn = ation, àh = ight, …",
-				"sv": "À + bokstav ger ett suffix: às = ement, àn = ation, àh = ight, …",
-				"tr": "À + harf bir son ek verir: às = ement, àn = ation, àh = ight, …",
-				"uk": "À + літера дає суфікс: às = ement, àn = ation, àh = ight, …",
-				"zh": "À + 字母 = 后缀：às = ement，àn = ation，àh = ight，…"
 			},
 			"hotstrings/french/autocorrection.toml": {
 				"ar": "تصحيح تلقائي",
@@ -1980,7 +1934,7 @@
 												"recommended": true,
 												"label": [
 													{
-														"text_ref": "hotstrings/magickey.toml#replace"
+														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
 													}
 												]
 											},
@@ -2450,29 +2404,6 @@
 							{
 								"select_all": true,
 								"groups": [
-									{
-										"path": "category_enabled.french_distancesreduction",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/french/distancesreduction.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.french_distancesreduction.suffixes_a.enabled",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/french/distancesreduction.toml#suffixes_a"
-													}
-												]
-											}
-										]
-									},
 									{
 										"path": "category_enabled.french_autocorrection",
 										"value": true,
@@ -3620,7 +3551,7 @@
 												"recommended": true,
 												"label": [
 													{
-														"text_ref": "hotstrings/magickey.toml#replace"
+														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
 													}
 												]
 											},
@@ -4090,29 +4021,6 @@
 							{
 								"select_all": true,
 								"groups": [
-									{
-										"path": "hotstrings.groups.french_distancesreduction",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/french/distancesreduction.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.modules.french_distancesreduction.suffixes_a",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/french/distancesreduction.toml#suffixes_a"
-													}
-												]
-											}
-										]
-									},
 									{
 										"path": "hotstrings.groups.french_autocorrection",
 										"value": true,
@@ -4769,7 +4677,7 @@
 												"recommended": true,
 												"label": [
 													{
-														"text_ref": "hotstrings/magickey.toml#replace"
+														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
 													}
 												]
 											},
@@ -5239,29 +5147,6 @@
 							{
 								"select_all": true,
 								"groups": [
-									{
-										"path": "hotstrings.groups.french_distancesreduction",
-										"value": true,
-										"default": false,
-										"label": [
-											{
-												"text_ref": "hotstrings/french/distancesreduction.toml"
-											}
-										],
-										"items": [
-											{
-												"path": "hotstrings.modules.french_distancesreduction.suffixes_a",
-												"value": true,
-												"default": false,
-												"recommended": false,
-												"label": [
-													{
-														"text_ref": "hotstrings/french/distancesreduction.toml#suffixes_a"
-													}
-												]
-											}
-										]
-									},
 									{
 										"path": "hotstrings.groups.french_autocorrection",
 										"value": true,

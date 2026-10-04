@@ -576,12 +576,12 @@ function M.get_magic_key_source()
 end
 
 --- Whether the magic key's replace section asks for the physical key: the
---- `magic_key` group and its `replace` section, the gates the keyboard-layout
---- menu shows on the replace row.
+--- `magickey` TOML group and its `replace` section, whose canonical choice the
+--- Ergopti extension's menu owns.
 --- @return boolean
 local function magic_key_replace_on()
-	return Registry.is_group_enabled("magic_key") == true
-		and Registry.is_section_enabled("magic_key", "replace") == true
+	return Registry.is_group_enabled("magickey") == true
+		and Registry.is_section_enabled("magickey", "replace") == true
 end
 
 --- Reports whether the actual key-down owner can emit an explicit magic key.

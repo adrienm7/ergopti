@@ -329,6 +329,7 @@ function M.load_catalogue(paths, options)
 					-- pack shipping per-section timings had them silently ignored.
 					category.sections[sec_name] = {
 						count    = entry_count,
+						description = section.description,
 						delay    = tonumber((meta.section_delays or {})[sec_name]),
 						priority = section_priorities[sec_name],
 						-- The extension a bound section comes from (Ergopti's repeat
@@ -415,6 +416,37 @@ function M.list_subdirs(dir)
 		if path ~= "" then result[#result + 1] = path end
 	end
 	return result
+end
+
+--- Proves two routes still name the same regular native source file.
+--- Logical shipped categories can use a relative path or physical alias; a
+--- same-named user copy has a different identity and grants no shipped binding.
+--- Missing or unstable native identity support refuses this distinction.
+--- @param left string Requested source path.
+--- @param right string Canonical shipped source path.
+--- @return boolean same Stable native device/inode identity agrees.
+function M.same_file(left, right)
+	if type(left) ~= "string" or left == "" or left:find("\0", 1, true)
+		or type(right) ~= "string" or right == "" or right:find("\0", 1, true) then return false end
+	local available, native = pcall(require, "lfs")
+	local stat = available and type(native) == "table" and native.attributes or nil
+	if type(stat) ~= "function" then
+		available, native = pcall(require, "luv")
+		stat = available and type(native) == "table" and native.fs_stat or nil
+	end
+	if type(stat) ~= "function" then return false end
+	local function identity(path)
+		local ok, attrs = pcall(stat, path)
+		if not ok or type(attrs) ~= "table" or (attrs.mode ~= "file" and attrs.type ~= "file") then return nil end
+		local device, inode = attrs.dev, attrs.ino
+		if type(device) ~= "number" or type(inode) ~= "number"
+			or device ~= device or inode ~= inode or device < 0 or inode <= 0
+			or device == math.huge or inode == math.huge
+			or device % 1 ~= 0 or inode % 1 ~= 0 then return nil end
+		return tostring(device) .. ":" .. tostring(inode)
+	end
+	local first, second = identity(left), identity(right)
+	return first ~= nil and first == second and identity(left) == first and identity(right) == second
 end
 
 --- Reads a whole file, or nil when it is absent.

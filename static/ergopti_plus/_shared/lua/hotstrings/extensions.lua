@@ -387,6 +387,29 @@ local function binding_covers(binding, section)
 	return false
 end
 
+--- Restricts binding discovery to one explicitly selected logical category.
+--- A single shipped source includes its bound sections without loading unrelated
+--- categories from the same extension. Ownership conflict checks still run over
+--- every discovered owner of that category through bound_source().
+--- @param packs table Validated discovered extension records.
+--- @param category string Exact runtime category.
+--- @return table Detached pack records carrying only this category's bindings.
+function M.category_bindings(packs, category)
+	assert(type(packs) == "table" and type(category) == "string" and category ~= "",
+		"category bindings need discovered packs and an exact category")
+	local selected = {}
+	for _, pack in ipairs(packs) do
+		local files = {}
+		for _, file in ipairs(pack.bound_files or {}) do
+			if file.binding and file.binding.category == category then files[#files + 1] = file end
+		end
+		if #files > 0 then
+			selected[#selected + 1] = { id = pack.id, name = pack.name, bound_files = files }
+		end
+	end
+	return selected
+end
+
 --- The discovered file that supplies a category, or one section of it.
 ---
 --- A namespaced key names its own file. A historical category keeps its bundled

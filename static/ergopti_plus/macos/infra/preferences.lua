@@ -36,6 +36,7 @@ local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
+local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
 local Agent     = require("llm.agent")
 local LOG       = "preferences"
@@ -1305,7 +1306,7 @@ function M.project_hotstring_preferences(saved, groups, get_sections)
 		local projected = {}
 		for _, section in ipairs(sections or {}) do
 			assert(type(section) == "table" and type(section.name) == "string", "hotstring section descriptor is invalid")
-			if section.name ~= "-" and not section.is_module_placeholder then
+			if HotstringLanguages.section_actionable(Manifest.features(), name, section) then
 				local selected = supplied and supplied[section.name]
 				if selected == nil then selected = Manifest.default_for("hotstrings.modules." .. name .. "." .. section.name) end
 				assert(type(selected) == "boolean", "hotstring section preference must be boolean")
@@ -1341,7 +1342,7 @@ function M.snapshot(state, hotfiles, core_mods)
 		if type(secs) == "table" then
 			section_states[name] = {}
 			for _, sec in ipairs(secs) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+				if HotstringLanguages.section_actionable(Manifest.features(), name, sec) then
 					local is_en = keymap and type(keymap.is_section_enabled) == "function"
 						and keymap.is_section_enabled(name, sec.name) or false
 					section_states[name][sec.name] = is_en

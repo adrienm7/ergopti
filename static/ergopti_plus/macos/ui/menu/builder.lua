@@ -346,8 +346,8 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		and menu_mods.hotstrings.bound_sections(ctx) or {}
 	for _, menu in ipairs(M.extension_menus(ctx, counts, BOUND_BY_EXTENSION, BOUND_SECTIONS)) do
 		local items = {}
-		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
-			and menu_mods.hotstrings.build_language_bulk_actions(ctx, menu.groups) or {}
+		local bulk = type(menu_mods.hotstrings.build_extension_bulk_actions) == "function"
+			and menu_mods.hotstrings.build_extension_bulk_actions(ctx, menu.groups, menu.sections) or {}
 		for _, row in ipairs(bulk) do items[#items + 1] = row end
 		items[#items + 1] = { separator = true }
 		-- One group at a time: a single pass over the loaded groups would draw them

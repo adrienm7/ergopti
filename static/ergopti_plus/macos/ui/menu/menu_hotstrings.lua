@@ -42,6 +42,9 @@ local keymap       = require("modules.keymap")
 -- (persisted to hotstrings_config.toml, shared with the config window). The quick
 -- menu items below read/write through it so the two UIs never desync.
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+local HotstringLanguages = require("hotstrings.languages")
+local BulkScope = require("hotstrings.bulk_scope")
+local ManifestReader = require("infra.manifest_reader")
 
 
 
@@ -140,7 +143,7 @@ local function section_names_for(keymap_api, group_name)
 		and keymap_api.get_sections(group_name) or nil
 	local names = {}
 	for _, section in ipairs(type(sections) == "table" and sections or {}) do
-		if type(section) == "table" and section.name ~= "-" and not section.is_module_placeholder then
+		if HotstringLanguages.section_actionable(ManifestReader.features(), group_name, section) then
 			names[#names + 1] = section.name
 		end
 	end
@@ -343,7 +346,12 @@ function M.build_bound_section_rows(ctx, bound)
 				rows[#rows + 1] = {
 					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 					checked  = sec_on or nil,
-					action   = (enabled and not ctx.paused) and toggleSectionFn(ctx, entry.group, sec.name, lbl) or nil,
+					action   = (enabled and not ctx.paused) and function()
+						if ctx.paused or (type(ctx.is_paused) == "function" and ctx.is_paused())
+							or not groupEnabled(ctx, entry.group) then return false end
+						local enable = not ctx.keymap.is_section_enabled(entry.group, entry.section)
+						return M.commit_extension_selection(ctx, {}, { entry }, enable)
+					end or nil,
 					disabled = not enabled or ctx.paused or nil,
 				}
 				if enabled and sec_on and sec.count ~= nil then total = total + tonumber(sec.count) end
@@ -351,6 +359,84 @@ function M.build_bound_section_rows(ctx, bound)
 		end
 	end
 	return rows, total
+end
+
+--- Commits the extension's exact whole-category and bound-section choices together.
+--- Persistence participates in the registry owner's rollback, so a refused save
+--- restores both its native gates and the settings cache.
+--- @param ctx table Menu context.
+--- @param groups table Whole category ids supplied by the extension.
+--- @param bound table Exact `{ group, section }` bindings.
+--- @param enabled boolean Explicit choice.
+--- @return boolean committed
+function M.commit_extension_selection(ctx, groups, bound, enabled)
+	if ctx.paused or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+	local km = ctx.keymap
+	if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
+	local inventory = {}
+	for _, file in ipairs(ctx.hotfiles or {}) do
+		local name = ctx.get_group_name and ctx.get_group_name(file) or file
+		inventory[name] = section_names_for(km, name)
+	end
+	local plan = BulkScope.plan(inventory, groups, enabled, bound)
+	if not plan then return false end
+	if enabled and not KeymapLifecycle.ensure_started(ctx, "enable extension hotstrings") then return false end
+	local changes, by_group, previous = {}, {}, {}
+	for _, choice in ipairs(plan) do
+		local change = by_group[choice.group]
+		if not change then
+			change = { name = choice.group, sections = {} }
+			changes[#changes + 1], by_group[choice.group] = change, change
+		end
+		if choice.section then
+			change.sections[#change.sections + 1] = choice.section
+		else
+			change.group_enabled = choice.enabled
+			previous[choice.group] = { value = ctx.state.hotstrings[choice.group] }
+		end
+	end
+	local committed = KeymapLifecycle.commit_mutation(ctx, "extension hotstring selection", function()
+		return km.set_groups_sections_enabled(changes, enabled, function()
+			for _, change in ipairs(changes) do
+				if change.group_enabled ~= nil then ctx.state.hotstrings[change.name] = change.group_enabled end
+			end
+			return ctx.save_prefs() == true
+		end)
+	end)
+	if not committed then
+		for name, record in pairs(previous) do ctx.state.hotstrings[name] = record.value end
+		return false
+	end
+	ctx.updateMenu()
+	return true
+end
+
+--- The extension-wide switch includes its native bound feature choices.
+--- @param ctx table Menu context.
+--- @param groups table Whole category ids.
+--- @param bound table Exact section bindings.
+--- @return table rows
+function M.build_extension_bulk_actions(ctx, groups, bound)
+	local all_on = #groups > 0 or #bound > 0
+	for _, name in ipairs(groups) do
+		if not groupEnabled(ctx, name) then all_on = false end
+		for _, section in ipairs(section_names_for(ctx.keymap, name)) do
+			if ctx.keymap.is_section_enabled(name, section) ~= true then all_on = false end
+		end
+	end
+	for _, leaf in ipairs(bound) do
+		if not groupEnabled(ctx, leaf.group) or ctx.keymap.is_section_enabled(leaf.group, leaf.section) ~= true then
+			all_on = false
+		end
+	end
+	return { {
+		label = i18n.get("menu.hotstrings.enable_all_sections"),
+		checked = all_on,
+		disabled = ctx.paused or nil,
+		action = not ctx.paused and function()
+			return M.commit_extension_selection(ctx, groups, bound, not all_on)
+		end or nil,
+	} }
 end
 
 --- Builds the main hotstring groups menu.
@@ -413,7 +499,6 @@ function M.build_groups(ctx, only, counts)
 			end
 
 			local sec_menu = {}
-			-- "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
 			local prev_was_sep = true -- Suppress a potential leading separator
 			for _, sec in ipairs(ordered_secs) do
 				if type(sec) == "table" then
@@ -422,8 +507,6 @@ function M.build_groups(ctx, only, counts)
 							sec_menu[#sec_menu + 1] = { separator = true }
 							prev_was_sep = true
 						end
-					elseif name == "magic_key" and sec.name == "replace" then
-						-- Skip: shown in Disposition Ergopti
 					elseif bound_by_group[name] and bound_by_group[name][sec.name] then
 						-- Skip: shown in the « Hotstrings <extension> » submenu
 					elseif sec.is_module_placeholder then

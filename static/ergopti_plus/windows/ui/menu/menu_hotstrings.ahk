@@ -1057,6 +1057,10 @@ _HS_ExtensionRows(Options := unset) {
 						(Targets, Enabled) => HotstringExtensions_SetCategoryEnabled(Targets[1], Enabled, Options))))
 			}
 		}
+		if Ext.toml_files.Length || (Ext.HasOwnProp("bound_files") && Ext.bound_files.Length) {
+			for Command in _HS_ExtensionScopeCommandRows(Ext.id, Options)
+				ExtRows.Push(Command)
+		}
 		Rows.Push(Map(
 			"label", StrReplace(t("menu.extensions.hotstrings_of"), "%s", Ext.name)
 				. " (" . FmtCount(ExtTotalForExt) . ")",
@@ -1065,7 +1069,46 @@ _HS_ExtensionRows(Options := unset) {
 	return Rows
 }
 
+; Reuse the shared explicit command declarations; the atomic owner resolves
+; current whole groups and bound leaves again when a retained row is clicked.
+_HS_ExtensionScopeCommandRows(ExtensionId, Options) {
+	Commands := Map(
+		"hotstring_category_enable_all", (*) => HotstringsExtensionScopeApply(ExtensionId, true, Options),
+		"hotstring_category_disable_all", (*) => HotstringsExtensionScopeApply(ExtensionId, false, Options))
+	Rows := []
+	for Id in ["hotstring_category_enable_all", "hotstring_category_disable_all"] {
+		Row := MenuRenderer_CommandRow("hotstring_category_menu", Id, Commands)
+		if Row is Map {
+			Row["disabled"] := A_IsSuspended
+			Rows.Push(Row)
+		}
+	}
+	return Rows
+}
+
 ; Read intent on the click, so an older menu never inverts a masked runtime flag.
+_HS_ProgrammableHotstringRows() {
+	Commands := Map("open_user_hotstring_source", UserHotstringsOpenSource,
+		"reload_user_hotstring_source", UserHotstringsReload,
+		"create_user_hotstring_example", UserHotstringsCreateExample)
+	Rows := []
+	for Declaration in _MR_GetMenuDef("programmable_hotstrings") {
+		if !(Declaration is Map)
+			continue
+		if Declaration.Get("type", "") == "feature" {
+			Label := _ApplyMenuLabelDynamicSubstitutions(t(Declaration["i18n"]), Declaration["path"])
+			Row := MenuRowWithLabel(Declaration["path"], Label, "DynamicHotstrings")
+		} else if Declaration.Get("type", "") == "command" {
+			Row := MenuRenderer_CommandRow("programmable_hotstrings", Declaration["id"], Commands)
+		} else {
+			continue
+		}
+		if Row is Map
+			Rows.Push(Row)
+	}
+	return Rows
+}
+
 _HS_ExtensionToggle(Path, Options, *) {
 	return HotstringExtensions_SetEnabled(Path, !ReadFeatureStateV2(Path)["enabled"], Options)
 }

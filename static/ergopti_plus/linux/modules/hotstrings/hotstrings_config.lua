@@ -1102,9 +1102,16 @@ local function resolve_paths()
 		by_stem[stem] = path
 	end
 
-	-- A single file as the config is the explicit-path case, and it means exactly
-	-- that file — no merge, because the user named one thing.
+	-- A user-selected physical file stays exact. Selecting the actual shipped
+	-- file names its logical category, including sections supplied by its bound
+	-- extension; loading only its common fragment would lose the native controls.
 	if _config_dir and _config_dir:match("%.toml$") then
+		local category = _config_dir:match("([^/\\]+)%.toml$")
+		local canonical = category and Paths.shared("modules/hotstrings/" .. category .. ".toml")
+		if canonical and type(Loader.same_file) == "function" and Loader.same_file(_config_dir, canonical) then
+			local found = Extensions.category_bindings(M.discover_extensions(), category)
+			return M.route_bound_sources({ _config_dir }, found), personal_sources
+		end
 		local root = _config_dir:match("^(.*)/[^/]+$") or ""
 		discover_personal(_config_dir, root)
 		local descriptor = descriptors_by_path[_config_dir]
@@ -1681,6 +1688,29 @@ function M.set_category_gates_enabled(targets, enabled)
 		return false, reason
 	end
 	local committed, refusal = commit_choices(changes, "Hotstring category gate selection")
+	if committed then notify_change() end
+	return committed, refusal
+end
+
+--- Sets whole category gates and exact sections supplied by one extension.
+--- A bound native feature participates in the same durable transaction without
+--- changing unrelated sections of its common category.
+--- @param targets table Dense whole-category ids.
+--- @param bound table Dense `{ group, section }` bindings.
+--- @param enabled boolean Explicit target state.
+--- @return boolean committed
+--- @return string|nil reason
+function M.set_extension_sections_enabled(targets, bound, enabled)
+	local inventory = {}
+	for id in pairs(_categories) do inventory[id] = known_sections(id) end
+	-- This driver's existing extension commands preserve each whole pack's
+	-- section choices while switching its category gate.
+	if type(targets) == "table" then
+		for _, id in ipairs(targets) do if inventory[id] then inventory[id] = {} end end
+	end
+	local changes, reason = BulkScope.plan(inventory, targets, enabled, bound)
+	if not changes then return false, reason end
+	local committed, refusal = commit_choices(changes, "Extension hotstring selection")
 	if committed then notify_change() end
 	return committed, refusal
 end
