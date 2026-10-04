@@ -240,7 +240,7 @@ helpers.describe("sqlite_command — arguments", function()
 
 	helpers.it("places flags before the database path", function()
 		local cmd = Cmd.build("/db", "SELECT 1;", { flags = { "-json" } })
-		helpers.assert_contains(cmd, "sqlite3 '-init' '/dev/null' '-json' '/db'", "owned flags precede the positional argument after isolated init")
+		helpers.assert_contains(cmd, "sqlite3 '-init' '/dev/null' '-bail' '-json' '/db'", "owned flags precede the positional argument after isolated fail-fast init")
 	end)
 
 	helpers.it("discards diagnostics by default and captures them on request", function()
@@ -257,6 +257,21 @@ helpers.describe("sqlite_command — arguments", function()
 		helpers.assert_nil((Cmd.build("/db", "")), "an empty script must not compose")
 		helpers.assert_nil((Cmd.build(nil, "SELECT 1;")), "a nil db_path must not compose")
 	end)
+end)
+
+
+helpers.describe("sqlite_command — stop-on-error ownership", function()
+	for _, mode in ipairs({ "write", "json", "scalar" }) do
+		helpers.it("linux-sqlite-bail: " .. mode .. " stops the native CLI at its first failed statement", function()
+			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
+			local command = assert(Cmd.build("/db/metrics.sqlite", "BEGIN;\nSELECT 42;\nCOMMIT;", { flags = flags, capture_exit = true }))
+			helpers.assert_contains(command, "'-bail'", "receipt refusal alone cannot undo a later COMMIT")
+			helpers.assert_true(command:find("sqlite3 '-init' '/dev/null'", 1, true) == 1)
+			for _, flag in ipairs(flags) do helpers.assert_contains(command, "'" .. flag .. "'") end
+			helpers.assert_contains(command, "BEGIN;\nSELECT 42;\nCOMMIT;")
+			helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
+		end)
+	end
 end)
 
 

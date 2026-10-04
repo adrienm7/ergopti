@@ -109,6 +109,42 @@ check("native legal SQL retains Unicode, shell literals and encoded NUL bytes", 
 	assert(#literal == 1 and literal[1] == expected_hex, "legal literal SQL bytes were changed: " .. tostring(literal[1]) .. " expected " .. expected_hex)
 end)
 
+assert(Writer.exec_sql("CREATE TABLE transaction_receipt(value TEXT UNIQUE CHECK(value <> 'denied-check')); INSERT INTO transaction_receipt VALUES ('retained');"))
+for _, case in ipairs({
+	{ "missing table", "INSERT INTO absent_native_transaction VALUES (1);" },
+	{ "syntax", "SELECT FROM;" },
+	{ "unique", "INSERT INTO transaction_receipt VALUES ('retained');" },
+	{ "check", "INSERT INTO transaction_receipt VALUES ('denied-check');" },
+}) do
+	check("native multiline transaction " .. case[1] .. " cannot commit after a failed statement", function()
+		assert(Writer.exec_sql("DELETE FROM transaction_receipt WHERE value <> 'retained';"))
+		-- The migration backend joins complete statements on separate lines.
+		-- sqlite3_exec stops within one line, but the default CLI continues at
+		-- the next line, including COMMIT, unless its native bail flag is set.
+		local script = "BEGIN;\nINSERT INTO transaction_receipt VALUES ('prefix');\n"
+			.. case[2] .. "\nINSERT INTO transaction_receipt VALUES ('suffix');\nCOMMIT;"
+		assert(Writer.exec_sql(script) == false, "failed statement reported successful transaction")
+		local rows = assert(Writer.query_rows("SELECT value FROM transaction_receipt ORDER BY value;"))
+		assert(#rows == 1 and rows[1] == "retained", "failed transaction persisted a prefix/suffix or lost prior data")
+	end)
+end
+
+check("native same-line SQL error still closes and rolls back its transaction", function()
+	assert(Writer.exec_sql("DELETE FROM transaction_receipt WHERE value <> 'retained';"))
+	assert(Writer.exec_sql("BEGIN; INSERT INTO transaction_receipt VALUES ('same-line'); INSERT INTO absent_native_transaction VALUES (1); COMMIT;") == false)
+	local rows = assert(Writer.query_rows("SELECT value FROM transaction_receipt ORDER BY value;"))
+	assert(#rows == 1 and rows[1] == "retained")
+end)
+
+check("native healthy multiline commit and explicit rollback retain their semantics", function()
+	assert(Writer.exec_sql("BEGIN;\nINSERT INTO transaction_receipt VALUES ('healthy-prefix');\nINSERT INTO transaction_receipt VALUES ('healthy-suffix');\nCOMMIT;"))
+	local committed = assert(Writer.query_rows("SELECT value FROM transaction_receipt WHERE value LIKE 'healthy-%' ORDER BY value;"))
+	assert(#committed == 2 and committed[1] == "healthy-prefix" and committed[2] == "healthy-suffix")
+	assert(Writer.exec_sql("BEGIN;\nINSERT INTO transaction_receipt VALUES ('explicit-rollback');\nROLLBACK;"))
+	local rolled_back = assert(Writer.query_rows("SELECT value FROM transaction_receipt WHERE value='explicit-rollback';"))
+	assert(#rolled_back == 0, "healthy explicit rollback was committed")
+end)
+
 Writer.close_db()
 for name in uv.fs_scandir_next, assert(uv.fs_scandir(root)) do assert(uv.fs_unlink(root .. "/" .. name)) end
 assert(uv.fs_rmdir(root))
