@@ -751,6 +751,19 @@
 			"i18n": "menu.agent.disabled_apps"
 		}
 	],
+	"agent_system_controls": [
+		{
+			"type": "check",
+			"id": "agent_system_off",
+			"i18n": "menu.agent.off",
+			"checked_when": [
+				"agent_system_is_off"
+			],
+			"disabled_when": [
+				"agent_system_off_ready"
+			]
+		}
+	],
 	"apps_menu": [
 		{
 			"type": "list",

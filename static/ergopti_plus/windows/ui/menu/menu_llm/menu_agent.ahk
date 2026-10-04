@@ -76,10 +76,13 @@ _LLM_Agent_SystemRow(Key) {
 	Value := LLM_Agent_Setting(Key)
 	Parsed := LLM_Vision_Parse(Value)
 	Current := (Parsed is Map) ? Parsed["backend"] : ""
-	Items := [Map(
-		"label", t("menu.agent.off"),
-		"checked", Current == "",
-		"action", _LLM_Agent_MenuSetBackend.Bind(Key, ""))]
+	Off := MenuRenderer_CheckRow("agent_system_controls", "agent_system_off",
+		Map("agent_system_off", _LLM_Agent_MenuSetBackend.Bind(Key, "")),
+		Map("agent_system_is_off", _LLM_Agent_MenuSystemIsOff.Bind(Key),
+			"agent_system_off_ready", (*) => true))
+	if !(Off is Map)
+		return Map("label", StrReplace(t("menu.agent." . SubStr(Key, 7)), "{1}", t("menu.agent.off")), "items", [])
+	Items := [Off]
 	CurrentLabel := t("menu.agent.off")
 	for Choice in LLM_Agent_BackendChoices(Key) {
 		Label := (Choice["value"] == LLM_VISION_LOCAL_BACKEND)
@@ -98,6 +101,16 @@ _LLM_Agent_SystemRow(Key) {
 		"disabled", Current == "",
 		"action", _LLM_Agent_MenuPromptModel.Bind(Key)))
 	return Map("label", StrReplace(t("menu.agent." . SubStr(Key, 7)), "{1}", CurrentLabel), "items", Items)
+}
+
+/**
+ * Reads the current system's checked state without retaining a backend snapshot.
+ * @param {String} Key The native system setting.
+ * @returns {Boolean} True when no backend is selected or its value is invalid.
+ */
+_LLM_Agent_MenuSystemIsOff(Key) {
+	Parsed := LLM_Vision_Parse(LLM_Agent_Setting(Key))
+	return !(Parsed is Map) || Parsed["backend"] == ""
 }
 
 /**

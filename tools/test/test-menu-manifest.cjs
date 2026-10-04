@@ -1608,3 +1608,46 @@ checkPrivacyTriggerControls();
 		'Selection case commands: shared trio, strict native receipts and unchanged placement.'
 	);
 }
+
+// Both Agent system providers publish the same declared Off control.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/agent_system_off.json'), 'utf8')
+	);
+	assert.deepEqual(corpus.systems, ['system1', 'system2']);
+	assert.deepEqual(
+		manifest.agent_system_controls,
+		[
+			{
+				type: 'check',
+				id: corpus.row_id,
+				i18n: corpus.label_key,
+				checked_when: ['agent_system_is_off'],
+				disabled_when: ['agent_system_off_ready']
+			}
+		],
+		'one canonical checked Off declaration owns both native system providers'
+	);
+	assert.equal(corpus.states.length, 3, 'the independent states must be nonempty');
+	for (const state of corpus.states) {
+		assert.equal(typeof state.spec, 'string');
+		assert.equal(typeof state.checked, 'boolean');
+	}
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_llm/menu_agent.ahk', 'MenuRenderer_CheckRow'],
+		['macos', 'ui/menu/menu_llm/agent_panel.lua', 'ManifestMenu.check_row'],
+		['linux', 'ui/menu/agent_rows.lua', 'require("infra.manifest_menu").check_row']
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert(
+			source.includes(call + '("agent_system_controls", "agent_system_off"'),
+			driver + ' must consume actual shared checked row data'
+		);
+	}
+	console.log('Agent system Off: one shared checked control, three actual native consumers.');
+}

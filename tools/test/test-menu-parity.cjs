@@ -84,6 +84,8 @@ const OPENS_SUBMENU = {
 	selection_operations: ['selection_caps_word_control', 'selection_case_commands'],
 	// Every native live-mode provider renders the shared fixed Off choice.
 	llm_live_mode: 'llm_live_controls',
+	agent_system1: 'agent_system_controls',
+	agent_system2: 'agent_system_controls',
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',
