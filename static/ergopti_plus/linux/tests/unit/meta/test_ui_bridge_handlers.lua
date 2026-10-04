@@ -2445,8 +2445,9 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	end
 	local function with_native_owners(body)
 		local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-ergopti-personal-reload"
-		local quote = require("adapters.shell_runner").quote
-		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		local Shell = require("adapters.shell_runner")
+		local quote = Shell.quote
+		assert(Shell.run("mkdir -p " .. quote(directory)) == true)
 		local path, choices, empty = directory .. "/personal_info.toml", directory .. "/config.toml", directory .. "/personal_hotstrings.toml"
 		local original = '# independent personal fields\n[info]\nfirst_name = "Ada"\n[letters]\np = "first_name"\n[future]\nvalues = [3, 9] # keep this comment\n'
 		write(path, original);write(choices, '[future]\nlabel = "unchanged"\n');write(empty, '# deliberately empty valid hotstring catalogue\n[raw]\n')
@@ -2466,8 +2467,8 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		end)
 		for name in pairs(package.loaded) do if prior[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(prior) do package.loaded[name] = value end
-		local removed = os.execute("rm -rf " .. quote(directory))
-		assert(removed == 0, "the owned native-file fixture is physically retired")
+		local removed = Shell.run("rm -rf " .. quote(directory))
+		assert(removed == true, "the owned native-file fixture is physically retired")
 		for name, value in pairs(prior) do assert(package.loaded[name] == value, "every prior module identity is restored") end
 		if not called then error(failure, 0) end
 	end
@@ -2692,6 +2693,66 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			helpers.assert_eq(require("json").decode(observed.storage_raw),
 				{ locale = "fr", future = { retained = true } },
 				"the existing runtime rollback persists its runtime snapshot, not an invented raw-source transaction")
+		end)
+	end
+end)
+
+helpers.describe("personal editor fixture process ABI", function()
+	local function with_real_shell(body)
+		local prior = package.loaded["adapters.shell_runner"]
+		package.loaded["adapters.shell_runner"] = nil
+		local Shell = require("adapters.shell_runner")
+		local native_execute = os.execute
+		local called, failure = pcall(body, Shell, native_execute)
+		os.execute = native_execute
+		package.loaded["adapters.shell_runner"] = prior
+		if not called then error(failure, 0) end
+	end
+	helpers.it("requires physical mkdir, exact data readback and cleanup through the existing status owner", function()
+		with_real_shell(function(Shell, native_execute)
+			local directory = os.tmpname(); assert(os.remove(directory))
+			directory = directory .. "-ergopti-personal-abi"
+			local quote, path = Shell.quote, directory .. "/independent.txt"
+			local calls = 0
+			os.execute = function(command)
+				calls = calls + 1
+				return native_execute(command)
+			end
+			local made = Shell.run("mkdir -p " .. quote(directory))
+			local called, readback = pcall(function()
+				local file = assert(io.open(path, "wb")); assert(file:write("independent physical bytes\n")); assert(file:close())
+				file = assert(io.open(path, "rb")); local data = assert(file:read("*a")); assert(file:close())
+				return data
+			end)
+			local refused = Shell.run("exit 1")
+			local removed = Shell.run("rm -rf " .. quote(directory))
+			os.execute = native_execute
+			helpers.assert_eq(made, true)
+			helpers.assert_eq({ called, readback }, { true, "independent physical bytes\n" })
+			helpers.assert_eq(refused, false, "an actual nonzero child cannot become an acknowledgement")
+			helpers.assert_eq(removed, true)
+			helpers.assert_eq(calls, 3, "all three owned command boundaries reached the real os.execute port")
+			local file = io.open(path, "rb"); if file then file:close() end
+			helpers.assert_eq(file, nil, "the physical private source was retired")
+		end)
+	end)
+	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw" }) do
+		helpers.it("refuses a non-success process receipt " .. outcome, function()
+			with_real_shell(function(Shell, native_execute)
+				local calls = 0
+				os.execute = function()
+					calls = calls + 1
+					if outcome == "throw" then error("inert native process refusal") end
+					if outcome == "nil" then return nil, "exit", 1 end
+					if outcome == "number" then return 2 end
+					if outcome == "text" then return "true" end
+					return false, "exit", 1
+				end
+				local acknowledged = Shell.run("inert-non-executed-fixture-command")
+				os.execute = native_execute
+				helpers.assert_eq(acknowledged, false)
+				helpers.assert_eq(calls, 1, "a retained test runner must not bypass the real status boundary")
+			end)
 		end)
 	end
 end)
