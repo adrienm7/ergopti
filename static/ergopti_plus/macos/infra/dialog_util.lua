@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Dialog Util
 --- DESCRIPTION:
---- Thin wrappers around hs.dialog.* that always bring Hammerspoon to the front
+--- Native dialog wrappers that always bring Hammerspoon to the front
 --- before showing a modal. macOS only routes Return/Escape to the dialog's
 --- default/cancel button when the owning app is frontmost — without an explicit
 --- focus step, dialogs opened from a menubar click appear behind the current
@@ -12,8 +12,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Single Source of Truth: Every dialog in the codebase goes through one
 ---    helper, so the "focus before open" rule cannot drift from site to site.
---- 2. Transparent API: Wrappers forward all arguments to hs.dialog.* unchanged
----    and return whatever the underlying call returns — drop-in replacement.
+--- 2. Native captions: Wrappers use hs.dialog.* where its API admits a title;
+---    application selection uses the existing in-process hs.osascript port.
 --- 3. Safe Focus: hs.focus is wrapped in pcall so a transient focus failure
 ---    (rare but possible during app-switch races) never prevents the dialog
 ---    from opening.
@@ -258,17 +258,45 @@ end
 --- The folder the application chooser opens on.
 local APPLICATIONS_DIR = "/Applications"
 
+--- Builds the native application-only panel through the in-process AppleScript port.
+--- Hammerspoon's chooseFileOrFolder API has no caption argument.
+--- @param message string The panel's unchanged message.
+--- @param title string|nil The translated, brandless parameter title.
+--- @return string script The escaped native panel source.
+function M.application_picker_script(message, title)
+	return text_utils.applescript_format([[
+use framework "AppKit"
+use scripting additions
+set panel to current application's NSOpenPanel's openPanel()
+panel's setTitle:"%s"
+panel's setMessage:"%s"
+panel's setDirectoryURL:(current application's NSURL's fileURLWithPath:"%s")
+panel's setCanChooseFiles:true
+panel's setCanChooseDirectories:false
+panel's setAllowsMultipleSelection:false
+panel's setAllowedFileTypes:{"app"}
+panel's setResolvesAliases:true
+set response to panel's runModal()
+if response is not (current application's NSModalResponseOK) then return missing value
+set chosenURLs to panel's |URLs|()
+if (chosenURLs's |count|()) is 0 then return missing value
+set chosenURL to chosenURLs's firstObject()
+return (chosenURL's |path|()) as text
+]], WindowTitles.compose(title), message, APPLICATIONS_DIR)
+end
+
 --- Focus-aware application chooser: an open panel on /Applications that
 --- accepts application bundles only. Modal, like text_prompt, and opened from
 --- a menu, never from the keyboard tap.
 --- @param message string The panel's message.
+--- @param title string|nil The translated, brandless parameter title.
 --- @return string|nil path The chosen .app path, nil when cancelled.
-function M.choose_application(message)
+function M.choose_application(message, title)
 	focus_hammerspoon()
-	local chosen = hs.dialog.chooseFileOrFolder(message, APPLICATIONS_DIR, true, false, false, { "app" }, true)
-	if type(chosen) ~= "table" then return nil end
-	-- The panel returns its selection keyed by position, as a string key.
-	local path = chosen[1] or chosen["1"]
+	local ok, path = hs.osascript.applescript(M.application_picker_script(message, title))
+	if ok ~= true then
+		error("dialog_util.choose_application: the native application picker failed", 2)
+	end
 	return type(path) == "string" and path ~= "" and path or nil
 end
 
