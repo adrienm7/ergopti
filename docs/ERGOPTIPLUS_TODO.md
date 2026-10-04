@@ -2370,11 +2370,21 @@ The maintained AHK and Hammerspoon configuration-schema draft examples no longer
       combination engine and retains the shared availability reason. The
       real macOS provider regression covers all 21 locales; shared contracts
       also replay each driver's physical catalogue. Native CI qualification
-      remains pending. Find which action left the three French hotstring
-      categories off in the maintainer's config.toml on 2026-09-30 (a
+      remains pending. Find which action left the French magic-key category
+      off in the maintainer's config.toml on 2026-09-30 (a
       restore, a clear or the wizard), since « ct★ » did nothing only because
       `category_enabled.french_magickey` was false; no historical attribution
       is established yet.
+
+Historical notes in commits `accf53c7f` and `6145b014f` record
+`french_magickey = false` in the September 30 18:06 backup while
+`magic_key`, `french_autocorrection` and `french_distancesreduction` were enabled. The boot message counted three
+disabled feature sections under that one gate, not three disabled categories.
+The parallel-container handover retains no original before/after configuration,
+log or backup for attribution, and the maintainer cannot recall the preceding
+operation. Source review found intentional clear, explicit-disable and wizard
+writers, but no independently demonstrated writer regression; keep this
+historical attribution requirement partial.
 
 The physical-label contract is independent of the native matrix and stored action
 IDs. Original provider cases fail before the fix; the qualified component suites
