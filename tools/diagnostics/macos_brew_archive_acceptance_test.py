@@ -152,7 +152,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_bytes(b"Independent source identity bytes\n")
             output = outer / "receipt.json"
-            children = Mock(debt=[{"kind": "process-group", "pid": 73136}])
+            children = Mock(debt=[{"kind": "process-group", "pid": 73136}], active=[], groups={})
             attempts = []
 
             def retire():
@@ -542,6 +542,176 @@ class AppleEventBoundaryControls(unittest.TestCase):
         with TemporaryDirectory() as directory:
             with self.assertRaisesRegex(probe.AppleEventBoundaryError, "delivery state"):
                 self.invoke(directory, unexpected_delivery=True)
+
+
+class PhaseEvidenceControls(unittest.TestCase):
+    """Actual bounded filesystem controls; these never substitute native process closure."""
+
+    def evidence(self, root):
+        if not hasattr(os, "O_NOFOLLOW"):
+            with self.assertRaisesRegex(probe.AdmissionError, "no-follow"):
+                probe.PhaseEvidence(root)
+            self.assertEqual(list(root.iterdir()), [])
+            return None
+        return probe.PhaseEvidence(root)
+
+    def test_failed_initial_directory_census_retires_the_acquired_descriptor(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            if not hasattr(os, "O_NOFOLLOW"):
+                self.evidence(root)
+                return
+            original_open, original_fstat = probe.os.open, probe.os.fstat
+            acquired = []
+
+            def tracked_open(*arguments, **options):
+                descriptor = original_open(*arguments, **options)
+                acquired.append(descriptor)
+                return descriptor
+
+            with (
+                patch.object(probe.os, "open", side_effect=tracked_open),
+                patch.object(probe.os, "fstat", side_effect=OSError("original census refusal")),
+            ):
+                with self.assertRaisesRegex(OSError, "original census refusal"):
+                    probe.PhaseEvidence(root)
+            self.assertEqual(len(acquired), 1)
+            with self.assertRaises(OSError):
+                original_fstat(acquired[0])
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_initial_phase_interruption_retires_evidence_without_acquiring_native_fixture(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            writer = self.evidence(root)
+            if writer is None:
+                return
+            descriptor, original_record, original_fstat = writer.descriptor, writer.record, os.fstat
+
+            def interrupted_initial(phase, **facts):
+                if phase == "candidate.begin":
+                    raise process_owner.OwnedProcessInterrupted("initial cancellation")
+                return original_record(phase, **facts)
+
+            with (
+                patch.object(probe, "PhaseEvidence", return_value=writer),
+                patch.object(writer, "record", side_effect=interrupted_initial),
+                patch.object(probe.tempfile, "mkdtemp") as acquire,
+            ):
+                with self.assertRaisesRegex(
+                    process_owner.OwnedProcessInterrupted, "initial cancellation"
+                ):
+                    probe.observe("unused", "unused", evidence_directory=root)
+            acquire.assert_not_called()
+            with self.assertRaises(OSError):
+                original_fstat(descriptor)
+            self.assertFalse(
+                json.loads((root / "checkpoint.json").read_bytes())["ownership_closed"]
+            )
+
+    def test_phase_is_exported_before_native_prerequisite_refusal(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            writer = self.evidence(root)
+            if writer is None:
+                return
+            writer.close()
+            with (
+                patch.object(probe.sys, "platform", "linux"),
+                patch.object(probe.tempfile, "mkdtemp") as acquire,
+            ):
+                with self.assertRaisesRegex(probe.AdmissionError, "requires macOS"):
+                    probe.observe("unused", "unused", evidence_directory=root)
+            acquire.assert_not_called()
+            packet = json.loads((root / "checkpoint.json").read_bytes())
+            self.assertEqual(packet["phase"], "candidate.failed")
+            self.assertEqual(packet["ownership_closed"], False)
+            self.assertEqual(packet["owner_pid"], os.getpid())
+            self.assertEqual(packet["groups"], [])
+
+    def test_symlink_evidence_directory_cannot_write_foreign_state(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            if not hasattr(os, "O_NOFOLLOW"):
+                self.evidence(root)
+                return
+            foreign = root / "foreign"
+            foreign.mkdir()
+            link = root / "link"
+            link.symlink_to(foreign, target_is_directory=True)
+            with self.assertRaises(OSError):
+                probe.PhaseEvidence(link)
+            self.assertEqual(list(foreign.iterdir()), [])
+
+    def test_unknown_receipt_fact_cannot_export_private_payload_or_claim_closure(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            writer = self.evidence(root)
+            if writer is None:
+                return
+            try:
+                self.assertTrue(writer.record("candidate.begin"))
+                expected = (root / "checkpoint.json").read_bytes()
+                self.assertFalse(
+                    writer.record(
+                        "cleanup.closed", closed=True, cases={"private-signing-key": False}
+                    )
+                )
+                self.assertTrue(writer.failed)
+                self.assertEqual((root / "checkpoint.json").read_bytes(), expected)
+                self.assertFalse(json.loads(expected)["ownership_closed"])
+                self.assertEqual(
+                    set(path.name for path in root.iterdir()), {"checkpoint.json", "phase-000.json"}
+                )
+            finally:
+                writer.close()
+
+    def test_signal_during_phase_publication_preserves_the_primary_cancellation(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            writer = self.evidence(root)
+            if writer is None:
+                return
+            try:
+                self.assertTrue(writer.record("candidate.begin"))
+                expected = (root / "checkpoint.json").read_bytes()
+                with patch.object(
+                    probe.os,
+                    "fsync",
+                    side_effect=process_owner.OwnedProcessInterrupted("original cancellation"),
+                ):
+                    with self.assertRaisesRegex(
+                        process_owner.OwnedProcessInterrupted, "original cancellation"
+                    ):
+                        writer.record("command.begin")
+                self.assertEqual((root / "checkpoint.json").read_bytes(), expected)
+                self.assertFalse(any(path.name.startswith(".phase-") for path in root.iterdir()))
+            finally:
+                writer.close()
+
+    def test_bounded_history_preserves_latest_actual_phase_with_explicit_omission(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            writer = self.evidence(root)
+            if writer is None:
+                return
+            try:
+                for index in range(258):
+                    self.assertTrue(writer.record("phase-" + str(index)))
+                self.assertEqual(len(list(root.glob("phase-*.json"))), 256)
+                latest = json.loads((root / "checkpoint.json").read_bytes())
+                self.assertEqual(latest["phase"], "phase-257")
+                self.assertEqual(latest["history_omitted"], 2)
+                self.assertFalse(latest["ownership_closed"])
+                self.assertLessEqual(max(path.stat().st_size for path in root.iterdir()), 4096)
+            finally:
+                writer.close()
 
 
 if __name__ == "__main__":

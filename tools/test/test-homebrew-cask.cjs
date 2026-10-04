@@ -275,7 +275,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 20 tests in /);
+	assert.match(result.stderr, /Ran 27 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -368,6 +368,65 @@ check('native macOS CI admits the pinned Python nonreaping prerequisites', () =>
 			assert.match(result.stderr, missing ? /Missing native nonreaping APIs/ : /CPython >= 3.13/);
 		}
 	}
+});
+
+check('archive artifacts bind only this step session independently of TIS', () => {
+	const pipeline = require('./ci-pipeline.cjs');
+	const job = pipeline.job('package-macos');
+	const step = pipeline.step(job, 'Run Swift launcher tests');
+	const lines = pipeline.runOf(step).join('\n');
+	assert.match(
+		lines,
+		/ERGOPTI_ARCHIVE_EVIDENCE_DIR="\$\(mktemp -d "\$RUNNER_TEMP\/swift-launcher-evidence\/archive-session\.XXXXXX"\)"/
+	);
+	assert.ok(
+		lines.indexOf('archive_session_dir=') < lines.indexOf('export ERGOPTI_TIS_EVIDENCE_DIR=')
+	);
+	assert.ok(
+		lines.indexOf('"scope": "swift-not-started"') <
+			lines.indexOf('export ERGOPTI_TIS_EVIDENCE_DIR=')
+	);
+	assert.match(step, /timeout-minutes: 10/);
+	const upload = pipeline.step(job, 'Retain archive diagnostic session');
+	assert.equal(
+		pipeline.stepField(upload, 'if'),
+		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
+	);
+	assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
+	const pathBlock = /^ {10}path: \|\n((?: {12}.+\n?)+)/m.exec(upload)?.[1];
+	assert.ok(pathBlock);
+	const paths = pathBlock
+		.trim()
+		.split('\n')
+		.map((line) => line.trim());
+	assert.deepEqual(paths, [
+		'${{ steps.swift-launcher-tests.outputs.archive_session_dir }}/*/*.json',
+		'${{ steps.swift-launcher-tests.outputs.archive_session_dir }}/*/helper/*.json'
+	]);
+	assert.doesNotMatch(upload, /tis_session_dir|\*\*|cache|fixture|key|\.app/i);
+});
+
+check('archive owners publish bounded typed phase evidence before native work', () => {
+	const testRoot = 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/';
+	for (const [file, owner] of [
+		['HomebrewArchiveAcceptanceTests.swift', 'brew'],
+		['SparkleArchiveUpdateAcceptanceTests.swift', 'sparkle']
+	]) {
+		const source = fs.readFileSync(path.join(ROOT, testRoot, file), 'utf8');
+		assert.ok(source.includes(`ArchiveAcceptanceEvidence(owner: .${owner})`));
+		assert.ok(source.includes('checkpoint("candidate.begin")'));
+		assert.match(source, /checkpoint\("cleanup\.debt(?:-" \+ label|"), status: "cleanup-debt"/);
+		if (owner === 'brew') assert.ok(source.includes('if evidenceRefused { canRetire = false }'));
+	}
+	const writer = fs.readFileSync(
+		path.join(ROOT, testRoot, 'ArchiveAcceptanceEvidence.swift'),
+		'utf8'
+	);
+	assert.match(writer, /swift-launcher-evidence/);
+	assert.match(writer, /O_NOFOLLOW/);
+	assert.match(writer, /bytes\.count <= 4096/);
+	assert.match(writer, /sequence < 256/);
+	assert.match(writer, /testRefusedPublicationNeverReplacesAnUnclosedCheckpoint/);
 });
 
 check('shared native process ownership controls remain registered and mandatory', () => {

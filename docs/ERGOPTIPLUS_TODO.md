@@ -1726,6 +1726,19 @@ Native Swift/C compilation, Sparkle installation/relaunch, AppleEvent sandbox
 containment, real Brew lifecycle and the final packaging/install matrix remain
 pending. These authored native tests do not close item 36.
 
+Archive acceptance now exports bounded typed checkpoints before prerequisite
+admission and during native cleanup, into one fresh CI-owned session. An
+independent always-upload step retains only those JSON facts, including an
+unclosed phase after interruption. Diagnostic refusal retains the private
+fixture instead of deleting evidence. Seven additive Python controls and three
+native Swift filesystem controls preserve all existing lifecycle assertions.
+The Sparkle fixture consumes byte-identical appcasts from the real publication
+CLI and official foreign/correct-key signing receipts; only its private signed
+application routes the exact admitted enclosure to its owned local server.
+Production TLS policy is unchanged. Final native compilation, generated-feed
+delivery, archive lifecycles and the complete packaging/install verdict remain
+required before removing item 36.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

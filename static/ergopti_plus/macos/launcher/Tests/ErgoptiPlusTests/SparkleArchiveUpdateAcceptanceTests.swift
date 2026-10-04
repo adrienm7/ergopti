@@ -18,6 +18,15 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		case evidence(String)
 	}
 
+	private var phaseEvidence: ArchiveAcceptanceEvidence?
+	private var evidenceRefused = false
+	private func checkpoint(_ phase: String, status: String = "pending", closed: Bool = false, pids: [Int32] = []) {
+		if let phaseEvidence, !phaseEvidence.record(phase, status: status, closed: closed, ownedPIDs: pids), !evidenceRefused {
+			evidenceRefused = true
+			XCTFail("Safe Sparkle phase evidence publication refused")
+		}
+	}
+
 	private struct Receipt {
 		let status: Int32
 		let stdout: String
@@ -196,12 +205,14 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 	private func run(_ executable: String, _ arguments: [String], root: URL,
 		expecting status: Int32 = 0, timeout: Double = 60) throws -> Receipt {
+		checkpoint("command.begin")
 		let child = try OwnedProcess(executable, arguments, root: root, guarded: true, workerTimeout: timeout)
 		commands.append(child)
 		try child.start()
 		let receipt: Receipt
 		do { receipt = try child.finish(timeout + 10) }
 		catch { retirementDebt = true; throw error }
+		checkpoint("command.end", status: receipt.status == status ? "accepted" : "refused")
 		guard receipt.status == status else {
 			// Compiler diagnostics concern only this checked-in fixture source.
 			// Signing children keep their captured output private.
@@ -221,6 +232,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 	}
 
 	private func waitFor(_ name: String, root: URL, seconds: Double = 45) throws -> [String: Any] {
+		checkpoint("wait." + name)
 		let target = root.appendingPathComponent(name + ".json")
 		let deadline = Date().addingTimeInterval(seconds)
 		while !manager.fileExists(atPath: target.path), Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
@@ -228,6 +240,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			let packet = try JSONSerialization.jsonObject(with: Data(contentsOf: target)) as? [String: Any] else {
 			throw Failure.deadline(name)
 		}
+		checkpoint("observed." + name, status: "accepted")
 		return packet
 	}
 
@@ -287,8 +300,39 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		return String(lines[0].dropFirst(14))
 	}
 
+	private struct ReleaseRepository {
+		let owner: String
+		let name: String
+		var archiveOrigin: String {
+			"https://github.com/" + owner + "/" + name + "/releases/download/v2.0.0/ErgoptiPlus.app.tar.xz"
+		}
+	}
+
+	/// Read the canonical checkout data, while keeping fixture tag/artifact expectations independent.
+	private func releaseRepository() throws -> ReleaseRepository {
+		let source = repository.appendingPathComponent("static/ergopti_plus/_shared/modules/updater/defaults.json")
+		let descriptor = open(source.path, O_RDONLY | O_NOFOLLOW)
+		guard descriptor >= 0 else { throw Failure.prerequisite("canonical-release-repository") }
+		let stream = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+		defer { try? stream.close() }
+		var info = stat()
+		guard fstat(descriptor, &info) == 0, info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+			info.st_size > 0, info.st_size <= 65536,
+			let bytes = try stream.read(upToCount: 65537), Int64(bytes.count) == info.st_size, bytes.count <= 65536,
+			let defaults = try JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+			let github = defaults["github"] as? [String: Any],
+			let owner = github["owner"] as? String, let name = github["repo"] as? String else {
+			throw Failure.prerequisite("canonical-release-repository")
+		}
+		let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-".utf8)
+		guard [owner, name].allSatisfy({ !$0.isEmpty && $0.utf8.count <= 100 && $0.utf8.allSatisfy({ allowed.contains($0) }) }) else {
+			throw Failure.prerequisite("canonical-release-repository-components")
+		}
+		return ReleaseRepository(owner: owner, name: name)
+	}
+
 	private func makeBundle(_ app: URL, compiled: URL, framework: URL, root: URL,
-		nonce: String, port: Int, publicKey: String, version: String) throws {
+		nonce: String, port: Int, publicKey: String, version: String, identity: ReleaseRepository) throws {
 		try privateDirectory(app)
 		for relative in ["Contents", "Contents/MacOS", "Contents/Resources", "Contents/Frameworks"] {
 			try privateDirectory(app.appendingPathComponent(relative))
@@ -303,6 +347,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			"CFBundlePackageType": "APPL", "CFBundleVersion": version,
 			"CFBundleShortVersionString": version + ".0",
 			"FixtureRoot": root.path, "FixtureNonce": nonce,
+			"FixtureGitHubOwner": identity.owner, "FixtureGitHubRepo": identity.name,
+			"FixtureArchiveOrigin": identity.archiveOrigin,
+			"FixtureArchiveTransport": "http://localhost:" + String(port) + "/archive.tar.xz",
 			"SUFeedURL": "http://localhost:" + String(port) + "/feed.xml",
 			"SUEdPublicKey": publicKey, "SUVerifyUpdateBeforeExtraction": true,
 			"SUEnableAutomaticChecks": false, "SUAutomaticallyUpdate": false,
@@ -322,21 +369,23 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		_ = try run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path], root: root)
 	}
 
-	private func feed(_ signature: String, length: Int, port: Int, destination: URL) throws {
-		// This independent feed intentionally targets only the owned loopback
-		// resource. It does not edit a production feed, cask or archive payload.
-		let xml = """
-		<?xml version="1.0" encoding="utf-8"?>
-		<rss version="2.0" xmlns:sparkle="http://www.andymattes.com/xml/namespaces/sparkle/1.0">
-		  <channel><title>Private archive acceptance</title><item>
-		    <title>Private version 2</title><sparkle:version>2</sparkle:version>
-		    <sparkle:shortVersionString>2.0</sparkle:shortVersionString>
-		    <enclosure url="http://localhost:\(port)/archive.tar.xz" length="\(length)"
-		      sparkle:edSignature="\(signature)" type="application/octet-stream" />
-		  </item></channel>
-		</rss>
-		"""
-		try Data(xml.utf8).write(to: destination, options: .atomic)
+	/// Preserve the production generator's exact XML and canonical HTTPS origin.
+	/// Only the signed disposable child's download request routes to loopback.
+	private func generatedFeed(_ archives: URL, destination: URL, root: URL, identity: ReleaseRepository) throws -> Data {
+		let generated = root.appendingPathComponent("generated-appcast-" + UUID().uuidString + ".xml")
+		_ = try run("/usr/bin/env", ["ERGOPTI_VERSION=2.0.0", "ERGOPTI_BUILD=2", "ERGOPTI_CHANNEL=dev",
+			"GH_OWNER=" + identity.owner, "GH_REPO=" + identity.name, "ARCHIVE_DIR=" + archives.path,
+			"OUTPUT_PATH=" + generated.path, "node", repository.appendingPathComponent(
+				"tools/build/macos-release-publication.cjs").path, "appcast"], root: root)
+		let bytes = try Data(contentsOf: generated)
+		let xml = try XCTUnwrap(String(data: bytes, encoding: .utf8))
+		XCTAssertTrue(xml.contains("url=\"" + identity.archiveOrigin + "\""))
+		XCTAssertFalse(xml.contains("http://localhost:"), "The producer's XML is never rewritten for fixture transport")
+		XCTAssertTrue(xml.contains("<sparkle:version>2</sparkle:version>"))
+		XCTAssertTrue(xml.contains("<sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>"))
+		try bytes.write(to: destination, options: .atomic)
+		XCTAssertTrue(try Data(contentsOf: destination) == bytes, "The served appcast must retain exact generated bytes")
+		return bytes
 	}
 
 	private func census(_ roots: [URL], root: URL) throws -> [[String: Any]] {
@@ -401,7 +450,11 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 	}
 
 	func testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch() throws {
+		phaseEvidence = try ArchiveAcceptanceEvidence(owner: .sparkle)
+		evidenceRefused = false
+		checkpoint("candidate.begin")
 		guard getuid() != 0 else { throw Failure.prerequisite("nonroot-aqua-user-session") }
+		let identity = try releaseRepository()
 		let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
 		let bundleID = "org.ergoptiplus.archive-acceptance." + nonce
 		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
@@ -417,10 +470,12 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
 		var passed = false
 		defer {
+			checkpoint("cleanup.begin", pids: [application, server].compactMap { $0?.process.processIdentifier }.filter { $0 > 0 })
 			func attempt(_ label: String, _ action: () throws -> Void) {
 				do { try action() }
 				catch {
 					retirementDebt = true
+					checkpoint("cleanup.debt-" + label, status: "cleanup-debt")
 					XCTFail("Private Sparkle retirement refused (" + label + "); fixture retained at " + root.path)
 				}
 			}
@@ -464,7 +519,11 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			// Job and census commands were acquired during cleanup and retain the
 			// same idempotent physical-retirement obligation as earlier children.
 			for command in commands { attempt("cleanup-child") { try command.retire() } }
-			if !retirementDebt, passed, testRun?.failureCount == failuresBefore {
+			if !retirementDebt {
+				checkpoint("cleanup.closed", status: "accepted", closed: true,
+					pids: [application, server].compactMap { $0?.process.processIdentifier }.filter { $0 > 0 })
+			}
+			if !retirementDebt, !evidenceRefused, passed, testRun?.failureCount == failuresBefore {
 				attempt("private-inputs") {
 					UserDefaults.standard.removePersistentDomain(forName: bundleID)
 					guard UserDefaults.standard.synchronize() else { throw Failure.evidence("private-defaults-retirement") }
@@ -520,7 +579,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let source = root.appendingPathComponent("source/ErgoptiPlus.app")
 		for (app, version) in [(installed, "1"), (source, "2")] {
 			try makeBundle(app, compiled: compiled, framework: framework.bundleURL, root: root,
-				nonce: nonce, port: port, publicKey: key.publicKey.rawRepresentation.base64EncodedString(), version: version)
+				nonce: nonce, port: port, publicKey: key.publicKey.rawRepresentation.base64EncodedString(), version: version, identity: identity)
 		}
 		let oldSnapshot = try snapshot(installed)
 		let newSnapshot = try snapshot(source)
@@ -541,12 +600,28 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let wrongSignature = try foreignKey.signature(for: payload)
 		XCTAssertTrue(foreignKey.publicKey.isValidSignature(wrongSignature, for: payload))
 		XCTAssertFalse(key.publicKey.isValidSignature(wrongSignature, for: payload))
+		let foreignArchives = root.appendingPathComponent("foreign-key-archives")
+		try privateDirectory(foreignArchives)
+		for name in ["ErgoptiPlus.app.tar.xz", "ErgoptiPlus.app.zip"] {
+			try manager.copyItem(at: archives.appendingPathComponent(name), to: foreignArchives.appendingPathComponent(name))
+		}
+		let foreignKeyFile = root.appendingPathComponent("foreign-file-key")
+		try Data(foreignKey.rawRepresentation.base64EncodedString().utf8).write(to: foreignKeyFile, options: .withoutOverwriting)
+		try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: foreignKeyFile.path)
+		_ = try run("/usr/bin/env", ["node", repository.appendingPathComponent("tools/build/macos-release-publication.cjs").path,
+			"sign", foreignArchives.path, signer, foreignKeyFile.path], root: root)
+		let foreignFragment = try String(contentsOf: foreignArchives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
+		let foreignMatch = try XCTUnwrap(expression.firstMatch(in: foreignFragment, range: NSRange(foreignFragment.startIndex..., in: foreignFragment)))
+		let foreignSignature = String(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 1), in: foreignFragment))])
+		XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")
+		XCTAssertEqual(Int(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 2), in: foreignFragment))]), payload.count)
 		try payload.write(to: www.appendingPathComponent("archive.tar.xz"), options: .withoutOverwriting)
-		try feed(wrongSignature.base64EncodedString(), length: payload.count, port: port, destination: www.appendingPathComponent("feed.xml"))
+		let refusedFeed = try generatedFeed(foreignArchives, destination: www.appendingPathComponent("feed.xml"), root: root, identity: identity)
 
 		application = try OwnedProcess(installed.appendingPathComponent("Contents/MacOS/PrivateSparkleChild").path, [], root: root)
 		commands.append(try XCTUnwrap(application))
 		try application?.start()
+		checkpoint("application.started", pids: application.map { [$0.process.processIdentifier] } ?? [])
 		let started = try waitFor("started-1", root: root)
 		XCTAssertEqual((started["pid"] as? NSNumber)?.int32Value, application?.process.processIdentifier)
 		XCTAssertEqual(started["nonce"] as? String, nonce)
@@ -565,7 +640,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		XCTAssertFalse(manager.fileExists(atPath: root.appendingPathComponent("installing-1.json").path))
 		XCTAssertFalse(manager.fileExists(atPath: root.appendingPathComponent("started-2.json").path))
 
-		try feed(signature, length: payload.count, port: port, destination: www.appendingPathComponent("feed.xml"))
+		let acceptedFeed = try generatedFeed(archives, destination: www.appendingPathComponent("feed.xml"), root: root, identity: identity)
 		try publishControl("retry", nonce: nonce, root: root)
 		_ = try waitFor("retry-accepted", root: root)
 		_ = try waitFor("ready-2", root: root)
@@ -593,11 +668,24 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let downloaded = try requests.compactMap { try JSONSerialization.jsonObject(with: Data(contentsOf: $0)) as? [String: Any] }
 			.filter { $0["path"] as? String == "/archive.tar.xz" }
 		XCTAssertEqual(downloaded.count, 2, "Refusal and retry must both fetch the real tar.xz archive")
+		let fetchedFeeds = try requests.compactMap { try JSONSerialization.jsonObject(with: Data(contentsOf: $0)) as? [String: Any] }
+			.filter { $0["path"] as? String == "/feed.xml" }
+		XCTAssertEqual(fetchedFeeds.count, 2, "Both native update cycles must consume the actual generated feed")
+		XCTAssertEqual(Set(fetchedFeeds.compactMap { $0["sha256"] as? String }), Set([hash(refusedFeed), hash(acceptedFeed)]))
+		for cycle in [1, 2] {
+			let routing = try waitFor("routed-" + String(cycle), root: root)
+			XCTAssertEqual(routing["nonce"] as? String, nonce)
+			XCTAssertEqual((routing["pid"] as? NSNumber)?.int32Value, application?.process.processIdentifier)
+			let details = try XCTUnwrap(routing["details"] as? [String: Any])
+			XCTAssertEqual(details["origin"] as? String, identity.archiveOrigin)
+			XCTAssertEqual(details["transport"] as? String, "http://localhost:" + String(port) + "/archive.tar.xz")
+		}
 		for receipt in downloaded {
 			XCTAssertEqual(receipt["nonce"] as? String, nonce)
 			XCTAssertEqual(receipt["sha256"] as? String, hash(payload))
 			XCTAssertEqual(receipt["bytes"] as? Int, payload.count)
 		}
+		checkpoint("receipt.checked", status: testRun?.failureCount == failuresBefore ? "accepted" : "refused")
 		passed = testRun?.failureCount == failuresBefore
 	}
 }

@@ -967,6 +967,54 @@ try {
 	errors.push(`Native Sparkle acceptance registration failed: ${error.message}`);
 }
 
+// Native composition must parse actual publication output before the private transport routes bytes.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	assert.match(fixture, /"OUTPUT_PATH=" \+ generated.path/);
+	assert.match(fixture, /static\/ergopti_plus\/_shared\/modules\/updater\/defaults\.json/);
+	assert.match(fixture, /let github = defaults\["github"\]/);
+	assert.match(fixture, /"GH_OWNER=" \+ identity.owner, "GH_REPO=" \+ identity.name/);
+	assert.match(fixture, /"FixtureArchiveOrigin": identity.archiveOrigin/);
+	assert.match(fixture, /details\["origin"\] as\? String, identity.archiveOrigin/);
+	assert.match(fixture, /"tools\/build\/macos-release-publication\.cjs"\)\.path, "appcast"/);
+	assert.match(fixture, /let refusedFeed = try generatedFeed\(foreignArchives/);
+	assert.match(fixture, /let acceptedFeed = try generatedFeed\(archives/);
+	assert.match(fixture, /"sign", foreignArchives.path, signer, foreignKeyFile.path/);
+	assert.match(fixture, /fetchedFeeds\.count, 2/);
+	assert.match(fixture, /hash\(refusedFeed\), hash\(acceptedFeed\)/);
+	assert.doesNotMatch(fixture, /<rss|private func feed\(/);
+	assert.match(
+		child,
+		/willDownloadUpdate item: SUAppcastItem, withRequest request: NSMutableURLRequest/
+	);
+	assert.match(child, /item\.fileURL == origin, request\.url == origin/);
+	assert.match(child, /transport\.scheme == "http", transport\.host == "localhost"/);
+	assert.match(
+		child,
+		/transport\.user == nil, transport\.password == nil, transport\.query == nil, transport\.fragment == nil/
+	);
+	assert.match(child, /request\.url = transport/);
+	assert.match(child, /request\.httpShouldHandleCookies = false/);
+	assert.match(fixture, /"NSAppTransportSecurity": \["NSAllowsLocalNetworking": true\]/);
+	assert.doesNotMatch(fixture, /NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads/);
+	console.log(
+		'Native Sparkle composition consumes unchanged generated feed bytes with exact private routing.'
+	);
+} catch (error) {
+	errors.push(`Native generated appcast composition guard failed: ${error.message}`);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
