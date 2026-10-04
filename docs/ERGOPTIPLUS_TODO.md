@@ -1927,6 +1927,17 @@ checks thirteen legal, typed, multiline, comment and literal controls. Selected
 portable gates pass; the repaired include graph, native notice lifecycle and
 semantic TOML corpus still require the next non-release Windows execution.
 
+Linux refusal now offers an explicit replacement from an already answered,
+fresh local-server cache. It publishes the exact private entry before selecting
+the backend and requesting fresh enable admission. Modal restoration admits
+only its own native resynchronization; post-dialog freshness and exact engine
+and preference revisions refuse unrelated cancellation or source drift,
+including same-byte rewrites. The focused owner suites pass 60 cases on each of
+LuaJIT and Lua 5.4; causal mutations reproduce the three corrected admission
+failures. Native dialogs, physical keyboard restoration, owned runtime
+start/install and complete qualification remain unfinished. Item 48 stays
+partial.
+
 - [ ] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
       reinstalls its own low-level keyboard hook around every SendInput (upstream
       `keyboard_mouse.cpp`, `SendEventArray`), so after the driver's first send its
