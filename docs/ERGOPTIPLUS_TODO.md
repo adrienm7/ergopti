@@ -1937,7 +1937,11 @@ overflow during sending preserves its fault and original error while consuming
 only the accepted prefix. Independent native C regressions cover nested release,
 second-thread admission, retry, teardown and overflow. The original 929 native
 assertions remain unchanged; test and production DLL cross-compilation pass.
-Windows execution remains pending. KLE-first physical capture, event-specific
+The first MSVC generation run (37231707811) refused a signed/unsigned enum
+comparison in a new expected-phase assertion under /W4 /WX. The expected phase
+now uses the snapshot field's explicit unsigned type, preserving the assertion
+and warnings-as-errors policy. Native retry and generated artifacts are pending.
+KLE-first physical capture, event-specific
 layout replay, digit/profile routes and modifier/hold balancing still require
 the full hook-order audit; this prerequisite does not complete item 49.
 

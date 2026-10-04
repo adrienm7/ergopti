@@ -60,7 +60,7 @@ jobs:
 
       - name: Prepare group 7 native artifacts and causal receipts
         shell: pwsh
-        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate f50b0d37530ac7bae32ca1332f55a774080d1f4c
+        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate 2f836cac02f88c7742312ee0c565a161845f6537
 
       - name: Build and test native navigation event owner
         shell: pwsh
@@ -473,7 +473,7 @@ jobs:
 
       - name: Prepare group 7 native artifacts and causal receipts
         shell: pwsh
-        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate f50b0d37530ac7bae32ca1332f55a774080d1f4c
+        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate 2f836cac02f88c7742312ee0c565a161845f6537
 
       - name: Build and test native navigation event owner
         shell: pwsh
