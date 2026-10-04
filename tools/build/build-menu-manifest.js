@@ -8,7 +8,9 @@
 // Input:
 //   static/ergopti_plus/_shared/modules/features/manifest.toml  ([menu.*] tables)
 //   static/ergopti_plus/_shared/modules/updater/channels.json  (registry choices)
-//   static/ergopti_plus/_shared/ui/update_channels.js  (canonical registry validator)
+//   static/ergopti_plus/_shared/ui/update_channels.js  (canonical channel validator)
+//   static/ergopti_plus/_shared/modules/updater/defaults.json  (cadence registry)
+//   static/ergopti_plus/_shared/modules/updater/schedule.js  (canonical timing validator)
 //
 // Output:
 //   static/ergopti_plus/_shared/modules/menu/menu_manifest.json
@@ -30,6 +32,7 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { runInNewContext } from 'vm';
 import sharedPaths from '../lib/paths.cjs';
+import { validateTiming } from '../../static/ergopti_plus/_shared/modules/updater/schedule.js';
 
 const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -135,6 +138,54 @@ function updaterChannelChoices() {
 	}));
 }
 
+/** Projects the cadence owner's validated numeric values and translated labels. */
+function updaterIntervalChoices() {
+	const timing = JSON.parse(readFileSync(shared('modules/updater/defaults.json'), 'utf8')).timing;
+	validateTiming(timing);
+	return timing.check_interval_presets.map((preset) => ({
+		value: preset.seconds,
+		i18n: `menu.about.frequency.${preset.code}`
+	}));
+}
+
+/** Projects signed display offsets from their numeric feature catalogue. */
+function indentationChoices(feature) {
+	const values = feature?.choice_values;
+	if (
+		feature?.type !== 'number' ||
+		!Array.isArray(values) ||
+		values.length < 2 ||
+		values.some(
+			(value, index) =>
+				!Number.isSafeInteger(value) || (index > 0 && value !== values[index - 1] + 1)
+		) ||
+		!values.includes(feature.default) ||
+		!values.includes(feature.recommended)
+	)
+		throw new Error(
+			'llm.indentation: numeric choices need ordered integral values containing the defaults'
+		);
+	return values.map((value) => ({
+		value,
+		i18n:
+			value === 0
+				? 'menu.llm.indent_none'
+				: Math.abs(value) === 1
+					? 'menu.llm.indent_space'
+					: 'menu.llm.indent_spaces',
+		label_prefix: value === 0 ? '' : `${value > 0 ? '+' : ''}${value} `
+	}));
+}
+
+const CHOICE_REGISTRIES = {
+	'llm.indentation': { path: 'llm.display.pred_indent', project: indentationChoices },
+	'updater.channels': { path: 'updater.channel', project: updaterChannelChoices },
+	'updater.check_intervals': {
+		path: 'updater.check_interval_seconds',
+		project: updaterIntervalChoices
+	}
+};
+
 /**
  * Projects each `choice` row's values from its enum feature or registered settings owner.
  *
@@ -162,8 +213,10 @@ function projectChoices(menu, raw) {
 		)
 	);
 	const enums = new Map();
+	const numeric = new Map();
 	for (const entry of flattened.entries || []) {
 		if (entry.type === 'enum') enums.set(`${entry.path_prefix}.${entry.id}`, entry);
+		if (entry.type === 'number') numeric.set(`${entry.path_prefix}.${entry.id}`, entry);
 	}
 	for (const [key, rows] of Object.entries(menu)) {
 		if (!Array.isArray(rows)) continue;
@@ -173,11 +226,12 @@ function projectChoices(menu, raw) {
 			let projectedRegistry;
 			let feature = enums.get(row.path);
 			if (row.choice_registry !== undefined) {
-				if (row.choice_registry !== 'updater.channels' || row.path !== 'updater.channel')
+				const registry = CHOICE_REGISTRIES[row.choice_registry];
+				if (!registry || row.path !== registry.path)
 					throw new Error(`${where}: unknown choice_registry or registry-owned path`);
 				if (row.choice_values !== undefined || row.choice_label_prefix !== undefined)
 					throw new Error(`${where}: registry choices own their values, order and label keys`);
-				projectedRegistry = updaterChannelChoices();
+				projectedRegistry = registry.project(numeric.get(row.path));
 				feature = {
 					enum_values: projectedRegistry.map((entry) => entry.value),
 					platforms: PLATFORMS

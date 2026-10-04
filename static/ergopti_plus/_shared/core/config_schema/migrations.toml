@@ -63,7 +63,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 9
+current_version = 10
 unstamped_version = 2
 
 
@@ -261,4 +261,13 @@ drivers = ["hs"]
 reason = "Representable legacy hotstring editor shortcuts become ordinary actions; explicit custom or disabled choices disable the contextual recommendation."
 ops = [
 	{ op = "move_chord_action", section = "hotstrings.editor", key = "shortcut", to_section = "shortcuts.keyboard", action = "open_hotstrings_editor", conditional_key = "magic_editor", disabled_action = "none", platform = "macos" },
+]
+
+[steps.v9_to_v10]
+from = 9
+to = 10
+drivers = ["ahk"]
+reason = "The Windows number-row switch becomes an explicit native, digits or symbols policy; only genuine legacy booleans are mapped."
+ops = [
+	{ op = "map_value", section = "layout", key = "direct_access_digits", map = [{ from = false, to = "native" }, { from = true, to = "digits" }] },
 ]

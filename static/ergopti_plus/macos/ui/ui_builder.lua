@@ -620,6 +620,13 @@ end
 --- closes it as soon as the grant arrives. No other window may name this chrome.
 M.PERMISSION_DIALOG_CHROME = "permission_dialog"
 
+--- Reports native constructor availability without allocating or changing a window.
+--- @return boolean available The factory has its actual native creation port.
+function M.can_create_webview()
+	return type(hs) == "table" and type(hs.webview) == "table"
+		and type(hs.webview.new) == "function"
+end
+
 --- Centralized factory to create a webview window with consistent properties.
 --- @param opts table The configuration options for the webview; focus = false
 ---        shows the window without activating the app or changing its level;
@@ -627,6 +634,7 @@ M.PERMISSION_DIALOG_CHROME = "permission_dialog"
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	if M.can_create_webview() ~= true then return nil end
 	if opts.level ~= nil then
 		-- Refused before the native window exists, so nothing is left to clean up.
 		Logger.error(LOG, "WebView factory refused a window level: windows are focused, never kept on top.")

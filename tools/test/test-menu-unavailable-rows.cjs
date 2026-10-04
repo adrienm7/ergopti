@@ -174,17 +174,100 @@ if (greyed < 1) errors.push('found no greyed row — the stand-in is untested by
 if (disabledWithReason < 1)
 	errors.push('found no disabled_reason_key — the runtime stand-in is untested by the manifest.');
 
-// One stand-in for both conditions: each renderer draws the row its
-// disabled_when greys through the same greyed stand-in as a row not yet ported.
+/**
+ * Extract one complete top-level native owner, without matching another helper.
+ * @param {string} text Native source.
+ * @param {string} name Function name.
+ * @returns {string}
+ */
+function ahkOwner(text, name) {
+	const match = text.match(new RegExp('^' + name + '\\([^\\n]*\\) \\{\\n([\\s\\S]*?)^\\}', 'm'));
+	return match ? match[1].replace(/^\s*;.*$/gm, '') : '';
+}
+
+/**
+ * The command-data owner passes the disabled reason to the original inert owner.
+ * Provider data is not asserted to render reasons by itself: this checks only
+ * the full command renderer, which owns the disabled stand-in publication.
+ * @param {string} text Native renderer source.
+ * @returns {boolean}
+ */
+function ahkDisabledReasonStandIn(text) {
+	const data = ahkOwner(text, '_MR_CommandRowData');
+	const render = ahkOwner(text, '_MR_RenderCommand');
+	const standIn = ahkOwner(text, '_MR_RenderGreyedStandIn');
+	return (
+		/Disabled := MenuRenderer_ResolveDisabledWhen\(ManifestKey, Id, StateGetters\)/.test(data) &&
+		/ReasonKey := _MR_Get\(Item, "disabled_reason_key"\)/.test(data) &&
+		/if Disabled && ReasonKey != ""\s+return Map\("label", t\(I18nKey\), "disabled", true, "disabled_reason_key", ReasonKey\)/.test(
+			data
+		) &&
+		/Row := _MR_CommandRowData\(Item, ManifestKey, Commands, StateGetters\)/.test(render) &&
+		/if !\(Row is Map\)\s+return 0/.test(render) &&
+		/if Row\.Has\("disabled_reason_key"\)\s+return _MR_RenderGreyedStandIn\(ResultMenu,\s*Map\("id", _MR_Get\(Item, "id"\), "i18n", _MR_Get\(Item, "i18n"\),\s*"reason_key", Row\["disabled_reason_key"\]\), ManifestKey\)/.test(
+			render
+		) &&
+		/ReasonKey := _MR_Get\(Item, "reason_key"\)/.test(standIn) &&
+		/Label := t\(I18nKey\) \. " — " \. _MR_ReasonHead\(t\(ReasonKey\)\)/.test(standIn) &&
+		/ResultMenu\.Add\(Label, \(\*\) => ""\)/.test(standIn) &&
+		/ResultMenu\.Disable\(Label\)/.test(standIn)
+	);
+}
+
+// Literal owner shapes pin every link; production source alone cannot prove
+// the scanner is sensitive to a lost reason, condition, callback or disable.
+const AHK_STAND_IN_FIXTURE = `
+_MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
+	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
+	ReasonKey := _MR_Get(Item, "disabled_reason_key")
+	if Disabled && ReasonKey != ""
+		return Map("label", t(I18nKey), "disabled", true, "disabled_reason_key", ReasonKey)
+}
+_MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Row := _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters)
+	if !(Row is Map)
+		return 0
+	if Row.Has("disabled_reason_key")
+		return _MR_RenderGreyedStandIn(ResultMenu,
+			Map("id", _MR_Get(Item, "id"), "i18n", _MR_Get(Item, "i18n"),
+				"reason_key", Row["disabled_reason_key"]), ManifestKey)
+}
+_MR_RenderGreyedStandIn(ResultMenu, Item, ManifestKey) {
+	ReasonKey := _MR_Get(Item, "reason_key")
+	Label := t(I18nKey) . " — " . _MR_ReasonHead(t(ReasonKey))
+	ResultMenu.Add(Label, (*) => "")
+	ResultMenu.Disable(Label)
+}
+`;
+assert.equal(ahkDisabledReasonStandIn(AHK_STAND_IN_FIXTURE), true);
+for (const [before, after] of [
+	['MenuRenderer_ResolveDisabledWhen(', 'AnotherCondition('],
+	['if Disabled && ReasonKey != ""', 'if ReasonKey != ""'],
+	['"disabled", true', '"disabled", false'],
+	['Row := _MR_CommandRowData(', 'Row := AnotherDataOwner('],
+	['if !(Row is Map)', 'if false'],
+	['if Row.Has("disabled_reason_key")', 'if false'],
+	['Row["disabled_reason_key"]', 'Row["another_reason"]'],
+	['_MR_ReasonHead(t(ReasonKey))', 't(ReasonKey)'],
+	['ResultMenu.Add(Label, (*) => "")', 'ResultMenu.Add(Label, Action)'],
+	['ResultMenu.Disable(Label)', 'ResultMenu.Enable(Label)']
+]) {
+	assert.notEqual(AHK_STAND_IN_FIXTURE.replace(before, after), AHK_STAND_IN_FIXTURE);
+	assert.equal(ahkDisabledReasonStandIn(AHK_STAND_IN_FIXTURE.replace(before, after)), false);
+}
+
+// One stand-in for both conditions: each full renderer draws the row its
+// disabled_when greys through the same native stand-in as an unavailable row.
 const STAND_IN = {
-	'renderer.lua': /greyed_stand_in\(manifest_key,\s*\{[^}]*reason_key = item\.disabled_reason_key/,
-	'manifest_menu.ahk': /_MR_RenderGreyedStandIn\(ResultMenu,\s*Map\([^)]*"reason_key", ReasonKey\)/
+	'renderer.lua': (text) =>
+		/greyed_stand_in\(manifest_key,\s*\{[^}]*reason_key = item\.disabled_reason_key/.test(text),
+	'manifest_menu.ahk': ahkDisabledReasonStandIn
 };
 for (const file of RENDERERS) {
 	const text = fs.readFileSync(file, 'utf8');
 	if (!/unavailable/.test(text) || !/"grey"/.test(text))
 		errors.push(`${path.relative(ROOT, file)} does not draw a greyed stand-in.`);
-	if (!STAND_IN[path.basename(file)].test(text))
+	if (!STAND_IN[path.basename(file)](text))
 		errors.push(
 			`${path.relative(ROOT, file)} does not draw a row its disabled_when greys with a reason ` +
 				'through the greyed stand-in.'

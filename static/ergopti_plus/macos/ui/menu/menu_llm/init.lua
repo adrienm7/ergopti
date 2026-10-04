@@ -1003,6 +1003,7 @@ local function create_menu(deps)
 						local api_title, api_menu = ApiPanel.build({
 								state       = state,
 								paused      = paused,
+								is_paused   = deps.script_control and deps.script_control.is_paused,
 								keymap      = keymap,
 								update_menu = update_menu,
 								WarmupCtrl  = WarmupCtrl,
@@ -1122,6 +1123,7 @@ local function create_menu(deps)
 								update_menu   = update_menu,
 								DEFAULT_STATE = M.DEFAULT_STATE,
 								paused        = paused,   -- gate model rows while paused (M-16)
+								is_paused     = deps.script_control and deps.script_control.is_paused,
 						})
 
 						-- MLX server port — Ergopti's own server, so let the user move it off
@@ -1184,6 +1186,7 @@ local function create_menu(deps)
 						state              = state,
 						keymap             = keymap,
 						is_disabled        = is_disabled,
+						is_paused          = deps.script_control and deps.script_control.is_paused,
 						save_prefs         = save_prefs,
 						update_menu        = update_menu,
 						settings_mgr       = settings_mgr,
@@ -1292,6 +1295,7 @@ local function create_menu(deps)
 						state        = state,
 						keymap       = keymap,
 						is_disabled  = is_disabled,
+						is_paused    = deps.script_control and deps.script_control.is_paused,
 						save_prefs   = save_prefs,
 						update_menu  = update_menu,
 						settings_mgr = settings_mgr,
@@ -1313,20 +1317,27 @@ local function create_menu(deps)
 				if type(val_mods) ~= "table" then val_mods = llm_mod.DEFAULT_STATE.llm_val_modifiers end
 
 				local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-				local nav_title = format_shortcut_title(i18n.get("menu.llm.nav_label"), nav_mods, i18n.get("menu.llm.arrows_only"), i18n.get("menu.llm.arrows"))
-				table.insert(nav_rows, {
-						label    = nav_title,
-						disabled = (is_disabled or num_preds_safe < 2) or nil,
-						-- The modifier picker is settings_mgr's tree, handed over whole.
-						submenu  = settings_mgr.build_nav_modifier_menu()
-				})
-
-				local val_title = format_shortcut_title(string.format(i18n.get("menu.llm.val_label"), (num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)), val_mods, i18n.get("menu.llm.digits_only"), i18n.get("menu.llm.digits"))
-				table.insert(nav_rows, {
-						label    = val_title,
-						disabled = (is_disabled or num_preds_safe < 2) or nil,
-						submenu  = settings_mgr.build_val_modifier_menu()
-				})
+				for _, definition in ipairs(ManifestMenu.get_array("llm_navigation_rows")) do
+					if type(definition) == "table" and definition.type == "list"
+						and type(definition.i18n) == "string" and definition.i18n ~= "" then
+						if definition.id == "llm_nav_modifiers" then
+							table.insert(nav_rows, {
+								label = format_shortcut_title(i18n.get(definition.i18n), nav_mods,
+									i18n.get("menu.llm.arrows_only"), i18n.get("menu.llm.arrows")),
+								disabled = (is_disabled or num_preds_safe < 2) or nil,
+								submenu = settings_mgr.build_nav_modifier_menu(),
+							})
+						elseif definition.id == "llm_val_modifiers" then
+							table.insert(nav_rows, {
+								label = format_shortcut_title(string.format(i18n.get(definition.i18n),
+									(num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)), val_mods,
+									i18n.get("menu.llm.digits_only"), i18n.get("menu.llm.digits")),
+								disabled = (is_disabled or num_preds_safe < 2) or nil,
+								submenu = settings_mgr.build_val_modifier_menu(),
+							})
+						end
+					end
+				end
 
 				row_for("llm_navigation", { title = i18n.get("menu.llm.nav_menu_title"), disabled = MenuLayout.row_disabled("llm_navigation", is_disabled, paused), menu = ManifestMenu.render_rows(nav_rows, "llm_navigation") })
 

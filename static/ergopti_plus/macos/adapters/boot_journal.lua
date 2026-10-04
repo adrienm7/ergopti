@@ -105,4 +105,34 @@ function M.append(variant, message)
 	return written
 end
 
+--- Records the managed runtime's public scripting getter without using AppleEvents.
+--- The callable Lua bridge is not proof of native event-handler registration or entry.
+--- @param runtime table Native hs table; its getter is called with no setter argument.
+--- @return boolean written Exact synchronous boot-journal publication receipt.
+function M.record_native_scripting_state(runtime)
+	local pid, getter, allowed, bridge = "unknown", "missing", "unknown", "missing"
+	if type(runtime) == "table" then
+		local info = runtime.processInfo
+		local native_pid = type(info) == "table" and info.processID or nil
+		if type(native_pid) == "number" and native_pid > 0 and native_pid < 2 ^ 53
+			and native_pid == math.floor(native_pid) then
+			pid = string.format("%.0f", native_pid)
+		end
+		bridge = type(runtime.__appleScriptRunString) == "function" and "callable" or "missing"
+		if type(runtime.allowAppleScript) == "function" then
+			local ok, value = pcall(runtime.allowAppleScript)
+			if not ok then
+				getter = "error"
+			elseif type(value) ~= "boolean" then
+				getter = "malformed"
+			else
+				getter, allowed = "boolean", tostring(value)
+			end
+		end
+	end
+	return M.append("INFO", string.format(
+		"Native scripting server: pid=%s; getter=%s; allowed=%s; bridge=%s; handler_registration=unobserved; handler_entry=unobserved.",
+		pid, getter, allowed, bridge))
+end
+
 return M

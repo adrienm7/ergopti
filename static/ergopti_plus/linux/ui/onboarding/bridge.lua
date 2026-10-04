@@ -382,7 +382,7 @@ local function finish(state, answers)
 		config_dir = authorities.config_paths.get_config_dir(),
 	}
 	for _, operation in ipairs({
-		{ "locale", function() return authorities.i18n.set_locale(answers.locale) end,
+		{ "locale", function() return authorities.i18n.persist_locale(answers.locale) == true end,
 			"onboarding.error.locale_persist_failed" },
 		{ "config directory", function() return authorities.config_paths.set_config_dir(target_dir) end,
 			"paths_editor.save_failed" },

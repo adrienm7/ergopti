@@ -121,3 +121,62 @@ Test("meta llm-health-probe: every arming site passes the named interval constan
 	_HPC_EveryArmingSiteUsesTheConstant)
 Test("meta llm-health-probe: the probe body carries no bare millisecond literal",
 	_HPC_ProbeBodyHasNoMillisecondLiteral)
+
+
+
+
+
+; ================================================================
+; ================================================================
+; ======= 4/ Mutable origins precede native clock sampling =======
+; ================================================================
+; ================================================================
+
+; Native monotonic comparisons must snapshot a shared origin before sampling
+; the clock: a callback may replace that origin between separate statements.
+; These are source-order guards, not a reproduction of native timer preemption.
+; Symbol-derived bodies stay contiguous when files move. Masked prose and data
+; cannot satisfy executable assignments; aliases come from the real comparison.
+_HPC_NativeOriginPrecedesClock(Symbol, OriginOwner, OriginField := "") {
+	Body := _DriverFuncBody(Symbol)
+	Assert(Body != "", Symbol . " must have a nonempty production body")
+	Code := _DriverMaskNonCode(&Body)
+	Pattern := "i)\bTickElapsed64\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)"
+	CallAt := RegExMatch(Code, Pattern, &Call)
+	Assert(CallAt > 0, Symbol . " must call the full native elapsed owner")
+	Assert(!RegExMatch(Code, Pattern, , CallAt + Call.Len),
+		Symbol . " must have one unambiguous elapsed comparison")
+	Origin := Call[1]
+	Now := Call[2]
+	OriginPattern := "im)^[ \t]*" . Origin . "\s*:=\s*([^\r\n]+)"
+	OriginAt := RegExMatch(Code, OriginPattern, &Snapshot)
+	Assert(OriginAt > 0, Symbol . " must compare a captured origin")
+	Assert(!RegExMatch(Code, OriginPattern, , OriginAt + Snapshot.Len),
+		Symbol . " must not replace the captured origin")
+	Assert(RegExMatch(Snapshot[1], "i)\b" . OriginOwner . "\b") > 0,
+		Symbol . " must snapshot its actual shared origin owner")
+	if OriginField != ""
+		AssertContains(SubStr(Body, OriginAt, Snapshot.Len), OriginField,
+			Symbol . " must snapshot the actual health timestamp field")
+	NowPattern := "im)^[ \t]*" . Now . "\s*:=\s*[^\r\n]*\bA_TickCount\b[^\r\n]*"
+	NowAt := RegExMatch(Code, NowPattern, &Sample)
+	Assert(NowAt > 0, Symbol . " must retain its native default clock sample")
+	Assert(!RegExMatch(Code, NowPattern, , NowAt + Sample.Len),
+		Symbol . " must have one unambiguous native clock sample")
+	Assert(OriginAt < NowAt && NowAt < CallAt,
+		Symbol . " must snapshot the shared origin before sampling and comparing native time")
+}
+
+_HPC_HealthNativeOriginPrecedesClock() {
+	_HPC_NativeOriginPrecedesClock("_LLM_Menu_FireHealthProbe", "_LLM_Menu",
+		"last_health_probe_tick")
+}
+
+_HPC_TagsNativeOriginPrecedesClock() {
+	_HPC_NativeOriginPrecedesClock("_LLM_Menu_FireInstalledTagsProbe", "_LLM_InstalledTagsCacheAt")
+}
+
+Test("menu-probe-clock-native64: health origin snapshot precedes native clock sample",
+	_HPC_HealthNativeOriginPrecedesClock)
+Test("menu-probe-clock-native64: tags origin snapshot precedes native clock sample",
+	_HPC_TagsNativeOriginPrecedesClock)

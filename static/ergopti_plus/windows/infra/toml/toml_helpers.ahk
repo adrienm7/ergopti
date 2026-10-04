@@ -23,9 +23,9 @@
 ;    ``Map<Section, Map<Key, Value>>`` so that a startup with hundreds of
 ;    lookups never reopens the file. Mirrors ``ParseIniFile``'s shape so the
 ;    cache-aware accessor (``IniCacheGet``) keeps working.
-; 4. Section-scoped batch write: ``TOML_BatchWrite`` rewrites every section
-;    in one go (read once, modify in memory, write once). Representable sources
-;    keep canonical formatting. A loss-sensitive no-op keeps the exact source;
+; 4. Section-scoped batch write: owned assignment rows retain canonical
+;    rendering while unmatched physical records and comments remain user data.
+;    Detached candidates and ordinary publication share one qualified image;
 ;    changed unrepresentable namespaces refuse before any staging write.
 ; ==============================================================================
 
@@ -209,6 +209,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 		Section     := ""
 		PendingKey  := ""   ; key whose value spans multiple lines
+		HasPendingValue := false ; an empty quoted key is still a valid owner
 		PendingVal  := ""   ; accumulated raw characters of the multi-line value
 		PendingDepth := 0
 		PendingQuote := ""
@@ -218,7 +219,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				Line := Trim(A_LoopField)
 
 				; --- Continuation of a multi-line array ---
-				if (PendingKey != "") {
+				if HasPendingValue {
 						; Drop any comment on this line before it is accumulated. Skipping
 						; only whole-comment lines let a TRAILING comment on an element line
 						; become part of the value, and it was then persisted as a real
@@ -237,6 +238,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 								DiscardedArrays += 1
 								try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' in [{2}] - aborting array, resuming section parse.", PendingKey, Section)
 								PendingKey := ""
+								HasPendingValue := false
 								PendingVal := ""
 								Section := Trim(RegExReplace(Line, "^\[+|\]+$", ""))
 								if !Sections.Has(Section)
@@ -253,6 +255,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
 										PreserveBooleanLiterals)
 								PendingKey := ""
+								HasPendingValue := false
 								PendingVal := ""
 						}
 						continue
@@ -275,14 +278,11 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						continue
 				}
 
-				eq := InStr(Line, "=")
+				eq := _TOML_AssignmentDelimiter(Line)
 				if !eq
 						continue
-				key := Trim(SubStr(Line, 1, eq - 1))
+				key := TOML_DecodeKey(Trim(SubStr(Line, 1, eq - 1)))
 				val := Trim(SubStr(Line, eq + 1))
-				; Quoted key: "Foo.Enabled" → Foo.Enabled
-				if (StrLen(key) >= 2 && SubStr(key, 1, 1) = '"' && SubStr(key, -1) = '"')
-						key := SubStr(key, 2, StrLen(key) - 2)
 				if (Section = "")
 						continue
 
@@ -297,6 +297,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						? _TOML_ArrayScanFragment(val, 0, &PendingQuote, &PendingEscaped) : 0
 				if (PendingDepth > 0) {
 						PendingKey := key
+						HasPendingValue := true
 						PendingVal := val
 						continue
 				}
@@ -305,13 +306,39 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				; erases it into integer 0/1. Ordinary readers keep native values.
 				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
 		}
-		if (PendingKey != "") {
+		if HasPendingValue {
 				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
 		}
 		if StoreCache
 			_ParseTomlCache[Path] := Sections
 		return Sections
+}
+
+; The assignment separator belongs outside quoted keys. A value may itself
+; contain equals signs, so stop at the first unquoted separator rather than
+; splitting the entire line into a presumed pair.
+_TOML_AssignmentDelimiter(Line) {
+	KeyQuote := ""
+	KeyEscaped := false
+	Loop Parse Line {
+		KeyChar := A_LoopField
+		if KeyEscaped {
+			KeyEscaped := false
+		} else if KeyQuote == '"' && KeyChar == "\" {
+			KeyEscaped := true
+		} else if KeyQuote != "" {
+			if KeyChar == KeyQuote
+				KeyQuote := ""
+		} else if KeyChar == '"' || (KeyChar == "'" && _TOML_IsLiteralStart(Line, A_Index)) {
+			KeyQuote := KeyChar
+		} else if KeyChar == "=" {
+			return A_Index
+		} else if KeyChar == "#" {
+			return 0
+		}
+	}
+	return 0
 }
 
 ; Split only at the current array level. All three decoders consume these raw
@@ -689,8 +716,9 @@ TOML_WriteRefusal(Path) {
 }
 
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
-; Preserves keys we did not touch and renders the complete result canonically
-; (sorted sections/keys and stable spacing) before the one atomic replace.
+; Renders explicitly owned rows canonically and retains foreign physical records
+; and comments before the one atomic replace. A wholly owned, uncommented source
+; keeps the existing complete canonical serializer and stable spacing.
 ; It must not call SaveFullConfig afterward: targeted writers persist before
 ; publishing their candidate globals, so a nested full save would serialize
 ; the stale live state back over the just-committed values.
@@ -719,7 +747,7 @@ _TOML_RemoveOwnedStage(Path) {
 	return false
 }
 
-; A successful Write call is not proof that the complete canonical image
+; A successful Write call is not proof that the complete qualified image
 ; reached the stage. Read it back exactly before any rename can make it live.
 _TOML_StageMatches(Path, Expected, ReadFn := 0) {
 	try {
@@ -731,7 +759,7 @@ _TOML_StageMatches(Path, Expected, ReadFn := 0) {
 	return (Actual is String) && StrCompare(Actual, Expected, true) == 0
 }
 
-; Builds the same canonical image used by TOML_BatchWrite without publishing a
+; Builds the same qualified image used by TOML_BatchWrite without publishing a
 ; target. Multi-file transactions need the complete new bytes before their WAL
 ; can capture the old image; routing both modes through one renderer prevents a
 ; subtly different onboarding serializer from drifting from ordinary saves.
@@ -952,6 +980,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 					"content", Admitted["content"])
 		}
 
+		; Admission may retain foreign physical records around canonical owned rows.
+		; Both detached and ordinary modes publish this one qualified image.
+		body := SubStr(Admitted["content"], 2)
+
 		if Admitted["preserve_source"] {
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
@@ -961,7 +993,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				return true
 		}
 
-		; A canonical image already on disk needs no stage or atomic replacement.
+		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
 		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
 				global _ParseTomlCache

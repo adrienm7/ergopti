@@ -37,6 +37,13 @@ def _check_ahk(ahk: dict, entry_id: str, errors: list[str]) -> None:
     if not isinstance(ahk, dict):
         errors.append(f"{entry_id}: ahk must be object")
         return
+    if "persisted_sample" in ahk:
+        if entry_id != "streaming_multi" or ahk.get("tray_key") != "show_all_at_once":
+            errors.append(f"{entry_id}: inverse wire sample belongs only to native show-all")
+        elif type(ahk.get("sample")) is not bool or type(ahk["persisted_sample"]) is not bool:
+            errors.append(f"{entry_id}: inverse native and wire samples must both be boolean")
+        elif ahk["persisted_sample"] == ahk["sample"]:
+            errors.append(f"{entry_id}: progressive and show-all samples must be opposite")
     persist = ahk.get("persist")
     if persist == "extra":
         for k in ("tray_key", "section", "key", "sample"):

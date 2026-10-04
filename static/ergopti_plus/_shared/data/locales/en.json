@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Remove Ergopti from Karabiner",
 	"menu.global.restore_touchpad_gestures": "Restore Windows touchpad gestures",
 	"dialog.start_at_login.failed": "Could not change automatic startup. Check the system startup settings.",
-	"onboarding.error.open_failed": "The setup wizard could not open. Check the logs, then try Setup wizard in the menu."
+	"onboarding.error.open_failed": "The setup wizard could not open. Check the logs, then try Setup wizard in the menu.",
+	"platform_reason.token_streaming_transport_missing": "Not on Windows: Windows cannot yet show suggestions token by token. This option stays inactive.",
+	"menu.layout.number_row": "Number row",
+	"menu.layout.number_row_native": "Native order",
+	"menu.layout.number_row_digits": "Digits first",
+	"menu.layout.number_row_symbols": "Symbols first",
+	"platform_reason.number_row_override_unsupported": "Unsupported: This driver keeps the system’s native number row; forced digits and symbols are unavailable.",
+	"platform_reason.number_row_source_unavailable": "Unavailable: Symbols first requires an active emulated layout with valid digit and symbol levels at every number-row position."
 }

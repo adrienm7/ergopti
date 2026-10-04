@@ -51,7 +51,6 @@ const SINGLE_DRIVER_KEYS = [
 	['hotstrings.expansion_delay', 'hs'],
 	// The Windows layout is installed by the AHK driver's own remapper.
 	['layout.ergopti_base', 'ahk'],
-	['layout.direct_access_digits', 'ahk'],
 	['layout.ergopti_alt_gr', 'ahk'],
 	['layout.ergopti_plus', 'ahk'],
 	// Per-category master switches exist only in the AHK tray menu.
@@ -144,3 +143,31 @@ if (errors.length > 0) {
 console.log(
 	`\x1b[32m[OK] ${SINGLE_DRIVER_KEYS.length} single-driver feature(s) reach only their own driver.\x1b[0m`
 );
+
+// Number-row intent is now shared; forced emission still belongs to Windows.
+const assert = require('node:assert/strict');
+const TOML = require('smol-toml');
+for (const [driver, source] of Object.entries(templates)) {
+	assert.equal(
+		TOML.parse(source).layout.direct_access_digits,
+		'native',
+		`${driver}: native status`
+	);
+}
+const policy = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/_shared/lua/layout/number_row_policy.lua'),
+	'utf8'
+);
+assert.match(policy, /return platform == "ahk" and/);
+for (const driver of ['macos', 'linux']) {
+	const file = driver === 'macos' ? 'menu_keyboard_layout.lua' : 'menu_builder.lua';
+	const native = fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus', driver, 'ui/menu', file),
+		'utf8'
+	);
+	assert.match(
+		native,
+		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands\)/,
+		`${driver}: actual read-only native provider`
+	);
+}

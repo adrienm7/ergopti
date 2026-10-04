@@ -123,6 +123,7 @@ local KEY_MAP = {
 	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
+	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
 	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
 	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
 	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
@@ -829,6 +830,7 @@ end
 -- full-document model long after boot. A last-moment check inside the adapter
 -- cannot detect an external edit that landed before save() was called.
 local _source_snapshots = {}
+local _save_receipts = {}
 local _owned_publications = {}
 -- Paths load() judged outdated, per destination: never read into the state,
 -- which holds their default instead. An ordinary save must not turn that
@@ -974,6 +976,67 @@ function M.load(prefs_file)
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
 	_load_outdated[prefs_file] = outdated
 	return values, "ok"
+end
+
+--- Reads current canonical preferences without adopting overwrite authority.
+--- This view is admission evidence only; load/save alone own source snapshots.
+--- @param prefs_file string Canonical configuration path.
+--- @return table|nil flat Current owned preferences, nil on a refused view.
+--- @return table|nil source Exact classified bytes read for this view.
+function M.current_view(prefs_file)
+	if type(prefs_file) ~= "string" or prefs_file == "" or _owned_publications[prefs_file] then return nil end
+	local called, values, source = pcall(function()
+		local current = classify_source(prefs_file)
+		if not current then return nil end
+		if current.status == "absent" then return {}, current end
+		local decoded = TomlCodec.decode(current.content)
+		if type(decoded) ~= "table" then return nil end
+		for _, spec in pairs(KEY_MAP) do
+			local node = decoded[spec.sec]
+			if node ~= nil and type(node) ~= "table" then return nil end
+			for segment in (spec.path or ""):gmatch("[^.]+") do
+				node = node and node[segment]
+				if node ~= nil and type(node) ~= "table" then return nil end
+			end
+		end
+		local flat
+		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded) end)
+		if next(outdated) ~= nil then return nil end
+		for key, value in pairs(flat) do
+			local spec = KEY_MAP[key]
+			if spec then
+				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
+				local entry = Manifest.find_entry_by_path(path)
+				if entry and entry.type ~= "enum" and type(value) ~= (entry.type == "array" and "table" or entry.type) then return nil end
+				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then return nil end
+			end
+		end
+		return flat, current
+	end)
+	if not called then return nil end
+	return values, source
+end
+
+--- Compares classifications issued by the current preferences owner.
+--- @param expected table|nil Captured exact source classification.
+--- @param current table|nil Current exact source classification.
+--- @return boolean matches Whether the admitted source is unchanged.
+function M.source_matches(expected, current)
+	local function classified(source)
+		return type(source) == "table"
+			and (source.status == "absent" or (source.status == "ok" and type(source.content) == "string"))
+	end
+	return classified(expected) and classified(current) and same_source(expected, current)
+end
+
+--- Returns detached evidence of this owner's last acknowledged full save.
+--- Load, source adoption and cleanup do not issue publication receipts.
+--- @param prefs_file string Canonical configuration path.
+--- @return table receipt Monotonic id and exact acknowledged source, when any.
+function M.publication_receipt(prefs_file)
+	local receipt = _save_receipts[prefs_file]
+	if not receipt then return { id = 0 } end
+	return { id = receipt.id, source = { status = "ok", content = receipt.source.content } }
 end
 
 --- Marks every config.toml path load() takes into the flat state, through the
@@ -1451,6 +1514,10 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		return false
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
+	if type(encoded) == "string" then
+		local prior = _save_receipts[prefs_file]
+		_save_receipts[prefs_file] = { id = (prior and prior.id or 0) + 1, source = { status = "ok", content = encoded } }
+	end
 	-- The user's own value replaced the outdated one: its later default is a
 	-- real choice again, saved sparsely like any other.
 	for _, path in ipairs(replaced) do outdated[path] = nil end

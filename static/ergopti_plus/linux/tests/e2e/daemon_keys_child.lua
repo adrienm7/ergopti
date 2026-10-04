@@ -28,6 +28,7 @@
 
 local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
 local MAGIC_REPEAT = os.getenv("ERGOPTI_E2E_MAGIC_REPEAT") or "none"
+local TAP_COLLISION = MAGIC_REPEAT:match("^tap%-") ~= nil
 if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/modules/hotstrings/magickey.toml" end
 arg = { "--device", DEVICE, "--config", CONFIG }
 package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
@@ -226,7 +227,7 @@ if os.getenv("ERGOPTI_E2E_GESTURE_PUMP") == "fails" then
 	end
 end
 
-if TAP_WRAP ~= "none" then
+if TAP_WRAP ~= "none" or TAP_COLLISION then
 	local Clipboard = require("adapters.clipboard")
 	Clipboard.read_primary = function()
 		selection.reads = selection.reads + 1
@@ -334,6 +335,22 @@ package.preload["adapters.event_loop"] = function()
 			assert(require("modules.hotstrings.hotstrings_config").set_all_sections("magickey", true),
 				"the real magic-key category must acknowledge activation")
 			assert(Source.set("KeyJ"), "the real source owner must acknowledge the key")
+			local choice_ok, choice_reason, before_bytes, native = nil, nil, nil, 36
+			if TAP_COLLISION then
+				local Keys = require("modules.shortcuts.tap_keys")
+				local Master = require("modules.shortcuts.manager")
+				assert(Master.set_enabled(MAGIC_REPEAT ~= "tap-off"))
+				assert(Keys.set_action("number_row_left", MAGIC_REPEAT == "tap-none" and "none" or "send_text"))
+				for _, key in ipairs(Keys.keys()) do if key.id == "number_row_left" then native = key.linux end end
+				local file = assert(io.open(selection_config, "rb")); before_bytes = file:read("*a"); file:close()
+				choice_ok, choice_reason = Source.set("Backquote")
+				if MAGIC_REPEAT ~= "tap-choice" and MAGIC_REPEAT ~= "tap-none" then
+					-- Model previously stored/hand-edited conflicting intent through the
+					-- actual preference publication owner, never a guessed live flag.
+					assert(require("infra.hotstring_preferences").set("hotstrings.magic_key_source", "Backquote"))
+				end
+				if MAGIC_REPEAT == "tap-paused" then repeat_controller.toggle_pause() end
+			end
 			local Capture = require("adapters.xkb_capture")
 			local primed, chosen = false, 0
 			-- Count origin publications during this press, excluding boot probes.
@@ -342,7 +359,7 @@ package.preload["adapters.event_loop"] = function()
 				create = function() return {} end,
 				destroy = function() end,
 				source_group = function() return repeat_state.group, 1 end,
-				key_sym = function() return "j" end,
+				key_sym = function(_, code) return TAP_COLLISION and code == 37 and 0xffe3 or 0x6a end,
 				key_utf8 = function()
 					if not primed then
 						primed = true
@@ -378,12 +395,17 @@ package.preload["adapters.event_loop"] = function()
 				end,
 			})
 			assert(Capture.load("fixture keymap"))
-			if MAGIC_REPEAT == "capture" then
+			local refused = {}
+			if MAGIC_REPEAT == "capture" or MAGIC_REPEAT == "tap-choice" then
 				assert(Source.capture({ on_chosen = function() chosen = chosen + 1 end,
-					on_refused = function(reason) error(reason) end }))
+					on_refused = function(reason) refused[#refused + 1] = reason end }))
 			end
-			local stream = { { type = 1, code = 36, value = 1 }, { type = 1, code = 36, value = 2 },
-				{ type = 1, code = 36, value = 2 }, { type = 1, code = 36, value = 0 } }
+			local stream = { { type = 1, code = native, value = 1 }, { type = 1, code = native, value = 2 },
+				{ type = 1, code = native, value = 2 }, { type = 1, code = native, value = 0 } }
+			if MAGIC_REPEAT == "tap-modified" then
+				table.insert(stream, 1, { type = 1, code = 29, value = 1 })
+				stream[#stream + 1] = { type = 1, code = 29, value = 0 }
+			end
 			hook._test_drive(stream, {
 				liveXkb = true,
 				onChar = callbacks.onChar, onKey = callbacks.onKey,
@@ -401,6 +423,14 @@ package.preload["adapters.event_loop"] = function()
 			print(string.format("MAGIC_REPEAT decisions=%d dispatched=%d attempts=%d origins=%d raw=%d chosen=%d",
 				repeat_state.decisions, repeat_state.dispatched, repeat_state.attempts,
 				repeat_state.origins, repeat_state.raw, chosen))
+			if TAP_COLLISION then
+				local file = assert(io.open(selection_config, "rb")); local after_bytes = file:read("*a"); file:close()
+				local Keys = require("modules.shortcuts.tap_keys")
+				print(string.format("TAP_COLLISION choice=%s reason=%s source=%s tap=%s queued=%d executed=%d bytes=%s captured=%s",
+					tostring(choice_ok), tostring(choice_reason), Source.get(), Keys.get_action("number_row_left"),
+					selection.queued, selection.executed, tostring(before_bytes == after_bytes), tostring(refused[1])))
+			end
+			assert(MAGIC_REPEAT == "tap-choice" or #refused == 0, "an unrelated capture must not be refused")
 			print(string.format("SCREEN %q", table.concat(screen)))
 			Capture._reset_backend()
 			return

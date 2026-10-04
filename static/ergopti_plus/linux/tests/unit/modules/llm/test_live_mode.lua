@@ -688,3 +688,78 @@ helpers.describe("live mode: the daemon tells the engine", function()
 			"the tray's live submenu follows the action")
 	end)
 end)
+
+
+helpers.describe("declared Linux live Off choice", function()
+	local function find_off(menu, label)
+		for _, row in ipairs(menu or {}) do
+			if row.title == label then return row end
+			local found = find_off(row.menu, label)
+			if found then return found end
+		end
+	end
+
+	helpers.it("returns exact native ACK and never redraws a refused cancellation", function()
+		scenario({}, function(world)
+			local builder = helpers.load_module("ui.menu.menu_builder")
+			local i18n = require("infra.i18n")
+			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
+			local spec = Json.decode(file:read("*a")); file:close()
+			local redraws, calls, observed = 0, 0, {}
+			local ctx = { llm = world.engine, on_menu_changed = function() redraws = redraws + 1 end }
+			helpers.assert_true(world.engine.set_live("translate_en"))
+			local before = world.engine.get_live()
+			local setter = world.engine.set_live
+			for _, refusal in ipairs(spec.refusals) do
+				world.engine.set_live = function()
+					calls = calls + 1
+					if refusal == "throw" then error("owned live refusal") end
+					if refusal == "number" then return 2 end
+					if refusal == "nil" then return nil end
+					return false
+				end
+				local row = find_off(builder.build(ctx), i18n.get(spec.label_key))
+				helpers.assert_not_nil(row)
+				local invoked, receipt = pcall(row.fn)
+				observed[#observed + 1] = { refusal = refusal, invoked = invoked, receipt = receipt,
+					state = world.engine.get_live() }
+			end
+			helpers.assert_eq(redraws, 0, "refusal must not claim an applied change, including a truthy non-ACK")
+			for _, outcome in ipairs(observed) do
+				if outcome.refusal == "throw" then helpers.assert_eq(outcome.invoked, false)
+				else helpers.assert_eq(outcome.invoked, true); helpers.assert_eq(outcome.receipt, false) end
+				helpers.assert_eq(outcome.state, before)
+			end
+			world.engine.set_live = setter
+			local row = find_off(builder.build(ctx), i18n.get(spec.label_key))
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_nil(world.engine.get_live())
+			helpers.assert_eq(redraws, 1)
+			helpers.assert_eq(calls, 4)
+			helpers.assert_eq(find_off(builder.build(ctx), i18n.get(spec.label_key)).checked, true)
+			assert_menu_untouched(world)
+		end)
+	end)
+
+	helpers.it("projects all existing actual locale labels without changing rewrite prompts", function()
+		scenario({}, function(world)
+			local builder = helpers.load_module("ui.menu.menu_builder")
+			local i18n = require("infra.i18n")
+			local saved_get = i18n.get
+			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
+			local spec = Json.decode(file:read("*a")); file:close()
+			local ok, err = xpcall(function()
+				for _, code in ipairs(spec.locales) do
+					local locale = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. code .. ".json", "r"))
+					local catalog = Json.decode(locale:read("*a")); locale:close()
+					i18n.get = function(key) return catalog[key] or key end
+					local row = find_off(builder.build({ llm = world.engine }), catalog[spec.label_key])
+					helpers.assert_not_nil(row, code)
+					helpers.assert_eq(row.checked, true)
+				end
+			end, debug.traceback)
+			i18n.get = saved_get
+			helpers.assert_true(ok, err)
+		end)
+	end)
+end)

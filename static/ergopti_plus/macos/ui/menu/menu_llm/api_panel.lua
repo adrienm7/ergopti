@@ -246,12 +246,13 @@ end
 --- decisions_test), and only a proven entry is persisted; a refused one is
 --- rolled back with the provider's verdict.
 --- @param add table { api_remote, keymap, update_menu, WarmupCtrl, new_entry,
----        entries (with the new one), previous_entries, previous_active_id }.
+---        entries (with the new one), previous_entries, previous_active_id, admit }.
 --- @return boolean started True when the probe was sent.
 local function add_system1_entry(add)
 	local api_remote, new_entry = add.api_remote, add.new_entry
 	local label = entry_names(api_remote, add.entries)[new_entry.id]
 	if reset_prediction_identity(add.keymap, "stage System 1 API entry") ~= true then return false end
+	if add.admit() ~= true then return false end
 	local my_add_gen = begin_mutation()
 	if not my_add_gen then return false end
 	--- Restores the entries, and the prediction backend the staging invalidated.
@@ -303,7 +304,7 @@ end
 
 --- Builds the Test and Remove rows of one System 1-only entry, which no
 --- entry picker lists: they name the entry, since it is never the active one.
---- @param ctx table Context with fields: state, paused, keymap, update_menu, WarmupCtrl.
+--- @param ctx table Context with fields: state, paused, is_paused, keymap, update_menu, WarmupCtrl.
 --- @param api_remote table The remote backend.
 --- @param entry table The System 1-only entry.
 --- @param busy boolean True while a mutation or a pause forbids actions.
@@ -370,7 +371,7 @@ end
 
 --- Builds the API entries submenu and returns the title string and menu table.
 --- Only call when state.llm_backend == "api" — returns nil, nil otherwise.
---- @param ctx table Context with fields: state, paused, keymap, update_menu, WarmupCtrl.
+--- @param ctx table Context with fields: state, paused, is_paused, keymap, update_menu, WarmupCtrl.
 --- @return string|nil title   Title string for the parent row, or nil.
 --- @return table|nil  menu    The entries submenu, rendered from row data.
 function M.build(ctx)
@@ -390,6 +391,17 @@ function M.build(ctx)
 	local rows       = {}
 	local mutation_busy = _mutation_owner ~= nil
 	local names      = entry_names(api_remote, entries)
+
+	-- Retained provider choices must read the actual native owner, including
+	-- after each modal prompt. The menu-build pause snapshot is display data.
+	local function native_unpaused()
+		if type(ctx.is_paused) ~= "function" then return false end
+		local ok, current_paused = pcall(ctx.is_paused)
+		return ok and type(current_paused) == "boolean" and current_paused == false
+	end
+	local function add_commands_ready()
+		return native_unpaused() and state.llm_backend == "api" and _mutation_owner == nil
+	end
 
 
 	-- =====================================================
@@ -452,9 +464,10 @@ function M.build(ctx)
 				label    = string.format("➕ %s", p.label),
 				disabled = (paused or mutation_busy) or nil,
 				action       = (not paused and not mutation_busy) and function()
-					if _mutation_owner ~= nil then return false end
+					if not add_commands_ready() then return false end
 					local function trim(s) return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")) end
 					local function prompt_field(title_key, default_val, hint)
+						if not add_commands_ready() then return false, nil end
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,
 							title_key, hint, default_val or "",
 							"OK", i18n.get("button.cancel"))
@@ -466,6 +479,7 @@ function M.build(ctx)
 							picked_text, picked_btn = ret_a, ret_b
 						end
 						if picked_btn ~= "OK" then return false, nil end
+						if not add_commands_ready() then return false, nil end
 						return true, trim(picked_text)
 					end
 
@@ -514,6 +528,7 @@ function M.build(ctx)
 							api_remote = api_remote, keymap = keymap, update_menu = update_menu,
 							WarmupCtrl = WarmupCtrl, new_entry = new_entry, entries = clone,
 							previous_entries = previous_entries, previous_active_id = previous_active_id,
+							admit = add_commands_ready,
 						})
 					end
 					-- Stage in memory only — DO NOT persist yet. check_availability
@@ -521,6 +536,7 @@ function M.build(ctx)
 					-- don't want to write a bad token into the Keychain. Persist only
 					-- on success; on failure, roll the in-memory state back.
 					if reset_prediction_identity(keymap, "stage remote API entry") ~= true then return false end
+					if not add_commands_ready() then return false end
 					local my_add_gen = begin_mutation()
 					if not my_add_gen then return false end
 					api_remote.set_entries(clone)
@@ -629,6 +645,10 @@ function M.build(ctx)
 	-- Remove): resolve it once so the two cannot disagree mid-build.
 	local active_entry = api_remote and api_remote.get_active_entry() or nil
 	local active_label = active_entry and (names[active_entry.id] or "") or ""
+	local function active_commands_ready()
+		return native_unpaused() and _mutation_owner == nil and active_entry ~= nil
+			and api_remote.get_active_entry_id() == active_entry.id
+	end
 
 
 
@@ -644,10 +664,8 @@ function M.build(ctx)
 	if active_entry then
 		table.insert(rows, { separator = true })
 	end
-	table.insert(rows, {
-		label    = i18n.get("menu.llm.api_test_entry"),
-		disabled = (paused or mutation_busy or (active_entry == nil)) or nil,
-		action       = (not paused and not mutation_busy and active_entry) and function()
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", "api_test_active", {
+		api_test_active = function()
 			local probed_id = active_entry.id
 			local probed_label = active_label
 			local probed_entry = {
@@ -691,8 +709,8 @@ function M.build(ctx)
 				return false
 			end
 			return true
-		end or nil,
-	})
+		end,
+	}, { llm_api_active_ready = active_commands_ready })
 
 
 	-- =====================================================
@@ -703,12 +721,8 @@ function M.build(ctx)
 	-- the AHK tray's "remove active" semantics. Disabled when nothing is
 	-- configured so the user does not chase a no-op click. Test sits above
 	-- it: the destructive action stays last.
-	table.insert(rows, {
-		label    = active_entry
-			and string.format("🗑️ %s (%s)", i18n.get("menu.llm.api_remove_entry"), active_label)
-			or  "🗑️ " .. i18n.get("menu.llm.api_remove_entry"),
-		disabled = (paused or mutation_busy or (active_entry == nil)) or nil,
-		action       = (not paused and not mutation_busy and active_entry) and function()
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", "api_remove_active", {
+		api_remove_active = function()
 			if _mutation_owner ~= nil then return false end
 			-- Confirm before destroying — the saved token is gone for good once
 			-- we delete it. Worth one extra click in a small menu.
@@ -719,6 +733,7 @@ function M.build(ctx)
 			if not (ok_c and choice == i18n.get("button.delete")) then
 				return
 			end
+			if not active_commands_ready() then return false end
 			local previous_entries = api_remote.get_entries() or {}
 			local previous_active_id = api_remote.get_active_entry_id()
 			local previous_model = state.llm_model
@@ -753,8 +768,20 @@ function M.build(ctx)
 				pcall_log("update_menu(delete rollback)", update_menu)
 			end, { delete_entry_ids = { active_entry.id } })
 			return true
-		end or nil,
-	})
+		end,
+	}, { llm_api_active_ready = active_commands_ready })
+	if remove_row then
+		remove_row.label = "🗑️ " .. remove_row.label .. (active_entry and (" (" .. active_label .. ")") or "")
+	end
+	local active_rows = { api_test_active = test_row, api_remove_active = remove_row }
+	for _, declaration in ipairs(ManifestMenu.get_array("llm_api_active_commands")) do
+		local row = active_rows[declaration.id]
+		if row then
+			-- Preserve the native disabled-row ABI; retained live actions still recheck readiness.
+			if row.disabled then row.action = nil end
+			table.insert(rows, row)
+		end
+	end
 
 
 	-- =====================================================
@@ -790,7 +817,7 @@ end
 --- Builds the "active model" submenu when the remote API backend is selected.
 --- Mirrors Windows ``_LLM_Menu_BuildApiEntriesMenu()`` — local catalogue rows
 --- are hidden because they have no ``urls.api`` entry in models.json.
---- @param ctx table Context with fields: state, paused, keymap, update_menu, WarmupCtrl.
+--- @param ctx table Context with fields: state, paused, is_paused, keymap, update_menu, WarmupCtrl.
 --- @return table menu Populated API entry picker.
 function M.build_model_picker(ctx)
 	local state       = ctx.state

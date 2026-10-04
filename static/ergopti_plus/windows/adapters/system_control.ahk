@@ -56,6 +56,14 @@ global SYSTEM_CONTROL_HKEY_CURRENT_USER := 0x80000001
 global SYSTEM_CONTROL_KEY_QUERY_VALUE := 0x0001
 ; How long an activated window may take to come to the foreground.
 global SYSTEM_CONTROL_ACTIVATE_WAIT_S := 1
+; OpenProcess receives a process identifier as a native DWORD.
+global SYSTEM_CONTROL_MAX_PROCESS_ID := 0xFFFFFFFF
+; Least rights needed by a retained process target.
+global SYSTEM_CONTROL_PROCESS_TERMINATE := 0x0001
+global SYSTEM_CONTROL_PROCESS_QUERY_LIMITED_INFORMATION := 0x1000
+global SYSTEM_CONTROL_SYNCHRONIZE := 0x00100000
+global SYSTEM_CONTROL_WAIT_OBJECT_0 := 0
+global SYSTEM_CONTROL_WAIT_TIMEOUT := 258
 
 
 
@@ -149,6 +157,59 @@ class SystemControl {
 		return ProcessClose(Pid) != 0
 	}
 
+	; Acquires one non-inheritable process capability before destructive approval.
+	; @param {Integer} Pid The resolved positive DWORD process id; reused ids are never reopened.
+	; @returns {Object} The retained native handle and its process id.
+	; @throws {TypeError} When the PID is outside the native DWORD domain.
+	; @throws {OSError} When Windows refuses the process access.
+	AcquireProcessTarget(Pid) {
+		global SYSTEM_CONTROL_PROCESS_TERMINATE, SYSTEM_CONTROL_PROCESS_QUERY_LIMITED_INFORMATION, SYSTEM_CONTROL_SYNCHRONIZE
+		global SYSTEM_CONTROL_MAX_PROCESS_ID
+		if !(Pid is Integer) || Pid <= 0 || Pid > SYSTEM_CONTROL_MAX_PROCESS_ID
+			throw TypeError("A process target requires a positive DWORD PID.")
+		Access := SYSTEM_CONTROL_PROCESS_TERMINATE | SYSTEM_CONTROL_PROCESS_QUERY_LIMITED_INFORMATION | SYSTEM_CONTROL_SYNCHRONIZE
+		Handle := DllCall("Kernel32\OpenProcess", "UInt", Access, "Int", false, "UInt", Pid, "Ptr")
+		if !Handle
+			throw OSError(A_LastError, -1, "OpenProcess target")
+		return { Handle: Handle, Pid: Pid }
+	}
+
+	; @returns {Boolean} Whether the retained process still runs.
+	; @throws {OSError} When Windows cannot query its retained handle.
+	ProcessTargetIsLive(Lease) {
+		global SYSTEM_CONTROL_WAIT_OBJECT_0, SYSTEM_CONTROL_WAIT_TIMEOUT
+		if !IsObject(Lease) || !Lease.HasOwnProp("Handle") || !Lease.Handle
+			return false
+		Status := DllCall("Kernel32\WaitForSingleObject", "Ptr", Lease.Handle, "UInt", 0, "UInt")
+		if Status == SYSTEM_CONTROL_WAIT_OBJECT_0
+			return false
+		if Status != SYSTEM_CONTROL_WAIT_TIMEOUT
+			throw OSError(A_LastError, -1, "WaitForSingleObject target")
+		return true
+	}
+
+	; Terminates only the exact retained process object, never a numeric lookup.
+	; @returns {Boolean} Whether native termination accepted this process handle.
+	TerminateProcessTarget(Lease) {
+		if !IsObject(Lease) || !Lease.HasOwnProp("Handle") || !Lease.Handle
+			throw ValueError("The process target has already been released.")
+		return DllCall("Kernel32\TerminateProcess", "Ptr", Lease.Handle, "UInt", 1, "Int") != 0
+	}
+
+	; Releases the capability once; this cleanup also runs during suspension.
+	; @throws {OSError} When native handle cleanup fails.
+	ReleaseProcessTarget(Lease) {
+		PreviousCritical := Critical("On")
+		try {
+			if !IsObject(Lease) || !Lease.HasOwnProp("Handle") || !Lease.Handle
+				return
+			Handle := Lease.Handle
+			Lease.Handle := 0
+		} finally Critical(PreviousCritical)
+		if !DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
+			throw OSError(A_LastError, -1, "CloseHandle process target")
+	}
+
 	; @returns {Integer} This script's own process id.
 	OwnPid() {
 		return DllCall("GetCurrentProcessId", "UInt")
@@ -198,6 +259,27 @@ class SystemControl {
 			return ""
 	}
 
+	; Reads exactly one window, including a hidden one, without choosing a new
+	; foreground target. HWND, process and class are the available Win32 receipt;
+	; they do not claim an unavailable unique window-generation identity.
+	; @param {Integer} Hwnd The admitted window handle, 0 when no window was read.
+	; @returns {Object|String} Detached { Hwnd, Pid, Class }, or "" when absent.
+	WindowSnapshot(Hwnd) {
+		if !(Hwnd is Integer)
+			throw TypeError("A window snapshot requires an integer HWND.")
+		if !Hwnd || !DllCall("IsWindow", "Ptr", Hwnd, "Int")
+			return ""
+		PreviousHidden := DetectHiddenWindows(true)
+		try {
+			Pid := WinGetPID("ahk_id " . Hwnd)
+			ClassName := WinGetClass("ahk_id " . Hwnd)
+			if !DllCall("IsWindow", "Ptr", Hwnd, "Int")
+				return ""
+			return { Hwnd: Hwnd, Pid: Pid, Class: ClassName }
+		} catch TargetError {
+			return ""
+		} finally DetectHiddenWindows(PreviousHidden)
+	}
 	; @returns {Integer} The process id of the desktop shell, whose explorer.exe
 	;   owns the desktop and the taskbar, or 0 when no shell is running.
 	ShellPid() {

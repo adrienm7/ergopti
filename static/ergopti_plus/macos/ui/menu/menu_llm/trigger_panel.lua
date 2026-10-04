@@ -21,6 +21,11 @@ local i18n         = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local Logger       = require("infra.logger")
 
+local PrivacyPolicy = require("llm.trigger_policy")
+local Preferences = require("infra.preferences")
+local ConfigPaths = require("infra.config_paths")
+local SettingsManager = require("ui.menu.menu_llm.settings_manager")
+
 local LOG = "menu_llm.trigger_panel"
 
 --- Routes one trigger setting through the shared transactional owner.
@@ -93,61 +98,56 @@ function M.build(ctx)
 	-- ===== 1.2) Instant triggers =====
 	-- =====================================================
 
-	rows[#rows + 1] = {
-		label    = i18n.get("menu.llm.instant_on_word_end"),
-		checked  = state.llm_instant_on_word_end,
-		disabled = is_disabled or nil,
-		action   = not is_disabled and function()
-			return apply_setting_transaction(settings_mgr,
-				"llm_instant_on_word_end",
-				not state.llm_instant_on_word_end,
-				"set_llm_instant_on_word_end")
-		end or nil,
-	}
+	local leading_rows = rows
+	rows = {}
 
-	rows[#rows + 1] = {
-		label    = i18n.get("menu.llm.after_hotstring"),
-		checked  = state.llm_after_hotstring,
-		disabled = is_disabled or nil,
-		action   = not is_disabled and function()
-			return apply_setting_transaction(settings_mgr,
-				"llm_after_hotstring",
-				not state.llm_after_hotstring,
-				"set_llm_after_hotstring")
-		end or nil,
-	}
-
-	rows[#rows + 1] = { separator = true }
-
-
-	-- =====================================================
-	-- ===== 1.3) Field filters =====
-	-- =====================================================
-
-	rows[#rows + 1] = {
-		label    = i18n.get("menu.llm.disable_url_bars"),
-		checked  = state.llm_url_bar_filter_enabled,
-		disabled = is_disabled or nil,
-		action   = not is_disabled and function()
-			return apply_setting_transaction(settings_mgr,
-				"llm_url_bar_filter_enabled",
-				not state.llm_url_bar_filter_enabled,
-				"set_llm_url_bar_filter_enabled")
-		end or nil,
-	}
-
-	rows[#rows + 1] = {
-		label    = i18n.get("menu.llm.disable_password_fields"),
-		checked  = state.llm_secure_field_filter_enabled,
-		disabled = is_disabled or nil,
-		action   = not is_disabled and function()
-			return apply_setting_transaction(settings_mgr,
-				"llm_secure_field_filter_enabled",
-				not state.llm_secure_field_filter_enabled,
-				"set_llm_secure_field_filter_enabled")
-		end or nil,
-	}
-
+	-- Fixed field filters belong to the declaration. Native owners prove the
+	-- actual cached runtime and the preowned canonical file before any click.
+	local function privacy_snapshot(key)
+		local snapshot = { owner = settings_mgr, generation = 0, value = state[key],
+			enabled = state.llm_enabled, backend = state.llm_backend,
+			paused = true, blocked = true }
+		local ok, detail = xpcall(function()
+			local core = llm_mod.streaming_snapshot()
+			local runtime = settings_mgr.setting_snapshot(key)
+			local path = ConfigPaths.get("ConfigTomlPath")
+			local canonical, physical = Preferences.current_view(path)
+			snapshot.source = Preferences.source_snapshot(path)
+			snapshot.paused = ctx.is_paused()
+			snapshot.generation = core.generation + (runtime and runtime.generation or 0)
+			local function canonical_value(field)
+				if canonical == nil then return nil end
+				if canonical[field] == nil then return llm_mod.DEFAULT_STATE[field] end
+				return canonical[field]
+			end
+			snapshot.blocked = ctx.is_disabled ~= false or core.blocked ~= false
+				or settings_mgr.scope_idle() ~= true or runtime == nil
+				or (runtime and (runtime.owner ~= settings_mgr or runtime.value ~= snapshot.value))
+				or core.enabled ~= snapshot.enabled or core.backend ~= snapshot.backend
+				or not Preferences.source_matches(snapshot.source, physical)
+				or canonical_value(key) ~= snapshot.value
+				or canonical_value("llm_enabled") ~= snapshot.enabled
+				or canonical_value("llm_backend") ~= snapshot.backend
+		end, debug.traceback)
+		if not ok then
+			Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
+			snapshot.blocked = true
+		end
+		return snapshot
+	end
+	local url_source = privacy_snapshot("llm_url_bar_filter_enabled")
+	local secure_source = privacy_snapshot("llm_secure_field_filter_enabled")
+	local function privacy_command(expected, key, runtime_fn)
+		local current = privacy_snapshot(key)
+		if not Preferences.source_matches(expected.source, current.source) then return false end
+		local decision = PrivacyPolicy.intent(expected, current)
+		if decision.admitted ~= true then return false end
+		return settings_mgr.apply_setting_transaction({
+			key = key, value = decision.value, runtime_fn = runtime_fn, publish_setting = false,
+			publication_guard = SettingsManager.publication_guard(Preferences,
+				ConfigPaths.get("ConfigTomlPath"), expected.source),
+		})
+	end
 
 	-- =====================================================
 	-- ===== 1.4) App exclusions =====
@@ -173,7 +173,43 @@ function M.build(ctx)
 		items    = exclusion_menu,
 	}
 
-	return ManifestMenu.render_rows(rows, "llm_trigger")
+	local function ready()
+		return state.llm_enabled == true and ctx.is_disabled ~= true
+			and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+	end
+	local shared_ctx = {
+		commands = {
+			["llm_url_bar_filter"] = function()
+				return privacy_command(url_source, "llm_url_bar_filter_enabled", "set_llm_url_bar_filter_enabled")
+			end,
+			["llm_secure_field_filter"] = function()
+				return privacy_command(secure_source, "llm_secure_field_filter_enabled", "set_llm_secure_field_filter_enabled")
+			end,
+			["llm_instant_on_word_end"] = function()
+				if not ready() then return false end
+				return apply_setting_transaction(settings_mgr, "llm_instant_on_word_end",
+					not state.llm_instant_on_word_end, "set_llm_instant_on_word_end")
+			end,
+			["llm_after_hotstring"] = function()
+				if not ready() then return false end
+				return apply_setting_transaction(settings_mgr, "llm_after_hotstring",
+					not state.llm_after_hotstring, "set_llm_after_hotstring")
+			end,
+		},
+		state_getters = {
+			["llm_url_bar_filter_enabled"] = function() return state.llm_url_bar_filter_enabled end,
+			["llm_secure_field_filter_enabled"] = function() return state.llm_secure_field_filter_enabled end,
+			["llm_url_bar_filter_ready"] = function() return PrivacyPolicy.ready(url_source) end,
+			["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
+			["llm_instant_on_word_end_enabled"] = function() return state.llm_instant_on_word_end end,
+			["llm_after_hotstring_enabled"] = function() return state.llm_after_hotstring end,
+			["llm_trigger_ready"] = ready,
+		},
+	}
+	return ManifestMenu.build("llm_trigger_menu", "LLM", nil, nil, shared_ctx, {
+		["llm_trigger_leading"] = function() return leading_rows end,
+		["llm_trigger_remaining"] = function() return rows end,
+	})
 end
 
 return M

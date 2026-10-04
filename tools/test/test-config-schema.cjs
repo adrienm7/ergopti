@@ -349,6 +349,37 @@ if (DRIVERS.length < MIN_DRIVERS) {
 	totalFail++;
 }
 
+// The number-row migration owns only typed legacy Windows Booleans. Runtime
+// config validation accepts exactly the three declared strings on every driver.
+{
+	const assert = require('node:assert/strict');
+	const choice = schema.$defs.layout.properties.direct_access_digits;
+	assert.equal(choice.type, 'string');
+	assert.deepEqual(choice.enum, ['native', 'digits', 'symbols']);
+	for (const [value, accepted] of [
+		['native', true],
+		['digits', true],
+		['symbols', true],
+		[false, false],
+		[true, false],
+		[0, false],
+		[1, false],
+		['true', false],
+		['Native', false],
+		['future', false],
+		[null, false],
+		[[], false],
+		[{ value: 'native' }, false]
+	]) {
+		const errors = [];
+		validate({ layout: { direct_access_digits: value } }, schema, '', errors);
+		assert.equal(errors.length === 0, accepted, 'typed number-row config value');
+	}
+	const absentErrors = [];
+	validate({ layout: {} }, schema, '', absentErrors);
+	assert.deepEqual(absentErrors, [], 'absence is not a malformed mode or a default flush');
+}
+
 console.log('');
 console.log(`Total: ${totalFail} violation(s) across ${DRIVERS.length} driver template(s).`);
 process.exit(totalFail > 0 ? 1 : 0);

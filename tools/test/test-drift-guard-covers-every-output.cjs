@@ -23,11 +23,13 @@
  * one had fallen four behind, and nothing could tell you. The fix snapshots the
  * whole of each `_generated/` tree instead of naming files.
  *
- * WHY THIS TEST PERTURBS THE REPO:
+ * WHY THIS TEST PERTURBS AN ISOLATED COPY:
  * The failure is only observable through a real edit surviving a real run. A
  * static check ("does the guard mention config_template?") would pass on a
  * guard that mentions it and still restores nothing. Every perturbation below
- * is restored from an in-memory snapshot in a finally block.
+ * is restored from an in-memory snapshot in a finally block. Run those probes
+ * against current source bytes in a private tree: native readers of a running
+ * driver must never contend with a test overwriting their configuration.
  * ==============================================================================
  */
 
@@ -35,7 +37,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const os = require('os');
+const { spawnSync, execFileSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PREVIOUSLY_UNGUARDED = [
 	'static/ergopti_plus/macos/_generated/config_template.toml',
@@ -157,10 +160,51 @@ function runCoverage({ fs: io = fs, runGuard = runGuardNative, root = ROOT } = {
 	return errors;
 }
 
-module.exports = { runCoverage };
+/** Copies current source bytes and confines every perturbation to that copy. */
+function runIsolatedCoverage({ files, probe = runCoverage } = {}) {
+	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-drift-coverage-'));
+	let failure;
+	try {
+		const selected =
+			files ||
+			execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--'], {
+				cwd: ROOT,
+				encoding: 'utf8'
+			})
+				.split('\0')
+				.filter(Boolean);
+		for (const relative of new Set(selected)) {
+			const source = path.resolve(ROOT, relative);
+			const destination = path.resolve(temporary, relative);
+			if (!source.startsWith(ROOT + path.sep) || !destination.startsWith(temporary + path.sep))
+				throw new Error('Drift fixture path escapes its source or private tree');
+			if (!fs.existsSync(source)) continue;
+			fs.mkdirSync(path.dirname(destination), { recursive: true });
+			fs.copyFileSync(source, destination);
+		}
+		fs.symlinkSync(
+			path.join(ROOT, 'node_modules'),
+			path.join(temporary, 'node_modules'),
+			process.platform === 'win32' ? 'junction' : 'dir'
+		);
+		return probe({ root: temporary });
+	} catch (error) {
+		failure = error;
+		throw error;
+	} finally {
+		try {
+			fs.rmSync(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		} catch (error) {
+			if (failure) throw new AggregateError([failure, error], 'Drift fixture and cleanup failed');
+			throw error;
+		}
+	}
+}
+
+module.exports = { runCoverage, runIsolatedCoverage };
 
 if (require.main === module) {
-	const errors = runCoverage();
+	const errors = runIsolatedCoverage();
 	if (errors.length > 0) {
 		console.error('[ERROR] drift-guard coverage:');
 		for (const error of errors) console.error('    - ' + error);

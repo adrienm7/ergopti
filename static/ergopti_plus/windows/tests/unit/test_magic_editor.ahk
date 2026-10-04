@@ -10,6 +10,30 @@
 
 #Requires AutoHotkey v2.0
 
+; These native fixtures require exact DLL output even when the layout is absent
+; from the user's installed list. Loading must preserve both active owners.
+_MET_Layout(Klid) {
+	Caller := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
+	Window := DllCall("GetForegroundWindow", "Ptr")
+	ForegroundProcess := 0
+	ForegroundThread := DllCall("GetWindowThreadProcessId", "Ptr", Window, "UInt*", &ForegroundProcess, "UInt")
+	Assert(Window != 0 && ForegroundThread != 0 && ForegroundProcess != 0,
+		"the native layout fixture requires an acknowledged foreground owner")
+	Assert(ForegroundProcess != DllCall("GetCurrentProcessId", "UInt"),
+		"a fixture with keyboard focus must refuse loading before it can change the user's layout")
+	Foreground := DllCall("GetKeyboardLayout", "UInt", ForegroundThread, "Ptr")
+	Hkl := DllCall("LoadKeyboardLayoutW", "Str", Klid, "UInt", 0x80, "Ptr")
+	Assert(Hkl != 0, "the native magic editor fixture requires keyboard layout " . Klid)
+	Wanted := Integer("0x" . Klid)
+	AssertEqual((Wanted << 16) | Wanted, Hkl & 0xFFFFFFFF,
+		"the exact requested native layout must not be replaced by the system's default language")
+	AssertEqual(Caller, DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"),
+		"loading a native fixture must not activate or reorder its caller layout")
+	AssertEqual(Foreground, DllCall("GetKeyboardLayout", "UInt", ForegroundThread, "Ptr"),
+		"the exact foreground thread retains its native layout")
+	return Hkl
+}
+
 _MET_ActualDefaultCatalogue() {
 	global _SharedDir
 	Root := _SharedDir
@@ -108,17 +132,17 @@ _MET_FreshProvenance() {
 		AssertEqual("magic_editor", Updates[1].Key, "the runnable contextual default remains ordinary configuration")
 		Source := Map("code", "KeyC", "native_code", 0x2E, "identity", "win:SC02E", "text", Chr(0x2605))
 		_IniCache := Map("shortcuts.keyboard", Raw)
-		AssertFalse(_MagicEditorExplicitClaim(Source, _APRL_Layout("00000409")) is Map,
+		AssertFalse(_MagicEditorExplicitClaim(Source, _MET_Layout("00000409")) is Map,
 			"merged neutral defaults are not raw personal provenance")
 		Raw["win_c"] := "none", Updates := []
 		CollectKeyboardShortcutUpdates(Updates, KeyboardShortcutAssignments, Raw, Defaults)
 		AssertEqual(2, Updates.Length, "an actual personal none remains durable on every full save")
-		Claim := _MagicEditorExplicitClaim(Source, _APRL_Layout("00000409"))
+		Claim := _MagicEditorExplicitClaim(Source, _MET_Layout("00000409"))
 		AssertEqual("win_c", Claim["slot"])
 		AssertEqual("none", Claim["action"], "stored none owns the resolved physical chord")
 		AssertEqual(1, Claim["slots"].Length)
 		Raw["win_c"] := "copy", KeyboardShortcutAssignments["win_c"] := "copy"
-		AssertEqual("copy", _MagicEditorExplicitClaim(Source, _APRL_Layout("00000409"))["action"],
+		AssertEqual("copy", _MagicEditorExplicitClaim(Source, _MET_Layout("00000409"))["action"],
 			"a personal action is never replaced by the default editor")
 	} finally {
 		_IniCache := IsSet(SavedCache) ? SavedCache : unset
@@ -167,7 +191,7 @@ _MET_ExistingPhysicalSlots() {
 Test("magic editor: existing physical slots join once while ordinary VK slots stay owned", _MET_ExistingPhysicalSlots)
 
 _MET_RealLayouts() {
-	Us := _APRL_Layout("00000409"), French := _APRL_Layout("0000040C")
+	Us := _MET_Layout("00000409"), French := _MET_Layout("0000040C")
 	Known := _MET_Options()["known_codes"]
 	UsSource := MagicEditorProbeSource(Us, ";", 1, MagicEditorPhysicalCatalogue(_SharedDir))
 	Selected := MagicEditorSelectSource(UsSource, ";", Known)
@@ -217,17 +241,30 @@ _MET_RealLayouts() {
 }
 Test("magic editor: real neutral US and French source receipts", _MET_RealLayouts)
 
+_MET_UnavailableNativeSource() {
+	Receipt := MagicEditorProbeSource(0, ";", 1, MagicEditorPhysicalCatalogue(_SharedDir))
+	AssertEqual("unavailable", Receipt["status"], "HKL zero cannot authorize native probing")
+	AssertEqual(0, Receipt["candidates"].Length, "an unavailable layout supplies no physical evidence")
+	Selected := MagicEditorSelectSource(Receipt, ";", _MET_Options()["known_codes"])
+	AssertEqual("source_unavailable", Selected["reason"])
+	AssertFalse(Selected["source"] is Map, "the real source owner cannot fabricate a fallback physical key")
+	AssertFalse(_MagicEditorExplicitClaim(Selected["source"], 0) is Map,
+		"unavailable native evidence cannot acquire an ordinary Win owner")
+}
+Test("magic editor: unavailable native layouts retain strict source refusal (magic-editor-native-layout-fixture)",
+	_MET_UnavailableNativeSource)
+
 _MET_ActualSourceOwner() {
 	global Features, ScriptInformation, KLE_Model, TapHold
 	Saved := [Features, ScriptInformation, KLE_Model, TapHold]
 	try {
-		Features := Map("layout", Map("ergopti_base", false, "direct_access_digits", false, "emulated_layout", ""),
+		Features := Map("layout", Map("ergopti_base", false, "direct_access_digits", "native", "emulated_layout", ""),
 			"hotstrings", Map("magic_key", Map("replace", Map("enabled", true))))
 		ScriptInformation := Map("MagicKey", ";", "MagicKeySourceScan", "SC024", "MagicKeySourceChosen", true,
 			"MagicKeySourceOverridesEmulation", true)
 		KLE_Model := 0, TapHold := Map("keys", Map())
 		Table := MagicEditorPhysicalCatalogue(_SharedDir), Known := _MET_Options()["known_codes"]
-		Us := _APRL_Layout("00000409")
+		Us := _MET_Layout("00000409")
 		Receipt := _MagicEditorCurrentSource(1, Table, Us)
 		Selected := MagicEditorSelectSource(Receipt, ";", Known)
 		AssertEqual("KeyJ", Selected["source"]["code"],
@@ -238,7 +275,7 @@ _MET_ActualSourceOwner() {
 		AssertEqual("Semicolon", MagicEditorSelectSource(Receipt, ";", Known)["source"]["code"],
 			"a configured but ineffective replacement does not prove KeyJ")
 		ScriptInformation["MagicKey"] := Chr(0xF9), ScriptInformation["MagicKeySourceChosen"] := false
-		Receipt := _MagicEditorCurrentSource(3, Table, _APRL_Layout("0000040C"))
+		Receipt := _MagicEditorCurrentSource(3, Table, _MET_Layout("0000040C"))
 		AssertEqual("Quote", MagicEditorSelectSource(Receipt, Chr(0xF9), Known)["source"]["code"],
 			"automatic mode retargets the actual French direct trigger")
 		ScriptInformation["MagicKey"] := Chr(0x2605)

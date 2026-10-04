@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Windows packaging stamp preserves exact AHK source encoding',
+		cmd: 'node',
+		args: ['tools/test/test-windows-bundle-stamp-encoding.cjs'],
+		repro: 'npm run test:windows-bundle-stamp-encoding'
+	},
+	{
 		name: 'JS suite failures preserve error headlines and process status',
 		cmd: 'node',
 		args: ['tools/test/test-js-suite-failure-diagnostics.cjs'],
@@ -71,6 +77,12 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-windows-range-transport.cjs'],
 		repro: 'npm run test:windows-range-transport'
+	},
+	{
+		name: 'AHK E2E admission requires every pure and native Edit corpus result',
+		cmd: process.execPath,
+		args: ['tools/test/test-ahk-e2e-manifest.cjs'],
+		repro: 'npm run test:ahk-e2e-manifest'
 	},
 	{
 		name: 'AHK suite manifest rejects early completion before the slow tail',
@@ -635,6 +647,12 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-ahk-startup-contract.cjs'],
 		repro: 'node tools/test/test-ahk-startup-contract.cjs'
+	},
+	{
+		name: 'AHK startup smoke requires fresh process-bound warm readiness (inert admission)',
+		cmd: 'node',
+		args: ['tools/test/test-ahk-startup-smoke-readiness.cjs'],
+		repro: 'node tools/test/test-ahk-startup-smoke-readiness.cjs'
 	},
 	{
 		name: 'full AHK startup smoke (real auto-execute to ready, isolated config)',

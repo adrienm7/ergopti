@@ -57,14 +57,20 @@ local function with_fixture(callback)
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Terminators = require("keymap.terminators")
 		local calls = { writes = 0, updates = 0 }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {
-			text_prompt = function() return "OK", "☂" end,
+			text_prompt = function(_, _, _, accept_label) return accept_label, "☂" end,
 			block_alert = function(_, body)
 				return body == "dialog.hotstrings.consume_body" and "dialog.hotstrings.consume_no" or "button.delete"
 			end,
 		}
+		local command_row = require("infra.manifest_menu").command_row
+		local check_row = require("infra.manifest_menu").check_row
+		local get_array = require("infra.manifest_menu").get_array
 		package.loaded["infra.manifest_menu"] = {
+			command_row = command_row,
+			check_row = check_row,
+			get_array = get_array,
 			build = function(section, _, _, _, _, providers)
 				if section == "word_expanders_menu" then return providers.word_expander_entries() end
 				return providers.word_expanders()
@@ -160,9 +166,10 @@ helpers.describe("hand-written delimiter records through the management owner", 
 		end)
 	end)
 	for _, action in ipairs({ "add_custom", "delete_expander" }) do
+		local label = action == "delete_expander" and "menu.hotstrings.delete_delimiter" or "menu.hotstrings.add_delimiter"
 		helpers.it("preserves the untouched AoT sibling through " .. action, function()
 			with_fixture(function(fixture)
-				local row = find_row(fixture.rows, "menu.hotstrings." .. action)
+				local row = find_row(fixture.rows, label)
 				helpers.assert_type(row, "table")
 				helpers.assert_eq(row.action(), true)
 				helpers.assert_eq(fixture.calls.writes, 1)
@@ -185,7 +192,7 @@ helpers.describe("hand-written delimiter records through the management owner", 
 		end)
 		helpers.it("rolls an AoT " .. action .. " back after real publication refuses", function()
 			with_fixture(function(fixture)
-				local row = find_row(fixture.rows, "menu.hotstrings." .. action)
+				local row = find_row(fixture.rows, label)
 				helpers.assert_type(row, "table")
 				local before = require("ui.menu.preferences_transaction").clone(fixture.state)
 				fixture.calls.refuse_write = true

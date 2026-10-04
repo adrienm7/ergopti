@@ -274,16 +274,17 @@ helpers.describe("menu_keyboard_layout.DEFAULT_STATE (pause-layout feature)", fu
 	-- could not hydrate the layout keys and they were silently ignored.
 	-- The menubar icon variant joined them on 2026-09-24: it moved from
 	-- hs.settings to config.toml [ui], so this module now seeds its default too.
-	helpers.it("DEFAULT_STATE has exactly the three pause-layout keys and the menubar icon (no extras)", function()
+	helpers.it("DEFAULT_STATE has exactly the three pause-layout keys, native number-row mode and menubar icon (no extras)", function()
 		local allowed = { layout_pause_switch_enabled = true, layout_on_pause = true, layout_on_resume = true,
-			menubar_icon = true }
+			menubar_icon = true, layout_number_row_mode = true }
 		local count = 0
 		for k in pairs(kbd.DEFAULT_STATE) do
 			count = count + 1
 			helpers.assert_true(allowed[k] == true,
 				"Unexpected key in DEFAULT_STATE: " .. tostring(k))
 		end
-		helpers.assert_eq(count, 4)
+		helpers.assert_eq(count, 5)
+		helpers.assert_eq(kbd.DEFAULT_STATE.layout_number_row_mode, "native", "unsupported forced modes acquire no default authority")
 	end)
 end)
 

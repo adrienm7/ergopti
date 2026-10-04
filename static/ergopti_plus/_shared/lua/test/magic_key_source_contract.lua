@@ -91,6 +91,51 @@ return function(helpers, Source, fixture)
 			helpers.assert_eq(idle[1].items[5].label, codes[1], "a layout that cannot answer shows the code")
 		end)
 
+		helpers.it("(magic-key-source) configured tap claims preserve native aliases and menu refusal", function()
+			local Json = require("json")
+			local path = helpers.shared and helpers.shared("tests/corpus/keymap/magic_source_tap_claims.json")
+				or helpers.driver_root() .. "/../_shared/tests/corpus/keymap/magic_source_tap_claims.json"
+			local file = assert(io.open(path, "rb"))
+			local corpus = Json.decode(file:read("*a"))
+			file:close()
+			path = helpers.shared and helpers.shared("modules/actions/tap_keys.json")
+				or helpers.driver_root() .. "/../_shared/modules/actions/tap_keys.json"
+			file = assert(io.open(path, "rb"))
+			local keys = Json.decode(file:read("*a")).keys
+			file:close()
+			local options = {}
+			for key, value in pairs(fixture) do options[key] = value end
+			if fixture.field == "hs" then options.aliases = { "macos_iso" } end
+			local owned = Source.new(options)
+			helpers.assert_eq(Source.TAP_CONFLICT_REASON, corpus.reason_key)
+			for _, case in ipairs(corpus.cases) do
+				local original = Json.encode(case.assignments)
+				local function action(id) return case.assignments[id] or "none" end
+				local function reason(value)
+					if Source.tap_conflict(owned, value, keys, fixture.field == "hs" and "hs" or "linux", action) then
+						return Source.TAP_CONFLICT_REASON
+					end
+				end
+				local actual = Source.tap_conflict(owned, case.source, keys, fixture.field == "hs" and "hs" or "linux", action)
+				helpers.assert_eq(actual or "", case.expected[fixture.field], case.name)
+				local choices = Source.menu_rows(owned, { t = function(key) return key end,
+					current = "auto", key_text = function() return nil end, choose = function() end, reason = reason })
+				for index, code in ipairs(owned.candidates()) do
+					if code == case.source then
+						local row = choices[1].items[index + 4]
+						local blocked = case.expected[fixture.field] ~= ""
+						helpers.assert_eq(row.disabled == true, blocked, case.name)
+						helpers.assert_eq(type(row.action) == "function", not blocked, case.name)
+						if blocked then helpers.assert_true(row.label:find(corpus.reason_key, 1, true) ~= nil) end
+					end
+				end
+				helpers.assert_eq(Json.encode(case.assignments), original, "claim projection never edits assignments")
+			end
+			local first = owned.native_codes("Backquote")
+			first[1] = -1
+			helpers.assert_true(owned.native_codes("Backquote")[1] ~= -1, "callers never mutate the resolver's aliases")
+		end)
+
 		helpers.it("(magic-key-source) refuses a manifest or registry it cannot trust", function()
 			local function refused(opts)
 				return not pcall(Source.new, opts)

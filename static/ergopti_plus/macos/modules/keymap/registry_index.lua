@@ -83,8 +83,8 @@ end
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
 --- @param section_sources table|nil Sections a layout extension's files supply.
-function M.load_toml(name, path, section_sources)
-	return Groups.load_toml(name, path, section_sources)
+function M.load_toml(name, path, section_sources, personal_source)
+	return Groups.load_toml(name, path, section_sources, personal_source)
 end
 
 --- Atomically replaces one enabled TOML group while preserving a deliberately
@@ -159,6 +159,13 @@ end
 --- @return table|nil inventory Detached copies keyed by group name.
 function M.hotstring_delay_inventory()
 	return Groups.hotstring_delay_inventory()
+end
+
+--- Captures the current native owner used by file-labelled scope callbacks.
+--- @param name string Registered group identity.
+--- @return table|nil binding Detached metadata and an exact owner predicate.
+function M.personal_file_scope_binding(name)
+	return Groups.personal_file_scope_binding(name)
 end
 
 --- Enables a previously disabled group by reloading its file (or re-running its hook).

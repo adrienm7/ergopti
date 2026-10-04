@@ -69,16 +69,23 @@ global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
 ; ========================================================
 ; ========================================================
 
-; Extract an individual per-hotstring priority from a TOML entry line, or return
-; Fallback when the entry carries no `priority = N` key. The key must be preceded
-; by `{` or `,` so it is matched only as a real inline-table key and can never
-; collide with the word "priority" appearing inside the output string. This is
-; the top level of the priority cascade (individual > section > file > source).
+; Extract the structural priority member through the shared quote-aware owner.
+; Output text and trailing comments cannot participate in the priority cascade.
 _ParseEntryPriority(Line, Fallback) {
-		if RegExMatch(Line, "i)[,{]\s*priority\s*=\s*([0-9]+)", &PrioM) {
-				if TOML_TryParseInteger(PrioM[1], &ParsedPriority)
+		if !InStr(Line, "priority", false)
+				return Fallback
+		Delimiter := _TOML_AssignmentDelimiter(Line)
+		if !Delimiter
+				return Fallback
+		RawTable := Trim(TOML_StripInlineComment(SubStr(Line, Delimiter + 1)))
+		Fields := TOML_ParseInlineTable(RawTable, (Raw) => Raw)
+		for Key, Raw in Fields {
+				if StrLower(Key) != "priority"
+						continue
+				if Raw is String && RegExMatch(Raw, "^[0-9]+$") && TOML_TryParseInteger(Raw, &ParsedPriority)
 						and HotstringsTryPriority(ParsedPriority, &Priority)
 						return Priority
+				return Fallback
 		}
 		return Fallback
 }
@@ -160,7 +167,7 @@ _TomlWarmFileCounts(FilePath) {
 				; displayed count could exceed the registered/cached row count.
 				if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
 						if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
-						or RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
+						or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
 								Counts[CurrentSec] := Counts[CurrentSec] + 1
 						}
 				}
@@ -465,8 +472,43 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				CategoryName, SectionName, Loaded)
 }
 
+; Register admitted sections together so physical TOML order survives boundaries.
+; Callers own the admission map; unknown and disabled sections do not register.
+LoadHotstringsCategory(CategoryName, Sections, ExtraOptions := Map()) {
+	global _HS_CACHE_ROWS
+	; Bound sources keep their native section owner and its existing order policy.
+	; A missing bound file never grants permission to use the bundled cache.
+	if HotstringsBoundTomlPath(CategoryName) != "" || HotstringsBoundSections(CategoryName).Count {
+		for Section, Config in Sections {
+			if (Config is Map) && Config.Get("enabled", false)
+				LoadHotstringsSection(CategoryName, Section, Config, ExtraOptions)
+		}
+		return
+	}
+	HotstringsCacheEnsure()
+	Category := StrLower(CategoryName)
+	Configs := Map(), Priorities := Map()
+	for Section, Config in Sections {
+		if !(Config is Map) || !Config.Get("enabled", false)
+			continue
+		Resolved := HotstringsResolve(CategoryName, Section)
+		Configs[Section] := { Enabled: true, TimeActivationSeconds: Resolved.Delay }
+		Priorities[Section] := Resolved.Priority
+	}
+	if !_HS_CACHE_ROWS.HasOwnProp("SourceOrder")
+		throw Error("Hotstring source order is unavailable.")
+	for Record in _HS_CACHE_ROWS.SourceOrder {
+		Parts := StrSplit(Record[1], ".",, 2)
+		if Parts[1] != Category || Parts.Length != 2 || !Configs.Has(Parts[2])
+			continue
+		_HsCacheRegisterRows(Record[1], [Record[2]], Configs[Parts[2]], ExtraOptions, Priorities[Parts[2]])
+	}
+}
+
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
-LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
+LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource := unset) {
+		if IsSet(PersonalSource) && !PersonalFileDescriptorValid(PersonalSource)
+				throw TypeError("Invalid personal hotstring source descriptor.")
 		global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
 		global HS_TOML_SECTION_HEADER_PATTERN
 		if !FileExist(FilePath) {
@@ -510,7 +552,7 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
 						continue
 				}
 				if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
-						if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleM) {
+						if RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleM) {
 								Trigger := UnescapeTomlString(
 									(SimpleM[1] != "") ? SimpleM[1] : SimpleM[2])
 								Output  := UnescapeTomlString(SimpleM[3])
@@ -520,9 +562,14 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
 								; user's key, not the corpus placeholder.
 								Output  := StrReplace(Output, "★", ScriptInformation["MagicKey"])
 								Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
+								Options["Category"] := CategoryLabel
+								Options["Section"] := CurrentSection
+								if IsSet(PersonalSource)
+									Options["PersonalSource"] := PersonalSource
+								; Provenance must not adopt a new activation owner for whole-file packs.
+								if SelectedSection == ""
+										Options["Group"] := "default"
 								if SelectedSection != "" {
-										Options["Category"] := CategoryLabel
-										Options["Section"] := CurrentSection
 										Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
 										Options["Priority"] := Resolved.Priority
 										Options["TimeActivationSeconds"] := Resolved.Delay
@@ -554,9 +601,14 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "") {
 						and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
 				EntryPriority := _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE)
 				Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
+				Options["Category"] := CategoryLabel
+				Options["Section"] := CurrentSection
+				if IsSet(PersonalSource)
+					Options["PersonalSource"] := PersonalSource
+				; Provenance must not adopt a new activation owner for whole-file packs.
+				if SelectedSection == ""
+						Options["Group"] := "default"
 				if SelectedSection != "" {
-						Options["Category"] := CategoryLabel
-						Options["Section"] := CurrentSection
 						Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
 						Options["Priority"] := _ParseEntryPriority(Line, Resolved.Priority)
 						Options["TimeActivationSeconds"] := Resolved.Delay

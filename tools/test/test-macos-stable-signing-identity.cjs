@@ -168,21 +168,21 @@ generate_info_plist() { mkdir -p "$APP_PATH/Contents"; : > "$APP_PATH/Contents/I
 plutil() { :; }
 disarm_bundle_sparkle() { :; }
 zip_app() { record zip; }
+# The full app now delegates both archives to one producer. This isolated
+# signing replay accepts only that exact boundary; it does not create archives.
+node() {
+	[ "$#" -eq 3 ] && [ "$1" = "$REPO_ROOT/tools/build/macos-release-archives.cjs" ] && \
+		[ "$2" = "$APP_PATH" ] && [ "$3" = "$BUILD_DIR" ] || fail "Unexpected archive producer invocation."
+	record archive-producer "$@"
+	# ZIP is one output of this admitted producer, preserving the signing-order check.
+	record zip
+}
 ${options.entry === 'main' ? 'main' : 'build_native_helper'}
 `;
 		const result = spawnSync(
 			bashExecutable(),
-			[
-				'-c',
-				script,
-				'replay',
-				posix,
-				options.base64,
-				options.password,
-				options.dr ?? '',
-				options.failOn ?? ''
-			],
-			{ encoding: 'utf8', timeout: 20000 }
+			['-s', '--', posix, options.base64, options.password, options.dr ?? '', options.failOn ?? ''],
+			{ input: script, encoding: 'utf8', timeout: 20000 }
 		);
 		const logPath = path.join(tmp, 'calls.log');
 		const calls = fs.existsSync(logPath)
@@ -358,11 +358,52 @@ check(
 	'certificate build: the zip must be made after the last signature'
 );
 
+const archiveCalls = full.calls.filter((call) => call[0] === 'archive-producer');
+const fullApp = target(signatures(full).at(-1) ?? []);
+const fullBuild = path.posix.dirname(fullApp);
+check(
+	archiveCalls.length === 1 &&
+		JSON.stringify(archiveCalls[0]) ===
+			JSON.stringify([
+				'archive-producer',
+				path.posix.join(
+					path.posix.dirname(fullBuild),
+					'repo/tools/build/macos-release-archives.cjs'
+				),
+				fullApp,
+				fullBuild
+			]),
+	'certificate build: exactly the owned archive producer receives the signed app and build directory'
+);
+/** @param {ReturnType<typeof replay>} run Replay whose archive order is checked. @returns {boolean} */
+function archiveOrderIsValid(run) {
+	const archiveAt = run.calls.findIndex((call) => call[0] === 'archive-producer');
+	const signatureAt = run.calls.lastIndexOf(signatures(run).at(-1));
+	const verificationAt = run.calls
+		.map((call, index) => (call[0] === 'codesign' && call.includes('--verify') ? index : -1))
+		.filter((index) => index >= 0);
+	return (
+		signatureAt >= 0 &&
+		archiveAt > signatureAt &&
+		verificationAt.length === 2 &&
+		verificationAt.every((index) => index < archiveAt)
+	);
+}
+check(
+	archiveOrderIsValid(full),
+	'certificate build: archive creation follows both real signature verifications'
+);
+
 const helper = replay(BUILD, { entry: 'helper', base64: B64, password: P12_PASSWORD, dr: CERT_DR });
 errors.push(
 	...certificateProblems(helper, HELPER_ORDER).map((problem) => `native helper: ${problem}`)
 );
 checkKeychain(helper, 'native helper');
+check(
+	!helper.calls.some((call) => call[0] === 'archive-producer') &&
+		helper.calls.filter((call) => call[0] === 'zip').length === 1,
+	'native helper: the original helper ZIP owner remains independent of the full-app producer'
+);
 
 // A requirement that still reads as ad hoc means the certificate did not
 // take; the build must stop rather than ship it.
@@ -389,6 +430,10 @@ const failed = replay(BUILD, {
 	failOn: 'Hammerspoon.app'
 });
 check(failed.status !== 0, 'a failed signature must fail the build');
+check(
+	![failed, mismatch].some((run) => run.calls.some((call) => call[0] === 'archive-producer')),
+	'a failed signature or refused certificate requirement must never enter archive creation'
+);
 check(
 	failed.calls.some((call) => call[0] === 'security' && call[1] === 'delete-keychain') &&
 		failed.leftovers.length === 0,
@@ -451,6 +496,57 @@ if (adHocOnly === BUILD) {
 		'self-check: a build that signs ad hoc with the certificate variables set went unnoticed'
 	);
 }
+
+// Self-check the narrowly admitted producer boundary, not a generic node double.
+const archiveInvocation =
+	'node "$REPO_ROOT/tools/build/macos-release-archives.cjs" "$APP_PATH" "$BUILD_DIR"';
+for (const [label, invocation] of [
+	['wrong producer', 'node "$REPO_ROOT/tools/build/foreign-archives.cjs" "$APP_PATH" "$BUILD_DIR"'],
+	[
+		'wrong app',
+		'node "$REPO_ROOT/tools/build/macos-release-archives.cjs" "$BUILD_DIR" "$BUILD_DIR"'
+	],
+	[
+		'wrong output',
+		'node "$REPO_ROOT/tools/build/macos-release-archives.cjs" "$APP_PATH" "$APP_PATH"'
+	]
+]) {
+	const source = BUILD.replace(archiveInvocation, invocation);
+	check(source !== BUILD, `self-check: archive invocation drifted for ${label}`);
+	const refused = replay(source, {
+		entry: 'main',
+		base64: B64,
+		password: P12_PASSWORD,
+		dr: CERT_DR
+	});
+	check(
+		refused.status !== 0 &&
+			/Unexpected archive producer invocation/.test(refused.stderr) &&
+			!refused.calls.some((call) => call[0] === 'archive-producer'),
+		`self-check: ${label} must be rejected by the owned producer port`
+	);
+	checkKeychain(refused, label);
+}
+const earlyArchiveSource = BUILD.replace(`\t${archiveInvocation}\n`, '').replace(
+	'\tcodesign_app\n',
+	`\t${archiveInvocation}\n\tcodesign_app\n`
+);
+check(
+	earlyArchiveSource !== BUILD,
+	'self-check: archive/signing order mutation must alter the real main'
+);
+const earlyArchive = replay(earlyArchiveSource, {
+	entry: 'main',
+	base64: B64,
+	password: P12_PASSWORD,
+	dr: CERT_DR
+});
+check(
+	earlyArchive.status === 0 &&
+		earlyArchive.calls.filter((call) => call[0] === 'archive-producer').length === 1 &&
+		!archiveOrderIsValid(earlyArchive),
+	'self-check: an admitted archive producer before signing must fail the order guard'
+);
 
 // ==========================================
 // ==========================================

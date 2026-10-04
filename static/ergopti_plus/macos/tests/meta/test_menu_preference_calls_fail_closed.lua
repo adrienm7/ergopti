@@ -52,9 +52,10 @@ local function assert_guards(source)
 
 	-- The reviewed pre-retirement census had 59 calls. Exactly the one call in
 	-- apply_metrics_shortcut and the one in apply_apps_time_shortcut left with
-	-- those dedicated owners. All 57 remaining call sites and strict predicates
-	-- stay in this complete scan; a missing call is now a failure, not new slack.
-	helpers.assert_eq(calls, 57,
+	-- those dedicated owners. The baseline delay transaction adds one protected
+	-- call to those 57 sites. All 58 strict predicates stay in this complete scan;
+	-- a missing call is a failure, not new slack.
+	helpers.assert_eq(calls, 58,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
@@ -83,6 +84,32 @@ helpers.describe("menu preference call sites fail closed", function()
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(err):find("every menu preference writer", 1, true) ~= nil)
 	end)
+
+	for _, mutation in ipairs({
+		{ name = "removing", before = "local called, committed = xpcall(options.save_prefs, debug.traceback)",
+			after = "local called, committed = true, true", reason = "reviewed post-retirement census" },
+		{ name = "weakening", before = "if not called or committed ~= true then",
+			after = "if not called or not committed then", reason = "every menu preference writer" },
+	}) do
+		helpers.it("rejects " .. mutation.name .. " the baseline delay writer acknowledgement", function()
+			local owner, owner_error = helpers.read_driver_unit("MODULE: Baseline Delay Mutation Owner")
+			helpers.assert_not_nil(owner, owner_error)
+			local first = owner:find(mutation.before, 1, true)
+			helpers.assert_not_nil(first, "the mutation must reach the real baseline owner")
+			helpers.assert_eq(owner:find(mutation.before, first + 1, true), nil)
+			local altered_owner = owner:sub(1, first - 1) .. mutation.after
+				.. owner:sub(first + #mutation.before)
+			local source = helpers.read_driver_source("save_prefs")
+			local owner_start = source:find(owner, 1, true)
+			helpers.assert_not_nil(owner_start, "the complete census must include the baseline owner")
+			helpers.assert_eq(source:find(owner, owner_start + 1, true), nil)
+			local changed = source:sub(1, owner_start - 1) .. altered_owner
+				.. source:sub(owner_start + #owner)
+			local ok, err = pcall(assert_guards, changed)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(err):find(mutation.reason, 1, true) ~= nil)
+		end)
+	end
 
 	helpers.it("restores core backend identity before keymap warmup setters", function()
 		local source, err = helpers.read_driver_unit("Restore the backend/profile/model identity")

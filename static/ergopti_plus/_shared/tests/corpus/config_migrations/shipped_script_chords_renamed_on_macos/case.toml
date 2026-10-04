@@ -5,4 +5,4 @@ description = "The shipped v6 to v7 step gives macOS's script-control switch and
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 6
-to_version = 9
+to_version = 10

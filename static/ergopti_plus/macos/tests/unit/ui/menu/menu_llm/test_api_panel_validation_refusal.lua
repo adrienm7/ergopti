@@ -89,7 +89,20 @@ helpers.describe("API panel validation acquisition", function()
 					return true
 				end,
 			}
+			local command_renderer = assert(require("menu.renderer").new({
+				platform = "hs",
+				manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+				json_decode = require("adapters.json_codec").decode,
+				i18n = {
+			get = package.loaded["infra.i18n"].get,
+			-- These command rows never request a translated section.
+			section = function() return {} end,
+		},
+				logger = helpers.make_logger_stub(),
+			}))
 			package.loaded["infra.manifest_menu"] = {
+				command_row = command_renderer.command_row,
+			get_array = command_renderer.get_array,
 				render_rows = function(rows) return rows end,
 			}
 			package.loaded["ui.menu.menu_llm.api_panel"] = nil
@@ -99,6 +112,7 @@ helpers.describe("API panel validation acquisition", function()
 			local context = {
 				state = state,
 				paused = false,
+				is_paused = function() return false end,
 				keymap = { reset_predictions = function() return true end },
 				update_menu = function() updates = updates + 1 end,
 				WarmupCtrl = { warmup = function() warmups = warmups + 1 end },

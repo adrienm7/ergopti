@@ -3124,7 +3124,7 @@
 	"platform_reason.llm_mlx_is_apple_silicon": "macOS 전용: MLX는 Apple Silicon용 Apple 온디바이스 추론 프레임워크이며 Windows나 Linux용 빌드는 없습니다.",
 	"platform_reason.lists_windows_only_settings": "Windows 전용: 이 행이 나열할 항목은 모두 Windows 전용이므로 macOS와 Linux에서는 빈 목록이 됩니다.",
 	"platform_reason.touchpad_cannot_count_that_many": "이 터치패드는 그만큼의 손가락을 셀 수 없습니다. 커널은 해당 슬롯을 갖춘 하드웨어에서만 네 손가락과 다섯 손가락 접촉을 보고합니다.",
-	"platform_reason.preview_bubbles_are_lua_previews": "Windows에는 없습니다. 이 스위치들은 macOS와 Linux 드라이버가 직접 그리는 미리 보기 풍선을 제어합니다. Windows는 핫스트링 피드백을 다른 툴팁으로 표시하며, 해당하는 스위치가 없습니다.",
+	"platform_reason.preview_bubbles_are_lua_previews": "Windows에서는 지원되지 않음: 이 스위치들은 macOS와 Linux 드라이버가 직접 그리는 미리 보기 풍선을 제어합니다. Windows는 핫스트링 피드백을 다른 툴팁으로 표시하며, 해당하는 스위치가 없습니다.",
 	"platform_reason.no_magic_key_editor_on_linux": "Linux 제외: 이 행은 매직 키를 변경합니다. macOS와 Windows는 이를 위한 대화상자를 엽니다. Linux 드라이버는 설정에서 키를 읽기만 하고 메뉴에서 바꿀 방법이 없습니다.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux 제외: 이 행들은 사용자가 지정한 조합키를 나열합니다. macOS와 Windows는 조합키를 캡처해 저장할 수 있지만, Linux 드라이버에는 슬롯 지정 수단이 전혀 없어 목록이 항상 비어 있게 됩니다.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux 제외: 이 행은 개인 단축키 파일을 엽니다. macOS와 Windows에는 그런 파일이 있지만, Linux 드라이버의 단축키는 토글과 선택 영역 변환이라 편집할 파일이 없습니다.",
@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Karabiner에서 Ergopti 제거",
 	"menu.global.restore_touchpad_gestures": "Windows 터치패드 제스처 복원",
 	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
-	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요."
+	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요.",
+	"platform_reason.token_streaming_transport_missing": "Windows 제외: Windows는 아직 제안을 토큰 단위로 표시할 수 없습니다. 이 옵션은 비활성 상태로 유지됩니다.",
+	"menu.layout.number_row": "숫자 행",
+	"menu.layout.number_row_native": "시스템 순서",
+	"menu.layout.number_row_digits": "숫자 우선",
+	"menu.layout.number_row_symbols": "기호 우선",
+	"platform_reason.number_row_override_unsupported": "지원 안 됨: 이 드라이버는 시스템의 숫자 행을 유지하며 숫자나 기호를 강제할 수 없습니다.",
+	"platform_reason.number_row_source_unavailable": "사용 불가: 기호 우선은 숫자 행의 모든 위치에 유효한 숫자와 기호 단계가 있는 활성 에뮬레이션 배열이 필요합니다."
 }

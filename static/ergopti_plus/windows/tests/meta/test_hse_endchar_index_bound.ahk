@@ -32,20 +32,42 @@ Test_HSE_EndCharMatchUsesBoundedFullTriggerIndex() {
 }
 Test("HSE: end-char matching probes a bounded full-trigger index", Test_HSE_EndCharMatchUsesBoundedFullTriggerIndex)
 
-; The trigger-body slice is the only buffer-SIZED work on the per-keystroke match
-; path: SubStr(HSE_Buffer, 1, BufLen - 1) copies up to HSE_MAX_BUFFER_LEN chars.
-; Only the END-CHAR block reads it, and that block runs on word terminators alone
-; (~15-20 % of keystrokes), so computing it up front billed the whole buffer to
-; every ordinary letter. Pin the ordering rather than the absence: the slice must
-; sit AFTER the terminator guard, which is what makes the common keystroke O(1).
-Test_HSE_BodySliceIsDeferredToTerminators() {
-	MatchBody := _DriverFuncBody("HSE_FindMatchAtEnd")
+; The buffer-sized body slice belongs inside the balanced terminator block.
+; Ordering alone cannot prove containment, and a supplementary terminator consumes
+; two UTF-16 units. The shared mask/extractor keeps prose and quoted braces from
+; impersonating syntax while retaining the original bounded-matching assertions.
+_HSE_AssertBodySliceDeferredToTerminators(MatchBody) {
 	Assert(MatchBody != "", "HSE_FindMatchAtEnd() must exist in the driver source")
-	GuardPos := InStr(MatchBody, "if IsTerminator {")
-	SlicePos := InStr(MatchBody, "SubStr(HSE_Buffer, 1, BufLen - 1)")
-	Assert(GuardPos > 0, "HSE_FindMatchAtEnd must gate the trigger-body slice behind a terminator check")
-	Assert(SlicePos > 0, "HSE_FindMatchAtEnd must still derive the trigger-body slice for the end-char path")
-	Assert(GuardPos < SlicePos,
-		"the buffer-sized trigger-body slice must be derived INSIDE the terminator guard — computing it up front copies the whole buffer on every non-terminator keystroke")
+	Code := _DriverMaskNonCode(&MatchBody)
+	Assert(RegExMatch(Code, "m)^[ `t]*if\s+IsTerminator\s*\{", &Guard) > 0,
+		"the trigger-body slice requires a terminator guard")
+	OpenPos := InStr(Code, "{", , Guard.Pos)
+	GuardBody := _DriverExtractDefinedBody(&Code, { Idx: Guard.Pos, OpenPos: OpenPos })
+	Assert(GuardBody != "" && SubStr(RTrim(GuardBody, " `t`r`n"), -1) == "}", "the terminator guard must be a complete balanced block")
+	SlicePattern := "SubStr\s*\(\s*HSE_Buffer\s*,\s*1\s*,\s*BufLen\s*-\s*StrLen\s*\(\s*JustTypedChar\s*\)\s*\)"
+	Assert(RegExMatch(GuardBody, SlicePattern) > 0,
+		"the buffer-sized slice must be INSIDE the guard and remove the actual UTF-16 terminator width")
+	RegExReplace(Code, "SubStr\s*\(\s*HSE_Buffer\s*,\s*1\s*,\s*BufLen\s*-", "", &SliceCount)
+	AssertEqual(1, SliceCount, "the function must not copy the trigger body again outside the terminator guard")
+}
+Test_HSE_BodySliceIsDeferredToTerminators() {
+	_HSE_AssertBodySliceDeferredToTerminators(_DriverFuncBody("HSE_FindMatchAtEnd"))
 }
 Test("HSE: the trigger-body slice is only derived on terminators (perf-2026-07-21)", Test_HSE_BodySliceIsDeferredToTerminators)
+
+Test_HSE_BodySliceGuardRejectsMalformedSources() {
+	Body := _DriverFuncBody("HSE_FindMatchAtEnd")
+	_HSE_AssertBodySliceDeferredToTerminators(Body)
+	Slice := "BodyBuf := SubStr(HSE_Buffer, 1, BufLen - StrLen(JustTypedChar))"
+	Assert(InStr(Body, Slice) > 0, "mutations require the actual body-slice statement")
+	WithoutSlice := StrReplace(Body, Slice, "BodyBuf := 0")
+	BeforeGuard := StrReplace(WithoutSlice, "if IsTerminator {", Slice . "`nif IsTerminator {")
+	AssertThrows(_HSE_AssertBodySliceDeferredToTerminators.Bind(BeforeGuard), "a slice before the guard must fail")
+	AssertThrows(_HSE_AssertBodySliceDeferredToTerminators.Bind(WithoutSlice . "`n" . Slice), "a slice after the guard must fail")
+	AssertThrows(_HSE_AssertBodySliceDeferredToTerminators.Bind(Body . "`n" . Slice), "a second unguarded slice must fail")
+	StaleWidth := StrReplace(Body, "BufLen - StrLen(JustTypedChar)", "BufLen - 1")
+	Assert(StaleWidth != Body, "the width mutant must alter actual source")
+	AssertThrows(_HSE_AssertBodySliceDeferredToTerminators.Bind(StaleWidth), "a literal one-unit terminator width must fail")
+	AssertThrows(_HSE_AssertBodySliceDeferredToTerminators.Bind(""), "empty source must fail")
+}
+Test("HSE: terminator slice guard rejects unguarded and stale-width mutants", Test_HSE_BodySliceGuardRejectsMalformedSources)

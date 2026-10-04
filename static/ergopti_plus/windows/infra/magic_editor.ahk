@@ -220,7 +220,7 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	if Features["hotstrings"]["magic_key"]["replace"]["enabled"]
 			&& StrUpper(Scan) == StrUpper(ScriptInformation["MagicKeySourceScan"])
 		return { Count: StrLen(ScriptInformation["MagicKey"]), Text: ScriptInformation["MagicKey"] }
-	if Features["layout"]["direct_access_digits"] {
+	if NumberRowEffectiveMode() == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
 		Edges := ErgoptiNumberRowEdgeMapping()
@@ -228,8 +228,14 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 			return { Count: StrLen(Edges[Numeric]), Text: Edges[Numeric] }
 	}
 	if _KLE_BaseCriterion(Scan, false) && KLE_KeyCodes.Has(Scan) {
+		Shift := false
+		if NumberRowEffectiveMode() == "symbols" && NumberRowSymbolsCapable(false) {
+			Level := NumberRowSymbolsLevel(Numeric, false)
+			if Level["supported"]
+				Shift := Level["shift"]
+		}
 		Step := Keylayout_Step(KLE_Model, KEYLAYOUT_NEUTRAL_STATE,
-			KLE_LevelIndex[_KLE_ComboKey(false, false, false)], KLE_KeyCodes[Scan])
+			KLE_LevelIndex[_KLE_ComboKey(Shift, false, false)], KLE_KeyCodes[Scan])
 		return { Count: Step["Next"] != "" && Step["Next"] != KEYLAYOUT_NEUTRAL_STATE ? -1 : StrLen(Step["Output"]),
 			Text: Step["Output"] }
 	}

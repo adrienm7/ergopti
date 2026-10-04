@@ -318,6 +318,25 @@ _SRCL_TreeHeldCaptureOutlivesBudget() {
 Test("shell runner: a tree capture held past its budget warns once (shell-capture-lock)",
 	_SRCL_TreeHeldCaptureOutlivesBudget)
 
+_SRCL_CaptureBudgetCrossesDwordBoundary() {
+	Claim := Map("TmpFile", "private-wrap-fixture", "CaptureDir", "private-wrap-directory")
+	Origin := 0xFFFFFFF0
+	BeforeExpiry := Origin + SR_CAPTURE_LOCK_BUDGET_MS - 1
+	AtExpiry := Origin + SR_CAPTURE_LOCK_BUDGET_MS
+	Log := _SRCL_BeginLog()
+	try {
+		AssertEqual("retry", _SR_CaptureSettle(Claim, SRCL_ERROR_SHARING_VIOLATION, "native crossing fixture", Origin))
+		AssertEqual(Origin, Claim["CaptureLockSince"])
+		AssertEqual("retry", _SR_CaptureSettle(Claim, SRCL_ERROR_SHARING_VIOLATION, "native crossing fixture", BeforeExpiry))
+		AssertEqual("abandoned", _SR_CaptureSettle(Claim, SRCL_ERROR_SHARING_VIOLATION, "native crossing fixture", AtExpiry),
+			"capture-budget-tick-wrap: a locked capture cannot keep its poller past the budget")
+	} finally _SRCL_EndLog(Log)
+	AssertEqual(0, _SRCL_Count(Log.Lines, "ERROR"))
+	AssertEqual(1, _SRCL_Count(Log.Lines, "WARNING", "the next start's sweep removes it"))
+}
+Test("shell runner capture-budget-tick-wrap: native age crosses DWORD boundary without truncation",
+	_SRCL_CaptureBudgetCrossesDwordBoundary)
+
 ; The legacy poller shares the policy: a held capture defers the release within
 ; the budget, then releases it to the sweep with one warning and no error.
 _SRCL_LegacyHeldCaptureIsNotAnError() {
@@ -485,3 +504,85 @@ Test("shell runner: capture removal keeps an adjacent owner's output",
 	_SRCL_RemovalKeepsOtherOwners.Bind(false))
 Test("shell runner: capture removal keeps an unclaimed file in its directory",
 	_SRCL_RemovalKeepsOtherOwners.Bind(true))
+
+
+; The capture policy stores an unmasked native origin on its first refusal.
+; These claims own no path or native resource; only policy and log effects run.
+_SRCL_Native64Budget(Elapsed, Expected) {
+	static Serial := 0
+	Serial += 1
+	Owner := "native64 capture budget " . Serial
+	Claim := Map("TmpFile", "unopened owned capture", "CaptureDir", "unopened owned directory")
+	Log := _SRCL_BeginLog()
+	try {
+		Before := A_TickCount
+		AssertEqual("retry", _SR_CaptureSettle(Claim, 32, Owner))
+		After := A_TickCount
+		Origin := Claim["CaptureLockSince"]
+		Assert(Origin >= Before && Origin <= After, "the actual owner must publish a native64 origin")
+		AssertEqual(32, Claim["CaptureLockCode"], "the first refusal code remains owned")
+		AssertEqual(Expected, _SR_CaptureSettle(Claim, 33, Owner, Origin + Elapsed),
+			"a legal full native age must exhaust the literal capture budget")
+		AssertEqual(Origin, Claim["CaptureLockSince"], "later refusals never renew the origin")
+		AssertEqual(32, Claim["CaptureLockCode"], "later refusals never replace the first code")
+		AssertEqual(Expected == "abandoned" ? 1 : 0,
+			_SRCL_Count(Log.Lines, "WARNING", "the next start's sweep removes it"),
+			"bounded lock warning: " . _DescribeValue(Log.Lines))
+		if Expected == "abandoned" {
+			AssertEqual(1, _SRCL_Count(Log.Lines, "WARNING", "after " . Elapsed . " ms"),
+				"the warning retains the complete elapsed age")
+			AssertEqual(1, _SRCL_Count(Log.Lines, "WARNING", "Win32 33"),
+				"the warning describes the current refusal without changing its owned first code")
+		}
+		AssertEqual(0, _SRCL_Count(Log.Lines, "ERROR"))
+	} finally _SRCL_EndLog(Log)
+}
+
+_SRCL_Native64RemovalDuration(Elapsed) {
+	static Serial := 0
+	Serial += 1
+	Owner := "native64 capture removal " . Serial
+	Claim := Map("TmpFile", "unopened owned capture")
+	Log := _SRCL_BeginLog()
+	try {
+		AssertEqual("retry", _SR_CaptureSettle(Claim, 32, Owner))
+		Origin := Claim["CaptureLockSince"]
+		AssertEqual("done", _SR_CaptureSettle(Claim, 0, Owner, Origin + Elapsed),
+			"successful removal always wins over elapsed budget")
+		AssertEqual(1, _SRCL_Count(Log.Lines, "DEBUG", "capture removed " . Elapsed . " ms"),
+			"recovered capture diagnostics retain the full native age: " . _DescribeValue(Log.Lines))
+		AssertEqual(0, _SRCL_Count(Log.Lines, "WARNING"))
+		AssertEqual(0, _SRCL_Count(Log.Lines, "ERROR"))
+	} finally _SRCL_EndLog(Log)
+}
+
+_SRCL_Native64UnlockedRemoval() {
+	Claim := Map("TmpFile", "unopened owned capture")
+	Log := _SRCL_BeginLog()
+	try {
+		AssertEqual("done", _SR_CaptureSettle(Claim, 0, "native64 unlocked capture"))
+		AssertFalse(Claim.Has("CaptureLockSince"), "unrefused removal creates no retry debt")
+		AssertEqual(0, Log.Lines.Length, "unrefused removal emits no lock diagnostic")
+	} finally _SRCL_EndLog(Log)
+}
+
+Test("shell capture native64: before literal budget (shell-capture-native64)",
+	_SRCL_Native64Budget.Bind(4999, "retry"))
+Test("shell capture native64: exact literal budget (shell-capture-native64)",
+	_SRCL_Native64Budget.Bind(5000, "abandoned"))
+Test("shell capture native64: after literal budget (shell-capture-native64)",
+	_SRCL_Native64Budget.Bind(5001, "abandoned"))
+Test("shell capture native64: full cycle cannot renew debt (shell-capture-native64)",
+	_SRCL_Native64Budget.Bind(4294967296, "abandoned"))
+Test("shell capture native64: cycle before remainder budget (shell-capture-native64)",
+	_SRCL_Native64Budget.Bind(4294972295, "abandoned"))
+Test("shell capture native64: cycle exact remainder budget (shell-capture-native64)",
+	_SRCL_Native64Budget.Bind(4294972296, "abandoned"))
+Test("shell capture native64: two full cycles cannot renew debt (shell-capture-native64)",
+	_SRCL_Native64Budget.Bind(8589934592, "abandoned"))
+Test("shell capture native64: short recovered duration (shell-capture-native64)",
+	_SRCL_Native64RemovalDuration.Bind(5001))
+Test("shell capture native64: full recovered duration (shell-capture-native64)",
+	_SRCL_Native64RemovalDuration.Bind(4294972297))
+Test("shell capture native64: unrefused removal owns no debt (shell-capture-native64)",
+	_SRCL_Native64UnlockedRemoval)

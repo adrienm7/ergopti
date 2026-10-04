@@ -110,6 +110,139 @@ TestHSE_BackspaceOnEmptyBufferFlipsBoundary() {
 Test("HSE backspace on empty buffer marks unknown context",
     TestHSE_BackspaceOnEmptyBufferFlipsBoundary)
 
+/** Replays the driver's actual burst into an owned hidden native Edit control. */
+TestHSE_UnicodeNativeErase(Paste := false, EndChar := "", Admission := false) {
+	global CategoryEnabled, Features, _PrefixBuffer, _PrefixFocusedControlToken
+	global _HSResolveCache, _HSResolveGen
+	SavedCallback := { Categories: CategoryEnabled, Features: Features,
+		Prefix: _PrefixBuffer, Focus: _PrefixFocusedControlToken, Resolver: _HSResolveCache }
+	global HSE_Buffer, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, _Stub_RecordedSends
+	SavedTerminators := HSE_WORD_TERMINATORS
+	SavedConsumed := HSE_CONSUMED_DELIMITERS
+	ResetHotstringRecorders()
+	if Paste
+		SimulateNotepadActive()
+	else
+		SimulateRegularApp()
+	HSE_TestReset()
+	Emoji := Chr(0x1F600)
+	Trigger := Emoji . "x"
+	Window := Gui()
+	EditControl := Window.AddEdit(, "A" . Trigger . EndChar)
+	Window.Show("Hide")
+	SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+	try {
+		if EndChar != "" {
+			HSE_WORD_TERMINATORS .= EndChar
+			HSE_CONSUMED_DELIMITERS .= EndChar
+		}
+		CreateHotstring(EndChar == "" ? "*?C" : "?C", Trigger, "R",
+			Map("Category", "_unicode_probe", "Section", "native"))
+		if Admission {
+			CategoryEnabled := Map("Hotstrings", true)
+			Features := Map()
+			_PrefixBuffer := ""
+			_PrefixFocusedControlToken := 1
+			_HSResolveCache := Map("_unicode_probe|native", {
+				gen: _HSResolveGen, val: { ShowTooltip: false } })
+			for Char in ["A", Emoji, "x", EndChar] {
+				if Char == ""
+					continue
+				_OnPrefixChar(0, Char, (*) => 0, (*) => true)
+				_PrefixCancelRender()
+			}
+			AssertEqual(1, _Stub_RecordedSends.Length, "the real callback must dispatch exactly once")
+		} else {
+			HSE_FeedChar("A")
+			HSE_FeedChar(Emoji)
+			Match := HSE_FeedChar("x")
+			if EndChar != ""
+				Match := HSE_FeedChar(EndChar)
+			AssertTrue(IsObject(Match), "the non-BMP trigger must match")
+			AssertTrue(HSE_DispatchMatch(Match, EndChar), "the actual dispatcher must send")
+		}
+		if Paste {
+			SendRecord := _Stub_RecordedSends[_Stub_RecordedSends.Length]
+			AssertEqual("SendInstant", SendRecord.fn, "the actual clipboard branch must run")
+			ControlSend(SendRecord.args[2] . "{Text}" . SendRecord.args[1], EditControl)
+		} else
+			ControlSend(_ConformDF_LastBurst(), EditControl)
+		Sleep(30)
+		AssertEqual("AR", EditControl.Value, "native Backspace must preserve the preceding character")
+		AssertEqual(EditControl.Value, HSE_Buffer, "UTF-16 buffer edits must match native output")
+	} finally {
+		Window.Destroy()
+		if Admission
+			_PrefixInvalidateDeferredEffects()
+		CategoryEnabled := SavedCallback.Categories
+		Features := SavedCallback.Features
+		_PrefixBuffer := SavedCallback.Prefix
+		_PrefixFocusedControlToken := SavedCallback.Focus
+		_HSResolveCache := SavedCallback.Resolver
+		HSE_WORD_TERMINATORS := SavedTerminators
+		HSE_CONSUMED_DELIMITERS := SavedConsumed
+		HSE_TestReset()
+	}
+}
+Test("HSE Unicode erase preserves the native preceding character (unicode-erase)",
+	TestHSE_UnicodeNativeErase)
+Test("HSE Unicode paste erase preserves native context (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(true))
+Test("HSE Unicode completion consumes its complete UTF-16 span (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(false, Chr(0x1F600)))
+Test("HSE real input callback preserves supplementary trigger context (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(false, "", true))
+Test("HSE real input callback consumes a whole supplementary completion (unicode-erase)",
+	TestHSE_UnicodeNativeErase.Bind(false, Chr(0x1F600), true))
+
+/** One physical Backspace erases a surrogate pair from both observed buffers. */
+TestHSE_UnicodePhysicalBackspace() {
+	global HSE_Buffer, _PrefixBuffer
+	HSE_TestReset()
+	try {
+		HSE_Buffer := "A" . Chr(0x1F600)
+		_PrefixBuffer := HSE_Buffer
+		_PrefixCommitBackspace()
+		AssertEqual("A", HSE_Buffer, "the canonical buffer must not retain a lone surrogate")
+		AssertEqual("A", _PrefixBuffer, "the preview must erase the same scalar")
+	} finally {
+		_PrefixBuffer := ""
+		HSE_TestReset()
+	}
+}
+Test("HSE physical Backspace erases one Unicode scalar (unicode-erase)",
+	TestHSE_UnicodePhysicalBackspace)
+
+_UnicodeRawApply(EditControl, EndChar) {
+	ControlSend("{BackSpace 2}{Text}R", EditControl)
+	return {Ok: true, Bs: 2, Ins: "R"}
+}
+
+/** The raw callback's native key count must publish a UTF-16 buffer effect. */
+TestHSE_UnicodeRawErase() {
+	global HSE_Buffer
+	HSE_TestReset()
+	HSE_Buffer := "A" . Chr(0x1F600) . "x"
+	Window := Gui()
+	EditControl := Window.AddEdit(, HSE_Buffer)
+	Window.Show("Hide")
+	SendMessage(0x00B1, StrLen(EditControl.Value), StrLen(EditControl.Value), EditControl)
+	try {
+		Spec := {Callback: _UnicodeRawApply.Bind(EditControl)}
+		Effect := 0
+		AssertTrue(_HSE_DispatchRawCallback(Spec, "", &Effect))
+		Sleep(30)
+		AssertEqual("AR", EditControl.Value)
+		AssertEqual(EditControl.Value, HSE_Buffer)
+		AssertEqual(3, Effect.DeleteFromEnd, "two keys erase three UTF-16 units")
+	} finally {
+		Window.Destroy()
+		HSE_TestReset()
+	}
+}
+Test("HSE raw Unicode erase publishes its complete UTF-16 span (unicode-erase)",
+	TestHSE_UnicodeRawErase)
+
 TestHSE_FeedResetClearsBufferAndFlag() {
     HSE_TestReset()
     HSE_FeedChar("x")
@@ -1303,6 +1436,70 @@ TestHSE_CrossSensitivityStarArbitration() {
 Test("HSE cross-sensitivity end/star arbitration follows the star candidate",
     TestHSE_CrossSensitivityStarArbitration)
 
+TestHSE_StarPrefixRequiresEligibleContinuation() {
+    Cases := [
+        { Flags: "*", Typed: "xfoo", Boundary: true, Conform: false, Shadow: false },
+        { Flags: "*?", Typed: "xfoo", Boundary: true, Conform: false, Shadow: true },
+        { Flags: "*", Typed: "foo", Boundary: true, Conform: false, Shadow: true },
+        { Flags: "*", Typed: "foo", Boundary: false, Conform: false, Shadow: false },
+        { Flags: "*", Typed: "x'foo", Boundary: false, Conform: false, Shadow: true },
+        { Flags: "*?", Typed: "fOo", Boundary: true, Conform: true, Shadow: false },
+        { Flags: "*?", Typed: "Foo", Boundary: true, Conform: true, Shadow: true },
+        { Flags: "*?", Typed: "FOO", Boundary: true, Conform: true, Shadow: true }
+    ]
+    for Index, Vector in Cases {
+        HSE_TestReset()
+        try {
+            HSE_FeedReset(Vector.Boundary)
+            HSE_Register("?", "foo", () => 0)
+            HSE_Register(Vector.Flags, "foo bar", () => 0,
+                Map("CaseConform", Vector.Conform))
+            for Char in StrSplit(Vector.Typed)
+                HSE_FeedChar(Char)
+            Match := HSE_FeedChar(" ")
+            if Vector.Shadow {
+                AssertEqual("", Match, "case " . Index . ": an eligible longer star still reserves its prefix")
+            } else {
+                AssertTrue(IsObject(Match), "case " . Index . ": an impossible star must not silence the end trigger")
+                AssertEqual("foo", Match.Trigger, "case " . Index . ": the valid end trigger wins")
+            }
+        } finally {
+            HSE_TestReset()
+        }
+    }
+}
+Test("HSE star prefix checks word scope and conform case (star-prefix-eligibility)",
+    TestHSE_StarPrefixRequiresEligibleContinuation)
+
+TestHSE_StarPrefixEligibilitySurvivesGroupToggles() {
+    HSE_TestReset()
+    try {
+        HSE_Register("?", "foo", () => 0)
+        Restricted := HSE_Register("*", "foo bar", () => 0, Map("group", "restricted"))
+        InWord := HSE_Register("*?", "foo baz", () => 0, Map("group", "inword"))
+        AssertEqual("restricted", Restricted.Group, "the restricted candidate is in its own group")
+        AssertEqual("inword", InWord.Group, "the in-word candidate is independently toggleable")
+        for Enabled in [true, false, true] {
+            if Enabled
+                HSE_EnableGroup("inword")
+            else
+                HSE_DisableGroup("inword")
+            HSE_FeedReset(true)
+            for Char in StrSplit("xfoo")
+                HSE_FeedChar(Char)
+            Match := HSE_FeedChar(" ")
+            AssertEqual(!Enabled, IsObject(Match),
+                "any eligible continuation may suppress; a disabled or word-scoped one cannot")
+            if IsObject(Match)
+                AssertEqual("foo", Match.Trigger, "the end trigger remains live across index rebuilds")
+        }
+    } finally {
+        HSE_TestReset()
+    }
+}
+Test("HSE star prefix retains candidate eligibility across group toggles (star-prefix-eligibility)",
+    TestHSE_StarPrefixEligibilitySurvivesGroupToggles)
+
 
 
 
@@ -1605,3 +1802,222 @@ TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking() {
 }
 Test("HSE: conform admission preserves clean casing, registry precedence and identity masking",
     TestHSE_ConformAdmissionKeepsValidCaseAndNoOpMasking)
+
+
+; Explicit ownership is distinct from the fallback group name. In particular,
+; source provenance must not let a bundled section claim a registration whose
+; caller deliberately retains the default owner.
+_TestHSE_ExplicitGroupAuthority(UseMap, HasGroup, GroupName, Category, Section, Expected) {
+    global HSE_RegistryByGroup, HSE_SeqCounter
+    HSE_TestReset()
+    try {
+        Meta := UseMap ? Map("Category", Category, "Section", Section, "Replacement", "owned")
+            : { Category: Category, Section: Section, Replacement: "owned" }
+        if HasGroup {
+            if UseMap
+                Meta["group"] := GroupName
+            else
+                Meta.group := GroupName
+        }
+        Spec := HSE_Register("*", "qz", (*) => "", Meta)
+        AssertEqual(Expected, Spec.Group, "the explicit native owner wins independently of source provenance")
+        AssertEqual(Category, Spec.Category, "ownership never rewrites the supplied category")
+        AssertEqual(Section, Spec.Section, "ownership never rewrites the supplied section")
+        AssertEqual(0, Spec.GroupOrder, "provenance does not invent a load-order rank")
+        AssertEqual(1, HSE_SeqCounter, "one registration allocates exactly one insertion sequence")
+        AssertTrue(HSE_RegistryByGroup.Has(Expected), "the owning native group is indexed")
+        AssertEqual(1, HSE_RegistryByGroup.Count, "no derived or duplicate owner is indexed")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec, "the native group retains the exact registered object")
+
+        Foreign := Expected == "rolls.hc" ? "default" : "rolls.hc"
+        HSE_DisableGroup(Foreign)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        Found := HSE_FeedChar("z")
+        AssertTrue(IsObject(Found), "a foreign section gate cannot steal this native registration")
+        AssertEqual("qz", Found.Trigger)
+
+        HSE_DisableGroup(Expected)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        AssertEqual("", HSE_FeedChar("z"), "only its actual owner silences the registration")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec, "disabling retains the exact owned specification")
+        HSE_EnableGroup(Expected)
+        HSE_FeedReset(true)
+        HSE_FeedChar("q")
+        Restored := HSE_FeedChar("z")
+        AssertTrue(IsObject(Restored), "the owning native gate restores the registration")
+        AssertEqual("qz", Restored.Trigger)
+        AssertEqual(1, HSE_RegistryByGroup[Expected].Length, "re-enabling never duplicates a registration")
+        AssertTrue(HSE_RegistryByGroup[Expected][1] == Spec)
+        AssertEqual(1, HSE_SeqCounter, "toggle publication never allocates another insertion sequence")
+    } finally {
+        HSE_TestReset()
+    }
+}
+
+Test("HSE explicit default Map owner survives non-empty category provenance",
+    () => _TestHSE_ExplicitGroupAuthority(true, true, "default", "rolls", "hc", "default"))
+Test("HSE explicit default object owner survives non-empty category provenance",
+    () => _TestHSE_ExplicitGroupAuthority(false, true, "default", "rolls", "hc", "default"))
+
+_TestHSE_GroupAuthorityGoldens(UseMap) {
+    ; Independent goldens preserve named, future and legacy-empty explicit
+    ; groups, and the old derivation only when no explicit owner was supplied.
+    for AuthorityRecord in [
+        { Present: true, Name: "custom_group", Category: "rolls", Section: "hc", Expected: "custom_group" },
+        { Present: true, Name: "future: Équipe / source", Category: "rolls", Section: "hc", Expected: "future: Équipe / source" },
+        { Present: true, Name: "", Category: "rolls", Section: "hc", Expected: "" },
+        { Present: false, Name: "", Category: "rolls", Section: "hc", Expected: "rolls.hc" },
+        { Present: false, Name: "", Category: "", Section: "", Expected: "default" }
+    ]
+        _TestHSE_ExplicitGroupAuthority(UseMap, AuthorityRecord.Present, AuthorityRecord.Name,
+            AuthorityRecord.Category, AuthorityRecord.Section, AuthorityRecord.Expected)
+}
+Test("HSE Map group authority retains independent named and missing-owner goldens",
+    () => _TestHSE_GroupAuthorityGoldens(true))
+Test("HSE object group authority retains independent named and missing-owner goldens",
+    () => _TestHSE_GroupAuthorityGoldens(false))
+
+
+TestHSE_MagicCompletionDoesNotOpenWord() {
+    global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, HSE_Terminators
+    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+    SavedWords := HSE_WORD_TERMINATORS
+    SavedConsumed := HSE_CONSUMED_DELIMITERS
+    SavedCapacity := HSE_MAX_BUFFER_LEN
+    SavedCatalogue := HSE_Terminators
+    Magic := ""
+    for Entry in HSE_Terminators.all()
+        if Entry["key"] == "star"
+            Magic := Entry["chars"][1]
+    Assert(Magic != "", "the shipped catalogue must own a magic completion slot")
+    try {
+        HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+        HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
+        for Flags in ["*", ""] {
+            HSE_TestReset()
+            HSE_Register(Flags, "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(Magic . "the")
+                Match := HSE_FeedChar(Char)
+            if Flags == ""
+                Match := HSE_FeedChar(" ")
+            AssertEqual("", Match, "magic-completion-word-boundary: the selector is word text")
+        }
+        AssertEqual(Magic . "the", _PrefixWordTail(Magic . "the"),
+            "preview must not offer a suffix the matcher refuses")
+        HSE_TestReset()
+        HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+        AssertEqual("", HSE_PreviewNextDecision(Magic . "th", "e"),
+            "the real preview decision must reject the same suffix")
+        for Boundary in [" ", ".", "-", "'", Chr(0x2019), Chr(0xA0), Chr(0x202F)] {
+            HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters() . Boundary
+            HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters() . " "
+            HSE_TestReset()
+            HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(Boundary . "the")
+                Match := HSE_FeedChar(Char)
+            Assert(IsObject(Match), "configured punctuation, whitespace and quotes still open words")
+        }
+        HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+        HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
+        HSE_TestReset()
+        HSE_Register("", "foo", (*) => 0, { Replacement: "BAR" })
+        for Char in StrSplit("foo" . Magic)
+            Match := HSE_FeedChar(Char)
+        Assert(IsObject(Match), "magic must remain an end-character selector")
+        Effect := HSE_ApplyExpansion(Match, "BAR", Magic)
+        AssertEqual("BAR", HSE_Buffer, "the selector is consumed after completion")
+        AssertFalse(Effect.KnownBoundaryAfter)
+        HSE_TestReset()
+        HSE_Register("*", "foo", (*) => 0, { Replacement: Magic })
+        for Char in StrSplit("foo")
+            Match := HSE_FeedChar(Char)
+        Effect := HSE_ApplyExpansion(Match, Magic)
+        AssertFalse(Effect.KnownBoundaryAfter, "inserted magic text cannot invent a boundary")
+        HSE_MAX_BUFFER_LEN := 3
+        HSE_Buffer := Magic . "the"
+        HSE_StartIsWordBoundary := true
+        _HSE_TrimBufferToCapacity()
+        AssertEqual("the", HSE_Buffer)
+        AssertFalse(HSE_StartIsWordBoundary, "eviction must retain the real preceding word character")
+        HSE_MAX_BUFFER_LEN := SavedCapacity
+        HSE_Terminators := Terminators()
+        for SlotChar in ["§", "-"] {
+            HSE_Terminators.updateMagicKey(SlotChar)
+            HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+            HSE_TestReset()
+            HSE_Register("*", "the", (*) => 0, { Replacement: "THE" })
+            for Char in StrSplit(SlotChar . "the")
+                Match := HSE_FeedChar(Char)
+            if SlotChar == "-"
+                Assert(IsObject(Match), "an ASCII magic slot keeps its punctuation role")
+            else
+                AssertEqual("", Match, "a renamed Unicode slot retains completion-only semantics")
+        }
+    } finally {
+        HSE_Terminators := SavedCatalogue
+        HSE_WORD_TERMINATORS := SavedWords
+        HSE_CONSUMED_DELIMITERS := SavedConsumed
+        HSE_MAX_BUFFER_LEN := SavedCapacity
+        HSE_TestReset()
+    }
+}
+Test("HSE magic-completion-word-boundary: completion and word opening have separate roles",
+    TestHSE_MagicCompletionDoesNotOpenWord)
+
+_UCAP_WithEngine(Body) {
+	global HSE_MAX_BUFFER_LEN, HSE_WORD_TERMINATORS
+	Saved := { Capacity: HSE_MAX_BUFFER_LEN, Terminators: HSE_WORD_TERMINATORS }
+	try {
+		HSE_TestReset()
+		HSE_MAX_BUFFER_LEN := 3
+		HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+		Body()
+	} finally {
+		HSE_MAX_BUFFER_LEN := Saved.Capacity
+		HSE_WORD_TERMINATORS := Saved.Terminators
+		HSE_TestReset()
+	}
+}
+
+_UCAP_EngineTail(Boundary) {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+	if Boundary
+		HSE_WORD_TERMINATORS .= Chr(0x1F600)
+	for Char in ["A", Chr(0x1F600), "b", "c"]
+		HSE_FeedChar(Char)
+	AssertEqual("bc", HSE_Buffer, "a bounded tail drops the complete oldest pair")
+	AssertEqual(Boundary, HSE_StartIsWordBoundary,
+		"the last discarded complete scalar determines the left boundary")
+}
+Test("HSE unicode-context-cap: typed tail never starts with half a pair", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineTail.Bind(false)))
+Test("HSE unicode-context-cap: discarded supplementary boundary remains known", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineTail.Bind(true)))
+
+_UCAP_EngineFraming() {
+	global HSE_WORD_TERMINATORS, HSE_Buffer, HSE_LastEndChar
+	Delimiter := Chr(0x1F600)
+	HSE_WORD_TERMINATORS .= Delimiter
+	HSE_Register("?C", "abc", (*) => 0)
+	for Char in ["a", "b", "c"]
+		HSE_FeedChar(Char)
+	Match := HSE_FeedChar(Delimiter)
+	AssertEqual("abc" . Delimiter, HSE_Buffer,
+		"the full completion scalar is framing outside the trigger capacity")
+	Assert(IsObject(Match), "the longest admitted END trigger still matches")
+	AssertEqual(Delimiter, HSE_LastEndChar)
+}
+Test("HSE unicode-context-cap: supplementary END framing does not evict trigger text", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineFraming))
+
+_UCAP_EngineReplacement() {
+	global HSE_Buffer
+	Spec := HSE_Register("*?", "x", (*) => 0)
+	HSE_FeedChar("x")
+	HSE_ApplyExpansion(HSE_LastMatch, "A" . Chr(0x1F600) . "bc")
+	AssertEqual("bc", HSE_Buffer, "replacement commits share the pair-safe capacity owner")
+}
+Test("HSE unicode-context-cap: committed replacement retains a valid bounded suffix", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineReplacement))

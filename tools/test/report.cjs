@@ -212,7 +212,8 @@ function main() {
 		process.stderr.write(
 			'Usage: node tools/test/report.cjs --name <label> [--json out.json] -- <cmd> [args…]\n'
 		);
-		process.exit(2);
+		process.exitCode = 2;
+		return;
 	}
 
 	// PARSE_ONLY mode (for self-tests): read pre-captured output from a file
@@ -221,11 +222,13 @@ function main() {
 		const out = fs.readFileSync(opts.cmd[1], 'utf8');
 		const res = parseResults(out);
 		emit(opts, res, res.failed > 0 ? 1 : 0);
-		process.exit(res.failed > 0 ? 1 : 0);
+		process.exitCode = res.failed > 0 ? 1 : 0;
+		return;
 	}
 
 	const child = spawn(opts.cmd[0], opts.cmd.slice(1), { shell: false });
 	let buf = '';
+	let spawnFailed = false;
 	child.stdout.on('data', (d) => {
 		buf += d;
 		process.stdout.write(d);
@@ -235,13 +238,17 @@ function main() {
 		process.stderr.write(d);
 	});
 	child.on('close', (code) => {
+		if (spawnFailed) return;
 		const res = parseResults(buf);
 		emit(opts, res, code ?? 0);
-		process.exit(code ?? 0);
+		// Natural shutdown drains both forwarded streams and final annotations.
+		// An immediate exit discards pending pipe writes despite a valid JSON file.
+		process.exitCode = code ?? 0;
 	});
 	child.on('error', (err) => {
+		spawnFailed = true;
 		process.stderr.write(`[report:${opts.name}] failed to spawn: ${err.message}\n`);
-		process.exit(2);
+		process.exitCode = 2;
 	});
 }
 

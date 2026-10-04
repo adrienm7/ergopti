@@ -433,6 +433,209 @@ helpers.describe("menu preferences: first-click rollback", function()
 	end)
 end)
 
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 2/ Current Preference View =======
+-- ==========================================
+-- ==========================================
+
+helpers.describe("Preferences current canonical view", function()
+	helpers.it("observes foreign master and display settings without adopting save authority (streaming-current-view)", function()
+		local path = "/virtual/config.toml"
+		local initial = "[llm]\nenabled = true\n[llm.models]\nselected = \"ollama\"\n"
+		local external = "[llm]\nenabled = false\n[llm.models]\nselected = \"api\"\n[llm.display]\nstreaming = true\nstreaming_multi = false\n[future]\nvalue = 42\n"
+		local disk, reads = initial, {}
+		local preferences = load_preferences({
+			read_with_status = function(read_path) reads[#reads + 1] = read_path; return disk, "ok" end,
+			write = function() return false end,
+		})
+		preferences.load(path)
+		local baseline = preferences.source_snapshot(path)
+		disk = external
+		local view, source = preferences.current_view(path)
+		helpers.assert_eq(view.llm_enabled, false)
+		helpers.assert_eq(view.llm_backend, "api")
+		helpers.assert_eq(view.llm_streaming, true)
+		helpers.assert_eq(view.llm_streaming_multi, false)
+		helpers.assert_eq(source, {status = "ok", content = external})
+		helpers.assert_true(preferences.source_matches(source, {status = "ok", content = external}))
+		helpers.assert_eq(preferences.source_matches(baseline, source), false)
+		helpers.assert_eq(preferences.source_matches(nil, source), false)
+		helpers.assert_eq(preferences.source_matches({status = "unreadable"}, {status = "unreadable"}), false)
+		helpers.assert_eq(preferences.source_matches({status = "ok"}, {status = "ok"}), false)
+		helpers.assert_eq(preferences.source_matches({status = "absent"}, {status = "absent"}), true)
+		helpers.assert_eq(preferences.source_matches({status = "absent"}, source), false)
+		helpers.assert_eq(preferences.source_snapshot(path), baseline, "a current read is not overwrite authority")
+		view.llm_enabled = true
+		source.content = "replaced by caller"
+		local again, second = preferences.current_view(path)
+		helpers.assert_eq(again.llm_enabled, false, "successive current views are detached")
+		helpers.assert_eq(second.content, external)
+		helpers.assert_eq(preferences.source_snapshot(path), baseline)
+		for _, read_path in ipairs(reads) do helpers.assert_eq(read_path, path) end
+		helpers.assert_eq(disk, external)
+	end)
+
+	helpers.it("keeps the original compare-and-swap source after observing a foreign image (streaming-current-view)", function()
+		local path = "/virtual/config.toml"
+		local initial = "[llm]\nenabled = true\n"
+		local external = "[llm]\nenabled = false\n[future]\nvalue = 42\n"
+		local disk, observed, writes = initial, nil, 0
+		local preferences = load_preferences({
+			read_with_status = function() return disk, "ok" end,
+			write = function() return false end,
+			write_if_unchanged = function(_, content, expected)
+				writes = writes + 1; observed = expected
+				if expected.content ~= disk then return false, "source changed" end
+				disk = content; return true
+			end,
+		})
+		preferences.load(path)
+		disk = external
+		local view = preferences.current_view(path)
+		helpers.assert_eq(view.llm_enabled, false)
+		helpers.assert_eq(preferences.save(path, {llm_enabled = true}, {}, {}), false)
+		helpers.assert_eq(observed, nil, "the real batch owner refuses changed bytes before reaching its adapter")
+		helpers.assert_eq(writes, 0)
+		helpers.assert_eq(disk, external, "the read-only view never bypasses the stale-save refusal")
+		helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = external}, "only the existing actual refusal may adopt its valid winner")
+	end)
+
+	helpers.it("distinguishes proven absence from unreadable malformed and raised reads (streaming-current-view)", function()
+		for _, mode in ipairs({"absent", "unreadable", "malformed", "raise"}) do
+			local status = "ok"
+			local preferences = load_preferences({
+				read_with_status = function()
+					if mode == "raise" then error("read refused", 0) end
+					if mode == "absent" then return nil, "absent" end
+					if mode == "unreadable" then return nil, "unreadable" end
+					return "[llm", status
+				end,
+				write = function() return false end,
+			})
+			local ok, view, source = pcall(preferences.current_view, "/virtual/config.toml")
+			helpers.assert_true(ok, "a current-view read failure is a refused view, not a thrown UI action")
+			if mode == "absent" then
+				helpers.assert_eq(view, {})
+				helpers.assert_eq(source, {status = "absent"})
+			else
+				helpers.assert_eq(view, nil)
+				helpers.assert_eq(source, nil)
+			end
+			helpers.assert_eq(preferences.source_snapshot("/virtual/config.toml"), nil)
+		end
+	end)
+
+	helpers.it("refuses invalid owned leaves without promoting them to absent defaults (streaming-current-view)", function()
+		local path = "/virtual/config.toml"
+		local initial = "[llm]\nenabled = true\n"
+		local disk = initial
+		local preferences = load_preferences({
+			read_with_status = function() return disk, "ok" end,
+			write = function() return false end,
+		})
+		preferences.load(path)
+		local baseline = preferences.source_snapshot(path)
+		for _, invalid in ipairs({"[llm]\nenabled = \"maybe\"\n", "[llm.display]\nstreaming = 1\n", "[llm]\nagent_mode = \"future-unknown\"\n", "[llm.models]\nselected = 123\n", "llm = 123\n", "[llm]\nmodels = false\n"}) do
+			disk = invalid
+			local view, source = preferences.current_view(path)
+			helpers.assert_eq(view, nil)
+			helpers.assert_eq(source, nil)
+			helpers.assert_eq(preferences.source_snapshot(path), baseline)
+			helpers.assert_eq(disk, invalid)
+		end
+	end)
+	helpers.it("issues detached publication evidence only after exact owned save acknowledgements (streaming-current-view)", function()
+		local path = "/virtual/config.toml"
+		local disk = "[llm]\nenabled = true\n"
+		local outcome = "ok"
+		local preferences = load_preferences({
+			read_with_status = function() return disk, "ok" end,
+			write_if_unchanged = function(_, content)
+				if outcome == "throw" then error("write refused", 0) end
+				if outcome == "false" then return false end
+				if outcome == "nil" then return nil end
+				disk = content
+				return true
+			end,
+		})
+		helpers.assert_eq(preferences.publication_receipt(path), {id = 0})
+		preferences.load(path)
+		helpers.assert_eq(preferences.publication_receipt(path), {id = 0})
+		helpers.assert_eq(preferences.save(path, {llm_enabled = true}, {}, {}), true)
+		local first = preferences.publication_receipt(path)
+		helpers.assert_eq(first, {id = 1, source = {status = "ok", content = disk}})
+		first.id = 999
+		first.source.content = "changed by caller"
+		local acknowledged = preferences.publication_receipt(path)
+		helpers.assert_eq(acknowledged.id, 1)
+		helpers.assert_eq(acknowledged.source.content, disk)
+		for _, refusal in ipairs({"false", "nil", "throw"}) do
+			outcome = refusal
+			helpers.assert_eq(preferences.save(path, {llm_enabled = true}, {}, {}), false)
+			helpers.assert_eq(preferences.publication_receipt(path), acknowledged)
+		end
+		disk = "[llm]\nenabled = false\n[future]\nvalue = 42\n"
+		helpers.assert_eq(preferences.save(path, {llm_enabled = true}, {}, {}), false)
+		helpers.assert_eq(preferences.source_snapshot(path).content, disk)
+		helpers.assert_eq(preferences.publication_receipt(path), acknowledged, "adopting a foreign winner is not an owned acknowledgement")
+		preferences.load(path)
+		helpers.assert_eq(preferences.publication_receipt(path), acknowledged)
+		outcome = "ok"
+		helpers.assert_eq(preferences.save(path, {llm_enabled = true}, {}, {}), true)
+		helpers.assert_eq(preferences.publication_receipt(path), {id = 2, source = {status = "ok", content = disk}})
+		helpers.assert_eq(preferences.publication_receipt("/virtual/other.toml"), {id = 0})
+	end)
+end)
+
+
+helpers.describe("Number-row native-only preferences", function()
+	helpers.it("keeps native absence sparse through the existing preference owner", function()
+		local path, disk, written = "/virtual/number-row-native.toml", nil, 0
+		local preferences = load_preferences({
+			read_with_status = function() return disk, disk and "ok" or "absent" end,
+			write_if_unchanged = function(_, content, expected)
+				if expected.status ~= "absent" then return false end
+				disk, written = content, written + 1
+				return true
+			end,
+		})
+		local saved, status = preferences.load(path)
+		helpers.assert_eq(status, "absent")
+		helpers.assert_eq(preferences.flat_key_for("layout.direct_access_digits"), "layout_number_row_mode")
+		helpers.assert_eq(require("infra.manifest_reader").default_for("layout.direct_access_digits"), "native")
+		helpers.assert_eq(saved.layout_number_row_mode, nil)
+		helpers.assert_eq(preferences.save(path, { layout_number_row_mode = "native" }, {}, {}), true)
+		helpers.assert_eq(written, 1)
+		helpers.assert_eq(disk:find("direct_access_digits", 1, true), nil,
+			"an unrelated ordinary save must not flush native absence")
+	end)
+	helpers.it("preserves malformed and future personal values through ordinary saves", function()
+		for _, value in ipairs({ '"future-mode"', 'true', '1', '"true"', '{ future = 7 }' }) do
+			local path = "/virtual/number-row-unknown.toml"
+			local before = '[layout]\ndirect_access_digits = ' .. value .. ' # retained personal spelling\nfuture = { keep = 8 }\n'
+			local disk = before
+			local preferences = load_preferences({
+				read_with_status = function() return disk, "ok" end,
+				write_if_unchanged = function(_, content, expected)
+					if expected.content ~= disk then return false end
+					disk = content
+					return true
+				end,
+			})
+			local saved = preferences.load(path)
+			helpers.assert_eq(saved.layout_number_row_mode, nil)
+			helpers.assert_eq(preferences.save(path, { layout_number_row_mode = "native" }, {}, {}), true)
+			helpers.assert_eq(disk:sub(1, #before), before, "native default never acquires outdated personal intent")
+		end
+	end)
+end)
+
 -- Do not leak the final FileSystem double into later test modules in the same
 -- Lua process; those modules intentionally exercise the real atomic adapter.
 package.loaded["adapters.file_system"] = nil

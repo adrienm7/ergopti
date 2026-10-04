@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Odebrat Ergopti z Karabineru",
 	"menu.global.restore_touchpad_gestures": "Obnovit gesta touchpadu Windows",
 	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému.",
-	"onboarding.error.open_failed": "Průvodce nastavením se nepodařilo otevřít. Zkontrolujte protokoly a zkuste to znovu z nabídky."
+	"onboarding.error.open_failed": "Průvodce nastavením se nepodařilo otevřít. Zkontrolujte protokoly a zkuste to znovu z nabídky.",
+	"platform_reason.token_streaming_transport_missing": "Ne ve Windows: Windows zatím neumí zobrazovat návrhy po jednotlivých tokenech. Tato možnost zůstává neaktivní.",
+	"menu.layout.number_row": "Číselná řada",
+	"menu.layout.number_row_native": "Nativní pořadí",
+	"menu.layout.number_row_digits": "Nejprve číslice",
+	"menu.layout.number_row_symbols": "Nejprve symboly",
+	"platform_reason.number_row_override_unsupported": "Nepodporováno: Tento ovladač zachovává nativní číselnou řadu systému; vynucení číslic ani symbolů není dostupné.",
+	"platform_reason.number_row_source_unavailable": "Nedostupné: Symboly nejprve vyžadují aktivní emulované rozložení s platnými úrovněmi číslic a symbolů na každé pozici číselné řady."
 }

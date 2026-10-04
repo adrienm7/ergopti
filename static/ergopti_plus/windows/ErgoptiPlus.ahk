@@ -340,6 +340,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include infra/wall_clock.ahk
 #Include infra/logger.ahk
 #Include infra/boot_profiler.ahk
+#Include infra/startup_smoke.ahk
 #Include infra/diagnostic_snapshot.ahk
 #Include infra/issue_link.ahk
 #Include infra/redact.ahk
@@ -389,6 +390,8 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
+#Include ../_shared/modules/actions/brightness.ahk
+#Include adapters/screen_brightness.ahk
 #Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
 BootProfile_Stamp("Adapters initialised")
@@ -505,6 +508,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/personal_toml_editor.ahk
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
+#Include ../_shared/modules/features/number_row_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
@@ -573,6 +577,7 @@ KLPF_InitializeCleanup()
 #Include modules/llm/rewrite.ahk
 #Include modules/llm/parser.ahk
 #Include modules/llm/remote_formats.ahk
+#Include ..\_shared\modules\llm\local_server_auth.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
@@ -624,7 +629,8 @@ BootProfile_Stamp("Paths and shared configuration loaded")
 ; Settle parse-time personal includes before any process reveals the tray icon.
 try {
 		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
-				_DriverStartupSmokeDir == "")
+				_PersonalShortcutsBootAllowsReload(A_IsCompiled,
+						_DriverStartupSmokeDir != "" and EnvGet("ERGOPTI_STARTUP_SMOKE_BOOTSTRAP") != "1"))
 				throw Error("personal shortcuts bootstrap was not durable")
 } catch as _epsErr {
 		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
@@ -900,6 +906,23 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 
 
+
+/**
+ * Only source-mode startup can reload a newly generated parse-time include.
+ * Compiled includes are embedded at build time; restarting the same executable
+ * cannot load a newly written personal file or forwarding stub. Keep the empty
+ * first-use template durable without retiring the instance before readiness.
+ * @param {Boolean} IsCompiled - The actual A_IsCompiled capability.
+ * @param {Boolean} IsStartupSmoke - Whether the owned startup smoke is active.
+ * @returns {Boolean} Whether source-mode bootstrap may perform its terminal reload.
+ */
+_PersonalShortcutsBootAllowsReload(IsCompiled, IsStartupSmoke) {
+	if !(IsCompiled is Integer) || (IsCompiled != 0 && IsCompiled != 1)
+		throw TypeError("personal-shortcuts compiled capability must be Boolean")
+	if !(IsStartupSmoke is Integer) || (IsStartupSmoke != 0 && IsStartupSmoke != 1)
+		throw TypeError("personal-shortcuts startup-smoke capability must be Boolean")
+	return !IsCompiled && !IsStartupSmoke
+}
 
 EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
 		ReplaceFn := 0, ReadFn := 0) {
@@ -1425,7 +1448,27 @@ if (_DriverStartupSmokeDir != "") {
 		; deliberately bypasses production teardown and OnExit callbacks.
 		if IsSet(_DriverStartupSmokeInspect)
 				_DriverStartupSmokeInspect.Call()
-		try _LoggerFlush(true)
+		if !LoggerPrepareShutdown(&_StartupSmokeLoggerRefusal) {
+				; The smoke already retains stdout on failure; never enqueue more debt.
+				try FileAppend("startup-smoke-logger-refusal: phase="
+						. _StartupSmokeLoggerRefusal["phase"]
+						. " flush_active=" . _StartupSmokeLoggerRefusal["flush_active"]
+						. " force_flush_pending=" . _StartupSmokeLoggerRefusal["force_flush_pending"]
+						. " append_owners=" . _StartupSmokeLoggerRefusal["append_owners"]
+						. " append_debts=" . _StartupSmokeLoggerRefusal["append_debts"]
+						. " append_repairs=" . _StartupSmokeLoggerRefusal["append_repairs"]
+						. " main_lines=" . _StartupSmokeLoggerRefusal["main_lines"]
+						. " error_lines=" . _StartupSmokeLoggerRefusal["error_lines"]
+						. " topical_queues=" . _StartupSmokeLoggerRefusal["topical_queues"]
+						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"] . "`n",
+						"*", "UTF-8-RAW")
+				throw Error("The startup smoke could not make its diagnostic logs durable.")
+		}
+		_StartupSmokeNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")
+		if _StartupSmokeNonce != ""
+				StartupSmokePublishReady(_DriverStartupSmokeDir, _StartupSmokeNonce, true)
+		if EnvGet("ERGOPTI_STARTUP_SMOKE_ACK") == "1"
+				StartupSmokeAwaitObserver(_DriverStartupSmokeDir, _StartupSmokeNonce)
 		; This isolated probe has just materialised a deep native Menu tree and must
 		; not run the production OnExit teardown against test-only paths/owners. AHK's
 		; immediate destruction of that fresh tree can itself raise STATUS_HEAP_CORRUPTION

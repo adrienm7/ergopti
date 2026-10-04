@@ -245,3 +245,316 @@ Test("preview index: pack indexing is not gated on a per-section Features node (
 	_PICR_PackIndexingIsNotGatedOnPerSectionFeatures)
 Test("preview index: the engine and the index share one pack enumeration (preview-index-covers-every-registration)",
 	_PICR_BothSidesShareOneEnumeration)
+
+
+; The live pack and its preview must identify the same parsed source without
+; accidentally adopting bundled-category activation gates from that label.
+_PICR_LivePersonalProvenanceMatchesPreview(Label) {
+	global ScriptInformation, _HotstringRegistrar, HSE_RegistryByGroup, HSE_SeqCounter, CategoryEnabled
+	Root := A_Temp . "\ergopti_picr_provenance_" . A_TickCount
+	DirCreate(Root)
+	DirCreate(Root . "\Équipe")
+	Path := Label == "rolls" ? Root . "\rolls.toml" : Root . "\Équipe\mémoire.toml"
+	SavedRegistrar := _HotstringRegistrar
+	HadDirectory := ScriptInformation.Has("PersonalHotstringsDir")
+	SavedDirectory := ScriptInformation.Get("PersonalHotstringsDir", "")
+	HadMaster := CategoryEnabled.Has("Hotstrings")
+	SavedMaster := CategoryEnabled.Get("Hotstrings", false)
+	try {
+		FileAppend('[_meta]`ndescription = "not a trigger"`n'
+			. '[Fallback]`npsx = "simple"`n'
+			. '"plx" = { output = "Literal", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true, is_case_sensitive_strict = true, priority = 81 }`n'
+			. '[[Other]]`n"pcx★" = { output = "Owned conform", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }`n'
+			. '"pex" = { output = "Explicit", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n', Path, "UTF-8")
+		; Native enumeration expands short directory aliases. Obtain the expected
+		; identity independently from Win32 before observing the catalogue owner.
+		CanonicalPaths := []
+		for SourcePath in [Root, Path] {
+			CanonicalBuffer := Buffer(32768 * 2, 0)
+			CanonicalLength := DllCall("GetLongPathNameW", "Str", SourcePath,
+				"Ptr", CanonicalBuffer, "UInt", 32768, "UInt")
+			AssertTrue(CanonicalLength > 0 && CanonicalLength < 32768,
+				"Win32 must resolve the existing fixture without truncation")
+			CanonicalPaths.Push(StrGet(CanonicalBuffer, CanonicalLength, "UTF-16"))
+		}
+		ScriptInformation["PersonalHotstringsDir"] := Root
+		Packs := HS_EnumeratePersonalExtFiles()
+		AssertEqual(1, Packs.Length, "the actual recursive owner enumerates exactly this personal source")
+		AssertEqual(CanonicalPaths[2], Packs[1]["Path"])
+		AssertEqual(Label, Packs[1]["Label"], "the source label comes from the authoritative enumerator")
+		ScriptInformation["PersonalHotstringsDir"] := CanonicalPaths[1]
+		CanonicalPacks := HS_EnumeratePersonalExtFiles()
+		AssertEqual(1, CanonicalPacks.Length, "both native root spellings identify exactly one source")
+		AssertEqual(CanonicalPaths[2], CanonicalPacks[1]["Path"])
+		AssertEqual(Label, CanonicalPacks[1]["Label"], "root aliases preserve the hierarchical Unicode label")
+		ScriptInformation["PersonalHotstringsDir"] := Root
+		CategoryEnabled["Hotstrings"] := true
+		_HotstringRegistrar := 0
+		HSE_RegistryClear()
+		AssertEqual(4, LoadExtTomlFile(Packs[1]["Path"], Packs[1]["Label"], "", Packs[1]["PersonalSource"]), "metadata is excluded from both entry shapes")
+		AssertEqual(1, HSE_RegistryByGroup.Count, "source metadata must preserve whole-file activation ownership")
+		AssertTrue(HSE_RegistryByGroup.Has("default"))
+		Specs := HSE_RegistryByGroup["default"]
+		AssertEqual(8, Specs.Length, "simple and inline case families retain their original registration counts")
+		ActualPersonalBinding := Map("source", Specs[1].PersonalSource, "owner", Specs[1].Group, "path", Packs[1]["Path"])
+		ActualPersonalEvidence := [Map("source", Specs[1].PersonalSource, "owner", Specs[1].Group, "path", Packs[1]["Path"],
+			"admitted", true, "exclusive", false)]
+		AssertEqual("default", ActualPersonalBinding["owner"], "the registered owner remains the historical shared default")
+		RefusedPersonalBinding := PersonalScopeAdmit(ActualPersonalEvidence, ActualPersonalBinding, &PersonalBindingRefusal)
+		AssertFalse(RefusedPersonalBinding, "actual additional-file registration grants no exclusive file gate")
+		AssertEqual("unavailable-owner", PersonalBindingRefusal)
+		AssertEqual(8, HSE_RegistryByGroup["default"].Length, "admission never mutates live specs or activation")
+		ExpectedTriggers := ["psx", "PSX", "Psx", "plx", "pcx" . ScriptInformation["MagicKey"], "pex", "PEX", "Pex"]
+		ExpectedOutputs := ["simple", "SIMPLE", "Simple", "Literal", "owned conform", "explicit", "EXPLICIT", "Explicit"]
+		Index := Map()
+		Set := Map()
+		AssertEqual(4, _RegisterExtPackTriggers(Path, Label, Index, Set, "", Packs[1]["PersonalSource"]))
+		PreviewRows := Map()
+		PreviewRows.CaseSense := "On"
+		for _, Bucket in Index {
+			for Row in Bucket {
+				AssertFalse(PreviewRows.Has(Row.Trigger), "the preview never duplicates a case variant")
+				PreviewRows[Row.Trigger] := Row
+			}
+		}
+		AssertEqual(10, PreviewRows.Count, "the conform family previews each of its three accepted cases")
+		for Position, OwnedSpec in Specs {
+			AssertEqual(ExpectedTriggers[Position], OwnedSpec.Trigger, "historical factory registration order is unchanged")
+			AssertEqual(ExpectedOutputs[Position], OwnedSpec.Replacement)
+			AssertEqual(Label, OwnedSpec.Category, "live metadata retains the actual hierarchical personal-file label")
+			AssertEqual(Position <= 4 ? "fallback" : "other", OwnedSpec.Section, "the parser's section supplies provenance even without a declaration")
+			AssertEqual("default", OwnedSpec.Group)
+			AssertEqual(Position, OwnedSpec.Seq)
+			AssertEqual(0, OwnedSpec.TimeActivationSeconds)
+			AssertEqual(Position == 4 ? 81 : 30, OwnedSpec.Priority)
+			AssertTrue(PreviewRows.Has(OwnedSpec.Trigger), "every actual live spec has an exact preview row")
+			Preview := PreviewRows[OwnedSpec.Trigger]
+			AssertEqual(OwnedSpec.Category, Preview.Category)
+			AssertEqual(OwnedSpec.Section, Preview.Section)
+			AssertTrue(OwnedSpec.HasOwnProp("PersonalSource"), "native factory variant " . Position . " must retain admitted personal provenance")
+			AssertEqual(Packs[1]["PersonalSource"]["id"], OwnedSpec.PersonalSource["id"], "the actual live spec retains discovery identity")
+			AssertEqual(OwnedSpec.PersonalSource["id"], Preview.PersonalSource["id"], "the real preview row retains the same source")
+			Assert(OwnedSpec.PersonalSource != Preview.PersonalSource, "live and preview never share mutable provenance")
+			Assert(OwnedSpec.PersonalSource != Packs[1]["PersonalSource"], "each registered variant owns its discovery descriptor snapshot")
+			AssertEqual(OwnedSpec.Priority, Preview.Priority)
+			AssertEqual(OwnedSpec.Replacement, Preview.Output)
+		}
+		Packs[1]["PersonalSource"]["components"][1] := "changed.toml"
+		for OwnedSpec in Specs
+			AssertTrue(PersonalFileDescriptorValid(OwnedSpec.PersonalSource), "mutating discovery never corrupts any simple or inline registered variant")
+		AssertTrue(Specs[4].Star && Specs[4].CaseSensitive && Specs[4].FinalResult)
+		AssertFalse(Specs[4].InWord)
+		AssertTrue(Specs[5].Star && Specs[5].InWord && Specs[5].CaseConform)
+		AssertFalse(Specs[5].FinalResult)
+		HSE_DisableGroup(Label . ".fallback")
+		HSE_DisableGroup(Label . ".other")
+		HSE_FeedReset(true)
+		for Char in StrSplit("plx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[4], "unrelated derived-section gates cannot silence a whole-file pack")
+		HSE_DisableGroup("default")
+		HSE_FeedReset(true)
+		for Char in StrSplit("plx")
+			Match := HSE_FeedChar(Char, true)
+		AssertEqual("", Match, "the retained default owner still disables the native mapping")
+		HSE_EnableGroup("default")
+		HSE_EnableGroup("default")
+		HSE_FeedReset(true)
+		for Char in StrSplit("plx")
+			Match := HSE_FeedChar(Char, true)
+		AssertTrue(Match == Specs[4], "reactivation restores the exact original native spec")
+		AssertEqual(7, HSE_MappingsForTail("X").Length, "restoring the default group never duplicates end-character or literal specs")
+		AssertEqual(1, HSE_MappingsForTail(ScriptInformation["MagicKey"]).Length, "the conform spec retains its exact live identity")
+		AssertEqual(8, HSE_SeqCounter, "toggle operations neither duplicate nor re-register personal entries")
+	} finally {
+		_HotstringRegistrar := SavedRegistrar
+		if HadDirectory
+			ScriptInformation["PersonalHotstringsDir"] := SavedDirectory
+		else
+			ScriptInformation.Delete("PersonalHotstringsDir")
+		if HadMaster
+			CategoryEnabled["Hotstrings"] := SavedMaster
+		else
+			CategoryEnabled.Delete("Hotstrings")
+		HSE_RegistryClear()
+		HSE_FeedReset(true)
+		DirDelete(Root, true)
+	}
+}
+Test("personal pack provenance: nested Unicode labels and parsed sections match real preview rows", (*) => _PICR_LivePersonalProvenanceMatchesPreview("Équipe / mémoire"))
+Test("personal pack provenance: bundled-label collisions preserve whole-file activation ownership", (*) => _PICR_LivePersonalProvenanceMatchesPreview("rolls"))
+
+
+_PICR_DescriptorCorpus() {
+	global _SharedDir
+	DescriptorCorpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\personal_file_descriptors.json", "UTF-8"))
+	AssertEqual(13, DescriptorCorpus["vectors"].Length, "the independent cross-driver goldens must be complete")
+	SeenDescriptors := Map()
+	SeenDescriptors.CaseSense := "On"
+	for AuthorityVector in DescriptorCorpus["vectors"] {
+		OwnedDescriptor := PersonalFileDescribe(AuthorityVector["components"])
+		Assert(OwnedDescriptor["id"] == AuthorityVector["id"], AuthorityVector["name"])
+		Assert(OwnedDescriptor["label"] == AuthorityVector["label"], AuthorityVector["name"])
+		AssertFalse(SeenDescriptors.Has(OwnedDescriptor["id"]), "every admitted filename has a distinct identity")
+		SeenDescriptors[OwnedDescriptor["id"]] := true
+		AssertFalse(InStr(OwnedDescriptor["id"], "."), "the identity stays one canonical TOML path segment")
+		DecodedComponents := PersonalFileComponents(AuthorityVector["id"])
+		AssertTrue(DecodedComponents is Array)
+		AssertEqual(AuthorityVector["components"].Length, DecodedComponents.Length)
+		for Position, NativeComponent in DecodedComponents
+			Assert(NativeComponent == AuthorityVector["components"][Position], "native UTF-8 roundtrip preserves exact components")
+		CopiedDescriptor := PersonalFileDescriptorCopy(OwnedDescriptor)
+		OwnedDescriptor["components"][1] := "mutated.toml"
+		AssertTrue(PersonalFileDescriptorValid(CopiedDescriptor))
+		AssertFalse(PersonalFileDescriptorValid(OwnedDescriptor), "forged components refuse")
+		CopiedDescriptor["label"] := "forged"
+		AssertFalse(PersonalFileDescriptorValid(CopiedDescriptor), "forged label refuses")
+	}
+	for InvalidComponents in DescriptorCorpus["invalid_components"] {
+		AdmittedComponents := true
+		try PersonalFileDescribe(InvalidComponents)
+		catch {
+			AdmittedComponents := false
+		}
+		AssertFalse(AdmittedComponents, "malformed relative components refuse")
+	}
+	for InvalidIdentity in DescriptorCorpus["invalid_ids"]
+		AssertEqual(0, PersonalFileComponents(InvalidIdentity), "noncanonical or malformed UTF-8 identity refuses")
+	ExtraDescriptor := PersonalFileDescribe(["a.toml"])
+	ExtraDescriptor["future"] := true
+	AssertFalse(PersonalFileDescriptorValid(ExtraDescriptor), "unknown fields cannot silently cross the source boundary")
+	NumericLabel := PersonalFileDescribe(["123.toml"])
+	NumericLabel["label"] := 123
+	AssertFalse(PersonalFileDescriptorValid(NumericLabel), "native comparison cannot coerce a numeric label into text")
+	AssertFalse(PersonalFileDescriptorValid(Map("ID", "personal-file:612e746f6d6c", "components", ["a.toml"], "label", "a")), "descriptor fields retain exact shared spelling")
+}
+Test("personal-file descriptors: independent exact UTF-8 identity corpus", _PICR_DescriptorCorpus)
+
+
+_PICR_DistinctDiscoveredSources(RootSpelling := "temp") {
+	global ScriptInformation
+	OwnedRoot := A_Temp . "\ergopti_picr_sources_" . A_TickCount
+	SourceFiles := Map("a__b.toml", "personal-file:615f5f622e746f6d6c",
+		"a\b.toml", "personal-file:61:622e746f6d6c",
+		"words.old.toml", "personal-file:776f7264732e6f6c642e746f6d6c",
+		"work\team.toml", "personal-file:776f726b:7465616d2e746f6d6c",
+		"home\team.toml", "personal-file:686f6d65:7465616d2e746f6d6c",
+		"Équipe\mémoire.toml", "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c",
+		"rolls.toml", "personal-file:726f6c6c732e746f6d6c", ".toml", "personal-file:2e746f6d6c")
+	HadRoot := ScriptInformation.Has("PersonalHotstringsDir")
+	PriorRoot := ScriptInformation.Get("PersonalHotstringsDir", "")
+	try {
+		for Directory in ["", "a", "work", "home", "Équipe"]
+			DirCreate(OwnedRoot . "\" . Directory)
+		for RelativeFile in SourceFiles
+			FileAppend('[probe]`n"pqx" = "Owned"`n', OwnedRoot . "\" . RelativeFile, "UTF-8")
+		FileAppend('[probe]`n"pqx" = "Canonical"`n', OwnedRoot . "\personal_hotstrings.toml", "UTF-8")
+		; Resolve the oracle through Win32, independently of the catalogue owner.
+		NativeBuffer := Buffer(32768 * 2, 0)
+		NativeLength := DllCall("GetLongPathNameW", "Str", OwnedRoot, "Ptr", NativeBuffer, "UInt", 32768, "UInt")
+		AssertTrue(NativeLength > 0 && NativeLength < 32768, "Win32 resolves the owned existing root without truncation")
+		LongRoot := StrGet(NativeBuffer, NativeLength, "UTF-16")
+		InputRoot := RootSpelling == "long" ? LongRoot : OwnedRoot
+		ScriptInformation["PersonalHotstringsDir"] := InputRoot
+		Packs := HS_EnumeratePersonalExtFiles()
+		AssertEqual(8, Packs.Length, "neither colliding labels, repeated basenames nor the historical empty stem may disappear from actual discovery")
+		SeenSources := Map()
+		for Pack in Packs {
+			Assert(SubStr(Pack["Path"], 1, StrLen(LongRoot) + 1) == LongRoot . "\", "the canonical discovered file must remain inside the exact owned native root")
+			RelativeFile := SubStr(Pack["Path"], StrLen(LongRoot) + 2)
+			AssertTrue(SourceFiles.Has(RelativeFile), "only actual fixture-owned source paths are admitted")
+			AssertTrue(PersonalFileDescriptorValid(Pack["PersonalSource"]))
+			AssertEqual(SourceFiles[RelativeFile], Pack["PersonalSource"]["id"])
+			AssertFalse(SeenSources.Has(Pack["PersonalSource"]["id"]), "each exact relative file has its own descriptor")
+			SeenSources[Pack["PersonalSource"]["id"]] := true
+		}
+		AssertEqual(8, SeenSources.Count)
+	} finally {
+		if HadRoot
+			ScriptInformation["PersonalHotstringsDir"] := PriorRoot
+		else if ScriptInformation.Has("PersonalHotstringsDir")
+			ScriptInformation.Delete("PersonalHotstringsDir")
+		try DirDelete(OwnedRoot, true)
+	}
+}
+Test("personal-file descriptors: recursive native discovery retains distinct exact paths", _PICR_DistinctDiscoveredSources)
+Test("personal-file descriptors: recursive native discovery admits the exact long root", (*) => _PICR_DistinctDiscoveredSources("long"))
+
+#Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+
+; A TOML header comment cannot create or erase known-trigger analytics rows.
+_PICR_CommentedHeaderCatalogue(Kind, Mode, Brackets := 2) {
+	global Features, ScriptInformation, CategoryEnabled
+	ProcessId := ProcessExist()
+	Root := A_Temp . "\ergopti_picr_header_" . ProcessId . "_" . A_TickCount
+	Path := Root . "\owned.toml"
+	AssertFalse(DirExist(Root), "the fixture refuses a pre-existing temporary root")
+	DirCreate(Root)
+	Open := Brackets == 1 ? "[" : "[["
+	Close := Brackets == 1 ? "]" : "]]"
+	Inline := '"cmtb" = { output = "second#value", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`n'
+	Content := Open . "first" . Close . (Mode == "first" ? " # first section" : "") . '`n"cmta" = { output = "first#value", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`n'
+	if Mode == "second" || Mode == "selected"
+		Content .= Open . "second" . Close . " # selected section`n" . Inline
+	else if Mode == "metadata"
+		Content .= Open . "_meta.sections" . Close . ' # metadata`ndescription = "not a trigger"`n'
+	HadMaster := CategoryEnabled.Has("Hotstrings")
+	PriorMaster := CategoryEnabled.Get("Hotstrings", false)
+	HadPersonal := Features["hotstrings"].Has("personal")
+	PriorPersonal := Features["hotstrings"].Get("personal", 0)
+	HadPath := ScriptInformation.Has("PersonalTomlPath")
+	PriorPath := ScriptInformation.Get("PersonalTomlPath", "")
+	try {
+		CategoryEnabled["Hotstrings"] := true
+		Features["hotstrings"]["personal"] := Map("first", Map("enabled", true), "second", Map("enabled", true))
+		ScriptInformation["PersonalTomlPath"] := Path
+		FileAppend(Content, Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Index := Map(), TriggerSet := Map()
+		if Kind == "category"
+			Count := _RegisterCategoryTriggers("personal", Index, TriggerSet)
+		else
+			Count := _RegisterExtPackTriggers(Path, "owned", Index, TriggerSet, Mode == "selected" ? "second" : "")
+		ExpectedCount := Mode == "second" ? 2 : 1
+		AssertEqual(ExpectedCount, Count, "only source hotstring rows enter the analytics catalogue")
+		if Mode != "selected" {
+			AssertTrue(TriggerSet.Has("cmta"), "the first declared source row remains a known trigger")
+			AssertEqual("first", TriggerSet["cmta"].Section, "commented headers retain exact section ownership")
+			AssertEqual("first#value", TriggerSet["cmta"].Output, "a hash inside output remains source text")
+		}
+		if Mode == "second" || Mode == "selected" {
+			AssertTrue(TriggerSet.Has("cmtb"), "a later commented section cannot disappear or inherit its predecessor")
+			AssertEqual("second", TriggerSet["cmtb"].Section, "the second declared section owns its row")
+			AssertEqual("second#value", TriggerSet["cmtb"].Output)
+		}
+		if Mode == "selected"
+			AssertFalse(TriggerSet.Has("cmta"), "selection still excludes another declared section")
+		AssertFalse(TriggerSet.Has("description"), "commented metadata can never become a known trigger")
+	} finally {
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		finally {
+			if HadMaster
+				CategoryEnabled["Hotstrings"] := PriorMaster
+			else
+				CategoryEnabled.Delete("Hotstrings")
+			if HadPersonal
+				Features["hotstrings"]["personal"] := PriorPersonal
+			else
+				Features["hotstrings"].Delete("personal")
+			if HadPath
+				ScriptInformation["PersonalTomlPath"] := PriorPath
+			else
+				ScriptInformation.Delete("PersonalTomlPath")
+			Assert(InStr(Root, RTrim(A_Temp, "\/") . "\ergopti_picr_header_" . ProcessId . "_") == 1, "cleanup stays inside this process-owned temporary root")
+			DirDelete(Root, true)
+		}
+	}
+}
+Test("catalogue: commented initial personal header retains analytics rows (catalogue-header-comments)", (*) => _PICR_CommentedHeaderCatalogue("category", "first"))
+Test("catalogue: commented later personal header retains analytics rows (catalogue-header-comments)", (*) => _PICR_CommentedHeaderCatalogue("category", "second"))
+for _PICR_HeaderBrackets in [1, 2] {
+	Test("catalogue: commented initial extension header " . _PICR_HeaderBrackets . " retains analytics rows (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "first", _PICR_HeaderBrackets))
+	Test("catalogue: commented later extension header " . _PICR_HeaderBrackets . " retains exact ownership (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "second", _PICR_HeaderBrackets))
+	Test("catalogue: commented selected extension header " . _PICR_HeaderBrackets . " retains analytics rows (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "selected", _PICR_HeaderBrackets))
+	Test("catalogue: commented metadata header " . _PICR_HeaderBrackets . " cannot become a trigger (catalogue-header-comments)", _PICR_CommentedHeaderCatalogue.Bind("extension", "metadata", _PICR_HeaderBrackets))
+}

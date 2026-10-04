@@ -1,0 +1,5 @@
+[_meta]
+schema_version = 10
+
+[layout]
+future = "kept" # independently retained

@@ -237,7 +237,8 @@ LLM_Menu_ApplySharedDefaults() {
 			_LLM_Menu[tray_key] := NormalizedPort
 			continue
 		}
-		_LLM_Menu[tray_key] := LLM_Defaults[shared_key]
+		_LLM_Menu[tray_key] := (shared_key == "llm_streaming_multi")
+			? LLM_DisplayShowAll(LLM_Defaults[shared_key]) : LLM_Defaults[shared_key]
 	}
 }
 LLM_Menu_ApplySharedDefaults()

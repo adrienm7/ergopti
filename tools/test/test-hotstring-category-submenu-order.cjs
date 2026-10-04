@@ -133,7 +133,8 @@ const PERSONAL_REGIONS = [
 			'"hotstring_category_disable_all"',
 			'M.category_scope_fn(ctx, names,',
 			'submenu = scope_menu(scope_names, {}, menu_items)',
-			'submenu = file_menu_for_group(gname, g_rows)'
+			'submenu = file_menu_for_group(gname, g_rows, admission)',
+			'PersonalFileScope.bind(ctx, record)'
 		]
 	},
 	{

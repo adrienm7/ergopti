@@ -200,3 +200,230 @@ helpers.describe("loader: the scan skips what is not a pack", function()
 	end)
 
 end)
+
+
+helpers.describe("personal-file descriptors: independent cross-driver corpus", function()
+	helpers.it("preserves exact relative components without borrowing mutable arrays", function()
+		local PersonalFiles = require("hotstrings.personal_files")
+		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/personal_file_descriptors.json", "r"))
+		local content = assert(handle:read("*a")); assert(handle:close())
+		local corpus = assert(require("json").decode(content))
+		helpers.assert_eq(#corpus.vectors, 13, "the independent corpus must not become vacuous")
+		local identities = {}
+		for _, vector in ipairs(corpus.vectors) do
+			local descriptor = PersonalFiles.describe(vector.components)
+			helpers.assert_eq(descriptor.id, vector.id, vector.name)
+			helpers.assert_eq(descriptor.label, vector.label, vector.name)
+			helpers.assert_eq(PersonalFiles.components(vector.id), vector.components, vector.name)
+			helpers.assert_nil(identities[descriptor.id], "each admitted filename has a distinct identity")
+			identities[descriptor.id] = true
+			helpers.assert_true(not descriptor.id:find(".", 1, true), "the id remains one TOML path segment")
+			local copied = PersonalFiles.copy(descriptor)
+			descriptor.components[1] = "mutated.toml"
+			helpers.assert_eq(copied.components, vector.components, "each consumer owns its components")
+			helpers.assert_true(PersonalFiles.is_descriptor(copied))
+			helpers.assert_eq(PersonalFiles.is_descriptor(descriptor), false, "forged components refuse")
+			copied.label = "forged"
+			helpers.assert_eq(PersonalFiles.is_descriptor(copied), false, "forged display labels refuse")
+		end
+		for _, components in ipairs(corpus.invalid_components) do
+			local accepted = pcall(PersonalFiles.describe, components)
+			helpers.assert_eq(accepted, false, "malformed relative components refuse")
+		end
+		for _, identity in ipairs(corpus.invalid_ids) do
+			helpers.assert_nil(PersonalFiles.components(identity), "noncanonical identities refuse: " .. identity)
+		end
+		for _, components in ipairs({ { "a.toml", extra = true }, { [1] = "a", [3] = "b.toml" },
+			{ string.char(0xED, 0xA0, 0x80) .. ".toml" } }) do
+			local admitted, refusal = pcall(PersonalFiles.describe, components)
+			helpers.assert_eq(admitted, false, "shape and Unicode refuse")
+			helpers.assert_true(type(refusal) == "string" and refusal:find("invalid personal-file", 1, true) ~= nil)
+		end
+		local extra = PersonalFiles.describe({ "a.toml" }); extra.future = true
+		helpers.assert_eq(PersonalFiles.is_descriptor(extra), false, "unknown descriptor fields refuse")
+	end)
+end)
+
+
+helpers.describe("personal-file transport through the real loader and compiled engine", function()
+	helpers.it("keeps independent source metadata, preview identity and old collision/output order", function()
+		local path = os.tmpname()
+		local handle = assert(io.open(path, "w"))
+		assert(handle:write('[_meta]\ndelay = 1.25\n[probe]\n"pqx" = { output = "Owned", auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true, priority = 73 }\n'))
+		assert(handle:close())
+		local ok, err = pcall(function()
+			local PersonalFiles = require("hotstrings.personal_files")
+			local source = PersonalFiles.describe({ "Équipe", "mémoire.toml" })
+			local Loader = helpers.load_module("modules.hotstrings.loader")
+			local catalogue = Loader.load_catalogue({ { path = path, category = "legacy", personal_source = source } })
+			helpers.assert_eq(catalogue.committed, true); helpers.assert_eq(#catalogue.mappings, 1)
+			local mapping = catalogue.mappings[1]
+			helpers.assert_eq({ mapping.trigger, mapping.replacement, mapping.group, mapping.section, mapping.priority },
+				{ "pqx", "Owned", "legacy", "probe", 73 })
+			helpers.assert_eq(catalogue.categories.legacy.delay, 1.25)
+			helpers.assert_eq(mapping.personal_source.id, "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c")
+			source.components[1] = "mutated"
+			helpers.assert_eq(mapping.personal_source.components[1], "Équipe")
+			helpers.assert_true(mapping.personal_source ~= catalogue.categories.legacy.personal_source)
+			local engine = require("hotstring_engine").new()
+			helpers.assert_true(engine:load_mappings(catalogue.mappings))
+			mapping.personal_source.components[1] = "borrowed"
+			engine:on_char("p"); engine:on_char("q"); local result = engine:on_char("x")
+			helpers.assert_eq(result.replacement, "Owned"); helpers.assert_eq(result.group, "legacy")
+			helpers.assert_eq(result.personal_source_id, "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c")
+			local rows = engine:candidates()
+			helpers.assert_eq(#rows, 1); helpers.assert_eq(rows[1].personal_source_id, result.personal_source_id)
+			helpers.assert_eq(rows[1].replacement, "Owned"); helpers.assert_eq(rows[1].fires, true)
+			local before = engine:mapping_state()
+			helpers.assert_eq(engine:load_mappings(catalogue.mappings), false, "borrowed invalid metadata refuses atomically")
+			helpers.assert_eq(engine:mapping_state(), before)
+			engine:reset(); engine:on_char("p"); engine:on_char("q")
+			helpers.assert_eq(engine:on_char("x").personal_source_id, result.personal_source_id)
+			local forged = PersonalFiles.describe({ "a.toml" }); forged.label = "forged"
+			local admitted, refusal = pcall(Loader.load_catalogue, { { path = path, personal_source = forged } })
+			helpers.assert_eq(admitted, false)
+			helpers.assert_true(type(refusal) == "string" and refusal:find("invalid personal source descriptor", 1, true) ~= nil)
+		end)
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("personal-file discovery: preserve the existing root overlay and choices", function()
+	helpers.it("retains every recursive source descriptor while only old overlay winners become live", function()
+		local root = os.tmpname(); os.remove(root)
+		local Shell = require("adapters.shell_runner")
+		assert(Shell.run("mkdir -p " .. Shell.quote(root .. "/a") .. " " .. Shell.quote(root .. "/work")
+			.. " " .. Shell.quote(root .. "/home") .. " " .. Shell.quote(root .. "/Équipe")))
+		local files = { ["a__b.toml"] = "flatx", ["a/b.toml"] = "nestedx", ["words.old.toml"] = "dottedx",
+			["work/team.toml"] = "workx", ["home/team.toml"] = "homex", ["Équipe/mémoire.toml"] = "memoryx",
+			["rolls.toml"] = "userrollx" }
+		local ok, err = pcall(function()
+			for relative, trigger in pairs(files) do
+				local handle = assert(io.open(root .. "/" .. relative, "w"))
+				assert(handle:write('[probe]\n"' .. trigger .. '" = { output = "' .. trigger
+					.. '-result", auto_expand = true, is_case_sensitive_strict = true }\n'))
+				assert(handle:close())
+			end
+			local discovered = require("modules.hotstrings.loader").find_toml_files(root)
+			local team_winner
+			for _, path in ipairs(discovered) do
+				if path:match("/team%.toml$") then team_winner = path:sub(#root + 2) end
+			end
+			helpers.assert_not_nil(team_winner, "actual discovery must admit both same-stem files")
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			require("tests.support.hotstring_choices").with_file(Config,
+				'[hotstrings]\ngroups = { a__b = true, b = true, "words.old" = true, team = true, "mémoire" = true, rolls = true }\n'
+				.. '[hotstrings.modules]\na__b = { probe = true }\nb = { probe = true }\n"words.old" = { probe = true }\n'
+				.. 'team = { probe = true }\n"mémoire" = { probe = true }\nrolls = { probe = true }\n', function(choice_path)
+				local before = require("tests.support.hotstring_choices").read(choice_path)
+				helpers.assert_true(Config.init(engine, root, nil))
+				local count, published = Config.load_all()
+				helpers.assert_eq(published, true); helpers.assert_eq(count, 5, "legacy same-stem overlays and dotted-name gate remain unchanged")
+				local discovery = Config.personal_file_sources()
+				helpers.assert_eq(#discovery, 7, "overlay losers are discovered explicitly, never claimed as live mappings")
+				local sources = {}
+				for _, source in ipairs(discovery) do sources[source.path:sub(#root + 2)] = source.descriptor.id end
+				helpers.assert_eq(sources, {
+					["a__b.toml"] = "personal-file:615f5f622e746f6d6c", ["a/b.toml"] = "personal-file:61:622e746f6d6c",
+					["words.old.toml"] = "personal-file:776f7264732e6f6c642e746f6d6c",
+					["work/team.toml"] = "personal-file:776f726b:7465616d2e746f6d6c", ["home/team.toml"] = "personal-file:686f6d65:7465616d2e746f6d6c",
+					["Équipe/mémoire.toml"] = "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c", ["rolls.toml"] = "personal-file:726f6c6c732e746f6d6c",
+				})
+				discovery[1].descriptor.components[1] = "borrowed"
+				helpers.assert_true(require("hotstrings.personal_files").is_descriptor(Config.personal_file_sources()[1].descriptor))
+				local function match(text)
+					engine:reset(); local result
+					for char in text:gmatch(".") do result = engine:on_char(char) end
+					return result
+				end
+				local team_loser = team_winner == "home/team.toml" and "work/team.toml" or "home/team.toml"
+				local Policy = require("hotstrings.personal_scope")
+				local evidence, selected = {}, {}
+				for _, item in ipairs(Config.personal_file_sources()) do
+					local relative = item.path:sub(#root + 2)
+					if relative == team_winner or relative == team_loser then
+						local live = match(files[relative])
+						evidence[#evidence + 1] = { source = item.descriptor, owner = "team", path = item.path,
+							admitted = live ~= nil and live.personal_source_id == item.descriptor.id, exclusive = true }
+						selected[relative] = { source = item.descriptor, owner = "team", path = item.path }
+					end
+				end
+				helpers.assert_eq(#evidence, 2, "both actual sources provide independent admission evidence")
+				local denied, reason = Policy.admit(evidence, selected[team_loser])
+				helpers.assert_nil(denied); helpers.assert_eq(reason, "unadmitted-source")
+				local accepted, refusal = Policy.admit(evidence, selected[team_winner])
+				helpers.assert_nil(refusal); helpers.assert_eq(accepted.source.id, sources[team_winner])
+				helpers.assert_nil(match(files[team_loser]), "the old last same-stem winner remains the only live team source")
+				helpers.assert_nil(match("dottedx"), "this transport prerequisite does not silently change persisted gate addressability")
+				for _, relative in ipairs({ "a__b.toml", "a/b.toml", team_winner, "Équipe/mémoire.toml", "rolls.toml" }) do
+					local result = match(files[relative])
+					helpers.assert_not_nil(result); helpers.assert_eq(result.replacement, files[relative] .. "-result")
+					helpers.assert_eq(result.personal_source_id, sources[relative], "real compiled matches retain their source identity")
+					local preview
+					for _, row in ipairs(engine:candidates()) do
+						if row.trigger == files[relative] then preview = row end
+					end
+					helpers.assert_not_nil(preview)
+					helpers.assert_eq(preview.personal_source_id, sources[relative], "the actual preview agrees")
+					helpers.assert_eq(preview.fires, true)
+				end
+				helpers.assert_eq(require("tests.support.hotstring_choices").read(choice_path), before, "metadata transport never rewrites choices")
+			end)
+		end)
+		for relative in pairs(files) do os.remove(root .. "/" .. relative) end
+		for _, directory in ipairs({ "a", "work", "home", "Équipe", "" }) do os.remove(root .. "/" .. directory) end
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("common autocorrection interleaved source order", function()
+	local function actual_catalogue(category, selected)
+		local Paths = require("infra.paths")
+		local handle = assert(io.open(Paths.shared("tests/corpus/hotstrings/source_order_entries.json"), "r"))
+		local expected = require("json").decode(handle:read("*a")); assert(handle:close())
+		local path = os.tmpname()
+		handle = assert(io.open(path, "w")); assert(handle:write(expected.source)); assert(handle:close())
+		local ok, failure = pcall(function()
+			local Loader = helpers.load_module("modules.hotstrings.loader")
+			local result = Loader.load_catalogue({ { path = path, category = category,
+				only_sections = selected, skip_sections = { "unknown" } } })
+			helpers.assert_eq(result.committed, true); helpers.assert_eq(result.errors, 0)
+			local order = {}
+			for _, mapping in ipairs(result.mappings) do
+				order[#order + 1] = mapping.trigger
+				helpers.assert_eq(mapping.group, category)
+				helpers.assert_true(mapping.trigger ~= "unknownx")
+				if mapping.trigger == "secondx" then
+					helpers.assert_eq(mapping.is_case_sensitive_strict, true); helpers.assert_eq(mapping.priority, 44)
+				elseif mapping.trigger == "firstx" then
+					helpers.assert_eq(mapping.final_result, true); helpers.assert_eq(mapping.priority, 10)
+				end
+			end
+			local wanted = selected and expected.caps_order
+				or (category == "autocorrection" and expected.admitted_source_order or expected.declared_order)
+			helpers.assert_eq(order, wanted, "the real catalogue stream supplies native insertion precedence")
+			local category_info = result.categories[category]
+			helpers.assert_eq(category_info.count, #wanted)
+			if not selected then
+				helpers.assert_eq(category_info.sections.caps.count, 3)
+				helpers.assert_eq(category_info.sections.terms.count, 1)
+				helpers.assert_eq(category_info.sections.caps.delay, 0.2)
+				helpers.assert_eq(category_info.sections.terms.delay, 0.3)
+			end
+		end)
+		assert(os.remove(path))
+		if not ok then error(failure, 0) end
+	end
+	helpers.it("(source-ordered-autocorrection) publishes interleaved common entries through the actual loader", function()
+		actual_catalogue("autocorrection")
+	end)
+	helpers.it("(source-ordered-autocorrection) retains French declared order and caps-only filtering", function()
+		actual_catalogue("french_autocorrection")
+		actual_catalogue("autocorrection", { "caps" })
+	end)
+end)

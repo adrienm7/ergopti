@@ -1173,6 +1173,7 @@ default = 0
 recommended = 0
 input_altering = false
 type = "number"
+choice_values = [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
 description_key = "menu.llm.display.pred_indent"
 
 [[features.llm.display]]
@@ -3410,13 +3411,13 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
 id = "direct_access_digits"
-platforms = ["ahk"]
-default = false
-recommended = true
+platforms = ["ahk", "hs", "linux"]
+default = "native"
+recommended_per_platform = { ahk = "digits", hs = "native", linux = "native" }
 input_altering = true
-type = "boolean"
-description_key = "menu.layout.direct_access_digits"
-superseded_reason_key = "menu.layout.superseded_digit_row"
+type = "enum"
+enum_values = ["native", "digits", "symbols"]
+description_key = "menu.layout.number_row"
 
 [[features.layout]]
 id = "ergopti_alt_gr"
@@ -3758,10 +3759,14 @@ platforms = ["ahk"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 [[menu.top_level]]
+type = "command"
 id = "reload"
+i18n = "menu.global.reload"
 
 [[menu.top_level]]
+type = "command"
 id = "quit"
+i18n = "menu.global.quit"
 
 [[menu.top_level]]
 id = "debug"
@@ -3900,6 +3905,14 @@ disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
+# Fixed Off choice; prompts remain the native live-mode provider's data.
+[[menu.llm_live_controls]]
+type = "check"
+id = "llm_live_mode_off"
+i18n = "menu.llm.live_mode_off"
+checked_when = ["llm_live_is_off"]
+disabled_when = ["llm_live_off_ready"]
+
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_generation_settings"
@@ -3936,8 +3949,8 @@ platforms = ["ahk", "hs", "linux"]
 #
 # All three drivers show the same block: the version, one channel submenu titled
 # with the subscribed channel and listing every channel of the shared
-# update-channel registry, right before the check row, the check frequency (a
-# `list`, because its rows come from the registry and the updater state), then
+# update-channel registry, right before the check row, the check frequency (another
+# registered choice, using the cadence owner and its snapped state), then
 # Versions and its GitHub page, then startup and Uninstall after a separator. Linux
 # had its updater as a separate top-level "Updates" entry until 2026-09.
 # The updater registry owns the channel ids, stability order and both label forms.
@@ -3949,6 +3962,17 @@ i18n = "menu.about.channel_menu"
 choice_registry = "updater.channels"
 show_current_choice = true
 current_choice_placeholder = "{channel}"
+
+# The cadence registry owns numeric values and duration labels; the shared
+# renderer owns order, ticks and the translated current-choice caption.
+[[menu.about_update_frequency_menu]]
+type = "choice"
+id = "update_check_interval"
+path = "updater.check_interval_seconds"
+i18n = "menu.about.frequency_menu"
+choice_registry = "updater.check_intervals"
+show_current_choice = true
+current_choice_suffix = ": {1}"
 
 [[menu.about_menu]]
 type = "list"
@@ -4002,6 +4026,48 @@ disabled_reason_key = "menu.about.source_run_reason"
 # picker remain dynamic: they depend on stored API entries and native apps.
 # The common Info Bar check keeps the native display providers on either side:
 # macOS retains its leading indent selector; the other drivers supply no leading row.
+# The two automatic prediction triggers share row identity, labels and admission.
+# Numeric debounce and application exclusions retain native row owners.
+# Privacy checks use shared identity and native source-fenced transactions.
+[[menu.llm_trigger_menu]]
+type = "list"
+id = "llm_trigger_leading"
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_instant_on_word_end"
+i18n = "menu.llm.instant_on_word_end"
+checked_when = ["llm_instant_on_word_end_enabled"]
+disabled_when = ["llm_trigger_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_after_hotstring"
+i18n = "menu.llm.after_hotstring"
+checked_when = ["llm_after_hotstring_enabled"]
+disabled_when = ["llm_trigger_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "---"
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_url_bar_filter"
+i18n = "menu.llm.disable_url_bars"
+checked_when = ["llm_url_bar_filter_enabled"]
+disabled_when = ["llm_url_bar_filter_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_secure_field_filter"
+i18n = "menu.llm.disable_password_fields"
+checked_when = ["llm_secure_field_filter_enabled"]
+disabled_when = ["llm_secure_field_filter_ready"]
+
+[[menu.llm_trigger_menu]]
+type = "list"
+id = "llm_trigger_remaining"
+
 [[menu.llm_display_menu]]
 type = "list"
 id = "llm_display_leading"
@@ -4016,6 +4082,40 @@ disabled_when = ["llm_info_bar_ready"]
 [[menu.llm_display_menu]]
 type = "list"
 id = "llm_display_remaining"
+
+[[menu.llm_display_menu]]
+type = "check"
+id = "llm_token_streaming"
+i18n = "menu.llm.show_streaming"
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.token_streaming_transport_missing"
+checked_when = ["llm_token_streaming_enabled"]
+disabled_when = ["llm_token_streaming_ready"]
+
+[[menu.llm_display_menu]]
+type = "check"
+id = "llm_show_all"
+i18n = "menu.llm.show_all_at_once"
+checked_when = ["llm_show_all_enabled"]
+disabled_when = ["llm_show_all_ready"]
+
+[[menu.llm_display_menu]]
+type = "---"
+
+[[menu.llm_display_menu]]
+type = "choice"
+id = "llm_indentation"
+path = "llm.display.pred_indent"
+i18n = "menu.llm.indent_label"
+choice_registry = "llm.indentation"
+show_current_choice = true
+current_choice_suffix = ": {1}"
+disabled_when = ["llm_indentation_ready"]
+
+[[menu.llm_display_menu]]
+type = "list"
+id = "llm_display_trailing"
 
 # Generation numeric providers retain their native prompts; the common diversity
 # checkbox has one label, checked state and current readiness owner on every OS.
@@ -4059,6 +4159,14 @@ type = "---"
 type = "dynamic"
 id = "agent_disabled_apps"
 i18n = "menu.agent.disabled_apps"
+
+# Both native system providers use this fixed Off row; backend choices remain data.
+[[menu.agent_system_controls]]
+type = "check"
+id = "agent_system_off"
+i18n = "menu.agent.off"
+checked_when = ["agent_system_is_off"]
+disabled_when = ["agent_system_off_ready"]
 
 # The Applications submenu, macOS only: it lists the bundled applications
 # found on disk and launches them. Linux's copy held only the config-folder row,
@@ -4356,6 +4464,17 @@ type = "list"
 id = "selection_operations"
 platforms = ["linux"]
 reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
+
+# CapsWord belongs to Linux selection operations; the other drivers expose
+# their existing binding owners instead of a duplicate selection checkbox.
+[[menu.selection_caps_word_control]]
+type = "check"
+id = "selection_caps_word"
+i18n = "sg_actions.caps_word"
+checked_when = ["selection_caps_word_active"]
+disabled_when = ["selection_caps_word_ready"]
+platforms = ["linux"]
+unavailable = "hide"
 
 # On every platform: the rows above act on typed or selected text, the groups
 # below are the user's own modifier shortcuts, two distinct blocks.
@@ -4982,13 +5101,12 @@ id = "base_layouts"
 platforms = ["linux"]
 reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
 
-# Swaps digits and symbols on any layout whose digits sit behind Shift (AZERTY,
-# BÉPO) — not an Ergopti-only setting.
+# One policy, with actual source-scoped availability supplied by native owners.
+# Lua drivers report native input only; Windows can also force digits and can
+# force symbols through a supported registry source's original action machine.
 [[menu.layout_menu]]
-type = "feature"
-path = "layout.direct_access_digits"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+type = "list"
+id = "number_row_policy"
 
 # Works on every layout since 2026-09-21: the chords follow the key that types
 # the accented letter directly in the user's own layout, not Ergopti's positions.
@@ -5173,6 +5291,12 @@ reason_key = "platform_reason.only_linux_rereads_its_catalogue"
 # The fixed word-expander bulk controls share their labels, order and paused
 # posture. Each native port supplies only its existing acknowledged delimiter
 # owner; the remaining catalogue and personal entries remain provider data.
+[[menu.personal_hotstring_commands]]
+type = "command"
+id = "personal_hotstring_open_editor"
+i18n = "menu.hotstrings.open_editor"
+disabled_when = ["personal_hotstring_editor_ready"]
+
 [[menu.word_expanders_menu]]
 type = "command"
 id = "word_expanders_enable_all"
@@ -5198,6 +5322,18 @@ type = "---"
 type = "list"
 id = "word_expander_entries"
 
+[[menu.word_expander_custom_menu]]
+type = "command"
+id = "word_expander_delete"
+i18n = "menu.hotstrings.delete_delimiter"
+disabled_when = ["word_expanders_ready"]
+
+[[menu.word_expander_custom_menu]]
+type = "command"
+id = "word_expander_add"
+i18n = "menu.hotstrings.add_delimiter"
+disabled_when = ["word_expanders_ready"]
+
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "word_expanders"
@@ -5205,6 +5341,12 @@ id = "word_expanders"
 # `list` since 2026-08-07, the last row of this group to move. It opens the
 # settings window and offers the per-category delays beside it — the same rows on
 # all three drivers, built three times because `action` hands the id back.
+[[menu.hotstrings_delays_menu]]
+type = "command"
+id = "hotstrings_config_window"
+i18n = "menu.hotstrings.config_item"
+disabled_when = ["hotstrings_config_ready"]
+
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "delays_colors"
@@ -5252,6 +5394,51 @@ platforms = ["hs", "linux"]
 type = "list"
 id = "preview_bubbles"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
+# Preview checkbox declarations retain the existing presence/style positions.
+[[menu.preview_colored_control]]
+type = "check"
+id = "preview_colored_tooltips"
+i18n = "menu.hotstrings.tooltip_colored"
+checked_when = ["hotstrings.preview_colored_tooltips"]
+disabled_when = ["preview_colored_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
+# Preview presence keeps its existing position; native ports supply only the
+# current flag and the acknowledged toggle owner.
+[[menu.preview_magic_control]]
+type = "check"
+id = "preview_star_enabled"
+i18n = "menu.hotstrings.tooltip_magic"
+checked_when = ["hotstrings.preview_star_enabled"]
+disabled_when = ["preview_magic_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
+# Autocorrection and AI presence share one ordered checkbox declaration.
+# Native ports provide only current flags and acknowledged mutation owners.
+[[menu.preview_presence_controls]]
+type = "check"
+id = "preview_autocorrect_enabled"
+i18n = "menu.hotstrings.tooltip_autocorrect"
+checked_when = ["hotstrings.preview_autocorrect_enabled"]
+disabled_when = ["preview_presence_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
+[[menu.preview_presence_controls]]
+type = "check"
+id = "preview_ai_enabled"
+i18n = "menu.hotstrings.tooltip_ai"
+checked_when = ["hotstrings.preview_ai_enabled"]
+disabled_when = ["preview_presence_ready"]
+platforms = ["hs", "linux"]
+unavailable = "grey"
 reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
 # Unrestricted with the feature above, and for the same reason: macOS built this
@@ -6027,3 +6214,100 @@ description_key = "onboarding.metrics.desc"
 master = { ahk = "metrics.metrics_enabled", hs = "metrics.enabled", linux = "metrics.enabled" }
 checklist = "none"
 consent = true
+
+# Browser presentation is native; the fixed command and live capability are shared.
+[[menu.llm_model_commands]]
+type = "command"
+id = "llm_browse_models"
+i18n = "menu.llm.browse_models_entry"
+disabled_when = ["llm_model_browser_ready"]
+
+# A source checkout has no installed release to update; its fixed reason is shared.
+[[menu.about_source_menu]]
+type = "command"
+id = "about_source_check"
+i18n = "menu.about.check_for_updates"
+disabled_when = ["about_source_release_ready"]
+disabled_reason_key = "menu.about.source_run_reason"
+
+# Profile creation keeps its native editor and publication owner on each driver.
+[[menu.llm_profile_commands]]
+type = "command"
+id = "llm_profile_create"
+i18n = "menu.profiles.create_profile"
+disabled_when = ["llm_profile_create_ready"]
+
+# Native clone/edit/save owners stay unchanged; only their fixed command is declared here.
+[[menu.llm_profile_commands]]
+type = "command"
+id = "llm_profile_clone"
+i18n = "menu.profiles.clone_builtin"
+disabled_when = ["llm_profile_clone_ready"]
+
+# Optional native file providers keep their captured source and opening owner.
+[[menu.hotstring_file_commands]]
+type = "command"
+id = "hotstring_file_open"
+i18n = "menu.hotstrings.open_file"
+disabled_when = ["hotstring_file_ready"]
+
+# The fixed active API-entry commands share captions, order and live readiness.
+# Native adapters keep the existing probe and acknowledged removal owners.
+[[menu.llm_api_active_commands]]
+type = "command"
+id = "api_test_active"
+i18n = "menu.llm.api_test_entry"
+disabled_when = ["llm_api_active_ready"]
+
+[[menu.llm_api_active_commands]]
+type = "command"
+id = "api_remove_active"
+i18n = "menu.llm.api_remove_entry"
+disabled_when = ["llm_api_active_ready"]
+
+# Selection case commands use each driver's existing action bindings. The Linux
+# selection provider offers these direct tray actions without duplicate native
+# keyboard slots on Windows or macOS.
+[[menu.selection_case_commands]]
+type = "command"
+id = "uppercase_selection"
+i18n = "menu.shortcuts.to_uppercase"
+disabled_when = ["uppercase_selection_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_case_commands]]
+type = "command"
+id = "selection_lowercase"
+i18n = "menu.shortcuts.to_lowercase"
+disabled_when = ["selection_lowercase_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_case_commands]]
+type = "command"
+id = "titlecase_selection"
+i18n = "menu.shortcuts.to_titlecase"
+disabled_when = ["titlecase_selection_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+# Native prompts and modifier picker subtrees retain their own settings owners.
+[[menu.llm_navigation_rows]]
+type = "list"
+id = "llm_nav_modifiers"
+i18n = "menu.llm.nav_label"
+
+[[menu.llm_navigation_rows]]
+type = "list"
+id = "llm_val_modifiers"
+i18n = "menu.llm.val_label"
+
+# The existing choice renderer supplies provider DATA; availability and writes
+# remain native-owned. This child declaration owns all labels and value order.
+[[menu.number_row_policy_rows]]
+type = "choice"
+id = "number_row_mode"
+path = "layout.direct_access_digits"
+i18n = "menu.layout.number_row"
+choice_label_prefix = "menu.layout.number_row_"

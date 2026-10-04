@@ -248,13 +248,19 @@ end
 local function system_rows(ctx, system)
 	local value = ctx.state[system.key] or ""
 	local parsed = value ~= "" and Vision.parse(value) or nil
-	local items = {
-		{
-			label = i18n.get("menu.agent.off"),
-			checked = parsed == nil,
-			action = function() return apply(ctx, system.key, "", system.setter) end,
-		},
-	}
+	local off = ManifestMenu.check_row("agent_system_controls", "agent_system_off", {
+		agent_system_off = function() return apply(ctx, system.key, "", system.setter) end,
+	}, {
+		agent_system_is_off = function()
+			local current = ctx.state[system.key] or ""
+			return current == "" or Vision.parse(current) == nil
+		end,
+		agent_system_off_ready = function()
+			return type(ctx.settings_mgr.apply_setting_transaction) == "function"
+		end,
+	})
+	if not off then return {} end
+	local items = { off }
 	local Remote = require("modules.llm.api_remote")
 	local choices = M.backends(system.use)
 	local chosen_listed = parsed == nil

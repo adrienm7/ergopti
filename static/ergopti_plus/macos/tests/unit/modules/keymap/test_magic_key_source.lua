@@ -20,6 +20,7 @@ local KEYCODE_J = 38
 local KEYCODE_C = 8
 
 local RESET_MODULES = {
+	"modules.keylogger.physical_accounting_mode",
 	"adapters.event_provenance", "adapters.synthetic_input",
 	"infra.logger", "infra.text_utils",
 	"modules.hotstrings.hotstrings_config", "modules.keylogger",
@@ -226,4 +227,44 @@ helpers.describe("magic key source: config.toml", function()
 			helpers.assert_eq(scan.keys[1].section .. "." .. scan.keys[1].key, PATH)
 		end)
 	end)
+end)
+
+helpers.describe("magic key source: acknowledged tap dispatcher", function()
+ helpers.it("(magic-key-source) an acknowledged tap keeps both physical aliases without keymap mutation", function()
+  -- The earlier real keymap owns an always-on KC drain. Retire that exact
+  -- producer before constructing another CoreState and its bridge owner.
+  local prior_bridge = package.loaded["modules.keylogger.kc_bridge"]
+  if prior_bridge then helpers.assert_true(prior_bridge.stop()) end
+  package.loaded["modules.keylogger.kc_bridge"] = nil
+  local keymap, keymap_tap = load_keymap()
+  local Registry = require("modules.keymap.registry")
+  Registry.is_group_enabled = function(name) return name == "magic_key" end
+  Registry.is_section_enabled = function(group, section) return group == "magic_key" and section == "replace" end
+  assert(keymap.set_magic_key_source("Backquote"))
+  local fixture = require("tests.support.system_actions_fixture")
+  fixture.with_fixture(function()
+   local sys, spy = fixture.make_sys_screenshot_spies()
+   local Tap = require("modules.shortcuts.tap_keys")
+   local f = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
+   local actions = require("actions.assignable").build(require("_generated.action_catalogue"), Json.decode(f:read("*a")), "macos"); f:close()
+   assert(Tap.apply_configuration({shortcuts={tap_keys={number_row_left="send_text"}}}, function(id) return actions[id] == true end))
+   local ran, admitted = 0, true
+   sys.bind_tap_keys(function() return admitted end, function(code)
+    local action = Tap.decide(code)
+    if action then return function() ran = ran + 1; return true end end
+   end)
+   local results = {}
+   for _, code in ipairs({50, 10}) do
+    local event = key_down(code, {})
+    local keymap_consumed = keymap_tap.callback(event)
+    local tap_consumed = spy.captured_cb(event)
+    fixture.run_screenshot_deferred(spy)
+    results[#results+1] = {code=code, unicode=event.set, keymap=keymap_consumed, tap=tap_consumed, ran=ran}
+   end
+   helpers.assert_eq(results[1].tap, true)
+   helpers.assert_eq(results[2].tap, true)
+   helpers.assert_eq(ran, 2)
+   helpers.assert_nil(results[1].unicode, "a native accepted tap should not mutate the keymap's text context first")
+  end)
+ end)
 end)

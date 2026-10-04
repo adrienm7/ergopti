@@ -18,9 +18,10 @@
  * @param {Array} Args - Structured arguments.
  * @param {object} Ownership - Retains the fixture if exact child retirement fails.
  * @param {integer} ExpectedCode - Zero for real probes, two only for the expiry mutation.
+ * @param {integer} TimeoutMs - Bound derived from the owned child observations.
  * @returns {string} Captured ASCII completion acknowledgement.
  */
-_NDT_RunChild(Executable, Args, Ownership, ExpectedCode := 0) {
+_NDT_RunChild(Executable, Args, Ownership, ExpectedCode := 0, TimeoutMs := 15000) {
 	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
 	OnDone(Code, Output, Errors) {
 		Receipt.Calls += 1
@@ -32,7 +33,7 @@ _NDT_RunChild(Executable, Args, Ownership, ExpectedCode := 0) {
 	try {
 		AssertTrue(Handle.start(), "the exact native-dialog child must start")
 		Started := A_TickCount
-		while !Receipt.Calls && TickElapsed(Started) < 15000 {
+		while !Receipt.Calls && TickElapsed(Started) < TimeoutMs {
 			_SR_TreePoll()
 			Sleep(10)
 		}
@@ -208,6 +209,11 @@ _NDT_FilePickerProbeSource(Artifact, Owner) {
 		. 'throw Error("The privately owned fixture path must resolve")' . "`n"
 		. '_NFPOwnedFile := StrGet(CanonicalBuffer, CanonicalLength, "UTF-16")' . "`n"
 		. 'FileAppend(_NFPOwnedFile, _NFPRoot . "\owned.path", "UTF-8-RAW")' . "`n"
+		. '_NFPMode := "baseline"' . "`n"
+		. 'SetTimer(_NFPCapture, 20)' . "`n"
+		. '_NFPBaseline := FileSelect(35, _NFPOwnedFile, "Owned native baseline", "Owned files (*.txt)")' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'FileAppend(Type(_NFPBaseline) . "|" . _NFPBaseline, _NFPRoot . "\baseline.result", "UTF-8-RAW")' . "`n"
 		. '_NFPMode := "selected"' . "`n"
 		. 'SetTimer(_NFPCapture, 20)' . "`n"
 		. '_NFPSelected := Ui_FileSelect(35, _NFPOwnedFile, "Navigation layer", "Owned files (*.txt)")' . "`n"
@@ -343,6 +349,11 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'ObserverProcess := Integer(ObserverArgs[3])' . "`n"
 		. 'ObserverView := Integer(ObserverArgs[4])' . "`n"
 		. 'ObserverType := Integer(ObserverArgs[5])' . "`n"
+		. 'ObserverWaitMs := Integer(ObserverArgs[9])' . "`n"
+		. 'ObserverUiaTimeoutMs := Integer(ObserverArgs[10])' . "`n"
+		. 'ObserverExpectedItems := StrSplit(FileRead(ObserverArgs[8], "UTF-8"), "|")' . "`n"
+		. 'if ObserverExpectedItems.Length != 3 || ObserverExpectedItems[1] == "" || ObserverExpectedItems[2] != "All Files (*.*)" || ObserverExpectedItems[3] != ""' . "`n"
+		. 'throw Error("The direct native baseline must publish two exact nonempty filter labels")' . "`n"
 		. 'if ObserverProcess == DllCall("GetCurrentProcessId", "UInt")' . "`n"
 		. 'throw Error("The owned UIA observer must be a separate client process")' . "`n"
 		. '_NFO_Phase("com", ObserverPhaseStarted)' . "`n"
@@ -353,8 +364,8 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. '_NFO_Phase("shell-items", ObserverPhaseStarted)' . "`n"
 		. 'ObserverTxtNames := _NFO_ShellNames(ObserverArgs[6])' . "`n"
 		. 'ObserverBinNames := _NFO_ShellNames(ObserverArgs[7])' . "`n"
-		. 'UIA.ConnectionTimeout := 500' . "`n"
-		. 'UIA.TransactionTimeout := 500' . "`n"
+		. 'UIA.ConnectionTimeout := ObserverUiaTimeoutMs' . "`n"
+		. 'UIA.TransactionTimeout := ObserverUiaTimeoutMs' . "`n"
 		. '_NFO_Fence(ObserverWindow, ObserverProcess, ObserverView, ObserverType)' . "`n"
 		. '_NFO_Phase("uia-provider", ObserverPhaseStarted)' . "`n"
 		. 'ObserverElement := UIA.ElementFromHandle(ObserverView, , false)' . "`n"
@@ -362,31 +373,33 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'throw Error("The owned shell-view UIA element must match its native process")' . "`n"
 		. 'ObserverStarted := A_TickCount' . "`n"
 		. '_NFO_Phase("restricted-txt", ObserverPhaseStarted)' . "`n"
-		. '_NFO_WaitVisible(ObserverElement, ObserverTxtNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted)' . "`n"
+		. '_NFO_WaitVisible(ObserverElement, ObserverTxtNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted, ObserverWaitMs)' . "`n"
 		. 'ObserverItems := ControlGetItems(ObserverType)' . "`n"
 		. 'if ControlGetIndex(ObserverType) != 1' . "`n"
 		. 'throw Error("The owned picker must begin on its first file type")' . "`n"
 		. 'if ObserverItems.Length == 1 && ObserverItems[1] == "All Files (*.*)" {' . "`n"
-		. '_NFO_WaitVisible(ObserverElement, ObserverBinNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted)' . "`n"
+		. '_NFO_WaitVisible(ObserverElement, ObserverBinNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted, ObserverWaitMs)' . "`n"
 		. 'throw Error("Owned BIN visible under the restricted file filter")' . "`n"
 		. '}' . "`n"
 		. '_NFO_Phase("restricted-bin", ObserverPhaseStarted)' . "`n"
 		. 'if _NFO_Visible(ObserverElement, ObserverBinNames, ObserverProcess)' . "`n"
 		. 'throw Error("Owned BIN visible under the restricted file filter")' . "`n"
-		. 'if ObserverItems.Length != 2 || ObserverItems[1] != "Owned files" || ObserverItems[2] != "All Files (*.*)"' . "`n"
+		. 'if ObserverItems.Length != 2 || ObserverItems[1] != ObserverExpectedItems[1] || ObserverItems[2] != ObserverExpectedItems[2]' . "`n"
 		. 'throw Error("The native friendly names must match independently observed SetFileTypes labels")' . "`n"
 		. '_NFO_Phase("all-files", ObserverPhaseStarted)' . "`n"
 		. 'ControlChooseIndex(2, ObserverType)' . "`n"
-		. '_NFO_WaitVisible(ObserverElement, ObserverBinNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted)' . "`n"
+		. 'ObserverStarted := A_TickCount' . "`n"
+		. '_NFO_WaitVisible(ObserverElement, ObserverBinNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted, ObserverWaitMs)' . "`n"
 		. 'if ControlGetIndex(ObserverType) != 2' . "`n"
 		. 'throw Error("The owned native All Files selection must be acknowledged")' . "`n"
 		. '_NFO_Phase("restored", ObserverPhaseStarted)' . "`n"
 		. 'ControlChooseIndex(1, ObserverType)' . "`n"
+		. 'ObserverStarted := A_TickCount' . "`n"
 		. 'loop {' . "`n"
 		. '_NFO_Fence(ObserverWindow, ObserverProcess, ObserverView, ObserverType)' . "`n"
 		. 'if ControlGetIndex(ObserverType) == 1 && _NFO_Visible(ObserverElement, ObserverTxtNames, ObserverProcess) && !_NFO_Visible(ObserverElement, ObserverBinNames, ObserverProcess)' . "`n"
 		. 'break' . "`n"
-		. 'if ((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= 4000' . "`n"
+		. 'if ((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= ObserverWaitMs' . "`n"
 		. 'throw Error("The restored native file filter must show TXT and hide BIN")' . "`n"
 		. 'Sleep(10)' . "`n"
 		. '}' . "`n"
@@ -458,12 +471,12 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. '}' . "`n"
 		. 'return false' . "`n"
 		. '}' . "`n"
-		. '_NFO_WaitVisible(OwnerElement, OwnerNames, OwnerWindow, OwnerProcess, OwnerView, OwnerType, ObserverStarted) {' . "`n"
+		. '_NFO_WaitVisible(OwnerElement, OwnerNames, OwnerWindow, OwnerProcess, OwnerView, OwnerType, ObserverStarted, ObserverWaitMs) {' . "`n"
 		. 'loop {' . "`n"
 		. '_NFO_Fence(OwnerWindow, OwnerProcess, OwnerView, OwnerType)' . "`n"
 		. 'if _NFO_Visible(OwnerElement, OwnerNames, OwnerProcess)' . "`n"
 		. 'return' . "`n"
-		. 'if ((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= 4000' . "`n"
+		. 'if ((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= ObserverWaitMs' . "`n"
 		. 'throw Error("An exact owned file item did not become visible in the native shell view")' . "`n"
 		. 'Sleep(10)' . "`n"
 		. '}' . "`n"
@@ -496,7 +509,7 @@ _NDT_FileFilterCaptureSource() {
 		. '_NFPLastHwnd := Hwnd' . "`n"
 		. 'PickerObserverReceipt := _NFPRoot . "\" . _NFPMode . ".observer"' . "`n"
 		. 'FileAppend("", PickerObserverReceipt . ".failure", "UTF-8-RAW")' . "`n"
-		. 'PickerObserverArguments := [A_AhkPath, "/ErrorStdOut", _NFPObserverPath, PickerObserverReceipt, Hwnd, DllCall("GetCurrentProcessId", "UInt"), PickerShellView, PickerTypeCombo, _NFPOwnedFile, _NFPBinFile]' . "`n"
+		. 'PickerObserverArguments := [A_AhkPath, "/ErrorStdOut", _NFPObserverPath, PickerObserverReceipt, Hwnd, DllCall("GetCurrentProcessId", "UInt"), PickerShellView, PickerTypeCombo, _NFPOwnedFile, _NFPBinFile, _NFPRoot . "\baseline.filter", _NFPViewWaitMs, _NFPUiaTimeoutMs]' . "`n"
 		. 'PickerObserverCommand := ""' . "`n"
 		. 'for PickerObserverArgument in PickerObserverArguments {' . "`n"
 		. 'if InStr(PickerObserverArgument, Chr(34))' . "`n"
@@ -506,7 +519,7 @@ _NDT_FileFilterCaptureSource() {
 		. 'PickerObserverHandle := ComObject("WScript.Shell").Exec(PickerObserverCommand)' . "`n"
 		. 'try {' . "`n"
 		. 'PickerObserverStarted := A_TickCount' . "`n"
-		. 'while PickerObserverHandle.Status == 0 && ((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < 5000' . "`n"
+		. 'while PickerObserverHandle.Status == 0 && ((A_TickCount - PickerObserverStarted) & 0xFFFFFFFF) < _NFPObserverBudgetMs' . "`n"
 		. 'Sleep(10)' . "`n"
 		. 'if PickerObserverHandle.Status == 0 {' . "`n"
 		. 'PickerObserverPhase := FileExist(PickerObserverReceipt . ".phase") ? SubStr(FileRead(PickerObserverReceipt . ".phase", "UTF-8"), 1, 128) : "not-started"' . "`n"
@@ -546,7 +559,14 @@ _NDT_FileFilterCaptureSource() {
  * @returns {string} Complete native picker with genuine filter behavior checks.
  */
 _NDT_FileFilterBehaviorProbeSource(Artifact, Owner, Observer) {
+	FilterBudgets := _NDT_FileFilterBudgets()
 	BehaviorSource := _NDT_FilePickerProbeSource(Artifact, Owner)
+	BehaviorSource := StrReplace(BehaviorSource, 'global _NFPMode := ""',
+		'global _NFPMode := ""' . "`n"
+			. 'global _NFPObserverBudgetMs := ' . FilterBudgets.ObserverMs . "`n"
+			. 'global _NFPViewWaitMs := ' . FilterBudgets.ViewWaitMs . "`n"
+			. 'global _NFPUiaTimeoutMs := ' . FilterBudgets.UiaTimeoutMs, , &BudgetBoundaries)
+	AssertEqual(1, BudgetBoundaries, "the native picker owns one complete derived observer budget")
 	BehaviorSource := StrReplace(BehaviorSource, 'global _NFPOwnedFile := _NFPRoot . "\selected.txt"',
 		'DirCreate(_NFPRoot . "\items")' . "`n"
 			. 'global _NFPOwnedFile := _NFPRoot . "\items\visible-filter-owned.txt"' . "`n"
@@ -556,11 +576,11 @@ _NDT_FileFilterBehaviorProbeSource(Artifact, Owner, Observer) {
 			. 'FileAppend("Owned binary fixture", _NFPBinFile, "UTF-8-RAW")', , &FixtureBoundaries)
 	AssertEqual(1, FixtureBoundaries, "the genuine filter proof adds one distinct controlled binary file")
 	BehaviorSource := StrReplace(BehaviorSource, 'global _NFPRoot, _NFPMode',
-		'global _NFPRoot, _NFPMode, _NFPOwnedFile, _NFPBinFile, _NFPLastHwnd, _NFPObserverPath', , &CallbackBoundaries)
+		'global _NFPRoot, _NFPMode, _NFPOwnedFile, _NFPBinFile, _NFPLastHwnd, _NFPObserverPath, _NFPObserverBudgetMs, _NFPViewWaitMs, _NFPUiaTimeoutMs', , &CallbackBoundaries)
 	AssertEqual(1, CallbackBoundaries, "the capture owns its exact file and observer state")
 	ObserverBoundary := 'SetTimer(_NFPCapture, 0)' . "`n" . 'if _NFPMode == "selected" {'
 	BehaviorSource := StrReplace(BehaviorSource, ObserverBoundary,
-		_NDT_FileFilterCaptureSource() . ObserverBoundary, , &ObserverBoundaries)
+		'if _NFPMode != "baseline" {' . "`n" . _NDT_FileFilterCaptureSource() . '}' . "`n" . ObserverBoundary, , &ObserverBoundaries)
 	AssertEqual(1, ObserverBoundaries, "the real view is queried once before either native action")
 	for ResultMode in ["Selected", "Cancelled"] {
 		RetirementBoundary := 'FileAppend(_NFPSelected, _NFPRoot . "\selected.result", "UTF-8-RAW")'
@@ -582,6 +602,7 @@ _NDT_FileFilterBehaviorProbeSource(Artifact, Owner, Observer) {
  * The no-filter mutation runs only after all five genuine policy cases complete.
  */
 _NDT_CheckFileFilterBehaviorPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
+	FilterBudgets := _NDT_FileFilterBudgets()
 	FilterRoot := Fixture . "\file_behavior"
 	DirCreate(FilterRoot)
 	FilterObserver := FilterRoot . "\observer.ahk"
@@ -590,7 +611,7 @@ _NDT_CheckFileFilterBehaviorPolicy(Index, Spec, Fixture, Artifact, Owner, Owners
 	FilterSource := _NDT_FileFilterBehaviorProbeSource(Artifact, Owner, FilterObserver)
 	FileAppend(FilterSource, FilterHarness, "UTF-8")
 	AssertEqual("file-picker-written", _NDT_RunChild(A_AhkPath,
-		["/ErrorStdOut", FilterHarness, FilterRoot], Ownership),
+		["/ErrorStdOut", FilterHarness, FilterRoot], Ownership, 0, FilterBudgets.ChildMs),
 		"genuine native filtering completes without hidden observer errors")
 	for FilterKind in ["selected", "cancelled"] {
 		AssertEqual(Spec.Expected, FileRead(FilterRoot . "\" . FilterKind . ".title", "UTF-8"),
@@ -607,15 +628,55 @@ _NDT_CheckFileFilterBehaviorPolicy(Index, Spec, Fixture, Artifact, Owner, Owners
 		"genuine native filtering preserves multiselect cancellation")
 	if Index != 5
 		return
+	LabelMutationRoot := Fixture . "\filter_label_mutation"
+	DirCreate(LabelMutationRoot)
+	LabelMutationHarness := LabelMutationRoot . "\changed_label.ahk"
+	FileAppend(_NDT_MutateDelegatedFilter(FilterSource, "Changed label (*.txt)"), LabelMutationHarness, "UTF-8")
+	AssertEqual("The native friendly names must match independently observed SetFileTypes labels",
+		_NDT_RunChild(A_AhkPath, ["/ErrorStdOut", LabelMutationHarness, LabelMutationRoot], Ownership, 2, FilterBudgets.ChildMs),
+		"changing only delegated friendly labels must fail against the untouched native baseline")
 	MutationRoot := Fixture . "\unfiltered_mutation"
 	DirCreate(MutationRoot)
-	MutationSource := StrReplace(FilterSource, '"Owned files (*.txt)"', '""', , &FilterMutations)
-	AssertEqual(2, FilterMutations, "only the two actual native filter arguments are removed")
+	MutationSource := _NDT_MutateDelegatedFilter(FilterSource, "")
 	MutationHarness := MutationRoot . "\unfiltered.ahk"
 	FileAppend(MutationSource, MutationHarness, "UTF-8")
 	AssertEqual("Owned BIN visible under the restricted file filter", _NDT_RunChild(A_AhkPath,
-		["/ErrorStdOut", MutationHarness, MutationRoot], Ownership, 2),
+		["/ErrorStdOut", MutationHarness, MutationRoot], Ownership, 2, FilterBudgets.ChildMs),
 		"removing the real native filter must expose the controlled BIN rather than pass vacuously")
+}
+
+
+/**
+ * Derives process bounds from three independently settling native view transitions.
+ * Each filename has at most two shell spellings. A visible spelling requires
+ * FindElements, ProcessId and IsOffscreen; absence only requires FindElements.
+ * A final synchronous query can cross its polling deadline, so its complete
+ * request bound belongs to the outer owner. Modal setup keeps its existing bound.
+ * @returns {object} Canonical per-query, per-transition and process bounds.
+ */
+_NDT_FileFilterBudgets() {
+	UiaTimeoutMs := 500
+	ViewWaitMs := 4000
+	ShellSpellings := 2
+	VisibleCalls := ShellSpellings * 3
+	AbsentCalls := ShellSpellings
+	TransitionCalls := VisibleCalls * 2 + VisibleCalls + AbsentCalls
+	SetupCalls := 2
+	ObserverMs := 3 * ViewWaitMs + (TransitionCalls + AbsentCalls + SetupCalls) * UiaTimeoutMs
+	return {UiaTimeoutMs: UiaTimeoutMs, ViewWaitMs: ViewWaitMs, ObserverMs: ObserverMs,
+		ChildMs: 15000 + 2 * ObserverMs}
+}
+
+
+/** Mutates only the public delegate filter, leaving its native baseline intact. */
+_NDT_MutateDelegatedFilter(ProbeSource, Replacement) {
+	for NativeOptions in ["35", '"M35"'] {
+		Boundary := 'Ui_FileSelect(' . NativeOptions . ', _NFPOwnedFile, "Navigation layer", "Owned files (*.txt)")'
+		Changed := 'Ui_FileSelect(' . NativeOptions . ', _NFPOwnedFile, "Navigation layer", "' . Replacement . '")'
+		ProbeSource := StrReplace(ProbeSource, Boundary, Changed, , &Mutations)
+		AssertEqual(1, Mutations, "each public delegate filter mutation has one exact call boundary")
+	}
+	return ProbeSource
 }
 
 
@@ -822,19 +883,23 @@ _NDT_CheckFilePickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
 	AssertEqual("file-picker-written", _NDT_RunChild(A_AhkPath,
 		["/ErrorStdOut", PickerHarness, PickerRoot], Ownership),
 		"the actual native file picker completes without hidden errors")
+	AssertEqual("String|", FileRead(PickerRoot . "\baseline.result", "UTF-8"),
+		"the independently observed direct native baseline cancels with its original String result")
+	AssertContains(FileRead(PickerRoot . "\baseline.types", "UTF-8"), "items=2,truncated=0,selected=1|",
+		"the direct native baseline contains exactly two filters and selects the first")
 	for Kind in ["selected", "cancelled"] {
 		AssertEqual(Spec.Expected, FileRead(PickerRoot . "\" . Kind . ".title", "UTF-8"),
 			"the real file picker caption follows independent policy " . Index)
-		; IFileDialog shows pszName separately from the pszSpec filter.
-		; The independent shell-view family proves the actual *.txt behavior.
-		AssertEqual("Owned files|All Files (*.*)|",
+		; Windows renders the native friendly name and pattern together.
+		; Compare exact native observations against the direct built-in baseline.
+		AssertEqual(FileRead(PickerRoot . "\baseline.filter", "UTF-8"),
 			FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"),
 			"the actual native picker retains the exact friendly labels (" . Kind
 				. ", policy " . Index . ", owned HWND control classes/IDs: "
 				. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8")
 				. "; owned file-type ComboBox items/selection: "
 				. FileRead(PickerRoot . "\" . Kind . ".types", "UTF-8") . ")")
-		AssertEqual("items=2,truncated=0,selected=1|1:Owned files|2:All Files (*.*)|choice:Owned files",
+		AssertEqual(FileRead(PickerRoot . "\baseline.types", "UTF-8"),
 			FileRead(PickerRoot . "\" . Kind . ".types", "UTF-8"),
 			"the owned native file-type control selects the supplied friendly name")
 	}

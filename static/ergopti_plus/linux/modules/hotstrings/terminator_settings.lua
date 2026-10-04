@@ -110,9 +110,10 @@ end
 --- @param reject function reject(path_segments, detail) for each unusable entry.
 --- @param mark function|nil Cleanup mark(...segments) for each kept entry.
 --- @return table settings { states = key -> boolean, custom = records }
+--- @return table admitted_indices Stored list positions owned by usable custom records.
 local function keep_usable(states, custom, reject, mark)
 	local shipped = builtins()
-	local settings, keys, chars = { states = {}, custom = {} }, {}, {}
+	local settings, keys, chars, admitted = { states = {}, custom = {} }, {}, {}, {}
 	for index, record in ipairs(custom or {}) do
 		local detail = custom_refusal(record, shipped, keys, chars)
 		if detail then
@@ -120,7 +121,7 @@ local function keep_usable(states, custom, reject, mark)
 			-- it, the usable ones included, to the cleanup.
 			reject({ CUSTOM_PATH[1], CUSTOM_PATH[2], index }, detail)
 		else
-			keys[record.key], chars[record.char] = true, true
+			keys[record.key], chars[record.char], admitted[index] = true, true, true
 			settings.custom[#settings.custom + 1] = { key = record.key, char = record.char, label = record.label,
 				consume = record.consume }
 		end
@@ -137,7 +138,7 @@ local function keep_usable(states, custom, reject, mark)
 			if mark then mark(path[1], path[2], path[3]) end
 		end
 	end
-	return settings
+	return settings, admitted
 end
 
 --- The default a delimiter has when config.toml says nothing about it.
@@ -164,6 +165,7 @@ local function file() return ConfigPaths.config("config.toml") end
 --- @param document table Decoded config.toml.
 --- @param mark function|nil Cleanup mark(...segments).
 --- @return table settings { states, custom }
+--- @return table admitted_indices Stored list positions owned by usable custom records.
 local function resolve(document, mark)
 	assert(type(document) == "table", "word-delimiter settings need a decoded configuration")
 	local hotstrings = ConfigOutdated.settings_table(document.hotstrings, { "hotstrings" }, Logger) or {}
@@ -399,10 +401,12 @@ local function plan(document, current, synced)
 	if not changed then return operations end
 	local stored = hotstrings.terminators
 	local listed = type(stored) == "table" and (next(stored) == nil or #stored > 0)
+	local _, admitted = resolve(document)
 	local list, placed = {}, {}
-	for _, entry in ipairs(listed and stored or {}) do
+	for index, entry in ipairs(listed and stored or {}) do
 		local key = type(entry) == "table" and entry.key or nil
-		if type(key) == "string" and was[key] then
+		if admitted[index] and type(key) == "string" and was[key] then
+			-- Only the occurrence admitted by the reader belongs to the catalogue.
 			-- A delimiter the catalogue holds: dropped if the menu removed it,
 			-- rewritten if the menu changed it, otherwise kept as written.
 			if now[key] and not placed[key] then
@@ -412,11 +416,27 @@ local function plan(document, current, synced)
 		else
 			-- An unusable record, or one added by hand since, stays as written.
 			list[#list + 1] = entry
-			if type(key) == "string" then placed[key] = true end
+			-- An unusable same-key record cannot hide its admitted neighbor.
+			if type(key) == "string" and not was[key] then placed[key] = true end
 		end
 	end
 	for _, record in ipairs(current.custom) do
 		if not placed[record.key] and not same_record(was[record.key], record) then list[#list + 1] = record end
+	end
+	-- Retaining a formerly unusable occurrence can hide a pending Add, either
+	-- by key or by character. Prove the delta against the real reader before
+	-- an empty plan acknowledges it or the writer publishes a masked record.
+	local candidate, candidate_hotstrings = {}, {}
+	for key, value in pairs(document) do candidate[key] = value end
+	for key, value in pairs(hotstrings) do candidate_hotstrings[key] = value end
+	candidate_hotstrings.terminators = list
+	candidate.hotstrings = candidate_hotstrings
+	local effective = by_key(resolve(candidate).custom)
+	for _, record in ipairs(current.custom) do
+		if not same_record(was[record.key], record) then
+			assert(same_record(effective[record.key], record),
+				"the pending custom delimiter is hidden by a retained record")
+		end
 	end
 	if #list == 0 then
 		if stored ~= nil then operations[#operations + 1] = { path = CUSTOM_PATH, delete = true } end

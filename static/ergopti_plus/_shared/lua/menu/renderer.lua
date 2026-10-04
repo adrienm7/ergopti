@@ -480,7 +480,7 @@ function M.new(deps)
 		local current_label = nil
 		for _, choice in ipairs(choices) do
 			local value = choice.value
-			local label = choice.label or i18n.get(choice.i18n)
+			local label = (choice.label_prefix or "") .. (choice.label or i18n.get(choice.i18n))
 			if current == value then
 				current_label = choice.current_i18n and i18n.get(choice.current_i18n) or label
 			end
@@ -515,6 +515,112 @@ function M.new(deps)
 			end
 		end
 		Logger.error(LOG, "Missing declared choice '%s.%s' — provider row refused.", manifest_key, row_id)
+		return nil
+	end
+
+	--- Builds the shared native shape for a declared command or checkbox.
+	--- @param item table Canonical declaration.
+	--- @param manifest_key string Owning menu declaration.
+	--- @param commands table Native command owners.
+	--- @param getters table Native state readers.
+	--- @return table|nil row
+	local function command_item(item, manifest_key, commands, getters)
+		local t = item.type
+		local row_id   = type(item.id) == "string" and item.id or ""
+		local i18n_key = type(item.i18n) == "string" and item.i18n or ""
+		-- `command` defaults to the id, because the two are the same name in
+		-- every case so far and repeating it is a second thing to get wrong.
+		local cmd_id = type(item.command) == "string" and item.command or row_id
+		local fn     = commands[cmd_id]
+
+		if row_id == "" or i18n_key == "" then
+			Logger.warn(LOG, "'%s' item missing id or i18n in '%s' — skipped.", t, manifest_key)
+			return nil
+		end
+		if type(fn) ~= "function" then
+			-- Same class as the "action" branch: a declared row whose command
+			-- the driver never registered renders one item short, permanently
+			-- and undetected.
+			Logger.warn(LOG, "No command '%s' registered for '%s.%s' — item skipped.",
+				tostring(cmd_id), manifest_key, row_id)
+			return nil
+		end
+
+		local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
+		-- Greyed by `disabled_when` with the reason it declares, the row is
+		-- drawn as the same stand-in as a row this platform has not yet
+		-- ported, « label — head of the reason », with nothing to run: the
+		-- two differ only in how the condition is evaluated.
+		if disabled and type(item.disabled_reason_key) == "string" then
+			return greyed_stand_in(manifest_key,
+				{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
+		end
+		local built = {
+			title    = i18n.get(i18n_key),
+			fn       = fn,
+			disabled = disabled or nil,
+		}
+		-- Only "check" carries a tick. A "command" is a plain action row, and
+		-- giving it `checked = false` would draw an empty checkbox next to a
+		-- row that toggles nothing.
+		if t == "check" then
+			built.checked = R.resolve_checked_when(manifest_key, row_id, getters)
+		end
+		return built
+
+	end
+
+	--- Supplies a declared command as provider data through the same row policy.
+	--- A retained provider callback rechecks its declaration before delivery.
+	--- @param manifest_key string Owning menu declaration.
+	--- @param row_id string Declared command identity.
+	--- @param commands table Native command owners.
+	--- @param getters table Native state readers.
+	--- @return table|nil row
+	function R.command_row(manifest_key, row_id, commands, getters)
+		commands, getters = commands or {}, getters or {}
+		for _, item in ipairs(get_menu_def(manifest_key)) do
+			if item.type == "command" and item.id == row_id and is_for_platform(item) then
+				local built = command_item(item, manifest_key, commands, getters)
+				if not built then return nil end
+				local action = built.fn
+				return {
+					label = built.title, disabled = built.disabled,
+					action = type(action) == "function" and function(...)
+						if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
+						return action(...)
+					end or nil,
+				}
+			end
+		end
+		Logger.error(LOG, "Missing declared command '%s.%s' — provider row refused.", manifest_key, row_id)
+		return nil
+	end
+
+	--- Supplies a declared checkbox as provider data through the shared policy.
+	--- A retained callback rechecks its declared readiness before delivery.
+	--- @param manifest_key string Owning menu declaration.
+	--- @param row_id string Declared checkbox identity.
+	--- @param commands table Native mutation owners.
+	--- @param getters table Native state readers.
+	--- @return table|nil row
+	function R.check_row(manifest_key, row_id, commands, getters)
+		commands, getters = commands or {}, getters or {}
+		for _, item in ipairs(get_menu_def(manifest_key)) do
+			if item.type == "check" and item.id == row_id and is_for_platform(item) then
+				local built = command_item(item, manifest_key, commands, getters)
+				if not built then return nil end
+				local action = built.fn
+				return {
+					label = built.title, checked = built.checked, disabled = built.disabled,
+					action = type(action) == "function" and function(...)
+						if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
+						return action(...)
+					end or nil,
+				}
+			end
+		end
+		Logger.error(LOG, "Missing declared checkbox '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
 	end
 
@@ -764,54 +870,12 @@ function M.new(deps)
 				-- function per BEHAVIOUR rather than one builder per row. A row that
 				-- reads the same on three drivers is the point; a shared renderer that
 				-- cannot build a checkbox was never going to deliver it.
-				local row_id   = type(item.id) == "string" and item.id or ""
-				local i18n_key = type(item.i18n) == "string" and item.i18n or ""
-				-- `command` defaults to the id, because the two are the same name in
-				-- every case so far and repeating it is a second thing to get wrong.
-				local cmd_id = type(item.command) == "string" and item.command or row_id
-				local fn     = commands[cmd_id]
-
-				if row_id == "" or i18n_key == "" then
-					Logger.warn(LOG, "'%s' item missing id or i18n in '%s' — skipped.", t, manifest_key)
-					goto continue
+				local built = command_item(item, manifest_key, commands, getters)
+				if built then
+					flush_sep()
+					table.insert(result, built)
+					item_count = item_count + 1
 				end
-				if type(fn) ~= "function" then
-					-- Same class as the "action" branch: a declared row whose command
-					-- the driver never registered renders one item short, permanently
-					-- and undetected.
-					Logger.warn(LOG, "No command '%s' registered for '%s.%s' — item skipped.",
-						tostring(cmd_id), manifest_key, row_id)
-					goto continue
-				end
-
-				flush_sep()
-				local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
-				-- Greyed by `disabled_when` with the reason it declares, the row is
-				-- drawn as the same stand-in as a row this platform has not yet
-				-- ported, « label — head of the reason », with nothing to run: the
-				-- two differ only in how the condition is evaluated.
-				if disabled and type(item.disabled_reason_key) == "string" then
-					local stand_in = greyed_stand_in(manifest_key,
-						{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
-					if stand_in then
-						table.insert(result, stand_in)
-						item_count = item_count + 1
-					end
-					goto continue
-				end
-				local built = {
-					title    = i18n.get(i18n_key),
-					fn       = fn,
-					disabled = disabled or nil,
-				}
-				-- Only "check" carries a tick. A "command" is a plain action row, and
-				-- giving it `checked = false` would draw an empty checkbox next to a
-				-- row that toggles nothing.
-				if t == "check" then
-					built.checked = R.resolve_checked_when(manifest_key, row_id, getters)
-				end
-				table.insert(result, built)
-				item_count = item_count + 1
 
 			elseif t == "choice" then
 				local row = choice_row_data(item, manifest_key, commands, getters)

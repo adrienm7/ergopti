@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Quitar Ergopti de Karabiner",
 	"menu.global.restore_touchpad_gestures": "Restaurar los gestos del panel táctil de Windows",
 	"dialog.start_at_login.failed": "No se pudo cambiar el inicio automático. Revise los ajustes de inicio del sistema.",
-	"onboarding.error.open_failed": "No se pudo abrir el asistente de configuración. Revise los registros e inténtelo de nuevo desde el menú."
+	"onboarding.error.open_failed": "No se pudo abrir el asistente de configuración. Revise los registros e inténtelo de nuevo desde el menú.",
+	"platform_reason.token_streaming_transport_missing": "No en Windows: Windows todavía no puede mostrar las sugerencias token por token. Esta opción permanece inactiva.",
+	"menu.layout.number_row": "Fila de números",
+	"menu.layout.number_row_native": "Orden nativo",
+	"menu.layout.number_row_digits": "Números primero",
+	"menu.layout.number_row_symbols": "Símbolos primero",
+	"platform_reason.number_row_override_unsupported": "No compatible: Este controlador conserva la fila nativa del sistema; no permite forzar números ni símbolos.",
+	"platform_reason.number_row_source_unavailable": "No disponible: Símbolos primero requiere una distribución emulada activa con niveles válidos de números y símbolos en cada posición de la fila."
 }

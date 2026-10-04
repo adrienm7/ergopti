@@ -19,7 +19,7 @@ Verify before you trust anything here, and rewrite it when you find it wrong.
 
 ## What still holds
 
-### CI runs LuaJIT — luv and lfs are absent
+### CI runs LuaJIT and exercises both event backends
 
 `npm run test:linux` probes `luajit`, then `lua5.4`, then `lua`. Develop against
 5.4 locally and you are not testing what gates the merge.
@@ -32,8 +32,10 @@ Verify before you trust anything here, and rewrite it when you find it wrong.
   this reason. A `&` compiles fine on 5.4 and is a syntax error in CI.
 - **`os.execute` return type.** 5.1/LuaJIT return a number, 5.2+ return `true`.
   Every call site must accept both (`result == true or result == 0`).
-- **`luv` is not installed**, so `sleep_ms` always takes the forked-`/bin/sleep`
-  fallback in CI. **`lfs` is not installed**, so test discovery shells out.
+- **The unit lane installs `luv`** and admits its real event-loop and file-event
+  integrations. Polling tests explicitly load the dependency as absent, so
+  installed libraries cannot silently change the branch under test. **`lfs`
+  remains optional**, so test discovery can still shell out.
 - Plain `lua5.1` is not viable: `goto` is 5.2+.
 
 ### A `local` declared after the function that reads it is a nil global

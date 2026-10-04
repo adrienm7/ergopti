@@ -2060,17 +2060,18 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 ; Enforces one monotonic wall-clock budget for the entire hidden download
 ; process. This is independent from HttpWebRequest's per-operation timeouts.
 _Updater_EnforceDownloadDeadline(NowTick := unset, RebuildMenu := true,
-	NotifyFn := 0) {
+	NotifyFn := 0, CancelFn := _Updater_CancelSelfUpdateTransaction) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick
 	global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
 	if !_UpdaterDownloadInProgress or !_UpdaterDownloadStartedTick
 		return false
+	StartedTick := _UpdaterDownloadStartedTick
 	if !IsSet(NowTick)
 		NowTick := A_TickCount
-	if !TickExpired(_UpdaterDownloadStartedTick,
+	if !TickExpired64(StartedTick,
 		UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, NowTick)
 		return false
-	if !_Updater_CancelSelfUpdateTransaction(
+	if !CancelFn.Call(
 		"Update download exceeded its absolute wall-clock deadline.",
 		RebuildMenu, false)
 		return false
@@ -2900,75 +2901,80 @@ _Updater_PublishExitIntent(TransactionId, Owner) {
 	}
 }
 
-_Updater_PollSwapHandshake(TransactionId) {
+_Updater_PollSwapHandshake(TransactionId, NowTick := unset,
+	WaitFn := _Updater_WaitSwapOwnerHandleState,
+	FailFn := _Updater_FailSwapTransaction, ArmFn := _Updater_ArmSwapHandshakePoll,
+	SetEventFn := _Updater_SetSwapOwnerEvent) {
 	global UPDATER_SWAP_READY_TIMEOUT_MS, UPDATER_SWAP_ACK_TIMEOUT_MS
 	Owner := _Updater_CurrentSwapOwner(TransactionId)
 	if !(Owner is Map)
 		return
 	if A_IsSuspended {
-		_Updater_FailSwapTransaction(TransactionId,
+		FailFn.Call(TransactionId,
 			"the driver was suspended before the swap handshake completed")
 		return
 	}
-	ProcessState := _Updater_WaitSwapOwnerHandleState(Owner, "ProcessHandle")
+	ProcessState := WaitFn.Call(Owner, "ProcessHandle")
 	if (ProcessState != 0) {
-		_Updater_FailSwapTransaction(TransactionId,
+		FailFn.Call(TransactionId,
 			ProcessState == 1 ? "the swap worker exited before ownership transfer"
 				: "the exact swap-worker process handle could not be queried")
 		return
 	}
 	Phase := Owner.Get("Phase", "")
 	if (Phase == "AwaitReady") {
-		ReadyState := _Updater_WaitSwapOwnerHandleState(Owner, "ReadyHandle")
+		ReadyState := WaitFn.Call(Owner, "ReadyHandle")
 		if (ReadyState < 0) {
-			_Updater_FailSwapTransaction(TransactionId, "the Ready event could not be queried")
+			FailFn.Call(TransactionId, "the Ready event could not be queried")
 			return
 		}
 		if (ReadyState == 0) {
-			if TickExpired(Owner.Get("PhaseStartedTick", A_TickCount),
-				UPDATER_SWAP_READY_TIMEOUT_MS) {
-				_Updater_FailSwapTransaction(TransactionId, "the Ready event timed out")
+			PhaseStartedTick := Owner.Get("PhaseStartedTick", A_TickCount)
+			if TickExpired64(PhaseStartedTick,
+				UPDATER_SWAP_READY_TIMEOUT_MS, NowTick?) {
+				FailFn.Call(TransactionId, "the Ready event timed out")
 				return
 			}
-			_Updater_ArmSwapHandshakePoll(TransactionId)
+			ArmFn.Call(TransactionId)
 			return
 		}
-		if !_Updater_SetSwapOwnerEvent(Owner, "CommitHandle") {
-			_Updater_FailSwapTransaction(TransactionId, "the Commit event could not be signaled")
+		if !SetEventFn.Call(Owner, "CommitHandle") {
+			FailFn.Call(TransactionId, "the Commit event could not be signaled")
 			return
 		}
 		if !_Updater_SetSwapPhase(TransactionId, "AwaitAck")
 			return
-		_Updater_ArmSwapHandshakePoll(TransactionId)
+		ArmFn.Call(TransactionId)
 		return
 	}
 	if (Phase != "AwaitAck") {
-		_Updater_FailSwapTransaction(TransactionId, "the swap handshake entered an invalid phase")
+		FailFn.Call(TransactionId, "the swap handshake entered an invalid phase")
 		return
 	}
-	AckState := _Updater_WaitSwapOwnerHandleState(Owner, "AckHandle")
+	AckState := WaitFn.Call(Owner, "AckHandle")
 	if (AckState < 0) {
-		_Updater_FailSwapTransaction(TransactionId, "the Ack event could not be queried")
+		FailFn.Call(TransactionId, "the Ack event could not be queried")
 		return
 	}
 	if (AckState == 0) {
-		if TickExpired(Owner.Get("PhaseStartedTick", A_TickCount),
-			UPDATER_SWAP_ACK_TIMEOUT_MS) {
-			_Updater_FailSwapTransaction(TransactionId, "the Ack event timed out")
+		PhaseStartedTick := Owner.Get("PhaseStartedTick", A_TickCount)
+		if TickExpired64(PhaseStartedTick,
+			UPDATER_SWAP_ACK_TIMEOUT_MS, NowTick?) {
+			FailFn.Call(TransactionId, "the Ack event timed out")
 			return
 		}
-		_Updater_ArmSwapHandshakePoll(TransactionId)
+		ArmFn.Call(TransactionId)
 		return
 	}
 	; Ack is only authority to request shutdown while the exact child remains
 	; alive. The OnExit handler performs the same check again immediately before
 	; publishing FinalExit and once more before ownership transfer.
-	if (_Updater_WaitSwapOwnerHandleState(Owner, "ProcessHandle") != 0) {
-		_Updater_FailSwapTransaction(TransactionId, "the swap worker died after Ack")
+	if (WaitFn.Call(Owner, "ProcessHandle") != 0) {
+		FailFn.Call(TransactionId, "the swap worker died after Ack")
 		return
 	}
 	if !_Updater_PublishExitIntent(TransactionId, Owner) {
-		_Updater_FailSwapTransaction(TransactionId, "the updater exit intent could not be published atomically")
+		FailFn.Call(TransactionId, "the updater exit intent could not be published atomically")
 		return
 	}
 	try LoggerInfo("Updater", "Swap worker transaction {1} acknowledged commit; requesting guarded shutdown.", TransactionId)

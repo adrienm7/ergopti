@@ -128,6 +128,7 @@ graph TD
         WINDOWS_network_info["NetworkInfo.ahk"]
         WINDOWS_notifier["Notifier.ahk"]
         WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
+        WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
         WINDOWS_shell_runner["ShellRunner.ahk"]
         WINDOWS_storage["Storage.ahk"]

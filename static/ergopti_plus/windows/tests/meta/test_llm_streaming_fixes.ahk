@@ -133,7 +133,7 @@ _AHK011_EffectiveStreamingOwnsEveryWindowsBoundary() {
 		["_LLM_Menu_RestoreSavedOptsOnce", "saved-state restore"],
 		["LLM_Menu_ToggleBool", "menu mutation"],
 		["_LLM_Menu_ApplyBackendCommitted", "backend transition"],
-		["_LLM_Menu_DisplayRows", "visible menu state"]
+		["LLM_Menu_BuildDisplayMenu", "visible menu state"]
 	]
 	for Boundary in Boundaries {
 		Body := _DriverFuncBody(Boundary[1])
@@ -142,6 +142,58 @@ _AHK011_EffectiveStreamingOwnsEveryWindowsBoundary() {
 		AssertContains(Body, HelperName . "(",
 			Boundary[2] . " must consume the one effective streaming policy")
 	}
+	DisplayBody := _DriverFuncBody("LLM_Menu_BuildDisplayMenu")
+	RowsBody := _DriverFuncBody("_LLM_Menu_DisplayRows")
+	SnapshotBody := _DriverFuncBody("_LLM_Menu_StreamingSnapshot")
+	CommandBody := _DriverFuncBody("_LLM_Menu_StreamingCommand")
+	Assert(RowsBody != "" && SnapshotBody != "" && CommandBody != "",
+		"shared row providers and native admission owners must remain discoverable")
+	AssertContains(DisplayBody, 'MenuRenderer_Build("llm_display_menu"',
+		"visible streaming must project the actual shared menu declaration")
+	AssertContains(DisplayBody, '"llm_token_streaming_enabled", (*) => LLM_EffectiveStreaming(',
+		"the shared checkbox binds the actual effective native transport policy")
+	AssertContains(DisplayBody, '"llm_token_streaming_ready", (*) => LLM_DisplayStreamingReady(StreamingSource)',
+		"the shared row binds acknowledged native owner availability")
+	AssertContains(DisplayBody, '"llm_token_streaming", (*) => _LLM_Menu_StreamingCommand(StreamingSource, StreamingCommand)',
+		"a retained shared row dispatches through its captured native owner")
+	AssertContains(DisplayBody, 'StreamingCommand := (*) => LLM_Menu_ToggleBool("streaming")',
+		"an admitted command retains the existing acknowledged settings transaction")
+	AssertContains(CommandBody, "LLM_DisplayStreamingIntent(Expected, _LLM_Menu_StreamingSnapshot())",
+		"the actual command compares its captured and current owner before mutation")
+	GuardPosition := InStr(CommandBody, 'if !Decision["admitted"]')
+	CallPosition := InStr(CommandBody, "Command.Call()")
+	Assert(GuardPosition > 0 && CallPosition > GuardPosition
+		&& InStr(SubStr(CommandBody, GuardPosition, CallPosition - GuardPosition), "return false") > 0,
+		"a refused native owner must return before invoking the acknowledged command")
+	AssertContains(SnapshotBody, "!IsSet(_LLM_Engine)",
+		"an unset engine must remain unavailable without reading it")
+	AssertContains(SnapshotBody, "!(_LLM_Engine is Map)",
+		"non-map runtime owners must remain unavailable")
+	for Key in ["backend", "enabled"] {
+		HasPosition := InStr(SnapshotBody, '!_LLM_Engine.Has("' . Key . '")')
+		ReadPosition := InStr(SnapshotBody, '_LLM_Engine["' . Key . '"]')
+		Assert(HasPosition > 0 && ReadPosition > HasPosition,
+			"an incomplete engine must be refused before reading " . Key)
+	}
+	Assert(InStr(RowsBody, '"llm_token_streaming"') = 0
+		&& InStr(RowsBody, 't("menu.llm.show_streaming")') = 0
+		&& InStr(RowsBody, 'LLM_Menu_ToggleBool("streaming")') = 0,
+		"native row providers must not duplicate or bypass the shared streaming declaration")
+	Matches := 0
+	for Row in _MR_GetManifestRoot()["llm_display_menu"] {
+		if Row.Get("id", "") != "llm_token_streaming"
+			continue
+		Matches += 1
+		AssertEqual("check", Row["type"])
+		AssertEqual("menu.llm.show_streaming", Row["i18n"])
+		AssertEqual(1, Row["checked_when"].Length)
+		AssertEqual("llm_token_streaming_enabled", Row["checked_when"][1])
+		AssertEqual(1, Row["disabled_when"].Length)
+		AssertEqual("llm_token_streaming_ready", Row["disabled_when"][1])
+		AssertEqual("grey", Row["unavailable"])
+		AssertEqual("platform_reason.token_streaming_transport_missing", Row["reason_key"])
+	}
+	AssertEqual(1, Matches, "exactly one authoritative shared declaration owns the visible streaming row")
 	DispatchBody := _DriverFuncBody("LLM_Engine_FirePrediction")
 	Assert(InStr(DispatchBody, "streaming_enabled := false") = 0,
 		"backend branches must not silently override the published setting")

@@ -246,12 +246,136 @@ helpers.describe("macOS captured About channel states", function()
 			local rows, catalogue = build(owner)
 			local row = picker(rows, catalogue)
 			local ok, result = pcall(row.menu[2].fn)
-			helpers.assert_eq(ok, refusal ~= "throw")
-			if ok then helpers.assert_eq(result, nil, "the existing Mac callback returns no mutation receipt") end
+			helpers.assert_eq(ok, true, "the channel callback protects native owner exceptions")
+			helpers.assert_eq(result, false, "a refused native owner never acknowledges the callback")
 			helpers.assert_eq(requests, { "dev" })
 			helpers.assert_eq(owner.get(), "main", "refusal must not publish a guessed preference")
 			local rebuilt, translated = build(owner)
 			helpers.assert_eq(picker(rebuilt, translated).title, channel_corpus().locales.fr.captions[1])
 		end
+	end)
+end)
+
+
+helpers.describe("macOS About channel durable receipts", function()
+	for _, outcome in ipairs({"false", "nil", "number", "throw"}) do
+		helpers.it("protects exact owner refusal and preserves the current channel (channel-ack " .. outcome .. ")", function()
+			local owner, calls = fake_owner("main")
+			owner.set = function(id)
+				calls[#calls + 1] = id
+				if outcome == "throw" then error("The channel owner refused.") end
+				if outcome == "number" then return 2 end
+				if outcome == "false" then return false end
+				return nil
+			end
+			local rows, catalogue = build(owner)
+			local ok, accepted = pcall(picker(rows, catalogue).menu[2].fn)
+			helpers.assert_eq(ok, true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(calls, {"dev"})
+			helpers.assert_eq(owner.get(), "main")
+		end)
+	end
+
+	for _, outcome in ipairs({"false", "nil", "number", "throw"}) do
+		helpers.it("retries the actual durable owner only after a refused write (channel-ack durable " .. outcome .. ")", function()
+			local names = {"modules.updater.channel", "adapters.update_launcher"}
+			local previous = {}
+			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+			local writer = require("toml_codec.writer")
+			local real_write = writer.batch_write
+			local path = os.tmpname()
+			local original = "[updater]\nchannel = \"main\"\nfuture_channel_option = 42\n"
+			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
+			local writes, publications, launcher_calls = 0, 0, 0
+			local refusing = true
+			local state = {update_channel = "main"}
+			local ok, detail = xpcall(function()
+				package.loaded["adapters.update_launcher"] = {select_channel = function()
+					launcher_calls = launcher_calls + 1; return true
+				end}
+				package.loaded["modules.updater.channel"] = nil
+				local owner = require("modules.updater.channel").new({state = state, save = function()
+					writes = writes + 1
+					if refusing then
+						if outcome == "throw" then error("The durable writer refused.") end
+						if outcome == "number" then return 2 end
+						if outcome == "false" then return false end
+						return nil
+					end
+					return real_write(path, {{section = "updater", key = "channel", value = state.update_channel}})
+				end})
+				owner.subscribe("receipt-test", function() publications = publications + 1 end)
+				local rows, catalogue = build(owner)
+				local held = picker(rows, catalogue).menu[2].fn
+				local accepted = held()
+				local before = assert(io.open(path, "rb")); local bytes = before:read("*a"); assert(before:close())
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(bytes, original)
+				helpers.assert_eq(state.update_channel, "main")
+				helpers.assert_eq(owner.get(), "main")
+				helpers.assert_eq(publications, 0)
+				helpers.assert_eq(launcher_calls, 0)
+				helpers.assert_eq(writes, 1)
+				refusing = false
+				helpers.assert_eq(held(), true)
+				local after = assert(io.open(path, "rb")); local committed = after:read("*a"); assert(after:close())
+				helpers.assert_true(committed:find('channel = "dev"', 1, true) ~= nil)
+				helpers.assert_true(committed:find("future_channel_option = 42", 1, true) ~= nil)
+				helpers.assert_eq(owner.get(), "dev")
+				helpers.assert_eq(publications, 1)
+				helpers.assert_eq(writes, 2)
+				helpers.assert_eq(held(), true)
+				helpers.assert_eq(writes, 2, "the native owner acknowledges the already durable absolute selection")
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+			os.remove(path)
+			if not ok then error(detail, 0) end
+		end)
+	end
+end)
+
+
+helpers.describe("macOS About channel post-publication refusal", function()
+	helpers.it("does not manufacture a rollback when a packaged observer raises after the durable ACK (channel-ack post-publication)", function()
+		local names = {"modules.updater.channel", "adapters.update_launcher"}
+		local previous = {}
+		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local updater = require("modules.updater")
+		local previous_source = updater.is_local_source
+		local writer = require("toml_codec.writer")
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb"))
+		assert(file:write('[updater]\nchannel = "main"\nfuture_channel_option = 42\n')); assert(file:close())
+		local state = {update_channel = "main"}
+		local writes, deliveries, heard = 0, 0, 0
+		local ok, detail = xpcall(function()
+			updater.is_local_source = function() return false end
+			package.loaded["adapters.update_launcher"] = {select_channel = function()
+				deliveries = deliveries + 1
+				error("The packaged observer raised after publication.")
+			end}
+			package.loaded["modules.updater.channel"] = nil
+			local owner = require("modules.updater.channel").new({state = state, save = function()
+				writes = writes + 1
+				return writer.batch_write(path, {{section = "updater", key = "channel", value = state.update_channel}})
+			end})
+			owner.subscribe("receipt-test", function() heard = heard + 1 end)
+			local rows, catalogue = build(owner)
+			local protected, accepted = pcall(picker(rows, catalogue).menu[2].fn)
+			local saved = assert(io.open(path, "rb")); local bytes = saved:read("*a"); assert(saved:close())
+			helpers.assert_eq(protected, true)
+			helpers.assert_eq(accepted, false, "an incomplete native return is not an acknowledged callback")
+			helpers.assert_eq(writes, 1)
+			helpers.assert_eq(deliveries, 1)
+			helpers.assert_eq(heard, 0)
+			helpers.assert_eq(owner.get(), "dev", "the callback does not borrow inverse publication authority")
+			helpers.assert_true(bytes:find('channel = "dev"', 1, true) ~= nil)
+			helpers.assert_true(bytes:find("future_channel_option = 42", 1, true) ~= nil)
+		end, debug.traceback)
+		updater.is_local_source = previous_source
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		os.remove(path)
+		if not ok then error(detail, 0) end
 	end)
 end)

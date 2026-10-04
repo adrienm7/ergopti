@@ -63,6 +63,7 @@ local ResponseClassifier = require("modules.llm.remote_response_classifier")
 local Formats        = require("llm.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
+local AuthPolicy     = require("llm.local_server_auth")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -300,6 +301,7 @@ register_local_servers()
 function M.is_local_server(provider_id)
 	local provider = type(provider_id) == "string" and M.PROVIDERS[provider_id] or nil
 	return type(provider) == "table" and provider.local_server == true
+		and AuthPolicy.token_allowed(provider_id, "", LocalServers.SERVERS)
 end
 
 --- Tells whether an entry cannot be sent without a key: every provider needs
@@ -307,8 +309,9 @@ end
 --- @param entry table API entry.
 --- @return boolean missing
 local function key_missing(entry)
-	if M.is_local_server(entry.provider) then return false end
-	return type(entry.token) ~= "string" or entry.token == ""
+	if type(entry) ~= "table" then return true end
+	local servers = M.is_local_server(entry.provider) and LocalServers.SERVERS or {}
+	return not AuthPolicy.token_allowed(entry.provider, entry.token, servers)
 end
 
 --- Lists the providers that serve one use (modules/llm/provider_uses.lua), in
@@ -2835,7 +2838,7 @@ function M.detect_local_servers(on_done)
 	for _, id in ipairs(LocalServers.ORDER) do
 		if M.is_local_server(id) then targets[#targets + 1] = M.local_server_target(id) end
 	end
-	return LocalServers.sweep(targets, function(target, settle)
+	return LocalServers.sweep(targets, function(target, settle, ticket)
 		local base, reason = normalize_base_url(target.base_url)
 		if not base then
 			Logger.warn(LOG, "Local server '%s' has an invalid address: %s.", target.id, reason)
@@ -2847,11 +2850,26 @@ function M.detect_local_servers(on_done)
 			client = _http_adapter.new({ timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms") })
 			_local_probe_clients[target.id] = client
 		end
+		-- The ticket fences logical supersession, not native task retirement.
+		-- Compare the live settings owner as well: these are its current in-memory
+		-- entry/pending fields, not a fresh private-file read or a disk lease.
+		local function target_is_current()
+			if ticket.is_current() ~= true or not M.is_local_server(target.id) then return false end
+			local current = M.local_server_target(target.id)
+			return current.id == target.id and current.base_url == target.base_url and current.token == target.token
+		end
 		local function probe(token)
-			return dispatch_probe(client, base, "openai", token, settle)
+			if not target_is_current() then return false end
+			return dispatch_probe(client, base, "openai", token, function(response)
+				if target_is_current() then settle(response) else settle(nil) end
+			end)
 		end
 		if target.token == "" then return probe("") end
 		TokenCrypto.decrypt_async(target.token, function(decrypted, token, token_reason)
+			-- Held credentials from an older generation must not acquire the
+			-- same HTTP client and cancel a newer request. Changed live settings
+			-- settle this current target as unavailable until its next search.
+			if not target_is_current() then settle(nil); return end
 			if decrypted ~= true or type(token) ~= "string" or token == "" then
 				Logger.warn(LOG, "Local server '%s' key is unreadable: %s.", target.id, tostring(token_reason))
 				-- Probed without its key, the server says whether it wants one

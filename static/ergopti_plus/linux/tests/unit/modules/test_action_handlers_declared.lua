@@ -690,6 +690,10 @@ helpers.describe("linux actions: media and brightness keys", function()
 			local commands, pressed = run(action, true, true)
 			helpers.assert_eq(#commands, 1, action .. " runs " .. media.tool .. " alone")
 			helpers.assert_contains(commands[1], media.tool)
+			if action == "brightness_up" or action == "brightness_down" then
+				helpers.assert_contains(commands[1], "brightnessctl --class=backlight set ",
+					"a screen brightness request may never select keyboard LEDs")
+			end
 			helpers.assert_nil(commands[1]:find("xdotool", 1, true), action .. ": " .. commands[1])
 			helpers.assert_eq(pressed, {}, action .. ": the tool worked, no keystroke on top")
 		end

@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Retirer Ergopti de Karabiner",
 	"menu.global.restore_touchpad_gestures": "Restaurer les gestes du pavé tactile Windows",
 	"dialog.start_at_login.failed": "Impossible de modifier le démarrage automatique. Vérifiez les réglages de démarrage du système.",
-	"onboarding.error.open_failed": "L’assistant de configuration n’a pas pu s’ouvrir. Consultez les journaux, puis réessayez depuis le menu."
+	"onboarding.error.open_failed": "L’assistant de configuration n’a pas pu s’ouvrir. Consultez les journaux, puis réessayez depuis le menu.",
+	"platform_reason.token_streaming_transport_missing": "Pas sous Windows: Windows ne peut pas encore afficher les suggestions jeton par jeton. Cette option reste inactive.",
+	"menu.layout.number_row": "Rangée des chiffres",
+	"menu.layout.number_row_native": "Ordre natif",
+	"menu.layout.number_row_digits": "Chiffres en premier",
+	"menu.layout.number_row_symbols": "Symboles en premier",
+	"platform_reason.number_row_override_unsupported": "Non pris en charge: Ce pilote conserve la rangée native du système ; les chiffres et symboles forcés sont indisponibles.",
+	"platform_reason.number_row_source_unavailable": "Indisponible: Les symboles en premier nécessitent une disposition émulée active avec des niveaux chiffre et symbole valides sur toute la rangée."
 }

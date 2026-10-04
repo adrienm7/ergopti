@@ -36,6 +36,7 @@
 ; no counterpart in _shared/core/ports/ — it wraps Windows-only process spawning.
 ; ==============================================================================
 
+#Include ../infra/tick_count.ahk
 
 
 
@@ -2624,21 +2625,23 @@ _SR_CaptureRemove(Capture, DeleteFn := 0) {
 ; removal are DEBUG. A lock outliving the budget is WARN, once: the next
 ; process's sweep recovers the folder, but a handle held that long needs a look.
 ; ERROR stays for the refusals no foreign handle explains.
-_SR_CaptureSettle(Claim, Refusal, Owner) {
+_SR_CaptureSettle(Claim, Refusal, Owner, NowTick := unset) {
+	if !IsSet(NowTick)
+		NowTick := A_TickCount
 	if !Refusal {
 		if Claim.Has("CaptureLockSince")
 			_SR_LogAt("Debug", "{1} capture removed {2} ms after another process first held it (Win32 {3}).",
-				Owner, A_TickCount - Claim["CaptureLockSince"], Claim["CaptureLockCode"])
+				Owner, TickElapsed64(Claim["CaptureLockSince"], NowTick), Claim["CaptureLockCode"])
 		return "done"
 	}
 	if !Claim.Has("CaptureLockSince") {
-		Claim["CaptureLockSince"] := A_TickCount
+		Claim["CaptureLockSince"] := NowTick
 		Claim["CaptureLockCode"] := Refusal
 		_SR_LogAt("Debug", "{1} capture is held by another process (Win32 {2}); retrying its removal for up to {3} ms.",
 			Owner, Refusal, SR_CAPTURE_LOCK_BUDGET_MS)
 		return "retry"
 	}
-	local held_ms := A_TickCount - Claim["CaptureLockSince"]
+	local held_ms := TickElapsed64(Claim["CaptureLockSince"], NowTick)
 	if held_ms < SR_CAPTURE_LOCK_BUDGET_MS
 		return "retry"
 	local capture_dir := Claim.Get("CaptureDir", "")

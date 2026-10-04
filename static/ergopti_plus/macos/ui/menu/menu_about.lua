@@ -112,32 +112,30 @@ local function channel_picker(owner, subscribed)
 	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
 		update_channel = function(id)
 			Logger.info(LOG, "User chose the update channel '%s'.", id)
-			owner.set(id)
+			local ok, committed = pcall(owner.set, id)
+			return ok and committed == true
 		end,
 	}, { ["updater.channel"] = function() return subscribed end })
 end
 
 --- The check-frequency picker: one row per shared preset, ticked on the
 --- interval in force, whose click persists through the automatic-check owner.
---- @param checks table The menu session's automatic-check owner.
+--- @param checks table|nil The menu session's automatic-check owner.
+--- @param stored_seconds number|nil A source run's snapped interval, without an owner.
 --- @return table row A provider row with its items.
-local function frequency_picker(checks)
-	local current = checks.interval_code()
-	local rows = {}
-	for _, preset in ipairs(checks.presets()) do
-		rows[#rows + 1] = {
-			label = i18n.get("menu.about.frequency." .. preset.code),
-			checked = preset.code == current,
-			action = function()
-				Logger.info(LOG, "User chose the check frequency '%s'.", preset.code)
-				checks.set_interval(preset.seconds)
-			end,
-		}
-	end
-	return {
-		label = i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. current),
-		items = rows,
-	}
+local function frequency_picker(checks, stored_seconds)
+	return ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval", {
+		update_check_interval = function(seconds)
+			if type(checks) ~= "table" then return false end
+			Logger.info(LOG, "User chose the check interval %ds.", seconds)
+			return checks.set_interval(seconds) == true
+		end,
+	}, {
+		["updater.check_interval_seconds"] = function()
+			if stored_seconds ~= nil then return stored_seconds end
+			return checks.interval()
+		end,
+	})
 end
 
 
@@ -224,14 +222,16 @@ function M.build(ctx, actions)
 		-- nothing. The two rows are still drawn, greyed with the reason: left
 		-- out, nobody could tell whether the automatic update exists.
 		local state = type(ctx) == "table" and type(ctx.state) == "table" and ctx.state or {}
-		local code = require("modules.updater.auto_check").stored_interval_code(state)
-		for _, label in ipairs({
-			i18n.get("menu.about.check_for_updates"),
-			i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. code),
-		}) do
-			table.insert(menu_items, { label = label, disabled = true,
-				disabled_reason_key = "menu.about.source_run_reason" })
-		end
+		local seconds = require("modules.updater.auto_check").stored_interval(state)
+		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+			["about_source_check"] = function() return false end,
+		}, { ["about_source_release_ready"] = function() return not local_src end })
+		if source_row then table.insert(menu_items, source_row) end
+		local frequency_row = frequency_picker(nil, seconds)
+		frequency_row.items = nil
+		frequency_row.disabled = true
+		frequency_row.disabled_reason_key = "menu.about.source_run_reason"
+		table.insert(menu_items, frequency_row)
 	end
 
 	-- The updater block above is the manifest's `about_updates` list; the rows

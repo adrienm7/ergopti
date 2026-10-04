@@ -232,6 +232,7 @@
 			"id": "streaming_multi",
 			"ahk": {
 				"tray_key": "show_all_at_once",
+				"persisted_sample": true,
 				"features": ["display", "streaming_multi"],
 				"section": "llm.display",
 				"key": "streaming_multi",

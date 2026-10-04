@@ -183,7 +183,7 @@ function M.new(options)
 			if Terminators.adopt_configuration(decoded) ~= true then return false end
 			local trigger = MagicKey.get()
 			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
-			if Config.apply_configuration(owner, decoded, secondary.candidate()) ~= true then return false end
+			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			if not apply_dependents(trigger, previous) then return false end
 			-- A first write creates the configuration folder the two files share.
 			local directory = options.path:match("^(.*)/[^/]+$")

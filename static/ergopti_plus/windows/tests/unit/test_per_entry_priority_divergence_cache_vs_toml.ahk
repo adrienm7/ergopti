@@ -44,6 +44,9 @@ _PriorityDivergence_RoundTripKeepsOverride() {
 		["", "cd", "second", true, false, true, 60]
 	]
 
+	Rows.SourceOrder := [["distancesreduction.assign", Rows["distancesreduction.assign"][1]],
+		["distancesreduction.assign", Rows["distancesreduction.assign"][2]]]
+
 	TmpTsv := A_Temp . "\ergopti_priority_divergence_test.tsv"
 	_HotstringsCacheWriteTsv(TmpTsv, Rows)
 	Back := _HotstringsCacheReadTsv(FileRead(TmpTsv, "UTF-8"))
@@ -102,7 +105,7 @@ _PriorityDivergence_RejectsOverflowAliases() {
 	AssertEqual(10, _ParseEntryPriority(Line, 10),
 		"an overflowing entry priority must use the caller's fallback")
 	for BadPriority in [Overflow, "-1", "not-a-number"] {
-		BadCache := "rolls`tassign`t`tcd`tsecond`t1`t0`t1`t" . BadPriority . "`n"
+		BadCache := "# source-order-v1`nrolls`tassign`t`tcd`tsecond`t1`t0`t1`t" . BadPriority . "`n"
 		AssertThrows(() => _HotstringsCacheReadTsv(BadCache),
 			"an invalid derived-cache priority must force a TOML rebuild")
 	}

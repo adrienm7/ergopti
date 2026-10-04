@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "Ergopti aus Karabiner entfernen",
 	"menu.global.restore_touchpad_gestures": "Windows-Touchpad-Gesten wiederherstellen",
 	"dialog.start_at_login.failed": "Der automatische Start konnte nicht geändert werden. Prüfen Sie die Autostart-Einstellungen des Systems.",
-	"onboarding.error.open_failed": "Der Einrichtungsassistent konnte nicht geöffnet werden. Prüfen Sie die Protokolle und versuchen Sie es erneut über das Menü."
+	"onboarding.error.open_failed": "Der Einrichtungsassistent konnte nicht geöffnet werden. Prüfen Sie die Protokolle und versuchen Sie es erneut über das Menü.",
+	"platform_reason.token_streaming_transport_missing": "Nicht unter Windows: Windows kann Vorschläge noch nicht Token für Token anzeigen. Diese Option bleibt inaktiv.",
+	"menu.layout.number_row": "Ziffernreihe",
+	"menu.layout.number_row_native": "Native Reihenfolge",
+	"menu.layout.number_row_digits": "Ziffern zuerst",
+	"menu.layout.number_row_symbols": "Symbole zuerst",
+	"platform_reason.number_row_override_unsupported": "Nicht unterstützt: Dieser Treiber behält die native Ziffernreihe des Systems bei; erzwungene Ziffern und Symbole sind nicht verfügbar.",
+	"platform_reason.number_row_source_unavailable": "Nicht verfügbar: Symbole zuerst erfordert ein aktives emuliertes Layout mit gültigen Ziffern- und Symbolebenen an jeder Position der Ziffernreihe."
 }

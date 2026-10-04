@@ -39,8 +39,9 @@ local MODULES = {
 	"modules.llm.ollama_deps_checker",
 }
 
-local function with_fixture(callback)
+local function with_fixture(callback, options)
 	return helpers.with_fresh_modules(MODULES, function()
+		local native_renderer = require("infra.manifest_menu")
 		local noop = function() end
 		local accept = function() return true end
 		local updates = 0
@@ -222,6 +223,9 @@ local function with_fixture(callback)
 			has_health_dot = function(id) return id == "llm_model" end,
 		}
 		package.loaded["infra.manifest_menu"] = {
+			command_row = native_renderer.command_row,
+		check_row = native_renderer.check_row,
+			get_array = native_renderer.get_array,
 			render_rows = function(rows) return rows end,
 			build = function(key, _, handlers, _, render_ctx, providers)
 				-- Only the health-bearing top-level handlers are observed here.
@@ -255,6 +259,10 @@ local function with_fixture(callback)
 
 		local ok, err = xpcall(function()
 			package.loaded["ui.menu.menu_llm.backend_panel"] = nil
+			if options and options.actual_api_panel then
+				package.loaded["ui.menu.menu_llm.api_panel"] = nil
+				require("ui.menu.menu_llm.api_panel")
+			end
 			local MenuLLM = require("ui.menu.menu_llm")
 			local script_control = {
 				is_paused = function() return false end,
@@ -279,6 +287,7 @@ local function with_fixture(callback)
 			})
 			callback({
 				MenuLLM = MenuLLM,
+				script_control = script_control,
 				handler = handler,
 				state = state,
 				probes = probes,
@@ -522,6 +531,41 @@ helpers.describe("LLM health probe ownership", function()
 			helpers.assert_eq(fixture.mlx_restarts[1].opts._mlx_port, 4567)
 			helpers.assert_eq(fixture.stop_kinds, { "backend", "port" })
 		end)
+	end)
+end)
+
+
+helpers.describe("API active commands: actual native pause context", function()
+	helpers.it("the real menu builder passes the live ScriptControl reader into the retained Test", function()
+		with_fixture(function(fixture)
+			local paused, requests = false, 0
+			fixture.script_control.is_paused = function() return paused end
+			local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
+			package.loaded["modules.llm"].api_remote = {
+				PROVIDER_ORDER = {}, PROVIDERS = {},
+				get_entries = function() return { entry } end,
+				get_active_entry = function() return entry end,
+				get_active_entry_id = function() return entry.id end,
+				get_test_request_spec = function() return {} end,
+				test_request = function() requests = requests + 1; return true end,
+			}
+			fixture.state.llm_backend = "api"
+			local item = fixture.handler.build_item()
+			local native_label = package.loaded["infra.manifest_menu"].command_row(
+				"llm_api_active_commands", "api_test_active", { api_test_active = function() end },
+				{ llm_api_active_ready = function() return true end }).label
+			local held
+			for _, parent in ipairs(item.submenu or {}) do
+				for _, row in ipairs(parent.menu or {}) do
+					if row.label == native_label then held = row.action end
+				end
+			end
+			helpers.assert_type(held, "function", "the real native API provider supplies the active Test row")
+			paused = true
+			local observed = held()
+			helpers.assert_eq(observed, false)
+			helpers.assert_eq(requests, 0, "a retained native action cannot create a request after real pause")
+		end, { actual_api_panel = true })
 	end)
 end)
 

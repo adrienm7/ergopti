@@ -344,12 +344,14 @@ local MEDIA_TOOL_TIMEOUT_S = 1
 -- missing or refuses. The fallback was `xdotool key XF86...`, which exits zero
 -- and presses nothing under Wayland, so a missing brightnessctl or playerctl
 -- left the action dead with no error.
+local BrightnessActions = require("brightness_actions")
+local Brightness = BrightnessActions.load()
 local MEDIA_ACTIONS = {
 	vol_up          = { tool = "pactl set-sink-volume @DEFAULT_SINK@ +5%", key = "XF86AudioRaiseVolume" },
 	vol_down        = { tool = "pactl set-sink-volume @DEFAULT_SINK@ -5%", key = "XF86AudioLowerVolume" },
 	mute            = { tool = "pactl set-sink-mute @DEFAULT_SINK@ toggle", key = "XF86AudioMute" },
-	brightness_up   = { tool = "brightnessctl set +5%", key = "XF86MonBrightnessUp" },
-	brightness_down = { tool = "brightnessctl set 5%-", key = "XF86MonBrightnessDown" },
+	brightness_up   = { tool = BrightnessActions.linux_command(Brightness, "brightness_up"), key = Brightness.actions.brightness_up.linux_key },
+	brightness_down = { tool = BrightnessActions.linux_command(Brightness, "brightness_down"), key = Brightness.actions.brightness_down.linux_key },
 	track_play      = { tool = "playerctl play-pause", key = "XF86AudioPlay" },
 	track_next      = { tool = "playerctl next", key = "XF86AudioNext" },
 	track_prev      = { tool = "playerctl previous", key = "XF86AudioPrev" },

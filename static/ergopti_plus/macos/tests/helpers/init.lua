@@ -260,6 +260,12 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- was first required, and no later call here can reach it. A test that needs
 	-- such a submodule re-read must clear it itself.
 	loaded[module_name] = nil
+	-- The keylogger and its process-lifetime physical-source settlement port
+	-- form one ownership unit. A fresh fixture parent cannot inherit a child
+	-- bound to the preceding CoreState; the scoped proxy restores both caches.
+	if module_name == "modules.keylogger" or module_name == "modules.keylogger.init" then
+		loaded["modules.keylogger.physical_accounting_mode"] = nil
+	end
 	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
 	-- consumes the replay module's exact commitment, and replay correctly refuses
 	-- rebinding to a different CoreState. Reloading only the parent would therefore

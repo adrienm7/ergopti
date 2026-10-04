@@ -144,6 +144,11 @@ end
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
 local Boot               = require("infra.boot_profiler")
 local BootJournal        = require("adapters.boot_journal")
+-- Observe the in-process getter before onboarding can defer the rest of boot.
+local scripting_observed, scripting_written = pcall(BootJournal.record_native_scripting_state, hs)
+if scripting_observed ~= true or scripting_written ~= true then
+	BootJournal.append("INFO", "Native scripting server witness publication unacknowledged.")
+end
 Boot.begin()
 
 --- Records one boot fact in the log and in the synchronous boot journal, which
@@ -1637,6 +1642,7 @@ for _, fname in ipairs(remaining) do table.insert(toml_fnames, fname) end
 
 local hotfiles = {}
 local hotfile_paths = {}
+local personal_files = {}
 -- Defer sorting for the entire startup load: personal, dynamic, and TOML files all
 -- feed into the same mappings list. A single flush_sort() at the end collapses
 -- what used to be 8+ full O(N log N) passes into one.
@@ -1670,7 +1676,8 @@ Boot.stage("Hotstring groups registered (personal + dynamic + common)")
 -- The personal group + recursive extension scan live in infra/personal_hotstrings;
 -- it registers each group with keymap and returns them in load order so they keep
 -- the lowest group_order (= highest priority). Extracted from init.lua Section 5.1.
-for _, g in ipairs(require("infra.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })) do
+personal_files = require("infra.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })
+for _, g in ipairs(personal_files) do
 	table.insert(hotfiles, g.name)
 	hotfile_paths[g.name] = g.path
 end
@@ -1845,7 +1852,8 @@ Logger.debug(LOG, "Starting user interface components…")
 local menubar = menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections,
-	karabiner, hotfile_paths, ExtensionPacks.catalogue()
+	karabiner, hotfile_paths, ExtensionPacks.catalogue(), personal_files,
+	(config_paths.get("PersonalHotstringsDir") or ""):gsub("/+$", "")
 )
 -- nil means no tray: the menubar, its native menu or the preference rollback
 -- could not settle. Ignoring it still logged "boot SUCCESSFUL" with no menu.

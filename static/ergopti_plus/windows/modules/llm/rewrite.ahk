@@ -156,21 +156,7 @@ LLM_Rewrite_MaxTokens(Span) {
 LLM_Rewrite_CodepointLength(Text) {
 	if !(Text is String)
 		throw TypeError("LLM_Rewrite_CodepointLength expects a string, got " . Type(Text) . ".")
-	Units := StrLen(Text)
-	Count := 0
-	Position := 1
-	while (Position <= Units) {
-		Unit := Ord(SubStr(Text, Position, 1))
-		Width := 1
-		if (Unit >= 0xD800 && Unit <= 0xDBFF && Position < Units) {
-			Next := Ord(SubStr(Text, Position + 1, 1))
-			if (Next >= 0xDC00 && Next <= 0xDFFF)
-				Width := 2
-		}
-		Count += 1
-		Position += Width
-	}
-	return Count
+	return _TextCodepointLength(Text)
 }
 
 

@@ -140,3 +140,102 @@ SendEscapeLiteral(Text) {
 	Escaped := StrReplace(Escaped, "#", "{#}")
 	return Escaped
 }
+
+
+/** Counts Unicode scalars while retaining UTF-16 units for internal offsets. */
+_TextCodepointLength(Text) {
+	if !(Text is String)
+		throw TypeError("_TextCodepointLength expects a string, got " . Type(Text) . ".")
+	Units := StrLen(Text)
+	Count := 0
+	Position := 1
+	while (Position <= Units) {
+		Count += 1
+		Position += _TextCodepointWidth(Text, Position, Units)
+	}
+	return Count
+}
+
+/** Returns the UTF-16 span erased by up to Count native Backspace events. */
+_TextTailCodeUnits(Text, Count) {
+	if !(Text is String) || !(Count is Integer) || Count < 0
+		throw TypeError("_TextTailCodeUnits expects a string and a nonnegative integer.")
+	Position := StrLen(Text)
+	Start := Position
+	loop Count {
+		if Position == 0
+			break
+		Position := _TextCodepointStart(Text, Position) - 1
+	}
+	return Start - Position
+}
+
+
+/** Returns whole Unicode characters without splitting surrogate pairs. */
+_TextCodepoints(Text) {
+	if !(Text is String)
+		throw TypeError("_TextCodepoints expects a string, got " . Type(Text) . ".")
+	Characters := []
+	Position := 1
+	Units := StrLen(Text)
+	while Position <= Units {
+		Width := _TextCodepointWidth(Text, Position, Units)
+		Characters.Push(SubStr(Text, Position, Width))
+		Position += Width
+	}
+	return Characters
+}
+
+; Counting and replay share the same surrogate-pair admission rule.
+_TextCodepointWidth(Text, Position, Units) {
+	Unit := Ord(SubStr(Text, Position, 1))
+	if Unit >= 0xD800 && Unit <= 0xDBFF && Position < Units {
+		Next := Ord(SubStr(Text, Position + 1, 1))
+		if Next >= 0xDC00 && Next <= 0xDFFF
+			return 2
+	}
+	return 1
+}
+
+
+; Reverse scans use the same complete-pair boundary as native erasure.
+_TextCodepointStart(Text, Position) {
+	Unit := Ord(SubStr(Text, Position, 1))
+	if Unit >= 0xDC00 && Unit <= 0xDFFF && Position > 1 {
+		Previous := Ord(SubStr(Text, Position - 1, 1))
+		if Previous >= 0xD800 && Previous <= 0xDBFF
+			return Position - 1
+	}
+	return Position
+}
+
+/** Returns a contiguous suffix within a UTF-16 budget without splitting a pair. */
+_TextTailWithinUnits(Text, MaxUnits) {
+	if !(Text is String) || !(MaxUnits is Integer) || MaxUnits < 0
+		throw TypeError("_TextTailWithinUnits expects a string and a nonnegative integer.")
+	if MaxUnits == 0
+		return ""
+	Units := StrLen(Text)
+	if Units <= MaxUnits
+		return Text
+	Start := Units - MaxUnits + 1
+	; Moving forward drops the complete oldest pair and preserves the bound.
+	if _TextCodepointStart(Text, Start) < Start
+		Start += 1
+	return SubStr(Text, Start)
+}
+
+
+/** Returns the complete scalar immediately before the final scalar, or empty. */
+_TextPenultimateCodepoint(Text) {
+	if !(Text is String)
+		throw TypeError("_TextPenultimateCodepoint expects a string.")
+	Units := StrLen(Text)
+	if Units == 0
+		return ""
+	PreviousEnd := _TextCodepointStart(Text, Units) - 1
+	if PreviousEnd == 0
+		return ""
+	PreviousStart := _TextCodepointStart(Text, PreviousEnd)
+	return SubStr(Text, PreviousStart, PreviousEnd - PreviousStart + 1)
+}

@@ -1782,13 +1782,17 @@ _TooltipResolvePosition(DeferUia := false) {
 
 		ActiveHwnd := WinExist("A")
 		CurrentEnvironment := _TooltipReadPositionReceipt(ActiveHwnd)
-		if _TooltipPositionCacheCanReuse(_TooltipPositionCache, ActiveHwnd,
-				CurrentEnvironment, A_TickCount, TOOLTIP_POSITION_CACHE_MS,
+		; A plain global argument can read a newer object after a later call.
+		; Pair one local receipt with the native sample and keep its fields.
+		CachedPosition := _TooltipPositionCache
+		CacheNowTick := A_TickCount
+		if _TooltipPositionCacheCanReuse(CachedPosition, ActiveHwnd,
+				CurrentEnvironment, CacheNowTick, TOOLTIP_POSITION_CACHE_MS,
 				WIGetFocusedControlToken()) {
 				_TooltipCountResolveExit("cache")
-				return { Type: _TooltipPositionCache["type"],
-						X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"],
-						H: _TooltipPositionCache["h"] }
+				return { Type: CachedPosition["type"],
+						X: CachedPosition["x"], Y: CachedPosition["y"],
+						H: CachedPosition["h"] }
 		}
 
 		; ----- 2. Disposable UIA bounds worker -------------------------------

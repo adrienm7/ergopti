@@ -145,3 +145,44 @@ _LBBC_EveryRuntimeWriterUsesCanonicalEditor() {
 }
 Test("meta llm: every bridge-buffer writer uses the cap owner (llm-buffer-cap-single-owner)",
 	_LBBC_EveryRuntimeWriterUsesCanonicalEditor)
+
+_UCAP_Bridge(Initial, Inserted, Capacity, Expected, Agent := false) {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Bridge_AgentBuffer
+	global _LLM_Bridge_AgentFeeding, LLM_BRIDGE_BUFFER_MAX_CHARS
+	Saved := { Buffer: _LLM_Bridge_Buffer, Generation: _LLM_Bridge_ContentGeneration,
+		AgentBuffer: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding,
+		Capacity: LLM_BRIDGE_BUFFER_MAX_CHARS, Critical: A_IsCritical }
+	try {
+		LLM_BRIDGE_BUFFER_MAX_CHARS := Capacity
+		if Agent {
+			_LLM_Bridge_AgentBuffer := Initial
+			_LLM_Bridge_AgentFeeding := true
+			AssertTrue(LLM_Bridge_MirrorAgentEdit(0, Inserted))
+			Actual := _LLM_Bridge_AgentBuffer
+		} else {
+			_LLM_Bridge_Buffer := Initial
+			Actual := _LLM_Bridge_ApplyBufferEdit(0, Inserted)
+			AssertEqual(Saved.Generation + 1, _LLM_Bridge_ContentGeneration,
+				"one bounded edit advances its content generation exactly once")
+		}
+		AssertEqual(Expected, Actual,
+			"cap the actual edited suffix once: dropped pairs cannot resurrect older text")
+		Assert(StrLen(Actual) <= Capacity, "the UTF-16 memory bound remains strict")
+		AssertEqual(Saved.Critical, A_IsCritical, "the editor restores its caller's scheduler")
+	} finally {
+		_LLM_Bridge_Buffer := Saved.Buffer
+		_LLM_Bridge_ContentGeneration := Saved.Generation
+		_LLM_Bridge_AgentBuffer := Saved.AgentBuffer
+		_LLM_Bridge_AgentFeeding := Saved.Feeding
+		LLM_BRIDGE_BUFFER_MAX_CHARS := Saved.Capacity
+		Critical(Saved.Critical)
+	}
+}
+Test("llm unicode-context-cap: active buffer cannot resurrect an older prefix", (*) =>
+	_UCAP_Bridge("X", Chr(0x1F600) . "ab", 3, "ab"))
+Test("llm unicode-context-cap: active append drops a complete old pair", (*) =>
+	_UCAP_Bridge("A" . Chr(0x1F600) . "b", "c", 3, "bc"))
+Test("llm unicode-context-cap: a pair that cannot fit leaves no older text", (*) =>
+	_UCAP_Bridge("A", Chr(0x1F600), 1, ""))
+Test("llm unicode-context-cap: agent-only mirror keeps a valid suffix", (*) =>
+	_UCAP_Bridge("A" . Chr(0x1F600) . "b", "c", 3, "bc", true))

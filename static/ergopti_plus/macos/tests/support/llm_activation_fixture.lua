@@ -78,6 +78,8 @@ local LOCAL_SERVERS = {
 }
 
 local function build_fixture(backend, save_results, options)
+	-- Bind the real shared row policy before the fixture installs its menu port.
+	local native_renderer = require("infra.manifest_menu")
 	options = options or {}
 	local noop = function() end
 	local calls = {
@@ -400,6 +402,8 @@ local function build_fixture(backend, save_results, options)
 		has_health_dot = function() return false end,
 	}
 	package.loaded["infra.manifest_menu"] = {
+		check_row = native_renderer.check_row,
+		get_array = native_renderer.get_array,
 		render_rows = function(rows) return rows end,
 		-- The render context is kept so a test can hand it to the real renderer.
 		build = function(_key, _category, _handlers, _groups, render_ctx)

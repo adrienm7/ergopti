@@ -29,6 +29,12 @@ const SOURCES = [
 	'static/ergopti_plus/linux/modules/llm/local_model_offer.lua',
 	'static/ergopti_plus/linux/tests/unit/meta/test_http_client_curl.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_local_api_auth.lua',
+	'static/ergopti_plus/linux/modules/llm/api_remote.lua',
+	'static/ergopti_plus/linux/modules/llm/api_entries.lua',
+	'static/ergopti_plus/linux/modules/llm/local_server_catalogue.lua',
+	'static/ergopti_plus/_shared/lua/llm/local_server_auth.lua',
+	'static/ergopti_plus/_shared/modules/llm/local_servers.json',
 	'static/ergopti_plus/_shared/lua/llm/local_model_policy.lua'
 ];
 
@@ -129,11 +135,13 @@ function main() {
 			0,
 			'Linux native refusal cannot skip'
 		);
+	const invocations = [];
 	let invocation;
 	assert.equal(
 		run({
 			platform: 'linux',
 			spawn: (...args) => {
+				invocations.push(args);
 				invocation = args;
 				return { status: 0 };
 			},
@@ -142,7 +150,29 @@ function main() {
 		0
 	);
 	assert.equal(invocation[0], 'luajit');
-	assert.deepEqual(invocation[1], ['tests/hardware/run_http_stream_receipts.lua']);
+	assert.deepEqual(
+		invocations.map((args) => args[1]),
+		[['tests/hardware/run_http_stream_receipts.lua'], ['tests/hardware/run_local_api_auth.lua']],
+		'both actual owners are mandatory and ordered'
+	);
+	for (const failedIndex of [0, 1]) {
+		let calls = 0;
+		assert.equal(
+			run({
+				platform: 'linux',
+				spawn: () => ({ status: calls++ === failedIndex ? 17 : 0 }),
+				log: () => {},
+				error: () => {}
+			}),
+			17,
+			'either child failure retains its real exit'
+		);
+		assert.equal(
+			calls,
+			2,
+			'a first child refusal cannot silently skip the second mandatory fixture'
+		);
+	}
 	assert.equal(invocation[2].cwd, path.join(ROOT, 'static/ergopti_plus/linux'));
 	assert.equal(invocation[2].stdio, 'inherit');
 	assert(invocation[2].env.LUA_PATH.includes('../_shared/lua/?.lua'));
@@ -160,6 +190,8 @@ function main() {
 			'.github/linux-ci-coverage.json',
 			'tools/test/verify-change.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
+			'tools/test/validate-ahk-e2e-manifest.cjs',
+			'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json',
 			'tools/test/test-ahk-test-coverage.cjs',
 			'tools/lint/format.cjs',
 			'tools/test/run-js-suite.cjs',

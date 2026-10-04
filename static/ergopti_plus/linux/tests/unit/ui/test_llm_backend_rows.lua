@@ -68,7 +68,10 @@ local function setup(backend)
 		end,
 		error = function(text) state.errors[#state.errors + 1] = text end,
 		info = function(title, text) state.infos[#state.infos + 1] = title .. " | " .. text end,
-		confirm = function() return state.confirm end,
+		confirm = function()
+			if type(state.confirm) == "function" then return state.confirm() end
+			return state.confirm
+		end,
 	}
 	local Rows = helpers.load_module("ui.menu.llm_backend_rows")
 	local function build()
@@ -176,7 +179,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		find(build(), "➕ Cerebras").action()
 		helpers.assert_true(state.prompts[1].hidden, "the key is typed into a masked field")
 		helpers.assert_eq(state.prompts[2].initial, "qwen", "the model defaults to the provider's")
-		helpers.assert_eq(state.entries[1].token, "csk-123", "surrounding blanks from a paste are dropped")
+		helpers.assert_eq(state.entries[1].token, "  csk-123  ", "provided secret bytes remain authoritative")
 		helpers.assert_eq(state.entries[1].model, "", "the provider default is stored as no override")
 		helpers.assert_eq(state.backend, "api")
 		helpers.assert_eq(#state.tests, 1, "the new entry is tested at once")
@@ -305,4 +308,145 @@ helpers.describe("AI menu: a key for the agent's System 1 only (Jev)", function(
 		helpers.assert_eq(#state.entries, 0, "its own removal")
 	end)
 
+end)
+
+
+helpers.describe("Local API optional-auth tray consumer", function()
+	helpers.it("stores an explicitly empty local key and tests the selected model (local-api-optional-auth-ui)", function()
+		local build, state, restore = setup("api")
+		local remote = package.loaded["modules.llm.api_remote"]
+		local provider = { id = "lmstudio", label = "LM Studio", base_url = "http://localhost:1234/v1", default_model = "" }
+		local providers, lookup = remote.providers, remote.provider
+		local _, servers = require("modules.llm.local_server_catalogue").load({})
+		remote.providers = function() local list = providers(); list[#list + 1] = provider; return list end
+		remote.provider = function(id) return id == provider.id and provider or lookup(id) end
+		remote.token_allowed = function(id, token) return require("llm.local_server_auth").token_allowed(id, token, servers) end
+		state.answers = { "", "fixture-model" }
+		local action = find(build(), "➕ LM Studio")
+		local ok, failure = xpcall(function() action.action() end, debug.traceback)
+		restore()
+		if not ok then error(failure) end
+		helpers.assert_eq(#state.entries, 1)
+		helpers.assert_eq(state.entries[1].token, "")
+		helpers.assert_eq(state.entries[1].provider, "lmstudio")
+		helpers.assert_eq(state.entries[1].model, "fixture-model")
+		helpers.assert_eq(state.tests[1], state.entries[1])
+		helpers.assert_eq(state.backend, "api")
+		helpers.assert_eq(state.prompts[1].hidden, true)
+	end)
+end)
+
+helpers.describe("AI active API commands: acknowledged private removal", function()
+	for _, refused in ipairs({ true, false }) do
+		helpers.it("publishes a removal only after the real private writer ACK " .. tostring(not refused), function()
+			local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local path = assert(os.tmpname())
+			local rename = os.rename
+			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert-key","model":"qwen","base_url":""}],"active_id":"chosen","future":{"kept":true}}]]
+			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
+			local changed, result, after, count, active, foreign, stage_calls = 0, nil, nil, nil, nil, nil, 0
+			local ok, failure = pcall(function()
+				local owner = helpers.load_module("modules.llm.api_entries")
+				owner._set_path_for_test(path)
+				package.loaded["modules.llm.api_remote"] = {
+					provider = function() return { default_model = "qwen", base_url = "https://example.invalid/v1" } end,
+					providers = function() return {} end,
+					serves = function() return true end,
+					test = function() error("removal must not acquire an HTTP request") end,
+				}
+				os.rename = function(from, to)
+					if to == path then
+						stage_calls = stage_calls + 1
+						if refused then return nil, "owned staged publication refused" end
+					end
+					return rename(from, to)
+				end
+				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
+					{ get_backend = function() return "api" end },
+					{ confirm = function() return true end },
+					function() changed = changed + 1 end, function() return {} end)
+				result = find(rows, "🗑️").action()
+				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
+				count, active = #owner.list(), owner.active()
+				foreign = require("json").decode(after).future.kept
+			end)
+			os.rename = rename
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			local removed = os.remove(path)
+			helpers.assert_eq(ok, true, tostring(failure))
+			helpers.assert_eq(removed, true)
+			helpers.assert_eq(stage_calls, 1, "use the actual private stage and native publication owner")
+			helpers.assert_eq(changed, refused and 0 or 1, "writer refusal must not refresh as a committed mutation")
+			helpers.assert_eq(result, not refused, "the menu returns only a durable ACK")
+			helpers.assert_eq(count, refused and 1 or 0, "the real store rolls back RAM when publication refuses")
+			helpers.assert_eq(active ~= nil, refused)
+			helpers.assert_eq(foreign, true, "unknown root data survives successful removal")
+			if refused then helpers.assert_eq(after, original, "refusal preserves exact source bytes") end
+		end)
+	end
+end)
+
+helpers.describe("AI active API commands: shared captions and live selection", function()
+	for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it",
+		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+		helpers.it("renders the actual shared command data in " .. code, function()
+			local names = { "infra.i18n", "infra.manifest_menu" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local restore, observations
+			local ok, failure = pcall(function()
+				local path = require("infra.paths").shared("data/locales/" .. code .. ".json")
+				local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
+				local labels = require("json").decode(raw)
+				package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+					section = function() return {} end }
+				package.loaded["infra.manifest_menu"] = nil
+				local renderer = require("infra.manifest_menu")
+				local declaration = renderer.get_array("llm_api_active_commands")
+				declaration[1].i18n = "button.cancel"
+				local build, state, cleanup = setup("api"); restore = cleanup
+				local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
+				state.entries, state.active = { entry }, entry
+				local rows, positions = build(), {}
+				for index, row in ipairs(rows) do
+					if row.label == labels["button.cancel"] then positions[1] = index end
+					if type(row.label) == "string" and row.label:find(labels["menu.llm.api_remove_entry"], 1, true) then positions[2] = index end
+				end
+				observations = { positions = positions, rows = rows }
+			end)
+			if restore then restore() end
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			helpers.assert_eq(ok, true, tostring(failure))
+			helpers.assert_type(observations.positions[1], "number")
+			helpers.assert_eq(observations.positions[2], observations.positions[1] + 1)
+			helpers.assert_type(observations.rows[observations.positions[1]].action, "function")
+		end)
+	end
+	helpers.it("a retained Test refuses a revoked active entry before native request creation", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
+		state.entries, state.active = { entry }, entry
+		local held = exact(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action
+		state.active = nil
+		local observed = held()
+		restore()
+		helpers.assert_eq(observed, false)
+		helpers.assert_eq(#state.tests, 0)
+		helpers.assert_eq(state.entries[1], entry)
+	end)
+	helpers.it("a selection change during confirmation refuses removal before the store owner", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
+		state.entries, state.active, state.confirm = { entry }, entry, true
+		local rows = build()
+		-- The actual confirmation port changes selection before returning its accepted receipt.
+		state.confirm = function() state.active = nil; return true end
+		local observed = find(rows, "🗑️").action()
+		restore()
+		helpers.assert_eq(observed, false)
+		helpers.assert_eq(#state.entries, 1)
+		helpers.assert_eq(state.changed, nil)
+	end)
 end)

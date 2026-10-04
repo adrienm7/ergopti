@@ -275,8 +275,12 @@ _TooltipPreparePreviewPosition(Request) {
 	Context := _TooltipCurrentUiaContext()
 	if !(Context is Map) || _TooltipUiaProcessIsHostile(Context.Get("ProcName", ""))
 		return false
-	if _TooltipPositionCacheCanReuse(_TooltipPositionCache, Context["Hwnd"],
-			Context["Environment"], A_TickCount, TOOLTIP_POSITION_CACHE_MS,
+	; A plain global argument can read a newer object after a later call.
+	; Pair one local receipt with the native sample and keep its fields.
+	CachedPosition := _TooltipPositionCache
+	CacheNowTick := A_TickCount
+	if _TooltipPositionCacheCanReuse(CachedPosition, Context["Hwnd"],
+			Context["Environment"], CacheNowTick, TOOLTIP_POSITION_CACHE_MS,
 			Context["Control"])
 		return false
 	Owner := TooltipPreviewPositionRequest(Request)
@@ -325,8 +329,12 @@ _TooltipPositionWarmPump(ContextFn := _TooltipCurrentUiaContext,
 		Context := ContextFn.Call()
 		if !(Context is Map) || _TooltipUiaProcessIsHostile(Context.Get("ProcName", ""))
 			return
-		if _TooltipPositionCacheCanReuse(_TooltipPositionCache, Context["Hwnd"],
-				Context["Environment"], A_TickCount, TOOLTIP_POSITION_CACHE_MS // 2,
+		; A plain global argument can read a newer object after a later call.
+		; Pair one local receipt with the native sample and keep its fields.
+		CachedPosition := _TooltipPositionCache
+		CacheNowTick := A_TickCount
+		if _TooltipPositionCacheCanReuse(CachedPosition, Context["Hwnd"],
+				Context["Environment"], CacheNowTick, TOOLTIP_POSITION_CACHE_MS // 2,
 				Context["Control"])
 			return
 		ScheduleFn.Call(Context)

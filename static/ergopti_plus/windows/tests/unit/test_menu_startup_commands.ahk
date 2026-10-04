@@ -9,6 +9,26 @@
 
 #Requires AutoHotkey v2.0
 
+; The unit runner deliberately excludes infra/lifecycle.ahk: its suspension
+; globals and timers belong to the real boot. The builders still require both
+; native callback identities. Record and refuse their fallback effects so even
+; a caught dispatch cannot conceal an accidental runner reload or termination.
+global _MSC_UnexpectedLifecycleCalls := []
+
+_MSC_UnexpectedLifecycleCommand(Id) {
+	global _MSC_UnexpectedLifecycleCalls
+	_MSC_UnexpectedLifecycleCalls.Push(Id)
+	throw Error("Startup fixtures must not execute native lifecycle effects")
+}
+
+ActivateReload(*) {
+	return _MSC_UnexpectedLifecycleCommand("reload")
+}
+
+ActivateExitApp(*) {
+	return _MSC_UnexpectedLifecycleCommand("quit")
+}
+
 _MSC_InitializationOwnership() {
 	global _MenuStartupCommands
 	Saved := _MenuStartupCommands
@@ -179,3 +199,150 @@ _MSC_DiagnosticsAdmission(Owner, State) {
 }
 Test("menu startup: diagnostic admission uses its own cleanup milestone (early-ui-admission)",
 	(*) => _MSC_WithOwner(_MSC_DiagnosticsAdmission))
+
+_MSC_SharedLifecycleRows(Owner, State) {
+	global _TrayMenuStage, _TrayStartupCommands
+	SavedStage := _TrayMenuStage
+	try {
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageReload()
+		_MI_StageQuit()
+		AssertEqual(2, _TrayMenuStage.Length, "the real configured builders stage both declared commands")
+		for Index, Id in ["reload", "quit"] {
+			State.Ready := false
+			_TrayStartupCommands := TrayStartupCommands(() => State.Ready,
+				(CommandId) => State.Calls.Push(CommandId), (Fn, Delay) => State.Timers.Push(Fn))
+			Row := _TrayMenuStage[Index]
+			AssertEqual(t("menu.global." . Id), Row["label"])
+			AssertEqual("action", Row["kind"])
+			AssertTrue(Row["target"] is MenuStartupSafeCommand,
+				"the shared provider wrapper cannot conceal lifecycle admission")
+			MenuCommandRun(Row["target"], [])
+			AssertEqual(Id, _TrayStartupCommands.Pending)
+			AssertEqual(0, Owner.Pending.Length, "lifecycle commands never enter ordinary early-selection debt")
+			MenuCommandRun(_TrayMenuStage[Index == 1 ? 2 : 1]["target"], [])
+			AssertEqual(Id, _TrayStartupCommands.Pending, "a second terminal intent cannot replace the admitted owner")
+			AssertEqual(Index - 1, State.Calls.Length, "the actual startup owner retains the request until readiness")
+			State.Ready := true
+			_TrayStartupCommands.NotifyReady()
+			State.Timers[State.Timers.Length].Call()
+			AssertEqual(Index, State.Calls.Length)
+			AssertEqual(Id, State.Calls[Index])
+			_TrayStartupCommands.Retire()
+		}
+	} finally {
+		_TrayMenuStage := SavedStage
+	}
+}
+Test("menu startup: shared lifecycle rows preserve native early-command precedence (shared-lifecycle)",
+	(*) => _MSC_WithOwner(_MSC_SharedLifecycleRows))
+
+_MSC_DeclaredLifecyclePresentation() {
+	global _TrayMenuStage
+	SavedStage := _TrayMenuStage
+	Reload := _MR_FindItemById("top_level", "reload")
+	Quit := _MR_FindItemById("top_level", "quit")
+	AssertTrue(Reload is Map && Quit is Map, "the real shared root carries both commands")
+	SavedReloadLabel := Reload.Get("i18n", "")
+	SavedQuitLabel := Quit.Get("i18n", "")
+	ReloadHadType := Reload.Has("type")
+	QuitHadType := Quit.Has("type")
+	SavedReloadType := Reload.Get("type", "")
+	SavedQuitType := Quit.Get("type", "")
+	try {
+		Reload["type"] := "command"
+		Quit["type"] := "command"
+		Reload["i18n"] := "button.cancel"
+		Quit["i18n"] := "button.ok"
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageReload()
+		_MI_StageQuit()
+		AssertEqual(2, _TrayMenuStage.Length)
+		AssertEqual(t("button.cancel"), _TrayMenuStage[1]["label"], "the actual reload stage reads its declaration")
+		AssertEqual(t("button.ok"), _TrayMenuStage[2]["label"], "the actual quit stage reads its declaration")
+		Reload["type"] := "---"
+		Quit["type"] := "---"
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageReload()
+		_MI_StageQuit()
+		AssertEqual(0, _TrayMenuStage.Length, "a native builder cannot reinterpret a non-command declaration")
+	} finally {
+		Reload["i18n"] := SavedReloadLabel
+		Quit["i18n"] := SavedQuitLabel
+		if ReloadHadType
+			Reload["type"] := SavedReloadType
+		else
+			Reload.Delete("type")
+		if QuitHadType
+			Quit["type"] := SavedQuitType
+		else
+			Quit.Delete("type")
+		_TrayMenuStage := SavedStage
+	}
+}
+Test("menu startup: actual configured lifecycle builders consume labels and command types (shared-lifecycle)",
+	_MSC_DeclaredLifecyclePresentation)
+
+_MSC_HeldLifecycleDeclaration(Owner, State) {
+	global _TrayMenuStage, _TrayStartupCommands
+	SavedStage := _TrayMenuStage
+	Item := _MR_FindItemById("top_level", "reload")
+	AssertTrue(Item is Map)
+	HadDisabled := Item.Has("disabled_when")
+	SavedDisabled := Item.Get("disabled_when", [])
+	try {
+		if HadDisabled
+			Item.Delete("disabled_when")
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageReload()
+		AssertEqual(1, _TrayMenuStage.Length)
+		Held := _TrayMenuStage[1]["target"]
+		_TrayStartupCommands := TrayStartupCommands(() => State.Ready,
+			(Id) => State.Calls.Push(Id), (Fn, Delay) => State.Timers.Push(Fn))
+		Item["disabled_when"] := ["unregistered_lifecycle_owner"]
+		MenuCommandRun(Held, [])
+		AssertEqual("", _TrayStartupCommands.Pending, "held delivery rechecks the actual shared declaration")
+		AssertEqual(0, Owner.Pending.Length)
+		AssertEqual(0, State.Calls.Length)
+	} finally {
+		if HadDisabled
+			Item["disabled_when"] := SavedDisabled
+		else if Item.Has("disabled_when")
+			Item.Delete("disabled_when")
+		_TrayMenuStage := SavedStage
+	}
+}
+Test("menu startup: held shared lifecycle callbacks refuse a newly unregistered readiness owner (shared-lifecycle)",
+	(*) => _MSC_WithOwner(_MSC_HeldLifecycleDeclaration))
+
+_MSC_NativeLifecycleFixtureOwnership() {
+	global _TrayStartupCommands, _MSC_UnexpectedLifecycleCalls
+	SavedTray := IsSet(_TrayStartupCommands) ? _TrayStartupCommands : false
+	SavedCalls := _MSC_UnexpectedLifecycleCalls
+	try {
+		_TrayStartupCommands := false
+		_MSC_UnexpectedLifecycleCalls := []
+		AssertTrue(ActivateReload is Func && ActivateExitApp is Func,
+			"the actual staged builders require typed native callback identities")
+		for Entry in [["reload", ActivateReload], ["quit", ActivateExitApp]] {
+			Refused := false
+			try MenuStartupLifecycleDispatch(Entry[1], Entry[2])
+			catch
+				Refused := true
+			AssertTrue(Refused, "fixture fallbacks refuse native lifecycle effects")
+		}
+		AssertEqual(2, _MSC_UnexpectedLifecycleCalls.Length)
+		AssertEqual("reload", _MSC_UnexpectedLifecycleCalls[1])
+		AssertEqual("quit", _MSC_UnexpectedLifecycleCalls[2],
+			"both actual fallback callbacks remain observable after refusal")
+	} finally {
+		_TrayStartupCommands := SavedTray
+		_MSC_UnexpectedLifecycleCalls := SavedCalls
+	}
+}
+Test("menu startup: omitted boot callbacks have typed observable fixture ownership (shared-lifecycle)",
+	_MSC_NativeLifecycleFixtureOwnership)

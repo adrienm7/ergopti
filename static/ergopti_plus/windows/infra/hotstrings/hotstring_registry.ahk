@@ -20,6 +20,7 @@
 ;    comparable with the live registrations.
 ;
 ; Included by infra/hotstrings/hotstring_prefix_watcher.ahk.
+#Include %A_LineFile%\..\..\..\_generated\personal_file_descriptors.ahk
 ; ==============================================================================
 
 
@@ -111,7 +112,8 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "", PathOver
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
-		if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
+		; Match the runtime loader: header comments cannot erase catalogue rows.
+		if RegExMatch(TOML_StripInlineComment(Line), "^\[\[(.+)\]\]$", &SectionMatch) {
 			CurrentSection := StrLower(SectionMatch[1])
 			continue
 		}
@@ -186,15 +188,17 @@ HS_EnumeratePersonalExtFiles() {
 	; Explicit stack rather than a recursive closure: this runs on the index
 	; rebuild path, and a closure that captures itself is the shape that already
 	; cost this driver a silent nil-binding elsewhere.
-	Pending := [Map("Dir", Root, "Prefix", "")]
+	Pending := [Map("Dir", Root, "Prefix", "", "Components", [])]
 	while (Pending.Length > 0) {
 		Node := Pending.Pop()
 		Dir := Node["Dir"]
 		Prefix := Node["Prefix"]
 		Loop Files Dir . "\*", "DF" {
 			Child := (Prefix == "" ? "" : Prefix . " / ") . A_LoopFileName
+			Components := Node["Components"].Clone()
+			Components.Push(A_LoopFileName)
 			if (A_LoopFileAttrib ~= "D") {
-				Pending.Push(Map("Dir", A_LoopFileFullPath, "Prefix", Child))
+				Pending.Push(Map("Dir", A_LoopFileFullPath, "Prefix", Child, "Components", Components))
 				continue
 			}
 			if !(A_LoopFileName ~= "i)\.toml$")
@@ -203,7 +207,8 @@ HS_EnumeratePersonalExtFiles() {
 				continue
 			SplitPath A_LoopFileFullPath, , , , &Stem
 			Found.Push(Map("Path", A_LoopFileFullPath,
-				"Label", (Prefix == "" ? "" : Prefix . " / ") . Stem))
+				"Label", (Prefix == "" ? "" : Prefix . " / ") . Stem,
+				"PersonalSource", PersonalFileDescribe(Components)))
 		}
 	}
 	return Found
@@ -221,7 +226,9 @@ HS_EnumeratePersonalExtFiles() {
 ; @param IndexTarget {Map}    Index being built.
 ; @param SetTarget   {Map}    Trigger set being built.
 ; @returns {Integer} Number of triggers indexed.
-_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection := "") {
+_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection := "", PersonalSource := unset) {
+	if IsSet(PersonalSource) && !PersonalFileDescriptorValid(PersonalSource)
+		throw TypeError("Invalid personal preview source descriptor.")
 	global ScriptInformation, HS_PREFIX_ENTRY_PATTERN
 	global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 	global HSE_PRIORITY_PACKAGE
@@ -241,7 +248,8 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 		; other bracketed line, so every entry under a single-bracket `[section]`
 		; header was skipped — while LoadExtTomlFile registered them happily. The
 		; pack expanded and could never be previewed.
-		if RegExMatch(Line, HS_TOML_SECTION_HEADER_PATTERN, &SectionMatch) {
+		; Otherwise commented metadata inherits the previous hotstring section.
+		if RegExMatch(TOML_StripInlineComment(Line), HS_TOML_SECTION_HEADER_PATTERN, &SectionMatch) {
 			CurrentSection := StrLower(Trim(SectionMatch[1]))
 			continue
 		}
@@ -267,7 +275,7 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 			IsCaseSensitive := (Match[3] == "true")
 			IsStrict := (Match.Count >= 4 and Match[4] == "true")
 			Individual := _ParseEntryPriority(Line, "")
-		} else if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
+		} else if RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
 			; The engine's second accepted shape: a bare `key = "value"` line, which
 			; LoadExtTomlFile registers through CreateCaseSensitiveHotstrings. The
 			; preview side ignored it entirely, so those entries expanded without
@@ -294,7 +302,7 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 		; the tooltip named one expansion and the user got another
 		; (ext-pack-preview-ranked-below-its-fire).
 		_AddTriggerVariants(Trigger, Output, Label, CurrentSection, IsCaseSensitive, IsStrict,
-			Individual, IndexTarget, SetTarget, HSE_PRIORITY_PACKAGE)
+			Individual, IndexTarget, SetTarget, HSE_PRIORITY_PACKAGE, IsSet(PersonalSource) ? PersonalSource : unset)
 		Count += 1
 	}
 	return Count
@@ -427,30 +435,30 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 ; letter-only trigger of any length — which used to suppress the UPPER
 ; variant globally and leave typings like ``IA`` without a tooltip even
 ; though the engine still fires on the upper variant.
-_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict, Individual := "", IndexTarget := "", SetTarget := "", SourceDefault := "") {
+_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict, Individual := "", IndexTarget := "", SetTarget := "", SourceDefault := "", PersonalSource := unset) {
 	global ScriptInformation
 	if IsStrict {
 		; Strict triggers only match the exact casing in the TOML — anything
 		; else neither fires nor previews.
-		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
+		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
 		return
 	}
 	if IsCaseSensitive {
 		; Single registration via plain CreateHotstring (no auto-folding) —
 		; only the literal lowercase form is matched in practice.
-		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
+		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
 		return
 	}
 	LowerTrig := StrLower(Trigger)
 	TitleTrig := StrTitle(Trigger)
 	UpperTrig := StrUpper(Trigger)
-	_AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
-	_AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
+	_AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
+	_AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
 	MagicSuffix := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
 		? ScriptInformation["MagicKey"] : "★"
 	BodyLen := StrLen(RTrim(Trigger, MagicSuffix))
 	if (BodyLen != 1) {
-		_AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
+		_AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
 	}
 }
 
@@ -475,7 +483,7 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
 ; (everything else) are not indexed at all — their previews would
 ; fire on a single-letter typed buffer, which is too noisy to be
 ; useful.
-_AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTarget := "", SetTarget := "", SourceDefault := "") {
+_AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTarget := "", SetTarget := "", SourceDefault := "", PersonalSource := unset) {
 	global _PrefixIndex, _TriggerSet, _MIN_PREFIX_LEN, ScriptInformation, HSE_PRIORITY_COMMON
 	; Default to the live globals so existing direct callers (and the test
 	; suite) keep populating _PrefixIndex / _TriggerSet exactly as before.
@@ -526,6 +534,8 @@ _AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTa
 	           Section:  Section,
 	           Length:   Len,
 	           Priority: Priority }
+	if IsSet(PersonalSource)
+		Entry.PersonalSource := PersonalFileDescriptorCopy(PersonalSource)
 
 	KeyLen := HasMagic ? (Len - MkLen) : Len
 	; Magic-key triggers with a 1-char body (e.g. "c★") are allowed through

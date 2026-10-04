@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Logic for handling numerical configurations via system dialogs.
 --- Manages debounce delays, temperature, token limits, and context length.
---- Includes a dedicated menu builder for indentation preferences.
+--- Retains native setting transactions and their canonical publication guards.
 --- ==============================================================================
 
 local M = {}
@@ -27,6 +27,36 @@ local function clone_value(value)
 	local clone = {}
 	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
 	return clone
+end
+
+--- Retains the exact source authority across forward, inverse and debt retry saves.
+--- Source adoption is never a publication receipt; only one next owned ACK may
+--- advance the checkpoint used by this native setting transaction.
+--- @param preferences table Actual canonical preference owner.
+--- @param path string Canonical configuration path.
+--- @param expected_source table Source captured by the admitted menu row.
+--- @return function guard Strict before/acknowledged publication guard.
+function M.publication_guard(preferences, path, expected_source)
+	local expected = clone_value(expected_source)
+	local before_id
+	return function(phase)
+		if phase == "before" then
+			local _, source = preferences.current_view(path)
+			if not preferences.source_matches(expected, source) then return false end
+			local receipt = preferences.publication_receipt(path)
+			if type(receipt) ~= "table" or type(receipt.id) ~= "number" or receipt.id < 0
+				or receipt.id ~= math.floor(receipt.id) then return false end
+			before_id = receipt.id
+			return true
+		end
+		if phase ~= "acknowledged" or before_id == nil then return false end
+		local receipt = preferences.publication_receipt(path)
+		if not receipt or receipt.id ~= before_id + 1
+			or not preferences.source_matches(receipt.source, receipt.source) then return false end
+		expected = clone_value(receipt.source)
+		before_id = nil
+		return true
+	end
 end
 
 --- Reports whether a numeric candidate can be safely published and persisted.
@@ -250,7 +280,25 @@ end
 function M.new(deps)
 	local obj = { deps = deps }
 	local setting_recovery_debt = nil
+	local setting_generation = 0
 	function obj.scope_idle() return setting_recovery_debt == nil end
+
+	--- Persists only inside the source authority retained by this one action.
+	--- @param debt table Per-action guard, including compensation retries.
+	--- @param label string Native publication phase.
+	--- @return boolean acknowledged
+	local function publish_setting(debt, label)
+		if debt.publication_guard then
+			local ok, admitted = Logger.callback(LOG, label .. " source admission", debt.publication_guard, "before")
+			if ok ~= true or admitted ~= true then return false end
+		end
+		if save_prefs(deps, label) ~= true then return false end
+		if debt.publication_guard then
+			local ok, admitted = Logger.callback(LOG, label .. " source receipt", debt.publication_guard, "acknowledged")
+			if ok ~= true or admitted ~= true then return false end
+		end
+		return true
+	end
 
 	--- Restores every boundary reached by a rejected setting transition.
 	--- @param debt table Mutable per-boundary compensation ledger.
@@ -268,7 +316,7 @@ function M.new(deps)
 			end
 		end
 		if debt.persist then
-			local persisted = save_prefs(deps, "LLM setting preference rollback")
+			local persisted = publish_setting(debt, "LLM setting preference rollback")
 			-- The outer preference owner may restore its last committed candidate
 			-- when this compensating write refuses, so reclaim this key immediately
 			deps.state[snapshot.key] = clone_value(snapshot.state_value)
@@ -317,6 +365,17 @@ function M.new(deps)
 		return restore_setting_transaction(setting_recovery_debt)
 	end
 
+	--- Reads an actual runtime value and this transaction owner's current revision.
+	--- @param key string Existing canonical runtime setting.
+	--- @return table|nil snapshot Unknown/refused getters remain unavailable.
+	function obj.setting_snapshot(key)
+		local getter = deps.keymap and deps.keymap.get_llm_runtime_setting
+		if type(getter) ~= "function" then return nil end
+		local ok, found, value = Logger.callback(LOG, "LLM display runtime snapshot", getter, key)
+		if ok ~= true or found ~= true then return nil end
+		return {owner = obj, generation = setting_generation, value = value}
+	end
+
 	--- Applies one state/runtime/persistence/native-setting/menu transaction.
 	--- Void runtime and native setters commit on a non-throwing nil return; literal
 	--- false is an operational refusal. Preference persistence alone requires true.
@@ -328,6 +387,7 @@ function M.new(deps)
 			Logger.error(LOG, "LLM setting transaction refused invalid options.")
 			return false
 		end
+		if options.publication_guard ~= nil and type(options.publication_guard) ~= "function" then return false end
 		if not is_finite_number(options.value) then
 			Logger.error(LOG, "LLM setting '%s' refused a non-finite numeric value.",
 				tostring(options.key))
@@ -377,6 +437,7 @@ function M.new(deps)
 		}
 		local debt = {
 			snapshot = snapshot,
+			publication_guard = options.publication_guard,
 			runtime_callback = runtime_callback,
 			runtime = false,
 			persist = false,
@@ -394,6 +455,7 @@ function M.new(deps)
 		end
 
 		local candidate = clone_value(options.value)
+		setting_generation = setting_generation + 1
 		debt.runtime = true
 		if not invoke_required("LLM setting runtime sync", runtime_callback,
 			clone_value(candidate)) then
@@ -402,7 +464,7 @@ function M.new(deps)
 
 		deps.state[options.key] = clone_value(candidate)
 		debt.persist = true
-		if not save_prefs(deps, "LLM setting preference save") then
+		if not publish_setting(debt, "LLM setting preference save") then
 			return reject_transition("preference save")
 		end
 
@@ -636,34 +698,6 @@ function M.new(deps)
 		if not ok_apply or apply_result == false then return false end
 		if apply_result == true then return true end
 		return commit_port()
-	end
-
-	--- Builds the indentation selection submenu.
-	--- @return table The Hammerspoon menu structure.
-	function obj.build_indent_menu()
-		local menu = {}
-		local default_val = llm_mod.DEFAULT_STATE.llm_pred_indent
-		local current = math.floor(tonumber(deps.state.llm_pred_indent) or default_val)
-		local paused = is_paused(deps, "Indentation menu pause-state read")
-
-		for i = -7, 7 do
-			local title_str = ((i == -1 or i == 0 or i == 1) and i18n.get("menu.settings.indent_space")) or (i .. i18n.get("menu.settings.indent_spaces"))
-			if i == default_val then title_str = title_str .. " " .. i18n.get("menu.settings.default_indicator") end
-			
-			table.insert(menu, {
-				title   = title_str,
-				checked = (i == current) or nil,
-				fn      = not paused and function()
-					return obj.apply_setting_transaction({
-						key = "llm_pred_indent",
-						value = i,
-						runtime_fn = "set_llm_pred_indent",
-						publish_setting = true,
-					})
-				end or nil,
-			})
-		end
-		return menu
 	end
 
 	--- Dynamic builder for modifier menus.

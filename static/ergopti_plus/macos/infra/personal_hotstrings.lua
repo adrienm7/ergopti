@@ -31,6 +31,7 @@ local menu_paths       = require("infra.config_paths")
 local keymap           = require("modules.keymap")
 local hotstring_editor = require("ui.hotstring_editor")
 
+local PersonalFiles = require("hotstrings.personal_files")
 local LOG = "personal_hotstrings"
 
 -- Hard cap on how deep the recursive extension-TOML scan descends. The scanned
@@ -99,7 +100,7 @@ function M.load(ctx)
 	-- because "__" is used both as a literal character allowed in a stem AND as
 	-- the path-segment join separator.
 	local group_name_sources = {}
-	local function scan_recursive(dir, prefix, depth)
+	local function scan_recursive(dir, prefix, depth, components)
 		if depth > SCAN_MAX_DEPTH then
 			Logger.warn(LOG, "Personal ext scan hit max depth %d at '%s' — not descending further (directory cycle?).",
 				SCAN_MAX_DEPTH, dir)
@@ -153,18 +154,25 @@ function M.load(ctx)
 						group_name, prior_path, item.path)
 				end
 				group_name_sources[group_name] = item.path
-				keymap.load_toml(group_name, item.path)
-				table.insert(loaded, { name = group_name, path = item.path })
+				local source_components = {}
+				for index, component in ipairs(components) do source_components[index] = component end
+				source_components[#source_components + 1] = item.name
+				local personal_source = PersonalFiles.describe(source_components)
+				keymap.load_toml(group_name, item.path, nil, personal_source)
+				table.insert(loaded, { name = group_name, path = item.path, personal_source = PersonalFiles.copy(personal_source) })
 				Logger.info(LOG, "Loaded extra personal hotstrings group '%s' from '%s'.", group_name, item.path)
 			else
 				-- Recurse into subdirectory
 				local new_prefix = (prefix == "") and item.name or (prefix .. "__" .. item.name)
-				scan_recursive(item.path, new_prefix, depth + 1)
+				local child_components = {}
+				for index, component in ipairs(components) do child_components[index] = component end
+				child_components[#child_components + 1] = item.name
+				scan_recursive(item.path, new_prefix, depth + 1, child_components)
 			end
 		end
 	end
 
-	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "", 1)
+	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "", 1, {})
 
 	return loaded
 end

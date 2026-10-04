@@ -30,6 +30,9 @@ function buildCommand(fakeBinary, logFile) {
 	const sharedRoot = SHARED_LUA_ROOT.replace(/\\/g, '/');
 	const source = [
 		`package.path = ${JSON.stringify(`${moduleRoot}/?.lua;${moduleRoot}/?/init.lua;${sharedRoot}/?.lua;${sharedRoot}/?/init.lua;`)} .. package.path`,
+		// Native Windows Lua expands module dots with backslashes. Load this
+		// path-sensitive macOS module with its real POSIX filename on every host.
+		`package.loaded["modules.llm.network_env"] = assert(loadfile(${JSON.stringify(`${moduleRoot}/modules/llm/network_env.lua`)}))()`,
 		'local Builder = require("modules.llm.ollama_server_command")',
 		`local command, detail = Builder.build(${JSON.stringify(fakeBinary)}, ${JSON.stringify(logFile)}, ${PORT})`,
 		'if not command then io.stderr:write(tostring(detail)); os.exit(2) end',

@@ -3182,5 +3182,12 @@
 	"menu.global.remove_from_karabiner": "הסרת Ergopti מ-Karabiner",
 	"menu.global.restore_touchpad_gestures": "שחזור מחוות משטח המגע של Windows",
 	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת.",
-	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט."
+	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט.",
+	"platform_reason.token_streaming_transport_missing": "לא ב-Windows: Windows עדיין אינו יכול להציג הצעות טוקן אחר טוקן. אפשרות זו נשארת לא פעילה.",
+	"menu.layout.number_row": "שורת הספרות",
+	"menu.layout.number_row_native": "הסדר המקורי",
+	"menu.layout.number_row_digits": "ספרות תחילה",
+	"menu.layout.number_row_symbols": "סמלים תחילה",
+	"platform_reason.number_row_override_unsupported": "לא נתמך: מנהל התקן זה שומר על שורת הספרות המקורית של המערכת; אי אפשר לכפות ספרות או סמלים.",
+	"platform_reason.number_row_source_unavailable": "לא זמין: העדפת סמלים דורשת פריסה מדומה פעילה עם רמות תקינות לספרות ולסמלים בכל מיקום בשורת הספרות."
 }

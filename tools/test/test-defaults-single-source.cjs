@@ -93,7 +93,12 @@ async function main() {
 				inputCount++;
 				const enabled = entry.type === 'feature' ? neutral.enabled : neutral;
 				assert(
-					enabled === false || enabled === 'none' || enabled === '',
+					enabled === false ||
+						enabled === 'none' ||
+						enabled === '' ||
+						(name === 'layout.direct_access_digits' &&
+							entry.type === 'enum' &&
+							enabled === 'native'),
 					`${name}: empty ${platform} configuration must not activate input behavior`
 				);
 			} else {
@@ -110,6 +115,17 @@ async function main() {
 		[...APPROVED_ACTIVE_BY_DEFAULT].sort(),
 		'only approved script-management and physical magic editor slots may be active by default'
 	);
+	const numberRow = manifest.entries.find(
+		(entry) => entry.section === 'layout' && entry.id === 'direct_access_digits'
+	);
+	assert.equal(numberRow.type, 'enum');
+	assert.deepEqual(numberRow.enum_values, ['native', 'digits', 'symbols']);
+	assert.equal(numberRow.default, 'native', 'an empty source retains the native input owner');
+	assert.deepEqual(numberRow.recommended_per_platform, {
+		ahk: 'digits',
+		hs: 'native',
+		linux: 'native'
+	});
 	const contextual = manifest.entries.find(
 		(entry) => entry.section === 'shortcuts.keyboard' && entry.id === 'magic_editor'
 	);
@@ -151,6 +167,16 @@ async function main() {
 		const master =
 			platform === 'ahk' ? template.category_enabled.shortcuts : template.shortcuts.enabled;
 		assert.equal(master, false, `${driver}: default input capture stays closed`);
+		assert.equal(
+			template.layout.direct_access_digits,
+			'native',
+			`${driver}: the template reports native posture`
+		);
+		assert.equal(
+			template.category_enabled?.layout ?? false,
+			false,
+			`${driver}: number-row status cannot activate its master`
+		);
 		for (const entry of manifest.entries.filter((item) => item.section === 'shortcuts.keyboard')) {
 			if (entry.platforms && !entry.platforms.includes(platform)) continue;
 			const value = entry.default_per_platform?.[platform] ?? entry.default;

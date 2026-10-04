@@ -1,0 +1,42 @@
+{
+	"description": "Independent fixed Off-choice contract; a cancellation command, not a persistent setting. Native prompt rows and lifecycle remain owned by their engines.",
+	"manifest": "llm_live_controls",
+	"id": "llm_live_mode_off",
+	"label_key": "menu.llm.live_mode_off",
+	"checked_getter": "llm_live_is_off",
+	"ready_getter": "llm_live_off_ready",
+	"states": [
+		{
+			"live": false,
+			"checked": true
+		},
+		{
+			"live": true,
+			"checked": false
+		}
+	],
+	"refusals": ["false", "nil", "number", "throw"],
+	"locales": [
+		"ar",
+		"cs",
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"he",
+		"hi",
+		"it",
+		"ja",
+		"ko",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"ru",
+		"sv",
+		"tr",
+		"uk",
+		"zh"
+	]
+}

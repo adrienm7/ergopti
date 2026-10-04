@@ -31,6 +31,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const crypto = require('node:crypto');
 const {
 	createStartupCodeFixture,
 	prepareStartupPersonalInclude
@@ -159,6 +160,61 @@ function scriptChordReceiptProblem(configRoot, running) {
 	return null;
 }
 
+/**
+ * Checks the existing native startup publisher's fresh source-process receipt.
+ * @param {string} configRoot Exclusive smoke directory.
+ * @param {number} pid Native PID returned by the synchronous launcher.
+ * @param {string} nonce Current launch's private nonce.
+ * @param {string} ahk Selected interpreter.
+ * @returns {string|null} Refusal reason, or null for complete source readiness.
+ */
+function startupReceiptProblem(configRoot, pid, nonce, ahk) {
+	const file = path.join(configRoot, 'ready.json');
+	if (!fs.existsSync(file)) return 'the boot published no fresh readiness receipt';
+	let receipt;
+	try {
+		receipt = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+	} catch (error) {
+		return 'the readiness receipt cannot be read: ' + error.message;
+	}
+	if (
+		!receipt ||
+		typeof receipt !== 'object' ||
+		Array.isArray(receipt) ||
+		Object.keys(receipt).sort().join('|') !==
+			[
+				'schema_version',
+				'nonce',
+				'pid',
+				'executable',
+				'compiled',
+				'build_commit',
+				'bundle_identity',
+				'phase',
+				'driver_ready',
+				'menu_ready',
+				'logs_flushed'
+			]
+				.sort()
+				.join('|') ||
+		receipt.schema_version !== 1 ||
+		receipt.nonce !== nonce ||
+		!Number.isSafeInteger(pid) ||
+		pid <= 0 ||
+		receipt.pid !== pid ||
+		receipt.compiled !== false ||
+		receipt.phase !== 'ready' ||
+		receipt.driver_ready !== true ||
+		receipt.menu_ready !== true ||
+		receipt.logs_flushed !== true ||
+		typeof receipt.executable !== 'string' ||
+		path.win32.normalize(receipt.executable).toLowerCase() !==
+			path.win32.normalize(path.resolve(ahk)).toLowerCase()
+	)
+		return 'the readiness receipt is foreign or incomplete';
+	return null;
+}
+
 function logTail(configRoot) {
 	// Under the smoke, boot puts the default logs folder at
 	// <smoke dir>\<AppDirsWindowsLogsRelative()>.
@@ -282,6 +338,7 @@ async function main() {
 			const marker = path.join(configRoot, 'suspend_restore.marker');
 			if (markerBearing) fs.writeFileSync(marker, '1\n', 'utf8');
 			prepareStartupPersonalInclude(code.windows, path.join(configRoot, 'config'));
+			const nonce = crypto.randomBytes(16).toString('hex');
 			const result = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
 				cwd: code.windows,
 				encoding: 'utf8',
@@ -290,6 +347,7 @@ async function main() {
 					...process.env,
 					LOCALAPPDATA: configRoot,
 					ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
+					ERGOPTI_STARTUP_SMOKE_NONCE: nonce,
 					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : ''
 				}
 			});
@@ -304,6 +362,8 @@ async function main() {
 					`${fixture} exited ${result.status}.${output ? `\n${output}` : ''}${logs ? `\n${logs}` : ''}`
 				);
 			}
+			const readiness = startupReceiptProblem(configRoot, result.pid, nonce, ahk);
+			if (readiness) return fail(fixture + ': ' + readiness);
 			if (!fs.existsSync(path.join(configRoot, 'startup-pump.txt')))
 				return fail(
 					`${fixture}: timers did not progress while the headless tray request was retained`
@@ -342,11 +402,18 @@ async function main() {
 			if (logged !== null) return logged;
 			// Reuse the first fixture once so the no-bootstrap path is exercised too.
 			if (fixture === 'fresh-config') {
+				fs.unlinkSync(path.join(configRoot, 'ready.json'));
+				const warmNonce = crypto.randomBytes(16).toString('hex');
 				const second = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
 					cwd: code.windows,
 					encoding: 'utf8',
 					timeout: 120000,
-					env: { ...process.env, LOCALAPPDATA: configRoot, ERGOPTI_STARTUP_SMOKE_DIR: configRoot }
+					env: {
+						...process.env,
+						LOCALAPPDATA: configRoot,
+						ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
+						ERGOPTI_STARTUP_SMOKE_NONCE: warmNonce
+					}
 				});
 				if (second.error || second.status !== 0) {
 					const output = `${second.stdout || ''}${second.stderr || ''}`.trim();
@@ -355,6 +422,8 @@ async function main() {
 						`reloaded-config exited ${second.status}.${output ? `\n${output}` : ''}${logs ? `\n${logs}` : ''}`
 					);
 				}
+				const warmReadiness = startupReceiptProblem(configRoot, second.pid, warmNonce, ahk);
+				if (warmReadiness) return fail('reloaded-config: ' + warmReadiness);
 				const reloaded = failOnLoggedErrors('reloaded-config', configRoot);
 				if (reloaded !== null) return reloaded;
 			}

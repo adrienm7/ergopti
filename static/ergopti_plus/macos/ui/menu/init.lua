@@ -167,8 +167,10 @@ end
 --- Builds the menubar and wires its owners.
 --- @param extension_packs table|nil The boot's extension discovery catalogue, whose
 ---   loaded packs the Hotstrings menu lists under their extension.
+--- @param personal_files table|nil Actual boot-loaded personal source records.
+--- @param personal_root string|nil Configured route that admitted those sources.
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths,
-	extension_packs)
+	extension_packs, personal_files, personal_root)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	-- init.lua initializes only the resolver. The editor owns its reload callback
 	-- and must be initialized here even when ConfigPaths is already ready.
@@ -383,6 +385,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local transactional_save_prefs = nil
 	local preference_checkpoint = nil
 	local llm_handler = nil
+	local base_delay_owner = nil
+	local script_chords_owner = nil
 	local apply_preference_scope
 	local apply_global_scope
 	-- Features whose runtime refused the saved value this session: their state
@@ -429,7 +433,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return true
 	end
 
-	sync_state_to_modules = function(saved, config_absent, restoring)
+	sync_state_to_modules = function(saved, config_absent, restoring, rollback_modules)
 		local committed, report = MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
 			apply_llm_enabled         = function(enabled)
@@ -444,7 +448,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
-			core_mods                = core_mods,
+			core_mods                = rollback_modules or core_mods,
 			restoring                 = restoring == true,
 			-- A deferred engine refusal (keylogger start) lands after this sync
 			-- returned; it keeps the acknowledged value on disk like a boot one.
@@ -693,7 +697,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		snapshot_view       = session_demotions.persisted_view,
 		read_only_reason    = function() return read_only_reason end,
 		restore_runtime     = function(snapshot)
-			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
+			if base_delay_owner and base_delay_owner.pending()
+				and base_delay_owner.restore_runtime() ~= true then return false end
+			local rollback_modules = core_mods
+			if script_chords_owner and script_chords_owner.pending() then
+				if script_chords_owner.restore_runtime() ~= true then return false end
+				rollback_modules = script_chords_owner.rollback_modules(core_mods)
+				if type(rollback_modules) ~= "table" then return false end
+			end
+			if sync_state_to_modules(snapshot, false, true, rollback_modules) ~= true then return false end
+			if script_chords_owner and script_chords_owner.pending()
+				and script_chords_owner.restore_runtime() ~= true then return false end
 			if type(llm_handler) == "table"
 				and type(llm_handler.restore_preference_runtime) == "function" then
 				return llm_handler.restore_preference_runtime(snapshot) == true
@@ -1249,7 +1263,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
 				scope = scope, state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 				runtime = {
-					capture = function() return menu_mods.keyboard_layout.capture_scope(state) end,
+					capture = function(_, source) return menu_mods.keyboard_layout.capture_scope(state, source) end,
 					apply = function(_, rows) return menu_mods.keyboard_layout.apply_scope(state, rows) end,
 					restore = function(snapshot) return menu_mods.keyboard_layout.restore_scope(state, snapshot) end,
 				},
@@ -1340,6 +1354,25 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return global_scope.apply(mode)
 	end
+	local function live_pause()
+		if type(core_mods.shortcuts_mod) ~= "table"
+			or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+		return core_mods.shortcuts_mod.is_paused()
+	end
+	-- These owners enter the global writer fence before changing runtime state.
+	-- Their save port is the ordinary transaction, avoiding nested admission.
+	local preview_owner = require("ui.menu.preview_transaction").new({
+		state = state, keymap = keymap, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
+	base_delay_owner = require("ui.menu.base_delay_transaction").new({
+		state = state, keymap = keymap, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
+	script_chords_owner = require("ui.menu.script_chords_transaction").new({
+		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
 	local ctx = {
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
@@ -1347,6 +1380,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,
+		commit_preview           = preview_owner.toggle,
+		commit_base_delay        = base_delay_owner.set,
+		commit_script_chords     = script_chords_owner.toggle,
 		notify_feature           = notify_feature,
 		do_reload                = do_reload,
 		applyTriggerChar         = applyTriggerChar,
@@ -1357,6 +1393,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- The packs this boot discovered and registered; the counter groups their
 		-- loaded categories under each extension from it.
 		extension_packs          = extension_packs,
+		personal_files           = PreferencesTransaction.clone(personal_files or {}),
+		personal_root            = personal_root,
 		module_sections          = module_sections,
 		hotstring_editor         = hotstring_editor,
 		personal_info            = core_mods.dyn_hot_mod,

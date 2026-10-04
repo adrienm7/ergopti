@@ -95,29 +95,11 @@ CS_Read() {
 		if (content = "")
 				return out
 
-		section := ""
-		loop parse, content, "`n", "`r" {
-				line := Trim(A_LoopField)
-				if (line = "" || SubStr(line, 1, 1) = "#")
-						continue
-				; Section header: [name]
-				if (SubStr(line, 1, 1) = "[" && SubStr(line, -1) = "]") {
-						section := Trim(SubStr(line, 2, StrLen(line) - 2))
-						if !out.Has(section)
-								out[section] := Map()
-						continue
-				}
-				; Key = value
-				eq := InStr(line, "=")
-				if !eq
-						continue
-				key := Trim(SubStr(line, 1, eq - 1))
-				val := Trim(SubStr(line, eq + 1))
-				if (section = "")
-						continue
-				out[section][key] := CS_CoerceValue(val)
-		}
-		return out
+		; A second lexical grammar silently ignored commented headers and could
+		; not read multiline application opt-outs. Parse the bytes already read
+		; through the canonical reader, retaining native Boolean values and the
+		; metrics-specific unreadable-file latch above.
+		return _ParseTomlFileImpl(path, false, false, content)
 }
 
 ; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an
@@ -127,21 +109,7 @@ CS_Read() {
 ; escaped quote is preserved. Without this, "false # x" fell through to the bare-
 ; string fallback and coerced to a TRUTHY string, inverting the user's opt-out.
 CS_StripInlineComment(s) {
-		in_str := false
-		escaped := false
-		loop parse, s {
-				c := A_LoopField
-				if escaped {
-						escaped := false
-				} else if (c = "\") {
-						escaped := true
-				} else if (c = '"') {
-						in_str := !in_str
-				} else if (!in_str && c = "#") {
-						return Trim(SubStr(s, 1, A_Index - 1))
-				}
-		}
-		return s
+		return TOML_StripInlineComment(s)
 }
 
 CS_CoerceValue(raw) {

@@ -173,3 +173,87 @@ helpers.describe("Lua's os library has no getpid", function()
 		)
 	end)
 end)
+
+--- Runs the actual root builder over independently authored lifecycle declarations.
+local function with_lifecycle_declarations(callback)
+	local renderer = require("infra.manifest_menu")
+	local rows = renderer.get_array("top_level")
+	local saved, owned = {}, {}
+	for index, row in ipairs(rows) do
+		if row.id == "reload" or row.id == "quit" then
+			saved[index] = row
+			local copy = {}
+			for key, value in pairs(row) do copy[key] = value end
+			copy.type = "command"
+			copy.i18n = row.id == "reload" and "button.cancel" or "button.ok"
+			rows[index], owned[row.id] = copy, copy
+		end
+	end
+	local ok, err = pcall(function()
+		helpers.assert_true(owned.reload ~= nil and owned.quit ~= nil, "the real root declares both commands")
+		callback(helpers.load_module("ui.menu.menu_builder"), owned)
+	end)
+	for index, row in pairs(saved) do rows[index] = row end
+	renderer.invalidate_cache()
+	if not ok then error(err, 0) end
+end
+
+local function lifecycle_declared_row(items, key)
+	local label = require("infra.i18n").get(key)
+	for _, item in ipairs(items) do
+		if item.title == label then return item end
+	end
+end
+
+helpers.describe("shared lifecycle commands (Linux)", function()
+	helpers.it("uses declared labels and preserves daemon ownership and Quit-last while paused (shared-lifecycle)", function()
+		with_lifecycle_declarations(function(builder)
+			local calls = {}
+			local items = builder.build({ config = make_config(), paused = true,
+				on_reload = function() calls[#calls + 1] = "reload" end,
+				on_quit = function() calls[#calls + 1] = "quit" end,
+			})
+			local reload = lifecycle_declared_row(items, "button.cancel")
+			local quit = lifecycle_declared_row(items, "button.ok")
+			helpers.assert_true(reload ~= nil and quit ~= nil, "both commands consume their shared labels")
+			helpers.assert_true(reload.disabled ~= true and quit.disabled ~= true)
+			helpers.assert_true(items[#items] == quit, "the existing desktop Quit-last policy is retained")
+			reload.fn(); quit.fn()
+			helpers.assert_eq(table.concat(calls, ","), "reload,quit")
+		end)
+	end)
+
+	helpers.it("refuses an unregistered declared readiness predicate without running native owners (shared-lifecycle)", function()
+		with_lifecycle_declarations(function(builder, owned)
+			owned.reload.i18n, owned.quit.i18n = "menu.global.reload", "menu.global.quit"
+			owned.reload.disabled_when = { "unregistered_lifecycle_owner" }
+			owned.quit.disabled_when = { "unregistered_lifecycle_owner" }
+			local calls = 0
+			local items = builder.build({ config = make_config(),
+				on_reload = function() calls = calls + 1 end,
+				on_quit = function() calls = calls + 1 end,
+			})
+			local reload = lifecycle_declared_row(items, "menu.global.reload")
+			local quit = lifecycle_declared_row(items, "menu.global.quit")
+			helpers.assert_true(reload.disabled == true and quit.disabled == true)
+			helpers.assert_eq(reload.fn(), false)
+			helpers.assert_eq(quit.fn(), false)
+			helpers.assert_eq(calls, 0)
+		end)
+	end)
+
+	helpers.it("does not reinterpret a non-command declaration as a lifecycle row (shared-lifecycle)", function()
+		with_lifecycle_declarations(function(builder, owned)
+			owned.reload.i18n, owned.quit.i18n = "menu.global.reload", "menu.global.quit"
+			owned.reload.type, owned.quit.type = "---", "---"
+			local calls = 0
+			local items = builder.build({ config = make_config(),
+				on_reload = function() calls = calls + 1 end,
+				on_quit = function() calls = calls + 1 end,
+			})
+			helpers.assert_nil(lifecycle_declared_row(items, "menu.global.reload"))
+			helpers.assert_nil(lifecycle_declared_row(items, "menu.global.quit"))
+			helpers.assert_eq(calls, 0)
+		end)
+	end)
+end)

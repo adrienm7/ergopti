@@ -1,0 +1,222 @@
+{
+	"row": {
+		"id": "llm_indentation",
+		"path": "llm.display.pred_indent",
+		"i18n": "menu.llm.indent_label"
+	},
+	"choices": [
+		{
+			"value": -7,
+			"prefix": "-7 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": -6,
+			"prefix": "-6 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": -5,
+			"prefix": "-5 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": -4,
+			"prefix": "-4 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": -3,
+			"prefix": "-3 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": -2,
+			"prefix": "-2 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": -1,
+			"prefix": "-1 ",
+			"i18n": "menu.llm.indent_space"
+		},
+		{
+			"value": 0,
+			"prefix": "",
+			"i18n": "menu.llm.indent_none"
+		},
+		{
+			"value": 1,
+			"prefix": "+1 ",
+			"i18n": "menu.llm.indent_space"
+		},
+		{
+			"value": 2,
+			"prefix": "+2 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": 3,
+			"prefix": "+3 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": 4,
+			"prefix": "+4 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": 5,
+			"prefix": "+5 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": 6,
+			"prefix": "+6 ",
+			"i18n": "menu.llm.indent_spaces"
+		},
+		{
+			"value": 7,
+			"prefix": "+7 ",
+			"i18n": "menu.llm.indent_spaces"
+		}
+	],
+	"base": {
+		"owner": "owned",
+		"generation": 4,
+		"backend": "ollama",
+		"indentation": 0,
+		"progressive": true,
+		"count": 3,
+		"enabled": true,
+		"paused": false,
+		"blocked": false
+	},
+	"cases": [
+		{
+			"id": "negative_boundary",
+			"value": -7,
+			"current": {},
+			"admitted": true
+		},
+		{
+			"id": "zero",
+			"value": 0,
+			"current": {},
+			"admitted": true
+		},
+		{
+			"id": "positive_boundary",
+			"value": 7,
+			"current": {},
+			"admitted": true
+		},
+		{
+			"id": "show_all",
+			"value": 1,
+			"expected": {
+				"progressive": false
+			},
+			"current": {
+				"progressive": false
+			},
+			"admitted": true
+		},
+		{
+			"id": "below",
+			"value": -8,
+			"current": {},
+			"admitted": false
+		},
+		{
+			"id": "above",
+			"value": 8,
+			"current": {},
+			"admitted": false
+		},
+		{
+			"id": "fraction",
+			"value": 0.5,
+			"current": {},
+			"admitted": false
+		},
+		{
+			"id": "typed_string",
+			"value": "1",
+			"current": {},
+			"admitted": false
+		},
+		{
+			"id": "changed_paused",
+			"value": 2,
+			"current": {
+				"paused": true
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_enabled",
+			"value": 2,
+			"current": {
+				"enabled": false
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_blocked",
+			"value": 2,
+			"current": {
+				"blocked": true
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_count",
+			"value": 2,
+			"current": {
+				"count": 1
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_owner",
+			"value": 2,
+			"current": {
+				"owner": "retired"
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_generation",
+			"value": 2,
+			"current": {
+				"generation": 5
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_backend",
+			"value": 2,
+			"current": {
+				"backend": "api"
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_indentation",
+			"value": 2,
+			"current": {
+				"indentation": 1
+			},
+			"admitted": false
+		},
+		{
+			"id": "changed_progressive",
+			"value": 2,
+			"current": {
+				"progressive": false
+			},
+			"admitted": false
+		}
+	]
+}

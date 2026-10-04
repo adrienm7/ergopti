@@ -192,3 +192,46 @@ _LT_ThrowUpdaterFailure() {
 }
 Test("lifecycle transition: a resume accepts an updater with nothing retained (resume-updater-nothing-pending)",
 	_LT_ResumeAcceptsAnUpdaterWithNothingRetained)
+
+_LT_BrightnessReturnsNoReceipt(State) {
+	State.calls.Push("screen-brightness")
+}
+
+_LT_BrightnessAcknowledgesRetirement() {
+	global _LifecycleLatestTransition, _LifecycleTransitionsByPhase
+	Body := _DriverFuncBody("Ergopti_OnSuspendEnter")
+	Assert(RegExMatch(Body,
+		'_LifecycleRunRequiredStep\(\s*Transition\s*,\s*"screen-brightness"\s*,\s*\(\) => ScreenBrightnessCancel\("suspended"\)\s*(,\s*true\s*)?\)',
+		&Step) > 0, "the actual suspend entry must call the brightness native owner")
+	RequireTrue := Step[1] != ""
+	SavedLatest := _LifecycleLatestTransition
+	SavedPhases := _LifecycleTransitionsByPhase
+	try {
+		for Mode in ["success", "false", "missing", "throw"] {
+			_LifecycleTransitionsByPhase := Map()
+			State := { calls: [] }
+			Transaction := LifecycleTransitionBegin("suspend")
+			LifecycleTransitionMarkStarted(Transaction)
+			Action := Mode == "success" ? _LT_Succeed.Bind(State, "screen-brightness")
+				: Mode == "false" ? _LT_ReturnFalse.Bind(State, "screen-brightness")
+				: Mode == "missing" ? _LT_BrightnessReturnsNoReceipt.Bind(State)
+				: _LT_Throw.Bind(State, "screen-brightness")
+			Accepted := _LifecycleRunRequiredStep(Transaction, "screen-brightness", Action, RequireTrue)
+			Finished := LifecycleTransitionFinish(Transaction)
+			Debt := LifecycleTransitionDebtSnapshot("suspend")
+			AssertEqual(1, State.calls.Length, Mode . ": the registered native owner must actually run")
+			AssertEqual(Mode == "success", Accepted, Mode . ": only exact retirement acknowledgement succeeds")
+			AssertEqual(Mode == "success", Finished, Mode . ": native cleanup debt blocks suspend success")
+			AssertEqual(Mode != "success", LifecycleTransitionNeedsCompensation("suspend"),
+				Mode . ": a started teardown retains the existing compensation requirement")
+			AssertEqual(Mode == "success" ? 0 : 1, Debt.Length, Mode . ": exactly this owner records debt")
+			if Debt.Length
+				AssertEqual("screen-brightness", Debt[1].owner, Mode . ": debt retains exact owner identity")
+		}
+	} finally {
+		_LifecycleLatestTransition := SavedLatest
+		_LifecycleTransitionsByPhase := SavedPhases
+	}
+}
+Test("lifecycle transition: brightness retirement acknowledgement and refusal gate suspend",
+	_LT_BrightnessAcknowledgesRetirement)

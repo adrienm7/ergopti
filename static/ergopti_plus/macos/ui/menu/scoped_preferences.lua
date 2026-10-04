@@ -94,7 +94,7 @@ function M.new(options)
 					assert(type(baseline) == "table" and baseline.status == source.status
 						and (source.status == "absent" or baseline.content == source.content),
 						"scope source differs from loaded preferences")
-					local native = runtime.capture(updates)
+					local native = runtime.capture(updates, source)
 					assert(type(native) == "table", "scope native snapshot unavailable")
 					local snapshot = { source = baseline, candidate = { status = "ok", content = candidate },
 						checkpoint = checkpoint.capture(), native = native }

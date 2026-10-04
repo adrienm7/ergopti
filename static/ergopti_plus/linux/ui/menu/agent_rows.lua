@@ -85,11 +85,18 @@ local function system_rows(system, dialogs, changed)
 	local function store(value)
 		if AgentSettings.set_spec(system, value) then changed() end
 	end
-	local rows = { {
-		label = tr("menu.agent.off"),
-		checked = spec == "",
-		action = function() store("") end,
-	} }
+	local off = require("infra.manifest_menu").check_row("agent_system_controls", "agent_system_off", {
+		agent_system_off = function()
+			if AgentSettings.set_spec(system, "") ~= true then return false end
+			changed()
+			return true
+		end,
+	}, {
+		agent_system_is_off = function() return AgentSettings.get_spec(system) == "" end,
+		agent_system_off_ready = function() return type(AgentSettings.set_spec) == "function" end,
+	})
+	if not off then return current_label, {} end
+	local rows = { off }
 	for _, choice in ipairs(choices) do
 		local value = choice.value
 		rows[#rows + 1] = {

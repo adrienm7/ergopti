@@ -113,7 +113,7 @@ _MSR_ReplacementCarriesTheUsersMagicKey() {
 ; HSE_RegisterFromTomlFlags must normalise BOTH, so the class is asserted
 ; together rather than one member at a time.
 _MSR_EveryTomlLoaderSubstitutesBothSides() {
-	for Fn in ["LoadHotstringsSection", "LoadExtTomlFile", "_HsCacheRegisterSection"] {
+	for Fn in ["LoadHotstringsSection", "LoadExtTomlFile", "_HsCacheRegisterRows"] {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . "() must exist in the driver source")
 		Assert(InStr(Body, "HSE_RegisterFromTomlFlags") > 0 or InStr(Body, "CreateCaseSensitiveHotstrings") > 0,
@@ -123,6 +123,21 @@ _MSR_EveryTomlLoaderSubstitutesBothSides() {
 		Assert(RegExMatch(Body, "Output\s*:=\s*StrReplace"),
 			Fn . " must substitute the corpus marker in the REPLACEMENT too, not only in the trigger — the preview index already does both, and a one-sided substitution makes the tooltip and the engine disagree")
 	}
+	Legacy := _DriverFuncBody("_HsCacheRegisterSection")
+	Assert(InStr(Legacy, "_HsCacheRegisterRows(LoaderKey, _HS_CACHE_ROWS[LoaderKey], FeatureConfig, ExtraOptions, ResolvedPriority)"),
+		"the legacy cached section must reach the inspected marker-substituting native row owner")
+	Ensure := _DriverFuncBody("HotstringsCacheEnsure")
+	Assert(InStr(Ensure, "_GENERATED_HOTSTRINGS[Key] := _HsCacheRegisterSection.Bind(Key)"),
+		"the actual legacy generated map must bind that section wrapper")
+	Fallback := _DriverFuncBody("LoadHotstringsSection")
+	Assert(InStr(Fallback, "GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]")
+		&& InStr(Fallback, "GeneratedFn(FeatureConfig, ExtraOptions, ResolvedPriority)"),
+		"the legacy section loader must dispatch through its exact generated cache owner")
+	Ordered := _DriverFuncBody("LoadHotstringsCategory")
+	Assert(InStr(Ordered, "_HsCacheRegisterRows(Record[1], [Record[2]], Configs[Parts[2]], ExtraOptions, Priorities[Parts[2]])"),
+		"the ordered category must reach that same marker-substituting row owner")
+	Assert(InStr(Ordered, "LoadHotstringsSection(CategoryName, Section, Config, ExtraOptions)"),
+		"the bound category fallback must still reach the separately inspected TOML registrar")
 }
 
 

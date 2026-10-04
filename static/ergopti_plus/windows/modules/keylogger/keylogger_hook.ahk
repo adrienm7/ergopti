@@ -307,7 +307,11 @@ KL_Hook_NoteActivity(already_called := false, authorized := true, Now := unset) 
 		; Skip when already_called is true — the shortcut branch already fired the
 		; watcher for this same physical keydown; a second call here would duplicate
 		; session/idle accounting for chords that are also special keys (H-01 fix).
+		LastTick := KLHook.last_tick
 		now := IsSet(Now) ? Now : A_TickCount
+		delay := TickElapsed64(LastTick, now)
+		if LastTick = 0
+				delay := 0
 		if !Keylogger.synth_active and !already_called {
 				if authorized {
 						try KL_Watchers_OnKeystroke(0, now)
@@ -315,7 +319,6 @@ KL_Hook_NoteActivity(already_called := false, authorized := true, Now := unset) 
 						try KL_Watchers_OnPrivateKeystroke(now)
 				}
 		}
-		delay := (KLHook.last_tick > 0) ? ((now - KLHook.last_tick) & 0xFFFFFFFF) : 0
 		KLHook.last_tick := now
 		return delay
 }

@@ -1,0 +1,19 @@
+{
+	"section": "llm_api_active_commands",
+	"ready": "llm_api_active_ready",
+	"rows": [
+		{
+			"id": "api_test_active",
+			"i18n": "menu.llm.api_test_entry"
+		},
+		{
+			"id": "api_remove_active",
+			"i18n": "menu.llm.api_remove_entry"
+		}
+	],
+	"refusal_results": [false, null, 2],
+	"remove_effects": {
+		"ack": 1,
+		"refused": 0
+	}
+}

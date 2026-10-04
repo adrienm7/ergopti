@@ -15,6 +15,11 @@ local Json = require("json")
 local Toml = require("toml_codec")
 local Files = require("keymap.layer_editor")
 local Outdated = require("config_outdated")
+local Logger = require("logger.shim")
+
+local LOG = "platform.remap.nav_layer"
+
+local Brightness = require("brightness_actions").load()
 
 local MODIFIER_KEYS = { ctrl = "ControlLeft", alt = "AltLeft", shift = "ShiftLeft", meta = "MetaLeft" }
 
@@ -43,6 +48,8 @@ function M.compile(bindings, registry)
 		local code = key_code(registry, source)
 		if resolved.kind == "none" then
 			layer[code] = { mods = {}, keys = {} }
+		elseif resolved.kind == "call" and Brightness.actions[resolved.handler] then
+			layer[code] = { mods = {}, keys = { Brightness.actions[resolved.handler].linux_code } }
 		elseif resolved.kind == "keystroke" then
 			local chords = {}
 			for _, chord in ipairs(resolved.chords) do
@@ -87,7 +94,8 @@ end
 --- so a reload keeps the layer in force; an entry this build no longer runs (a
 --- retired action, key, field or layer) is warned once and ignored, and every
 --- other binding of the file still loads.
---- @param opts table { shared_root, config_dir }.
+--- @param opts table { shared_root, config_dir, boot? }. A boot load isolates
+---   classified user-file failures; every later load remains strict.
 --- @return table layer Native chords for the navigation layer.
 function M.load(opts)
 	local ctx = Layers.load_context({
@@ -100,6 +108,13 @@ function M.load(opts)
 	})
 	for _, item in ipairs(result.errors) do
 		if rejects_whole_file(item) then
+			-- Only the initial engine may isolate a refused user file. A reload
+			-- must leave its previously acknowledged engine in force instead.
+			if opts.boot == true then
+				Logger.error(LOG, "'%s' could not be used as a whole: the navigation layer binds no key (%s).",
+					result.path, Layers.error_signature(item))
+				return {}
+			end
 			error("invalid navigation layer: " .. Layers.error_signature(item) .. " (" .. tostring(item.detail) .. ")", 2)
 		end
 	end

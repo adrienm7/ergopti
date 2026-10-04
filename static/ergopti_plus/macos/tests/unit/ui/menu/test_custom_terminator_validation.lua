@@ -68,17 +68,18 @@ local function run_action(mode, outcome)
 			if key == "editor.hotstrings.err_id_exists" then return "DUPLICATE:%s" end
 			return key
 		end,
+		section = function(key) return key end,
 	}
 	package.loaded["infra.dialog_util"] = {
-		text_prompt = function()
+		text_prompt = function(_, _, _, accept_label)
 			prompt_calls = prompt_calls + 1
 			if mode == "duplicate" then
-				if prompt_calls == 1 then return "OK", "," end
+				if prompt_calls == 1 then return accept_label, "," end
 				return "button.cancel", ""
 			end
-			if mode == "invalid_magic" then return "OK", invalid_byte end
-			if mode == "add_refusal" then return "OK", "@" end
-			return "OK", "§"
+			if mode == "invalid_magic" then return accept_label, invalid_byte end
+			if mode == "add_refusal" then return accept_label, "@" end
+			return accept_label, "§"
 		end,
 		block_alert = function(_title, body)
 			effects.alerts[#effects.alerts + 1] = body
@@ -89,7 +90,13 @@ local function run_action(mode, outcome)
 			return "button.retry"
 		end,
 	}
+	local command_row = require("infra.manifest_menu").command_row
+	local check_row = require("infra.manifest_menu").check_row
+	local get_array = require("infra.manifest_menu").get_array
 	package.loaded["infra.manifest_menu"] = {
+		command_row = command_row,
+		check_row = check_row,
+		get_array = get_array,
 		build = function(section, _, _, _, _, providers)
 			if section == "word_expanders_menu" then return providers.word_expander_entries() end
 			local rows = {}
@@ -169,7 +176,7 @@ local function run_action(mode, outcome)
 		local row
 		if mode == "duplicate" or mode == "add_refusal" then
 			row = find_row(built.menu, function(candidate)
-				return candidate.label == "menu.hotstrings.add_custom"
+				return candidate.label == "menu.hotstrings.add_delimiter"
 			end)
 		else
 			row = find_row(built.menu, function(candidate)

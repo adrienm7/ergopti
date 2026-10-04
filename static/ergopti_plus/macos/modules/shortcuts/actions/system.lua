@@ -146,6 +146,8 @@ local _awake_generation = 0
 local wrap_tap
 local acquire_tap
 local _failed_tap_cleanup = {}
+-- Exact committed tap dispatchers; retired delivery never reserves a new source.
+local _tap_key_claims = {}
 
 local function close_awake_alert()
 	local id    = awake_alert_id
@@ -828,6 +830,28 @@ function M.capture_frontmost_window(parent)
 		{ "-l", tostring(id) }, "screenshot", parent or SHORTCUT_ACTION_PARENT)
 end
 
+--- Whether an acknowledged tap dispatcher owns this plain native press.
+--- This projection reads its existing owner, admission and assignment callback.
+--- @param keycode integer Native key identity.
+--- @param flags table|nil Native modifiers of the press.
+--- @return boolean|nil claimed Nil when the assignment callback could not be read.
+function M.has_tap_key_claim(keycode, flags)
+	flags = flags or {}
+	if flags.cmd or flags.alt or flags.ctrl or flags.shift or flags.fn then return false end
+	for owner, claim in pairs(_tap_key_claims) do
+		if owner.delivering == true and owner.released ~= true
+			and raw_binding_admitted(claim.admission) then
+			local called, action = pcall(claim.decide, keycode)
+			if not called then
+				Logger.error(LOG, "Tap assignment projection was refused: %s.", tostring(action))
+				return nil
+			end
+			if type(action) == "function" then return true end
+		end
+	end
+	return false
+end
+
 --- Runs the number-row tap keys from a raw keyDown tap, so a tapped key is
 --- consumed before macOS generates its character.
 ---
@@ -843,7 +867,7 @@ function M.bind_tap_keys(admission_guard, decide)
 	if type(decide) ~= "function" then
 		error("shortcuts.actions.system.bind_tap_keys: decide must be a function")
 	end
-	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
+	local owner = acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.tap_keys")
@@ -873,6 +897,15 @@ function M.bind_tap_keys(admission_guard, decide)
 		if scheduled == true then invalidate_wrap_selection_cache() end
 		return finish_tap(scheduled, fence_events)
 	end, "tap keys")
+	if owner == nil then return nil end
+	_tap_key_claims[owner] = { admission = admission_guard, decide = decide }
+	local delete = owner.delete
+	function owner:delete()
+		local settled = delete(self)
+		if settled == true then _tap_key_claims[self] = nil end
+		return settled
+	end
+	return owner
 end
 
 --- Adds one exact parent claim to the shared screenshot owner.

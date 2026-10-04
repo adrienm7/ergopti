@@ -33,9 +33,11 @@ local MagicKeySourceMenu = require("ui.menu.magic_key_source_menu")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
+local NumberRowPolicy = require("layout.number_row_policy")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
+	layout_number_row_mode       = Manifest.default_for("layout.direct_access_digits"),
 	layout_pause_switch_enabled = Manifest.default_for("layout.pause_switch_enabled"),
 	layout_on_pause             = Manifest.default_for("layout.on_pause"),
 	layout_on_resume            = Manifest.default_for("layout.on_resume"),
@@ -727,8 +729,11 @@ function M.build(ctx)
 			return ctx.apply_preference_scope("keyboard_layout", mode)
 		end
 	end
+	-- Native-only status never acquires a preference or forced-input writer.
+	render_ctx.commands["number_row_mode"] = function() return false end
 	local custom_rows = custom_layout_rows(update_menu)
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
+		["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = active_layout_rows,
 		["layout_bundle"]    = function() return bundle_rows end,
@@ -843,8 +848,24 @@ function M.scope_pending() return next(pending_switches) ~= nil end
 --- Captures the exact future automatic-switching policy.
 --- @param state table Live menu state.
 --- @return table|nil snapshot Detached policy, absent while native work is pending.
-function M.capture_scope(state)
+function M.capture_scope(state, source)
 	if M.scope_pending() then return nil end
+	-- The new read-only number-row status does not acquire a future or malformed
+	-- personal leaf during a whole scope restoration. Observe only this leaf
+	-- from the transaction's exact admitted source, before backup/publication.
+	if source ~= nil then
+		if type(source) ~= "table" or (source.status ~= "ok" and source.status ~= "absent") then return nil end
+		if source.status == "ok" then
+			if type(source.content) ~= "string" then return nil end
+			local decoded, document = pcall(require("infra.toml.codec").decode, source.content)
+			if not decoded or type(document) ~= "table" then return nil end
+			local layout = document.layout
+			if layout ~= nil and type(layout) ~= "table" then return nil end
+			local value
+			if type(layout) == "table" then value = layout.direct_access_digits end
+			if value ~= nil and NumberRowPolicy.mode(value) == nil then return nil end
+		end
+	end
 	local result = {}
 	local Preferences = require("infra.preferences")
 	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
