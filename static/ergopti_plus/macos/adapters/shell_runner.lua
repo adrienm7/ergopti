@@ -130,7 +130,14 @@ end
 --- a launch failure by shape alone: start() is false, and the task is settled
 --- because no process was ever created.
 --- @return table
-local function refused_handle()
+local function process_logger(private)
+	if private ~= true then return Logger end
+	local function closed() Logger.error(LOG, "Private user program native operation refused.") end
+	return { error = closed, warn = closed, trace = function() end, done = function() end }
+end
+
+local function refused_handle(private)
+	local Logger = process_logger(private)
 	local handle = {}
 	function handle.start() return false end
 	function handle.set_input() return false end
@@ -164,27 +171,32 @@ end
 --- @param environment table|nil Explicit child values, copied and verified without
 ---   modifying the Hammerspoon environment or admitting launcher-only authority.
 --- @return table Handle with start() (returns boolean) and terminate() methods.
-function M.spawn(executable, args, on_done, on_chunk, environment)
+function M.spawn(executable, args, on_done, on_chunk, environment, private, owned_protocol)
+	local Logger = process_logger(private)
 	local refusal = M.validate_spawn_args(executable, args)
 	if refusal ~= "" then
 		Logger.error(LOG, "spawn(): refused for '%s' — %s.",
 			tostring(executable), refusal)
-		return refused_handle()
+		return refused_handle(private)
 	end
 	local handle = {}
 	local _task  = nil
+	local _protocol_task = nil
 	local _input_closed = false
 	local _lifecycle = "constructing"
 	local _start_dispatching = false
 	local _start_committed = false
 	local _pending_completion = nil
 	local _pending_chunks = {}
+	local _pending_protocol_bytes = 0
+	local _pending_protocol_overflow = false
 	local _business_stream_closed = false
 	local _business_terminal_sent = false
 	local _settlement_observers = {}
 	local _started_ms = nil
 	local _deliver_business_completion
 	local _deliver_business_chunk
+	local _safe_close_input
 
 	local function _notify_settled()
 		if _task ~= nil or _start_dispatching then return false end
@@ -208,7 +220,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 
 	local function _safe_terminate()
 		if not _task then return true, "settled" end
-		_business_stream_closed = true
+		_business_stream_closed = owned_protocol ~= true
 		local task = _task
 		if _lifecycle == "prepared"
 			or (_lifecycle == "start_failed" and _task_proven_not_running(task)) then
@@ -220,6 +232,12 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 			M._active_tasks[task] = nil
 			_notify_settled()
 			return true, "settled"
+		end
+		if owned_protocol == true then
+			-- Only EOF asks the retained native owner to retire its complete tree.
+			-- A helper signal or isRunning() result is never a retirement receipt.
+			local closed = _safe_close_input()
+			return closed, closed and "pending" or "refused"
 		end
 		if _lifecycle == "terminating" then return true, "pending" end
 
@@ -269,7 +287,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 		_start_dispatching = true
 		local ok, started = pcall(function() return task:start() end)
 		_start_dispatching = false
-		if ok and started then
+		if ok and started and (private ~= true or started == true or started == task) then
 			_started_ms = now_ms()
 			_start_committed = true
 			if _lifecycle == "starting" then _lifecycle = "started" end
@@ -295,25 +313,40 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 			return true
 		end
 
-		_start_committed = false
-		_business_stream_closed = true
-		_pending_completion = nil
-		_pending_chunks = {}
-		if _lifecycle ~= "completed" then
-			_input_closed = true
-			_lifecycle = "start_failed"
-			if _task_proven_not_running(task) then
-				if _task == task then _task = nil end
-				M._active_tasks[task] = nil
-				_lifecycle = "terminated"
-				_notify_settled()
-			else
-				-- False/nil/throw may follow native mutation. Retain this exact task,
-				-- initiate rollback, and await its real completion callback.
-				_safe_terminate()
+		if owned_protocol == true then
+			-- Failed start can follow native launch. Keep the exact input and bounded
+			-- receipt stream while the private protocol owner cancels admission.
+			_start_committed = true
+			if _lifecycle ~= "completed" then _lifecycle = "start_failed" end
+			local pending_chunks, pending_completion = _pending_chunks, _pending_completion
+			_pending_chunks, _pending_completion = {}, nil
+			for _, pending in ipairs(pending_chunks) do
+				_deliver_business_chunk(pending[1], pending[2], pending[3], true)
 			end
-		else
+			if pending_completion then _deliver_business_completion(table.unpack(pending_completion, 1, pending_completion.n)) end
+			_safe_terminate()
 			_notify_settled()
+		else
+			_start_committed = false
+			_business_stream_closed = true
+			_pending_completion = nil
+			_pending_chunks = {}
+			if _lifecycle ~= "completed" then
+				_input_closed = true
+				_lifecycle = "start_failed"
+				if _task_proven_not_running(task) then
+					if _task == task then _task = nil end
+					M._active_tasks[task] = nil
+					_lifecycle = "terminated"
+					_notify_settled()
+				else
+					-- False/nil/throw may follow native mutation. Retain this exact task,
+					-- initiate rollback, and await its real completion callback.
+					_safe_terminate()
+				end
+			else
+				_notify_settled()
+			end
 		end
 		if not ok then
 			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
@@ -349,7 +382,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 
 	--- Closes a streaming task's standard input, delivering EOF exactly once.
 	--- @return boolean True when EOF was delivered or had already been delivered.
-	local function _safe_close_input()
+	_safe_close_input = function()
 		if _input_closed then return true end
 		if not _task then
 			Logger.error(LOG, "spawn.close_input(): no live task exists for %s.", tostring(executable))
@@ -376,7 +409,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 	--- @param err any The error value captured by xpcall.
 	local function report_callback_throw(label, err)
 		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), tostring(err))
-		if type(_G.ergopti_report_crash) == "function" then
+		if private ~= true and type(_G.ergopti_report_crash) == "function" then
 			local report_ctx = "shell_runner." .. label .. ": " .. tostring(err)
 			DeferredWork.after(0,
 				function() pcall(_G.ergopti_report_crash, report_ctx) end,
@@ -428,8 +461,10 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 		_task = nil
 		_input_closed = true
 		_lifecycle = "completed"
-		_record_exit(RuntimeLog.program_name(executable), exit_code,
-			_started_ms and (now_ms() - _started_ms) or 0)
+		if private ~= true then
+			_record_exit(RuntimeLog.program_name(executable), exit_code,
+				_started_ms and (now_ms() - _started_ms) or 0)
+		end
 		if _start_dispatching then
 			if _pending_completion == nil then
 				_pending_completion = table.pack(exit_code, stdout, stderr)
@@ -453,9 +488,12 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 	-- generation guards on the next chunk).
 	_deliver_business_chunk = function(task, stdout_chunk, stderr_chunk, start_replay)
 		if type(on_chunk) ~= "function" then return true end
-		if _start_committed ~= true or _business_stream_closed == true
-			or _business_terminal_sent == true
-			or (_lifecycle ~= "started" and start_replay ~= true) then
+		if owned_protocol == true and task ~= _protocol_task then return true end
+		local late_protocol = owned_protocol == true and _lifecycle == "completed"
+		if _start_committed ~= true or (_business_stream_closed == true and not late_protocol)
+			or (_business_terminal_sent == true and not late_protocol)
+			or (_lifecycle ~= "started" and start_replay ~= true
+				and not (owned_protocol == true and (_lifecycle == "start_failed" or late_protocol))) then
 			return true
 		end
 		local ok, result_or_err = xpcall(function()
@@ -475,6 +513,19 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 		if _start_dispatching == true then
 			if _lifecycle ~= "completed" and _business_stream_closed ~= true
 				and _business_terminal_sent ~= true then
+				if owned_protocol == true then
+					if _pending_protocol_overflow then return true end
+					if (stdout_chunk == nil or stdout_chunk == "") and (stderr_chunk == nil or stderr_chunk == "") then return true end
+					_pending_protocol_bytes = _pending_protocol_bytes
+						+ (type(stdout_chunk) == "string" and #stdout_chunk or 0)
+						+ (type(stderr_chunk) == "string" and #stderr_chunk or 0)
+					if _pending_protocol_bytes > require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES
+						or #_pending_chunks >= require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES then
+						_pending_protocol_overflow = true
+						_pending_chunks = { table.pack(task, "V1 INVALID\n", "") }
+						return true
+					end
+				end
 				_pending_chunks[#_pending_chunks + 1] =
 					table.pack(task, stdout_chunk, stderr_chunk)
 			end
@@ -513,6 +564,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 	end
 	if task_or_err ~= nil then
 		_task = task_or_err
+		if owned_protocol == true then _protocol_task = _task end
 		_lifecycle = "prepared"
 		-- Pin the task in M._active_tasks so the GC cannot collect it while
 		-- the subprocess is still running (shell-runner-gc-kill fix).
@@ -695,6 +747,20 @@ end
 ---        code 0 and stdout has its trailing whitespace stripped.
 --- @return boolean started True when the subprocess was started.
 --- @return table|nil handle Exact lifecycle handle; nil only before construction.
+--- Constructs a privacy-safe literal-argv task; terminal receipts expose no child output.
+--- terminal receives Boolean success and the native signed integer status, or nil
+--- when the native status is unavailable. No signal interpretation is inferred.
+
+function M.spawn_private(executable, arguments, terminal, admitted, source)
+	return require("adapters.owned_program_runner").spawn(M.spawn, executable, arguments, terminal, admitted, source)
+end
+
+--- Reports whether the bundle-owned native program supervisor can be resolved.
+--- @return boolean available
+function M.private_program_available()
+	return require("adapters.owned_program_runner").available()
+end
+
 function M.run(executable, args, on_done)
 	local refusal = M.validate_spawn_args(executable, args)
 	if refusal ~= "" then

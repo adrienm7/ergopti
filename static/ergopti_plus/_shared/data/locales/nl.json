@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Cijfers eerst",
 	"menu.layout.number_row_symbols": "Symbolen eerst",
 	"platform_reason.number_row_override_unsupported": "Niet ondersteund: Deze driver behoudt de oorspronkelijke cijferrij van het systeem; cijfers en symbolen kunnen niet worden geforceerd.",
-	"platform_reason.number_row_source_unavailable": "Niet beschikbaar: Symbolen eerst vereist een actieve geëmuleerde indeling met geldige cijfer- en symboolniveaus op elke positie van de cijferrij."
+	"platform_reason.number_row_source_unavailable": "Niet beschikbaar: Symbolen eerst vereist een actieve geëmuleerde indeling met geldige cijfer- en symboolniveaus op elke positie van de cijferrij.",
+	"sg_actions.run_program": "▶️ Een programma uitvoeren [instelbaar]",
+	"dialog.gestures.param_program": "Kies het absolute pad van het programma en voer elk argument afzonderlijk in. Kies voor een script de interpreter en voeg het scriptpad als argument toe.",
+	"dialog.gestures.param_err_program": "Gebruik een absoluut pad en letterlijke tekstargumenten.",
+	"dialog.action_picker.program_executable": "Uitvoerbaar bestand",
+	"dialog.action_picker.program_arguments": "Argumenten (één per veld)",
+	"dialog.action_picker.program_add_argument": "Argument toevoegen",
+	"dialog.action_picker.program_remove_argument": "Argument verwijderen",
+	"platform_reason.program_runner_unavailable": "Niet beschikbaar: De native programmastarter of deze toewijzing is niet beschikbaar."
 }

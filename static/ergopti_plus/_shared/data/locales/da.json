@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Tal først",
 	"menu.layout.number_row_symbols": "Symboler først",
 	"platform_reason.number_row_override_unsupported": "Ikke understøttet: Denne driver bevarer systemets talrække; tal og symboler kan ikke gennemtvinges.",
-	"platform_reason.number_row_source_unavailable": "Ikke tilgængelig: Symboler først kræver et aktivt emuleret layout med gyldige tal- og symbolniveauer på alle positioner i talrækken."
+	"platform_reason.number_row_source_unavailable": "Ikke tilgængelig: Symboler først kræver et aktivt emuleret layout med gyldige tal- og symbolniveauer på alle positioner i talrækken.",
+	"sg_actions.run_program": "▶️ Kør et program [kan indstilles]",
+	"dialog.gestures.param_program": "Vælg programmets absolutte sti, og indtast hvert argument separat. For et script skal du vælge fortolkeren og tilføje scriptets sti som argument.",
+	"dialog.gestures.param_err_program": "Brug en absolut sti og bogstavelige tekstargumenter.",
+	"dialog.action_picker.program_executable": "Programfil",
+	"dialog.action_picker.program_arguments": "Argumenter (ét pr. felt)",
+	"dialog.action_picker.program_add_argument": "Tilføj argument",
+	"dialog.action_picker.program_remove_argument": "Fjern argument",
+	"platform_reason.program_runner_unavailable": "Utilgængelig: Den native programstarter eller denne binding er utilgængelig."
 }

@@ -74,6 +74,10 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 		; level, starts the category the rows below it are shown under.
 		CurrentCat := ""
 		for _, Item in PickerItems {
+				if Item.HasOwnProp("Id") && Item.Id == "run_program"
+						&& (!IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
+				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId))
+						continue
 				if (Item.Type = "heading")
 						CurrentCat := Item.Text
 				else

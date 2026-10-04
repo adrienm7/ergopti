@@ -83,8 +83,23 @@ class FakeElement {
 		if (v === '') this.children = [];
 	}
 	appendChild(child) {
+		child.parent = this;
 		this.children.push(child);
 		return child;
+	}
+	append(...children) {
+		for (const child of children) this.appendChild(child);
+	}
+	replaceChildren() {
+		this.children = [];
+	}
+	remove() {
+		if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
+	}
+	querySelectorAll(tag) {
+		return this.children.flatMap((child) =>
+			(child.tagName === tag ? [child] : []).concat(child.querySelectorAll(tag))
+		);
 	}
 	addEventListener(type, fn) {
 		(this.listeners[type] = this.listeners[type] || []).push(fn);
@@ -149,7 +164,13 @@ const IDS = [
 	'param-vision-model-label',
 	'param-language',
 	'param-language-label',
-	'param-language-select'
+	'param-language-select',
+	'param-program',
+	'param-program-executable',
+	'param-program-executable-label',
+	'param-program-arguments',
+	'param-program-arguments-label',
+	'param-program-add'
 ];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
@@ -171,6 +192,10 @@ function loadPage(platform, current) {
 		console
 	};
 	vm.createContext(context);
+	vm.runInContext(
+		fs.readFileSync(path.join(SP, '_shared', 'ui', 'program_parameter.js'), 'utf8'),
+		context
+	);
 	vm.runInContext(fs.readFileSync(SCRIPT, 'utf8'), context, { filename: SCRIPT });
 	for (const fn of docListeners.DOMContentLoaded || []) fn();
 	posted.length = 0;
@@ -194,6 +219,8 @@ function loadPage(platform, current) {
 				promptLabel: 'Prompt', countLabel: 'Count', countDefault: 'Menu ({1})',
 				visionProviderLabel: 'Provider', visionModelLabel: 'Model', visionModelDefault: 'Default: {1}',
 				visionModelRequired: 'Required', languageLabel: 'Translate into',
+				programExecutableLabel: 'Executable', programArgumentsLabel: 'Arguments',
+				programAddLabel: 'Add argument', programRemoveLabel: 'Remove argument',
 				prompts: { text: 'Text?', key: 'Key?', shortcut: 'Shortcut?' },
 				errors: { text: 'Bad text', key: 'Bad key', shortcut: 'Bad shortcut', llm_prompt: 'Bad prompt',
 					llm_vision: 'Bad vision', llm_language: 'Bad language' }
@@ -209,6 +236,7 @@ function loadPage(platform, current) {
 					parameterValue: 'cerebras|llama-4-scout' },
 				{ type: 'action', id: 'llm_translate_selection', label: 'Translate', parameter: 'llm_language',
 					parameterValue: 'ja' },
+				{ type: 'action', id: 'run_program', label: 'Run program', parameter: 'program' },
 				{ type: 'action', id: 'enter', label: 'Enter' }
 			]
 		})`,
@@ -653,6 +681,75 @@ function loadPage(platform, current) {
 		vm.runInContext("parseParameter('llm_language', 'xx')", page.context) === null,
 		'a language the host does not offer is refused'
 	);
+}
+
+// 11. The editor stores an executable and literal ordered arguments, including
+// empty strings and line breaks, without interpreting shell syntax.
+for (const platform of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(platform);
+	vm.runInContext("doConfirm('run_program')", page.context);
+	check(
+		page.posted.length === 0 && page.byId['param-program'].hidden === false,
+		'program selection opens its real executable/argv editor'
+	);
+	check(page.byId['param-input'].hidden === true, 'raw scalar JSON is not the program input');
+	check(
+		page.byId['param-program-executable-label'].textContent === 'Executable',
+		'host executable label is forwarded'
+	);
+	page.byId['param-program-executable'].value =
+		platform === 'ahk' ? 'C:\\Program Files\\été.exe' : '/private/été 日本 program';
+	const literal = ['', 'two words', ' padded ', '日本語', '%TOKEN%;$(literal)', 'line\nnext'];
+	for (const argument of literal) {
+		page.byId['param-program-add'].dispatch('click');
+		const inputs = page.byId['param-program-arguments'].querySelectorAll('textarea');
+		inputs[inputs.length - 1].value = argument;
+	}
+	const enter = page.keydown({ key: 'Enter', code: 'Enter' });
+	check(
+		page.posted.length === 0 && enter.prevented === false,
+		'Enter remains literal program argument input'
+	);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].id === 'run_program',
+		'program save delivers the actual action choice'
+	);
+	const decoded = page.posted[0] && JSON.parse(page.posted[0].parameter);
+	check(
+		decoded &&
+			decoded.version === 1 &&
+			decoded.executable === page.byId['param-program-executable'].value,
+		'program executable remains an opaque absolute path'
+	);
+	check(
+		decoded && JSON.stringify(decoded.arguments) === JSON.stringify(literal),
+		'all literal argv values/order remain exact'
+	);
+}
+
+// 12. Independent shared vectors reject duplicate, null, bool/version and
+// malformed argument shapes across each actual picker platform.
+{
+	const corpus = JSON.parse(
+		fs.readFileSync(
+			path.join(SP, '_shared', 'tests', 'corpus', 'action_parameters', 'program_vectors.json'),
+			'utf8'
+		)
+	);
+	let count = 0;
+	for (const vector of corpus.cases)
+		for (const platform of vector.platforms) {
+			const page = loadPage(platform);
+			page.context.__raw = vector.value;
+			const parsed = vm.runInContext('ProgramParameter.parse(__raw, hostPlatform)', page.context);
+			check(
+				JSON.stringify(parsed) === JSON.stringify(vector.expected),
+				`${vector.id}/${platform}: program codec disagrees with independent vector`
+			);
+			count += 1;
+		}
+	check(count >= 63, 'all independent program vectors execute');
 }
 
 if (errors.length > 0) {

@@ -184,6 +184,8 @@
 		"test:linux": "node ./tools/test/run-linux-lua.cjs tests/run.lua",
 		"test:linux:e2e": "node ./tools/test/run-linux-lua.cjs tests/e2e/run_e2e.lua",
 		"test:linux:xkb-source": "node ./tools/test/run-linux-xkb-source.cjs",
+		"test:linux:window-switch": "node ./tools/test/run-linux-window-switch-receipts.cjs",
+		"test:linux-window-switch-registration": "node ./tools/test/test-linux-window-switch-registration.cjs",
 		"test:linux:http-stream": "node ./tools/test/run-linux-http-stream-receipts.cjs",
 		"test:linux-http-stream-registration": "node ./tools/test/test-linux-http-stream-registration.cjs",
 		"build:linux": "node ./tools/lib/git-bash.cjs tools/build/build-linux-driver.sh --skip-smoke",

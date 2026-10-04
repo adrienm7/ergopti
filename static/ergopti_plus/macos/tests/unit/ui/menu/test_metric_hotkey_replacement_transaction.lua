@@ -181,7 +181,14 @@ local function load_fixture(legacy)
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["ui.menu.init"] = nil
 	local Menu = require("ui.menu.init")
-	local menu = Menu.start("/virtual/", {}, {}, {}, {}, {}, nil, {})
+	local program_admission
+	local gestures = { configure_program_admission = function(callback)
+		helpers.assert_type(callback, "function")
+		program_admission = callback
+		return true
+	end }
+	local menu = Menu.start("/virtual/", {}, gestures, {}, {}, {}, nil, {})
+	helpers.assert_type(program_admission, "function", "metric startup registers the required program owner")
 	helpers.assert_not_nil(menu)
 	helpers.assert_type(dynamic_menu_callback, "function")
 	dynamic_menu_callback()

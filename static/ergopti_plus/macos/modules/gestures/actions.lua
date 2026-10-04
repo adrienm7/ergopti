@@ -28,6 +28,9 @@ local WrapPair      = require("wrap_pair")
 local DesktopNavigation = require("desktop_navigation")
 local SendInput     = require("send_input")
 local AppParameter  = require("app_parameter")
+local ProgramParameter = require("program_parameter")
+local _program_revision = 0
+local _program_parameters_owned = false
 local PromptAction  = require("llm.prompt_action")
 local ProfileSelector = require("llm.profile_selector")
 local Tone          = require("llm.tone")
@@ -1407,6 +1410,7 @@ for _, system_action in ipairs(SYSTEM_ACTIONS) do
 	sg(system_action, owner_action("modules.gestures.system_actions", system_action))
 end
 -- The application is the binding's own parameter, as for open_url.
+sg("run_program", function(binding) return M.run_program(binding) end)
 sg("open_app", function(binding)
 	local value = M.get_action_parameter(binding, "open_app")
 	if not M.validate_action_parameter("open_app", value) then
@@ -2247,6 +2251,7 @@ function M.validate_action_parameter(action, value)
 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
 	-- Syntax only: whether the application is installed is checked when it opens
 	if spec == "app" then return AppParameter.is_valid(value) end
+	if spec == "program" then return ProgramParameter.parse(value, "hs") ~= nil end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2268,6 +2273,7 @@ function M.parameter_prompt(action)
 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
+	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
 	if spec == "text" then
 		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2317,6 +2323,7 @@ function M.parameter_error(action)
 	if spec == "llm_vision" then return i18n.get("dialog.gestures.param_err_llm_vision") end
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
+	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2405,10 +2412,120 @@ function M.get_action_parameter(binding, action)
 	return _state.action_params[parameter_key(binding, action)] or ""
 end
 
+--- Identifies existing executable binding families without inventing another invoker.
+function M.program_binding_supported(binding)
+	return type(binding) == "string" and ((type(_state) == "table" and type(_state.ga) == "table"
+		and _state.ga[binding] ~= nil) or binding:match("^keyboard__.+$") ~= nil
+		or binding:match("^script__.+$") ~= nil or binding:match("^tap_key__.+$") ~= nil)
+end
+
+--- Captures acknowledged binding leaves, exact source and the current action parent.
+local _program_admission = nil
+local _program_admission_checking = false
+
+--- Registers the boot-owned parameter transaction admission port exactly once.
+function M.configure_program_admission(callback)
+	if type(callback) ~= "function" or _program_admission ~= nil then return false end
+	_program_admission = callback
+	return true
+end
+
+--- Reports boot readiness without hiding the picker needed to retry owned debt.
+function M.program_admission_available()
+	return type(_program_admission) == "function"
+end
+
+local function program_admission_open()
+	if type(_program_admission) ~= "function" or _program_admission_checking then return false end
+	_program_admission_checking = true
+	local ok, receipt = pcall(_program_admission)
+	_program_admission_checking = false
+	return ok and receipt == true
+end
+
+function M.run_program(binding)
+	local ok, started = pcall(function()
+		local parent = current_action_parent()
+		if not program_admission_open() or not M.program_binding_supported(binding)
+			or not _state or not AuxOwner.program_available()
+			or not aux_admission_open(parent) then return false end
+		local Preferences = require("infra.preferences")
+		local ConfigPaths = require("infra.config_paths")
+		local Toml = require("infra.toml.codec")
+		local path = ConfigPaths.get("ConfigTomlPath")
+		local scalar = M.get_action_parameter(binding, "run_program")
+		local parsed = ProgramParameter.parse(scalar, "hs")
+		if not parsed then return false end
+		local function binding_action()
+			if type(_state.ga) == "table" and _state.ga[binding] ~= nil then
+				return _state.ga[binding], "gestures", binding
+			end
+			if binding:match("^script__") then
+				local id = binding:sub(9)
+				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], "script_control", id
+			end
+			local descriptors = {
+				{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
+				{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
+			}
+			for _, descriptor in ipairs(descriptors) do
+				if binding:sub(1, #descriptor[1]) == descriptor[1] then
+					local id = binding:sub(#descriptor[1] + 1)
+					return require(descriptor[2]).get_action(id), descriptor[3], id
+				end
+			end
+			return nil
+		end
+		local action, section, id = binding_action()
+		-- Admission checks only owned binding leaves so unrelated outdated values
+		-- stay retained. The exact acknowledged source still fences execution.
+		local source = Preferences.source_snapshot(path)
+		local content, status = FileSystem.read_with_status(path)
+		if not program_admission_open() or action ~= "run_program"
+			or type(source) ~= "table" or source.status ~= "ok"
+			or type(source.content) ~= "string" or status ~= "ok" or content ~= source.content then return false end
+		local config = Toml.decode(source.content)
+		local parameters = type(config.gestures) == "table" and config.gestures.action_parameters
+		local actions = section == "gestures" and config.gestures
+			or type(config.shortcuts) == "table" and config.shortcuts[section]
+		if type(actions) ~= "table" or actions[id] ~= "run_program" or type(parameters) ~= "table"
+			or parameters[parameter_key(binding, "run_program")] ~= scalar then return false end
+		local revision = _program_revision
+		local function admitted()
+			if not program_admission_open() or not aux_admission_open(parent) or revision ~= _program_revision
+				or ConfigPaths.get("ConfigTomlPath") ~= path
+				or M.get_action_parameter(binding, "run_program") ~= scalar
+				or binding_action() ~= "run_program"
+				or Preferences.source_matches(source, Preferences.source_snapshot(path)) ~= true then return false end
+			local current, current_status = FileSystem.read_with_status(path)
+			return program_admission_open() and current_status == "ok" and current == source.content
+				and ConfigPaths.get("ConfigTomlPath") == path and revision == _program_revision
+				and Preferences.source_matches(source, Preferences.source_snapshot(path)) == true
+		end
+		local digest = require("adapters.crypto").sha256_bytes(source.content, function()
+			Logger.error(LOG, "Private user program source hashing refused.")
+		end)
+		if type(digest) ~= "string" or #digest ~= 64 or not digest:match("^[0-9a-f]+$") then return false end
+		_program_parameters_owned = true
+		return AuxOwner.run_program(parsed.executable, parsed.arguments, admitted, parent,
+			{ source_path = path, source_sha256 = digest })
+	end)
+	return ok and started == true
+end
+
+local function retire_program_parameters()
+	if not _program_parameters_owned then return true end
+	local gestures = AuxOwner.stop_programs(GESTURE_ACTION_PARENT)
+	local shortcuts = AuxOwner.stop_programs(SHORTCUT_ACTION_PARENT)
+	return gestures == true and shortcuts == true
+end
+
 function M.set_action_parameter(binding, action, value)
 	if not _state or not M.validate_action_parameter(action, value) then return false end
+	if not retire_program_parameters() then return false end
 	_state.action_params = _state.action_params or {}
 	_state.action_params[parameter_key(binding, action)] = value
+	_program_revision = _program_revision + 1
 	return true
 end
 
@@ -2418,6 +2535,7 @@ end
 --- @return boolean committed
 function M.replace_action_parameters(parameters)
 	if not _state or type(parameters) ~= "table" then return false end
+	if not retire_program_parameters() then return false end
 	local staged = {}
 	for key, value in pairs(parameters) do
 		if type(key) ~= "string" or type(value) ~= "string" then return false end
@@ -2426,6 +2544,7 @@ function M.replace_action_parameters(parameters)
 		staged[key] = value
 	end
 	_state.action_params = staged
+	_program_revision = _program_revision + 1
 	return true
 end
 

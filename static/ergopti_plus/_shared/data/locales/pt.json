@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Números primeiro",
 	"menu.layout.number_row_symbols": "Símbolos primeiro",
 	"platform_reason.number_row_override_unsupported": "Não suportado: Este controlador mantém a fila nativa do sistema; não é possível forçar números ou símbolos.",
-	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila."
+	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila.",
+	"sg_actions.run_program": "▶️ Executar um programa [configurável]",
+	"dialog.gestures.param_program": "Escolha o caminho absoluto do programa e introduza cada argumento separadamente. Para um script, escolha o interpretador e adicione o caminho do script como argumento.",
+	"dialog.gestures.param_err_program": "Use um caminho absoluto e argumentos de texto literais.",
+	"dialog.action_picker.program_executable": "Executável",
+	"dialog.action_picker.program_arguments": "Argumentos (um por campo)",
+	"dialog.action_picker.program_add_argument": "Adicionar argumento",
+	"dialog.action_picker.program_remove_argument": "Remover argumento",
+	"platform_reason.program_runner_unavailable": "Indisponível: O executor nativo ou esta associação está indisponível."
 }

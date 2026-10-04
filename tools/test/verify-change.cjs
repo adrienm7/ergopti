@@ -496,6 +496,32 @@ const RULES = [
 			].includes(f) || f.startsWith('static/ergopti_plus/_shared/modules/layouts/')
 	},
 	{
+		gate: 'linux-window-switch',
+		why: 'scoped window switching requires actual owned X11/RandR, input-focus, source-fence and cleanup receipts through the real dispatcher',
+		match: (f) =>
+			[
+				'static/ergopti_plus/linux/adapters/window_switch.lua',
+				'static/ergopti_plus/linux/platform/window_switch_worker.lua',
+				'static/ergopti_plus/linux/adapters/program_runner.lua',
+				'static/ergopti_plus/linux/infra/libuv_process_group.lua',
+				'static/ergopti_plus/linux/infra/libuv_exit.lua',
+				'static/ergopti_plus/linux/modules/gestures/manager.lua',
+				'static/ergopti_plus/linux/ergopti_hotstrings.lua',
+				'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
+				'static/ergopti_plus/_shared/lua/cursor_window_policy.lua',
+				'static/ergopti_plus/_shared/modules/actions/actions.toml',
+				'static/ergopti_plus/linux/_generated/action_catalogue.lua',
+				'static/ergopti_plus/linux/_generated/action_emit.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py',
+				'static/ergopti_plus/linux/tests/hardware/run_window_switch_operation.lua',
+				'tools/test/run-linux-window-switch-receipts.cjs',
+				'.github/workflows/ci-linux.yml',
+				'.github/linux-ci-coverage.json',
+				'static/ergopti_plus/linux/tests/hardware/native_fixture_family.py',
+				'static/ergopti_plus/linux/tests/hardware/run_native_fixture_family_receipts.py'
+			].includes(f)
+	},
+	{
 		gate: 'linux-http-stream',
 		why: 'streaming HTTP receipts require actual libuv/curl status, complete error bodies and native owner settlement',
 		match: (f) =>
@@ -567,7 +593,11 @@ function findAhk() {
  * the gate never ran — a false red is as damaging here as a false green.
  */
 function runNpm(script) {
-	return spawnSync('npm', ['run', script], { cwd: REPO_ROOT, stdio: 'inherit', shell: true });
+	return spawnSync('npm', ['run', script], {
+		cwd: REPO_ROOT,
+		stdio: 'inherit',
+		shell: true
+	});
 }
 
 // How each gate is actually executed. A TABLE rather than a switch so a test can
@@ -589,6 +619,7 @@ const GATE_COMMANDS = {
 	'linux-e2e': { npm: 'test:linux:e2e' },
 	'linux-xkb-source': { npm: 'test:linux:xkb-source' },
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
+	'linux-window-switch': { npm: 'test:linux:window-switch', platform: 'linux' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }
@@ -598,8 +629,14 @@ function runGate(gate) {
 	const spec = GATE_COMMANDS[gate];
 	// Fail loudly instead of reporting a pass for a gate nobody wired up.
 	if (!spec) {
-		return { error: new Error(`gate "${gate}" has no command in GATE_COMMANDS`) };
+		return {
+			error: new Error(`gate "${gate}" has no command in GATE_COMMANDS`)
+		};
 	}
+	if (spec.platform && spec.platform !== process.platform)
+		return {
+			skipped: `${gate} requires ${spec.platform}; mandatory native CI remains unexecuted here`
+		};
 	if (spec.npm) return runNpm(spec.npm);
 	const ahk = findAhk();
 	if (!ahk) return { skipped: 'AutoHotkey v2 not installed on this machine' };
@@ -621,7 +658,12 @@ function runGate(gate) {
 		const validate = gate === 'ahk-e2e' ? validateAhkE2eManifest : validateAhkSuiteManifest;
 		manifest = validate(fs.readFileSync(resultsFile, 'utf8'));
 	} catch (error) {
-		manifest = { complete: false, planned: 0, executed_count: 0, errors: [error.message] };
+		manifest = {
+			complete: false,
+			planned: 0,
+			executed_count: 0,
+			errors: [error.message]
+		};
 	} finally {
 		try {
 			fs.rmSync(resultsFile, { force: true });
@@ -654,7 +696,11 @@ function runGate(gate) {
  */
 function classifyGateResult(gate, result, selectedByChange) {
 	if (result.skipped) {
-		return { kind: 'environment-deferral', blockingInDiagnosis: false, detail: result.skipped };
+		return {
+			kind: 'environment-deferral',
+			blockingInDiagnosis: false,
+			detail: result.skipped
+		};
 	}
 	if (result.error || result.status === null) {
 		return {
@@ -782,7 +828,11 @@ function main() {
 		console.error(`verify-change: ${failed} gate(s) failed.`);
 		return 1;
 	}
-	console.log('verify-change: every required gate passed.');
+	console.log(
+		classifications.some((item) => item.kind === 'environment-deferral')
+			? 'verify-change: required gates passed or were explicitly deferred; deferred native validation remains unexecuted.'
+			: 'verify-change: every required gate passed.'
+	);
 	return 0;
 }
 
