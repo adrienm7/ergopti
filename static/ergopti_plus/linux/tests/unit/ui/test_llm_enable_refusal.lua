@@ -33,7 +33,7 @@ local function with_notice(tool, body)
 		exec_checked = function(command)
 			world.order[#world.order + 1] = "dialog"
 			world.commands[#world.commands + 1] = command
-			return world.command_ok ~= false
+			return world.command_ok ~= false, world.answer
 		end,
 	}
 	package.loaded["adapters.keyboard_hook"] = { while_released = function(callback, options)
@@ -43,14 +43,14 @@ local function with_notice(tool, body)
 			if world.observer then world.observer("refused", { ok = false, reason = "release_failed" }) end
 			return callback()
 		end
-		local result = callback()
+		local result, answer = callback()
 		world.order[#world.order + 1] = "restore"
 		if world.observer then
 			if world.restore_ok then world.observer("after", { ok = true })
 			else world.observer("refused", { ok = false, reason = "regrab_failed" }) end
 		end
 		-- Production returns the dialog choice even when native restoration refuses.
-		return result
+		return result, answer
 	end }
 	package.loaded["adapters.notifier"] = { send = function(message, options)
 		world.notifications[#world.notifications + 1] = { message, options }; return true
@@ -63,6 +63,37 @@ local function with_notice(tool, body)
 end
 
 helpers.describe("AI refusal notice", function()
+	for _, tool in ipairs({ "zenity", "kdialog" }) do
+		helpers.it("requires an explicit restored replacement choice in " .. tool .. " (ai-enable-admission)", function()
+			with_notice(tool, function(world)
+				local opaque = {}
+				local label = "Use LM Studio (model:2b, 127.0.0.1:1234) 50%'"
+				world.answer = "replacement_1\n"
+				local shown, retry, chosen = world.notice.show("http://127.0.0.1:11434", { { label = label, value = opaque } })
+				helpers.assert_true(shown)
+				helpers.assert_eq(retry, false)
+				helpers.assert_eq(chosen, opaque)
+				helpers.assert_eq(world.order, { "release", "dialog", "restore" })
+				helpers.assert_true(world.commands[1]:find(Shell.quote(label), 1, true) ~= nil)
+				world.restore_ok = false
+				local _, _, refused = world.notice.show("http://127.0.0.1:11434", { { label = label, value = opaque } })
+				helpers.assert_nil(refused)
+			end)
+		end)
+	end
+
+	helpers.it("does not infer replacement consent from retry or malformed native output (ai-enable-admission)", function()
+		with_notice("zenity", function(world)
+			local replacements = { { label = "Use LM Studio", value = {} } }
+			for _, answer in ipairs({ "retry\n", "replacement_9\n", "replacement_1\nforeign", "" }) do
+				world.answer = answer
+				local shown, retry, chosen = world.notice.show("http://127.0.0.1:11434", replacements)
+				helpers.assert_true(shown)
+				helpers.assert_eq(retry, answer == "retry\n")
+				helpers.assert_nil(chosen)
+			end
+		end)
+	end)
 	for _, tool in ipairs({ "zenity", "kdialog" }) do
 		helpers.it("names and quotes the configured origin in " .. tool .. " (ai-enable-admission)", function()
 			with_notice(tool, function(world)
