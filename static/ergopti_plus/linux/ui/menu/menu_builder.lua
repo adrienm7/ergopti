@@ -1379,7 +1379,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					if family.separator then
 						sub[#sub + 1] = { separator = true }
 					else
-						local section, enabled = family.section, family.enabled
+						local section, enabled, family_id = family.section, family.enabled, family.id
 						-- The count, on the families that have one. A prefix family with
 						-- 0 behind it is a switch that can do nothing until the user
 						-- fills in that field of personal_info.toml, and the count is
@@ -1397,16 +1397,50 @@ local function _manifest_hotstring_rows(ctx, config)
 							-- switched on.
 							disabled = not on,
 							action       = function()
-								dyn.set_rule_enabled(section, not enabled)
+								local current_family
+								local called, committed = pcall(function()
+									local current = ctx.dyn_hotstrings
+									if current ~= dyn or type(current.is_enabled) ~= "function"
+										or type(current.rule_families) ~= "function"
+										or type(current.is_rule_enabled) ~= "function"
+										or type(current.set_rule_enabled) ~= "function" then return false end
+									local declared = 0
+									for _, entry in ipairs(ManifestMenu.get_dynamic_hotstring_families()) do
+										if entry.id == family_id and (entry.linux_section or entry.section) == section then
+											declared = declared + 1
+										end
+									end
+									if declared ~= 1 then return false end
+									for _, entry in ipairs(current.rule_families()) do
+										if entry.id == family_id and entry.section == section then
+											if current_family ~= nil then return false end
+											current_family = entry
+										end
+									end
+									if type(current_family) ~= "table" or type(current_family.enabled) ~= "boolean"
+										or current.is_enabled() ~= true then return false end
+									local live_enabled = current.is_rule_enabled(nil, section)
+									if type(live_enabled) ~= "boolean" or live_enabled ~= current_family.enabled
+										or ctx.dyn_hotstrings ~= current then return false end
+									return current.set_rule_enabled(section, not live_enabled)
+								end)
+								if not called or committed ~= true then
+									Logger.error(LOG, "Dynamic hotstring family refused (%s).", called and "owner-not-committed" or "owner-error")
+									show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+									return false
+								end
 								-- A prefix family is matched by the ORDINARY engine, which
 								-- knows nothing about dynamic families — so its switch has
 								-- to add or remove mappings rather than filter them, and
 								-- that means a reload. The date families need none of this;
 								-- their guard is read at match time.
-								if family.count and config and type(config.reload) == "function" then
+								-- The preference receipt above does not acknowledge this
+								-- separate catalogue reload or invent its compensation.
+								if current_family.count and config and type(config.reload) == "function" then
 									config.reload()
 								end
 								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								return true
 							end,
 						}
 					end

@@ -1789,6 +1789,8 @@ The macOS baseline hotstring-delay prompt now enters the existing global writer 
 
 The real-file Personal reload fixtures now use the existing ShellRunner strict normalized success receipt for their private mkdir and cleanup boundaries. This corrects the numeric-only precondition seen in the six Fedora/Alpine Personal cases without changing save/reload owners or assertions. Actual LuaJIT and Lua5.4 focused cases pass69/0; actual Lua5.4 old fixtures reproduce57/6. The exact Fedora build flag is unobserved, and the corrected hosted distribution/full checkpoint remains pending. TODO102 stays open.
 
+Linux dynamic-family menu callbacks now re-read the retained native owner and canonical family before writing, require the exact true preference publication receipt, and refresh/reload only after that receipt. Real refused writes retain source bytes and support retry; stale row, detached owner, category-off and malformed receipts refuse. Prefix catalogue reload remains its existing separate post-save operation; this change does not claim compensation or whole-transaction success. Focused actual LuaJIT tests pass58/0; hosted distro/native menu and the remaining TODO102 owners remain pending.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
