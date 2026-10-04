@@ -69,9 +69,8 @@ global _PathsOverrides := ReadPathsToml(_PathsFile)
 global _DefaultConfigDir := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\config\")
 		: (EnvGet("USERPROFILE") . "\.config\ergopti_plus\")
-global _ConfigDir := (_PathsOverrides.Has("ConfigDirPath") and _PathsOverrides["ConfigDirPath"] != "")
-		? _PathsOverrides["ConfigDirPath"]
-		: _DefaultConfigDir
+global _ConfigDir := ConfigTransitionSelectBootConfigDir(
+		_PathsOverrides, _DefaultConfigDir)
 if !(_ConfigDir ~= "[/\\]$")
 		_ConfigDir .= "\"
 if !DirExist(_ConfigDir) {
