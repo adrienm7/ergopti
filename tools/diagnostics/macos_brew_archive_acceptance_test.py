@@ -356,7 +356,10 @@ class ArchiveAcceptanceControls(unittest.TestCase):
         self.assertIn("(deny file-write*)", profile)
         self.assertIn("(deny network-outbound)", profile)
         self.assertEqual(profile.count("(deny appleevent-send)"), 1)
-        self.assertIn('(remote ip "127.0.0.1:*")', profile)
+        self.assertIn('(remote ip "localhost:*")', profile)
+        self.assertEqual(profile.count("(allow network-outbound "), 1)
+        self.assertEqual(profile.count("(remote ip "), 1)
+        self.assertNotIn('(remote ip "*:*")', profile)
         self.assertIn("(subpath " + json.dumps('/owned "fixture"') + ")", profile)
         self.assertNotIn("(allow network-outbound)", profile)
 

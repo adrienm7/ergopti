@@ -125,7 +125,7 @@ def sandbox_profile(root):
             f'(allow file-write* (subpath {escaped}) (literal "/dev/null"))',
             "(deny network-outbound)",
             "(deny appleevent-send)",
-            '(allow network-outbound (remote ip "127.0.0.1:*"))',
+            '(allow network-outbound (remote ip "localhost:*"))',
             "",
         ]
     )
