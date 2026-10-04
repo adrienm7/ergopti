@@ -41,7 +41,7 @@ class KLSessionCloseAuthority {
 			"IdleDuration", Owner.Get("idle_end", -1))
 		Getters := Map()
 		for Name, Value in Values {
-			Getter := KLSessionCloseAuthority.ReadOnly.Bind(KLSessionCloseAuthority, Value)
+			Getter := KLSessionCloseAuthority.MakeReadOnlyGetter(Value)
 			this.DefineProp(Name, {Get: Getter})
 			Getters[Name] := Getter
 		}
@@ -52,10 +52,10 @@ class KLSessionCloseAuthority {
 		_KL_SessionCloseAuthorityReceipt(this, , , , true)
 	}
 
-	; Bind the static class receiver and frozen value, leaving only the property
-	; receiver. No variadic parameters: indexed reads must reach the returned Map.
-	static ReadOnly(Value, GetterInstance) {
-		return Value
+	; BoundFunc always exposes variadic arity, which would consume property
+	; indices. A fresh closure has one receiver and captures one immutable value.
+	static MakeReadOnlyGetter(Value) {
+		return (GetterInstance) => Value
 	}
 
 	IsCurrent(Kind, Duration) {
@@ -100,7 +100,7 @@ class KLSessionClosePublication {
 			"CommitFn", _KL_Watchers_CommitClose.Bind(Owner, Kind))
 		Getters := Map()
 		for Name, Value in Values {
-			Getter := KLSessionCloseAuthority.ReadOnly.Bind(KLSessionCloseAuthority, Value)
+			Getter := KLSessionCloseAuthority.MakeReadOnlyGetter(Value)
 			this.DefineProp(Name, {Get: Getter})
 			Getters[Name] := Getter
 		}
