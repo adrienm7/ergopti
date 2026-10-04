@@ -441,10 +441,8 @@ function M.build_management(ctx)
 	-- dedicated configuration window where colors can also be tuned. Categories
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
-	table.insert(delay_menu, {
-		label    = i18n.get("menu.hotstrings.config_item"),
-		disabled = paused or nil,
-		action       = not paused and function()
+	local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+		hotstrings_config_window = function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
 			if not ok or not win or type(win.open) ~= "function" then return end
 			-- make_category_delay_item bakes the resolved delay and the
@@ -457,8 +455,9 @@ function M.build_management(ctx)
 				ctx.updateMenu()
 			end
 			pcall(win.open)
-		end or nil,
-	})
+		end,
+	}, { hotstrings_config_ready = function() return not paused end })
+	if settings_row then table.insert(delay_menu, settings_row) end
 	table.insert(delay_menu, { separator = true })
 	if def_delays then
 		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_ai_acceptance"), "llm_prediction", def_delays.llm_prediction, false))

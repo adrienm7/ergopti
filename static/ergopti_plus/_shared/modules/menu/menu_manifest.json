@@ -1869,6 +1869,16 @@
 			]
 		}
 	],
+	"hotstrings_delays_menu": [
+		{
+			"type": "command",
+			"id": "hotstrings_config_window",
+			"i18n": "menu.hotstrings.config_item",
+			"disabled_when": [
+				"hotstrings_config_ready"
+			]
+		}
+	],
 	"gestures_menu": [
 		{
 			"type": "toggle",

@@ -712,7 +712,9 @@ local function menu_controls(Settings, paused, reordered)
 		manifest_path = function() return paths.shared("modules/menu/menu_manifest.json") end,
 		json_decode = function(raw)
 			local value = assert(require("json").decode(raw))
-			if reordered == "custom_delete_label" then
+			if reordered == "config_shared_label" then
+				if type(value.hotstrings_delays_menu) == "table" then value.hotstrings_delays_menu[1].i18n = "button.ok" end
+			elseif reordered == "custom_delete_label" then
 				value.word_expander_custom_menu[1].i18n = "button.delete"
 			elseif reordered then
 				local rows = value.word_expanders_menu
@@ -754,7 +756,8 @@ local function menu_controls(Settings, paused, reordered)
 	if not passed then error(rows, 0) end
 	local function find(items)
 		for _, row in ipairs(items or {}) do
-			if row.title == i18n.get("menu.hotstrings.word_expanders") then return row.menu end
+			if row.title == i18n.get("menu.hotstrings.delays_colors") then observations.delay_controls = row.menu end
+			if row.title == i18n.get("menu.hotstrings.word_expanders") then observations.controls_found = row.menu end
 			local found = find(row.menu)
 			if found then return found end
 		end
@@ -765,7 +768,8 @@ local function menu_controls(Settings, paused, reordered)
 			observations.hotstrings_submenu = row.menu
 		end
 	end
-	return assert(find(rows) or observations.controls, "the actual word-expander menu must be built"), ctx, observations
+	find(rows)
+	return assert(observations.controls_found or observations.controls, "the actual word-expander menu must be built"), ctx, observations
 end
 
 --- Reads the independent fixed-command and delimiter-state expectations.
@@ -1095,4 +1099,49 @@ helpers.describe("custom delimiter Add uses shared declaration and native acknow
 			helpers.assert_eq(observed.writer_restored, true)
 		end)
 	end
+end)
+
+
+--- Reads the independent command and existing native window identity.
+--- @return table corpus Historical command expectation.
+local function delay_settings_command_expected()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
+	local bytes = file:read("*a")
+	file:close()
+	return assert(require("json").decode(bytes))
+end
+
+helpers.describe("declared delay configuration command: actual Linux provider", function()
+	helpers.it("uses the shared command label and preserves existing quick-delay rows", function()
+		with_settings(SOURCE, function(Settings)
+			local _, _, observations = menu_controls(Settings, false, "config_shared_label")
+			local rows = assert(observations.delay_controls)
+			local expected = delay_settings_command_expected()
+			helpers.assert_eq(rows[expected.position].title, require("infra.i18n").get("button.ok"))
+			helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_eq(#rows, 5, "the three existing variable-delay rows stay after the command")
+		end)
+	end)
+
+	helpers.it("dispatches the existing window identity without a preference write", function()
+		with_settings(SOURCE, function(Settings, path, sandbox)
+			local _, ctx, observations = menu_controls(Settings, false, false)
+			local native = { opens = 0 }
+			ctx.webview = { show = function(name) native.opens = native.opens + 1; native.name = name end }
+			assert(observations.delay_controls)[1].fn()
+			helpers.assert_eq(native.opens, 1)
+			helpers.assert_eq(native.name, delay_settings_command_expected().window)
+			helpers.assert_eq(observations.writes, 0)
+			helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+		end)
+	end)
+
+	helpers.it("refuses a missing window owner without saving or redrawing", function()
+		with_settings(SOURCE, function(Settings)
+			local _, _, observations = menu_controls(Settings, false, false)
+			assert(observations.delay_controls)[1].fn()
+			helpers.assert_eq(observations.writes, 0)
+			helpers.assert_eq(observations.redraws, 0)
+		end)
+	end)
 end)

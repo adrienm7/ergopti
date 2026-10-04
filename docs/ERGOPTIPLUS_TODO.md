@@ -1240,6 +1240,14 @@ Items 54 and 81 remain partial. The configured top-level Reload and Quit command
 
 The ordered projection preserves the preceding shared Word Expander Delete and Add owners and their native transaction tests. Owning generators reproduce their exact parent artifacts before composing this tranche. The measured census changes from Windows/macOS/Linux 101/166/109 to 101/164/107; only this tranche's 0/−2/−2 retirement is attributed here. Focused macOS 7/0 and Linux 7/0 cases plus the registered menu-manifest test pass on the composed sources; complete integration and native Windows remain pending.
 
+The first fixed “Configure delays and colours” command under the delay submenu now uses one `hotstrings_delays_menu` command declaration and the existing `menu.hotstrings.config_item` label on all three drivers. Native ports supply the existing window callback and retain their previous pause posture; all variable quick-delay rows, positions, singleton windows, preference publication and save-refresh callbacks remain intact.
+
+The actual old Linux and macOS providers fail the declared-label replay (55/1 and 26/1), while the new providers pass 56/0 and 27/0. The macOS replay covers all 21 real locale labels, actual acknowledged/refused preference writes, paused admission and a missing window owner; ignoring the existing save receipt makes both refused-write cases fail. Every original test assertion is retained. Both owning generators reproduce the candidate twice and regenerate the exact ordered Add parent on inversion, with native fixed-row counts changing from Windows/macOS/Linux 101/164/107 to 100/163/106. Final integrated gates, hosted AutoHotkey and physical native window execution remain pending; items 54 and 81 stay partial for other native/provider rows.
+
+The graph parity guard now follows the actual `delays_colors` provider to `hotstrings_delays_menu`, preserving the earlier custom-delimiter graph edge and every existing assertion/floor. The composed Lifecycle/Add parent reports the new child as unreachable without this edge; the actual corrected graph passes with all 21 locale inputs. The composed Linux56 and macOS27 focused owner replays pass. Frozen earlier cohorts and their original qualification receipts remain unchanged.
+
+The native Windows corpus readers use the `_SharedDir` initialized by the test harness. Reader-only corrections preserve all assertions; native AHK execution remains pending CI.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

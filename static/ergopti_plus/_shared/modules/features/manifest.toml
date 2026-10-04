@@ -5315,6 +5315,12 @@ id = "word_expanders"
 # `list` since 2026-08-07, the last row of this group to move. It opens the
 # settings window and offers the per-category delays beside it — the same rows on
 # all three drivers, built three times because `action` hands the id back.
+[[menu.hotstrings_delays_menu]]
+type = "command"
+id = "hotstrings_config_window"
+i18n = "menu.hotstrings.config_item"
+disabled_when = ["hotstrings_config_ready"]
+
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "delays_colors"
