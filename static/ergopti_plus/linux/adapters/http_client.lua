@@ -203,7 +203,9 @@ local function curl_args(url, headers, body, options)
 		if not allowed then error(err) end
 		lines[#lines + 1] = "header = " .. config_quote(header_name .. ": " .. header_value)
 	end
-	if body ~= nil then lines[#lines + 1] = "data-binary = " .. config_quote(body) end
+	-- The port body is literal caller text. data-binary treats leading @ as a
+	-- filename (or stdin), even inside a quoted config value.
+	if body ~= nil then lines[#lines + 1] = "data-raw = " .. config_quote(body) end
 	lines[#lines + 1] = "url = " .. config_quote(url)
 	return args, table.concat(lines, "\n") .. "\n"
 end
