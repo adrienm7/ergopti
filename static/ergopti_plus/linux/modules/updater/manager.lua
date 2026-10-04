@@ -533,6 +533,12 @@ local function _fetch_releases(channel, callback)
 			local status = tonumber(result and result.status) or 0
 			local body = result and result.body
 			if status == 304 then
+				-- Curl retains 304 on a failed transfer; only a completed response
+				-- carries error_body and can validate the cached page's ETag.
+				if type(result.error_body) ~= "string" then
+					finish(nil, status, "incomplete conditional response", "no_connection")
+					return
+				end
 				body = _list_cache[key]
 				if not body then
 					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)

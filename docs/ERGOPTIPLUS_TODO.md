@@ -1332,6 +1332,26 @@ These are software implementations; final hardware verification remains below.
   Foreign runtime gates remain deferred. No titles, metrics policy, menus,
   input, shared API or hosted CI changed.
 
+- [~] **L97.** Linux updater conditional cache completion: require the HTTP
+  adapter's existing completed-response receipt before reusing a cached page
+  for status 304. A native TLS server sends a new ETag in an interrupted 304
+  header, then performs a real TCP reset. Curl exits 56 while retaining status
+  304 and saving the new ETag; the original updater incorrectly reuses its old
+  release page. Refuse that incomplete response through the existing error
+  path, invalidating the page/validator association. Preserve the physical ETag
+  sidecar, omit conditional headers until a fresh complete 200, then resume
+  ordinary complete-304 reuse. Five actual TLS controls have two original
+  failures and pass after with current and verified Ubuntu 22.04 curl/libuv;
+  exact wire headers, one callback and native handle settlement are checked.
+  Four registered simulated completion-shape regressions preserve all existing
+  assertions and completed-304 fixtures now carry the actual empty-string
+  receipt. Register the native fixture for future Linux CI without launching
+  hosted workflows. Windows WinHttp rejects failed Send/Wait before cache
+  interpretation and its curl adapter publishes status only after successful
+  exit; macOS maps negative native network failure to status zero by source.
+  Foreign runtime gates remain deferred. No shared contract, release/install
+  behavior, reserved surface or native transport policy changed.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
