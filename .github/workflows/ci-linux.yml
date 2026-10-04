@@ -192,6 +192,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_literal_receipts.lua
         timeout-minutes: 1
 
+      - name: Preserve native decrypted migration values and foreign ownership
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_text_migration_literal_receipts.lua
+        timeout-minutes: 1
+
       - name: Isolate SQLite from an actual disposable user's personal init
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

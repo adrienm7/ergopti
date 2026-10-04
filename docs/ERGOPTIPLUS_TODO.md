@@ -776,6 +776,21 @@ These are software implementations; final hardware verification remains below.
   on failure by source. Neither uses this CLI line-resumption behavior. No
   schema, crypto format, TOML, reserved source, cross-OS native gate, physical
   input or manual CI was modified or exercised.
+- [~] **L59.** SQLite decryption migration literal bytes: centralize the existing
+  scalar SQL encoder in shared sqlite.literal and reuse it in the shared plan
+  and Linux native command helper. A real Linux decrypt pass previously reported
+  a converted row while dropping its CRLF; NUL plaintext was refused instead of
+  represented in SQL. Six of seven production cipher/migration/backend cases
+  fail before and all pass after under LuaJIT/Lua 5.4, preserving both columns,
+  foreign-device ciphertext and the ordinary-byte control. Only the machine-id
+  path provider routes to a synthetic owned file; PBKDF/AES/OpenSSL, SQLite,
+  cursor ownership, parser and filesystem execute natively. Three unit cases
+  retain exact fragments, local-device/row scope and representable script bytes.
+  macOS consumes the same pure SQL plan and encoder by source; Windows has a
+  separate native SQL producer. Their native byte/bridge qualification remains
+  with the principal owner. Key derivation, salt, IV rules, envelopes, schema and
+  TOML are unchanged. Per the Linux task instruction, macOS/AHK suites and manual
+  CI remain unexecuted; no reserved source or physical input was exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
