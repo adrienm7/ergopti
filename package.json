@@ -49,6 +49,7 @@
 		"test:ahk-parse": "node ./tools/test/test-ahk-parse-coverage.cjs",
 		"test:ahk-startup-contract": "node ./tools/test/test-ahk-startup-contract.cjs",
 		"test:ahk-full-startup-smoke": "node ./tools/test/test-ahk-full-startup-smoke.cjs",
+		"test:ahk-startup-smoke-readiness": "node ./tools/test/test-ahk-startup-smoke-readiness.cjs",
 		"test:hardening-b-no-user-data-under-driver-dir": "node ./tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs",
 		"test:hardening-c-ahk-scan-code-precedence": "node ./tools/test/test-hardening-c-ahk-scan-code-precedence.cjs",
 		"test:hardening-d-native-timeout-contract": "node ./tools/test/test-hardening-d-native-timeout-contract.cjs",

@@ -649,6 +649,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-ahk-startup-contract.cjs'
 	},
 	{
+		name: 'AHK startup smoke requires fresh process-bound warm readiness (inert admission)',
+		cmd: 'node',
+		args: ['tools/test/test-ahk-startup-smoke-readiness.cjs'],
+		repro: 'node tools/test/test-ahk-startup-smoke-readiness.cjs'
+	},
+	{
 		name: 'full AHK startup smoke (real auto-execute to ready, isolated config)',
 		cmd: 'node',
 		args: ['tools/test/test-ahk-full-startup-smoke.cjs'],
