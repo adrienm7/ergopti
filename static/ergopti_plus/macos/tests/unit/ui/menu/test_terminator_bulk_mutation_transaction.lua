@@ -99,6 +99,7 @@ local function run_action(label, outcome, options)
 	package.loaded["infra.manifest_menu"] = {
 		command_row = command_row,
 		check_row = native_renderer.check_row,
+		get_array = native_renderer.get_array,
 		build = function(section, category, handlers, groups, ctx, providers)
 			return native_renderer.build(section, category, handlers, groups, ctx, providers)
 		end,

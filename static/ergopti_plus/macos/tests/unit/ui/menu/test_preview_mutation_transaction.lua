@@ -30,11 +30,15 @@ end
 
 local MAGIC_SOURCE = '# independent retained header\n[hotstrings]\npreview_star_enabled = true\npreview_colored_tooltips = true\n[foreign]\nfuture = "kept" # retained\n'
 
-local function with_fixture(outcome, callback, translate, declaration_label, selected_key)
+local PRESENCE_SOURCE = '# independent presence header\n[hotstrings]\npreview_autocorrect_enabled = true\npreview_ai_enabled = true\npreview_star_enabled = true\npreview_colored_tooltips = true\n[foreign]\nfuture = "kept" # retained\n'
+
+local function with_fixture(outcome, callback, translate, declaration_label, selected_key, reverse_presence)
 	local owned_key = selected_key or KEY
-	local owned_source = selected_key and MAGIC_SOURCE or SOURCE
-	local label_key = selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored"
-	local section = selected_key and "preview_magic_control" or "preview_colored_control"
+	local presence = selected_key == "preview_autocorrect_enabled" or selected_key == "preview_ai_enabled"
+	local owned_source = presence and PRESENCE_SOURCE or (selected_key and MAGIC_SOURCE or SOURCE)
+	local label_key = presence and (selected_key == "preview_ai_enabled" and "menu.hotstrings.tooltip_ai" or "menu.hotstrings.tooltip_autocorrect")
+		or (selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored")
+	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
 		"infra.preferences", "adapters.file_system", "infra.logger", "infra.dialog_util",
 		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
@@ -52,13 +56,20 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
 			json_decode = function(raw)
 				local decoded = require("adapters.json_codec").decode(raw)
-				if declaration_label and decoded[section] then decoded[section][1].i18n = declaration_label end
+				if declaration_label and decoded[section] then
+					for _, item in ipairs(decoded[section]) do
+						if item.id == owned_key then item.i18n = declaration_label end
+					end
+				end
+				if reverse_presence and decoded.preview_presence_controls then
+					local rows = decoded.preview_presence_controls; rows[1], rows[2] = rows[2], rows[1]
+				end
 				return decoded
 			end, i18n = { get = translate, section = function(key) return key end },
 			logger = require("infra.logger"),
 		}))
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { delay = 0.1, has_override = false } end }
-		package.loaded["infra.manifest_menu"] = { command_row = renderer.command_row, check_row = renderer.check_row, build = function(_, _, _, _, _, providers)
+		package.loaded["infra.manifest_menu"] = { command_row = renderer.command_row, check_row = renderer.check_row, get_array = renderer.get_array, build = function(_, _, _, _, _, providers)
 			if type(providers.preview_bubbles) == "function" then return providers.preview_bubbles() end
 			return {}
 		end }
@@ -368,4 +379,110 @@ helpers.describe("magic preview shared label contract", function()
 		end
 		helpers.assert_eq(observed, 21)
 	end)
+end)
+
+
+helpers.describe("declared autocorrection and AI preview presence", function()
+	for _, key in ipairs({ "preview_autocorrect_enabled", "preview_ai_enabled" }) do
+		helpers.it("fences retained pause for " .. key .. " before native mutation", function()
+			with_fixture("ok", function(f)
+				f.set_context_paused(true)
+				helpers.assert_eq(f.action(), false)
+				helpers.assert_eq(f.calls.native, 0)
+				helpers.assert_eq(f.calls.writes, 0)
+				helpers.assert_eq(f.calls.notices, 0)
+				helpers.assert_eq(f.calls.updates, 0)
+				helpers.assert_eq(f.state[key], true)
+				helpers.assert_eq(f.read(), PRESENCE_SOURCE)
+			end, nil, nil, key)
+		end)
+		for _, outcome in ipairs({ "native_false", "native_nil", "native_throw", "native_missing", "write_false", "write_throw" }) do
+			helpers.it("retains native and physical " .. key .. " after " .. outcome, function()
+				with_fixture(outcome, function(f)
+					helpers.assert_eq(f.action(), false)
+					helpers.assert_eq(f.state[key], true)
+					helpers.assert_eq(f.runtime(), true)
+					helpers.assert_eq(f.read(), PRESENCE_SOURCE)
+					helpers.assert_eq(f.calls.notices, 0)
+					helpers.assert_eq(f.calls.updates, 0)
+				end, nil, nil, key)
+			end)
+		end
+		helpers.it("keeps the actual global scope owner for " .. key, function()
+			with_fixture("ok", function(f)
+				local observed
+				local accepted = f.global.run_exclusive("Held independent owner", function() observed = f.action(); return true end)
+				helpers.assert_eq(accepted, true)
+				helpers.assert_eq(observed, false)
+				helpers.assert_eq(f.calls.native, 0)
+				helpers.assert_eq(f.calls.writes, 0)
+				helpers.assert_eq(f.read(), PRESENCE_SOURCE)
+			end, nil, nil, key)
+		end)
+		helpers.it("persists and reloads the acknowledged " .. key .. " without changing its neighbour", function()
+			with_fixture("ok", function(f)
+				helpers.assert_eq(f.action(), true)
+				helpers.assert_eq(f.calls.writes, 1)
+				helpers.assert_eq(f.calls.notices, 1)
+				helpers.assert_eq(f.calls.updates, 1)
+				helpers.assert_eq(f.runtime(), false)
+				local loaded, status = f.preferences.load(f.path)
+				helpers.assert_eq(status, "ok")
+				helpers.assert_nil(loaded[key], "the existing sparse writer removes the neutral false leaf")
+				helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings." .. key), false)
+				local neighbour = key == "preview_ai_enabled" and "preview_autocorrect_enabled" or "preview_ai_enabled"
+				helpers.assert_eq(loaded[neighbour], true)
+				helpers.assert_true(f.read():find('future = "kept" # retained', 1, true) ~= nil)
+			end, nil, nil, key)
+		end)
+	end
+end)
+
+
+helpers.describe("ordered presence checkbox locale contract", function()
+	local function read_json(path)
+		local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close()
+		return assert(require("adapters.json_codec").decode(text))
+	end
+	helpers.it("uses both real labels and the actual declaration order in all twenty-one locales", function()
+		local Paths = require("infra.paths")
+		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_presence_controls.json"))
+		local observed = 0
+		for _, locale in ipairs(corpus.locales) do
+			local catalog = read_json(Paths.shared("data/locales/" .. locale .. ".json"))
+			local function translate(key) return catalog[key] or key end
+			for _, reverse in ipairs({ false, true }) do
+				with_fixture("ok", function(f)
+					local function preview(rows)
+						for _, row in ipairs(rows or {}) do
+							if row.items and row.items[2] and (row.items[2] == f.row or row.items[3] == f.row) then return row.items end
+							local child = preview(row.items or row.submenu); if child then return child end
+						end
+					end
+					local rows = assert(preview(f.menus))
+					helpers.assert_eq(#rows, 5)
+					helpers.assert_eq(rows[1].label, translate("menu.hotstrings.tooltip_magic"))
+					for index, expected in ipairs(corpus.rows) do
+						local position = reverse and (4 - index) or (index + 1)
+						helpers.assert_eq(rows[position].label, translate(expected.i18n))
+						helpers.assert_true(rows[position].label ~= expected.i18n)
+						helpers.assert_eq(rows[position].checked, true)
+					end
+					helpers.assert_eq(rows[4].separator, true)
+					helpers.assert_eq(rows[5].label, translate("menu.hotstrings.tooltip_colored"))
+				end, translate, nil, "preview_autocorrect_enabled", reverse)
+			end
+			observed = observed + 1
+		end
+		helpers.assert_eq(observed, 21)
+	end)
+	for _, key in ipairs({ "preview_autocorrect_enabled", "preview_ai_enabled" }) do
+		helpers.it("consumes the admitted declaration label for " .. key, function()
+			with_fixture("ok", function(f)
+				helpers.assert_eq(f.row.label, "button.ok")
+				helpers.assert_eq(f.action(), true)
+				helpers.assert_eq(f.calls.writes, 1)
+			end, nil, "button.ok", key)
+		end)
+	end
 end)

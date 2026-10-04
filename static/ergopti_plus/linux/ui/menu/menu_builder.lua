@@ -1642,50 +1642,45 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- renderer materialises, rather than a menu tree this driver assembled.
 		["preview_bubbles"] = function()
 			local choices = {}
-			local toggles = PreviewSettings.toggles()
-			for index, toggle in ipairs(toggles) do
-				-- "colored" is a different kind of switch from the three above it —
-				-- they choose WHICH previews appear, it chooses how they look — so it
-				-- is separated, the same way macOS separates it.
-				if index == #toggles then choices[#choices + 1] = { separator = true } end
-				local name = toggle.name
-				if name == "star" then
-					local row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
-						["preview_star_enabled"] = function()
-							if PreviewSettings.toggle("star") ~= true then return false end
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-							return true
-						end,
-					}, {
-						["hotstrings.preview_star_enabled"] = function() return PreviewSettings.get("star") == true end,
-						-- Preserve configuration access while the Linux engine is paused.
-						["preview_magic_ready"] = function() return true end,
-					})
-					if row then choices[#choices + 1] = row end
-				elseif name == "colored" then
-					local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
-						["preview_colored_tooltips"] = function()
-							if PreviewSettings.toggle("colored") ~= true then return false end
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-							return true
-						end,
-					}, {
-						["hotstrings.preview_colored_tooltips"] = function() return PreviewSettings.get("colored") == true end,
-						-- Configuring a preview remains allowed while the Linux engine is paused.
-						["preview_colored_ready"] = function() return true end,
-					})
-					if row then choices[#choices + 1] = row end
-				else
-					choices[#choices + 1] = {
-						label   = i18n_safe(toggle.label),
-						checked = PreviewSettings.get(name),
-						action  = function()
-							PreviewSettings.toggle(name)
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-						end,
-					}
+			local row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
+				["preview_star_enabled"] = function()
+					if PreviewSettings.toggle("star") ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				["hotstrings.preview_star_enabled"] = function() return PreviewSettings.get("star") == true end,
+				-- Preserve configuration access while the Linux engine is paused.
+				["preview_magic_ready"] = function() return true end,
+			})
+			if row then choices[#choices + 1] = row end
+			local presence_commands, presence_getters = {}, { preview_presence_ready = function() return true end }
+			for key, name in pairs({ preview_autocorrect_enabled = "autocorrect", preview_ai_enabled = "ai" }) do
+				presence_commands[key] = function()
+					if PreviewSettings.toggle(name) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
 				end
+				presence_getters["hotstrings." .. key] = function() return PreviewSettings.get(name) == true end
 			end
+			for _, declaration in ipairs(ManifestMenu.get_array("preview_presence_controls")) do
+				local row = ManifestMenu.check_row("preview_presence_controls", declaration.id, presence_commands, presence_getters)
+				if row then choices[#choices + 1] = row end
+			end
+			choices[#choices + 1] = { separator = true }
+			local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
+				["preview_colored_tooltips"] = function()
+					if PreviewSettings.toggle("colored") ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				["hotstrings.preview_colored_tooltips"] = function() return PreviewSettings.get("colored") == true end,
+				-- Configuring a preview remains allowed while the Linux engine is paused.
+				["preview_colored_ready"] = function() return true end,
+			})
+			if row then choices[#choices + 1] = row end
+
 			return { { label = i18n_safe("menu.hotstrings.preview_bubbles"), items = choices } }
 		end,
 	}
