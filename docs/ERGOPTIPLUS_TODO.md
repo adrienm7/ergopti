@@ -1913,6 +1913,33 @@ until explicit cleanup. Ordinary saves cannot replace an outdated scalar with a
 new subtree. This decision preserves the existing strict batch-writer refusal;
 it does not qualify the remaining Windows bootstrap or physical-source gaps.
 
+The Windows bootstrap cache and feature owner now consume a configuration-only
+semantic snapshot through the existing typed document reader. Root and section
+relative dotted assignments and declared inline namespaces reach the native
+section/key cache and feature records from the same admitted source generation.
+Owned inline feature records merge through the existing child policies onto
+detached seeded records, keeping unspecified defaults and exact outdated child
+identities. Root presence belongs to the admitted read, so external deletion
+cannot make the two boot consumers select different generations. Quoted literal dots, Unicode
+case-distinct and empty names retain exact identities; dynamic personal names
+keep their Boolean and timing domains independently of static manifest identity.
+Nested native values are
+independent between cache, retained source rows and each feature application.
+Table-array members remain outside scalar settings instead of collapsing their
+owner generations. Malformed semantic boot sources publish no partial cache or
+feature state and retain session write protection after a later readable repair;
+invalid/newer schema-stamp refusals remain owned by migration. Generic data-file
+parsing and ordinary/detached writer admission keep their existing contracts.
+Registered native cases include the unchanged independent dotted corpus with
+handwritten complete cache goldens, actual child bootstrap readers, ordinary and
+full-save no-op preservation, native read locks, stale-source publication and
+version authority. Portable encoding, source registration, closure, startup,
+coercion and convention checks do not qualify those native cases. Windows unit,
+compile/startup, E2E, packaging and installation validation remains required;
+item 42 and physical-source preservation stay partial. Selected local
+verification passed formatting, all 356 JS checks and 1,815 AHK BOM/LF files;
+native Windows unit, compile and E2E were not executed on this Linux host.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
