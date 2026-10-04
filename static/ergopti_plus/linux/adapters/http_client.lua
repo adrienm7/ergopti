@@ -297,9 +297,10 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		end
 		return false
 	end
+	if type(url) ~= "string" or url == "" then return reject("curl URL must be a non-empty string") end
 	-- Curl reads the URL from a C-string config value. NUL silently selects a
 	-- shorter address, so refuse before native side effects or owner replacement.
-	if type(url) == "string" and url:find("\0", 1, true) then
+	if url:find("\0", 1, true) then
 		Logger.error(LOG, "Cannot compose curl configuration: request URL contains NUL.")
 		return reject("curl config URL cannot contain NUL")
 	end
@@ -314,6 +315,27 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		-- until the adapter owns and filters every redirect hop explicitly.
 		options.follow_redirects = allowed
 	end
+	local timeout_ms = tonumber(options.timeout_ms) or DEFAULT_TIMEOUT_MS
+	local request_options = {
+		buffered = options.buffered == true,
+		method = options.method or "POST",
+		timeout_ms = timeout_ms,
+		follow_redirects = options.follow_redirects == true,
+		https_only = options.https_only == true,
+		etag_compare = options.etag_compare,
+		etag_save = options.etag_save,
+		output_path = options.output_path,
+		max_download_bytes = options.max_download_bytes,
+	}
+	-- Metadata refusal is transactional too: an invalid replacement must not
+	-- retire a valid owner or leave timers/pipes behind after composition raises.
+	local composed, argv, config = pcall(curl_args, url, headers, body, request_options)
+	if not composed then
+		Logger.error(LOG, "Cannot compose curl configuration; request refused.")
+		return reject("curl configuration refused")
+	end
+	local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
+	if argv_refusal ~= "" then return reject("curl argument vector refused: " .. argv_refusal) end
 	local owner = request_owner(options.owner)
 	if _active[owner] and not M.cancel(owner) then
 		return reject("previous request cancellation failed")
@@ -322,7 +344,6 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		return reject("asynchronous HTTP unavailable")
 	end
 
-	local timeout_ms = tonumber(options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request = {
 		owner = owner,
 		buffered = options.buffered == true,
@@ -358,29 +379,6 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		return false
 	end
 
-	local request_options = {
-		buffered = request.buffered,
-		method = options.method or "POST",
-		timeout_ms = timeout_ms,
-		follow_redirects = options.follow_redirects == true,
-		https_only = options.https_only == true,
-		etag_compare = options.etag_compare,
-		etag_save = options.etag_save,
-		output_path = options.output_path,
-		max_download_bytes = options.max_download_bytes,
-	}
-	-- Refuse an ill-typed argv before libuv sees it: curl_args interpolates
-	-- timeouts and byte budgets, and libuv would reject a bare number without
-	-- naming the slot (keylogger-worker-timings-must-be-strings).
-	local argv, config = curl_args(url, headers, body, request_options)
-	local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
-	if argv_refusal ~= "" then
-		finish(request, {
-			ok = false, status = 0, body = "",
-			error = "curl argument vector refused: " .. argv_refusal,
-		})
-		return false
-	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
 		args = argv,
 		stdio = { request.stdin, request.stdout, request.stderr },
