@@ -190,6 +190,8 @@ function main() {
 			'.github/linux-ci-coverage.json',
 			'tools/test/verify-change.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
+			'tools/test/validate-ahk-e2e-manifest.cjs',
+			'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json',
 			'tools/test/test-ahk-test-coverage.cjs',
 			'tools/lint/format.cjs',
 			'tools/test/run-js-suite.cjs',

@@ -29,6 +29,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
+const { validateAhkE2eManifest } = require('./validate-ahk-e2e-manifest.cjs');
 const { includeClosure } = require('./test-ahk-test-coverage.cjs');
 const { PRETTIER_EXTENSIONS } = require('../lint/format.cjs');
 
@@ -606,7 +607,6 @@ function runGate(gate) {
 	// native gates noninteractive and route that failure to the inherited receipt.
 	const args = ['/ErrorStdOut', spec.ahk];
 	const options = { cwd: WINDOWS_TESTS, stdio: 'inherit', windowsHide: true };
-	if (spec.ahk !== 'run_all.ahk') return spawnSync(ahk, args, options);
 
 	const resultsFile = path.join(
 		os.tmpdir(),
@@ -618,7 +618,8 @@ function runGate(gate) {
 	});
 	let manifest;
 	try {
-		manifest = validateAhkSuiteManifest(fs.readFileSync(resultsFile, 'utf8'));
+		const validate = gate === 'ahk-e2e' ? validateAhkE2eManifest : validateAhkSuiteManifest;
+		manifest = validate(fs.readFileSync(resultsFile, 'utf8'));
 	} catch (error) {
 		manifest = { complete: false, planned: 0, executed_count: 0, errors: [error.message] };
 	} finally {

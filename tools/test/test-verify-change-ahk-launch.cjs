@@ -64,7 +64,11 @@ assert.equal(
 	1,
 	'a zero exit without a manifest must still fail'
 );
-assert.equal(context.runGate('ahk-e2e').status, 0, 'normal E2E completion must remain successful');
+assert.equal(
+	context.runGate('ahk-e2e').status,
+	1,
+	'a zero E2E exit without a receipt must still fail'
+);
 
 const nativeCalls = calls.slice(0, 2);
 if (process.platform === 'win32' && fs.existsSync(nativeCalls[0].command)) {

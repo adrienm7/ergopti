@@ -79,6 +79,12 @@ const CHECKS = [
 		repro: 'npm run test:windows-range-transport'
 	},
 	{
+		name: 'AHK E2E admission requires every pure and native Edit corpus result',
+		cmd: process.execPath,
+		args: ['tools/test/test-ahk-e2e-manifest.cjs'],
+		repro: 'npm run test:ahk-e2e-manifest'
+	},
+	{
 		name: 'AHK suite manifest rejects early completion before the slow tail',
 		cmd: 'node',
 		args: ['tools/test/test-ahk-suite-manifest.cjs'],

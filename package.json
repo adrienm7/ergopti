@@ -418,7 +418,8 @@
 		"test:editor-format-on-save": "node ./tools/test/test-editor-format-on-save.cjs",
 		"check:agent-skills": "node ./tools/agents/sync-skills.cjs check",
 		"sync:agent-skills": "node ./tools/agents/sync-skills.cjs write",
-		"test:windows-bundle-stamp-encoding": "node ./tools/test/test-windows-bundle-stamp-encoding.cjs"
+		"test:windows-bundle-stamp-encoding": "node ./tools/test/test-windows-bundle-stamp-encoding.cjs",
+		"test:ahk-e2e-manifest": "node ./tools/test/test-ahk-e2e-manifest.cjs"
 	},
 	"type": "module",
 	"dependencies": {
