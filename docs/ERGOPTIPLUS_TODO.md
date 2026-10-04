@@ -1187,6 +1187,23 @@ These are software implementations; final hardware verification remains below.
   and macOS use their host message loops and native timer backends by source;
   there is no equivalent Lua-owned loop startup transaction. Their runtime
   suites and hosted CI remain deferred; physical input is untested here.
+- [~] **L88.** Linux SQLite device registration: refresh only mutable host
+  fields with a transactional UPSERT, preserving creation/import metadata,
+  unknown schema columns and existing UPDATE triggers. REPLACE previously
+  deleted that durable history and bypassed update refusals. Registration now
+  returns the checked native write receipt and logs success only when accepted.
+  Eleven real collector/SQLite cases have ten failures before and none after;
+  the intermediate UPSERT alone still fails the AFTER UPDATE rollback case.
+  BEGIN IMMEDIATE/COMMIT therefore keeps row and trigger writes atomic when
+  an AFTER trigger raises FAIL or an independent native reader refuses COMMIT.
+  Healthy retries, first insert, reopen, row bytes, schema/index/trigger and
+  actual CLI receipts pass. Three registered native unit regressions preserve
+  all allocator/cursor and schema assertions. The fixture reuses L75's genuine
+  shared-reader child. macOS still uses REPLACE by source and can reset import
+  and extension fields; its persisted device creation timestamp differs. That
+  bounded native follow-up remains with the principal owner. Windows has no
+  equivalent devices-table registration by source. No metrics enable/fallback,
+  reserved input/configuration policy, foreign runtime suite or hosted CI changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

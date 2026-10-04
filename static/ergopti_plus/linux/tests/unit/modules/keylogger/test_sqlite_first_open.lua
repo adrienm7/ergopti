@@ -164,6 +164,80 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		if not ok then error(failure, 0) end
 	end)
 
+	helpers.it("native device registration retains existing creation and import metadata", function()
+		local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			local opened = writer.open_db(dir .. "/metrics.sqlite")
+			if not HAS_SQLITE then
+				helpers.assert_eq(opened, false, "without SQLite opening must be refused")
+				return
+			end
+			helpers.assert_true(opened)
+			writer.register_device("owned-device", "Original", "linux", "1", "signature")
+			helpers.assert_true(writer.exec_sql("UPDATE devices SET created_at='original-created',imported_data_sql_size=37,"
+				.. "imported_data_sql_sha256='owned-digest';"))
+			writer.register_device("owned-device", "Updated", "linux", "2", "new-signature")
+			local rows = assert(writer.query_rows("SELECT name,os_version,host_signature,created_at,imported_data_sql_size,imported_data_sql_sha256 FROM devices;"))
+			helpers.assert_eq(rows[1], "Updated|2|new-signature|original-created|37|owned-digest")
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("native device registration refuses an update and acknowledges its healthy retry", function()
+		local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			local opened = writer.open_db(dir .. "/metrics.sqlite")
+			if not HAS_SQLITE then
+				helpers.assert_eq(opened, false, "without SQLite opening must be refused")
+				return
+			end
+			helpers.assert_true(opened)
+			writer.register_device("owned-device", "Original", "linux", "1", "signature")
+			helpers.assert_true(writer.exec_sql("CREATE TRIGGER owned_refusal BEFORE UPDATE ON devices BEGIN SELECT RAISE(FAIL,'owned refusal'); END;"))
+			helpers.assert_eq(writer.register_device("owned-device", "Refused", "linux", "2", "new-signature"), false)
+			helpers.assert_eq(assert(writer.query_rows("SELECT name,os_version,host_signature FROM devices;"))[1], "Original|1|signature")
+			helpers.assert_true(writer.exec_sql("DROP TRIGGER owned_refusal;"))
+			helpers.assert_eq(writer.register_device("owned-device", "Updated", "linux", "2", "new-signature"), true)
+			helpers.assert_eq(assert(writer.query_rows("SELECT name,os_version,host_signature FROM devices;"))[1], "Updated|2|new-signature")
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("native AFTER UPDATE refusal rolls back device fields and trigger writes", function()
+		local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			local opened = writer.open_db(dir .. "/metrics.sqlite")
+			if not HAS_SQLITE then
+				helpers.assert_eq(opened, false, "without SQLite opening must be refused")
+				return
+			end
+			helpers.assert_true(opened)
+			helpers.assert_true(writer.register_device("owned-device", "Original", "linux", "1", "signature"))
+			local before = table.concat(assert(writer.query_rows("SELECT hex(name),hex(os_version),hex(host_signature),hex(created_at),hex(updated_at) FROM devices;")))
+			helpers.assert_true(writer.exec_sql("CREATE TABLE owned_trigger_writes (name TEXT); "
+				.. "CREATE TRIGGER owned_after_refusal AFTER UPDATE ON devices BEGIN "
+				.. "INSERT INTO owned_trigger_writes VALUES(NEW.name); SELECT RAISE(FAIL,'owned refusal'); END;"))
+			helpers.assert_eq(writer.register_device("owned-device", "Refused", "linux", "2", "refused-signature"), false)
+			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT hex(name),hex(os_version),hex(host_signature),hex(created_at),hex(updated_at) FROM devices;"))), before)
+			helpers.assert_eq(assert(writer.query_rows("SELECT count(*) FROM owned_trigger_writes;"))[1], "0")
+			helpers.assert_true(writer.exec_sql("DROP TRIGGER owned_after_refusal;"))
+			helpers.assert_true(writer.register_device("owned-device", "Updated", "linux", "2", "new-signature"))
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("finds sqlite3 on a system that has no `which`", function()
 		-- Arch's base image ships sqlite3 but not `which`; the probe used it and
 		-- disabled SQLite there. Any command starting with it fails here.
