@@ -6,6 +6,34 @@ local helpers = require("tests.helpers")
 local with_events = require("tests.support.physical_accounting_scope").run
 
 helpers.describe("physical accounting (hs274)", function()
+	helpers.it("credits physical holds without another press or ergonomic streak", function()
+		with_events(function(events, state, _, press)
+			press(53)
+			for _, duration in ipairs({ 0, 250, 251, 900 }) do
+				events.walk_system_event({ action = "physical_release", capture = "lease-a", device = "41",
+					keycode = 53, timestamp = "2026-09-12 10:00:00.000", app = "TestApp", hold_ms = duration })
+			end
+			local key = "2026-09-12\1TestApp\1" .. "53"
+			helpers.assert_eq(state.agg_batch.kc_hold[key], { date = "2026-09-12", app = "TestApp",
+				keycode = 53, sum_ms = 1401, count = 4, max_ms = 900, tap_count = 2, hold_count = 2 })
+			helpers.assert_eq(state.agg_batch.kc_ngram[key].count, 1)
+			helpers.assert_eq(next(state.agg_batch.system_day), nil)
+		end)
+	end)
+
+	helpers.it("rejects invalid physical releases without changing hold or press totals", function()
+		with_events(function(events, state)
+			for _, duration in ipairs({ -1, 0.5, "251", math.huge, 0 / 0, 1e100, 9223372036855 }) do
+				local accepted = pcall(events.walk_system_event, { action = "physical_release", capture = "lease-a",
+					device = "41", keycode = 53, timestamp = "2026-09-12 10:00:00.000", app = "TestApp",
+					hold_ms = duration })
+				helpers.assert_eq(accepted, false)
+			end
+			helpers.assert_eq(next(state.agg_batch.kc_hold), nil)
+			helpers.assert_eq(next(state.agg_batch.kc_ngram), nil)
+		end)
+	end)
+
 	helpers.it("preserves physical streaks across logical text with no physical credit", function()
 		with_events(function(events, state, _, press)
 			for _ = 1, 2 do

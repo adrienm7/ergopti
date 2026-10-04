@@ -1518,6 +1518,23 @@ requirements are complete. All unresolved magic-key ownership, watchdog
 recovery, native freshness and real-device requirements above remain in item 30.
 Hosted Lua owner tests do not qualify physical input.
 
+Windows PC follow-up for item30 (maintainer-deferred; does not block this
+macOS feature integration):
+
+- [ ] From the integrated `dev` SHA, run `npm run test:ahk-encoding`,
+      AutoHotkey v2 with `/ErrorStdOut=UTF-8` on
+      `static/ergopti_plus/windows/tests/run_all.ahk` and
+      `static/ergopti_plus/windows/tests/e2e/run_e2e.ahk`; retain the exact SHA and native
+      result files, including failed and skipped counts.
+- [ ] In the actual Windows app, capture a physical magic key with Ergopti+
+      emulation active, reload, then switch to the native Ergopti layout and back
+      in the same window. Verify durable chosen identity, plain-press replacement
+      and unchanged Shift/AltGr/Ctrl/Win behavior without a manual reload.
+- [ ] Assign that key a tap action, then open the magic-key chooser. Verify the
+      collision is refused with its existing reason and that refused capture does
+      not change the source or tap assignment. Exercise held/deferred input across
+      layout changes and verify the real tap-to-UIA freshness transition.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -1536,6 +1553,12 @@ Hosted Lua owner tests do not qualify physical input.
   VirtualHIDDevice version skew must block the incompatible runtime with an
   explicit explanation and offer an update only after confirmation (maintainer
   decision, 2026-10-04); implementation and native acceptance remain pending.
+  Physical hold policy: retain the accepted initial press's application and
+  calendar date; cancel the entire duration across any pause, private interval
+  or capture/source gap. Privacy cancellation is the maintainer's explicit
+  decision; initial-press attribution follows the delegated routine decisions.
+  Matched delivery and production history wiring still need implementation;
+  every new hold prerequisite still needs native acceptance.
   About 30-40 agent-days plus maintainer
   hardware time.
 
@@ -1566,6 +1589,17 @@ current state has changed. Two causal regressions fail against the preimage;
 108 focused portable Lua cases and 14 diagnostic Python cases pass. Outbox
 ownership is not durable storage, full production history wiring or native
 acceptance. The capture owner remains dormant and TODO31 remains partial.
+
+WP3 hold persistence now accepts only a validated same-capture physical release
+into the real ordered LogManager outbox. Its shared duration policy updates only
+the existing hold metrics and never credits a second press. Twenty-two focused
+portable Lua cases pass. A real SQLite fixture drives the actual writer and
+aggregator, verifies ingestion and two independent raw rebuilds after poisoned
+derived rows, and preserves independently authored duration and identity
+expectations; its confinement control also passes. Original sink and aggregate
+preimages fail. This is an adapted macOS API proof, not native Hammerspoon or
+matched physical delivery. TODO31 remains partial and default startup stays
+unchanged.
 
 The dormant startup now runs the real `--hs274-clock` command after pinned
 identity verification. It transfers a validated copied timebase and immutable

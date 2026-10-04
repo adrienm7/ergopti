@@ -950,10 +950,12 @@ def load_tests(loader, tests, pattern):
     import hs_delayed_timer_probe_test
     import hs_karabiner_config_probe_test
     import hs_native_bootstrap_probe_test
+    import hs274_persistence_test
 
     tests.addTests(loader.loadTestsFromModule(hs_delayed_timer_probe_test))
     tests.addTests(loader.loadTestsFromModule(hs_karabiner_config_probe_test))
     tests.addTests(loader.loadTestsFromModule(hs_native_bootstrap_probe_test))
+    tests.addTests(loader.loadTestsFromModule(hs274_persistence_test))
     return tests
 
 

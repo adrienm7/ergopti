@@ -367,6 +367,54 @@ end)
 -- ===========================================
 
 helpers.describe("log_manager append transaction ownership", function()
+	helpers.it("owns a copied physical release and retains it across storage refusal", function()
+		with_fixture(function() return load_log_manager_fixture(2) end, function(fixture)
+			local release = { capture = "sink-test", device = "18446744073709551615", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 251 }
+			helpers.assert_eq(fixture.manager.log_physical_release(release), false)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			fixture.state.is_enabled, fixture.state.is_private_window = false, true
+			helpers.assert_eq(fixture.manager.log_physical_release(release), true)
+			helpers.assert_eq(#fixture.appended, 0, "FIFO acceptance precedes deferred storage")
+			release.capture, release.device, release.keycode = "changed", "1", 49
+			release.app, release.timestamp, release.hold_ms = "Changed", "invalid", 1
+			helpers.assert_true(fixture.mode.interrupt("sink-owner", "sink-test"))
+			helpers.assert_eq(fixture.manager.stop(), false, "refused storage retains teardown debt")
+			helpers.assert_eq(#fixture.appended, 0)
+			helpers.assert_eq(fixture.manager.log_physical_release(release), false)
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(fixture.appended, {{ type = "system_event", action = "physical_release",
+				capture = "sink-test", device = "18446744073709551615", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 251 }})
+		end)
+	end)
+
+	helpers.it("rejects invalid physical hold durations before outbox ownership", function()
+		with_fixture(function() return load_log_manager_fixture(0) end, function(fixture)
+			helpers.assert_eq(type(fixture.manager.log_physical_release), "function")
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			for _, invalid in ipairs({ -1, 0.5, "251", math.huge, 0 / 0, 1e100, 9223372036855 }) do
+				local release = { capture = "sink-test", device = "41", keycode = 53,
+					app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = invalid }
+				local accepted, refusal = pcall(fixture.manager.log_physical_release, release)
+				helpers.assert_eq(accepted, false)
+				helpers.assert_true(tostring(refusal):find(
+					"Physical release requires nonnegative integer hold_ms", 1, true) ~= nil,
+					"the duration guard must reject each malformed hold before ownership")
+			end
+			local maximum = { capture = "sink-test", device = "41", keycode = 53,
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 9223372036854 }
+			helpers.assert_true(fixture.manager.log_physical_release(maximum))
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(#fixture.appended, 1, "only the exact signed-nanosecond maximum is owned")
+			helpers.assert_eq(fixture.appended[1].hold_ms, 9223372036854)
+			helpers.assert_eq(fixture.appended[1].capture, "sink-test")
+			helpers.assert_eq(fixture.appended[1].device, "41")
+		end)
+	end)
+
 	helpers.it("acknowledges original retained context through the real physical outbox sink", function()
 		with_fixture(function() return load_log_manager_fixture(0) end, function(fixture)
 			helpers.assert_true(fixture.mode.select_stream("sink-owner"))

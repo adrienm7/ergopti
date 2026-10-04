@@ -3,7 +3,9 @@
 # Group 5 macOS input checkpoint
 
 This is a partial feature checkpoint, not group completion or integration into
-`dev`. Preserve `feat/macos-input` until its remaining scope is qualified.
+`dev`. The maintainer subsequently requested integration of prepared corrections
+with explicit Windows PC follow-ups; unfinished macOS and Karabiner requirements
+stay open in the TODO rather than being claimed complete.
 The inspected base is `689d30293704093feab2e3caa077604e88560eb6` from the actual
 `origin/dev`; no old handover patch belongs to this group.
 
@@ -19,6 +21,7 @@ The inspected base is `689d30293704093feab2e3caa077604e88560eb6` from the actual
 | `10486f41de7ed8f20ebfe91220440ccac3dfcb26` | Require exact physical sink acceptance, copied outbox ownership and retained context. |
 | `6aa4121972dd4ed5764ec9b200ac0652d140bfda` | Include the actual CLI baseline version in the cheap admission preflight.             |
 | `c392b57282b8a6ee91d91b29b4774b5ca8f25bf5` | Retain observed owned file-read sample ancestry through bounded closed markers.       |
+| `6200f557c2490ea6a95a571acccfff9640e971c6` | Require validated native clock ownership before physical capture.                     |
 
 Default startup does not load the new capture session. Opening v1, consumer
 baseline v2, producer baseline v1, fixture-only coverage and independent JSON
@@ -98,9 +101,23 @@ acknowledgement precedes stream creation. Cancellation retains native debt and
 fences successors; prepare/status/open remain in the existing single capture
 process. Five causal preimage failures cover missing startup/ownership refusal;
 37 focused cases pass (13 startup, 20 existing supervisor and 4 arithmetic).
-The complete source-selected gate remains a prerequisite before committing.
+The complete source-selected gate passed formatting, 356 JS checks, 13,922
+portable macOS Lua cases and 101 stubbed E2E checks, with one explicit skip.
 This port does not bind production context history, activate startup or establish
 native acceptance.
+
+The frozen release/interval source composition passed the full selected local
+gate: formatting, 356 JS checks, 13,933 portable macOS units, 101 stubbed macOS
+E2E checks (one explicit skip), 6,489 native Linux Lua units and 188 Linux E2E
+checks. These Linux results do not establish physical X11/Wayland input. The
+new Swift diagnostic slice was not part of this gate and needs its own checks.
+
+The release persistence prerequisite passes 22 focused portable Lua cases and
+2 real SQLite/adapted API cases. Actual ingestion and two raw cache rebuilds
+preserve independent duration, original application/date and exact capture/device
+expectations without crediting another press. Original sink and aggregate
+preimages fail; a disabled path-confinement guard fails its independent control.
+This prerequisite does not implement matched delivery or activate the runtime.
 
 TODO13/35 closure reuses inspected native receipts:
 
@@ -141,27 +158,32 @@ A real work Mac is available only as a last resort. Maximize meaningful CI;
 collect the remaining physical checks together after CI has resolved everything
 it can prove. Hardware double results cannot close these acceptance requirements.
 
-## Native CI reservation status
+## Native CI status
 
-No new group5 native CI has been executed. The existing remote lock
-`0563f0d589a181698bd2b13d75026aec673dbb61` belongs to group7, branch
-`feat/windows-native`, candidate `45d5c2db602ee74711da965ba17207c69b6dcba5`.
-Its first run37228466168 reached terminal failure; the owner subsequently
-continued the same reservation with new manual runs. Run37236435190 completed
-with Windows unit failure at `cb2e62e0a4691ae57a0c05a36a6b998973663879`;
-macOS and Release were skipped. Group5 requested the
-owner's next-phase/release status in issue86. Inspect the current terminal result
-and actual owner release before reserving. Do not take it over or delete it. Group5 has
-not moved `codex/ci-validation` and does not own either CI ref.
+Manual run37238984667 tested CI SHA
+`e405575f60a078866468057b05952f3df9ee821b`, whose tree exactly equals feature
+`6200f557c2490ea6a95a571acccfff9640e971c6`. Validate, shared Core and macOS
+stubbed unit/E2E jobs passed. The release Swift build passed; Package failed
+because `KeyboardSourceProbeTests.testActualSelectedSourcesProveDirectPunctuationAndRejectDeadAccent`
+did not complete before the native test process ended. The job duration was
+120 seconds; the transcript is required to explain that termination. Subsequent packaging,
+installation and launch scenarios were skipped. Release and unselected OS lanes
+were skipped. No native packaging acceptance is claimed.
 
-Group4 published the standalone shared Core provisioning correction at
-b57a94802986adb80496d8abb7e4c1bcb6298299. Group5 reuses only its workflow hunk;
-`.github/workflows/ci.yml` matches that released owner image byte-for-byte.
-Stock Lua5.4 receives lua-luv for unchanged exact native file admission; no
-fallback, assertion, lane or release-policy change is made. Fresh hosted proof
-remains pending. The group5 macOS phase must verify candidate/CI tree equality,
-the actual tested SHA, terminal job conclusions and skipped Release before
-releasing its own newly acquired lock.
+Artifact11317355627 is preserved by GitHub, but its download redirects to
+`productionresultssa18.blob.core.windows.net`, refused by the running cloud
+network policy (proxy tunnel403). The domain is saved in the environment draft;
+saving does not apply it to this running instance. Native failure diagnosis and
+an exact final-candidate rerun remain necessary before integration qualification.
+
+The maintainer now allows feature test CI in parallel: group5 exclusively uses
+`codex/ci-macos-input`, without a lock. Only final integration reserves
+`codex/ci-lock` and `codex/ci-validation`. Group5 deleted its own earlier empty
+lock `e163741159149c2987f9db0a868d3b09b316c127` after this policy change and
+owns no current lock. Its already-running manual CI was left to completion.
+
+Group4's released shared Core provisioning correction is reused byte-for-byte;
+stock Lua5.4 receives lua-luv without changes to assertions or release policy.
 
 ## Coordination and setup
 
@@ -173,7 +195,8 @@ holds no shared manifest/schema/locales/generator ownership.
 Use the remote `codex/ci-lock` only as a lock. Its empty commit must parent the
 latest `origin/dev` and name group5, feature branch and exact candidate. An
 existing lock blocks reservation; only its owner deletes it after terminal CI.
-Dispatch exclusively through `codex/ci-validation`. A validation-only two-parent
+For feature tests use only `codex/ci-macos-input`; final integrated validation
+uses `codex/ci-validation`. A validation-only two-parent
 commit can retain the previous CI ancestry while using the exact candidate tree;
 verify both tree equality and actual tested SHA. Do not force-push or import
 other groups' unintegrated payloads into the feature.

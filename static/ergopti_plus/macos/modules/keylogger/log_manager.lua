@@ -94,6 +94,7 @@ local _state = nil
 local _physical_sink_active, _physical_sink_generation = false, 0
 local PhysicalAccounting = require("modules.keylogger.physical_accounting_mode")
 local PhysicalWire = require("modules.keylogger.physical_wire")
+local PhysicalRelease = require("keylogger.physical_release")
 
 --- Device identity, read from / written to device.json.
 local _device_id  = nil
@@ -728,15 +729,11 @@ function M.log_system_event(event_type, metadata)
 	M.append_log(entry)
 end
 
---- Accepts one validated physical press into the ordered outbox by value.
---- Retained event-time privacy is the capture owner's responsibility; consulting
---- current focus here would reclassify delayed input. Exact true means FIFO
---- ownership, not durable storage or SQLite ingestion.
+--- Validates and copies the common physical event fields before queue ownership.
 --- @param press table Capture, exact device, keycode, original app and timestamp.
---- @return boolean accepted False when lifecycle or capture ownership is revoked.
-function M.log_physical_press(press)
-	if not _require_state("log_physical_press") then return false end
-	if not _physical_sink_active then return false end
+--- @param action string Physical press or release action.
+--- @return table entry Detached scalar fields only.
+local function _physical_entry(press, action)
 	assert(type(press) == "table" and getmetatable(press) == nil, "Invalid physical press")
 	assert(type(press.capture) == "string" and press.capture ~= "", "Missing physical capture")
 	assert(type(press.device) == "string" and press.device:match("^[1-9]%d*$"), "Invalid physical device")
@@ -747,10 +744,36 @@ function M.log_physical_press(press)
 	assert(type(press.timestamp) == "string"
 		and press.timestamp:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$"),
 		"Invalid original physical timestamp")
-	if PhysicalAccounting.admitted_capture() ~= press.capture then return false end
-	return M.append_log({ type = "system_event", action = "physical_press",
-		capture = press.capture, device = press.device, keycode = press.keycode,
-		app = press.app, timestamp = press.timestamp })
+	return { type = "system_event", action = action, capture = press.capture, device = press.device,
+		keycode = press.keycode, app = press.app, timestamp = press.timestamp }
+end
+
+--- Accepts one validated physical press into the ordered outbox by value.
+--- Retained event-time privacy is the capture owner's responsibility; consulting
+--- current focus here would reclassify delayed input. Exact true means FIFO
+--- ownership, not durable storage or SQLite ingestion.
+--- @param press table Capture, exact device, keycode, original app and timestamp.
+--- @return boolean accepted False when lifecycle or capture ownership is revoked.
+function M.log_physical_press(press)
+	if not _require_state("log_physical_press") then return false end
+	if not _physical_sink_active then return false end
+	local entry = _physical_entry(press, "physical_press")
+	if PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
+end
+
+--- Accepts one approved matched release by value under the same capture owner.
+--- The caller supplies its approved immutable app/date context and HID duration;
+--- current privacy or delivery time cannot redefine that historical decision.
+--- @param release table Common physical fields and nonnegative integer hold_ms.
+--- @return boolean accepted Exact true transfers ownership to the ordered FIFO.
+function M.log_physical_release(release)
+	if not _require_state("log_physical_release") then return false end
+	if not _physical_sink_active then return false end
+	local entry = _physical_entry(release, "physical_release")
+	entry.hold_ms = PhysicalRelease.duration(release.hold_ms)
+	if PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
 end
 
 function M.log_shortcut(shortcut_key, app_name)
