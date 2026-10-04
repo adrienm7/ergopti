@@ -150,6 +150,9 @@ end
 local function curl_args(url, headers, body, options)
 	local timeout_ms = options.timeout_ms
 	local args = {
+		-- Curl only ignores personal config when this is its first argument.
+		-- Inherited location/insecure/output can otherwise override our policy.
+		"--disable",
 		"--silent", "--show-error", "--no-buffer", "--fail-with-body",
 		"--max-time", tostring(math.max(1, math.ceil(timeout_ms / 1000))),
 		"--request", options.method,

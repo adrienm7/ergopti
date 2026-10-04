@@ -633,6 +633,19 @@ These are software implementations; final hardware verification remains below.
   while public Hammerspoon initial URL behavior remains native-unvalidated.
   Those reserved native owners need independent file/stream/output receipts.
   No reserved source, physical input, native cross-OS suite or manual CI ran.
+- [~] **L49.** Linux personal curl config isolation: put --disable first in
+  native curl argv. An inherited .curlrc could otherwise re-enable credential
+  redirects, inject headers, overwrite local output or bypass TLS verification.
+  Four of five native groups fail before; all pass after on LuaJIT/Lua 5.4,
+  replaying 121 native redirect/header/body/TLS receipts plus one real proxy
+  transaction. Owned CURL_HOME and output files isolate these tests from actual
+  user configuration. Environment proxy routing and certificate trust remain
+  operational. Eight portable cases fail before and pass after, asserting the
+  first-argument requirement, private stdin config and each method's redirect
+  contract. Windows async curl also starts with --config by source; its reserved
+  owner needs native personal-config receipts and the equivalent first flag.
+  macOS uses Hammerspoon HTTP rather than this curl path. No reserved native
+  implementation/gate, physical input or manual CI was changed or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
