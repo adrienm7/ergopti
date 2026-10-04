@@ -730,6 +730,32 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(not client.isActive())
 	end)
 
+	for _, method in ipairs({ "get", "get_owned", "post", "postStream", "download" }) do
+		helpers.it("literal-URL: " .. method .. " disables curl URL expansion", function()
+			local client, state = fresh_client()
+			local result
+			local function done(value) result = value end
+			local target = "http://127.0.0.1:9000/models?filter[name]=value&set={one,two}"
+			local operation
+			if method == "get" then client.get(target, {}, {}, done)
+			elseif method == "get_owned" then operation = client.get_owned(target, {}, {}, done)
+			elseif method == "post" then client.post(target, {}, "{}", done)
+			elseif method == "download" then client.download(target, {}, "/tmp/owned-download", {}, done)
+			else client.postStream(target, {}, "{}", {}, function() end, done) end
+			helpers.assert_eq(#state.requests, 1)
+			helpers.assert_nil(result, "curl must remain asynchronous")
+			helpers.assert_eq(state.options.args[1], "--disable", "personal config stays disabled first")
+			helpers.assert_true(("\n" .. table.concat(state.options.args, "\n") .. "\n"):find("\n--globoff\n", 1, true) ~= nil,
+				"curl's own URL parser must not expand or reject literal caller brackets and braces")
+			helpers.assert_true(state.config:find('url = "' .. target .. '"', 1, true) ~= nil)
+			if method == "postStream" then state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
+			else state.stdout("abc\nERGOPTI_HTTP_STATUS:200\n") end
+			state.complete()
+			helpers.assert_true(result.ok and result.status == 200)
+			if operation then helpers.assert_true(operation:is_settled()) end
+		end)
+	end
+
 	helpers.it("enforces the exact buffered body limit after separating the curl receipt", function()
 		for _, status in ipairs({ 200, 401 }) do
 			for _, size in ipairs({ 3, 4, 5, 13 }) do

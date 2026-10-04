@@ -214,6 +214,8 @@ local function curl_args(url, headers, body, options)
 		-- Curl only ignores personal config when this is its first argument.
 		-- Inherited location/insecure/output can otherwise override our policy.
 		"--disable",
+		-- A caller URL is one literal target, never curl's range/list language.
+		"--globoff",
 		"--silent", "--show-error", "--no-buffer", "--fail-with-body",
 		"--max-time", tostring(math.max(1, math.ceil(timeout_ms / 1000))),
 		"--request", options.method,
