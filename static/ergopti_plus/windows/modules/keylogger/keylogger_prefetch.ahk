@@ -1461,7 +1461,7 @@ class KLPFRebuildPublisher {
 		PublishProgress(Info) {
 				Final := Info.Get("final", false)
 				if !Final && this.last_progress
-								&& TickElapsed(this.last_progress, this.clock.Call()) < KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
+								&& TickElapsed64(this.last_progress, this.clock.Call()) < KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
 						return false
 				Progress := KLPF_RebuildProgress(Info)
 				Progress["pid"] := KLPFWorker.process_id
@@ -1477,7 +1477,7 @@ class KLPFRebuildPublisher {
 				Oldest := Info["oldest_complete"]
 				if (Oldest = "") || (Oldest = this.published_oldest)
 						return false
-				if this.last_partial && TickElapsed(this.last_partial, this.clock.Call())
+				if this.last_partial && TickElapsed64(this.last_partial, this.clock.Call())
 								< Max(KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS,
 										KLPFRebuildPublisher.PARTIAL_COST_FACTOR * this.partial_cost)
 						return false
@@ -1489,7 +1489,7 @@ class KLPFRebuildPublisher {
 										KLPF_BuildPartialJson(which, Info["db"], Partial))
 								return false
 				}
-				this.partial_cost := TickElapsed(Tick, this.clock.Call())
+				this.partial_cost := TickElapsed64(Tick, this.clock.Call())
 				this.last_partial := this.clock.Call()
 				this.published_oldest := Oldest
 				return true
