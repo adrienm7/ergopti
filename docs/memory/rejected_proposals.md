@@ -143,3 +143,14 @@ budgets. Desktop variation prevents assigning every stall to the query, but the
 evidence does not justify shipping it. Reconsider only with a changed mechanism
 and matched moving-position controls. See the
 [native border experiment](../audits/performance/ahk/2026_09_08/border_position/report.md).
+
+## Differential updates at current release sizes
+
+The maintainer withdrew differential update packages on 2026-10-04. Reported
+release archives are below 20 MB; full signed/checksummed downloads retain one
+installation and rollback path. Delta generation, base selection, reconstruction
+and fallback add maintenance and failure surfaces without a demonstrated current
+transfer benefit. This is a maintainer scope decision, not a measured bandwidth
+benchmark or a claim that deltas were implemented. Reconsider only when release
+size or observed repeated-download costs materially increase. Archive compression
+and enterprise proxy/trust support remain independent requirements.

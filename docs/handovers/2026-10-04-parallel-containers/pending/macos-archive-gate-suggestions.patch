@@ -1,0 +1,47 @@
+diff --git a/tools/test/test-macos-swift-launcher-ci.cjs b/tools/test/test-macos-swift-launcher-ci.cjs
+--- a/tools/test/test-macos-swift-launcher-ci.cjs
++++ b/tools/test/test-macos-swift-launcher-ci.cjs
+@@ -567,9 +567,9 @@
+ check(
+ 	privateKeyReads.length === 1 &&
+ 		/secrets\.SPARKLE_ED_PRIVATE_KEY\b/.test(
+-			pipeline.step(packageJob, 'Sign zip with Sparkle EdDSA key')
++			pipeline.step(packageJob, 'Sign declared archives with Sparkle EdDSA key')
+ 		),
+-	`only "Sign zip with Sparkle EdDSA key" may read secrets.SPARKLE_ED_PRIVATE_KEY in ${MACOS_BOX}, found ${privateKeyReads.length} read(s)`
++	`only "Sign declared archives with Sparkle EdDSA key" may read secrets.SPARKLE_ED_PRIVATE_KEY in ${MACOS_BOX}, found ${privateKeyReads.length} read(s)`
+ );
+ // The code-signing .p12 and its password reach the one step that signs the
+ // bundle: the build. An ad hoc release must say so on the run, because every
+diff --git a/tools/build/macos-release-publication.cjs b/tools/build/macos-release-publication.cjs
+--- a/tools/build/macos-release-publication.cjs
++++ b/tools/build/macos-release-publication.cjs
+@@ -288,7 +288,27 @@
+ 			.replaceAll('<', '&lt;')
+ 			.replaceAll('>', '&gt;');
+ 	const url = `https://github.com/${env.GH_OWNER}/${env.GH_REPO}/releases/download/v${env.ERGOPTI_VERSION}/${selected.name}`;
+-	const published = options.pubDate ?? new Date().toUTCString();
++	// Publication follows the explicit release source revision, not the clock.
++	const revision = env.GITHUB_SHA ?? 'HEAD';
++	if (revision !== 'HEAD' && !/^[a-f0-9]{40}$/.test(revision))
++		throw new Error('Appcast source revision refused.');
++	const published =
++		options.pubDate ??
++		command(options.execute ?? execute, 'git', [
++			'-C',
++			path.resolve(__dirname, '..', '..'),
++			'show',
++			'-s',
++			'--format=%cD',
++			revision
++		]).trim();
++	if (
++		typeof published !== 'string' ||
++		published === '' ||
++		/[\r\n]/.test(published) ||
++		!Number.isFinite(Date.parse(published))
++	)
++		throw new Error('Appcast publication date refused.');
+ 	const xml = `<?xml version="1.0" encoding="utf-8"?>
+ <rss version="2.0"
+      xmlns:sparkle="http://www.andymattes.com/xml/namespaces/sparkle/1.0"

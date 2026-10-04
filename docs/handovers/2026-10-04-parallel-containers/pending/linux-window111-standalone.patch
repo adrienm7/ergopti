@@ -1,0 +1,594 @@
+diff --git a/static/ergopti_plus/_shared/modules/actions/actions.toml b/static/ergopti_plus/_shared/modules/actions/actions.toml
+--- a/static/ergopti_plus/_shared/modules/actions/actions.toml
++++ b/static/ergopti_plus/_shared/modules/actions/actions.toml
+@@ -1339,7 +1339,7 @@
+ platform = "all"
+ emit_hs_key = "f17"
+ emit_hs_mods = ["ctrl"]
+-emit_linux = "alt+Tab"
++requires_linux = ["session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop"]
+ 
+ [sg_actions.home]
+ platform = "hs,linux"
+diff --git a/static/ergopti_plus/linux/adapters/window_switch.lua b/static/ergopti_plus/linux/adapters/window_switch.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/linux/adapters/window_switch.lua
+@@ -0,0 +1,241 @@
++--- adapters/window_switch.lua
++
++--- ==============================================================================
++--- MODULE: Cursor Display Window Switch (Linux)
++--- DESCRIPTION:
++--- Selects a managed visible window on the display containing the current
++--- pointer. The normal system Alt+Tab action remains a separate key emission.
++---
++--- FEATURES & RATIONALE:
++--- 1. Wayland is explicitly unsupported: XWayland sees only part of a desktop.
++--- 2. One bounded snapshot child reads pointer, displays and EWMH stacking.
++---    Stacking is front-to-back placement, not a history of application use.
++--- 3. Titles are used only to reject unnamed windows, never emitted or logged.
++--- 4. The selected window and display are revalidated before bounded activation;
++---    a refusal never substitutes a global Alt+Tab or a different display.
++--- ==============================================================================
++
++local M = {}
++
++local Logger = require("logger.shim")
++local Shell = require("adapters.shell_runner")
++local Display = require("infra.display_server")
++
++local LOG = "adapters.window_switch"
++local TOOLS = { "timeout", "xdotool", "xrandr", "xprop" }
++
++-- Like the existing workspace switcher, a display query must not hold the
++-- grabbed keyboard indefinitely. This bounds the entire snapshot, not each row.
++local TOOL_TIMEOUT_S = 1
++
++-- Every printed field comes from a numeric query or a fixed marker. Client
++-- titles and arbitrary atom values never enter the returned packet.
++local SNAPSHOT = [[set -eu
++printf 'pointer\n'
++xdotool getmouselocation --shell
++printf 'monitors\n'
++xrandr --listactivemonitors
++printf 'active\n'
++xdotool getactivewindow
++printf 'desktop\n'
++xdotool get_desktop
++printf 'stacking\n'
++stacking=$(xprop -root _NET_CLIENT_LIST_STACKING)
++case "$stacking" in '_NET_CLIENT_LIST_STACKING(WINDOW): window id # '*) ;; *) exit 1;; esac
++ids=${stacking#*# }
++printf '%s\n' "$ids"
++old_ifs=$IFS
++IFS=', '
++for id in $ids; do
++    digits=${id#0x}
++    case "$id:$digits" in 0x*:*) ;; *) exit 1;; esac
++    case "$digits" in ''|*[!0-9a-fA-F]*) exit 1;; esac
++    printf 'window %s\n' "$id"
++    if geometry=$(xdotool getwindowgeometry --shell "$id" 2>/dev/null) &&
++       desktop=$(xdotool get_desktop_for_window "$id" 2>/dev/null) &&
++       props=$(xprop -id "$id" WM_STATE _NET_WM_STATE _NET_WM_WINDOW_TYPE 2>/dev/null) &&
++       title=$(xdotool getwindowname "$id" 2>/dev/null); then
++        printf '%s\nDESKTOP=%s\n' "$geometry" "$desktop"
++        eligible=0
++        case "$props" in *'window state: Normal'*) eligible=1;; esac
++        case "$props" in *_NET_WM_STATE_HIDDEN*|*_NET_WM_WINDOW_TYPE_DESKTOP*|*_NET_WM_WINDOW_TYPE_DOCK*|*_NET_WM_WINDOW_TYPE_TOOLTIP*|*_NET_WM_WINDOW_TYPE_MENU*|*_NET_WM_WINDOW_TYPE_NOTIFICATION*) eligible=0;; esac
++        [ -n "$title" ] || eligible=0
++        printf 'ELIGIBLE=%s\n' "$eligible"
++    else
++        printf 'UNAVAILABLE=1\n'
++    fi
++    printf 'end_window\n'
++done
++IFS=$old_ifs
++printf 'end_snapshot\n']]
++
++--- Returns whether this session can perform the scoped operation.
++--- @return boolean available
++--- @return string|nil reason Existing translated capability key.
++--- @return string|nil tool Missing tool when the reason requires it.
++function M.available()
++	if Display.kind() ~= Display.X11 then
++		return false, "dialog.action_picker.requires_x11"
++	end
++	for _, tool in ipairs(TOOLS) do
++		if Shell.has_command(tool) ~= true then
++			return false, "dialog.action_picker.requires_tool", tool
++		end
++	end
++	return true
++end
++
++local function integer(value)
++	if type(value) ~= "string" or not value:match("^%-?%d+$") then return nil end
++	local number = tonumber(value)
++	if not number or math.abs(number) > 2147483647 then return nil end
++	return number
++end
++
++local function window_id(value)
++	if type(value) ~= "string" then return nil end
++	local digits = value:match("^0x([%da-fA-F]+)$")
++	local id = digits and tonumber(digits, 16) or integer(value)
++	if not id or id < 1 or id > 4294967295 then return nil end
++	return id
++end
++
++--- Decodes the fixed snapshot packet, refusing partial or ambiguous answers.
++--- @param text string Native stdout packet, with no client titles.
++--- @return table|nil snapshot
++function M.parse_snapshot(text)
++	if type(text) ~= "string" then return nil end
++	local lines = {}
++	for line in text:gmatch("([^\n]*)\n") do lines[#lines + 1] = line end
++	if #lines == 0 or text:sub(-1) ~= "\n" then return nil end
++	local index = 1
++	local function take(expected)
++		local line = lines[index]
++		index = index + 1
++		if expected and line ~= expected then error("invalid snapshot", 0) end
++		return line
++	end
++	local function fields(stop, allowed)
++		local values = {}
++		while lines[index] and lines[index] ~= stop do
++			local key, value = take():match("^([A-Z_]+)=(%-?%d+)$")
++			if not key or not allowed[key] or values[key] ~= nil then error("invalid fields", 0) end
++			values[key] = value
++		end
++		return values
++	end
++	local ok, snapshot = pcall(function()
++		take("pointer")
++		local pointer = fields("monitors", { X = true, Y = true, SCREEN = true, WINDOW = true })
++		local x, y = integer(pointer.X), integer(pointer.Y)
++		if not x or not y then error("invalid pointer", 0) end
++		take("monitors")
++		local count = integer((take() or ""):match("^Monitors: (%d+)$"))
++		if not count or count < 1 or count > #lines then error("invalid monitors", 0) end
++		local monitors, selected = {}, nil
++		for _ = 1, count do
++			local line = take() or ""
++			local id, width, height, left, top = line:match("^%s*(%d+):%s+%S+%s+(%d+)/%d+x(%d+)/%d+([+-]%d+)([+-]%d+)%s+%S+%s*$")
++			width, height = integer(width), integer(height)
++			left, top = integer(left and left:gsub("^%+", "")), integer(top and top:gsub("^%+", ""))
++			if not id or not width or not height or not left or not top or width < 1 or height < 1 or monitors[id] then
++				error("invalid monitor", 0)
++			end
++			local monitor = { id = id, x = left, y = top, width = width, height = height }
++			monitors[id] = monitor
++			if x >= left and x < left + width and y >= top and y < top + height then
++				if selected then error("ambiguous pointer display", 0) end
++				selected = monitor
++			end
++		end
++		if not selected then error("pointer outside displays", 0) end
++		take("active")
++		local active = window_id(take())
++		take("desktop")
++		local desktop = integer(take())
++		if not active or not desktop or desktop < 0 then error("invalid desktop", 0) end
++		take("stacking")
++		local order, known = {}, {}
++		local raw = take() or ""
++		if raw:match("^%s*,") or raw:match(",%s*$") or raw:match(",%s*,") then error("invalid stacking separators", 0) end
++		for token in raw:gmatch("[^, ]+") do
++			local id = window_id(token)
++			if not id or known[id] then error("invalid stacking", 0) end
++			known[id] = true
++			order[#order + 1] = id
++		end
++		if #order == 0 or not known[active] then error("incomplete stacking", 0) end
++		local windows = {}
++		for _, id in ipairs(order) do
++			if window_id((take() or ""):match("^window (.+)$")) ~= id then error("invalid window", 0) end
++			local values = fields("end_window", { WINDOW = true, X = true, Y = true, WIDTH = true, HEIGHT = true,
++				SCREEN = true, DESKTOP = true, ELIGIBLE = true, UNAVAILABLE = true })
++			take("end_window")
++			if values.UNAVAILABLE ~= nil then
++				if values.UNAVAILABLE ~= "1" then error("invalid unavailable window", 0) end
++				for key in pairs(values) do
++					if key ~= "UNAVAILABLE" then error("mixed unavailable window", 0) end
++				end
++			end
++			if values.UNAVAILABLE ~= "1" then
++				local wx, wy, width, height = integer(values.X), integer(values.Y), integer(values.WIDTH), integer(values.HEIGHT)
++				local wd = values.DESKTOP == "4294967295" and -1 or integer(values.DESKTOP)
++				if window_id(values.WINDOW) ~= id or not wx or not wy or not width or not height
++					or width < 1 or height < 1 or not wd or wd < -1
++					or (values.ELIGIBLE ~= "0" and values.ELIGIBLE ~= "1") then
++					error("invalid geometry", 0)
++				end
++				windows[id] = { x = wx, y = wy, width = width, height = height,
++					desktop = wd, eligible = values.ELIGIBLE == "1" }
++			end
++		end
++		take("end_snapshot")
++		if index ~= #lines + 1 then error("unexpected tail", 0) end
++		return { monitor = selected, active = active, desktop = desktop, order = order, windows = windows }
++	end)
++	return ok and snapshot or nil
++end
++
++local function candidate(snapshot)
++	local monitor = snapshot.monitor
++	for index = #snapshot.order, 1, -1 do
++		local id = snapshot.order[index]
++		local window = snapshot.windows[id]
++		if id ~= snapshot.active and window and window.eligible
++			and (window.desktop == snapshot.desktop or window.desktop == -1) then
++			local x, y = window.x + window.width / 2, window.y + window.height / 2
++			if x >= monitor.x and x < monitor.x + monitor.width
++				and y >= monitor.y and y < monitor.y + monitor.height then return id end
++		end
++	end
++	return nil
++end
++
++local function snapshot()
++	local ok, text = Shell.exec_checked("timeout " .. TOOL_TIMEOUT_S .. " sh -c " .. Shell.quote(SNAPSHOT) .. " 2>/dev/null")
++	return ok == true and M.parse_snapshot(text) or nil
++end
++
++--- Requests focus on the first eligible stacked window under the current cursor.
++--- @return boolean accepted True only when the bounded activation command succeeds.
++--- @return string|nil reason Existing capability reason when unavailable.
++--- @return string|nil tool Missing capability tool.
++function M.previous_on_cursor_display()
++	local usable, reason, tool = M.available()
++	if not usable then return false, reason, tool end
++	local first = snapshot()
++	local target = first and candidate(first)
++	if not target then return false end
++	local current = snapshot()
++	if not current or Display.kind() ~= Display.X11 or current.active ~= first.active
++		or current.desktop ~= first.desktop or current.monitor.id ~= first.monitor.id
++		or current.monitor.x ~= first.monitor.x or current.monitor.y ~= first.monitor.y
++		or current.monitor.width ~= first.monitor.width or current.monitor.height ~= first.monitor.height
++		or candidate(current) ~= target then
++		Logger.debug(LOG, "Cursor-display window source changed; activation refused.")
++		return false
++	end
++	return Shell.run("timeout " .. TOOL_TIMEOUT_S .. " xdotool windowactivate " .. Shell.quote(tostring(target)) .. " >/dev/null 2>&1") == true
++end
++
++return M
+diff --git a/static/ergopti_plus/linux/modules/gestures/system_actions.lua b/static/ergopti_plus/linux/modules/gestures/system_actions.lua
+--- a/static/ergopti_plus/linux/modules/gestures/system_actions.lua
++++ b/static/ergopti_plus/linux/modules/gestures/system_actions.lua
+@@ -175,6 +175,19 @@
+ --- receives { run_background = fn(cmd), clipboard = adapter, emit_combo = fn,
+ --- sleep_ms = fn } from the executor.
+ M.HANDLERS = {
++	alt_tab_monitor = function()
++		local Switch = require("adapters.window_switch")
++		local accepted, reason, tool = Switch.previous_on_cursor_display()
++		if reason then
++			local message = i18n.get(reason)
++			if tool then message = message:gsub("{1}", function() return tool end) end
++			local ok, Notifier = pcall(require, "adapters.notifier")
++			if ok and type(Notifier.send) == "function" then
++				Notifier.send(message, { level = "info" })
++			end
++		end
++		return accepted == true
++	end,
+ 	-- Backgrounded, the command's failure is invisible: with none of the
+ 	-- clients installed nothing could ever be cleared, which is said here.
+ 	clear_notifications = function(deps)
+diff --git a/static/ergopti_plus/linux/tests/unit/modules/test_system_actions.lua b/static/ergopti_plus/linux/tests/unit/modules/test_system_actions.lua
+--- a/static/ergopti_plus/linux/tests/unit/modules/test_system_actions.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/test_system_actions.lua
+@@ -323,3 +323,286 @@
+ 		end
+ 	end)
+ end)
++
++
++
++
++-- ==================================================
++-- ==================================================
++-- ======= 4/ Cursor Display Window Operation =======
++-- ==================================================
++-- ==================================================
++
++--- Independent native query packet: the active window is on the left display,
++--- the cursor on the right, and the topmost other window on the left.
++local CURSOR111_PACKET = [[pointer
++X=1500
++Y=200
++SCREEN=0
++WINDOW=101
++monitors
++Monitors: 2
++ 0: +*LEFT 1000/300x800/240+0+0 LEFT
++ 1: +RIGHT 1000/300x800/240+1000+0 RIGHT
++active
++101
++desktop
++0
++stacking
++0x65, 0x66, 0x67
++window 0x65
++WINDOW=101
++X=100
++Y=100
++WIDTH=500
++HEIGHT=400
++SCREEN=0
++DESKTOP=0
++ELIGIBLE=1
++end_window
++window 0x66
++WINDOW=102
++X=1100
++Y=100
++WIDTH=500
++HEIGHT=400
++SCREEN=0
++DESKTOP=0
++ELIGIBLE=1
++end_window
++window 0x67
++WINDOW=103
++X=100
++Y=100
++WIDTH=500
++HEIGHT=400
++SCREEN=0
++DESKTOP=0
++ELIGIBLE=1
++end_window
++end_snapshot
++]]
++
++--- Runs actual native parsing, adapter and action code behind recording ports.
++--- @param options table Query/activation refusal or independent changed packet.
++--- @param body function Receives actual adapter, real gesture manager and observations.
++local function cursor111_ports(options, body)
++	local names = { "adapters.shell_runner", "infra.display_server", "adapters.window_switch",
++		"modules.gestures.system_actions", "modules.gestures.manager", "adapters.notifier",
++		"modules.gestures.combo_emitter", "adapters.clipboard", "adapters.event_loop" }
++	local saved = {}
++	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
++	local execute = os.execute
++	local seen = { queries = 0, activations = {}, combos = {}, commands = {}, notices = {} }
++	local Shell = helpers.load_module("adapters.shell_runner")
++	Shell._set_runner(function(command)
++		seen.commands[#seen.commands + 1] = command
++		if command:find("command -v", 1, true) then
++			return options.missing_tool ~= command:match("command %-v '([^']+)'")
++		end
++		if command:find("sh -c", 1, true) then
++			seen.queries = seen.queries + 1
++			if options.query_throw then error("closed native query refusal") end
++			local packet = seen.queries == 1 and (options.first or CURSOR111_PACKET)
++				or (options.second or options.first or CURSOR111_PACKET)
++			return { ok = options.query_ack ~= false, output = packet }
++		end
++		if command:find("xdotool windowactivate", 1, true) then
++			seen.activations[#seen.activations + 1] = command
++			if options.activation_throw then error("closed native activation refusal") end
++			return options.activation_ack == nil and true or options.activation_ack
++		end
++		return false
++	end)
++	if options.raw_activation_set then
++		Shell.run = function(command)
++			if command:find("command -v", 1, true) then return true end
++			seen.activations[#seen.activations + 1] = command
++			return options.activation_ack
++		end
++	end
++	local Display = helpers.load_module("infra.display_server")
++	Display._set_for_test(options.display or Display.X11, "fixture")
++	package.loaded["modules.gestures.combo_emitter"] = { press = function(combo)
++		seen.combos[#seen.combos + 1] = combo
++		return true
++	end }
++	package.loaded["adapters.clipboard"] = {}
++	package.loaded["adapters.event_loop"] = { sleep_ms = function() end }
++	package.loaded["adapters.notifier"] = { send = function(message)
++		seen.notices[#seen.notices + 1] = message
++		return true
++	end }
++	os.execute = function(command)
++		seen.commands[#seen.commands + 1] = command
++		return true
++	end
++	local Switch = helpers.load_module("adapters.window_switch")
++	helpers.load_module("modules.gestures.system_actions")
++	local Gestures = helpers.load_module("modules.gestures.manager")
++	local ok, err = pcall(body, Switch, Gestures, seen)
++	os.execute = execute
++	Shell._reset_runner()
++	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
++	if not ok then error(err, 0) end
++end
++
++helpers.describe("Cursor-display window operation (TODO111)", function()
++	helpers.it("the actual action focuses the cursor display, not the active window display", function()
++		cursor111_ports({}, function(_, Gestures, seen)
++			Gestures.execute_action("alt_tab_monitor", "tap_3")
++			helpers.assert_eq(seen.queries, 2)
++			helpers.assert_eq(seen.activations, { "timeout 1 xdotool windowactivate '102' >/dev/null 2>&1" })
++			helpers.assert_eq(seen.combos, {}, "the scoped action must not emit global Alt+Tab")
++		end)
++	end)
++
++	helpers.it("normal system Alt+Tab remains a separate actual action", function()
++		cursor111_ports({}, function(_, Gestures, seen)
++			Gestures.execute_action("app_switcher", "tap_3")
++			helpers.assert_eq(seen.combos, { "alt+Tab" })
++			helpers.assert_eq(seen.queries, 0)
++			helpers.assert_eq(seen.activations, {})
++		end)
++	end)
++
++	helpers.it("both existing action identities remain visible, with a truthful X11 requirement", function()
++		local Catalogue = require("_generated.action_catalogue")
++		helpers.assert_true(Catalogue.actions.app_switcher ~= nil)
++		helpers.assert_true(Catalogue.actions.alt_tab_monitor ~= nil)
++		helpers.assert_eq(Catalogue.actions.alt_tab_monitor.requires,
++			{ "session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop" })
++		helpers.assert_eq(require("_generated.gesture_emit_actions").alt_tab_monitor, nil)
++		helpers.assert_eq(require("_generated.gesture_emit_actions").app_switcher, "alt+Tab")
++	end)
++
++	helpers.it("Wayland refuses execution and offers the existing translated X11 reason", function()
++		cursor111_ports({ display = "wayland" }, function(Switch, Gestures, seen)
++			local accepted, reason = Switch.previous_on_cursor_display()
++			helpers.assert_eq(false, accepted)
++			helpers.assert_eq(reason, "dialog.action_picker.requires_x11")
++			Gestures.execute_action("alt_tab_monitor", "tap_3")
++			helpers.assert_eq(seen.queries, 0)
++			helpers.assert_eq(seen.activations, {})
++			helpers.assert_eq(seen.combos, {})
++			helpers.assert_eq(#seen.notices, 1)
++		end)
++	end)
++
++	for _, tool in ipairs({ "timeout", "xdotool", "xrandr", "xprop" }) do
++		helpers.it("missing " .. tool .. " refuses before querying or activating", function()
++			cursor111_ports({ missing_tool = tool }, function(Switch, _, seen)
++				local accepted, reason, missing = Switch.previous_on_cursor_display()
++				helpers.assert_eq(false, accepted)
++				helpers.assert_eq(reason, "dialog.action_picker.requires_tool")
++				helpers.assert_eq(missing, tool)
++				helpers.assert_eq(seen.queries, 0)
++				helpers.assert_eq(seen.activations, {})
++			end)
++		end)
++	end
++
++	for _, change in ipairs({
++		{ name = "cursor moved to the active window display", packet = CURSOR111_PACKET:gsub("X=1500", "X=200", 1) },
++		{ name = "cursor outside every display", packet = CURSOR111_PACKET:gsub("X=1500", "X=2500", 1) },
++		{ name = "active window changed", packet = CURSOR111_PACKET:gsub("active\n101", "active\n103", 1) },
++		{ name = "target geometry changed", packet = CURSOR111_PACKET:gsub("X=1100", "X=100", 1) },
++		{ name = "target minimized or ineligible", packet = CURSOR111_PACKET:gsub("DESKTOP=0\nELIGIBLE=1\nend_window\nwindow 0x67", "DESKTOP=0\nELIGIBLE=0\nend_window\nwindow 0x67", 1) },
++		{ name = "desktop changed", packet = CURSOR111_PACKET:gsub("desktop\n0", "desktop\n1", 1) },
++	}) do
++		helpers.it("revalidation refuses when " .. change.name, function()
++			cursor111_ports({ second = change.packet }, function(Switch, _, seen)
++				helpers.assert_eq(false, Switch.previous_on_cursor_display())
++				helpers.assert_eq(seen.activations, {})
++			end)
++		end)
++	end
++
++	for _, malformed in ipairs({
++		CURSOR111_PACKET:sub(1, -2),
++		CURSOR111_PACKET:gsub("X=1500", "UNKNOWN=1\nX=1500", 1),
++		CURSOR111_PACKET:gsub("WIDTH=500", "UNKNOWN=1\nWIDTH=500", 1),
++		CURSOR111_PACKET:gsub("Monitors: 2", "Monitors: 999999999999999999999999", 1),
++		CURSOR111_PACKET:gsub("1000/300x800", "999999999999999999999999/300x800", 1),
++		CURSOR111_PACKET:gsub("0x65, 0x66, 0x67", "0x65, , 0x66, 0x67", 1),
++		CURSOR111_PACKET .. "unexpected\n",
++		CURSOR111_PACKET:gsub("WIDTH=500", "WIDTH=0", 1),
++		CURSOR111_PACKET:gsub("0x65, 0x66, 0x67", "0x65, 0x66, 0x66", 1),
++		CURSOR111_PACKET:gsub("1000/300x800/240%+1000%+0", "1000/300x800/240+0+0", 1),
++	}) do
++		helpers.it("a malformed or ambiguous native packet never activates", function()
++			cursor111_ports({ first = malformed }, function(Switch, _, seen)
++				helpers.assert_eq(false, Switch.previous_on_cursor_display())
++				helpers.assert_eq(seen.activations, {})
++			end)
++		end)
++	end
++
++	helpers.it("a spanning window belongs to its centre display, not its top-left corner", function()
++		local packet = CURSOR111_PACKET:gsub("X=1100", "X=800", 1)
++		cursor111_ports({ first = packet }, function(Switch, _, seen)
++			helpers.assert_true(Switch.previous_on_cursor_display())
++			helpers.assert_eq(#seen.activations, 1)
++		end)
++	end)
++
++	for _, ack in ipairs({ false, 0, 1, "ack" }) do
++		helpers.it("the activation adapter refuses a non-true receipt", function()
++			cursor111_ports({ activation_ack = ack, raw_activation_set = true }, function(Switch, _, seen)
++				helpers.assert_eq(false, Switch.previous_on_cursor_display())
++				helpers.assert_eq(#seen.activations, 1)
++			end)
++		end)
++	end
++
++	helpers.it("a native query refusal does not try global switching", function()
++		cursor111_ports({ query_ack = false }, function(Switch, Gestures, seen)
++			helpers.assert_eq(false, Switch.previous_on_cursor_display())
++			Gestures.execute_action("alt_tab_monitor", "tap_3")
++			helpers.assert_eq(seen.activations, {})
++			helpers.assert_eq(seen.combos, {})
++		end)
++	end)
++
++	helpers.it("a missing activation receipt is a refusal", function()
++		cursor111_ports({ raw_activation_set = true }, function(Switch, _, seen)
++			helpers.assert_eq(false, Switch.previous_on_cursor_display())
++			helpers.assert_eq(#seen.activations, 1)
++		end)
++	end)
++
++	for _, failure in ipairs({ "query_throw", "activation_throw" }) do
++		helpers.it("the actual action contains a native " .. failure .. " without global fallback", function()
++			cursor111_ports({ [failure] = true }, function(_, Gestures, seen)
++				Gestures.execute_action("alt_tab_monitor", "tap_3")
++				helpers.assert_eq(seen.combos, {})
++				helpers.assert_eq(#seen.activations, failure == "query_throw" and 0 or 1)
++			end)
++		end)
++	end
++
++	for _, packet in ipairs({
++		CURSOR111_PACKET:gsub("window 0x66\n.-end_window", "window 0x66\nUNAVAILABLE=1\nend_window", 1),
++		CURSOR111_PACKET:gsub("DESKTOP=0\nELIGIBLE=1\nend_window\nwindow 0x67", "DESKTOP=0\nELIGIBLE=0\nend_window\nwindow 0x67", 1),
++		CURSOR111_PACKET:gsub("X=1100", "X=100", 1),
++	}) do
++		helpers.it("an initially closed, minimized or foreign-display target never activates", function()
++			cursor111_ports({ first = packet }, function(Switch, _, seen)
++				helpers.assert_eq(false, Switch.previous_on_cursor_display())
++				helpers.assert_eq(seen.activations, {})
++			end)
++		end)
++	end
++
++	helpers.it("a fresh retry after refused activation uses new snapshots", function()
++		cursor111_ports({ activation_ack = false }, function(Switch, _, seen)
++			helpers.assert_eq(false, Switch.previous_on_cursor_display())
++			helpers.assert_eq(seen.queries, 2)
++		end)
++		cursor111_ports({}, function(Switch, _, seen)
++			helpers.assert_true(Switch.previous_on_cursor_display())
++			helpers.assert_eq(seen.queries, 2)
++			helpers.assert_eq(#seen.activations, 1)
++		end)
++	end)
++end)
+diff --git a/static/ergopti_plus/linux/_generated/gesture_emit_actions.lua b/static/ergopti_plus/linux/_generated/gesture_emit_actions.lua
+--- a/static/ergopti_plus/linux/_generated/gesture_emit_actions.lua
++++ b/static/ergopti_plus/linux/_generated/gesture_emit_actions.lua
+@@ -16,7 +16,6 @@
+ --- ==============================================================================
+ 
+ return {
+-	["alt_tab_monitor"] = "alt+Tab",
+ 	["app_switcher"] = "alt+Tab",
+ 	["app_window_previous"] = "alt+Escape",
+ 	["arrow_down"] = "Down",
+diff --git a/static/ergopti_plus/linux/_generated/action_catalogue.lua b/static/ergopti_plus/linux/_generated/action_catalogue.lua
+--- a/static/ergopti_plus/linux/_generated/action_catalogue.lua
++++ b/static/ergopti_plus/linux/_generated/action_catalogue.lua
+@@ -195,7 +195,7 @@
+ 	},
+ 	ax_items = {},
+ 	actions = {
+-		["alt_tab_monitor"] = { family = "sg", label_key = "sg_actions.alt_tab_monitor" },
++		["alt_tab_monitor"] = { family = "sg", label_key = "sg_actions.alt_tab_monitor", requires = { "session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop" } },
+ 		["app_switcher"] = { family = "sg", label_key = "sg_actions.app_switcher" },
+ 		["app_window_previous"] = { family = "sg", label_key = "sg_actions.app_window_previous" },
+ 		["arrow_down"] = { family = "sg", label_key = "sg_actions.arrow_down" },
