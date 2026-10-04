@@ -2391,8 +2391,14 @@ local function _build_llm(ctx)
 					label = label,
 					checked = checked,
 					action = function()
-						set(option)
+						local called, committed = pcall(set, option)
+						if not called or committed ~= true then
+							Logger.error(LOG, "Prediction modifier choice was not durably acknowledged.")
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
+							return false
+						end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return true
 					end,
 				}
 			end
@@ -2402,20 +2408,38 @@ local function _build_llm(ctx)
 		local no_modifier = i18n_safe("menu.settings.no_modifier")
 		local navigation = NavigationSettings.get_navigation()
 		local validation = NavigationSettings.get()
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.nav_menu_title"),
-			items = {
-				{
-					label = i18n_safe("menu.llm.nav_label") .. " — "
+		local definitions = {}
+		for _, definition in ipairs(ManifestMenu.get_array("llm_navigation_rows")) do
+			if type(definition) == "table" and definition.type == "list"
+				and type(definition.i18n) == "string" and definition.i18n ~= ""
+				and (definition.id == "llm_nav_modifiers" or definition.id == "llm_val_modifiers") then
+				definitions[definition.id] = definition
+			end
+		end
+		local navigation_providers = {
+			["llm_nav_modifiers"] = function()
+				local definition = definitions.llm_nav_modifiers
+				if not definition then return {} end
+				return { {
+					label = i18n_safe(definition.i18n) .. " — "
 						.. (#navigation > 0 and table.concat(navigation, "+") or arrows_only),
 					items = chord_rows(navigation, arrows_only, NavigationSettings.set_navigation),
-				},
-				{
-					label = string.format(i18n_safe("menu.llm.val_label"),
+				} }
+			end,
+			["llm_val_modifiers"] = function()
+				local definition = definitions.llm_val_modifiers
+				if not definition then return {} end
+				return { {
+					label = string.format(i18n_safe(definition.i18n),
 						#validation > 0 and table.concat(validation, "+") or no_modifier),
 					items = chord_rows(validation, no_modifier, NavigationSettings.set),
-				},
-			},
+				} }
+			end,
+		}
+		local rows = ManifestMenu.build("llm_navigation_rows", "LLM navigation", nil, nil, ctx, navigation_providers)
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.nav_menu_title"),
+			submenu = rows,
 			disabled = not enabled or nil,
 		}, "llm_navigation")
 	end

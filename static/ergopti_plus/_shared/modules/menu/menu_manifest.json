@@ -2309,5 +2309,17 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"llm_navigation_rows": [
+		{
+			"type": "list",
+			"id": "llm_nav_modifiers",
+			"i18n": "menu.llm.nav_label"
+		},
+		{
+			"type": "list",
+			"id": "llm_val_modifiers",
+			"i18n": "menu.llm.val_label"
+		}
 	]
 }

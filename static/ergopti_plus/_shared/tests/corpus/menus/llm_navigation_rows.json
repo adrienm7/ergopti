@@ -1,0 +1,36 @@
+{
+	"rows": [
+		{
+			"id": "llm_nav_modifiers",
+			"type": "list",
+			"i18n": "menu.llm.nav_label"
+		},
+		{
+			"id": "llm_val_modifiers",
+			"type": "list",
+			"i18n": "menu.llm.val_label"
+		}
+	],
+	"prediction_ranges": [
+		{
+			"count": 1,
+			"range": "1-1",
+			"disabled": true
+		},
+		{
+			"count": 2,
+			"range": "1-2",
+			"disabled": false
+		},
+		{
+			"count": 10,
+			"range": "1-0",
+			"disabled": false
+		}
+	],
+	"native_shapes": {
+		"ahk": "prompt",
+		"hs": "submenu",
+		"linux": "items"
+	}
+}

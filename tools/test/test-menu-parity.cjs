@@ -128,6 +128,8 @@ const OPENS_SUBMENU = {
 	// Optional category-file providers return this declared opening command.
 	hotstring_category_file: 'hotstring_file_commands',
 	llm_display: 'llm_display_menu',
+	// Native prediction modifier providers consume the shared child records.
+	llm_navigation: 'llm_navigation_rows',
 	llm_trigger: 'llm_trigger_menu',
 	llm_generation_settings: 'llm_generation_menu',
 	// Linux uses the same generation child inline, through its dynamic handler.
@@ -633,7 +635,8 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // Explicit hotstring category commands and section lists now have one shared head.
 // The three Word Expander controls now share one declared child menu.
 // The common AI Info Bar check delegates to a shared display child menu.
-const RENDERED_THROUGH_SHARED = { hs: 22, linux: 19 };
+// Linux 19 → 20: navigation and validation now use their declared list providers.
+const RENDERED_THROUGH_SHARED = { hs: 22, linux: 20 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 
