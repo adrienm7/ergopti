@@ -1,0 +1,15 @@
+{
+	"original-native-provider": {
+		"exit_status": 1,
+		"passed": 27,
+		"failed": 12
+	},
+	"original-native-provider-js-wiring": {
+		"exit_status": 1
+	},
+	"original-menu-child-field": {
+		"exit_status": 1,
+		"passed": 32,
+		"failed": 7
+	}
+}
