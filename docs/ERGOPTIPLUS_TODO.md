@@ -1110,6 +1110,13 @@ failed native SELECT. The untouched dev fixture fails before this correction;
 independent real SQLite replays pass with 648 grouped versus 2,808 raw rows.
 This restores validation coverage, not a new metrics feature or TODO5 completion.
 
+The Linux public Tap-Hold scope regression now records and strictly removes only
+its own acknowledged backup publications, without an undeclared LuaFileSystem
+dependency. The unchanged functional assertions passed before the CI fixture's
+cleanup failed: the original case gives 47/1 without lfs, while the corrected
+module passes 48/0 both with and without lfs and with the real libuv adapter.
+Runtime scope ownership and cleanup requirements are unchanged.
+
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] On Windows, replay the registered neutral/recommended/clear scope and global composition cases with the pinned native runtime. Check verified backups, exact runtime acknowledgement, stale-source refusal and retryable rollback.
