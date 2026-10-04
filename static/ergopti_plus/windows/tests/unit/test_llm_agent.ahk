@@ -1683,3 +1683,83 @@ Test("LLM agent: tool cache expires at its exact ordinary TTL (tools-cache-wrap)
 	_LAG_ToolsCacheLifetime.Bind(100))
 Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
 	_LAG_ToolsCacheLifetime.Bind(0xFFFFFFF0))
+
+
+; Both native systems consume one independently authored shared Off declaration.
+_LAG_SystemOffCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\agent_system_off.json", "UTF-8"))
+}
+
+; Observe the actual native system submenu and its dispatcher-owned first row.
+_LAG_NativeSystemOffRow(System, Owned) {
+	global _MenuDispatchCallbacks
+	Built := LLM_Agent_MenuBuild()
+	Owned.Push(Built)
+	Position := System == "system1" ? 2 : 3
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr")
+	Assert(Handle != 0, "each actual system owns its native child menu")
+	Sub := MenuFromHandle(Handle)
+	Id := DllCall("GetMenuItemID", "ptr", Handle, "int", 0, "uint")
+	Assert(_MenuDispatchCallbacks.Has(Id), "the actual Off row keeps its native dispatcher")
+	return Map("label", _CTC_LabelAt(Sub, 0), "checked", _CTC_IsChecked(Sub, 0),
+		"action", _MenuDispatchCallbacks[Id])
+}
+
+_LAG_SystemOffSharedRow() {
+	Corpus := _LAG_SystemOffCorpus()
+	for Vector in Corpus["states"] {
+		_LAG_Run(_LAG_Menu("action", Vector["spec"], Vector["spec"]), _LTN_Screen(""), _Body.Bind(Corpus, Vector))
+		_Body(Corpus, Vector, Fx, Lines, Sent) {
+			Owned := []
+			try {
+				for System in Corpus["systems"] {
+					Off := _LAG_NativeSystemOffRow(System, Owned)
+					AssertEqual(t(Corpus["label_key"]), Off["label"], "the same canonical Off label owns both systems")
+					AssertEqual(Vector["checked"], Off["checked"], "native checked state stays unchanged")
+					AssertTrue(HasMethod(Off["action"], "Call"))
+				}
+			} finally {
+				for Built in Owned
+					_CTC_ReleaseMenu(Built)
+			}
+		}
+	}
+}
+Test("LLM agent: shared system Off rows replay independent native states (agent-system-off)", _LAG_SystemOffSharedRow)
+
+_LAG_SystemOffOwnerRefusal() {
+	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu, _LLM_Agent_CommitFn
+		Corpus := _LAG_SystemOffCorpus()
+		Declaration := _MR_GetManifestRoot()["agent_system_controls"][1]
+		Label := Declaration["i18n"]
+		Declaration["i18n"] := Corpus["mutated_label_key"]
+		Commit := _LLM_Agent_CommitFn
+		Owned := []
+		try {
+			Off := _LAG_NativeSystemOffRow("system1", Owned)
+			AssertEqual(t(Corpus["mutated_label_key"]), Off["label"], "the actual child follows shared label changes")
+			_LLM_Agent_CommitFn := (*) => false
+			AssertFalse(Off["action"].Call())
+			AssertEqual("cerebras", _LLM_Menu["agent_system1"])
+			AssertEqual("cerebras", _LLM_Menu["agent_system2"])
+			AssertEqual(0, Fx.Commits.Length)
+			AssertEqual(0, Fx.Rebuilds, "a refused transaction cannot refresh as success")
+			_LLM_Agent_CommitFn := Commit
+			AssertTrue(Off["action"].Call(), "the retained callback retries through its actual owner")
+			AssertEqual("", _LLM_Menu["agent_system1"])
+			AssertEqual("cerebras", _LLM_Menu["agent_system2"])
+			AssertEqual(1, Fx.Rebuilds)
+			AssertFalse(Off["action"].Call(), "Windows keeps its existing already-Off no-op policy")
+			AssertEqual(1, Fx.Rebuilds)
+		} finally {
+			Declaration["i18n"] := Label
+			_LLM_Agent_CommitFn := Commit
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
+	}
+}
+Test("LLM agent: shared system Off preserves transaction refusal and no-op (agent-system-off)", _LAG_SystemOffOwnerRefusal)

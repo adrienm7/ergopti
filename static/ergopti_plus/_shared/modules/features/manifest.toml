@@ -4160,6 +4160,14 @@ type = "dynamic"
 id = "agent_disabled_apps"
 i18n = "menu.agent.disabled_apps"
 
+# Both native system providers use this fixed Off row; backend choices remain data.
+[[menu.agent_system_controls]]
+type = "check"
+id = "agent_system_off"
+i18n = "menu.agent.off"
+checked_when = ["agent_system_is_off"]
+disabled_when = ["agent_system_off_ready"]
+
 # The Applications submenu, macOS only: it lists the bundled applications
 # found on disk and launches them. Linux's copy held only the config-folder row,
 # which moved to configuration_menu; a row promising per-app settings must not
