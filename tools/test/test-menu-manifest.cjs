@@ -1501,3 +1501,54 @@ checkPrivacyTriggerControls();
 	}
 	console.log('Category file: one shared opening command and three existing native owners.');
 }
+
+// Linux selection owns one CapsWord checkbox; other drivers retain their bindings.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/tests/corpus/menus/linux_caps_word.json'),
+			'utf8'
+		)
+	);
+	assert.deepEqual(
+		manifest[corpus.section],
+		[
+			{
+				type: 'check',
+				id: 'selection_caps_word',
+				i18n: 'sg_actions.caps_word',
+				checked_when: ['selection_caps_word_active'],
+				disabled_when: ['selection_caps_word_ready'],
+				platforms: ['linux'],
+				unavailable: 'hide'
+			}
+		],
+		'the canonical declaration owns identity, label, live readiness and platform policy'
+	);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	const start = source.indexOf('local function _build_shortcuts(ctx)');
+	const end = source.indexOf('local function _tap_hold_key_label', start);
+	assert(start >= 0 && end > start, 'the actual shortcuts provider must be readable');
+	const body = source.slice(start, end);
+	assert(
+		body.includes('ManifestMenu.check_row("selection_caps_word_control", "selection_caps_word"'),
+		'the real selection provider consumes its declaration'
+	);
+	assert(
+		!/label\s*=\s*i18n_safe\("sg_actions\.caps_word"\)/.test(body),
+		'the selection provider cannot redeclare the CapsWord label'
+	);
+	assert.equal(
+		manifest.shortcuts_menu.find((row) => row.id === 'selection_operations').platforms.join(','),
+		'linux',
+		'Windows and macOS keep their existing binding owners'
+	);
+	console.log(
+		'CapsWord selection: one Linux-only declaration and the existing acknowledged native owner.'
+	);
+}

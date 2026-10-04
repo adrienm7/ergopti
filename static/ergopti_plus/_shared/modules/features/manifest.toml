@@ -4457,6 +4457,17 @@ id = "selection_operations"
 platforms = ["linux"]
 reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
 
+# CapsWord belongs to Linux selection operations; the other drivers expose
+# their existing binding owners instead of a duplicate selection checkbox.
+[[menu.selection_caps_word_control]]
+type = "check"
+id = "selection_caps_word"
+i18n = "sg_actions.caps_word"
+checked_when = ["selection_caps_word_active"]
+disabled_when = ["selection_caps_word_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
 # On every platform: the rows above act on typed or selected text, the groups
 # below are the user's own modifier shortcuts, two distinct blocks.
 [[menu.shortcuts_menu]]
