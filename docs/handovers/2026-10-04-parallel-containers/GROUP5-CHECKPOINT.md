@@ -8,7 +8,13 @@ with explicit Windows PC follow-ups; unfinished macOS and Karabiner requirements
 stay open in the TODO rather than being claimed complete.
 The initial inspected base was `689d30293704093feab2e3caa077604e88560eb6`.
 Current synchronization targets actual dev
-`460e984529c18d06dfca9672456f4aa67c7de31b`, preserving the Group7 integration.
+`8f4b7ef73e3da1784f25f99f3136763aaee18450`, preserving Group7 and Group4
+integrations. Group7 synchronization already passed formatting, 356 JS checks
+and AHK UTF-8 BOM/LF for 1,815 files. Group4 native Windows work remains in its
+imported PC handoff. The resulting non-Windows composition passed formatting,
+356 JS checks, AHK UTF-8 BOM/LF for 1,820 files, 13,954 portable macOS units,
+101 stubbed macOS E2E checks (one explicit skip), 6,516 Linux Lua units and
+188 Linux E2E checks. Native Swift and final packaging remain unqualified.
 No old handover patch belongs to this group. This clone tracks main only:
 fetch dev with `git fetch origin refs/heads/dev:refs/remotes/origin/dev` and
 compare `git ls-remote --heads origin dev` with the tracking ref. A plain
@@ -202,8 +208,9 @@ lock `e163741159149c2987f9db0a868d3b09b316c127` after this policy change and
 owns no current lock. Its already-running manual CI was left to completion.
 
 Group4's released Core provisioning correction was reused for the earlier
-checkpoint. Current-dev synchronization preserves the exact released Group7
-ci.yml image, with the same stock Lua5.4/lua-luv prerequisite. Only comments and
+checkpoint. Current-dev synchronization preserves the released upstream
+ci.yml image, including Group4's restored explanatory comment, with the same
+stock Lua5.4/lua-luv prerequisite. Only comments and
 package order differ; assertions, lane selection and release policy stay intact.
 The TODO merge preserves every Group5 block and Group7 block exactly before the
 owned explanatory update. No upstream Windows source or artifact was rewritten;
