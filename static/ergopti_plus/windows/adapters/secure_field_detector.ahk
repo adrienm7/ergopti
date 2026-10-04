@@ -345,15 +345,20 @@ SFD_DetectNative(Hwnd, &Conclusive) {
 
 SFD_CommitFieldVerdict(Hwnd, Secure, FocusGeneration, ElementId := "") {
 	global SFD_FIELD_CACHE
-	; Publish the key last so concurrent reader callbacks cannot pair a new HWND
-	; with the previous control's verdict.
-	SFD_FIELD_CACHE["secure"] := !!Secure
-	SFD_FIELD_CACHE["at"] := A_TickCount
-	SFD_FIELD_CACHE["verdict_generation"] := FocusGeneration
-	SFD_FIELD_CACHE["element_id"] := ElementId
-	if (FocusGeneration = SFD_FIELD_CACHE["focus_generation"])
-		SFD_FIELD_CACHE["current_element_id"] := ElementId
-	SFD_FIELD_CACHE["hwnd"] := Hwnd
+	PreviousCritical := Critical("On")
+	try {
+		; Verdict, timestamp and identity form one publication. Key-last alone
+		; still exposes the old identity while earlier fields already changed.
+		SFD_FIELD_CACHE["secure"] := !!Secure
+		SFD_FIELD_CACHE["at"] := A_TickCount
+		SFD_FIELD_CACHE["verdict_generation"] := FocusGeneration
+		SFD_FIELD_CACHE["element_id"] := ElementId
+		if (FocusGeneration = SFD_FIELD_CACHE["focus_generation"])
+			SFD_FIELD_CACHE["current_element_id"] := ElementId
+		SFD_FIELD_CACHE["hwnd"] := Hwnd
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Returns the exact delay still needed before a cross-process provider probe is
