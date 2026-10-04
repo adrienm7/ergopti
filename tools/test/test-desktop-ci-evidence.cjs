@@ -1134,6 +1134,101 @@ for (const [from, to] of [
 	);
 }
 
+// Exercise the actual Windows consumer after the catalogue reader returns its flat packet.
+{
+	const vm = require('node:vm');
+	const runtimePath = require.resolve('./support/windows-startup-log-runtime.cjs');
+	const module = { exports: {} };
+	const cases = [];
+	const ownedRoots = new Set();
+	let catalogueCalls = 0;
+	const catalog = {
+		base: 'ERGOPTI_TEST_LOG_ROOT',
+		segments: ['independent-app', 'trace'],
+		prefix: 'independent_daily_',
+		extension: '.txt'
+	};
+	function nativeSpawn(program, arguments_, options) {
+		if (program === 'python') {
+			catalogueCalls++;
+			assert.equal(arguments_[0], '-c');
+			assert.equal(options.timeout, 5000);
+			return { status: 0, stdout: JSON.stringify(catalog), stderr: '' };
+		}
+		assert.equal(program, 'pwsh.exe', 'only the actual native collector boundary is replaced');
+		assert.deepEqual(Array.from(arguments_.slice(0, 3)), [
+			'-NoProfile',
+			'-NonInteractive',
+			'-File'
+		]);
+		assert.equal(options.timeout, 30000, 'the existing native collector keeps its deadline');
+		const defaultRoot = options.env.ERGOPTI_TEST_LOG_ROOT;
+		assert.equal(
+			typeof defaultRoot,
+			'string',
+			'the flat catalogue base owns the native environment'
+		);
+		assert.equal(path.basename(defaultRoot), 'private-local-app-data');
+		assert.equal(options.env.GITHUB_WORKSPACE, pipeline.ROOT);
+		const scenario = path.dirname(defaultRoot);
+		ownedRoots.add(path.dirname(scenario));
+		const smoke = options.env.ERGOPTI_STARTUP_SMOKE_DIR !== '';
+		const selected = smoke ? options.env.ERGOPTI_STARTUP_SMOKE_DIR : defaultRoot;
+		assert.equal(path.dirname(selected), scenario);
+		const observer = fs.readFileSync(arguments_[3], 'utf8');
+		assert.ok(observer.includes('Write-StartupOwnershipEvidence $proc'));
+		const bootstrap = path.join(selected, 'independent-app', 'trace', 'bootstrap.log');
+		const present = fs.existsSync(bootstrap);
+		cases.push(`${smoke ? 'smoke' : 'normal'}-${present ? 'present' : 'absent'}`);
+		const logs = ['bootstrap.log', 'independent_daily_2026-10-04.txt'];
+		const rows = logs.map((log) => {
+			if (!present)
+				return {
+					log,
+					status: 'unavailable',
+					cause: 'Owned fixture log is absent.'
+				};
+			const bytes = fs.readFileSync(bootstrap);
+			return {
+				log,
+				status: 'observed',
+				size_bytes: bytes.length,
+				read_bytes: 4096,
+				truncated: true,
+				tail: bytes.subarray(bytes.length - 4096).toString('utf8')
+			};
+		});
+		return {
+			status: 0,
+			stdout: rows.map((row) => JSON.stringify(row)).join('\n'),
+			stderr: ''
+		};
+	}
+	vm.runInNewContext(
+		fs.readFileSync(runtimePath, 'utf8'),
+		{
+			module,
+			exports: module.exports,
+			process: { platform: 'win32', env: {} },
+			Buffer,
+			console: { log() {} },
+			require(name) {
+				if (name === 'node:child_process') return { spawnSync: nativeSpawn };
+				if (name === '../ci-pipeline.cjs') return pipeline;
+				return require(name);
+			}
+		},
+		{ filename: runtimePath, timeout: 10000 }
+	);
+	assert.equal(typeof module.exports, 'function');
+	module.exports();
+	assert.equal(catalogueCalls, 1, 'the real consumer acquires one strict catalogue packet');
+	assert.deepEqual(cases, ['smoke-present', 'smoke-absent', 'normal-present', 'normal-absent']);
+	assert.equal(ownedRoots.size, 1, 'all four actual scenarios share one acquired fixture owner');
+	for (const directory of ownedRoots)
+		assert.equal(fs.existsSync(directory), false, 'the actual consumer retires its fixture');
+}
+
 require('./support/windows-launch-runtime.cjs')();
 
 require('./support/windows-startup-log-runtime.cjs')();
