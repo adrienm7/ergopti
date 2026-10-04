@@ -49,11 +49,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		let process = Process()
 		process.executableURL = URL(fileURLWithPath: executable)
 		process.arguments = arguments
-		// Native signing tools can forbid forced Swift crash backtracing. Keep
-		// parent XCTest diagnostics enabled; only the owned child opts out.
-		var environment = ProcessInfo.processInfo.environment
-		environment["SWIFT_BACKTRACE"] = "enable=no"
-		process.environment = environment
+		process.environment = NativeFixtureChildEnvironment.make()
 		process.standardOutput = output
 		process.standardError = errors
 		let completed = DispatchSemaphore(value: 0)

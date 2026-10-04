@@ -65,6 +65,7 @@ final class ApplicationPickerPanelTests: XCTestCase {
 		let process = Process()
 		process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
 		process.arguments = [scriptURL.path]
+		process.environment = NativeFixtureChildEnvironment.make()
 		process.standardOutput = output
 		process.standardError = errors
 		let completed = DispatchSemaphore(value: 0)
@@ -95,6 +96,25 @@ final class ApplicationPickerPanelTests: XCTestCase {
 			print("APPKIT_PANEL_STDERR bytes=\(stderr.utf8.count) lines=\(stderr.split(separator: "\n").count) termination=\(reason) status=\(process.terminationStatus) artifact=\(retained ? "retained" : "unavailable")")
 		}
 		return try String(contentsOf: outputURL, encoding: .utf8)
+	}
+
+	func testActualApplicationChildEnvironmentPreservesParentAndExecutableSearchPath() throws {
+		let inherited = ProcessInfo.processInfo.environment
+		let inheritedPath = try XCTUnwrap(inherited["PATH"])
+		let root = FileManager.default.temporaryDirectory.appendingPathComponent("ErgoptiApplicationEnvironment-" + UUID().uuidString)
+		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+		defer {
+			if fixtureCanRetire {
+				do { try FileManager.default.removeItem(at: root) }
+				catch { XCTFail("The exact native application environment fixture did not retire") }
+			}
+		}
+		XCTAssertEqual(try runNative("return (system attribute \"SWIFT_BACKTRACE\")", root: root),
+			"enable=no\n", "The actual osascript child disables unsupported crash backtracing")
+		XCTAssertEqual(try runNative("return (system attribute \"PATH\")", root: root),
+			inheritedPath + "\n", "The actual osascript child preserves executable lookup")
+		XCTAssertEqual(ProcessInfo.processInfo.environment, inherited,
+			"The parent XCTest environment remains unchanged")
 	}
 
 	func testActualApplicationPanelTemplateKeepsCaptionAndSelectionPolicy() throws {
