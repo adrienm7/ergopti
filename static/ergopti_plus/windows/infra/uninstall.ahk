@@ -9,6 +9,8 @@
 ; ==============================================================================
 
 ; The holder is initialized on first use, including in the headless test runner.
+#Include tick_count.ahk
+
 UninstallState() {
 	static State := Map()
 	return State
@@ -150,12 +152,7 @@ ShowUninstallErgopti(*) {
 		Resumed := PLC_ResumeThreadHandle(NumGet(Info, A_PtrSize, "Ptr"))
 		if Resumed["Value"] == 0xFFFFFFFF
 			throw Error("Could not resume the removal worker")
-		Started := A_TickCount
-		while PLC_WaitHandle(Owner.Get("Ready", 0), 0) != 0 {
-			if A_TickCount - Started > 10000 || PLC_WaitHandle(NumGet(Info, 0, "Ptr"), 0) != 0x102
-				throw Error("The removal worker did not become ready")
-			Sleep(20)
-		}
+		_UninstallAwaitReady(Owner, Info)
 		Owner["Phase"] := "Ready"
 		ExitApp()
 		; ExitApp returns only when an OnExit owner refuses the shutdown.
@@ -173,4 +170,18 @@ ShowUninstallErgopti(*) {
 		Ui_MsgBox(t("dialog.uninstall.failed"), t("dialog.uninstall.window_title"), "Icon!")
 		return false
 	}
+}
+
+/** Waits for this owner's READY capability without caching revocable handles. */
+_UninstallAwaitReady(Owner, Info, ClockFn := unset, WaitFn := unset, SleepFn := unset) {
+	Clock := IsSet(ClockFn) ? ClockFn : () => A_TickCount
+	Wait := IsSet(WaitFn) ? WaitFn : PLC_WaitHandle
+	Nap := IsSet(SleepFn) ? SleepFn : Sleep
+	Started := Clock.Call()
+	while Wait.Call(Owner.Get("Ready", 0), 0) != 0 {
+		if TickElapsed(Started, Clock.Call()) > 10000 || Wait.Call(NumGet(Info, 0, "Ptr"), 0) != 0x102
+			throw Error("The removal worker did not become ready")
+		Nap.Call(20)
+	}
+	return true
 }
