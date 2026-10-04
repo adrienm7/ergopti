@@ -360,6 +360,19 @@
 			]
 		}
 	],
+	"llm_live_controls": [
+		{
+			"type": "check",
+			"id": "llm_live_mode_off",
+			"i18n": "menu.llm.live_mode_off",
+			"checked_when": [
+				"llm_live_is_off"
+			],
+			"disabled_when": [
+				"llm_live_off_ready"
+			]
+		}
+	],
 	"about_update_channel_menu": [
 		{
 			"type": "choice",

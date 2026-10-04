@@ -228,12 +228,15 @@ _LLM_Menu_LiveModeRows() {
 	global _LLM_Menu
 	Live := LLM_Engine_LiveOverride()
 	Active := Live is Map
-	Rows := [Map(
-		"label",   t("menu.llm.live_mode_off"),
-		"checked", !Active,
-		"action",  (*) => LLM_Menu_StopLiveMode())]
-	; Labels must be unique within a menu: AHK addresses its rows by label
-	Seen := Map(t("menu.llm.live_mode_off"), 1)
+	Off := MenuRenderer_CheckRow("llm_live_controls", "llm_live_mode_off",
+		Map("llm_live_mode_off", (*) => LLM_Menu_StopLiveMode()),
+		Map("llm_live_is_off", (*) => !(LLM_Engine_LiveOverride() is Map),
+			"llm_live_off_ready", (*) => true))
+	if !(Off is Map)
+		return []
+	Rows := [Off]
+	; AHK addresses rows by their actual rendered label, including shared edits.
+	Seen := Map(Off["label"], 1)
 	for Choice in LLM_Menu_PromptChoices() {
 		Id := Choice["value"]
 		if !LLM_Rewrite_IsRewriteProfile(LLM_FindProfile(Id, _LLM_Menu["user_profiles"]))

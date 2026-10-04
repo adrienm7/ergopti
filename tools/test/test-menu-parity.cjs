@@ -81,6 +81,8 @@ const SEPARATOR = '---';
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
 const OPENS_SUBMENU = {
+	// Every native live-mode provider renders the shared fixed Off choice.
+	llm_live_mode: 'llm_live_controls',
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',

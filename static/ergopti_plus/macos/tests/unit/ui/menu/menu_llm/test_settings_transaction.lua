@@ -330,6 +330,8 @@ local function with_fixture(options, callback)
 		logger = Logger,
 	}))
 	package.loaded["infra.manifest_menu"] = {
+		check_row = display_renderer.check_row,
+		get_array = display_renderer.get_array,
 		render_rows = function(rows)
 			local items = {}
 			for _, row in ipairs(rows) do

@@ -41,6 +41,7 @@ local MODULES = {
 
 local function with_fixture(callback)
 	return helpers.with_fresh_modules(MODULES, function()
+		local native_renderer = require("infra.manifest_menu")
 		local noop = function() end
 		local accept = function() return true end
 		local updates = 0
@@ -222,6 +223,8 @@ local function with_fixture(callback)
 			has_health_dot = function(id) return id == "llm_model" end,
 		}
 		package.loaded["infra.manifest_menu"] = {
+			check_row = native_renderer.check_row,
+			get_array = native_renderer.get_array,
 			render_rows = function(rows) return rows end,
 			build = function(key, _, handlers, _, render_ctx, providers)
 				-- Only the health-bearing top-level handlers are observed here.

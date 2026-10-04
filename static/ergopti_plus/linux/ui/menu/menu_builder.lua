@@ -1985,13 +1985,14 @@ local function _build_llm(ctx)
 		local live = llm.get_live()
 		local count = ProfileSettings.get("num_predictions") or 1
 		local function choose(profile_id)
-			if llm.set_live(profile_id) and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			local committed = llm.set_live(profile_id) == true
+			if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return committed
 		end
-		local rows = { {
-			label = i18n_safe("menu.llm.live_mode_off"),
-			checked = live == nil,
-			action = function() choose(nil) end,
-		} }
+		local rows = { ManifestMenu.check_row("llm_live_controls", "llm_live_mode_off",
+			{ llm_live_mode_off = function() return choose(nil) end },
+			{ llm_live_is_off = function() return llm.get_live() == nil end,
+				llm_live_off_ready = function() return true end }) }
 		local prompts = {}
 		for _, profile in ipairs(ProfileSettings.list_built_in()) do prompts[#prompts + 1] = profile end
 		for _, profile in ipairs(ProfileSettings.list_user()) do prompts[#prompts + 1] = profile end

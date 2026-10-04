@@ -831,3 +831,92 @@ _LLV_FailedMenuNoticeRetiresBeforeYield() {
 }
 Test("LLM live mode: failed menu fixture retires due rendering (live-menu-failure-fixture)",
 	_LLV_FailedMenuNoticeRetiresBeforeYield)
+
+
+; The fixed Off command is declared once; dynamic prompt rows keep their owners.
+_LLV_DeclaredOffPolicy() {
+	global _SharedDir
+	Spec := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\llm_live_off.json", "UTF-8"))
+	Declarations := _MR_GetMenuDef(Spec["manifest"])
+	AssertEqual(1, Declarations.Length, "only the fixed Off choice belongs to the shared head")
+	Entry := Declarations[1]
+	AssertEqual("check", Entry["type"])
+	AssertEqual(Spec["id"], Entry["id"])
+	AssertEqual(Spec["label_key"], Entry["i18n"])
+	AssertEqual(Spec["checked_getter"], Entry["checked_when"][1])
+	AssertEqual(Spec["ready_getter"], Entry["disabled_when"][1])
+	Observed := Map("ready", true, "off", false, "calls", 0)
+	Row := MenuRenderer_CheckRow(Spec["manifest"], Spec["id"],
+		Map(Spec["id"], _Run), Map(Spec["ready_getter"], (*) => Observed["ready"],
+			Spec["checked_getter"], (*) => Observed["off"]))
+	_Run(*) {
+		Observed["calls"] += 1
+		return false
+	}
+	AssertFalse(Row["checked"])
+	for State in Spec["states"] {
+		Observed["off"] := !State["live"]
+		Projected := MenuRenderer_CheckRow(Spec["manifest"], Spec["id"],
+			Map(Spec["id"], _Run), Map(Spec["ready_getter"], (*) => Observed["ready"],
+				Spec["checked_getter"], (*) => Observed["off"]))
+		AssertEqual(State["checked"], Projected["checked"], "the declared state keeps the actual native tick")
+	}
+	Observed["ready"] := false
+	AssertFalse(Row["action"].Call(), "retained command checks current policy before delivery")
+	AssertEqual(0, Observed["calls"])
+	Observed["ready"] := true
+	AssertFalse(Row["action"].Call(), "native refusal remains the callback result")
+	AssertEqual(1, Observed["calls"])
+}
+Test("LLM live mode: fixed Off command retains shared policy and native receipt", _LLV_DeclaredOffPolicy)
+
+
+; Drive the actual provider under a shared label edit that collides with a prompt.
+_LLV_DeclaredOffLabelOwnsUniqueness() {
+	_LLV_Run("hello", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _MM_MANIFEST_ROOT_CACHE, _LLM_Menu, _LLM_Engine
+		SavedCache := _MM_MANIFEST_ROOT_CACHE
+		SavedMenuProfiles := _LLM_Menu["user_profiles"]
+		SavedEngineProfiles := _LLM_Engine["user_profiles"]
+		Observed := Map()
+		try {
+			Root := _MM_GetManifestRoot().Clone()
+			Entry := Root["llm_live_controls"][1].Clone()
+			Entry["i18n"] := "button.ok"
+			Root["llm_live_controls"] := [Entry]
+			_MM_MANIFEST_ROOT_CACHE := Root
+			Label := t("button.ok")
+			Custom := Map("id", "user_off_collision", "label", Label,
+				"system_single", "Rewrite TAIL. Reply REWRITE: <text>", "system_multi", "", "batch", false)
+			_LLM_Menu["user_profiles"] := [Custom]
+			_LLM_Engine["user_profiles"] := [Custom]
+			Rows := _LLM_Menu_LiveModeRows()
+			Observed["off_label"] := Rows[1]["label"]
+			Seen := Map()
+			Duplicates := 0
+			for Row in Rows {
+				if Seen.Has(Row["label"])
+					Duplicates++
+				Seen[Row["label"]] := true
+			}
+			Observed["duplicates"] := Duplicates
+			Observed["renamed_prompt"] := Seen.Has(Label . " #2")
+			Entry["type"] := "command"
+			Observed["refused_rows"] := _LLM_Menu_LiveModeRows().Length
+		} finally {
+			_MM_MANIFEST_ROOT_CACHE := SavedCache
+			_LLM_Menu["user_profiles"] := SavedMenuProfiles
+			_LLM_Engine["user_profiles"] := SavedEngineProfiles
+		}
+		AssertEqual(t("button.ok"), Observed["off_label"], "the actual shared label is admitted")
+		AssertEqual(0, Observed["duplicates"], "the provider owns uniqueness for the admitted label")
+		AssertTrue(Observed["renamed_prompt"], "the existing prompt suffix owner resolves the collision")
+		AssertEqual(0, Observed["refused_rows"], "a refused shared Off row never serves a guessed fallback")
+		AssertTrue(_MM_MANIFEST_ROOT_CACHE == SavedCache, "the exact prior manifest owner is restored")
+		AssertTrue(_LLM_Menu["user_profiles"] == SavedMenuProfiles, "the exact prior menu profiles are restored")
+		AssertTrue(_LLM_Engine["user_profiles"] == SavedEngineProfiles, "the exact prior engine profiles are restored")
+	}
+}
+Test("LLM live mode: shared Off label edits preserve actual native prompt uniqueness",
+	_LLV_DeclaredOffLabelOwnsUniqueness)
