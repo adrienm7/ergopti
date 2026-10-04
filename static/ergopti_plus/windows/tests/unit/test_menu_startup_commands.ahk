@@ -9,6 +9,26 @@
 
 #Requires AutoHotkey v2.0
 
+; The unit runner deliberately excludes infra/lifecycle.ahk: its suspension
+; globals and timers belong to the real boot. The builders still require both
+; native callback identities. Record and refuse their fallback effects so even
+; a caught dispatch cannot conceal an accidental runner reload or termination.
+global _MSC_UnexpectedLifecycleCalls := []
+
+_MSC_UnexpectedLifecycleCommand(Id) {
+	global _MSC_UnexpectedLifecycleCalls
+	_MSC_UnexpectedLifecycleCalls.Push(Id)
+	throw Error("Startup fixtures must not execute native lifecycle effects")
+}
+
+ActivateReload(*) {
+	return _MSC_UnexpectedLifecycleCommand("reload")
+}
+
+ActivateExitApp(*) {
+	return _MSC_UnexpectedLifecycleCommand("quit")
+}
+
 _MSC_InitializationOwnership() {
 	global _MenuStartupCommands
 	Saved := _MenuStartupCommands
@@ -298,3 +318,31 @@ _MSC_HeldLifecycleDeclaration(Owner, State) {
 }
 Test("menu startup: held shared lifecycle callbacks refuse a newly unregistered readiness owner (shared-lifecycle)",
 	(*) => _MSC_WithOwner(_MSC_HeldLifecycleDeclaration))
+
+_MSC_NativeLifecycleFixtureOwnership() {
+	global _TrayStartupCommands, _MSC_UnexpectedLifecycleCalls
+	SavedTray := IsSet(_TrayStartupCommands) ? _TrayStartupCommands : false
+	SavedCalls := _MSC_UnexpectedLifecycleCalls
+	try {
+		_TrayStartupCommands := false
+		_MSC_UnexpectedLifecycleCalls := []
+		AssertTrue(ActivateReload is Func && ActivateExitApp is Func,
+			"the actual staged builders require typed native callback identities")
+		for Entry in [["reload", ActivateReload], ["quit", ActivateExitApp]] {
+			Refused := false
+			try MenuStartupLifecycleDispatch(Entry[1], Entry[2])
+			catch
+				Refused := true
+			AssertTrue(Refused, "fixture fallbacks refuse native lifecycle effects")
+		}
+		AssertEqual(2, _MSC_UnexpectedLifecycleCalls.Length)
+		AssertEqual("reload", _MSC_UnexpectedLifecycleCalls[1])
+		AssertEqual("quit", _MSC_UnexpectedLifecycleCalls[2],
+			"both actual fallback callbacks remain observable after refusal")
+	} finally {
+		_TrayStartupCommands := SavedTray
+		_MSC_UnexpectedLifecycleCalls := SavedCalls
+	}
+}
+Test("menu startup: omitted boot callbacks have typed observable fixture ownership (shared-lifecycle)",
+	_MSC_NativeLifecycleFixtureOwnership)
