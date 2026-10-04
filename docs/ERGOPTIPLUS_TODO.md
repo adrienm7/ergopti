@@ -619,6 +619,20 @@ These are software implementations; final hardware verification remains below.
   so it does not interpret the caller's leading @. macOS passes caller bodies
   directly to its native API. Both are source parity findings, not native
   cross-OS execution. No reserved source, physical input or manual CI ran.
+- [~] **L48.** Linux HTTP protocol boundary: native curl accepted file URLs,
+  emitted local file bytes to streaming callbacks and created download output
+  before the missing HTTP status finally reported failure. Resolve initial URL
+  schemes against the canonical shared HTTP/HTTPS inventory before ownership
+  changes and apply its native curl protocol fence to initial and redirect hops.
+  Keep HTTPS-only narrowing, TLS verification and uppercase HTTP/HTTPS intact.
+  Thirty-two of forty actual held-owner cases fail before and all pass after
+  on LuaJIT/Lua 5.4; native TLS redirect controls also pass. Fifty-two portable
+  cases cover all methods, exact native fences and missing/malformed policy.
+  Windows async curl validates controls but lacks an initial scheme/protocol
+  fence by source. macOS restricts its explicit credentialed redirect parser,
+  while public Hammerspoon initial URL behavior remains native-unvalidated.
+  Those reserved native owners need independent file/stream/output receipts.
+  No reserved source, physical input, native cross-OS suite or manual CI ran.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -287,7 +287,27 @@ if (
 
 // ==================================================
 // ==================================================
-// ======= 6/ Summary ===============================
+// ======= 6/ HTTP Transport Scheme Boundary ========
+// ==================================================
+// ==================================================
+
+const transportPolicy = JSON.parse(
+	fs.readFileSync(shared('data/http/transport_policy.json'), 'utf8')
+);
+const httpSchemes = transportPolicy.allowed_schemes;
+if (
+	Array.isArray(httpSchemes) &&
+	new Set(httpSchemes).size === httpSchemes.length &&
+	JSON.stringify([...httpSchemes].sort()) === '["http","https"]'
+) {
+	pass('HTTP transport policy allows HTTP and HTTPS without native file protocols');
+} else {
+	fail('HTTP transport policy allows HTTP and HTTPS without native file protocols');
+}
+
+// ==================================================
+// ==================================================
+// ======= 7/ Summary ===============================
 // ==================================================
 // ==================================================
 
