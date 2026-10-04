@@ -107,18 +107,61 @@ Test("keylogger: watcher native64 clocks retain all five intervals (keylogger-na
 ; ===============================================
 ; ===============================================
 
-_KLTO_HookWrapSafe() {
-	Raw := _KLTO_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Src := _KLTO_StripComments(Raw)
-	Assert(Src != "", "modules/keylogger/keylogger_hook.ahk must be readable")
-
-	Assert(InStr(Src, "& 0xFFFFFFFF") > 0,
-		"keylogger_hook.ahk must apply the & 0xFFFFFFFF mask to the A_TickCount inter-keystroke delay (keylogger-tickcount-overflow)")
-
-	Assert(InStr(Src, "last_tick) & 0xFFFFFFFF") > 0,
-		"keylogger_hook.ahk must mask the (now - last_tick) delay with & 0xFFFFFFFF")
+_KLTO_ClockWrites(Code, Name) {
+	Pattern := "i)(?<![\w.])" . Name . "\h*(?::=|\+=|-=|\*=|/=|//=|\*\*=|<<=|>>=|>>>=|&=|\|=|\^=|\.=|\+\+|--)"
+		. "|(?<![\w.])(?:\+\+|--)\h*" . Name . "\b|(?<!&)&\h*" . Name . "\b"
+	Count := 0
+	Position := InStr(Code, "{") + 1
+	while RegExMatch(Code, Pattern, &Found, Position) {
+		Count += 1
+		Position := Found.Pos + Found.Len
+	}
+	return Count
 }
-Test("keylogger: keylogger_hook.ahk uses & 0xFFFFFFFF mask on inter-keystroke delay (keylogger-tickcount-overflow)", _KLTO_HookWrapSafe)
+
+_KLTO_HookDelayOwner(Body) {
+	_KLTO_Native64Calls(Body, 1)
+	Origin := _KLTO_UniqueCode(Body, "im)^\h*([A-Za-z_]\w*)\h*:=\h*KLHook\.last_tick\h*$",
+		"physical activity must capture its origin once")
+	Clock := _KLTO_UniqueCode(Body, "im)^\h*([A-Za-z_]\w*)\h*:=\h*IsSet\(\h*Now\h*\)\h*\?\h*Now\h*:\h*A_TickCount\h*$",
+		"the activity owner must select its final native observation once")
+	Delay := _KLTO_UniqueCode(Body, "im)^\h*([A-Za-z_]\w*)\h*:=\h*TickElapsed64\h*\(\h*"
+		. Origin[1] . "\h*,\h*" . Clock[1] . "\h*\)\h*$", "the delay must retain both captured endpoints")
+	Assert(Origin.Pos < Clock.Pos && Clock.Pos < Delay.Pos,
+		"physical origin capture must precede the native sample and interval")
+	_KLTO_UniqueCode(Body, "im)^\h*if\h+" . Origin[1] . "\h*=\h*0\h*\n\h*" . Delay[1] . "\h*:=\h*0\h*$",
+		"absent physical input must retain its zero delay independently of accepted session ownership")
+	Code := _DriverMaskNonCode(&Body)
+	AssertFalse(StrLower(Origin[1]) = StrLower(Clock[1]) || StrLower(Origin[1]) = StrLower(Delay[1])
+		|| StrLower(Clock[1]) = StrLower(Delay[1]), "origin, clock and delay require distinct local identities")
+	AssertEqual(1, _KLTO_ClockWrites(Code, Origin[1]), "the captured physical origin cannot be rebound")
+	AssertEqual(1, _KLTO_ClockWrites(Code, Clock[1]), "the selected native clock cannot be rebound")
+	AssertEqual(2, _KLTO_ClockWrites(Code, Delay[1]), "only the full interval and absent-physical zero own the delay")
+	AssertEqual(0, RegExMatch(SubStr(Code, Clock.Pos), "i):=\h*KLHook\.last_tick\b"),
+		"the interval cannot reread a newer mutable origin after sampling")
+	Publish := _KLTO_UniqueCode(Body, "im)^\h*KLHook\.last_tick\h*:=\h*" . Clock[1] . "\h*$",
+		"physical publication must retain the exact selected native sample")
+	Assert(Publish.Pos > Delay.Pos, "the physical watermark must follow interval validation")
+}
+
+_KLTO_HookWrapSafe() {
+	Body := _DriverFuncBody("KL_Hook_NoteActivity")
+	_KLTO_HookDelayOwner(Body)
+	for Replacement in ["TickElapsed", "'TickElapsed64'"] {
+		Changed := StrReplace(Body, "TickElapsed64", Replacement, false, &Count)
+		AssertEqual(1, Count)
+		_KLTO_AssertRefused(_KLTO_HookDelayOwner.Bind(Changed))
+	}
+	Changed := RegExReplace(Body, "im)^(\h*LastTick\h*:=\h*KLHook\.last_tick)\h*$", "; $1", &Count)
+	AssertEqual(1, Count)
+	_KLTO_AssertRefused(_KLTO_HookDelayOwner.Bind(Changed))
+	for Rebinding in ["LastTick := 0", "LASTTICK := 0", "now := 0", "NOW := 0", "delay := 1", "DELAY += 1"] {
+		Changed := Body . Chr(10) . Rebinding
+		_KLTO_AssertRefused(_KLTO_HookDelayOwner.Bind(Changed))
+	}
+	_KLTO_HookDelayOwner(RegExReplace(Body, "i)\b(?:LastTick|now|delay|TickElapsed64)\b", "$U0"))
+}
+Test("keylogger: physical activity retains native64 delay ownership (keylogger-hook-native-clock-guard)", _KLTO_HookWrapSafe)
 
 
 
