@@ -58,23 +58,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare group 7 native artifacts and causal receipts
+      - name: Recover official group 7 native artifacts from an isolated worktree
         shell: pwsh
-        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate 2f836cac02f88c7742312ee0c565a161845f6537
+        run: |
+          $ownedRoot = Join-Path $env:RUNNER_TEMP "group7-native-recovery"
+          git worktree add --detach $ownedRoot $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Owned generation worktree creation failed." }
+          Push-Location $ownedRoot
+          try { ./tools/test/group7_native_recovery.ps1 -SourceCandidate b51a2f5658dc311eaa61e6ebb5093536e72ba5f9 }
+          finally { Pop-Location }
+
+      - name: Replay the exact native group 7 close probe
+        shell: pwsh
+        run: ./tools/test/group7_close_probe.ps1
 
       - name: Build and test native navigation event owner
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
-
-      - name: Save group 7 generated native artifacts and causal receipts
-        uses: actions/upload-artifact@v4
-        with:
-          name: group7-native-owner-generated
-          if-no-files-found: error
-          path: |
-            static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll
-            static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json
-            tools/test/group7-native-generation-results/
 
       # The suites run on the interpreter the release exe ships with: its
       # version, archive and digest come from the one release contract, so a
@@ -470,10 +470,6 @@ jobs:
     steps:
       # A shallow clone: no step of this job reads git history.
       - uses: actions/checkout@v4
-
-      - name: Prepare group 7 native artifacts and causal receipts
-        shell: pwsh
-        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate 2f836cac02f88c7742312ee0c565a161845f6537
 
       - name: Build and test native navigation event owner
         shell: pwsh

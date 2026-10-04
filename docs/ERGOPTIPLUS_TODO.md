@@ -2531,7 +2531,7 @@ predicate. Frozen boundaries, queue/commit identity and generation are checked
 again after yielding preparation, with refusal retaining the original close.
 A registered native child exercises the actual focus-stop, privacy and queue
 chain through controlled native ports, including replacement and mutation
-refusals. Native execution and full Windows qualification remain pending.
+refusals. A complete native pass and full Windows qualification remain pending.
 The maintainer confirmed that the original supplied diagnostic is no longer
 available; this mechanism does not establish its historical live cause.
 
@@ -2545,6 +2545,14 @@ class receiver before the accepted scalar. Both issued-authority getters now
 bind that receiver explicitly. Independent typed-preimage assertions exercise
 the accepted owner and publication boundaries before the shutdown chain.
 Native retry is pending.
+The next native run (37232550379, candidate 2f836cac0) passed both frozen
+scalar-preimage probes but exposed a later Number/Map type failure: a variadic
+property getter consumed the row index instead of forwarding it to Map.\_\_Item.
+The frozen getter now consumes exactly its instance receiver, preserving normal
+indexed reads and writes. An independent indexed-duration assertion checks the
+expected scalar before every mutation scenario. Failure receipts also include
+the native stack. All central admission and privacy assertions remain intact;
+the exact old/new native regression and full-suite retry are pending.
 The other failure is the pre-existing personal-TOML metadata case (item 102).
 E2E, packaging and installation were skipped after the unit failure.
 
