@@ -2366,6 +2366,22 @@ certificate acceptance are not yet qualified. Linux routing, installer/server
 children, updater/rollback and usable shared failure actions remain required.
 Item 62 remains open.
 
+The shared managed-network policy now classifies only typed native receipts.
+Ambiguous TLS handshakes, DNS/timeouts, origin refusals and unstructured child
+stderr remain unknown. Reports expose cause, translated keys and admitted
+action ids, never native URLs, paths, credentials or stderr. Independent receipt
+and capability corpora preserve the same policy across the three drivers.
+Four additional labels and corrected certificate, proxy and route wording are
+translated in all 21 locale sources.
+
+macOS MLX failure dialogs retain a monotonic failed-intent revision and recheck
+both that owner and actual action capabilities after modal interaction. Network
+Retry reuses the ordinary installation path; only explicit Repair admits runtime
+rebuilding. Existing unrelated runtime diagnoses and repair controls remain.
+Actual MLX children still produce unstructured stderr, so these consumer changes
+do not prove a deployed typed receipt producer or enterprise-network coverage.
+Native action opening and the final three-driver qualification remain pending.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

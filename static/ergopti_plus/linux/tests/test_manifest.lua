@@ -108,6 +108,7 @@ return {
 	"tests.unit.meta.test_helper_assertions",
 	"tests.unit.meta.test_hotstrings_config",
 	"tests.unit.meta.test_http_client_curl",
+	"tests.unit.meta.test_managed_network_failure",
 	"tests.unit.meta.test_i18n_is_ready_before_the_tray",
 	"tests.unit.meta.test_i18n_persistence",
 	"tests.unit.meta.test_injector_commands",
