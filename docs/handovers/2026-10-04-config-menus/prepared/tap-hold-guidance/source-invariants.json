@@ -1,0 +1,72 @@
+[
+	{
+		"path": "tools/build/build-menu-manifest.js",
+		"sha256": "291be363d85123635352054a8d55cf74b44314f856572848f9195d1afc293b21",
+		"unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/_shared/lua/menu/renderer.lua",
+		"sha256": "2e31d51b7a241d0cbe3c45d8315c78055e75b79478352dc30e24d559b4b1c4e8",
+		"unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/windows/infra/manifest_menu.ahk",
+		"sha256": "1e10a67880ecc998807e088025056463f8d3a70ee36bfc58126713f8f88c61d1",
+		"unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/macos/infra/manifest_menu.lua",
+		"sha256": "bcd790a6661dd5eeabbd960508d511f8e77302d0b8bc9fa0e5ea0576f574fd10",
+		"unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/linux/infra/manifest_menu.lua",
+		"sha256": "aabf3d27879d722837654708a3a382cd8d5a15bc663cae8de9f1607b641025b8",
+		"unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+		"sha256": "efe907ebc220059cf6cede790bed4cbc65dbe76e1729d853dc20a07c3738c2fd",
+		"unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua",
+		"sha256": "c61f826c99d736e1fb20ed55df927f53821956646a0d961eaa678a5a58c5bed2",
+		"unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/macos/tests/unit/ui/menu/test_karabiner_bulk_commands_transaction.lua",
+		"original_prefix_sha256": "67cce38bc2d8c6f7f9c2e1e4826573d9b7bb9b3399e71c6cd4ebb9fc1eff5df4",
+		"original_prefix_unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_tap_holds_karabiner_off.lua",
+		"original_prefix_sha256": "b863a0e3fe671865f6f84fb67847af01067d085a3d05ed3c69881a1103834643",
+		"original_prefix_unchanged": true
+	},
+	{
+		"path": "tools/test/test-menu-manifest.cjs",
+		"original_prefix_sha256": "8c97ce31e2cb6b6e8124b7cd4004c9c634c6a12f0b76864dfcd6a473545429fa",
+		"original_prefix_unchanged": true
+	},
+	{
+		"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+		"original_prefix_sha256": "dfb119b81faf75a06114ef697dd4e9605825308f76fd0b59b2ebd52b9c330b2f",
+		"original_prefix_unchanged": true
+	},
+	{
+		"native_callback": "Logger.info(LOG, \"Showing the Login Items steps again",
+		"body_sha256_ignoring_indent": "b7192b9b39451c942d09afe0cba4f93660b05bd7c1172879622fe73e728589d1",
+		"unchanged": true
+	},
+	{
+		"native_callback": "Logger.info(LOG, \"Opening Login Items for the remap guardian",
+		"body_sha256_ignoring_indent": "61125128ab6b275582a646baafbd2a8c43b1015fde964770c633791188601e2d",
+		"unchanged": true
+	},
+	{
+		"native_callback": "Logger.info(LOG, \"Showing the legacy Karabiner rules cleanup",
+		"body_sha256_ignoring_indent": "7ee78b4e87d2ac0c1a2c3b615f6bcbf536445b7aae70d48b5242c01c40663a02",
+		"unchanged": true
+	}
+]

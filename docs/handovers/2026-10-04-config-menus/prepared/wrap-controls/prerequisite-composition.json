@@ -1,0 +1,12 @@
+{
+	"tap_delay_prerequisite_patch_sha256": "b5b892d8e9c333a33b57acd23075d6a0fb4c69e7a152915f08a6a69968b8f712",
+	"parity_prerequisite_postimage_sha256": "5dec06318bfa448565c6f3006696359742ded84338006b5d925727692da2ac65",
+	"inherited_renderer_compiler_native_owner_bytes_unchanged": {
+		"static/ergopti_plus/_shared/lua/menu/renderer.lua": "2e31d51b7a241d0cbe3c45d8315c78055e75b79478352dc30e24d559b4b1c4e8",
+		"static/ergopti_plus/windows/infra/manifest_menu.ahk": "1e10a67880ecc998807e088025056463f8d3a70ee36bfc58126713f8f88c61d1",
+		"tools/build/build-menu-manifest.js": "291be363d85123635352054a8d55cf74b44314f856572848f9195d1afc293b21",
+		"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk": "e5f650201029549e66fb6401001484b10ffbaf559226f313376b47e61c6b017e",
+		"static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua": "d59554403181029920b703f50049997ef7c0a1cc3d41c42b9731b336d21d3707",
+		"static/ergopti_plus/linux/ui/menu/menu_builder.lua": "c121e9ae307370f442a4c0a8035431d9d1fbde2ec8b47627baa837fbb544fdff"
+	}
+}

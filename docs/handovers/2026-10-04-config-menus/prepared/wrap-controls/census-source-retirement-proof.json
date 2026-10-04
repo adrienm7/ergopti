@@ -1,0 +1,121 @@
+{
+	"windows": {
+		"before_count": 95,
+		"after_count": 84,
+		"retired_count": 11,
+		"removed_exact_source_signatures": [
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "separator",
+				"source": "Rows.Push(Map(\"separator\", true))",
+				"multiplicity": 3
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "static",
+				"source": "Rows.Push(Map(\"label\", t(\"menu.shortcuts.wrap_symbols_check_all\"),",
+				"multiplicity": 1
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "static",
+				"source": "Rows.Push(Map(\"label\", t(\"menu.shortcuts.wrap_symbols_uncheck_all\"),",
+				"multiplicity": 1
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "static",
+				"source": "Rows.Push(Map(\"label\", t(\"common.restore_recommended\"),",
+				"multiplicity": 1
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "static",
+				"source": "GroupRows.Push(Map(\"label\", t(\"menu.shortcuts.wrap_symbols_check_all\"),",
+				"multiplicity": 1
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "static",
+				"source": "GroupRows.Push(Map(\"label\", t(\"menu.shortcuts.wrap_symbols_uncheck_all\"),",
+				"multiplicity": 1
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "separator",
+				"source": "GroupRows.Push(Map(\"separator\", true))",
+				"multiplicity": 1
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "static",
+				"source": "Map(\"label\", t(\"button.delete\"), \"action\", ((I) => (*) => _WS_MenuRemoveCustom(I))(Idx))",
+				"multiplicity": 1
+			},
+			{
+				"path": "windows/ui/menu/menu_shortcuts.ahk",
+				"kind": "static",
+				"source": "Rows.Push(Map(\"label\", t(\"menu.shortcuts.wrap_symbols_add_custom\"),",
+				"multiplicity": 1
+			}
+		],
+		"added_count": 0
+	},
+	"macos": {
+		"before_count": 150,
+		"after_count": 139,
+		"retired_count": 11,
+		"removed_exact_source_signatures": [
+			{
+				"path": "macos/ui/menu/menu_shortcuts.lua",
+				"kind": "static",
+				"source": "label    = i18n.get(\"menu.shortcuts.wrap_symbols_check_all\"),",
+				"multiplicity": 2
+			},
+			{
+				"path": "macos/ui/menu/menu_shortcuts.lua",
+				"kind": "static",
+				"source": "label    = i18n.get(\"menu.shortcuts.wrap_symbols_uncheck_all\"),",
+				"multiplicity": 2
+			},
+			{
+				"path": "macos/ui/menu/menu_shortcuts.lua",
+				"kind": "static",
+				"source": "label    = i18n.get(\"common.restore_recommended\"),",
+				"multiplicity": 1
+			},
+			{
+				"path": "macos/ui/menu/menu_shortcuts.lua",
+				"kind": "separator",
+				"source": "sub[#sub + 1] = { separator = true }",
+				"multiplicity": 3
+			},
+			{
+				"path": "macos/ui/menu/menu_shortcuts.lua",
+				"kind": "separator",
+				"source": "group_items[#group_items + 1] = { separator = true }",
+				"multiplicity": 1
+			},
+			{
+				"path": "macos/ui/menu/menu_shortcuts.lua",
+				"kind": "static",
+				"source": "label = i18n.get(\"button.delete\"),",
+				"multiplicity": 1
+			},
+			{
+				"path": "macos/ui/menu/menu_shortcuts.lua",
+				"kind": "static",
+				"source": "label    = i18n.get(\"menu.shortcuts.wrap_symbols_add_custom\"),",
+				"multiplicity": 1
+			}
+		],
+		"added_count": 0
+	},
+	"linux": {
+		"before_count": 93,
+		"after_count": 93,
+		"retired_count": 0,
+		"removed_exact_source_signatures": [],
+		"added_count": 0
+	}
+}

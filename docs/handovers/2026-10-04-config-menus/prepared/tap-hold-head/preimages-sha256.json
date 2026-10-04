@@ -1,0 +1,18 @@
+{
+	"docs/ERGOPTIPLUS_TODO.md": "999baa3f074d61747e29fff1b51674a0f798db2a1f7410bd2574f54f16c82e15",
+	"static/ergopti_plus/_shared/lua/menu/renderer.lua": "df17dce48a6312debc0abe133cab57e836cdbae2d03a89aaafa868f15a47ed91",
+	"static/ergopti_plus/_shared/modules/features/manifest.toml": "2b1f72309d3657973c336d33c2a7d9fd49507335ce13960f4f79a787347330f3",
+	"static/ergopti_plus/_shared/modules/menu/menu_manifest.json": "9a63c293a3962b0050f3f8d8c4ef9e2fdb5eff86e56c9ef1cc311b2f30042fd4",
+	"static/ergopti_plus/_shared/tests/corpus/menus/tap_hold_key_head.json": null,
+	"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_menu.lua": "829beb033fb354a8104b3cc0e7503892dc13246c046d6890c3f2920722e62876",
+	"static/ergopti_plus/linux/ui/menu/menu_builder.lua": "849f2e3e9a57aaea4c44da2cfd5cf3513c558dc7412064b449321cf70d4fc042",
+	"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_tap_holds_hand_sections.lua": "7ba4fb2e98b976275fda9c6dc1ccae38f12464a9dca30f1d85ed60211d6953be",
+	"static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua": "6a482d767d63fc930f8531bbf277c8e5cddbb153dd2589acc4c82df343faadad",
+	"static/ergopti_plus/windows/infra/manifest_menu.ahk": "53b465d6bad2a616bebae8bf5486a2a4caad1289b9b6fe94dc121d20db386353",
+	"static/ergopti_plus/windows/tests/unit/test_tap_hold_hand_sections.ahk": "0b3055637ee536a61a119a3adb551e10b5ea670f37ea41d0411db7f602ac7df9",
+	"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk": "47a3212ae6d14d0844d97c7a575afbedcc082eed4e32086a23cf06fa717a6ba5",
+	"tools/build/build-menu-manifest.js": "c20c9b02ca7831fc890c6dafe96b2d08e585ee3eb5c944c8c704bbc91cf6ea40",
+	"tools/test/native-menu-rows-baseline.json": "8cdbcb55718fa1affb8259a9451d41c1ae6e8510bee1be2a78b586ee3d23fccb",
+	"tools/test/test-menu-manifest.cjs": "a87fdb6ab892df6484f3db6348abef604ae5f966c668d33229b8ee125fa92c83",
+	"tools/test/test-menu-parity.cjs": "6502d7bf814d51b177dba8d263573f7dede33dd2be62c84fccfa5308b6488eb1"
+}

@@ -1,0 +1,13 @@
+{
+	"base": "ef278416ee26c74c1ffd88b3ec86416b2b7036e4",
+	"paths": {
+		"static/ergopti_plus/_shared/lua/layouts/catalogue.lua": "98d1d6d40f9f5a8784f3c6ea8753574b5f3f288a6f763df07377f58cb9ba5077",
+		"static/ergopti_plus/linux/modules/keymap/layout_registry.lua": "ce7dcc5333b5a319b2bc1198b29b9916ad541525c234ae8756a310e326c5c36d",
+		"static/ergopti_plus/macos/modules/keymap/layout_registry.lua": "8d56b647d25a0dfc1014782a44756033178f6fb3d19298a402c7123022ae5fbb",
+		"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_catalogue.lua": "79e7f94915cc98045bfc658dcc11d23fe4d5f72554876f10d137619be6a7a230",
+		"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua": "765decf6a53bf94e49309be4823dd03c5868687514a8d0aafa38655c0263c986",
+		"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua": "d765ad66232806a7d0e4229ecd9c8d088a7fd8409a545477d758ee2e3afa7c93",
+		"static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua": "69af430b29e93a594e9093a0fc88ebcf682a4450692db1d5d7dfbe37781fcbe7",
+		"docs/ERGOPTIPLUS_TODO.md": "0ff2612fa76553b693511893de8afb59b005961780610551013ef54e50ed9593"
+	}
+}
