@@ -112,7 +112,8 @@ local function channel_picker(owner, subscribed)
 	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
 		update_channel = function(id)
 			Logger.info(LOG, "User chose the update channel '%s'.", id)
-			owner.set(id)
+			local ok, committed = pcall(owner.set, id)
+			return ok and committed == true
 		end,
 	}, { ["updater.channel"] = function() return subscribed end })
 end

@@ -339,8 +339,8 @@ helpers.describe("tray (linux): published About channel choices", function()
 				local changed = { count = 0 }
 				local row = submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT]
 				local accepted, result = pcall(row.menu[2].fn)
-				helpers.assert_eq(accepted, refusal ~= "throw")
-				if accepted then helpers.assert_eq(result, nil) end
+				helpers.assert_eq(accepted, true, "the native owner exception is a refused callback")
+				helpers.assert_eq(result, false, "the native receipt must be exact true")
 				helpers.assert_eq(requests.set, { "dev" })
 				helpers.assert_eq(up.get_channel(), "main")
 				helpers.assert_eq(changed.count, 0)
@@ -587,4 +587,76 @@ helpers.describe("About source check shared command", function()
 			helpers.assert_eq(seen.effects, 0)
 		end)
 	end)
+end)
+
+
+helpers.describe("Linux About channel durable receipts", function()
+	for _, outcome in ipairs({"false", "nil", "number", "throw", "true"}) do
+		helpers.it("publishes menu and Versions effects only after exact native ACK (channel-ack " .. outcome .. ")", function()
+			local previous_bridge = package.loaded["ui.changelog.bridge"]
+			local pushes, calls = 0, 0
+			package.loaded["ui.changelog.bridge"] = {push_subscribed_channel = function() pushes = pushes + 1 end}
+			local ok, detail = xpcall(function()
+				local up = fake_updater("main")
+				up.set_channel = function()
+					calls = calls + 1
+					if outcome == "throw" then error("The native owner refused.") end
+					if outcome == "number" then return 2 end
+					if outcome == "nil" then return nil end
+					return outcome == "true"
+				end
+				local changed = {count = 0}
+				local held = submenu_of(build(up, changed), "menu.about.title")[CHANNEL_AT].menu[2].fn
+				local protected, accepted = pcall(held)
+				helpers.assert_eq(protected, true)
+				helpers.assert_eq(accepted, outcome == "true")
+				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(changed.count, outcome == "true" and 1 or 0)
+				helpers.assert_eq(pushes, outcome == "true" and 1 or 0)
+			end, debug.traceback)
+			package.loaded["ui.changelog.bridge"] = previous_bridge
+			if not ok then error(detail, 0) end
+		end)
+	end
+
+	for _, outcome in ipairs({"false", "nil", "number", "throw"}) do
+		helpers.it("retries actual updater persistence after refusal without changing canonical bytes (channel-ack durable " .. outcome .. ")", function()
+			with_frequency_owner(nil, function(up, obs, path, original)
+				local writer = require("toml_codec.writer")
+				local previous_write = writer.batch_write
+				local refusing, writes = true, 0
+				writer.batch_write = function(...)
+					writes = writes + 1
+					if refusing then
+						if outcome == "throw" then error("The canonical writer refused.") end
+						if outcome == "number" then return 2 end
+						if outcome == "false" then return false end
+						return nil
+					end
+					return previous_write(...)
+				end
+				local initial = up.get_channel()
+				local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT]
+				local target = initial == "main" and "dev" or "main"
+				local held = row.menu[target == "main" and 1 or 2].fn
+				local accepted = held()
+				local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); assert(file:close())
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(bytes, original)
+				helpers.assert_eq(up.get_channel(), initial)
+				helpers.assert_eq(obs.redraws.count, 0)
+				helpers.assert_eq(writes, 1)
+				refusing = false
+				helpers.assert_eq(held(), true)
+				local saved = assert(io.open(path, "rb")); local committed = saved:read("*a"); assert(saved:close())
+				helpers.assert_true(committed:find('channel = "' .. target .. '"', 1, true) ~= nil)
+				helpers.assert_true(committed:find("future_interval_option = 42", 1, true) ~= nil)
+				helpers.assert_eq(up.get_channel(), target)
+				helpers.assert_eq(obs.redraws.count, 1)
+				helpers.assert_eq(writes, 2)
+				helpers.assert_eq(held(), true)
+				helpers.assert_eq(writes, 2)
+			end)
+		end)
+	end
 end)

@@ -4038,7 +4038,8 @@ end
 local function _channel_picker(ctx, up)
 	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
 		update_channel = function(id)
-			if not up.set_channel(id) then return end
+			local ok, committed = pcall(up.set_channel, id)
+			if not ok or committed ~= true then return false end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			-- An open Versions page follows only an acknowledged subscription.
 			local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
@@ -4047,6 +4048,7 @@ local function _channel_picker(ctx, up)
 			else
 				Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
 			end
+			return true
 		end,
 	}, { ["updater.channel"] = function() return up.get_channel() end })
 end
