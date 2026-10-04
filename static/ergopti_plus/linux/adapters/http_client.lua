@@ -414,8 +414,10 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	}
 	-- Metadata refusal is transactional too: an invalid replacement must not
 	-- retire a valid owner or leave timers/pipes behind after composition raises.
+	local owner = request_owner(options.owner)
+	local predecessor = _active[owner]
 	local composed, argv, config
-	if not operation then
+	if not operation or (predecessor and not predecessor.operation) then
 		composed, argv, config = pcall(curl_args, url, headers, body, request_options)
 		if not composed then
 			Logger.error(LOG, "Cannot compose curl configuration; request refused.")
@@ -424,7 +426,6 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
 		if argv_refusal ~= "" then return reject("curl argument vector refused: " .. argv_refusal) end
 	end
-	local owner = request_owner(options.owner)
 	if _owned[owner] then return reject("previous request cleanup pending") end
 	if _active[owner] and not M.cancel(owner) then
 		return reject("previous request cancellation failed")
@@ -489,9 +490,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		return false
 	end
 
-	-- Owned requests retain the new cleanup contract when construction raises
-	-- after allocation; ordinary replacements complete preflight beforehand.
-	if operation then
+	-- First owned requests retain late construction and its physical close debt.
+	-- Replacements of regular owners reuse metadata admitted before cancellation.
+	if operation and not composed then
 		local built
 		built, argv, config = pcall(curl_args, url, headers, body, request_options)
 		if not built then
