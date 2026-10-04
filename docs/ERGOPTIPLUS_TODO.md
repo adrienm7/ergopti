@@ -1536,11 +1536,30 @@ Hosted Lua owner tests do not qualify physical input.
   Karabiner instances" option, WP7 owned configuration, WP8 native acceptance,
   WP9 real-Mac acceptance (internal keyboard: verify the ISO 0x35/0x64
   assumption and fn/globe), WP10 enable and retire. Open: an identity for media
-  keys without a macOS keycode (play/pause, track skips, brightness), and a
-  VirtualHIDDevice version-skew policy. About 30-40 agent-days plus maintainer
+  keys without a macOS keycode (play/pause, track skips, brightness).
+  VirtualHIDDevice version skew must block the incompatible runtime with an
+  explicit explanation and offer an update only after confirmation (maintainer
+  decision, 2026-10-04); implementation and native acceptance remain pending.
+  About 30-40 agent-days plus maintainer
   hardware time.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
+
+WP3 remains partial. An explicitly initialized, dormant physical-capture session
+owner now composes the real accounting policy, delivery receiver and transport.
+It verifies the caller's pinned executable requirement asynchronously, waits for
+both completion and exact task settlement before opening the stream, admits only
+complete coverage, and fences cancellation and successor startup until native
+ownership retires. Unsupported opening or baseline versions carry typed refusal
+metadata and produce one unavailable WARNING without retry, acknowledgement or
+credit; malformed input retains its error verdict. Opening v1 and baseline v2
+remain unchanged. The version regression failed all three cases against the old
+transport; 60 focused portable cases pass with explicit native task doubles.
+Default startup does not load or activate this session owner. Trusted artifact
+provisioning, clock/prepare/status startup, retained production privacy/time
+context, log-sink binding and physical holds, bounded recovery, controlled async
+shutdown, native and real-Mac acceptance are still required before completing
+WP3 or enabling the owned runtime.
 
 ## Remaining work after the 2026-09-30 releases
 

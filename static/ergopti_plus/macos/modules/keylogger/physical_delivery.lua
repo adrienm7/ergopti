@@ -5,6 +5,7 @@
 local M = {}
 local Wire = require("modules.keylogger.physical_wire")
 local Baseline = require("modules.keylogger.physical_baseline")
+local Protocol = require("modules.keylogger.physical_protocol")
 local decimal, successor = Wire.decimal, Wire.successor
 
 --- Orders uncounted tally rows by page, usage, keyboard type and reason.
@@ -62,9 +63,10 @@ function M.new(dependencies)
 	function receiver.open(frame)
 		assert(state == "new", "Physical receiver cannot reopen")
 		state = "failed"
-		assert(type(frame) == "table" and frame.version == 1 and frame.kind == "opened"
+		assert(type(frame) == "table" and frame.kind == "opened"
 			and type(frame.incarnation) == "string" and frame.incarnation ~= ""
 			and type(frame.coverage) == "string", "Invalid physical opening envelope")
+		Protocol.require_version("opening", frame.version, Protocol.OPENING_VERSION)
 		decimal(frame.lease, true)
 		initial = Baseline.new(frame.baseline)
 		local owner = { incarnation = frame.incarnation, lease = frame.lease, coverage = frame.coverage }
