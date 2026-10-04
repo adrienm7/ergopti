@@ -155,6 +155,15 @@ function M.sha256(path, options, callback)
 		return false
 	end
 	if type(path) ~= "string" or path:sub(1, 1) ~= "/" then return reject("invalid digest path") end
+	-- Refuse the complete argument vector before replacing a valid incumbent.
+	-- A NUL-bearing absolute path has the right shape but cannot reach execve.
+	local argv = { "--binary", "--zero", "--", path }
+	local argv_refusal = ShellRunner.validate_spawn_args("sha256sum", argv)
+	if argv_refusal ~= "" then
+		-- Keep ordinary terminal reporting without acquiring native ownership.
+		finish({ callback = callback }, nil, "sha256sum argument vector refused: " .. argv_refusal)
+		return false
+	end
 	if _active and not M.cancel() then return reject("previous digest cancellation failed") end
 	if not luv or type(luv.spawn) ~= "function" then return reject("asynchronous digest unavailable") end
 
@@ -190,15 +199,6 @@ function M.sha256(path, options, callback)
 		return false
 	end
 
-	-- `path` arrives from a caller, so its type is not this module's to assume:
-	-- refuse an ill-typed argv by index before libuv turns it into a nameless
-	-- spawn failure (keylogger-worker-timings-must-be-strings).
-	local argv = { "--binary", "--zero", "--", path }
-	local argv_refusal = ShellRunner.validate_spawn_args("sha256sum", argv)
-	if argv_refusal ~= "" then
-		finish(request, nil, "sha256sum argument vector refused: " .. argv_refusal)
-		return false
-	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "sha256sum", {
 		args = argv,
 		stdio = { nil, request.stdout, request.stderr },

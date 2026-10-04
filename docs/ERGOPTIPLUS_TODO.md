@@ -1028,6 +1028,19 @@ These are software implementations; final hardware verification remains below.
   device metadata. The registered unit reopens the production writer. Windows
   and macOS schema paths do not use this truncated CLI DDL probe; their native
   suites remain deferred. No shared schema or reserved configuration was changed.
+- [~] **L76.** Linux digest replacement admission: validate the complete native
+  sha256sum argument vector before cancelling an incumbent or allocating its
+  replacement. An absolute path containing NUL previously cancelled a valid
+  pending digest before being refused. Two of seven actual native process
+  regressions fail before and all pass after: the original FIFO digest survives
+  both ordinary and raising refusal callbacks and finishes the known abc hash
+  exactly once. Controls retain relative-path refusal, accepted replacement,
+  FIFO and /dev/zero deadlines, explicit cancellation and native handle cleanup.
+  The registered regression uses actual LuaJIT/libuv processes and files, with
+  no simulated syscall receipts or physical device validation. macOS hashes
+  in-process and Windows owns its hashing worker; neither uses this Linux
+  singleton admission path. Their native suites remain deferred. Separate
+  caller ownership isolation is still pending.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
