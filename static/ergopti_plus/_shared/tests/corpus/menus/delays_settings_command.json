@@ -1,0 +1,9 @@
+{
+	"section": "hotstrings_delays_menu",
+	"id": "hotstrings_config_window",
+	"i18n": "menu.hotstrings.config_item",
+	"ready": "hotstrings_config_ready",
+	"position": 1,
+	"following": "separator",
+	"window": "hotstrings_config_window"
+}

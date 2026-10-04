@@ -791,3 +791,43 @@ _HSDT_CustomAddProviderKeepsPostModalAdmission() {
 }
 Test("custom word expanders: actual Add dialog rechecks admission after its native close receipt",
 	_HSDT_CustomAddProviderKeepsPostModalAdmission)
+
+
+_HSDT_DeclaredDelayConfigCommand() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\delays_settings_command.json"))
+	Assert(Corpus is Map)
+	Root := _MR_GetManifestRoot()
+	Rows := Root[Corpus["section"]]
+	OriginalLabel := Rows[1]["i18n"]
+	Observations := Map("opens", 0)
+	try {
+		Rows[1]["i18n"] := "button.ok"
+		Provider := _HS_DelaysColorsRows(_HSDT_ObserveDelayWindow.Bind(Observations))
+		Items := Provider[1]["items"]
+		AssertEqual(t("button.ok"), Items[1]["label"], "the actual provider owns no fixed command label")
+		AssertEqual(true, Items[2]["separator"])
+		AssertEqual(8, Items.Length, "the five variable quick-delay rows and separators remain in place")
+		Items[1]["action"].Call("native_menu_label", 1, 0)
+		AssertEqual(1, Observations["opens"])
+	} finally Rows[1]["i18n"] := OriginalLabel
+	AssertEqual(OriginalLabel, Rows[1]["i18n"], "the actual shared definition is restored")
+}
+
+_HSDT_ObserveDelayWindow(Observations) {
+	Observations["opens"] += 1
+}
+Test("hotstrings delay settings: actual provider consumes its declared command and native window owner",
+	_HSDT_DeclaredDelayConfigCommand)
+
+_HSDT_DelayConfigKeepsNativeWindowAndRefreshOwner() {
+	Body := _DriverFuncBody("_HS_DelaysColorsRows")
+	Assert(Body != "", "the actual delay provider must exist")
+	Assert(InStr(Body, 'MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window"'))
+	AssertFalse(InStr(Body, 't("menu.hotstrings.config_item")'))
+	Source := FSReadUtf8Exact(A_ScriptDir . "\..\..\ui\menu\menu_hotstrings.ahk")
+	Assert(InStr(Source, "_HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow)"),
+		"ordinary calls retain the existing native singleton window owner")
+}
+Test("hotstrings delay settings: ordinary entry keeps the existing native config window",
+	_HSDT_DelayConfigKeepsNativeWindowAndRefreshOwner)

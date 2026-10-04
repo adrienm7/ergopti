@@ -103,14 +103,15 @@ _HS_MagicKeyRows() {
 ; `list` since 2026-08-07: the row itself is the renderer's, and the submenu
 ; hanging off it stays a native Menu this function owns and hands over — the same
 ; `submenu` shape the category blocks use while their trees are still built here.
-_HS_DelaysColorsRows() {
+_HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow) {
 	global UI_LLM_TIMEOUT_SEC, DYN_HOTSTRINGS_DEFAULT_DELAY
 	; Nested row DATA since 2026-08-07. This was a native Menu handed over in
 	; `submenu`, so the whole submenu was assembled here; none of these rows
 	; mutates the live menu — each opens a prompt and the tray rebuilds after —
 	; so nothing held them back.
 	Sub := [
-		Map("label", t("menu.hotstrings.config_item"), "action", (*) => OpenHotstringsConfigWindow()),
+		MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window",
+			Map("hotstrings_config_window", (*) => OpenConfigFn.Call()), Map("hotstrings_config_ready", (*) => true)),
 		Map("separator", true),
 		Map("label", _HS_DefaultDelayLabel(), "action", (*) => _HS_PromptDefaultDelay()),
 		Map("label", _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"),

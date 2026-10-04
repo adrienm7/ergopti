@@ -103,6 +103,8 @@ const OPENS_SUBMENU = {
 	accented_letters: 'accented_letters_group',
 	hotstrings_params: 'hotstrings_params_group',
 	word_expanders: 'word_expanders_menu',
+	// The native delay providers open the same declared configuration command.
+	delays_colors: 'hotstrings_delays_menu',
 	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
 	word_expander_entries: 'word_expander_custom_menu',
 	llm_display: 'llm_display_menu',

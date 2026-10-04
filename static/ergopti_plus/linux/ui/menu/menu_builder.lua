@@ -1277,9 +1277,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The values were all there; only the prompts were missing.
 			local sub = {}
 
-			sub[#sub + 1] = {
-				label  = i18n_safe("menu.hotstrings.config_item"),
-				action = function()
+			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+				hotstrings_config_window = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
 						return
@@ -1290,7 +1289,8 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- this whole submenu points at had never once opened on Linux.
 					ctx.webview.show("hotstrings_config_window")
 				end,
-			}
+			}, { hotstrings_config_ready = function() return true end })
+			if settings_row then sub[#sub + 1] = settings_row end
 			sub[#sub + 1] = { separator = true }
 			sub[#sub + 1] = global_delay_row()
 

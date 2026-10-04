@@ -56,6 +56,7 @@ local function with_fixture(outcome, callback, locale)
 		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "keymap.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
+		"ui.hotstrings_config_window",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local FileSystem = require("adapters.file_system")
@@ -104,7 +105,13 @@ local function with_fixture(outcome, callback, locale)
 		local command_renderer = assert(require("menu.renderer").new({
 			platform = "hs",
 			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode,
+			json_decode = function(raw)
+				local value = require("adapters.json_codec").decode(raw)
+				if outcome == "config_shared_label" and type(value.hotstrings_delays_menu) == "table" then
+					value.hotstrings_delays_menu[1].i18n = "button.ok"
+				end
+				return value
+			end,
 			i18n = { get = translate, section = translate },
 			logger = require("infra.logger"),
 		}))
@@ -112,7 +119,9 @@ local function with_fixture(outcome, callback, locale)
 			command_row = command_renderer.command_row,
 			build = function(section, _, _, _, _, providers)
 				if section == "word_expanders_menu" then return providers.word_expander_entries() end
-				return providers.word_expanders()
+				local rows = providers.word_expanders()
+				for _, row in ipairs(providers.delays_colors()) do rows[#rows + 1] = row end
+				return rows
 			end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
@@ -188,6 +197,7 @@ local function with_fixture(outcome, callback, locale)
 				updateMenu = function() calls.updates = calls.updates + 1 end,
 				notify_feature = function() end,
 			}
+			if outcome == "config_paused" then active_context.paused = true end
 			local rows = Management.build_management(active_context)
 			local row = find_add(rows.menu, translate(custom_command_expected().i18n), translate("menu.hotstrings.add_custom"))
 			helpers.assert_type(row, "table")
@@ -195,6 +205,8 @@ local function with_fixture(outcome, callback, locale)
 			local fixture = {
 				state = state, initial_state = initial_state, calls = calls, action = row.action, label = row.label, context = active_context,
 				path = path, definitions = Terminators.get_terminator_defs,
+				delay_rows = assert(find_add(rows.menu, translate("menu.hotstrings.delays_colors"), translate("menu.hotstrings.delays_colors"))).items,
+				translate = translate,
 				read = function() return read_bytes(path) end,
 				retry = function() current_outcome = "true" end,
 			}
@@ -315,5 +327,72 @@ helpers.describe("custom delimiter Add uses actual supplied native button labels
 		end
 		helpers.assert_eq(admitted, 21)
 		helpers.assert_eq(refused, 21)
+	end)
+end)
+
+
+--- Reads the independent command and existing native window identity.
+--- @return table corpus Historical command expectation.
+local function delay_settings_command_expected()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
+	local bytes = file:read("*a")
+	file:close()
+	return assert(require("adapters.json_codec").decode(bytes))
+end
+
+helpers.describe("declared delay configuration command: actual macOS provider", function()
+	helpers.it("uses the declared label in all 21 locale providers and keeps variable rows", function()
+		for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+			with_fixture("config_shared_label", function(fixture)
+				local expected = delay_settings_command_expected()
+				local row = fixture.delay_rows[expected.position]
+				helpers.assert_eq(row.label, fixture.translate("button.ok"), locale)
+				helpers.assert_eq(fixture.delay_rows[2].separator, true)
+				helpers.assert_eq(#fixture.delay_rows, 8, "the five variable quick-delay rows keep their position")
+			end, locale)
+		end
+	end)
+
+	for _, outcome in ipairs({ "true", "write_false", "write_throw" }) do
+		helpers.it("retains the real save/refresh owner after opening: " .. outcome, function()
+			with_fixture(outcome, function(fixture)
+				local observations = { opens = 0 }
+				local window = { open = function() observations.opens = observations.opens + 1 end }
+				package.loaded["ui.hotstrings_config_window"] = window
+				fixture.delay_rows[1].action()
+				helpers.assert_eq(observations.opens, 1)
+				helpers.assert_eq(fixture.calls.saves, 0, "opening the existing window writes no preferences")
+				fixture.state.trigger_char = "◇"
+				observations.callback_result = window._on_config_changed()
+				helpers.assert_eq(fixture.calls.saves, 1)
+				helpers.assert_eq(fixture.calls.updates, outcome == "true" and 1 or 0)
+				if outcome ~= "true" then
+					helpers.assert_eq(observations.callback_result, false)
+					helpers.assert_eq(fixture.read(), SOURCE, "refused refresh writes preserve the real physical source")
+				else
+					helpers.assert_eq(require("toml_codec").decode(fixture.read()).foreign.keep, "untouched")
+				end
+			end)
+		end)
+	end
+
+	helpers.it("preserves the existing paused disabled row without acquiring its window", function()
+		with_fixture("config_paused", function(fixture)
+			local observations = { opens = 0 }
+			package.loaded["ui.hotstrings_config_window"] = { open = function() observations.opens = observations.opens + 1 end }
+			helpers.assert_eq(fixture.delay_rows[1].disabled, true)
+			if fixture.delay_rows[1].action then fixture.delay_rows[1].action() end
+			helpers.assert_eq(observations.opens, 0)
+			helpers.assert_eq(fixture.calls.saves, 0)
+		end)
+	end)
+
+	helpers.it("contains an unavailable window owner and performs no save or redraw", function()
+		with_fixture("true", function(fixture)
+			package.loaded["ui.hotstrings_config_window"] = { open = false }
+			fixture.delay_rows[1].action()
+			helpers.assert_eq(fixture.calls.saves, 0)
+			helpers.assert_eq(fixture.calls.updates, 0)
+		end)
 	end)
 end)
