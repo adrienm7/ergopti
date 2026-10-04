@@ -1,0 +1,12 @@
+[
+	{
+		"source": "candidate",
+		"exit_code": 1,
+		"log": "/workspace/ergopti-validation/linux-metrics-candidate.log"
+	},
+	{
+		"source": "baseline-dev",
+		"exit_code": 1,
+		"log": "/workspace/ergopti-validation/linux-metrics-baseline-dev.log"
+	}
+]

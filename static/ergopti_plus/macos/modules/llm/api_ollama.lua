@@ -1190,10 +1190,11 @@ M.MODEL_MISSING = LocalModelPolicy.MODEL_MISSING
 -- Longest server error text a log line carries
 local MAX_LOGGED_SERVER_ERROR = 300
 
--- What the local server listed last (/api/tags): normalized model name -> true,
--- nil until a listing succeeded. A request names a model only once a listing
--- held it; a "model not found" answer clears the listing.
+-- The newest acknowledged /api/tags receipt owns its canonical endpoint,
+-- acquisition epoch and normalized model names. Separate menu/request HTTP
+-- owners cannot publish an older inventory over a newer or forgotten receipt.
 local _listed_models = nil
+local _model_listing_epoch = 0
 
 --- Normalizes a model name as the local server matches it: case-insensitive,
 --- with its implicit ":latest" tag written out.
@@ -1228,13 +1229,28 @@ end
 --- @return string|nil model nil for any other failure.
 local missing_model_of = LocalModelPolicy.missing_model
 
+--- Whether this inventory still describes the canonical current endpoint.
+--- @param receipt table|nil Captured inventory acquisition.
+--- @return boolean
+local function listing_current(receipt)
+	return type(receipt) == "table" and receipt.epoch == _model_listing_epoch
+		and receipt.origin == M.get_base_url()
+end
+
 --- Asks the local server which models it holds and records the answer.
 --- @param client table The HTTP client to ask with: the request's own, so a
 ---        newer request supersedes the listing as it supersedes the request.
 --- @param on_done function Receives the listed names, or nil and a reason.
-local function list_models(client, on_done)
-	client.get(M.get_base_url() .. "/api/tags", {}, function(r)
+--- @param origin string|nil Canonical endpoint captured by the originating request.
+local function list_models(client, on_done, origin)
+	_model_listing_epoch = _model_listing_epoch + 1
+	local receipt = { origin = origin or M.get_base_url(), epoch = _model_listing_epoch }
+	client.get(receipt.origin .. "/api/tags", {}, function(r)
 		Logger.pcall(LOG, function()
+			if not listing_current(receipt) then
+				on_done(nil, "model_list_unavailable")
+				return
+			end
 			if r.status ~= 200 then
 				Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
 					tostring(r.status), server_error_text(r))
@@ -1250,9 +1266,20 @@ local function list_models(client, on_done)
 				on_done(nil, reason)
 				return
 			end
-			_listed_models = names
+			-- Parsing may call a reentrant dependency. Publish only the exact
+			-- originating endpoint and newest joint inventory acquisition.
+			if not listing_current(receipt) then
+				on_done(nil, "model_list_unavailable")
+				return
+			end
+			receipt.models = names
+			_listed_models = receipt
 			Logger.debug(LOG, "The local server returned a readable model list.")
-			on_done(names)
+			if not listing_current(receipt) then
+				on_done(nil, "model_list_unavailable")
+				return
+			end
+			on_done(names, nil, receipt)
 		end)
 	end)
 end
@@ -1262,8 +1289,8 @@ end
 --- @return boolean|nil installed nil while no listing succeeded.
 function M.local_model_installed(model)
 	local name = normalize_model_name(model)
-	if name == nil or _listed_models == nil then return nil end
-	return _listed_models[name] == true
+	if name == nil or not listing_current(_listed_models) then return nil end
+	return _listed_models.models[name] == true
 end
 
 --- Lists the local server's models again, for the menus.
@@ -1290,6 +1317,7 @@ end
 
 --- Forgets the last listing: a download or a removal changed what the server holds.
 function M.forget_local_models()
+	_model_listing_epoch = _model_listing_epoch + 1
 	_listed_models = nil
 end
 
@@ -1872,23 +1900,41 @@ local function request_prebuilt(client, label, body, on_text, on_fail)
 	if normalize_model_name(model) == nil then
 		error("api_ollama." .. label .. " request: the body names no model")
 	end
+	local origin = M.get_base_url()
 	local encoded, encode_error = JsonCodec.encode(body)
 	if not encoded then
 		Logger.error(LOG, "%s request body encode failed: %s.", label, tostring(encode_error))
 		ApiCommon.protected_call(on_fail, "on_fail", "encode_failed")
 		return
 	end
-	local function post()
+	local function post(receipt)
+		local function current()
+			return listing_current(receipt) and receipt.origin == origin and _listed_models == receipt
+		end
+		if not current() then
+			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+		end
 		local t0 = TimerScheduler.now()
 		Logger.info(LOG, "%s request to the local server (model %s, %d byte(s)).", label, model, #encoded)
-		client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+		-- The logger and timer are native boundaries too. Recheck immediately
+		-- before handing private bytes to the captured endpoint's HTTP owner.
+		if not current() then
+			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+		end
+		client.post(origin .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
 			function(r)
 				Logger.pcall(LOG, function()
+					if origin ~= M.get_base_url() then
+						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+					end
 					local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 					if r.status ~= 200 then
 						local server_error = server_error_text(r)
 						Logger.error(LOG, "%s request to the local server failed in %dms: HTTP %s (%s).",
 							label, ms, tostring(r.status), server_error)
+						if origin ~= M.get_base_url() then
+							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+						end
 						local missing = missing_model_of(r.status, server_error)
 						if missing then
 							-- The listing that held it is stale: the next request lists again
@@ -1905,28 +1951,37 @@ local function request_prebuilt(client, label, body, on_text, on_fail)
 					local text = type(content) == "string" and Parser.strip_thinking(content) or ""
 					if text == "" then
 						Logger.warn(LOG, "%s answer of the local server holds no text (%dms).", label, ms)
+						if origin ~= M.get_base_url() then
+							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+						end
 						ApiCommon.protected_call(on_fail, "on_fail", "empty_answer")
 						return
 					end
 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
+					if origin ~= M.get_base_url() then
+						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+					end
 					ApiCommon.protected_call(on_text, "on_text", text)
 				end)
 			end)
 	end
-	if M.local_model_installed(model) == true then return post() end
+	if M.local_model_installed(model) == true then return post(_listed_models) end
 	Logger.info(LOG, "%s request: checking that the local server holds model %s…", label, model)
-	list_models(client, function(names, reason)
+	list_models(client, function(names, reason, receipt)
 		if names == nil then
 			ApiCommon.protected_call(on_fail, "on_fail", reason)
 			return
 		end
 		if names[normalize_model_name(model)] ~= true then
 			Logger.warn(LOG, "%s request not sent: the local server does not hold model %s.", label, model)
+			if not listing_current(receipt) then
+				return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+			end
 			ApiCommon.protected_call(on_fail, "on_fail", M.MODEL_MISSING, { model = model })
 			return
 		end
-		post()
-	end)
+		post(receipt)
+	end, origin)
 end
 
 --- Posts one prebuilt vision request body (a screenshot and its prompt) to the
