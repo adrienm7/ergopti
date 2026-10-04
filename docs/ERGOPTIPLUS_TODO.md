@@ -1761,6 +1761,12 @@ actual macOS requalification; the failed run does not qualify Brew install,
 upgrade, refusal/retry or the final packaging/install matrix. Item 36 remains
 partial.
 
+Native Sparkle command refusals now retain fixed operation phases and a
+bounded helper-PID/errno census diagnostic. No private child stream, signing
+key, path or URL is published by this diagnostic. Census admission and every
+existing native assertion and cleanup requirement are unchanged. The first
+failed native operation and its actual cause still require the next macOS run.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

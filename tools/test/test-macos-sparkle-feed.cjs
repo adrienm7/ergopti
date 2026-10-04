@@ -927,14 +927,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 7 tests in /);
+	assert.match(result.stderr, /Ran 10 tests in /);
 	const skipped = process.platform === 'win32' ? 5 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${7 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${10 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -952,6 +952,36 @@ try {
 			`Mandatory native XCTest ${method} is absent.`
 		);
 	}
+	// Fixed command diagnostics cannot project private command arguments or streams.
+	for (const phase of [
+		'archiveBuild',
+		'archiveSign',
+		'archiveSignForeign',
+		'generatedAppcast',
+		'nativeProcessCensus'
+	]) {
+		assert.ok(fixture.includes(`phase: .${phase}`));
+	}
+	assert.match(fixture, /case command\(NativeCommandPhase, Int32\)/);
+	assert.match(fixture, /checkpoint\("command\." \+ phase.rawValue \+ "\.begin"\)/);
+	assert.match(fixture, /throw Failure\.command\(phase, receipt.status\)/);
+	assert.doesNotMatch(fixture, /Failure\.command\(URL/);
+	const annotation = fixture.slice(
+		fixture.indexOf('private func annotateCensusRefusal'),
+		fixture.indexOf('private func privateDirectory')
+	);
+	assert.match(annotation, /stdout.utf8.count <= 512/);
+	assert.match(
+		annotation,
+		/Set\(packet.keys\) == Set\(\["schema", "code", "helper_pid", "path_errno"\]\)/
+	);
+	assert.match(annotation, /CFGetTypeID\(value\) != CFBooleanGetTypeID\(\)/);
+	assert.match(annotation, /maximum: 4095/);
+	assert.match(
+		annotation,
+		/print\("Native Sparkle census refusal: code=path-unavailable helper_pid=/
+	);
+	assert.doesNotMatch(annotation, /print\(stdout|stderr|String\(reflecting|ownedPIDs/);
 	assert.match(fixture, /macos_owned_process\.py/);
 	assert.match(fixture, /packet\["closed"\] as\? Bool == true/);
 	assert.match(fixture, /packet\["exit_status"\] as\? NSNumber/);
