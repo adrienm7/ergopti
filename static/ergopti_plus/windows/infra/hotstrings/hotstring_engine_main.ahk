@@ -803,21 +803,24 @@ _HSE_TrimBufferToCapacity() {
 				return
 		; Completion framing is not trigger text. Retain an in-progress nbsp too,
 		; because its punctuation arrives in a separate character notification.
-		LastChar := SubStr(HSE_Buffer, -1)
+		LastChar := SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))
 		FramingLength := (InStr(HSE_WORD_TERMINATORS, LastChar)
-				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F)) ? 1 : 0
+				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F)) ? StrLen(LastChar) : 0
 		if (LastChar == ":" or LastChar == ";") {
 				PreviousChar := SubStr(HSE_Buffer, -2, 1)
 				if (PreviousChar == Chr(0xA0) or PreviousChar == Chr(0x202F))
 						FramingLength := 2
 		}
-		DropCount := BufferLength - HSE_MAX_BUFFER_LEN - FramingLength
+		Tail := _TextTailWithinUnits(HSE_Buffer, HSE_MAX_BUFFER_LEN + FramingLength)
+		DropCount := BufferLength - StrLen(Tail)
 		if (DropCount <= 0)
 				return
 		; The last discarded character is known: trimming must not turn a real
 		; word boundary into unknown context, or invent one after a word character.
-		HSE_StartIsWordBoundary := InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, DropCount, 1)) > 0
-		HSE_Buffer := SubStr(HSE_Buffer, DropCount + 1)
+		DiscardedStart := _TextCodepointStart(HSE_Buffer, DropCount)
+		DiscardedChar := SubStr(HSE_Buffer, DiscardedStart, DropCount - DiscardedStart + 1)
+		HSE_StartIsWordBoundary := InStr(_HSE_WordBoundarySet(), DiscardedChar) > 0
+		HSE_Buffer := Tail
 }
 
 ; Append a printable character to the buffer and report whether a trigger

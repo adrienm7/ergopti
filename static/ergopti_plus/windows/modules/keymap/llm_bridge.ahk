@@ -111,24 +111,15 @@ _LLM_Bridge_ApplyBufferEdit(DeleteFromEnd := unset, InsertedText := "") {
 	global LLM_BRIDGE_BUFFER_MAX_CHARS
 	DeleteAll := !IsSet(DeleteFromEnd)
 	DeleteCount := DeleteAll ? 0 : Max(0, DeleteFromEnd)
-	InsertedTail := InsertedText
-	if (StrLen(InsertedTail) > LLM_BRIDGE_BUFFER_MAX_CHARS)
-		InsertedTail := SubStr(InsertedTail, -LLM_BRIDGE_BUFFER_MAX_CHARS)
 	PreviousCritical := Critical("On")
 	try {
 		RemainingLen := DeleteAll ? 0
 			: Max(0, StrLen(_LLM_Bridge_Buffer) - DeleteCount)
 		Remaining := RemainingLen > 0
 			? SubStr(_LLM_Bridge_Buffer, 1, RemainingLen) : ""
-		Available := LLM_BRIDGE_BUFFER_MAX_CHARS - StrLen(InsertedTail)
-		if (Available <= 0) {
-			KeptTail := ""
-		} else if (StrLen(Remaining) > Available) {
-			KeptTail := SubStr(Remaining, -Available)
-		} else {
-			KeptTail := Remaining
-		}
-		_LLM_Bridge_Buffer := KeptTail . InsertedTail
+		; Cap the complete edited suffix once so a discarded pair cannot expose
+		; older text that was no longer contiguous with the retained insertion.
+		_LLM_Bridge_Buffer := _TextTailWithinUnits(Remaining . InsertedText, LLM_BRIDGE_BUFFER_MAX_CHARS)
 		_LLM_Bridge_ContentGeneration += 1
 		return _LLM_Bridge_Buffer
 	} finally {
@@ -1431,8 +1422,7 @@ LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText := "", ClearAll := false)
 		Edited := SubStr(_LLM_Bridge_AgentBuffer, 1, KeptLen) . InsertedText
 		; The same ceiling as the prediction context: the agent reads only the
 		; current sentence, but an unbroken typing run must not grow forever
-		if (StrLen(Edited) > LLM_BRIDGE_BUFFER_MAX_CHARS)
-			Edited := SubStr(Edited, -LLM_BRIDGE_BUFFER_MAX_CHARS)
+		Edited := _TextTailWithinUnits(Edited, LLM_BRIDGE_BUFFER_MAX_CHARS)
 		_LLM_Bridge_AgentBuffer := Edited
 		return true
 	} finally {
