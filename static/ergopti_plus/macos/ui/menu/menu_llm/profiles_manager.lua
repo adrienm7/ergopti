@@ -647,9 +647,12 @@ end
 --- @param state table Shared menu state.
 --- @param src table The built-in profile to clone.
 --- @param activate_candidate function Exact candidate-registry transaction.
-local function clone_builtin_profile(deps, state, src, activate_candidate, replace_profile)
+--- @param replace_profile function Exact profile replacement owner.
+--- @param is_ready function The existing live native menu admission.
+local function clone_builtin_profile(deps, state, src, activate_candidate, replace_profile, is_ready)
 	if type(src) ~= "table" then return end
-	if not settle_profile_mutation_recovery(deps) then return false end
+	if not is_ready() or not settle_profile_mutation_recovery(deps)
+		or not is_ready() then return false end
 	-- Unique id: seq suffix prevents collision when two profiles are cloned
 	-- within the same second (os.time() resolution = 1s).
 	_profile_seq = _profile_seq + 1
@@ -672,7 +675,8 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 		local function open_clone_editor()
 			if timer_fired then return false end
 			timer_fired = true
-			if not settle_profile_mutation_recovery(deps) then return false end
+			if not is_ready() or not settle_profile_mutation_recovery(deps)
+				or not is_ready() then return false end
 			local editor_ok, editor_result = Logger.callback(LOG,
 				"Cloned-profile editor",
 				prompt_editor.open,
@@ -681,7 +685,8 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				if editor_settled then return false end
 				editor_settled = true
 				if type(updated) ~= "table" then return false end
-				if not settle_profile_mutation_recovery(deps) then return false end
+				if not is_ready() or not settle_profile_mutation_recovery(deps)
+					or not is_ready() then return false end
 				if type(replace_profile) ~= "function"
 					or replace_profile(copy, updated) ~= true then
 					return false
@@ -1138,6 +1143,13 @@ local function build_profile_menu(
 		end
 	end
 
+	local function create_ready()
+		if type(deps.script_control) ~= "table"
+			or type(deps.script_control.is_paused) ~= "function" then return false end
+		local ok, current = pcall(deps.script_control.is_paused)
+		return ok and current == false
+	end
+
 	-- "Clone active profile…" — built-ins ship with the driver and are read-only,
 	-- so cloning the active one into an editable user profile is the supported way
 	-- to customise its prompt. Only shown when the active profile is a built-in
@@ -1153,22 +1165,16 @@ local function build_profile_menu(
 	end
 	if active_builtin and not paused then
 		table.insert(rows, { separator = true })
-		table.insert(rows, {
-			label = i18n.get("menu.profiles.clone_builtin"),
-			action    = function()
+		local clone_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_clone", {
+			llm_profile_clone = function()
 				return clone_builtin_profile(
-					deps, state, active_builtin, activate_candidate, replace_profile)
+					deps, state, active_builtin, activate_candidate, replace_profile, create_ready)
 			end,
-		})
+		}, { llm_profile_clone_ready = create_ready })
+		if clone_row then table.insert(rows, clone_row) end
 	end
 
 	table.insert(rows, { separator = true })
-	local function create_ready()
-		if type(deps.script_control) ~= "table"
-			or type(deps.script_control.is_paused) ~= "function" then return false end
-		local ok, current = pcall(deps.script_control.is_paused)
-		return ok and current == false
-	end
 	local function create_profile()
 		if not create_ready() or not settle_profile_mutation_recovery(deps)
 			or not create_ready() then return false end

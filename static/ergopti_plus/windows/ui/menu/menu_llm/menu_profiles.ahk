@@ -182,11 +182,8 @@ _LLM_Menu_ProfileRows() {
 	; supported way to customise their prompts.
 	active_id := _LLM_Menu["profile_id"]
 	is_builtin := LLM_Option_IsBuiltinProfileId(active_id)
-	if is_builtin {
-		Rows.Push(Map(
-			"label",  t("menu.profiles.clone_builtin"),
-			"action", (*) => LLM_Menu_CloneActiveBuiltinProfile()))
-	}
+	if is_builtin
+		Rows.Push(_LLM_Menu_CloneProfileRow(LLM_Menu_CloneActiveBuiltinProfile))
 
 	; Auto-detect toggle: when ON, switching model in the model submenu also
 	; re-picks the matching profile based on the params count. Mirrors the
@@ -599,6 +596,20 @@ _LLM_Menu_CreateProfileRow(OpenFn, PausedFn := 0) {
 	return MenuRenderer_CommandRow("llm_profile_commands", "llm_profile_create",
 		Map("llm_profile_create", OpenFn),
 		Map("llm_profile_create_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)))
+}
+
+/**
+ * Builds the declared clone command through the existing native profile pause owner.
+ * @param {Func} OpenFn - Existing transactional clone operation.
+ * @param {Func|Integer} PausedFn - Exact native pause reader, or 0 for the live owner.
+ * @returns {Map} Native provider row with retained-command admission.
+ */
+_LLM_Menu_CloneProfileRow(OpenFn, PausedFn := 0) {
+	if (PausedFn is Integer) && PausedFn == 0
+		PausedFn := (*) => A_IsSuspended
+	return MenuRenderer_CommandRow("llm_profile_commands", "llm_profile_clone",
+		Map("llm_profile_clone", OpenFn),
+		Map("llm_profile_clone_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)))
 }
 
 /**

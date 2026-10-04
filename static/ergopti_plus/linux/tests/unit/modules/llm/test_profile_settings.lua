@@ -400,3 +400,97 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 		restore()
 	end)
 end)
+
+helpers.describe("shared Clone Profile command", function()
+	helpers.it("shared Clone Profile preserves editor refusal, live pause and exact save acknowledgement", function()
+		local ok, err = xpcall(function()
+			local storage_options = {}
+			local storage = PreferencesFixture.new(storage_options)
+			replace("infra.llm_preferences", storage)
+			replace("modules.llm.model_profile", {
+				recommend = function() return "basic" end, _reset = function() end,
+			})
+			package.loaded["modules.llm.profile_settings"] = nil
+			local settings = require("modules.llm.profile_settings")
+			settings._reset()
+			local opened, paused = nil, false
+			local calls, refreshes = 0, 0
+			local accepted = true
+			replace("ui.prompt_editor.bridge", {
+				open = function(existing, on_save, opts)
+					calls = calls + 1
+					opened = { existing = existing, on_save = on_save, opts = opts }
+					return accepted
+				end,
+			})
+			local context = {
+				is_paused = function() return paused end,
+				llm = {
+					is_enabled = function() return true end,
+					get_models = function() return {} end,
+					get_current_model = function() return "small" end,
+				},
+				on_menu_changed = function() refreshes = refreshes + 1 end,
+			}
+			local function find(rows, title)
+				for _, row in ipairs(rows or {}) do
+					if row.title == title then return row end
+					local nested = find(row.menu, title)
+					if nested then return nested end
+				end
+				return nil
+			end
+			local i18n = require("infra.i18n")
+			local builder = helpers.load_module("ui.menu.menu_builder")
+			local row = find(builder.build(context), i18n.get("menu.profiles.clone_builtin"))
+			helpers.assert_not_nil(row)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_not_nil(opened.existing)
+			helpers.assert_eq(opened.opts.as_new, true)
+			helpers.assert_eq(#settings.list_user(), 0, "opening the existing native clone draft does not publish it")
+			paused = true
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(calls, 1)
+			local profile = { id = opened.opts.profile_id, label = "Cloned", system_single = "Clone {context}", batch = false }
+			helpers.assert_eq(opened.on_save(profile), false)
+			helpers.assert_eq(#settings.list_user(), 0)
+			helpers.assert_eq(refreshes, 0)
+			paused = false
+			storage_options.writes_fail = true
+			helpers.assert_eq(opened.on_save(profile), false, "the real profile writer refusal remains false")
+			helpers.assert_eq(#settings.list_user(), 0)
+			helpers.assert_eq(refreshes, 0)
+			storage_options.writes_fail = false
+			helpers.assert_eq(opened.on_save(profile), true)
+			helpers.assert_eq(settings.list_user()[1].label, "Cloned")
+			helpers.assert_eq(storage.get("llm.profiles.active"), profile.id)
+			helpers.assert_eq(refreshes, 1)
+			accepted = false
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(calls, 2)
+			helpers.assert_eq(refreshes, 1)
+			helpers.assert_eq(settings.set("active", "basic"), true,
+				"the conditional Clone row requires a real active built-in before rebuilding")
+			local Paths = require("infra.paths")
+			local file = assert(io.open(Paths.shared("modules/menu/menu_manifest.json"), "r"))
+			local manifest = require("json").decode(file:read("*a"))
+			file:close()
+			for _, declaration in ipairs(manifest.llm_profile_commands) do
+				if declaration.id == "llm_profile_clone" then declaration.i18n = "button.cancel" end
+			end
+			replace("infra.manifest_menu", assert(require("menu.renderer").new({
+				platform = "linux", manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+				json_decode = function() return manifest end, i18n = i18n, logger = require("logger.shim"),
+			})))
+			builder = helpers.load_module("ui.menu.menu_builder")
+			local changed = find(builder.build(context), i18n.get("button.cancel"))
+			helpers.assert_not_nil(changed, "the real Clone provider must follow only the shared declaration")
+			helpers.assert_eq(changed.fn(), false)
+			helpers.assert_eq(calls, 3)
+			helpers.assert_eq(refreshes, 1)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+end)

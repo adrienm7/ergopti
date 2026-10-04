@@ -2491,3 +2491,58 @@ _LMT_SharedCreateProfileLabelOwner() {
 	} finally Declaration["i18n"] := SavedKey
 }
 Test("LLM profiles: actual Create provider follows a changed shared label", _LMT_SharedCreateProfileLabelOwner)
+
+_LMT_ProfileCloneCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\profile_clone_command.json"))
+	Assert(Corpus is Map, "the independent Clone command corpus must be readable")
+	return Corpus
+}
+
+_LMT_SharedCloneProfileCommand() {
+	Corpus := _LMT_ProfileCloneCorpus()
+	Seen := Map("paused", 0, "opens", 0, "result", 1)
+	Row := _LLM_Menu_CloneProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+		_LMT_ProfileCreatePaused.Bind(Seen))
+	Assert(Row is Map, "the real native Clone row owner must consume its declaration")
+	AssertEqual(t(Corpus["i18n"]), Row["label"])
+	AssertEqual(1, Row["action"].Call())
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 1
+	AssertEqual(false, Row["action"].Call(), "held Clone callbacks re-read the exact pause owner")
+	AssertEqual(1, Seen["opens"])
+	Seen["paused"] := 0
+	Seen["result"] := 0
+	AssertEqual(0, Row["action"].Call(), "transactional clone refusal stays refusal")
+	AssertEqual(2, Seen["opens"])
+	for Unknown in ["0", "false", Map(), 2] {
+		Seen["paused"] := Unknown
+		AssertEqual(false, Row["action"].Call(), "unknown pause receipts cannot reach the clone owner")
+		AssertEqual(2, Seen["opens"])
+	}
+}
+Test("LLM profiles: shared Clone command retains native pause and refusal", _LMT_SharedCloneProfileCommand)
+
+_LMT_SharedCloneProfileLabelOwner() {
+	Corpus := _LMT_ProfileCloneCorpus()
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the actual manifest must be initialized before controlled mutation")
+	Declaration := 0
+	for Row in Root[Corpus["section"]] {
+		if StrCompare(Row["id"], Corpus["id"], true) == 0
+			Declaration := Row
+	}
+	Assert(Declaration is Map, "the native Clone declaration must be present")
+	AssertEqual(Corpus["ready"], Declaration["disabled_when"][1])
+	SavedKey := Declaration["i18n"]
+	try {
+		Declaration["i18n"] := "button.cancel"
+		Seen := Map("paused", 0, "opens", 0, "result", 1)
+		Row := _LLM_Menu_CloneProfileRow(_LMT_ProfileCreateOpen.Bind(Seen),
+			_LMT_ProfileCreatePaused.Bind(Seen))
+		AssertEqual(t("button.cancel"), Row["label"], "the actual shared declaration owns the native Clone label")
+		AssertEqual(1, Row["action"].Call())
+		AssertEqual(1, Seen["opens"])
+	} finally Declaration["i18n"] := SavedKey
+}
+Test("LLM profiles: actual Clone row follows a changed shared declaration", _LMT_SharedCloneProfileLabelOwner)
