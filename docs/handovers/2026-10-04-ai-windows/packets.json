@@ -1,0 +1,1549 @@
+{
+	"schema_version": 1,
+	"archives": {
+		"linux-runtime-recovery.tar.gz": {
+			"bytes": 85135,
+			"sha256": "be0a916933fce7811043603272ded8cec170dcbd9b582fa943464140b73fa2ec",
+			"members": [
+				{
+					"path": "linux-runtime-candidate/ADOPTION.md",
+					"bytes": 2490,
+					"sha256": "8eaa9ca21a8548cf0827cb64c25a95f37508b47ad2119e84e44a179b6337b617"
+				},
+				{
+					"path": "linux-runtime-candidate/INSTALLER-PREPARATION.md",
+					"bytes": 4366,
+					"sha256": "09a5956d09a49d9f85fdb0676c37e4de23e87f9b898b9eaac42d598e183919a1"
+				},
+				{
+					"path": "linux-runtime-candidate/INSTALLER-QUALIFICATION.md",
+					"bytes": 5894,
+					"sha256": "29fb605406db7f426f3c4a3d68971410f0e7ec97309b5cc89175316cb2c91567"
+				},
+				{
+					"path": "linux-runtime-candidate/QUALIFICATION.md",
+					"bytes": 4017,
+					"sha256": "08938e5c9d1540a48829498f172e2e6637438d97ac592fa35f85c61a6d96f03a"
+				},
+				{
+					"path": "linux-runtime-candidate/RUNTIME-PLAN.md",
+					"bytes": 9580,
+					"sha256": "1c37f444991bf048eb1c97f35dbcf771bc5e26f526a45ab087138f1835d88548"
+				},
+				{
+					"path": "linux-runtime-candidate/adapters/owned_process.lua",
+					"bytes": 15828,
+					"sha256": "3f175c7a1c92df4e835912551efab00115611f806e5be62e462796b399934d5f"
+				},
+				{
+					"path": "linux-runtime-candidate/adoption/static/ergopti_plus/linux/adapters/owned_process.lua",
+					"bytes": 15828,
+					"sha256": "3f175c7a1c92df4e835912551efab00115611f806e5be62e462796b399934d5f"
+				},
+				{
+					"path": "linux-runtime-candidate/adoption/static/ergopti_plus/linux/tests/hardware/run_owned_process_receipts.lua",
+					"bytes": 8614,
+					"sha256": "b646f0265b75128427f2980fef9498e67a33dae9802688f0817d493a85e2a5da"
+				},
+				{
+					"path": "linux-runtime-candidate/adoption/static/ergopti_plus/linux/tests/hardware/run_owned_process_subreaper.py",
+					"bytes": 3862,
+					"sha256": "661a773ca242d7a7e03af848be3ad998c26cbbd4c5ea2ad6e08e797dee30583b"
+				},
+				{
+					"path": "linux-runtime-candidate/adoption/static/ergopti_plus/linux/tests/hardware/run_owned_process_subreaper_teardown.py",
+					"bytes": 2742,
+					"sha256": "b9e1a56af6ef87997d0917686a772213e0aba42ed94a4ec91e57ed16d04cdf7a"
+				},
+				{
+					"path": "linux-runtime-candidate/adoption/static/ergopti_plus/linux/tests/unit/adapters/test_owned_process.lua",
+					"bytes": 13668,
+					"sha256": "9eba5e471c145c86237edf03d0a8cce8193254b3440f4a97934f0d80d530da5a"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/BRIDGE-QUALIFICATION.md",
+					"bytes": 6091,
+					"sha256": "2f0bc4b4faefe7994eca6895c88df282d6d4cff5203dd3aaaa4f6120fd8648a9"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/lua5.4-native.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/lua5.4-native.stdout.log",
+					"bytes": 417,
+					"sha256": "f449ca9496433fff6b00c43b76630e0b2e2baa481ce816dac536975625ea7941"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/lua5.4-seams.stderr.log",
+					"bytes": 201,
+					"sha256": "bc7c7284413ae74a6f4b0b8fd066f24b7febec252de9c374d14f495a0af5bc8d"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/lua5.4-seams.stdout.log",
+					"bytes": 1028,
+					"sha256": "49aa9e63b53a2c19c7edf6e006a23bfb7caac15272bc77da8d95c25d9d2b669e"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/luajit-native.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/luajit-native.stdout.log",
+					"bytes": 417,
+					"sha256": "f449ca9496433fff6b00c43b76630e0b2e2baa481ce816dac536975625ea7941"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/luajit-seams.stderr.log",
+					"bytes": 201,
+					"sha256": "bc7c7284413ae74a6f4b0b8fd066f24b7febec252de9c374d14f495a0af5bc8d"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/luajit-seams.stdout.log",
+					"bytes": 1028,
+					"sha256": "49aa9e63b53a2c19c7edf6e006a23bfb7caac15272bc77da8d95c25d9d2b669e"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/results/initial-g3-1b3f5c/summary.json",
+					"bytes": 6024,
+					"sha256": "90a3535a8b0be43b2336282ff8cc93aa84d97628547f0f58dce862f672fa6a72"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/shared/llm/finite_process_port.lua",
+					"bytes": 8686,
+					"sha256": "ec138ee06ee316b98c3637a27de01b672fe0a12ae2e9e5a92331f19d0d54cf1b"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/tests/run_finite_process_port_native.lua",
+					"bytes": 4431,
+					"sha256": "7594c72ee5f32d0dcc6ba924f583b37a0309c603d691a3fd8a0cbe1c1bc05992"
+				},
+				{
+					"path": "linux-runtime-candidate/common-worker-preparation/tests/test_finite_process_port_seams.lua",
+					"bytes": 13623,
+					"sha256": "e731e9b46b538affe515f4c7ee5e80857e89a9132e6d72dd264ecfedb8481dc1"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-qualified-sha256.json",
+					"bytes": 1089,
+					"sha256": "ab08fafb4db725796f4891edbd6543527b1dfddecac91b7096eefc47c3d696cf"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-files.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-files.stdout.log",
+					"bytes": 1163,
+					"sha256": "fb3f559b489a886455942223fa23ea4667377f1abd587dbc4b4a7a534ddeab54"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-mutants.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-mutants.stdout.log",
+					"bytes": 869,
+					"sha256": "8975c3e2d40b6784e33d09855f2d0db9153f3818fb12a1d669966572608c8d25"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-native.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-native.stdout.log",
+					"bytes": 821,
+					"sha256": "428f0a7163fc5e3fb425490a1396128534404ef7f954043cd97f12195e599db8"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-transaction.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/lua5.4-transaction.stdout.log",
+					"bytes": 1281,
+					"sha256": "9575812dc4a31aad39207d9a8360f03e5dde8e3e8e7876552c3166c7a4681e78"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-files.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-files.stdout.log",
+					"bytes": 1163,
+					"sha256": "fb3f559b489a886455942223fa23ea4667377f1abd587dbc4b4a7a534ddeab54"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-mutants.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-mutants.stdout.log",
+					"bytes": 869,
+					"sha256": "8975c3e2d40b6784e33d09855f2d0db9153f3818fb12a1d669966572608c8d25"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-native.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-native.stdout.log",
+					"bytes": 821,
+					"sha256": "428f0a7163fc5e3fb425490a1396128534404ef7f954043cd97f12195e599db8"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-transaction.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/luajit-transaction.stdout.log",
+					"bytes": 1281,
+					"sha256": "9575812dc4a31aad39207d9a8360f03e5dde8e3e8e7876552c3166c7a4681e78"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/summary.json",
+					"bytes": 10490,
+					"sha256": "8fa3e59b70d8acc5acec4edb6c88fbb8eff9d4af584b322cd06f01d59eca71a4"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/wrapper-teardown.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/installer-results/final-string-owner-20261004/wrapper-teardown.stdout.log",
+					"bytes": 159,
+					"sha256": "f649c03bf0bb10e3a2bc0630ac3589a7a1266d8fcab889c299ce6ef1fb2ca87d"
+				},
+				{
+					"path": "linux-runtime-candidate/modules/llm/ollama_archive_installer.lua",
+					"bytes": 11374,
+					"sha256": "8a9c9a4c076a5c38878bfe087fd11990f6bafdde956c5b9f528c063d5efe70f6"
+				},
+				{
+					"path": "linux-runtime-candidate/modules/llm/ollama_install_files.lua",
+					"bytes": 14694,
+					"sha256": "32a543091b81abbc1bf18c12d475ba81f2d4f6a2e96bb7e9bf49b1d636d4f26c"
+				},
+				{
+					"path": "linux-runtime-candidate/owned-process-adoption.patch",
+					"bytes": 47200,
+					"sha256": "b729536462c1296d0bfdf2a1422916676edf2eca5739ddc7ad0307feaf19755d"
+				},
+				{
+					"path": "linux-runtime-candidate/owned-process-manifest.patch",
+					"bytes": 580,
+					"sha256": "e82915b7f687793f449958d0ea5519b84a7e25e552eb4558b49627d1d15924c5"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/BRIDGE-PLAN.md",
+					"bytes": 13326,
+					"sha256": "73d894fa00561c8b0a31956da3580253b6307c7cec28db56c8a26d07b9723e2c"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/RESOLVER-QUALIFICATION.md",
+					"bytes": 3396,
+					"sha256": "09e779c0f14a994d251850aa61cf8beb907ab37b05c3c785d11f07bb87e7b240"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/linux/modules/llm/ollama_install_resolver.lua",
+					"bytes": 8917,
+					"sha256": "a004f3e967f146e0ff75d925705fc79b77f942cf59f69202710e09e505c5f701"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/lua5.4-namespace-default.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/lua5.4-namespace-default.stdout.log",
+					"bytes": 187,
+					"sha256": "5de6782635acda7d839127780846761018155cac28e95cbba7902744c65b9644"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/lua5.4.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/lua5.4.stdout.log",
+					"bytes": 1269,
+					"sha256": "3edd7ff3b910993710b32570d3a57ae79a047f631f9f45c39ceff7bc9026ace4"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/luajit-namespace-default.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/luajit-namespace-default.stdout.log",
+					"bytes": 187,
+					"sha256": "5de6782635acda7d839127780846761018155cac28e95cbba7902744c65b9644"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/luajit-namespace.stderr.log",
+					"bytes": 321,
+					"sha256": "b4f4716ed7a106158438cd370332da977f88541835afacfb691bafad40a639ca"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/luajit-namespace.stdout.log",
+					"bytes": 79,
+					"sha256": "d8f7647cee029eb59a00cf50a804fcb846cbf927a2b215b02fd4d0096418dbd9"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/luajit.stderr.log",
+					"bytes": 0,
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/luajit.stdout.log",
+					"bytes": 1269,
+					"sha256": "3edd7ff3b910993710b32570d3a57ae79a047f631f9f45c39ceff7bc9026ace4"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/namespace-refusal.lua",
+					"bytes": 1334,
+					"sha256": "edbc0a4e30f724c50e9cc7dd79bbe5d5d67e14e65bda75a4fb174676f07673ef"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/results/resolver-seams-and-namespace-20261004/summary.json",
+					"bytes": 6297,
+					"sha256": "2feee99107e0343ae33134c0e496d2699a285beaa840bc7f48a6ce0aa8a2e681"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/shared/llm/ollama_install_policy.lua",
+					"bytes": 5412,
+					"sha256": "e50bb92a2afdf1377d7befb782e33a80c5f95b65cd136e342901532546b616a5"
+				},
+				{
+					"path": "linux-runtime-candidate/resolver-preparation/tests/test_install_resolver_seams.lua",
+					"bytes": 9864,
+					"sha256": "8135fdbfbcdf4d2c7000fd046bbd001ecdaa3dac0e0513cb1c0ad40dfe494bd2"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/capture_installer_qualification.py",
+					"bytes": 3789,
+					"sha256": "8785db9fdd66c21a782fe632ab06f21ecc6198204b3edda7bb86d184614bd803"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/run_archive_installer_mutants.py",
+					"bytes": 3963,
+					"sha256": "77f0c982a4a05c66b1abb6f3ca30228a75279bdbeda89eedf7543aa9863b2110"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/run_install_files_native.lua",
+					"bytes": 10516,
+					"sha256": "338ae3e2b94914aa05198c0455a70110c8d453f5051aef5264f691d28405d384"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/run_install_files_native.py",
+					"bytes": 1886,
+					"sha256": "d711a1447cb64646e205bb2b9a0cbe0662a72a84f1d69a3dbfe24929c8958e61"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/run_native_subreaper.py",
+					"bytes": 3380,
+					"sha256": "2c595e448a82caa8d6ba8db7a06e620673adc954ee6a3f5b12bb75926fb2c4d2"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/run_native_subreaper_teardown.py",
+					"bytes": 2628,
+					"sha256": "c0fc925dafb1414e78c36b48b392b9bc274101a541d962e9728d185c09d3f0d5"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/run_owned_process_mutants.py",
+					"bytes": 3494,
+					"sha256": "3f84585d9df525897327233d7e0c9d5a2cf6b32642057e8dec687381449316c1"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/run_owned_process_native.lua",
+					"bytes": 8277,
+					"sha256": "1570e2487917d76e26b004c97b16eb834416ddba696a5ac2b34d8493ad467649"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/test_archive_installer_seams.lua",
+					"bytes": 13628,
+					"sha256": "cc38eefc9cdeacdf826f137578ec4a631f31aa8a1b141bc647622c1444267fae"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/test_install_files_seams.lua",
+					"bytes": 12791,
+					"sha256": "e9b63c186732cf01f9a156265ebf8e6ec0478cf8c5dec92a3be4c4760265adac"
+				},
+				{
+					"path": "linux-runtime-candidate/tests/test_owned_process_seams.lua",
+					"bytes": 14034,
+					"sha256": "1c4853b75829c6327307599d01d0acfb5759546b769be6ea158d664629a3528e"
+				}
+			]
+		},
+		"macos-tooltip-recovery.tar.gz": {
+			"bytes": 11407,
+			"sha256": "541baabd2f2ad39f9f73c1b285bddd8d745c63b6c44992b534cab64afd65ae2c",
+			"members": [
+				{
+					"path": "macos-tooltip-pixel-candidate/PREPARATION.json",
+					"bytes": 1813,
+					"sha256": "efff636d62c52a787a1d787637a746bee608aed4c9e1e53b2f035a277c1bc146"
+				},
+				{
+					"path": "macos-tooltip-pixel-candidate/README.md",
+					"bytes": 4701,
+					"sha256": "2dc70c406bb0cac03b192c0a1cfa05733323c0850a23653ae58ff6a28f9ce3b2"
+				},
+				{
+					"path": "macos-tooltip-pixel-candidate/init.lua",
+					"bytes": 8835,
+					"sha256": "ad257e390451f2c93ff996206f0e1c2e6449d6743de0265e9bda86ea0af24e5f"
+				},
+				{
+					"path": "macos-tooltip-pixel-candidate/observe.py",
+					"bytes": 8541,
+					"sha256": "320dbacc75b3f210b859fc70895794010094f6facc4971bf8b34e148ad397bf8"
+				},
+				{
+					"path": "macos-tooltip-pixel-candidate/run.py",
+					"bytes": 8357,
+					"sha256": "0540c6db6a1ce399d9a2136a7fcda86f25b8bd34ce0243909ebb410fb399bb9b"
+				}
+			]
+		},
+		"linux-tooltip-evidence.tar.gz": {
+			"bytes": 177961,
+			"sha256": "8d5858ff13db27e08416e7e611fe327f74d906fe6005785cecd4465931f755dc",
+			"members": [
+				{
+					"path": "results-ea6e849-qualified/cache/dconf/user",
+					"bytes": 2,
+					"sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/0bd3dc0958fa2205aaaa8ebb13e2872b-le64.cache-9",
+					"bytes": 478896,
+					"sha256": "2277e0bc034c64d836d70a51e6c6729ee8f05b92237c888c5fda8c5338c1cb9e"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/12c5eb5b0d6d6fd1848053bcdafabe09-le64.cache-9",
+					"bytes": 6088,
+					"sha256": "dacb3cf6fe6fa356f59d0ce564b91e1dabe16c7882612f19d8a2dacd68a36679"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/188ac73a183f12857f63bb60a4a6d603-le64.cache-9",
+					"bytes": 120,
+					"sha256": "c1977325261aa85fe90df9e2a42f92e3ebcfda0781cc96de1c2173b4c458d3f5"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/3047814df9a2f067bd2d96a2b9c36e5a-le64.cache-9",
+					"bytes": 23056,
+					"sha256": "2fd96202e32d23283fe628684a8d48edd2570b9946fa39ee80b865fa24ce5bf7"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/32b6488e5b8292a2e95c79d947e009e8-le64.cache-9",
+					"bytes": 104,
+					"sha256": "fa67ba38430493de5407dfddce3e0511831ec0eeafab5f67193a993e97e777d2"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/3830d5c3ddfd5cd38a049b759396e72e-le64.cache-9",
+					"bytes": 352,
+					"sha256": "965e49af5f482d1f716eab4d3d8435455ffc9ac57fbd500b40662e1324bb913b"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/467c019e582ee353435ea5c21d137ef6-le64.cache-9",
+					"bytes": 149944,
+					"sha256": "6d959246431e5e8627f73434caf50d853cfc7bef3c8ba7d98785d7f609ba0d72"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/4c599c202bc5c08e2d34565a40eac3b2-le64.cache-9",
+					"bytes": 104,
+					"sha256": "4040dc849c2040257fdbbd8a313640e09e5d3f283329986772b17b1d449c8b98"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/573ec803664ed168555e0e8b6d0f0c7f-le64.cache-9",
+					"bytes": 200,
+					"sha256": "38252b4c25c60717a92b079f15b6a38a4291b2b9ceace41bed29049e82a9d6ad"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/57e423e26b20ab21d0f2f29c145174c3-le64.cache-9",
+					"bytes": 336,
+					"sha256": "13d08e67330d19e76800734f8328005fbfa35ce0ca383c1a8b3456588e622c9e"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/6333f38776742d18e214673cd2c24e34-le64.cache-9",
+					"bytes": 120,
+					"sha256": "538b8b4fbebe40ab25fec761bbfb7b555cccc95595eaac082c5e3d6d06dbffe9"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/6aa41aa22e18b8fa06a12da28ea9c28b-le64.cache-9",
+					"bytes": 19088,
+					"sha256": "ad398b137c1d67a5391fa1591abd6f498b4aa6c31c3288fbfaa9c6e24025ada8"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/6cc790b63b123a6a96ee260fcdad32a9-le64.cache-9",
+					"bytes": 62112,
+					"sha256": "1de020cefca9e29e978538b3fc4e0ffb526baeb21aa80597b57907444ae75f14"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/707971e003b4ae6c8121c3a920e507f5-le64.cache-9",
+					"bytes": 160,
+					"sha256": "b4df21ad887ff90fe5e3ac5fb462cc613b177f8c4d02ef61d0c433991890b47c"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/7ef2298fde41cc6eeb7af42e48b7d293-le64.cache-9",
+					"bytes": 384,
+					"sha256": "7cc178b53654026ded890da9fc24e39c2ea616a44a6ceb1e207b7a9ca1b556ae"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/95530828ff6c81d309f8258d8d02a23e-le64.cache-9",
+					"bytes": 112,
+					"sha256": "6393d839518d7534b6959f7e7bffb799bff2a6c874abf1ccfac6c09738c68166"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/9b89f8e3dae116d678bbf48e5f21f69b-le64.cache-9",
+					"bytes": 68800,
+					"sha256": "87aae86789ac68c8954ccea2805323718ee4e68df70d81071754e4037c03c680"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/CACHEDIR.TAG",
+					"bytes": 200,
+					"sha256": "05e7633fb31bf1f6f8d89020c16b9f24587fdf7638e951c9745b192f5fc3b682"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/a4e60e8d1e10d2fdff3fe3037a1845fb-le64.cache-9",
+					"bytes": 54136,
+					"sha256": "79fa2e4660de0c87118f8115219479d981e8ba72c26ee579b5df82e9e59376c8"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/bbd3eebb6912613e2596f2fd46535a95-le64.cache-9",
+					"bytes": 23688,
+					"sha256": "425553f3e82a531f9f097fdf2cff1ed13e19ab8c8656c9d8e9415b384295e45e"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/c57959a16110560c8d0fcea73374aeeb-le64.cache-9",
+					"bytes": 19296,
+					"sha256": "253f2158b1d7a0950424fe02008620ece074369018b0cc9f74cdf07702619b36"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/c855463f699352c367813e37f3f70ea7-le64.cache-9",
+					"bytes": 224,
+					"sha256": "20ec39e68eb77e416b51f453527a7bdea9a409ae9708455bae93a3c80faf32d1"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/d3e5c4ee2ceb1fc347f91d4cefc53bc0-le64.cache-9",
+					"bytes": 120,
+					"sha256": "49b717167ba234e656470e26e89a8b53f9b52e07655469921d44b9e5d8a78339"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/d589a48862398ed80a3d6066f4f56f4c-le64.cache-9",
+					"bytes": 51736,
+					"sha256": "f53c2bd81057aa6b89298842db447df043c47a3e5d041f6e2dd55685a802c054"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/d82eb4fd963d448e2fcb7d7b793b5df3-le64.cache-9",
+					"bytes": 216,
+					"sha256": "5199f668a817ef8e992a9eda61518c1f916b6fb1f41b63c76930d7e2dd8c4eaf"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/e0aa53bcfa504e64f87823c16bc01eb6-le64.cache-9",
+					"bytes": 2800,
+					"sha256": "e6c02129482a3c24888f87f3baed66a577deba812a2738d8a4b8f521f4a25dcb"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/e13b20fdb08344e0e664864cc2ede53d-le64.cache-9",
+					"bytes": 114368,
+					"sha256": "4bfb2d72320bc01b39414d9bbff41f41d337fa0418d660d948c3ec3be3b1e172"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/e52a45a1c8c8fe895fc0fc8c4e6999b8-le64.cache-9",
+					"bytes": 120,
+					"sha256": "e695ef09a373406af98b54ea73a2b002868db918570b577118ef06fda9a14bd8"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/f1f2465696798768e9653f19e17ccdc8-le64.cache-9",
+					"bytes": 120,
+					"sha256": "230c297eb4cae37dec2d587f3fea12abf4bab55a559f728d258b48d02df4a9a2"
+				},
+				{
+					"path": "results-ea6e849-qualified/cache/fontconfig/fe547fea3a41b43a38975d292a2b19c7-le64.cache-9",
+					"bytes": 112,
+					"sha256": "768af729c8ca3161f97c5c41bf78096f1015bed73619a26cc8e6f02e76cf311d"
+				},
+				{
+					"path": "results-ea6e849-qualified/config/ergopti/config.toml",
+					"bytes": 54,
+					"sha256": "8a57d6ca07614037a07e64f53758aa4316f8a20828a282949bb788fce0cee632"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent--1-active-1-regular-control.png",
+					"bytes": 8737,
+					"sha256": "f9b0c403bf585a9fb5aae7da206a1e7f04f0b9cbb6c7593d34e8d2a8bee30be5"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent--1-active-1.png",
+					"bytes": 9379,
+					"sha256": "af0203758e7752419d4545f0546a132cc82294cae68b497901ccb9888795aa66"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent--1-active-2.png",
+					"bytes": 9438,
+					"sha256": "f28e80e0110d562d2e9ba25954f5401a512d617789302df5061a9a08db0a4e52"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent--3-active-1-regular-control.png",
+					"bytes": 8735,
+					"sha256": "7ce7eb540342313c60e975e28a31db1597350840e9b6a453eb7d2f8a94c58770"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent--3-active-1.png",
+					"bytes": 9400,
+					"sha256": "f16fc97be148533af2515c4c4be0d2e6574f30cda37ea006eb989464bcc5494d"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent--3-active-2.png",
+					"bytes": 9456,
+					"sha256": "bb5ec20b69eccd68898e9fa941bdcdaec033ef475d7b82d0ccf77de7304d6fd4"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent-0-active-1-regular-control.png",
+					"bytes": 8737,
+					"sha256": "4a85dbb852efe7dc1a341082ee40ed27c421f54f83e773b69a2f64b275268abf"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent-0-active-1.png",
+					"bytes": 9381,
+					"sha256": "4931379a846efc00e91d0af3fac6b96cb58f4d599c5a41fc7419d00a69df5503"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent-0-active-2.png",
+					"bytes": 9444,
+					"sha256": "2e8e6856c4d143b9e11d2243aec8d7db1622393fc51e6136af72d8ebc41be8f2"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent-2-active-1-regular-control.png",
+					"bytes": 8740,
+					"sha256": "7e83ddd216aea72436630cf16ebad2f1cac9808e03d0879f40edf1efe60bbfdf"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent-2-active-1.png",
+					"bytes": 9385,
+					"sha256": "01e336597cf213e1c95f2a87123b576213ede98e5d189d80863364b2b7f71df0"
+				},
+				{
+					"path": "results-ea6e849-qualified/indent-2-active-2.png",
+					"bytes": 9446,
+					"sha256": "1d0599f099cfd7e8b5ee5365c33c962b859ca0d23ca9a332514109cdbf016116"
+				},
+				{
+					"path": "results-ea6e849-qualified/probe_hashes.json",
+					"bytes": 166,
+					"sha256": "c4778fb744163238bbf3a1a8b6c8ffdb6af8e0cc4d56fc0f23d3807ce5fa6ed1"
+				},
+				{
+					"path": "results-ea6e849-qualified/qualification-summary.json",
+					"bytes": 1176,
+					"sha256": "7962644db2af293fdba102da83b116e78f94eebd86227032b8035e6339f684dd"
+				},
+				{
+					"path": "results-ea6e849-qualified/receipts.json",
+					"bytes": 9692,
+					"sha256": "a0cdf6e134f6e447ddece7f3ca5f58557082e2fef053db4c95940696f5194875"
+				},
+				{
+					"path": "results-ea6e849-qualified/screenshot_hashes.json",
+					"bytes": 1213,
+					"sha256": "20bb7a2bbea2ea6b695db13208149ec9258520ba0150eb113a714b6080eec6d3"
+				},
+				{
+					"path": "results-ea6e849-qualified/source_commit.txt",
+					"bytes": 41,
+					"sha256": "f288faba0f34f91d8ae8ea2e4ef13ae6f58982a4213cdc9154d7c4147b7c2b0c"
+				},
+				{
+					"path": "results-ea6e849-qualified/source_hashes.json",
+					"bytes": 1518,
+					"sha256": "b5ef7444fe6e49fb2847a89e479f6a20b5a063a4e8d94fcf9b8ab810236201ac"
+				}
+			]
+		},
+		"windows-recovery.tar.gz": {
+			"bytes": 725181,
+			"sha256": "0727afe4122cf00f4f7ef7899119abcea076ac92371c43fbb3d3cb205488d7fe",
+			"members": [
+				{
+					"path": "windows-local-servers-candidate/candidate-receipt.json",
+					"bytes": 3929,
+					"sha256": "1bdaf94854a386c267cc2baf6995a9f3d174c6459edf0bebcf9885c0ba97f1e6"
+				},
+				{
+					"path": "windows-local-servers-candidate/check-candidate.cjs",
+					"bytes": 2858,
+					"sha256": "70d4eec675cbf78b07b4584792228bdf6c16d264ec84bf3eb0dd2719d98831f7"
+				},
+				{
+					"path": "windows-local-servers-candidate/local_server_menu.ahk",
+					"bytes": 4230,
+					"sha256": "2fdc77679588dcb717aeccd48093b16ee1639dcdc8d162fda42e5b1b7dbb3fdb"
+				},
+				{
+					"path": "windows-local-servers-candidate/local_servers.ahk",
+					"bytes": 31470,
+					"sha256": "eb590ecbd10c1dff1574f070d38f317971198656f4c8eac6a3b1d0b6d5331598"
+				},
+				{
+					"path": "windows-local-servers-candidate/pre-write-admission-receipt.json",
+					"bytes": 957,
+					"sha256": "6956e5a6752b9c055bdec065ba8d36de00bb00fa522c88cdf167a74b7a172724"
+				},
+				{
+					"path": "windows-local-servers-candidate/source-port-contract.md",
+					"bytes": 10480,
+					"sha256": "c5c7abe5ca3e0c5645c1cffe5ee58738ddba1982bea2759aec2bb8d773e9326e"
+				},
+				{
+					"path": "windows-local-servers-candidate/test_local_server_menu.ahk",
+					"bytes": 4118,
+					"sha256": "27a5bf04bcfc2d43bad1fbe3470bb446a4e25822552f8cd0b06a7d24245c6ed6"
+				},
+				{
+					"path": "windows-local-servers-candidate/test_local_server_write_admission.ahk",
+					"bytes": 11161,
+					"sha256": "71c5586588753f58cbb487313fbb3e16546275dfeaa260158caf46ac63dc88e1"
+				},
+				{
+					"path": "windows-local-servers-candidate/test_local_servers.ahk",
+					"bytes": 21417,
+					"sha256": "4e6e5bd4d582dac8d1ea918e0230af63484903c5366728ad6a72197c72c54bf1"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/README.md",
+					"bytes": 6546,
+					"sha256": "a0c6bdcfd4ec1b6f18bb87cda13d788d73b195085dea15be283f8ffe22171138"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/WINDOWS-PC-RECOVERY.md",
+					"bytes": 9283,
+					"sha256": "fcb6e000732ad8cf75653bc3fc4143acbc8cbaa272cc47a2b36c429538c14164"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/check-candidate.cjs",
+					"bytes": 4195,
+					"sha256": "b39a93a9414a2dc01e82da766deb17e54b676d5d2006719a7e75cf9bb0a7811f"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hook-preimages.json",
+					"bytes": 3165,
+					"sha256": "18867bb06ad87ba9f4e7b9d483d057a892a523582dddab9bffe9d542f5133e8d"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hooks/ErgoptiPlus.ahk",
+					"bytes": 81200,
+					"sha256": "944c43b69cd69a64e4b93c129d22ad46fc09aff38e86d0a70de555b67ef80d0b"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hooks/infra/lifecycle.ahk",
+					"bytes": 67343,
+					"sha256": "f75c8dba2e783cd54f53faaca90d7b01c37df1c9e0a077e3f1e7e661e34a4666"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hooks/ui/menu/menu_llm/_index.ahk",
+					"bytes": 13975,
+					"sha256": "d00eff5d7abe43d949ccf01b92d0ef633e892e4b8621119a2695358c2a9d4a99"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hooks/ui/menu/menu_llm/actions.ahk",
+					"bytes": 28165,
+					"sha256": "5d8ef77b83e84cb354dc69e11638676d4cb616d3cccaafbebe7488563ce8e27c"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hooks/ui/menu/menu_llm/init.ahk",
+					"bytes": 17340,
+					"sha256": "65fcc8d9de4fb0aac7eec8c0eaaffead40b1e656bba6bf4b3526d04be4f66a51"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hooks/ui/menu/menu_llm/menu_main.ahk",
+					"bytes": 19620,
+					"sha256": "c8fb60ab6f7a85ba0e5c4b9a0de7fbd6d161eba3bb55505faf0b07b988e4df99"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/hooks/ui/menu/menu_llm/menu_models.ahk",
+					"bytes": 28365,
+					"sha256": "1528351dfb3ca055ca198bf73d1d7fa25e0c40484b90a9ba3293e9dc84122f01"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/integration-hooks.patch",
+					"bytes": 5229,
+					"sha256": "6bd099b7881d43e2f6189bf51ec0da55efd95ee6c5eecfc5a195524f08e646f2"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/local_server_panel.ahk",
+					"bytes": 16463,
+					"sha256": "dd8da23d24a622260ae5515adfe327ae2cca82e643d453179c726564794ec71e"
+				},
+				{
+					"path": "windows-local-server-panel-candidate/panel-receipt.json",
+					"bytes": 2604,
+					"sha256": "bbba576e9502257033b9c1dc59d6d935bb70582dbd69c6a73fdb4578b8a997b3"
+				},
+				{
+					"path": "windows-local-server-join-candidate/test_local_server_join.ahk",
+					"bytes": 16651,
+					"sha256": "bad3a73ae474e83f1106c91a0e893e90461a0dfed68eb91e2605b60899780808"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/README.md",
+					"bytes": 7368,
+					"sha256": "30fecf27ae46e31e39598b775daee9eadd72d0adc39f62a65639e5c89c9c1285"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/candidate/infra/manifest_menu.ahk",
+					"bytes": 43184,
+					"sha256": "2f3a2472278f4b51a011f345ae61e3e76063f49561034a79fee2a7087ee79ed9"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/candidate/infra/menu_dispatcher.ahk",
+					"bytes": 35588,
+					"sha256": "f9236b850fd4dc28cd48d2c297e15ad6c6274714f0ee63cf11ae12bea0f6c0ed"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/candidate/tests/run_llm_model_menu_disabled.ahk",
+					"bytes": 8600,
+					"sha256": "54802f109b13b33efa22d793cb340a192f74fe25807486d50eab4fb56f2a887a"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/manifest_menu.ahk.patch",
+					"bytes": 3321,
+					"sha256": "bfdb3390a473d2e0fef427550057d56fa4246133cd1d5235a8ba6883dd8e27bc"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/menu_dispatcher.ahk.patch",
+					"bytes": 1661,
+					"sha256": "ec8de82fc08908d6937e759ab23160b66fcbc1ba2abc7de48464b5758d6d141d"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/native_cases.ahk",
+					"bytes": 11899,
+					"sha256": "d2a571d1937bff273e80020b72c6d3c062a6e3d8623f453567dfe6df0948230e"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/preimages/infra/manifest_menu.ahk",
+					"bytes": 42690,
+					"sha256": "53b465d6bad2a616bebae8bf5486a2a4caad1289b9b6fe94dc121d20db386353"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/preimages/infra/menu_dispatcher.ahk",
+					"bytes": 34969,
+					"sha256": "cbb928a054e7e0a3a05ec72781ef78cd73d85589cfc4a81ccbe8f9bb06460f73"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/preimages/tests/run_llm_model_menu_disabled.ahk",
+					"bytes": 8500,
+					"sha256": "aa1e71bbe960601c396dc39888ffdccdd2ffcee17c141bcb053ebcdb979d2143"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/preparation-sha256.json",
+					"bytes": 854,
+					"sha256": "7f0d82a77f503abcfaefc7655f12b513f6881ceb5d8b6d3ba059aac171da7222"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/prepare.py",
+					"bytes": 5924,
+					"sha256": "0f5329fed3389a4c70db9bcf5730badc6946216bd0171f8e822052583f12840b"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/run_llm_model_menu_disabled.ahk.patch",
+					"bytes": 569,
+					"sha256": "840b6a68d14f288270f67e34f72c2120943aed94f644094c4ec864f50acb931f"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/source-receipts.json",
+					"bytes": 815,
+					"sha256": "88983e7ec0ac14e2e7368d07d3fa0bf3f6f8aa0cf8cf30e41084c14bf5849420"
+				},
+				{
+					"path": "windows-menu-duplicate-candidate/upstream-receipt.json",
+					"bytes": 416,
+					"sha256": "d743f3b6b8c8f5f4282ef5177ffc67fe6adc1be8961eeedeac684964f6a9f95b"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/FILE-PORT-CONTRACT.md",
+					"bytes": 6384,
+					"sha256": "f140ccdac9aa4a599f52595584cbe1eed7634eb2108f46ef5c780805dd2f2ff4"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/PLAN.md",
+					"bytes": 9665,
+					"sha256": "9085c3d187e44a7492135430d154c7b963d08fcd4d078e83723cbe3ee3131aa4"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/REVIEW-FILE-PORT-V2.md",
+					"bytes": 5616,
+					"sha256": "76544478aa739fd7d2e8b8980f5ccbecffd31dd5b9553abab1fce5a23ed828f4"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/SOURCE-SNAPSHOT.json",
+					"bytes": 2992,
+					"sha256": "d413295a4e5c63609fcfa28e231ab09938fad1b361a84e35be6d95b5053fd11d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/WINDOWS-PC-RECOVERY.md",
+					"bytes": 7107,
+					"sha256": "1d7045d44781dc9da529a93a43f8d1e941391bb7431bdf432157d79b2e34e50f"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/coordination-comments.json",
+					"bytes": 1833,
+					"sha256": "f4bc050fd0bc656cbeab78ea2b37de515bc81fe63b6ea0e43ab8f65ae0609581"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/ads.zip",
+					"bytes": 258,
+					"sha256": "a7a0eecab5fb5524e23a9e49be3ff14ff0e79b89ce0b4d51da7b5746d4b18618"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/build-fixtures.py",
+					"bytes": 2289,
+					"sha256": "3fb3bd66f364bbfd55e8c633e63f376e3215d8acfe0204d856be8a5f15b73855"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/collision.zip",
+					"bytes": 224,
+					"sha256": "377ebdc0627fc2b1f081a0ff127b1a42da95b31c949aa80272bc22044e814cf8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/device.zip",
+					"bytes": 256,
+					"sha256": "6fc1fec55518b59ed5a4c3da8c74131e039c38907c85baa1459ebdc3f6c12372"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/directory-cli.zip",
+					"bytes": 122,
+					"sha256": "c9327074ea75d82fcb00da475c255026d3f6265a80af43810eba2917a218694c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/payloads.json",
+					"bytes": 596,
+					"sha256": "59865cba3cc9690398ea8685c139a971cb3c58ec0f2e120bb7e65864ebb05c06"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/portable.zip",
+					"bytes": 665,
+					"sha256": "6c4b7888c996d500ac51424f9f103e258bd1e476a2da76641b8d8464dd82b759"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/receipt-collision.zip",
+					"bytes": 234,
+					"sha256": "ec8fb87534a4965eadb051b009be18b6649de56037eabe9fb214cd30ae83a09d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/receipts.json",
+					"bytes": 1213,
+					"sha256": "a264ed553667109297591c62a759bb536b137ebc93ac6d8144505712637f4aef"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/rooted.zip",
+					"bytes": 250,
+					"sha256": "e5e1a574349e7c973eeff9ee531bc8d0a7defd0c14f7a010aade93ed152cc14c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/symlink.zip",
+					"bytes": 250,
+					"sha256": "0a987e90195775d04217c07851aa385b46a5a923f3242230b109f33298a4016b"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/trailing-dot.zip",
+					"bytes": 252,
+					"sha256": "418c0a532b5f98437577122fb6341b1641d09c49e02aeabc4b49af7b988713c8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/fixtures/traversal.zip",
+					"bytes": 254,
+					"sha256": "1fb0c2c41e460e31559bd37d7215eb466c026ea7060acb6ca21ddc21b6fb8967"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/g3-construction-packet.json",
+					"bytes": 13439,
+					"sha256": "9b9d6ae4428a73baf5e38c279ccdadcca409ede3d3f7e4ac319f382a49abdccc"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/g3-shell-runner-1b3f5c.ahk",
+					"bytes": 99457,
+					"sha256": "deba93c562b3d9844cd646b5d20f0de627c4923d0941eb6ab0c742f53a048256"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/g3-shell-runner-source.json",
+					"bytes": 138240,
+					"sha256": "d74ee04ebcd91dc2e0fa2b7dd067a0f3d6545a6d88f36e02b9dacc11253f8935"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/ollama-runtime-launch.ps1",
+					"bytes": 1737,
+					"sha256": "66b671b4e40fc32ede4995270c584f65de3ae82da6a865d28be93fd660fa84db"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/ollama_install_files_port.ahk",
+					"bytes": 8101,
+					"sha256": "db6d106c2752d5b30ddbfc6b4526ab1a56ca273301ebecdcd100b8f50fdf5cb8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/ollama_managed_files.ps1",
+					"bytes": 33491,
+					"sha256": "31cfd939273f5ea1aff8258711e0f31e78fe2e072544c3b82016a9b300cb2062"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/ollama_runtime_owner.ahk",
+					"bytes": 9013,
+					"sha256": "026ded09058f922c6ae974a46e1edf08242c112f78078116b4a6f3969b4f35c5"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/parse-v2.ps1",
+					"bytes": 1453,
+					"sha256": "cf350152ec8594a848115f8f9cdb3b3d6907d8cfae88dbcc180653801818ac07"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/test_ollama_install_files.ps1",
+					"bytes": 7110,
+					"sha256": "f90125f1320fc962b0ac1a8d5ebf02bf844cb34d70184dbd88ebfe331116f427"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/FILE-PORT-CONTRACT.md",
+					"bytes": 6384,
+					"sha256": "f140ccdac9aa4a599f52595584cbe1eed7634eb2108f46ef5c780805dd2f2ff4"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/PLAN.md",
+					"bytes": 9665,
+					"sha256": "9085c3d187e44a7492135430d154c7b963d08fcd4d078e83723cbe3ee3131aa4"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/SOURCE-SNAPSHOT.json",
+					"bytes": 2992,
+					"sha256": "d413295a4e5c63609fcfa28e231ab09938fad1b361a84e35be6d95b5053fd11d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/ads.zip",
+					"bytes": 258,
+					"sha256": "a7a0eecab5fb5524e23a9e49be3ff14ff0e79b89ce0b4d51da7b5746d4b18618"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/build-fixtures.py",
+					"bytes": 2289,
+					"sha256": "3fb3bd66f364bbfd55e8c633e63f376e3215d8acfe0204d856be8a5f15b73855"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/collision.zip",
+					"bytes": 224,
+					"sha256": "377ebdc0627fc2b1f081a0ff127b1a42da95b31c949aa80272bc22044e814cf8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/device.zip",
+					"bytes": 256,
+					"sha256": "6fc1fec55518b59ed5a4c3da8c74131e039c38907c85baa1459ebdc3f6c12372"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/directory-cli.zip",
+					"bytes": 122,
+					"sha256": "c9327074ea75d82fcb00da475c255026d3f6265a80af43810eba2917a218694c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/payloads.json",
+					"bytes": 596,
+					"sha256": "59865cba3cc9690398ea8685c139a971cb3c58ec0f2e120bb7e65864ebb05c06"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/portable.zip",
+					"bytes": 665,
+					"sha256": "6c4b7888c996d500ac51424f9f103e258bd1e476a2da76641b8d8464dd82b759"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/receipt-collision.zip",
+					"bytes": 234,
+					"sha256": "ec8fb87534a4965eadb051b009be18b6649de56037eabe9fb214cd30ae83a09d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/receipts.json",
+					"bytes": 1213,
+					"sha256": "a264ed553667109297591c62a759bb536b137ebc93ac6d8144505712637f4aef"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/rooted.zip",
+					"bytes": 250,
+					"sha256": "e5e1a574349e7c973eeff9ee531bc8d0a7defd0c14f7a010aade93ed152cc14c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/symlink.zip",
+					"bytes": 250,
+					"sha256": "0a987e90195775d04217c07851aa385b46a5a923f3242230b109f33298a4016b"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/trailing-dot.zip",
+					"bytes": 252,
+					"sha256": "418c0a532b5f98437577122fb6341b1641d09c49e02aeabc4b49af7b988713c8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/fixtures/traversal.zip",
+					"bytes": 254,
+					"sha256": "1fb0c2c41e460e31559bd37d7215eb466c026ea7060acb6ca21ddc21b6fb8967"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/ollama-runtime-launch.ps1",
+					"bytes": 1737,
+					"sha256": "66b671b4e40fc32ede4995270c584f65de3ae82da6a865d28be93fd660fa84db"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/ollama_install_files_port.ahk",
+					"bytes": 8101,
+					"sha256": "db6d106c2752d5b30ddbfc6b4526ab1a56ca273301ebecdcd100b8f50fdf5cb8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/ollama_managed_files.ps1",
+					"bytes": 33491,
+					"sha256": "31cfd939273f5ea1aff8258711e0f31e78fe2e072544c3b82016a9b300cb2062"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/ollama_runtime_owner.ahk",
+					"bytes": 9013,
+					"sha256": "026ded09058f922c6ae974a46e1edf08242c112f78078116b4a6f3969b4f35c5"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v1/test_ollama_install_files.ps1",
+					"bytes": 7110,
+					"sha256": "f90125f1320fc962b0ac1a8d5ebf02bf844cb34d70184dbd88ebfe331116f427"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/FILE-PORT-CONTRACT.md",
+					"bytes": 6539,
+					"sha256": "47e0b4bcc916f4c353e41c6d447b268d06585abdd213e8f994a32064ad6f458d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/PARSER-COMMANDS.md",
+					"bytes": 1984,
+					"sha256": "743960f7fda7f19c0a0e5a9c728b312f9a9ee2493521022e9fbf7a618b9f68eb"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/PLAN.md",
+					"bytes": 9665,
+					"sha256": "9085c3d187e44a7492135430d154c7b963d08fcd4d078e83723cbe3ee3131aa4"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/SOURCE-SNAPSHOT.json",
+					"bytes": 3689,
+					"sha256": "51b12b37f26f4c26476b3cef138663a0d416a7604fb2d572ed6c5af7e36aa2ae"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/WAL-CHANGES.md",
+					"bytes": 3582,
+					"sha256": "c09a5de5321ac6e711893fe678ecf04ba774976cb9d8535e80f35dd1a9ac36e8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/ads.zip",
+					"bytes": 258,
+					"sha256": "a7a0eecab5fb5524e23a9e49be3ff14ff0e79b89ce0b4d51da7b5746d4b18618"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/build-fixtures.py",
+					"bytes": 2289,
+					"sha256": "3fb3bd66f364bbfd55e8c633e63f376e3215d8acfe0204d856be8a5f15b73855"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/collision.zip",
+					"bytes": 224,
+					"sha256": "377ebdc0627fc2b1f081a0ff127b1a42da95b31c949aa80272bc22044e814cf8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/device.zip",
+					"bytes": 256,
+					"sha256": "6fc1fec55518b59ed5a4c3da8c74131e039c38907c85baa1459ebdc3f6c12372"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/directory-cli.zip",
+					"bytes": 122,
+					"sha256": "c9327074ea75d82fcb00da475c255026d3f6265a80af43810eba2917a218694c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/payloads.json",
+					"bytes": 596,
+					"sha256": "59865cba3cc9690398ea8685c139a971cb3c58ec0f2e120bb7e65864ebb05c06"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/portable.zip",
+					"bytes": 665,
+					"sha256": "6c4b7888c996d500ac51424f9f103e258bd1e476a2da76641b8d8464dd82b759"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/receipt-collision.zip",
+					"bytes": 234,
+					"sha256": "ec8fb87534a4965eadb051b009be18b6649de56037eabe9fb214cd30ae83a09d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/receipts.json",
+					"bytes": 1213,
+					"sha256": "a264ed553667109297591c62a759bb536b137ebc93ac6d8144505712637f4aef"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/rooted.zip",
+					"bytes": 250,
+					"sha256": "e5e1a574349e7c973eeff9ee531bc8d0a7defd0c14f7a010aade93ed152cc14c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/symlink.zip",
+					"bytes": 250,
+					"sha256": "0a987e90195775d04217c07851aa385b46a5a923f3242230b109f33298a4016b"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/trailing-dot.zip",
+					"bytes": 252,
+					"sha256": "418c0a532b5f98437577122fb6341b1641d09c49e02aeabc4b49af7b988713c8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/fixtures/traversal.zip",
+					"bytes": 254,
+					"sha256": "1fb0c2c41e460e31559bd37d7215eb466c026ea7060acb6ca21ddc21b6fb8967"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/ollama-runtime-launch.ps1",
+					"bytes": 1737,
+					"sha256": "66b671b4e40fc32ede4995270c584f65de3ae82da6a865d28be93fd660fa84db"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/ollama_install_files_port.ahk",
+					"bytes": 8329,
+					"sha256": "6e1357c01ec29bce9f6099b412208c5d48117e13e7ba491db07fea54496b50fc"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/ollama_managed_files.ps1",
+					"bytes": 46039,
+					"sha256": "ee0a64aa40c17e15bd863e7b651043e3bd607848dd0f49bfb90b5150ea017d1f"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/ollama_runtime_owner.ahk",
+					"bytes": 9013,
+					"sha256": "026ded09058f922c6ae974a46e1edf08242c112f78078116b4a6f3969b4f35c5"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/parser-v2-pre-inventory.json",
+					"bytes": 1375,
+					"sha256": "4e8441c481c5b9942ac880be1e1e749499db122bf43ac21d2313a1e2099a4b3e"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/parser-v2.json",
+					"bytes": 1375,
+					"sha256": "3885c8ac097346e7c7e758772bf62323aefc86632540ee18683812ef9e6c75ea"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v2/test_ollama_install_files.ps1",
+					"bytes": 13044,
+					"sha256": "a68c20221bbbfa97cf57f97f204352c37ed1e6cbfb9bfaa6953ef462d5a67f06"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/FILE-PORT-CONTRACT.md",
+					"bytes": 6539,
+					"sha256": "47e0b4bcc916f4c353e41c6d447b268d06585abdd213e8f994a32064ad6f458d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/FROZEN-SNAPSHOT.json",
+					"bytes": 4353,
+					"sha256": "b603b46deed6880da0351253de2e01871e5c8d0dea2484c2cf59b754654b3a9a"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/PARSER-COMMANDS.md",
+					"bytes": 1984,
+					"sha256": "743960f7fda7f19c0a0e5a9c728b312f9a9ee2493521022e9fbf7a618b9f68eb"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/PLAN.md",
+					"bytes": 9665,
+					"sha256": "9085c3d187e44a7492135430d154c7b963d08fcd4d078e83723cbe3ee3131aa4"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/PREIMAGE-SNAPSHOT.json",
+					"bytes": 3689,
+					"sha256": "51b12b37f26f4c26476b3cef138663a0d416a7604fb2d572ed6c5af7e36aa2ae"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/WAL-CHANGES.md",
+					"bytes": 3582,
+					"sha256": "c09a5de5321ac6e711893fe678ecf04ba774976cb9d8535e80f35dd1a9ac36e8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/ads.zip",
+					"bytes": 258,
+					"sha256": "a7a0eecab5fb5524e23a9e49be3ff14ff0e79b89ce0b4d51da7b5746d4b18618"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/build-fixtures.py",
+					"bytes": 2289,
+					"sha256": "3fb3bd66f364bbfd55e8c633e63f376e3215d8acfe0204d856be8a5f15b73855"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/collision.zip",
+					"bytes": 224,
+					"sha256": "377ebdc0627fc2b1f081a0ff127b1a42da95b31c949aa80272bc22044e814cf8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/device.zip",
+					"bytes": 256,
+					"sha256": "6fc1fec55518b59ed5a4c3da8c74131e039c38907c85baa1459ebdc3f6c12372"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/directory-cli.zip",
+					"bytes": 122,
+					"sha256": "c9327074ea75d82fcb00da475c255026d3f6265a80af43810eba2917a218694c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/payloads.json",
+					"bytes": 596,
+					"sha256": "59865cba3cc9690398ea8685c139a971cb3c58ec0f2e120bb7e65864ebb05c06"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/portable.zip",
+					"bytes": 665,
+					"sha256": "6c4b7888c996d500ac51424f9f103e258bd1e476a2da76641b8d8464dd82b759"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/receipt-collision.zip",
+					"bytes": 234,
+					"sha256": "ec8fb87534a4965eadb051b009be18b6649de56037eabe9fb214cd30ae83a09d"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/receipts.json",
+					"bytes": 1213,
+					"sha256": "a264ed553667109297591c62a759bb536b137ebc93ac6d8144505712637f4aef"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/rooted.zip",
+					"bytes": 250,
+					"sha256": "e5e1a574349e7c973eeff9ee531bc8d0a7defd0c14f7a010aade93ed152cc14c"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/symlink.zip",
+					"bytes": 250,
+					"sha256": "0a987e90195775d04217c07851aa385b46a5a923f3242230b109f33298a4016b"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/trailing-dot.zip",
+					"bytes": 252,
+					"sha256": "418c0a532b5f98437577122fb6341b1641d09c49e02aeabc4b49af7b988713c8"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/fixtures/traversal.zip",
+					"bytes": 254,
+					"sha256": "1fb0c2c41e460e31559bd37d7215eb466c026ea7060acb6ca21ddc21b6fb8967"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/ollama-runtime-launch.ps1",
+					"bytes": 1737,
+					"sha256": "66b671b4e40fc32ede4995270c584f65de3ae82da6a865d28be93fd660fa84db"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/ollama_download_archive.ps1",
+					"bytes": 7444,
+					"sha256": "7c6eb8c4f8375c33f9141be9e3806670c640ac525d2bc81a88aa44b8ed19ac33"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/ollama_install_files_port.ahk",
+					"bytes": 8584,
+					"sha256": "b78e74a7cf5aa38b42f4424b4cb2656d75f3f72a9ce2d54907bd80544563b553"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/ollama_managed_files.ps1",
+					"bytes": 47521,
+					"sha256": "ef750be5ea8488f4c41f813af4872d5c447e91148e581a565f891621c8856bfd"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/ollama_native_source.ps1",
+					"bytes": 1309,
+					"sha256": "bc3511328b03e4aad29a7c6091d598f91c10d0f7a3aa6b6b202b9237fd66074f"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/ollama_runtime_owner.ahk",
+					"bytes": 9013,
+					"sha256": "026ded09058f922c6ae974a46e1edf08242c112f78078116b4a6f3969b4f35c5"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/parser-v2-pre-inventory.json",
+					"bytes": 1375,
+					"sha256": "4e8441c481c5b9942ac880be1e1e749499db122bf43ac21d2313a1e2099a4b3e"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/parser-v2.json",
+					"bytes": 1375,
+					"sha256": "3885c8ac097346e7c7e758772bf62323aefc86632540ee18683812ef9e6c75ea"
+				},
+				{
+					"path": "windows-ollama-runtime-candidate/versions/file-port-v3/test_ollama_install_files.ps1",
+					"bytes": 13044,
+					"sha256": "a68c20221bbbfa97cf57f97f204352c37ed1e6cbfb9bfaa6953ef462d5a67f06"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/README.md",
+					"bytes": 3701,
+					"sha256": "1b8839910a7de64e5fc6dc5b306ea37904decac3cec815b0eda989085119cfb8"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/candidate/docs/ERGOPTIPLUS_TODO.md",
+					"bytes": 343204,
+					"sha256": "b92ce84329e976a0a7dd3e8d1137c6a26c30f47b3ef0822d2e0e625d6f9e97b4"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/candidate/static/ergopti_plus/windows/infra/lifecycle.ahk",
+					"bytes": 67232,
+					"sha256": "caf175a613dd2c90305170041c1dc0eaab8d0ee17c245314fa856b5365a14151"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/candidate/static/ergopti_plus/windows/tests/unit/test_local_server_private_publication.ahk",
+					"bytes": 39463,
+					"sha256": "81bd71db40502ce72256ef381c015bbe01623b9c38543a6bf1274cafc21a15bb"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/candidate/static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk",
+					"bytes": 73438,
+					"sha256": "ecbc1321fecf3f4e0f3c9f51642e43aaca7bb3e483359e5e85d43357ed2702bc"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/preimages/docs/ERGOPTIPLUS_TODO.md",
+					"bytes": 342890,
+					"sha256": "cc2a5be609cb902e1ae5e5485e50fa754ba27d71c39a16e3ea9489204db9f0f2"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/preimages/static/ergopti_plus/windows/infra/lifecycle.ahk",
+					"bytes": 66692,
+					"sha256": "0361d8d6acbe630add8f790783f2c79335b59fceb8889e8d4fd114aa8057c406"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/preimages/static/ergopti_plus/windows/tests/unit/test_local_server_private_publication.ahk",
+					"bytes": 34087,
+					"sha256": "0be9922ea4b6a6f92beabc30c457abd8503c8c38f9cc4cfc00f0cf35402b0525"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/preimages/static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk",
+					"bytes": 72075,
+					"sha256": "30725f0d97220d30b0abd937428ab7fbafe09cfc4027fee315669dcce424e57d"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/receipt.json",
+					"bytes": 1217,
+					"sha256": "fa2475b2b70ea49d0d64b7184884df83a5309a2a0ce6da0a5e7f44acf41c3c71"
+				},
+				{
+					"path": "windows-private-shutdown-candidate/shutdown.patch",
+					"bytes": 14164,
+					"sha256": "d15a704a8b7e8b0cd9bb67f3c15c64c55411b25382a7ae1d0cb2a9e008164adc"
+				},
+				{
+					"path": "base-url-policy-candidate/IMPLEMENTATION.md",
+					"bytes": 3546,
+					"sha256": "7aedbcccb53c29bd8d41f8c1da2517e090dfe706a68ed49959b19e3d3f1804ec"
+				},
+				{
+					"path": "base-url-policy-candidate/PREIMAGES.json",
+					"bytes": 3963,
+					"sha256": "215c9d6ceb902ac9facc030060c640e8711d5cc7b72b17625b2cca8d7404605b"
+				},
+				{
+					"path": "base-url-policy-candidate/URL_POLICY_PLAN.md",
+					"bytes": 8003,
+					"sha256": "45f8791d5556ee6568c9daf1d128f04d30fabd4308ebd3ec5f502351e8a47883"
+				},
+				{
+					"path": "base-url-policy-candidate/shared/lua/llm/base_url.lua",
+					"bytes": 3006,
+					"sha256": "b9675ed5249c4cbbda863c410a7cd38e0572db0070fda0515dcad1290b1083bf"
+				},
+				{
+					"path": "base-url-policy-candidate/shared/modules/llm/base_url.ahk",
+					"bytes": 3172,
+					"sha256": "f40ff87d989e8a5e8de2efcb2983f1bc30d27f2246c867615a064a279b930fbf"
+				},
+				{
+					"path": "base-url-policy-candidate/tests/test_base_url_models_admission.ahk",
+					"bytes": 3464,
+					"sha256": "7e8738ac3ce8a31cae1e31a0c7caab5b5587627d8a6da571123acb4718d9bdf7"
+				},
+				{
+					"path": "base-url-policy-candidate/tests/test_base_url_policy.ahk",
+					"bytes": 2436,
+					"sha256": "8118cd47e249de008f072ddf62faa15dedee11dbfb86ba064811ba2828e4d636"
+				},
+				{
+					"path": "base-url-policy-candidate/tests/test_base_url_policy.lua",
+					"bytes": 2304,
+					"sha256": "b078e9bb947142bb831f189e95a05c59de62374bbf86eedbff338e8ebb522363"
+				},
+				{
+					"path": "base-url-policy-candidate/url-vectors.json",
+					"bytes": 3787,
+					"sha256": "005a9f954fe087dcfad6e86847d3dd43a3dbef3d72a583da891e355b93a0373a"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/01-api_remote.patch",
+					"bytes": 2951,
+					"sha256": "7540883ed4aa1efb6759e01154bf50aa59661bb5e613b403ef15947d80dfea4a"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/02-api_remote.patch",
+					"bytes": 1750,
+					"sha256": "537a5550fc5c21b112869ee94a595127121b234851ce156a27f87e570a796d7a"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/03-local_server_models.patch",
+					"bytes": 1241,
+					"sha256": "c611ff09f68e7fcd123a84b5f10a51e933030b4fd40e28f67d27611b14dc5bba"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/04-local_server_panel.patch",
+					"bytes": 922,
+					"sha256": "e4a7983f88bd0794611197f707489fb15f10e71759a0138660f549cb2c9e423d"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/05-local_servers.patch",
+					"bytes": 796,
+					"sha256": "77893dba207490b578edfd94c1a421e4922f0569c127af99c2ed3f89f638f091"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/06-ErgoptiPlus.patch",
+					"bytes": 447,
+					"sha256": "7b394177b930b13570116cedeeedde1cfaa5e7a0bd10b6ddc235b9faef92d0ba"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/07-run_all.patch",
+					"bytes": 875,
+					"sha256": "6612a702c935e66a7e5d42c30169d38ba2f4935fbc10fb2d8d402ce3d6aca761"
+				},
+				{
+					"path": "base-url-policy-candidate/wiring/08-test_manifest.patch",
+					"bytes": 481,
+					"sha256": "a1b0eb6400dbdbeb1daa75071fe2415b62bd4f675fa50ed75eb5c92d2223a372"
+				},
+				{
+					"path": "official-ollama-archive-metadata/windows-amd64-directory.json",
+					"bytes": 3495,
+					"sha256": "12d0d873eb282570bdf9a49235c1a7455afd3c0094f238b526d9fb8db451747d"
+				},
+				{
+					"path": "official-ollama-archive-metadata/windows-amd64-tail.json",
+					"bytes": 295,
+					"sha256": "6e4fa37495cc8ef49900fbd8088914d67bbb24cbf9cf73f116f63d55f4dce652"
+				},
+				{
+					"path": "official-ollama-archive-metadata/windows-arm64-cli-imports.json",
+					"bytes": 872,
+					"sha256": "73e8f66c266322d74d043119e532a6583b0c60e18abf3f40a684098ff0f36740"
+				},
+				{
+					"path": "official-ollama-archive-metadata/windows-arm64.json",
+					"bytes": 574,
+					"sha256": "b9a842c039248116f2d4ab940647e36e167e3457e4e61e4e2f173f1dabe7bbaf"
+				}
+			]
+		}
+	}
+}
