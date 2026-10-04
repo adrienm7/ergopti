@@ -482,6 +482,98 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(M.get_state(), "idle")
 	end)
 
+	for _, mode in ipairs({ "transport", "http-error", "invalid-json", "wrong-root", "oversized-page", "entries-mismatch", "dispatch-refusal", "cancel" }) do
+		helpers.it("linux-updater-etag: " .. mode .. " forces a fresh page after an unknown native validator", function()
+			local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
+			local real_fs = require("adapters.file_system")
+			package.loaded["adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
+			package.loaded["modules.updater.manager"] = nil
+			local loaded, fresh = pcall(require, "modules.updater.manager")
+			package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
+			helpers.assert_true(loaded and type(fresh) == "table", tostring(fresh))
+			local old = '[{"tag_name":"v1.0.0"}]'
+			local new = '[{"tag_name":"v2.0.0"}]'
+			local too_many = {}
+			for _ = 1, 21 do too_many[#too_many + 1] = '{"tag_name":"v2.0.0"}' end
+			local failure = {
+				transport = { ok = false, status = 200, body = "", error = "truncated native transfer" },
+				["http-error"] = { ok = false, status = 503, body = "", error = "HTTP 503" },
+				["invalid-json"] = { ok = true, status = 200, body = "{malformed" },
+				["wrong-root"] = { ok = true, status = 200, body = '{"tag_name":"v2.0.0"}' },
+				["oversized-page"] = { ok = true, status = 200, body = "[" .. table.concat(too_many, ",") .. "]" },
+				["entries-mismatch"] = { ok = true, status = 200, body = '["not a release object"]' },
+			}
+			local requests, completions = {}, {}
+			fresh._http_client = {
+				get = function(_, _, options, callback)
+					requests[#requests + 1] = options
+					if #requests == 1 then callback({ ok = true, status = 200, body = old })
+					elseif #requests == 2 then
+						if mode == "dispatch-refusal" then return false end
+						if mode == "cancel" then return true end
+						callback(failure[mode])
+					else callback({ ok = true, status = 200, body = new }) end
+					return true
+				end,
+				cancel = function() return true end,
+			}
+			fresh._file_digest = { cancel = function() return true end }
+			for index = 1, 3 do
+				local count = 0
+				fresh._fetch_releases("main", function(body, status, err)
+					completions[index] = { body = body, status = status, error = err }; count = count + 1
+				end)
+				if mode == "cancel" and index == 2 then helpers.assert_true(fresh.cancel_update()) end
+				helpers.assert_eq(count, 1)
+			end
+			helpers.assert_nil(requests[1].etag_compare)
+			helpers.assert_true(requests[2].etag_compare ~= nil, "accepted page retains its conditional association")
+			helpers.assert_nil(requests[3].etag_compare, "failed page cannot associate a changed validator with its old body")
+			helpers.assert_eq(completions[1].body, old)
+			helpers.assert_nil(completions[2].body)
+			helpers.assert_true(type(completions[2].error) == "string")
+			helpers.assert_eq(completions[3].body, new)
+			helpers.assert_eq(completions[3].status, 200)
+		end)
+	end
+
+	helpers.it("linux-updater-etag: a failed second page keeps the accepted first-page association", function()
+		local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
+		local real_fs = require("adapters.file_system")
+		package.loaded["adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
+		package.loaded["modules.updater.manager"] = nil
+		local loaded, fresh = pcall(require, "modules.updater.manager")
+		package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
+		helpers.assert_true(loaded and type(fresh) == "table", tostring(fresh))
+		local entries = {}
+		for index = 1, 20 do entries[index] = '{"tag_name":"v1.0.' .. index .. '"}' end
+		local first_page = "[" .. table.concat(entries, ",") .. "]"
+		local final_page = '[{"tag_name":"v2.0.0"}]'
+		local responses = {
+			{ ok = true, status = 200, body = first_page }, { ok = true, status = 200, body = '[{"tag_name":"v1.0.21"}]' },
+			{ ok = false, status = 304, body = "", error = "HTTP 304" }, { ok = false, status = 200, body = "", error = "truncated page" },
+			{ ok = false, status = 304, body = "", error = "HTTP 304" }, { ok = true, status = 200, body = final_page },
+		}
+		local requests, results = {}, {}
+		fresh._http_client = { get = function(_, _, options, callback)
+			requests[#requests + 1] = options; callback(assert(table.remove(responses, 1))); return true
+		end }
+		for index = 1, 3 do
+			local callbacks = 0
+			helpers.assert_true(fresh._fetch_releases("main", function(body, status, err)
+				results[index] = { body = body, status = status, error = err }; callbacks = callbacks + 1
+			end))
+			helpers.assert_eq(callbacks, 1)
+		end
+		helpers.assert_eq(#requests, 6)
+		helpers.assert_nil(results[2].body)
+		helpers.assert_true(type(results[2].error) == "string")
+		helpers.assert_true(requests[5].etag_compare ~= nil, "an accepted earlier page keeps its own validator")
+		helpers.assert_nil(requests[6].etag_compare, "the failed page alone must refetch fully")
+		helpers.assert_true(results[3].body:find("v1.0.20", 1, true) ~= nil and results[3].body:find("v2.0.0", 1, true) ~= nil)
+		helpers.assert_eq(results[3].status, 200)
+	end)
+
 	-- GitHub answers 304 Not Modified, with no body, when the list is unchanged
 	-- since the ETag curl saved. check_for_updates cleared the cached release
 	-- before fetching and a 304 then read as "nothing available": an update

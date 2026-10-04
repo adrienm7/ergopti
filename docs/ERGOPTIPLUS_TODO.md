@@ -688,6 +688,20 @@ These are software implementations; final hardware verification remains below.
   work. Windows Registry/macOS hs.settings have no matching file backup path by
   source. No TOML, reserved source, native cross-OS gate, hardware input or manual
   CI was modified or exercised.
+- [~] **L53.** Linux release-page validator association: invalidate only the
+  failed page's cached body before completing a refused, cancelled, invalid or
+  truncated fetch. Native curl can save a new ETag before its response is
+  accepted; a later 304 previously acknowledged an older release list with
+  that new validator. Retain accepted earlier pages and healthy 304 reuse.
+  Nine unit regressions fail before and pass after, including a two-page retry.
+  Six certificate-verifying TLS/file/curl/libuv scenarios pass on LuaJIT and
+  Lua 5.4, with origin and home providers simulated to route owned fixtures.
+  Three scenarios reproduce changed-validator poisoning; the HTTP 503 control
+  retains its prior ETag and conservatively retries fully after failure.
+  Windows and macOS publish body/validator pairs only after usable-response
+  validation by source, so they have no matching mutable curl validator file.
+  No TOML persistence, reserved source, native cross-OS gate, physical input or
+  manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
