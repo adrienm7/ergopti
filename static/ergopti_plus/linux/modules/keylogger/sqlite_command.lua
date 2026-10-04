@@ -121,7 +121,10 @@ function M.build(db_path, sql, opts)
 	end
 	opts = opts or {}
 
-	local words = { "sqlite3" }
+	-- A personal .sqliterc is executable CLI setup: it can replace JSON mode,
+	-- prepend output or run .shell before the owned script/receipt even starts.
+	-- Select an empty init explicitly without changing the user's login home.
+	local words = { "sqlite3", Shell.quote("-init"), Shell.quote("/dev/null") }
 	-- Flags are literals chosen inside this repository, never caller data, but
 	-- they go through the same quoter so no call site can smuggle one in later.
 	for _, flag in ipairs(opts.flags or {}) do
