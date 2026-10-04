@@ -92,9 +92,15 @@ _KLTO_WatchersNative64(EndIdle, Close, Key, Periodic) {
 }
 
 _KLTO_WatchersWrapSafe() {
-	_KLTO_WatchersNative64(_DriverFuncBody("_KL_Watchers_EndIdle"),
-		_DriverFuncBody("_KL_Watchers_CloseSession"),
-		_DriverFuncBody("KL_Watchers_OnKeystroke"), _DriverFuncBody("KL_Watchers_IdleTick"))
+	EndIdle := _DriverFuncBody("_KL_Watchers_EndIdle")
+	Close := _DriverFuncBody("_KL_Watchers_CloseSession")
+	Key := _DriverFuncBody("KL_Watchers_OnKeystroke")
+	Periodic := _DriverFuncBody("KL_Watchers_IdleTick")
+	Assert(RegExMatch(_DriverMaskNonCode(&EndIdle), "\{\s*[^}\s]"), "the idle-close owner must contain executable code")
+	Assert(RegExMatch(_DriverMaskNonCode(&Close), "\{\s*[^}\s]"), "the session-close owner must contain executable code")
+	Assert(RegExMatch(_DriverMaskNonCode(&Key), "\{\s*[^}\s]"), "the accepted-activity owner must contain executable code")
+	Assert(RegExMatch(_DriverMaskNonCode(&Periodic), "\{\s*[^}\s]"), "the periodic-activity owner must contain executable code")
+	_KLTO_WatchersNative64(EndIdle, Close, Key, Periodic)
 }
 Test("keylogger: watcher native64 clocks retain all five intervals (keylogger-native-clock-guard)", _KLTO_WatchersWrapSafe)
 
@@ -186,7 +192,11 @@ _KLTO_WatchersStopNative64(Stop, Close) {
 }
 
 _KLTO_WatchersStopDrainMasked() {
-	_KLTO_WatchersStopNative64(_DriverFuncBody("KL_Watchers_Stop"), _DriverFuncBody("_KL_Watchers_CloseSession"))
+	Stop := _DriverFuncBody("KL_Watchers_Stop")
+	Close := _DriverFuncBody("_KL_Watchers_CloseSession")
+	Assert(RegExMatch(_DriverMaskNonCode(&Stop), "\{\s*[^}\s]"), "the shutdown owner must contain executable code")
+	Assert(RegExMatch(_DriverMaskNonCode(&Close), "\{\s*[^}\s]"), "the retained close owner must contain executable code")
+	_KLTO_WatchersStopNative64(Stop, Close)
 }
 Test("keylogger: shutdown close owner preserves native64 boundaries (keylogger-native-clock-guard)", _KLTO_WatchersStopDrainMasked)
 
