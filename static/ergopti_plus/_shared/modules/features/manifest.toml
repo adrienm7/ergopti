@@ -6178,3 +6178,10 @@ id = "about_source_check"
 i18n = "menu.about.check_for_updates"
 disabled_when = ["about_source_release_ready"]
 disabled_reason_key = "menu.about.source_run_reason"
+
+# Profile creation keeps its native editor and publication owner on each driver.
+[[menu.llm_profile_commands]]
+type = "command"
+id = "llm_profile_create"
+i18n = "menu.profiles.create_profile"
+disabled_when = ["llm_profile_create_ready"]

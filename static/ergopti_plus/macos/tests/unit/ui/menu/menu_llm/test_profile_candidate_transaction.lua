@@ -145,8 +145,24 @@ local function with_fixture(options, body)
 			section = function(key) return key end,
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		local renderer = assert(require("menu.renderer").new({
+			platform = "hs",
+			manifest_path = function()
+				return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+			end,
+			json_decode = function(text)
+				local manifest = require("json").decode(text)
+				if options.create_label_key then
+					manifest.llm_profile_commands[1].i18n = options.create_label_key
+				end
+				return manifest
+			end,
+			i18n = package.loaded["infra.i18n"],
+			logger = package.loaded["infra.logger"],
+		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
+			command_row = renderer.command_row,
 		}
 		package.loaded["infra.notifications"] = {
 			notify = function()
@@ -202,6 +218,7 @@ local function with_fixture(options, body)
 				editor_open_count = editor_open_count + 1
 				editor_calls[#editor_calls + 1] = profile or false
 				if profile == nil then
+					if options.before_editor_save then options.before_editor_save() end
 					local candidate = table.remove(created_profiles, 1)
 					local result = callback(candidate)
 					if options.editor_double_callback then
@@ -304,7 +321,7 @@ local function with_fixture(options, body)
 			end,
 		})
 		local deps = {
-			script_control = {is_paused = function() return false end},
+			script_control = {is_paused = function() return options.paused or false end},
 			state = state,
 			save_prefs = transactional_save,
 			update_menu = function()
@@ -1140,6 +1157,62 @@ helpers.describe("LLM scope deferred editor admission", function()
 			helpers.assert_eq(fixture.manager.scope_idle(), false)
 			options.editor_busy = false
 			helpers.assert_eq(fixture.manager.scope_idle(), true)
+		end)
+	end)
+end)
+
+helpers.describe("shared Create Profile command", function()
+	helpers.it("shared Create Profile follows the changed declaration without a native label", function()
+		with_fixture({ create_label_key = "button.cancel" }, function(fixture)
+			local rows = fixture.manager.get_menu_item().menu
+			helpers.assert_eq(find_row(rows, "menu.profiles.create_profile"), nil)
+			local row = find_row(rows, "button.cancel")
+			helpers.assert_type(row, "table")
+			helpers.assert_eq(row.action(), true)
+			fixture.fire_timer()
+			helpers.assert_eq(fixture.state.llm_active_profile, "user_created")
+			helpers.assert_eq(fixture.save_count(), 1)
+		end)
+	end)
+
+	helpers.it("shared Create Profile refuses a retained row after the live native pause owner changes", function()
+		local options = {}
+		with_fixture(options, function(fixture)
+			local row = find_row(fixture.manager.get_menu_item().menu, "menu.profiles.create_profile")
+			helpers.assert_type(row.action, "function")
+			options.paused = true
+			helpers.assert_eq(row.action(), false)
+			helpers.assert_eq(fixture.timer_count(), 0)
+			helpers.assert_eq(fixture.editor_open_count(), 0)
+			helpers.assert_eq(fixture.save_count(), 0)
+		end)
+	end)
+
+	helpers.it("shared Create Profile refuses the actual deferred editor opening after pause", function()
+		local options = {}
+		with_fixture(options, function(fixture)
+			local row = find_row(fixture.manager.get_menu_item().menu, "menu.profiles.create_profile")
+			helpers.assert_eq(row.action(), true)
+			options.paused = true
+			fixture.fire_timer()
+			helpers.assert_eq(fixture.editor_open_count(), 0)
+			helpers.assert_eq(fixture.save_count(), 0)
+			helpers.assert_eq(#fixture.runtime_calls(), 0)
+		end)
+	end)
+
+	helpers.it("shared Create Profile refuses a native editor save after pause without candidate publication", function()
+		local options = {}
+		options.before_editor_save = function() options.paused = true end
+		with_fixture(options, function(fixture)
+			local row = find_row(fixture.manager.get_menu_item().menu, "menu.profiles.create_profile")
+			helpers.assert_eq(row.action(), true)
+			fixture.fire_timer()
+			helpers.assert_eq(fixture.editor_open_count(), 1)
+			helpers.assert_eq(fixture.save_count(), 0)
+			helpers.assert_eq(#fixture.runtime_calls(), 0)
+			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
+			helpers.assert_eq(fixture.notifications(), 0)
 		end)
 	end)
 end)

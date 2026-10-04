@@ -1,0 +1,6 @@
+{
+	"section": "llm_profile_commands",
+	"id": "llm_profile_create",
+	"i18n": "menu.profiles.create_profile",
+	"ready": "llm_profile_create_ready"
+}

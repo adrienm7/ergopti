@@ -204,16 +204,21 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			return module, fake
 		end)()
 		local opened = nil
+		local editor_accepted = true
+		local editor_calls = 0
 		replace("ui.prompt_editor.bridge", {
 			open = function(existing, on_save, opts)
+				editor_calls = editor_calls + 1
 				opened = { existing = existing, on_save = on_save, opts = opts }
-				return true
+				return editor_accepted
 			end,
 		})
 		local rebuilds = 0
 		local opened_window = nil
 		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local paused = false
 		local context = {
+			is_paused = function() return paused end,
 			llm = {
 				is_enabled = function() return true end,
 				toggle = function() return true end,
@@ -249,6 +254,23 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		helpers.assert_eq(create.fn(), true)
 		helpers.assert_eq(opened.existing, nil)
 		helpers.assert_true(opened.opts.profile_id:match("^user_") ~= nil)
+		helpers.assert_eq(editor_calls, 1)
+		paused = true
+		helpers.assert_eq(create.fn(), false,
+			"a retained Create callback must re-read the native pause owner")
+		helpers.assert_eq(editor_calls, 1, "the paused callback cannot reach the editor")
+		helpers.assert_eq(opened.on_save({ id = opened.opts.profile_id,
+			label = "Refused", system_single = "Refused", batch = false }), false,
+			"a retained editor save must not publish while paused")
+		helpers.assert_eq(#settings.list_user(), 0)
+		helpers.assert_eq(rebuilds, 0)
+		paused = false
+		editor_accepted = false
+		helpers.assert_eq(create.fn(), false, "the real editor's refusal remains refusal")
+		helpers.assert_eq(#settings.list_user(), 0)
+		helpers.assert_eq(rebuilds, 0)
+		editor_accepted = true
+		helpers.assert_eq(create.fn(), true)
 		local created_id = opened.opts.profile_id
 		helpers.assert_eq(opened.on_save({
 			id = created_id,
@@ -272,6 +294,26 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			system_single = "Updated {context}",
 			batch = false,
 		}), true)
+		helpers.assert_eq(settings.list_user()[1].label, "Menu updated")
+		local Paths = require("infra.paths")
+		local Json = require("json")
+		local file = assert(io.open(Paths.shared("modules/menu/menu_manifest.json"), "r"))
+		local document = Json.decode(file:read("*a"))
+		file:close()
+		document.llm_profile_commands[1].i18n = "button.cancel"
+		local renderer = assert(require("menu.renderer").new({
+			platform = "linux",
+			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+			json_decode = function() return document end,
+			i18n = require("infra.i18n"),
+			logger = require("logger.shim"),
+		}))
+		replace("infra.manifest_menu", renderer)
+		menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local changed = find(menu_builder.build(context), require("infra.i18n").get("button.cancel"))
+		helpers.assert_not_nil(changed, "the actual Create provider follows its changed declaration")
+		editor_accepted = false
+		helpers.assert_eq(changed.fn(), false)
 		helpers.assert_eq(settings.list_user()[1].label, "Menu updated")
 		restore()
 	end)

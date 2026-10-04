@@ -113,6 +113,8 @@ const OPENS_SUBMENU = {
 	word_expander_entries: 'word_expander_custom_menu',
 	// The model provider publishes its fixed browser command on every driver.
 	llm_models: 'llm_model_commands',
+	// All three profile providers render the shared Create/Clone command head.
+	llm_profile: 'llm_profile_commands',
 	llm_display: 'llm_display_menu',
 	llm_trigger: 'llm_trigger_menu',
 	llm_generation_settings: 'llm_generation_menu',
