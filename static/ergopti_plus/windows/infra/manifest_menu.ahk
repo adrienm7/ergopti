@@ -520,15 +520,26 @@ _MR_CommandProviderDelivery(ManifestKey, CommandId, Action, Getters, *) {
  * @param {Map} StateGetters Native state readers.
  * @returns {Map|false} Canonical provider row or a refused declaration.
  */
-MenuRenderer_CommandRow(ManifestKey, CommandId, Commands, StateGetters := unset) {
+_MR_DeclaredProviderRow(ManifestKey, CommandId, Commands, StateGetters, ExpectedType) {
 	Item := _MR_FindItemById(ManifestKey, CommandId)
-	if !(Item is Map) || _MR_Get(Item, "type") != "command" || !_MR_IsForAhk(Item)
+	if !(Item is Map) || _MR_Get(Item, "type") != ExpectedType || !_MR_IsForAhk(Item)
 		return false
 	Getters := IsSet(StateGetters) ? StateGetters : Map()
 	Row := _MR_CommandRowData(Item, ManifestKey, Commands, Getters)
 	if Row is Map && Row.Has("action")
 		Row["action"] := _MR_CommandProviderDelivery.Bind(ManifestKey, CommandId, Row["action"], Getters)
 	return Row
+}
+
+; A checked command uses the same declaration and retained readiness policy.
+MenuRenderer_CommandRow(ManifestKey, CommandId, Commands, StateGetters := unset) {
+	return _MR_DeclaredProviderRow(ManifestKey, CommandId, Commands,
+		IsSet(StateGetters) ? StateGetters : Map(), "command")
+}
+
+MenuRenderer_CheckRow(ManifestKey, CheckId, Commands, StateGetters := unset) {
+	return _MR_DeclaredProviderRow(ManifestKey, CheckId, Commands,
+		IsSet(StateGetters) ? StateGetters : Map(), "check")
 }
 
 /**

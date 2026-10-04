@@ -71,7 +71,9 @@ function M.build(ctx)
 		-- The rest of the AI menu stays usable: this submenu alone is greyed
 		Logger.error(LOG, "The keymap bridge or the LLM core lacks the live-mode API — submenu greyed.")
 		return ManifestMenu.render_rows({
-			{ label = i18n.get("menu.llm.live_mode_off"), checked = true, disabled = true },
+			ManifestMenu.check_row("llm_live_controls", "llm_live_mode_off",
+				{ llm_live_mode_off = function() return false end },
+				{ llm_live_is_off = function() return true end, llm_live_off_ready = function() return false end }),
 		}, ROW_ID)
 	end
 	local live = keymap.get_live_prompt()
@@ -91,12 +93,10 @@ function M.build(ctx)
 	end
 
 	local rows = {
-		{
-			label    = i18n.get("menu.llm.live_mode_off"),
-			checked  = current == nil,
-			disabled = is_disabled or nil,
-			action   = not is_disabled and function() return choose(nil) end or nil,
-		},
+		ManifestMenu.check_row("llm_live_controls", "llm_live_mode_off",
+			{ llm_live_mode_off = function() return choose(nil) end },
+			{ llm_live_is_off = function() return keymap.get_live_prompt() == nil end,
+				llm_live_off_ready = function() return ctx.is_disabled ~= true end }),
 		{ separator = true },
 	}
 	for _, prompt in ipairs(M.live_prompts(llm_mod, ctx.count)) do
