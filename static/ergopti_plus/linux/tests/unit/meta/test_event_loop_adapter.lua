@@ -385,6 +385,13 @@ helpers.describe("event loop backend isolation", function()
       local result = os.execute(quote(executable) .. " " .. quote(fixture))
       helpers.assert_true(result == true or result == 0, "isolated native loop fixture must succeed")
     end)
+    helpers.it("installed luv unwinds failed loop startup and permits the next run", function()
+      local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
+      local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_startup.lua"
+      local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+      local result = os.execute(quote(executable) .. " " .. quote(fixture))
+      helpers.assert_true(result == true or result == 0, "isolated native startup ownership must succeed")
+    end)
   else
     print("  [native luv POSIX integration unavailable; explicit backend fixtures still run]")
   end

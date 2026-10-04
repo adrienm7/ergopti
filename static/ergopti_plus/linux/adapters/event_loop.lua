@@ -161,6 +161,20 @@ local function _safe_periodic(onPeriodic)
 	end
 end
 
+--- Retires only the handles owned by this loop, including partial startup.
+local function _cleanup_luv()
+	if _idle_handle then
+		pcall(luv.idle_stop, _idle_handle)
+		pcall(luv.close, _idle_handle)
+		_idle_handle = nil
+	end
+	if _timer_handle then
+		pcall(luv.timer_stop, _timer_handle)
+		pcall(luv.close, _timer_handle)
+		_timer_handle = nil
+	end
+end
+
 --- Starts a native luv event loop with idle + periodic callbacks.
 --- @param opts table { onIdle = function, onPeriodic = function, periodSec = number }
 local function _run_luv(opts)
@@ -171,7 +185,8 @@ local function _run_luv(opts)
 	-- Idle handle: fires whenever the event loop has nothing else to do.
 	-- This replaces the tight while loop for keyboard-hook + tray pumping.
 	_idle_handle = luv.new_idle()
-	luv.idle_start(_idle_handle, function()
+	if not _idle_handle then error("Unable to allocate event loop idle handle", 0) end
+	local idle_started, idle_error = luv.idle_start(_idle_handle, function()
 		if not _running then
 			if _idle_handle then
 				luv.idle_stop(_idle_handle)
@@ -183,12 +198,16 @@ local function _run_luv(opts)
 		_safe_idle(onIdle)
 		_run_idle_handlers()
 	end)
+	if idle_started == nil or idle_started == false then
+		error("Unable to start event loop idle handle: " .. tostring(idle_error), 0)
+	end
 
 	-- Periodic timer: drives process_lifecycle.tick() at a fixed interval.
 	if onPeriodic then
 		local periodMs = math.max(1, math.floor(periodSec * 1000))
 		_timer_handle = luv.new_timer()
-		NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
+		if not _timer_handle then error("Unable to allocate event loop timer handle", 0) end
+		local timer_started, timer_error = NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
 			if not _running then
 				if _timer_handle then
 					luv.timer_stop(_timer_handle)
@@ -199,20 +218,13 @@ local function _run_luv(opts)
 			end
 			_safe_periodic(onPeriodic)
 		end)
+		if timer_started == nil or timer_started == false then
+			error("Unable to start event loop timer handle: " .. tostring(timer_error), 0)
+		end
 	end
 
 	-- stop() returns control even if another component still owns active handles.
 	luv.run()
-
-	-- Cleanup any handles that were not already stopped.
-	if _idle_handle then
-		pcall(function() luv.idle_stop(_idle_handle); luv.close(_idle_handle) end)
-		_idle_handle = nil
-	end
-	if _timer_handle then
-		pcall(function() luv.timer_stop(_timer_handle); luv.close(_timer_handle) end)
-		_timer_handle = nil
-	end
 end
 
 
@@ -289,6 +301,8 @@ end
 ---
 --- When neither onIdle nor onPeriodic is provided, returns immediately
 --- (there is nothing to pump — an empty loop would spin forever).
+--- Native startup failures retire owned handles and clear the running state
+--- before raising the error, so a later run can retry.
 ---
 --- @param opts table|nil
 ---   .onIdle     function  Called on every loop iteration (pump keyboard, tray, etc.).
@@ -309,19 +323,22 @@ function M.run(opts)
 	end
 
 	_running = true
+	local ran, run_error
 
 	if luv then
 		Logger.debug(LOG, "Starting luv native event loop (idle + periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)
-		_run_luv(options)
+		ran, run_error = pcall(_run_luv, options)
+		_cleanup_luv()
 	else
 		Logger.debug(LOG, "Starting pump fallback loop (1 ms sleep, periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)
-		_run_pump(options)
+		ran, run_error = pcall(_run_pump, options)
 	end
 
 	_running = false
 	Logger.debug(LOG, "Event loop exited.")
+	if not ran then error(run_error, 0) end
 end
 
 --- Signals the event loop to stop at the next safe point.
