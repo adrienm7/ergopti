@@ -408,6 +408,20 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_header_receipts.lua
         timeout-minutes: 1
 
+      - name: Deliver large literal POST bodies through native anonymous pipes
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_http_body_pipe_receipts.py
+        timeout-minutes: 2
+
+      - name: Retain native POST resources after simulated cleanup refusal
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_body_cleanup_receipts.lua
+        timeout-minutes: 1
+
       - name: Send literal at-prefixed HTTP bodies without native file loading
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
