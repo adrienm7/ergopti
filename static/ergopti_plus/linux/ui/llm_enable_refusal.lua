@@ -39,22 +39,23 @@ function M.show(origin, replacements, modal_observer)
 	local retry = I18n.get("button.retry")
 	local command
 	local choices = type(replacements) == "table" and #replacements > 0
-	if choices and Shell.has_command("zenity") then
-		command = "zenity --list --no-markup --title=" .. Shell.quote(title)
-			.. " --text=" .. Shell.quote(body) .. " --column='' --column='' --hide-column=1 --print-column=1"
-			.. " --ok-label=" .. Shell.quote(I18n.get("llm.unreachable.apply"))
-			.. " --cancel-label=" .. Shell.quote(keep_off)
-			.. " retry " .. Shell.quote(retry)
-	elseif choices and Shell.has_command("kdialog") then
-		command = "kdialog --menu " .. Shell.quote(body) .. " --title " .. Shell.quote(title)
-			.. " retry " .. Shell.quote(retry)
-	elseif Shell.has_command("zenity") then
-		command = "zenity --question --no-markup --title=" .. Shell.quote(title)
-			.. " --text=" .. Shell.quote(body) .. " --ok-label=" .. Shell.quote(retry)
-			.. " --cancel-label=" .. Shell.quote(keep_off)
+	if Shell.has_command("zenity") then
+		command = "zenity " .. (choices and "--list" or "--question") .. " --no-markup --title=" .. Shell.quote(title)
+			.. " --text=" .. Shell.quote(body)
+		if choices then
+			command = command .. " --column='' --column='' --hide-column=1 --print-column=1"
+				.. " --ok-label=" .. Shell.quote(I18n.get("llm.unreachable.apply"))
+				.. " --cancel-label=" .. Shell.quote(keep_off) .. " retry " .. Shell.quote(retry)
+		else
+			command = command .. " --ok-label=" .. Shell.quote(retry) .. " --cancel-label=" .. Shell.quote(keep_off)
+		end
 	elseif Shell.has_command("kdialog") then
-		command = "kdialog --yesno " .. Shell.quote(body) .. " --title " .. Shell.quote(title)
-			.. " --yes-label " .. Shell.quote(retry) .. " --no-label " .. Shell.quote(keep_off)
+		command = "kdialog " .. (choices and "--menu" or "--yesno") .. " " .. Shell.quote(body) .. " --title " .. Shell.quote(title)
+		if choices then
+			command = command .. " retry " .. Shell.quote(retry)
+		else
+			command = command .. " --yes-label " .. Shell.quote(retry) .. " --no-label " .. Shell.quote(keep_off)
+		end
 	else
 		Logger.warn(LOG, "The local AI stays off; no native acknowledgement dialog is available.")
 		return require("adapters.notifier").send(body, { title = title, level = "warning" }) == true, false
