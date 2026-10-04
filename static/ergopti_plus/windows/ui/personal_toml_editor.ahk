@@ -67,6 +67,8 @@ _EditorPrefSet(Key, Value, WriterFn := 0, NotifyFn := 0) {
 ; ======================
 
 global _PersonalEditorGui := ""
+global _PersonalEditorOpeningSource := false
+global _PersonalEditorSessionEpoch := 0
 global _PersonalEditorData := ""   ; last loaded TOML data (Map)
 global _PersonalEditorSection := "" ; currently selected section name
 ; Priority Edit control. Held as a module global rather than threaded through the
@@ -107,6 +109,7 @@ _GetSharedPersonalDefault() {
 ; DefaultSection — if set, the editor pre-selects that section.
 OpenPersonalEditor(DefaultSection := "") {
 	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
 
 	; Prefer the shared WebView2 frontend (identical to the macOS editor) when
 	; available; fall back to the native Gui below otherwise. _HsEdWeb_TryOpen
@@ -126,7 +129,14 @@ OpenPersonalEditor(DefaultSection := "") {
 		}
 	}
 
-	_PersonalEditorData := ReadPersonalToml()
+	_PersonalEditorSessionEpoch += 1
+	SessionEpoch := _PersonalEditorSessionEpoch
+	_PersonalEditorOpeningSource := false
+	OpeningSource := Map()
+	OpeningData := ReadPersonalToml(false, OpeningSource)
+	if SessionEpoch != _PersonalEditorSessionEpoch
+		return
+	_PersonalEditorData := OpeningData
 
 	; Resolve the section to open
 	TargetSection := DefaultSection
@@ -257,9 +267,17 @@ OpenPersonalEditor(DefaultSection := "") {
 	CloseOnAddChk.OnEvent("Click", (*) => _EditorPrefSet("close_on_add",
 		CloseOnAddChk.Value ? "1" : "0"))
 
-	W.OnEvent("Close", (*) => _OnEditorClose())
+	W.OnEvent("Close", (*) => _OnEditorClose(W, SessionEpoch))
 	W.OnEvent("Size", (*) => _ResizeEditor(W, LV, OutputEdit, StatusText))
 
+	if SessionEpoch != _PersonalEditorSessionEpoch {
+		W.Destroy()
+		return
+	}
+	OpeningSource["kind"] := "native"
+	OpeningSource["epoch"] := SessionEpoch
+	OpeningSource["window"] := W
+	_PersonalEditorOpeningSource := OpeningSource
 	_PersonalEditorGui := W
 	W.Show("Center w900 h690")
 }
@@ -407,8 +425,10 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
 }
 
 _PersonalEditorDeferredSaveCompleted(LV, StatusText, Candidate, SectionName,
-		SuccessFn, CommitResult) {
+		SuccessFn, OpeningSource, CommitResult) {
 	global PERSONAL_TOML_COMMIT_FAILED
+	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
+		return
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		try StatusText.Value := t("editor.hotstrings.err_write")
 		try LoggerError("PersonalEditor",
@@ -430,14 +450,20 @@ _PersonalEditorDeferredSaveCompleted(LV, StatusText, Candidate, SectionName,
 }
 
 _SaveData(W, LV, StatusText, DeferredSuccessFn := 0) {
-	global _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
+	OpeningSource := _PersonalEditorOpeningSource
+	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
+		|| !(W is Gui) || ObjPtr(W) != ObjPtr(OpeningSource["window"]) {
+		try StatusText.Value := t("editor.hotstrings.err_write")
+		return false
+	}
 	Candidate := _PersonalTomlCloneDetached(_PersonalEditorData)
 	CompletionFn := _PersonalEditorDeferredSaveCompleted.Bind(
 		LV, StatusText, Candidate, _PersonalEditorSection,
-		DeferredSuccessFn)
+		DeferredSuccessFn, OpeningSource)
 	CommitResult := PersonalTomlCommitAndReload(
-		Candidate, [_PersonalEditorSection], 0, 0, 0, 0, 0, CompletionFn)
+		Candidate, [_PersonalEditorSection], 0, 0, 0, 0, 0, CompletionFn, 0, OpeningSource)
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		StatusText.Value := t("editor.hotstrings.err_write")
 		return false
@@ -449,6 +475,8 @@ _SaveData(W, LV, StatusText, DeferredSuccessFn := 0) {
 		StatusText.Value := t("editor.hotstrings.err_write")
 		return false
 	}
+	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
+		return false
 	_PopulateList(LV, Candidate, _PersonalEditorSection)
 	StatusText.Value := t("editor.hotstrings.saved_prefix") . A_Now
 	return true
@@ -459,6 +487,7 @@ _PersonalEditorCompleteAddedEntry(W, TriggerEdit, OutputEdit, ChkIsWord,
 	_ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens,
 		ChkFinal)
 	if CloseAfterSave {
+		_OnEditorClose(W)
 		try W.Destroy()
 		catch as Err {
 			try LoggerError("PersonalEditor",
@@ -712,13 +741,23 @@ _SwitchEditorSection(SectionName) {
 	; The ListView and dropdown are stored as named controls — rebuild via a fresh open
 	; is the simplest approach for AHK (no handle cache needed).
 	_PersonalEditorData := ReadPersonalToml()
-	_PersonalEditorGui.Destroy()
-	_PersonalEditorGui := ""
+	ClosingWindow := _PersonalEditorGui
+	_OnEditorClose(ClosingWindow)
+	ClosingWindow.Destroy()
 	OpenPersonalEditor(SectionName)
 }
 
-_OnEditorClose() {
+_OnEditorClose(Window := 0, SessionEpoch := 0) {
 	global _PersonalEditorGui, _PersonalEditorPrioCtrl
+	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+	if Window is Gui {
+		if !(_PersonalEditorGui is Gui) || ObjPtr(Window) != ObjPtr(_PersonalEditorGui)
+			return false
+	}
+	if SessionEpoch != 0 && SessionEpoch != _PersonalEditorSessionEpoch
+		return false
+	_PersonalEditorSessionEpoch += 1
+	_PersonalEditorOpeningSource := false
 	_PersonalEditorGui := ""
 	; Drop the reference to the now-destroyed control so no form helper touches it
 	_PersonalEditorPrioCtrl := ""

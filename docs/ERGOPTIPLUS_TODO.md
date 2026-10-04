@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-03. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
+Updated: 2026-10-04. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
 ahead of it without a release (CI cancelled on purpose).
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
@@ -25,14 +25,40 @@ was deleted after its useful content was committed here. The historical
 workflow context (prompts, task status, feature map, analysis reports and
 journal) is in the handoff package's `workflow-context-2026-09-24.zip`.
 
-The current session requires one atomic commit per fix or feature, updating this
-checklist in the same commit. Push each commit immediately to `dev`, then cancel
-every CI run triggered by that exact push to avoid releases. Run the full CI
-through `workflow_dispatch` on a temporary `codex/ci-*` branch: a non-dev ref runs
-the CI profile and publishes nothing. Use its Windows and macOS runners for
-native behavior and parity regression tests. Preserve unrelated changes, stage
-exact paths, never force-push `dev`/`main`, and delete only the temporary CI
-branches this session created after their evidence is recorded.
+Delivery now supports independent feature containers. The primary group and
+branch for every remaining item are recorded in
+[the parallel work contract](handovers/2026-10-04-parallel-containers/PARALLEL-WORK.md),
+with ready-to-copy fresh-context prompts and saved pending candidates in
+[the container-stop handover](handovers/2026-10-04-parallel-containers/README.md).
+Feature workers commit one coherent slice at a time, update only their assigned
+items and push their `feat/*` branch immediately. One coordinator integrates
+reviewed slices into `dev`, preserving concurrent workstation/Linux work, and
+pushes each integration immediately. Cancel every automatic workflow triggered
+by each exact pushed SHA to avoid releases. Only the coordinator moves the
+single `codex/ci-validation` branch and dispatches `ci.yml` with `os_lanes` set to
+the affected OSes; manual validation never publishes a release and runs to its
+terminal result. Shared checks remain mandatory. Preserve unrelated changes,
+stage exact paths, and never use reset, clean, stash or force-push.
+
+Item 22 (differential updates) is withdrawn by the maintainer on 2026-10-04:
+reported release downloads are below 20 MB, so the additional delta-generation,
+base-selection and reconstruction/fallback paths are not justified by a measured
+current benefit. Full signed/checksummed updates and rollback remain required.
+This is a scope decision, not a completed delta implementation. Archive
+compression (36) and managed-network downloads (62) remain in scope.
+
+Repository hygiene is complete. The 2026-10-03 cleanup retired 131 obsolete
+CI refs; a read-only 2026-10-04 inspection confirms only `main`, `dev`,
+`gh-pages`, `sparkle-appcasts`, `fix/linux` and `codex/ci-validation` remotely,
+and one registered main checkout. Reuse the single CI ref with distinct manual
+run groups; never create `backup/*` branches. Active source, validation fixtures
+and evidence remain owned work. The overnight handoff marks its former backup,
+force-push and release instructions as superseded.
+
+Historical provenance limitation: the exact uncommitted tooltip DPI-test edit
+reported in `wip/win-tooltip-border-fix` is unavailable and was not recovered.
+Current committed DPI geometry coverage does not establish those old bytes.
+Real Windows 10/11 rendering acceptance remains in items 19 and 38.
 
 The Windows regression backlog (former item 72) is closed: non-release CI
 run [36916568697](https://github.com/adrienm7/ergopti/actions/runs/36916568697)
@@ -79,7 +105,7 @@ These are software implementations; final hardware verification remains below.
   the broader window-title family; configured action values replace placeholders.
 - Bundled keyboard-layout catalogue and manager on three OSes, installation
   owners, Ergo-L support, and independent base/Shift versus AltGr emulation.
-  Extension geometry and physical magic-key completion remain in L4.
+  Physical magic-key completion remains in item 30.
 - Manifest-driven menus, category masters and retained child choices;
   configuration schema/migration infrastructure; substantial neutral-state and
   transactional recommended/clear machinery. W1 is explicitly incomplete.
@@ -1038,9 +1064,6 @@ These are software implementations; final hardware verification remains below.
   validation remains pending. Recommended-delay native verification and
   editable handwritten [[hotstrings.terminators]] support remain open under
   item 34.
-- [~] **6.** Complete L4 extension layout geometry and physical magic-key
-  behavior. Keep independent base/Shift, AltGr/ShiftAltGr and number-row
-  emulation. The physical magic-key setting is item 30.
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -1425,20 +1448,15 @@ native three-OS qualification remains pending.
 - [~] **19.** Windows tooltip border hidden under its content and white corner
   pixels (pooled border z-order + ring drawn from the content region).
   Integrated; verify visually on Windows 10/11.
-- [ ] **22.** Delta updates: macOS Sparkle deltas are ready on
-      `wip/delta-updates` (mirrored as `backup/wip/delta-updates`, not integrated:
-      its CI step only runs on real releases, so it needs a dry-run CI mode first),
-      then Windows and Linux per ADR 010 with an automatic full-download fallback.
-
-Ergopti-only distance and SFB reduction, rolls and repeat corrections now
-come from the Ergopti extension. Their declared bindings preserve the historical
-categories, preference sections and `common` priority. These source files are
-unchanged since non-release checkpoint
-[37008038530](https://github.com/adrienm7/ergopti/actions/runs/37008038530)
-at `b92d9dec8`, which passed the complete three-OS unit, E2E, packaging and
-installation pipeline with release publication skipped. Item 37 retains the
-installed-layout visibility and French suffix/magic-key placement decisions;
-item 104 separately tracks the common-autocorrection section split.
+  Ergopti-only distance and SFB reduction, rolls and repeat corrections now
+  come from the Ergopti extension. Their declared bindings preserve the historical
+  categories, preference sections and `common` priority. These source files are
+  unchanged since non-release checkpoint
+  [37008038530](https://github.com/adrienm7/ergopti/actions/runs/37008038530)
+  at `b92d9dec8`, which passed the complete three-OS unit, E2E, packaging and
+  installation pipeline with release publication skipped. Item 37 retains the
+  installed-layout visibility and French suffix/magic-key placement decisions;
+  item 104 separately tracks the common-autocorrection section split.
 
 - [~] **24.** macOS tap-hold outage: a not-ready remap guardian held every
   Karabiner regeneration forever and pinned the first bulk edit (Restore
@@ -1490,6 +1508,19 @@ The macOS registered Tap Keys callback now retires positive and negative AX sele
 An acknowledged chosen Linux magic-key press now owns its auto-repeats through a strict per-source/key callback receipt. Its published native-origin and active-XKB epochs, preference generation, pause, modifiers, capture and injection acknowledgement must remain valid. An initial Compose-cancellation refusal retires optional repeats while preserving the consumed first output. A refused or stale repeat stays suppressed until physical release; ordinary tap and capture consumers remain once-only. Completed initial keyboard startup publishes native-origin admission before the first eligible press, without per-repeat device rescans. Independent actual-daemon screen/receipt cases reproduce the former behavior. Separate watchdog recovery gaps, real-device three-OS acceptance and the magic-source/tap-action collision remain pending.
 
 Completed Linux keyboard recovery publishes its actual native origin before the first eligible fresh press. Retained consumed source/key owners keep suppression through reopening and successive reacquisitions while their previous repeat callbacks are retired. A conclusive native released-key snapshot also retires debt when the release event was lost while the descriptor was closed; an unreadable query acknowledges no release and retains suppression until an observed key-up. One snapshot per indebted retained source covers multiple keys, without per-key or per-repeat queries. Added and retired sources keep separate ownership for the same key code, and warm acquisitions reuse already-qualified native origin. Independent real start/pump/watchdog regressions reproduce the missing epoch, raw-repeat leak and swallowed fresh press. Physical hotplug/manual Windows/macOS/Linux parity remains pending.
+
+Completed L4 layout scope: the [Ergopti manifest](../static/layouts/registry/ergopti/manifest.toml)
+and [shared extension owner](../static/ergopti_plus/_shared/lua/layouts/extension.lua)
+route geometry-dependent sections; Windows keeps base/Shift, AltGr/ShiftAltGr
+and number-row choices independent. Existing
+[Windows registry tests](../static/ergopti_plus/windows/tests/unit/test_keylayout_emulation.ahk),
+[Linux geometry tests](../static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_extension_geometry_routing.lua)
+and [macOS binding tests](../static/ergopti_plus/macos/tests/unit/modules/keymap/test_registry_bound_sections.lua)
+have named passing cases at [checkpoint 37216141887](https://github.com/adrienm7/ergopti/actions/runs/37216141887),
+with their audited sources and independent corpus unchanged. Item 6's layout
+requirements are complete. All unresolved magic-key ownership, watchdog
+recovery, native freshness and real-device requirements above remain in item 30.
+Hosted Lua owner tests do not qualify physical input.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
@@ -1680,28 +1711,6 @@ The five-file source slice has 22 portable native-owner cases, seven actual work
       checkpoints 36931498806 and 36940286440. This consolidates former item 99
       under hardware acceptance; it does not establish physical acceptance or
       a new runtime fault from the supplied unpublished snapshot.
-- [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
-  branch on 2026-09-30; agents must not create `backup/*` branches again. The
-  historical `wip/win-tooltip-border-fix` worktree was reported to contain an
-  uncommitted tooltip DPI-radius test edit. Its exact bytes are unavailable in
-  this container and have not been claimed as recovered. The committed tooltip
-  border tests now cover DPI geometry; this proves current coverage rather than
-  the provenance of that historical edit.
-
-The 2026-10-03 branch cleanup removed 131 obsolete `codex/ci-*` refs after
-checking reachability, open pull requests and active manual validations. The
-remaining remote branches are `main`, `dev`, `gh-pages`, `sparkle-appcasts`,
-`fix/linux` and the single reusable `codex/ci-validation`. Future manual runs
-use that CI ref with distinct run groups, so advancing it cannot cancel an
-older validation. No registered worktree or uncommitted source was removed by
-that branch cleanup. A fresh 2026-10-03 inspection found only the main checkout
-registered, with neither `.claude/worktrees/` nor `.git/worktrees/` present.
-Active validation checkouts and evidence remain owned work; there is no
-registered worktree to remove in this checkout. Item 39 remains partial for the
-unavailable historical edit's provenance.
-
-[The overnight handoff](handovers/2026-09-29-overnight/README.md) now marks its former backup, force-push and release instructions as superseded.
-
 - [~] **40.** The packaged-launch gate never builds a Karabiner configuration:
   the CI runners have no Karabiner-Elements, so dev.148 passed every launch
   scenario while every real Mac refused the deploy (« generated rule 1
@@ -2734,6 +2743,16 @@ Linux personal hotstring views now retain the exact classified opening bytes/pat
 
 TODO102 remains open. The Linux real-WebKit fixture now creates its own valid Personal source and initializes the actual configuration owner before the editor opening; it verifies the real classified bytes and canonical projection, retaining the existing Manager route and all four window/page/payload assertions for each page. The fixture shuts down its view and retires only its owned source paths after success or refusal. Physical LuaJIT and Lua5.4 source-boundary controls reproduce the absent-path refusal and admit the owned source, with malformed source refused. Both actual isolated Xvfb host attempts stop at the mandatory environment check because LGI/WebKit2GTK are unavailable locally; native payload-null OLD RED / received-payload candidate GREEN remains pending source-qualified CI. No production opening-source, CAS, editor UI, GPU, timeout, or save/refusal policy is weakened.
 
+Windows personal-editor opening-source consent is a bounded TODO102 prerequisite. The native GUI and WebView now obtain their displayed model and consent receipt from one classified fresh read, independently of the ordinary untagged reader cache. The receipt retains exact path, presence, UTF-8 image and actual window/session identity. A missing, unreadable, replaced, deleted or stale-session source cannot authorize publication. Web initialization uses the existing native script-outcome receipt; that receipt does not certify application rendering.
+
+The existing personal-file lease, detached request generation, deferred last-wins queue, durable staging and atomic replacement remain the mutation owners. The final physical comparison occurs after arbitrary authorization and outside Critical; a short pure owner/session check follows. After exact replacement acknowledgment, the receipt advances only to the staged own image. Same-session A→B saves remain admissible. A durable save whose reload is refused returns FAILED, keeps the form incomplete and retains its resync obligation; a foreign source refuses before replay of that older live image. The four existing file/section metadata override fields are parsed from the admitted image through their existing parser.
+
+This is cooperative opening-byte consent, not kernel CAS against an external writer after the last read. Successful saves still use the existing whole-model serializer: general unknown-field/comment preservation and TODO104 leaf migration remain separate. No schema, new WAL, generic scope, lock, polling, locale or writer fallback is introduced. macOS's retained opening snapshot and Linux's separately delivered opening-source owner are unchanged; their runtime and serialization contracts are not claimed equivalent to the Windows lease/deferred owner.
+
+All existing test bodies and assertions are retained. Twenty-two additional cases are registered through the existing Windows runner and exercise real private file publication, hidden Gui identities, the existing WebView Promise port, source drift, actual read/rename sharing refusals, own coalescing, failed reload/resync and metadata neighbors. Local proof consists of bounded source/registration, encoding and existing syntax/loop scans only. AutoHotkey and native GUI execution are unavailable locally; original/candidate native RED/GREEN, full root validation and Windows CI remain required. Root integration must reconcile exact five-path preimages with concurrently delivered Windows changes before applying this historical private candidate.
+
+Windows personal opening-source checks now compare the exact String image returned by their existing classified read. The previous calls passed TOML text to a helper whose first parameter is a file path, causing present-file saves and retained resyncs to refuse before reaching publication. The retained durable-image String guard, configured path/session/lease checks and native journal remain authoritative. Two metadata fixture replacements now pass the native limit in the sixth argument, leaving the fifth OutputVar argument omitted. All existing native assertions remain intact. Native run 37221758669 supplied the seven failures; corrected native Windows execution is still required. TODO 102 remains partial, including additional-file gate ownership.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
@@ -3158,6 +3177,29 @@ The native application-panel XCTest child now uses the same owned Swift backtrac
 Partial: the existing macOS native install diagnostic now owns a bounded sampler during the exact no-prompt AppleEvent send. Sampling is associated only while the checked sender stage remains send_entered; late, foreign, or unretired observations cannot claim that interval. The native 8-second send, 10-second sender deadline, original caption/installation assertions, and cleanup authority remain unchanged. Portable process/phase tests do not qualify actual macOS transport: clean and Karabiner installation still require native CI evidence.
 
 TODO 109 remains partial. The managed macOS bootstrap now records the public hs.allowAppleScript() getter, a validated in-process PID and the callable Lua bridge through the existing synchronous boot journal before onboarding can defer boot. Getter observation uses no setter argument and preserves bridge identity; malformed, thrown or missing getters remain unknown. Exact Boolean publication ACK is required, and refusal cannot gain boot authority. Portable registered journal/lifecycle tests pass 16/0 and 9/0; original-source and five behavioral mutations fail. Actual managed macOS observations are pending CI. Callable Lua bridge state does not prove native AppleEvent handler registration or entry, and the existing strict send/timeout/cleanup assertions remain unchanged. The previously observed clean/Karabiner no-prompt -1712 boundary is still unresolved.
+
+- [ ] **111.** Provide two distinct, explicitly labelled shared window-switching
+      actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
+      (the native equivalent on macOS), and switching only among windows on the display
+      containing the **current mouse cursor**. Resolve that display at invocation; never
+      substitute the active window's display or silently fall back to the global
+      switcher. Reuse existing action identities where their contracts match, preserving
+      saved bindings and current native window/lifecycle policies. Native adapters own
+      window eligibility, monitor geometry and activation; define the existing placement
+      rule for windows spanning displays. Offer a translated unavailability reason where
+      the desktop/compositor cannot provide the scoped operation. Do not add a
+      monitor-selection setting. Test cursor and active window on different displays,
+      moved cursors, spanning/minimized/closed windows, activation refusal and
+      unsupported display access through the real action providers, then qualify actual
+      two-display behavior on each supported OS.
+
+Windows already has `app_switcher` (native Alt+Tab) and `alt_tab_monitor`
+(current pointer display, candidate-window centre filtering); verify that the
+picker exposes both intended contracts clearly. macOS has cursor-display
+window cycling, while the native system switcher is currently unavailable.
+Linux currently emits global Alt+Tab for `alt_tab_monitor`: this alias does not
+fulfil the scoped contract and must be implemented or explicitly unavailable.
+Existing distinct action labels already have all 21 translations.
 
 ## Time estimate
 

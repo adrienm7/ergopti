@@ -190,9 +190,95 @@ _PersonalTomlCanonicalSectionOrder(Data, &Detail) {
 ;   .sections_order  — Array of section names in meta order (or file order if no meta)
 ;   .sections        — Map(name → {description, entries[]})
 ;   .meta_description — string
-ReadPersonalToml(Refresh := false) {
+; A single classified image drives both the displayed model and save consent.
+_PersonalTomlReadOpeningImage(FilePath) {
+	Image := Map("admitted", false, "path", FilePath, "present", false, "content", "")
+	if !(FilePath is String) || FilePath == ""
+		return Image
+	try {
+		if !FSStrictExists(FilePath) {
+			Image["admitted"] := true
+			return Image
+		}
+		Content := FSReadUtf8Exact(FilePath)
+		if !(Content is String)
+			return Image
+		Image["present"] := true
+		Image["content"] := Content
+		Image["admitted"] := true
+	} catch {
+		return Image
+	}
+	return Image
+}
+
+; Only the actual UI owners supply session authority. No arbitrary callback or
+; physical read runs here, including at the final short Critical boundary.
+_PersonalTomlOpeningSessionIdentity(Source) {
+	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch, _PersonalEditorGui
+	global _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch, _HsEdWeb_Gui
+	if !(Source is Map) || !(Source.Get("admitted", false) is Integer)
+		|| Source.Get("admitted", false) != 1
+		return false
+	Window := Source.Get("window", 0)
+	Epoch := Source.Get("epoch", 0)
+	Kind := Source.Get("kind", "")
+	if !(Window is Gui) || !(Epoch is Integer) || Epoch < 1 || !(Kind is String)
+		return false
+	if Kind == "native" {
+		return IsSet(_PersonalEditorOpeningSource) && _PersonalEditorOpeningSource is Map
+			&& ObjPtr(_PersonalEditorOpeningSource) == ObjPtr(Source)
+			&& IsSet(_PersonalEditorSessionEpoch) && Epoch == _PersonalEditorSessionEpoch
+			&& IsSet(_PersonalEditorGui) && _PersonalEditorGui is Gui
+			&& ObjPtr(_PersonalEditorGui) == ObjPtr(Window)
+	}
+	if Kind == "webview" {
+		return IsSet(_HsEdWeb_OpeningSource) && _HsEdWeb_OpeningSource is Map
+			&& ObjPtr(_HsEdWeb_OpeningSource) == ObjPtr(Source)
+			&& IsSet(_HsEdWeb_SessionEpoch) && Epoch == _HsEdWeb_SessionEpoch
+			&& IsSet(_HsEdWeb_Gui) && _HsEdWeb_Gui is Gui
+			&& ObjPtr(_HsEdWeb_Gui) == ObjPtr(Window)
+	}
+	return false
+}
+
+_PersonalTomlOpeningSessionCurrent(Source) {
+	if !_PersonalTomlOpeningSessionIdentity(Source)
+		return false
+	; Native script completion is an existing logical receipt, not proof of
+	; application rendering. Refused/unsettled init submission grants no save.
+	return Source.Get("kind", "") != "webview"
+		|| (Source.Get("ready", false) is Integer && Source.Get("ready", false) == 1)
+}
+
+_PersonalTomlOpeningAuthority(Source, FilePath, OwnerToken) {
+	if !_PersonalTomlOpeningSessionCurrent(Source)
+		return false
+	SourcePath := Source.Get("path", "")
+	if !(SourcePath is String) || SourcePath == ""
+		return false
+	return _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath) && !A_IsSuspended
+		&& _ConfigWriteLeaseKey(SourcePath) == _ConfigWriteLeaseKey(FilePath)
+		&& _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
+}
+
+_PersonalTomlOpeningImageMatches(Source, FilePath, OwnerToken) {
+	if !_PersonalTomlOpeningAuthority(Source, FilePath, OwnerToken)
+		return false
+	Expected := Source.Get("content", 0)
+	Present := Source.Get("present", -1)
+	if !(Expected is String) || !(Present is Integer) || (Present != 0 && Present != 1)
+		return false
+	; This native read may yield. It stays outside Critical and is followed by
+	; another pure lease/session/path check before the existing atomic replace.
+	Observed := _PersonalTomlReadOpeningImage(FilePath)
+	return Observed["admitted"] == true && Observed["present"] == Present
+		&& (Observed["content"] == Expected)
+}
+
+ReadPersonalToml(Refresh := false, OpeningSource := 0) {
 	global _ReadPersonalTomlCache
-	if (!Refresh && _ReadPersonalTomlCache != false)
+	if (!Refresh && !(OpeningSource is Map) && _ReadPersonalTomlCache != false)
 		return _ReadPersonalTomlCache
 
 	FilePath := PersonalTomlPath()
@@ -201,7 +287,21 @@ ReadPersonalToml(Refresh := false) {
 		"sections", Map(),
 		"meta_description", t("editor.hotstrings.meta_desc"),
 	)
-	if !FileExist(FilePath) {
+	Capturing := OpeningSource is Map
+	Image := Capturing ? _PersonalTomlReadOpeningImage(FilePath) : 0
+	global _TomlUnreadableFiles
+	if Capturing {
+		OpeningSource.Clear()
+		for Key, Value in Image
+			OpeningSource[Key] := Value
+		if !Image["admitted"] {
+			_TomlUnreadableFiles[FilePath] := true
+			return Result
+		}
+	}
+	if (Capturing ? !Image["present"] : !FileExist(FilePath)) {
+		if Capturing && _TomlUnreadableFiles.Has(FilePath)
+			_TomlUnreadableFiles.Delete(FilePath)
 		_ReadPersonalTomlCache := Result
 		return Result
 	}
@@ -227,7 +327,10 @@ ReadPersonalToml(Refresh := false) {
 	Raw := ""
 	global _TomlUnreadableFiles
 	try {
-		Raw := FileRead(FilePath, "UTF-8")
+		Raw := Capturing ? Image["content"] : FileRead(FilePath, "UTF-8")
+		; Preserve BOM bytes in consent; ordinary FileRead omitted it for parsing.
+		if Capturing && SubStr(Raw, 1, 1) == Chr(0xFEFF)
+			Raw := SubStr(Raw, 2)
 	} catch as Err {
 		_TomlUnreadableFiles[FilePath] := true
 		try LoggerError("PersonalToml", "Cannot read '{1}': {2}. No personal hotstrings are loaded this session, and writes to this file are blocked so the empty result cannot replace its contents.", FilePath, Err.Message)
@@ -428,21 +531,31 @@ _PersonalTomlOverrideFields() {
 ; must carry the sibling writer's fields forward rather than silently deleting
 ; them. Keep their TOML literals raw so booleans, numbers and escaped colors
 ; round-trip without inventing a second serializer.
-_PersonalTomlCaptureOverrides(FilePath) {
+_PersonalTomlCaptureOverrides(FilePath, OpeningSource := 0) {
 	Captured := Map(
 		"ok", true,
 		"detail", "",
 		"file", Map(),
 		"sections", Map()
 	)
-	if !FileExist(FilePath)
-		return Captured
-	try Raw := FileRead(FilePath, "UTF-8")
-	catch as Err {
-		Captured["ok"] := false
-		Captured["detail"] := Err.Message
-		return Captured
+	if OpeningSource is Map {
+		if !OpeningSource["present"]
+			return Captured
+		Raw := OpeningSource["content"]
+		if SubStr(Raw, 1, 1) == Chr(0xFEFF)
+			Raw := SubStr(Raw, 2)
+	} else {
+		if !FileExist(FilePath)
+			return Captured
+		try Raw := FileRead(FilePath, "UTF-8")
+		catch as Err {
+			Captured["ok"] := false
+			Captured["detail"] := Err.Message
+			return Captured
+		}
 	}
+	; Existing parser below consumes the same admitted image for UI saves.
+	; Ordinary non-UI callers retain the original fresh metadata reader.
 
 	Known := Map()
 	for Field in _PersonalTomlOverrideFields()
@@ -494,7 +607,8 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 ; write-through rename. No failure before that final OS call can alter the
 ; durable target: even a partial stage write is isolated under a unique name.
 _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
-		DeleteFn := 0, AuthorizeFn := 0, PublishFn := 0) {
+		DeleteFn := 0, AuthorizeFn := 0, PublishFn := 0,
+		OpeningSource := 0, OwnerToken := 0) {
 	static STALE_TEMP_MS := 60000
 	static WriteSeq := 0
 	InheritedCritical := A_IsCritical
@@ -503,7 +617,7 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		; Critical state into stale-temp cleanup, staging or atomic replacement.
 		Critical("Off")
 		try return _PersonalTomlWriteAtomic(FilePath, Content, WriterFn,
-			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn)
+			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn, OpeningSource, OwnerToken)
 		finally Critical(InheritedCritical)
 	}
 	HasPublisher := !((PublishFn is Integer) && PublishFn == 0)
@@ -566,6 +680,20 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		return false
 	}
 
+	if !((OpeningSource is Integer) && OpeningSource == 0) {
+		; Arbitrary authorization is complete and its Critical span has ended.
+		; Read the exact expected image now, then resample only pure authority.
+		SourceMatches := _PersonalTomlOpeningImageMatches(OpeningSource, FilePath, OwnerToken)
+		PreviousCritical := Critical("On")
+		try SourceMatches := SourceMatches
+			&& _PersonalTomlOpeningAuthority(OpeningSource, FilePath, OwnerToken)
+		finally Critical(PreviousCritical)
+		if !SourceMatches {
+			_PersonalTomlCleanupStage(StagePath, DeleteFn)
+			return false
+		}
+	}
+
 	; Filesystem filters and antivirus can block an atomic rename. The exact
 	; global owner stays held, but Critical must not span this OS call.
 	Replaced := false
@@ -590,6 +718,16 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		}
 		_PersonalTomlCleanupStage(StagePath, DeleteFn)
 		return false
+	}
+
+	if OpeningSource is Map {
+		; Advance from our exact acknowledged staged image, even when reload
+		; later refuses. Never treat a fresh arbitrary disk image as our own.
+		PreviousCritical := Critical("On")
+		try {
+			OpeningSource["present"] := true
+			OpeningSource["content"] := Content
+		} finally Critical(PreviousCritical)
 	}
 
 	; Publish only the already-validated memory projection in a second short
@@ -785,12 +923,12 @@ _PersonalTomlModelFieldsAreValid(Data, CanonicalOrder, &Detail) {
 }
 
 WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
-		AuthorizeFn := 0, ExistingOwner := 0) {
+		AuthorizeFn := 0, ExistingOwner := 0, OpeningSource := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return WritePersonalToml(Data, WriterFn, ReplaceFn, DeleteFn,
-			AuthorizeFn, ExistingOwner)
+			AuthorizeFn, ExistingOwner, OpeningSource)
 		finally Critical(InheritedCritical)
 	}
 	FilePath := PersonalTomlPath()
@@ -839,7 +977,11 @@ WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		try LoggerError("PersonalToml", "Refusing to write '{1}': it could not be read, so the model in memory is empty rather than the user's hotstrings. Reopen the editor once the file is readable.", FilePath)
 		return false
 	}
-	PreservedOverrides := _PersonalTomlCaptureOverrides(FilePath)
+	if !((OpeningSource is Integer) && OpeningSource == 0) {
+		if !_PersonalTomlOpeningImageMatches(OpeningSource, FilePath, OwnerToken)
+			return false
+	}
+	PreservedOverrides := _PersonalTomlCaptureOverrides(FilePath, OpeningSource)
 	if !PreservedOverrides["ok"] {
 		try LoggerError("PersonalToml",
 			"Refusing to write '{1}': its metadata overrides could not be read ({2}). The previous contents are intact.",
@@ -927,7 +1069,7 @@ WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 	return _PersonalTomlWriteAtomic(FilePath, Content,
 		WriterFn, ReplaceFn, DeleteFn,
 		_PersonalTomlAuthorizeOwnedWrite.Bind(
-			OwnerToken, FilePath, AuthorizeFn))
+			OwnerToken, FilePath, AuthorizeFn), 0, OpeningSource, OwnerToken)
 	} finally {
 		; A read can interrupt the O(entries) serialization/staging window and
 		; repopulate every cache from the OLD durable target. Evict again after
@@ -1405,6 +1547,10 @@ _PersonalTomlRequestContextIsCurrent(Request, OwnerToken) {
 	if _ConfigWriteLeaseKey(CurrentPath)
 			!= _ConfigWriteLeaseKey(Request.FilePath)
 		return false
+	if Request.HasOwnProp("OpeningSource")
+		&& !((Request.OpeningSource is Integer) && Request.OpeningSource == 0)
+		&& !_PersonalTomlOpeningSessionCurrent(Request.OpeningSource)
+		return false
 	return !_PersonalTomlRequestIsSuspended(Request.SuspendFn)
 }
 
@@ -1452,7 +1598,7 @@ _PersonalTomlNotifyDeferredCompletion(Request, Result) {
 ; A retry obligation must retain the immutable durable candidate and its live
 ; reloader, never GUI controls captured by a one-shot completion callback.
 _PersonalTomlResyncSnapshot(Request) {
-	return {
+	Snapshot := {
 		Generation: Request.Generation,
 		FilePath: Request.FilePath,
 		Candidate: Request.Candidate,
@@ -1463,6 +1609,9 @@ _PersonalTomlResyncSnapshot(Request) {
 		CompletionFn: 0,
 		Deferred: false,
 	}
+	if Request.HasOwnProp("DurableImage")
+		Snapshot.DurableImage := Request.DurableImage
+	return Snapshot
 }
 
 ; Accept a complete candidate only behind the exact live owner that guarantees
@@ -1578,6 +1727,13 @@ _PersonalTomlPublishRequestOwned(Request, OwnerToken) {
 	if !_PersonalTomlRequestContextIsCurrent(Request, OwnerToken)
 		return PERSONAL_TOML_COMMIT_FAILED
 
+	if Request.OpeningSource is Map {
+		; Stale consent must refuse before even a retained reload can mutate the
+		; live registry. The writer repeats this admission before staging.
+		if !_PersonalTomlOpeningImageMatches(Request.OpeningSource, Request.FilePath, OwnerToken)
+			return PERSONAL_TOML_COMMIT_FAILED
+	}
+
 	; A previous durable commit whose reload failed must be reconciled before a
 	; newer write can make its failure impossible to diagnose. Retry once, owned,
 	; with no timer; a persistent failure remains latched for the next user action.
@@ -1590,6 +1746,22 @@ _PersonalTomlPublishRequestOwned(Request, OwnerToken) {
 		if _ConfigWriteLeaseKey(PendingResync.FilePath)
 				!= _ConfigWriteLeaseKey(Request.FilePath)
 			return PERSONAL_TOML_COMMIT_FAILED
+		if PendingResync.HasOwnProp("DurableImage") {
+			; A foreign file cannot turn the old acknowledged image into current
+			; source. Keep the existing resync obligation rather than replay it.
+			if !_PersonalTomlRequestContextIsCurrent(Request, OwnerToken)
+				return PERSONAL_TOML_COMMIT_FAILED
+			Observed := _PersonalTomlReadOpeningImage(PendingResync.FilePath)
+			if !Observed["admitted"] || !Observed["present"]
+				|| !(PendingResync.DurableImage is String)
+				|| !(Observed["content"] == PendingResync.DurableImage)
+				return PERSONAL_TOML_COMMIT_FAILED
+			if !_PersonalTomlWriteLeaseOwns(OwnerToken, Request.FilePath)
+				|| A_IsSuspended
+				|| _ConfigWriteLeaseKey(PersonalTomlPath()) != _ConfigWriteLeaseKey(Request.FilePath)
+				|| (Request.OpeningSource is Map && !_PersonalTomlOpeningSessionCurrent(Request.OpeningSource))
+				return PERSONAL_TOML_COMMIT_FAILED
+		}
 		if !_PersonalTomlReloadRequestOwned(PendingResync, OwnerToken)
 			return PERSONAL_TOML_COMMIT_FAILED
 	}
@@ -1597,8 +1769,11 @@ _PersonalTomlPublishRequestOwned(Request, OwnerToken) {
 	if !WritePersonalToml(Request.Candidate, Request.WriterFn,
 			Request.ReplaceFn, Request.DeleteFn,
 			_PersonalTomlAuthorizeLiveRequest.Bind(Request, OwnerToken),
-			OwnerToken)
+			OwnerToken, Request.OpeningSource)
 		return PERSONAL_TOML_COMMIT_FAILED
+
+	if Request.OpeningSource is Map
+		Request.DurableImage := Request.OpeningSource["content"]
 
 	; The rename is durable but the path/suspend authority may have changed while
 	; the OS call was in flight. Never project those bytes into the wrong live HSE.
@@ -1749,14 +1924,14 @@ _PersonalTomlTryPublishRequest(Request) {
 
 PersonalTomlCommitAndReload(Data, RequestedSections := 0, WriterFn := 0,
 		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0, ReloadFn := 0,
-		CompletionFn := 0, SuspendFn := 0) {
+		CompletionFn := 0, SuspendFn := 0, OpeningSource := 0) {
 	global PERSONAL_TOML_COMMIT_FAILED
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return PersonalTomlCommitAndReload(Data, RequestedSections,
 			WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, ReloadFn,
-			CompletionFn, SuspendFn)
+			CompletionFn, SuspendFn, OpeningSource)
 		finally Critical(InheritedCritical)
 	}
 	HasInjectedReloader := !((ReloadFn is Integer) && ReloadFn == 0)
@@ -1817,6 +1992,7 @@ PersonalTomlCommitAndReload(Data, RequestedSections := 0, WriterFn := 0,
 		HasInjectedReloader: HasInjectedReloader,
 		CompletionFn: CompletionFn,
 		SuspendFn: SuspendFn,
+		OpeningSource: OpeningSource,
 		Deferred: false,
 	}
 	return _PersonalTomlTryPublishRequest(Request)

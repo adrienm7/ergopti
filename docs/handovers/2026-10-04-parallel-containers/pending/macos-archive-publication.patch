@@ -1,0 +1,3647 @@
+diff --git a/.github/workflows/ci-macos.yml b/.github/workflows/ci-macos.yml
+index 2e053e063..774771b40 100644
+--- a/.github/workflows/ci-macos.yml
++++ b/.github/workflows/ci-macos.yml
+@@ -29,7 +29,7 @@ on:
+         description: Sparkle EdDSA public key embedded as SUPublicEDKey; absent for fork pull requests
+         required: false
+       SPARKLE_ED_PRIVATE_KEY:
+-        description: Sparkle EdDSA private key that signs the release zip; passed on release runs only
++        description: Sparkle EdDSA private key that signs the declared release archives; passed on release runs only
+         required: false
+       MACOS_SIGNING_CERTIFICATE_BASE64:
+         description: Self-signed code-signing .p12, base64; passed on release runs only
+@@ -179,6 +179,19 @@ jobs:
+         run: swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci"
+         timeout-minutes: 10
+ 
++      # The native archive fixture uses disposable file keys on every run.
++      - name: Install Sparkle signing tool
++        shell: bash
++        env:
++          SPARKLE_VERSION: '2.9.2'
++        run: |
++          set -euo pipefail
++          curl -fsSLo /tmp/Sparkle.tar.xz \
++              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
++          mkdir -p /tmp/sparkle-dist
++          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
++          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
++
+       # Keep XCTest serial: the lease tests install process-wide signal handlers
+       # and fork/reap real children, so parallel workers would race each other.
+       - name: Run Swift launcher tests
+@@ -189,11 +202,19 @@ jobs:
+           set -euo pipefail
+           mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"
+           xctest_log="$(mktemp "$RUNNER_TEMP/swift-launcher-evidence/xctest.log.XXXXXX")"
++          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$RUNNER_TEMP/swift-launcher-evidence/tis-session.XXXXXX")"
++          echo "tis_session_dir=$ERGOPTI_TIS_EVIDENCE_DIR" >> "$GITHUB_OUTPUT"
++          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+           set +e
+           script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"
+           swift_pipeline_status=("${PIPESTATUS[@]}")
+-          set -e
+           node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json"
++          xctest_evidence_status=$?
++          node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"
++          tis_evidence_status=$?
++          set -e
++          if [ "$xctest_evidence_status" -ne 0 ]; then exit "$xctest_evidence_status"; fi
++          if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi
+           if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
+               echo "::error::the XCTest process ended without its successful suite summary"
+               exit 1
+@@ -208,6 +229,19 @@ jobs:
+           path: ${{ runner.temp }}/swift-launcher-evidence
+           if-no-files-found: error
+ 
++      # Preserve only the fresh session acquired by this exact Swift step.
++      - name: Retain closed TIS diagnostic session
++        if: ${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}
++        uses: actions/upload-artifact@v4
++        with:
++          name: swift-tis-session-${{ github.run_id }}-${{ github.run_attempt }}
++          path: |
++            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/start.json
++            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/manifest.json
++            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/record-*.dat
++            ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/refusal.json
++          if-no-files-found: error
++
+       # LauncherLogTests append to the real launcher log,
+       # ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke below
+       # refuses to judge a launch over a launcher log it did not start fresh.
+@@ -319,23 +353,10 @@ jobs:
+           path: ${{ runner.temp }}/release-launch
+           if-no-files-found: warn
+ 
+-      - name: Install Sparkle signing tool
+-        if: inputs.release
+-        shell: bash
+-        env:
+-          SPARKLE_VERSION: '2.9.2'
+-        run: |
+-          set -euo pipefail
+-          curl -fsSLo /tmp/Sparkle.tar.xz \
+-              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+-          mkdir -p /tmp/sparkle-dist
+-          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
+-          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
+-
+       # A release fails here rather than skipping the signature: without it no
+       # appcast is written, and Release would otherwise have nothing to feed
+       # Sparkle. This is the only step that sees the private key.
+-      - name: Sign zip with Sparkle EdDSA key
++      - name: Sign declared archives with Sparkle EdDSA key
+         if: inputs.release
+         shell: bash
+         env:
+@@ -347,10 +368,10 @@ jobs:
+               exit 1
+           fi
+           printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
+-          "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
+-              > build/macos/_ErgoptiPlus.app.zip.sig
+-          rm -f /tmp/sparkle_priv.key
+-          echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
++          trap 'rm -f /tmp/sparkle_priv.key' EXIT
++          node tools/build/macos-release-publication.cjs sign \
++              build/macos "$SIGN_UPDATE" /tmp/sparkle_priv.key
++          echo "Declared Sparkle archive signatures and exact publication receipt written."
+ 
+       - name: Generate Sparkle appcast
+         if: inputs.release
+@@ -359,8 +380,7 @@ jobs:
+           ERGOPTI_VERSION: ${{ inputs.version }}
+           ERGOPTI_BUILD: ${{ github.run_number }}
+           ERGOPTI_CHANNEL: ${{ inputs.channel }}
+-          SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
+-          ZIP_PATH: build/macos/ErgoptiPlus.app.zip
++          ARCHIVE_DIR: build/macos
+           GH_OWNER: ${{ github.repository_owner }}
+           GH_REPO: ${{ github.event.repository.name }}
+           OUTPUT_PATH: build/macos/appcast-${{ inputs.channel }}.xml
+@@ -387,8 +407,8 @@ jobs:
+           path: build/macos/ErgoptiPlus.app.ci-receipt.json
+ 
+       # CI installs the first declared available format from the independently
+-      # signed source receipt. Public release assets, Sparkle and Homebrew keep ZIP
+-      # until their separate migration. Keep release artifacts for seven days so
++      # signed source receipt. Public consumers validate their own archive/signature publication
++      # receipt. Keep release artifacts for seven days so
+       # a next-day retry can find the archive this job gated.
+       - name: Upload the package
+         uses: actions/upload-artifact@v4
+@@ -401,7 +421,8 @@ jobs:
+             build/macos/ErgoptiPlus.app.zip
+             build/macos/ErgoptiPlus.app.tar.xz
+             build/macos/Ergopti_macOS.zip
+-            build/macos/_ErgoptiPlus.app.zip.sig
++            build/macos/_*.sig
++            build/macos/macos-publication.json
+             build/macos/appcast-*.xml
+ 
+   # ─────────────────────────────────────────────────
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index e23367d16..56d97dc90 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -627,6 +627,11 @@ jobs:
+                   exit 1
+               fi
+           fi
++          # Only a fresh publication requires the new producer's complete signed
++          # set. Historical published releases retain their attached feed.
++          if [ "$create_release" = true ]; then
++              node tools/build/macos-release-publication.cjs validate release-assets
++          fi
+           echo "create_tag=$create_tag" >> "$GITHUB_OUTPUT"
+           echo "create_release=$create_release" >> "$GITHUB_OUTPUT"
+           echo "skip_feed=$skip_feed" >> "$GITHUB_OUTPUT"
+@@ -706,8 +711,8 @@ jobs:
+           branch="sparkle-appcasts"
+           worktree="$RUNNER_TEMP/sparkle-appcasts"
+           # The appcast carries the size and the EdDSA signature of one exact
+-          # zip. When an earlier attempt already published the release, that
+-          # zip is the release's, so its own appcast is published, never this
++          # archive. When an earlier attempt already published the release, that
++          # archive is the release's, so its own appcast is published, never this
+           # attempt's artifact, which a rebuilt package would no longer match.
+           if [ "$RESUMED" = true ]; then
+               gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+@@ -775,13 +780,14 @@ jobs:
+               exit 0
+           fi
+           download="$RUNNER_TEMP/homebrew-asset"
+-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+-              --pattern ErgoptiPlus.app.zip --dir "$download" --clobber
+-          sha=$(sha256sum "$download/ErgoptiPlus.app.zip" | cut -d ' ' -f 1)
++          selected=$(node tools/build/macos-release-publication.cjs download \
++              "$GITHUB_REPOSITORY" "$TAG" "$download")
++          archive=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.name)' "$selected")
++          sha=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.sha256)' "$selected")
+ 
+           tap="$RUNNER_TEMP/homebrew-tap"
+           git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPOSITORY}.git" "$tap"
+-          cask=$(node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap")
++          cask=$(node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap" "$archive")
+           git -C "$tap" config user.name "github-actions[bot]"
+           git -C "$tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+           git -C "$tap" add -- "$cask"
+diff --git a/.github/workflows/macos-release-launch.yml b/.github/workflows/macos-release-launch.yml
+index 89f6bba26..0ce47d265 100644
+--- a/.github/workflows/macos-release-launch.yml
++++ b/.github/workflows/macos-release-launch.yml
+@@ -69,24 +69,9 @@ jobs:
+           GH_TOKEN: ${{ github.token }}
+           RELEASE_TAG: ${{ inputs.tag || 'v0.0.0-dev.126' }}
+         run: |
+-          python3 - <<'PY'
+-          import hashlib, json, os, pathlib, subprocess
+-          repository = os.environ["GITHUB_REPOSITORY"]
+-          tag = os.environ["RELEASE_TAG"]
+-          release = json.loads(subprocess.check_output(["gh", "release", "view", tag, "--repo", repository, "--json", "assets,tagName"]))
+-          asset, = [entry for entry in release["assets"] if entry["name"] == "ErgoptiPlus.app.zip"]
+-          target = pathlib.Path(os.environ["RUNNER_TEMP"], "release-download")
+-          target.mkdir()
+-          subprocess.run(["gh", "release", "download", tag, "--repo", repository, "--pattern", asset["name"], "--dir", str(target)], check=True)
+-          archive = target / asset["name"]
+-          digest = "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest()
+-          if asset.get("digest") != digest:
+-              raise RuntimeError("Published application digest is absent or mismatched")
+-          pathlib.Path(os.environ["RUNNER_TEMP"], "release-provenance.json").write_text(json.dumps({"tag": tag, "asset": asset, "verified_digest": digest}, indent=2))
+-          if pathlib.Path("/Applications/ErgoptiPlus.app").exists():
+-              raise RuntimeError("Refusing to replace an existing application")
+-          subprocess.run(["ditto", "-x", "-k", str(archive), "/Applications"], check=True)
+-          PY
++          python3 tools/diagnostics/macos_release_launch_test.py
++          python3 tools/diagnostics/macos-release-launch.py --install-published
++
+       - name: Add the missing production dependency to the verified release
+         if: inputs.scenario == 'published_with_dependency'
+         run: |
+diff --git a/docs/ERGOPTIPLUS_TODO.md b/docs/ERGOPTIPLUS_TODO.md
+index e2ffcbf2c..05cf5b84b 100644
+--- a/docs/ERGOPTIPLUS_TODO.md
++++ b/docs/ERGOPTIPLUS_TODO.md
+@@ -773,6 +773,12 @@ CI smoke and install/launch now prefer the first available archive declared by t
+ 
+ The five-file source slice has 22 portable native-owner cases, seven actual workflow cases, two actual evidence controls, two original causal failures and six guard-removal failures. The original producer contract passes with closed filesystem and physical POSIX ports. Native extraction/signing/xattr and the two added Swift cases still require hosted macOS CI; root full selected qualification is pending. Item 36 remains partial until public archive migration and native acceptance are complete.
+ 
++The macOS archive migration is delivered as one coherent consumer and native-validation cohort. Published diagnostics, release signing, appcast generation, Homebrew rendering and release preflight consume the existing declared archive policy. Fresh releases require the declared signed payloads; historical ZIP remains eligible only when the preferred archive is absent. Raw GitHub REST inventory retains actual asset digests, and each archive signature, fragment, length and checksum remains bound to the selected bytes. Ordinary helper ZIP output, unrelated OS assets, immutable appcast attachments and newer-tag safeguards keep their existing owners. Manual OS selection, shared verification and release authorization remain unchanged.
++
++The native package lane installs the existing pinned Sparkle tools before XCTest, while actual product signing, private keys and publication stay behind their original release guards. Its registered disposable-key fixture verifies both archive payloads with the real Sparkle binary and rejects crossed signatures and changed equal-length bytes. A separate owned TIS session retains complete native diagnostics without replacing the strict raw XCTest verdict or hiding incomplete sessions.
++
++This cohort mechanically combines four independently reviewed packets, with exact forward and inverse source proofs and unchanged prior behavioral qualification. No new whole-suite, hosted native, Homebrew, updater or publication acceptance is inferred from composition. Full root verification and a macOS-only native checkpoint remain required. TODO36 remains partial until actual Sparkle archive verification/update and Homebrew install/upgrade acceptance are recorded; signing-only and direct extraction tests do not prove those final consumer behaviors.
++
+ - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
+       should appear only when the layout is really installed (today: always,
+       shipped copy), and whether to move French `suffixes_a` and the magickey
+diff --git a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift
+index 6261067fd..d123066a5 100644
+--- a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift
++++ b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift
+@@ -88,7 +88,14 @@ final class KeyboardSourceTestDiagnostics {
+ 	private(set) var events: [Event] = []
+ 	private(set) var omittedEvents = 0
+ 
+-	init(_ test: String) { self.test = .bounded(test) }
++	private let enrollment: Int?
++
++	init(_ test: String, enroll: Bool = true) {
++		self.test = .bounded(test)
++		// Enrollment precedes the caller's first native capture, including failure
++		// paths. Pure encoder controls explicitly opt out of the bundle session.
++		enrollment = enroll ? KeyboardSourceTestTransport.enroll() : nil
++	}
+ 
+ 	func append(_ event: Event) {
+ 		guard events.count < 64 else { omittedEvents += 1; return }
+@@ -171,7 +178,12 @@ final class KeyboardSourceTestDiagnostics {
+ 	}
+ 
+ 	func emit() {
+-		Self.writeRecord(encode: { try JSONEncoder().encode(receipt()) })
++		guard let enrollment else { XCTFail("TIS diagnostic session was not admitted"); return }
++		Self.writeRecord(encode: { try JSONEncoder().encode(receipt()) }, write: { data in
++			if !KeyboardSourceTestTransport.publish(enrollment, data) {
++				XCTFail("TIS diagnostic publication was not acknowledged")
++			}
++		})
+ 	}
+ }
+ 
+@@ -194,7 +206,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
+ 	}
+ 
+ 	func testReceiptRetainsNativeStatusAndEscapesIdentity() throws {
+-		let recorder = KeyboardSourceTestDiagnostics("controlled.\"identity\n")
++		let recorder = KeyboardSourceTestDiagnostics("controlled.\"identity\n", enroll: false)
+ 		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,
+ 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil))
+ 		let data = try JSONEncoder().encode(recorder.receipt())
+@@ -207,7 +219,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
+ 	}
+ 
+ 	func testEventOverflowIsCountedWithoutChangingPriorReceipt() {
+-		let recorder = KeyboardSourceTestDiagnostics("controlled.bounded")
++		let recorder = KeyboardSourceTestDiagnostics("controlled.bounded", enroll: false)
+ 		let event = KeyboardSourceTestDiagnostics.Event(phase: "controlled", uptime: 1, status: 0,
+ 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil)
+ 		for _ in 0..<67 { recorder.append(event) }
+@@ -221,7 +233,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
+ // call Carbon, change a source, or relax the strict XCTest receipt reader.
+ extension KeyboardSourceTestDiagnosticsTests {
+ 	func testEvidenceWritesOneCompleteUTF8RecordBeforeFollowingReceipt() throws {
+-		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity")
++		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity", enroll: false)
+ 		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,
+ 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil))
+ 		var writes: [Data] = []
+@@ -256,7 +268,7 @@ extension KeyboardSourceTestDiagnosticsTests {
+ 	}
+ 
+ 	func testBoundedLargeReceiptKeepsTerminatorInTheSingleWrite() throws {
+-		let recorder = KeyboardSourceTestDiagnostics(String(repeating: "é", count: 512))
++		let recorder = KeyboardSourceTestDiagnostics(String(repeating: "é", count: 512), enroll: false)
+ 		let event = KeyboardSourceTestDiagnostics.Event(phase: "controlled", uptime: 1, status: -50,
+ 			original: nil, target: nil, current: nil,
+ 			snapshotID: .bounded(String(repeating: "é", count: 512)), keyboardType: nil, unicodeDataBytes: nil)
+diff --git a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestTransport.swift b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestTransport.swift
+new file mode 100644
+index 000000000..921f9a6ce
+--- /dev/null
++++ b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestTransport.swift
+@@ -0,0 +1,296 @@
++// Tests/ErgoptiPlusTests/KeyboardSourceTestTransport.swift
++// Test-only, lossless diagnostic transport. XCTest stdout remains its own owner.
++import CryptoKit
++import Darwin
++import Foundation
++import XCTest
++
++private func tisSHA(_ data: Data) -> String {
++	SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
++}
++
++final class KeyboardSourceTestSession: NSObject, XCTestObservation {
++	struct Record: Codable {
++		let index: Int
++		let bytes: Int
++		let sha256: String
++		let closed: Bool
++	}
++	struct Start: Codable {
++		let version: Int
++		let session: String
++		let producerPID: Int32
++		let bundleSHA256: String
++	}
++	struct Manifest: Codable {
++		let version: Int
++		let session: String
++		let producerPID: Int32
++		let bundleSHA256: String
++		let startSHA256: String
++		let phase: String
++		let enrolledCount: Int
++		let records: [Record]
++	}
++	enum Refusal: Error { case source, publication, terminal }
++	private let root: URL
++	private let nonce: String
++	private let pid: Int32
++	private let bundle: URL
++	private let start: Data
++	private let closeDescriptor: (Int32) -> Int32
++	private let lock = NSLock()
++	private var pending: [Record?] = []
++	private var refused = false
++	private var finished = false
++	private(set) var cleanupDebt = false
++
++	init(root: URL, nonce: String, bundle: URL, pid: Int32,
++		closeDescriptor: @escaping (Int32) -> Int32 = { Darwin.close($0) }) throws {
++		guard root.isFileURL, root.path.hasPrefix("/"), nonce.utf8.count == 64,
++			nonce.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }), pid > 0 else {
++			throw Refusal.source
++		}
++		var state = stat()
++		guard lstat(root.path, &state) == 0, (state.st_mode & S_IFMT) == S_IFDIR,
++			state.st_uid == getuid(), (state.st_mode & 0o077) == 0,
++			try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty else { throw Refusal.source }
++		self.root = root
++		self.nonce = nonce
++		self.pid = pid
++		self.closeDescriptor = closeDescriptor
++		let canonicalBundle = bundle.standardizedFileURL.resolvingSymlinksInPath()
++		self.bundle = canonicalBundle
++		self.start = try JSONEncoder().encode(Start(version: 1, session: nonce, producerPID: pid,
++			bundleSHA256: tisSHA(Data(canonicalBundle.path.utf8))))
++		super.init()
++		guard publishFile("start.json", start) else { throw Refusal.publication }
++	}
++
++	// Write only a newly acquired descriptor. Close is attempted once; a failed
++	// close ACK is retained debt, never permission to close a possibly reused fd.
++	private func publishFile(_ name: String, _ data: Data) -> Bool {
++		guard !cleanupDebt, getpid() == pid else { return false }
++		let stage = root.appendingPathComponent("." + name + ".stage").path
++		let target = root.appendingPathComponent(name).path
++		let descriptor = open(stage, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode_t(0o600))
++		guard descriptor >= 0 else { return false }
++		var offset = 0
++		let written = data.withUnsafeBytes { buffer -> Bool in
++			guard let base = buffer.baseAddress else { return false }
++			while offset < data.count {
++				let count = Darwin.write(descriptor, base.advanced(by: offset), data.count - offset)
++				guard count > 0 else { return false }
++				offset += count
++			}
++			return fsync(descriptor) == 0
++		}
++		let closed = closeDescriptor(descriptor) == 0
++		if !closed { cleanupDebt = true; return false }
++		guard written else {
++			if unlink(stage) != 0 { cleanupDebt = true }
++			return false
++		}
++		// link refuses an existing destination. No delete/replace fallback.
++		guard link(stage, target) == 0 else {
++			if unlink(stage) != 0 { cleanupDebt = true }
++			return false
++		}
++		guard unlink(stage) == 0 else { cleanupDebt = true; return false }
++		return true
++	}
++
++	private func refuse() {
++		refused = true
++		// A later invalid call must also invalidate an already published terminal.
++		_ = publishFile("refusal.json", Data("{\"version\":1,\"refused\":true}".utf8))
++	}
++
++	func enroll() -> Int? {
++		lock.lock(); defer { lock.unlock() }
++		guard !refused, !finished, !cleanupDebt, getpid() == pid, pending.count < 64 else {
++			refuse(); return nil
++		}
++		pending.append(nil)
++		return pending.count
++	}
++
++	func publish(_ index: Int, _ data: Data) -> Bool {
++		lock.lock(); defer { lock.unlock() }
++		guard !refused, !finished, !cleanupDebt, getpid() == pid,
++			index > 0, index <= pending.count, pending[index - 1] == nil,
++			data.count > 0, data.count <= 2_097_152 else { refuse(); return false }
++		guard publishFile(String(format: "record-%06d.dat", index), data) else { refuse(); return false }
++		pending[index - 1] = Record(index: index, bytes: data.count, sha256: tisSHA(data), closed: true)
++		return true
++	}
++
++	func finish(bundle: URL, pid: Int32) -> Bool {
++		lock.lock(); defer { lock.unlock() }
++		guard !refused, !finished, !cleanupDebt, pid == self.pid, getpid() == self.pid,
++			bundle.standardizedFileURL.resolvingSymlinksInPath() == self.bundle,
++			!pending.isEmpty, pending.allSatisfy({ $0 != nil }) else { refuse(); return false }
++		finished = true
++		let manifest = Manifest(version: 1, session: nonce, producerPID: self.pid,
++			bundleSHA256: tisSHA(Data(self.bundle.path.utf8)), startSHA256: tisSHA(start),
++			phase: "closed", enrolledCount: pending.count, records: pending.compactMap { $0 })
++		guard let data = try? JSONEncoder().encode(manifest), publishFile("manifest.json", data) else {
++			refuse(); return false
++		}
++		return true
++	}
++
++	func testBundleDidFinish(_ testBundle: Bundle) {
++		if !finish(bundle: testBundle.bundleURL, pid: ProcessInfo.processInfo.processIdentifier) {
++			XCTFail("TIS diagnostic terminal publication was refused")
++		}
++	}
++}
++
++enum KeyboardSourceTestTransport {
++	// Strong process-local ownership; forked children cannot inherit admission.
++	private static let session: KeyboardSourceTestSession? = {
++		let environment = ProcessInfo.processInfo.environment
++		guard let path = environment["ERGOPTI_TIS_EVIDENCE_DIR"],
++			let nonce = environment["ERGOPTI_TIS_EVIDENCE_SESSION"] else { return nil }
++		guard let owner = try? KeyboardSourceTestSession(root: URL(fileURLWithPath: path), nonce: nonce,
++			bundle: Bundle(for: KeyboardSourceTestDiagnosticsTests.self).bundleURL,
++			pid: ProcessInfo.processInfo.processIdentifier) else { return nil }
++		XCTestObservationCenter.shared.addTestObserver(owner)
++		return owner
++	}()
++	static func enroll() -> Int? {
++		guard let index = session?.enroll() else { XCTFail("TIS diagnostic enrollment was refused"); return nil }
++		return index
++	}
++	static func publish(_ index: Int, _ data: Data) -> Bool { session?.publish(index, data) == true }
++}
++
++final class KeyboardSourceTestTransportTests: XCTestCase {
++	private func fixture(_ body: (KeyboardSourceTestSession, URL) throws -> Void) throws {
++		let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
++		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
++			attributes: [.posixPermissions: 0o700])
++		defer { try? FileManager.default.removeItem(at: root) }
++		let owner = try KeyboardSourceTestSession(root: root, nonce: String(repeating: "a", count: 64),
++			bundle: Bundle(for: Self.self).bundleURL, pid: getpid())
++		try body(owner, root)
++	}
++
++	func testExactLargeEncoderBytesCloseBeforeTerminalPublication() throws {
++		try fixture { owner, root in
++			let index = try XCTUnwrap(owner.enroll())
++			let recorder = KeyboardSourceTestDiagnostics("controlled.é", enroll: false)
++			for _ in 0..<64 {
++				recorder.append(.init(phase: "controlled", uptime: 1, status: -50,
++					original: nil, target: nil, current: nil,
++					snapshotID: .bounded(String(repeating: "é", count: 512)), keyboardType: nil, unicodeDataBytes: nil))
++			}
++			let json = try JSONEncoder().encode(recorder.receipt())
++			var record = Data("TIS_TEST_EVIDENCE ".utf8); record.append(json); record.append(0x0A)
++			XCTAssertGreaterThan(record.count, 4_096)
++			XCTAssertTrue(owner.publish(index, record))
++			XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("record-000001.dat")), record)
++			XCTAssertFalse(owner.cleanupDebt)
++			XCTAssertTrue(owner.finish(bundle: Bundle(for: Self.self).bundleURL, pid: getpid()))
++			let terminal = try JSONDecoder().decode(KeyboardSourceTestSession.Manifest.self,
++				from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
++			XCTAssertEqual(terminal.records.first?.sha256, tisSHA(record))
++			XCTAssertEqual(terminal.records.first?.bytes, record.count)
++			XCTAssertEqual(terminal.enrolledCount, 1)
++		}
++	}
++
++	func testActualObserverCallbackPublishesOnlyItsExactBundle() throws {
++		try fixture { owner, root in
++			let index = try XCTUnwrap(owner.enroll())
++			let recorder = KeyboardSourceTestDiagnostics("controlled.callback", enroll: false)
++			var bytes = Data()
++			KeyboardSourceTestDiagnostics.writeRecord(encode: { try JSONEncoder().encode(recorder.receipt()) },
++				write: { bytes = $0 })
++			XCTAssertTrue(owner.publish(index, bytes))
++			owner.testBundleDidFinish(Bundle(for: Self.self))
++			XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("manifest.json").path))
++			XCTAssertFalse(owner.finish(bundle: Bundle(for: Self.self).bundleURL, pid: getpid()))
++			XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("refusal.json").path))
++		}
++	}
++
++	func testLastUnemittedEnrollmentCannotPublishTerminal() throws {
++		try fixture { owner, root in
++			XCTAssertNotNil(owner.enroll())
++			XCTAssertFalse(owner.finish(bundle: Bundle(for: Self.self).bundleURL, pid: getpid()))
++			XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("manifest.json").path))
++		}
++	}
++
++	func testForeignBundleAndDuplicatePublicationRefuseWithoutReplacingBytes() throws {
++		try fixture { owner, root in
++			let index = try XCTUnwrap(owner.enroll())
++			let bytes = Data("controlled complete record\n".utf8)
++			XCTAssertTrue(owner.publish(index, bytes))
++			XCTAssertFalse(owner.publish(index, Data("foreign".utf8)))
++			XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("record-000001.dat")), bytes)
++			XCTAssertFalse(owner.finish(bundle: Bundle(for: Self.self).bundleURL, pid: getpid()))
++		}
++		try fixture { owner, _ in
++			XCTAssertNotNil(owner.enroll())
++			XCTAssertFalse(owner.finish(bundle: URL(fileURLWithPath: "/foreign.bundle"), pid: getpid()))
++		}
++	}
++
++	func testExistingNativeDestinationIsNeverOverwritten() throws {
++		try fixture { owner, root in
++			let index = try XCTUnwrap(owner.enroll())
++			let target = root.appendingPathComponent("record-000001.dat")
++			let foreign = Data("foreign bytes".utf8)
++			try foreign.write(to: target, options: .withoutOverwriting)
++			XCTAssertFalse(owner.publish(index, Data("owned".utf8)))
++			XCTAssertEqual(try Data(contentsOf: target), foreign)
++			XCTAssertNil(owner.enroll())
++		}
++	}
++	func testZeroRecordsAndForeignPIDCannotPublishTerminal() throws {
++		try fixture { owner, root in
++			XCTAssertFalse(owner.finish(bundle: Bundle(for: Self.self).bundleURL, pid: getpid()))
++			XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("manifest.json").path))
++		}
++		try fixture { owner, _ in
++			let index = try XCTUnwrap(owner.enroll())
++			XCTAssertTrue(owner.publish(index, Data("controlled\n".utf8)))
++			XCTAssertFalse(owner.finish(bundle: Bundle(for: Self.self).bundleURL, pid: getpid() + 1))
++		}
++	}
++
++	func testForeignNativePIDCannotAcquireAnyPublicationFile() throws {
++		let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
++		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
++			attributes: [.posixPermissions: 0o700])
++		defer { try? FileManager.default.removeItem(at: root) }
++		XCTAssertThrowsError(try KeyboardSourceTestSession(root: root, nonce: String(repeating: "a", count: 64),
++			bundle: Bundle(for: Self.self).bundleURL, pid: getpid() + 1))
++		XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
++	}
++
++	func testNativeCloseRefusalKeepsDebtAndBlocksSuccessor() throws {
++		let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
++		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
++			attributes: [.posixPermissions: 0o700])
++		defer { try? FileManager.default.removeItem(at: root) }
++		var closes = 0
++		let owner = try KeyboardSourceTestSession(root: root, nonce: String(repeating: "a", count: 64),
++			bundle: Bundle(for: Self.self).bundleURL, pid: getpid(), closeDescriptor: { descriptor in
++				let native = Darwin.close(descriptor)
++				closes += 1
++				return closes == 2 ? -1 : native
++			})
++		let index = try XCTUnwrap(owner.enroll())
++		XCTAssertFalse(owner.publish(index, Data("owned\n".utf8)))
++		XCTAssertTrue(owner.cleanupDebt)
++		XCTAssertNil(owner.enroll())
++		XCTAssertFalse(owner.finish(bundle: Bundle(for: Self.self).bundleURL, pid: getpid()))
++		XCTAssertEqual(closes, 2, "A refused close is never retried on a reused descriptor")
++		XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("manifest.json").path))
++	}
++
++}
+diff --git a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift
+index cff809d9f..c7e7b9546 100644
+--- a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift
++++ b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift
+@@ -5,6 +5,7 @@
+ // copy of the independently built fixture; no installed app is changed or run.
+ 
+ import Foundation
++import Security
+ import XCTest
+ 
+ final class ReleaseArchiveStagingTests: XCTestCase {
+@@ -381,4 +382,156 @@ final class ReleaseArchiveStagingTests: XCTestCase {
+ 			XCTAssertFalse(try manager.contentsOfDirectory(atPath: input.path).contains { $0.hasPrefix(".ci-install-") })
+ 		}
+ 	}
++
++	/// Key commands never include their captured text in thrown failures. The
++	/// existing exact-child deadline/retirement owner retains inputs on debt.
++	private func privateSparkleChild(_ executable: String, _ arguments: [String], root: URL) throws -> Receipt {
++		guard let failuresBefore = testRun?.failureCount else {
++			throw FixtureError.toolFailure("owned-native-child-observation-unavailable", -1, "")
++		}
++		do {
++			let receipt = try child(executable, arguments, root: root)
++			// The shared child owner records a non-exit or still-running receipt
++			// through XCTest. Retain private inputs on that exact owner refusal;
++			// its assertions must never be converted into a signing receipt.
++			guard testRun?.failureCount == failuresBefore else {
++				fixtureCanRetire = false
++				throw FixtureError.toolFailure("owned-native-child-retirement-refused", -1, "")
++			}
++			return receipt
++		} catch { throw FixtureError.toolFailure("owned-native-signer-child", -1, "") }
++	}
++
++	private func privateSparkleRetire(_ root: URL) {
++		guard fixtureCanRetire else {
++			XCTFail("The private signer fixture retains its inputs until its child retires")
++			return
++		}
++		do {
++			try manager.removeItem(at: root)
++			XCTAssertFalse(manager.fileExists(atPath: root.path))
++		} catch { XCTFail("The private signer fixture could not retire") }
++	}
++
++	/// This uses the pinned Sparkle decoder's 32-byte seed ABI, not generate_keys
++	/// or the login Keychain. No key bytes are arguments, output or evidence.
++	func testActualSparkleFileKeyBindsBothArchivesAndRefusesCrossedSameLengthSignatures() throws {
++		let root = try scratch()
++		defer { privateSparkleRetire(root) }
++		try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
++		guard let signer = ProcessInfo.processInfo.environment["SIGN_UPDATE"],
++			!signer.isEmpty, manager.isExecutableFile(atPath: signer) else {
++			throw FixtureError.toolFailure("owned-native-signer-unavailable", -1, "")
++		}
++		let app = try signedBundle(root: root)
++		let preferred = try archive("tar.xz", app: app, root: root)
++		let directory = preferred.deletingLastPathComponent()
++		let payloads = [preferred, directory.appendingPathComponent("ErgoptiPlus.app.zip")]
++		let before = try payloads.map { try Data(contentsOf: $0) }
++		var seed = [UInt8](repeating: 0, count: 32)
++		let randomStatus = seed.withUnsafeMutableBytes { bytes in
++			SecRandomCopyBytes(kSecRandomDefault, bytes.count, bytes.baseAddress!)
++		}
++		guard randomStatus == errSecSuccess else {
++			throw FixtureError.toolFailure("owned-native-seed-refused", -1, "")
++		}
++		let key = root.appendingPathComponent("owned-file-key")
++		guard manager.createFile(atPath: key.path,
++			contents: Data(Data(seed).base64EncodedString().utf8),
++			attributes: [.posixPermissions: 0o600]) else {
++			throw FixtureError.toolFailure("owned-native-key-create-refused", -1, "")
++		}
++		let keyAttributes = try manager.attributesOfItem(atPath: key.path)
++		XCTAssertEqual((keyAttributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
++		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-publication.cjs")
++		let published = try privateSparkleChild("/usr/bin/env",
++			["node", owner.path, "sign", directory.path, signer, key.path], root: root)
++		XCTAssertEqual(published.status, 0, "The actual publication owner must use the native file-key signer")
++		XCTAssertTrue(published.stderr.isEmpty, "The native file-key signer must complete without errors")
++		guard published.status == 0 else {
++			throw FixtureError.toolFailure("owned-native-publication-refused", published.status, "")
++		}
++		let receiptURL = directory.appendingPathComponent("macos-publication.json")
++		let receipt = try XCTUnwrap(try JSONSerialization.jsonObject(with:
++			Data(contentsOf: receiptURL)) as? [String: Any])
++		let records = try XCTUnwrap(receipt["archives"] as? [[String: Any]])
++		XCTAssertEqual(records.count, 2)
++		guard records.count == 2 else {
++			throw FixtureError.toolFailure("owned-native-records-incomplete", -1, "")
++		}
++		XCTAssertEqual(records.compactMap { $0["format"] as? String }, ["tar.xz", "zip"])
++		let expression = try NSRegularExpression(pattern: #"^sparkle:edSignature="([A-Za-z0-9+/]{86}==)" length="([1-9][0-9]*)"\n$"#)
++		var signatures: [String] = []
++		for (index, payload) in payloads.enumerated() {
++			let fragment = try String(contentsOf: directory.appendingPathComponent("_" + payload.lastPathComponent + ".sig"), encoding: .utf8)
++			let match = try XCTUnwrap(expression.firstMatch(in: fragment,
++				range: NSRange(fragment.startIndex..., in: fragment)))
++			let signature = String(fragment[try XCTUnwrap(Range(match.range(at: 1), in: fragment))])
++			let length = String(fragment[try XCTUnwrap(Range(match.range(at: 2), in: fragment))])
++			let decoded = try XCTUnwrap(Data(base64Encoded: signature))
++			XCTAssertEqual(decoded.count, 64)
++			XCTAssertEqual(signature.count, 88)
++			XCTAssertTrue(decoded.base64EncodedString() == signature)
++			XCTAssertEqual(Int(length), before[index].count)
++			XCTAssertEqual((records[index]["size"] as? NSNumber)?.intValue, before[index].count)
++			XCTAssertEqual(records[index]["sha256"] as? String, try digest(payload, root: root))
++			XCTAssertEqual(records[index]["fragment_sha256"] as? String,
++				try digest(directory.appendingPathComponent("_" + payload.lastPathComponent + ".sig"), root: root))
++			let verified = try privateSparkleChild(signer,
++				["--verify", "-f", key.path, payload.path, signature], root: root)
++			XCTAssertEqual(verified.status, 0, "The real Sparkle verifier must accept its own payload")
++			XCTAssertTrue(verified.stderr.isEmpty, "Native verification must produce no errors")
++			signatures.append(signature)
++		}
++		guard signatures.count == 2 else {
++			throw FixtureError.toolFailure("owned-native-signatures-incomplete", -1, "")
++		}
++		XCTAssertFalse(signatures[0] == signatures[1], "Distinct archive bytes must have distinct signatures")
++		XCTAssertEqual(signatures[0].count, signatures[1].count)
++		for (index, payload) in payloads.enumerated() {
++			let crossed = try privateSparkleChild(signer,
++				["--verify", "-f", key.path, payload.path, signatures[1 - index]], root: root)
++			XCTAssertEqual(crossed.status, 1, "A valid equal-length signature for the other archive must refuse")
++			XCTAssertTrue(crossed.stdout.contains("Error: failed to pass signing verification."),
++				"The native verifier must reach its actual cryptographic refusal")
++			var changed = before[index]
++			changed[changed.startIndex] ^= 1
++			XCTAssertEqual(changed.count, before[index].count)
++			let modified = root.appendingPathComponent("same-length-payload-\(index)")
++			try changed.write(to: modified)
++			let refused = try privateSparkleChild(signer,
++				["--verify", "-f", key.path, modified.path, signatures[index]], root: root)
++			XCTAssertEqual(refused.status, 1, "The native verifier must refuse changed same-length bytes")
++			XCTAssertTrue(refused.stdout.contains("Error: failed to pass signing verification."),
++				"Same-length byte mutations must reach the native cryptographic refusal")
++			XCTAssertEqual(try Data(contentsOf: payload), before[index])
++			let stillOwned = try privateSparkleChild(signer,
++				["--verify", "-f", key.path, payload.path, signatures[index]], root: root)
++			XCTAssertEqual(stillOwned.status, 0, "Negative controls must leave the original signature valid")
++		}
++		let malformed = root.appendingPathComponent("invalid-file-key")
++		guard manager.createFile(atPath: malformed.path,
++			contents: Data(Data(seed.prefix(31)).base64EncodedString().utf8),
++			attributes: [.posixPermissions: 0o600]) else {
++			throw FixtureError.toolFailure("owned-invalid-key-create-refused", -1, "")
++		}
++		for invalid in [malformed, root.appendingPathComponent("absent-file-key")] {
++			let refused = try privateSparkleChild(signer, ["-f", invalid.path, preferred.path], root: root)
++			XCTAssertNotEqual(refused.status, 0, "Missing or malformed owned file keys cannot sign")
++			XCTAssertFalse(refused.stdout.hasPrefix("sparkle:edSignature="))
++			let rejectedDirectory = root.appendingPathComponent("refused-publication-" + UUID().uuidString)
++			try manager.createDirectory(at: rejectedDirectory, withIntermediateDirectories: false)
++			for (index, payload) in payloads.enumerated() {
++				try before[index].write(to: rejectedDirectory.appendingPathComponent(payload.lastPathComponent))
++			}
++			let unpublished = try privateSparkleChild("/usr/bin/env",
++				["node", owner.path, "sign", rejectedDirectory.path, signer, invalid.path], root: root)
++			XCTAssertNotEqual(unpublished.status, 0, "The actual publication owner must reject the invalid native key")
++			XCTAssertFalse(manager.fileExists(atPath: rejectedDirectory.appendingPathComponent("macos-publication.json").path))
++			for payload in payloads {
++				XCTAssertFalse(manager.fileExists(atPath: rejectedDirectory.appendingPathComponent("_" + payload.lastPathComponent + ".sig").path))
++			}
++		}
++		XCTAssertEqual(try Data(contentsOf: preferred), before[0])
++	}
+ }
+diff --git a/tools/build/generate_appcast.sh b/tools/build/generate_appcast.sh
+index efa7531b8..144e95ad3 100644
+--- a/tools/build/generate_appcast.sh
++++ b/tools/build/generate_appcast.sh
+@@ -6,7 +6,7 @@
+ # DESCRIPTION:
+ # Emits a minimal Sparkle-compatible appcast XML file that tells Sparkle where
+ # to download the next release and how to verify it. Called by release.yml
+-# after the zip has been signed with sign_update.
++# after the selected archive has been signed and verified with sign_update.
+ #
+ # All inputs are read from environment variables so the script is usable both
+ # from CI and from a maintainer's terminal without argument juggling.
+@@ -16,7 +16,8 @@
+ #   ERGOPTI_BUILD    — integer build number (CFBundleVersion in Info.plist)
+ #   ERGOPTI_CHANNEL  — update channel id (_shared/modules/updater/channels.json)
+ #   SPARKLE_SIG_FILE — path to the .sig file written by sign_update
+-#   ZIP_PATH         — path to ErgoptiPlus.app.zip
++#   ARCHIVE_DIR      — fresh signed archives and their publication receipt
++#   ZIP_PATH         — explicit historical ZIP input (without ARCHIVE_DIR)
+ #   GH_OWNER         — GitHub organisation / user name
+ #   GH_REPO          — GitHub repository name
+ #   OUTPUT_PATH      — where to write the finished appcast-{channel}.xml
+@@ -24,59 +25,6 @@
+ 
+ set -euo pipefail
+ 
+-: "${ERGOPTI_VERSION:?Required: ERGOPTI_VERSION}"
+-: "${ERGOPTI_BUILD:?Required: ERGOPTI_BUILD}"
+-: "${ERGOPTI_CHANNEL:?Required: ERGOPTI_CHANNEL}"
+-: "${SPARKLE_SIG_FILE:?Required: SPARKLE_SIG_FILE}"
+-: "${ZIP_PATH:?Required: ZIP_PATH}"
+-: "${GH_OWNER:?Required: GH_OWNER}"
+-: "${GH_REPO:?Required: GH_REPO}"
+-: "${OUTPUT_PATH:?Required: OUTPUT_PATH}"
+-
+-TAG="v${ERGOPTI_VERSION}"
+-ZIP_URL="https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/${TAG}/ErgoptiPlus.app.zip"
+-ZIP_SIZE="$(wc -c < "${ZIP_PATH}" | tr -d ' ')"
+-SIG_FRAGMENT="$(tr -d '\r\n' < "${SPARKLE_SIG_FILE}")"
+-SIGNATURE_VALUE="$(printf '%s\n' "${SIG_FRAGMENT}" |
+-  sed -nE 's|^sparkle:edSignature="([A-Za-z0-9+/=]+)" length="([0-9]+)"$|\1|p')"
+-SIGNED_SIZE="$(printf '%s\n' "${SIG_FRAGMENT}" |
+-  sed -nE 's|^sparkle:edSignature="([A-Za-z0-9+/=]+)" length="([0-9]+)"$|\2|p')"
+-if [[ -z "${SIGNATURE_VALUE}" || -z "${SIGNED_SIZE}" ]]; then
+-  echo "[appcast] invalid sign_update fragment: expected one EdDSA signature and numeric length" >&2
+-  exit 1
+-fi
+-EXPECTED_FRAGMENT="sparkle:edSignature=\"${SIGNATURE_VALUE}\" length=\"${SIGNED_SIZE}\""
+-if [[ "${SIG_FRAGMENT}" != "${EXPECTED_FRAGMENT}" ]]; then
+-  echo "[appcast] sign_update fragment contains unexpected attributes or whitespace" >&2
+-  exit 1
+-fi
+-if [[ "${SIGNED_SIZE}" != "${ZIP_SIZE}" ]]; then
+-  echo "[appcast] sign_update length ${SIGNED_SIZE} does not match archive size ${ZIP_SIZE}" >&2
+-  exit 1
+-fi
+-PUB_DATE="$(date -R)"
+-
+-cat > "${OUTPUT_PATH}" << EOF
+-<?xml version="1.0" encoding="utf-8"?>
+-<rss version="2.0"
+-     xmlns:sparkle="http://www.andymattes.com/xml/namespaces/sparkle/1.0"
+-     xmlns:dc="http://purl.org/dc/elements/1.1/">
+-  <channel>
+-    <title>Ergopti</title>
+-    <link>https://github.com/${GH_OWNER}/${GH_REPO}</link>
+-    <item>
+-      <title>Ergopti ${ERGOPTI_VERSION}</title>
+-      <pubDate>${PUB_DATE}</pubDate>
+-      <sparkle:version>${ERGOPTI_BUILD}</sparkle:version>
+-      <sparkle:shortVersionString>${ERGOPTI_VERSION}</sparkle:shortVersionString>
+-      <enclosure
+-        url="${ZIP_URL}"
+-        ${SIG_FRAGMENT}
+-        type="application/octet-stream"
+-      />
+-    </item>
+-  </channel>
+-</rss>
+-EOF
+-
+-echo "[appcast] ${OUTPUT_PATH} — channel=${ERGOPTI_CHANNEL} version=${ERGOPTI_VERSION} size=${ZIP_SIZE}"
++# Fresh CI uses the exact publication signing receipt; explicit historical ZIP
++# callers keep their strict fragment/length contract in the same owning helper.
++node "$(dirname "$0")/macos-release-publication.cjs" appcast
+diff --git a/tools/build/homebrew-cask.cjs b/tools/build/homebrew-cask.cjs
+index 64d52386e..5eb2aef81 100644
+--- a/tools/build/homebrew-cask.cjs
++++ b/tools/build/homebrew-cask.cjs
+@@ -33,7 +33,7 @@
+  * 4. The postflight clears the quarantine flag: the app is not notarised, and
+  *    Gatekeeper would otherwise refuse to open it.
+  *
+- * USAGE:  node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir>
++ * USAGE:  node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> [declared-asset]
+  *         Prints the path of the cask it wrote, relative to <tap-dir>.
+  *         node tools/build/homebrew-cask.cjs --token <channel>
+  *         Prints the cask token of a channel (the release notes name it).
+@@ -45,6 +45,7 @@
+ const fs = require('fs');
+ const path = require('path');
+ 
++const { bindings } = require('./macos-release-publication.cjs');
+ const { loadChannels, REGISTRY_PATH } = require('./release-channel.cjs');
+ 
+ // Repository publishing the releases and the Sparkle appcasts
+@@ -54,7 +55,8 @@ const SOURCE_REPOSITORY = 'adrienm7/ergopti';
+ const APPCAST_BRANCH = 'sparkle-appcasts';
+ 
+ // Release asset and bundle name (tools/build/build_macos_app.sh)
+-const ASSET_NAME = 'ErgoptiPlus.app.zip';
++const ASSET_NAME = bindings().find((archive) => archive.format === 'zip')?.name;
++if (!ASSET_NAME) throw new Error('The historical macOS cask binding is absent.');
+ const APP_NAME = 'ErgoptiPlus.app';
+ 
+ // Launcher bundle identifier (tools/build/build_macos_app.sh BUNDLE_ID)
+@@ -99,10 +101,12 @@ function tokenForChannel(id) {
+ /**
+  * Renders the cask of one release.
+  * @param {string} tag Release tag, e.g. "v0.0.0-dev.142".
+- * @param {string} sha256 Lowercase hex checksum of the release's app zip.
++ * @param {string} sha256 Lowercase hex checksum of the selected release archive.
+  * @return {{token: string, file: string, text: string}}
+  */
+-function renderCask(tag, sha256) {
++function renderCask(tag, sha256, assetName = ASSET_NAME) {
++	if (!bindings().some((archive) => archive.name === assetName))
++		throw new Error('homebrew-cask: undeclared macOS archive.');
+ 	if (typeof tag !== 'string' || !tag.startsWith('v')) {
+ 		throw new Error(`homebrew-cask: a release tag starts with "v", got ${JSON.stringify(tag)}.`);
+ 	}
+@@ -124,7 +128,7 @@ function renderCask(tag, sha256) {
+ 		`  version "${version}"`,
+ 		`  sha256 "${sha256}"`,
+ 		'',
+-		`  url "https://github.com/${SOURCE_REPOSITORY}/releases/download/v#{version}/${ASSET_NAME}"`,
++		`  url "https://github.com/${SOURCE_REPOSITORY}/releases/download/v#{version}/${assetName}"`,
+ 		`  name "Ergopti+${suffix}"`,
+ 		'  desc "Ergopti keyboard layout companion: hotstrings, tap-holds, gestures and AI"',
+ 		'  homepage "https://ergopti.fr/"',
+@@ -183,14 +187,14 @@ function main(args) {
+ 		process.stdout.write(`${tokenForChannel(args[1])}\n`);
+ 		return 0;
+ 	}
+-	if (args.length !== 3 || args.some((arg) => arg === '')) {
++	if (![3, 4].includes(args.length) || args.some((arg) => arg === '')) {
+ 		console.error(
+-			'usage: node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> | --token <channel>'
++			'usage: node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> [declared-asset] | --token <channel>'
+ 		);
+ 		return 1;
+ 	}
+-	const [tag, sha256, tapDir] = args;
+-	const cask = renderCask(tag, sha256);
++	const [tag, sha256, tapDir, assetName = ASSET_NAME] = args;
++	const cask = renderCask(tag, sha256, assetName);
+ 	const target = path.join(tapDir, cask.file);
+ 	fs.mkdirSync(path.dirname(target), { recursive: true });
+ 	fs.writeFileSync(target, cask.text);
+diff --git a/tools/build/macos-release-publication.cjs b/tools/build/macos-release-publication.cjs
+new file mode 100644
+index 000000000..c644d36cf
+--- /dev/null
++++ b/tools/build/macos-release-publication.cjs
+@@ -0,0 +1,345 @@
++// tools/build/macos-release-publication.cjs
++
++/**
++ * Public macOS archive consumers use the producer's canonical bindings. Signing
++ * receipts bind actual payload and fragment bytes; they are not CI bundle or
++ * native cryptographic verification authority by themselves.
++ */
++'use strict';
++
++const fs = require('node:fs');
++const path = require('node:path');
++const crypto = require('node:crypto');
++const { spawnSync } = require('node:child_process');
++const { resolveArchives } = require('./macos-release-archives.cjs');
++const { shared } = require('../lib/paths.cjs');
++
++const RECEIPT = 'macos-publication.json';
++const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
++
++/** Load the actual canonical policy without copying its names or order. */
++function bindings(defaults) {
++	return resolveArchives(
++		defaults ?? JSON.parse(fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8'))
++	);
++}
++
++/** Refuse absent/unsafe payloads; only explicit historical selection admits ENOENT. */
++function bytes(filename, allowAbsent = false) {
++	let fd;
++	try {
++		fd = fs.openSync(filename, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
++	} catch (error) {
++		if (allowAbsent && error.code === 'ENOENT') return null;
++		throw error;
++	}
++	try {
++		const stat = fs.fstatSync(fd);
++		if (!stat.isFile() || stat.size <= 0 || fs.lstatSync(filename).isSymbolicLink())
++			throw new Error('A public archive input is not a nonempty regular file.');
++		return fs.readFileSync(fd);
++	} finally {
++		fs.closeSync(fd);
++	}
++}
++
++/** Keep native failure output private; the caller receives only closed refusal. */
++function execute(executable, args) {
++	return spawnSync(executable, args, { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
++}
++
++function command(run, executable, args) {
++	const result = run(executable, args);
++	if (
++		!result ||
++		result.error ||
++		!Number.isInteger(result.status) ||
++		result.status !== 0 ||
++		result.signal != null ||
++		typeof result.stdout !== 'string'
++	)
++		throw new Error('Public archive command refused.');
++	return result.stdout;
++}
++
++function fragment(value, size) {
++	if (typeof value !== 'string') throw new Error('Public archive signature fragment refused.');
++	const match = /^sparkle:edSignature="([A-Za-z0-9+/]{86}==)" length="([1-9][0-9]*)"\n?$/.exec(
++		value
++	);
++	if (
++		!match ||
++		Number(match[2]) !== size ||
++		Buffer.from(match[1], 'base64').toString('base64') !== match[1]
++	)
++		throw new Error('Public archive signature fragment refused.');
++	return { text: value.replace(/\n$/, ''), signature: match[1] };
++}
++
++/** Sign and natively verify every retained declared archive with the explicit key. */
++function signArchives(directory, tool, keyFile, options = {}) {
++	const policy = bindings(options.defaults),
++		run = options.execute ?? execute;
++	if (typeof tool !== 'string' || tool === '' || typeof keyFile !== 'string' || keyFile === '')
++		throw new Error('An explicit signing tool and key file are required.');
++	const records = [],
++		owned = [];
++	try {
++		for (const binding of policy) {
++			const target = path.join(directory, binding.name),
++				before = bytes(target);
++			const result = command(run, tool, ['-f', keyFile, target]);
++			const signed = fragment(result, before.length);
++			command(run, tool, ['--verify', '-f', keyFile, target, signed.signature]);
++			if (!bytes(target).equals(before)) throw new Error('The signed public archive changed.');
++			const signatureName = `_${binding.name}.sig`,
++				signatureBytes = Buffer.from(signed.text + '\n');
++			const signaturePath = path.join(directory, signatureName);
++			fs.writeFileSync(signaturePath, signatureBytes, { flag: 'wx', mode: 0o600 });
++			owned.push({
++				filename: signaturePath,
++				stat: fs.lstatSync(signaturePath),
++				sha256: digest(signatureBytes)
++			});
++			records.push({
++				...binding,
++				size: before.length,
++				sha256: digest(before),
++				signature_name: signatureName,
++				fragment_sha256: digest(signatureBytes)
++			});
++		}
++		const receipt = { schema_version: 1, archives: records };
++		fs.writeFileSync(path.join(directory, RECEIPT), JSON.stringify(receipt) + '\n', {
++			flag: 'wx',
++			mode: 0o600
++		});
++		return receipt;
++	} catch (error) {
++		for (const entry of owned) {
++			try {
++				const current = fs.lstatSync(entry.filename);
++				if (
++					current.dev === entry.stat.dev &&
++					current.ino === entry.stat.ino &&
++					digest(bytes(entry.filename)) === entry.sha256
++				)
++					fs.unlinkSync(entry.filename);
++			} catch {
++				/* Preserve the primary refusal and any unretired file. */
++			}
++		}
++		throw error;
++	}
++}
++
++/** Recheck every exact archive/fragment pair before fresh public output. */
++function validatePublication(directory, options = {}) {
++	const policy = bindings(options.defaults);
++	const rawReceipt = bytes(path.join(directory, RECEIPT)).toString('utf8');
++	const receipt = JSON.parse(rawReceipt);
++	if (JSON.stringify(receipt) + '\n' !== rawReceipt)
++		throw new Error('Public signing receipt encoding refused.');
++	if (
++		!receipt ||
++		Object.keys(receipt).sort().join(',') !== 'archives,schema_version' ||
++		receipt.schema_version !== 1 ||
++		!Array.isArray(receipt.archives) ||
++		receipt.archives.length !== policy.length
++	)
++		throw new Error('Public signing receipt refused.');
++	return policy.map((binding, index) => {
++		const record = receipt.archives[index];
++		if (
++			!record ||
++			Object.keys(record).sort().join(',') !==
++				'format,fragment_sha256,name,sha256,signature_name,size' ||
++			record.name !== binding.name ||
++			record.format !== binding.format ||
++			record.signature_name !== `_${binding.name}.sig` ||
++			!Number.isSafeInteger(record.size) ||
++			record.size <= 0 ||
++			typeof record.sha256 !== 'string' ||
++			!/^[a-f0-9]{64}$/.test(record.sha256) ||
++			typeof record.fragment_sha256 !== 'string' ||
++			!/^[a-f0-9]{64}$/.test(record.fragment_sha256)
++		)
++			throw new Error('Public signing receipt binding refused.');
++		const payload = bytes(path.join(directory, binding.name));
++		const signatureBytes = bytes(path.join(directory, record.signature_name));
++		const signature = fragment(signatureBytes.toString('utf8'), payload.length);
++		if (
++			payload.length !== record.size ||
++			digest(payload) !== record.sha256 ||
++			digest(signatureBytes) !== record.fragment_sha256
++		)
++			throw new Error('Public signing receipt bytes changed.');
++		return { ...record, fragment: signature.text };
++	});
++}
++
++/** Only actual absence of a preferred published asset admits the historical one. */
++function selectPublished(release, tag, options = {}) {
++	if (
++		typeof tag !== 'string' ||
++		tag === '' ||
++		!release ||
++		release.isDraft !== false ||
++		release.tagName !== tag ||
++		!Array.isArray(release.assets) ||
++		release.assets.some((asset) => !asset || typeof asset !== 'object')
++	)
++		throw new Error('Published release inventory refused.');
++	for (const binding of bindings(options.defaults)) {
++		const matches = release.assets.filter((asset) => asset.name === binding.name);
++		if (matches.length === 0) continue;
++		if (matches.length !== 1) throw new Error('Published archive inventory is ambiguous.');
++		const asset = matches[0];
++		if (
++			typeof asset.digest !== 'string' ||
++			!/^sha256:[a-f0-9]{64}$/.test(asset.digest) ||
++			!Number.isSafeInteger(asset.size) ||
++			asset.size <= 0
++		)
++			throw new Error('Published archive integrity receipt refused.');
++		return { ...binding, sha256: asset.digest.slice(7), size: asset.size };
++	}
++	throw new Error('Published release has no declared archive.');
++}
++
++/** Hash the actual selected published bytes before the cask receives their name. */
++function downloadPublished(repository, tag, directory, options = {}) {
++	if (
++		typeof repository !== 'string' ||
++		!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repository) ||
++		typeof tag !== 'string' ||
++		tag === ''
++	)
++		throw new Error('Published release identity refused.');
++	const run = options.execute ?? execute;
++	const release = JSON.parse(
++		command(run, 'gh', ['api', `repos/${repository}/releases/tags/${encodeURIComponent(tag)}`])
++	);
++	// Read actual REST fields. Older release-view projections discard digest.
++	if (!release || typeof release !== 'object' || Array.isArray(release))
++		throw new Error('Published release REST inventory refused.');
++	const selected = selectPublished(
++		{ isDraft: release.draft, tagName: release.tag_name, assets: release.assets },
++		tag,
++		options
++	);
++	fs.mkdirSync(directory);
++	command(run, 'gh', [
++		'release',
++		'download',
++		tag,
++		'--repo',
++		repository,
++		'--pattern',
++		selected.name,
++		'--dir',
++		directory
++	]);
++	const payload = bytes(path.join(directory, selected.name));
++	if (payload.length !== selected.size || digest(payload) !== selected.sha256)
++		throw new Error('Published archive bytes differ from their receipt.');
++	return selected;
++}
++
++/** Emit a feed from one bound signing receipt, retaining the explicit legacy ZIP ABI. */
++function generateAppcast(env, options = {}) {
++	for (const key of [
++		'ERGOPTI_VERSION',
++		'ERGOPTI_BUILD',
++		'ERGOPTI_CHANNEL',
++		'GH_OWNER',
++		'GH_REPO',
++		'OUTPUT_PATH'
++	])
++		if (typeof env[key] !== 'string' || env[key] === '')
++			throw new Error('Required appcast input is absent.');
++	let selected;
++	if (env.ARCHIVE_DIR !== undefined) {
++		if (typeof env.ARCHIVE_DIR !== 'string' || env.ARCHIVE_DIR === '')
++			throw new Error('Appcast archive directory refused.');
++		selected = validatePublication(env.ARCHIVE_DIR, options)[0];
++	} else {
++		// Existing maintainer/fixture calls explicitly name historical ZIP. This
++		// branch cannot turn an unbound preferred archive into a fresh feed.
++		const legacy = bindings(options.defaults).find((binding) => binding.format === 'zip');
++		if (
++			!legacy ||
++			typeof env.ZIP_PATH !== 'string' ||
++			path.basename(env.ZIP_PATH) !== legacy.name ||
++			typeof env.SPARKLE_SIG_FILE !== 'string'
++		)
++			throw new Error('Explicit historical appcast input refused.');
++		const payload = bytes(env.ZIP_PATH);
++		selected = {
++			...legacy,
++			size: payload.length,
++			fragment: fragment(bytes(env.SPARKLE_SIG_FILE).toString('utf8'), payload.length).text
++		};
++	}
++	const escape = (value) =>
++		value
++			.replaceAll('&', '&amp;')
++			.replaceAll('"', '&quot;')
++			.replaceAll('<', '&lt;')
++			.replaceAll('>', '&gt;');
++	const url = `https://github.com/${env.GH_OWNER}/${env.GH_REPO}/releases/download/v${env.ERGOPTI_VERSION}/${selected.name}`;
++	const published = options.pubDate ?? new Date().toUTCString();
++	const xml = `<?xml version="1.0" encoding="utf-8"?>
++<rss version="2.0"
++     xmlns:sparkle="http://www.andymattes.com/xml/namespaces/sparkle/1.0"
++     xmlns:dc="http://purl.org/dc/elements/1.1/">
++  <channel>
++    <title>Ergopti</title>
++    <link>https://github.com/${escape(env.GH_OWNER)}/${escape(env.GH_REPO)}</link>
++    <item>
++      <title>Ergopti ${escape(env.ERGOPTI_VERSION)}</title>
++      <pubDate>${escape(published)}</pubDate>
++      <sparkle:version>${escape(env.ERGOPTI_BUILD)}</sparkle:version>
++      <sparkle:shortVersionString>${escape(env.ERGOPTI_VERSION)}</sparkle:shortVersionString>
++      <enclosure
++        url="${escape(url)}"
++        ${selected.fragment}
++        type="application/octet-stream"
++      />
++    </item>
++  </channel>
++</rss>
++`;
++	fs.writeFileSync(env.OUTPUT_PATH, xml);
++	return { name: selected.name, format: selected.format, size: selected.size };
++}
++
++if (require.main === module) {
++	try {
++		const [operation, ...args] = process.argv.slice(2);
++		let result;
++		if (operation === 'sign' && args.length === 3) result = signArchives(...args);
++		else if (operation === 'validate' && args.length === 1) result = validatePublication(args[0]);
++		else if (operation === 'preferred' && args.length === 1)
++			result = validatePublication(args[0])[0];
++		else if (operation === 'appcast' && args.length === 0) result = generateAppcast(process.env);
++		else if (operation === 'download' && args.length === 3) result = downloadPublished(...args);
++		else throw new Error('Invalid public archive command.');
++		process.stdout.write(JSON.stringify(result) + '\n');
++	} catch {
++		console.error('Public macOS archive operation refused.');
++		process.exitCode = 1;
++	}
++}
++
++module.exports = {
++	RECEIPT,
++	bindings,
++	bytes,
++	fragment,
++	signArchives,
++	validatePublication,
++	selectPublished,
++	downloadPublished,
++	generateAppcast
++};
+diff --git a/tools/diagnostics/macos-release-launch.py b/tools/diagnostics/macos-release-launch.py
+index 04f68727c..933c4a1b4 100644
+--- a/tools/diagnostics/macos-release-launch.py
++++ b/tools/diagnostics/macos-release-launch.py
+@@ -2,13 +2,17 @@
+ """Retain a downloaded release's actual Launch Services startup on disposable macOS."""
+ 
+ import json
++import hashlib
+ import os
++import re
+ from pathlib import Path
+ import shutil
+ import signal
++import stat
+ import subprocess
+ import sys
+ import time
++from urllib.parse import quote
+ 
+ # The job log shows the failure without downloading the artifact; the full logs
+ # stay in the artifact, so a noisy failure is capped here.
+@@ -48,6 +52,162 @@ def processes(executable):
+     ]
+ 
+ 
++def _published_json_object(pairs):
++    """Refuse ambiguous transport objects without echoing their contents."""
++    value = {}
++    for key, item in pairs:
++        if key in value:
++            raise RuntimeError("Published archive transport has duplicate fields")
++        value[key] = item
++    return value
++
++
++def _published_command(arguments, execute, capture=False):
++    """Require the actual synchronous command's typed successful completion."""
++    result = execute(arguments, check=True, capture_output=capture, text=True)
++    if type(result.returncode) is not int or result.returncode != 0:
++        raise RuntimeError("Published archive command refused")
++    return result
++
++
++def published_archive_bindings(execute=None):
++    """Read the same validated archive policy the actual producer consumes."""
++    if execute is None:
++        execute = subprocess.run
++    root = Path(__file__).resolve().parents[2]
++    program = (
++        "const fs = require('node:fs');"
++        "const {resolveArchives} = require(process.argv[1]);"
++        "const defaults = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));"
++        "process.stdout.write(JSON.stringify(resolveArchives(defaults)) + '\\n');"
++    )
++    result = _published_command(
++        [
++            "node",
++            "-e",
++            program,
++            str(root / "tools/build/macos-release-archives.cjs"),
++            str(root / "static/ergopti_plus/_shared/modules/updater/defaults.json"),
++        ],
++        execute,
++        True,
++    )
++    try:
++        bindings = json.loads(result.stdout, object_pairs_hook=_published_json_object)
++    except (ValueError, TypeError) as error:
++        raise RuntimeError("Published archive policy transport refused") from error
++    if type(bindings) is not list or not bindings:
++        raise RuntimeError("Published archive policy transport refused")
++    names, formats = set(), set()
++    for binding in bindings:
++        if (
++            type(binding) is not dict
++            or set(binding) != {"name", "format"}
++            or type(binding["name"]) is not str
++            or not binding["name"]
++            or Path(binding["name"]).name != binding["name"]
++            or binding["format"] not in ("zip", "tar.xz")
++            or binding["name"] in names
++            or binding["format"] in formats
++        ):
++            raise RuntimeError("Published archive policy transport refused")
++        names.add(binding["name"])
++        formats.add(binding["format"])
++    return bindings
++
++
++def install_published_release(repository, tag, temporary, destination, execute=None):
++    """Install one digest-verified declared asset without a preferred-failure fallback."""
++    if (
++        type(repository) is not str
++        or re.fullmatch(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+", repository) is None
++        or type(tag) is not str
++        or not tag
++    ):
++        raise RuntimeError("Published release identity refused")
++    if execute is None:
++        execute = subprocess.run
++    bindings = published_archive_bindings(execute)
++    result = _published_command(
++        ["gh", "api", f"repos/{repository}/releases/tags/{quote(tag, safe='')}"],
++        execute,
++        True,
++    )
++    release = json.loads(result.stdout, object_pairs_hook=_published_json_object)
++    if (
++        type(release) is not dict
++        or release.get("draft") is not False
++        or release.get("tag_name") != tag
++        or type(release.get("assets")) is not list
++        or any(type(asset) is not dict for asset in release["assets"])
++    ):
++        raise RuntimeError("Published release metadata refused")
++    selected = None
++    for binding in bindings:
++        matches = [asset for asset in release["assets"] if asset.get("name") == binding["name"]]
++        if not matches:
++            continue
++        if len(matches) != 1:
++            raise RuntimeError("Published preferred archive is ambiguous")
++        selected, asset = binding, matches[0]
++        break
++    if selected is None:
++        raise RuntimeError("Published release has no declared application archive")
++    digest = asset.get("digest")
++    if (
++        type(digest) is not str
++        or not digest.startswith("sha256:")
++        or len(digest) != 71
++        or any(char not in "0123456789abcdef" for char in digest[7:])
++    ):
++        raise RuntimeError("Published application digest is absent or mismatched")
++    size = asset.get("size")
++    if type(size) is not int or not 0 < size <= 2**53 - 1:
++        raise RuntimeError("Published application size is absent or mismatched")
++    temporary, destination = Path(temporary), Path(destination)
++    target = temporary / "release-download"
++    target.mkdir()
++    _published_command(
++        [
++            "gh",
++            "release",
++            "download",
++            tag,
++            "--repo",
++            repository,
++            "--pattern",
++            selected["name"],
++            "--dir",
++            str(target),
++        ],
++        execute,
++    )
++    archive = target / selected["name"]
++    if not stat.S_ISREG(archive.lstat().st_mode) or archive.stat().st_size == 0:
++        raise RuntimeError("Published application archive is not a nonempty regular file")
++    if archive.stat().st_size != size:
++        raise RuntimeError("Published application size is absent or mismatched")
++    if "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest() != digest:
++        raise RuntimeError("Published application digest is absent or mismatched")
++    if (destination / "ErgoptiPlus.app").exists():
++        raise RuntimeError("Refusing to replace an existing application")
++    if selected["format"] == "zip":
++        arguments = ["/usr/bin/ditto", "-x", "-k", str(archive), str(destination)]
++    else:
++        arguments = ["/usr/bin/tar", "-xJpf", str(archive), "-C", str(destination)]
++    _published_command(arguments, execute)
++    if "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest() != digest:
++        raise RuntimeError("Published application archive changed during extraction")
++    provenance = {
++        "tag": tag,
++        "asset": asset,
++        "verified_digest": digest,
++        "format": selected["format"],
++    }
++    (temporary / "release-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
++    return provenance
++
++
+ def main():
+     """Observe beyond log creation and preserve failures before owned cleanup."""
+     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true":
+@@ -131,4 +291,14 @@ def main():
+ 
+ 
+ if __name__ == "__main__":
+-    sys.exit(main())
++    if len(sys.argv) == 2 and sys.argv[1] == "--install-published":
++        if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true":
++            raise RuntimeError("Published release installation requires a disposable macOS runner")
++        install_published_release(
++            os.environ["GITHUB_REPOSITORY"],
++            os.environ["RELEASE_TAG"],
++            os.environ["RUNNER_TEMP"],
++            Path("/Applications"),
++        )
++    else:
++        sys.exit(main())
+diff --git a/tools/diagnostics/macos_release_launch_test.py b/tools/diagnostics/macos_release_launch_test.py
+index d918f68ff..a395f9dfe 100644
+--- a/tools/diagnostics/macos_release_launch_test.py
++++ b/tools/diagnostics/macos_release_launch_test.py
+@@ -2,9 +2,15 @@
+ """Reject the early-log false green observed in the published macOS application."""
+ 
+ import importlib.util
++import hashlib
++import json
+ from pathlib import Path
++import subprocess
++import shutil
+ import tempfile
+ import unittest
++from contextlib import contextmanager
++from unittest.mock import patch
+ 
+ spec = importlib.util.spec_from_file_location(
+     "release_launch", Path(__file__).with_name("macos-release-launch.py")
+@@ -74,5 +80,451 @@ class FailureEvidenceTests(unittest.TestCase):
+         self.assertEqual(lines, ["release launch failed: RuntimeError: boom"])
+ 
+ 
++class PublishedArchiveTests(unittest.TestCase):
++    """Use real private bytes and the actual policy owner before native ports."""
++
++    XZ = "ErgoptiPlus.app.tar.xz"
++    ZIP = "ErgoptiPlus.app.zip"
++    TAG = "v0.0.0-dev.999"
++
++    @contextmanager
++    def fixture(self, names=None, fault=None):
++        with tempfile.TemporaryDirectory() as folder:
++            root = Path(folder)
++            destination = root / "Applications"
++            destination.mkdir()
++            payloads = {self.XZ: b"independent XZ bytes", self.ZIP: b"historical ZIP bytes"}
++            assets = [
++                {
++                    "name": name,
++                    "digest": "sha256:" + hashlib.sha256(payloads[name]).hexdigest(),
++                    "size": len(payloads[name]),
++                    "future": {"untouched": True},
++                }
++                for name in (names if names is not None else [self.XZ, self.ZIP])
++            ]
++            release = {"draft": False, "tag_name": self.TAG, "assets": assets}
++            events = []
++
++            def execute(arguments, **keywords):
++                if arguments[0] == "node":
++                    return subprocess.run(arguments, **keywords)
++                if arguments[:2] == ["gh", "api"]:
++                    events.append(("view", list(arguments), dict(keywords)))
++                    return subprocess.CompletedProcess(arguments, 0, json.dumps(release), "")
++                if arguments[:3] == ["gh", "release", "download"]:
++                    name = arguments[arguments.index("--pattern") + 1]
++                    target = Path(arguments[arguments.index("--dir") + 1]) / name
++                    events.append(("download", name))
++                    if fault == "download":
++                        raise subprocess.CalledProcessError(1, arguments)
++                    if fault == "symlink":
++                        backing = root / "foreign"
++                        backing.write_bytes(payloads[name])
++                        target.symlink_to(backing)
++                    else:
++                        target.write_bytes(b"changed" if fault == "bytes" else payloads[name])
++                    return subprocess.CompletedProcess(arguments, 0)
++                if arguments[0] in ("/usr/bin/tar", "/usr/bin/ditto"):
++                    events.append(("extract", list(arguments)))
++                    if fault == "extract":
++                        raise subprocess.CalledProcessError(1, arguments)
++                    if fault == "extract_status":
++                        return subprocess.CompletedProcess(arguments, 3)
++                    if fault == "extract_bool":
++                        return subprocess.CompletedProcess(arguments, False)
++                    if fault == "source_race":
++                        (root / "release-download" / self.XZ).write_bytes(
++                            b"foreign after extraction"
++                        )
++                    (destination / "ErgoptiPlus.app").mkdir()
++                    return subprocess.CompletedProcess(arguments, 0)
++                events.append(("unexpected", list(arguments)))
++                raise RuntimeError("Unexpected test transport command")
++
++            yield root, destination, assets, events, execute
++
++    def install(self, root, destination, execute):
++        return observer.install_published_release(
++            "fixture/project", self.TAG, root, destination, execute
++        )
++
++    def test_actual_shared_binding_owner_orders_preferred_before_historical(self):
++        self.assertEqual(
++            observer.published_archive_bindings(),
++            [
++                {"name": self.XZ, "format": "tar.xz"},
++                {"name": self.ZIP, "format": "zip"},
++            ],
++        )
++
++    def test_both_archives_install_preferred_and_retain_exact_selected_evidence(self):
++        with self.fixture() as (root, destination, assets, events, execute):
++            result = self.install(root, destination, execute)
++            receipt = json.loads((root / "release-provenance.json").read_text())
++            self.assertEqual(result, receipt)
++            self.assertEqual(receipt["asset"], assets[0])
++            self.assertEqual(receipt["format"], "tar.xz")
++            self.assertEqual(events[1], ("download", self.XZ))
++            self.assertEqual(
++                events[2],
++                (
++                    "extract",
++                    [
++                        "/usr/bin/tar",
++                        "-xJpf",
++                        str(root / "release-download" / self.XZ),
++                        "-C",
++                        str(destination),
++                    ],
++                ),
++            )
++            self.assertTrue((destination / "ErgoptiPlus.app").is_dir())
++
++    def test_preferred_only_is_consumable(self):
++        with self.fixture([self.XZ]) as (root, destination, _, events, execute):
++            result = self.install(root, destination, execute)
++            self.assertEqual(result["asset"]["name"], self.XZ)
++            self.assertEqual([e[1] for e in events if e[0] == "download"], [self.XZ])
++
++    def test_absent_preferred_preserves_historical_zip_command(self):
++        with self.fixture([self.ZIP]) as (root, destination, assets, events, execute):
++            result = self.install(root, destination, execute)
++            self.assertEqual(result["asset"], assets[0])
++            self.assertEqual(result["format"], "zip")
++            self.assertEqual(
++                events[-1],
++                (
++                    "extract",
++                    [
++                        "/usr/bin/ditto",
++                        "-x",
++                        "-k",
++                        str(root / "release-download" / self.ZIP),
++                        str(destination),
++                    ],
++                ),
++            )
++
++    def test_unknown_future_asset_and_metadata_are_not_rewritten(self):
++        with self.fixture() as (root, destination, assets, _, execute):
++            assets.insert(0, {"name": "future-unrelated.bin", "future": [1, 2, 3]})
++            result = self.install(root, destination, execute)
++            self.assertEqual(result["asset"], assets[1])
++            self.assertEqual(assets[0], {"name": "future-unrelated.bin", "future": [1, 2, 3]})
++
++    def test_present_preferred_missing_or_bad_digest_never_falls_back(self):
++        for value in (None, "", "sha256:" + "G" * 64, "sha256:" + "0" * 64, False):
++            with (
++                self.subTest(value=value),
++                self.fixture() as (root, destination, assets, events, execute),
++            ):
++                assets[0]["digest"] = value
++                with self.assertRaises(RuntimeError):
++                    self.install(root, destination, execute)
++                self.assertFalse(any(e == ("download", self.ZIP) for e in events))
++                self.assertFalse(any(e[0] == "extract" for e in events))
++                self.assertFalse((root / "release-provenance.json").exists())
++
++    def test_duplicate_preferred_refuses_before_download(self):
++        with self.fixture([self.XZ, self.XZ, self.ZIP]) as (root, destination, _, events, execute):
++            with self.assertRaisesRegex(RuntimeError, "ambiguous"):
++                self.install(root, destination, execute)
++            self.assertEqual([e[0] for e in events], ["view"])
++            self.assertFalse((root / "release-download").exists())
++
++    def test_duplicate_historical_refuses_when_preferred_absent(self):
++        with self.fixture([self.ZIP, self.ZIP]) as (root, destination, _, events, execute):
++            with self.assertRaisesRegex(RuntimeError, "ambiguous"):
++                self.install(root, destination, execute)
++            self.assertEqual([e[0] for e in events], ["view"])
++
++    def test_absent_all_declared_assets_refuses(self):
++        with self.fixture([]) as (root, destination, _, events, execute):
++            with self.assertRaisesRegex(RuntimeError, "no declared"):
++                self.install(root, destination, execute)
++            self.assertEqual([e[0] for e in events], ["view"])
++
++    def test_preferred_download_refusal_does_not_try_historical(self):
++        with self.fixture(fault="download") as (root, destination, _, events, execute):
++            with self.assertRaises(subprocess.CalledProcessError):
++                self.install(root, destination, execute)
++            self.assertEqual([e[1] for e in events if e[0] == "download"], [self.XZ])
++            self.assertFalse(any(e[0] == "extract" for e in events))
++
++    def test_downloaded_wrong_bytes_and_symlink_refuse_before_extraction(self):
++        for fault in ("bytes", "symlink"):
++            with (
++                self.subTest(fault=fault),
++                self.fixture(fault=fault) as (root, destination, _, events, execute),
++            ):
++                with self.assertRaises(RuntimeError):
++                    self.install(root, destination, execute)
++                self.assertFalse(any(e[0] == "extract" for e in events))
++                self.assertFalse((root / "release-provenance.json").exists())
++
++    def test_extractor_throw_nonzero_and_boolean_do_not_admit_provenance(self):
++        for fault in ("extract", "extract_status", "extract_bool"):
++            with (
++                self.subTest(fault=fault),
++                self.fixture(fault=fault) as (root, destination, _, events, execute),
++            ):
++                with self.assertRaises((subprocess.CalledProcessError, RuntimeError)):
++                    self.install(root, destination, execute)
++                self.assertEqual([e[1] for e in events if e[0] == "download"], [self.XZ])
++                self.assertEqual(len([e for e in events if e[0] == "extract"]), 1)
++                self.assertFalse((root / "release-provenance.json").exists())
++
++    def test_changed_archive_after_native_completion_is_not_successful_evidence(self):
++        with self.fixture(fault="source_race") as (root, destination, _, events, execute):
++            with self.assertRaisesRegex(RuntimeError, "changed during"):
++                self.install(root, destination, execute)
++            self.assertEqual(len([e for e in events if e[0] == "extract"]), 1)
++            self.assertFalse((root / "release-provenance.json").exists())
++            self.assertEqual(
++                (root / "release-download" / self.XZ).read_bytes(), b"foreign after extraction"
++            )
++
++    def test_existing_application_is_not_replaced(self):
++        with self.fixture() as (root, destination, _, events, execute):
++            (destination / "ErgoptiPlus.app").mkdir()
++            marker = destination / "ErgoptiPlus.app" / "foreign"
++            marker.write_bytes(b"retained application")
++            with self.assertRaisesRegex(RuntimeError, "replace"):
++                self.install(root, destination, execute)
++            self.assertEqual(marker.read_bytes(), b"retained application")
++            self.assertFalse(any(e[0] == "extract" for e in events))
++
++    def test_policy_loader_rejects_failed_completion_and_malformed_transport(self):
++        packets = [
++            (1, "[]"),
++            (False, "[]"),
++            (0, "not-json"),
++            (0, "null"),
++            (0, "[]"),
++            (0, '[{"name":"x.zip","name":"y.zip","format":"zip"}]'),
++            (0, '[{"name":"../x.zip","format":"zip"}]'),
++            (0, '[{"name":"x.zip","format":"zip","future":1}]'),
++            (0, '[{"name":"x.zip","format":"zip"},{"name":"x.zip","format":"zip"}]'),
++        ]
++        for code, output in packets:
++            calls = []
++
++            def execute(arguments, **keywords):
++                calls.append(list(arguments))
++                return subprocess.CompletedProcess(arguments, code, output, "private decoder text")
++
++            with self.subTest(code=code, output=output), self.assertRaises(RuntimeError):
++                observer.published_archive_bindings(execute)
++            self.assertEqual(len(calls), 1)
++
++    def test_policy_loader_throw_is_not_a_guessed_fallback(self):
++        calls = []
++
++        def execute(arguments, **keywords):
++            calls.append(list(arguments))
++            raise OSError("owned loader refused")
++
++        with self.assertRaises(OSError):
++            observer.published_archive_bindings(execute)
++        self.assertEqual(len(calls), 1)
++
++    @contextmanager
++    def policy_fixture(self):
++        """Give the actual Node owner an independent classified data fixture."""
++        original_root = Path(observer.__file__).resolve().parents[2]
++        with tempfile.TemporaryDirectory() as folder:
++            root = Path(folder)
++            for relative in (
++                "tools/build/macos-release-archives.cjs",
++                "tools/lib/paths.cjs",
++                "static/ergopti_plus/_shared/modules/updater/defaults.json",
++            ):
++                target = root / relative
++                target.parent.mkdir(parents=True, exist_ok=True)
++                shutil.copyfile(original_root / relative, target)
++            config = root / "static/ergopti_plus/_shared/modules/updater/defaults.json"
++            with patch.object(
++                observer, "__file__", str(root / "tools/diagnostics/macos-release-launch.py")
++            ):
++                yield config
++
++    def test_real_node_policy_refusal_does_not_return_local_defaults(self):
++        with self.policy_fixture() as config:
++            config.write_text('{"release_install":{"macos_archives":[]}}')
++            with self.assertRaises(subprocess.CalledProcessError):
++                observer.published_archive_bindings()
++
++    def test_real_node_policy_order_is_consumed_instead_of_duplicated(self):
++        with self.policy_fixture() as config:
++            defaults = json.loads(config.read_text())
++            defaults["release_install"]["macos_archives"].reverse()
++            config.write_text(json.dumps(defaults))
++            with self.fixture() as (root, destination, _, events, execute):
++                result = self.install(root, destination, execute)
++                self.assertEqual(result["format"], "zip")
++                self.assertEqual([e[1] for e in events if e[0] == "download"], [self.ZIP])
++
++    def test_real_node_bad_declared_filename_refuses_without_format_guessing(self):
++        with self.policy_fixture() as config:
++            defaults = json.loads(config.read_text())
++            defaults["release_assets"]["macos_bundle_tar_xz"] = "../not-owned.tar.xz"
++            config.write_text(json.dumps(defaults))
++            with self.assertRaises(subprocess.CalledProcessError):
++                observer.published_archive_bindings()
++
++    # REST_DIGEST_NATIVE_TRANSPORT_TESTS_BEGIN
++    def test_raw_rest_retains_digest_dropped_by_actual_old_cli_export(self):
++        with self.fixture() as (root, destination, assets, events, execute):
++            projected = {
++                "tagName": self.TAG,
++                "assets": [{"name": item["name"], "size": item["size"]} for item in assets],
++            }
++            observed = []
++
++            def transport(arguments, **keywords):
++                observed.append(list(arguments))
++                if arguments[:3] == ["gh", "release", "view"]:
++                    return subprocess.CompletedProcess(arguments, 0, json.dumps(projected), "")
++                return execute(arguments, **keywords)
++
++            result = self.install(root, destination, transport)
++            self.assertNotIn("digest", projected["assets"][0])
++            self.assertEqual(result["asset"], assets[0])
++            self.assertEqual(
++                observed[1], ["gh", "api", f"repos/fixture/project/releases/tags/{self.TAG}"]
++            )
++            self.assertEqual([e[1] for e in events if e[0] == "download"], [self.XZ])
++
++    def test_raw_api_identity_validation_occurs_before_any_owner_command(self):
++        cases = [
++            (None, self.TAG),
++            (False, self.TAG),
++            ("fixture", self.TAG),
++            ("fixture/project/extra", self.TAG),
++            ("fixture/project?query", self.TAG),
++            ("fixture/project", None),
++            ("fixture/project", False),
++            ("fixture/project", ""),
++        ]
++        for repository, tag in cases:
++            observed = []
++
++            def transport(arguments, **keywords):
++                observed.append(list(arguments))
++                return subprocess.CompletedProcess(arguments, 0, "{}", "")
++
++            with (
++                self.subTest(repository=repository, tag=tag),
++                self.assertRaisesRegex(RuntimeError, "identity"),
++            ):
++                observer.install_published_release(repository, tag, "/unused", "/unused", transport)
++            self.assertEqual(observed, [])
++
++    def test_raw_api_publication_and_tag_shape_refuses_without_download(self):
++        for replacement in (
++            {"draft": True},
++            {"draft": None},
++            {"draft": 0},
++            {"draft": "false"},
++            {"tag_name": None},
++            {"tag_name": "foreign"},
++            {"assets": None},
++            {"assets": [None]},
++        ):
++            with (
++                self.subTest(replacement=replacement),
++                self.fixture() as (root, destination, assets, events, execute),
++            ):
++                raw = {"draft": False, "tag_name": self.TAG, "assets": assets, **replacement}
++                observed = []
++
++                def transport(arguments, **keywords):
++                    if arguments[:2] == ["gh", "api"]:
++                        observed.append(list(arguments))
++                        return subprocess.CompletedProcess(arguments, 0, json.dumps(raw), "")
++                    return execute(arguments, **keywords)
++
++                with self.assertRaisesRegex(RuntimeError, "metadata"):
++                    self.install(root, destination, transport)
++                self.assertEqual(len(observed), 1)
++                self.assertEqual(events, [])
++                self.assertFalse((root / "release-download").exists())
++                self.assertFalse((root / "release-provenance.json").exists())
++
++    def test_raw_api_http_refusal_and_malformed_packets_have_no_fallback(self):
++        for code, output in (
++            (1, "{}"),
++            (False, "{}"),
++            (-15, "{}"),
++            (0, "not-json"),
++            (0, "null"),
++            (0, '[{"draft":false}]'),
++            (0, '{"draft":false,"draft":false}'),
++        ):
++            with (
++                self.subTest(code=code, output=output),
++                self.fixture() as (root, destination, _, events, execute),
++            ):
++                observed = []
++
++                def transport(arguments, **keywords):
++                    if arguments[:2] == ["gh", "api"]:
++                        observed.append(list(arguments))
++                        return subprocess.CompletedProcess(
++                            arguments, code, output, "private packet"
++                        )
++                    return execute(arguments, **keywords)
++
++                with self.assertRaises((RuntimeError, ValueError)):
++                    self.install(root, destination, transport)
++                self.assertEqual(len(observed), 1)
++                self.assertEqual(events, [])
++                self.assertFalse((root / "release-download").exists())
++                self.assertFalse((root / "release-provenance.json").exists())
++
++    def test_declared_size_is_strict_before_download_and_matches_private_bytes(self):
++        for size in (None, False, 0, -1, 1.5, "19", 2**53, 1):
++            with (
++                self.subTest(size=size),
++                self.fixture() as (root, destination, assets, events, execute),
++            ):
++                assets[0]["size"] = size
++                with self.assertRaisesRegex(RuntimeError, "size"):
++                    self.install(root, destination, execute)
++                self.assertFalse(any(e[0] == "extract" for e in events))
++                self.assertFalse((root / "release-provenance.json").exists())
++                if size == 1 and type(size) is int:
++                    self.assertEqual([e[1] for e in events if e[0] == "download"], [self.XZ])
++                else:
++                    self.assertFalse(any(e[0] == "download" for e in events))
++
++    def test_raw_api_encoded_tag_preserves_exact_selected_provenance(self):
++        tag = "v0.0.0-dev.999/owned-tag"
++        with self.fixture() as (root, destination, assets, events, execute):
++            observed = []
++
++            def transport(arguments, **keywords):
++                observed.append(list(arguments))
++                if arguments[:2] == ["gh", "api"]:
++                    raw = {"draft": False, "tag_name": tag, "assets": assets}
++                    return subprocess.CompletedProcess(arguments, 0, json.dumps(raw), "")
++                return execute(arguments, **keywords)
++
++            result = observer.install_published_release(
++                "fixture/project", tag, root, destination, transport
++            )
++            self.assertEqual(
++                observed[1],
++                ["gh", "api", "repos/fixture/project/releases/tags/v0.0.0-dev.999%2Fowned-tag"],
++            )
++            self.assertEqual(result["tag"], tag)
++            self.assertEqual(result["asset"], assets[0])
++            self.assertEqual([e[1] for e in events if e[0] == "download"], [self.XZ])
++            self.assertEqual(json.loads((root / "release-provenance.json").read_text()), result)
++
++    # REST_DIGEST_NATIVE_TRANSPORT_TESTS_END
++
++
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/tools/diagnostics/tis_evidence_transport.cjs b/tools/diagnostics/tis_evidence_transport.cjs
+new file mode 100644
+index 000000000..d05e05d3f
+--- /dev/null
++++ b/tools/diagnostics/tis_evidence_transport.cjs
+@@ -0,0 +1,238 @@
++// tools/diagnostics/tis_evidence_transport.cjs
++// Lossless test diagnostics are independent of the strict raw XCTest reporter.
++'use strict';
++const fs = require('node:fs');
++const path = require('node:path');
++const crypto = require('node:crypto');
++const PREFIX = Buffer.from('TIS_TEST_EVIDENCE ');
++const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
++const refuse = () => {
++	throw new Error('TIS diagnostic transport refused');
++};
++const integer = (value, min, max) => Number.isSafeInteger(value) && value >= min && value <= max;
++const hash = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
++function keys(value, required) {
++	if (
++		!value ||
++		typeof value !== 'object' ||
++		Array.isArray(value) ||
++		Object.keys(value).sort().join(',') !== [...required].sort().join(',')
++	)
++		refuse();
++}
++function json(data) {
++	const text = data.toString('utf8');
++	if (!Buffer.from(text, 'utf8').equals(data)) refuse();
++	let value;
++	try {
++		value = JSON.parse(text);
++	} catch {
++		refuse();
++	}
++	// JSON.parse accepts repeated keys; the transport does not. Token strings
++	// remain escaped until decoded, so braces/colons inside data are harmless.
++	const tokens =
++		text.match(/"(?:[^"\\]|\\.)*"|[{}\[\]:,]|true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g) ||
++		[];
++	const stack = [];
++	for (let index = 0; index < tokens.length; index++) {
++		const token = tokens[index];
++		if (token === '{') stack.push(new Set());
++		else if (token === '[') stack.push(null);
++		else if (token === '}' || token === ']') stack.pop();
++		else if (token.startsWith('"') && tokens[index + 1] === ':') {
++			const object = stack.at(-1),
++				key = JSON.parse(token);
++			if (!object || object.has(key)) refuse();
++			object.add(key);
++		}
++	}
++	return value;
++}
++function boundedIdentity(value) {
++	if (
++		!value ||
++		typeof value !== 'object' ||
++		Array.isArray(value) ||
++		typeof value.state !== 'string' ||
++		!['present', 'missing', 'oversize', 'invalidType', 'sourceUnavailable'].includes(value.state)
++	)
++		refuse();
++	if (value.state === 'present') {
++		if (typeof value.value !== 'string' || Buffer.byteLength(value.value, 'utf8') > 1024) refuse();
++	} else if (value.value !== undefined && value.value !== null) refuse();
++}
++function record(data, pid) {
++	if (
++		data.length < PREFIX.length + 3 ||
++		data.length > 2097152 ||
++		!data.subarray(0, PREFIX.length).equals(PREFIX) ||
++		data.at(-1) !== 10 ||
++		data.subarray(0, -1).includes(10)
++	)
++		refuse();
++	const text = data.subarray(PREFIX.length, -1).toString('utf8');
++	if (!Buffer.from(text, 'utf8').equals(data.subarray(PREFIX.length, -1))) refuse();
++	const receipt = json(data.subarray(PREFIX.length, -1));
++	keys(receipt, ['version', 'test', 'pid', 'events', 'omittedEvents']);
++	if (
++		receipt.version !== 1 ||
++		receipt.pid !== pid ||
++		!Array.isArray(receipt.events) ||
++		!integer(receipt.events.length, 0, 64) ||
++		!integer(receipt.omittedEvents, 0, Number.MAX_SAFE_INTEGER)
++	)
++		refuse();
++	boundedIdentity(receipt.test);
++	for (const event of receipt.events) {
++		if (
++			!event ||
++			typeof event !== 'object' ||
++			typeof event.phase !== 'string' ||
++			!Number.isFinite(event.uptime) ||
++			event.uptime < 0
++		)
++			refuse();
++		if (event.status !== undefined && !integer(event.status, -2147483648, 2147483647)) refuse();
++		if (event.snapshotID !== undefined) boundedIdentity(event.snapshotID);
++		for (const source of ['original', 'target', 'current']) {
++			if (event[source] === undefined) continue;
++			boundedIdentity(event[source].id);
++			for (const property of ['enabled', 'selected', 'selectCapable']) {
++				const value = event[source][property];
++				if (
++					!value ||
++					!['present', 'missing', 'invalidType', 'sourceUnavailable'].includes(value.state) ||
++					(value.state === 'present'
++						? typeof value.value !== 'boolean'
++						: value.value !== undefined && value.value !== null)
++				)
++					refuse();
++			}
++		}
++		if (event.keyboardType !== undefined && !integer(event.keyboardType, 0, 4294967295)) refuse();
++		if (
++			event.unicodeDataBytes !== undefined &&
++			!integer(event.unicodeDataBytes, 0, Number.MAX_SAFE_INTEGER)
++		)
++			refuse();
++	}
++	return receipt;
++}
++function validate(root, session) {
++	if (!path.isAbsolute(root) || !hash(session)) refuse();
++	const directory = fs.lstatSync(root);
++	if (!directory.isDirectory() || directory.isSymbolicLink()) refuse();
++	if (process.getuid && directory.uid !== process.getuid()) refuse();
++	function read(name, maximum) {
++		const source = path.join(root, name);
++		const status = fs.lstatSync(source);
++		if (
++			!status.isFile() ||
++			status.isSymbolicLink() ||
++			status.nlink !== 1 ||
++			status.size > maximum ||
++			status.size === 0
++		)
++			refuse();
++		if (process.getuid && status.uid !== process.getuid()) refuse();
++		const descriptor = fs.openSync(source, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
++		try {
++			const retained = fs.fstatSync(descriptor);
++			if (
++				retained.dev !== status.dev ||
++				retained.ino !== status.ino ||
++				retained.size !== status.size
++			)
++				refuse();
++			const data = fs.readFileSync(descriptor);
++			const after = fs.fstatSync(descriptor);
++			if (
++				data.length !== status.size ||
++				after.size !== retained.size ||
++				after.mtimeMs !== retained.mtimeMs ||
++				after.ctimeMs !== retained.ctimeMs
++			)
++				refuse();
++			return data;
++		} finally {
++			fs.closeSync(descriptor);
++		}
++	}
++	const startData = read('start.json', 4096);
++	const terminalData = read('manifest.json', 32768);
++	const start = json(startData),
++		terminal = json(terminalData);
++	keys(start, ['version', 'session', 'producerPID', 'bundleSHA256']);
++	keys(terminal, [
++		'version',
++		'session',
++		'producerPID',
++		'bundleSHA256',
++		'startSHA256',
++		'phase',
++		'enrolledCount',
++		'records'
++	]);
++	if (
++		start.version !== 1 ||
++		start.session !== session ||
++		!integer(start.producerPID, 1, 2147483647) ||
++		!hash(start.bundleSHA256) ||
++		terminal.version !== 1 ||
++		terminal.session !== session ||
++		terminal.producerPID !== start.producerPID ||
++		terminal.bundleSHA256 !== start.bundleSHA256 ||
++		terminal.startSHA256 !== sha(startData) ||
++		terminal.phase !== 'closed' ||
++		!integer(terminal.enrolledCount, 1, 64) ||
++		!Array.isArray(terminal.records) ||
++		terminal.records.length !== terminal.enrolledCount
++	)
++		refuse();
++	const expected = ['start.json', 'manifest.json'];
++	const receipts = [];
++	for (const [offset, entry] of terminal.records.entries()) {
++		keys(entry, ['index', 'bytes', 'sha256', 'closed']);
++		if (
++			entry.index !== offset + 1 ||
++			!integer(entry.bytes, 1, 2097152) ||
++			!hash(entry.sha256) ||
++			entry.closed !== true
++		)
++			refuse();
++		const name = 'record-' + String(entry.index).padStart(6, '0') + '.dat';
++		expected.push(name);
++		const data = read(name, 2097152);
++		if (data.length !== entry.bytes || sha(data) !== entry.sha256) refuse();
++		receipts.push(record(data, start.producerPID));
++	}
++	if (fs.readdirSync(root).sort().join(',') !== expected.sort().join(',')) refuse();
++	// Reread terminal/source and the exact census to refuse concurrent replacement.
++	if (
++		!read('start.json', 4096).equals(startData) ||
++		!read('manifest.json', 32768).equals(terminalData) ||
++		fs.readdirSync(root).sort().join(',') !== expected.sort().join(',')
++	)
++		refuse();
++	const afterDirectory = fs.lstatSync(root);
++	if (
++		!afterDirectory.isDirectory() ||
++		afterDirectory.isSymbolicLink() ||
++		afterDirectory.dev !== directory.dev ||
++		afterDirectory.ino !== directory.ino
++	)
++		refuse();
++	return { complete: true, record_count: receipts.length, receipts };
++}
++module.exports = { validate, record };
++if (require.main === module) {
++	try {
++		if (process.argv.length !== 4) refuse();
++		const result = validate(process.argv[2], process.argv[3]);
++		console.log('[OK] Closed TIS diagnostic session: ' + result.record_count + ' records.');
++	} catch {
++		console.error('::error::TIS diagnostic session is incomplete or refused');
++		process.exitCode = 1;
++	}
++}
+diff --git a/tools/test/test-ci-pipeline-wiring.cjs b/tools/test/test-ci-pipeline-wiring.cjs
+index e3ec49d98..9915529b0 100644
+--- a/tools/test/test-ci-pipeline-wiring.cjs
++++ b/tools/test/test-ci-pipeline-wiring.cjs
+@@ -187,14 +187,19 @@ const STEP_CONDITIONS = [
+ 		'Retain packaged application startup evidence',
+ 		'always() && inputs.release'
+ 	],
++	[
++		MACOS_BOX,
++		'package-macos',
++		'Retain closed TIS diagnostic session',
++		"${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}"
++	],
+ 	[
+ 		MACOS_BOX,
+ 		'package-macos',
+ 		'Upload Swift launcher failure transcript',
+ 		"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
+ 	],
+-	[MACOS_BOX, 'package-macos', 'Install Sparkle signing tool', 'inputs.release'],
+-	[MACOS_BOX, 'package-macos', 'Sign zip with Sparkle EdDSA key', 'inputs.release'],
++	[MACOS_BOX, 'package-macos', 'Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
+ 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
+ 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
+ 	[MACOS_BOX, 'launch', 'Retain launch evidence', 'always()'],
+@@ -1217,6 +1222,26 @@ function stepProblems(files) {
+ }
+ 
+ errors.push(...stepProblems(pipeline.files()));
++for (const condition of ['', 'false', 'success()']) {
++	const head = '      - name: Retain closed TIS diagnostic session\n';
++	const from =
++		head +
++		"        if: ${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}\n";
++	mustCatch(
++		'TIS retained evidence condition ' + condition,
++		MACOS_BOX,
++		from,
++		head + (condition ? '        if: ' + condition + '\n' : ''),
++		stepProblems
++	);
++}
++mustCatch(
++	'missing mandatory TIS evidence upload',
++	MACOS_BOX,
++	'      - name: Retain closed TIS diagnostic session\n',
++	'      - name: Omitted TIS evidence upload\n',
++	stepProblems
++);
+ for (const condition of ['false', "matrix.kind == 'deb'"]) {
+ 	mustCatch(
+ 		`an AppImage launch routed through ${condition}`,
+@@ -1897,6 +1922,80 @@ for (const input of ['{', 'null', '[]', '{}']) {
+ 	assert.equal(result.stdout, '');
+ }
+ 
++/** Requires native signing tools before XCTest without release-key access. */
++function sparkleToolProblems(files) {
++	const problems = [];
++	const mac = files.find((entry) => entry.rel === MACOS_BOX);
++	const job =
++		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'package-macos');
++	const steps = job ? pipeline.steps(job.body) : [];
++	const tools = steps.filter((step) => step.name === 'Install Sparkle signing tool');
++	const toolAt = steps.findIndex((step) => step.name === 'Install Sparkle signing tool');
++	const nativeAt = steps.findIndex((step) => step.name === 'Run Swift launcher tests');
++	if (tools.length !== 1 || toolAt < 0 || nativeAt <= toolAt) {
++		problems.push('the actual pinned Sparkle tool installer must precede native XCTest');
++	} else if (
++		pipeline.stepField(tools[0].body, 'if') !== null ||
++		pipeline.stepField(tools[0].body, 'continue-on-error') !== null ||
++		/\bsecrets\.|SPARKLE_ED_PRIVATE_KEY/.test(codeOf(tools[0].body))
++	) {
++		problems.push(
++			'native fixture tool installation must be unconditional and cannot receive release secrets'
++		);
++	}
++	return problems;
++}
++errors.push(...sparkleToolProblems(pipeline.files()));
++const sparkleToolBody = pipeline.step(
++	pipeline.job('package-macos'),
++	'Install Sparkle signing tool'
++);
++const sparkleNativeBody = pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests');
++for (const [what, from, to] of [
++	['missing native Sparkle tools', sparkleToolBody, ''],
++	[
++		'release-only native Sparkle tools',
++		sparkleToolBody,
++		sparkleToolBody.replace(
++			'        shell: bash',
++			'        if: inputs.release\n        shell: bash'
++		)
++	],
++	[
++		'forgiven native Sparkle tools',
++		sparkleToolBody,
++		sparkleToolBody.replace(
++			'        shell: bash',
++			'        continue-on-error: true\n        shell: bash'
++		)
++	],
++	[
++		'release secret handed to native Sparkle tools',
++		sparkleToolBody,
++		sparkleToolBody.replace(
++			"          SPARKLE_VERSION: '2.9.2'",
++			"          SPARKLE_VERSION: '2.9.2'\n          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}"
++		)
++	]
++]) {
++	mustCatch(what, MACOS_BOX, from, to, sparkleToolProblems);
++}
++const swappedSparkleSteps = pipeline.files().map((entry) =>
++	entry.rel === MACOS_BOX
++		? {
++				...entry,
++				text: entry.text
++					.replace(sparkleToolBody, '__OWNED_SPARKLE_TOOL_STEP__')
++					.replace(sparkleNativeBody, sparkleToolBody)
++					.replace('__OWNED_SPARKLE_TOOL_STEP__', sparkleNativeBody)
++			}
++		: entry
++);
++assert.ok(
++	sparkleToolProblems(swappedSparkleSteps).length > 0,
++	'native XCTest before Sparkle tool installation must refuse'
++);
++
+ if (errors.length > 0) {
+ 	console.error(
+ 		'[FAIL] the CI pipeline wiring can skip a gate, publish a wrong or partial release, or draw a tangled graph:'
+diff --git a/tools/test/test-ci-release-reruns.cjs b/tools/test/test-ci-release-reruns.cjs
+index b464571bf..4cb2873ed 100644
+--- a/tools/test/test-ci-release-reruns.cjs
++++ b/tools/test/test-ci-release-reruns.cjs
+@@ -182,6 +182,10 @@ function repository(name, branch) {
+ 	for (const relative of [
+ 		'tools/build/release-channel.cjs',
+ 		'tools/build/publish-verified-release.cjs',
++		'tools/build/macos-release-publication.cjs',
++		'tools/build/macos-release-archives.cjs',
++		'tools/lib/paths.cjs',
++		'static/ergopti_plus/_shared/modules/updater/defaults.json',
+ 		'static/ergopti_plus/_shared/modules/updater/channels.json',
+ 		'static/ergopti_plus/_shared/ui/update_channels.js'
+ 	]) {
+@@ -727,6 +731,26 @@ function preflight(
+ 		const flattened = runScript(flattenScript, cwd, {});
+ 		if (flattened.status !== 0) return { ...flattened, ghCalls: [] };
+ 	}
++	// The new fresh-publication owner is exercised with actual private files.
++	// It signs only through controlled native ports; no native crypto claim.
++	const publication = require('../build/macos-release-publication.cjs');
++	for (const archive of publication.bindings()) {
++		const target = path.join(assets, archive.name);
++		if (!fs.existsSync(target)) fs.writeFileSync(target, `${archive.name}\n`);
++		const signature = path.join(assets, `_${archive.name}.sig`);
++		if (fs.existsSync(signature)) fs.unlinkSync(signature);
++	}
++	publication.signArchives(assets, 'private-fixture-signer', 'private-fixture-key', {
++		execute: (tool, args) => ({
++			status: 0,
++			stdout: args.includes('--verify')
++				? ''
++				: `sparkle:edSignature="${'A'.repeat(86)}==" length="${fs.statSync(args[2]).size}"\n`,
++			stderr: ''
++		})
++	});
++	if (missingAsset && fs.existsSync(path.join(assets, missingAsset)))
++		fs.unlinkSync(path.join(assets, missingAsset));
+ 	const ghLog = stubLog('gh');
+ 	const result = runScript(
+ 		preflightScript,
+@@ -1303,6 +1327,33 @@ check(
+ 	}
+ );
+ 
++// The existing actual preflight must distinguish missing new output from an
++// already published historical inventory, without guessing release existence.
++check('fresh publication refuses missing preferred archive', () => {
++	const publication = require('../build/macos-release-publication.cjs');
++	const result = preflight('v0.0.0-dev.20', { missingAsset: publication.bindings()[0].name });
++	assert.notEqual(result.status, 0);
++	assert.match(result.stderr, /Public macOS archive operation refused/);
++	assert.deepEqual(result.outputs, {});
++});
++check('fresh publication refuses missing preferred signature', () => {
++	const publication = require('../build/macos-release-publication.cjs');
++	const result = preflight('v0.0.0-dev.20', {
++		missingAsset: `_${publication.bindings()[0].name}.sig`
++	});
++	assert.notEqual(result.status, 0);
++	assert.deepEqual(result.outputs, {});
++});
++check('published historical resume does not require rebuilt preferred archive', () => {
++	const publication = require('../build/macos-release-publication.cjs');
++	const result = preflight('v0.0.0-dev.13', {
++		ghMode: 'published',
++		missingAsset: publication.bindings()[0].name
++	});
++	assert.equal(result.status, 0, result.stdout + result.stderr);
++	assert.equal(result.outputs.create_release, 'false');
++});
++
+ // ==========================================
+ // ==========================================
+ // ======= 5/ The Resume Wiring =============
+diff --git a/tools/test/test-homebrew-cask.cjs b/tools/test/test-homebrew-cask.cjs
+index 2d436a4ce..a3ed5cddd 100644
+--- a/tools/test/test-homebrew-cask.cjs
++++ b/tools/test/test-homebrew-cask.cjs
+@@ -164,7 +164,8 @@ check(
+ 	'the release workflow runs the generator on the published asset and the docs name its tap',
+ 	() => {
+ 		assert.ok(WORKFLOW.includes('node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap"'));
+-		assert.ok(WORKFLOW.includes(`--pattern ${Cask.ASSET_NAME}`));
++		assert.ok(WORKFLOW.includes('node tools/build/macos-release-publication.cjs download'));
++		assert.ok(WORKFLOW.includes('"$tap" "$archive"'));
+ 		const tap = WORKFLOW.match(
+ 			/TAP_REPOSITORY: \$\{\{ github\.repository_owner \}\}\/(homebrew-[a-z-]+)/
+ 		);
+@@ -232,6 +233,37 @@ check('Ruby parses both casks', () => {
+ 	}
+ });
+ 
++check('an admitted preferred name remains coupled to its independent hash', () => {
++	const publication = require('../build/macos-release-publication.cjs');
++	const preferred = publication.bindings()[0];
++	const crypto = require('node:crypto');
++	const tap = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-preferred-cask-'));
++	try {
++		const payload = path.join(tap, preferred.name);
++		fs.writeFileSync(payload, Buffer.from('independent selected public archive bytes'));
++		const actualHash = crypto.createHash('sha256').update(fs.readFileSync(payload)).digest('hex');
++		const selected = Cask.renderCask('v0.0.0-dev.142', actualHash, preferred.name);
++		assert.ok(selected.text.includes(`/v#{version}/${preferred.name}"`));
++		assert.ok(selected.text.includes(`sha256 "${actualHash}"`));
++		const result = spawnSync(
++			process.execPath,
++			[
++				path.join(ROOT, 'tools/build/homebrew-cask.cjs'),
++				'v0.0.0-dev.142',
++				actualHash,
++				tap,
++				preferred.name
++			],
++			{ encoding: 'utf8' }
++		);
++		assert.equal(result.status, 0, result.stderr);
++		assert.equal(fs.readFileSync(path.join(tap, selected.file), 'utf8'), selected.text);
++		assert.throws(() => Cask.renderCask('v1.2.3', actualHash, 'unknown.tar.xz'), /undeclared/);
++	} finally {
++		fs.rmSync(tap, { recursive: true });
++	}
++});
++
+ if (failures > 0) {
+ 	console.error(`\n${failures} Homebrew cask check(s) failed.`);
+ 	process.exit(1);
+diff --git a/tools/test/test-macos-sparkle-feed.cjs b/tools/test/test-macos-sparkle-feed.cjs
+index 2c6ffa1a8..dd9fd2893 100644
+--- a/tools/test/test-macos-sparkle-feed.cjs
++++ b/tools/test/test-macos-sparkle-feed.cjs
+@@ -125,7 +125,7 @@ for (const [label, value] of [
+ // A release must fail rather than skip its signature: a skipped signature
+ // writes no appcast, and the tag and the immutable release used to be created
+ // before the feed step noticed.
+-for (const name of ['Sign zip with Sparkle EdDSA key', 'Generate Sparkle appcast']) {
++for (const name of ['Sign declared archives with Sparkle EdDSA key', 'Generate Sparkle appcast']) {
+ 	if (!/^\s+if:\s*inputs\.release\s*$/m.test(pipeline.step(macosJob, name))) {
+ 		errors.push(
+ 			`"${name}" must run on every release (if: inputs.release), never on the key's presence`
+@@ -137,7 +137,7 @@ if (/SPARKLE_ED_PRIVATE_KEY\s*!=\s*''/.test(workflow)) {
+ }
+ if (
+ 	!/if \[ -z "\$SPARKLE_ED_PRIVATE_KEY" \]; then\s*echo "::error::[^\n]*\n\s*exit 1/.test(
+-		pipeline.step(macosJob, 'Sign zip with Sparkle EdDSA key')
++		pipeline.step(macosJob, 'Sign declared archives with Sparkle EdDSA key')
+ 	)
+ ) {
+ 	errors.push('a release without SPARKLE_ED_PRIVATE_KEY must fail the signing step');
+@@ -329,6 +329,477 @@ try {
+ 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
+ }
+ 
++// PUBLICATION_CONSUMER_TESTS_BEGIN
++// Private byte/signing ports qualify coupling, not native Sparkle cryptography.
++{
++	const assert = require('node:assert/strict');
++	const crypto = require('node:crypto');
++	const Publication = require('../build/macos-release-publication.cjs');
++	const policy = Publication.bindings();
++	const archiveRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-publication-'));
++	let cases = 0;
++	function check(name, callback) {
++		const directory = fs.mkdtempSync(path.join(archiveRoot, 'case-'));
++		const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
++		const observations = [];
++		for (const [index, archive] of policy.entries())
++			fs.writeFileSync(path.join(directory, archive.name), Buffer.alloc(32, index + 1));
++		function execute(tool, args) {
++			const target = args.includes('--verify') ? args[3] : args[2];
++			const payload = fs.readFileSync(target);
++			observations.push({
++				tool,
++				args: [...args],
++				digest: crypto.createHash('sha256').update(payload).digest('hex')
++			});
++			if (args.includes('--verify')) {
++				const accepted = crypto.verify(null, payload, publicKey, Buffer.from(args[4], 'base64'));
++				return { status: accepted ? 0 : 1, stdout: '', stderr: '' };
++			}
++			return {
++				status: 0,
++				stdout: `sparkle:edSignature="${crypto.sign(null, payload, privateKey).toString('base64')}" length="${payload.length}"\n`,
++				stderr: ''
++			};
++		}
++		try {
++			callback({ directory, observations, execute });
++			cases++;
++		} catch (error) {
++			errors.push(`public archive ${name}: ${error.message}`);
++		} finally {
++			fs.rmSync(directory, { recursive: true });
++		}
++	}
++	const env = (directory) => ({
++		ARCHIVE_DIR: directory,
++		ERGOPTI_VERSION: '0.0.0-dev.117',
++		ERGOPTI_BUILD: '117',
++		ERGOPTI_CHANNEL: 'dev',
++		GH_OWNER: 'adrienm7',
++		GH_REPO: 'ergopti',
++		OUTPUT_PATH: path.join(directory, 'appcast-dev.xml')
++	});
++	check('actual ordered signing and feed bytes', ({ directory, observations, execute }) => {
++		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
++		const checked = Publication.validatePublication(directory);
++		assert.equal(checked[0].name, 'ErgoptiPlus.app.tar.xz');
++		assert.equal(observations.length, policy.length * 2);
++		for (const [index, archive] of policy.entries()) {
++			assert.equal(path.basename(observations[index * 2].args[2]), archive.name);
++			assert.equal(path.basename(observations[index * 2 + 1].args[3]), archive.name);
++			assert.equal(observations[index * 2].digest, checked[index].sha256);
++			assert.equal(observations[index * 2 + 1].digest, checked[index].sha256);
++		}
++		Publication.generateAppcast(env(directory));
++		const xml = fs.readFileSync(env(directory).OUTPUT_PATH, 'utf8');
++		assert.ok(xml.includes('/ErgoptiPlus.app.tar.xz"'));
++		assert.ok(xml.includes(checked[0].fragment));
++		assert.equal((xml.match(/sparkle:edSignature=/g) ?? []).length, 1);
++	});
++	check('missing fresh preferred output refuses', ({ directory, observations, execute }) => {
++		fs.unlinkSync(path.join(directory, policy[0].name));
++		assert.throws(() =>
++			Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute })
++		);
++		assert.equal(observations.length, 0);
++		assert.equal(fs.existsSync(path.join(directory, Publication.RECEIPT)), false);
++	});
++	check('native sign ACK shape', ({ directory }) => {
++		let entered = 0;
++		assert.throws(() =>
++			Publication.signArchives(directory, 'owned-signer', 'owned-key', {
++				execute: () => {
++					entered++;
++					return {
++						status: false,
++						stdout: `sparkle:edSignature="${'A'.repeat(86)}==" length="32"\n`
++					};
++				}
++			})
++		);
++		assert.equal(entered, 1);
++		assert.equal(fs.existsSync(path.join(directory, Publication.RECEIPT)), false);
++	});
++	check('native verify refusal', ({ directory, execute }) => {
++		let verifies = 0;
++		assert.throws(() =>
++			Publication.signArchives(directory, 'owned-signer', 'owned-key', {
++				execute: (tool, args) => {
++					if (args.includes('--verify')) {
++						verifies++;
++						return { status: 1, stdout: '' };
++					}
++					return execute(tool, args);
++				}
++			})
++		);
++		assert.equal(verifies, 1);
++		assert.equal(fs.existsSync(path.join(directory, Publication.RECEIPT)), false);
++	});
++	check('native signer archive race', ({ directory, execute }) => {
++		let changed = 0;
++		assert.throws(() =>
++			Publication.signArchives(directory, 'owned-signer', 'owned-key', {
++				execute: (tool, args) => {
++					const result = execute(tool, args);
++					if (args.includes('--verify')) {
++						changed++;
++						fs.writeFileSync(args[3], Buffer.alloc(32, 9));
++					}
++					return result;
++				}
++			})
++		);
++		assert.equal(changed, 1);
++		assert.deepEqual(fs.readFileSync(path.join(directory, policy[0].name)), Buffer.alloc(32, 9));
++		assert.equal(fs.existsSync(path.join(directory, Publication.RECEIPT)), false);
++	});
++	check('ambiguous signing receipt encoding refuses', ({ directory, execute }) => {
++		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
++		const target = path.join(directory, Publication.RECEIPT);
++		fs.writeFileSync(
++			target,
++			fs
++				.readFileSync(target, 'utf8')
++				.replace('"schema_version":1', '"schema_version":1,"schema_version":1')
++		);
++		assert.throws(() => Publication.validatePublication(directory));
++	});
++	check('same-length crossed fragment refuses before feed', ({ directory, execute }) => {
++		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
++		const receipt = Publication.validatePublication(directory);
++		fs.copyFileSync(
++			path.join(directory, receipt[1].signature_name),
++			path.join(directory, receipt[0].signature_name)
++		);
++		assert.throws(() => Publication.generateAppcast(env(directory)));
++		assert.equal(fs.existsSync(env(directory).OUTPUT_PATH), false);
++	});
++	check('same-length substituted archive refuses', ({ directory, execute }) => {
++		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
++		fs.writeFileSync(path.join(directory, policy[0].name), Buffer.alloc(32, 7));
++		assert.throws(() => Publication.validatePublication(directory));
++	});
++	check('preferred symlink refuses', ({ directory, observations, execute }) => {
++		fs.unlinkSync(path.join(directory, policy[0].name));
++		fs.symlinkSync(policy[1].name, path.join(directory, policy[0].name));
++		assert.throws(() =>
++			Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute })
++		);
++		assert.equal(observations.length, 0);
++	});
++	function asset(archive, payload = Buffer.alloc(32, 1)) {
++		return {
++			name: archive.name,
++			size: payload.length,
++			digest: 'sha256:' + crypto.createHash('sha256').update(payload).digest('hex')
++		};
++	}
++	check('unknown or draft publication state refuses', () => {
++		for (const isDraft of [true, null, undefined, 0, 'false'])
++			assert.throws(() =>
++				Publication.selectPublished(
++					{ isDraft, tagName: 'v1.2.3', assets: policy.map((a) => asset(a)) },
++					'v1.2.3'
++				)
++			);
++	});
++	check('published both chooses preferred', () => {
++		assert.equal(
++			Publication.selectPublished(
++				{ isDraft: false, tagName: 'v1.2.3', assets: policy.map((a) => asset(a)) },
++				'v1.2.3'
++			).name,
++			'ErgoptiPlus.app.tar.xz'
++		);
++	});
++	check('historical actual absence chooses ZIP', () => {
++		assert.equal(
++			Publication.selectPublished(
++				{ isDraft: false, tagName: 'v1.2.3', assets: [asset(policy[1])] },
++				'v1.2.3'
++			).name,
++			'ErgoptiPlus.app.zip'
++		);
++	});
++	check('present malformed preferred never fallback', () => {
++		const preferred = asset(policy[0]);
++		delete preferred.digest;
++		assert.throws(() =>
++			Publication.selectPublished(
++				{ isDraft: false, tagName: 'v1.2.3', assets: [preferred, asset(policy[1])] },
++				'v1.2.3'
++			)
++		);
++	});
++	check('duplicate preferred never fallback', () => {
++		const preferred = asset(policy[0]);
++		assert.throws(() =>
++			Publication.selectPublished(
++				{ isDraft: false, tagName: 'v1.2.3', assets: [preferred, preferred, asset(policy[1])] },
++				'v1.2.3'
++			)
++		);
++	});
++	check('actual published download binds selected bytes', ({ directory }) => {
++		const downloaded = path.join(directory, 'download');
++		const calls = [],
++			payload = Buffer.alloc(32, 1);
++		const result = Publication.downloadPublished('adrienm7/ergopti', 'v1.2.3', downloaded, {
++			execute: (tool, args) => {
++				calls.push([...args]);
++				if (args[0] === 'api')
++					return {
++						status: 0,
++						stdout: JSON.stringify({
++							draft: false,
++							tag_name: 'v1.2.3',
++							assets: [asset(policy[0], payload), asset(policy[1])]
++						})
++					};
++				fs.writeFileSync(path.join(downloaded, policy[0].name), payload);
++				return { status: 0, stdout: '' };
++			}
++		});
++		assert.equal(result.name, 'ErgoptiPlus.app.tar.xz');
++		assert.equal(calls.length, 2);
++		assert.equal(calls[1][calls[1].indexOf('--pattern') + 1], result.name);
++		assert.equal(
++			result.sha256,
++			crypto
++				.createHash('sha256')
++				.update(fs.readFileSync(path.join(downloaded, result.name)))
++				.digest('hex')
++		);
++	});
++	check('download false receipt refuses', ({ directory }) => {
++		const calls = [];
++		assert.throws(() =>
++			Publication.downloadPublished(
++				'adrienm7/ergopti',
++				'v1.2.3',
++				path.join(directory, 'download'),
++				{
++					execute: (tool, args) => {
++						calls.push([...args]);
++						if (args[0] === 'api')
++							return {
++								status: 0,
++								stdout: JSON.stringify({
++									draft: false,
++									tag_name: 'v1.2.3',
++									assets: policy.map((a) => asset(a))
++								})
++							};
++						return { status: false, stdout: '' };
++					}
++				}
++			)
++		);
++		assert.equal(calls.length, 2);
++	});
++	check('download wrong bytes refuses', ({ directory }) => {
++		let downloads = 0;
++		assert.throws(() =>
++			Publication.downloadPublished(
++				'adrienm7/ergopti',
++				'v1.2.3',
++				path.join(directory, 'download'),
++				{
++					execute: (tool, args) => {
++						if (args[0] === 'api')
++							return {
++								status: 0,
++								stdout: JSON.stringify({
++									draft: false,
++									tag_name: 'v1.2.3',
++									assets: policy.map((a) => asset(a))
++								})
++							};
++						downloads++;
++						fs.writeFileSync(path.join(directory, 'download', policy[0].name), Buffer.alloc(32, 9));
++						return { status: 0, stdout: '' };
++					}
++				}
++			)
++		);
++		assert.equal(downloads, 1);
++	});
++	// REST_GH_DIGEST_TESTS_BEGIN
++	check('raw REST retains fields dropped by the actual old CLI export', ({ directory }) => {
++		const raw = { draft: false, tag_name: 'v1.2.3', assets: [asset(policy[0])] };
++		// GH v2.46 ReleaseAsset/ExportData lacks Digest despite a REST receipt.
++		const projected = {
++			isDraft: raw.draft,
++			tagName: raw.tag_name,
++			assets: raw.assets.map(({ name, size }) => ({ name, size }))
++		};
++		assert.equal(projected.assets[0].digest, undefined);
++		assert.throws(() => Publication.selectPublished(projected, 'v1.2.3'));
++		const calls = [];
++		const selected = Publication.downloadPublished(
++			'adrienm7/ergopti',
++			'v1.2.3',
++			path.join(directory, 'raw-download'),
++			{
++				execute: (tool, args) => {
++					calls.push([...args]);
++					if (args[0] === 'api') return { status: 0, stdout: JSON.stringify(raw) };
++					if (args[0] === 'release' && args[1] === 'view')
++						return { status: 0, stdout: JSON.stringify(projected) };
++					fs.writeFileSync(
++						path.join(directory, 'raw-download', policy[0].name),
++						Buffer.alloc(32, 1)
++					);
++					return { status: 0, stdout: '' };
++				}
++			}
++		);
++		assert.equal(selected.name, policy[0].name);
++		assert.deepEqual(calls[0], ['api', 'repos/adrienm7/ergopti/releases/tags/v1.2.3']);
++		assert.equal(calls.length, 2);
++	});
++	check('raw REST identity and asset refusals precede download', ({ directory }) => {
++		const malformedPreferred = asset(policy[0]);
++		delete malformedPreferred.digest;
++		const bodies = [
++			{ tag_name: 'v1.2.3', assets: [asset(policy[0])] },
++			{ draft: 'false', tag_name: 'v1.2.3', assets: [asset(policy[0])] },
++			{ draft: false, tag_name: 'other', assets: [asset(policy[0])] },
++			{ draft: false, tag_name: 'v1.2.3', assets: null },
++			{ draft: false, tag_name: 'v1.2.3', assets: [malformedPreferred, asset(policy[1])] },
++			{
++				draft: false,
++				tag_name: 'v1.2.3',
++				assets: [asset(policy[0]), asset(policy[0]), asset(policy[1])]
++			},
++			null,
++			[]
++		];
++		for (const [index, body] of bodies.entries()) {
++			const calls = [];
++			const target = path.join(directory, 'refused-' + index);
++			assert.throws(() =>
++				Publication.downloadPublished('adrienm7/ergopti', 'v1.2.3', target, {
++					execute: (tool, args) => {
++						calls.push([...args]);
++						return { status: 0, stdout: JSON.stringify(body) };
++					}
++				})
++			);
++			assert.equal(calls.length, 1);
++			assert.equal(calls[0][0], 'api');
++			assert.equal(fs.existsSync(target), false);
++		}
++	});
++	check('API failed HTTP and malformed process receipts refuse', ({ directory }) => {
++		const body = JSON.stringify({ draft: false, tag_name: 'v1.2.3', assets: [asset(policy[0])] });
++		for (const [index, receipt] of [
++			{ status: 1, stdout: body }, // gh api returns nonzero for non2xx.
++			{ status: false, stdout: body },
++			{ status: 0, signal: 'SIGTERM', stdout: body },
++			{ status: 0, stdout: '{' }
++		].entries()) {
++			let entered = 0;
++			const target = path.join(directory, 'bad-status-' + index);
++			assert.throws(() =>
++				Publication.downloadPublished('adrienm7/ergopti', 'v1.2.3', target, {
++					execute: () => {
++						entered++;
++						return receipt;
++					}
++				})
++			);
++			assert.equal(entered, 1);
++			assert.equal(fs.existsSync(target), false);
++		}
++	});
++	check('actual download CLI uses encoded REST tag and closed HTTP failure', ({ directory }) => {
++		const tag = 'v1.2.3/owned-tag';
++		const bin = path.join(directory, 'bin');
++		fs.mkdirSync(bin);
++		const rawPath = path.join(directory, 'release.json');
++		const callPath = path.join(directory, 'calls.jsonl');
++		const payloadPath = path.join(directory, policy[0].name);
++		fs.writeFileSync(
++			rawPath,
++			JSON.stringify({ draft: false, tag_name: tag, assets: [asset(policy[0])] })
++		);
++		const shim = path.join(bin, 'gh');
++		fs.writeFileSync(
++			shim,
++			`#!${process.execPath}\n` +
++				`
++'use strict';
++const fs = require('node:fs'), path = require('node:path');
++const args = process.argv.slice(2);
++fs.appendFileSync(process.env.OWNED_GH_CALLS, JSON.stringify(args) + '\\n');
++if (args[0] === 'api') {
++ if (process.env.OWNED_GH_HTTP_REFUSAL === '1') { process.stderr.write('INERT_PRIVATE_GH_FAILURE'); process.exit(1); }
++ process.stdout.write(fs.readFileSync(process.env.OWNED_GH_RELEASE));
++} else if (args[0] === 'release' && args[1] === 'download') {
++ fs.copyFileSync(process.env.OWNED_GH_PAYLOAD, path.join(args[args.indexOf('--dir') + 1], args[args.indexOf('--pattern') + 1]));
++} else if (args[0] === 'release' && args[1] === 'view') {
++ const raw = JSON.parse(fs.readFileSync(process.env.OWNED_GH_RELEASE));
++ process.stdout.write(JSON.stringify({isDraft: raw.draft, tagName: raw.tag_name, assets: raw.assets.map(({name,size}) => ({name,size}))}));
++} else process.exit(2);
++`,
++			{ mode: 0o700 }
++		);
++		const environment = {
++			...process.env,
++			PATH: bin + path.delimiter + process.env.PATH,
++			OWNED_GH_CALLS: callPath,
++			OWNED_GH_RELEASE: rawPath,
++			OWNED_GH_PAYLOAD: payloadPath
++		};
++		const owner = require.resolve('../build/macos-release-publication.cjs');
++		const target = path.join(directory, 'cli-download');
++		const success = spawnSync(
++			process.execPath,
++			[owner, 'download', 'adrienm7/ergopti', tag, target],
++			{ encoding: 'utf8', env: environment }
++		);
++		assert.equal(success.status, 0, 'the actual CLI admits a source-retained REST checksum');
++		assert.equal(success.stderr, '');
++		const selected = JSON.parse(success.stdout);
++		assert.equal(selected.name, policy[0].name);
++		assert.deepEqual(
++			fs.readFileSync(path.join(target, selected.name)),
++			fs.readFileSync(payloadPath)
++		);
++		const calls = fs
++			.readFileSync(callPath, 'utf8')
++			.trim()
++			.split('\n')
++			.map((s) => JSON.parse(s));
++		assert.deepEqual(calls[0], ['api', 'repos/adrienm7/ergopti/releases/tags/v1.2.3%2Fowned-tag']);
++		assert.equal(calls.length, 2);
++		fs.writeFileSync(callPath, '');
++		const refusedTarget = path.join(directory, 'cli-refused');
++		const refused = spawnSync(
++			process.execPath,
++			[owner, 'download', 'adrienm7/ergopti', tag, refusedTarget],
++			{
++				encoding: 'utf8',
++				env: { ...environment, OWNED_GH_HTTP_REFUSAL: '1' }
++			}
++		);
++		assert.equal(refused.status, 1);
++		assert.equal(refused.stdout, '');
++		assert.equal(refused.stderr, 'Public macOS archive operation refused.\n');
++		assert.equal(refused.stderr.includes('INERT_PRIVATE_GH_FAILURE'), false);
++		assert.equal(fs.existsSync(refusedTarget), false);
++		assert.equal(fs.readFileSync(callPath, 'utf8').trim().split('\n').length, 1);
++	});
++	// REST_GH_DIGEST_TESTS_END
++
++	fs.rmSync(archiveRoot, { recursive: true });
++	console.log(`Public archive callable cases: ${cases}/21`);
++}
++// PUBLICATION_CONSUMER_TESTS_END
++
+ if (errors.length > 0) {
+ 	for (const error of errors) console.error(`[FAIL] ${error}`);
+ 	process.exit(1);
+diff --git a/tools/test/test-release-notes-assets-are-uploaded.cjs b/tools/test/test-release-notes-assets-are-uploaded.cjs
+index e597fa622..ef8e91fe6 100644
+--- a/tools/test/test-release-notes-assets-are-uploaded.cjs
++++ b/tools/test/test-release-notes-assets-are-uploaded.cjs
+@@ -434,6 +434,25 @@ if (layoutSection < 0 || applicationSection <= layoutSection) {
+ 	errors.push('release notes must explain keyboard layouts before the companion application');
+ }
+ 
++// Fresh public macOS artifacts are admitted by their actual canonical owner,
++// in addition to the retained historical/common release requirements above.
++const publication = require('../build/macos-release-publication.cjs');
++const freshMacosFiles = publication
++	.bindings()
++	.flatMap((archive) => [archive.name, `_${archive.name}.sig`]);
++freshMacosFiles.push(publication.RECEIPT);
++for (const name of freshMacosFiles) {
++	if (!uploadedNames.has(name) && !uploadedGlobs.some((pattern) => pattern.test(name)))
++		errors.push(`the fresh macOS publication file ${name} has no assets-* upload owner`);
++}
++if (
++	!preflight.includes('if [ "$create_release" = true ]; then') ||
++	!preflight.includes('node tools/build/macos-release-publication.cjs validate release-assets')
++)
++	errors.push(
++		'fresh macOS publication must validate its whole canonical signing receipt before publication'
++	);
++
+ if (errors.length > 0) {
+ 	console.error(
+ 		'\x1b[31m[FAIL] the release notes link to files the release does not contain:\x1b[0m'
+diff --git a/tools/test/test-release-packaging-workflow.cjs b/tools/test/test-release-packaging-workflow.cjs
+index cb4e19d33..7f4c1301c 100644
+--- a/tools/test/test-release-packaging-workflow.cjs
++++ b/tools/test/test-release-packaging-workflow.cjs
+@@ -1022,16 +1022,176 @@ if (macosSmokeStep !== null) {
+ 	}
+ }
+ 
+-// The preferred archive is smoked, then the historical ZIP is signed; the
++// NATIVE_SPARKLE_FIXTURE_BEGIN
++/** The real keyless CI tool owner must be available before native XCTest. */
++function nativeSparkleFixtureProblems(steps, fixture) {
++	const problems = [];
++	const install = steps.filter((step) => step.name === 'Install Sparkle signing tool');
++	const tests = steps.filter((step) => step.name === 'Run Swift launcher tests');
++	if (
++		install.length !== 1 ||
++		tests.length !== 1 ||
++		steps.indexOf(install[0]) >= steps.indexOf(tests[0])
++	)
++		problems.push('The native Sparkle fixture needs exactly one installer before XCTest.');
++	if (install.length === 1) {
++		if (
++			pipeline.stepField(install[0].body, 'if') !== null ||
++			pipeline.stepField(install[0].body, 'continue-on-error') !== null
++		)
++			problems.push(
++				'The public native signing tool must be installed unconditionally and strictly.'
++			);
++		for (const token of [
++			"SPARKLE_VERSION: '2.9.2'",
++			'curl -fsSLo /tmp/Sparkle.tar.xz',
++			'tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist',
++			'SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update'
++		]) {
++			if (!install[0].body.includes(token))
++				problems.push('The pinned native signing tool owner changed.');
++		}
++	}
++	if (!fixture.includes('import Security'))
++		problems.push('The native seed requires the actual Security owner.');
++	const ownedFixture = fixture.slice(fixture.indexOf('private func privateSparkleChild('));
++	for (const token of [
++		'SecRandomCopyBytes(kSecRandomDefault, bytes.count, bytes.baseAddress!)',
++		'[UInt8](repeating: 0, count: 32)',
++		'attributes: [.posixPermissions: 0o600]',
++		'.posixPermissions: 0o700',
++		'try child(executable, arguments, root: root)',
++		'guard fixtureCanRetire else',
++		'guard testRun?.failureCount == failuresBefore else',
++		'["node", owner.path, "sign", directory.path, signer, key.path]',
++		'["--verify", "-f", key.path, payload.path, signature]',
++		'["--verify", "-f", key.path, payload.path, signatures[1 - index]]',
++		'["--verify", "-f", key.path, modified.path, signatures[index]]',
++		'changed[changed.startIndex] ^= 1',
++		'XCTAssertEqual(crossed.status, 1',
++		'XCTAssertEqual(refused.status, 1',
++		'Error: failed to pass signing verification.',
++		'XCTAssertEqual(stillOwned.status, 0',
++		'XCTAssertEqual(decoded.count, 64)',
++		'XCTAssertEqual(signatures[0].count, signatures[1].count)',
++		'XCTAssertEqual(try Data(contentsOf: payload), before[index])'
++	]) {
++		if (!ownedFixture.includes(token))
++			problems.push('The actual private native signing fixture lost an owned control.');
++	}
++	return problems;
++}
++const nativeSparkleFixturePath = path.join(
++	root,
++	'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift'
++);
++const nativeSparkleFixture = fs.readFileSync(nativeSparkleFixturePath, 'utf8');
++const nativeSparkleSteps = pipeline.steps(pipeline.job(PACKAGE_JOB[MACOS_BOX]));
++errors.push(...nativeSparkleFixtureProblems(nativeSparkleSteps, nativeSparkleFixture));
++// Portable controls prove the actual CI prerequisite and control guards only;
++// actual Sparkle cryptography and child retirement remain macOS XCTest work.
++const nativeSparkleControls = [
++	['installed prerequisite', nativeSparkleSteps, nativeSparkleFixture, false],
++	[
++		'release-only installer',
++		nativeSparkleSteps.map((step) =>
++			step.name === 'Install Sparkle signing tool'
++				? {
++						...step,
++						body: step.body.replace(/^ {8}if:.*\n/gm, '') + '\n        if: inputs.release\n'
++					}
++				: step
++		),
++		nativeSparkleFixture,
++		true
++	],
++	[
++		'missing installer',
++		nativeSparkleSteps.filter((step) => step.name !== 'Install Sparkle signing tool'),
++		nativeSparkleFixture,
++		true
++	],
++	[
++		'late installer',
++		[
++			...nativeSparkleSteps.filter((step) => step.name !== 'Install Sparkle signing tool'),
++			...nativeSparkleSteps.filter((step) => step.name === 'Install Sparkle signing tool')
++		],
++		nativeSparkleFixture,
++		true
++	],
++	[
++		'duplicate installer',
++		[
++			...nativeSparkleSteps,
++			...nativeSparkleSteps.filter((step) => step.name === 'Install Sparkle signing tool')
++		],
++		nativeSparkleFixture,
++		true
++	],
++	[
++		'unpinned tool',
++		nativeSparkleSteps.map((step) => ({
++			...step,
++			body: step.body.replace("SPARKLE_VERSION: '2.9.2'", "SPARKLE_VERSION: 'unqualified'")
++		})),
++		nativeSparkleFixture,
++		true
++	],
++	[
++		'crossed signature removed',
++		nativeSparkleSteps,
++		nativeSparkleFixture.replace(
++			'payload.path, signatures[1 - index]',
++			'payload.path, signatures[index]'
++		),
++		true
++	],
++	[
++		'private key flag removed',
++		nativeSparkleSteps,
++		nativeSparkleFixture.replace(
++			'["--verify", "-f", key.path, payload.path, signature]',
++			'["--verify", key.path, payload.path, signature]'
++		),
++		true
++	],
++	[
++		'byte mutation removed',
++		nativeSparkleSteps,
++		nativeSparkleFixture.replace(
++			'changed[changed.startIndex] ^= 1',
++			'changed[changed.startIndex] ^= 0'
++		),
++		true
++	],
++	[
++		'retirement debt bypassed',
++		nativeSparkleSteps,
++		nativeSparkleFixture.replace(
++			'private func privateSparkleRetire(_ root: URL) {\n\t\tguard fixtureCanRetire else',
++			'private func privateSparkleRetire(_ root: URL) {\n\t\tguard true else'
++		),
++		true
++	]
++];
++for (const [name, steps, fixture, refuses] of nativeSparkleControls) {
++	if (nativeSparkleFixtureProblems(steps, fixture).length > 0 !== refuses)
++		errors.push(`Native Sparkle fixture prerequisite control failed: ${name}`);
++}
++// NATIVE_SPARKLE_FIXTURE_END
++
++// The preferred archive is smoked, then declared archives are signed; the
+ // upload must follow every file it carries. A signature or keylayout step
+ // moved past the upload leaves its file out, and the release preflight then
+ // stops the whole release after every box has run.
+ const MACOS_ORDER = [
++	'Install Sparkle signing tool',
++	'Run Swift launcher tests',
+ 	'Build ErgoptiPlus.app',
+ 	'Record signed CI archive source',
+ 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
+-	'Install Sparkle signing tool',
+-	'Sign zip with Sparkle EdDSA key',
++	'Sign declared archives with Sparkle EdDSA key',
+ 	'Generate Sparkle appcast',
+ 	'Upload the independent CI archive source',
+ 	'Upload the package'
+@@ -1064,8 +1224,8 @@ if (
+ for (const [name, condition] of [
+ 	['Smoke test built ErgoptiPlus.app (crash-on-launch guard)', 'inputs.release'],
+ 	['Retain packaged application startup evidence', 'always() && inputs.release'],
+-	['Install Sparkle signing tool', 'inputs.release'],
+-	['Sign zip with Sparkle EdDSA key', 'inputs.release'],
++	['Install Sparkle signing tool', null],
++	['Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
+ 	['Generate Sparkle appcast', 'inputs.release'],
+ 	['Package latest keylayout bundle', 'inputs.release']
+ ]) {
+@@ -1805,6 +1965,80 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
+ }
+ // CI_ARCHIVE_OWNED_TESTS_END
+ 
++// PUBLIC_MACOS_PUBLICATION_WIRING_BEGIN
++// Fresh signing/feed/cask consumers all invoke the one canonical publication owner.
++{
++	const publication = require('../build/macos-release-publication.cjs');
++	const job = pipeline.job('package-macos');
++	const signer = pipeline
++		.runOf(pipeline.step(job, 'Sign declared archives with Sparkle EdDSA key'))
++		.join('\n');
++	if (
++		!signer.includes('node tools/build/macos-release-publication.cjs sign') ||
++		!signer.includes('build/macos "$SIGN_UPDATE" /tmp/sparkle_priv.key')
++	)
++		errors.push(
++			'the release signer must invoke the actual declared-archive owner with an explicit key file'
++		);
++	const appcast = pipeline.step(job, 'Generate Sparkle appcast');
++	if (!appcast.includes('ARCHIVE_DIR: build/macos') || appcast.includes('ZIP_PATH:'))
++		errors.push('fresh appcasts must consume the actual publication signing receipt');
++	const upload = pipeline.step(job, 'Upload the package');
++	if (
++		!upload.includes(`build/macos/${publication.RECEIPT}`) ||
++		!upload.includes('build/macos/_*.sig')
++	)
++		errors.push('the exact signing receipt and declared fragments must reach release preflight');
++	const cask = pipeline.step(pipeline.job('release'), 'Publish Homebrew cask');
++	if (
++		!cask.includes('node tools/build/macos-release-publication.cjs download') ||
++		!cask.includes('"$tap" "$archive"')
++	)
++		errors.push('the cask must receive the actual admitted published archive name and hash');
++}
++// PUBLIC_MACOS_PUBLICATION_WIRING_END
++
++// PUBLISHED_ARCHIVE_POLICY_TESTS_BEGIN
++// The published diagnostic consumes the producer's canonical archive bindings.
++// Its current-build and retained-helper branches remain independent ZIP users.
++function publishedArchiveWorkflowProblems(source) {
++	const failures = [];
++	const jobs = pipeline.jobsOfText(source, '.github/workflows/macos-release-launch.yml');
++	const observe = jobs.find((job) => job.id === 'observe');
++	if (!observe) return ['the published archive diagnostic must retain its observe job'];
++	const download = pipeline.step(observe.body, 'Download and verify the published application');
++	if (
++		pipeline.stepField(download, 'if') !==
++		"inputs.scenario == 'published' || inputs.scenario == 'published_with_dependency'"
++	)
++		failures.push('the published archive preference must remain scoped to published scenarios');
++	const commands = pipeline.runOf(download)?.filter((line) => line.trim() !== '') ?? [];
++	if (
++		commands.length !== 2 ||
++		commands[0] !== 'python3 tools/diagnostics/macos_release_launch_test.py' ||
++		commands[1] !== 'python3 tools/diagnostics/macos-release-launch.py --install-published'
++	)
++		failures.push('the published download must qualify and invoke its actual archive helper');
++	const observeLaunch = pipeline.step(
++		observe.body,
++		'Observe the installed release without a waiting open helper'
++	);
++	const launch = pipeline.runOf(observeLaunch) ?? [];
++	if (
++		!launch.includes(
++			'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"'
++		)
++	)
++		failures.push('the installed published archive must retain the actual strict launch observer');
++	return failures;
++}
++errors.push(
++	...publishedArchiveWorkflowProblems(
++		fs.readFileSync(path.join(root, '.github/workflows/macos-release-launch.yml'), 'utf8')
++	)
++);
++// PUBLISHED_ARCHIVE_POLICY_TESTS_END
++
+ if (errors.length > 0) {
+ 	console.error('[ERROR] Release packaging workflow is unsafe:');
+ 	for (const error of errors) console.error(`  - ${error}`);
+diff --git a/tools/test/test-swift-xctest-evidence.cjs b/tools/test/test-swift-xctest-evidence.cjs
+index 37a5c6f94..61d687e22 100644
+--- a/tools/test/test-swift-xctest-evidence.cjs
++++ b/tools/test/test-swift-xctest-evidence.cjs
+@@ -16,6 +16,7 @@ const {
+ 	cleanTranscript,
+ 	evaluate
+ } = require('../diagnostics/swift_xctest_evidence.cjs');
++const { validate: validateTIS } = require('../diagnostics/tis_evidence_transport.cjs');
+ const pipeline = require('./ci-pipeline.cjs');
+ const { bashExecutable } = require('../lib/git-bash.cjs');
+ 
+@@ -148,6 +149,78 @@ assert.equal(
+ 	'::error title=Swift XCTest failure,file=a%2Cb.swift,line=7::Échec %25%0A::warning::inert%0Dnext'
+ );
+ 
++// Independent protocol fixtures publish real private files. They model the
++// native wire contract, not Carbon execution or XCTest observer delivery.
++function makeControlledSession(root, nonce) {
++	const fs = require('node:fs');
++	const path = require('node:path');
++	const crypto = require('node:crypto');
++	const sha = (data) => crypto.createHash('sha256').update(data).digest('hex');
++	function publish(name, data) {
++		const stage = path.join(root, '.' + name + '.stage');
++		const target = path.join(root, name);
++		const descriptor = fs.openSync(stage, 'wx', 0o600);
++		try {
++			fs.writeFileSync(descriptor, data);
++			fs.fsyncSync(descriptor);
++		} finally {
++			fs.closeSync(descriptor);
++		}
++		fs.linkSync(stage, target);
++		fs.unlinkSync(stage);
++	}
++	const start = Buffer.from(
++		JSON.stringify({
++			version: 1,
++			session: nonce,
++			producerPID: 9123,
++			bundleSHA256: sha(Buffer.from('controlled XCTest bundle'))
++		})
++	);
++	publish('start.json', start);
++	const records = [];
++	for (let index = 1; index <= 6; index++) {
++		const receipt = {
++			version: 1,
++			pid: 9123,
++			test: { state: 'present', value: 'controlled-native-' + index },
++			events: [
++				{
++					phase: 'restore.after',
++					uptime: 123.5,
++					status: -50,
++					snapshotID: { state: 'present', value: 'é'.repeat(512) }
++				}
++			],
++			omittedEvents: 0
++		};
++		// More than 4KiB of independent bounded Unicode source data is retained.
++		if (index === 6) receipt.events = Array.from({ length: 64 }, () => receipt.events[0]);
++		const bytes = Buffer.concat([
++			Buffer.from('TIS_TEST_EVIDENCE '),
++			Buffer.from(JSON.stringify(receipt)),
++			Buffer.from('\n')
++		]);
++		publish('record-' + String(index).padStart(6, '0') + '.dat', bytes);
++		records.push({ index, bytes: bytes.length, sha256: sha(bytes), closed: true });
++	}
++	publish(
++		'manifest.json',
++		Buffer.from(
++			JSON.stringify({
++				version: 1,
++				session: nonce,
++				producerPID: 9123,
++				bundleSHA256: JSON.parse(start).bundleSHA256,
++				startSHA256: sha(start),
++				phase: 'closed',
++				enrolledCount: 6,
++				records
++			})
++		)
++	);
++}
++
+ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-swift-evidence-'));
+ try {
+ 	const log = path.join(root, 'native.log');
+@@ -190,8 +263,15 @@ try {
+ 		const fixture = path.join(root, 'pipeline-' + script + '-' + tee + '-' + expected);
+ 		fs.mkdirSync(fixture);
+ 		fs.writeFileSync(log, text);
++		const fixturePublisher = path.join(fixture, 'publish.cjs');
++		fs.writeFileSync(
++			fixturePublisher,
++			'(' +
++				makeControlledSession.toString() +
++				')(process.env.ERGOPTI_TIS_EVIDENCE_DIR,process.env.ERGOPTI_TIS_EVIDENCE_SESSION);'
++		);
+ 		const harness =
+-			'script() { cat "$SWIFT_FIXTURE_LOG"; return "$SWIFT_FIXTURE_SCRIPT_STATUS"; }\n' +
++			'script() { node "$SWIFT_FIXTURE_PUBLISHER" || return $?; cat "$SWIFT_FIXTURE_LOG"; return "$SWIFT_FIXTURE_SCRIPT_STATUS"; }\n' +
+ 			'tee() { command tee "$@"; return "$SWIFT_FIXTURE_TEE_STATUS"; }\n' +
+ 			run;
+ 		result = spawnSync(bashExecutable(), ['-c', harness], {
+@@ -199,6 +279,8 @@ try {
+ 			env: {
+ 				...process.env,
+ 				RUNNER_TEMP: fixture.replaceAll('\\', '/'),
++				GITHUB_OUTPUT: path.join(fixture, 'step-outputs').replaceAll('\\', '/'),
++				SWIFT_FIXTURE_PUBLISHER: fixturePublisher.replaceAll('\\', '/'),
+ 				SWIFT_FIXTURE_LOG: log.replaceAll('\\', '/'),
+ 				SWIFT_FIXTURE_SCRIPT_STATUS: String(script),
+ 				SWIFT_FIXTURE_TEE_STATUS: String(tee)
+@@ -227,3 +309,252 @@ try {
+ console.log(
+ 	'[OK] Native Swift transcript failures, exhaustive XCTest receipts, original pipeline statuses and safe annotations are preserved.'
+ );
++
++// These controls exercise the actual artifact validator and real filesystem;
++// successful raw XCTest and successful artifact admission remain independent.
++const transportRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-tis-transport-'));
++const sessionNonce = 'a'.repeat(64);
++try {
++	let serial = 0;
++	function fixture() {
++		const directory = path.join(transportRoot, String(++serial));
++		fs.mkdirSync(directory, { mode: 0o700 });
++		makeControlledSession(directory, sessionNonce);
++		return directory;
++	}
++	function terminal(directory, change) {
++		const source = path.join(directory, 'manifest.json');
++		const value = JSON.parse(fs.readFileSync(source));
++		change(value);
++		fs.writeFileSync(source, JSON.stringify(value));
++	}
++	const good = fixture();
++	const before = fs.readFileSync(path.join(good, 'record-000006.dat'));
++	assert.ok(before.length > 4096);
++	const admitted = validateTIS(good, sessionNonce);
++	assert.equal(admitted.complete, true);
++	assert.equal(admitted.record_count, 6);
++	assert.equal(admitted.receipts[5].events.length, 64);
++	assert.equal(admitted.receipts[5].events[0].snapshotID.value, 'é'.repeat(512));
++	assert.deepEqual(fs.readFileSync(path.join(good, 'record-000006.dat')), before);
++	for (const [name, mutate] of [
++		['wholly lost last diagnostic', (d) => fs.unlinkSync(path.join(d, 'record-000006.dat'))],
++		['missing terminal', (d) => fs.unlinkSync(path.join(d, 'manifest.json'))],
++		[
++			'no enrollment',
++			(d) => {
++				for (const file of fs.readdirSync(d).filter((x) => x.startsWith('record-')))
++					fs.unlinkSync(path.join(d, file));
++				terminal(d, (x) => {
++					x.enrolledCount = 0;
++					x.records = [];
++				});
++			}
++		],
++		[
++			'pending last enrollment',
++			(d) =>
++				terminal(d, (x) => {
++					x.enrolledCount = 7;
++				})
++		],
++		[
++			'duplicated index',
++			(d) =>
++				terminal(d, (x) => {
++					x.records[5].index = 5;
++				})
++		],
++		[
++			'reordered records',
++			(d) =>
++				terminal(d, (x) => {
++					x.records.reverse();
++				})
++		],
++		[
++			'unclosed record',
++			(d) =>
++				terminal(d, (x) => {
++					x.records[0].closed = false;
++				})
++		],
++		[
++			'truthy close instead of ACK',
++			(d) =>
++				terminal(d, (x) => {
++					x.records[0].closed = 1;
++				})
++		],
++		[
++			'foreign producer',
++			(d) =>
++				terminal(d, (x) => {
++					x.producerPID++;
++				})
++		],
++		[
++			'foreign bundle',
++			(d) =>
++				terminal(d, (x) => {
++					x.bundleSHA256 = 'b'.repeat(64);
++				})
++		],
++		[
++			'stale nonce',
++			(d) =>
++				terminal(d, (x) => {
++					x.session = 'b'.repeat(64);
++				})
++		],
++		['changed start receipt', (d) => fs.appendFileSync(path.join(d, 'start.json'), ' ')],
++		['changed diagnostic', (d) => fs.appendFileSync(path.join(d, 'record-000001.dat'), 'x')],
++		[
++			'same-length changed content',
++			(d) => {
++				const file = path.join(d, 'record-000001.dat');
++				fs.writeFileSync(
++					file,
++					fs.readFileSync(file, 'utf8').replace('"status":-50', '"status":-49')
++				);
++			}
++		],
++		[
++			'missing full content hash',
++			(d) =>
++				terminal(d, (x) => {
++					delete x.records[0].sha256;
++				})
++		],
++		[
++			'incorrect byte length',
++			(d) =>
++				terminal(d, (x) => {
++					x.records[0].bytes++;
++				})
++		],
++		[
++			'open publication debt',
++			(d) => fs.writeFileSync(path.join(d, '.record-000007.dat.stage'), 'owned debt')
++		],
++		['terminal reentry refusal', (d) => fs.writeFileSync(path.join(d, 'refusal.json'), '{}')],
++		['foreign directory member', (d) => fs.writeFileSync(path.join(d, 'foreign.json'), '{}')],
++		[
++			'nonterminal phase',
++			(d) =>
++				terminal(d, (x) => {
++					x.phase = 'publishing';
++				})
++		],
++		[
++			'encoding refusal payload',
++			(d) => {
++				const file = path.join(d, 'record-000001.dat');
++				const bytes = Buffer.from(
++					'TIS_TEST_EVIDENCE {"version":1,"diagnosticEncodingRefused":true}\n'
++				);
++				fs.writeFileSync(file, bytes);
++				terminal(d, (x) => {
++					x.records[0].bytes = bytes.length;
++					x.records[0].sha256 = require('node:crypto')
++						.createHash('sha256')
++						.update(bytes)
++						.digest('hex');
++				});
++			}
++		]
++	]) {
++		const directory = fixture();
++		mutate(directory);
++		assert.throws(() => validateTIS(directory, sessionNonce), name);
++		fs.rmSync(directory, { recursive: true });
++	}
++	assert.throws(() => validateTIS(good, 'b'.repeat(64)), 'caller owns exact session nonce');
++	assert.throws(() => validateTIS(good, ''), 'missing env never falls back');
++	if (process.platform !== 'win32') {
++		const directory = fixture();
++		const target = path.join(directory, 'record-000001.dat');
++		fs.renameSync(target, path.join(transportRoot, 'foreign-record'));
++		fs.symlinkSync(path.join(transportRoot, 'foreign-record'), target);
++		assert.throws(
++			() => validateTIS(directory, sessionNonce),
++			'foreign symlink cannot supply evidence'
++		);
++	}
++	const uploaded = pipeline.step(
++		pipeline.job('package-macos'),
++		'Retain closed TIS diagnostic session'
++	);
++	assert.equal(
++		pipeline.stepField(uploaded, 'if'),
++		"${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}"
++	);
++	assert.match(uploaded, /steps\.swift-launcher-tests\.outputs\.tis_session_dir/);
++	assert.doesNotMatch(uploaded, /runner\.temp|\/tmp|\*\*/);
++	assert.match(uploaded, /if-no-files-found: error/);
++	const commands = pipeline
++		.runOf(pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests'))
++		.join('\n');
++	assert.match(commands, /mktemp -d .*tis-session\.XXXXXX/);
++	assert.match(commands, /randomBytes\(32\)/);
++	assert.match(commands, /tis_evidence_transport\.cjs/);
++	assert.ok(
++		commands.indexOf('swift_xctest_evidence.cjs') < commands.indexOf('tis_evidence_transport.cjs')
++	);
++	// Execute the actual mandatory workflow gate after a successful raw suite,
++	// with a genuinely missing terminal or wholly lost final artifact file.
++	for (const lost of ['manifest.json', 'record-000006.dat']) {
++		const runner = path.join(transportRoot, 'workflow-' + lost);
++		fs.mkdirSync(runner, { mode: 0o700 });
++		const transcript = path.join(runner, 'native.log');
++		fs.writeFileSync(transcript, passed);
++		const producer = path.join(runner, 'producer.cjs');
++		fs.writeFileSync(
++			producer,
++			'(' +
++				makeControlledSession.toString() +
++				')(process.env.ERGOPTI_TIS_EVIDENCE_DIR,process.env.ERGOPTI_TIS_EVIDENCE_SESSION);' +
++				'require("node:fs").unlinkSync(require("node:path").join(process.env.ERGOPTI_TIS_EVIDENCE_DIR,' +
++				JSON.stringify(lost) +
++				'));'
++		);
++		const harness =
++			'script() { node "$SWIFT_FIXTURE_PUBLISHER" || return $?; cat "$SWIFT_FIXTURE_LOG"; }\n' +
++			commands;
++		const result = spawnSync(bashExecutable(), ['-c', harness], {
++			cwd: repository,
++			env: {
++				...process.env,
++				RUNNER_TEMP: runner.replaceAll('\\', '/'),
++				GITHUB_OUTPUT: path.join(runner, 'outputs').replaceAll('\\', '/'),
++				SWIFT_FIXTURE_PUBLISHER: producer.replaceAll('\\', '/'),
++				SWIFT_FIXTURE_LOG: transcript.replaceAll('\\', '/')
++			},
++			encoding: 'utf8'
++		});
++		assert.equal(result.error, undefined);
++		assert.equal(result.status, 1, 'Lost TIS transport evidence defeats a successful raw suite');
++		assert.match(result.stderr, /TIS diagnostic session is incomplete or refused/);
++		const verdict = JSON.parse(
++			fs.readFileSync(path.join(runner, 'swift-launcher-evidence/verdict.json'))
++		);
++		assert.equal(verdict.exit_status, 0, 'The raw XCTest owner keeps its own unchanged verdict');
++	}
++	// A raw receipt glued after any diagnostic still refuses unchanged.
++	const mixed = passed.replace(
++		"Test Case '-[ErgoptiPlusTests.WindowTitlePolicyTests testPrivatePolicies]' passed",
++		'TIS_TEST_EVIDENCE {"unclosed":' +
++			"Test Case '-[ErgoptiPlusTests.WindowTitlePolicyTests testPrivatePolicies]' passed"
++	);
++	assert.equal(evaluate(mixed, 0, 0).exit_status, 1);
++	assert.equal(
++		validateTIS(good, sessionNonce).complete,
++		true,
++		'artifact success cannot repair a raw XCTest refusal'
++	);
++} finally {
++	fs.rmSync(transportRoot, { recursive: true, force: true });
++}
++console.log(
++	'[OK] Six lossless closed records, Unicode, source identity and twenty-one mandatory refusal cases are admitted independently of raw XCTest.'
++);
