@@ -1904,6 +1904,23 @@ HTTP/process retirement. This is a prerequisite only: Windows asynchronous
 models transport, menu integration and complete native qualification remain
 unfinished. No model or server installation is claimed.
 
+The Windows native models-request owner now acquires the existing tree-owned
+curl adapter with a dispatch fence after private-file staging. Provider slots
+retain creator, cancellation, timeout, private-file and timer-stop debts until
+their exact observable owners settle; ShellRunner retains its independent
+capture cleanup. Twenty registered cases exercise typed receipts, source
+order, superseding requests and native locks/handles. Source review and static
+checks pass; native execution, actual HTTP acceptance and production discovery
+menu integration remain required. This transport prerequisite does not close
+item 47.
+
+Windows checkpoint 37227446912 at 02ddf2e18 actually passed all 17 discovery
+policy cases. The full unit result was 9053 passed and one pre-existing personal
+metadata fixture failure; E2E, packaging and installation did not execute.
+The new models transport was added afterward and still requires native
+qualification. The separate shared-CI native-read dependency failure also
+prevents treating this checkpoint as complete qualification.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
