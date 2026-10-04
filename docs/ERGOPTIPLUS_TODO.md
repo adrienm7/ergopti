@@ -917,6 +917,22 @@ These are software implementations; final hardware verification remains below.
   pass in both runtimes. Windows Storage uses the registry and macOS hs.settings
   by source, so this FIFO reader is Linux-specific. No generic FileSystem/TOML
   writer, config-path policy, physical input, reserved source or manual CI changed.
+- [~] **L69.** Linux generic file-read special sources: reuse the native pinned
+  regular-file reader in FileSystem.read, including the updater's default read
+  port. Six of twenty-two real filesystem/port cases block before and all pass
+  after per LuaJIT/Lua 5.4 runtime. Controls preserve ordinary and symlink file
+  reads, empty/UTF-8/CRLF/NUL bytes, and every source inode. FIFO/no-peer/held-peer,
+  FIFO symlinks, directories and Unix sockets return nil without waiting.
+  Three simulated admission regressions also fail before and pass after; four
+  libc metadata receipts cover file type, a missing type mask and syscall failure.
+  The libc fallback uses statx on the descriptor instead of a shell probe, keeping
+  reload and menu reads in-process. Existing no-shell/title assertions stay intact.
+  macOS already classifies regular paths before its read by source; Windows uses
+  FileOpen and has no POSIX FIFO namespace. Its distinct named-pipe behavior is
+  unqualified and remains with the native owner. The reserved read_with_status
+  path and shared TOML reader still need the principal's coordinated fix; they
+  are not covered by this generic port change. No TOML, title, autostart placement,
+  physical input, reserved method or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -10,6 +10,7 @@
 local M = {}
 local O_NONBLOCK, O_CLOEXEC = 2048, 524288 -- Linux open flags, with O_RDONLY = 0.
 local ENOENT, EIO, EINVAL = 2, 5, 22 -- Linux errno receipts.
+local AT_EMPTY_PATH, STATX_TYPE, S_IFREG = 4096, 1, 32768 -- Linux descriptor/type query.
 
 --- Opens a nonblocking descriptor and its owned native operations.
 --- @param path string
@@ -32,16 +33,29 @@ local function native_open(path)
 	pcall(ffi.cdef, [[
 		int open(const char *path, int flags, ...);
 		int close(int fd);
-		int getpid(void);
+		int statx(int dirfd, const char *path, int flags, unsigned int mask, void *buffer);
+		struct ergopti_read_statx {
+			uint32_t mask, block_size;
+			uint64_t attributes;
+			uint32_t link_count, uid, gid;
+			uint16_t mode;
+			unsigned char remaining[226];
+		};
 	]])
+	local has_statx, statx = pcall(function() return ffi.C.statx end)
+	if not has_statx then return nil, "native descriptor metadata unavailable", EIO end
 	local fd = ffi.C.open(path, O_NONBLOCK + O_CLOEXEC)
 	if fd < 0 then local errno = ffi.errno(); return nil, "native open refused", errno end
 	return fd, {
 		regular = function()
-			-- The child shell must inspect this process's descriptor, not its own.
-			local Shell = require("adapters.shell_runner")
-			local pinned = "/proc/" .. tostring(ffi.C.getpid()) .. "/fd/" .. tostring(fd)
-			return Shell.run("test -f " .. Shell.quote(pinned) .. " 2>/dev/null")
+			-- Linux's fixed 256-byte statx UAPI is independent of libc's per-arch
+			-- struct stat layout. Query the owned fd without spawning a child.
+			local record = ffi.new("struct ergopti_read_statx")
+			assert(ffi.sizeof(record) == 256 and ffi.offsetof("struct ergopti_read_statx", "mode") == 28,
+				"unexpected native statx record layout")
+			if statx(fd, "", AT_EMPTY_PATH, STATX_TYPE, record) ~= 0 or tonumber(record.mask) % 2 ~= 1 then return false end
+			local mode = tonumber(record.mode)
+			return mode - mode % 4096 == S_IFREG
 		end,
 		close = function() return ffi.C.close(fd) == 0 end,
 	}
