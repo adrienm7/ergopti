@@ -82,6 +82,99 @@ helpers.describe("storage exclusive temporary ownership", function()
 	end
 end)
 
+helpers.describe("storage concurrent backup ownership", function()
+	for _, result in ipairs({ "EEXIST", "EACCES", "unlink-refused", "success" }) do
+		helpers.it("linux-storage-backup-link: checks native fallback " .. result .. " receipts", function()
+			local real_ffi, real_preload, real_uv = package.loaded.ffi, package.preload.ffi, package.loaded.luv
+			local links, removals = 0, 0
+			package.loaded.ffi = nil
+			package.preload.ffi = function() error("stock Lua fixture has no FFI") end
+			package.loaded.luv = {
+				fs_link = function(source, destination)
+					helpers.assert_eq(source, "source"); helpers.assert_eq(destination, "backup")
+					links = links + 1
+					if result == "EEXIST" or result == "EACCES" then return nil, "refused", result end
+					return true
+				end,
+				fs_unlink = function(source)
+					helpers.assert_eq(source, "source")
+					removals = removals + 1
+					if result == "unlink-refused" then return nil, "refused", "EACCES" end
+					return true
+				end,
+			}
+			local ok, err = xpcall(function()
+				local mover = assert(loadfile("infra/no_replace_move.lua"))()
+				local moved, failure = mover.move("source", "backup")
+				helpers.assert_eq(moved, result == "success")
+				local expected_failure
+				if result ~= "success" then expected_failure = result == "unlink-refused" and "EACCES" or result end
+				helpers.assert_eq(failure, expected_failure)
+				helpers.assert_eq(links, 1)
+				helpers.assert_eq(removals, (result == "success" or result == "unlink-refused") and 1 or 0)
+			end, debug.traceback)
+			package.loaded.ffi, package.preload.ffi, package.loaded.luv = real_ffi, real_preload, real_uv
+			helpers.assert_true(ok, tostring(err))
+		end)
+	end
+	for _, alias in ipairs({ "regular", "dangling" }) do
+		for _, depth in ipairs({ 0, 1 }) do
+			helpers.it("linux-storage-backup-race: retains concurrent " .. alias .. " at suffix " .. depth, function()
+				local root = make_temp_config_root()
+				local path = root .. "/ergopti_plus/storage.json"
+				local backup = path .. ".corrupt" .. (depth == 0 and "" or ".1")
+				local original, history = "{Malformed original bytes", "Retained concurrent backup bytes"
+				local real_open, real_getenv = io.open, os.getenv
+				local function write(name, bytes)
+					local file = assert(real_open(name, "wb")); assert(file:write(bytes) and file:close())
+				end
+				local function read(name)
+					local file = assert(real_open(name, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
+				end
+				write(path, original)
+				if depth == 1 then write(path .. ".corrupt", history) end
+				os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
+				local claimed = false
+				io.open = function(name, mode)
+					if name == backup and mode == "r" and not claimed then
+						claimed = true
+						if alias == "regular" then write(backup, history)
+						else
+							local Shell = require("adapters.shell_runner")
+							helpers.assert_true(Shell.run("ln -s -- " .. Shell.quote(root .. "/missing") .. " " .. Shell.quote(backup)))
+						end
+						return nil, "No such file or directory", 2
+					end
+					return real_open(name, mode)
+				end
+				local next_backup = path .. ".corrupt." .. (depth + 1)
+				local ok, err = xpcall(function()
+					local storage = helpers.load_module("adapters.storage")
+					helpers.assert_eq(storage.get("value", "default"), "default")
+					helpers.assert_true(claimed)
+					local recovery = storage.recovery_status()
+					helpers.assert_true(recovery and recovery.preserved)
+					helpers.assert_eq(recovery.path, next_backup)
+					helpers.assert_eq(read(next_backup), original)
+					if alias == "regular" then helpers.assert_eq(read(backup), history)
+					else
+						local Shell = require("adapters.shell_runner")
+						helpers.assert_true(Shell.run("test -L " .. Shell.quote(backup)))
+						helpers.assert_nil(real_open(root .. "/missing", "r"))
+					end
+					if depth == 1 then helpers.assert_eq(read(path .. ".corrupt"), history) end
+					helpers.assert_true(storage.set("value", "replacement"))
+				end, debug.traceback)
+				io.open, os.getenv = real_open, real_getenv
+				package.loaded["adapters.storage"] = nil
+				os.remove(backup); os.remove(next_backup); os.remove(path .. ".corrupt"); os.remove(path)
+				os.remove(root .. "/ergopti_plus"); os.remove(root)
+				helpers.assert_true(ok, tostring(err))
+			end)
+		end
+	end
+end)
+
 helpers.describe("storage backup path inspection", function()
 	for _, alias in ipairs({ "dangling", "directory", "symlink", "regular" }) do
 		for _, depth in ipairs({ 0, 1 }) do

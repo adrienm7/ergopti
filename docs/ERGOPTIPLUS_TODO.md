@@ -791,6 +791,19 @@ These are software implementations; final hardware verification remains below.
   with the principal owner. Key derivation, salt, IV rules, envelopes, schema and
   TOML are unchanged. Per the Linux task instruction, macOS/AHK suites and manual
   CI remain unexecuted; no reserved source or physical input was exercised.
+- [~] **L60.** Linux corrupt JSON backup publication: use native no-replace
+  rename under LuaJIT and checked link/unlink under stock Lua. Retry a competing
+  destination without replacing its inode; block mutations on other failures.
+  Twelve production cases create real regular files, hard links, symlinks,
+  dangling links, FIFOs and directories between inspection and publication at
+  two backup suffixes. All fail before and pass after under LuaJIT and Lua 5.4;
+  strace delays actual syscalls to coordinate the two real processes. Four unit
+  collisions and four simulated libuv receipt controls cover retry and refusal.
+  Stock Lua's link/unlink pair is not an atomic move; unlink failure retains the
+  backup and blocks mutations. This fixes destination clobbering, not concurrent
+  replacement of the source. macOS uses hs.settings and Windows the registry,
+  with no corresponding JSON recovery move. TOML, reserved source, physical
+  input, macOS/AHK suites and manual CI remain outside this Linux correction.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
