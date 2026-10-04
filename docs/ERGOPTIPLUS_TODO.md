@@ -736,6 +736,10 @@ TODO 36 remains partial. The pending dual-archive producer accepts only the obse
 
 The stable-signing replay admits only the actual archive producer path with its signed app and build directory, and checks both signature verifications precede that call. Native-helper ZIP behavior and all existing identity/keychain cleanup assertions remain intact. The original replay fails; the corrected replay passes, while the original identity defect, permissive producer port and missing archive-order guard each fail. This fixture-only evidence does not qualify physical native archive/signing; final composed and hosted native validation remain pending.
 
+CI smoke and install/launch now prefer the first available archive declared by the shared macOS install policy. ZIP remains compatible only when the preferred XZ file is absent; malformed, changed or refused preferred input fails without fallback. The native signed source supplies the bundle snapshot, independent designated requirement and exact archive digests through a separate CI-only artifact. Launch evidence hashes the retained bytes actually installed. Public release assets, Sparkle ZIP signing/feed, Homebrew and ordinary helper ZIP output remain unchanged.
+
+The five-file source slice has 22 portable native-owner cases, seven actual workflow cases, two actual evidence controls, two original causal failures and six guard-removal failures. The original producer contract passes with closed filesystem and physical POSIX ports. Native extraction/signing/xattr and the two added Swift cases still require hosted macOS CI; root full selected qualification is pending. Item 36 remains partial until public archive migration and native acceptance are complete.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

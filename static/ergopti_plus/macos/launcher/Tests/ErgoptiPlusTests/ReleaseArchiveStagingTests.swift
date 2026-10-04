@@ -309,4 +309,76 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		XCTAssertNotEqual(refused.status, 0, "A display failure cannot authorize staged verification")
 	}
 
+
+	func testCIInstallSelectsDeclaredArchiveAndPreservesIndependentSignedSource() throws {
+		let root = try scratch()
+		defer { retire(root) }
+		let app = try signedBundle(root: root)
+		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-archives.cjs")
+		for format in ["tar.xz", "zip"] {
+			let payload = try archive(format, app: app, root: root)
+			let input = payload.deletingLastPathComponent()
+			if format == "zip" {
+				try manager.removeItem(at: input.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
+			}
+			let source = try successful("/usr/bin/env", ["node", owner.path, "--ci-receipt", app.path, input.path], root: root)
+			XCTAssertTrue(source.stdout.isEmpty)
+			XCTAssertTrue(source.stderr.isEmpty)
+			let sourcePacket = try XCTUnwrap(try JSONSerialization.jsonObject(with:
+				Data(contentsOf: input.appendingPathComponent("ErgoptiPlus.app.ci-receipt.json"))) as? [String: Any])
+			let requirement = try XCTUnwrap(sourcePacket["requirement"] as? String)
+			XCTAssertFalse(requirement.isEmpty)
+			let output = root.appendingPathComponent("ci-install-" + UUID().uuidString)
+			try manager.createDirectory(at: output, withIntermediateDirectories: false)
+			let result = try successful("/usr/bin/env", ["node", owner.path, "--ci-install", input.path, output.path], root: root)
+			XCTAssertTrue(result.stderr.isEmpty)
+			let packet = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+			XCTAssertEqual(packet["format"] as? String, format)
+			let retained = URL(fileURLWithPath: try XCTUnwrap(packet["archive"] as? String))
+			XCTAssertEqual(try Data(contentsOf: retained), try Data(contentsOf: payload))
+			XCTAssertEqual(packet["sha256"] as? String, try digest(retained, root: root))
+			let installed = output.appendingPathComponent(bundleName)
+			let verification = try successful("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R", "=" + requirement, installed.path], root: root)
+			XCTAssertTrue(verification.stdout.isEmpty)
+			XCTAssertTrue(verification.stderr.isEmpty)
+			XCTAssertEqual(try Data(contentsOf: installed.appendingPathComponent("Contents/Resources/données.txt")),
+				Data("Independent Unicode bytes: café 😀\n".utf8))
+			let attributes = try manager.attributesOfItem(atPath: installed.appendingPathComponent("Contents/MacOS/OwnedFixture").path)
+			XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o751)
+			XCTAssertEqual(try manager.destinationOfSymbolicLink(atPath: installed.appendingPathComponent("Contents/Resources/owned-link").path), "données.txt")
+			let metadata = try successful("/usr/bin/xattr", ["-p", "com.ergopti.owned-fixture", installed.appendingPathComponent("Contents/Resources/données.txt").path], root: root)
+			XCTAssertEqual(metadata.stdout, "owned-metadata\n")
+			XCTAssertEqual(try Data(contentsOf: app.appendingPathComponent("Contents/Resources/données.txt")),
+				Data("Independent Unicode bytes: café 😀\n".utf8))
+		}
+	}
+
+	func testCIPreferredArchiveNeverFallsBackAfterDigestExtractionOrSignatureRefusal() throws {
+		let root = try scratch()
+		defer { retire(root) }
+		let app = try signedBundle(root: root)
+		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-archives.cjs")
+		for refusal in ["digest", "extract", "signature"] {
+			let payload = try archive("tar.xz", app: app, root: root)
+			let input = payload.deletingLastPathComponent()
+			if refusal == "extract" { try Data("Not a native XZ archive\n".utf8).write(to: payload) }
+			_ = try successful("/usr/bin/env", ["node", owner.path, "--ci-receipt", app.path, input.path], root: root)
+			if refusal == "digest" { try Data("Different archive bytes\n".utf8).write(to: payload) }
+			if refusal == "signature" {
+				let receipt = input.appendingPathComponent("ErgoptiPlus.app.ci-receipt.json")
+				var packet = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: receipt)) as? [String: Any])
+				packet["requirement"] = "identifier \"com.ergopti.foreign-staging-fixture\""
+				try JSONSerialization.data(withJSONObject: packet).write(to: receipt)
+			}
+			let output = root.appendingPathComponent("ci-refusal-" + UUID().uuidString)
+			try manager.createDirectory(at: output, withIntermediateDirectories: false)
+			let result = try child("/usr/bin/env", ["node", owner.path, "--ci-install", input.path, output.path], root: root)
+			XCTAssertNotEqual(result.status, 0)
+			XCTAssertTrue(result.stdout.isEmpty)
+			XCTAssertFalse(manager.fileExists(atPath: output.appendingPathComponent(bundleName).path))
+			XCTAssertTrue(manager.fileExists(atPath: input.appendingPathComponent("ErgoptiPlus.app.zip").path),
+				"A usable compatibility ZIP cannot turn a refused preferred archive into success")
+			XCTAssertFalse(try manager.contentsOfDirectory(atPath: input.path).contains { $0.hasPrefix(".ci-install-") })
+		}
+	}
 }

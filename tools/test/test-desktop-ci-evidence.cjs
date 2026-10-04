@@ -1328,3 +1328,46 @@ for (const [from, to] of [
 require('./support/windows-launch-runtime.cjs')();
 
 require('./support/windows-startup-log-runtime.cjs')();
+
+// CI_INSTALLED_ARCHIVE_EVIDENCE_BEGIN
+{
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-installed-archive-evidence-'));
+	try {
+		const observation = path.join(root, 'result.json');
+		fs.writeFileSync(observation, JSON.stringify({ scenario: 'upgraded', failures: [] }));
+		const previousSha = process.env.GITHUB_SHA,
+			previousRunner = process.env.MATRIX_RUNNER;
+		try {
+			process.env.GITHUB_SHA = 'a'.repeat(40);
+			process.env.MATRIX_RUNNER = 'macos-15';
+			for (const extension of ['tar.xz', 'zip']) {
+				const selected = path.join(root, 'installed.' + extension);
+				const unselected = path.join(root, 'other-' + extension);
+				const output = path.join(root, 'evidence-' + extension + '.json');
+				fs.writeFileSync(selected, 'Actual installed immutable bytes: ' + extension);
+				fs.writeFileSync(unselected, 'Another valid archive, never installed');
+				recordMac(observation, selected, output);
+				const actual = JSON.parse(fs.readFileSync(output));
+				assert.equal(
+					actual.package_sha256,
+					crypto.createHash('sha256').update(fs.readFileSync(selected)).digest('hex')
+				);
+				assert.notEqual(
+					actual.package_sha256,
+					crypto.createHash('sha256').update(fs.readFileSync(unselected)).digest('hex')
+				);
+				assert.equal(actual.scenario, 'upgraded');
+				assert.deepEqual(actual.failures, []);
+			}
+		} finally {
+			if (previousSha === undefined) delete process.env.GITHUB_SHA;
+			else process.env.GITHUB_SHA = previousSha;
+			if (previousRunner === undefined) delete process.env.MATRIX_RUNNER;
+			else process.env.MATRIX_RUNNER = previousRunner;
+		}
+	} finally {
+		fs.rmSync(root, { recursive: true });
+	}
+	console.log('Actual installed-archive evidence controls: 2');
+}
+// CI_INSTALLED_ARCHIVE_EVIDENCE_END
