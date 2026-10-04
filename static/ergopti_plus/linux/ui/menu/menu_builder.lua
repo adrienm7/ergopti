@@ -3365,8 +3365,19 @@ local function _build_shortcuts(ctx)
 	sc_ctx.commands["scope_restore"] = function() return apply_shortcuts_scope("recommended") end
 	sc_ctx.commands["scope_clear"] = function() return apply_shortcuts_scope("clear") end
 	sc_ctx.commands["shortcuts_toggle"] = function()
-		sc.toggle()
+		local read, current = false, nil
+		if type(sc.is_enabled) == "function" then read, current = pcall(sc.is_enabled) end
+		local called, committed = false, false
+		if read and type(current) == "boolean" and type(sc.set_enabled) == "function" then
+			called, committed = pcall(sc.set_enabled, not current)
+		end
+		if not called or committed ~= true then
+			Logger.error(LOG, "The shortcuts master did not acknowledge durable publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
 	end
 	sc_ctx.commands["edit_chatgpt_url"] = function()
 		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")

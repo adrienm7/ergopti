@@ -543,11 +543,11 @@ function M.set_enabled(enabled)
 			Logger.error(LOG, "Shortcut state cannot be persisted — nothing changed.")
 			return false
 		end
-		local ok, err = TomlWriter.batch_write(_config_path, {
+		local called, committed, err = pcall(TomlWriter.batch_write, _config_path, {
 			{ section = CONFIG_SECTION, key = "enabled", value = enabled },
 		})
-		if not ok then
-			Logger.error(LOG, "Could not persist shortcut state: %s.", tostring(err))
+		if not called or committed ~= true then
+			Logger.error(LOG, "Could not persist shortcut state: %s.", tostring(called and err or committed))
 			return false
 		end
 	end

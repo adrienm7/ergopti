@@ -353,3 +353,143 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   end)
 
 end)
+
+helpers.describe("Shortcuts master publication: exact acknowledgement", function()
+	--- Keeps each real manager and private canonical file independent of prior cases.
+	--- @param enabled boolean Initial durable/runtime master state.
+	--- @param body function Uses the fresh native owner and exact source.
+	local function with_master(enabled, body)
+		local path = os.tmpname()
+		local source = '# independent future shortcut preferences\n[shortcuts]\nenabled = '
+			.. tostring(enabled) .. '\nfuture_mode = "kept" # preserve this comment\n[future]\nvalues = ["a", "b"]\n'
+		local file = assert(io.open(path, "wb"));assert(file:write(source));assert(file:close())
+		local prior = package.loaded["modules.shortcuts.manager"]
+		local writer, rename = require("toml_codec.writer"), os.rename
+		local batch = writer.batch_write
+		local called, failure = pcall(function()
+			local manager = helpers.load_module("modules.shortcuts.manager")
+			manager.init({ persist = true, config_path = path })
+			body(manager, path, source, writer)
+		end)
+		writer.batch_write, os.rename = batch, rename
+		package.loaded["modules.shortcuts.manager"] = prior
+		os.remove(path .. ".tmp")
+		local removed = os.remove(path)
+		assert(removed, "the owned master fixture is physically retired")
+		if not called then error(failure, 0) end
+	end
+	--- Reads the actual canonical image after its writer has returned.
+	--- @param path string Owned private config path.
+	--- @return string source Exact bytes.
+	local function read(path)
+		local file = assert(io.open(path, "rb"));local source = file:read("*a");assert(file:close());return source
+	end
+
+	for _, initial in ipairs({ true, false }) do
+		for _, outcome in ipairs({ "committed", "rename-false", "rename-nil", "rename-number", "rename-throw", "ack-number", "ack-text", "ack-throw" }) do
+			helpers.it("requires exact durable master acknowledgement " .. outcome .. " from " .. tostring(initial), function()
+				with_master(initial, function(manager, path, source, writer)
+					local renamed, published = os.rename, 0
+					if outcome:match("^rename%-") then
+						os.rename = function(from, to)
+							if from == path .. ".tmp" and to == path then
+								published = published + 1
+								if outcome == "rename-throw" then error("controlled publication refusal") end
+								if outcome == "rename-nil" then return nil, "controlled publication refusal" end
+								if outcome == "rename-number" then return 2 end
+								return false, "controlled publication refusal"
+							end
+							return renamed(from, to)
+						end
+					elseif outcome:match("^ack%-") then
+						writer.batch_write = function()
+							if outcome == "ack-number" then return 2 end
+							if outcome == "ack-throw" then error("controlled writer refusal") end
+							return "true"
+						end
+					end
+					local called, committed = pcall(manager.set_enabled, not initial)
+					os.rename = renamed
+					helpers.assert_true(called, "the public master owner returns a refused acknowledgement")
+					helpers.assert_eq(committed, outcome == "committed")
+					local expected = initial
+					if outcome == "committed" then expected = not initial end
+					helpers.assert_eq(manager.is_enabled(), expected)
+					if outcome == "committed" then
+						helpers.assert_eq(read(path), source:gsub("enabled = " .. tostring(initial), "enabled = " .. tostring(not initial), 1))
+						manager.init({ persist = true, config_path = path })
+						helpers.assert_eq(manager.is_enabled(), not initial, "a native reload reads the durable target")
+					else
+						helpers.assert_eq(read(path), source, "refusal retains all prior bytes and future fields")
+						if outcome:match("^rename%-") then helpers.assert_eq(published, 1) end
+					end
+				end)
+			end)
+		end
+		helpers.it("keeps the historical toggle posture ABI from " .. tostring(initial), function()
+			with_master(initial, function(manager, path, source, writer)
+				local batch = writer.batch_write
+				writer.batch_write = function() return false, "controlled refusal" end
+				local refused = manager.toggle()
+				writer.batch_write = batch
+				helpers.assert_eq(refused, initial, "toggle returns posture rather than a commit receipt")
+				helpers.assert_eq(read(path), source)
+				helpers.assert_eq(manager.toggle(), not initial)
+				helpers.assert_eq(manager.is_enabled(), not initial)
+			end)
+		end)
+		for _, outcome in ipairs({ "committed", "false", "nil", "number", "throw" }) do
+			helpers.it("ties the real menu to durable master publication " .. outcome .. " from " .. tostring(initial), function()
+				with_master(initial, function(manager, path, source)
+					local builder = helpers.load_module("ui.menu.menu_builder")
+					local redraws, attempts, notices, releases = 0, 0, {}, 0
+					local tree = builder.build({ shortcuts = manager, _version = "9.9.9",
+						on_menu_changed = function() redraws = redraws + 1 end })
+					local title = require("infra.i18n").get("menu.shortcuts.enable")
+					local action, matches = nil, 0
+					for _, group in ipairs(tree) do
+						for _, row in ipairs(group.menu or {}) do
+							if row.title == title then action = row.fn; matches = matches + 1 end
+						end
+					end
+					helpers.assert_eq(matches, 1)
+					helpers.assert_eq(type(action), "function")
+					local rename, execute, modal = os.rename, os.execute, require("ui.modal")
+					local run = modal.run
+					os.rename = function(from, to)
+						if from == path .. ".tmp" and to == path then
+							attempts = attempts + 1
+							if outcome == "throw" then error("controlled publication refusal") end
+							if outcome == "false" then return false end
+							if outcome == "nil" then return nil end
+							if outcome == "number" then return 2 end
+						end
+						return rename(from, to)
+					end
+					modal.run = function(callback) releases = releases + 1; return callback() end
+					os.execute = function(command)
+						if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+						return execute(command)
+					end
+					local called, receipt = pcall(action)
+					os.rename, os.execute, modal.run = rename, execute, run
+					helpers.assert_true(called)
+					helpers.assert_eq(attempts, 1)
+					helpers.assert_eq(receipt, outcome == "committed")
+					helpers.assert_eq(redraws, outcome == "committed" and 1 or 0)
+					helpers.assert_eq(#notices, outcome == "committed" and 0 or 1)
+					helpers.assert_eq(releases, #notices)
+					local expected = initial
+					if outcome == "committed" then expected = not initial end
+					helpers.assert_eq(manager.is_enabled(), expected)
+					local expected_source = source
+					if outcome == "committed" then
+						expected_source = source:gsub("enabled = " .. tostring(initial), "enabled = " .. tostring(expected), 1)
+					end
+					helpers.assert_eq(read(path), expected_source, "the real canonical owner preserves unrelated future data")
+				end)
+			end)
+		end
+
+	end
+end)

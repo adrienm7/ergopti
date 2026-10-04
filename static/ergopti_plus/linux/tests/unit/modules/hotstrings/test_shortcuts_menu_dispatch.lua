@@ -428,3 +428,108 @@ helpers.describe("shortcuts menu: configured binding labels", function()
 		end)
 	end
 end)
+
+helpers.describe("shortcuts menu: master publication receipt", function()
+	--- Records visible refusals while preserving the real menu callback boundary.
+	--- @param action function Native rendered callback.
+	--- @return boolean called
+	--- @return any receipt
+	--- @return table notices
+	--- @return integer releases
+	local function observe(action)
+		local execute, modal = os.execute, require("ui.modal")
+		local run, notices, releases = modal.run, {}, 0
+		modal.run = function(callback) releases = releases + 1; return callback() end
+		os.execute = function(command)
+			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			return execute(command)
+		end
+		local called, receipt = pcall(action)
+		os.execute, modal.run = execute, run
+		return called, receipt, notices, releases
+	end
+	--- Selects the exact declared master rather than a coincidental native index.
+	--- @param sc table Native shortcuts owner.
+	--- @param changed function Menu publication observer.
+	--- @return table row
+	local function master_row(sc, changed)
+		local key, declarations = nil, 0
+		for _, declaration in ipairs(require("infra.manifest_menu").get_array("shortcuts_menu")) do
+			if declaration.id == "shortcuts_toggle" then key = declaration.i18n; declarations = declarations + 1 end
+		end
+		helpers.assert_eq(declarations, 1)
+		local row = find_row(shortcuts_menu({ shortcuts = sc, on_menu_changed = changed }), require("infra.i18n").get(key))
+		helpers.assert_not_nil(row)
+		helpers.assert_eq(type(row.fn), "function")
+		return row
+	end
+	for _, initial in ipairs({ true, false }) do
+		for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
+			helpers.it("requires the native master receipt " .. outcome .. " from " .. tostring(initial), function()
+				local state, asked, legacy, redraws = initial, {}, 0, 0
+				local sc = fake_shortcuts()
+				sc.is_enabled = function() return state end
+				sc.toggle = function() legacy = legacy + 1; return state end
+				sc.set_enabled = function(value)
+					asked[#asked + 1] = value
+					if outcome == "throw" then error("controlled master refusal") end
+					if outcome == "nil" then return nil end
+					if outcome == "number" then return 2 end
+					if outcome == "text" then return "true" end
+					if outcome == "true" then state = value end
+					return outcome == "true"
+				end
+				if outcome == "missing" then sc.set_enabled = nil end
+				local row = master_row(sc, function() redraws = redraws + 1 end)
+				local called, receipt, notices, releases = observe(row.fn)
+				helpers.assert_true(called)
+				helpers.assert_eq(legacy, 0, "posture is not a durable acknowledgement")
+				helpers.assert_eq(asked, outcome == "missing" and {} or { not initial })
+				helpers.assert_eq(receipt, outcome == "true")
+				helpers.assert_eq(redraws, outcome == "true" and 1 or 0)
+				helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
+				helpers.assert_eq(releases, #notices)
+				if #notices > 0 then
+					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+				end
+			end)
+		end
+		helpers.it("uses the current master instead of the held checked state " .. tostring(initial), function()
+			local state, asked, redraws = initial, {}, 0
+			local sc = fake_shortcuts()
+			sc.is_enabled = function() return state end
+			sc.set_enabled = function(value) asked[#asked + 1] = value; state = value; return true end
+			local row = master_row(sc, function() redraws = redraws + 1 end)
+			state = not initial
+			local called, receipt, notices = observe(row.fn)
+			helpers.assert_true(called)
+			helpers.assert_eq(receipt, true)
+			helpers.assert_eq(asked, { initial })
+			helpers.assert_eq(state, initial)
+			helpers.assert_eq(redraws, 1)
+			helpers.assert_eq(#notices, 0)
+		end)
+	end
+	for _, invalid in ipairs({ "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("refuses malformed current master " .. invalid .. " before writing", function()
+			local sc, writes, redraws = fake_shortcuts(), 0, 0
+			sc.set_enabled = function() writes = writes + 1; return true end
+			local row = master_row(sc, function() redraws = redraws + 1 end)
+			sc.is_enabled = function()
+				if invalid == "throw" then error("controlled read refusal") end
+				if invalid == "number" then return 2 end
+				if invalid == "text" then return "true" end
+				return nil
+			end
+			if invalid == "missing" then sc.is_enabled = nil end
+			local called, receipt, notices, releases = observe(row.fn)
+			helpers.assert_true(called)
+			helpers.assert_eq(receipt, false)
+			helpers.assert_eq(writes, 0)
+			helpers.assert_eq(redraws, 0)
+			helpers.assert_eq(#notices, 1)
+			helpers.assert_eq(releases, 1)
+		end)
+	end
+end)
