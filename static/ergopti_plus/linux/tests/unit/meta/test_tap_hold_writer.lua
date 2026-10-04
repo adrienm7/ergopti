@@ -559,3 +559,110 @@ helpers.describe("tap-hold writer: classified source refusal", function()
 		helpers.assert_eq(document.future.opaque[2], "two")
 	end)
 end)
+
+helpers.describe("tap-hold writer: staging write and close acknowledgement", function()
+	local original = '# Preserve the complete source when staging is refused.\n'
+		.. '[tap_hold]\nenabled = true\n'
+		.. '[tap_hold.keys.left_shift]\ntap_action = "copy"\ncustom = "future"\n'
+		.. '[future]\nopaque = ["left", "right"]\n'
+
+	local function observe_staging(fault)
+		local writer, path, state = fresh_writer()
+		write_file(path, original)
+		local real_open, real_rename, real_remove = io.open, os.rename, os.remove
+		local observed = { opens = 0, writes = 0, closes = 0, renames = 0, removals = 0 }
+		local handle, proxy
+		io.open = function(target, mode)
+			if target ~= path .. ".tmp" or mode ~= "w" then return real_open(target, mode) end
+			observed.opens = observed.opens + 1
+			local opened, err, code = real_open(target, mode)
+			handle = opened
+			if not opened then return nil, err, code end
+			proxy = {
+				write = function(self, text)
+					observed.writes = observed.writes + 1
+					local partial = fault:match("^write_") or fault == "cleanup_refused"
+					local payload = partial and text:sub(1, math.floor(#text / 2)) or text
+					local written, write_err, write_code = handle:write(payload)
+					observed.native_write_ack = written == true or written == handle
+					if fault == "write_raise" then error("owned staging write raised") end
+					if fault == "write_nil" or fault == "cleanup_refused" then return nil, "owned staging write refused" end
+					if fault == "write_false" then return false end
+					if fault == "write_table" then return {} end
+					if fault == "write_string" then return "written" end
+					if fault == "write_foreign_handle" then return handle end
+					if written == true then return true end
+					if written ~= handle then return nil, write_err, write_code end
+					return self
+				end,
+				close = function()
+					observed.closes = observed.closes + 1
+					local closed, close_err, close_code = handle:close()
+					observed.native_close_ack = closed == true
+					if fault == "close_raise" then error("owned staging close raised") end
+					if fault == "close_nil" then return nil, "owned staging close refused" end
+					if fault == "close_false" then return false end
+					if fault == "close_string" then return "closed" end
+					if fault == "close_handle" then return handle end
+					return closed, close_err, close_code
+				end,
+			}
+			return proxy
+		end
+		os.rename = function(from, to)
+			if from == path .. ".tmp" and to == path then observed.renames = observed.renames + 1 end
+			return real_rename(from, to)
+		end
+		os.remove = function(target)
+			if target == path .. ".tmp" then
+				observed.removals = observed.removals + 1
+				if fault == "cleanup_refused" then return nil, "owned stage removal refused" end
+			end
+			return real_remove(target)
+		end
+		local call_ok, accepted = pcall(writer.set_tap, "left_shift", "paste")
+		io.open, os.rename, os.remove = real_open, real_rename, real_remove
+		if handle then pcall(handle.close, handle) end
+		local source, staged = read_or_nil(path), read_or_nil(path .. ".tmp")
+		os.remove(path)
+		os.remove(path .. ".tmp")
+		helpers.assert_true(call_ok, "the public setter reports staging refusal without raising")
+		helpers.assert_eq(accepted, false, "a refused staging receipt cannot acknowledge a tray change")
+		helpers.assert_true(handle ~= nil, "the fault reached an actual temporary file handle")
+		helpers.assert_eq(observed.opens, 1)
+		helpers.assert_eq(observed.writes, 1)
+		helpers.assert_eq(observed.native_write_ack, true, "the temporary bytes were written by the native file owner")
+		helpers.assert_eq(observed.closes, 1, "even a raised write closes its actual handle")
+		helpers.assert_eq(observed.native_close_ack, true, "the real file handle was physically closed")
+		helpers.assert_eq(observed.renames, 0, "an unacknowledged stage is never published")
+		helpers.assert_eq(state.reloads, 0, "runtime sees no refused candidate")
+		helpers.assert_eq(source, original, "known fields, comments and unknown neighbors retain exact bytes")
+		helpers.assert_eq(observed.removals, 1, "cleanup concerns only the temporary file the writer opened")
+		if fault == "cleanup_refused" then
+			helpers.assert_type(staged, "string", "refused cleanup leaves its owned candidate, never the user source")
+		else
+			helpers.assert_nil(staged, "acknowledged cleanup retires the refused candidate")
+		end
+	end
+
+	for _, fault in ipairs({ "write_nil", "write_false", "write_table", "write_string", "write_foreign_handle",
+		"write_raise", "close_nil", "close_false", "close_string", "close_handle", "close_raise", "cleanup_refused" }) do
+		helpers.it("refuses " .. fault .. " before publication and reload", function() observe_staging(fault) end)
+	end
+
+	helpers.it("publishes only after the actual file write and close acknowledge their owner", function()
+		local writer, path, state = fresh_writer()
+		write_file(path, original)
+		local accepted = writer.set_tap("left_shift", "paste")
+		local document = require("toml_codec").decode(read_file(path))
+		local staged = read_or_nil(path .. ".tmp")
+		os.remove(path)
+		helpers.assert_eq(accepted, true)
+		helpers.assert_eq(state.reloads, 1)
+		helpers.assert_eq(document.tap_hold.keys.left_shift.tap_action, "paste")
+		helpers.assert_eq(document.tap_hold.keys.left_shift.custom, "future")
+		helpers.assert_eq(document.future.opaque[1], "left")
+		helpers.assert_eq(document.future.opaque[2], "right")
+		helpers.assert_nil(staged)
+	end)
+end)

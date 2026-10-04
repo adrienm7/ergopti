@@ -191,8 +191,20 @@ local function write_document(path, document)
 		Logger.error(LOG, "Cannot write '%s' (%s) — the change was not saved.", tmp, tostring(err))
 		return false
 	end
-	fh:write(text)
-	fh:close()
+	local write_ok, written, write_err = pcall(fh.write, fh, text)
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	-- Lua 5.1 returns true from file:write; later Lua returns that same file.
+	local write_ack = write_ok and (written == true or written == fh)
+	if not write_ack or not close_ok or closed ~= true then
+		local removed, remove_err = os.remove(tmp)
+		if not removed then
+			Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(remove_err))
+		end
+		local detail = not write_ok and written or (not write_ack and write_err)
+			or (not close_ok and closed) or close_err or "write or close acknowledgement refused"
+		Logger.error(LOG, "Cannot complete staging file '%s' (%s) — the change was not saved.", tmp, tostring(detail))
+		return false
+	end
 	local ok, rename_err = os.rename(tmp, path)
 	if not ok then
 		os.remove(tmp)
