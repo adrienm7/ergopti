@@ -434,6 +434,8 @@ TODO 16 / 36 remains partial. Native Observer4 run37208812034 at d7c80bf complet
 
 Three pure XCTest controls exercise the actual emitter for Unicode success, encoding refusal and a bounded receipt larger than4KiB. These are authored but unexecuted locally because Swift/macOS is unavailable. Portable source controls reject five counterfactuals; replaying the unchanged reporter with only the three modeled record boundaries recognizes all290 existing native receipts. This replay does not reconstruct truncated JSON or qualify the new native emitter. Actual macOS CI must confirm full diagnostic framing. One FileHandle call does not establish global atomicity against other output producers.
 
+Manual CI can select all, a single OS, or one of the three two-OS pairs through the strict os_lanes choice. Shared checks always run. Push and pull-request runs keep all OS lanes, and the release job remains push-only with its original all-platform prerequisites and secret guards. The manual verdict rejects missing, failed, unexpectedly skipped or unexpectedly executed work and validates the actual plan selection outputs. Local portable selector/CLI/wiring controls pass; root full selected validation and actual hosted dispatch remain required.
+
 ## Maintainer requests added on 2026-09-29 (see the overnight handoff)
 
 Checkpoint 37046411788 at `ea6b21bed` passes all three OSes, including

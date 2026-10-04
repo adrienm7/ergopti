@@ -23,6 +23,20 @@ on:
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
+    inputs:
+      os_lanes:
+        description: Native OS lanes to validate (shared checks always run)
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - windows
+          - macos
+          - linux
+          - windows+macos
+          - windows+linux
+          - macos+linux
 
 permissions:
   contents: read
@@ -57,6 +71,9 @@ jobs:
       prerelease: ${{ steps.meta.outputs.prerelease }}
       channel: ${{ steps.meta.outputs.channel }}
       linux_bundle: ${{ steps.contract.outputs.linux_bundle }}
+      lane_windows: ${{ steps.lanes.outputs.lane_windows }}
+      lane_macos: ${{ steps.lanes.outputs.lane_macos }}
+      lane_linux: ${{ steps.lanes.outputs.lane_linux }}
 
     steps:
       # A depth-1 clone without tags, which the checks below expect.
@@ -71,6 +88,13 @@ jobs:
         with:
           node-version-file: '.node-version'
           cache: 'npm'
+
+      - name: Select native OS lanes
+        id: lanes
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_OS_SELECTION: ${{ inputs.os_lanes }}
+        run: node tools/ci/manual-ci-lanes.cjs select >> "$GITHUB_OUTPUT"
 
       - name: Check hotstring TOML files are sorted and formatted
         if: ${{ !cancelled() }}
@@ -325,6 +349,7 @@ jobs:
   macos:
     name: 'macOS'
     needs: [validate]
+    if: needs.validate.outputs.lane_macos == 'true'
     uses: ./.github/workflows/ci-macos.yml
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
@@ -342,6 +367,7 @@ jobs:
   windows:
     name: 'Windows'
     needs: [validate]
+    if: needs.validate.outputs.lane_windows == 'true'
     uses: ./.github/workflows/ci-windows.yml
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
@@ -360,11 +386,38 @@ jobs:
   linux:
     name: 'Linux'
     needs: [validate]
+    if: needs.validate.outputs.lane_linux == 'true'
     uses: ./.github/workflows/ci-linux.yml
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
       linux_bundle: ${{ needs.validate.outputs.linux_bundle }}
+
+  # A manual subset must still prove every selected lane and shared checks.
+  # This leaf runs even when a needed lane fails or skips; it cannot publish.
+  manual-verdict:
+    name: 'Validate / Selected OS verdict'
+    needs:
+      - validate
+      - core
+      - macos
+      - windows
+      - linux
+    if: always() && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Assert selected lanes completed
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_OS_SELECTION: ${{ inputs.os_lanes }}
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: node tools/ci/manual-ci-lanes.cjs verdict
 
   # ============================================================
   # ============================================================
