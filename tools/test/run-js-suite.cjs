@@ -1974,6 +1974,12 @@ const CHECKS = [
 		repro: 'npm run test:download-window-session'
 	},
 	{
+		name: 'managed download failures render safe translated actions with captured owners',
+		cmd: 'node',
+		args: ['tools/test/test-managed-network-failure-ui.cjs'],
+		repro: 'npm run test:managed-network-failure-ui'
+	},
+	{
 		name: 'model browser actions retain their operation session across native reuse',
 		cmd: 'node',
 		args: ['tools/test/test-model-browser-session.cjs'],
