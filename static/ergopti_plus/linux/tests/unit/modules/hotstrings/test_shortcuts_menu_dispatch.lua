@@ -533,3 +533,235 @@ helpers.describe("shortcuts menu: master publication receipt", function()
 		end)
 	end
 end)
+
+helpers.describe("shortcuts menu: current script chord publication", function()
+	--- Observes the existing localized modal boundary outside caught callbacks.
+	--- @param action function Rendered native command.
+	--- @return boolean called
+	--- @return any receipt
+	--- @return table notices
+	--- @return integer releases
+	local function observe(action)
+		local execute, modal = os.execute, require("ui.modal")
+		local run, notices, releases = modal.run, {}, 0
+		modal.run = function(callback) releases = releases + 1; return callback() end
+		os.execute = function(command)
+			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			return execute(command)
+		end
+		local called, receipt = pcall(action)
+		os.execute, modal.run = execute, run
+		return called, receipt, notices, releases
+	end
+	--- Borrows the exact shared command and the supplied native chord owner.
+	--- @param chords table Script chord owner.
+	--- @param changed function Publication observer.
+	--- @return function action
+	local function command(chords, changed)
+		local key, declared = nil, 0
+		for _, row in ipairs(require("infra.manifest_menu").get_array("script_control_group")) do
+			if row.id == "script_control_toggle" then key = row.i18n; declared = declared + 1 end
+		end
+		helpers.assert_eq(declared, 1)
+		local prior = package.loaded["modules.shortcuts.script_chords"]
+		package.loaded["modules.shortcuts.script_chords"] = chords
+		local called, row = pcall(function()
+			return find_row(shortcuts_menu({ on_menu_changed = changed }), require("infra.i18n").get(key))
+		end)
+		package.loaded["modules.shortcuts.script_chords"] = prior
+		helpers.assert_true(called, tostring(row))
+		helpers.assert_not_nil(row)
+		helpers.assert_eq(type(row.fn), "function")
+		return row.fn
+	end
+	--- Supplies only the native fields the actual group renderer consumes.
+	--- @param current boolean Initial runtime posture.
+	--- @return table owner
+	local function inert_owner(current)
+		return { chords_enabled = function() return current end, slots = function() return {} end }
+	end
+	for _, initial in ipairs({ true, false }) do
+		for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
+			helpers.it("requires the script chord setter receipt " .. outcome .. " from " .. tostring(initial), function()
+				local owner, asked, redraws = inert_owner(initial), {}, 0
+				owner.set_chords_enabled = function(value)
+					asked[#asked + 1] = value
+					if outcome == "throw" then error("controlled native chord refusal") end
+					if outcome == "nil" then return nil end
+					if outcome == "number" then return 2 end
+					if outcome == "text" then return "true" end
+					return outcome == "true"
+				end
+				if outcome == "missing" then owner.set_chords_enabled = nil end
+				local called, receipt, notices, releases = observe(command(owner, function() redraws = redraws + 1 end))
+				helpers.assert_true(called, "a native setter refusal remains a contained menu result")
+				helpers.assert_eq(asked, outcome == "missing" and {} or { not initial })
+				helpers.assert_eq(redraws, outcome == "true" and 1 or 0)
+				helpers.assert_eq(receipt, outcome == "true")
+				helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
+				helpers.assert_eq(releases, #notices)
+				if #notices > 0 then
+					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+				end
+			end)
+		end
+		helpers.it("retires the held script chord target from " .. tostring(initial), function()
+			local current, asked, redraws = initial, {}, 0
+			local owner = inert_owner(initial)
+			owner.chords_enabled = function() return current end
+			owner.set_chords_enabled = function(value) asked[#asked + 1] = value; current = value; return true end
+			local action = command(owner, function() redraws = redraws + 1 end)
+			current = not initial
+			local called, receipt, notices = observe(action)
+			helpers.assert_true(called)
+			helpers.assert_eq(asked, { initial }, "the current posture decides the requested opposite")
+			helpers.assert_eq(current, initial)
+			helpers.assert_eq(receipt, true)
+			helpers.assert_eq(redraws, 1)
+			helpers.assert_eq(#notices, 0)
+		end)
+	end
+	for _, invalid in ipairs({ "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("rejects the current script chord read " .. invalid .. " before writes", function()
+			local owner, writes, redraws = inert_owner(true), 0, 0
+			owner.set_chords_enabled = function() writes = writes + 1; return true end
+			local action = command(owner, function() redraws = redraws + 1 end)
+			owner.chords_enabled = function()
+				if invalid == "throw" then error("controlled chord read refusal") end
+				if invalid == "number" then return 2 end
+				if invalid == "text" then return "true" end
+				return nil
+			end
+			if invalid == "missing" then owner.chords_enabled = nil end
+			local called, receipt, notices, releases = observe(action)
+			helpers.assert_true(called)
+			helpers.assert_eq(writes, 0)
+			helpers.assert_eq(redraws, 0)
+			helpers.assert_eq(receipt, false)
+			helpers.assert_eq(#notices, 1)
+			helpers.assert_eq(releases, 1)
+		end)
+	end
+	--- Uses the real chord loader, sparse native writer and private canonical file.
+	--- @param initial boolean Durable/runtime posture.
+	--- @param body function Test over the actual initialized owner.
+	local function with_real_owner(initial, body)
+		local path = os.tmpname()
+		local source = '# independently owned future configuration\n[shortcuts.script_control]\nchords_enabled = '
+			.. tostring(initial) .. '\nscript_altgr_enter = "script_reload"\nfuture_mode = "kept" # independent comment\n[future]\nvalues = ["a", "b"]\n'
+		local file = assert(io.open(path, "wb"));assert(file:write(source));assert(file:close())
+		local paths, loaded = require("infra.config_paths"), {}
+		for _, name in ipairs({ "infra.config_paths", "modules.shortcuts.script_chords" }) do
+			loaded[#loaded + 1] = { name = name, value = package.loaded[name] }
+		end
+		local port = {}
+		for key, value in pairs(paths) do port[key] = value end
+		port.config = function(name) if name == "config.toml" then return path end return paths.config(name) end
+		local rename = os.rename
+		local called, failure = pcall(function()
+			package.loaded["infra.config_paths"] = port
+			package.loaded["modules.shortcuts.script_chords"] = nil
+			local chords = require("modules.shortcuts.script_chords")
+			chords.init({ is_paused = function() return false end, defer = function() return true end })
+			helpers.assert_eq(chords.chords_enabled(), initial)
+			body(chords, path, source)
+		end)
+		os.rename = rename
+		for _, row in ipairs(loaded) do package.loaded[row.name] = row.value end
+		os.remove(path .. ".tmp")
+		assert(os.remove(path), "the actual private chord config is retired")
+		if not called then error(failure, 0) end
+	end
+	--- Reads the complete owned canonical byte image.
+	--- @param path string Private config path.
+	--- @return string source
+	local function read(path)
+		local file = assert(io.open(path, "rb"));local source = file:read("*a");assert(file:close());return source
+	end
+	for _, initial in ipairs({ true, false }) do
+		for _, outcome in ipairs({ "true", "false", "nil", "number", "throw" }) do
+			helpers.it("acknowledges the actual chord publication " .. outcome .. " from " .. tostring(initial), function()
+				with_real_owner(initial, function(chords, path, source)
+					local redraws, writes, rename = 0, 0, os.rename
+					local action = command(chords, function() redraws = redraws + 1 end)
+					os.rename = function(from, to)
+						if from == path .. ".tmp" and to == path then
+							writes = writes + 1
+							if outcome == "throw" then error("controlled native publication refusal") end
+							if outcome == "false" then return false end
+							if outcome == "nil" then return nil end
+							if outcome == "number" then return 2 end
+						end
+						return rename(from, to)
+					end
+					local called, receipt, notices, releases = observe(action)
+					os.rename = rename
+					helpers.assert_true(called)
+					helpers.assert_eq(writes, 1)
+					helpers.assert_eq(receipt, outcome == "true")
+					helpers.assert_eq(redraws, outcome == "true" and 1 or 0)
+					helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
+					helpers.assert_eq(releases, #notices)
+					if outcome == "true" then
+						helpers.assert_eq(chords.chords_enabled(), not initial)
+						local expected = source:gsub("chords_enabled = " .. tostring(initial), "chords_enabled = " .. tostring(not initial), 1)
+						if not initial then expected = source:gsub("chords_enabled = false\n", "", 1) end
+						helpers.assert_eq(read(path), expected, "only the owned sparse switch leaf changes")
+						local decoded = require("toml_codec").decode(read(path))
+						if not initial then helpers.assert_nil(decoded.shortcuts.script_control.chords_enabled, "the true default is a deletion") end
+						package.loaded["modules.shortcuts.script_chords"] = nil
+						local reloaded = require("modules.shortcuts.script_chords")
+						helpers.assert_eq(reloaded.chords_enabled(), not initial, "a native reload reads the acknowledged target")
+					else
+						helpers.assert_eq(read(path), source, "all slot assignments/comments/future fields survive refusal")
+						helpers.assert_eq(chords.chords_enabled(), initial)
+					end
+					helpers.assert_eq(chords.get_action("script_altgr_enter"), "script_reload")
+				end)
+			end)
+		end
+		helpers.it("uses the real owner after independent chord publication from " .. tostring(initial), function()
+			with_real_owner(initial, function(chords, path, source)
+				local redraws, writes, rename = 0, 0, os.rename
+				local action = command(chords, function() redraws = redraws + 1 end)
+				helpers.assert_true(chords.set_chords_enabled(not initial), "the actual independent writer changes the live posture")
+				helpers.assert_eq(chords.chords_enabled(), not initial)
+				os.rename = function(from, to)
+					if from == path .. ".tmp" and to == path then writes = writes + 1 end
+					return rename(from, to)
+				end
+				local called, receipt, notices = observe(action)
+				os.rename = rename
+				helpers.assert_true(called)
+				helpers.assert_eq(chords.chords_enabled(), initial, "the real held callback toggles the current durable state")
+				helpers.assert_eq(receipt, true)
+				helpers.assert_eq(writes, 1)
+				helpers.assert_eq(redraws, 1)
+				helpers.assert_eq(#notices, 0)
+				local observed = read(path):gsub("\nchords_enabled = %a+\n", "\n")
+				local retained = source:gsub("\nchords_enabled = %a+\n", "\n")
+				helpers.assert_eq(observed, retained, "all independent slot/comment/future bytes remain exact")
+				package.loaded["modules.shortcuts.script_chords"] = nil
+				helpers.assert_eq(require("modules.shortcuts.script_chords").chords_enabled(), initial)
+			end)
+		end)
+		helpers.it("respects the native chord configuration reservation from " .. tostring(initial), function()
+			with_real_owner(initial, function(chords, path, source)
+				local action, redraws = nil, 0
+				action = command(chords, function() redraws = redraws + 1 end)
+				local owner = {}
+				helpers.assert_true(chords.acquire_configuration(owner))
+				local called, receipt, notices = observe(action)
+				local released = chords.release_configuration(owner)
+				helpers.assert_true(released)
+				helpers.assert_true(called)
+				helpers.assert_eq(receipt, false)
+				helpers.assert_eq(redraws, 0)
+				helpers.assert_eq(#notices, 1)
+				helpers.assert_eq(read(path), source)
+				helpers.assert_eq(chords.chords_enabled(), initial)
+			end)
+		end)
+	end
+end)
