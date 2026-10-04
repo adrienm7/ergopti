@@ -903,6 +903,20 @@ These are software implementations; final hardware verification remains below.
   uses its native accessibility path; neither production path reads arg[-1]
   there. Their native gates remain deferred as requested. No reserved AI menu,
   title, autostart placement, TOML source or manual CI was changed.
+- [~] **L68.** Linux JSON special-source admission: open the source with native
+  O_NONBLOCK/O_CLOEXEC, classify its pinned descriptor and reopen only regular
+  files through the kernel-owned fd alias. A FIFO or symlink to one previously
+  blocked startup; an open peer can also hold a JSON-looking FIFO read forever.
+  Twelve of twenty-eight native cases fail before and all pass after per
+  LuaJIT/Lua 5.4 runtime. Regular-file and file-symlink controls preserve their
+  behavior; FIFOs, directories and Unix sockets retain their inodes and reject
+  every mutation. The native libc fallback also passes without libuv's Lua
+  binding. Nine simulated descriptor receipts check classification, flags,
+  close ownership and exceptions; existing read-refusal assertions remain.
+  Existing native read (38), temporary-file (11) and backup-type (15) regressions
+  pass in both runtimes. Windows Storage uses the registry and macOS hs.settings
+  by source, so this FIFO reader is Linux-specific. No generic FileSystem/TOML
+  writer, config-path policy, physical input, reserved source or manual CI changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
