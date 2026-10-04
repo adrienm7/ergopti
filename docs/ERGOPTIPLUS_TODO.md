@@ -1363,6 +1363,12 @@ The ordered cohort preserves the corrected PersonalReload joint-result assertion
 
 Navigation and validation child rows now consume one shared declaration for their labels, presence, and order on all three drivers. Windows keeps its native modifier prompts; macOS and Linux keep their existing modifier picker subtrees. Linux now requires the actual durable setter to return exactly true before refreshing or acknowledging the choice; a refused publication retains the old source and chord and can be retried. Isolated registered tests replay all 21 locale captions, native range states, changed declarations, and real private-file publication faults. Full current-root verification and hosted Windows/macOS native qualification remain pending; TODO54/81 remain partial.
 
+TODO 54/81 — Mac script-control toggle prerequisite (partial)
+
+The existing Script control switch now enters the global action fence before changing RAM or the logical native chord gate. It reads the current native gate, requires exact Boolean setter acknowledgement and readback, and publishes through the unchanged ordinary Preferences transaction/source owner. A refused publication restores the previous RAM checkpoint and the independently observed native inverse, including across whole-preference rollback. Failed inverse or a changed native binding retains recovery debt and blocks a successor; no foreign setter is invoked.
+
+The original registered cases remain intact. Controlled native filesystem publication refusals, canonical sparse default reloads, retained pause/reentry, exact native identity and inverse ordering have portable focused proof. Windows and Linux owners are unchanged. Karabiner sync is asynchronous: this receipt acknowledges the logical native gate, not physical deployment or keyboard capture. Generic whole-feature postpublication rollback remains outside this slice. Shared row migration, hosted Hammerspoon/native CI and complete TODO 54/81 closure remain pending.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

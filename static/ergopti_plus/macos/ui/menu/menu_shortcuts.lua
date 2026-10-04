@@ -710,11 +710,8 @@ function M.build(ctx)
 		for key, value in pairs(ctx) do render_ctx[key] = value end
 		render_ctx.commands = {
 			["script_control_toggle"] = function()
-				state.script_control_enabled = not chords_on
-				if type(script_control.set_script_chords_enabled) == "function" then
-					pcall(script_control.set_script_chords_enabled, state.script_control_enabled)
-				end
-				if ctx.save_prefs() ~= true then return false end
+				if type(ctx.commit_script_chords) ~= "function"
+					or ctx.commit_script_chords() ~= true then return false end
 				ctx.updateMenu()
 				return true
 			end,

@@ -386,6 +386,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local preference_checkpoint = nil
 	local llm_handler = nil
 	local base_delay_owner = nil
+	local script_chords_owner = nil
 	local apply_preference_scope
 	local apply_global_scope
 	-- Features whose runtime refused the saved value this session: their state
@@ -432,7 +433,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return true
 	end
 
-	sync_state_to_modules = function(saved, config_absent, restoring)
+	sync_state_to_modules = function(saved, config_absent, restoring, rollback_modules)
 		local committed, report = MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
 			apply_llm_enabled         = function(enabled)
@@ -447,7 +448,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
-			core_mods                = core_mods,
+			core_mods                = rollback_modules or core_mods,
 			restoring                 = restoring == true,
 			-- A deferred engine refusal (keylogger start) lands after this sync
 			-- returned; it keeps the acknowledged value on disk like a boot one.
@@ -698,7 +699,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		restore_runtime     = function(snapshot)
 			if base_delay_owner and base_delay_owner.pending()
 				and base_delay_owner.restore_runtime() ~= true then return false end
-			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
+			local rollback_modules = core_mods
+			if script_chords_owner and script_chords_owner.pending() then
+				if script_chords_owner.restore_runtime() ~= true then return false end
+				rollback_modules = script_chords_owner.rollback_modules(core_mods)
+				if type(rollback_modules) ~= "table" then return false end
+			end
+			if sync_state_to_modules(snapshot, false, true, rollback_modules) ~= true then return false end
+			if script_chords_owner and script_chords_owner.pending()
+				and script_chords_owner.restore_runtime() ~= true then return false end
 			if type(llm_handler) == "table"
 				and type(llm_handler.restore_preference_runtime) == "function" then
 				return llm_handler.restore_preference_runtime(snapshot) == true
@@ -1360,6 +1369,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		state = state, keymap = keymap, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})
+	script_chords_owner = require("ui.menu.script_chords_transaction").new({
+		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
 	local ctx = {
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
@@ -1369,6 +1382,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		save_prefs               = save_prefs,
 		commit_preview           = preview_owner.toggle,
 		commit_base_delay        = base_delay_owner.set,
+		commit_script_chords     = script_chords_owner.toggle,
 		notify_feature           = notify_feature,
 		do_reload                = do_reload,
 		applyTriggerChar         = applyTriggerChar,
