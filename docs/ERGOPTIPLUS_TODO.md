@@ -2080,6 +2080,8 @@ Windows Variables and Key History remain a native-caption limitation: both use A
 
 The native application-panel caption regression now retains a bounded, verified copy of its exact retired child stderr in the existing Swift failure evidence channel, with closed count/status facts and no raw diagnostic payload in job logs. The original stderr.isEmpty, caption/selection policy, deadlines and exact fixture-child retirement assertions remain unchanged. Three additional native file-evidence controls cover exact bytes, bounds/unknown images/local absence, and source/owner symlinks; their actual macOS execution is pending. The current native failure cause remains unobserved until the next evidence artifact is collected. TODO109 remains partial; this diagnostic does not relax or complete the application picker qualification.
 
+The native application-panel test now exposes only its retired child's bounded escaped stderr in readable job logs, while retaining the existing strict empty-stderr assertion and exact artifact copy. Exact owned paths, panel title/message and URLs are removed; 2 KiB of sanitized UTF-8 is captured on one physical line. Three actual Swift XCTest controls cover redaction, boundaries/escaping and refusal of unknown input ownership. Native Swift execution and the underlying 79-byte AppKit stderr cause remain unverified; TODO109 stays partial.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

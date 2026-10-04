@@ -83,6 +83,12 @@ final class ApplicationPickerPanelTests: XCTestCase {
 		let stderr = try String(contentsOf: errorURL, encoding: .utf8)
 		XCTAssertTrue(stderr.isEmpty, "The actual native panel must emit no errors")
 		if !stderr.isEmpty {
+			var paths = [(errorURL.path, "<owned-stderr>"), (root.path, "<owned-fixture>"),
+				(Self.repositoryURL.path, "<checkout>"), (NSHomeDirectory(), "<home>")]
+			if let temporary = ProcessInfo.processInfo.environment["RUNNER_TEMP"] {
+				paths.append((temporary, "<runner-temp>"))
+			}
+			print(nativeStandardErrorText(stderr, script: script, paths: paths))
 			let retained = try retainNativeStandardError(errorURL, bytes: Data(stderr.utf8),
 				evidence: nativeEvidenceDirectory())
 			let reason = process.terminationReason == .exit ? "exit" : "signal"
@@ -102,6 +108,100 @@ final class ApplicationPickerPanelTests: XCTestCase {
 		}
 		for title in ["Configure application", "Application \"quoted\" %s C:\\Applications", "配置应用程序 😀"] {
 			XCTAssertEqual(try runNative(constructionScript(title: title, message: "Application to open: %s"), root: root), "OK\n")
+		}
+	}
+
+	/// Exposes only bounded escaped retired-child text, with owned inputs removed.
+	private func nativeStandardErrorText(_ stderr: String, script: String,
+		paths: [(String, String)]) -> String {
+		var privateValues: [String] = []
+		var assignmentKinds: Set<String> = []
+		for line in script.components(separatedBy: "\n") {
+			for prefix in ["panel's setTitle:\"", "panel's setMessage:\""] {
+				if line.hasPrefix(prefix), line.hasSuffix("\"") {
+					assignmentKinds.insert(prefix)
+					let literal = String(line.dropFirst(prefix.count).dropLast())
+					privateValues.append(literal)
+					privateValues.append(literal.replacingOccurrences(of: "\\\"", with: "\"")
+						.replacingOccurrences(of: "\\\\", with: "\\"))
+				}
+			}
+		}
+		// Unknown or repeated input assignments cannot authorize raw diagnostic text.
+		guard assignmentKinds.count == 2, privateValues.count == 4, !privateValues.contains("") else {
+			return "APPKIT_PANEL_STDERR_TEXT bytes=\(stderr.utf8.count) text=<input-redaction-refused>"
+		}
+		var safe = stderr
+		// URLs are removed before any input or path substitution can split a private signed query.
+		guard let urls = try? NSRegularExpression(pattern: #"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"'<>]+"#) else {
+			return "APPKIT_PANEL_STDERR_TEXT bytes=\(stderr.utf8.count) text=<url-redaction-refused>"
+		}
+		safe = urls.stringByReplacingMatches(in: safe, range: NSRange(safe.startIndex..., in: safe),
+			withTemplate: "<url>")
+		for value in privateValues.sorted(by: { $0.count > $1.count }) {
+			safe = safe.replacingOccurrences(of: value, with: "<panel-text>")
+		}
+		for (value, marker) in paths.filter({ !$0.0.isEmpty }).sorted(by: { $0.0.count > $1.0.count }) {
+			safe = safe.replacingOccurrences(of: value, with: marker)
+		}
+		let bytes = Data(safe.utf8)
+		var text = String(reflecting: String(decoding: bytes.prefix(2048), as: UTF8.self))
+		for (separator, escaped) in [("\u{85}", "\\u{85}"), ("\u{2028}", "\\u{2028}"),
+			("\u{2029}", "\\u{2029}")] {
+			text = text.replacingOccurrences(of: separator, with: escaped)
+		}
+		return "APPKIT_PANEL_STDERR_TEXT bytes=\(stderr.utf8.count) truncated=\(bytes.count > 2048) text=\(text)"
+	}
+
+	func testNativeStandardErrorTextRemovesExactOwnedPathsPanelInputsAndURLs() {
+		let script = "panel's setTitle:\"Private \\\"title\\\"\"\npanel's setMessage:\"Private message %s\""
+		let paths = [("/owned/fixture/error.stderr", "<owned-stderr>"), ("/owned/fixture", "<owned-fixture>"),
+			("/owned/runner", "<runner-temp>"), ("/owned/checkout", "<checkout>"), ("/owned/home", "<home>")]
+		let stderr = "/owned/fixture/error.stderr:17: execution error: Expected identifier\n"
+			+ "Private \"title\" Private message %s /owned/runner /owned/checkout /owned/home\n"
+			+ "https://example.invalid/owned/fixture?secret=PRIVATE_QUERY\n"
+		let packet = nativeStandardErrorText(stderr, script: script, paths: paths)
+		XCTAssertTrue(packet.contains("execution error: Expected identifier"))
+		for marker in ["<owned-stderr>", "<runner-temp>", "<checkout>", "<home>", "<panel-text>", "<url>"] {
+			XCTAssertTrue(packet.contains(marker))
+		}
+		for hidden in ["/owned/", "Private", "example.invalid", "PRIVATE_QUERY", "secret="] {
+			XCTAssertFalse(packet.contains(hidden))
+		}
+		XCTAssertFalse(packet.contains("<owned-fixture>/error.stderr"), "The deepest owner is removed first")
+		let overlappingScript = "panel's setTitle:\"Secret\"\npanel's setMessage:\"Message\""
+		let overlap = nativeStandardErrorText("https://private.invalid/Secret?token=PRIVATE_QUERY",
+			script: overlappingScript, paths: [])
+		XCTAssertTrue(overlap.contains("<url>"))
+		for hidden in ["private.invalid", "Secret", "token=", "PRIVATE_QUERY"] {
+			XCTAssertFalse(overlap.contains(hidden), "Panel-input URL overlap must not expose the query")
+		}
+	}
+
+	func testNativeStandardErrorTextBoundsAndEscapesPhysicalLines() {
+		let script = "panel's setTitle:\"Fixture title\"\npanel's setMessage:\"Fixture message\""
+		let stderr = "quoted \"text\"\n\r\t\0\u{1b}\u{85}\u{2028}\u{2029}😀 "
+			+ String(repeating: "A", count: 2048) + "PRIVATE_TAIL"
+		let packet = nativeStandardErrorText(stderr, script: script, paths: [])
+		XCTAssertTrue(packet.contains("truncated=true"))
+		XCTAssertTrue(packet.contains("bytes=\(stderr.utf8.count) "))
+		XCTAssertTrue(packet.contains("\\\"text\\\""))
+		for separator in ["\n", "\r", "\t", "\0", "\u{1b}", "\u{85}", "\u{2028}", "\u{2029}"] {
+			XCTAssertFalse(packet.contains(separator), "Diagnostics remain one escaped physical line")
+		}
+		XCTAssertFalse(packet.contains("PRIVATE_TAIL"))
+		XCTAssertLessThan(packet.utf8.count, 16384)
+		let exact = nativeStandardErrorText(String(repeating: "A", count: 2048), script: script, paths: [])
+		XCTAssertTrue(exact.contains("truncated=false"))
+	}
+
+	func testNativeStandardErrorTextRefusesMissingOrAmbiguousPanelInputs() {
+		for script in ["", "panel's setTitle:\"private\"",
+			"panel's setTitle:\"private\"\npanel's setTitle:\"other\"",
+			"panel's setTitle:\"private\"\npanel's setMessage:\"private\"\npanel's setTitle:\"other\""] {
+			let packet = nativeStandardErrorText("PRIVATE_DIAGNOSTIC", script: script, paths: [])
+			XCTAssertTrue(packet.contains("text=<input-redaction-refused>"))
+			XCTAssertFalse(packet.contains("PRIVATE_DIAGNOSTIC"))
 		}
 	}
 
