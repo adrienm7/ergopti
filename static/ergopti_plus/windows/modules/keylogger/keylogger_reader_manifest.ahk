@@ -93,17 +93,21 @@ KLR__SumSystemDay(db, manifest, where) {
 ; Aggregates are persisted at focus changes, so without this projection-only
 ; addition a dashboard opened during a long uninterrupted task reports zero
 ; time for the current application until the user leaves it.
-KLR_AddLiveForegroundTime(manifest, start_date := "", end_date := "") {
+KLR_AddLiveForegroundTime(manifest, start_date := "", end_date := "", Now := unset) {
 		if !(manifest is Map)
 				return
 		if (KLHook.prev_app = "" || KLHook.app_entered_at = 0)
 				return
-		now := A_TickCount
+		now := IsSet(Now) ? Now : A_TickCount
 		elapsed := (now - KLHook.app_entered_at) & 0xFFFFFFFF
 		if (elapsed <= 0)
 				return
-		; A full abandoned session must not be rendered as foreground work.
-		if (KLHook.last_tick > 0 && ((now - KLHook.last_tick) & 0xFFFFFFFF) >= KLWatchConst.SESSION_TIMEOUT_MS)
+		; Synthetic callbacks clear physical timing without ending accepted sessions.
+		; Retain that session clock so abandonment cannot become foreground work.
+		LastActivity := KLHook.last_tick
+		if LastActivity = 0 && KLWatch.is_session_active
+				LastActivity := KLWatch.last_authorized_tick
+		if (LastActivity > 0 && ((now - LastActivity) & 0xFFFFFFFF) >= KLWatchConst.SESSION_TIMEOUT_MS)
 				return
 		date_str := A_YYYY . "-" . A_MM . "-" . A_DD
 		if (start_date != "" && StrCompare(date_str, start_date) < 0)

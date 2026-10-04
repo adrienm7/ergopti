@@ -256,3 +256,167 @@ for _KLRManifest_LiveDateEncoded in [false, true]
 	Test("Keylogger live dates: actual " . (_KLRManifest_LiveDateEncoded ? "encoded" : "Map")
 		. " consumer keeps carry (klr-live-date-bounds)",
 		_KLRManifest_LiveDateConsumer.Bind(_KLRManifest_LiveDateEncoded))
+
+; Synthetic callback reset cannot erase accepted session timeout authority.
+_KLRManifest_AbandonmentStart(Kind, Duration := unset, Commit := 0) {
+	AssertEqual("session_start", Kind)
+	Commit.Call()
+	return true
+}
+
+_KLRManifest_Abandonment(Scenario, Consumer := "") {
+	HookSaved := Map()
+	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick"]
+		HookSaved[Name] := KLHook.%Name%
+	WatchSaved := Map()
+	for Name in ["is_session_active", "session_started_at", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
+		WatchSaved[Name] := KLWatch.%Name%
+	KeyloggerSaved := Map()
+	for Name in ["initialized", "session_app", "session_title", "synth_active", "synth_type", "synth_private", "buffer_events", "buffer_text"]
+		KeyloggerSaved[Name] := Keylogger.%Name%
+	FocusSaved := MetricsFocusCache.state
+	FilterSaved := Map()
+	for Name in ["disabled_apps", "private_browsing", "secure_field", "system_auth"]
+		FilterSaved[Name] := MetricsFilters.%Name%
+	Db := 0
+	try {
+		AssertFalse(A_IsSuspended, "the recording fixture cannot inherit suspension")
+		Keylogger.initialized := true
+		Keylogger.synth_active := false
+		Keylogger.synth_private := false
+		Keylogger.buffer_events := []
+		Keylogger.buffer_text := ""
+		KLHook.prev_app := ""
+		KLHook.prev_title := ""
+		KLHook.last_tick := 0
+		KLWatch.is_session_active := false
+		KLWatch.is_idle := false
+		KLWatch.session_close := false
+		KLWatch.session_close_draining := false
+		KLWatch.privacy_interrupted := false
+		KLWatch.privacy_started_at := 0
+		KLWatch.last_authorized_tick := 0
+		MetricsFocusCache.state := {valid: true, last_at: A_TickCount, hwnd: 1,
+			process_name: "owned-synthetic-editor.exe", title: "Owned synthetic fixture",
+			class: "OwnedSyntheticFixture", failure_reason: "", timed_out: false}
+		MetricsFilters.disabled_apps := Map()
+		for Name in ["private_browsing", "secure_field", "system_auth"]
+			MetricsFilters.%Name% := false
+		AssertTrue(KL_Hook_RefreshContext(true), "actual cached-focus owner publishes a native nonzero origin")
+		AssertTrue(KLHook.app_entered_at > 0)
+		Sleep(20)
+		Sample := A_TickCount
+		AssertTrue(Sample > KLWatchConst.SESSION_TIMEOUT_MS + 100,
+			"the passive fixture needs legal positive past native ticks")
+		Accepted := (Consumer != "" && Scenario = "expired") || Scenario = "inactive-retained"
+			? Sample - KLWatchConst.SESSION_TIMEOUT_MS - 100 : Sample
+		if Scenario != "inactive" {
+			AssertTrue(KL_Watchers_OnKeystroke(_KLRManifest_AbandonmentStart, Accepted))
+			AssertTrue(KLWatch.is_session_active)
+			AssertEqual(Accepted, KLWatch.last_authorized_tick)
+			if Scenario = "inactive-retained"
+				_KL_Watchers_CommitSessionEnd()
+		}
+		KLHook.last_tick := Sample
+		Keylogger.synth_active := 1
+		Keylogger.synth_type := "hotstring"
+		KL_Hook_OnChar(0, "x")
+		AssertEqual(0, KLHook.last_tick, "the actual synthetic callback clears physical timing")
+		AssertEqual("x", Keylogger.buffer_text, "privacy admission must actually reach the reset")
+		AssertEqual(1, Keylogger.buffer_events.Length)
+		AssertEqual(1, Keylogger.buffer_events[1][3]["s"])
+		AssertEqual(Scenario = "inactive" ? 0 : Accepted, KLWatch.last_authorized_tick,
+			"synthetic input cannot replace accepted session timing")
+		Keylogger.synth_active := false
+		Today := A_YYYY . "-" . A_MM . "-" . A_DD
+		Carry := 73
+		if Consumer != "" {
+			Db := _KLRManifest_OpenFixture()
+			AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day (device_id,date,app,app_time_ms) VALUES ('owned-synthetic',"
+				. SQLite_Q(Today) . ",'owned-synthetic-editor.exe'," . Carry . ");"))
+			Before := A_TickCount
+			Index := Map()
+			if Consumer = "encoded"
+				Manifest := JsonParse(KLR_BuildManifestJson(Db, Today, Today, &Index))
+			else
+				Manifest := KLR_ReadManifest(Db, Today, Today)
+			After := A_TickCount
+			Cell := Manifest[Today]["owned-synthetic-editor.exe"]
+			if Scenario = "expired"
+				AssertEqual(Carry, Cell["app_time_ms"], "abandoned foreground cannot increase actual stored carry")
+			else {
+				AssertTrue(Cell["app_time_ms"] >= Carry + Before - KLHook.app_entered_at)
+				AssertTrue(Cell["app_time_ms"] <= Carry + After - KLHook.app_entered_at)
+			}
+			AssertEqual(1, Manifest.Count)
+			AssertEqual(1, Manifest[Today].Count)
+			if Consumer = "encoded" {
+				AssertEqual(1, Index.Count)
+				AssertTrue(Index[Today].Has("owned-synthetic-editor.exe"))
+			}
+		} else {
+			Now := Accepted + KLWatchConst.SESSION_TIMEOUT_MS
+			Expected := false
+			switch Scenario {
+				case "before":
+					Now -= 1
+					Expected := true
+				case "after":
+					Now += 1
+				case "exact":
+				case "inactive":
+					Expected := true
+				case "inactive-retained":
+					Now := Sample
+					AssertFalse(KLWatch.is_session_active)
+					Expected := true
+				case "physical-recent":
+					KL_Hook_NoteActivity(false, false, Now - 10)
+					AssertTrue(KLWatch.privacy_interrupted)
+					Expected := true
+				case "physical-expired":
+					KL_Hook_NoteActivity(false, false, Accepted - 10)
+				case "empty-app":
+					KLHook.prev_app := ""
+					Now := Sample + 1
+				case "zero-origin":
+					KLHook.app_entered_at := 0
+					Now := Sample + 1
+				default:
+					throw Error("Unknown synthetic abandonment fixture: " . Scenario)
+			}
+			Manifest := Map()
+			Cell := KLR_GetCell(Manifest, Today, "owned-synthetic-editor.exe")
+			Cell["app_time_ms"] := Carry
+			Physical := KLHook.last_tick
+			KLR_AddLiveForegroundTime(Manifest, Today, Today, Now)
+			AssertEqual(Carry + (Expected ? Now - KLHook.app_entered_at : 0), Cell["app_time_ms"],
+				"only a retained live interval can increase persisted carry")
+			AssertEqual(Physical, KLHook.last_tick, "projection cannot change physical timing authority")
+			AssertEqual(1, Manifest.Count)
+			AssertEqual(1, Manifest[Today].Count, "invalid context cannot invent another app cell")
+		}
+	} finally {
+		if Db
+			SQLite_Close(Db)
+		for Name, Value in HookSaved
+			KLHook.%Name% := Value
+		for Name, Value in WatchSaved
+			KLWatch.%Name% := Value
+		for Name, Value in KeyloggerSaved
+			Keylogger.%Name% := Value
+		MetricsFocusCache.state := FocusSaved
+		for Name, Value in FilterSaved
+			MetricsFilters.%Name% := Value
+	}
+}
+for _KLRManifest_AbandonmentScenario in ["before", "exact", "after", "inactive", "inactive-retained", "physical-recent",
+	"physical-expired", "empty-app", "zero-origin"]
+	Test("Keylogger synthetic abandonment: " . _KLRManifest_AbandonmentScenario . " (klr-synthetic-abandonment)",
+		_KLRManifest_Abandonment.Bind(_KLRManifest_AbandonmentScenario))
+for _KLRManifest_AbandonmentConsumer in ["Map", "encoded"] {
+	for _KLRManifest_AbandonmentLive in ["expired", "recent"]
+		Test("Keylogger synthetic abandonment: actual " . _KLRManifest_AbandonmentConsumer . " "
+			. _KLRManifest_AbandonmentLive . " (klr-synthetic-abandonment)",
+			_KLRManifest_Abandonment.Bind(_KLRManifest_AbandonmentLive, _KLRManifest_AbandonmentConsumer))
+}
