@@ -13,7 +13,7 @@ void require(bool value) {
 }
 
 inventory::sample key(std::uint32_t usage) {
-  return {usage, usage + 100, {true, false, true, 1, 6, 0, 1}, 0, true,
+  return {7, usage, usage + 100, {true, false, true, 1, 6, 0, 1}, 0, true,
           usage + 100, 0, 0, usage * 2, usage * 2 + 1};
 }
 
@@ -34,6 +34,7 @@ void replay_native(const char* path) {
       const bool fixture = row.at("device") == scenario.at("fixture_device");
       for (const auto& element : row.at("elements")) {
         const auto sample = hs274_test::inventory_sample<decltype(replay)::sample>(element);
+        require(sample.page == 7);
         replay.append(sample);
         if (fixture && sample.value == 1) {
           require(element.at("usage") == 44);
@@ -76,7 +77,7 @@ int main(int argc, char** argv) {
   std::uint64_t ordinal = 0;
   auto append = [&](std::uint32_t usage, bool is_array) {
     ++ordinal;
-    expanded.append({usage, static_cast<std::uint32_t>(ordinal),
+    expanded.append({7, usage, static_cast<std::uint32_t>(ordinal),
         {true, false, is_array, 1, is_array ? 32u : 1u, 0, 1}, 0, true,
         static_cast<std::uint32_t>(ordinal), 0, 0, ordinal * 2, ordinal * 2 + 1});
   };
@@ -120,6 +121,13 @@ int main(int argc, char** argv) {
     if (variant != 0) incomplete.append(key(44));
     require(!incomplete.finish(variant != 1, variant == 2));
   }
+  for (const auto page : {0u, 12u, 0xff01u}) {
+    inventory invalid;
+    auto sample = key(44);
+    sample.page = page;
+    invalid.append(sample);
+    require(!invalid.finish(true, false));
+  }
   inventory held;
   auto space = key(44);
   space.value = 1;
@@ -134,7 +142,7 @@ int main(int argc, char** argv) {
   require(overflow && !bounded.finish(true, true));
   hs274_stream_protocol::key_inventory<1> limited;
   const hs274_stream_protocol::key_inventory<1>::sample single{
-      44, 144, {true, false, false, 1, 1, 0, 1}, 0, true, 144, 1, 42, 88, 89};
+      7, 44, 144, {true, false, false, 1, 1, 0, 1}, 0, true, 144, 1, 42, 88, 89};
   limited.append(single);
   overflow = false;
   try { limited.append(single); } catch (const std::overflow_error&) { overflow = true; }

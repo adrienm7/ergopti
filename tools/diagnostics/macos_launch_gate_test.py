@@ -64,6 +64,14 @@ HEALTHY = {
     "native_transport_control": control_summary(),
 }
 
+UNKNOWN_NATIVE_NOTICE = (
+    "::notice::Native launch observations: scenario=clean; getter=unknown; allowed=unknown; "
+    "bridge=unknown; journal_publication_ack=unobserved; handler_entry=unobserved; "
+    "finished_launching=unknown; launch_timing=unknown; received_lua=unobserved; "
+    "no_prompt_status=unknown; no_prompt_origin=unknown; no_prompt_outcome=unknown; "
+    "supplementary_bootstrap=unobserved; diagnostics_admit_original=false"
+)
+
 
 # The fallback boot log line every fatal Lua abort now writes before exiting.
 REFUSED_BOOT_LOG = "t [ERROR] [init] FATAL at boot stage 'native_logger_transport': refused\n"
@@ -139,6 +147,7 @@ class VerdictTests(unittest.TestCase):
                 [
                     "::error::macOS launch gate [clean] failed",
                     "::error::native scripting refused: 50%25%0D%0A::notice::foreign text",
+                    UNKNOWN_NATIVE_NOTICE,
                 ],
             )
             self.assertEqual(json.loads((output / "result.json").read_text())["failures"], [cause])
@@ -976,6 +985,9 @@ class EarlyLuaJournalObservationTests(unittest.TestCase):
                     live["started"] = True
                     (logs / gate.LAUNCHER_LOG_NAME).write_text(HEALTHY["launcher_log"])
                     (logs / gate.FALLBACK_BOOT_LOG_NAME).write_text(
+                        "2026-10-04 00:00:00 [INFO] [init] Native scripting server: pid=42; "
+                        "getter=boolean; allowed=true; bridge=callable; "
+                        "handler_registration=unobserved; handler_entry=unobserved.\n"
                         "2026-10-04 00:00:00 [INFO] [init] Native scripting Lua body stage: "
                         "phase=received_lua_body; pid=42; nonce=" + owner.nonce + ".\n"
                     )
@@ -1020,6 +1032,10 @@ class EarlyLuaJournalObservationTests(unittest.TestCase):
                 ),
             ):
                 report = gate.run(app, output, "clean", "")
+            self.assertEqual(
+                report["native_scripting_journal"],
+                {"getter": "boolean", "allowed": "true", "bridge": "callable"},
+            )
             stage = report["supplementary_received_lua_stage"]
             self.assertEqual(stage["body_stage"], "observed")
             self.assertFalse(stage["qualified"])
@@ -1228,6 +1244,197 @@ class ConcurrentManagedLaunchGateTests(unittest.TestCase):
         self.assertTrue(any("public observer cleanup" in reason for reason in report["failures"]))
         self.assertTrue(any("original feature refused" in reason for reason in report["failures"]))
         self.assertNotIn("arbitrary private", json.dumps(report))
+
+
+class NativeFailureNoticeTests(unittest.TestCase):
+    """One closed notice keeps native evidence visible without changing admission."""
+
+    @staticmethod
+    def diagnostic_report():
+        return {
+            "native_scripting_journal": {
+                "getter": "boolean",
+                "allowed": "true",
+                "bridge": "callable",
+            },
+            "managed_launch_observation": {"finished_launching": False, "timing": "overlaps_path"},
+            "supplementary_received_lua_stage": {"body_stage": "observed"},
+            "native_pid_no_prompt_control": {
+                "status": -1744,
+                "error_origin": "send",
+                "outcome": "consent_required",
+            },
+            "supplementary_native_bootstrap": {
+                "contract": "hs.startup.supplementary-feature",
+                "qualification": "installed native feature only; no managed boot or AppleEvent admission",
+                "feature": "karabiner_config",
+                "cleanup_acknowledged": True,
+                "process_retired": True,
+                "preference_restored": True,
+            },
+        }
+
+    def test_actual_failure_cli_keeps_one_notice_and_every_original_error(self):
+        report = self.diagnostic_report()
+        errors = ["original refusal " + str(index) for index in range(12)]
+        errors[0] = "original refusal: 50%\r\n::notice::foreign"
+        report["failures"] = errors
+        expected_errors = ["::error::macOS launch gate [karabiner_config] failed"]
+        expected_errors += ["::error::original refusal: 50%25%0D%0A::notice::foreign"] + [
+            "::error::original refusal " + str(index) for index in range(1, 12)
+        ]
+        with tempfile.TemporaryDirectory() as root:
+            output = Path(root) / "evidence"
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(gate.sys, "platform", "darwin"),
+                mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
+                mock.patch.object(gate, "run", return_value=report),
+                mock.patch.object(gate, "print_tails"),
+                mock.patch.object(gate, "print_native_probe_diagnostics"),
+                contextlib.redirect_stdout(stdout),
+            ):
+                status = gate.main(
+                    ["/Applications/ErgoptiPlus.app", str(output), "karabiner_config"]
+                )
+            self.assertEqual(status, 1)
+            self.assertEqual(json.loads((output / "result.json").read_text()), report)
+        lines = stdout.getvalue().splitlines()
+        self.assertEqual([line for line in lines if line.startswith("::error::")], expected_errors)
+        notices = [line for line in lines if line.startswith("::notice::")]
+        self.assertEqual(
+            len(notices), 1, "diagnostic aggregation must survive error annotation limits"
+        )
+        notice = notices[0]
+        self.assertLessEqual(len(notice), 1024)
+        for expected in (
+            "getter=boolean; allowed=true; bridge=callable",
+            "journal_publication_ack=unobserved; handler_entry=unobserved",
+            "finished_launching=false; launch_timing=overlaps_path; received_lua=observed",
+            "no_prompt_status=-1744; no_prompt_origin=send; no_prompt_outcome=consent_required",
+            "supplementary_bootstrap=feature_only; diagnostics_admit_original=false",
+        ):
+            self.assertIn(expected, notice)
+
+    def test_notice_drops_foreign_payloads_and_requires_native_scalar_types(self):
+        private = "/private/FOREIGN_TOKEN%\r\n::error::injected" + "x" * 100000
+        report = {
+            "native_scripting_journal": {key: private for key in ("getter", "allowed", "bridge")},
+            "managed_launch_observation": {"finished_launching": 1, "timing": private},
+            "supplementary_received_lua_stage": {"body_stage": private, "qualified": True},
+            "native_pid_no_prompt_control": {
+                "status": True,
+                "error_origin": private,
+                "outcome": private,
+            },
+            "supplementary_native_bootstrap": {"feature": private, "private": private},
+            "private": private,
+        }
+        notice = gate.native_failure_notice(private, report)
+        self.assertNotIn("FOREIGN_TOKEN", notice)
+        self.assertNotIn("injected", notice)
+        self.assertNotIn("%", notice)
+        self.assertEqual(len(notice.splitlines()), 1)
+        self.assertLessEqual(len(notice), 1024)
+        for value in ("scenario=unknown", "finished_launching=unknown", "no_prompt_status=unknown"):
+            self.assertIn(value, notice)
+        for value in (None, False, [], "PRIVATE"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    gate.native_failure_notice(
+                        "clean", {key: value for key in report if key != "private"}
+                    ),
+                    UNKNOWN_NATIVE_NOTICE,
+                )
+
+    def test_status_boundaries_and_bootstrap_refusal_stay_observations(self):
+        for status in (-(2**31), 2**31 - 1):
+            self.assertIn(
+                "no_prompt_status=" + str(status),
+                gate.native_failure_notice(
+                    "clean", {"native_pid_no_prompt_control": {"status": status}}
+                ),
+            )
+        for status in (-(2**31) - 1, 2**31, True, 0.0, "-1744"):
+            self.assertIn(
+                "no_prompt_status=unknown",
+                gate.native_failure_notice(
+                    "clean", {"native_pid_no_prompt_control": {"status": status}}
+                ),
+            )
+        report = {"supplementary_native_bootstrap_error": "PRIVATE%\r\n"}
+        self.assertIn(
+            "supplementary_bootstrap=refused", gate.native_failure_notice("clean", report)
+        )
+        self.assertNotIn("PRIVATE", gate.native_failure_notice("clean", report))
+        report.update(self.diagnostic_report())
+        self.assertIn(
+            "supplementary_bootstrap=unknown", gate.native_failure_notice("clean", report)
+        )
+
+    def test_annotation_escape_retains_percent_cr_and_lf_as_data(self):
+        self.assertEqual(
+            gate.escape_workflow_annotation("50%\r\n::error::text"), "50%25%0D%0A::error::text"
+        )
+
+    def test_journal_requires_one_bounded_complete_exact_owner_line(self):
+        line = (
+            "2026-10-04 00:00:00 [INFO] [init] Native scripting server: pid=42; "
+            "getter=boolean; allowed=true; bridge=callable; "
+            "handler_registration=unobserved; handler_entry=unobserved.\n"
+        )
+        expected = {"getter": "boolean", "allowed": "true", "bridge": "callable"}
+        unknown = {"getter": "unknown", "allowed": "unknown", "bridge": "unknown"}
+        self.assertEqual(gate.native_scripting_journal_summary(line, 42), expected)
+        for changed, pid in (
+            (line, 43),
+            (line, None),
+            (line, True),
+            (line, 42.0),
+            (line + line, 42),
+            (line.rstrip("\n"), 42),
+            (line.replace("\n", "\r\n"), 42),
+            (line.replace("pid=42", "pid=142"), 42),
+            (line.replace("getter=boolean", "getter=missing"), 42),
+            (line.replace("bridge=callable", "bridge=PRIVATE"), 42),
+            (line.replace("handler_entry=unobserved", "handler_entry=observed"), 42),
+            ("x" * 65536 + line, 42),
+        ):
+            with self.subTest(pid=pid, changed=changed[:50]):
+                self.assertEqual(gate.native_scripting_journal_summary(changed, pid), unknown)
+        self.assertEqual(
+            gate.native_scripting_journal_summary(
+                line.replace("getter=boolean; allowed=true", "getter=missing; allowed=unknown"), 42
+            ),
+            {"getter": "missing", "allowed": "unknown", "bridge": "callable"},
+        )
+
+    def test_supplementary_notice_cannot_repair_verdict_and_success_has_no_notice(self):
+        for scenario in ("clean", "karabiner_config"):
+            before = observe(
+                native_transport_control_error="original refusal",
+                native_delayed_timer=None,
+                native_karabiner_config=None,
+            )
+            expected = gate.evaluate(scenario, before)
+            self.assertTrue(expected)
+            after = dict(before, **self.diagnostic_report())
+            self.assertEqual(gate.evaluate(scenario, after), expected)
+            gate.native_failure_notice(scenario, after)
+            self.assertEqual(gate.evaluate(scenario, after), expected)
+        report = dict(self.diagnostic_report(), failures=[], machine="arm64", quit_seconds=0.5)
+        with tempfile.TemporaryDirectory() as root, io.StringIO() as stdout:
+            with (
+                mock.patch.object(gate.sys, "platform", "darwin"),
+                mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
+                mock.patch.object(gate, "run", return_value=report),
+                contextlib.redirect_stdout(stdout),
+            ):
+                status = gate.main(
+                    ["/Applications/ErgoptiPlus.app", str(Path(root) / "evidence"), "clean"]
+                )
+            self.assertEqual(status, 0)
+            self.assertNotIn("::notice::", stdout.getvalue())
 
 
 if __name__ == "__main__":

@@ -2396,6 +2396,11 @@ function run(argv) {
             "runModal",
             "lua_pcall",
             "dispatch_semaphore_wait",
+            # Hammerspoon 1.1.1 extensions/task/libtask.m dispatches create_task's
+            # termination block to the main queue before synchronous pipe reads.
+            # Preserve observed ancestry without attributing a timeout cause.
+            "__create_task_block_invoke",
+            "readDataToEndOfFile",
         )
         contexts = self.observed_sample_contexts(sample_text, markers)
         if contexts:

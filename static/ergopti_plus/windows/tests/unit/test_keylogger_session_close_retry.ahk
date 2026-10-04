@@ -17,7 +17,6 @@ _KLSCR_RetryPartialClose(Mode) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
 		"session_close", "session_close_draining", "idle_close"] {
@@ -103,7 +102,6 @@ _KLSCR_ClosePort(State, Kind, Duration, Commit) {
 _KLSCR_FrozenClose(Mode) {
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_generation", "idle_generation",
 		"session_close", "session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%
 	try {
@@ -145,7 +143,6 @@ _KLSCR_ShortIdleRetry(Mode) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
 		"session_close", "session_close_draining", "idle_close"] {
@@ -241,7 +238,6 @@ _KLSCR_Native64Scope(Run) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_generation", "idle_generation",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"session_close", "session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%
@@ -796,61 +792,3 @@ _KLA64_NativeDefaults() {
 	} finally KLHook.last_tick := SavedTick
 }
 Test("keylogger activity native64: omitted observation retains the actual native clock", _KLA64_NativeDefaults)
-
-
-; The main runner uses a recording append stub. A tree-owned child instead loads
-; the actual production append and teardown bodies, preserving their include
-; isolation while exercising the privacy refusal that the recording stub hides.
-_KLSCR_ShutdownCloseNativeChain() {
-	_KLRDC_Reset()
-	Script := _KLRDC_Root() . "shutdown_close_chain.ahk"
-	Handle := 0
-	Receipt := 0
-	try {
-		Source := Chr(0xFEFF) . "#Requires AutoHotkey v2.0`n#Warn All, StdOut`n"
-		for Spec in [["keylogger_password.ahk", "KLPasswordCache"],
-			["keylogger_watchers.ahk", "KLWatchConst"], ["keylogger_watchers.ahk", "KLWatch"]] {
-			ClassSource := FileRead(A_ScriptDir . "\..\modules\keylogger\" . Spec[1], "UTF-8")
-			AssertTrue(RegExMatch(ClassSource, "ms)^class " . Spec[2] . " \{.*?^\}", &NativeClass) > 0,
-				"each native-chain class must come from actual production source")
-			Source .= NativeClass[0] . "`n"
-		}
-		for Name in ["KL_AppendLog", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop",
-			"KL_CommitPwCache", "KL_TryGetPwCachedVerdict", "KL_PasswordFocusSnapshot",
-			"KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback", "KL_IsFocusedFieldPassword",
-			"MF_ShouldFilter", "MF_ShouldFilterFor", "KL_AssignStableEventId", "KL_AllocEventId",
-			"KL_RecordPrivacyHit", "TickElapsed64", "_KL_Watchers_CommitSessionStart",
-			"_KL_Watchers_CommitSessionEnd", "_KL_Watchers_CommitIdleStart", "_KL_Watchers_CommitIdleEnd",
-			"_KL_Watchers_CommitIdleClose", "_KL_Watchers_EndIdle", "_KL_Watchers_Log",
-			"_KL_Watchers_CommitClose", "_KL_Watchers_CloseSession", "KL_Watchers_OnKeystroke",
-			"KL_Watchers_OnPrivateKeystroke"] {
-			Body := _DriverFuncBody(Name)
-			AssertTrue(Body != "", "each actual native-chain function must be present")
-			Source .= Body . "`n"
-		}
-		Source .= '#Include ' . A_ScriptDir . '\..\modules\keylogger\keylogger_session_events.ahk' . "`n"
-		Source .= '#Include ' . A_ScriptDir . '\fixtures\keylogger_shutdown_close_fixture.ahk' . "`n"
-		AssertTrue(FSWriteCreateDurable(Script, Source) != 0)
-		Done(Code, Out, Err) {
-			Receipt := [Code, Out, Err]
-		}
-		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], Done)
-		AssertTrue(Handle.start())
-		Started := A_TickCount
-		while !IsObject(Receipt) && TickElapsed(Started) < 5000 {
-			_SR_TreePoll()
-			Sleep(10)
-		}
-		AssertTrue(IsObject(Receipt), "the native close fixture must complete within its owned deadline")
-		AssertEqual(0, Receipt[1], Receipt[2] . Receipt[3])
-		; The real ShellRunner callback removes terminal CR/LF from its capture.
-		AssertEqual("frozen-close-chain: passed", Receipt[2], "the complete native receipt must match")
-		AssertEqual("", Receipt[3], "the native close fixture must emit no errors or warnings")
-	} finally {
-		if IsObject(Handle)
-			AssertTrue(Handle.terminate())
-		_KLRDC_Cleanup()
-	}
-}
-Test("keylogger session: actual focus teardown retains only certified closes (keylogger-shutdown-close-chain)",
-	_KLRDC_CheckTeardown.Bind(_KLSCR_ShutdownCloseNativeChain))

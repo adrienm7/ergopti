@@ -145,7 +145,6 @@ typedef struct NavState {
 	NavInjectedModifierHold injected_modifiers[
 		NAV_INJECTED_MODIFIER_CAPACITY];
 	uint64_t terminal_token;
-	uint8_t terminal_release_active;
 	uint32_t terminal_phase;
 	uint32_t terminal_queued;
 	uint32_t terminal_replayed;
@@ -303,7 +302,6 @@ static void NavResetSemanticStateLocked(NavState *state)
 	state->next_profile_plan_generation = 0;
 	state->next_receipt_sequence = 0;
 	state->terminal_token = 0;
-	state->terminal_release_active = 0;
 	state->terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
 	state->terminal_queued = 0;
 	state->terminal_replayed = 0;
@@ -790,8 +788,7 @@ static bool NavHasPendingReceiptLocked(const NavState *state)
 /** Returns true while terminal capture owns suppressed physical input. */
 static bool NavHasTerminalDebtLocked(const NavState *state)
 {
-	return state->terminal_release_active != 0
-		|| state->terminal_phase != ERGOPTI_NAV_TERMINAL_IDLE
+	return state->terminal_phase != ERGOPTI_NAV_TERMINAL_IDLE
 		|| state->terminal_queued != 0;
 }
 
@@ -2388,12 +2385,6 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_Stop(void)
 	thread_handle = g_nav_state.thread_handle;
 	stop_event = g_nav_state.stop_event;
 	if (thread_handle == NULL) {
-		/* A replay sink may re-enter Stop before its accepted prefix is known.
-		 * Keep that owner's token and FIFO even without a resident hook thread. */
-		if (g_nav_state.terminal_release_active) {
-			LeaveCriticalSection(&g_nav_state.lock);
-			return ERGOPTI_NAV_STATUS_STOP_PENDING;
-		}
 		NavResetSemanticStateLocked(&g_nav_state);
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_OK;
@@ -2594,18 +2585,8 @@ static void NavConsumeTerminalReplayLocked(NavState *state, uint32_t count)
 
 
 
-/** Retires exclusive release ownership at its final locked acknowledgement. */
-static int32_t NavFinishTerminalReleaseLocked(int32_t status)
-{
-	g_nav_state.terminal_release_active = 0;
-	LeaveCriticalSection(&g_nav_state.lock);
-	return status;
-}
-
-
-
-/** Replays one capture after its caller claimed exclusive release ownership. */
-static int32_t NavReleaseTerminalCaptureOwned(
+/** Replays one capture through an injectable SendInput-compatible sink. */
+static int32_t NavReleaseTerminalCapture(
 	uint64_t token,
 	uint32_t release_kind,
 	NavTerminalSendFn send_fn,
@@ -2615,23 +2596,33 @@ static int32_t NavReleaseTerminalCaptureOwned(
 	uint32_t count;
 	uint32_t sent;
 	DWORD os_error;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (token == 0 || send_fn == NULL
+			|| (release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT
+				&& release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_ABORT))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 
 	for (;;) {
 		EnterCriticalSection(&g_nav_state.lock);
 		if (g_nav_state.terminal_token != token) {
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
 		}
 		if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_FAULTED) {
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OS_ERROR);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OS_ERROR;
 		}
 		if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_IDLE) {
 			int32_t idle_status = g_nav_state.terminal_release_kind == release_kind
 				? ERGOPTI_NAV_STATUS_OK : ERGOPTI_NAV_STATUS_INVALID_STATE;
-			return NavFinishTerminalReleaseLocked(idle_status);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return idle_status;
 		}
 		if (g_nav_state.terminal_release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_NONE
 				&& g_nav_state.terminal_release_kind != release_kind) {
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_INVALID_STATE);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_INVALID_STATE;
 		}
 		g_nav_state.terminal_release_kind = release_kind;
 		g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_REPLAYING;
@@ -2640,7 +2631,8 @@ static int32_t NavReleaseTerminalCaptureOwned(
 			g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
 			g_nav_state.terminal_last_os_error = ERROR_SUCCESS;
 			g_nav_state.last_os_error = ERROR_SUCCESS;
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OK);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OK;
 		}
 		LeaveCriticalSection(&g_nav_state.lock);
 
@@ -2652,77 +2644,31 @@ static int32_t NavReleaseTerminalCaptureOwned(
 
 		EnterCriticalSection(&g_nav_state.lock);
 		if (g_nav_state.terminal_token != token) {
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
 		}
 		if (sent != 0) {
 			NavConsumeTerminalReplayLocked(&g_nav_state, sent);
 			g_nav_state.terminal_replayed += sent;
 		}
-		/* Capture can fault while SendInput runs without the state lock. Its lost
-		 * physical edge cannot be repaired by accepting this earlier prefix. */
-		if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_FAULTED)
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OS_ERROR);
 		if (sent != count) {
 			if (os_error == ERROR_SUCCESS)
 				os_error = ERROR_WRITE_FAULT;
 			g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_RELEASE_PENDING;
 			g_nav_state.terminal_last_os_error = os_error;
 			g_nav_state.last_os_error = os_error;
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OS_ERROR);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OS_ERROR;
 		}
 		g_nav_state.terminal_last_os_error = ERROR_SUCCESS;
 		if (g_nav_state.terminal_queued == 0) {
 			g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
 			g_nav_state.last_os_error = ERROR_SUCCESS;
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OK);
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OK;
 		}
 		LeaveCriticalSection(&g_nav_state.lock);
 	}
-}
-
-
-
-/**
- * Owns every replay batch until its accepted prefix is acknowledged.
- *
- * SendInput runs outside the state lock so keyboard capture can append to the
- * FIFO. Re-entering release during that call must not send the same prefix or
- * acknowledge it twice; the release flag also keeps shutdown and new capture
- * admission fenced until the owner has finished its final acknowledgement.
- */
-static int32_t NavReleaseTerminalCapture(
-	uint64_t token,
-	uint32_t release_kind,
-	NavTerminalSendFn send_fn,
-	void *context)
-{
-	if (!NavEnsureInitialized())
-		return ERGOPTI_NAV_STATUS_OS_ERROR;
-	if (token == 0 || send_fn == NULL
-			|| (release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT
-				&& release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_ABORT))
-		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
-	EnterCriticalSection(&g_nav_state.lock);
-	if (g_nav_state.terminal_token != token) {
-		LeaveCriticalSection(&g_nav_state.lock);
-		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
-	}
-	if (g_nav_state.terminal_release_active) {
-		LeaveCriticalSection(&g_nav_state.lock);
-		return ERGOPTI_NAV_STATUS_BUSY;
-	}
-	/* Completed release is idempotent without opening a new capture interval. */
-	if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_IDLE) {
-		int32_t idle_status = g_nav_state.terminal_queued == 0
-			&& g_nav_state.terminal_release_kind == release_kind
-				? ERGOPTI_NAV_STATUS_OK : ERGOPTI_NAV_STATUS_INVALID_STATE;
-		LeaveCriticalSection(&g_nav_state.lock);
-		return idle_status;
-	}
-	g_nav_state.terminal_release_active = 1;
-	LeaveCriticalSection(&g_nav_state.lock);
-
-	return NavReleaseTerminalCaptureOwned(token, release_kind, send_fn, context);
 }
 
 
@@ -3598,8 +3544,6 @@ typedef struct NavTestTerminalSendContext {
 	ErgoptiNav_TestEvent *events;
 	uint32_t capacity;
 	uint32_t count;
-	ErgoptiNav_TerminalReplayObserver observer;
-	void *observer_context;
 } NavTestTerminalSendContext;
 
 
@@ -3614,8 +3558,6 @@ static uint32_t NavTestSendTerminalInputs(
 		(NavTestTerminalSendContext *)raw_context;
 	uint32_t accepted = event_count;
 	uint32_t index;
-	if (context->observer != NULL)
-		context->observer(context->observer_context);
 	if (context->remaining != UINT32_MAX && accepted > context->remaining)
 		accepted = context->remaining;
 	for (index = 0; index < accepted; ++index) {
@@ -3644,16 +3586,14 @@ static uint32_t NavTestSendTerminalInputs(
 
 
 
-/** Implements the hook-free terminal replay seam with a reentrant observer. */
-int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCaptureObserved(
+/** Implements the hook-free terminal replay seam. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCapture(
 	uint64_t token,
 	uint32_t release_kind,
 	uint32_t send_limit,
 	ErgoptiNav_TestEvent *out_events,
 	uint32_t event_capacity,
-	uint32_t *out_event_count,
-	ErgoptiNav_TerminalReplayObserver observer,
-	void *observer_context)
+	uint32_t *out_event_count)
 {
 	NavTestTerminalSendContext context;
 	if (out_event_count == NULL
@@ -3663,8 +3603,6 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCaptureObserved(
 	context.remaining = send_limit;
 	context.events = out_events;
 	context.capacity = event_capacity;
-	context.observer = observer;
-	context.observer_context = observer_context;
 	*out_event_count = 0;
 	{
 		int32_t status = NavReleaseTerminalCapture(
@@ -3672,21 +3610,5 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCaptureObserved(
 		*out_event_count = context.count;
 		return status;
 	}
-}
-
-
-
-/** Implements the hook-free terminal replay seam without an observer. */
-int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCapture(
-	uint64_t token,
-	uint32_t release_kind,
-	uint32_t send_limit,
-	ErgoptiNav_TestEvent *out_events,
-	uint32_t event_capacity,
-	uint32_t *out_event_count)
-{
-	return ErgoptiNav_TestReleaseTerminalCaptureObserved(
-		token, release_kind, send_limit, out_events, event_capacity,
-		out_event_count, NULL, NULL);
 }
 #endif

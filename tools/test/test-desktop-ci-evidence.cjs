@@ -415,7 +415,7 @@ function checkCore(body) {
 		'npm run test:${{ matrix.suite }}'
 	);
 	assert.ok(steps.some((step) => pipeline.stepField(step.body, 'run') === 'npm ci'));
-	assert.match(body, /sudo apt-get install -y lua5\.4 lua-luv libxml2-utils/);
+	assert.match(body, /sudo apt-get install -y lua5\.4 libxml2-utils/);
 	for (const [name, command] of [
 		['Install shared UI browsers', 'npx playwright install --with-deps chromium webkit'],
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor']
