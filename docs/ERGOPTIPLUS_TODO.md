@@ -1088,6 +1088,18 @@ These are software implementations; final hardware verification remains below.
   scenarios. macOS hashes layouts synchronously and owns its updater child;
   Windows hashes in its own worker by source, without this Linux singleton.
   Their native suites remain deferred. No shared hash policy changed.
+- [~] **L81.** Linux logger repoint ownership: acquire candidate append channels
+  before retiring the working pair. Previously a refused destination closed
+  the old handles and attempted a path-based rollback, which lost a healthy
+  journal when permissions changed after its original acquisition. Three of
+  18 actual native file/permission/descriptor cases fail before and all pass
+  after, preserving all 13 prior write controls plus refusal, retry, partial
+  candidate cleanup, successful switching and optional-mirror refusal. Twelve
+  unit controls distinguish simulated open faults and assert ownership order,
+  nil/false/throw refusal, stdout-only and degraded-sink behavior. macOS folder
+  changes reload into a new logger session; Windows reloads and acquires files
+  per batch rather than retaining this pair by source. Their native suites
+  remain deferred. Reserved persistence and paths-editor production are unchanged.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
