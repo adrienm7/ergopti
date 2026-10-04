@@ -599,6 +599,77 @@ for (const [from, to] of [
 	);
 	assert.throws(() => checkSourceOwnerEvidence(sourceObserver.replaceAll(from, to)), from);
 }
+/** Requires every isolated LLM runner, including deferred pointer dismissal, to gate CI. */
+function checkIsolatedLlmSuites(body) {
+	const step = pipeline.step(body, 'Run isolated AHK LLM suites');
+	assert.equal(pipeline.stepField(step, 'shell'), 'pwsh');
+	assert.equal(pipeline.stepField(step, 'if'), null);
+	assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+	const lines = pipeline.runOf(step);
+	const block = pipeline.scriptBlock(lines, 'foreach ($name in @(');
+	assert.match(block[0], /^foreach /, 'the suite loop must execute outside conditional wrappers');
+	const names = [...block[0].matchAll(/"(run_[a-z_]+\.ahk)"/g)].map((match) => match[1]);
+	assert.equal(new Set(names).size, names.length, 'each isolated suite runs once');
+	for (const name of [
+		'run_llm_model_browser.ahk',
+		'run_llm_model_menu_disabled.ahk',
+		'run_llm_pointer_dismiss.ahk'
+	])
+		assert.ok(names.includes(name), name + ' must be a mandatory native suite');
+	const nativeBody = block.filter((line) => !line.trimStart().startsWith('#')).join('\n');
+	assert.doesNotMatch(
+		nativeBody,
+		/\b(?:continue|break|return)\b/,
+		'selected suites cannot be skipped'
+	);
+	assert.match(nativeBody, /\$runner = Join-Path \$tests \$name/);
+	assert.match(
+		nativeBody,
+		/\$proc = Start-Process -FilePath \$ahk -ArgumentList @\("\/ErrorStdOut", \$runner\)/
+	);
+	assert.match(nativeBody, /-Wait -PassThru/);
+	assert.match(nativeBody, /if \(\$proc\.ExitCode -ne 0\) \{ \$failed \+= 1 \}/);
+	assert.match(nativeBody, /validate-ahk-suite-manifest\.cjs/);
+	assert.match(nativeBody, /--input \$env:ERGOPTI_AHK_RESULTS_FILE --json \$manifestFile/);
+	assert.match(nativeBody, /if \(\$LASTEXITCODE -ne 0\) \{ \$failed \+= 1 \}/);
+	assert.ok(pipeline.blockExits(pipeline.scriptBlock(lines, 'if ($failed -gt 0) {'), '1'));
+}
+checkIsolatedLlmSuites(sourceBoot);
+for (const [from, to] of [
+	[', "run_llm_pointer_dismiss.ahk"', ''],
+	['- name: Run isolated AHK LLM suites', '- name: Run isolated AHK LLM suites\n        if: false'],
+	[
+		'- name: Run isolated AHK LLM suites',
+		'- name: Run isolated AHK LLM suites\n        continue-on-error: true'
+	],
+	['$runner = Join-Path $tests $name', '$runner = Join-Path $tests "run_llm_model_browser.ahk"'],
+	[
+		'$runner = Join-Path $tests $name',
+		'if ($name -eq "run_llm_pointer_dismiss.ahk") { continue }\n              $runner = Join-Path $tests $name'
+	],
+	['$proc = Start-Process -FilePath $ahk', '$proc = Write-Output -FilePath $ahk'],
+	['if ($proc.ExitCode -ne 0) { $failed += 1 }', 'if ($proc.ExitCode -ne 0) { $failed += 0 }'],
+	[
+		'--input $env:ERGOPTI_AHK_RESULTS_FILE --json $manifestFile',
+		'--input $env:UNUSED_RESULTS_FILE --json $manifestFile'
+	],
+	['if ($LASTEXITCODE -ne 0) { $failed += 1 }', 'if ($LASTEXITCODE -ne 0) { $failed += 0 }'],
+	[
+		'if ($failed -gt 0) { Write-Error "$failed isolated LLM suite(s) failed."; exit 1 }',
+		'if ($failed -gt 0) { Write-Error "$failed isolated LLM suite(s) failed."; exit 0 }'
+	]
+]) {
+	const originalStep = pipeline.step(sourceBoot, 'Run isolated AHK LLM suites');
+	const mutatedStep = originalStep.replace(from, to);
+	assert.notEqual(
+		mutatedStep,
+		originalStep,
+		'the isolated-suite mutant must change its real subject'
+	);
+	const mutated = sourceBoot.replace(originalStep, mutatedStep);
+	assert.throws(() => checkIsolatedLlmSuites(mutated), from);
+}
+
 for (const [from, to] of [
 	['node tools/test/test-ahk-fresh-clone-startup.cjs', 'echo skipped source boot'],
 	['$env:ERGOPTI_AHK_EXE = $ahk', '$env:UNUSED_AHK_EXE = $ahk'],
