@@ -494,7 +494,9 @@ local BUILTIN_HANDLERS = {
 			return
 		end
 		Logger.info(LOG, "Opening the application '%s'.", app)
-		run_background("gtk-launch " .. shell_quote(app))
+		-- Desktop-file ids can begin with a dash; shell quoting preserves the
+		-- argument but only the option boundary makes it an application operand.
+		run_background("gtk-launch -- " .. shell_quote(app))
 	end,
 	["search_web"] = function(binding)
 		local template = M.get_action_parameter(binding, "search_web")

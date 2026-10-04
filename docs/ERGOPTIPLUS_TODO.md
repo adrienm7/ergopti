@@ -982,6 +982,16 @@ These are software implementations; final hardware verification remains below.
   new completion frame with their assertions intact. macOS and Windows use
   different native process-capture mechanisms without this temporary-file
   transmitter protocol. Their native suites and reserved subjects were untouched.
+- [~] **L74.** Linux application operands: add the native gtk-launch option
+  boundary so desktop-file ids such as --version and -help launch the chosen
+  application. Quoting alone let those ids act as launcher options. Two of four
+  real chooser/parameter/executor launch cases fail before and all pass after
+  on synchronized dev656. Private Xvfb and D-Bus sessions use actual owned
+  desktop entries whose executable records its fixed identity; these are
+  virtual desktop tests, not physical keyboard tests. Registered unit controls
+  preserve the shared application corpus and cover option-looking, quoted and
+  spaced ids. macOS and Windows use their native application launch ports
+  without this gtk-launch option parser; their native suites remain deferred.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
