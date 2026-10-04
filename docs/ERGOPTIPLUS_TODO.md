@@ -804,6 +804,20 @@ These are software implementations; final hardware verification remains below.
   replacement of the source. macOS uses hs.settings and Windows the registry,
   with no corresponding JSON recovery move. TOML, reserved source, physical
   input, macOS/AHK suites and manual CI remain outside this Linux correction.
+- [~] **L61.** Linux updater temporary-file ownership: retain os.tmpname's
+  reserved inode as the partial download, clean only that owned path, and
+  publish the verified archive with the native no-replace move. Previously a
+  failed checksum request deleted unrelated derived names; a valid download
+  overwrote them. Eleven of twelve native cases fail before and all pass after
+  under LuaJIT and Lua 5.4, including real certificate-verified TLS/curl/SHA-256,
+  regular/hardlinked/symlink/dangling competitors, transport/parse/digest refusal,
+  publication collision and healthy cancellation. strace only observes native
+  allocation; the owned TLS server creates adjacent files before replying.
+  Four unit cases simulate allocation and checksum refusal with real files.
+  macOS uses Sparkle for automatic updates; its separate release installer has
+  timestamp-derived staging directories. Windows has a separate staging worker.
+  Their native staging-ownership qualification remains with the principal owner;
+  no cross-OS native gate or source, TOML, physical input or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

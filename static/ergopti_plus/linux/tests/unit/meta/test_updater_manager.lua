@@ -690,6 +690,49 @@ helpers.describe("modules/updater/manager.lua", function()
 			"refusal must happen before the installer can mutate the archive")
 	end)
 
+	for _, suffix in ipairs({ ".tar.gz", ".tar.gz.part" }) do
+		for _, alias in ipairs({ "regular", "dangling" }) do
+			helpers.it("linux-updater-temp-ownership: preserves unrelated " .. alias .. " " .. suffix, function()
+				M.cancel_update()
+				local base = os.tmpname()
+				local candidate, target = base .. suffix, base .. ".missing"
+				local history = "Retained unrelated temporary bytes"
+				if alias == "regular" then write_file(candidate, history)
+				else helpers.assert_true(command_ok("ln -s -- " .. shell_quote(target) .. " " .. shell_quote(candidate))) end
+				local real_tmpname, real_http = os.tmpname, M._http_client
+				local callbacks, completion_error = 0, nil
+				os.tmpname = function() return base end
+				M._http_client = {
+					get = function(_, _, _, callback)
+						callback({ ok = false, status = 503, error = "synthetic checksum failure" })
+						return true
+					end,
+					download = function() error("failed checksum must not download an archive") end,
+					cancel = function() return true end,
+				}
+				local ok, err = xpcall(function()
+					helpers.assert_true(M.download_release({ tag = "v4.0.0", download_url = "https://example.invalid/archive",
+						checksum_url = "https://example.invalid/checksum" }, function(path, failure)
+						callbacks = callbacks + 1; completion_error = failure; helpers.assert_nil(path)
+					end))
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_eq(completion_error, "synthetic checksum failure")
+					if alias == "regular" then helpers.assert_eq(read_file(candidate), history)
+					else
+						helpers.assert_true(command_ok("test -L " .. shell_quote(candidate)))
+						helpers.assert_nil(io.open(target, "r"))
+					end
+					helpers.assert_eq(M.get_state(), "idle")
+					helpers.assert_eq(Fs.exists(base), false)
+				end, debug.traceback)
+				os.tmpname, M._http_client = real_tmpname, real_http
+				M.cancel_update()
+				os.remove(base); os.remove(candidate); os.remove(target)
+				helpers.assert_true(ok, tostring(err))
+			end)
+		end
+	end
+
 	helpers.it("downloads, hashes and publishes only a verified archive", function()
 		local real_http = M._http_client
 		local real_digest = M._file_digest
@@ -741,7 +784,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(completion_error, nil)
 		helpers.assert_true(type(verified_path) == "string" and Fs.exists(verified_path))
 		helpers.assert_true(not Fs.exists(downloaded_part),
-			"the .part path must be atomically renamed after verification")
+			"the owned partial path must be renamed after verification")
 		helpers.assert_eq(M.get_state(), "available")
 		Fs.delete(verified_path)
 		M.clear_cached_release()
@@ -794,8 +837,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_nil(verified_path)
 		helpers.assert_contains(completion_error, "checksum mismatch")
 		helpers.assert_true(not Fs.exists(downloaded_part),
-			"a mismatched .part archive must be removed")
-		helpers.assert_true(not Fs.exists(downloaded_part:gsub("%.part$", "")),
+			"a mismatched partial archive must be removed")
+		helpers.assert_true(not Fs.exists(downloaded_part .. ".tar.gz"),
 			"a mismatched archive must never be published")
 		helpers.assert_eq(M.get_state(), "idle")
 		M.clear_cached_release()

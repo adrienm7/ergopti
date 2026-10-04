@@ -406,6 +406,14 @@ jobs:
           python3 tests/hardware/run_updater_etag_receipts.py
         timeout-minutes: 2
 
+      - name: Preserve native updater temporary-file ownership
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_updater_temp_ownership_receipts.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_temp_ownership_receipts.py
+        timeout-minutes: 2
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
