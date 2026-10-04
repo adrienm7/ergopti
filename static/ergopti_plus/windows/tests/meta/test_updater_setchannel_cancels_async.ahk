@@ -110,7 +110,7 @@ _USCA_DeferredReloadRequiresFullQuiescence() {
 		and InStr(Refused, "_Updater_FailDeferredChannelReload(State") > 0
 		and InStr(Fail, "State.ConfigBundle") > 0,
 		"a launched Reload must keep the exact global configuration bundle and a refusal must recover it")
-	Assert(InStr(RunBody, "TickExpired(") > 0
+	Assert(InStr(RunBody, "TickExpired64(") > 0
 		and InStr(RunBody, "channel reload quiescence timed out") > 0,
 		"the quiescence wait must have a wrap-safe bounded timeout")
 	Assert(InStr(Fail, "LoggerError(") > 0
