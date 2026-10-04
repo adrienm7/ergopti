@@ -1633,3 +1633,38 @@ Test("system actions: invalid approved lease is already released (confirmed-proc
 	() => _SysActions_InvalidApprovedLease(true))
 Test("system actions: invalid approved lease belongs to another PID (confirmed-process-lease)",
 	() => _SysActions_InvalidApprovedLease(false))
+
+_SysActions_ResolvedGuard(TargetPid, Mode) {
+	global GESTURE_ACTIONS
+	Fake := _SysActions_ProcessLeaseFake("unchanged", true)
+	Fake.ShellPidValue := 6000
+	Fake.FramedApp := TargetPid
+	Protected := TargetPid == Fake.OwnPidValue || TargetPid == Fake.ShellPidValue
+	if Mode == "resolver" {
+		Resolved := GestureSysForceQuitTarget(Fake.Active, Fake)
+		AssertEqual(Protected, Resolved.Refusal != "", "the resolved app PID obeys the same self and shell refusal as its frame")
+		AssertEqual(Protected ? 0 : TargetPid, Resolved.Pid, "a refused resolved process has no effect authority")
+		return
+	}
+	Saved := _SysActions_InstallOwnedForce(Fake)
+	try {
+		if Mode == "confirmed" {
+			GestureInvokeAction("force_quit_frontmost", "keyboard__resolved_guard", Fake)
+			while Fake.Deferred.Length
+				Fake.Deferred.RemoveAt(1).Call()
+			AssertEqual(Protected ? 0 : 1, _SysActions_CallsNamed(Fake, "Ask").Length,
+				"a resolved protected process is refused before destructive confirmation")
+		} else {
+			GestureSysForceQuitFrontmost(Fake)
+		}
+		AssertEqual(Protected ? 0 : 1, Fake.Effects.Length, "neither confirmed nor direct execution can terminate a resolved self or shell PID")
+		AssertEqual(Protected ? 0 : 1, Fake.Leases.Length, "a protected child process never acquires termination authority")
+		AssertEqual(Fake.Leases.Length, Fake.Releases, "the accepted UWP capability still releases exactly once")
+	} finally GESTURE_ACTIONS["force_quit_frontmost"] := Saved
+}
+_SysActions_ResolvedGuardTest(Pid, Mode) => () => _SysActions_ResolvedGuard(Pid, Mode)
+for _SysActions_ResolvedGuardMode in ["resolver", "confirmed", "direct"] {
+	for _SysActions_ResolvedGuardPid in [4000, 6000, 7001]
+		Test("system actions: resolved process " . _SysActions_ResolvedGuardMode . " " . _SysActions_ResolvedGuardPid . " (resolved-process-guards)",
+			_SysActions_ResolvedGuardTest(_SysActions_ResolvedGuardPid, _SysActions_ResolvedGuardMode))
+}

@@ -391,6 +391,10 @@ GestureSysForceQuitTarget(Active, Sys) {
 	AppPid := Sys.FramedAppPid(Active.Hwnd)
 	if !AppPid
 		return { Pid: 0, Refusal: "the packaged app behind its frame could not be found" }
+	if (AppPid = Sys.OwnPid())
+		return { Pid: 0, Refusal: "it is ErgoptiPlus itself (use its Quit command)" }
+	if (AppPid = Sys.ShellPid())
+		return { Pid: 0, Refusal: "its process also runs the desktop and the taskbar" }
 	return { Pid: AppPid, Refusal: "" }
 }
 
