@@ -2535,7 +2535,12 @@ First Windows qualification (run 37228466168, candidate 45d5c2d) executed
 all 9038 AHK cases: 9036 passed and two failed. The new owned child reported
 local/global name warnings because its terminal loop and catch ran at top
 level; that block now runs inside its own function, retaining Warn All and
-every stdout, stderr, exit and scenario assertion. Native retry is pending.
+every stdout, stderr, exit and scenario assertion. The complete child log also
+exposed a frozen-getter binding error: AHK static methods bind their implicit
+class receiver before the accepted scalar. Both issued-authority getters now
+bind that receiver explicitly. Independent typed-preimage assertions exercise
+the accepted owner and publication boundaries before the shutdown chain.
+Native retry is pending.
 The other failure is the pre-existing personal-TOML metadata case (item 102).
 E2E, packaging and installation were skipped after the unit failure.
 

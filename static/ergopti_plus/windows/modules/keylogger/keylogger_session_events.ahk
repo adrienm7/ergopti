@@ -41,7 +41,7 @@ class KLSessionCloseAuthority {
 			"IdleDuration", Owner.Get("idle_end", -1))
 		Getters := Map()
 		for Name, Value in Values {
-			Getter := KLSessionCloseAuthority.ReadOnly.Bind(Value)
+			Getter := KLSessionCloseAuthority.ReadOnly.Bind(KLSessionCloseAuthority, Value)
 			this.DefineProp(Name, {Get: Getter})
 			Getters[Name] := Getter
 		}
@@ -52,6 +52,8 @@ class KLSessionCloseAuthority {
 		_KL_SessionCloseAuthorityReceipt(this, , , , true)
 	}
 
+	; Static methods still receive implicit this. Bind the class before the
+	; frozen value, then ignore the instance passed by the property getter.
 	static ReadOnly(Value, *) {
 		return Value
 	}
@@ -98,7 +100,7 @@ class KLSessionClosePublication {
 			"CommitFn", _KL_Watchers_CommitClose.Bind(Owner, Kind))
 		Getters := Map()
 		for Name, Value in Values {
-			Getter := KLSessionCloseAuthority.ReadOnly.Bind(Value)
+			Getter := KLSessionCloseAuthority.ReadOnly.Bind(KLSessionCloseAuthority, Value)
 			this.DefineProp(Name, {Get: Getter})
 			Getters[Name] := Getter
 		}

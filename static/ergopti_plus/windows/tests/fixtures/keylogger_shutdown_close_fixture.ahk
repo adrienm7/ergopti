@@ -108,6 +108,24 @@ _KLSCF_Check(Condition, Message) {
 		throw Error(Message)
 }
 
+; Getter bindings must preserve scalar preimages, including the implicit
+; class receiver of a static method and the instance supplied by DefineProp.
+_KLSCF_AuthorityPreimages() {
+	Owner := Map("idle_end", 150, "session_end", 100)
+	Authority := KLSessionCloseAuthority(Owner)
+	_KLSCF_Check(Authority.OwnerIdentity is Integer && Authority.OwnerIdentity = ObjPtr(Owner),
+		"the authority getter must preserve its scalar owner identity")
+	_KLSCF_Check(Authority.IdleDuration is Integer && Authority.IdleDuration = 150
+		&& Authority.SessionDuration is Integer && Authority.SessionDuration = 100,
+		"the authority getters must preserve independently frozen scalar durations")
+	_KLSCF_Check(Authority.SessionGeneration is Integer && Authority.SessionGeneration = KLWatch.session_generation
+		&& Authority.IdleGeneration is Integer && Authority.IdleGeneration = KLWatch.idle_generation,
+		"the authority getters must preserve accepted generation scalars")
+	_KLSCF_Check(Authority.SessionStartedAt is Integer && Authority.SessionStartedAt = KLWatch.session_started_at
+		&& Authority.IdleStartedAt is Integer && Authority.IdleStartedAt = KLWatch.idle_started_at,
+		"the authority getters must preserve accepted origin scalars")
+}
+
 _KLSCF_Seed() {
 	KLWatch.session_close := false
 	KLWatch.session_close_draining := false
@@ -175,7 +193,18 @@ _KLSCF_PreparePublication() {
 	_KLSCF_Check(!_KL_Watchers_CloseSession(200, 300, _KLSCF_Retain),
 		"technical refusal must detach a frozen close owner")
 	KLWatch.session_close_draining := true
-	return KLSessionClosePublication(KLWatch.session_close.CloseAuthority, "idle_end")
+	Publication := KLSessionClosePublication(KLWatch.session_close.CloseAuthority, "idle_end")
+	_KLSCF_Check(Publication.Authority == KLWatch.session_close.CloseAuthority
+		&& Publication.Kind is String && Publication.Kind == "idle_end"
+		&& Publication.Duration is Integer && Publication.Duration = 150,
+		"publication getters must preserve exact authority, kind and scalar duration")
+	_KLSCF_Check(Publication.Timestamp is String && Publication.Timestamp == "2026-10-04 12:00:00.000"
+		&& Publication.LifecycleGeneration is Integer
+		&& Publication.LifecycleGeneration = Keylogger.lifecycle_generation,
+		"publication getters must preserve exact timestamp and lifecycle scalars")
+	_KLSCF_Check(Publication.Entry is Map && HasMethod(Publication.CommitFn, "Call"),
+		"publication getters must preserve the exact entry and trusted callback objects")
+	return Publication
 }
 
 _KLSCF_Mutate(Mode, Publication) {
@@ -326,6 +355,7 @@ _KLSCF_ReceiptRetirement(Mode) {
 ; collide with the same names in the subjects under #Warn All.
 _KLSCF_Main() {
 	try {
+		_KLSCF_AuthorityPreimages()
 		_KLSCF_Chain()
 		_KLSCF_Refusals()
 		for Mode in ["success", "refused", "exception", "superseded"]
