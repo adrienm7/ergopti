@@ -1760,6 +1760,8 @@ The original native callback and original configuration owner demonstrably make 
 
 The native row scanner measures zero new sites; no generated baseline change is needed. Private menu availability checks encounter the sparse profile's absent startup script and remain refusal-only; they are not product/native-startup qualification. This prerequisite does not retire all TODO102 dynamic-menu work or claim hosted native UI/full integration success; those gates remain pending.
 
+Linux’s global and category delay menu callbacks now repaint and return true only after the existing override owner acknowledges publication with exact boolean true. Refused or throwing owners return false and show the existing keyboard-released save-failure notice. Private native-file regressions preserve the original source and RAM on publication refusal or a held-prompt source change, then verify a successful retry and disk reload. The 78 prior category-menu cases remain intact; root full validation and actual GUI/native CI remain pending. This is a bounded acknowledgement prerequisite; broader per-file editor and unknown-data ownership work remains partial.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
   An independent pre-split corpus now freezes all 140 rules, flags, metadata,
   delays, common priority and historical order. The shared editorial catalogue
