@@ -204,11 +204,22 @@ function M.build(ctx, actions)
 				})
 			end,
 		}
-		if latest then
-			check_row.label = update_now_label(latest.tag)
+		if type(latest) == "table" and type(latest.tag) == "string" and latest.tag ~= ""
+			and type(latest.channel) == "string" and latest.channel ~= "" then
+			-- The label is consent to this offer, not to a later mutation of its table.
+			local offered_tag, offered_channel = latest.tag, latest.channel
+			check_row.label = update_now_label(offered_tag)
 			check_row.action = function()
-				Logger.info(LOG, "User triggered one-click update to %s (channel: %s).", latest.tag, latest.channel)
-				UpdateLauncher.request_check(latest.channel)
+				local ok, accepted = pcall(function()
+					if type(owner) ~= "table" or type(owner.get) ~= "function"
+						or type(checks) ~= "table" or type(checks.latest) ~= "function" then return false end
+					local current_channel, current_offer = owner.get(), checks.latest()
+					if current_channel ~= offered_channel or type(current_offer) ~= "table"
+						or current_offer.tag ~= offered_tag or current_offer.channel ~= offered_channel then return false end
+					Logger.info(LOG, "User triggered one-click update to %s (channel: %s).", offered_tag, offered_channel)
+					return UpdateLauncher.request_check(offered_channel) == true
+				end)
+				return ok and accepted == true
 			end
 		end
 		table.insert(menu_items, check_row)

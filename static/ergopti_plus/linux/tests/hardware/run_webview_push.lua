@@ -70,222 +70,288 @@ if not ok_webkit then
 end
 if not ok_webkit or not WebKit then abort("WebKit2GTK is not available to lgi.") end
 
-local Manager = require("ui.webview_manager")
+-- The editor retains the source displayed by initData before it may save. A
+-- fresh test HOME has no user directory to borrow, so provide our own real file.
+local personal_directory = nil
+local PERSONAL_SOURCE = '[meta]\nname = "WebKit fixture"\n[General]\n"probe" = { replacement = "received", flags = "" }\n'
 
--- The daemon state the bridges read. Without it the settings window's payload is
--- an empty shell — correctly, since it has nothing to describe — and the "did the
--- push change the page" assertion would fail for a reason that says nothing about
--- the push. The REAL config module is used, loading the bundled packs, so what
--- the page renders is what a user would see.
-local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
-HotstringsConfig.init(nil, nil, nil)
-HotstringsConfig.load_all()
-Manager.set_daemon_state({ config = HotstringsConfig })
-
-local category_count = 0
-for _ in pairs(HotstringsConfig.get_categories() or {}) do category_count = category_count + 1 end
--- Reported, not asserted. Whether the catalogue loads from this working directory
--- is a separate question from whether a push reaches the page, and making the
--- second depend on the first is what produced a red run that said nothing about
--- either. The page-side spy below answers the push question on its own.
-print(string.format("  info %d hotstring categor(ies) loaded for the settings window",
-	category_count))
-
-
-
-
-
--- =======================================
--- =======================================
--- ======= 1/ Driving the GTK loop =======
--- =======================================
--- =======================================
-
-local Gtk = lgi.require("Gtk", "3.0")
-
---- Runs the GTK main loop until `predicate` is true or the wait runs out.
----
---- Pumped rather than entered: `gtk_main()` would never return, and the page
---- loads asynchronously, so there is no point at which a synchronous call could
---- read the result.
---- @param predicate function
---- @return boolean True when the predicate became true in time.
-local function pump_until(predicate)
-	for _ = 1, WAIT_ATTEMPTS do
-		while Gtk.events_pending() do Gtk.main_iteration_do(false) end
-		if predicate() then return true end
-		os.execute("sleep " .. tostring(WAIT_SECONDS))
-	end
-	while Gtk.events_pending() do Gtk.main_iteration_do(false) end
-	return predicate()
+--- Creates an independently authored source for the real editor opening owner.
+--- @return string directory An exclusively created temporary directory.
+local function prepare_personal_source()
+	local Shell = require("adapters.shell_runner")
+	local Writer = require("toml_codec.writer")
+	local Reader = require("toml_codec.reader")
+	local directory = os.tmpname()
+	assert(os.remove(directory), "the owned temporary placeholder must retire")
+	assert(Shell.run("mkdir " .. Shell.quote(directory)) == true,
+		"the physical Personal fixture directory must be created")
+	personal_directory = directory
+	local file = assert(io.open(directory .. "/personal.toml", "wb"))
+	local written = file:write(PERSONAL_SOURCE)
+	local closed = file:close()
+	assert((written == true or written == file) and closed == true,
+		"the owned Personal source must be written and closed")
+	local content, status = Writer.read_classified(directory .. "/personal.toml")
+	assert(status == "ok" and content == PERSONAL_SOURCE,
+		"the real classifier must read the exact independently authored source")
+	local parsed, committed = Reader.parse_text(content)
+	assert(committed == true and type(parsed) == "table" and parsed.sections.General,
+		"the real Personal projection must admit the displayed source")
+	print("  info owned Personal source: classified=ok parsed=true")
+	return directory
 end
 
---- Evaluates JavaScript in a live webview and returns its result as a string.
----
---- WebKit's evaluation is asynchronous, so the answer comes back through a
---- callback and the loop is pumped until it does. A test that read the result
---- synchronously would read nil every time and pass by asserting nothing.
---- @param webview userdata
---- @param source string
---- @return string|nil
-local function eval_sync(webview, source)
-	local answer, done = nil, false
-	webview:run_javascript(source, nil, function(_object, result)
-		local ok, value = pcall(function()
-			local js_result = webview:run_javascript_finish(result)
-			return js_result:get_js_value():to_string()
+--- Removes only the two fixture paths; unexpected directory contents refuse cleanup.
+--- @return boolean
+local function retire_personal_source()
+	if personal_directory == nil then return true end
+	local Shell = require("adapters.shell_runner")
+	local removed = os.remove(personal_directory .. "/personal.toml")
+	if not removed then return false end
+	local retired = Shell.run("rmdir " .. Shell.quote(personal_directory)) == true
+	if retired then personal_directory = nil end
+	return retired
+end
+
+local Manager
+
+--- Runs the original real-window checks with an owned editor source.
+--- @return integer
+local function run()
+	Manager = require("ui.webview_manager")
+
+	-- The daemon state the bridges read. Without it the settings window's payload is
+	-- an empty shell — correctly, since it has nothing to describe — and the "did the
+	-- push change the page" assertion would fail for a reason that says nothing about
+	-- the push. The REAL config module is used, loading the bundled packs, so what
+	-- the page renders is what a user would see.
+	local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
+	local config_dir = nil
+	if arg and arg[1] == "hotstring_editor" then config_dir = prepare_personal_source() end
+	assert(HotstringsConfig.init(nil, config_dir, nil) == true,
+		"the real hotstrings configuration must initialize")
+	if config_dir then
+		assert(HotstringsConfig.get_config_dir() == config_dir,
+			"the displayed Personal source must belong to the actual configuration owner")
+		print("  info owned Personal opening: config_dir_matches=true")
+	end
+	HotstringsConfig.load_all()
+	Manager.set_daemon_state({ config = HotstringsConfig })
+
+	local category_count = 0
+	for _ in pairs(HotstringsConfig.get_categories() or {}) do category_count = category_count + 1 end
+	-- Reported, not asserted. Whether the catalogue loads from this working directory
+	-- is a separate question from whether a push reaches the page, and making the
+	-- second depend on the first is what produced a red run that said nothing about
+	-- either. The page-side spy below answers the push question on its own.
+	print(string.format("  info %d hotstring categor(ies) loaded for the settings window",
+		category_count))
+
+
+
+
+
+	-- =======================================
+	-- =======================================
+	-- ======= 1/ Driving the GTK loop =======
+	-- =======================================
+	-- =======================================
+
+	local Gtk = lgi.require("Gtk", "3.0")
+
+	--- Runs the GTK main loop until `predicate` is true or the wait runs out.
+	---
+	--- Pumped rather than entered: `gtk_main()` would never return, and the page
+	--- loads asynchronously, so there is no point at which a synchronous call could
+	--- read the result.
+	--- @param predicate function
+	--- @return boolean True when the predicate became true in time.
+	local function pump_until(predicate)
+		for _ = 1, WAIT_ATTEMPTS do
+			while Gtk.events_pending() do Gtk.main_iteration_do(false) end
+			if predicate() then return true end
+			os.execute("sleep " .. tostring(WAIT_SECONDS))
+		end
+		while Gtk.events_pending() do Gtk.main_iteration_do(false) end
+		return predicate()
+	end
+
+	--- Evaluates JavaScript in a live webview and returns its result as a string.
+	---
+	--- WebKit's evaluation is asynchronous, so the answer comes back through a
+	--- callback and the loop is pumped until it does. A test that read the result
+	--- synchronously would read nil every time and pass by asserting nothing.
+	--- @param webview userdata
+	--- @param source string
+	--- @return string|nil
+	local function eval_sync(webview, source)
+		local answer, done = nil, false
+		webview:run_javascript(source, nil, function(_object, result)
+			local ok, value = pcall(function()
+				local js_result = webview:run_javascript_finish(result)
+				return js_result:get_js_value():to_string()
+			end)
+			answer = ok and value or nil
+			done = true
+		end, nil)
+
+		-- Its OWN loop, not pump_until. pump_until takes a predicate, and every
+		-- predicate this harness has calls eval_sync — so routing this through it
+		-- nested one evaluation inside another and let their callbacks interleave.
+		-- The result was an instrument that contradicted itself in the same run:
+		-- window.initData reported undefined, and then the push it supposedly could
+		-- not make plainly changed the page. Neither half could be trusted, which is
+		-- worse than a harness that fails.
+		for _ = 1, WAIT_ATTEMPTS do
+			while Gtk.events_pending() do Gtk.main_iteration_do(false) end
+			if done then return answer end
+			os.execute("sleep " .. tostring(WAIT_SECONDS))
+		end
+		while Gtk.events_pending() do Gtk.main_iteration_do(false) end
+		return answer
+	end
+
+
+
+
+	-- =======================================
+	-- =======================================
+	-- ======= 2/ Each page in turn ==========
+	-- =======================================
+	-- =======================================
+
+	--- Opens one app and checks that its entry point exists and can be driven.
+	--- @param app_name string Directory under _shared/ui/.
+	--- @param bridge string The bridge name the page posts to.
+	--- @param entry string The global function the host pushes into.
+	--- @param probe string JavaScript reading something the push should have changed.
+	local function exercise(app_name, bridge, entry, probe)
+		print(string.format("--- %s ---", app_name))
+
+		local opened = Manager.show(app_name)
+		check(opened == true, app_name .. ": the window opens")
+		if not opened then return end
+
+		local webview = Manager.webview_for(app_name)
+		check(webview ~= nil, app_name .. ": a WebKit view was created for it")
+		if not webview then return end
+
+		-- Waits for the ENTRY POINT, not for readyState.
+		--
+		-- readyState reaching "complete" was the earlier condition and it is not the
+		-- same question: the editor carries 69 KB of inline script against the
+		-- settings window's 24 KB, and a probe that fires the moment the document
+		-- reports complete can still land before the last of it has run. That is
+		-- what made the verdict alternate between the two pages across runs while
+		-- neither page changed.
+		--
+		-- Waiting for what the host actually needs removes the ambiguity: if it never
+		-- appears, that is a real failure and the timeout says so.
+		local ready = pump_until(function()
+			return eval_sync(webview, "typeof window." .. entry) == "function"
 		end)
-		answer = ok and value or nil
-		done = true
-	end, nil)
+		check(ready, string.format(
+			"%s: the page defines window.%s before the host pushes to it", app_name, entry))
+		if not ready then
+			print(string.format("       readyState=%s scripts=%s makeHostBridge=%s",
+				tostring(eval_sync(webview, "document.readyState")),
+				tostring(eval_sync(webview, "String(document.scripts.length)")),
+				tostring(eval_sync(webview, "typeof makeHostBridge"))))
+			return
+		end
 
-	-- Its OWN loop, not pump_until. pump_until takes a predicate, and every
-	-- predicate this harness has calls eval_sync — so routing this through it
-	-- nested one evaluation inside another and let their callbacks interleave.
-	-- The result was an instrument that contradicted itself in the same run:
-	-- window.initData reported undefined, and then the push it supposedly could
-	-- not make plainly changed the page. Neither half could be trusted, which is
-	-- worse than a harness that fails.
-	for _ = 1, WAIT_ATTEMPTS do
-		while Gtk.events_pending() do Gtk.main_iteration_do(false) end
-		if done then return answer end
-		os.execute("sleep " .. tostring(WAIT_SECONDS))
-	end
-	while Gtk.events_pending() do Gtk.main_iteration_do(false) end
-	return answer
-end
+		-- A spy on the page's own entry point, installed BEFORE the push. It answers
+		-- BOTH halves at one instant, which is why it replaced a separate `typeof`
+		-- probe: that probe ran a moment earlier and disagreed with the spy in the
+		-- same run — reporting the entry point undefined while the push it supposedly
+		-- could not make plainly arrived. Two measurements of one fact, taken at
+		-- different times, is how an instrument comes to contradict itself.
+		--
+		-- `__had_entry` is read at the instant the spy wraps it. That is the half no
+		-- unit test can reach: the host guards with `if(window.setData)`, so a page
+		-- that does not define it turns every push into a silent no-op — exactly the
+		-- failure that hid the returned-payload bug, and then the missing-script bug
+		-- behind it.
+		-- Kept deliberately small. A larger version of this script — three more
+		-- assignments, one of them an Array.from over document.scripts — stopped
+		-- running altogether: every value it set read back as undefined while
+		-- `typeof makeHostBridge` still answered "function", so the PAGE was healthy
+		-- and the instrumentation was not. Whatever the cause, the lesson took: the
+		-- probe that reports on the subject must be the least of what runs.
+		eval_sync(webview, string.format([[
+			window.__arrived = null;
+			window.__had_entry = (typeof window.%s === 'function');
+			(function () {
+				var original = window.%s;
+				window.%s = function (payload) {
+					window.__arrived = JSON.stringify(payload || {}).length;
+					return original.apply(this, arguments);
+				};
+			})();
+		]], entry, entry, entry))
 
+		-- Not asserted again here: the wait above already established it, and a second
+		-- reading of one fact taken at a different instant is how this harness came to
+		-- contradict itself once already. It is kept as a sanity value the spy carries.
+		local before = eval_sync(webview, probe)
+		-- The real path: the page's own "ready" message, routed to the bridge exactly
+		-- as the script-message handler routes it, which is what makes the bridge push.
+		Manager.route_message(app_name, bridge, "ready")
+		pump_until(function() return eval_sync(webview, "String(window.__arrived)") ~= "null" end)
 
+		local arrived = eval_sync(webview, "String(window.__arrived)")
+		check(arrived ~= nil and arrived ~= "null" and arrived ~= "undefined", string.format(
+			"%s: the payload ARRIVED in the page — %s was called with %s byte(s)",
+			app_name, entry, tostring(arrived)))
 
-
--- =======================================
--- =======================================
--- ======= 2/ Each page in turn ==========
--- =======================================
--- =======================================
-
---- Opens one app and checks that its entry point exists and can be driven.
---- @param app_name string Directory under _shared/ui/.
---- @param bridge string The bridge name the page posts to.
---- @param entry string The global function the host pushes into.
---- @param probe string JavaScript reading something the push should have changed.
-local function exercise(app_name, bridge, entry, probe)
-	print(string.format("--- %s ---", app_name))
-
-	local opened = Manager.show(app_name)
-	check(opened == true, app_name .. ": the window opens")
-	if not opened then return end
-
-	local webview = Manager.webview_for(app_name)
-	check(webview ~= nil, app_name .. ": a WebKit view was created for it")
-	if not webview then return end
-
-	-- Waits for the ENTRY POINT, not for readyState.
-	--
-	-- readyState reaching "complete" was the earlier condition and it is not the
-	-- same question: the editor carries 69 KB of inline script against the
-	-- settings window's 24 KB, and a probe that fires the moment the document
-	-- reports complete can still land before the last of it has run. That is
-	-- what made the verdict alternate between the two pages across runs while
-	-- neither page changed.
-	--
-	-- Waiting for what the host actually needs removes the ambiguity: if it never
-	-- appears, that is a real failure and the timeout says so.
-	local ready = pump_until(function()
-		return eval_sync(webview, "typeof window." .. entry) == "function"
-	end)
-	check(ready, string.format(
-		"%s: the page defines window.%s before the host pushes to it", app_name, entry))
-	if not ready then
-		print(string.format("       readyState=%s scripts=%s makeHostBridge=%s",
-			tostring(eval_sync(webview, "document.readyState")),
-			tostring(eval_sync(webview, "String(document.scripts.length)")),
-			tostring(eval_sync(webview, "typeof makeHostBridge"))))
-		return
+		local after = eval_sync(webview, probe)
+		if after == before then
+			-- Not a failure on its own: an empty payload renders nothing, correctly.
+			-- Said out loud so a green run is never read as "the page drew something".
+			print(string.format("       note: the DOM did not change (%s) — the payload "
+				.. "arrived but had nothing to draw", tostring(after)))
+		end
 	end
 
-	-- A spy on the page's own entry point, installed BEFORE the push. It answers
-	-- BOTH halves at one instant, which is why it replaced a separate `typeof`
-	-- probe: that probe ran a moment earlier and disagreed with the spy in the
-	-- same run — reporting the entry point undefined while the push it supposedly
-	-- could not make plainly arrived. Two measurements of one fact, taken at
-	-- different times, is how an instrument comes to contradict itself.
+	-- ONE page per invocation, chosen by argument.
 	--
-	-- `__had_entry` is read at the instant the spy wraps it. That is the half no
-	-- unit test can reach: the host guards with `if(window.setData)`, so a page
-	-- that does not define it turns every push into a silent no-op — exactly the
-	-- failure that hid the returned-payload bug, and then the missing-script bug
-	-- behind it.
-	-- Kept deliberately small. A larger version of this script — three more
-	-- assignments, one of them an Array.from over document.scripts — stopped
-	-- running altogether: every value it set read back as undefined while
-	-- `typeof makeHostBridge` still answered "function", so the PAGE was healthy
-	-- and the instrumentation was not. Whatever the cause, the lesson took: the
-	-- probe that reports on the subject must be the least of what runs.
-	eval_sync(webview, string.format([[
-		window.__arrived = null;
-		window.__had_entry = (typeof window.%s === 'function');
-		(function () {
-			var original = window.%s;
-			window.%s = function (payload) {
-				window.__arrived = JSON.stringify(payload || {}).length;
-				return original.apply(this, arguments);
-			};
-		})();
-	]], entry, entry, entry))
+	-- Exercising both in one process made the verdict move between them run to run:
+	-- config failed twice while the editor passed, then the reverse, with nothing
+	-- about the editor changed in between. Two webviews in one GTK loop means
+	-- pumping for one processes the other's events, and a probe can land while the
+	-- other page is still settling — so a per-page verdict could not be trusted even
+	-- when it was green.
+	--
+	-- Separate processes remove the interference rather than time around it. The
+	-- cost is a second interpreter start, which is nothing next to a result that
+	-- alternates.
+	local CASES = {
+		hotstrings_config_window = { bridge = "hotstrings_config_bridge", entry = "setData",
+			probe = "String(document.querySelectorAll('.cat').length)" },
+		hotstring_editor = { bridge = "hsEditor", entry = "initData",
+			probe = "String(document.getElementById('app') && document.getElementById('app').style.display)" },
+	}
 
-	-- Not asserted again here: the wait above already established it, and a second
-	-- reading of one fact taken at a different instant is how this harness came to
-	-- contradict itself once already. It is kept as a sanity value the spy carries.
-	local before = eval_sync(webview, probe)
-	-- The real path: the page's own "ready" message, routed to the bridge exactly
-	-- as the script-message handler routes it, which is what makes the bridge push.
-	Manager.route_message(app_name, bridge, "ready")
-	pump_until(function() return eval_sync(webview, "String(window.__arrived)") ~= "null" end)
-
-	local arrived = eval_sync(webview, "String(window.__arrived)")
-	check(arrived ~= nil and arrived ~= "null" and arrived ~= "undefined", string.format(
-		"%s: the payload ARRIVED in the page — %s was called with %s byte(s)",
-		app_name, entry, tostring(arrived)))
-
-	local after = eval_sync(webview, probe)
-	if after == before then
-		-- Not a failure on its own: an empty payload renders nothing, correctly.
-		-- Said out loud so a green run is never read as "the page drew something".
-		print(string.format("       note: the DOM did not change (%s) — the payload "
-			.. "arrived but had nothing to draw", tostring(after)))
+	local requested = arg and arg[1]
+	local case = requested and CASES[requested]
+	if not case then
+		local names = {}
+		for name in pairs(CASES) do names[#names + 1] = name end
+		table.sort(names)
+		abort("usage: run_webview_push.lua <" .. table.concat(names, "|") .. ">")
 	end
+
+	exercise(requested, case.bridge, case.entry, case.probe)
+
+	print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
+	return _failures == 0 and 0 or 1
 end
 
--- ONE page per invocation, chosen by argument.
---
--- Exercising both in one process made the verdict move between them run to run:
--- config failed twice while the editor passed, then the reverse, with nothing
--- about the editor changed in between. Two webviews in one GTK loop means
--- pumping for one processes the other's events, and a probe can land while the
--- other page is still settling — so a per-page verdict could not be trusted even
--- when it was green.
---
--- Separate processes remove the interference rather than time around it. The
--- cost is a second interpreter start, which is nothing next to a result that
--- alternates.
-local CASES = {
-	hotstrings_config_window = { bridge = "hotstrings_config_bridge", entry = "setData",
-		probe = "String(document.querySelectorAll('.cat').length)" },
-	hotstring_editor = { bridge = "hsEditor", entry = "initData",
-		probe = "String(document.getElementById('app') && document.getElementById('app').style.display)" },
-}
-
-local requested = arg and arg[1]
-local case = requested and CASES[requested]
-if not case then
-	local names = {}
-	for name in pairs(CASES) do names[#names + 1] = name end
-	table.sort(names)
-	abort("usage: run_webview_push.lua <" .. table.concat(names, "|") .. ">")
-end
-
-exercise(requested, case.bridge, case.entry, case.probe)
-
-print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
-os.exit(_failures == 0 and 0 or 1)
+-- Retire the real view and our exact source even when initialization refuses.
+local ran, result = pcall(run)
+local shutdown_ok = true
+if Manager then shutdown_ok = pcall(Manager.shutdown) end
+local retired = retire_personal_source()
+assert(shutdown_ok and retired == true, "the owned WebKit fixture must retire")
+if not ran then error(result, 0) end
+os.exit(result)
