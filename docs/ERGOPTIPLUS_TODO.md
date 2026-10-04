@@ -1266,6 +1266,8 @@ The coloured-preview shared row is registered in the Linux discovery manifest. E
 
 The Windows shared Models Browser provider now checks whether its actual native browser function exists before adopting the default callback. The definitions-only native menu graph can retain a disabled shared command without dereferencing an unavailable WebView owner; an explicitly supplied callable still returns its exact native presentation receipt. Every prior backend/model/menu assertion remains intact, and an additive registered regression exercises the genuinely absent default port rather than installing a stand-in. Source-only BOM/LF and ownership checks pass; hosted AutoHotkey and full selected qualification remain pending. Items54 and81 remain partial.
 
+The fixed disabled “Check for updates” row in source runs now consumes one shared `about_source_menu` command on Windows, macOS and Linux. Its existing caption and source-run reason remain localized in all 21 languages; source rows expose no update action or window, while packaged update/check/install and cadence owners remain unchanged. Independent declaration-label and reason mutations fail against the old Mac/Linux consumers and pass through the actual native-bound shared renderer. Owning menu generation and the native-row census are reproducible; this tranche retires only its measured Mac/Linux row sites (0/−1/−1). Native Windows execution and the complete three-OS validation remain required for this partial TODO54/81 slice.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

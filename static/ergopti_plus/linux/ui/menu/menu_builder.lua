@@ -3935,11 +3935,13 @@ local function _about_update_rows(ctx)
 	local frequency_row = _frequency_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
-	out[#out + 1] = source_run and {
-		label = i18n_safe("menu.about.check_for_updates"),
-		disabled = true,
-		disabled_reason_key = "menu.about.source_run_reason",
-	} or {
+	if source_run then
+		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+			["about_source_check"] = function() return false end,
+		}, { ["about_source_release_ready"] = function() return not source_run end })
+		if source_row then out[#out + 1] = source_row end
+	else
+		out[#out + 1] = {
 		label = up.get_menu_label(),
 		disabled = up.get_state() == "checking" or up.get_state() == "downloading"
 			or up.get_state() == "installing",
@@ -3971,6 +3973,7 @@ local function _about_update_rows(ctx)
 			end)
 		end,
 	}
+	end
 
 	-- Only once there is something to install: a permanently visible
 	-- "download" row that does nothing is indistinguishable from a broken one.

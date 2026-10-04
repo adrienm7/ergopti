@@ -444,3 +444,33 @@ _AMCR_FrequencyPublishedOrder() {
 }
 Test("About menu: frequency provider consumes the published order and alternate translated label",
 	_AMCR_FrequencyPublishedOrder)
+
+
+; The source-only row follows its declaration without gaining an update action.
+_AMCR_SourceCheckSharedCommand() {
+	global _AMCR_PICKER_AT
+	Root := _MR_GetManifestRoot()
+	Assert(Root.Has("about_source_menu"), "the shared source-only check must be declared")
+	Original := Root["about_source_menu"]
+	try {
+		for Labels in [Map("i18n", "menu.about.check_for_updates", "reason", "menu.about.source_run_reason"),
+			Map("i18n", "common.restore_recommended", "reason", "common.clear_to_system")] {
+			Declaration := Original[1].Clone()
+			Declaration["i18n"] := Labels["i18n"]
+			Declaration["disabled_reason_key"] := Labels["reason"]
+			Root["about_source_menu"] := [Declaration]
+			State := { Calls: [] }
+			Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind(State))
+			Row := Rows[_AMCR_PICKER_AT + 1]
+			AssertEqual(t(Labels["i18n"]), Row["label"], "the declared caption owns the source check")
+			AssertEqual(Labels["reason"], Row.Get("disabled_reason_key", ""),
+				"the source-only reason comes from the same shared declaration")
+			AssertEqual(true, Row.Get("disabled", false))
+			AssertFalse(Row.Has("action"), "a source checkout exposes no native update command")
+			AssertFalse(Row.Has("items"), "a source checkout opens no update window")
+			AssertFalse(Row.Has("checked"), "the source check cannot toggle settings")
+			AssertEqual(0, State.Calls.Length, "building a source row cannot mutate its channel")
+		}
+	} finally Root["about_source_menu"] := Original
+}
+Test("About source check: canonical disabled label reason and zero native effects", _AMCR_SourceCheckSharedCommand)

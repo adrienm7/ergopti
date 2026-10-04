@@ -6162,3 +6162,11 @@ type = "command"
 id = "llm_browse_models"
 i18n = "menu.llm.browse_models_entry"
 disabled_when = ["llm_model_browser_ready"]
+
+# A source checkout has no installed release to update; its fixed reason is shared.
+[[menu.about_source_menu]]
+type = "command"
+id = "about_source_check"
+i18n = "menu.about.check_for_updates"
+disabled_when = ["about_source_release_ready"]
+disabled_reason_key = "menu.about.source_run_reason"

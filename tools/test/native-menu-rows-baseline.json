@@ -105,7 +105,7 @@
 		]
 	},
 	"macos": {
-		"count": 162,
+		"count": 161,
 		"sites": [
 			"macos/ui/menu/builder.lua:318 separator",
 			"macos/ui/menu/builder.lua:352 separator",
@@ -118,7 +118,6 @@
 			"macos/ui/menu/canvas_badge.lua:123 separator",
 			"macos/ui/menu/menu_about.lua:181 separator",
 			"macos/ui/menu/menu_about.lua:196 static",
-			"macos/ui/menu/menu_about.lua:225 static",
 			"macos/ui/menu/menu_apps.lua:299 static",
 			"macos/ui/menu/menu_apps.lua:317 static",
 			"macos/ui/menu/menu_gestures.lua:205 static",
@@ -272,7 +271,7 @@
 		]
 	},
 	"linux": {
-		"count": 105,
+		"count": 104,
 		"sites": [
 			"linux/ui/menu/agent_rows.lua:102 separator",
 			"linux/ui/menu/agent_rows.lua:188 separator",
@@ -372,13 +371,12 @@
 			"linux/ui/menu/menu_builder.lua:3811 static",
 			"linux/ui/menu/menu_builder.lua:3857 static",
 			"linux/ui/menu/menu_builder.lua:3921 separator",
-			"linux/ui/menu/menu_builder.lua:3939 static",
-			"linux/ui/menu/menu_builder.lua:4033 static",
-			"linux/ui/menu/menu_builder.lua:4105 static",
-			"linux/ui/menu/menu_builder.lua:4163 static",
-			"linux/ui/menu/menu_builder.lua:4201 static",
-			"linux/ui/menu/menu_builder.lua:4322 separator",
-			"linux/ui/menu/menu_builder.lua:4346 separator"
+			"linux/ui/menu/menu_builder.lua:4036 static",
+			"linux/ui/menu/menu_builder.lua:4108 static",
+			"linux/ui/menu/menu_builder.lua:4166 static",
+			"linux/ui/menu/menu_builder.lua:4204 static",
+			"linux/ui/menu/menu_builder.lua:4325 separator",
+			"linux/ui/menu/menu_builder.lua:4349 separator"
 		]
 	}
 }
