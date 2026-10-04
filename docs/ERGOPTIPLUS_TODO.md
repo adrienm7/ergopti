@@ -1742,6 +1742,13 @@ original source; 225 portable Python tests pass, with one native AppKit test
 skipped on Linux. Live macOS observations and the original AppleEvent admission
 still require an exact-candidate manual CI checkpoint.
 
+The shared Core runner provisioning now reuses the released Group4 workflow
+correction b57a948029: stock Lua5.4 receives lua-luv for the unchanged exact
+native file-admission registry probe. The workflow image matches that owner
+correction byte-for-byte; original registry assertions, native lane selection
+and release policy remain unchanged. Fresh hosted macOS qualification is still
+pending the exclusive CI phase.
+
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
