@@ -127,6 +127,54 @@ end)
 -- =======================================
 -- =======================================
 
+describe("linux-diagnostic-read-admission", function()
+	local Collector = require("infra.diagnostic_snapshot")
+	local FileSystem = require("adapters.file_system")
+	local sha = "123456789" .. string.rep("0", 31)
+	local root = "/native-diagnostic-fixture"
+	for _, case in ipairs({ "stamp", "git", "pid", "facts" }) do
+		it("linux-diagnostic-read-admission: uses native ports for " .. case, function()
+			local original_read, original_exists = FileSystem.read, FileSystem.exists
+			local reads, probes = {}, {}
+			FileSystem.read = function(path)
+				reads[#reads + 1] = path
+				if case == "stamp" and path == root .. "/shared/build_stamp.txt" then return "commit=" .. sha .. "\n" end
+				if case == "git" and path == root .. "/source/.git/HEAD" then return sha .. "\n" end
+				if case == "pid" and path == "/proc/self/stat" then return "6543 (luajit) S 1\n" end
+				if case == "facts" and path == "/etc/os-release" then return 'NAME="Native fixture"\n' end
+				return nil
+			end
+			FileSystem.exists = function(path)
+				probes[#probes + 1] = path
+				return case == "git" and path == root .. "/source/.git/HEAD"
+			end
+			local ok, value, source = pcall(function()
+				if case == "pid" then return Collector.pid() end
+				if case == "facts" then return Collector.system_facts().os_name end
+				return Collector.resolve_commit({ shared_root = root .. "/shared", source_dir = root .. "/source" })
+			end)
+			FileSystem.read, FileSystem.exists = original_read, original_exists
+			assert_true(ok, tostring(value))
+			assert_true(#reads > 0, "the native adapter must own every diagnostic read")
+			if case == "pid" then
+				assert_eq("6543", value)
+				assert_eq("/proc/self/stat", reads[1])
+			elseif case == "facts" then
+				assert_eq("Native fixture", value)
+				assert_eq("/etc/os-release", reads[1])
+			else
+				assert_eq(sha:sub(1, 9), value)
+				assert_eq(case == "stamp" and "build" or "git", source)
+				assert_eq(root .. "/shared/build_stamp.txt", reads[1])
+				if case == "git" then
+					assert_eq(root .. "/source/.git/HEAD", probes[1])
+					assert_eq(root .. "/source/.git/HEAD", reads[2])
+				end
+			end
+		end)
+	end
+end)
+
 describe("Diagnostic snapshot: Linux collector", function()
 	local Collector = require("infra.diagnostic_snapshot")
 	local files = {

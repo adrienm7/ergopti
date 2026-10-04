@@ -456,6 +456,14 @@ jobs:
           ERGOPTI_FILE_READ_TEST_LUA=lua5.4 python3 tests/hardware/run_file_read_special_receipts.py
         timeout-minutes: 1
 
+      - name: Reject special native diagnostic metadata sources
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_diagnostic_source_receipts.py
+          ERGOPTI_DIAGNOSTIC_TEST_LUA=lua5.4 python3 tests/hardware/run_diagnostic_source_receipts.py
+        timeout-minutes: 1
+
       - name: Reject special native build-stamp version sources
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

@@ -958,6 +958,18 @@ These are software implementations; final hardware verification remains below.
   diagnostic reads use their native FileSystem ports by source. Native tests
   for those drivers remain with their owners. No shared parser policy, TOML
   persistence, reserved titles or autostart placement was changed.
+- [~] **L72.** Linux diagnostic metadata reads: use native FileSystem read and
+  existence ports for build stamps, git HEAD/pointers and system probes. The
+  duplicated stdio readers previously blocked on FIFO sources, including the
+  existence check of a FIFO HEAD. Nine of twenty-six real native cases fail
+  before and all pass after per LuaJIT/Lua 5.4 runtime. Fixtures keep file and
+  file-symlink commit controls, missing/directory/UNIX-socket refusal controls,
+  source inodes and bytes, and real /proc PID/kernel/memory and /etc OS probes.
+  Four simulated adapter unit cases check the stamp, git metadata, PID and OS
+  data paths. macOS and Windows already route related diagnostic reads through
+  their native FileSystem ports by source; their native gates remain with the
+  principal agent. Shared commit parsing, reserved TOML persistence, window
+  titles and autostart placement were not modified.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
