@@ -297,6 +297,13 @@ jobs:
           python3 tests/hardware/run_http_tls_redirect_receipts.py
         timeout-minutes: 1
 
+      - name: Refuse shortened native shell commands and stdin scripts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_shell_command_nul_receipts.lua
+        timeout-minutes: 1
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

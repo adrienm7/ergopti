@@ -566,6 +566,19 @@ These are software implementations; final hardware verification remains below.
   owner. Windows curl never enables native follow by source inspection. Neither
   driver's source or native gate was changed. Manual CI and physical input
   remain unexecuted; Linux uses real TLS, curl, libuv, sockets and private files.
+- [~] **L44.** Linux synchronous shell C-string refusal: libc system/popen
+  previously executed a shorter command when its composed script contained NUL.
+  Apply the existing common execve argv validator to the implicit sh -c vector
+  before execution or a test dispatcher. run, exec, exec_line, checked capture
+  and both textual stdin facades now refuse without replacing retained native
+  files. Unicode/newline commands and binary stdout remain valid; binary stdin
+  requires an explicit byte-safe transport such as the existing crypto Base64
+  path. The asynchronous argv path already refuses NUL. Native and portable
+  regressions cover shortened side effects, textual heredocs, exact return
+  shapes and bounded checked diagnostics. macOS forwards synchronous commands
+  to Hammerspoon without a source NUL fence; its actual native bridge remains
+  unvalidated and reserved. Windows uses AHK UTF-16 strings rather than Lua
+  binary strings. No native cross-OS check, manual CI or physical input ran.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -20,6 +20,43 @@
 local helpers = require("tests.helpers")
 local sh      = helpers.load_module("adapters.shell_runner")
 
+helpers.describe("linux-shell-command-nul", function()
+	for _, method in ipairs({ "run", "exec", "exec_line", "exec_stdin", "exec_exact_stdin", "exec_checked" }) do
+		for index, command in ipairs({ "printf literal\0private-suffix", "printf literal\0", "\0printf literal" }) do
+			helpers.it("linux-shell-command-nul: " .. method .. " refuses byte position " .. index .. " before dispatch", function()
+				local calls = 0
+				local shell = helpers.load_module("adapters.shell_runner")
+				shell._set_runner(function() calls = calls + 1; return "Shortened prefix stdout" end)
+				local value, output, reason
+				if method == "exec_stdin" or method == "exec_exact_stdin" then value = shell[method](command, "valid stdin")
+				else value, output, reason = shell[method](command) end
+				shell._reset_runner()
+				helpers.assert_eq(calls, 0, "invalid native bytes must not reach even a simulated dispatcher")
+				if method == "run" or method == "exec_checked" then helpers.assert_eq(value, false)
+				elseif method == "exec_line" then helpers.assert_nil(value)
+				else helpers.assert_eq(value, "") end
+				if method == "exec_checked" then
+					helpers.assert_eq(output, "")
+					helpers.assert_true(type(reason) == "string" and #reason < 200)
+					helpers.assert_contains(reason, "NUL")
+					helpers.assert_nil(reason:find("private-suffix", 1, true))
+				end
+			end)
+		end
+	end
+	for _, method in ipairs({ "exec_stdin", "exec_exact_stdin" }) do
+		helpers.it("linux-shell-command-nul: " .. method .. " refuses a NUL-bearing textual stdin before dispatch", function()
+			local calls = 0
+			local shell = helpers.load_module("adapters.shell_runner")
+			shell._set_runner(function() calls = calls + 1; return "Truncated prefix" end)
+			local value = shell[method]("cat", "prefix\0private-suffix")
+			shell._reset_runner()
+			helpers.assert_eq(value, "")
+			helpers.assert_eq(calls, 0)
+		end)
+	end
+end)
+
 helpers.describe("linux-shell-private-error-receipts", function()
 	for _, failure in ipairs({ "errno7", "errno24", "no errno", "open raised", "read raised", "close raised" }) do
 		helpers.it("linux-shell-private-error-receipts: " .. failure .. " cannot echo command arguments", function()
