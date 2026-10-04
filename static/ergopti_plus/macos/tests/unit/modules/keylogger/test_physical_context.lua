@@ -76,3 +76,94 @@ helpers.describe("physical context (hs274)", function()
 		rejects(function() context.observe(20, { allowed = false }) end, "retired")
 	end)
 end)
+
+helpers.describe("physical hold interval authority (wp3)", function()
+	helpers.it("cancels a complete hold across forbidden observations despite allowed endpoints", function()
+		local context = Context.new(4, tostring)
+		context.observe(100, { allowed = true, app = "Original", epoch = 1000 })
+		context.observe(200, { allowed = false })
+		context.observe(300, { allowed = true, app = "Resumed", epoch = 2000 })
+		helpers.assert_eq(context.resolve(150).allowed, true)
+		helpers.assert_eq(context.resolve(350).allowed, true)
+		helpers.assert_eq(context.resolve_interval(150, 350), { allowed = false })
+	end)
+
+	helpers.it("includes both endpoints and never infers a boundary before its observation", function()
+		local context = Context.new(3, tostring)
+		context.observe(100, { allowed = true, app = "Public", epoch = 1000 })
+		context.observe(200, { allowed = false })
+		context.observe(300, { allowed = true, app = "Resumed", epoch = 1001 })
+		helpers.assert_eq(context.resolve_interval(150, 199).allowed, true)
+		helpers.assert_eq(context.resolve_interval(150, 200), { allowed = false })
+		helpers.assert_eq(context.resolve_interval(200, 350), { allowed = false })
+		helpers.assert_eq(context.resolve_interval(200, 200), { allowed = false })
+		helpers.assert_eq(context.resolve_interval(300, 300).app, "Resumed")
+		helpers.assert_eq(context.resolve_interval(300, 350).allowed, true)
+	end)
+
+	helpers.it("copies initial press attribution across permitted app and date changes", function()
+		local context = Context.new(3, function(epoch)
+			if epoch < 2000 then return "2026-10-04 23:59:59.500" end
+			return "2026-10-05 00:00:00.500"
+		end)
+		local press = { allowed = true, app = "Original", epoch = 1000 }
+		context.observe(100, press)
+		press.app, press.epoch = "Mutated", 9000
+		context.observe(200, { allowed = true, app = "Current", epoch = 2000 })
+		local expected = { allowed = true, app = "Original", timestamp = "2026-10-04 23:59:59.500" }
+		local interval = context.resolve_interval(150, 250)
+		helpers.assert_eq(interval, expected)
+		helpers.assert_eq(context.resolve(250), {
+			allowed = true, app = "Current", timestamp = "2026-10-05 00:00:00.500" })
+		interval.app, interval.timestamp = "Replaced", "changed"
+		helpers.assert_eq(context.resolve_interval(150, 250), expected)
+	end)
+
+	helpers.it("refuses missing, early, reversed and noninteger interval authority", function()
+		local context = Context.new(1, tostring)
+		rejects(function() context.resolve_interval(0, 1) end, "predates retained context")
+		context.observe(10, { allowed = true, app = "Public", epoch = 1 })
+		rejects(function() context.resolve_interval(9, 20) end, "predates retained context")
+		rejects(function() context.resolve_interval(20, 10) end, "reversed")
+		for _, bounds in ipairs({ { -1, 10 }, { 10, -1 }, { 10.5, 20 }, { 10, 20.5 }, { "10", 20 } }) do
+			rejects(function() context.resolve_interval(bounds[1], bounds[2]) end, "Invalid physical context timestamp")
+		end
+	end)
+
+	helpers.it("revokes interval authority on exhausted history or explicit stop", function()
+		local context = Context.new(1, tostring)
+		context.observe(10, { allowed = true, app = "Public", epoch = 1 })
+		rejects(function() context.observe(20, { allowed = false }) end, "history exhausted")
+		rejects(function() context.resolve_interval(10, 20) end, "retired")
+		context = Context.new(1, tostring)
+		context.observe(10, { allowed = true, app = "Public", epoch = 1 })
+		context.stop()
+		rejects(function() context.resolve_interval(10, 20) end, "retired")
+	end)
+
+	helpers.it("refuses interval publication when formatting changes retained history", function()
+		local context
+		context = Context.new(2, function()
+			context.observe(20, { allowed = false })
+			return "formatted"
+		end)
+		context.observe(10, { allowed = true, app = "Public", epoch = 1 })
+		rejects(function() context.resolve_interval(10, 30) end, "history changed during formatting")
+		helpers.assert_eq(context.resolve_interval(10, 30), { allowed = false })
+	end)
+
+	helpers.it("fences stop and interval reentry even when the formatter catches the refusal", function()
+		local context
+		context = Context.new(1, function() context.stop(); return "formatted" end)
+		context.observe(10, { allowed = true, app = "Public", epoch = 1 })
+		rejects(function() context.resolve_interval(10, 20) end, "revoked during formatting")
+		context = Context.new(1, function()
+			local ok = pcall(function() context.resolve_interval(10, 20) end)
+			helpers.assert_eq(ok, false)
+			return "formatted"
+		end)
+		context.observe(10, { allowed = true, app = "Public", epoch = 1 })
+		rejects(function() context.resolve_interval(10, 20) end, "revoked during formatting")
+		rejects(function() context.resolve_interval(10, 20) end, "retired")
+	end)
+end)

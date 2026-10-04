@@ -119,6 +119,14 @@ expectations without crediting another press. Original sink and aggregate
 preimages fail; a disabled path-confinement guard fails its independent control.
 This prerequisite does not implement matched delivery or activate the runtime.
 
+The retained interval prerequisite passes all 11 focused context cases; its
+preimage passes the original four and fails the seven new cases. Any forbidden
+observation between inclusive original HID endpoints cancels the whole duration.
+Allowed app changes preserve original press attribution. Formatter-time history
+mutation, stop and caught recursive interval lookup cannot publish a result.
+Source-gap revocation remains the capture owner's responsibility. Independent
+source review found no blocking findings; production history wiring stays open.
+
 TODO13/35 closure reuses inspected native receipts:
 
 - Run37081066757 at `c47624171d2594785f1590a7f0fd7a6e460810fa` passed actual

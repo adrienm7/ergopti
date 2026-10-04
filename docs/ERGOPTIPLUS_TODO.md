@@ -1601,6 +1601,16 @@ preimages fail. This is an adapted macOS API proof, not native Hammerspoon or
 matched physical delivery. TODO31 remains partial and default startup stays
 unchanged.
 
+WP3 retained interval lookup now rejects every hold containing a forbidden
+observation, including either endpoint, and preserves the initial press's
+application/date across allowed focus changes. Formatting-time history mutation,
+stop and recursive interval lookup cannot publish a result. Seven new causal
+preimage cases fail; all eleven focused context cases pass. The frozen source
+composition passes 356 JS checks, 13,933 portable macOS units, 101 macOS E2E
+checks with one explicit skip, 6,489 Linux units and 188 Linux E2E checks.
+Production privacy subscriptions, capture-gap revocation and matched delivery
+remain outstanding; this does not activate the runtime or complete TODO31.
+
 The dormant startup now runs the real `--hs274-clock` command after pinned
 identity verification. It transfers a validated copied timebase and immutable
 tick converter to an explicitly injected context owner only after successful
