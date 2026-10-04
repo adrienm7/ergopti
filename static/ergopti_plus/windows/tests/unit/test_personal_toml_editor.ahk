@@ -751,3 +751,187 @@ TestPE_WebViewCarriesStrictCase() {
 }
 Test("Personal editor WebView: strict-case state reaches initData",
 	TestPE_WebViewCarriesStrictCase)
+
+#Include ../support/webview_script_fixture.ahk
+
+_PT102_NativeSaveRefusesForeign(Context) {
+	global _PersonalEditorData
+	_PersonalEditorData := _PTIOCR_Model("candidate")
+	LV := Context.window.AddListView("w200 r2", ["Trigger", "Output", "Word", "Auto", "Case", "Final", "Priority"])
+	Status := Context.window.AddText("w200", "unchanged")
+	AssertTrue(FSWriteDurable(Context.path, Context.foreign))
+	Result := _SaveData(Context.window, LV, Status)
+	AssertFalse(Result, "the real native save caller must refuse the older opening model")
+	AssertEqual(Context.foreign, FSReadUtf8Exact(Context.path))
+	AssertEqual(t("editor.hotstrings.err_write"), Status.Value)
+	AssertEqual("candidate-alpha", _PersonalEditorData["sections"]["alpha"]["entries"][1]["output"],
+		"refusal must keep the user's unsaved native form model")
+	_PTIOP_AssertLeaseFree(Context.path, "native caller refusal retires the same durable owner")
+}
+Test("personal-opening-source: real native save keeps independently replaced source",
+	_PT102_WithCase.Bind("native-click", _PT102_NativeSaveRefusesForeign))
+
+_PT102_ClosedCompletion(Context) {
+	global PERSONAL_TOML_COMMIT_OK
+	global _PersonalEditorSessionEpoch, _PersonalEditorGui, _PersonalEditorOpeningSource
+	Status := Context.window.AddText("w200", "not-saved")
+	LV := Context.window.AddListView("w200 r2", ["Trigger", "Output", "Word", "Auto", "Case", "Final", "Priority"])
+	Calls := []
+	OldSource := Context.source
+	if _OnEditorClose.MaxParams >= 2
+		_OnEditorClose(Context.window, OldSource["epoch"])
+	else
+		_OnEditorClose()
+	Replacement := Gui()
+	try {
+		_PersonalEditorGui := Replacement
+		_PersonalEditorSessionEpoch += 1
+		_PersonalEditorOpeningSource := Map("admitted", true, "path", Context.path,
+			"present", true, "content", FSReadUtf8Exact(Context.path), "kind", "native",
+			"window", Replacement, "epoch", _PersonalEditorSessionEpoch)
+		Args := [LV, Status, _PTIOCR_Model("completed"), "alpha", (*) => Calls.Push(true)]
+		if _PersonalEditorDeferredSaveCompleted.MaxParams >= 7
+			Args.Push(OldSource)
+		Args.Push(PERSONAL_TOML_COMMIT_OK)
+		_PersonalEditorDeferredSaveCompleted(Args*)
+		AssertEqual("not-saved", Status.Value, "an old completion cannot mark a replacement session saved")
+		AssertEqual(0, Calls.Length, "old completion cannot clear or close the replacement form")
+	} finally {
+		Replacement.Destroy()
+	}
+}
+Test("personal-opening-source: closed native session cannot publish deferred UI success",
+	_PT102_WithCase.Bind("closed-completion", _PT102_ClosedCompletion))
+
+_PT102_BOMAndEmpty(Context) {
+	global _PersonalEditorOpeningSource
+	Raw := Chr(0xFEFF) . FSReadUtf8Exact(Context.path)
+	AssertTrue(FSWriteDurable(Context.path, Raw))
+	Source := Map()
+	Data := _PT102_CaptureOpening(Source)
+	AssertEqual(Raw, Source["content"], "opening receipt retains BOM and CRLF byte intent")
+	AssertEqual("seed-alpha", Data["sections"]["alpha"]["entries"][1]["output"])
+	AssertTrue(FSWriteDurable(Context.path, ""))
+	Empty := Map()
+	EmptyData := _PT102_CaptureOpening(Empty)
+	AssertTrue(Empty["admitted"])
+	AssertTrue(Empty["present"], "present zero-length file is not absent")
+	AssertEqual("", Empty["content"])
+	AssertEqual(0, EmptyData["sections_order"].Length)
+}
+Test("personal-opening-source: same image keeps BOM, CRLF, and present empty classification",
+	_PT102_WithCase.Bind("bom-empty", _PT102_BOMAndEmpty))
+
+_PT102_PathChange(Context) {
+	global ScriptInformation, PERSONAL_TOML_COMMIT_FAILED
+	OtherPath := Context.path . ".other"
+	Original := FSReadUtf8Exact(Context.path)
+	AssertTrue(FSWriteDurable(OtherPath, Original))
+	try {
+		ScriptInformation["PersonalTomlPath"] := OtherPath
+		Result := _PT102_Commit(Context, _PTIOCR_Model("wrong-path"))
+		AssertEqual(PERSONAL_TOML_COMMIT_FAILED, Result,
+			"equal content at a different personal path does not transfer consent")
+		AssertEqual(Original, FSReadUtf8Exact(Context.path))
+		AssertEqual(Original, FSReadUtf8Exact(OtherPath))
+		AssertEqual(0, Context.stages)
+		AssertEqual(0, Context.reloads)
+	} finally {
+		ScriptInformation["PersonalTomlPath"] := Context.path
+		FileDelete(OtherPath)
+	}
+}
+Test("personal-opening-source: consent cannot transfer to an equal-content different path",
+	_PT102_WithCase.Bind("different-path", _PT102_PathChange))
+
+_PT102_ReadRefusal(Context) {
+	global _ReadPersonalTomlCache, _PersonalEditorOpeningSource, _TomlUnreadableFiles
+	global PERSONAL_TOML_COMMIT_FAILED
+	Original := FSReadUtf8Exact(Context.path)
+	Handle := DllCall("Kernel32\CreateFileW", "Str", Context.path, "UInt", 0x80000000,
+		"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+	Assert(Handle != -1 && Handle != 0, "the actual native exclusive read handle must be acquired")
+	Context.lock_handle := Handle
+	Context.handle_owner[Context.path] := Handle
+	Source := Map()
+	try {
+		; The public reader must classify a true ERROR_SHARING_VIOLATION; this is
+		; neither a fake empty-file success nor a modeled lower-level return.
+		if ReadPersonalToml.MaxParams >= 2
+			Data := ReadPersonalToml(false, Source)
+		else {
+			Data := ReadPersonalToml(true)
+			Source := Map("admitted", false)
+		}
+	} finally {
+		Closed := DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
+		if Closed {
+			Context.lock_handle := 0
+			Context.handle_owner.Delete(Context.path)
+		}
+	}
+	AssertTrue(Closed)
+	AssertFalse(Source["admitted"])
+	AssertEqual(0, Data["sections_order"].Length)
+	Source["kind"] := "native"
+	Source["path"] := Context.path
+	Source["window"] := Context.window
+	Source["epoch"] := Context.source["epoch"]
+	Context.source := Source
+	_PersonalEditorOpeningSource := Source
+	_ReadPersonalTomlCache := false
+	Recovered := ReadPersonalToml(true)
+	AssertEqual("seed-alpha", Recovered["sections"]["alpha"]["entries"][1]["output"])
+	AssertFalse(_TomlUnreadableFiles.Has(Context.path), "ordinary fresh recovery clears the existing latch")
+	Result := _PT102_Commit(Context, _PTIOCR_Model("empty-view"))
+	AssertEqual(PERSONAL_TOML_COMMIT_FAILED, Result,
+		"recovered disk readability cannot authorize an older empty error view")
+	AssertEqual(Original, FSReadUtf8Exact(Context.path))
+	AssertEqual(0, Context.stages)
+}
+Test("personal-opening-source: real read refusal remains unowned after ordinary cache recovery",
+	_PT102_WithCase.Bind("native-read-refusal", _PT102_ReadRefusal))
+
+_PT102_WebInitNativeOutcome(Context, View, Lines, Unhandled, Failure) {
+	global _HsEdWeb_Gui, _HsEdWeb_SessionEpoch, _HsEdWeb_OpeningSource, _HsEdWeb_WebView
+	HadView := IsSet(_HsEdWeb_WebView)
+	if HadView
+		OldView := _HsEdWeb_WebView
+	try {
+		_HsEdWeb_Gui := Context.window
+		_HsEdWeb_SessionEpoch += 1
+		_HsEdWeb_WebView := View
+		_HsEdWeb_OpeningSource := false
+		_HsEdWeb_PushInitData()
+		Source := _HsEdWeb_OpeningSource
+		AssertEqual(1, View.Scripts.Length)
+		AssertTrue(InStr(View.Scripts[1], "seed-alpha") > 0)
+		AssertTrue(Source is Map, "init payload must capture an actual fresh image")
+		AssertFalse(Source["ready"], "submission is not native script completion")
+		if Context.mode == "web-reject"
+			View.Reject.Call(Failure)
+		else
+			View.Resolve.Call("null")
+		_WVSO_Drain(View)
+		AssertEqual(0, Unhandled.Length)
+		AssertEqual(Context.mode != "web-reject", Source["ready"])
+		AssertEqual(FSReadUtf8Exact(Context.path), Source["content"])
+		_HsEdWeb_SessionEpoch += 1
+		if PersonalTomlCommitAndReload.MaxParams >= 10
+			_HsEdWeb_InitSourceSettled(Source, true)
+		AssertFalse(_PersonalTomlOpeningSessionCurrent(Source),
+			"a late native completion cannot revive an old Web epoch")
+	} finally {
+		if HadView
+			_HsEdWeb_WebView := OldView
+		else
+			_HsEdWeb_WebView := unset
+	}
+}
+_PT102_WebInitCase(Context) {
+	_WVSO_WithFixture(_PT102_WebInitNativeOutcome.Bind(Context))
+}
+for Mode in ["web-resolve", "web-reject"]
+	Test("personal-opening-source: actual Web init Promise " . Mode . " cannot bypass session consent",
+		_PT102_WithCase.Bind(Mode, _PT102_WebInitCase))
+
