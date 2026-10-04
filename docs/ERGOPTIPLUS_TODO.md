@@ -1063,6 +1063,18 @@ These are software implementations; final hardware verification remains below.
   single completion. Windows uses its native response budget/file path and
   macOS its native HTTP callback rather than this Linux trailer allowance;
   their runtime suites remain deferred. Existing shared size policy is retained.
+- [~] **L79.** Linux HTTP refusal completeness: publish error-body bytes only
+  after curl proves a completed transfer, including its ordinary exit 22 for
+  fail-with-body. Keep the actual HTTP status while omitting partial transfer
+  prefixes; a syntactically valid missing-model JSON prefix previously offered
+  a model download after a truncated 404. Twenty-one of 262 actual local
+  curl/libuv checks fail before and all pass after, including GET, POST,
+  download, streaming POST and owned GET. All 15 incoming dev owned-request
+  settlement/cancellation/retry checks remain intact. Four registered unit
+  cases add simulated exit 18/23/56 and signal controls without weakening
+  existing assertions. Windows publishes curl response bytes only after exit
+  zero; macOS suppresses body bytes on negative native network status by source.
+  Their native runtime suites remain deferred. Shared model policy is unchanged.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

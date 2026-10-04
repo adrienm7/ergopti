@@ -944,6 +944,43 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		end
 	end)
 
+	for _, method in ipairs({ "get", "post", "download", "postStream" }) do
+		helpers.it("incomplete-error-body: " .. method .. " publishes only complete HTTP rejection bytes", function()
+			local policy = require("llm.local_model_policy")
+			local url = "http://127.0.0.1:11434/api/chat"
+			local body = require("json").encode({ error = 'model "fixture:latest" not found' })
+			for _, status in ipairs({ 401, 404, 503 }) do
+				for _, exit in ipairs({ { code = 0 }, { code = 22 }, { code = 18 },
+					{ code = 23 }, { code = 56 }, { code = 0, signal = 15 } }) do
+					local client, state = fresh_client()
+					local result, callbacks = nil, 0
+					local function done(value) result, callbacks = value, callbacks + 1 end
+					local marker = "\nERGOPTI_HTTP_STATUS:" .. status .. "\n"
+					if method == "get" then client.get(url, {}, {}, done)
+					elseif method == "post" then client.post(url, {}, "{}", done)
+					elseif method == "download" then client.download(url, {}, "/tmp/owned-download", {}, done)
+					else client.postStream(url, {}, "{}", {}, function() end, done) end
+					if method == "postStream" then state.stdout(body); state.stderr(marker)
+					else state.stdout(body .. marker) end
+					state.stdout(nil); state.stderr(nil); state.exit(exit.code, exit.signal)
+					local completed = not exit.signal and (exit.code == 0 or exit.code == 22)
+					helpers.assert_eq(result.ok, false)
+					helpers.assert_eq(result.status, status, "the HTTP status survives a transfer failure")
+					helpers.assert_eq(result.error, "HTTP " .. status)
+					helpers.assert_eq(result.body, "")
+					helpers.assert_eq(result.error_body, completed and body or nil)
+					local failure = policy.response_failure(result, "http://127.0.0.1:11434")
+					helpers.assert_eq(policy.is_missing(failure), completed and status == 404 or false,
+						"an incomplete transfer cannot authorize a missing-model offer")
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_true(not client.isActive())
+					state.exit(exit.code, exit.signal)
+					helpers.assert_eq(callbacks, 1, "late native exits cannot republish the refusal")
+				end
+			end
+		end)
+	end
+
 	helpers.it("omits oversized error bodies and retains status after diagnostics exhaust their budget", function()
 		local client, state = fresh_client()
 		local result, bytes = nil, 0
