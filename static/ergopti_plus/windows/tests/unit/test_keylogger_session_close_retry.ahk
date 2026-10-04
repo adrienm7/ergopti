@@ -843,7 +843,8 @@ _KLSCR_ShutdownCloseNativeChain() {
 		}
 		AssertTrue(IsObject(Receipt), "the native close fixture must complete within its owned deadline")
 		AssertEqual(0, Receipt[1], Receipt[2] . Receipt[3])
-		AssertEqual("frozen-close-chain: passed`n", Receipt[2], "the complete native receipt must match")
+		; The real ShellRunner callback removes terminal CR/LF from its capture.
+		AssertEqual("frozen-close-chain: passed", Receipt[2], "the complete native receipt must match")
 		AssertEqual("", Receipt[3], "the native close fixture must emit no errors or warnings")
 	} finally {
 		if IsObject(Handle)
