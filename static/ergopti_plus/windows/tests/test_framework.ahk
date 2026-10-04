@@ -618,12 +618,12 @@ global TEST_RESULTS_CANONICAL := EnvGet("ERGOPTI_AHK_RESULTS_FILE") != ""
 	: A_Temp . "\ergopti_test_results.txt"
 global TEST_RESULTS_FILE := TEST_RESULTS_CANONICAL
 
-; Append one TAP line. FileAppend per line avoids a suite-wide exclusive handle
-; that blocked when two AutoHotkey.exe instances targeted the same path.
+; Persist each observation before optional console output. A refused disk write
+; must stop the runner instead of publishing a successful but incomplete receipt.
 _TestPrint(Line) {
 	global TEST_RESULTS_FILE
+	FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 	try FileAppend(Line . "`r`n", "*")
-	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 }
 
 ; Execute every registered test, print TAP-style results and exit with
