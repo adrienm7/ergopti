@@ -118,6 +118,72 @@ local function fresh_digest(config)
 end
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
+		for index, byte in ipairs({ "\r", "\n", "\r\n", "\0" }) do
+			for _, field in ipairs({ "name", "value" }) do
+				helpers.it("linux-http-header-boundary: " .. method .. " refuses " .. field .. " control " .. index, function()
+					local client, state = fresh_client()
+					local headers = field == "name" and { ["X-Native" .. byte .. "X-Injected"] = "synthetic" }
+						or { ["X-Native"] = "original" .. byte .. "X-Injected: synthetic" }
+					local result, callbacks, chunks = nil, 0, 0
+					local function complete(value) result = value; callbacks = callbacks + 1 end
+					local dispatched
+					if method == "get" then dispatched = client.get("https://example.invalid", headers, {}, complete)
+					elseif method == "post" then dispatched = client.post("https://example.invalid", headers, "{}", complete)
+					elseif method == "download" then dispatched = client.download("https://example.invalid", headers, "/tmp/unit-header", {}, complete)
+					else dispatched = client.postStream("https://example.invalid", headers, "{}", {}, function() chunks = chunks + 1 end, complete) end
+					helpers.assert_eq(dispatched, false)
+					helpers.assert_true(result and result.ok == false and result.status == 0 and type(result.error) == "string")
+					helpers.assert_nil(result.error:find("synthetic", 1, true))
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_eq(#state.handles, 0)
+					helpers.assert_eq(#state.requests, 0)
+					helpers.assert_eq(#state.kills, 0)
+					helpers.assert_eq(chunks, 0)
+					helpers.assert_eq(client.isActive(), false)
+				end)
+			end
+		end
+	end
+
+	for index, policy in ipairs({ {}, { forbidden_bytes = {} }, { forbidden_bytes = "0,10,13" },
+		{ forbidden_bytes = { 0, "10", 13 } }, { forbidden_bytes = { 0, 10, 10 } },
+		{ forbidden_bytes = { 0, 256 } }, { forbidden_bytes = { [0] = 13, [1] = 0 } },
+		{ forbidden_bytes = { 0, 10.5, 13 } } }) do
+		helpers.it("linux-http-header-policy: rejects malformed inventory " .. index, function()
+			local previous_json, previous_binding = package.loaded["json"], package.loaded["infra.http_header_policy"]
+			package.loaded["json"] = { decode = function() return policy end }
+			package.loaded["infra.http_header_policy"] = nil
+			local ok, binding = pcall(require, "infra.http_header_policy")
+			package.loaded["json"], package.loaded["infra.http_header_policy"] = previous_json, previous_binding
+			helpers.assert_true(ok and type(binding) == "table" and type(binding.validate) == "function", tostring(binding))
+			local allowed, err = binding.validate("X-Native", "literal")
+			helpers.assert_nil(allowed)
+			helpers.assert_eq(err, "HTTP header policy is invalid")
+		end)
+	end
+	helpers.it("linux-http-header-policy: unavailable policy cannot retire a valid owner", function()
+		local previous_paths, previous_binding = package.loaded["infra.paths"], package.loaded["infra.http_header_policy"]
+		package.loaded["infra.paths"] = { shared = function() return "/nonexistent-ergopti-header-policy/policy.json" end }
+		package.loaded["infra.http_header_policy"] = nil
+		local ok, binding = pcall(require, "infra.http_header_policy")
+		package.loaded["infra.paths"] = previous_paths
+		helpers.assert_true(ok and type(binding) == "table" and type(binding.validate) == "function", tostring(binding))
+		local client, state = fresh_client()
+		package.loaded["infra.http_header_policy"] = previous_binding
+		local good, bad = nil, nil
+		helpers.assert_true(client.get("https://example.invalid/held", {}, { owner = "kept" }, function(value) good = value end))
+		local handles = #state.handles
+		helpers.assert_eq(client.get("https://example.invalid", { ["X-Native"] = "literal" }, { owner = "kept" }, function(value) bad = value end), false)
+		helpers.assert_true(bad and bad.ok == false and bad.status == 0)
+		helpers.assert_eq(#state.handles, handles)
+		helpers.assert_eq(#state.requests, 1)
+		helpers.assert_eq(#state.kills, 0)
+		helpers.assert_true(client.isActive("kept"))
+		state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_true(good and good.ok and good.body == "abc")
+	end)
+
 	local invalid_preflight = {
 		{ name = "NUL compare path", options = { etag_compare = "/owned/etag\0private-suffix" } },
 		{ name = "NUL save path", options = { etag_save = "/owned/etag\0private-suffix" } },

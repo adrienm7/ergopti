@@ -124,12 +124,14 @@ check("literal URL percent escape remains an actual distinct endpoint", function
 	assert(last_path == "/native%00literal", "representable URI text was rejected or decoded before dispatch")
 end)
 
-check("native curl already refuses unrepresentable config header and body bytes", function()
+check("header preflight and native curl refuse unrepresentable config bytes", function()
 	for _, field in ipairs({ "header", "body" }) do
 		local result, before = nil, requests
 		local function complete(value) result = value end
 		local options = { timeout_ms = 1000, owner = owner }
-		if field == "header" then assert(HTTP.get(url, { ["X-Native"] = "prefix\0suffix" }, options, complete))
+		if field == "header" then
+			assert(HTTP.get(url, { ["X-Native"] = "prefix\0suffix" }, options, complete) == false)
+			assert(result and not HTTP.isActive(owner), "header refusal must precede native allocation")
 		else assert(HTTP.post(url, {}, "a\0retained bytes", complete, options)) end
 		wait_for(function() return result ~= nil end)
 		assert(result.ok == false and result.status == 0 and type(result.error) == "string")

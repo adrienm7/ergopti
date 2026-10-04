@@ -266,7 +266,28 @@ if (
 
 // ==================================================
 // ==================================================
-// ======= 5/ Summary ===============================
+// ======= 5/ HTTP Header Byte Boundary =============
+// ==================================================
+// ==================================================
+
+// The byte inventory belongs to the common HTTP contract. Header config
+// escaping alone cannot protect the wire boundary after native decoding.
+const headerPolicy = JSON.parse(fs.readFileSync(shared('data/http/header_policy.json'), 'utf8'));
+const forbiddenHeaderBytes = headerPolicy.forbidden_bytes;
+if (
+	Array.isArray(forbiddenHeaderBytes) &&
+	forbiddenHeaderBytes.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255) &&
+	new Set(forbiddenHeaderBytes).size === forbiddenHeaderBytes.length &&
+	JSON.stringify([...forbiddenHeaderBytes].sort((a, b) => a - b)) === '[0,10,13]'
+) {
+	pass('HTTP header policy refuses NUL, LF and CR without rejecting legal tabs');
+} else {
+	fail('HTTP header policy refuses NUL, LF and CR without rejecting legal tabs');
+}
+
+// ==================================================
+// ==================================================
+// ======= 6/ Summary ===============================
 // ==================================================
 // ==================================================
 

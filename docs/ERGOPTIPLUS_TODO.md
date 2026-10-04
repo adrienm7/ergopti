@@ -593,6 +593,19 @@ These are software implementations; final hardware verification remains below.
   validation, both source concerns reserved for their native owner. Windows's
   async curl class is a separate path. No cross-driver source, native cross-OS
   gate, physical input or manual CI was changed or exercised.
+- [~] **L46.** Linux HTTP header boundary: curl decodes config escapes before
+  serializing headers, so caller CR/LF previously injected additional native
+  wire headers. Validate serialized names/values against the canonical shared
+  forbidden-byte inventory before owner cancellation or native allocation.
+  NUL is also refused during preflight; legal tabs, Unicode, punctuation,
+  quotes and backslashes retain exact wire bytes. Thirty-two of thirty-six
+  actual curl cases fail before and all pass after on LuaJIT/Lua 5.4. Forty-one
+  portable cases cover all four methods, malformed/missing policy and retained
+  ownership. The earlier native NUL control now requires synchronous header
+  refusal while retaining the body refusal and zero-request assertions.
+  Windows async curl source already refuses controls; its synchronous WinHTTP
+  COM path and macOS native bridge require the reserved owner's native receipts.
+  No reserved driver implementation/gate, physical input or manual CI ran.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
