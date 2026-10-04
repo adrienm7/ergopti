@@ -1353,6 +1353,8 @@ Ordered after the reviewed active-hotstring editor and personal-editor reload fi
 
 The ordered cohort preserves the corrected PersonalReload joint-result assertion (510e478) as a complete prefix before the unchanged Wizard regression append. Source composition introduces no new behavior; full root and native qualification remain required.
 
+Navigation and validation child rows now consume one shared declaration for their labels, presence, and order on all three drivers. Windows keeps its native modifier prompts; macOS and Linux keep their existing modifier picker subtrees. Linux now requires the actual durable setter to return exactly true before refreshing or acknowledging the choice; a refused publication retains the old source and chord and can be retried. Isolated registered tests replay all 21 locale captions, native range states, changed declarations, and real private-file publication faults. Full current-root verification and hosted Windows/macOS native qualification remain pending; TODO54/81 remain partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

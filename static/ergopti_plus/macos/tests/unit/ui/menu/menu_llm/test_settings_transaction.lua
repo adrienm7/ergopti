@@ -274,7 +274,7 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["infra.logger"] = Logger
 	package.loaded["infra.notifications"] = {notify = function() end}
-	package.loaded["infra.i18n"] = {get = function(key) return key end}
+	package.loaded["infra.i18n"] = {get = options.translate or function(key) return key end}
 	local prompt_value = options.prompt_value or "0.75"
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function()
@@ -297,6 +297,12 @@ local function with_fixture(options, callback)
 		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
 		json_decode = function(raw)
 			local root = assert(require("json").decode(raw))
+			if options.navigation_reverse then
+				root.llm_navigation_rows[1], root.llm_navigation_rows[2] = root.llm_navigation_rows[2], root.llm_navigation_rows[1]
+			end
+			if options.navigation_label then root.llm_navigation_rows[1].i18n = options.navigation_label end
+			if options.navigation_absent then root.llm_navigation_rows = {} end
+			if options.navigation_invalid then root.llm_navigation_rows[1].i18n = 2 end
 			if options.info_label then root.llm_display_menu[2].i18n = options.info_label end
 			for index, row in ipairs(root.llm_display_menu) do
 				if row.id == "llm_show_all" then
@@ -541,6 +547,9 @@ local function with_fixture(options, callback)
 		})
 		assert(type(handler.build_item) == "function", table.concat(errors, "\n"))
 		local submenu = handler.build_item().submenu
+		if options.navigation_only then
+			return { rebuild = function() return handler.build_item().submenu end }
+		end
 		local generation = find_item(submenu, "menu.llm.generation_menu_title")
 		local predictions = find_item(generation.menu, "menu.llm.num_predictions_label")
 		local reset_predictions = find_item(generation.menu, "menu.llm.reset_label")
@@ -2177,6 +2186,85 @@ helpers.describe("Shared privacy intent policy", function()
 			helpers.assert_eq(actual.admitted, vector.admitted, vector.name)
 			helpers.assert_eq(actual.value, vector.value, vector.name)
 			if not policy.ready(current) then helpers.assert_eq(policy.intent(current, expected).admitted, false) end
+		end
+	end)
+end)
+
+
+helpers.describe("LLM navigation: shared native child declarations", function()
+	helpers.it("(llm-nav-shared) consumes actual reordered labels and missing declarations", function()
+		with_fixture({ navigation_reverse = true, navigation_label = "button.cancel" }, function(fixture)
+			local parent = find_item(fixture.top_level_callbacks().rebuild(), "menu.llm.nav_menu_title")
+			helpers.assert_eq(#parent.menu, 2)
+			helpers.assert_true(parent.menu[1].title:find("button.cancel", 1, true) == 1)
+			helpers.assert_true(parent.menu[2].title:find("menu.llm.nav_label", 1, true) == 1)
+			helpers.assert_eq(type(parent.menu[1].menu), "table", "the actual validation picker remains a whole subtree")
+			helpers.assert_eq(type(parent.menu[2].menu), "table", "the actual navigation picker remains a whole subtree")
+			helpers.assert_eq(fixture.calls.runtime, 0)
+			helpers.assert_eq(fixture.calls.save, 0)
+		end)
+		with_fixture({ navigation_absent = true }, function(fixture)
+			local parent = find_item(fixture.top_level_callbacks().rebuild(), "menu.llm.nav_menu_title")
+			helpers.assert_eq(#parent.menu, 0, "absent shared children never acquire native fallback rows")
+			helpers.assert_eq(fixture.calls.save, 0)
+		end)
+		with_fixture({ navigation_invalid = true }, function(fixture)
+			local parent = find_item(fixture.top_level_callbacks().rebuild(), "menu.llm.nav_menu_title")
+			helpers.assert_eq(#parent.menu, 1, "a malformed label is refused before native rendering")
+			helpers.assert_true(parent.menu[1].title:find("menu.llm.val_label", 1, true) == 1)
+		end)
+	end)
+
+	helpers.it("(llm-nav-shared) preserves all twenty-one actual captions and native ranges", function()
+		local Json = require("json")
+		local root = helpers.driver_root() .. "../_shared/"
+		local file = assert(io.open(root .. "data/locale_order.json", "r"))
+		local locales = assert(Json.decode(file:read("*a"))).order; file:close()
+		helpers.assert_eq(#locales, 21)
+		local manifest_file = assert(io.open(helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json", "r"))
+		local definitions = assert(Json.decode(manifest_file:read("*a"))).llm_navigation_rows; manifest_file:close()
+		local corpus_file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/llm_navigation_rows.json", "r"))
+		local expected = assert(Json.decode(corpus_file:read("*a"))).rows; corpus_file:close()
+		helpers.assert_eq(#definitions, 2, "both actual declared modifier providers must be present")
+		helpers.assert_eq(#expected, 2, "the independent navigation corpus must be nonempty and complete")
+		for index, definition in ipairs(definitions) do
+			helpers.assert_eq({ definition.id, definition.type, definition.i18n },
+				{ expected[index].id, expected[index].type, expected[index].i18n })
+		end
+		for _, locale in ipairs(locales) do
+			local input = assert(io.open(root .. "data/locales/" .. locale .. ".json", "r"))
+			local catalogue = assert(Json.decode(input:read("*a"))); input:close()
+			local matched_paths = {}
+			local function translated(key)
+				local direct = catalogue[key]
+				local value = catalogue
+				local matched = 0
+				for segment in key:gmatch("[^.]+") do
+					matched = matched + 1
+					value = type(value) == "table" and value[segment] or nil
+				end
+				matched_paths[#matched_paths + 1] = matched
+				if direct ~= nil then return direct end
+				return value or key
+			end
+			with_fixture({ translate = translated, navigation_only = true }, function(fixture)
+				for _, count in ipairs({ 1, 2, 10 }) do
+					fixture.state.llm_num_predictions = count
+					fixture.state.llm_nav_modifiers, fixture.state.llm_val_modifiers = {}, {}
+					local parent = find_item(fixture.top_level_callbacks().rebuild(), translated("menu.llm.nav_menu_title"))
+					helpers.assert_eq(#parent.menu, 2)
+					helpers.assert_true(parent.menu[1].title:find(translated("menu.llm.nav_label"), 1, true) == 1)
+					helpers.assert_true(parent.menu[2].title:find(string.format(translated("menu.llm.val_label"), count == 10 and "1-0" or "1-" .. count), 1, true) == 1)
+					helpers.assert_eq(parent.menu[1].disabled == true, count < 2)
+					helpers.assert_eq(parent.menu[2].disabled == true, count < 2)
+					helpers.assert_eq(type(parent.menu[1].menu[1].fn), "function", "the real modifier owner stays callable")
+					helpers.assert_eq(fixture.calls.save, 0)
+				end
+			end)
+			helpers.assert_true(#matched_paths > 0, "real locale lookups must execute")
+			for _, matched in ipairs(matched_paths) do
+				helpers.assert_true(matched > 0, "every actual locale lookup matches a nonempty key path")
+			end
 		end
 	end)
 end)

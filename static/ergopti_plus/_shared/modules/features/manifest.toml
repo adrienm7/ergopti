@@ -6292,3 +6292,14 @@ i18n = "menu.shortcuts.to_titlecase"
 disabled_when = ["titlecase_selection_ready"]
 platforms = ["linux"]
 unavailable = "hide"
+
+# Native prompts and modifier picker subtrees retain their own settings owners.
+[[menu.llm_navigation_rows]]
+type = "list"
+id = "llm_nav_modifiers"
+i18n = "menu.llm.nav_label"
+
+[[menu.llm_navigation_rows]]
+type = "list"
+id = "llm_val_modifiers"
+i18n = "menu.llm.val_label"

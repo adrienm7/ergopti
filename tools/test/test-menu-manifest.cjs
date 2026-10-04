@@ -1651,3 +1651,26 @@ checkPrivacyTriggerControls();
 	}
 	console.log('Agent system Off: one shared checked control, three actual native consumers.');
 }
+
+// Fixed child declarations own native labels/order; picker shape remains per driver.
+{
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_navigation_rows.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	require('node:assert/strict').deepEqual(menu.llm_navigation_rows, corpus.rows);
+	const providers = [
+		['windows/ui/menu/menu_llm/menu_settings.ahk', '_MR_GetMenuDef("llm_navigation_rows")'],
+		['macos/ui/menu/menu_llm/init.lua', 'ManifestMenu.get_array("llm_navigation_rows")'],
+		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.get_array("llm_navigation_rows")']
+	];
+	for (const [native, read] of providers) {
+		const source = readFileSync(resolve(SHARED, '..', native), 'utf8');
+		require('node:assert/strict').ok(
+			source.includes(read),
+			`${native} consumes the real shared child owner`
+		);
+		for (const row of corpus.rows)
+			require('node:assert/strict').ok(source.includes(row.id), `${native} binds ${row.id}`);
+	}
+}
