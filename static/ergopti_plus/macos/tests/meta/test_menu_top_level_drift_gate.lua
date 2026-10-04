@@ -164,7 +164,7 @@ end
 --- @param paused boolean|nil Whether the script is paused.
 --- @return table rows Rendered top-level rows, the title badge removed.
 --- @return table lines Recorded warnings and errors.
-local function render_root(manifest_text, paused)
+local function render_root(manifest_text, paused, command_actions)
 	local lines = {}
 	local rendered = ManifestFixture.with_manifest(manifest_text, recording_logger(lines), function()
 		local builder = helpers.load_with_stubs("ui.menu.builder")
@@ -192,7 +192,7 @@ local function render_root(manifest_text, paused)
 				build_agent_item = function() return stub_row("menu.agent.title") end,
 			},
 		}
-		local actions = setmetatable({}, { __index = function() return function() end end })
+		local actions = command_actions or setmetatable({}, { __index = function() return function() end end })
 		return builder.generate(ctx, mods, actions)
 	end)
 	helpers.assert_true(type(rendered) == "table" and #rendered > 2, "Builder.generate drew no tray")
@@ -325,5 +325,70 @@ helpers.describe("menu drift gate (macOS): the tray root is the manifest's top l
 		end
 		helpers.assert_eq(table.concat(greyed, ", "), table.concat(expected, ", "),
 			"a pause must grey the rows the manifest marks, and only those")
+	end)
+end)
+
+--- Gives the two native lifecycle owners independently declared presentation.
+local function lifecycle_manifest(mutator)
+	local raw = read_manifest_text()
+	local rows = hs.json.decode(raw).top_level
+	for _, row in ipairs(rows) do
+		if row.id == "reload" or row.id == "quit" then
+			row.type = "command"
+			row.i18n = row.id == "reload" and "button.cancel" or "button.ok"
+			if mutator then mutator(row) end
+		end
+	end
+	return with_top_level(raw, rows)
+end
+
+local function lifecycle_row(rows, glyph, key)
+	local expected = glyph .. " " .. key
+	for _, row in ipairs(rows) do
+		if row.title == expected then return row end
+	end
+end
+
+helpers.describe("shared lifecycle commands (macOS)", function()
+	helpers.it("uses declared labels while paused and preserves the native owners (shared-lifecycle)", function()
+		local calls = {}
+		local rows = render_root(lifecycle_manifest(), true, {
+			reload = function() calls[#calls + 1] = "reload"; return false end,
+			quit = function() calls[#calls + 1] = "quit"; return true end,
+		})
+		local reload = lifecycle_row(rows, "↺", "button.cancel")
+		local quit = lifecycle_row(rows, "✕", "button.ok")
+		helpers.assert_not_nil(reload, "the shared reload declaration owns the translated label")
+		helpers.assert_not_nil(quit, "the shared quit declaration owns the translated label")
+		helpers.assert_true(reload.disabled ~= true and quit.disabled ~= true, "lifecycle remains available during pause")
+		helpers.assert_eq(reload.fn(), false, "native refusal remains refusal")
+		helpers.assert_eq(quit.fn(), true, "native acknowledgement is forwarded")
+		helpers.assert_eq(table.concat(calls, ","), "reload,quit")
+	end)
+
+	helpers.it("does not draw commands without their callable owners (shared-lifecycle)", function()
+		local rows = render_root(lifecycle_manifest(), false, { reload = false, quit = {} })
+		helpers.assert_nil(lifecycle_row(rows, "↺", "button.cancel"))
+		helpers.assert_nil(lifecycle_row(rows, "✕", "button.ok"))
+		for _, row in ipairs(rows) do
+			helpers.assert_true(row.title:sub(1, #"↺ ") ~= "↺ " and row.title:sub(1, #"✕ ") ~= "✕ ",
+				"missing owners cannot leave a relabelled or original native lifecycle row")
+		end
+	end)
+
+	helpers.it("rechecks an unregistered declared readiness predicate on held delivery (shared-lifecycle)", function()
+		local calls = 0
+		local rows = render_root(lifecycle_manifest(function(row)
+			row.i18n = "menu.global." .. row.id
+			row.disabled_when = { "unregistered_lifecycle_owner" }
+		end), false, { reload = function() calls = calls + 1 end, quit = function() calls = calls + 1 end })
+		local reload = lifecycle_row(rows, "↺", "menu.global.reload")
+		local quit = lifecycle_row(rows, "✕", "menu.global.quit")
+		helpers.assert_not_nil(reload, "the shared reload row is present before readiness is inspected")
+		helpers.assert_not_nil(quit, "the shared quit row is present before readiness is inspected")
+		helpers.assert_true(reload.disabled == true and quit.disabled == true)
+		helpers.assert_eq(reload.fn(), false)
+		helpers.assert_eq(quit.fn(), false)
+		helpers.assert_eq(calls, 0, "disabled presentation cannot conceal a callable native bypass")
 	end)
 end)
