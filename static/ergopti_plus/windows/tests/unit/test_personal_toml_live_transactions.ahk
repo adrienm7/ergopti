@@ -745,9 +745,9 @@ _PT102_WithCase(Mode, Body) {
 		if Mode == "metadata" {
 			RawSeed := Chr(0xFEFF) . FSReadUtf8Exact(Path)
 			RawSeed := StrReplace(RawSeed, "[_meta]`r`n",
-				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , 1)
+				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , , 1)
 			RawSeed := StrReplace(RawSeed, "[_meta.sections.alpha]`r`n",
-				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n', , 1)
+				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n', , , 1)
 			if !FSWriteDurable(Path, RawSeed)
 				throw Error("opening-source fixture metadata publication refused")
 		}

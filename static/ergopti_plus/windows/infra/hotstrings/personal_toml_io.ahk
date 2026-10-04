@@ -273,7 +273,7 @@ _PersonalTomlOpeningImageMatches(Source, FilePath, OwnerToken) {
 	; another pure lease/session/path check before the existing atomic replace.
 	Observed := _PersonalTomlReadOpeningImage(FilePath)
 	return Observed["admitted"] == true && Observed["present"] == Present
-		&& FSUtf8ExactMatches(Observed["content"], Expected)
+		&& (Observed["content"] == Expected)
 }
 
 ReadPersonalToml(Refresh := false, OpeningSource := 0) {
@@ -1753,7 +1753,8 @@ _PersonalTomlPublishRequestOwned(Request, OwnerToken) {
 				return PERSONAL_TOML_COMMIT_FAILED
 			Observed := _PersonalTomlReadOpeningImage(PendingResync.FilePath)
 			if !Observed["admitted"] || !Observed["present"]
-				|| !FSUtf8ExactMatches(Observed["content"], PendingResync.DurableImage)
+				|| !(PendingResync.DurableImage is String)
+				|| !(Observed["content"] == PendingResync.DurableImage)
 				return PERSONAL_TOML_COMMIT_FAILED
 			if !_PersonalTomlWriteLeaseOwns(OwnerToken, Request.FilePath)
 				|| A_IsSuspended
