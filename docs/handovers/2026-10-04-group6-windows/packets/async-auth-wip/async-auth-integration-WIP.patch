@@ -1,0 +1,974 @@
+--- a/static/ergopti_plus/windows/adapters/http_client.ahk
++++ b/static/ergopti_plus/windows/adapters/http_client.ahk
+@@ -122,6 +122,197 @@
+ 		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
+ }
+ 
++
++; Actual curl build observation runs in an exact owned Job. The owning request
++; publishes this object before Start, so immediate completion cannot lose it.
++_HTTP_CurlCapabilityCreate(OnReady, StartTick, TimeoutMs, TickFn := 0) {
++	return CurlCapabilityAdmission(OnReady, StartTick, TimeoutMs, TickFn)
++}
++
++_HTTP_CurlRemaining(StartTick, TimeoutMs, TickFn := 0) {
++	Now := IsObject(TickFn) ? TickFn.Call() : A_TickCount
++	return Max(0, TimeoutMs - TickElapsed64(StartTick, Now))
++}
++
++_HTTP_CurlIntegratedProxyAuthConfig(CapabilityReceipt) {
++	if !(CapabilityReceipt is Map) || CapabilityReceipt.Get("schema_version", 0) != 1
++		return ""
++	Quiesced := CapabilityReceipt.Get("child_quiesced", false)
++	if !(Quiesced is Integer) || Quiesced != true
++		return ""
++	if CapabilityReceipt.Get("state", "") != "ready"
++		|| CapabilityReceipt.Get("backend", "") != "curl"
++		return ""
++	Capability := CapabilityReceipt.Get("capability", 0)
++	if !(Capability is Map) || Capability.Get("tls_backend", "") != "schannel"
++		return ""
++	Sspi := Capability.Get("sspi", false)
++	Spnego := Capability.Get("spnego", false)
++	if !(Sspi is Integer) || Sspi != true || !(Spnego is Integer) || Spnego != true
++		return ""
++	; curl's CLI cannot encode a Negotiate|NTLM-only auth mask. Negotiate
++	; permits the current user's SSPI Negotiate package; no ANYAUTH downgrade.
++	return "proxy-negotiate`nproxy-user = " . _HTTP_CurlConfigQuote(":") . "`n"
++}
++
++class CurlCapabilityAdmission {
++	__New(OnReady, StartTick, TimeoutMs, TickFn := 0) {
++		this.OnReady := OnReady
++		this.StartTick := StartTick
++		this.TimeoutMs := TimeoutMs
++		this.TickFn := TickFn
++		this.Handle := 0
++		this.Capture := 0
++		this.Started := false
++		this.Completed := false
++		this.Cancelled := false
++		this.Published := false
++		this.DeadlineFn := ObjBindMethod(this, "_Deadline")
++		this.RetireFn := ObjBindMethod(this, "Abort")
++	}
++
++	Remaining() {
++		return _HTTP_CurlRemaining(this.StartTick, this.TimeoutMs, this.TickFn)
++	}
++
++	Start() {
++		global _VendorDir
++		if this.Started || this.Completed || this.Cancelled
++			return false
++		this.Started := true
++		try {
++			Remaining := this.Remaining()
++			if Remaining <= 0 {
++				this.Completed := true
++				this._ReleaseTimers()
++				this._Publish(0)
++				return true
++			}
++			Directory := _SR_AcquireCaptureDirectory()
++			this.Capture := Map("TmpFile", Directory . "output.tmp", "CaptureDir", Directory)
++			if !FSWrite(this.Capture["TmpFile"], '{"schema_version":1,"budget_ms":' . Remaining . '}')
++				throw Error("Capability input could not be staged.")
++			if this.Cancelled
++				return this.Abort()
++			this.Handle := ShellRunner_SpawnTreeOwned(
++				A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
++				["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
++					_VendorDir . "\ergopti_curl_capabilities_worker.ps1", "-InputPath", this.Capture["TmpFile"]],
++				ObjBindMethod(this, "_OnDone"), 0, 0, 8192)
++			if this.Cancelled
++				return this.Abort()
++			if !(IsObject(this.Handle) && this.Handle.start())
++				throw Error("Capability worker could not start.")
++			if !this.Completed && !this.Cancelled
++				SetTimer(this.DeadlineFn, -Max(1, this.Remaining()))
++			return true
++		} catch {
++			; No native exception, environment or version output reaches logging.
++			this._Publish(0)
++			this.Cancel()
++			return true
++		}
++	}
++
++	_Publish(Receipt) {
++		if this.Published || this.Cancelled
++			return false
++		this.Published := true
++		Callback := this.OnReady
++		this.OnReady := 0
++		try Callback.Call(this, Receipt)
++		catch {
++			try LoggerError("HttpClient", "Curl capability continuation failed.")
++		}
++		return true
++	}
++
++	_OnDone(Code, Out, Err) {
++		if this.Completed
++			return
++		; ShellRunner only dispatches tree completion after zero Job accounting.
++		this.Completed := true
++		this.Handle := 0
++		this._ReleaseTimers()
++		_SystemProxy_CleanupInput(this)
++		if this.Cancelled
++			return
++		Receipt := 0
++		if Code == 0 && Err == "" && StrLen(Out) <= 8192 && this.Remaining() > 0 {
++			try Receipt := JsonParse(Out)
++			catch
++				Receipt := 0
++		}
++		this._Publish(Receipt)
++	}
++
++	_Deadline(*) {
++		if this.Completed || this.Cancelled
++			return
++		Remaining := this.Remaining()
++		if this.Completed || this.Cancelled
++			return
++		if Remaining > 0 {
++			if IsObject(this.DeadlineFn)
++				SetTimer(this.DeadlineFn, -Remaining)
++			return
++		}
++		this._Publish(0)
++		this.Cancel()
++	}
++
++	Cancel(*) {
++		global HTTP_CURL_CLEANUP_RETRY_MS
++		this.Cancelled := true
++		this.OnReady := 0
++		if IsObject(this.DeadlineFn) {
++			SetTimer(this.DeadlineFn, 0)
++			this.DeadlineFn := 0
++		}
++		if this.Completed
++			return _SystemProxy_CleanupInput(this)
++		; Cancellation is reached from the input hook. Physical termination runs
++		; in a timer; the bound object retains the exact child and cleanup debt.
++		SetTimer(this.RetireFn, -HTTP_CURL_CLEANUP_RETRY_MS)
++		return true
++	}
++
++	Abort(*) {
++		global HTTP_CURL_CLEANUP_RETRY_MS
++		this.Cancelled := true
++		this.OnReady := 0
++		if IsObject(this.Handle) && !IsObject(this.RetireFn)
++			this.RetireFn := ObjBindMethod(this, "Abort")
++		RetireFn := this.RetireFn
++		if IsObject(this.DeadlineFn) {
++			SetTimer(this.DeadlineFn, 0)
++			this.DeadlineFn := 0
++		}
++		Retired := !IsObject(this.Handle)
++		if !Retired
++			try Retired := this.Handle.terminate() == true
++			catch
++				Retired := false
++		if !Retired {
++			SetTimer(RetireFn, -HTTP_CURL_CLEANUP_RETRY_MS)
++			return false
++		}
++		this.Handle := 0
++		this.Completed := true
++		this._ReleaseTimers()
++		return _SystemProxy_CleanupInput(this)
++	}
++
++	_ReleaseTimers() {
++		for Name in ["DeadlineFn", "RetireFn"] {
++			Fn := this.%Name%
++			if IsObject(Fn)
++				SetTimer(Fn, 0)
++			this.%Name% := 0
++		}
++	}
++}
++
+ _HTTP_CurlSweepOrphans(Directory := A_Temp) {
+ 	CurrentPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+ 	Loop Files Directory . "\ergopti_http_*.*", "F" {
+@@ -256,6 +447,13 @@
+ 		this.Headers := Map()
+ 		this.Proxy := ""
+ 		this.ProxySelected := false
++		this.ProxyResolver := 0
++		this.ProxySelection := 0
++		this.CapabilityOwner := 0
++		this.SendStarted := false
++		this.DeadlineStart := 0
++		this.DeadlineTimeout := 0
++		this.DeadlineFn := 0
+ 		; "" = the body arrives on stdout as ResponseText (see SetOutputFile).
+ 		this.OutputPath := ""
+ 		this.ConnectTimeoutMs := 5000
+@@ -301,6 +499,38 @@
+ 		this.ProxySelected := true
+ 	}
+ 
++	; A readiness owner supplies its original deadline and actual resolver.
++	; SetProxy alone remains an explicit fixed-route compatibility API.
++	SetDeadline(StartTick, TimeoutMs) {
++		this.DeadlineStart := StartTick
++		this.DeadlineTimeout := TimeoutMs
++	}
++
++	_StopDeadline() {
++		if IsObject(this.DeadlineFn)
++			SetTimer(this.DeadlineFn, 0)
++		this.DeadlineFn := 0
++	}
++
++	SetProxyAdmission(Selection, Resolver) {
++		this.ProxySelection := Selection
++		this.ProxyResolver := Resolver
++	}
++
++	_Remaining() {
++		return _HTTP_CurlRemaining(this.DeadlineStart, this.DeadlineTimeout)
++	}
++
++	_Deadline(*) {
++		if this.Completed || this.Aborted
++			return
++		if this._Remaining() > 0 {
++			SetTimer(this.DeadlineFn, -Max(1, this._Remaining()))
++			return
++		}
++		this.Abort()
++	}
++
+ 	; Makes curl write the response body to Path, byte for byte, instead of
+ 	; stdout: the stdout collector decodes and trims what it reads, which a
+ 	; download verified against a checksum afterwards cannot afford. The caller
+@@ -320,13 +550,13 @@
+ 	Send(Body := "") {
+ 		if (this.Method == "" || this.Url == "")
+ 			throw Error("CurlAsyncRequest.Open must succeed before Send.")
+-		if IsObject(this.Handle)
+-			throw Error("CurlAsyncRequest.Send may run only once.")
+ 		if this.Completed {
+ 			if this.Aborted
+ 				return false
+ 			throw Error("CurlAsyncRequest.Send may run only once.")
+ 		}
++		if this.SendStarted || IsObject(this.Handle)
++			throw Error("CurlAsyncRequest.Send may run only once.")
+ 		CurlExe := A_WinDir . "\System32\curl.exe"
+ 		if !FileExist(CurlExe)
+ 			throw Error("The Windows curl transport is unavailable.")
+@@ -335,12 +565,84 @@
+ 		_HTTP_CurlSweepOrphans()
+ 		if this.Aborted
+ 			return false
+-
++		this.SendStarted := true
++		if this.DeadlineTimeout <= 0 {
++			this.DeadlineStart := A_TickCount
++			this.DeadlineTimeout := this.TotalTimeoutMs
++		}
++		if this._Remaining() <= 0
++			return this.Abort()
++		this.DeadlineFn := ObjBindMethod(this, "_Deadline")
++		SetTimer(this.DeadlineFn, -Max(1, this._Remaining()))
++		if this.Proxy == ""
++			return this._SendCurl(Body)
++		CreateFn := this._DispatchPortFn("create_curl_capability")
++		if !IsObject(CreateFn)
++			CreateFn := _HTTP_CurlCapabilityCreate
++		Owner := CreateFn.Call(ObjBindMethod(this, "_OnCapability", Body),
++			this.DeadlineStart, this.DeadlineTimeout)
++		this.CapabilityOwner := Owner
++		if this.Aborted || this.Completed
++			return Owner.Abort()
++		try Started := Owner.Start()
++		catch
++			Started := false
++		if !Started
++			this.Abort()
++		return true
++	}
++
++	_OnCapability(Body, Owner, Receipt) {
++		if !IsObject(this.CapabilityOwner) || ObjPtr(this.CapabilityOwner) != ObjPtr(Owner)
++			return false
++		this.CapabilityOwner := 0
++		if this.Aborted || this.Completed || this._Remaining() <= 0
++			return this.Abort()
++		AuthConfig := _HTTP_CurlIntegratedProxyAuthConfig(Receipt)
++		if AuthConfig == "" || !RegExMatch(this.Proxy, "i)^https?://")
++			return this.Abort()
++		if IsObject(this.ProxyResolver) {
++			this.ProxyFreshPending := true
++			try {
++				if !this.ProxyResolver.Call(this.Url, ObjBindMethod(this, "_OnFreshProxy", Body, AuthConfig))
++					this.Abort()
++			} catch {
++				this.Abort()
++			}
++			return true
++		}
++		try return this._SendCurl(Body, AuthConfig)
++		catch
++			return this.Abort()
++	}
++
++	_OnFreshProxy(Body, AuthConfig, Selection) {
++		if !this.HasOwnProp("ProxyFreshPending") || !this.ProxyFreshPending
++			return false
++		this.ProxyFreshPending := false
++		if this.Aborted || this.Completed || this._Remaining() <= 0
++			return this.Abort()
++		if !(Selection is Map) || !Selection.Get("ok", false)
++			return this.Abort()
++		this.ProxySelection := Selection
++		this.ProxySelected := !Selection.Get("inherit", false)
++		this.Proxy := this.ProxySelected ? Selection.Get("proxy", "") : ""
++		if this.Proxy != "" && (!SystemProxy_IsValidProxyUrl(this.Proxy) || !RegExMatch(this.Proxy, "i)^https?://"))
++			return this.Abort()
++		try return this._SendCurl(Body, this.Proxy != "" ? AuthConfig : "")
++		catch
++			return this.Abort()
++	}
++
++	_SendCurl(Body, AuthConfig := "") {
++		if this.Aborted || this.Completed || this._Remaining() <= 0
++			return this.Abort()
++		CurlExe := A_WinDir . "\System32\curl.exe"
+ 		Config := "url = " . _HTTP_CurlConfigQuote(this.Url) . "`n"
+ 		Config .= "request = " . _HTTP_CurlConfigQuote(this.Method) . "`n"
+ 		Config .= "silent`nshow-error`n"
+ 		Config .= "connect-timeout = " . Ceil(this.ConnectTimeoutMs / 1000) . "`n"
+-		Config .= "max-time = " . Ceil(this.TotalTimeoutMs / 1000) . "`n"
++		Config .= "max-time = " . Format("{:.3f}", this._Remaining() / 1000) . "`n"
+ 		Config .= "max-filesize = " . HTTP_CURL_MAX_RESPONSE_BYTES . "`n"
+ 		Config .= "dump-header = " . _HTTP_CurlConfigQuote(this.HeaderPath) . "`n"
+ 		Config .= "output = " . _HTTP_CurlConfigQuote(this.OutputPath != "" ? this.OutputPath : "-") . "`n"
+@@ -350,9 +652,10 @@
+ 		Config .= "ssl-revoke-best-effort`n"
+ 		if this.ProxySelected
+ 			Config .= "proxy = " . _HTTP_CurlConfigQuote(this.Proxy) . "`n"
+-		if (this.Proxy != "") {
+-			Config .= "proxy-anyauth`n"
+-			Config .= "proxy-user = " . _HTTP_CurlConfigQuote(":") . "`n"
++		if this.Proxy != "" {
++			if AuthConfig == ""
++				return this.Abort()
++			Config .= AuthConfig
+ 		}
+ 		for Name, Value in this.Headers
+ 			Config .= "header = "
+@@ -374,15 +677,35 @@
+ 		BeforeLaunchFn := this._DispatchPortFn("before_launch")
+ 		if IsObject(BeforeLaunchFn)
+ 			BeforeLaunchFn.Call(this)
+-		if this.Aborted
+-			return false
++		if this.Aborted || this._Remaining() <= 0
++			return this.Abort()
++		if this.ProxySelection is Map {
++			CurrentFn := this.ProxySelection.Get("current", 0)
++			try Current := !IsObject(CurrentFn) || CurrentFn.Call()
++			catch
++				Current := false
++			if !Current {
++				if !this._Cleanup()
++					return this.Abort()
++				if IsObject(this.ProxyResolver) {
++					this.ProxyFreshPending := true
++					try {
++						if !this.ProxyResolver.Call(this.Url, ObjBindMethod(this, "_OnFreshProxy", Body, AuthConfig))
++							this.Abort()
++					} catch
++						this.Abort()
++					return true
++				}
++				return this.Abort()
++			}
++		}
+ 
+ 		SpawnFn := this._DispatchPortFn("spawn")
+ 		Handle := IsObject(SpawnFn)
+-			? SpawnFn.Call(CurlExe, ["--config", this.ConfigPath],
++			? SpawnFn.Call(CurlExe, ["--disable", "--config", this.ConfigPath],
+ 				ObjBindMethod(this, "_OnDone"), 0, 0, HTTP_CURL_MAX_RESPONSE_BYTES)
+ 			: ShellRunner_SpawnTreeOwned(CurlExe,
+-				["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
++				["--disable", "--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
+ 				HTTP_CURL_MAX_RESPONSE_BYTES)
+ 		this.Handle := Handle
+ 		if this.Aborted {
+@@ -435,6 +758,14 @@
+ 			return true
+ 		}
+ 		this.Aborted := true
++		this._StopDeadline()
++		if IsObject(this.CapabilityOwner) {
++			if !this.CapabilityOwner.Abort() {
++				_HTTP_CurlRetainAbortDebt(this)
++				return false
++			}
++			this.CapabilityOwner := 0
++		}
+ 		Succeeded := true
+ 		Handle := this.Handle
+ 		if IsObject(Handle) {
+@@ -462,6 +793,7 @@
+ 
+ 	_OnDone(ExitCode, Stdout, Stderr) {
+ 		global HTTP_CURL_MAX_HEADER_BYTES
++		this._StopDeadline()
+ 		; A failed Abort retains the child until either a retry succeeds or its
+ 		; natural completion callback proves it terminal. Claim the latter without
+ 		; materializing response artifacts that cancellation will discard.
+@@ -727,7 +1059,7 @@
+ 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
+ 	Config := _SystemProxy_Config(ReaderFn, Strict)
+ 	ConfigIdentity := _SystemProxy_RefreshCache(Config)
+-	Result := Map("_proxy_resolved", true, "_proxy_receipts", Map())
++	Result := Map("_proxy_resolved", true, "_proxy_receipts", Map(), "_proxy_config_identity", ConfigIdentity)
+ 	Missing := []
+ 	for Url in Urls {
+ 		Selection := SystemProxy_SelectStatic(Config, Url, Strict)
+@@ -1051,17 +1383,31 @@
+ 			return true
+ 		}
+ 	}
+-	return SystemProxy_ResolveAsync([Url], _SystemProxy_PublishCurlSelection.Bind(Url, Callback), ReaderFn, SpawnFn, true)
++	return SystemProxy_ResolveAsync([Url], _SystemProxy_PublishCurlSelection.Bind(Url, Callback, ReaderFn, EnvFn), ReaderFn, SpawnFn, true)
+ }
+ 
+ 
+ ; Preserve closed native diagnosis without exposing any captured URL or stderr.
+-_SystemProxy_PublishCurlSelection(Url, Callback, Resolved) {
++_SystemProxy_PublishCurlSelection(Url, Callback, ReaderFn, EnvFn, Resolved) {
+ 	Ok := Resolved.Get("_proxy_resolved", false)
+ 	Metadata := Resolved.Get("_proxy_receipts", Map()).Get(Url, Map())
+ 	Callback.Call(Map("ok", Ok, "inherit", false, "proxy", Resolved[Url],
+ 		"source", Ok ? Metadata.Get("source", "system_direct") : "native_refused",
+-		"native_error", Metadata.Get("native_error", 0)))
++		"native_error", Metadata.Get("native_error", 0), "current",
++		_SystemProxy_CurlSelectionIsCurrent.Bind(Url, ReaderFn, EnvFn,
++			Resolved.Get("_proxy_config_identity", ""))))
++}
++
++_SystemProxy_CurlSelectionIsCurrent(Url, ReaderFn, EnvFn, Identity) {
++	Parts := _SystemProxy_UrlParts(Url)
++	Names := Parts["scheme"] == "https"
++		? ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
++		: ["http_proxy", "all_proxy", "ALL_PROXY"]
++	for Name in Names
++		if EnvFn.Call(Name) != ""
++			return false
++	Config := _SystemProxy_Config(ReaderFn, true)
++	return _SystemProxy_RefreshCache(Config) == Identity
+ }
+ 
+ 
+--- a/static/ergopti_plus/windows/modules/llm/api_remote.ahk
++++ b/static/ergopti_plus/windows/modules/llm/api_remote.ahk
+@@ -499,6 +499,12 @@
+ }
+ 
+ _LLMRemote_FailReserved(req_id, reservation, on_fail, Reason := "dispatch") {
++    if reservation.Has("capability_owner") {
++        try reservation["capability_owner"].Cancel()
++        reservation.Delete("capability_owner")
++    }
++    if reservation.Has("proxy_deadline")
++        SetTimer(reservation["proxy_deadline"], 0)
+     if !_LLMRemote_DeleteOwned(req_id, reservation)
+         return false
+     if !reservation["cancelled"]
+@@ -686,6 +692,10 @@
+     }
+     if !_LLMRemote_RequestOwns(req_id, reservation)
+         return true
++    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
++    if Remaining <= 0
++        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
++    timeout_ms := Remaining
+     reservation["transport"] := "curl"
+     config_image := _LLMRemote_BuildCurlConfig(
+         resolved["Format"], resolved["Token"], Url)
+@@ -711,6 +721,27 @@
+         }
+         return true
+     }
++    if !ProxySelection.Get("inherit", false) && ProxySelection.Get("proxy", "") != ""
++            && !reservation.Has("curl_capability_receipt") {
++        CreateCapabilityFn := _LLM_CurlArtifactPortFn(Port, "create_curl_capability", _HTTP_CurlCapabilityCreate)
++        ContinueCapabilityFn := _LLMRemote_ContinueCurlCapability.Bind(req_id, reservation,
++            resolved, Url, Payload, on_success, on_fail, Port)
++        try {
++            CapabilityOwner := CreateCapabilityFn.Call(ContinueCapabilityFn,
++                reservation["start_tick"], reservation["timeout_ms"], TickFn)
++            reservation["capability_owner"] := CapabilityOwner
++            if reservation["cancelled"] || !_LLMRemote_RequestOwns(req_id, reservation) {
++                CapabilityOwner.Cancel()
++                _LLMRemote_DeleteOwned(req_id, reservation)
++                return true
++            }
++            if !CapabilityOwner.Start()
++                _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
++        } catch {
++            _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
++        }
++        return true
++    }
+     if !ProxySelection.Get("inherit", false) {
+         Proxy := ProxySelection.Get("proxy", "")
+         if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy)) {
+@@ -718,14 +749,18 @@
+             return true
+         }
+         config_image .= "proxy = " . _LLMRemote_CurlConfQuote(Proxy) . "`n"
+-        if Proxy != ""
+-            config_image .= "proxy-anyauth`nproxy-user = " . _LLMRemote_CurlConfQuote(":") . "`n"
++        if Proxy != "" {
++            AuthConfig := _HTTP_CurlIntegratedProxyAuthConfig(reservation.Get("curl_capability_receipt", 0))
++            if AuthConfig == "" || !RegExMatch(Proxy, "i)^https?://")
++                return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
++            config_image .= AuthConfig
++        }
+     }
+     ; Remote-only users never enter either Ollama dispatcher. Schedule the same
+     ; bounded common reaper here so a prior crash cannot retain provider tokens,
+     ; typed payloads, bodies or terminal sidecars indefinitely.
+     try SweepFn.Call()
+-    uid := req_id . "_" . TickFn.Call()
++    uid := req_id . "_" . TickFn.Call() . "_" . _HTTP_CurlNextRequestId()
+     try tmp_dir := TempDirFn.Call()
+     catch as err {
+         try LoggerWarn("LLM.remote", "Private curl directory unavailable: {1}.", err.Message)
+@@ -763,10 +798,23 @@
+         _LLMRemote_DeleteOwned(req_id, reservation)
+         return true
+     }
++    CurrentFn := ProxySelection.Get("current", 0)
++    try Current := !IsObject(CurrentFn) || CurrentFn.Call()
++    catch
++        Current := false
++    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
++    if !Current || Remaining <= 0 {
++        Cleaned := _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
++        if Remaining <= 0 || !Cleaned
++            return _LLMRemote_FailReserved(req_id, reservation, on_fail, Remaining <= 0 ? "timeout" : "dispatch")
++        reservation["proxy_resolution_done"] := false
++        return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
++            on_fail, Remaining, Port, reservation)
++    }
+     ; URL and auth headers come from --config, never from argv (see
+     ; _LLMRemote_BuildCurlConfig): argv has no ACL for a same-user reader.
+-    curlCmd := '"' . curl_exe . '" -s -S -m '
+-        . Max(1, Ceil(timeout_ms / 1000)) . ' '
++    curlCmd := '"' . curl_exe . '" --disable -s -S -m '
++        . Format("{:.3f}", Remaining / 1000) . ' '
+         . _LLM_CurlMaxFileSizeArg() . '-X POST '
+         . '--config ' . _Q(tmp_config) . ' '
+         . '--data-binary @' . _Q(tmp_payload) . ' '
+@@ -797,6 +845,32 @@
+     return true
+ }
+ 
++; Actual build observation owns a separate exact child. Its continuation
++; obtains a new exact-URL PAC answer after observation, before private staging.
++_LLMRemote_ContinueCurlCapability(req_id, reservation, resolved, Url, Payload,
++        on_success, on_fail, Port, CapabilityOwner, Receipt) {
++    if !reservation.Has("capability_owner")
++            || ObjPtr(reservation["capability_owner"]) != ObjPtr(CapabilityOwner)
++        return false
++    reservation.Delete("capability_owner")
++    if !_LLMRemote_RequestOwns(req_id, reservation)
++        return false
++    if reservation["cancelled"] || A_IsSuspended {
++        _LLMRemote_DeleteOwned(req_id, reservation)
++        return false
++    }
++    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
++    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
++    if Remaining <= 0
++        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
++    if _HTTP_CurlIntegratedProxyAuthConfig(Receipt) == ""
++        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
++    reservation["curl_capability_receipt"] := Receipt
++    reservation["proxy_resolution_done"] := false
++    return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
++        on_fail, Remaining, Port, reservation)
++}
++
+ ; The resolver can yield to pause, cancellation, trim or a replacement owner.
+ ; Revalidate the captured request before allocating any credential artifacts.
+ _LLMRemote_ContinueProxyDispatch(req_id, reservation, resolved, Url, Payload,
+@@ -814,12 +888,12 @@
+         SetTimer(reservation["proxy_deadline"], 0)
+     TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+     Elapsed := TickElapsed64(reservation["start_tick"], TickFn.Call())
+-    if Elapsed >= timeout_ms
++    if Elapsed >= reservation["timeout_ms"]
+         return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+     if !(ProxySelection is Map) || !ProxySelection.Get("ok", false)
+         return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+     return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+-        on_fail, timeout_ms - Elapsed, Port, reservation, ProxySelection)
++        on_fail, reservation["timeout_ms"] - Elapsed, Port, reservation, ProxySelection)
+ }
+ 
+ _LLMRemote_ProxyDeadline(req_id, reservation, on_fail) {
+@@ -937,6 +1011,10 @@
+     ; carrying request PII on its next iteration, exactly as before.
+     entry["cancelled"] := true
+     Kills := []
++    if entry.Has("capability_owner") {
++        Kills.Push(Map("cancel", ObjBindMethod(entry["capability_owner"], "Abort")))
++        _LLMRemote_DeleteOwned(req_id, entry)
++    }
+     if (entry.Has("transport") and entry["transport"] == "curl") {
+         if entry.Has("process_owner")
+             Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
+@@ -959,10 +1037,15 @@
+     ; message pump is suspended. The poll tick still performs the temp-file
+     ; cleanup on its next iteration, exactly as before.
+     Kills := []
++    PendingDeletes := []
+     for _id, entry in _LLM_Remote_Async {
+         if (SpareKind != "" && entry.Has("kind") && entry["kind"] == SpareKind)
+             continue
+         entry["cancelled"] := true
++        if entry.Has("capability_owner") {
++            Kills.Push(Map("cancel", ObjBindMethod(entry["capability_owner"], "Abort")))
++            PendingDeletes.Push([_id, entry])
++        }
+         if (entry.Has("transport") and entry["transport"] == "curl") {
+             if entry.Has("process_owner")
+                 Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
+@@ -971,6 +1054,8 @@
+             Kills.Push(Map("http", entry["http"]))
+         }
+     }
++    for PendingDelete in PendingDeletes
++        _LLMRemote_DeleteOwned(PendingDelete[1], PendingDelete[2])
+     LLM_DeferCancelKills(Kills)
+ }
+ 
+@@ -1146,6 +1231,7 @@
+ ; check instead of repeating the same six guards everywhere.
+ _LLMRemoteResolveEntry(Entry) {
+     global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
++    NetworkStart := A_TickCount
+     ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+     if !LLM_API_PROVIDERS.Has(ProviderId)
+         return ""
+@@ -1240,6 +1326,9 @@
+         return Owner
+     }
+ 
++    Owner["network_start_tick"] := NetworkStart
++    LLM_AuxSchedule(Owner, _LLMRemote_ReadyDeadline.Bind(Owner, on_result),
++        -LLM_REMOTE_READY_PING_DEADLINE_MS)
+     Owner["local_server"] := LocalServerAuthTokenAllowed(ProviderId, "", LLM_LOCAL_API_SERVERS)
+     ProvFmt := Provider["Format"]
+     PingUrl := ""
+@@ -1258,7 +1347,7 @@
+     BindFn := (Http) => LLM_AuxBindResources(Owner, Map("cancel", (*) => Http.Abort()))
+     try {
+         if !ResolveFn.Call(PingUrl, _LLMRemote_DispatchReady.Bind(
+-                Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn))
++                Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ResolveFn))
+             _LLMRemote_CompleteReady(Owner, on_result, false)
+     } catch {
+         try LoggerError("LLM.remote", "Readiness proxy admission failed.")
+@@ -1268,10 +1357,12 @@
+ }
+ 
+ ; Only the still-current auxiliary owner may create or send the readiness child.
+-_LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ProxySelection) {
++_LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ResolveFn, ProxySelection) {
+     global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+     if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
+         return false
++    if _HTTP_CurlRemaining(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS) <= 0
++        return _LLMRemote_CompleteReady(Owner, on_result, false)
+     if A_IsSuspended || !(ProxySelection is Map) || !ProxySelection.Get("ok", false)
+         return _LLMRemote_CompleteReady(Owner, on_result, false)
+     if Owner.Get("proxy_admitted", false)
+@@ -1286,6 +1377,10 @@
+                         LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS)
+         if !ProxySelection.Get("inherit", false)
+             Http.SetProxy(ProxySelection.Get("proxy", ""))
++        if HasMethod(Http, "SetDeadline")
++            Http.SetDeadline(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS)
++        if HasMethod(Http, "SetProxyAdmission")
++            Http.SetProxyAdmission(ProxySelection, ResolveFn)
+         _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
+         if !_LLMRemote_ReadyOwnerIsCurrent(Owner) || A_IsSuspended {
+             Http.Abort()
+@@ -1299,8 +1394,14 @@
+         return false
+     }
+     PollFn := _LLM_CurlArtifactPortFn(Port, "poll_ready", _LLMRemote_PollReady)
+-    PollFn.Call(Http, on_result, A_TickCount, LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
++    PollFn.Call(Http, on_result, Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
+     return true
++}
++
++_LLMRemote_ReadyDeadline(Owner, on_result) {
++    if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
++        return false
++    return _LLMRemote_CompleteReady(Owner, on_result, false)
+ }
+ 
+ ; Polling tick for LLM_RemoteIsReady_Async. Re-arms itself on a relaxed cadence
+--- a/static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk
+@@ -243,6 +243,7 @@
+ 		Request.Abort()
+ 	}
+ 	Req := CurlAsyncRequest(Map("before_launch", Capture,
++		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
+ 		"spawn", (*) => Assert(false, "the captured request must not launch")))
+ 	try {
+ 		Req.Open("GET", "https://github.com/adrienm7/ergopti/releases.atom", true)
+@@ -258,7 +259,8 @@
+ _CNR_CurlUsesProxyAndBestEffortRevocation() {
+ 	Config := _CNR_CurlConfig("http://proxy.corp:8080")
+ 	AssertContains(Config, 'proxy = "http://proxy.corp:8080"', "curl must use the selected proxy")
+-	AssertContains(Config, "proxy-anyauth", "proxy authentication must be negotiated")
++	AssertContains(Config, "proxy-negotiate", "proxy authentication must use the native integrated scheme")
++	AssertFalse(InStr(Config, "proxy-anyauth"), "native authentication must not permit Basic/Digest downgrade")
+ 	AssertContains(Config, 'proxy-user = ":"', "the signed-in Windows account must authenticate (SSPI)")
+ 	AssertContains(Config, "ssl-revoke-best-effort",
+ 		"an unreachable revocation server of an inspection CA must not fail TLS")
+--- a/static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_integration.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_integration.ahk
+@@ -0,0 +1,188 @@
++﻿; tests/unit/test_curl_proxy_auth_integration.ahk
++; Deterministic owner-boundary controls. Native challenge qualification is separate.
++_CurlAuthIntegration_Receipt() {
++	return Map("schema_version", 1, "state", "ready", "backend", "curl",
++		"child_quiesced", true, "capability", Map("tls_backend", "schannel",
++			"sspi", true, "spnego", true, "ntlm", true, "version", "8.13.0"))
++}
++
++class _CurlAuthIntegration_Owner {
++	__New(Callback, State := 0) {
++		this.Callback := Callback
++		this.State := State is Map ? State : Map("deferred", false)
++		this.Cancelled := false
++	}
++	Start() {
++		this.State["owner"] := this
++		this.State["starts"] := this.State.Get("starts", 0) + 1
++		if !this.State.Get("deferred", false)
++			this.Publish(_CurlAuthIntegration_Receipt())
++		return true
++	}
++	Publish(Receipt) {
++		; Deliberately permits duplicate/late publication to exercise consumer fences.
++		this.Callback.Call(this, Receipt)
++	}
++	Cancel(*) {
++		return this.Abort()
++	}
++	Abort(*) {
++		this.Cancelled := true
++		this.State["aborts"] := this.State.Get("aborts", 0) + 1
++		return !this.State.Get("refuse_retirement", false)
++	}
++}
++
++_CurlAuthIntegration_CreateImmediate(Callback, *) {
++	return _CurlAuthIntegration_Owner(Callback)
++}
++_CurlAuthIntegration_Create(State, Callback, *) {
++	return _CurlAuthIntegration_Owner(Callback, State)
++}
++
++class _CurlAuthIntegration_Transport {
++	__New(State) {
++		this.State := State
++	}
++	start() {
++		this.State["runs"] += 1
++		return true
++	}
++	terminate() {
++		this.State["retired"] += 1
++		return true
++	}
++}
++_CurlAuthIntegration_Spawn(State, Exe, Args, Done, *) {
++	State["args"] := Args
++	State["done"] := Done
++	return _CurlAuthIntegration_Transport(State)
++}
++_CurlAuthIntegration_Capture(State, Request) {
++	State["configs"].Push(FileRead(Request.ConfigPath, "UTF-8"))
++}
++
++_CurlAuthIntegration_Http(ProbeCase := "success") {
++	State := Map("deferred", true, "runs", 0, "retired", 0, "configs", [])
++	Req := CurlAsyncRequest(Map("create_curl_capability", _CurlAuthIntegration_Create.Bind(State),
++		"before_launch", _CurlAuthIntegration_Capture.Bind(State),
++		"spawn", _CurlAuthIntegration_Spawn.Bind(State)))
++	try {
++		Req.Open("POST", "https://auth-fixture.invalid/private", true)
++		Req.SetProxy("http://managed.corp:3128")
++		Req.SetRequestHeader("Authorization", "Bearer private-provider-token")
++		AssertTrue(Req.Send("private-typed-body"))
++		Owner := State["owner"]
++		AssertEqual(0, State["runs"], "curl cannot run before actual build admission")
++		AssertFalse(FileExist(Req.ConfigPath), "provider credentials are not staged while observation is pending")
++		AssertFalse(FileExist(Req.BodyPath), "typed context is not staged while observation is pending")
++		Receipt := _CurlAuthIntegration_Receipt()
++		if ProbeCase == "cancel"
++			Req.Abort()
++		else if ProbeCase == "unsupported"
++			Receipt["capability"]["sspi"] := false
++		else if ProbeCase == "unretired"
++			Receipt["child_quiesced"] := false
++		else if ProbeCase == "timeout"
++			Req.SetDeadline(A_TickCount - 1001, 1000)
++		else if ProbeCase == "replace"
++			Req.CapabilityOwner := _CurlAuthIntegration_Owner((*) => 0)
++		Owner.Publish(Receipt)
++		Owner.Publish(_CurlAuthIntegration_Receipt())
++		if ProbeCase != "success" {
++			AssertEqual(0, State["runs"], "stale/unavailable/unfinished capability cannot launch curl")
++			AssertFalse(FileExist(Req.ConfigPath), "refused admission cannot leave credentials")
++			AssertFalse(FileExist(Req.BodyPath), "refused admission cannot leave typed context")
++			return
++		}
++		AssertEqual(1, State["runs"], "duplicate feature publication admits one child only")
++		AssertEqual("--disable", State["args"][1], "ambient curl config cannot broaden authentication")
++		AssertContains(State["configs"][1], "proxy-negotiate`n")
++		AssertContains(State["configs"][1], 'proxy-user = ":"')
++		AssertFalse(InStr(State["configs"][1], "proxy-anyauth"), "native current-user admission forbids ANYAUTH")
++		AssertFalse(InStr(State["configs"][1], "proxy-basic"), "native current-user admission forbids Basic downgrade")
++		AssertFalse(InStr(State["configs"][1], "proxy-digest"), "native current-user admission forbids Digest downgrade")
++		for Argument in State["args"] {
++			AssertFalse(InStr(Argument, "private-provider-token"), "provider token must remain outside argv")
++			AssertFalse(InStr(Argument, "private-typed-body"), "typed context must remain outside argv")
++		}
++	} finally {
++		Req.Abort()
++	}
++}
++Test("curl auth admission: asynchronous actual-build gate precedes every private artifact", _CurlAuthIntegration_Http)
++Test("curl auth admission: cancellation silences late build receipts", _CurlAuthIntegration_Http.Bind("cancel"))
++Test("curl auth admission: missing SSPI cannot become current-user authentication", _CurlAuthIntegration_Http.Bind("unsupported"))
++Test("curl auth admission: unfinished capability descendants cannot admit transport", _CurlAuthIntegration_Http.Bind("unretired"))
++Test("curl auth admission: feature observation consumes the original deadline", _CurlAuthIntegration_Http.Bind("timeout"))
++Test("curl auth admission: an old build receipt cannot replace a successor owner", _CurlAuthIntegration_Http.Bind("replace"))
++
++_CurlAuthIntegration_RemoteResolve(State, Url, ContinueFn) {
++	State["resolves"] += 1
++	ContinueFn.Call(Map("ok", true, "inherit", false, "proxy", "http://managed.corp:3128"))
++	return true
++}
++_CurlAuthIntegration_Remote(ProbeCase := "success") {
++	global _LLM_Remote_Async
++	SavedRegistry := _LLM_Remote_Async
++	_LLM_Remote_Async := Map()
++	State := _RemoteCancelPublication_NewState()
++	State["deferred"] := true
++	State["fail_calls"] := 0
++	State["resolves"] := 0
++	State["writes"] := []
++	State["tick"] := 1313
++	Port := _RemoteCancelPublication_CurlPort(State, _RemoteProxy_Run.Bind(State))
++	Port["resolve_proxy"] := _CurlAuthIntegration_RemoteResolve.Bind(State)
++	Port["create_curl_capability"] := _CurlAuthIntegration_Create.Bind(State)
++	Port["write"] := _RemoteProxy_Write.Bind(State)
++	Port["tick"] := (*) => State["tick"]
++	ReqId := "auth-integration-generation"
++	Resolved := Map("Format", "openai", "Model", "fixture", "Token", "private-provider-token")
++	try {
++		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved, "https://auth-fixture.invalid/private",
++			'{}', (*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
++		Reservation := _LLM_Remote_Async[ReqId]
++		Owner := State["owner"]
++		AssertEqual(0, State["writes"].Length, "feature admission must precede private generation artifacts")
++		AssertEqual(0, State["runs"], "generation cannot launch before feature observation")
++		Receipt := _CurlAuthIntegration_Receipt()
++		if ProbeCase == "cancel"
++			LLM_RemoteCancelAsync(ReqId)
++		else if ProbeCase == "replace"
++			_LLM_Remote_Async[ReqId] := Map("transport", "successor", "cancelled", false)
++		else if ProbeCase == "timeout"
++			State["tick"] += 1000
++		else if ProbeCase == "unsupported"
++			Receipt["capability"]["spnego"] := false
++		Owner.Publish(Receipt)
++		Owner.Publish(_CurlAuthIntegration_Receipt())
++		if ProbeCase != "success" {
++			AssertEqual(0, State["writes"].Length, "refusal cannot stage credentials")
++			AssertEqual(0, State["runs"], "old/expired/unsupported admission cannot dispatch")
++			if ProbeCase == "replace"
++				AssertEqual("successor", _LLM_Remote_Async[ReqId]["transport"], "old feature completion preserves its replacement")
++			return
++		}
++		AssertEqual(2, State["resolves"], "settings and dynamic PAC must be obtained again after build observation")
++		AssertEqual(1, State["runs"], "one admitted build/route launches one child")
++		AssertContains(State["writes"][2]["text"], "proxy-negotiate`n")
++		AssertFalse(InStr(State["writes"][2]["text"], "proxy-anyauth"), "generation cannot broaden integrated auth")
++		AssertFalse(InStr(State["command"]["command_line"], "private-provider-token"), "provider token is private config only")
++	} finally {
++		if IsSet(Reservation) {
++			if Reservation.Has("proxy_deadline")
++				SetTimer(Reservation["proxy_deadline"], 0)
++			if Reservation.Has("capability_owner")
++				Reservation["capability_owner"].Abort()
++			if Reservation.Has("process_owner")
++				_LLMRemote_CancelCurlReservation(ReqId, Reservation, Port)
++		}
++		_LLM_Remote_Async := SavedRegistry
++	}
++}
++Test("remote curl auth: actual-build owner precedes private staging and fresh settings", _CurlAuthIntegration_Remote)
++Test("remote curl auth: cancelled build receipt cannot launch or linger in the registry", _CurlAuthIntegration_Remote.Bind("cancel"))
++Test("remote curl auth: stale build receipt preserves successor", _CurlAuthIntegration_Remote.Bind("replace"))
++Test("remote curl auth: original deadline includes build observation", _CurlAuthIntegration_Remote.Bind("timeout"))
++Test("remote curl auth: unsupported native Negotiate refuses admission", _CurlAuthIntegration_Remote.Bind("unsupported"))
+--- a/static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk
+@@ -920,6 +920,7 @@
+ 
+ _RemoteCancelPublication_CurlPort(State, RunFn) {
+ 	return Map(
++		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
+ 		"file_exists", (*) => true,
+ 		"temp_dir", (*) => A_Temp,
+ 		"write", (*) => true,
+@@ -1464,6 +1465,11 @@
+ 
+ 
+ _RemoteProxy_CaptureResolve(State, Url, Callback) {
++	State["proxy_resolves"] := State.Get("proxy_resolves", 0) + 1
++	if State["proxy_resolves"] > 1 {
++		Callback.Call(Map("ok", true, "inherit", false, "proxy", "http://managed.corp:3128"))
++		return true
++	}
+ 	State["url"] := Url
+ 	State["continue"] := Callback
+ 	return true
+@@ -1520,7 +1526,8 @@
+ 		AssertEqual(1, State["runs"], "duplicate resolver completion must launch exactly once")
+ 		AssertEqual(2, State["writes"].Length, "one payload and one private config are staged")
+ 		AssertContains(State["writes"][2]["text"], 'proxy = "http://managed.corp:3128"')
+-		AssertContains(State["writes"][2]["text"], "proxy-anyauth")
++		AssertContains(State["writes"][2]["text"], "proxy-negotiate")
++		AssertFalse(InStr(State["writes"][2]["text"], "proxy-anyauth"), "the negotiated native scheme must not allow Basic/Digest downgrade")
+ 		AssertContains(State["writes"][2]["text"], 'proxy-user = ":"')
+ 		AssertFalse(InStr(State["command"]["command_line"], "private-api-key") > 0, "API credentials must remain outside argv")
+ 		AssertFalse(InStr(State["command"]["command_line"], "private-context") > 0, "typed text must remain outside argv")

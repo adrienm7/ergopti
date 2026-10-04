@@ -2414,6 +2414,17 @@ unchanged. Gated-model retry records its error kind before retiring old managed
 controls, preserving the existing macOS wiring check. Shared CI failures expose
 only check names in GitHub annotations when archived logs cannot be retrieved.
 
+Windows continuation is explicitly deferred to the maintainer's PC. The portable
+[Windows handover](handovers/2026-10-04-group6-windows/README.md) preserves exact
+patches, source/preimage hashes, dependency order and unexecuted/WIP status.
+Its twelve numbered Windows TODO steps cover composition, actual AHK/WebView
+controls, WinHTTP/PAC/WPAD ownership, enterprise CA/SSPI, redirect/failover,
+installer/serve/pull, installed packaging and update/rollback. Verify each
+packet's preimages before applying it; preserve newer owners and independent
+assertions. Native Windows tests and release/install acceptance remain unrun.
+These Windows steps no longer block the requested group-6 merge; item 62 and
+transversal items 16/38 stay open for their remaining validation scope.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
