@@ -1274,6 +1274,8 @@ Independent focused regressions ran every existing live-engine assertion: Mac 11
 
 The Live-off shared row retains its original native owners. Three existing macOS test fixtures now borrow the actual shared renderer check_row/get_array ports; all original assertions and the twelve Live source candidates remain byte-identical. The eleven affected modules pass 247 cases after the original current-root 94 failures. Full current-root qualification and hosted native admission remain required.
 
+The isolated Windows disabled-model catalogue runner now owns the actual shared command renderer, manifest decoder and native menu dependencies instead of outdated renderer doubles. Actual run 37175315386 passed all 8,121 main AHK checks but refused its isolated catalogue case when MenuRenderer_CommandRow was missing; the original four catalogue assertions remain, with new actual shared-metadata and unavailable-port regressions. Native candidate qualification is pending CI, and TODO 54 remains partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
