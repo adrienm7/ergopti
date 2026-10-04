@@ -1041,6 +1041,17 @@ These are software implementations; final hardware verification remains below.
   in-process and Windows owns its hashing worker; neither uses this Linux
   singleton admission path. Their native suites remain deferred. Separate
   caller ownership isolation is still pending.
+- [~] **L77.** Linux event-loop wait completion: retry nanosleep with its
+  remaining duration after EINTR and reject other native errors. Real libuv
+  child exits previously shortened a successful 400 ms wait to about 50 ms.
+  The registered native fixture now starts three actual sleep processes,
+  requires the full wall-clock delay with bounded CPU consumption, checks that
+  all children exited during the wait, and reaps them without leaked handles.
+  No signal delivery or syscall result is simulated. Windows uses its native
+  Sleep path without POSIX EINTR; macOS delegates to hs.timer.usleep, whose
+  underlying interruption behavior cannot be established in this container.
+  Their native suites remain deferred. The separate reserved injector wait
+  has an analogous source diagnosis and remains unchanged for its owner.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -62,10 +62,19 @@ local nap = (function()
 		end
 	end
 	local req = ffi.new("struct timespec[1]")
+	local remaining = ffi.new("struct timespec[1]")
+	local EINTR = 4 -- Linux errno for a signal-interrupted wait.
 	return function(seconds)
 		req[0].tv_sec = math.floor(seconds)
 		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
-		ffi.C.nanosleep(req, nil)
+		-- A libuv child's SIGCHLD interrupts nanosleep even with SA_RESTART.
+		-- Resume its remaining duration; restarting the whole wait extends it.
+		while ffi.C.nanosleep(req, remaining) ~= 0 do
+			local code = ffi.errno()
+			if code ~= EINTR then error("nanosleep failed (errno " .. code .. ")", 0) end
+			req[0].tv_sec = remaining[0].tv_sec
+			req[0].tv_nsec = remaining[0].tv_nsec
+		end
 	end
 end)()
 
