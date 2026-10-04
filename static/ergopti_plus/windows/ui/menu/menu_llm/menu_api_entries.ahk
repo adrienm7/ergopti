@@ -630,13 +630,13 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 ; Progress tick: fills the bar with the elapsed share of the budget and
 ; refreshes the label. Never throws into the timer thread; a missing state
 ; just stops meaning anything.
-_LLM_Menu_ApiTestProgressTick() {
+_LLM_Menu_ApiTestProgressTick(NowTick?) {
 	global _LLM_Menu_ApiTestProgress
 	if !(_LLM_Menu_ApiTestProgress is Map)
 		|| !_LLM_Menu_ApiTestProgress.Has("entry")
 		return
 	State := _LLM_Menu_ApiTestProgress
-	Elapsed := Max(0, A_TickCount - State["start"])
+	Elapsed := TickElapsed(State["start"], NowTick?)
 	Budget := State.Get("budget", 0)
 	if State.Has("label")
 		try State["label"].Text := _LLM_Menu_ApiTestProgressText(
@@ -869,7 +869,7 @@ _LLM_Menu_ApiTestServerLine(Info) {
 ; flow — a late verdict must never relabel another entry.
 ; @return boolean True when the verdict was surfaced.
 _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
-		NotifyFn := 0, Info := "") {
+		NotifyFn := 0, Info := "", NowTick?) {
 	global _LLM_Menu, _LLM_Menu_ApiTestProgress
 	; The progress belongs to this Owner reference: hide it before every
 	; exit, including stale and suspended ones, so no window ever lingers.
@@ -890,7 +890,7 @@ _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 	}
 	if (Matches != 1 || !LLM_AuxFinish(Owner))
 		return false
-	Ms := Max(0, A_TickCount - StartedTick)
+	Ms := TickElapsed(StartedTick, NowTick?)
 	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info)
 	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
 		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)
