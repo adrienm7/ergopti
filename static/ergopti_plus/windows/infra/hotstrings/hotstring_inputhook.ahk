@@ -1207,9 +1207,7 @@ _PrefixPostFireDecision(Effect, EngineBuffer, MaxBufferLen) {
 		return { Reset: true, Buffer: "", Schedule: false }
 	if Effect.ClearAll or Effect.KnownBoundaryAfter
 		return { Reset: true, Buffer: "", Schedule: false }
-	NextBuffer := EngineBuffer
-	if StrLen(NextBuffer) > MaxBufferLen
-		NextBuffer := SubStr(NextBuffer, -MaxBufferLen)
+	NextBuffer := _TextTailWithinUnits(EngineBuffer, MaxBufferLen)
 	return {
 		Reset: NextBuffer == "",
 		Buffer: NextBuffer,
@@ -1675,9 +1673,7 @@ _PrefixWordTail(Buf) {
 		Tail := Ch . Tail
 		Position := Start - 1
 	}
-	if (StrLen(Tail) > _MAX_BUFFER_LEN)
-		Tail := SubStr(Tail, -_MAX_BUFFER_LEN)
-	return Tail
+	return _TextTailWithinUnits(Tail, _MAX_BUFFER_LEN)
 }
 
 ; Commit one backspace to both in-memory buffers. The caller owns serialization;
@@ -1791,9 +1787,7 @@ _PrefixAppendTypedChar(Char) {
 	; invalidate it synchronously through TooltipHide's Win32-only fast teardown;
 	; the replacement remains debounced, so GUI/UIA work never moves onto OnChar.
 	_PrefixDismissStaleSuggestion("PrefixChanged")
-	NextPrefixBuffer := _PrefixBuffer . Char
-	if (StrLen(NextPrefixBuffer) > _MAX_BUFFER_LEN)
-		NextPrefixBuffer := SubStr(NextPrefixBuffer, -_MAX_BUFFER_LEN)
+	NextPrefixBuffer := _TextTailWithinUnits(_PrefixBuffer . Char, _MAX_BUFFER_LEN)
 	_PrefixSetBuffer(NextPrefixBuffer)
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "Render scheduled: buffer_units={1}.", _PrefixLogSafe(_PrefixBuffer))

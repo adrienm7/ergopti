@@ -208,3 +208,19 @@ _TextCodepointStart(Text, Position) {
 	}
 	return Position
 }
+
+/** Returns a contiguous suffix within a UTF-16 budget without splitting a pair. */
+_TextTailWithinUnits(Text, MaxUnits) {
+	if !(Text is String) || !(MaxUnits is Integer) || MaxUnits < 0
+		throw TypeError("_TextTailWithinUnits expects a string and a nonnegative integer.")
+	if MaxUnits == 0
+		return ""
+	Units := StrLen(Text)
+	if Units <= MaxUnits
+		return Text
+	Start := Units - MaxUnits + 1
+	; Moving forward drops the complete oldest pair and preserves the bound.
+	if _TextCodepointStart(Text, Start) < Start
+		Start += 1
+	return SubStr(Text, Start)
+}

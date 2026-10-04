@@ -102,3 +102,20 @@ _SU_UnicodeEraseAndReplaySpans() {
 }
 Test("text utils: Unicode replay and erasure preserve independent character spans (unicode-erase)",
 	_SU_UnicodeEraseAndReplaySpans)
+
+_UCAP_TextTailBudget() {
+	Text := "A" . Chr(0x1F600) . "bc"
+	Expected := ["", "c", "bc", "bc", Chr(0x1F600) . "bc", Text]
+	for Value in Expected {
+		Capacity := A_Index - 1
+		Actual := _TextTailWithinUnits(Text, Capacity)
+		AssertEqual(Value, Actual, "literal suffix for budget " . Capacity)
+		Assert(StrLen(Actual) <= Capacity, "whole pairs never exceed the unit budget")
+	}
+	AssertEqual("", _TextTailWithinUnits("A" . Chr(0x1F600), 1))
+	AssertEqual(Chr(0x1F600), _TextTailWithinUnits("A" . Chr(0x1F600), 2))
+	AssertEqual("A" . Chr(0xD800), _TextTailWithinUnits("A" . Chr(0xD800), 2),
+		"isolated legacy units retain their original representation")
+	AssertEqual(Chr(0xDC00), _TextTailWithinUnits("A" . Chr(0xDC00), 1))
+}
+Test("text unicode-context-cap: every unit budget preserves the exact complete suffix", _UCAP_TextTailBudget)

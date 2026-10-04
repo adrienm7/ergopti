@@ -1965,3 +1965,59 @@ TestHSE_MagicCompletionDoesNotOpenWord() {
 }
 Test("HSE magic-completion-word-boundary: completion and word opening have separate roles",
     TestHSE_MagicCompletionDoesNotOpenWord)
+
+_UCAP_WithEngine(Body) {
+	global HSE_MAX_BUFFER_LEN, HSE_WORD_TERMINATORS
+	Saved := { Capacity: HSE_MAX_BUFFER_LEN, Terminators: HSE_WORD_TERMINATORS }
+	try {
+		HSE_TestReset()
+		HSE_MAX_BUFFER_LEN := 3
+		HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+		Body()
+	} finally {
+		HSE_MAX_BUFFER_LEN := Saved.Capacity
+		HSE_WORD_TERMINATORS := Saved.Terminators
+		HSE_TestReset()
+	}
+}
+
+_UCAP_EngineTail(Boundary) {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+	if Boundary
+		HSE_WORD_TERMINATORS .= Chr(0x1F600)
+	for Char in ["A", Chr(0x1F600), "b", "c"]
+		HSE_FeedChar(Char)
+	AssertEqual("bc", HSE_Buffer, "a bounded tail drops the complete oldest pair")
+	AssertEqual(Boundary, HSE_StartIsWordBoundary,
+		"the last discarded complete scalar determines the left boundary")
+}
+Test("HSE unicode-context-cap: typed tail never starts with half a pair", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineTail.Bind(false)))
+Test("HSE unicode-context-cap: discarded supplementary boundary remains known", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineTail.Bind(true)))
+
+_UCAP_EngineFraming() {
+	global HSE_WORD_TERMINATORS, HSE_Buffer, HSE_LastEndChar
+	Delimiter := Chr(0x1F600)
+	HSE_WORD_TERMINATORS .= Delimiter
+	HSE_Register("?C", "abc", (*) => 0)
+	for Char in ["a", "b", "c"]
+		HSE_FeedChar(Char)
+	Match := HSE_FeedChar(Delimiter)
+	AssertEqual("abc" . Delimiter, HSE_Buffer,
+		"the full completion scalar is framing outside the trigger capacity")
+	Assert(IsObject(Match), "the longest admitted END trigger still matches")
+	AssertEqual(Delimiter, HSE_LastEndChar)
+}
+Test("HSE unicode-context-cap: supplementary END framing does not evict trigger text", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineFraming))
+
+_UCAP_EngineReplacement() {
+	global HSE_Buffer
+	Spec := HSE_Register("*?", "x", (*) => 0)
+	HSE_FeedChar("x")
+	HSE_ApplyExpansion(HSE_LastMatch, "A" . Chr(0x1F600) . "bc")
+	AssertEqual("bc", HSE_Buffer, "replacement commits share the pair-safe capacity owner")
+}
+Test("HSE unicode-context-cap: committed replacement retains a valid bounded suffix", (*) =>
+	_UCAP_WithEngine(_UCAP_EngineReplacement))

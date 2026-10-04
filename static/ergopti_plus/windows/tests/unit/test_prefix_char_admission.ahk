@@ -409,3 +409,42 @@ Test("prefix dead-key-chunk: a distinct supplementary scalar is never half a del
 Test("prefix dead-key-chunk: a boundary before a supplementary scalar keeps the full tail", (*) =>
 	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: "." . Chr(0x1F601), Flags: "", Trigger: "",
 		Replacement: "", Expected: "foo." . Chr(0x1F601), Sends: 0, End: "", Prefix: Chr(0x1F601) }))
+
+_UCAP_PrefixDecision(Capacity, Expected) {
+	Effect := { ClearAll: false, KnownBoundaryAfter: false }
+	Decision := _PrefixPostFireDecision(Effect, "A" . Chr(0x1F600) . "bc", Capacity)
+	AssertEqual(Expected, Decision.Buffer, "post-fire preview is a complete contiguous suffix")
+	AssertEqual(Expected == "", Decision.Reset)
+	AssertEqual(Expected != "", Decision.Schedule)
+}
+Test("prefix unicode-context-cap: post-fire truncation preserves complete pairs", (*) =>
+	_UCAP_PrefixDecision(3, "bc"))
+Test("prefix unicode-context-cap: zero capacity clears and retires the preview", (*) =>
+	_UCAP_PrefixDecision(0, ""))
+
+_UCAP_PrefixTail() {
+	global _MAX_BUFFER_LEN
+	Saved := _MAX_BUFFER_LEN
+	try {
+		_MAX_BUFFER_LEN := 3
+		AssertEqual("bc", _PrefixWordTail("A" . Chr(0x1F601) . "bc"),
+			"the final word remains bounded without cutting a supplementary scalar")
+	} finally {
+		_MAX_BUFFER_LEN := Saved
+	}
+}
+Test("prefix unicode-context-cap: final-word lookup keeps a pair-safe suffix", _UCAP_PrefixTail)
+
+_UCAP_PrefixAppend() {
+	global _MAX_BUFFER_LEN
+	Saved := _MAX_BUFFER_LEN
+	try {
+		_MAX_BUFFER_LEN := 3
+		_PCA_DeadKeyChunk({ Initial: "A" . Chr(0x1F601) . "b", Chunk: "c",
+			Trigger: "", Flags: "", Replacement: "", Sends: 0, End: "",
+			Expected: "A" . Chr(0x1F601) . "bc", Prefix: "bc" })
+	} finally {
+		_MAX_BUFFER_LEN := Saved
+	}
+}
+Test("prefix unicode-context-cap: actual printable callback caps the native preview", _UCAP_PrefixAppend)
