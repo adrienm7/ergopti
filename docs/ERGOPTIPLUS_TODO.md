@@ -1664,6 +1664,20 @@ harness requires table.pack; no shim was added. Selected root gates passed
 qualification and the separate scalar-binding parent refusal remain pending.
 This bounded preservation change does not complete 33.
 
+The macOS remap owner preserves a known unusable tap-hold scalar when an
+unrelated full-state save carries only its neutral slots. Load and save share
+one precise per-file warning identity; non-neutral binding or timeout candidates
+still refuse with their exact path before publication, until explicit file
+repair. Supported legacy combo strings and all existing typed-parent refusal
+assertions remain unchanged. Nine new real-file controls give the composed
+predecessor 1/8 and corrected 9/0 on Lua5.4; forty-one unchanged focused cases
+also pass. This slice preserves scalar models and foreign fields through the
+existing whole-document serializer, not arbitrary lexical formatting/comments.
+Selected local gates passed 356 JS checks, 13,981 portable macOS unit cases
+and 101 macOS E2E checks (one host-specific scenario skipped). Hosted native
+qualification and broader binding-parent/repair-intent work remain pending;
+TODO33 is not complete.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
