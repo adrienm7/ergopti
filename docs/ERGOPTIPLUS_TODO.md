@@ -1921,6 +1921,12 @@ The new models transport was added afterward and still requires native
 qualification. The separate shared-CI native-read dependency failure also
 prevents treating this checkpoint as complete qualification.
 
+The shared Core CI now provisions Lua 5.4's native luv module for the actual
+installed registry probe. Plain Lua without luv independently reproduces the
+native-reader refusal on a readable source; the correction retains exact
+descriptor admission and all discovery/count assertions. A fresh hosted
+checkpoint is required to qualify this prerequisite.
+
 - [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
 
 The native Windows strict version receipts exposed an older test that leaked
