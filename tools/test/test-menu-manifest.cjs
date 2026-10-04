@@ -1552,3 +1552,59 @@ checkPrivacyTriggerControls();
 		'CapsWord selection: one Linux-only declaration and the existing acknowledged native owner.'
 	);
 }
+
+// The selection case provider owns native effects; shared metadata owns its trio.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(
+				REPO_ROOT,
+				'static/ergopti_plus/_shared/tests/corpus/menus/linux_selection_case.json'
+			),
+			'utf8'
+		)
+	);
+	assert.deepEqual(
+		manifest[corpus.section],
+		corpus.commands.map((command) => ({
+			type: 'command',
+			id: command.id,
+			i18n: command.label_key,
+			disabled_when: [command.id + '_ready'],
+			platforms: ['linux'],
+			unavailable: 'hide'
+		})),
+		'the independent trio owns order, labels, native readiness and placement'
+	);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	const start = source.indexOf('local case_methods = {');
+	const end = source.indexOf('for _, helper in ipairs({', start);
+	assert(start >= 0 && end > start, 'the actual case provider must be nonempty');
+	const body = source.slice(start, end);
+	assert(
+		body.includes('ManifestMenu.get_array("selection_case_commands")'),
+		'the provider follows shared declaration order'
+	);
+	assert(
+		body.includes('ManifestMenu.command_row("selection_case_commands", id'),
+		'the provider consumes canonical command data'
+	);
+	assert(body.includes('sc[method]() ~= true'), 'a truthy native receipt cannot be borrowed');
+	assert(
+		!/label\s*=\s*i18n_safe\(transform\.key\)/.test(body),
+		'native transforms cannot redeclare the shared labels'
+	);
+	assert.equal(
+		manifest.shortcuts_menu.find((row) => row.id === 'selection_operations').platforms.join(','),
+		'linux',
+		'Windows and macOS retain actual binding owners'
+	);
+	console.log(
+		'Selection case commands: shared trio, strict native receipts and unchanged placement.'
+	);
+}

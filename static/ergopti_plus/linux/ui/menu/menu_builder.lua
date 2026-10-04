@@ -3076,15 +3076,30 @@ local function _build_shortcuts(ctx)
 	})
 	if caps_row then selection_rows[#selection_rows + 1] = caps_row end
 	selection_rows[#selection_rows + 1] = { separator = true }
-	for _, transform in ipairs({
-		{ key = "menu.shortcuts.to_uppercase", run = sc.transform_uppercase },
-		{ key = "menu.shortcuts.to_lowercase", run = sc.transform_lowercase },
-		{ key = "menu.shortcuts.to_titlecase", run = sc.transform_titlecase },
-	}) do
-		selection_rows[#selection_rows + 1] = {
-			label  = i18n_safe(transform.key),
-			action = function() transform.run() end,
-		}
+	local case_methods = {
+		uppercase_selection = "transform_uppercase",
+		selection_lowercase = "transform_lowercase",
+		titlecase_selection = "transform_titlecase",
+	}
+	local function case_ready(method)
+		return type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc[method]) == "function"
+	end
+	local case_getters = {
+		uppercase_selection_ready = function() return case_ready(case_methods.uppercase_selection) end,
+		selection_lowercase_ready = function() return case_ready(case_methods.selection_lowercase) end,
+		titlecase_selection_ready = function() return case_ready(case_methods.titlecase_selection) end,
+	}
+	for _, command in ipairs(ManifestMenu.get_array("selection_case_commands")) do
+		local id, method = command.id, case_methods[command.id]
+		local ready = assert(case_getters[id .. "_ready"], "Selection case command has no native owner")
+		local row = ManifestMenu.command_row("selection_case_commands", id, {
+			[id] = function()
+				if not ready() or sc[method]() ~= true then return false end
+				return true
+			end,
+		}, case_getters)
+		if row then selection_rows[#selection_rows + 1] = row end
 	end
 	selection_rows[#selection_rows + 1] = { separator = true }
 	for _, helper in ipairs({

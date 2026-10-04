@@ -6257,3 +6257,30 @@ type = "command"
 id = "api_remove_active"
 i18n = "menu.llm.api_remove_entry"
 disabled_when = ["llm_api_active_ready"]
+
+# Selection case commands use each driver's existing action bindings. The Linux
+# selection provider offers these direct tray actions without duplicate native
+# keyboard slots on Windows or macOS.
+[[menu.selection_case_commands]]
+type = "command"
+id = "uppercase_selection"
+i18n = "menu.shortcuts.to_uppercase"
+disabled_when = ["uppercase_selection_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_case_commands]]
+type = "command"
+id = "selection_lowercase"
+i18n = "menu.shortcuts.to_lowercase"
+disabled_when = ["selection_lowercase_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_case_commands]]
+type = "command"
+id = "titlecase_selection"
+i18n = "menu.shortcuts.to_titlecase"
+disabled_when = ["titlecase_selection_ready"]
+platforms = ["linux"]
+unavailable = "hide"

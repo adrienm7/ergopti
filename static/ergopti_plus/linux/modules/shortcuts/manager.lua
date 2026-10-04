@@ -385,6 +385,8 @@ end
 local function transform_selection(action, transform)
 	if _configuration_owner ~= nil then return false end
 	record(action)
+	-- Metric delivery can reserve configuration before clipboard ownership begins.
+	if _configuration_owner ~= nil then return false end
 	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
 	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
 	return ok

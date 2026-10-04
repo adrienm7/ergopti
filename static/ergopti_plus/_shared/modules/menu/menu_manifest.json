@@ -2258,5 +2258,43 @@
 				"llm_api_active_ready"
 			]
 		}
+	],
+	"selection_case_commands": [
+		{
+			"type": "command",
+			"id": "uppercase_selection",
+			"i18n": "menu.shortcuts.to_uppercase",
+			"disabled_when": [
+				"uppercase_selection_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "selection_lowercase",
+			"i18n": "menu.shortcuts.to_lowercase",
+			"disabled_when": [
+				"selection_lowercase_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "titlecase_selection",
+			"i18n": "menu.shortcuts.to_titlecase",
+			"disabled_when": [
+				"titlecase_selection_ready"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
 	]
 }
