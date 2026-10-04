@@ -120,7 +120,7 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 		; The callback IS the dispatch here (HSE_DispatchMatch routes RawCallback specs
 		; to it), so it is always passed; only the recorder string is gated on Rec.
 		Rec := _HotstringRegistrar
-		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: SubStr(Abbreviation, -2, 1), Category: Category, Section: Section, Priority: Priority }
+		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: _TextPenultimateCodepoint(Abbreviation), Category: Category, Section: Section, Priority: Priority }
 		if (IsSet(options) and options.Has("Group"))
 				Meta.group := options["Group"]
 		if (IsSet(options) and options.Has("PersonalSource"))
@@ -153,7 +153,7 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 				OnlyText: OnlyText,
 				FinalResult: FinalResult,
 				TimeActivationSeconds: TimeActivationSeconds,
-				PrevCharKey: SubStr(Abbreviation, -2, 1),
+				PrevCharKey: _TextPenultimateCodepoint(Abbreviation),
 				IsRepeat: IsRepeat,
 				Category: Category,
 				Section: Section,
@@ -176,7 +176,7 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "", IsPrivate := false) {
 		BackSpaceSeq := "{BackSpace " . _TextCodepointLength(Abbreviation) . "}"
 		AbbreviationLen := StrLen(Abbreviation)
-		PrevCharKey := SubStr(Abbreviation, -2, 1)
+		PrevCharKey := _TextPenultimateCodepoint(Abbreviation)
 		return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
 				TimeActivationSeconds, AbbreviationLen, Abbreviation, Category, Section, IsPrivate)
 }
@@ -299,9 +299,10 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		return Fired
 }
 
-IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
+; Optional observed ticks preserve the live default while allowing exact deadline replay.
+IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds, NowTick := unset) {
 		; Don't activate the hotstring if taped too slowly
-		Now := A_TickCount
+		Now := IsSet(NowTick) ? NowTick : A_TickCount
 		if OptionTimeActivationSeconds > 0 {
 				if !TickTryDurationMsFromSeconds(
 						OptionTimeActivationSeconds, &ActivationDurationMs)

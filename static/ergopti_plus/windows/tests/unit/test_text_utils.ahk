@@ -119,3 +119,17 @@ _UCAP_TextTailBudget() {
 	AssertEqual(Chr(0xDC00), _TextTailWithinUnits("A" . Chr(0xDC00), 1))
 }
 Test("text unicode-context-cap: every unit budget preserves the exact complete suffix", _UCAP_TextTailBudget)
+
+_TestTextPenultimateCodepoint() {
+	for Row in [["", ""], ["a", ""], [Chr(0x1F601), ""], ["ab", "a"],
+		["a" . Chr(0x1F601), "a"], [Chr(0x1F601) . "a", Chr(0x1F601)],
+		[Chr(0x1F600) . Chr(0x1F601), Chr(0x1F600)],
+		[Chr(0xD801) . "a", Chr(0xD801)], ["a" . Chr(0xDC01), "a"]]
+		AssertEqual(Row[2], _TextPenultimateCodepoint(Row[1]), "exact complete prior scalar")
+	Caught := 0
+	try _TextPenultimateCodepoint(42)
+	catch as Err
+		Caught := Err
+	AssertTrue(Caught is TypeError, "invalid text is refused explicitly")
+}
+Test("text_utils unicode-time-gate: prior scalar lookup covers short and supplementary spans", _TestTextPenultimateCodepoint)

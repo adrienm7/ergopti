@@ -224,3 +224,18 @@ _TextTailWithinUnits(Text, MaxUnits) {
 		Start += 1
 	return SubStr(Text, Start)
 }
+
+
+/** Returns the complete scalar immediately before the final scalar, or empty. */
+_TextPenultimateCodepoint(Text) {
+	if !(Text is String)
+		throw TypeError("_TextPenultimateCodepoint expects a string.")
+	Units := StrLen(Text)
+	if Units == 0
+		return ""
+	PreviousEnd := _TextCodepointStart(Text, Units) - 1
+	if PreviousEnd == 0
+		return ""
+	PreviousStart := _TextCodepointStart(Text, PreviousEnd)
+	return SubStr(Text, PreviousStart, PreviousEnd - PreviousStart + 1)
+}
