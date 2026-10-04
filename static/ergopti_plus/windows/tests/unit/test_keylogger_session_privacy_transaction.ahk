@@ -123,9 +123,9 @@ _KLSPT_StopAtPrivacyBoundary(Wrap) {
 		KLWatch.is_session_active := true
 		KLWatch.session_started_at := Wrap ? 0xFFFFFFF0 : 100
 		KLWatch.is_idle := true
-		KLWatch.idle_started_at := (KLWatch.session_started_at + 10) & 0xFFFFFFFF
+		KLWatch.idle_started_at := KLWatch.session_started_at + 10
 		KLWatch.privacy_interrupted := false
-		KL_Watchers_OnPrivateKeystroke((KLWatch.session_started_at + 30) & 0xFFFFFFFF)
+		KL_Watchers_OnPrivateKeystroke(KLWatch.session_started_at + 30)
 		_Stub_AppendLogRows := []
 		_Stub_AppendLogAccept := false
 		_Stub_AppendLogRejectSuspend := false
@@ -154,7 +154,7 @@ _KLSPT_StopAtPrivacyBoundary(Wrap) {
 	}
 }
 for Wrap in [false, true]
-	Test("keylogger watcher: shutdown respects private boundary wrap=" . Wrap
+	Test("keylogger watcher: shutdown respects private boundary native32-crossing=" . Wrap
 		. " (keylogger-private-stop-boundary)", _KLSPT_StopAtPrivacyBoundary.Bind(Wrap))
 
 _KLSPT_PauseClosesAuthorizedSession(Callback) {
@@ -169,7 +169,7 @@ _KLSPT_PauseClosesAuthorizedSession(Callback) {
 	try {
 		_KLSPT_ResetWatcher()
 		KLWatch.system_events := false
-		StartedAt := (A_TickCount - 1000) & 0xFFFFFFFF
+		StartedAt := A_TickCount
 		AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, StartedAt))
 		Suspend(1)
 		try Callback.Call()
@@ -177,10 +177,10 @@ _KLSPT_PauseClosesAuthorizedSession(Callback) {
 		AssertTrue(KLWatch.privacy_interrupted, "pause must retain the authorized session boundary")
 		Boundary := KLWatch.privacy_started_at
 		AssertEqual(1, _KLSPT_Sink.events.Length, "pause must not publish session records")
-		AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, (Boundary + 100000) & 0xFFFFFFFF))
+		AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, Boundary + 100000))
 		AssertEqual(3, _KLSPT_Sink.events.Length)
 		AssertEqual("session_end", _KLSPT_Sink.events[2]["kind"])
-		AssertEqual((Boundary - StartedAt) & 0xFFFFFFFF, _KLSPT_Sink.events[2]["duration_ms"],
+		AssertEqual(Boundary - StartedAt, _KLSPT_Sink.events[2]["duration_ms"],
 			"the next authorized key must exclude the complete paused interval")
 		AssertEqual("session_start", _KLSPT_Sink.events[3]["kind"])
 	} finally {

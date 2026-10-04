@@ -182,7 +182,7 @@ _KL_Watchers_EndIdle(EndTick, AppendFn := 0) {
 	} finally Critical(PreviousCritical)
 	try {
 		if !IsObject(KLWatch.idle_close)
-			KLWatch.idle_close := Map("duration", (EndTick - KLWatch.idle_started_at) & 0xFFFFFFFF)
+			KLWatch.idle_close := Map("duration", TickElapsed64(KLWatch.idle_started_at, EndTick))
 		Owner := KLWatch.idle_close
 		return _KL_Watchers_Log(AppendFn, "idle_end", Owner["duration"],
 			_KL_Watchers_CommitIdleClose.Bind(Owner))
@@ -233,12 +233,12 @@ _KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
 		if !IsObject(KLWatch.session_close) {
 			Owner := Map()
 			if KLWatch.is_idle {
-				Owner["idle_end"] := (IdleEndTick - KLWatch.idle_started_at) & 0xFFFFFFFF
+				Owner["idle_end"] := TickElapsed64(KLWatch.idle_started_at, IdleEndTick)
 				if IsObject(KLWatch.idle_close)
 					Owner["idle_end"] := KLWatch.idle_close["duration"]
 			}
 			if KLWatch.is_session_active
-				Owner["session_end"] := (SessionEndTick - KLWatch.session_started_at) & 0xFFFFFFFF
+				Owner["session_end"] := TickElapsed64(KLWatch.session_started_at, SessionEndTick)
 			KLWatch.session_close := Owner
 		}
 		Owner := KLWatch.session_close
@@ -285,8 +285,8 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 		return false
 	if !Keylogger.initialized && !HasMethod(AppendFn, "Call")
 		return false
-	now := IsSet(Now) ? Now : A_TickCount
 	last := KLWatch.last_authorized_tick
+	now := IsSet(Now) ? Now : A_TickCount
 	if IsObject(KLWatch.session_close) && !_KL_Watchers_CloseSession(0, 0, AppendFn)
 		return false
 
@@ -301,7 +301,7 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 
 	; Accepted session ownership also initializes a valid zero-valued tick.
 	if (last > 0 || KLWatch.is_session_active) {
-		gap := (now - last) & 0xFFFFFFFF
+		gap := TickElapsed64(last, now)
 		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
 			KL_Hook_AdvanceContextWatermarks(gap)
 		if KLWatch.is_session_active && gap >= KLWatchConst.SESSION_TIMEOUT_MS {
@@ -328,7 +328,7 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 ; Periodic check (~10 s) for « user has been silent for a while ». The
 ; only producer for idle_start and the in-time path for session_end —
 ; the keystroke producer above only handles retroactive session_end.
-KL_Watchers_IdleTick() {
+KL_Watchers_IdleTick(Now := unset) {
 		if A_IsSuspended {
 				KL_Watchers_OnSuspend()
 				return
@@ -338,10 +338,13 @@ KL_Watchers_IdleTick() {
 		if KLWatch.session_close_draining
 				return false
 		_KL_Watchers_SystemDrain()
-		if !KLHook.HasOwnProp("last_tick") || KLHook.last_tick = 0
+		if !KLHook.HasOwnProp("last_tick")
 				return
-		now := A_TickCount
-		gap := (now - KLHook.last_tick) & 0xFFFFFFFF
+		LastTick := KLHook.last_tick
+		if LastTick = 0
+				return
+		now := IsSet(Now) ? Now : A_TickCount
+		gap := TickElapsed64(LastTick, now)
 
 		if KLWatch.privacy_interrupted
 				return
@@ -353,11 +356,11 @@ KL_Watchers_IdleTick() {
 		if (!KLWatch.is_idle and KLWatch.is_session_active
 						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
 				KL_LogSession("idle_start", unset,
-						_KL_Watchers_CommitIdleStart.Bind(KLHook.last_tick))
+						_KL_Watchers_CommitIdleStart.Bind(LastTick))
 		}
 
 		if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-				return _KL_Watchers_CloseSession(KLHook.last_tick, now)
+				return _KL_Watchers_CloseSession(LastTick, now)
 		}
 }
 
