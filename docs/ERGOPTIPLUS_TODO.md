@@ -1117,6 +1117,14 @@ cleanup failed: the original case gives 47/1 without lfs, while the corrected
 module passes 48/0 both with and without lfs and with the real libuv adapter.
 Runtime scope ownership and cleanup requirements are unchanged.
 
+Linux native CI prerequisites now give the disposable SQLite account an owned
+home beneath /tmp, rather than an inaccessible runner-private parent; a refused
+chdir also stops before executing from the caller's checkout. CI installs the
+required xdotool before the AT-SPI interpreter fixture. The upstream diagnostic
+run37243988109 reproduces existing native E2E failures, including the inaccessible
+SQLite profile. Other hosted native failures remain under investigation with
+their Linux owners; local native replays do not replace the failed hosted verdict.
+
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] On Windows, replay the registered neutral/recommended/clear scope and global composition cases with the pinned native runtime. Check verified backups, exact runtime acknowledgement, stale-source refusal and retryable rollback.

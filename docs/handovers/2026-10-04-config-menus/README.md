@@ -6,18 +6,21 @@ The six assigned items (5, 7, 33, 42, 54, 81) remain partial; none is removed.
 Transverse items16/38 retain their validation requirements. No website or
 withdrawn differential-update work belongs to this handoff.
 
-## Integrated-source boundary
+## Delivered-source boundary
 
-The feature sources through `7339f6fc097286b557a469d6637f6dcdd9a3efd9`
-contain eleven bounded commits. This source checkpoint includes the Windows
+The feature sources through `38f2add0df777c1d49f04cb3a09e7ea8450c8b0f`
+contain fourteen bounded commits, listed exactly in `bounded-commits.json`,
+plus merges of current dev. This source checkpoint includes the Windows
 semantic cache/feature snapshot and obsolete installed-record preservation.
 Their portable checks passed, but their native Windows execution is pending.
 The actual integration SHA and final CI result must be recorded by delivery;
 a saved patch or portable Lua suite does not prove native integration.
 
-Local qualification includes 356 JS checks, 13,981 portable macOS unit cases,
-6,586 Linux unit cases, macOS/Linux E2E (101 passed plus one host-specific skip,
-188 passed), and BOM/LF checks. Individual commit receipts differ where source
+Final-source local qualification passed 356 JS checks, 14,002 portable macOS
+unit cases, 6,613 Linux unit cases, macOS/Linux E2E (101 passed plus one
+host-specific skip, 188 passed), and BOM/LF checks for 1,821 AHK files.
+The AHK unit/parse/E2E gates were not executed on this Linux host.
+Individual commit receipts differ where source
 selection deliberately omitted an unaffected driver. Actual X11 GTK/WebKit
 wizard round-trip, pending-folder, source-race/retry and obsolete-trigger probes
 passed. These do not establish physical input, Wayland, a restarted daemon,
@@ -33,6 +36,25 @@ publication was skipped. Windows failures remain workstation handoff work.
 The native metrics prerequisite also fails on untouched `689d30293704093feab2e3caa077604e88560eb6`:
 its fixture attempts to decode receipt-bearing SQLite stdout as JSON before
 production extracts the exit receipt. No assertion may be weakened to fix it.
+
+The final feature-source checkpoint is
+[37242713573](https://github.com/adrienm7/ergopti/actions/runs/37242713573),
+at `38f2add0df777c1d49f04cb3a09e7ea8450c8b0f`, with Windows explicitly deferred
+to the maintainer. JS/properties, Linux units, macOS portable unit/E2E and
+macOS packaging passed. Nine of eleven macOS install/launch profiles passed;
+`clean` and `karabiner_config` failed their original native AppleEvent probes.
+Independent upstream run37239438795 reproduces those same native failures.
+`evidence/macos-launch-source-equality.json` records 74 equal probe/launcher/
+packaging owners across the upstream and feature checkpoints. The complete
+runtime/package is not byte-identical, and the native cause remains unresolved.
+
+Five existing Linux E2E steps failed: disposable-profile SQLite init, release-page
+ETag associations, audio locale, AT-SPI interpreter options and literal desktop
+notifications. Linux packaging and installation were consequently not executed.
+The exact fixtures pass with real native components on both source snapshots in
+isolated local sessions (`evidence/linux-native-replays.json`), but their Debian
+versions differ from Ubuntu CI. These replays do not erase the hosted failures.
+Release publication was skipped. Final integrated-source CI remains mandatory.
 
 ## Windows resumption
 
