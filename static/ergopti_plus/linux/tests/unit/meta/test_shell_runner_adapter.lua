@@ -107,7 +107,7 @@ helpers.describe("linux-checked-output-receipts", function()
 		local previous_popen, command, calls = io.popen, nil, 0
 		io.popen = function(value)
 			command, calls = value, calls + 1
-			return { read = function() return "0 3\nabc" end, close = function() return true end }
+			return { read = function() return "0 3\nabc\nERGOPTI_CAPTURE_COMPLETE\n" end, close = function() return true end }
 		end
 		local protected, ok, output, reason = pcall(sh.exec_checked, "printf abc", { output_dir = dir })
 		io.popen = previous_popen
@@ -133,6 +133,43 @@ helpers.describe("linux-checked-output-receipts", function()
 			helpers.assert_eq(output, "")
 			helpers.assert_true(type(reason) == "string" and reason ~= "")
 			helpers.assert_eq(calls, 0)
+		end)
+	end
+end)
+
+helpers.describe("linux-checked-pipe-completion", function()
+	-- These are simulated libc receipts; the hardware capture test runs the
+	-- complete-frame transmitter failure through native children and pipes.
+	for _, failure in ipairs({ "read returned error", "read raised", "close returned error", "close raised", "missing trailer" }) do
+		helpers.it("linux-checked-pipe-completion: rejects " .. failure .. " and closes once", function()
+			local shell = helpers.load_module("adapters.shell_runner")
+			local previous_popen, closes = io.popen, 0
+			local canary = "SYNTHETIC_PRIVATE_RECEIPT_ERROR"
+			io.popen = function()
+				return {
+					read = function()
+						if failure == "read returned error" then return nil, canary, 5 end
+						if failure == "read raised" then error(canary) end
+						return "0 3\nabc" .. (failure == "missing trailer" and "" or "\nERGOPTI_CAPTURE_COMPLETE\n")
+					end,
+					close = function()
+						closes = closes + 1
+						if failure == "close returned error" then return nil, canary, 10 end
+						if failure == "close raised" then error(canary) end
+						return true
+					end,
+				}
+			end
+			local ok, err = xpcall(function()
+				local accepted, output, reason = shell.exec_checked("printf abc")
+				helpers.assert_eq(accepted, false, "an incomplete capture must not certify success")
+				helpers.assert_eq(closes, 1, "even failed reads must retire the pipe and reap its child")
+				helpers.assert_eq(output, (failure == "close returned error" or failure == "missing trailer") and "abc" or "")
+				helpers.assert_true(type(reason) == "string" and reason ~= "" and #reason < 200)
+				helpers.assert_nil(reason:find(canary, 1, true), "libc error text must stay private")
+			end, debug.traceback)
+			io.popen = previous_popen
+			if not ok then error(err, 0) end
 		end)
 	end
 end)

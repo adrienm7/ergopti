@@ -40,7 +40,7 @@ local function with_ps(outputs, body)
 		end
 		local pos = 0
 		return {
-			read = function() return string.format("%d %d\n%s", receipt.status, #content, content) end,
+			read = function() return string.format("%d %d\n%s\nERGOPTI_CAPTURE_COMPLETE\n", receipt.status, #content, content) end,
 			lines = function()
 				return function()
 					pos = pos + 1
