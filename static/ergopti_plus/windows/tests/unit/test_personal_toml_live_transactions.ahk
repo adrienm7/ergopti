@@ -608,3 +608,346 @@ _PTIO_PriorityDomainRejectsInvalidCandidate() {
 }
 Test("personal TOML: priority domain rejects invalid writer candidates",
 	_PTIO_PriorityDomainRejectsInvalidCandidate)
+
+; Opening-source consent uses actual private files, the ordinary durable owner,
+; and hidden native Gui identities. Callback bodies collect facts, never assert.
+_PT102_CaptureOpening(Source) {
+	if ReadPersonalToml.MaxParams >= 2
+		return ReadPersonalToml(false, Source)
+	; Original-driver comparison port: the old reader is called exactly as it
+	; was by the editor. This test-only receipt is never consumed by old code.
+	Data := ReadPersonalToml()
+	Present := FSStrictExists(PersonalTomlPath())
+	Source["admitted"] := true
+	Source["path"] := PersonalTomlPath()
+	Source["present"] := Present
+	Source["content"] := Present ? FSReadUtf8Exact(PersonalTomlPath()) : ""
+	return Data
+}
+
+_PT102_Stage(Context, StagePath, Content) {
+	Context.stages += 1
+	Context.stage_critical := Context.stage_critical || A_IsCritical
+	Context.stage_paths.Push(StagePath)
+	Written := FSWriteDurable(StagePath, Content)
+	if Context.mode == "stage-foreign"
+		Context.foreign_ack := FSWriteDurable(Context.path, Context.foreign)
+	else if Context.mode == "stage-close" {
+		if _OnEditorClose.MaxParams >= 2
+			_OnEditorClose(Context.window, Context.source["epoch"])
+		else
+			_OnEditorClose()
+		Context.window.Destroy()
+	}
+	return Written
+}
+
+_PT102_Replace(Context, StagePath, TargetPath) {
+	Context.replaces += 1
+	Context.replace_critical := Context.replace_critical || A_IsCritical
+	if Context.mode == "rename-lock" {
+		Handle := DllCall("Kernel32\CreateFileW", "Str", TargetPath, "UInt", 0x80000000,
+			"UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+		Context.lock_acquired := Handle != -1 && Handle != 0
+		Context.lock_handle := Context.lock_acquired ? Handle : 0
+		if Context.lock_acquired
+			Context.handle_owner[Context.path] := Handle
+		if !Context.lock_acquired
+			return false
+		try return FSAtomicMoveReplace(StagePath, TargetPath)
+		finally {
+			Context.lock_closed := DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
+			if Context.lock_closed {
+				Context.lock_handle := 0
+				Context.handle_owner.Delete(Context.path)
+			}
+		}
+	}
+	return FSAtomicMoveReplace(StagePath, TargetPath)
+}
+
+_PT102_Authorize(Context) {
+	Context.authorizes += 1
+	if Context.mode == "authorize-foreign"
+		Context.foreign_ack := FSWriteDurable(Context.path, Context.foreign)
+	return true
+}
+
+_PT102_Terminal(Context, Result) {
+	Context.terminals.Push(Result)
+	Owner := _ConfigWriteLeaseCurrent(Context.path)
+	Context.terminal_owner_ids.Push(Owner is Object ? Owner.id : 0)
+}
+
+_PT102_Reload(Context, Data, SectionName, FeatureConfig) {
+	Context.reloads += 1
+	Context.reload_critical := Context.reload_critical || A_IsCritical
+	if Context.fail_remaining > 0 {
+		Context.fail_remaining -= 1
+		throw Error("controlled opening-source reload refusal")
+	}
+	Context.live[SectionName] := Data["sections"][SectionName]["entries"][1]["output"]
+	if Context.queue_pending {
+		Context.queue_pending := false
+		Context.queued_result := _PT102_Commit(Context, _PTIOCR_Model("B"), true)
+	}
+}
+
+_PT102_Commit(Context, Data, Deferred := false) {
+	Args := [Data, 0, _PT102_Stage.Bind(Context), _PT102_Replace.Bind(Context),
+		0, _PT102_Authorize.Bind(Context), _PT102_Reload.Bind(Context),
+		Deferred ? _PT102_Terminal.Bind(Context) : 0, 0]
+	if PersonalTomlCommitAndReload.MaxParams >= 10
+		Args.Push(Context.source)
+	return PersonalTomlCommitAndReload(Args*)
+}
+
+_PT102_WithCase(Mode, Body) {
+	global ScriptInformation, _ReadPersonalTomlCache, _TomlUnreadableFiles
+	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection, _PersonalEditorPrioCtrl
+	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+	global _HsEdWeb_Gui, _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch
+	static Sequence := 0, RetainedHandles := Map()
+	if RetainedHandles.Count
+		throw Error("controlled native handle debt blocks successor fixture")
+	Sequence += 1
+	Path := A_Temp . "\ergopti_opening_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Sequence . ".toml"
+	Names := ["_ReadPersonalTomlCache", "_TomlUnreadableFiles", "_PersonalEditorGui",
+		"_PersonalEditorData", "_PersonalEditorSection", "_PersonalEditorPrioCtrl",
+		"_PersonalEditorOpeningSource", "_PersonalEditorSessionEpoch",
+		"_HsEdWeb_Gui", "_HsEdWeb_OpeningSource", "_HsEdWeb_SessionEpoch"]
+	Saved := Map()
+	for Name in Names {
+		Had := IsSet(%Name%)
+		Saved[Name] := Had ? {had: true, value: %Name%} : {had: false}
+	}
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldState := _PersonalTomlLiveCommitState()
+	OldSuspended := A_IsSuspended
+	OldCritical := Critical("Off")
+	Window := Gui()
+	Context := {path: Path, window: Window, source: Map(), mode: Mode,
+		foreign: "# independently changed source`r`n[_meta]`r`nfuture = 'preserve-me'`r`n",
+		stages: 0, replaces: 0, reloads: 0, authorizes: 0, stage_paths: [],
+		stage_critical: false, replace_critical: false, reload_critical: false,
+		foreign_ack: false, terminals: [], terminal_owner_ids: [],
+		lock_acquired: false, lock_closed: false, lock_handle: 0, handle_owner: RetainedHandles,
+		live: Map(), fail_remaining: 0, queue_pending: false, queued_result: "unreached"}
+	try {
+		Suspend(false)
+		ScriptInformation["PersonalTomlPath"] := Path
+		_TomlUnreadableFiles := _TomlUnreadableFiles.Clone()
+		_ReadPersonalTomlCache := false
+		_PersonalTomlLiveCommitState(_PTIOCR_FreshCommitState())
+		if Mode != "appeared"
+			if !WritePersonalToml(_PTIOCR_Model("seed"))
+				throw Error("opening-source fixture failed to seed its private file")
+		if Mode == "metadata" {
+			RawSeed := Chr(0xFEFF) . FSReadUtf8Exact(Path)
+			RawSeed := StrReplace(RawSeed, "[_meta]`r`n",
+				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , 1)
+			RawSeed := StrReplace(RawSeed, "[_meta.sections.alpha]`r`n",
+				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n', , 1)
+			if !FSWriteDurable(Path, RawSeed)
+				throw Error("opening-source fixture metadata publication refused")
+		}
+		if Mode == "cached"
+			_ReadPersonalTomlCache := _PTIOCR_Model("cached")
+		_PersonalEditorGui := Window
+		_PersonalEditorSessionEpoch := IsSet(_PersonalEditorSessionEpoch) ? _PersonalEditorSessionEpoch + 1 : 1
+		Context.opening_data := _PT102_CaptureOpening(Context.source)
+		Context.source["kind"] := "native"
+		Context.source["window"] := Window
+		Context.source["epoch"] := _PersonalEditorSessionEpoch
+		_PersonalEditorOpeningSource := Context.source
+		_PersonalEditorData := Context.opening_data
+		_PersonalEditorSection := "alpha"
+		Body.Call(Context)
+	} finally {
+		CleanupDebt := false
+		if Context.lock_handle {
+			if DllCall("Kernel32\CloseHandle", "Ptr", Context.lock_handle, "Int") {
+				Context.lock_handle := 0
+				RetainedHandles.Delete(Context.path)
+			} else
+				CleanupDebt := true
+		}
+		try Window.Destroy()
+		for StagePath in Context.stage_paths
+			try FileDelete(StagePath)
+		try FileDelete(Path)
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_PersonalTomlLiveCommitState(OldState)
+		for Name, State in Saved {
+			if State.had
+				%Name% := State.value
+			else
+				%Name% := unset
+		}
+		Suspend(OldSuspended)
+		Critical(OldCritical)
+		if CleanupDebt
+			throw Error("controlled native handle cleanup debt retained")
+	}
+}
+
+_PT102_Refusal(Context) {
+	global PERSONAL_TOML_COMMIT_FAILED
+	if Context.mode == "foreign" || Context.mode == "appeared"
+		AssertTrue(FSWriteDurable(Context.path, Context.foreign), "independent physical mutation must occur")
+	Expected := (Context.mode == "stage-foreign" || Context.mode == "authorize-foreign")
+		? Context.foreign : FSReadUtf8Exact(Context.path)
+	Result := _PT102_Commit(Context, _PTIOCR_Model("candidate"))
+	AssertEqual(PERSONAL_TOML_COMMIT_FAILED, Result)
+	AssertEqual(Expected, FSReadUtf8Exact(Context.path), "refused stale source must remain byte exact")
+	AssertEqual(0, Context.replaces)
+	AssertEqual(0, Context.reloads)
+	if Context.mode == "foreign" || Context.mode == "appeared"
+		AssertEqual(0, Context.stages, "preflight refusal must happen before any staging")
+	if Context.mode == "stage-foreign" || Context.mode == "authorize-foreign"
+		AssertTrue(Context.foreign_ack, "the controlled callback must really replace the source")
+	for StagePath in Context.stage_paths
+		AssertFalse(FileExist(StagePath), "refused owned stages must be retired")
+	_PTIOP_AssertLeaseFree(Context.path, "source refusal must release its actual native path owner")
+}
+for Mode in ["foreign", "appeared", "stage-foreign", "authorize-foreign", "stage-close"]
+	Test("personal-opening-source: actual owner refuses " . Mode,
+		_PT102_WithCase.Bind(Mode, _PT102_Refusal))
+
+_PT102_CacheBypass(Context) {
+	AssertEqual("seed-alpha", Context.opening_data["sections"]["alpha"]["entries"][1]["output"],
+		"opening source and model must come from the same fresh image, not the old untagged cache")
+	AssertEqual(FSReadUtf8Exact(Context.path), Context.source["content"])
+	AssertTrue(Context.source["present"])
+}
+Test("personal-opening-source: opening model bypasses stale ordinary cache",
+	_PT102_WithCase.Bind("cached", _PT102_CacheBypass))
+
+_PT102_Coalescing(Context) {
+	global PERSONAL_TOML_COMMIT_OK, PERSONAL_TOML_COMMIT_DEFERRED
+	Context.queue_pending := true
+	Result := _PT102_Commit(Context, _PTIOCR_Model("A"))
+	AssertEqual(PERSONAL_TOML_COMMIT_OK, Result)
+	AssertEqual(PERSONAL_TOML_COMMIT_DEFERRED, Context.queued_result)
+	AssertEqual(2, Context.stages)
+	AssertEqual(2, Context.replaces)
+	AssertEqual(1, Context.terminals.Length)
+	AssertEqual(PERSONAL_TOML_COMMIT_OK, Context.terminals[1])
+	AssertTrue(Context.terminal_owner_ids[1] > 0)
+	AssertEqual(FSReadUtf8Exact(Context.path), Context.source["content"],
+		"the receipt must advance to the exact staged own publication")
+	Disk := ReadPersonalToml(true)
+	AssertEqual("B-alpha", Disk["sections"]["alpha"]["entries"][1]["output"])
+	AssertEqual("B-beta", Context.live["beta"])
+	AssertFalse(Context.stage_critical)
+	AssertFalse(Context.replace_critical)
+	AssertFalse(Context.reload_critical)
+	_PTIOP_AssertLeaseFree(Context.path, "coalesced publication retains and finally releases its owner")
+}
+Test("personal-opening-source: own A then deferred B keeps exact publication lineage",
+	_PT102_WithCase.Bind("coalesced", _PT102_Coalescing))
+
+_PT102_ReloadRefusal(Context) {
+	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_OK
+	Context.fail_remaining := 2
+	Result := _PT102_Commit(Context, _PTIOCR_Model("saved"))
+	AssertEqual(PERSONAL_TOML_COMMIT_FAILED, Result)
+	AssertEqual(1, Context.replaces, "reload refusal must not masquerade as rolled-back disk")
+	AssertEqual(FSReadUtf8Exact(Context.path), Context.source["content"])
+	AssertTrue(_PersonalTomlLiveCommitState().resync is Object)
+	Context.mode := "retry"
+	Retry := _PT102_Commit(Context, _PTIOCR_Model("retry"))
+	AssertEqual(PERSONAL_TOML_COMMIT_OK, Retry)
+	AssertFalse(_PersonalTomlLiveCommitState().resync is Object)
+	AssertEqual(2, Context.replaces, "resync must reload the retained image without rewriting it")
+	AssertEqual("retry-beta", Context.live["beta"])
+	AssertEqual(FSReadUtf8Exact(Context.path), Context.source["content"])
+}
+Test("personal-opening-source: saved but reload refused retains own image for resync retry",
+	_PT102_WithCase.Bind("reload-refusal", _PT102_ReloadRefusal))
+
+_PT102_ForeignBeforeResync(Context) {
+	global PERSONAL_TOML_COMMIT_FAILED
+	Context.fail_remaining := 2
+	First := _PT102_Commit(Context, _PTIOCR_Model("saved"))
+	AssertEqual(PERSONAL_TOML_COMMIT_FAILED, First)
+	Retained := _PersonalTomlLiveCommitState().resync
+	AssertTrue(Retained is Object)
+	AssertTrue(FSWriteDurable(Context.path, Context.foreign))
+	BeforeReload := Context.reloads
+	BeforeStages := Context.stages
+	Retry := _PT102_Commit(Context, _PTIOCR_Model("unsafe-retry"))
+	AssertEqual(PERSONAL_TOML_COMMIT_FAILED, Retry)
+	AssertEqual(Context.foreign, FSReadUtf8Exact(Context.path))
+	AssertEqual(BeforeReload, Context.reloads, "stale source must refuse before replaying old resync")
+	AssertEqual(BeforeStages, Context.stages)
+	AssertEqual(ObjPtr(Retained), ObjPtr(_PersonalTomlLiveCommitState().resync),
+		"foreign refusal must retain the acknowledged old recovery obligation")
+}
+Test("personal-opening-source: foreign replacement refuses before owned resync mutates runtime",
+	_PT102_WithCase.Bind("foreign-resync", _PT102_ForeignBeforeResync))
+
+_PT102_ActualRenameRefusal(Context) {
+	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_OK
+	Original := FSReadUtf8Exact(Context.path)
+	Result := _PT102_Commit(Context, _PTIOCR_Model("rename-refused"))
+	AssertTrue(Context.lock_acquired, "the native replacement boundary must acquire the actual no-delete handle")
+	AssertTrue(Context.lock_closed, "only the exact acquired handle must be closed")
+	AssertEqual(PERSONAL_TOML_COMMIT_FAILED, Result)
+	AssertEqual(1, Context.replaces)
+	AssertEqual(0, Context.reloads)
+	AssertEqual(Original, FSReadUtf8Exact(Context.path))
+	AssertEqual(Original, Context.source["content"], "failed replacement cannot advance own-image lineage")
+	Context.mode := "rename-retry"
+	Retry := _PT102_Commit(Context, _PTIOCR_Model("retry"))
+	AssertEqual(PERSONAL_TOML_COMMIT_OK, Retry)
+	AssertEqual(FSReadUtf8Exact(Context.path), Context.source["content"])
+	AssertFalse(Context.replace_critical)
+}
+Test("personal-opening-source: actual no-delete handle refuses rename without source advancement",
+	_PT102_WithCase.Bind("rename-lock", _PT102_ActualRenameRefusal))
+
+_PT102_ConsentIdentityRefusal(Context) {
+	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+	global PERSONAL_TOML_COMMIT_FAILED
+	Original := FSReadUtf8Exact(Context.path)
+	if Context.mode == "deleted"
+		FileDelete(Context.path)
+	else if Context.mode == "new-session"
+		_PersonalEditorSessionEpoch += 1
+	else if Context.mode == "copied-receipt"
+		_PersonalEditorOpeningSource := Context.source.Clone()
+	else if Context.mode == "invalid-presence"
+		Context.source["present"] := "true"
+	Result := _PT102_Commit(Context, _PTIOCR_Model("unowned"))
+	AssertEqual(PERSONAL_TOML_COMMIT_FAILED, Result)
+	if Context.mode == "deleted"
+		AssertFalse(FSStrictExists(Context.path), "a deleted opening image cannot be recreated by stale consent")
+	else
+		AssertEqual(Original, FSReadUtf8Exact(Context.path))
+	AssertEqual(0, Context.stages)
+	AssertEqual(0, Context.replaces)
+	AssertEqual(0, Context.reloads)
+	_PTIOP_AssertLeaseFree(Context.path, "invalid opening consent must leave no publication owner")
+}
+for Mode in ["deleted", "new-session", "copied-receipt", "invalid-presence"]
+	Test("personal-opening-source: actual owner refuses " . Mode . " consent",
+		_PT102_WithCase.Bind(Mode, _PT102_ConsentIdentityRefusal))
+
+_PT102_KnownOverrides(Context) {
+	global PERSONAL_TOML_COMMIT_OK
+	AssertEqual(Chr(0xFEFF), SubStr(Context.source["content"], 1, 1))
+	Result := _PT102_Commit(Context, _PTIOCR_Model("updated"))
+	AssertEqual(PERSONAL_TOML_COMMIT_OK, Result)
+	Captured := _PersonalTomlCaptureOverrides(Context.path)
+	AssertTrue(Captured["ok"])
+	for Field, Literal in Map("delay", "0.125", "color", '"#123456"', "priority", "23", "show_tooltip", "false")
+		AssertEqual(Literal, Captured["file"][Field])
+	for Field, Literal in Map("delay", "0.75", "color", '"#ABCDEF"', "priority", "42", "show_tooltip", "true")
+		AssertEqual(Literal, Captured["sections"]["alpha"][Field])
+	AssertEqual(FSReadUtf8Exact(Context.path), Context.source["content"])
+	AssertEqual("updated-beta", Context.live["beta"])
+}
+Test("personal-opening-source: own image preserves all four file and section metadata neighbors",
+	_PT102_WithCase.Bind("metadata", _PT102_KnownOverrides))
