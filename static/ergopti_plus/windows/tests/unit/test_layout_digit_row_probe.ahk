@@ -756,3 +756,102 @@ _NRP_RegisteredSymbolsDeadAction() {
 	}
 }
 Test("number row: symbols retain real dead-action composition without a new emitter", _KLT_WithEmulation.Bind(_NRP_RegisteredSymbolsDeadAction))
+
+
+; These calls exercise the real criterion before its live sources are published.
+_NRP_AssertBootMode(Expected, Caption) {
+	Observed := ""
+	Failure := ""
+	try Observed := NumberRowEffectiveMode()
+	catch as Err
+		Failure := Err.Message
+	AssertEqual("", Failure, Caption . " must not escape an early-boot unset read")
+	AssertEqual(Expected, Observed, Caption . " must retain truthful native admission")
+}
+
+_NRP_UnpublishedBootSources() {
+	global Features, CategoryEnabled, KLE_Id, KLE_Model
+	HadFeatures := IsSet(Features)
+	HadCategory := IsSet(CategoryEnabled)
+	HadId := IsSet(KLE_Id)
+	HadModel := IsSet(KLE_Model)
+	if HadFeatures
+		SavedFeatures := Features
+	if HadCategory
+		SavedCategory := CategoryEnabled
+	if HadId
+		SavedId := KLE_Id
+	if HadModel
+		SavedModel := KLE_Model
+	try {
+		Features := Map("layout", Map("direct_access_digits", "digits"))
+		CategoryEnabled := unset
+		_NRP_AssertBootMode("native", "unpublished category map")
+		for Source in ["unpublished", 0, Map(), Map("Layout", false), Map("Layout", "true"),
+			Map("Layout", "1"), Map("Layout", 1.0), Map("Layout", 2)] {
+			CategoryEnabled := Source
+			_NRP_AssertBootMode("native", "unadmitted category source")
+		}
+		CategoryEnabled := Map("Layout", true)
+		_NRP_AssertBootMode("digits", "admitted Layout switch")
+		Features["layout"]["direct_access_digits"] := "native"
+		_NRP_AssertBootMode("native", "explicit native intent")
+		Features["layout"]["direct_access_digits"] := "symbols"
+		KLE_Id := "boot-source"
+		KLE_Model := unset
+		Features["layout"]["emulated_layout"] := KLE_Id
+		Features["layout"]["ergopti_base"] := true
+		_NRP_AssertBootMode("native", "unpublished symbols model")
+		KLE_Id := unset
+		_NRP_AssertBootMode("native", "unpublished symbols identity")
+		Features := unset
+		_NRP_AssertBootMode("native", "unpublished feature map")
+		for Source in ["unpublished", Map(), Map("layout", "invalid")] {
+			Features := Source
+			_NRP_AssertBootMode("native", "unadmitted feature source")
+		}
+	} finally {
+		if HadFeatures
+			Features := SavedFeatures
+		else
+			Features := unset
+		if HadCategory
+			CategoryEnabled := SavedCategory
+		else
+			CategoryEnabled := unset
+		if HadId
+			KLE_Id := SavedId
+		else
+			KLE_Id := unset
+		if HadModel
+			KLE_Model := SavedModel
+		else
+			KLE_Model := unset
+	}
+}
+Test("number row: unpublished and malformed boot sources retain native input", _NRP_UnpublishedBootSources)
+
+
+_NRP_AdmittedSymbolsBootMode() {
+	global Features, CategoryEnabled, LayerEnabled
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
+			"ergopti_alt_gr", true, "ergopti_plus", false, "direct_access_digits", "symbols"))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		_KLT_Load("ergol")
+		_NRP_AssertBootMode("symbols", "admitted real symbols source")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+	}
+}
+Test("number row: contained admission retains a genuine symbols capability", _KLT_WithEmulation.Bind(_NRP_AdmittedSymbolsBootMode))
