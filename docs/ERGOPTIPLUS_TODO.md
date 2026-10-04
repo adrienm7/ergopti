@@ -1750,6 +1750,17 @@ Production TLS policy is unchanged. Final native compilation, generated-feed
 delivery, archive lifecycles and the complete packaging/install verdict remain
 required before removing item 36.
 
+Actual macOS CI run 37242083827 refused the Brew sandbox profile before
+containment: Seatbelt accepts the network address host `localhost` or `*`,
+not the numeric host in `127.0.0.1:*`. The fixture now declares only
+`localhost:*`; outbound denial, the native EPERM probe, write/symlink
+containment, AppleEvent controls and ownership retirement remain unchanged.
+The portable policy guard requires exactly one loopback outbound allowance
+and rejects the unrestricted host. This grammar correction still requires
+actual macOS requalification; the failed run does not qualify Brew install,
+upgrade, refusal/retry or the final packaging/install matrix. Item 36 remains
+partial.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
