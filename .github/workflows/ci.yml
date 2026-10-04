@@ -320,13 +320,11 @@ jobs:
         # rather than reading it — a resolver that returns nil is invisible to
         # static inspection, which is how the language menu came to offer 2
         # locales of 21. The gate fails rather than skips when no interpreter is
-        # present, so this job needs one. The installed Linux registry probe
-        # also requires luv's exact descriptor admission on stock Lua 5.4.
-        # The Sparkle appcast fixture is parsed
+        # present, so this job needs one. The Sparkle appcast fixture is parsed
         # with xmllint so malformed release metadata cannot pass by string shape.
         run: |
           sudo apt-get update
-          sudo apt-get install -y lua5.4 libxml2-utils lua-luv
+          sudo apt-get install -y lua5.4 lua-luv libxml2-utils
 
       # One style per language: Prettier (JavaScript, Svelte, CSS, HTML, JSON,
       # Markdown, YAML) and Ruff (Python), at the version format.cjs pins.

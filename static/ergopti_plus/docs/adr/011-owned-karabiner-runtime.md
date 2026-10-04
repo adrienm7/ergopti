@@ -99,10 +99,8 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
   acceptance. New flags default to today's behaviour and use key names no older
   build ever wrote, so shared-mode generator output and boot stay identical.
 - VirtualHIDDevice version skew (only one version can be active system-wide) was
-  not part of the original answers. On 2026-10-04 the maintainer chose to block
-  an incompatible runtime with an explicit explanation and offer an update
-  only after confirmation. The owned mode must expose that named unavailable
-  state; an automatic driver replacement is not authorized by detection.
+  not part of the answers; the owned mode must surface it as an explicit named
+  state, and its resolution is still to be decided.
 - Counts are exact only inside an admitted capture. Before approval, during
   stream loss or with the option off while another Karabiner holds the
   keyboards, the gaps are recorded explicitly and never reconstructed.

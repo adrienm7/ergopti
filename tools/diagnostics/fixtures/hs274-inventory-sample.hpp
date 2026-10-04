@@ -10,9 +10,7 @@ namespace hs274_test {
 template <typename Sample>
 Sample inventory_sample(const nlohmann::json& element) {
   const auto& sample = element.at("sample");
-  // The retained inventory-v2 receipts enumerate only page-7 leaves. Their
-  // archived format omits the page; decoding preserves that original contract.
-  return {7, element.at("usage").get<std::uint32_t>(), element.at("cookie").get<std::uint32_t>(),
+  return {element.at("usage").get<std::uint32_t>(), element.at("cookie").get<std::uint32_t>(),
       {true, element.at("relative").get<bool>(), element.at("array").get<bool>(),
        element.at("bits").get<std::uint32_t>(), element.at("count").get<std::uint32_t>(),
        element.at("minimum").get<std::int64_t>(), element.at("maximum").get<std::int64_t>()},

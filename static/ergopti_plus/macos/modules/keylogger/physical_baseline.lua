@@ -12,7 +12,6 @@
 --- format and is refused.
 local M = {}
 local Wire = require("modules.keylogger.physical_wire")
-local Protocol = require("modules.keylogger.physical_protocol")
 local ENVELOPE = { "version", "kind", "coverage", "incarnation", "lease" }
 local PAGE = { "version", "kind", "coverage", "incarnation", "lease",
 	"boundary", "offset", "next", "total", "complete", "rows" }
@@ -41,7 +40,7 @@ end
 ---@return table baseline
 function M.new(descriptor)
 	Wire.fields(descriptor, { "version", "boundary", "rows" })
-	Protocol.require_version("baseline", descriptor.version, M.VERSION)
+	assert(descriptor.version == M.VERSION, "Unsupported physical baseline version")
 	local boundary = Wire.decimal(descriptor.boundary, false)
 	local total = Wire.integer(descriptor.rows, 1, 64 * (ELEMENTS_MAX + 1))
 	local status, cursor, count = "receiving", 0, 0

@@ -43,8 +43,7 @@ function M.new(dependencies)
 		if failure then return end
 		failure = tostring(reason)
 		transport.stop()
-		-- Keep the original failure available without changing the diagnostic port.
-		dependencies.on_error(failure, reason)
+		dependencies.on_error(failure)
 	end
 
 	local function consume(line)

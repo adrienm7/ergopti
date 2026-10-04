@@ -11,7 +11,7 @@ template <std::size_t Limit>
 class key_state final {
   static_assert(Limit > 0);
   struct element {
-    std::uint32_t page = 0, usage = 0, cookie = 0;
+    std::uint32_t usage = 0, cookie = 0;
     std::uint64_t sampled_at = 0, query_started = 0, query_finished = 0, last_at = 0;
     bool sampled_down = false, down = false, seen = false, last_down = false;
   };
@@ -21,7 +21,7 @@ public:
   enum class action { covered_by_snapshot, unchanged, pressed, released, auxiliary, invalid };
   enum class fault { none, initialization, device, element_identity, value, chronology, hid_error };
   struct frozen_element {
-    std::uint32_t page, usage, cookie;
+    std::uint32_t usage, cookie;
     std::uint64_t timestamp;
     bool down;
   };
@@ -42,7 +42,7 @@ public:
     if (!qualified.finish(enumerated, exhausted)) throw std::invalid_argument("Unreadable keyboard state inventory");
     for (std::size_t i = 0; i < count; ++i) {
       const auto& row = samples[i];
-      elements_[i] = {row.page, row.usage, row.cookie, row.timestamp, row.started, row.finished, 0,
+      elements_[i] = {row.usage, row.cookie, row.timestamp, row.started, row.finished, 0,
                       row.value == 1, row.value == 1, false, false};
     }
     count_ = count;
@@ -65,7 +65,7 @@ public:
       if (row.query_finished > boundary || frontier > boundary) {
         throw std::invalid_argument("Keyboard observation exceeds capture boundary");
       }
-      result.push_back({row.page, row.usage, row.cookie, frontier, row.down});
+      result.push_back({row.usage, row.cookie, frontier, row.down});
     }
     return result;
   }
@@ -82,21 +82,14 @@ public:
     if (failure_ != fault::none) return action::invalid;
     if (!initialized_) return fail(fault::initialization);
     if (input.device != device_) return fail(fault::device);
-    element* current = nullptr;
-    if (input.has_cookie) {
-      for (std::size_t i = 0; i < count_; ++i) {
-        if (elements_[i].cookie == input.cookie) { current = &elements_[i]; break; }
-      }
-    }
-    // Auxiliary interfaces may emit other pages, but an admitted element's
-    // explicit page must match before an observation can be ignored.
-    if (current && input.has_page && input.page != static_cast<std::int32_t>(current->page)) {
-      return fail(fault::element_identity);
-    }
     if (!input.has_page || input.page != 7) return action::auxiliary;
     if (!input.has_usage) return fail(fault::element_identity);
     if (input.usage == 0 || input.usage == -1) return action::auxiliary;
     if (!input.has_cookie || input.usage < 1 || input.usage > 255) return fail(fault::element_identity);
+    element* current = nullptr;
+    for (std::size_t i = 0; i < count_; ++i) {
+      if (elements_[i].cookie == input.cookie) { current = &elements_[i]; break; }
+    }
     if (!current || current->usage != static_cast<std::uint32_t>(input.usage)) return fail(fault::element_identity);
     if (input.value != 0 && input.value != 1) return fail(fault::value);
     if (input.usage <= 3 && input.value != 0) return fail(fault::hid_error);

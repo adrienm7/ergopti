@@ -68,13 +68,9 @@ local function run()
 			return nil, "unmapped_usage"
 		end,
 		emit = function(press)
-			assert(state.initialized, "Physical diagnostic aggregator is not initialized")
-			local entry = { action = "physical_press", capture = press.capture, device = press.device,
-				keycode = press.keycode, app = press.app, timestamp = press.timestamp }
-			events.walk_system_event(entry)
-			assert(state.initialized, "Physical diagnostic aggregation was revoked")
-			result.presses[#result.presses + 1] = entry
-			return true
+			result.presses[#result.presses + 1] = press
+			press.action = "physical_press"
+			events.walk_system_event(press)
 		end,
 	})
 	assert(not hs.fs.attributes(config.stream) and not hs.fs.attributes(config.diagnostics), "Capture outputs already exist")

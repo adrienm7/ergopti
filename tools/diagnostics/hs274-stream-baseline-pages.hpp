@@ -31,9 +31,7 @@ public:
       }
       std::unordered_set<std::uint32_t> cookies;
       for (const auto& key : device.keys) {
-        // Baseline v1 has an implicit keyboard page. Refuse other pages rather
-        // than silently discard their identity at this serialization boundary.
-        if (key.page != 7 || !key.usage || key.usage > 255 || (key.usage <= 3 && key.down) ||
+        if (!key.usage || key.usage > 255 || (key.usage <= 3 && key.down) ||
             key.timestamp > boundary_ || !cookies.insert(key.cookie).second) {
           throw std::invalid_argument("Invalid baseline element");
         }

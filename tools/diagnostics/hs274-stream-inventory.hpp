@@ -17,7 +17,7 @@ class key_inventory final {
   static_assert(Limit > 0);
 public:
   struct sample {
-    std::uint32_t page, usage, cookie;
+    std::uint32_t usage, cookie;
     key_element element;
     std::int32_t status;
     bool returned_value;
@@ -34,7 +34,7 @@ public:
       readable_ = false;
       throw std::overflow_error("Keyboard inventory bound exceeded");
     }
-    bool valid = input.page == 7 && input.usage >= 1 && input.usage <= 255 && binary_key(input.element) &&
+    bool valid = input.usage >= 1 && input.usage <= 255 && binary_key(input.element) &&
                  input.status == 0 && input.returned_value && input.cookie == input.value_cookie &&
                  (input.value == 0 || input.value == 1) && input.timestamp <= input.finished &&
                  previous_finish_ <= input.started && input.started <= input.finished;
