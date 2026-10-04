@@ -126,6 +126,8 @@ class KLWatch {
 		static privacy_started_at   := 0
 		static session_close := false
 		static session_close_draining := false
+		static session_generation := 0
+		static idle_generation := 0
 
 		; Idle machine. ``is_idle`` is independent of the session — a single
 		; session can contain many micro-idles without ending it.
@@ -156,11 +158,13 @@ class KLWatch {
 ; ==========================================
 
 _KL_Watchers_CommitIdleStart(StartedAt) {
+	KLWatch.idle_generation += 1
 	KLWatch.is_idle := true
 	KLWatch.idle_started_at := StartedAt
 }
 
 _KL_Watchers_CommitIdleEnd() {
+	KLWatch.idle_generation += 1
 	KLWatch.is_idle := false
 	KLWatch.idle_close := false
 }
@@ -190,23 +194,25 @@ _KL_Watchers_EndIdle(EndTick, AppendFn := 0) {
 }
 
 _KL_Watchers_CommitSessionStart(StartedAt) {
+	KLWatch.session_generation += 1
 	KLWatch.is_session_active := true
 	KLWatch.session_started_at := StartedAt
 	KLWatch.last_authorized_tick := StartedAt
 }
 
 _KL_Watchers_CommitSessionEnd() {
+	KLWatch.session_generation += 1
 	KLWatch.is_session_active := false
 }
 
-_KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0) {
+_KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0, FrozenClose := unset) {
 	if HasMethod(AppendFn, "Call") {
 		if IsSet(DurationMs)
 			return AppendFn.Call(Kind, DurationMs, CommitFn)
 		return AppendFn.Call(Kind, unset, CommitFn)
 	}
 	if IsSet(DurationMs)
-		return KL_LogSession(Kind, DurationMs, CommitFn)
+		return KL_LogSession(Kind, DurationMs, CommitFn, FrozenClose?)
 	return KL_LogSession(Kind, unset, CommitFn)
 }
 
@@ -239,17 +245,33 @@ _KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
 			}
 			if KLWatch.is_session_active
 				Owner["session_end"] := TickElapsed64(KLWatch.session_started_at, SessionEndTick)
+			Owner.DefineProp("CloseAuthority", {Value: KLSessionCloseAuthority(Owner)})
 			KLWatch.session_close := Owner
 		}
 		Owner := KLWatch.session_close
 		for Kind in ["idle_end", "session_end"] {
-			if Owner.Has(Kind) && !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind],
-				_KL_Watchers_CommitClose.Bind(Owner, Kind)) {
+			if !Owner.Has(Kind)
+				continue
+			FrozenClose := unset
+			CommitFn := _KL_Watchers_CommitClose.Bind(Owner, Kind)
+			if Keylogger._shutting_down && !HasMethod(AppendFn, "Call") {
+				if !Owner.HasOwnProp("CloseAuthority")
+					return false
+				FrozenClose := KLSessionClosePublication(Owner.CloseAuthority, Kind)
+				CommitFn := FrozenClose.CommitFn
+			}
+			if !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind], CommitFn, FrozenClose?) {
 				try LoggerWarn("Keylogger", Format(
 					"Session close '{1}' retained after publication refusal (shutdown={2}, privacy_interrupted={3}).",
 					Kind, Keylogger._shutting_down ? 1 : 0, KLWatch.privacy_interrupted ? 1 : 0))
 				return false
 			}
+		}
+		; Break the retained owner's authority cycle and retire its private receipt
+		; once every closing row has committed. Failed attempts keep one owner.
+		if Owner.HasOwnProp("CloseAuthority") {
+			_KL_SessionCloseAuthorityReceipt(Owner.CloseAuthority, , , , true)
+			Owner.DeleteProp("CloseAuthority")
 		}
 		KLWatch.session_close := false
 		return true
