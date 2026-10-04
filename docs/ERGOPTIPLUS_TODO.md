@@ -1316,6 +1316,22 @@ These are software implementations; final hardware verification remains below.
   stock Lua 5.4's actual native backend also passes. No caller, shared API,
   reserved feature or hosted CI changed.
 
+- [~] **L96.** Linux queued WebView messages after retirement: reject every
+  captured native epoch that differs from the current page epoch, including
+  when public hide has removed the page. An actual WebKit document posts two
+  messages; an explicitly injected public-hide timing seam in the first
+  handler retires the real window before the second native signal arrives.
+  Original behavior executes an extra handler; four virtual-GUI receipts go
+  from three passing to all four passing, including a live control, healthy
+  sibling and explicitly reopened responding document. Five registered unit
+  regressions go from three passing to all five passing, preserving current
+  epochs and legacy epochless calls. GTK/WebKit execute under owned Xvfb,
+  Openbox and D-Bus with private profiles; this is no physical desktop claim.
+  Windows deferred dispatch already rejects reset/retired epochs; macOS
+  metrics delivery checks generations and exact owned WebViews by source.
+  Foreign runtime gates remain deferred. No titles, metrics policy, menus,
+  input, shared API or hosted CI changed.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

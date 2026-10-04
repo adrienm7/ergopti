@@ -354,6 +354,7 @@ return {
 	"tests.unit.ui.test_llm_overlay_anchor",
 	"tests.unit.ui.test_llm_overlay_lines",
 	"tests.unit.ui.test_webview_page_messages",
+	"tests.unit.ui.test_webview_retired_bridge",
 	"tests.unit.ui.test_log_openers",
 	"tests.unit.ui.test_menu_extension_hotstrings",
 	"tests.unit.ui.test_menu_languages_and_global_separator",
