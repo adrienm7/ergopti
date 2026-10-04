@@ -1174,6 +1174,19 @@ These are software implementations; final hardware verification remains below.
   remains in use. Windows uses native process/SetTimer paths and macOS hs.task
   by source; their native admission behavior remains unqualified and deferred.
   No reserved source or public process API changed.
+- [~] **L87.** Linux event loop startup ownership: admit idle and periodic
+  handles only after their native start receipts succeed; unwind partial
+  construction on an exception or nil/false receipt, clear the running state
+  and raise the original refusal so the next run can retry. The rollback
+  retires only loop-owned handles, preserving an independently active timer.
+  Seven native component cases fail before and pass after: constructor/start
+  exceptions and allocation refusals are explicitly simulated; invalidating a
+  real timer produces the genuine EINVAL receipt. Acquired handles, foreign
+  ownership and healthy recovery runs use installed libuv. The registered
+  regression preserves existing clock and stop-boundary assertions. Windows
+  and macOS use their host message loops and native timer backends by source;
+  there is no equivalent Lua-owned loop startup transaction. Their runtime
+  suites and hosted CI remain deferred; physical input is untested here.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
