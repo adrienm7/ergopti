@@ -2862,6 +2862,11 @@ failure before the repair; all ten catalogue cases pass afterward without
 weakening absent-tool or availability assertions. This fixture correction does
 not integrate or qualify the pending executable/provider feature.
 
+The shared Core CI preparation reuses the independently released Group4
+`lua-luv` provisioning fix so stock Lua 5.4 can run native descriptor-admission
+checks. Manual validation still requires the dedicated CI branch and owned
+lock; this prerequisite does not qualify native program execution.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
