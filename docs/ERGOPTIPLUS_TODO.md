@@ -704,6 +704,8 @@ Actual macOS archive tests exposed a designated-requirement display boundary fai
 
 The signature display owner requires exactly one designated-requirement record before shell newline stripping, including refusal of a second empty record. Controlled shell ports preserve the withdrawn first correction's trailing-empty authorization failure and prove refusal before verification on both output streams. Native macOS remains pending.
 
+Native macOS requirement-display qualification remains blocked: the actual owned codesign child exits zero but the designated-record census is zero. The existing signed-bundle test now attaches separately bounded, control-escaped stdout/stderr packets, byte counts, truncation facts and its actual status to the unchanged strict status/designated-requirement assertions. A native calibration checks exact stream retention and independent 2,048-byte bounds. Signature matching, archive validation, deadlines, child retirement and all earlier assertions remain unchanged. The actual display grammar and native calibration await hosted macOS CI; no output-format cause or archive success is inferred. TODO36 remains partial.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
