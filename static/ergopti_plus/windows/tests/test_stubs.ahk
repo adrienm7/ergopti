@@ -873,7 +873,7 @@ global _Stub_AppendLogHook := 0
 global _Stub_FlushBufferMutates := false
 global _Stub_FlushBufferDeferred := false
 
-KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset, PublishCommit := unset) {
+KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset, PublishCommit := unset, FrozenClose := unset) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept
 	global _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	RejectedBySuspend := _Stub_AppendLogRejectSuspend

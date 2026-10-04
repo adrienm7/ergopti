@@ -2508,6 +2508,17 @@ Added a test-only characterization prerequisite for the legacy Windows Ergopti+ 
       shutdown debt (watchers=0). Keep privacy filtering fail-closed;
       distinguish measured stalls from causes before changing tooltip/hook code.
 
+Partial: Windows closing records now carry an exact accepted interval owner
+through producer teardown. Only content-free `idle_end` and `session_end`
+records can use that authority; ordinary telemetry keeps the current privacy
+predicate. Frozen boundaries, queue/commit identity and generation are checked
+again after yielding preparation, with refusal retaining the original close.
+A registered native child exercises the actual focus-stop, privacy and queue
+chain through controlled native ports, including replacement and mutation
+refusals. Native execution and full Windows qualification remain pending.
+The maintainer confirmed that the original supplied diagnostic is no longer
+available; this mechanism does not establish its historical live cause.
+
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
 rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all
 installation variants. Linux unit passes, but its real accessibility-bus probe
