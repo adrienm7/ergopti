@@ -2571,6 +2571,15 @@ arguments. Each frozen getter now comes from a separate factory invocation
 returning a real one-parameter closure, preserving the exact captured value
 and descriptor receipt. Source review and all existing privacy/refusal checks
 are retained; actual native execution and full qualification remain pending.
+Standard native run 37236435190 (source 5576e4dfa) completed all 9038 AHK
+cases with 9036 passes and two failures. The owned child now exits 0 after
+all frozen-close, refusal and receipt-retirement scenarios; its parent then
+incorrectly compares raw LF-terminated output with the real ShellRunner
+callback, which strips terminal CR/LF. The test now requires the exact callback
+marker without LF, retaining exit, complete-content, warning and scenario
+assertions. The standard 33-case C gate, 356 JS checks, 27 property checks
+and 72 browser checks passed. Native unit retry is required; E2E, packaging,
+startup and installation remain skipped after the unit failure.
 The other failure is the pre-existing personal-TOML metadata case (item 102).
 E2E, packaging and installation were skipped after the unit failure.
 
