@@ -711,7 +711,7 @@ _LLM_Menu_PromptDeleteCachedModel(name) {
 
 ; The fixed browser command is provider data; native browser fallback owns presentation.
 _LLM_Menu_ModelBrowserRow(OpenFn := 0) {
-	if !IsObject(OpenFn)
+	if !IsObject(OpenFn) && IsSet(LLM_ModelBrowser_Show)
 		OpenFn := LLM_ModelBrowser_Show
 	return MenuRenderer_CommandRow("llm_model_commands", "llm_browse_models",
 		Map("llm_browse_models", OpenFn),

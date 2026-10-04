@@ -1264,6 +1264,8 @@ The coloured hotstring-preview checkbox now consumes one shared typed declaratio
 
 The coloured-preview shared row is registered in the Linux discovery manifest. Existing macOS terminator fixtures delegate the added checkbox port to the actual shared renderer without changing their assertions. Japanese and Korean unavailability reasons keep their explanations and expose the required compact reason headings. Full composed verification and hosted native validation remain required.
 
+The Windows shared Models Browser provider now checks whether its actual native browser function exists before adopting the default callback. The definitions-only native menu graph can retain a disabled shared command without dereferencing an unavailable WebView owner; an explicitly supplied callable still returns its exact native presentation receipt. Every prior backend/model/menu assertion remains intact, and an additive registered regression exercises the genuinely absent default port rather than installing a stand-in. Source-only BOM/LF and ownership checks pass; hosted AutoHotkey and full selected qualification remain pending. Items54 and81 remain partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
