@@ -16,6 +16,26 @@ import sys
 import uuid
 
 
+class NativeCensusRefusal(RuntimeError):
+    """Bounded facts about this helper, never a process path or exception text."""
+
+    def __init__(self, path_errno):
+        helper_pid = os.getpid()
+        if (
+            type(path_errno) is not int
+            or not 0 <= path_errno <= 4095
+            or not 0 < helper_pid <= 2147483647
+        ):
+            raise RuntimeError("Native Sparkle diagnostic refused")
+        super().__init__("Native Sparkle process census is incomplete")
+        self.packet = {
+            "schema": 1,
+            "code": "path-unavailable",
+            "helper_pid": helper_pid,
+            "path_errno": path_errno,
+        }
+
+
 def publish(path, value):
     """Publish an exclusive receipt without exposing a partially written file."""
     stage = path.with_name("." + path.name + "." + uuid.uuid4().hex)
@@ -158,13 +178,15 @@ def census(roots):
         if owner != os.geteuid():
             continue
         buffer = ctypes.create_string_buffer(4096)
+        ctypes.set_errno(0)
         length = library.proc_pidpath(pid, buffer, len(buffer))
+        path_errno = ctypes.get_errno()
         if length <= 0:
             try:
                 os.kill(pid, 0)
             except ProcessLookupError:
                 continue
-            raise RuntimeError("Native Sparkle process census is incomplete")
+            raise NativeCensusRefusal(path_errno)
         executable = os.fsdecode(buffer.value)
         if any(executable.startswith(str(root) + "/") for root in admitted):
             result.append({"pid": pid, "executable": executable})
@@ -181,9 +203,19 @@ def main(arguments):
         raise RuntimeError("Private Sparkle operation refused")
 
 
-if __name__ == "__main__":
+def entrypoint(arguments):
+    """Export fixed refusal facts without changing strict native admission."""
     try:
-        main(sys.argv[1:])
+        main(arguments)
+    except NativeCensusRefusal as failure:
+        print(json.dumps(failure.packet, sort_keys=True))
+        print("Private Sparkle fixture refused.", file=sys.stderr)
+        return 1
     except Exception:
         print("Private Sparkle fixture refused.", file=sys.stderr)
-        sys.exit(1)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(entrypoint(sys.argv[1:]))

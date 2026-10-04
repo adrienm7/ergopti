@@ -3,7 +3,11 @@
 
 """Real loopback transport controls; native updater admission is separate."""
 
+import contextlib
+import ctypes
+import errno
 import hashlib
+import io
 import http.client
 import importlib.util
 import json
@@ -220,6 +224,86 @@ class PrivateSparkleTransportTests(unittest.TestCase):
         self.assertEqual(
             json.loads((self.root / "server-retired.json").read_bytes())["requests"], 0
         )
+
+
+class NativeCensusDiagnosticControls(unittest.TestCase):
+    """Model diagnostic projection only; these do not qualify Darwin census."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("sparkle_census_diagnostic", HELPER)
+        self.helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.helper)
+
+    def testPathRefusalKeepsStrictPolicyAndCapturesOnlyFreshErrno(self):
+        helper = self.helper
+        library = mock.Mock()
+        observed = []
+
+        def refuse(*_args):
+            observed.append(ctypes.get_errno())
+            ctypes.set_errno(errno.ESRCH)
+            return 0
+
+        library.proc_pidpath = mock.Mock(side_effect=refuse)
+        inventory = subprocess.CompletedProcess([], 0, stdout="91234 1000\n")
+        with (
+            mock.patch.object(helper.sys, "platform", "darwin"),
+            mock.patch.object(
+                helper, "private_directory", return_value=Path("/private/SECRET_NOT_EXPORTED")
+            ),
+            mock.patch.object(helper.ctypes, "CDLL", return_value=library),
+            mock.patch.object(helper.os, "geteuid", return_value=1000, create=True),
+            mock.patch.object(helper.subprocess, "run", return_value=inventory),
+        ):
+            for effect in [None, ProcessLookupError(), PermissionError("SECRET_NOT_EXPORTED")]:
+                ctypes.set_errno(999)
+                with mock.patch.object(helper.os, "kill", side_effect=effect) as probe:
+                    if effect is None:
+                        with self.assertRaises(helper.NativeCensusRefusal) as caught:
+                            helper.census(["/private/SECRET_NOT_EXPORTED"])
+                        self.assertEqual(caught.exception.packet["path_errno"], errno.ESRCH)
+                    elif isinstance(effect, ProcessLookupError):
+                        self.assertEqual(helper.census(["/private/SECRET_NOT_EXPORTED"]), [])
+                    else:
+                        with self.assertRaises(PermissionError):
+                            helper.census(["/private/SECRET_NOT_EXPORTED"])
+                    probe.assert_called_once_with(91234, 0)
+        self.assertEqual(observed, [0, 0, 0])
+
+    def testActualEntrypointExportsOnlyFixedFactsAndNeverPrivateExceptionText(self):
+        helper = self.helper
+        for failure in [
+            helper.NativeCensusRefusal(errno.ESRCH),
+            RuntimeError("PRIVATE_KEY_ARGV_PATH"),
+        ]:
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with (
+                mock.patch.object(helper, "main", side_effect=failure),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                status = helper.entrypoint(["census", "/PRIVATE_KEY_ARGV_PATH"])
+            self.assertEqual(status, 1)
+            self.assertEqual(stderr.getvalue(), "Private Sparkle fixture refused.\n")
+            self.assertNotIn("PRIVATE_KEY_ARGV_PATH", stdout.getvalue() + stderr.getvalue())
+            if isinstance(failure, helper.NativeCensusRefusal):
+                self.assertEqual(
+                    json.loads(stdout.getvalue()),
+                    {
+                        "schema": 1,
+                        "code": "path-unavailable",
+                        "helper_pid": os.getpid(),
+                        "path_errno": errno.ESRCH,
+                    },
+                )
+                self.assertLessEqual(len(stdout.getvalue().encode()), 512)
+            else:
+                self.assertEqual(stdout.getvalue(), "")
+
+    def testUnsupportedNativeDiagnosticValuesCannotBecomePublicFacts(self):
+        for value in [-1, 4096, True, "PRIVATE_KEY_ARGV_PATH"]:
+            with self.assertRaisesRegex(RuntimeError, "Native Sparkle diagnostic refused"):
+                self.helper.NativeCensusRefusal(value)
 
 
 if __name__ == "__main__":

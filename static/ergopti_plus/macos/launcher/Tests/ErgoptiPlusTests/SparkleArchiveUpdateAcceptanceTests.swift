@@ -4,6 +4,7 @@
 // XCTest, product installations, public feeds and the login Keychain stay outside
 // the fixture. No native prerequisite is replaced with a stub or a skip.
 
+import CoreFoundation
 import CryptoKit
 import Darwin
 import Foundation
@@ -11,9 +12,18 @@ import Sparkle
 import XCTest
 
 final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
+	private enum NativeCommandPhase: String {
+		case nativeTool = "native-tool"
+		case archiveBuild = "archive-build"
+		case archiveSign = "archive-sign"
+		case archiveSignForeign = "archive-sign-foreign"
+		case generatedAppcast = "generated-appcast"
+		case nativeProcessCensus = "native-process-census"
+	}
+
 	private enum Failure: Error {
 		case prerequisite(String)
-		case command(String, Int32)
+		case command(NativeCommandPhase, Int32)
 		case deadline(String)
 		case evidence(String)
 	}
@@ -204,15 +214,15 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 	}
 
 	private func run(_ executable: String, _ arguments: [String], root: URL,
-		expecting status: Int32 = 0, timeout: Double = 60) throws -> Receipt {
-		checkpoint("command.begin")
+		expecting status: Int32 = 0, timeout: Double = 60, phase: NativeCommandPhase = .nativeTool) throws -> Receipt {
+		checkpoint("command." + phase.rawValue + ".begin")
 		let child = try OwnedProcess(executable, arguments, root: root, guarded: true, workerTimeout: timeout)
 		commands.append(child)
 		try child.start()
 		let receipt: Receipt
 		do { receipt = try child.finish(timeout + 10) }
 		catch { retirementDebt = true; throw error }
-		checkpoint("command.end", status: receipt.status == status ? "accepted" : "refused")
+		checkpoint("command." + phase.rawValue + ".end", status: receipt.status == status ? "accepted" : "refused")
 		guard receipt.status == status else {
 			// Compiler diagnostics concern only this checked-in fixture source.
 			// Signing children keep their captured output private.
@@ -220,9 +230,29 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				XCTFail("Private Sparkle child compilation refused: "
 					+ String(reflecting: String((receipt.stdout + receipt.stderr).prefix(6000))))
 			}
-			throw Failure.command(URL(fileURLWithPath: executable).lastPathComponent, receipt.status)
+			if phase == .nativeProcessCensus { annotateCensusRefusal(receipt.stdout) }
+			throw Failure.command(phase, receipt.status)
 		}
 		return receipt
+	}
+
+	/// Admit only fixed native facts, never arbitrary child diagnostics or paths.
+	private func annotateCensusRefusal(_ stdout: String) {
+		guard stdout.utf8.count <= 512,
+			let packet = try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any],
+			Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno"]),
+			packet["code"] as? String == "path-unavailable" else { return }
+		func integer(_ key: String, maximum: Int64) -> Int64? {
+			guard let value = packet[key] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
+				value.doubleValue >= 0, value.doubleValue <= Double(maximum),
+				value.doubleValue == Double(value.int64Value) else { return nil }
+			return value.int64Value
+		}
+		guard integer("schema", maximum: 1) == 1,
+			let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
+			let pathErrno = integer("path_errno", maximum: 4095) else { return }
+		// The helper's PID is a diagnostic fact, not an ownership-closure ACK.
+		print("Native Sparkle census refusal: code=path-unavailable helper_pid=\(helperPID) path_errno=\(pathErrno)")
 	}
 
 	private func privateDirectory(_ url: URL) throws {
@@ -376,7 +406,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		_ = try run("/usr/bin/env", ["ERGOPTI_VERSION=2.0.0", "ERGOPTI_BUILD=2", "ERGOPTI_CHANNEL=dev",
 			"GH_OWNER=" + identity.owner, "GH_REPO=" + identity.name, "ARCHIVE_DIR=" + archives.path,
 			"OUTPUT_PATH=" + generated.path, "node", repository.appendingPathComponent(
-				"tools/build/macos-release-publication.cjs").path, "appcast"], root: root)
+				"tools/build/macos-release-publication.cjs").path, "appcast"], root: root, phase: .generatedAppcast)
 		let bytes = try Data(contentsOf: generated)
 		let xml = try XCTUnwrap(String(data: bytes, encoding: .utf8))
 		XCTAssertTrue(xml.contains("url=\"" + identity.archiveOrigin + "\""))
@@ -390,7 +420,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 	private func census(_ roots: [URL], root: URL) throws -> [[String: Any]] {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
-		let response = try run("/usr/bin/env", ["python3", helper.path, "census"] + roots.map(\.path), root: root)
+		let response = try run("/usr/bin/env", ["python3", helper.path, "census"] + roots.map(\.path), root: root, phase: .nativeProcessCensus)
 		guard let records = try JSONSerialization.jsonObject(with: Data(response.stdout.utf8)) as? [[String: Any]] else {
 			throw Failure.evidence("native-process-census")
 		}
@@ -586,9 +616,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let newRequirement = try requirement(source, root: root)
 		let archives = root.appendingPathComponent("archives")
 		_ = try run("/usr/bin/env", ["node", repository.appendingPathComponent("tools/build/macos-release-archives.cjs").path,
-			source.path, archives.path], root: root)
+			source.path, archives.path], root: root, phase: .archiveBuild)
 		_ = try run("/usr/bin/env", ["node", repository.appendingPathComponent("tools/build/macos-release-publication.cjs").path,
-			"sign", archives.path, signer, keyFile.path], root: root)
+			"sign", archives.path, signer, keyFile.path], root: root, phase: .archiveSign)
 		let payload = try Data(contentsOf: archives.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
 		let fragment = try String(contentsOf: archives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
 		let expression = try NSRegularExpression(pattern: #"^sparkle:edSignature="([A-Za-z0-9+/]{86}==)" length="([1-9][0-9]*)"\n$"#)
@@ -609,7 +639,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		try Data(foreignKey.rawRepresentation.base64EncodedString().utf8).write(to: foreignKeyFile, options: .withoutOverwriting)
 		try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: foreignKeyFile.path)
 		_ = try run("/usr/bin/env", ["node", repository.appendingPathComponent("tools/build/macos-release-publication.cjs").path,
-			"sign", foreignArchives.path, signer, foreignKeyFile.path], root: root)
+			"sign", foreignArchives.path, signer, foreignKeyFile.path], root: root, phase: .archiveSignForeign)
 		let foreignFragment = try String(contentsOf: foreignArchives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
 		let foreignMatch = try XCTUnwrap(expression.firstMatch(in: foreignFragment, range: NSRange(foreignFragment.startIndex..., in: foreignFragment)))
 		let foreignSignature = String(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 1), in: foreignFragment))])
