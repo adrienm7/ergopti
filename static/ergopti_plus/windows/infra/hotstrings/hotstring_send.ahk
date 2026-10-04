@@ -775,8 +775,10 @@ _SelectionCapturePoll(Job) {
 		}
 }
 
-_SelectionCaptureFinish(Job, Text, Deliver, Reason) {
-		global _SelectionCaptureJob
+_SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
+		SequenceFn := 0, ContextFn := 0) {
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		global SELECTION_CAPTURE_INPUT_GRACE_MS
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
@@ -787,15 +789,17 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason) {
 		; after our clear: it may be the user's own copy, and restoring the old
 		; snapshot would silently destroy it. All normal completion paths restore
 		; exactly the prior clipboard contents.
+		if !IsObject(SequenceFn)
+				SequenceFn := _SelectionClipboardSequence
 		PreserveCurrent := (Reason == "superseded by input"
-				and _SelectionClipboardSequence() != Job["clear_sequence"])
+				and SequenceFn.Call() != Job["clear_sequence"])
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
 		if !PreserveCurrent {
-				OwnedSequence := _SelectionClipboardSequence()
+				OwnedSequence := SequenceFn.Call()
 				if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
 						Job["owner_token"], "selection_capture_" . Reason, true,
-						!OwnedSequence)
+						!OwnedSequence, RestoreFn, SequenceFn)
 						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
 		} else if Job["owner_token"] {
 				CB_EndOwnedTransaction(Job["owner_token"])
@@ -803,6 +807,16 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason) {
 		Job["clipboard"] := ""
 
 		if !Deliver || A_IsSuspended
+				return
+		; Restoring ClipboardAll can yield after the job was retired. Reacquire
+		; its input context, then fence revocations which happened during either
+		; the restore or the context probe before invoking the continuation.
+		Context := IsObject(ContextFn) ? ContextFn.Call(Job)
+				: _SelectionCaptureCurrentContext(Job)
+		if (Context["foreground"] != Job["foreground"]
+				or Context["elapsed"] - Context["idle"] > SELECTION_CAPTURE_INPUT_GRACE_MS)
+				return
+		if A_IsSuspended or _SelectionCaptureNextId != Job["id"]
 				return
 		try Job["callback"].Call(Text)
 		catch as Err {
@@ -818,9 +832,17 @@ GetSelection() {
 }
 
 GetSelectionCancel(*) {
-		global _SelectionCaptureJob
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		; A completion has already retired its job while restoring the clipboard.
+		; Revoke that continuation even when there is no timer left to cancel.
+		_SelectionCaptureNextId += 1
 		if IsObject(_SelectionCaptureJob)
 				_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "cancelled")
+}
+
+_SelectionCaptureCurrentContext(Job) {
+		return Map("foreground", WinExist("A"),
+				"elapsed", TickElapsed(Job["started"]), "idle", A_TimeIdlePhysical)
 }
 
 _SelectionClipboardSequence() {
