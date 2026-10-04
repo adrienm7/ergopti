@@ -24,6 +24,7 @@ local function fake_luv(config)
 	end
 
 	local function handle(kind)
+		if options.allocation_nil_at == #state.handles + 1 then return nil end
 		if options.allocation_failure_at == #state.handles + 1 then error("allocation refused") end
 		local value = { kind = kind, closing = false }
 		state.handles[#state.handles + 1] = value
@@ -1342,6 +1343,12 @@ helpers.describe("file_digest: asynchronous sha256sum ownership", function()
 	local native_ok = pcall(require, "luv")
 	local ffi_ok = pcall(require, "ffi")
 	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-digest-allocation: actual partial handles retire before refusal returns", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_allocations.lua"
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native digest allocation fixture must pass")
+		end)
 		helpers.it("linux-digest-replacement: rejected paths preserve an actual native incumbent", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_replacement.lua"
@@ -1354,6 +1361,30 @@ helpers.describe("file_digest: asynchronous sha256sum ownership", function()
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native digest owner fixture must pass")
 		end)
+	end
+
+	for _, mode in ipairs({ "raised", "nil" }) do
+		for slot = 1, 3 do
+			helpers.it("linux-digest-allocation: " .. mode .. " constructor at " .. slot .. " releases prior handles", function()
+				local options = {}
+				options[mode == "raised" and "allocation_failure_at" or "allocation_nil_at"] = slot
+				local digest, state = fresh_digest(options)
+				local value, failure, callbacks = nil, nil, 0
+				helpers.assert_eq(digest.sha256("/tmp/allocation.part", { owner = "allocation-unit" }, function(hash, err)
+					value, failure, callbacks = hash, err, callbacks + 1
+				end), false)
+				helpers.assert_nil(value)
+				helpers.assert_eq(failure, "libuv handle allocation failed")
+				helpers.assert_eq(callbacks, 1)
+				helpers.assert_eq(#state.requests, 0)
+				helpers.assert_nil(state.command)
+				helpers.assert_true(not digest.isActive("allocation-unit"))
+				helpers.assert_eq(#state.handles, slot - 1)
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing, "partial allocation must close") end
+				helpers.assert_true(digest.cancel("allocation-unit"))
+				helpers.assert_eq(callbacks, 1, "cancelling a refused owner cannot publish another callback")
+			end)
+		end
 	end
 
 	for _, length in ipairs({ 957, 958, 1106, 3500 }) do

@@ -193,10 +193,16 @@ function M.sha256(path, options, callback)
 		exited = false,
 		terminal = false,
 	}
-	local handles_ok, stdout, stderr, timer = pcall(function()
-		return luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
+	local handles_ok = pcall(function()
+		-- Capture each allocation immediately so a later constructor exception
+		-- cannot hide already owned handles from finish().
+		request.stdout = luv.new_pipe(false)
+		if not request.stdout then error("stdout allocation refused", 0) end
+		request.stderr = luv.new_pipe(false)
+		if not request.stderr then error("stderr allocation refused", 0) end
+		request.timer = luv.new_timer()
+		if not request.timer then error("timer allocation refused", 0) end
 	end)
-	request.stdout, request.stderr, request.timer = stdout, stderr, timer
 	if not handles_ok or not request.stdout or not request.stderr or not request.timer then
 		finish(request, nil, "libuv handle allocation failed")
 		return false
