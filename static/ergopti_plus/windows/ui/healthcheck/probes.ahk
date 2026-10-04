@@ -89,8 +89,8 @@ _HC_ProbeStarted(Id, Detail) {
 ; @param Started {Integer} A_TickCount at the start.
 ; @param Result {Map} { state, detail? }
 ; @param Sections {Map} Values the probe filled, by section.
-_HC_ProbeFinish(Run, Id, Started, Result, Sections := 0) {
-	Result["ms"] := A_TickCount - Started
+_HC_ProbeFinish(Run, Id, Started, Result, Sections := 0, NowTick := unset) {
+	Result["ms"] := TickElapsed(Started, NowTick?)
 	LoggerDone("Healthcheck", "Probe '{1}' answered: {2} ({3} ms).", Id, Result["state"], Result["ms"])
 	if Run.Cancelled
 		return
@@ -155,25 +155,28 @@ _HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs) {
 }
 
 ; Harvests an HTTP probe's answer without waiting for it.
-_HC_ProbePoll(Run, Id, Request, Interpret, Started, TimeoutMs) {
+_HC_ProbePoll(Run, Id, Request, Interpret, Started, TimeoutMs, NowTick := unset, ArmPollFn := unset) {
 	if Run.Cancelled {
-		_HC_ProbeFinish(Run, Id, Started, Map("state", "cancelled"))
+		_HC_ProbeFinish(Run, Id, Started, Map("state", "cancelled"), 0, NowTick?)
 		return
 	}
 	if Request.WaitForResponse(0) {
 		Answer := Interpret.Call(Request.Status, Request.ResponseText)
-		_HC_ProbeFinish(Run, Id, Started, Answer["result"], Answer.Get("sections", 0))
+		_HC_ProbeFinish(Run, Id, Started, Answer["result"], Answer.Get("sections", 0), NowTick?)
 		return
 	}
 	; curl's own max-time ends the child first; this bound only covers a child
 	; that never reports back
-	if (A_TickCount - Started > TimeoutMs + 1000) {
+	if (TickElapsed(Started, NowTick?) > TimeoutMs + 1000) {
 		if !Request.Abort()
 			LoggerError("Healthcheck", "The timed-out probe '{1}' refused to stop; its cleanup is retained.", Id)
-		_HC_ProbeFinish(Run, Id, Started, Map("state", "timeout"))
+		_HC_ProbeFinish(Run, Id, Started, Map("state", "timeout"), 0, NowTick?)
 		return
 	}
-	_HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs)
+	if IsSet(ArmPollFn)
+		ArmPollFn.Call(Run, Id, Request, Interpret, Started, TimeoutMs)
+	else
+		_HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs)
 }
 
 ; The failure of an HTTP answer, from its status.
