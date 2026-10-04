@@ -227,7 +227,46 @@ if (totalFail === failBeforeCompleteness) {
 
 // ==================================================
 // ==================================================
-// ======= 4/ Summary ===============================
+// ======= 4/ HTTP Redirect Header Inventory ========
+// ==================================================
+// ==================================================
+
+// Linux consumes the canonical list. Pin the existing macOS native owner's
+// inventory until it can adopt the shared binding without changing its gates.
+const redirectPolicy = JSON.parse(
+	fs.readFileSync(shared('data/http/redirect_policy.json'), 'utf8')
+);
+const sensitiveHeaders = redirectPolicy.sensitive_headers;
+const validHeaderInventory =
+	Array.isArray(sensitiveHeaders) &&
+	sensitiveHeaders.length > 0 &&
+	sensitiveHeaders.every((name) => typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(name)) &&
+	new Set(sensitiveHeaders).size === sensitiveHeaders.length;
+if (validHeaderInventory) pass('HTTP redirect sensitive-header inventory is valid and unique');
+else fail('HTTP redirect sensitive-header inventory is valid and unique');
+
+const macHttpSource = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/macos/adapters/http_client.lua'),
+	'utf8'
+);
+const macHeaderBlock = macHttpSource.match(/local SENSITIVE_HEADERS = \{([\s\S]*?)\n\}/);
+const macHeaders = macHeaderBlock
+	? [...macHeaderBlock[1].matchAll(/\["([^"]+)"\]\s*=\s*true/g)].map((match) => match[1])
+	: [];
+if (
+	validHeaderInventory &&
+	JSON.stringify([...sensitiveHeaders].sort()) === JSON.stringify(macHeaders.sort())
+) {
+	pass('macOS native redirect header inventory matches the shared policy');
+} else {
+	fail('macOS native redirect header inventory matches the shared policy', [
+		'credential inventory drift or unrecognized native table'
+	]);
+}
+
+// ==================================================
+// ==================================================
+// ======= 5/ Summary ===============================
 // ==================================================
 // ==================================================
 

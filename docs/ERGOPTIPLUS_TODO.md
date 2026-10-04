@@ -538,6 +538,20 @@ These are software implementations; final hardware verification remains below.
   gate or source was changed. Technical refusal diagnostics contain no URL
   bytes. Shared encoding policy, manual CI and physical input tests remain
   unchanged or unexecuted; Linux native socket/process tests are real execution.
+- [~] **L42.** Linux HTTP redirect confidentiality: native curl forwards
+  custom API-key and Cookie2 headers to another origin. Disable native follow
+  for credentialed GET, POST, streaming and download requests while preserving
+  their original request and 302 refusal receipt. Public redirects and direct
+  credentialed responses remain usable. The header inventory lives in shared
+  JSON; a JS single-source guard pins the existing macOS inventory without
+  changing its reserved native owner. Windows curl does not enable redirect
+  following by source inspection. Twenty-eight of forty real loopback cases
+  fail before the fix; the original probe observes four actual leaking header
+  kinds. Portable regressions cover every sensitive header/method, casing,
+  invalid policy and request ownership. Missing or malformed policy fails
+  before allocating handles or replacing an active request. Credentialed
+  redirect support remains deferred until explicit per-hop ownership exists.
+  Native cross-OS checks, manual CI and physical keyboard tests were not run.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
