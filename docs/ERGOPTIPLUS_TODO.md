@@ -1704,6 +1704,28 @@ update plus Homebrew ZIP-install/XZ-upgrade acceptance remain pending. Native
 AHK and Swift gates are explicitly deferred to their respective runners.
 Item 36 remains partial.
 
+The registered native acceptance cohort now invokes the actual Sparkle updater
+with a signed preferred archive, preserves the old bundle after a wrong-key
+refusal and retries through its real installer/relaunch path. A separate native
+fixture invokes the generated Homebrew cask for ZIP installation, XZ upgrade,
+checksum/artifact refusal and recovery in an owned write sandbox. Two positive
+AppleEvent controls must establish that the sandbox actually prevents foreign
+application control before Brew is admitted.
+
+The shared fixture process owner reserves a nonreaped leader through native
+group census and retirement; cancellation keeps the ledger alive until cleanup
+is acknowledged. Swift invokers retain failed fixtures and never destroy a live
+ownership ledger. macOS Package now explicitly admits CPython 3.13 and the
+actual waitid/WNOWAIT APIs before XCTest. Native runtime observations still
+establish the physical behavior; API presence alone is not acceptance.
+
+Twenty Brew and fifteen process-owner portable controls pass without skips,
+along with four prerequisite controls, seven POSIX transport controls and the
+26 publication cases. Actual Ruby parses both generated casks in this container.
+Native Swift/C compilation, Sparkle installation/relaunch, AppleEvent sandbox
+containment, real Brew lifecycle and the final packaging/install matrix remain
+pending. These authored native tests do not close item 36.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

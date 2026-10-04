@@ -912,6 +912,61 @@ if (args[0] === 'api') {
 }
 // PUBLICATION_CONSUMER_TESTS_END
 
+try {
+	const assert = require('node:assert/strict');
+	const result = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		[path.join(root, 'tools/diagnostics/macos_sparkle_archive_fixture_test.py')],
+		{
+			cwd: root,
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+		}
+	);
+	assert.ifError(result.error);
+	assert.equal(result.signal, null, result.stderr);
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stderr, /Ran 7 tests in /);
+	const skipped = process.platform === 'win32' ? 5 : process.platform === 'darwin' ? 1 : 0;
+	assert.match(
+		result.stderr,
+		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
+	);
+	console.log(
+		`Sparkle transport controls: ${7 - skipped} passed, ${skipped} platform cases skipped.`
+	);
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	for (const method of [
+		'testDirectNativeChildExitACKAndCaptureRetirementAreIdempotent',
+		'testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch'
+	]) {
+		assert.ok(
+			fixture.includes(`func ${method}() throws`),
+			`Mandatory native XCTest ${method} is absent.`
+		);
+	}
+	assert.match(fixture, /macos_owned_process\.py/);
+	assert.match(fixture, /packet\["closed"\] as\? Bool == true/);
+	assert.match(fixture, /packet\["exit_status"\] as\? NSNumber/);
+	assert.match(fixture, /SUSparkleErrorDomain/);
+	assert.match(fixture, /snapshot\(installed\), oldSnapshot/);
+	assert.match(fixture, /snapshot\(installed\), newSnapshot/);
+	assert.match(fixture, /downloaded\.count, 2/);
+	assert.doesNotMatch(fixture, /XCTSkip(?:If|Unless)?\(/);
+	console.log(
+		'Actual Sparkle acceptance XCTest remains registered with strict retirement evidence.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle acceptance registration failed: ${error.message}`);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
