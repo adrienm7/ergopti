@@ -58,9 +58,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare group 7 native artifacts and causal receipts
+        shell: pwsh
+        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate f50b0d37530ac7bae32ca1332f55a774080d1f4c
+
       - name: Build and test native navigation event owner
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Save group 7 generated native artifacts and causal receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: group7-native-owner-generated
+          if-no-files-found: error
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll
+            static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json
+            tools/test/group7-native-generation-results/
 
       # The suites run on the interpreter the release exe ships with: its
       # version, archive and digest come from the one release contract, so a
@@ -456,6 +470,10 @@ jobs:
     steps:
       # A shallow clone: no step of this job reads git history.
       - uses: actions/checkout@v4
+
+      - name: Prepare group 7 native artifacts and causal receipts
+        shell: pwsh
+        run: ./tools/test/group7_native_generation.ps1 -SourceCandidate f50b0d37530ac7bae32ca1332f55a774080d1f4c
 
       - name: Build and test native navigation event owner
         shell: pwsh

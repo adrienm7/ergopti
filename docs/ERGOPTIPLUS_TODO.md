@@ -1929,6 +1929,18 @@ semantic TOML corpus still require the next non-release Windows execution.
       `LLM_NavEventOwner_EnsureStarted()` in `ErgoptiPlus.ahk`). Audit every native
       arbiter route, make each one order-independent, and test both hook orders like
       `test_llm_nav_cycle_windows.ahk`. Needs a Windows machine.
+
+Partial: terminal replay now has one exclusive native release owner across the
+unlocked SendInput boundary. Reentrant and concurrent release attempts retain
+the FIFO; final acknowledgement and ownership retirement are atomic. A capture
+overflow during sending preserves its fault and original error while consuming
+only the accepted prefix. Independent native C regressions cover nested release,
+second-thread admission, retry, teardown and overflow. The original 929 native
+assertions remain unchanged; test and production DLL cross-compilation pass.
+Windows execution remains pending. KLE-first physical capture, event-specific
+layout replay, digit/profile routes and modifier/hold balancing still require
+the full hook-order audit; this prerequisite does not complete item 49.
+
 - [ ] **50.** Measure SendEvent against SendInput on Windows. While the native
       arbiter's low-level hook is installed, SendInput is interruptible anyway,
       which is the only reason AutoHotkey removes its own hook, so SendInput now
@@ -2518,6 +2530,25 @@ chain through controlled native ports, including replacement and mutation
 refusals. Native execution and full Windows qualification remain pending.
 The maintainer confirmed that the original supplied diagnostic is no longer
 available; this mechanism does not establish its historical live cause.
+
+First Windows qualification (run 37228466168, candidate 45d5c2d) executed
+all 9038 AHK cases: 9036 passed and two failed. The new owned child reported
+local/global name warnings because its terminal loop and catch ran at top
+level; that block now runs inside its own function, retaining Warn All and
+every stdout, stderr, exit and scenario assertion. The complete child log also
+exposed a frozen-getter binding error: AHK static methods bind their implicit
+class receiver before the accepted scalar. Both issued-authority getters now
+bind that receiver explicitly. Independent typed-preimage assertions exercise
+the accepted owner and publication boundaries before the shutdown chain.
+Native retry is pending.
+The other failure is the pre-existing personal-TOML metadata case (item 102).
+E2E, packaging and installation were skipped after the unit failure.
+
+The same qualification also exposed one shared-core CI prerequisite failure:
+Lua 5.4 could not use the installed Linux regular-file reader without lua-luv.
+The Core runner now installs that native dependency. This changes only runner
+prerequisites; the fail-closed reader and its assertions remain unchanged.
+The exact installed-registry probe is checked with Lua 5.4 before retrying CI.
 
 The navigation-editor checkpoint (run 36928152648) passes all 72 Chromium/WebKit
 rendering scenarios, Windows unit/engine/installation and macOS unit/E2E/all
