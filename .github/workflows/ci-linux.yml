@@ -456,6 +456,14 @@ jobs:
           ERGOPTI_FILE_READ_TEST_LUA=lua5.4 python3 tests/hardware/run_file_read_special_receipts.py
         timeout-minutes: 1
 
+      - name: Preserve native file-read and close failure receipts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_file_read_error_receipts.py
+          ERGOPTI_FILE_READ_TEST_LUA=lua5.4 python3 tests/hardware/run_file_read_error_receipts.py
+        timeout-minutes: 1
+
       - name: Hand off native restart relays after real zombie targets exit
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

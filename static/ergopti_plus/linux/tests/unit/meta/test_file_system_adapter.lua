@@ -75,6 +75,44 @@ helpers.describe("generic file read admission", function()
 	end
 end)
 
+helpers.describe("file read and close receipts", function()
+	local cases = {
+		{ name = "healthy", content = "payload", closed = true, expected = "payload" },
+		{ name = "read refusal", closed = true },
+		{ name = "read exception", read_throws = true, closed = true },
+		{ name = "close nil", content = "payload" },
+		{ name = "close false", content = "payload", closed = false },
+		{ name = "close exception", content = "payload", close_throws = true },
+	}
+	for _, case in ipairs(cases) do
+		helpers.it("linux-file-read-receipts: settles " .. case.name, function()
+			local Reader = require("infra.regular_file_reader")
+			local original_open = Reader.open
+			local reads, closes = 0, 0
+			Reader.open = function()
+				return {
+					read = function(_, mode)
+						reads = reads + 1; helpers.assert_eq(mode, "*a")
+						if case.read_throws then error("native read raised") end
+						return case.content, "native read refused"
+					end,
+					close = function()
+						closes = closes + 1
+						if case.close_throws then error("native close raised") end
+						return case.closed, "native close refused"
+					end,
+				}
+			end
+			local ok, content = pcall(fs.read, "/synthetic/source")
+			Reader.open = original_open
+			helpers.assert_true(ok, tostring(content))
+			helpers.assert_eq(content, case.expected)
+			helpers.assert_eq(reads, 1)
+			helpers.assert_eq(closes, 1, "read exceptions must still close the owned stream")
+		end)
+	end
+end)
+
 --- Selects a metadata backend while preserving the production adapter itself.
 local function with_exists_backend(backend, result, test)
 	local previous_require, previous_open = require, io.open
