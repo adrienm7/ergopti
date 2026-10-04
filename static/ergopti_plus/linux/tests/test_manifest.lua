@@ -347,6 +347,7 @@ return {
 	"tests.unit.ui.test_llm_backend_rows",
 	"tests.unit.ui.test_llm_enable_refusal",
 	"tests.unit.ui.test_llm_menu_prediction_count",
+	"tests.unit.ui.test_models_browser_shared_command",
 	"tests.unit.ui.test_llm_overlay_anchor",
 	"tests.unit.ui.test_llm_overlay_lines",
 	"tests.unit.ui.test_webview_page_messages",

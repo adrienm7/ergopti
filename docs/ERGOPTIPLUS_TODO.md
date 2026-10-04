@@ -1258,6 +1258,8 @@ The Windows startup menu unit fixture now supplies both observable native lifecy
 
 The Windows hotstring delays-menu source regression now reads the existing central driver function-body owner instead of calculating a path relative to an included test file. Under tests/run_all.ahk, A_ScriptDir belongs to windows/tests, so the former two-parent path missed the real windows/ui/menu source. An explicit nonempty source guard precedes the unchanged native singleton-owner assertion; all 173 original assertions remain intact. Bounded source/path controls, three mutations and canonical conventions pass with BOM/LF retained. Full selected verification and native Windows CI remain pending; TODO54 remains partial.
 
+The fixed Browse Models command now uses one shared declaration on Windows, macOS and Linux. Its native browser owners and existing translated label are preserved. macOS rechecks its existing live pause policy before deferred presentation; Linux and Windows retain their configuration-browser admission. Browsing remains available while the AI is off and does not start or select a model. Targeted native-bound Lua regressions, deterministic menu generation and the measured native-row census pass. Complete repository validation and hosted Windows/native UI qualification remain required. TODO 54 remains partial for other native menu rows.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

@@ -2337,16 +2337,16 @@ local function _build_llm(ctx)
 			}
 		end
 		if #rows > 0 then rows[#rows + 1] = { separator = true } end
-		rows[#rows + 1] = {
-			label = i18n_safe("menu.llm.browse_models_entry"),
-			action = function()
-				if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-					Logger.error(LOG, "Model browser is unavailable.")
-					return false
-				end
+		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
+			["llm_browse_models"] = function()
 				return ctx.webview.show("model_browser") == true
 			end,
-		}
+		}, {
+			["llm_model_browser_ready"] = function()
+				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
+			end,
+		})
+		if browser_row then rows[#rows + 1] = browser_row end
 		return rows
 	end
 

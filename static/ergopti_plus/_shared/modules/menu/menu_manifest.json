@@ -2087,5 +2087,15 @@
 				"linux"
 			]
 		}
+	],
+	"llm_model_commands": [
+		{
+			"type": "command",
+			"id": "llm_browse_models",
+			"i18n": "menu.llm.browse_models_entry",
+			"disabled_when": [
+				"llm_model_browser_ready"
+			]
+		}
 	]
 }
