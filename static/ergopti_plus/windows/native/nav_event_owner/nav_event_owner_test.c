@@ -2726,6 +2726,453 @@ static bool TestTerminalCaptureAdmissionAndOverflow(void)
 
 
 
+/** Carries independent observations across the unlocked replay send boundary. */
+typedef struct TestTerminalReleaseObservation {
+	const char *name;
+	uint64_t token;
+	uint32_t release_kind;
+	uint32_t calls;
+	bool passed;
+} TestTerminalReleaseObservation;
+
+
+
+/** Carries actual worker-thread release results to the replay observer. */
+typedef struct TestTerminalReleaseThreadObservation {
+	uint64_t token;
+	uint32_t release_kind;
+	int32_t statuses[3];
+	uint32_t counts[3];
+} TestTerminalReleaseThreadObservation;
+
+
+
+/** Competes for release ownership from another actual native thread. */
+static DWORD WINAPI TestTerminalReleaseThread(void *raw_observation)
+{
+	TestTerminalReleaseThreadObservation *observation =
+		(TestTerminalReleaseThreadObservation *)raw_observation;
+	uint32_t other_kind = observation->release_kind
+		== ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT
+			? ERGOPTI_NAV_TERMINAL_RELEASE_ABORT
+			: ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT;
+	observation->statuses[0] = ErgoptiNav_TestReleaseTerminalCapture(
+		observation->token, observation->release_kind, UINT32_MAX,
+		NULL, 0, &observation->counts[0]);
+	observation->statuses[1] = ErgoptiNav_TestReleaseTerminalCapture(
+		observation->token, other_kind, UINT32_MAX,
+		NULL, 0, &observation->counts[1]);
+	observation->statuses[2] = ErgoptiNav_TestReleaseTerminalCapture(
+		TEST_OWNER_B, observation->release_kind, UINT32_MAX,
+		NULL, 0, &observation->counts[2]);
+	return 0;
+}
+
+
+
+/** Joins a competing release caller without borrowing a timed-out stack. */
+static bool TestTerminalReleaseThreadRefusals(
+	const char *name,
+	uint64_t token,
+	uint32_t release_kind)
+{
+	TestTerminalReleaseThreadObservation *observation;
+	HANDLE thread;
+	DWORD wait_result;
+	bool closed;
+	bool expected;
+	observation = (TestTerminalReleaseThreadObservation *)HeapAlloc(
+		GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*observation));
+	TEST_ASSERT(name, observation != NULL);
+	observation->token = token;
+	observation->release_kind = release_kind;
+	thread = CreateThread(NULL, 0, TestTerminalReleaseThread, observation, 0, NULL);
+	if (thread == NULL) {
+		HeapFree(GetProcessHeap(), 0, observation);
+		TEST_ASSERT(name, thread != NULL);
+	}
+	wait_result = WaitForSingleObject(thread, 5000);
+	closed = CloseHandle(thread) != 0;
+	/* On timeout the worker still owns its heap observation; leave it valid
+	 * until the failing test process exits rather than freeing borrowed memory. */
+	TEST_ASSERT(name, wait_result == WAIT_OBJECT_0);
+	expected = observation->statuses[0] == ERGOPTI_NAV_STATUS_BUSY
+		&& observation->statuses[1] == ERGOPTI_NAV_STATUS_BUSY
+		&& observation->statuses[2] == ERGOPTI_NAV_STATUS_OWNER_MISMATCH
+		&& observation->counts[0] == 0
+		&& observation->counts[1] == 0
+		&& observation->counts[2] == 0;
+	TEST_ASSERT(name, HeapFree(GetProcessHeap(), 0, observation) != 0);
+	TEST_ASSERT(name, closed);
+	TEST_ASSERT(name, expected);
+	return true;
+}
+
+
+
+/** Checks release refusals and captures fresh physical input during a send. */
+static bool TestObserveTerminalRelease(TestTerminalReleaseObservation *observation)
+{
+	const char *name = observation->name;
+	ErgoptiNav_TerminalCaptureSnapshot before;
+	ErgoptiNav_TerminalCaptureSnapshot after;
+	ErgoptiNav_TestEvent nested_events[8];
+	ErgoptiNav_DispatchResult result;
+	uint32_t nested_count = 9;
+	uint32_t other_kind = observation->release_kind
+		== ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT
+			? ERGOPTI_NAV_TERMINAL_RELEASE_ABORT
+			: ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT;
+	uint8_t can_stop = 1;
+	uint8_t complete = 1;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	++observation->calls;
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(observation->token, &before)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, before.phase == ERGOPTI_NAV_TERMINAL_REPLAYING);
+	TEST_ASSERT(name, before.release_kind == observation->release_kind);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestReleaseTerminalCapture(
+			observation->token, observation->release_kind, UINT32_MAX,
+			nested_events, 8, &nested_count) == ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name, nested_count == 0);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestReleaseTerminalCapture(
+			observation->token, other_kind, UINT32_MAX,
+			nested_events, 8, &nested_count) == ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name, nested_count == 0);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestReleaseTerminalCapture(
+			TEST_OWNER_B, observation->release_kind, UINT32_MAX,
+			nested_events, 8, &nested_count)
+				== ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+	TEST_ASSERT(name, nested_count == 0);
+	TEST_ASSERT(name, TestTerminalReleaseThreadRefusals(
+		name, observation->token, observation->release_kind));
+	TEST_ASSERT(name,
+		ErgoptiNav_SetSuspended(1) == ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(observation->token)
+			== ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+			== ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name,
+		ErgoptiNav_CanStop(&can_stop) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, can_stop == 0);
+	TEST_ASSERT(name,
+		ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_STOP_PENDING);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestDrainComplete(&complete) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, complete == 0);
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(observation->token, &after)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, memcmp(&before, &after, sizeof(before)) == 0);
+	if (observation->calls == 1) {
+		/* Physical input may still join the tail while this prefix is in flight. */
+		TEST_ASSERT(name, TestHookFlow(
+			name, (uint16_t)'B', 0x30, ERGOPTI_NAV_EVENT_DOWN,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+			&result, &mask, &passed, &ordered));
+		TEST_ASSERT(name,
+			result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+		TEST_ASSERT(name, passed == 0 && mask == 0);
+		TEST_ASSERT(name, TestHookFlow(
+			name, (uint16_t)'B', 0x30, ERGOPTI_NAV_EVENT_UP,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+			&result, &mask, &passed, &ordered));
+		TEST_ASSERT(name,
+			result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+		TEST_ASSERT(name, passed == 0 && mask == 0);
+	}
+	return true;
+}
+
+
+
+/** Invokes assertions through the same unlocked boundary used by SendInput. */
+static void TestTerminalReleaseObserver(void *raw_observation)
+{
+	TestTerminalReleaseObservation *observation =
+		(TestTerminalReleaseObservation *)raw_observation;
+	if (!TestObserveTerminalRelease(observation))
+		observation->passed = false;
+}
+
+
+
+/** Proves exact FIFO replay survives reentrant releases, failures and retries. */
+static bool TestTerminalReleaseHasOneOwner(void)
+{
+	const char *name = "terminal release has one owner";
+	const uint32_t kinds[2] = {
+		ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT
+	};
+	const uint32_t limits[3] = { 0, 1, UINT32_MAX };
+	const uint16_t scans[5] = { 0x1E, 0x1E, 0x14B, 0x30, 0x30 };
+	const uint8_t edges[5] = {
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_EVENT_UP
+	};
+	uint32_t kind_index;
+	uint32_t limit_index;
+	for (kind_index = 0; kind_index < 2; ++kind_index) {
+		for (limit_index = 0; limit_index < 3; ++limit_index) {
+			TestTerminalReleaseObservation observation;
+			ErgoptiNav_TerminalCaptureSnapshot snapshot;
+			ErgoptiNav_TerminalCaptureSnapshot before_refusal;
+			ErgoptiNav_DispatchResult result;
+			ErgoptiNav_TestEvent replayed[5];
+			uint32_t first_count = 0;
+			uint32_t retry_count = 0;
+			uint32_t refused_count = 9;
+			uint32_t index;
+			uint32_t other_kind = kinds[kind_index]
+				== ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT
+					? ERGOPTI_NAV_TERMINAL_RELEASE_ABORT
+					: ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT;
+			uint8_t can_stop = 0;
+			uint8_t mask = 0;
+			uint8_t passed = 0;
+			uint8_t ordered = 0;
+			int32_t status;
+			TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name,
+				ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name,
+				ErgoptiNav_BeginTerminalCapture(TEST_OWNER_A)
+					== ERGOPTI_NAV_STATUS_OK);
+			for (index = 0; index < 3; ++index) {
+				TEST_ASSERT(name, TestHookFlow(
+					name, index == 2 ? VK_LEFT : (uint16_t)'A',
+					scans[index], edges[index],
+					ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+					&result, &mask, &passed, &ordered));
+				TEST_ASSERT(name,
+					result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+			}
+			memset(&observation, 0, sizeof(observation));
+			observation.name = name;
+			observation.token = TEST_OWNER_A;
+			observation.release_kind = kinds[kind_index];
+			observation.passed = true;
+			status = ErgoptiNav_TestReleaseTerminalCaptureObserved(
+				TEST_OWNER_A, kinds[kind_index], limits[limit_index],
+				replayed, 5, &first_count,
+				TestTerminalReleaseObserver, &observation);
+			TEST_ASSERT(name, observation.passed);
+			TEST_ASSERT(name, observation.calls
+				== (limits[limit_index] == UINT32_MAX ? 2u : 1u));
+			TEST_ASSERT(name, status == (limits[limit_index] == UINT32_MAX
+				? ERGOPTI_NAV_STATUS_OK : ERGOPTI_NAV_STATUS_OS_ERROR));
+			TEST_ASSERT(name, first_count
+				== (limits[limit_index] == UINT32_MAX ? 5u : limits[limit_index]));
+			TEST_ASSERT(name,
+				ErgoptiNav_GetTerminalCapture(TEST_OWNER_A, &snapshot)
+					== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, snapshot.token == TEST_OWNER_A);
+			TEST_ASSERT(name, snapshot.release_kind == kinds[kind_index]);
+			TEST_ASSERT(name, snapshot.replayed == first_count);
+			TEST_ASSERT(name, snapshot.queued == 5u - first_count);
+			TEST_ASSERT(name, snapshot.phase == (uint32_t)(first_count == 5
+				? ERGOPTI_NAV_TERMINAL_IDLE
+				: ERGOPTI_NAV_TERMINAL_RELEASE_PENDING));
+			before_refusal = snapshot;
+			TEST_ASSERT(name,
+				ErgoptiNav_TestReleaseTerminalCapture(
+					TEST_OWNER_A, other_kind, UINT32_MAX, NULL, 0,
+					&refused_count) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+			TEST_ASSERT(name, refused_count == 0);
+			TEST_ASSERT(name,
+				ErgoptiNav_GetTerminalCapture(TEST_OWNER_A, &snapshot)
+					== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name,
+				memcmp(&before_refusal, &snapshot, sizeof(snapshot)) == 0);
+			TEST_ASSERT(name,
+				ErgoptiNav_TestReleaseTerminalCapture(
+					TEST_OWNER_A, kinds[kind_index], UINT32_MAX,
+					&replayed[first_count], 5u - first_count, &retry_count)
+						== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, first_count + retry_count == 5);
+			for (index = 0; index < 5; ++index) {
+				TEST_ASSERT(name, replayed[index].vk == 0);
+				TEST_ASSERT(name, replayed[index].sc == scans[index]);
+				TEST_ASSERT(name, replayed[index].kind == edges[index]);
+				TEST_ASSERT(name,
+					replayed[index].extra_info == ERGOPTI_NAV_TERMINAL_REPLAY_MARKER);
+			}
+			TEST_ASSERT(name,
+				ErgoptiNav_GetTerminalCapture(TEST_OWNER_A, &snapshot)
+					== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, snapshot.phase == ERGOPTI_NAV_TERMINAL_IDLE);
+			TEST_ASSERT(name, snapshot.queued == 0 && snapshot.replayed == 5);
+			TEST_ASSERT(name,
+				ErgoptiNav_CanStop(&can_stop) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, can_stop == 1);
+			TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
+		}
+	}
+	return true;
+}
+
+
+
+/** Captures a terminal FIFO overflow while an earlier replay prefix is sent. */
+static bool TestOverflowDuringTerminalRelease(TestTerminalReleaseObservation *observation)
+{
+	const char *name = observation->name;
+	ErgoptiNav_TerminalCaptureSnapshot snapshot;
+	ErgoptiNav_DispatchResult result;
+	uint32_t index;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	++observation->calls;
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(observation->token, &snapshot)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, snapshot.queued == 3);
+	TEST_ASSERT(name, snapshot.phase == ERGOPTI_NAV_TERMINAL_REPLAYING);
+	for (index = 3; index <= ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY; ++index) {
+		TEST_ASSERT(name, TestHookFlow(
+			name, (uint16_t)'C', 0x2E, ERGOPTI_NAV_EVENT_DOWN,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+			&result, &mask, &passed, &ordered));
+		TEST_ASSERT(name,
+			result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+		TEST_ASSERT(name, result.receipt_created == 0 && passed == 0 && mask == 0);
+	}
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(observation->token, &snapshot)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, snapshot.phase == ERGOPTI_NAV_TERMINAL_FAULTED);
+	TEST_ASSERT(name, snapshot.queued == ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY);
+	TEST_ASSERT(name, snapshot.last_os_error == ERROR_NOT_ENOUGH_MEMORY);
+	return true;
+}
+
+
+
+/** Invokes the overflow probe from the actual unlocked replay send boundary. */
+static void TestTerminalReleaseOverflowObserver(void *raw_observation)
+{
+	TestTerminalReleaseObservation *observation =
+		(TestTerminalReleaseObservation *)raw_observation;
+	if (!TestOverflowDuringTerminalRelease(observation))
+		observation->passed = false;
+}
+
+
+
+/** Proves send completion cannot clear an overflow fault or retry lost input. */
+static bool TestTerminalReleasePreservesConcurrentOverflow(void)
+{
+	const char *name = "terminal release preserves concurrent overflow";
+	const uint32_t kinds[2] = {
+		ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT
+	};
+	const uint32_t limits[3] = { 0, 1, UINT32_MAX };
+	const uint16_t scans[3] = { 0x1E, 0x1E, 0x14B };
+	const uint8_t edges[3] = {
+		ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_EVENT_DOWN
+	};
+	uint32_t kind_index;
+	uint32_t limit_index;
+	for (kind_index = 0; kind_index < 2; ++kind_index) {
+		for (limit_index = 0; limit_index < 3; ++limit_index) {
+			TestTerminalReleaseObservation observation;
+			ErgoptiNav_TerminalCaptureSnapshot snapshot;
+			ErgoptiNav_TerminalCaptureSnapshot before_retry;
+			ErgoptiNav_DispatchResult result;
+			ErgoptiNav_TestEvent replayed[3];
+			uint32_t replayed_count = 0;
+			uint32_t retry_count = 9;
+			uint32_t accepted = limits[limit_index] == UINT32_MAX
+				? 3u : limits[limit_index];
+			uint32_t index;
+			uint8_t can_stop = 1;
+			uint8_t mask = 0;
+			uint8_t passed = 0;
+			uint8_t ordered = 0;
+			TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name,
+				ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name,
+				ErgoptiNav_BeginTerminalCapture(TEST_OWNER_A)
+					== ERGOPTI_NAV_STATUS_OK);
+			for (index = 0; index < 3; ++index) {
+				TEST_ASSERT(name, TestHookFlow(
+					name, index == 2 ? VK_LEFT : (uint16_t)'A',
+					scans[index], edges[index], ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+					&result, &mask, &passed, &ordered));
+			}
+			memset(&observation, 0, sizeof(observation));
+			observation.name = name;
+			observation.token = TEST_OWNER_A;
+			observation.release_kind = kinds[kind_index];
+			observation.passed = true;
+			TEST_ASSERT(name,
+				ErgoptiNav_TestReleaseTerminalCaptureObserved(
+					TEST_OWNER_A, kinds[kind_index], limits[limit_index],
+					replayed, 3, &replayed_count,
+					TestTerminalReleaseOverflowObserver, &observation)
+						== ERGOPTI_NAV_STATUS_OS_ERROR);
+			TEST_ASSERT(name, observation.passed && observation.calls == 1);
+			TEST_ASSERT(name, replayed_count == accepted);
+			for (index = 0; index < accepted; ++index) {
+				TEST_ASSERT(name, replayed[index].vk == 0);
+				TEST_ASSERT(name, replayed[index].sc == scans[index]);
+				TEST_ASSERT(name, replayed[index].kind == edges[index]);
+				TEST_ASSERT(name,
+					replayed[index].extra_info == ERGOPTI_NAV_TERMINAL_REPLAY_MARKER);
+			}
+			TEST_ASSERT(name,
+				ErgoptiNav_GetTerminalCapture(TEST_OWNER_A, &snapshot)
+					== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, snapshot.token == TEST_OWNER_A);
+			TEST_ASSERT(name, snapshot.release_kind == kinds[kind_index]);
+			TEST_ASSERT(name, snapshot.phase == ERGOPTI_NAV_TERMINAL_FAULTED);
+			TEST_ASSERT(name,
+				snapshot.queued == ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY - accepted);
+			TEST_ASSERT(name, snapshot.replayed == accepted);
+			TEST_ASSERT(name, snapshot.last_os_error == ERROR_NOT_ENOUGH_MEMORY);
+			TEST_ASSERT(name, ErgoptiNav_GetLastOsError() == ERROR_NOT_ENOUGH_MEMORY);
+			before_retry = snapshot;
+			TEST_ASSERT(name,
+				ErgoptiNav_TestReleaseTerminalCapture(
+					TEST_OWNER_A, kinds[kind_index], UINT32_MAX,
+					NULL, 0, &retry_count) == ERGOPTI_NAV_STATUS_OS_ERROR);
+			TEST_ASSERT(name, retry_count == 0);
+			TEST_ASSERT(name,
+				ErgoptiNav_GetTerminalCapture(TEST_OWNER_A, &snapshot)
+					== ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name,
+				memcmp(&before_retry, &snapshot, sizeof(snapshot)) == 0);
+			TEST_ASSERT(name,
+				ErgoptiNav_SetSuspended(1) == ERGOPTI_NAV_STATUS_BUSY);
+			TEST_ASSERT(name,
+				ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+					== ERGOPTI_NAV_STATUS_BUSY);
+			TEST_ASSERT(name,
+				ErgoptiNav_CanStop(&can_stop) == ERGOPTI_NAV_STATUS_OK);
+			TEST_ASSERT(name, can_stop == 0);
+			/* The hook-free fixture owns no OS thread; retire its synthetic state. */
+			TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
+		}
+	}
+	return true;
+}
+
+
+
 /**
  * Proves a passed first down cannot become suppressed after modifiers change.
  *
@@ -3233,7 +3680,7 @@ static bool TestPlanValidationIsAtomic(void)
  *
  * @return Zero when every test passes or one after the first failure set.
  */
-int main(void)
+int main(int argc, char **argv)
 {
 	uint32_t index;
 	uint32_t passed = 0;
@@ -3278,6 +3725,9 @@ int main(void)
 			TestTerminalCapturePartialReplayIsRetryable},
 		{"terminal capture admission and overflow",
 			TestTerminalCaptureAdmissionAndOverflow},
+		{"terminal release has one owner", TestTerminalReleaseHasOneOwner},
+		{"terminal release preserves concurrent overflow",
+			TestTerminalReleasePreservesConcurrentOverflow},
 		{"unmatched down latches pass across modifiers",
 			TestUnmatchedDownLatchesPassAcrossModifiers},
 		{"profile receipt survives order swap",
@@ -3291,11 +3741,29 @@ int main(void)
 			TestStalePhysicalModifierCannotArmRoutes}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));
+	uint32_t selected_count = test_count;
+	if (argc > 2) {
+		fprintf(stderr, "Expected at most one exact native test name.\n");
+		return 2;
+	}
+	if (argc == 2) {
+		selected_count = 0;
+		for (index = 0; index < test_count; ++index) {
+			if (strcmp(tests[index].name, argv[1]) == 0)
+				++selected_count;
+		}
+		if (selected_count != 1) {
+			fprintf(stderr, "Unknown or ambiguous native test name: %s\n", argv[1]);
+			return 2;
+		}
+	}
 
 	for (index = 0; index < test_count; ++index) {
+		if (argc == 2 && strcmp(tests[index].name, argv[1]) != 0)
+			continue;
 		if (!tests[index].function()) {
 			fprintf(stderr, "Native navigation-owner tests stopped after %u/%u passes.\n",
-				passed, test_count);
+				passed, selected_count);
 			ErgoptiNav_Stop();
 			return 1;
 		}
@@ -3303,6 +3771,6 @@ int main(void)
 		printf("PASS %s\n", tests[index].name);
 	}
 	ErgoptiNav_Stop();
-	printf("Native navigation-owner tests passed: %u/%u.\n", passed, test_count);
+	printf("Native navigation-owner tests passed: %u/%u.\n", passed, selected_count);
 	return 0;
 }
