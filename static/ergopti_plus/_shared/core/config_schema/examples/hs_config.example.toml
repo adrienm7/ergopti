@@ -202,9 +202,6 @@ show_wpm = true
 colors = true
 graph = true
 
-[metrics.shortcuts]
-apps = false
-typing = false
 
 [metrics.disabled_apps]
 list = []
