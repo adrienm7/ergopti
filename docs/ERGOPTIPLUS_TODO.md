@@ -1256,6 +1256,8 @@ The macOS preview callbacks now acquire the existing global preference writer fe
 
 The Windows startup menu unit fixture now supplies both observable native lifecycle callback identities required by the real shared reload/quit builders. The production boot owns them in infra/lifecycle.ahk, deliberately excluded from the unit graph because it owns suspension/watchdog effects. All original label, command-type, delayed-admission and lifecycle-precedence assertions remain intact; fixture fallback effects are recorded and refused rather than reloading or terminating the runner. Source-level old-negative/new-positive and four mutation controls pass, with BOM/LF/convention/loop-capture checks. Full selected verification and actual Windows CI remain pending. TODO54 remains partial.
 
+The Windows hotstring delays-menu source regression now reads the existing central driver function-body owner instead of calculating a path relative to an included test file. Under tests/run_all.ahk, A_ScriptDir belongs to windows/tests, so the former two-parent path missed the real windows/ui/menu source. An explicit nonempty source guard precedes the unchanged native singleton-owner assertion; all 173 original assertions remain intact. Bounded source/path controls, three mutations and canonical conventions pass with BOM/LF retained. Full selected verification and native Windows CI remain pending; TODO54 remains partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
