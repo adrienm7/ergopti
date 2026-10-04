@@ -339,7 +339,10 @@ _PCA_DeadKeyChunk(Scenario) {
 		if Scenario.Trigger != "" {
 			Options := Map("Category", "_chunk_probe", "Section", "native",
 				"TimeActivationSeconds", Scenario.HasOwnProp("Timed") && Scenario.Timed ? 1 : 0)
-			CreateHotstring(Scenario.Flags, Scenario.Trigger, Scenario.Replacement, Options)
+			if Scenario.HasOwnProp("Conform") && Scenario.Conform
+				CreateCaseSensitiveHotstrings(Scenario.Flags, Scenario.Trigger, Scenario.Replacement, Options)
+			else
+				CreateHotstring(Scenario.Flags, Scenario.Trigger, Scenario.Replacement, Options)
 			if Scenario.HasOwnProp("ExtraEnd") && Scenario.ExtraEnd
 				CreateHotstring("?C", "foo´", "SHORT", Options)
 		}
@@ -358,10 +361,13 @@ _PCA_DeadKeyChunk(Scenario) {
 		if Scenario.HasOwnProp("Prefix")
 			AssertEqual(Scenario.Prefix, _PrefixBuffer, "the preview keeps only the final word")
 		if Scenario.HasOwnProp("Timed") && Scenario.Timed {
-			Assert(LastSentCharacterKeyTime.Has("´") && LastSentCharacterKeyTime.Has("."),
-				"delivered scalars receive timing metadata before the single match")
-			AssertEqual(LastSentCharacterKeyTime["´"], LastSentCharacterKeyTime["."],
-				"one physical chunk has one observed timestamp")
+			Keys := Scenario.HasOwnProp("TimedKeys") ? Scenario.TimedKeys : ["´", "."]
+			AssertTrue(Keys.Length >= 2, "the fixture must inspect actual delivered scalars")
+			for Key in Keys {
+				AssertTrue(LastSentCharacterKeyTime.Has(Key), "each complete scalar owns its timestamp")
+				AssertEqual(LastSentCharacterKeyTime[Keys[1]], LastSentCharacterKeyTime[Key],
+					"one physical chunk has one observed timestamp")
+			}
 		}
 	} finally {
 		_PrefixInvalidateDeferredEffects()
@@ -478,3 +484,16 @@ Test("prefix unicode-boundary-owner: repeat dispatch agrees with actual native U
 	_PCA_DeadKeyChunk({ Initial: "a" . Chr(0x1F601), Chunk: "★", Magic: "★",
 		Flags: "", Trigger: "", Replacement: "", Expected: "a" . Chr(0x1F601) . Chr(0x1F601),
 		Sends: 1, End: "", Prefix: "a" . Chr(0x1F601) . Chr(0x1F601) }))
+
+Test("prefix unicode-time-gate: supplementary penultimate scalar admits timed STAR", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F601) . "★", Flags: "*?C",
+		Trigger: "a" . Chr(0x1F601) . "★", Replacement: "BAR", Expected: "ABAR", Sends: 1,
+		End: "", Timed: true, TimedKeys: [Chr(0x1F601), "★"] }))
+Test("prefix unicode-time-gate: supplementary completion key preserves the preceding scalar", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F600) . Chr(0x1F601), Flags: "*?C",
+		Trigger: "a" . Chr(0x1F600) . Chr(0x1F601), Replacement: "BAR", Expected: "ABAR", Sends: 1,
+		End: "", Timed: true, TimedKeys: [Chr(0x1F600), Chr(0x1F601)] }))
+Test("prefix unicode-time-gate: case-conform live dispatch uses complete typed timing identity", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F601) . "★", Flags: "*?C", Magic: "★",
+		Trigger: "a" . Chr(0x1F601) . "★", Replacement: "bar", Expected: "Abar", Sends: 1,
+		End: "", Timed: true, TimedKeys: [Chr(0x1F601), "★"], Conform: true }))

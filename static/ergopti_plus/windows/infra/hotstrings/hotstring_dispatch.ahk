@@ -734,7 +734,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 ;   visibly presented. When supplied, the callable is not invoked a second time.
 ; @return Canonical decision object, or "" when dispatch must decline.
 _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
-		TypoNbspStripped := false, FrozenResolvedBase := unset) {
+		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
 		global LastSentCharacterKeyTime
 		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
 				return ""
@@ -758,7 +758,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 						TriggerStart := StrLen(BufferAfterCompletion)
 								- CompletionStripLen - Spec.Length + 1
 						TypedPrev := TriggerStart >= 1
-								? SubStr(BufferAfterCompletion, TriggerStart + Spec.Length - 2, 1)
+								? _TextPenultimateCodepoint(SubStr(BufferAfterCompletion, TriggerStart, Spec.Length))
 								: ""
 						if (TypedPrev != "")
 								PrevKey := TypedPrev
@@ -766,7 +766,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				if !LastSentCharacterKeyTime.Has(PrevKey)
 						return ""
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
-				ElapsedMs := TickElapsed(GateOriginTick)
+				ElapsedMs := TickElapsed(GateOriginTick, NowTick?)
 				; Preserve the engine's existing strict comparison: equality is the last
 				; fireable instant. The renderer separately refuses RemainingMs == 0 so
 				; it never paints a promise with no usable interaction window.
