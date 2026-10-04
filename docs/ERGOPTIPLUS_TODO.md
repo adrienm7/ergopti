@@ -2293,6 +2293,20 @@ not close the remaining TODO54 menu migration or updater ownership work.
 
 Mac About retained-release callbacks now detach the displayed release tag and channel, re-read the actual channel/check owners before dispatch, and return success only when the launcher accepts with Boolean true. Held rows refuse cleared/replaced offers, a changed channel, mutated borrowed offer data, invalid owners, and launcher refusal or exceptions. The four existing About cases remain byte-exact; 24 new cases exercise the actual menu/renderer and real Channel/AutoCheck public retirement paths with recording infrastructure ports (28/0, original callback 4/24, five causal mutants red). This is separate from the release-channel setter ACK prerequisite. Windows reads its live update request/cache owners and Linux validates the current cached release URL; neither shares this retained Mac feed callback. TODO54/81 remains partial: automatic notification callbacks and global/native acceptance are separate. Native macOS/Sparkle and full selected qualification are pending; no generation identity, readiness, or obsolete-tag-installation claim is made.
 
+Linux's Select Word, Select Line and Paste Plain helpers now consume shared
+command declarations for captions, order, readiness and platform presence.
+Windows and macOS retain their existing binding placement. Retained callbacks
+re-read the current native method and configuration admission, require an exact
+Boolean acknowledgement, and preserve native refusal and retry behavior. The
+independent helper corpus and 24 registered cases cover actual effect ports,
+reservation, withdrawn capabilities, declaration mutation, composed order and
+all 21 locale captions; the original 21 cases fail 19 times against the old
+provider and pass after migration. The original registered module remains an
+exact prefix. The native census stays at 97/154/98: its scanner excluded the
+computed helper captions already, and separator migration remains separate.
+Selected and hosted native qualification are pending; items 54 and 81 remain
+partial.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -2420,6 +2434,9 @@ pass with all 21 locale catalogues. Full native CI remains required.
   The update rows greyed on a local version (2026-10-01) were added as
   provider rows and join the About slice.
   The fixed agent Mode choices now use the shared declaration and renderers; see item 54 for the regression and remaining native-row scope.
+
+The fixed Linux selection helper trio is now declared; see item 54 for its
+independent regression evidence and remaining separator/native qualification.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
