@@ -876,6 +876,19 @@ These are software implementations; final hardware verification remains below.
   and Windows from A_ScriptDir by source; neither uses inherited PWD there.
   Their native gates remain unexecuted as requested. No configuration/TOML,
   title, autostart placement, physical input or reserved source was changed.
+- [~] **L66.** Linux restart zombie handoff: read the kernel's dedicated State
+  record from /proc/PID/status instead of parsing line-oriented /proc/PID/stat,
+  whose raw process name can contain newlines. Such a name previously left the
+  native detached relay waiting forever on an already exited daemon. Four of
+  fourteen native cases fail before and all pass after per LuaJIT/Lua 5.4
+  runtime, including live-target waiting, actual retained zombies, prctl-set
+  names and literal wrapper argument receipts. The fixture owns and reaps its
+  detached process descendants through native subreaper setup. This is a real
+  process/relay E2E regression; keyboard ownership and systemd service behavior
+  are not qualified. Windows uses native process handles; macOS has a bounded
+  kill probe without this Linux stat parser. Their native gates remain with the
+  principal owner and were not run. No autostart placement, title, reserved
+  source, physical input or manual CI was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
