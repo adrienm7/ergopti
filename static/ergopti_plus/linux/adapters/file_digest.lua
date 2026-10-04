@@ -27,11 +27,19 @@ if not ok_luv then luv = nil end
 -- =========================================
 
 local DEFAULT_TIMEOUT_MS = 30000
+local DEFAULT_OWNER = "default"
 local MAX_OUTPUT_BYTES = 1024
 
-local _active = nil
+local _active = {}
 
 M.HAS_ASYNC = luv ~= nil
+
+--- Resolves a stable owner while preserving the historical default request.
+--- @param owner any
+--- @return string
+local function request_owner(owner)
+	return type(owner) == "string" and owner ~= "" and owner or DEFAULT_OWNER
+end
 
 
 -- =========================================
@@ -95,7 +103,7 @@ end
 local function finish(request, digest, err, suppress_callback)
 	if request.terminal then return end
 	request.terminal = true
-	if _active == request then _active = nil end
+	if _active[request.owner] == request then _active[request.owner] = nil end
 	close_timer(request)
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
@@ -146,7 +154,8 @@ end
 
 --- Computes one file's SHA-256 asynchronously.
 --- @param path string Absolute file path.
---- @param options table|nil { timeout_ms? }
+--- A new digest replaces only the previous request for the same owner.
+--- @param options table|nil { timeout_ms?, owner? }
 --- @param callback function Receives digest, error exactly once.
 --- @return boolean Whether hashing was dispatched.
 function M.sha256(path, options, callback)
@@ -164,12 +173,14 @@ function M.sha256(path, options, callback)
 		finish({ callback = callback }, nil, "sha256sum argument vector refused: " .. argv_refusal)
 		return false
 	end
-	if _active and not M.cancel() then return reject("previous digest cancellation failed") end
+	local request_options = type(options) == "table" and options or {}
+	local owner = request_owner(request_options.owner)
+	if _active[owner] and not M.cancel(owner) then return reject("previous digest cancellation failed") end
 	if not luv or type(luv.spawn) ~= "function" then return reject("asynchronous digest unavailable") end
 
-	local request_options = type(options) == "table" and options or {}
 	local timeout_ms = tonumber(request_options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request = {
+		owner = owner,
 		callback = callback,
 		-- GNU sha256sum echoes the literal filename in its NUL-ended receipt.
 		-- Reserve that known payload separately from the bounded output budget.
@@ -245,16 +256,18 @@ function M.sha256(path, options, callback)
 		return false
 	end
 
-	_active = request
+	_active[owner] = request
 	Logger.debug(LOG, "SHA-256 file digest dispatched asynchronously (pid=%d).", pid)
 	return true
 end
 
---- Cancels the active digest without publishing its callback.
+--- Cancels one owner's active digest without publishing its callback.
+--- @param owner string|nil Defaults to the historical unnamed owner.
 --- @return boolean
-function M.cancel()
-	if not _active then return true end
-	local request = _active
+function M.cancel(owner)
+	local key = request_owner(owner)
+	if not _active[key] then return true end
+	local request = _active[key]
 	if not terminate_group(request) then
 		Logger.error(LOG, "Digest cancellation failed for pid=%s; ownership retained.",
 			tostring(request.pid))
@@ -264,10 +277,11 @@ function M.cancel()
 	return true
 end
 
---- Returns true while one file owns a live digest process.
+--- Returns true while this owner has a live digest process.
+--- @param owner string|nil Defaults to the historical unnamed owner.
 --- @return boolean
-function M.isActive()
-	return _active ~= nil
+function M.isActive(owner)
+	return _active[request_owner(owner)] ~= nil
 end
 
 return M

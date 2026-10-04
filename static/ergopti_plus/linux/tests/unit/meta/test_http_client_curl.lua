@@ -1157,6 +1157,12 @@ helpers.describe("file_digest: asynchronous sha256sum ownership", function()
 			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
 			helpers.assert_true(result == true or result == 0, "native digest replacement fixture must pass")
 		end)
+		helpers.it("linux-digest-owner: actual updater cancellation preserves another native digest", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_owners.lua"
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native digest owner fixture must pass")
+		end)
 	end
 
 	for _, length in ipairs({ 957, 958, 1106, 3500 }) do
