@@ -206,16 +206,16 @@ _MRS_PublisherClockProgress(Origin) {
 		InitialBytes := CryptoSha256Bytes(FileRead(Path, "RAW"))
 		AssertEqual(10, JsonParse(Initial)["percent"])
 		Info["done_bytes"] := 50
-		Now := (Origin + KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS - 1) & 0xFFFFFFFF
+		Now := (Origin + KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS - 1)
 		AssertFalse(Publisher.PublishProgress(Info))
 		AssertEqual(Initial, FileRead(Path, "UTF-8"), "an early report preserves the exact published bytes")
 		AssertEqual(InitialBytes, CryptoSha256Bytes(FileRead(Path, "RAW")))
 		AssertEqual(Origin, Publisher.last_progress, "a refusal cannot move the successful publication origin")
-		Now := (Origin + KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS) & 0xFFFFFFFF
+		Now := (Origin + KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS)
 		AssertTrue(Publisher.PublishProgress(Info), "the exact positive cadence admits publication")
 		AssertEqual(50, JsonParse(FileRead(Path, "UTF-8"))["percent"])
 		Info["done_bytes"] := 70
-		Now := (Origin + 2 * KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS + 1) & 0xFFFFFFFF
+		Now := (Origin + 2 * KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS + 1)
 		AssertTrue(Publisher.PublishProgress(Info), "a report after the next cadence is admitted")
 		AssertEqual(70, JsonParse(FileRead(Path, "UTF-8"))["percent"])
 		Info["final"] := true
@@ -253,7 +253,7 @@ _MRS_PublisherClockPartial(Origin) {
 			AssertEqual("2026-03-03", JsonParse(Initial[Which])["_partial"]["oldest"])
 		}
 		Info["oldest_complete"] := "2026-03-02"
-		Now := (Origin + KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS - 1) & 0xFFFFFFFF
+		Now := (Origin + KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS - 1)
 		AssertFalse(Publisher.PublishPartial(Info))
 		for Which in ["typing", "apps"] {
 			AssertEqual(Initial[Which], FileRead(KLPF_PartialSnapshotPath(Which, Root), "UTF-8"))
@@ -261,12 +261,12 @@ _MRS_PublisherClockPartial(Origin) {
 		}
 		AssertEqual(Origin, Publisher.last_partial)
 		AssertEqual("2026-03-03", Publisher.published_oldest)
-		Now := (Origin + KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS) & 0xFFFFFFFF
+		Now := (Origin + KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS)
 		AssertTrue(Publisher.PublishPartial(Info), "both actual snapshots publish at the exact positive cadence")
 		for Which in ["typing", "apps"]
 			AssertEqual("2026-03-02", JsonParse(FileRead(KLPF_PartialSnapshotPath(Which, Root), "UTF-8"))["_partial"]["oldest"])
 		Info["oldest_complete"] := "2026-03-01"
-		Now := (Origin + 2 * KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS + 1) & 0xFFFFFFFF
+		Now := (Origin + 2 * KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS + 1)
 		AssertTrue(Publisher.PublishPartial(Info), "a later snapshot after the next cadence is admitted")
 		AssertFalse(Publisher.PublishPartial(Info), "unchanged coverage never publishes again")
 		Info["oldest_complete"] := ""
@@ -289,7 +289,7 @@ _MRS_PublisherClockCost(Origin, Duration) {
 	Now := Origin
 	Clock() {
 		Reads += 1
-		return Measured ? Now : Reads == 1 ? Origin : (Origin + Duration) & 0xFFFFFFFF
+		return Measured ? Now : Reads == 1 ? Origin : (Origin + Duration)
 	}
 	Publisher := KLPFRebuildPublisher(Root, Clock)
 	try {
@@ -299,7 +299,7 @@ _MRS_PublisherClockCost(Origin, Duration) {
 		AssertTrue(Publisher.PublishPartial(Info))
 		AssertEqual(3, Reads, "only the start, completion and post-work origin are measured")
 		AssertEqual(Duration, Publisher.partial_cost, "the adaptive budget receives the actual positive write duration")
-		AssertEqual((Origin + Duration) & 0xFFFFFFFF, Publisher.last_partial)
+		AssertEqual((Origin + Duration), Publisher.last_partial)
 		Measured := true
 		Initial := Map()
 		InitialBytes := Map()
@@ -309,14 +309,14 @@ _MRS_PublisherClockCost(Origin, Duration) {
 		}
 		Budget := Max(KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS, KLPFRebuildPublisher.PARTIAL_COST_FACTOR * Duration)
 		Info["oldest_complete"] := "2026-03-02"
-		Now := (Origin + Duration + Budget - 1) & 0xFFFFFFFF
+		Now := (Origin + Duration + Budget - 1)
 		AssertFalse(Publisher.PublishPartial(Info), "the complete measured-cost budget is mandatory")
 		for Which in ["typing", "apps"] {
 			AssertEqual(Initial[Which], FileRead(KLPF_PartialSnapshotPath(Which, Root), "UTF-8"))
 			AssertEqual(InitialBytes[Which], CryptoSha256Bytes(FileRead(KLPF_PartialSnapshotPath(Which, Root), "RAW")))
 		}
 		AssertEqual(Duration, Publisher.partial_cost, "a refusal preserves the previous measured cost")
-		Now := (Origin + Duration + Budget) & 0xFFFFFFFF
+		Now := (Origin + Duration + Budget)
 		AssertTrue(Publisher.PublishPartial(Info), "the exact adaptive budget admits both native files")
 		for Which in ["typing", "apps"]
 			AssertEqual("2026-03-02", JsonParse(FileRead(KLPF_PartialSnapshotPath(Which, Root), "UTF-8"))["_partial"]["oldest"])
@@ -327,13 +327,13 @@ _MRS_PublisherClockCost(Origin, Duration) {
 }
 
 Test("metrics publisher-clock: ordinary progress cadence", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockProgress.Bind(100)))
-Test("metrics publisher-clock: wrapped progress cadence", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockProgress.Bind(0xFFFFFFF0)))
+Test("metrics publisher-clock: cross-boundary native progress cadence", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockProgress.Bind(0xFFFFFFF0)))
 Test("metrics publisher-clock: ordinary partial cadence", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockPartial.Bind(100)))
-Test("metrics publisher-clock: wrapped partial cadence", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockPartial.Bind(0xFFFFFFF0)))
+Test("metrics publisher-clock: cross-boundary native partial cadence", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockPartial.Bind(0xFFFFFFF0)))
 Test("metrics publisher-clock: ordinary 32ms partial cost", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockCost.Bind(100, 32)))
-Test("metrics publisher-clock: wrapped 32ms partial cost", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockCost.Bind(0xFFFFFFF0, 32)))
+Test("metrics publisher-clock: cross-boundary native 32ms partial cost", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockCost.Bind(0xFFFFFFF0, 32)))
 Test("metrics publisher-clock: ordinary adaptive partial budget", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockCost.Bind(100, 3001)))
-Test("metrics publisher-clock: wrapped adaptive partial budget", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockCost.Bind(0xFFFFFFF0, 3001)))
+Test("metrics publisher-clock: cross-boundary native adaptive partial budget", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockCost.Bind(0xFFFFFFF0, 3001)))
 
 ; An actual rename refusal cannot advance timing or coverage authority.
 _MRS_PublisherClockWriteRefusal(Partial) {
@@ -375,3 +375,51 @@ _MRS_PublisherClockWriteRefusal(Partial) {
 }
 Test("metrics publisher-clock: progress write refusal preserves retry", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockWriteRefusal.Bind(false)))
 Test("metrics publisher-clock: partial write refusal preserves retry", _KLRDC_CheckTeardown.Bind(_MRS_PublisherClockWriteRefusal.Bind(true)))
+
+; Native monotonic gaps do not alias to an early UInt32 cadence.
+_MRS_Publisher64LongGap(Partial, Offset) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Root := _KLRDC_Root()
+	Origin := 0x100000000 + 100000
+	Now := Origin
+	Publisher := KLPFRebuildPublisher(Root, () => Now)
+	try {
+		if Partial {
+			_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+			Info := Map("db", _KLRNF_Build(false), "oldest_complete", "2026-03-03", "newest_complete", "2026-03-03")
+			AssertTrue(Publisher.PublishPartial(Info))
+			Info["oldest_complete"] := "2026-03-02"
+			Interval := KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS
+		} else {
+			Info := Map("final", false, "total_bytes", 100, "done_bytes", 10,
+				"run_bytes", 10, "elapsed_ms", 10, "oldest_complete", "2026-03-03")
+			AssertTrue(Publisher.PublishProgress(Info))
+			Info["done_bytes"] := 50
+			Interval := KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
+		}
+		Now := Origin + 0x100000000 + Interval + Offset
+		AssertTrue(Partial ? Publisher.PublishPartial(Info) : Publisher.PublishProgress(Info),
+			"a complete native UInt32 span plus the boundary is always due")
+		if Partial {
+			AssertEqual(Now, Publisher.last_partial, "accepted publication retains its untruncated origin")
+			for Which in ["typing", "apps"]
+				AssertEqual("2026-03-02", JsonParse(FileRead(KLPF_PartialSnapshotPath(Which, Root), "UTF-8"))["_partial"]["oldest"])
+		} else {
+			AssertEqual(Now, Publisher.last_progress)
+			AssertEqual(50, JsonParse(FileRead(KLPF_RebuildProgressPath(Root), "UTF-8"))["percent"])
+		}
+		AssertTrue(Publisher.Retire())
+	} finally {
+		_MRS_RetireFiles(Root)
+		_KLRDC_Cleanup()
+	}
+}
+for _MRS_Publisher64Partial in [false, true] {
+	for _MRS_Publisher64Offset in [-1, 0, 1]
+		Test("metrics publisher native64: " . (_MRS_Publisher64Partial ? "partial" : "progress")
+			. " long gap offset " . _MRS_Publisher64Offset . " (metrics-publisher-native64)",
+			_KLRDC_CheckTeardown.Bind(_MRS_Publisher64LongGap.Bind(_MRS_Publisher64Partial, _MRS_Publisher64Offset)))
+}
+Test("metrics publisher native64: complete long measured cost and adaptive budget (metrics-publisher-native64)",
+	_KLRDC_CheckTeardown.Bind(_MRS_PublisherClockCost.Bind(0x100000000 + 100000, 0x100000000 + 32)))
