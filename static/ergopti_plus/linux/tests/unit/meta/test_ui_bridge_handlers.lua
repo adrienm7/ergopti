@@ -2104,7 +2104,7 @@ helpers.describe("ui.bridge_handlers", function()
       }
       state.config.reload = function()
         captured.reload_count = captured.reload_count + 1
-        return reload_result
+        return reload_result, true
       end
       local context = {
         close_owned_window = function()
@@ -2397,4 +2397,138 @@ helpers.describe("personal_toml_editor save (toml-save)", function()
     if not ok then error(err, 0) end
   end)
 
+end)
+
+helpers.describe("personal editor: canonical reload acknowledgement", function()
+	local function state_for(reload)
+		local observed = { saves = 0, closes = 0, refreshes = 0 }
+		local state = {
+			dyn_hotstrings = { save_info = function() observed.saves = observed.saves + 1;return true end },
+			config = { reload = reload },
+			on_config_changed = function() observed.refreshes = observed.refreshes + 1 end,
+		}
+		local context = { close_owned_window = function() observed.closes = observed.closes + 1;return true end }
+		return state, context, observed
+	end
+	for _, count in ipairs({ 0, 7 }) do
+		helpers.it("admits a canonical successful reload count " .. count, function()
+			local state, context, seen = state_for(function() return count, true end)
+			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+				{ action = "save", values = { first_name = "independent" } }, state, context)
+			helpers.assert_eq(result, { saved = true, reloaded = true, closed = true })
+			helpers.assert_eq(seen, { saves = 1, closes = 1, refreshes = 1 })
+		end)
+	end
+	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("retains a saved editor after reload acknowledgement " .. outcome, function()
+			local reload = function()
+				if outcome == "throw" then error("inert catalogue reload refusal") end
+				if outcome == "nil" then return 0, nil end
+				if outcome == "number" then return 0, 2 end
+				if outcome == "text" then return 0, "true" end
+				return 0, false, "inert catalogue reload refusal"
+			end
+			if outcome == "missing" then reload = nil end
+			local state, context, seen = state_for(reload)
+			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+				{ action = "save", values = { first_name = "independent" } }, state, context)
+			helpers.assert_eq(result, { saved = true, reloaded = false, closed = false })
+			helpers.assert_eq(seen, { saves = 1, closes = 0, refreshes = 0 })
+		end)
+	end
+	local function read(path)
+		local file = assert(io.open(path, "rb"));local text = file:read("*a");assert(file:close());return text
+	end
+	local function write(path, content)
+		local file = assert(io.open(path, "wb"));assert(file:write(content));assert(file:close())
+	end
+	local function with_native_owners(body)
+		local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-ergopti-personal-reload"
+		local quote = require("adapters.shell_runner").quote
+		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		local path, choices, empty = directory .. "/personal_info.toml", directory .. "/config.toml", directory .. "/personal_hotstrings.toml"
+		local original = '# independent personal fields\n[info]\nfirst_name = "Ada"\n[letters]\np = "first_name"\n[future]\nvalues = [3, 9] # keep this comment\n'
+		write(path, original);write(choices, '[future]\nlabel = "unchanged"\n');write(empty, '# deliberately empty valid hotstring catalogue\n[raw]\n')
+		local prior = {};for name, value in pairs(package.loaded) do prior[name] = value end
+		local called, failure = pcall(function()
+			for _, name in ipairs({ "modules.dynamic_hotstrings.manager", "dynamic_hotstrings", "infra.hotstring_preferences",
+				"modules.hotstrings.hotstrings_config" }) do package.loaded[name] = nil end
+			local preferences = require("infra.hotstring_preferences")
+			assert(preferences._set_file_for_test(choices))
+			local dynamic = require("modules.dynamic_hotstrings.manager")
+			assert(dynamic.init({ personal_info_path = path, trigger_char = "★" }))
+			local config = require("modules.hotstrings.hotstrings_config")
+			assert(config._set_config_file_for_test(choices))
+			assert(config._set_override_config_dir_for_test(directory))
+			body({ dynamic = dynamic, config = config, path = path, choices = choices, empty = empty,
+				original = original, directory = directory })
+		end)
+		for name in pairs(package.loaded) do if prior[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(prior) do package.loaded[name] = value end
+		local removed = os.execute("rm -rf " .. quote(directory))
+		assert(removed == 0, "the owned native-file fixture is physically retired")
+		for name, value in pairs(prior) do assert(package.loaded[name] == value, "every prior module identity is restored") end
+		if not called then error(failure, 0) end
+	end
+	for _, outcome in ipairs({ "committed", "uninitialized", "false", "nil", "number", "throw" }) do
+		helpers.it("consumes the actual canonical catalogue receipt after a real personal save " .. outcome, function()
+			with_native_owners(function(c)
+				local engine = require("hotstring_engine").new()
+				local native_load = engine.load_mappings
+				if outcome ~= "uninitialized" then assert(c.config.init(engine, c.empty)) end
+				local calls = 0
+				if outcome ~= "committed" and outcome ~= "uninitialized" then
+					engine.load_mappings = function()
+						calls = calls + 1
+						if outcome == "throw" then error("inert engine publication refusal") end
+						if outcome == "nil" then return nil end
+						if outcome == "number" then return 2 end
+						return false
+					end
+				end
+				local closes, refreshes = 0, 0
+				local native_reload, receipt = c.config.reload, nil
+				c.config.reload = function()
+					local count, committed, reason = native_reload()
+					receipt = { count = count, committed = committed }
+					return count, committed, reason
+				end
+				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local called, result = pcall(handler.on_message, { action = "save", values = { first_name = "Grace" } },
+					{ dyn_hotstrings = c.dynamic, config = c.config,
+						on_config_changed = function() refreshes = refreshes + 1 end },
+					{ close_owned_window = function() closes = closes + 1;return true end })
+				engine.load_mappings, c.config.reload = native_load, native_reload
+				print(string.format("PERSONAL_RELOAD outcome=%s native_count=%s native_ack=%s closes=%d refreshes=%d", outcome,
+					tostring(receipt and receipt.count), tostring(receipt and receipt.committed), closes, refreshes))
+				helpers.assert_eq({ called, result }, { true,
+					{ saved = true, reloaded = outcome == "committed", closed = outcome == "committed" } },
+					"the protected native handler returns the acknowledged save and runtime outcome")
+				helpers.assert_eq(receipt, { count = 0, committed = outcome == "committed" })
+				helpers.assert_eq(read(c.path), c.original:gsub('first_name = "Ada"', 'first_name = "Grace"', 1),
+					"the actual acknowledged leaf writer retains independent future data and comments")
+				helpers.assert_eq(c.dynamic.get_info().first_name, "Grace", "the real dynamic save refreshed its own rules")
+				helpers.assert_eq(result, { saved = true, reloaded = outcome == "committed", closed = outcome == "committed" },
+					"durable save and static-catalogue runtime publication remain separate acknowledgements")
+				helpers.assert_eq(closes, outcome == "committed" and 1 or 0)
+				helpers.assert_eq(refreshes, outcome == "committed" and 1 or 0)
+				helpers.assert_eq(calls, (outcome == "committed" or outcome == "uninitialized") and 0 or 1)
+				if outcome == "committed" then
+					local count, published = c.config.reload()
+					helpers.assert_eq(count, 0, "a legitimately empty actual catalogue still commits")
+					helpers.assert_eq(published, true)
+				end
+				if outcome ~= "committed" then
+					if outcome == "uninitialized" then assert(c.config.init(engine, c.empty)) end
+					local retry = handler.on_message({ action = "save", values = { first_name = "Grace" } },
+						{ dyn_hotstrings = c.dynamic, config = c.config,
+							on_config_changed = function() refreshes = refreshes + 1 end },
+						{ close_owned_window = function() closes = closes + 1;return true end })
+					helpers.assert_eq(retry, { saved = true, reloaded = true, closed = true })
+					helpers.assert_eq(closes, 1);helpers.assert_eq(refreshes, 1)
+					helpers.assert_eq(read(c.path), c.original:gsub('first_name = "Ada"', 'first_name = "Grace"', 1))
+				end
+			end)
+		end)
+	end
 end)
