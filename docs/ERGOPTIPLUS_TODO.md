@@ -992,6 +992,16 @@ These are software implementations; final hardware verification remains below.
   preserve the shared application corpus and cover option-looking, quoted and
   spaced ids. macOS and Windows use their native application launch ports
   without this gtk-launch option parser; their native suites remain deferred.
+- [~] **L75.** Linux device schema admission: read the complete SQLite table
+  definition when checking its Linux platform constraint. The scalar reader
+  kept only the first line and rebuilt the already-current registry at every
+  opening, removing its indexes and triggers and requesting an unnecessary
+  write lock. Four real SQLite regressions fail before and pass after: stable
+  schema version, retained index/trigger ownership, opening under an actual
+  read transaction, and a legacy migration that runs only once and retains
+  device metadata. The registered unit reopens the production writer. Windows
+  and macOS schema paths do not use this truncated CLI DDL probe; their native
+  suites remain deferred. No shared schema or reserved configuration was changed.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
