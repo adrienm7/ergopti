@@ -264,16 +264,30 @@ _DigitRowProfile(Hkl) {
 
 /** Returns typed effective intent; category masking never treats a string as a switch. */
 NumberRowEffectiveMode() {
-	global Features
+	global Features, CategoryEnabled
+	; Parse-time criteria can run during Bundle_Init, before category publication.
+	; Only the actual admitted Layout switch may enable a non-native policy.
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout") || !(Features["layout"] is Map)
-			|| !IsCategoryGated("Layout")
+			|| !IsSet(CategoryEnabled) || !(CategoryEnabled is Map) || !CategoryEnabled.Has("Layout")
+			|| !(CategoryEnabled["Layout"] is Integer) || CategoryEnabled["Layout"] != true
 		return "native"
 	Mode := NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", ""))
-	; Desired unsupported intent remains stored and greyed in the menu. The
-	; effective input owner retains its native source; it never claims symbols.
-	if Mode == "symbols" && !NumberRowSymbolsCapable(GetKeyState("CapsLock", "T"))
-		return "native"
+	; Capability dependencies are also unpublished during the first pump. A
+	; contained admission leaves native input authoritative on an unset source.
+	if Mode == "symbols" {
+		Supported := false
+		try NumberRowSymbolsAdmission(GetKeyState("CapsLock", "T"), &Supported)
+		if !Supported
+			return "native"
+	}
 	return Mode
+}
+
+/** Publishes capability only after the existing source owner returns exact true. */
+NumberRowSymbolsAdmission(Caps, &Supported) {
+	Supported := false
+	Observed := NumberRowSymbolsCapable(Caps)
+	Supported := (Observed is Integer) && Observed == true
 }
 
 /** Resolves the symbols-first level from the currently selected registry source. */

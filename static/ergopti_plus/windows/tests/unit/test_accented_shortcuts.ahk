@@ -168,9 +168,45 @@ _ACS_LayoutSectionsCase() {
 	for Row in ["number_row_policy", "accented_letters",
 			"hotstrings.magic_key.replace", "layout.ctrl_magic_save"]
 		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")
-	AltGrRows := _DriverFuncBody("_LAY_LayoutFeatureAltGrRows")
-	Assert(InStr(AltGrRows, '"direct_access_digits", "digits"') > 0,
-		"the Ergopti AltGr list must not repeat the any-layout digit row")
+	_ACS_LayoutProviderPlacement(Tokens, AnyLayout)
 	Assert(InStr(_TrayRootBuilderBodies(), "group_accented") == 0,
 		"the accented-letter group must stay enabled without the Ergopti emulation")
+}
+
+
+; Exercise the included provider, not the value of its unused exclusion marker.
+_ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
+	global Features
+	SavedFeatures := Features
+	State := MasterGateState()
+	SavedState := State.Clone()
+	try {
+		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", true,
+			"ergopti_plus", true, "ctrl_magic_save", false,
+			"direct_access_digits", "digits", "emulated_layout", ""))
+		State["initialized"] := false
+		Rows := _LAY_LayoutFeatureAltGrRows()
+		AssertEqual(2, Rows.Length, "the actual AltGr provider owns exactly its two declared overlays")
+		Expected := ["ergopti_alt_gr", "ergopti_plus"]
+		for Index, Id in Expected {
+			Entry := ManifestFindEntryByPath("layout." . Id)
+			Assert(Entry is Map, "each independently expected overlay must be declared")
+			AssertEqual(MenuLabelFromManifestEntry(Entry), Rows[Index]["label"],
+				"actual provider order must retain the two overlays without a digit-row duplicate")
+			AssertTrue(HasMethod(Rows[Index]["action"], "Call"), "each real overlay retains its native action")
+		}
+		Count := 0
+		for Index, Token in Tokens {
+			if Token == "number_row_policy" {
+				Count += 1
+				Assert(Index > AnyLayout, "the single global policy belongs after the any-layout header")
+			}
+		}
+		AssertEqual(1, Count, "the actual global declaration must contain exactly one number-row policy")
+	} finally {
+		Features := SavedFeatures
+		State.Clear()
+		for Key, Value in SavedState
+			State[Key] := Value
+	}
 }
