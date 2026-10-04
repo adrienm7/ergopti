@@ -825,7 +825,8 @@ _HSDT_DelayConfigKeepsNativeWindowAndRefreshOwner() {
 	Assert(Body != "", "the actual delay provider must exist")
 	Assert(InStr(Body, 'MenuRenderer_CommandRow("hotstrings_delays_menu", "hotstrings_config_window"'))
 	AssertFalse(InStr(Body, 't("menu.hotstrings.config_item")'))
-	Source := FSReadUtf8Exact(A_ScriptDir . "\..\..\ui\menu\menu_hotstrings.ahk")
+	Source := Body
+	Assert(Source != "", "the central driver locator must provide the actual provider signature")
 	Assert(InStr(Source, "_HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow)"),
 		"ordinary calls retain the existing native singleton window owner")
 }
