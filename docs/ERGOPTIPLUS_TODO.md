@@ -748,6 +748,19 @@ These are software implementations; final hardware verification remains below.
   rather than opening this canonical disk store. Existing WAL sidecar behavior
   is separate from these absent-source checks. No reserved source, TOML,
   cross-OS native gate, physical input or manual CI was modified or exercised.
+- [~] **L57.** Linux SQLite personal initialization isolation: explicitly select
+  -init /dev/null in the shared native command builder. An inherited .sqliterc
+  previously changed JSON mode, prefixed response bodies, prevented metrics
+  bootstrap and ran personal .shell directives before the application script.
+  Four actual ordinary-account receipts fail before and pass after with a real
+  owned login profile; three unit modes retain native flags, data and exit ABI.
+  Provision only a disposable CI account/container and validate the exact owned
+  profile corpus before exercising it; never replace a host personal profile or
+  repurpose HOME. SQLite values remain on stdin with the original large-input
+  budget. macOS hs.sqlite3 and Windows native prepared statements do not launch
+  the CLI and have no matching personal .sqliterc startup by source. No reserved
+  source, TOML, native cross-OS gate, physical input or manual CI was modified or
+  exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
