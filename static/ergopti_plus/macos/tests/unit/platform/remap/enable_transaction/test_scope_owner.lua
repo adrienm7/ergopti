@@ -47,6 +47,12 @@ local function scoped_remap(fixture)
 		disk.files[path] = nil
 		return true
 	end
+	-- This remap fixture models persistence over its private disk. Native
+	-- cooperative locking is exercised with real files by the adapter suite.
+	files.remove_if_unchanged = function(path, expected)
+		if disk.files[path] ~= expected.content then return false, "changed" end
+		return files.remove_exact(path)
+	end
 	files.read_with_status = function(path)
 		local content = disk.files[path]
 		return content, content and "ok" or "absent"
@@ -757,6 +763,43 @@ helpers.describe("macOS remap cohort source races", function()
 			helpers.assert_eq(disk.files[LAYERS], "# foreign layer content\n")
 			helpers.assert_eq(disk.layer_writes, 0)
 			helpers.assert_eq(disk.removals, 0)
+		end)
+	end)
+end)
+
+
+helpers.describe("macOS parent inverse removal-release debt", function()
+	helpers.it("retains no-effect unlink debt until native release settles (scope-layer-cohort)", function()
+		with_fixture(function(fixture)
+			local remap, calls, disk = cohort_remap(fixture)
+			local snapshot, receipt = committed_layer_scope(remap, disk)
+			local blocked, cleanup_calls, outcomes = true, 0, {}
+			local saves = calls.save
+			require("adapters.file_system").remove_if_unchanged = function(path, expected)
+				helpers.assert_eq(path, LAYERS)
+				helpers.assert_eq(expected.content, disk.files[path])
+				return false, "unlink refused without effect; release retained", function()
+					cleanup_calls = cleanup_calls + 1
+					return not blocked, nil, false
+				end
+			end
+			helpers.assert_eq(remap.restore_settings(snapshot, function(ok) outcomes[#outcomes + 1] = ok end, receipt), false)
+			helpers.assert_eq(remap.settings_pending(), true,
+				"no settings or file effect cannot retire the retained native release")
+			helpers.assert_eq(outcomes, { false }, "the facade must report refusal while retaining cleanup debt")
+			helpers.assert_eq(remap.retry_settings_recovery(), false)
+			helpers.assert_eq(remap.settings_pending(), true)
+			helpers.assert_eq(calls.save, saves)
+			helpers.assert_eq(disk.files[LAYERS], preset())
+			helpers.assert_eq(disk.regenerations, 1)
+			blocked = false
+			helpers.assert_eq(remap.retry_settings_recovery(), true)
+			helpers.assert_eq(remap.settings_pending(), false)
+			helpers.assert_eq(outcomes, { false })
+			helpers.assert_eq(cleanup_calls, 3, "the actual parent must retry the same retained capability")
+			helpers.assert_eq(disk.files[LAYERS], preset())
+			helpers.assert_eq(remap.get_tap_action(KEY), "copy")
+			helpers.assert_eq(disk.regenerations, 1)
 		end)
 	end)
 end)

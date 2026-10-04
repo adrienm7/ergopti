@@ -29,6 +29,8 @@ end
 --- @return boolean, string|nil, boolean Whether an owned file was removed.
 local function remove(record)
 	if record.status ~= require("keymap.layer_preset").IMPORTED then return true, nil, false end
+	local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
+	if settled ~= true then return false, settle_err, false end
 	local content, status, detail = read(record)
 	if status == "absent" then return true, nil, false end
 	if status ~= "ok" then return false, "navigation-layer-source-unreadable: " .. tostring(detail or status) end
@@ -51,6 +53,8 @@ end
 --- @param record table Private import identity.
 --- @return boolean, string|nil Native publication receipt.
 local function replace(record)
+	local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
+	if settled ~= true then return false, settle_err end
 	local content, status, detail = read(record)
 	if status == "ok" and content == record.content then return true end
 	if status ~= "absent" then
@@ -100,10 +104,12 @@ function M.inverse(token)
 	local sibling = {}
 	function sibling.prepare()
 		local ready, detail, changed = remove(record)
-		removed = changed == true
+		removed = removed or changed == true
 		return ready, detail
 	end
 	function sibling.restore()
+		local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
+		if settled ~= true then return false, settle_err end
 		if not removed then return true end
 		return replace(record)
 	end
