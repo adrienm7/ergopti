@@ -82,6 +82,81 @@ helpers.describe("storage exclusive temporary ownership", function()
 	end
 end)
 
+helpers.describe("storage backup path inspection", function()
+	for _, alias in ipairs({ "dangling", "directory", "symlink", "regular" }) do
+		for _, depth in ipairs({ 0, 1 }) do
+			helpers.it("linux-storage-backup-type: skips occupied " .. alias .. " at suffix " .. depth, function()
+				local root = make_temp_config_root()
+				local path = root .. "/ergopti_plus/storage.json"
+				local backup = path .. ".corrupt" .. (depth == 0 and "" or ".1")
+				local target, original, history = root .. "/foreign", "{malformed original bytes", "Retained previous bytes"
+				local function write(name, bytes)
+					local file = assert(io.open(name, "wb")); assert(file:write(bytes) and file:close())
+				end
+				local function read(name)
+					local file = assert(io.open(name, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
+				end
+				write(path, original)
+				if depth == 1 then write(path .. ".corrupt", history) end
+				local Shell = require("adapters.shell_runner")
+				if alias == "regular" then write(backup, history)
+				elseif alias == "directory" then helpers.assert_true(Shell.run("mkdir -- " .. Shell.quote(backup)))
+				else
+					if alias == "symlink" then write(target, history) end
+					helpers.assert_true(Shell.run("ln -s -- " .. Shell.quote(target) .. " " .. Shell.quote(backup)))
+				end
+				local real_getenv = os.getenv
+				os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
+				local next_backup = path .. ".corrupt." .. (depth + 1)
+				local ok, err = xpcall(function()
+					local storage = helpers.load_module("adapters.storage")
+					helpers.assert_nil(storage.get("value"))
+					local recovery = storage.recovery_status()
+					helpers.assert_true(recovery and recovery.preserved)
+					helpers.assert_eq(recovery.path, next_backup)
+					helpers.assert_eq(read(next_backup), original)
+					helpers.assert_true(storage.set("value", "replacement"))
+					if depth == 1 then helpers.assert_eq(read(path .. ".corrupt"), history) end
+					if alias == "dangling" or alias == "symlink" then helpers.assert_true(Shell.run("test -L " .. Shell.quote(backup))) end
+					if alias == "dangling" then helpers.assert_nil(io.open(target, "rb"))
+					elseif alias == "symlink" then helpers.assert_eq(read(target), history)
+					elseif alias == "regular" then helpers.assert_eq(read(backup), history) end
+				end, debug.traceback)
+				os.getenv = real_getenv
+				package.loaded["adapters.storage"] = nil
+				os.remove(backup); os.remove(next_backup); os.remove(path .. ".corrupt")
+				os.remove(path); os.remove(target); os.remove(root .. "/ergopti_plus"); os.remove(root)
+				helpers.assert_true(ok, tostring(err))
+			end)
+		end
+	end
+	for _, kind in ipairs({ "refused", "empty", "unknown", "raised" }) do
+		helpers.it("linux-storage-backup-type: refuses " .. kind .. " native inspection", function()
+			local root = make_temp_config_root()
+			local path, original = root .. "/ergopti_plus/storage.json", "{malformed original bytes"
+			local file = assert(io.open(path, "wb")); assert(file:write(original) and file:close())
+			local Shell = require("adapters.shell_runner")
+			local real_checked, real_getenv = Shell.exec_checked, os.getenv
+			os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
+			Shell.exec_checked = function()
+				if kind == "raised" then error("Synthetic private inspection error") end
+				return kind ~= "refused", kind == "unknown" and "unknown" or "", "inspection refused"
+			end
+			local ok, err = xpcall(function()
+				local storage = helpers.load_module("adapters.storage")
+				helpers.assert_nil(storage.get("value"))
+				helpers.assert_eq(storage.recovery_status().preserved, false)
+				helpers.assert_eq(storage.set("value", "replacement"), false)
+				local retained = assert(io.open(path, "rb")); helpers.assert_eq(retained:read("*a"), original); assert(retained:close())
+			end, debug.traceback)
+			Shell.exec_checked, os.getenv = real_checked, real_getenv
+			package.loaded["adapters.storage"] = nil
+			os.remove(path .. ".corrupt"); os.remove(path); os.remove(root .. "/ergopti_plus"); os.remove(root)
+			helpers.assert_true(ok, tostring(err))
+		end)
+	end
+end)
+
 helpers.describe("storage native open receipts", function()
 	for _, receipt in ipairs({ 13, 1, 20, 5, 24, 40, "unknown", "throw" }) do
 		helpers.it("linux-storage-read-receipts: blocks mutation after " .. receipt, function()

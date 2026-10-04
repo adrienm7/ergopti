@@ -346,6 +346,13 @@ jobs:
           python3 tests/hardware/run_storage_temp_receipts.py
         timeout-minutes: 1
 
+      - name: Inspect occupied JSON recovery paths without opening native endpoints
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_storage_backup_type_receipts.py
+        timeout-minutes: 1
+
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

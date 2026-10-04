@@ -672,6 +672,22 @@ These are software implementations; final hardware verification remains below.
   now pass under LuaJIT and Lua 5.4. The eleven new exclusive-staging/kernel-limit
   receipts also remain valid. No product behavior, TOML, reserved native gate,
   physical input or manual CI was modified or exercised.
+- [~] **L52.** Linux JSON backup type inspection: inspect occupied non-regular
+  paths and symlinks through checked native metadata before opening ordinary
+  backup files. Existing FIFOs previously blocked recovery, dangling symlinks
+  looked absent and were overwritten, and socket nodes prevented recovery.
+  Skip known occupied special paths and preserve their identities/foreign bytes;
+  retain conservative refusal for unreadable regular backups or denied parents.
+  Unknown/refused metadata blocks mutation rather than declaring a path free.
+  Six of fifteen real native cases fail before and all pass after on LuaJIT/
+  Lua 5.4, including actual AF_UNIX nodes and FIFO endpoints at both suffixes.
+  Twelve unit cases cover dangling-link regressions, positive alias/history
+  controls and four simulated metadata failures, without weakening older
+  unreadable-backup assertions. This fixes known types observed at inspection;
+  adversarial pathname replacement and atomic no-clobber rename remain separate
+  work. Windows Registry/macOS hs.settings have no matching file backup path by
+  source. No TOML, reserved source, native cross-OS gate, hardware input or manual
+  CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

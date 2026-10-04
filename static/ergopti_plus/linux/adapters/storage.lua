@@ -84,10 +84,20 @@ local function _next_recovery_path()
 	local candidate = _CORRUPT_PATH
 	local suffix = 0
 	while true do
-		local ok, fh, _, errno = pcall(io.open, candidate, "r")
-		if not ok then return nil end
-		if not fh then return errno == ENOENT and candidate or nil end
-		_close(fh)
+		-- Opening is not an existence probe: FIFO endpoints block and dangling
+		-- links look absent. Skip known occupied special paths without following
+		-- them; keep ordinary-file read refusals conservative as before.
+		local path = Shell.quote(candidate)
+		local query = "if test -L " .. path .. " || { test -e " .. path .. " && test ! -f " .. path
+			.. "; }; then printf special; else printf ordinary; fi"
+		local queried, inspected, kind = pcall(Shell.exec_checked, query)
+		if not queried or inspected ~= true or (kind ~= "special" and kind ~= "ordinary") then return nil end
+		if kind == "ordinary" then
+			local ok, fh, _, errno = pcall(io.open, candidate, "r")
+			if not ok then return nil end
+			if not fh then return errno == ENOENT and candidate or nil end
+			_close(fh)
+		end
 		suffix = suffix + 1
 		candidate = _CORRUPT_PATH .. "." .. suffix
 	end
