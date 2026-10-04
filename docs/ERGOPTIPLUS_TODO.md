@@ -3234,6 +3234,13 @@ Linux currently emits global Alt+Tab for `alt_tab_monitor`: this alias does not
 fulfil the scoped contract and must be implemented or explicitly unavailable.
 Existing distinct action labels already have all 21 translations.
 
+The shared native-worker owner now centralizes acquisition, admission, process,
+timer and auxiliary-resource retirement through injected native ports. Strict
+completion waits for physical acknowledgements; paused or revoked operations
+retain their cleanup debt. This independent prerequisite does not implement
+cursor-display switching or qualify the prepared native adapters. The Linux
+packet, full composed gates and native display acceptance remain pending.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
