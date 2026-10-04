@@ -771,3 +771,234 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		end)
 	end)
 end)
+
+helpers.describe("extension category gates: one acknowledged batch", function()
+	local function gate_action(config, enabled, changed)
+		local mb = helpers.load_module("ui.menu.menu_builder")
+		local label = require("infra.i18n").get(enabled and "menu.hotstrings.check_all" or "menu.hotstrings.uncheck_all")
+		local extension = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local found
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if row.title == extension then found = row end
+				if type(row.menu) == "table" then find(row.menu) end
+			end
+		end
+		find(mb.build({ config = config, _version = "9.9.9", on_menu_changed = changed }))
+		assert(found, "the native owning extension submenu is present")
+		for _, row in ipairs(found.menu or {}) do if row.title == label then return row.fn end end
+		error("the native extension gate command was not rendered")
+	end
+	local function observe_click(action)
+		local execute, modal = os.execute, require("ui.modal")
+		local run, notices, releases = modal.run, {}, 0
+		modal.run = function(callback) releases = releases + 1; return callback() end
+		os.execute = function(command)
+			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			return execute(command)
+		end
+		local called, result = pcall(action)
+		os.execute, modal.run = execute, run
+		return called, result, notices, releases
+	end
+	local function with_real_gate_owner(initial, body)
+		local directory = os.tmpname()
+		assert(os.remove(directory))
+		directory = directory .. "-ergopti-gate-batch"
+		local quote = require("adapters.shell_runner").quote
+		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		local path = directory .. "/config.toml"
+		local state = initial and "true" or "false"
+		local sections = '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[hotstrings.modules.sfbsreduction]\ncomma = true\n[hotstrings.modules.foreign]\nfx = true\n'
+		local foreign = '[future]\nlabel = "kept" # independent foreign comment\nnested = { flag = true, values = ["a", "b"] }\n'
+		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = '
+			.. state .. ', sfbsreduction = ' .. state .. ', foreign = true }\n' .. sections .. foreign
+		local fh = assert(io.open(path, "wb"));assert(fh:write(original));assert(fh:close())
+		local loaded = {}
+		for name, value in pairs(package.loaded) do loaded[name] = value end
+		local Terminators = require("modules.hotstrings.terminator_settings")
+		local catalogue = Terminators.snapshot()
+		local ok, err = pcall(function()
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			package.loaded["modules.hotstrings.loader"] = nil
+			local paths = {}
+			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			-- The private fixture has no external installed layout roots.
+			paths.extension_roots = function() return {} end
+			package.loaded["infra.paths"] = paths
+			local loader = require("modules.hotstrings.loader")
+			local native_find = loader.find_toml_files
+			package.loaded["modules.hotstrings.loader"] = {
+				find_toml_files = native_find, list_subdirs = function() return {} end,
+				read_file = function() return nil end,
+				load_catalogue = function()
+					return { committed = true, errors = 0, categories = {
+						rolls = { id = "rolls", path = directory .. "/rolls.toml", count = 1,
+							description = { en = "Rolls", fr = "Roulements" },
+							extension = { id = "ergopti", name = "Ergopti" },
+							sections_order = { "hc", "sx" }, sections = { hc = { count = 1 }, sx = { count = 0 } } },
+						sfbsreduction = { id = "sfbsreduction", path = directory .. "/sfbs.toml", count = 1,
+							description = { en = "SFB", fr = "SFB" }, extension = { id = "ergopti", name = "Ergopti" },
+							sections_order = { "comma" }, sections = { comma = { count = 1 } } },
+						foreign = { id = "foreign", path = directory .. "/foreign.toml", count = 1,
+							description = { en = "Foreign", fr = "Foreign" },
+							sections_order = { "fx" }, sections = { fx = { count = 1 } } },
+					}, mappings = {
+						{ trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true },
+						{ trigger = "qw", replacement = "sfbs-result", group = "sfbsreduction", section = "comma", auto_expand = true },
+						{ trigger = "xy", replacement = "foreign-result", group = "foreign", section = "fx", auto_expand = true },
+					} }
+				end,
+			}
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local changed = 0
+			assert(config._set_config_file_for_test(path))
+			assert(config.init(engine, directory, function() changed = changed + 1 end))
+			local _, loaded = config.load_all();assert(loaded)
+			body({ config = config, engine = engine, path = path, original = original,
+				changed = function() return changed end, sections = sections, foreign = foreign })
+		end)
+		local restored = Terminators.restore_configuration(catalogue)
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		local removed = os.execute("rm -rf " .. quote(directory))
+		assert(restored, "the exact delimiter catalogue is restored")
+		assert(removed == 0, "the owned private fixture is retired")
+		if not ok then error(err, 0) end
+	end
+	local function read(path)
+		local fh = assert(io.open(path, "rb"));local data = fh:read("*a");assert(fh:close());return data
+	end
+	local function fires(engine, trigger, replacement)
+		engine:reset();engine:on_char(trigger:sub(1, 1));local result = engine:on_char(trigger:sub(2, 2))
+		return result ~= nil and result.replacement == replacement
+	end
+
+	for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("requires the exact extension gate batch receipt " .. outcome, function()
+			local config = fake_config({})
+			local asked, toggles, redraws = {}, 0, 0
+			config.toggle_group = function() toggles = toggles + 1; return true end
+			if outcome ~= "missing" then config.set_category_gates_enabled = function(ids, enabled)
+				asked[#asked + 1] = { ids = ids, enabled = enabled }
+				if outcome == "throw" then error("inert batch owner refusal") end
+				if outcome == "nil" then return nil end
+				if outcome == "number" then return 2 end
+				if outcome == "text" then return "true" end
+				return outcome == "true"
+			end end
+			local called, result, notices, released = observe_click(gate_action(config, false, function() redraws = redraws + 1 end))
+			helpers.assert_true(called)
+			helpers.assert_eq(toggles, 0, "the native command never commits one pack at a time")
+			helpers.assert_eq(asked, outcome == "missing" and {} or { { ids = { "rolls" }, enabled = false } })
+			helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
+			helpers.assert_eq(result, outcome == "true")
+			helpers.assert_eq(redraws, outcome == "true" and 1 or 0)
+			helpers.assert_eq(released, #notices)
+		end)
+	end
+	for _, enabled in ipairs({ true, false }) do
+		helpers.it("publishes both extension gates once with no partial second-failure state " .. tostring(enabled), function()
+			with_real_gate_owner(not enabled, function(c)
+				local rename, attempts, redraws = os.rename, 0, 0
+				os.rename = function(from, to)
+					if from == c.path .. ".tmp" and to == c.path then
+						attempts = attempts + 1
+						if attempts == 2 then return false, "inert second publication refusal" end
+					end
+					return rename(from, to)
+				end
+				local called, result, notices = observe_click(gate_action(c.config, enabled, function() redraws = redraws + 1 end))
+				os.rename = rename
+				helpers.assert_true(called)
+				helpers.assert_eq(c.config.is_group_enabled("rolls"), enabled, "both captured categories must commit together; writes=" .. attempts .. ", rolls=" .. tostring(c.config.is_group_enabled("rolls")) .. ", sfbs=" .. tostring(c.config.is_group_enabled("sfbsreduction")))
+				helpers.assert_eq(c.config.is_group_enabled("sfbsreduction"), enabled, "a refused second write cannot leave a mixed extension state")
+				helpers.assert_eq(fires(c.engine, "hq", "section-result"), enabled)
+				helpers.assert_eq(fires(c.engine, "qw", "sfbs-result"), enabled)
+				helpers.assert_eq(attempts, 1, "one actual canonical publication commits the whole extension")
+				helpers.assert_eq(result, true)
+				helpers.assert_eq(c.changed(), 1)
+				helpers.assert_eq(redraws, 1)
+				helpers.assert_eq(#notices, 0)
+				local source = read(c.path)
+				helpers.assert_true(source:find(c.sections, 1, true) ~= nil, "every individual section choice remains byte-identical")
+				helpers.assert_true(source:find(c.foreign, 1, true) ~= nil, "independent future records, comments and nested values survive")
+				helpers.assert_true(c.config.is_group_enabled("foreign"))
+				helpers.assert_true(fires(c.engine, "xy", "foreign-result"))
+				helpers.assert_true(c.config.refresh_choices(), "the real owner reloads both gates from the committed file")
+				helpers.assert_eq(c.config.is_group_enabled("rolls"), enabled)
+				helpers.assert_eq(c.config.is_group_enabled("sfbsreduction"), enabled)
+				helpers.assert_eq(c.config.is_section_checked("rolls", "sx"), false)
+			end)
+		end)
+		for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
+			helpers.it("compensates the actual extension gate batch refusal " .. outcome .. " " .. tostring(enabled), function()
+				with_real_gate_owner(not enabled, function(c)
+					local rename, attempts, redraws = os.rename, 0, 0
+					os.rename = function(from, to)
+						if from == c.path .. ".tmp" and to == c.path then
+							attempts = attempts + 1
+							if outcome == "throw" then error("inert batch publication refusal") end
+							if outcome == "nil" then return nil, "inert batch publication refusal" end
+							if outcome == "number" then return 2 end
+							return false, "inert batch publication refusal"
+						end
+						return rename(from, to)
+					end
+					local called, result, notices, released = observe_click(gate_action(c.config, enabled, function() redraws = redraws + 1 end))
+					os.rename = rename
+					helpers.assert_true(called)
+					helpers.assert_eq(attempts, 1)
+					helpers.assert_eq(read(c.path), c.original, "the entire original source survives refused atomic publication")
+					helpers.assert_eq(c.config.is_group_enabled("rolls"), not enabled)
+					helpers.assert_eq(c.config.is_group_enabled("sfbsreduction"), not enabled)
+					helpers.assert_eq(fires(c.engine, "hq", "section-result"), not enabled)
+					helpers.assert_eq(fires(c.engine, "qw", "sfbs-result"), not enabled)
+					helpers.assert_true(fires(c.engine, "xy", "foreign-result"))
+					helpers.assert_eq(c.changed(), 0)
+					helpers.assert_eq(redraws, 0, "refusal cannot publish an optimistic repaint")
+					helpers.assert_eq(#notices, 1)
+					helpers.assert_eq(released, 1)
+					helpers.assert_eq(result, false)
+				end)
+			end)
+		end
+	end
+	for _, request in ipairs({
+		{ name = "unknown", targets = { "rolls", "absent" }, enabled = true },
+		{ name = "duplicate", targets = { "rolls", "rolls" }, enabled = true },
+		{ name = "sparse", targets = { [2] = "rolls" }, enabled = true },
+		{ name = "empty", targets = {}, enabled = true },
+		{ name = "nonboolean", targets = { "rolls" }, enabled = 2 },
+	}) do
+		helpers.it("refuses an invalid actual gate scope before effects " .. request.name, function()
+			with_real_gate_owner(true, function(c)
+				local result = c.config.set_category_gates_enabled(request.targets, request.enabled)
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(c.changed(), 0)
+				helpers.assert_eq(read(c.path), c.original)
+				helpers.assert_true(fires(c.engine, "hq", "section-result"))
+				helpers.assert_true(fires(c.engine, "qw", "sfbs-result"))
+			end)
+		end)
+	end
+	helpers.it("keeps a real pending configuration scope as the only mutation owner", function()
+		with_real_gate_owner(true, function(c)
+			local owner = {}
+			helpers.assert_true(c.config.acquire(owner))
+			local redraws = 0
+			local called, result, notices = observe_click(gate_action(c.config, false, function() redraws = redraws + 1 end))
+			local released = c.config.release(owner)
+			helpers.assert_true(released)
+			helpers.assert_true(called)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(redraws, 0)
+			helpers.assert_eq(c.changed(), 0)
+			helpers.assert_eq(read(c.path), c.original)
+			helpers.assert_true(fires(c.engine, "hq", "section-result"))
+			helpers.assert_true(fires(c.engine, "qw", "sfbs-result"))
+			helpers.assert_eq(#notices, 1)
+		end)
+	end)
+
+end)
