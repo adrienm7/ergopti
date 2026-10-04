@@ -130,6 +130,37 @@ helpers.describe("ui.bridge_handlers", function()
     if not ok then error(err, 0) end
   end
 
+  -- Existing personal persistence tests now enter through an accepted displayed source.
+  local function with_opened_spies(reader, writer, state, fn)
+    local RealWriter = require("toml_codec.writer")
+    local Shell = require("adapters.shell_runner")
+    local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-opening"
+    assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
+    local path = directory .. "/personal.toml"
+    local file = assert(io.open(path, "wb"))
+    assert(file:write('[_meta]\nsections_order = ["english"]\n[english]\n"omw" = { output = "on my way", is_word = true, auto_expand = false, is_case_sensitive = true, is_case_sensitive_strict = true, final_result = false }\n"ty" = { output = "thank you", is_word = true, final_result = false }\n'))
+    assert(file:close())
+    local old_dir, manager, native_write = state.config.get_config_dir, package.loaded["ui.webview_manager"], writer.write
+    state.config.get_config_dir = function() return directory end
+    local context = { app_name = "hotstring_editor", epoch = 41 }
+    package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+      eval_js = function() return true end }
+    writer.write = function(...)
+      local accepted, detail = native_write(...)
+      if accepted ~= true then return accepted, detail end
+      return RealWriter.write(...)
+    end
+    local ok, err = pcall(function()
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        assert(h.push_init(state, context) == true, "The original save case requires an accepted opening")
+        fn(h, context)
+      end)
+    end)
+    writer.write, state.config.get_config_dir, package.loaded["ui.webview_manager"] = native_write, old_dir, manager
+    assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
+    if not ok then error(err, 0) end
+  end
+
   -- ==========================================================================
   -- 1. webview_manager
   -- ==========================================================================
@@ -1814,9 +1845,10 @@ helpers.describe("ui.bridge_handlers", function()
       local pushed = {}
       local manager = package.loaded["ui.webview_manager"]
       package.loaded["ui.webview_manager"] = {
+        current_epoch = function() return 41 end,
         eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
       }
-      local ok, err = pcall(handler.on_message, "ready", state)
+      local ok, err = pcall(handler.on_message, "ready", state, { app_name = "hotstring_editor", epoch = 41 })
       package.loaded["ui.webview_manager"] = manager
       helpers.assert_true(ok, "the ready branch must not throw: " .. tostring(err))
 
@@ -1835,13 +1867,14 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'ready' carries strict-case state into the shared frontend", function()
       local reader, writer = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         local pushed = {}
         local manager = package.loaded["ui.webview_manager"]
         package.loaded["ui.webview_manager"] = {
+          current_epoch = function() return 41 end,
           eval_js = function(_, js) pushed[#pushed + 1] = js; return true end,
         }
-        local ok, err = pcall(h.on_message, "ready", state)
+        local ok, err = pcall(h.on_message, "ready", state, context)
         package.loaded["ui.webview_manager"] = manager
         helpers.assert_true(ok, "the strict payload push must not throw: " .. tostring(err))
         helpers.assert_eq(#pushed, 1, "strict state must be pushed exactly once")
@@ -1851,7 +1884,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' writes the whole model the editor sent", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         local result = h.on_message({
           action = "save",
           data = {
@@ -1862,7 +1895,7 @@ helpers.describe("ui.bridge_handlers", function()
               { trigger = "omw", output = "on my way" },
             } } },
           },
-        }, state)
+        }, state, context)
         helpers.assert_true(result.saved, "a successful write must report saved = true")
         local entries = captured.data.sections.work.entries
         helpers.assert_eq(#entries, 2, "every entry the editor sent must be written")
@@ -1874,7 +1907,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' replaces rather than merges, so a deletion sticks", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         -- The shared script sends its ENTIRE state on every save, so an entry the
         -- user deleted is simply absent from the payload. Merging into what is on
         -- disk would bring it back, and the deletion would appear to work until
@@ -1887,7 +1920,7 @@ helpers.describe("ui.bridge_handlers", function()
               { trigger = "ty", output = "thank you" },
             } } },
           },
-        }, state)
+        }, state, context)
         local entries = captured.data.sections.english.entries
         helpers.assert_eq(#entries, 1, "only what the editor sent may be on disk")
         helpers.assert_eq(entries[1].trigger, "ty", "and it must be the entry it sent")
@@ -1895,7 +1928,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' drops an entry with no trigger instead of writing it", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         h.on_message({
           action = "save",
           data = {
@@ -1905,7 +1938,7 @@ helpers.describe("ui.bridge_handlers", function()
               { trigger = "ok", output = "okay" },
             } } },
           },
-        }, state)
+        }, state, context)
         local entries = captured.data.sections.work.entries
         helpers.assert_eq(#entries, 1,
           "a triggerless entry can never fire, and on disk it is a row nobody can delete from the UI")
@@ -1914,11 +1947,11 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("'save' reports failure when the write fails", function()
       local reader, writer = make_spies(false, "disk full")
-      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+      with_opened_spies(reader, writer, state, function(h, context)
         local result = h.on_message({
           action = "save",
           data = { sections_order = { "work" }, sections = { work = { entries = {} } } },
-        }, state)
+        }, state, context)
         helpers.assert_eq(result.saved, false, "a failed write must not report success")
       end)
     end)
@@ -2755,4 +2788,303 @@ helpers.describe("personal editor fixture process ABI", function()
 			end)
 		end)
 	end
+end)
+
+
+-- Real private source publication exercises the displayed model's consent boundary.
+local OPENING_SOURCE = '[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "original", is_word = true, final_result = false }\n'
+local OPENING_FOREIGN = OPENING_SOURCE .. '[outside]\n"future" = { output = "independent external edit", final_result = false } # retain exact bytes\n'
+
+local function opening_model(output)
+	return { sections_order = { "english" }, sections = {
+		english = { description = "English", entries = { { trigger = "old", output = output } } },
+	} }
+end
+
+local function with_opening_file(callback)
+	local Shell, Writer = require("adapters.shell_runner"), require("toml_codec.writer")
+	local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-view-consent"
+	assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
+	local path = directory .. "/personal.toml"
+	local function put(content)
+		local file = assert(io.open(path, "wb")); assert(file:write(content)); assert(file:close())
+	end
+	local function read()
+		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
+	end
+	put(OPENING_SOURCE)
+	local manager, previous = package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"]
+	local writer_previous = package.loaded["toml_codec.writer"]
+	local seen = { epoch = 51, deliveries = {}, alerts = {}, reloads = 0, writes = 0 }
+	local publisher = {}
+	for key, value in pairs(Writer) do publisher[key] = value end
+	publisher.write = function(...)
+		seen.writes = seen.writes + 1
+		return Writer.write(...)
+	end
+	package.loaded["toml_codec.writer"] = publisher
+	package.loaded["ui.webview_manager"] = {
+		current_epoch = function() return seen.epoch end,
+		eval_js = function(_, js)
+			if js:find("window.initData(", 1, true) then
+				seen.deliveries[#seen.deliveries + 1] = js
+				if seen.delivery == "throw" then error("inert delivery refusal") end
+				if seen.delivery == "false" then return false end
+				if seen.delivery == "nil" then return nil end
+				if seen.delivery == "number" then return 1 end
+				return true
+			end
+			seen.alerts[#seen.alerts + 1] = js; return true
+		end,
+	}
+	package.loaded["ui.hotstring_editor.bridge"] = nil
+	local handler = require("ui.hotstring_editor.bridge")
+	local context = { app_name = "hotstring_editor", epoch = 51 }
+	local state = { config = { get_config_dir = function() return directory end,
+		reload = function() seen.reloads = seen.reloads + 1; if seen.reload_throw then error("inert reload refusal") end; return true end } }
+	local f = { path = path, handler = handler, context = context, state = state, seen = seen,
+		publisher = publisher, writer = Writer, put = put, read = read }
+	f.ready = function() return handler.push_init(state, context) end
+	f.save = function(output, selected) return handler.on_message({ action = "save", data = opening_model(output) }, state, selected or context) end
+	local ok, err = pcall(callback, f)
+	package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"], package.loaded["toml_codec.writer"] = manager, previous, writer_previous
+	assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("personal editor opening-source admission", function()
+	helpers.it("refuses a foreign section added after the actual displayed model", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			helpers.assert_true(f.seen.deliveries[1]:find('"original"', 1, true) ~= nil)
+			f.put(OPENING_FOREIGN)
+			local result = f.save("stale replacement")
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.read(), OPENING_FOREIGN)
+			helpers.assert_eq(f.seen.writes, 0)
+			helpers.assert_eq(f.seen.reloads, 0)
+			helpers.assert_eq(#f.seen.alerts, 1)
+		end)
+	end)
+
+	helpers.it("advances only our committed payload for a second actual save", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local first = f.save("first own edit")
+			helpers.assert_eq(first.saved, true)
+			helpers.assert_true(f.read():find('first own edit', 1, true) ~= nil)
+			local second = f.save("second own edit")
+			helpers.assert_eq(second.saved, true)
+			helpers.assert_true(f.read():find('second own edit', 1, true) ~= nil)
+			helpers.assert_eq(f.seen.reloads, 2)
+		end)
+	end)
+
+	helpers.it("fresh reopening admits the new source while the old held view refuses", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true); f.put(OPENING_FOREIGN)
+			helpers.assert_eq(f.save("old").saved, false)
+			helpers.assert_eq(f.ready(), true)
+			helpers.assert_true(f.seen.deliveries[2]:find('"future"', 1, true) ~= nil)
+			helpers.assert_eq(f.save("explicit new view edit").saved, true)
+		end)
+	end)
+
+	for _, change in ipairs({ "epoch", "route", "context", "missing" }) do
+		helpers.it("refuses a retired opening owner: " .. change, function()
+			with_opening_file(function(f)
+				helpers.assert_eq(f.ready(), true)
+				local selected = f.context
+				if change == "epoch" then f.seen.epoch = 52
+				elseif change == "route" then f.state.config.get_config_dir = function() return f.path .. "-foreign-route" end
+				elseif change == "context" then selected = { app_name = "another_app", epoch = 51 }
+				else selected = {} end
+				local result = f.save("retired", selected)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, refusal in ipairs({ "false", "nil", "number", "throw" }) do
+		helpers.it("failed initData cannot lend editable authority: " .. refusal, function()
+			with_opening_file(function(f)
+				f.seen.delivery = refusal
+				local opened = f.ready()
+				local result = f.save("never displayed")
+				helpers.assert_eq(opened, false)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, source in ipairs({ "malformed", "read_refusal", "absent" }) do
+		helpers.it("classifies the opening source before displaying it: " .. source, function()
+			with_opening_file(function(f)
+				if source == "malformed" then f.put('[english\nbroken = 2\n')
+				elseif source == "read_refusal" then f.publisher.read_classified = function() return nil, "error" end
+				else assert(os.remove(f.path)) end
+				local opened = f.ready()
+				local result = f.save("admitted absence")
+				if source == "absent" then
+					helpers.assert_eq(opened, true); helpers.assert_eq(result.saved, true)
+					helpers.assert_true(f.read():find('admitted absence', 1, true) ~= nil)
+				else
+					helpers.assert_eq(opened, false); helpers.assert_eq(result.saved, false)
+					helpers.assert_eq(f.seen.writes, 0)
+				end
+			end)
+		end)
+	end
+
+	for _, result in ipairs({ "false", "nil", "number", "text", "throw" }) do
+		helpers.it("refused publication preserves opening authority and supports owned retry: " .. result, function()
+			with_opening_file(function(f)
+				helpers.assert_eq(f.ready(), true)
+				local real = f.publisher.write
+				f.publisher.write = function()
+					if result == "throw" then error("inert write refusal") end
+					if result == "number" then return 1, nil, OPENING_SOURCE end
+					if result == "text" then return "accepted", nil, OPENING_SOURCE end
+					if result == "false" then return false end
+					return nil
+				end
+				local refused = f.save("not published")
+				helpers.assert_eq(refused.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.reloads, 0)
+				f.publisher.write = real
+				helpers.assert_eq(f.save("owned retry").saved, true)
+			end)
+		end)
+	end
+
+	helpers.it("passes the retained source into the actual stage-time CAS owner", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local captured
+			f.publisher.write = function(path, data, adapter, create, source)
+				captured = source.content
+				f.put(OPENING_FOREIGN)
+				return f.writer.write(path, data, adapter, create, source)
+			end
+			local result = f.save("stage replacement")
+			helpers.assert_eq(captured, OPENING_SOURCE)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.read(), OPENING_FOREIGN)
+			helpers.assert_eq(f.seen.reloads, 0)
+		end)
+	end)
+
+	helpers.it("post-ACK foreign bytes cannot become our next-save authority", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			f.publisher.write = function(...)
+				local ok, detail, payload = f.writer.write(...)
+				f.put(OPENING_FOREIGN)
+				return ok, detail, payload
+			end
+			local first = f.save("our committed edit")
+			helpers.assert_eq(first.saved, true, "existing publication ACK is separate from later external replacement")
+			local second = f.save("must not borrow foreign source")
+			helpers.assert_eq(second.saved, false)
+			helpers.assert_eq(f.read(), OPENING_FOREIGN)
+		end)
+	end)
+
+	helpers.it("keeps the existing saved-but-reload-refused policy", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true); f.seen.reload_throw = true
+			local saved = f.save("durable despite reload refusal")
+			helpers.assert_eq(saved.saved, true)
+			helpers.assert_true(f.read():find('durable despite reload refusal', 1, true) ~= nil)
+			f.seen.reload_throw = false
+			helpers.assert_eq(f.save("later owned save").saved, true)
+		end)
+	end)
+end)
+
+helpers.describe("personal editor opening-source admission", function()
+	helpers.it("uses the actual manager route and rejects retired page epochs", function()
+		with_opening_file(function(f)
+			local port = package.loaded["ui.webview_manager"]
+			package.loaded["ui.webview_manager"] = nil
+			local Manager = require("ui.webview_manager")
+			local html, creator, evaluate = Manager.build_page_html, Manager._create_gtk_window, Manager.eval_js
+			Manager.build_page_html = function() return "<html>inert recorded page</html>" end
+			Manager._create_gtk_window = function() return true end
+			Manager.eval_js = port.eval_js
+			Manager.set_daemon_state(f.state)
+			local ok, err = pcall(function()
+				helpers.assert_eq(Manager.show("hotstring_editor", "en"), true)
+				local first = Manager.current_epoch("hotstring_editor")
+				Manager.route_message("hotstring_editor", "hsEditor", "ready", first)
+				local saved = Manager.route_message("hotstring_editor", "hsEditor", {
+					action = "save", data = opening_model("actual managed route") }, first)
+				helpers.assert_eq(saved.saved, true)
+				helpers.assert_eq(Manager.hide("hotstring_editor", first), true)
+				helpers.assert_eq(Manager.show("hotstring_editor", "en"), true)
+				local second = Manager.current_epoch("hotstring_editor")
+				helpers.assert_true(second > first)
+				local bytes = f.read()
+				local routed = Manager.route_message("hotstring_editor", "hsEditor", {
+					action = "save", data = opening_model("stale route") }, first)
+				local direct = f.save("stale direct owner", { app_name = "hotstring_editor", epoch = first })
+				helpers.assert_nil(routed)
+				helpers.assert_eq(direct.saved, false)
+				helpers.assert_eq(f.read(), bytes)
+				Manager.route_message("hotstring_editor", "hsEditor", "ready", second)
+				local fresh = Manager.route_message("hotstring_editor", "hsEditor", {
+					action = "save", data = opening_model("new managed opening") }, second)
+				helpers.assert_eq(fresh.saved, true)
+			end)
+			Manager.hide("hotstring_editor", Manager.current_epoch("hotstring_editor"))
+			Manager.build_page_html, Manager._create_gtk_window, Manager.eval_js = html, creator, evaluate
+			package.loaded["ui.webview_manager"] = port
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("missing committed-payload receipt does not invent a next-save source", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local native = f.publisher.write
+			f.publisher.write = function(...)
+				local ok, detail = native(...)
+				return ok, detail
+			end
+			local result = f.save("physically saved without payload ACK")
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_true(f.read():find('physically saved without payload ACK', 1, true) ~= nil)
+			helpers.assert_eq(f.seen.reloads, 0)
+			f.publisher.write = native
+			helpers.assert_eq(f.save("cannot invent authority").saved, false)
+			helpers.assert_eq(f.ready(), true)
+			helpers.assert_eq(f.save("reopened actual bytes").saved, true)
+		end)
+	end)
+
+	helpers.it("a failed reentrant opening cannot be revived by an older write ACK", function()
+		with_opening_file(function(f)
+			helpers.assert_eq(f.ready(), true)
+			local native = f.publisher.write
+			local reentered
+			f.publisher.write = function(...)
+				local ok, detail, payload = native(...)
+				f.seen.delivery = "false"
+				reentered = f.ready()
+				return ok, detail, payload
+			end
+			local result = f.save("accepted old write")
+			helpers.assert_eq(reentered, false)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.seen.reloads, 0)
+			helpers.assert_true(f.read():find('accepted old write', 1, true) ~= nil)
+			f.publisher.write = native
+			helpers.assert_eq(f.save("must reopen").saved, false)
+		end)
+	end)
 end)
