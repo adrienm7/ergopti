@@ -46,6 +46,28 @@ local STICKY_TIMEOUT_MS_DEFAULT         = Defaults.sticky_timeout_ms
 local SIMULTANEOUS_THRESHOLD_MS_DEFAULT = Defaults.simultaneous_threshold_ms
 local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 
+--- Reads one timing leaf without treating obsolete data as a file failure.
+--- @return number value The existing numeric policy or the canonical default.
+--- @return boolean outdated True when the raw leaf must survive ordinary saves.
+local function timing_leaf(section, key, default, path, section_name)
+	if section[key] == nil then return default, false end
+	local called, value = pcall(tonumber, section[key])
+	if called and value ~= nil then return value, false end
+	Outdated.report_in_file(path, { section_name, key },
+		"a timing is numeric; the canonical default is used", Logger)
+	return default, true
+end
+
+--- Reads the combination switch; its absent state keeps combinations on.
+--- @return boolean|nil value
+--- @return boolean outdated
+local function combinations_enabled(section, path)
+	if section.enabled == nil or type(section.enabled) == "boolean" then return section.enabled, false end
+	Outdated.report_in_file(path, { "mod_combos", "enabled" },
+		"a combination switch is boolean; its absent state is used", Logger)
+	return nil, true
+end
+
 --- « Ergopti uses Karabiner »: `[karabiner] integration_enabled` in
 --- config_karabiner.toml. On by default; off means no lease worker, no guardian
 --- registration and no ErgoptiPlus rule left in karabiner.json. Karabiner
@@ -543,12 +565,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 
 	-- Reads one optional number; absence is the canonical default.
 	local function timing(section, key, default, label)
-		if section[key] == nil then return default end
-		local value = tonumber(section[key])
-		if value then return value end
-		Logger.warn(LOG, "Ignoring the non-numeric %s in the saved config — using the default (%d ms).",
-			label, default)
-		return default
+		local section_name = assert(label:match("^([^.]+)%."), "a timing needs its owning section")
+		return timing_leaf(section, key, default, user_config_path, section_name)
 	end
 	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, "tap_holds.timeout_ms")
 	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
@@ -564,13 +582,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 
 	-- The key-combinations switch stays absent until the user sets it: absent,
 	-- the combinations are on (Generator.key_combinations_enabled).
-	local mod_combos_enabled = nil
-	if type(combos.enabled) == "boolean" then
-		mod_combos_enabled = combos.enabled
-	elseif combos.enabled ~= nil then
-		Logger.error(LOG, "[mod_combos] enabled must be true or false, not %s — it is read as absent (on).",
-			tostring(combos.enabled))
-	end
+	local mod_combos_enabled = combinations_enabled(combos, user_config_path)
 
 	Logger.info(LOG, "User config loaded (Ergopti uses Karabiner: %s).", tostring(integration_enabled))
 	return {
@@ -641,6 +653,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		end
 	end
 
+	local candidate_refusal = nil
 	local ok, payload = pcall(function()
 		local function table_at(parent, key)
 			if parent[key] == nil then parent[key] = {} end
@@ -650,6 +663,17 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		local function assign(target, key, value, neutral)
 			if not overwrite_corrupt and value == neutral then value = nil end
 			target[key] = value
+		end
+		local function assign_timing(target, section, key, value, neutral)
+			local _, outdated = timing_leaf(target, key, neutral, user_config_path, section)
+			if not overwrite_corrupt and outdated then
+				if value ~= neutral then
+					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
+					error(candidate_refusal, 0)
+				end
+				return
+			end
+			assign(target, key, value, neutral)
 		end
 		local function merge_bindings(target, updates, fields)
 			for id, values in pairs(updates or {}) do
@@ -675,13 +699,21 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		end
 		local tap_holds = table_at(document, "tap_holds")
 		assign(tap_holds, "enabled", state.tap_holds_enabled, Manifest.default_for("tap_holds.enabled"))
-		assign(tap_holds, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
-		assign(tap_holds, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+		assign_timing(tap_holds, "tap_holds", "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
+		assign_timing(tap_holds, "tap_holds", "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
 		merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" })
 		local mod_combos = table_at(document, "mod_combos")
 		-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
-		mod_combos.enabled = state.mod_combos_enabled
-		assign(mod_combos, "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+		local _, outdated_enabled = combinations_enabled(mod_combos, user_config_path)
+		if not overwrite_corrupt and outdated_enabled then
+			if state.mod_combos_enabled ~= nil then
+				candidate_refusal = "candidate has no explicit repair owner for mod_combos.enabled"
+				error(candidate_refusal, 0)
+			end
+		else
+			mod_combos.enabled = state.mod_combos_enabled
+		end
+		assign_timing(mod_combos, "mod_combos", "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
 		assign(mod_combos, "symmetric", state.combo_symmetric, COMBO_SYMMETRIC_DEFAULT)
 		merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" })
 		if next(tap_holds.config) == nil then tap_holds.config = nil end
@@ -691,7 +723,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		return TomlCodec.encode(document)
 	end)
 	if not ok or type(payload) ~= "string" then
-		Logger.error(LOG, "Failed to encode user config as TOML.")
+		Logger.error(LOG, "User config candidate for '%s' refused: %s.", user_config_path,
+			candidate_refusal or "the candidate could not be encoded as TOML")
 		return false
 	end
 
