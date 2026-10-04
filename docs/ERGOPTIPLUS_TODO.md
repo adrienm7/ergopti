@@ -2076,6 +2076,8 @@ Partial: the macOS application-action picker now forwards the existing translate
 
 Windows Variables and Key History remain a native-caption limitation: both use A_ScriptHwnd, whose exact default title is part of AutoHotkey's existing #SingleInstance and Reload identity. The proposed direct console retitle was withdrawn before delivery because it could break that lifecycle ownership. A separately owned visible debug window or a demonstrated identity-preserving owner is required, together with real Windows duplicate-start/Reload/retirement regressions. Existing shared GUI/WebView composers remain implemented; item109 stays partial while this console boundary and complete native panel qualification remain open.
 
+The native application-panel caption regression now retains a bounded, verified copy of its exact retired child stderr in the existing Swift failure evidence channel, with closed count/status facts and no raw diagnostic payload in job logs. The original stderr.isEmpty, caption/selection policy, deadlines and exact fixture-child retirement assertions remain unchanged. Three additional native file-evidence controls cover exact bytes, bounds/unknown images/local absence, and source/owner symlinks; their actual macOS execution is pending. The current native failure cause remains unobserved until the next evidence artifact is collected. TODO109 remains partial; this diagnostic does not relax or complete the application picker qualification.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
