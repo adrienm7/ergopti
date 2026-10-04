@@ -781,3 +781,52 @@ for Code in ["Backspace", "Escape", "Enter", "Tab", "Delete", "ArrowLeft", "Arro
 	"ArrowDown", "Home", "End", "PageUp", "PageDown"]
 	Test("keylayout emulation: " . Code . " cancels pending accents by physical identity (keylayout-dead-reset-identity)",
 		_KLT_WithEmulation.Bind(_KLT_ResetKeyCase.Bind(Code)))
+
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 12/ Ergopti+ AltGr characterization =========
+; ====================================================
+; ====================================================
+
+_KLT_PlusOutputMatrixCase() {
+	Matrix := JsonParse(FileRead(_DriverDir . "\tests\fixtures\ergopti_plus_altgr_output_matrix.json", "UTF-8"))
+	Golden := JsonParse(FileRead(_DriverDir . "\tests\fixtures\ergopti_emulation_golden.json", "UTF-8"))["levels"]
+	AssertEqual(6, Matrix["rows"].Length, "all three legacy plus keys need both Shift states")
+	_KLT_Load("ergopti_plus")
+	Seen := Map()
+	Observed := 0
+	TextDifferences := 0
+	for Row in Matrix["rows"] {
+		Identity := Row["legacy_level"] . ":" . Row["scan"]
+		AssertFalse(Seen.Has(Identity), "the independent matrix must not repeat a legacy entry")
+		Seen[Identity] := true
+		ExpectedLegacy := Golden[Row["legacy_level"]][Row["scan"]]
+		AssertEqual(_EKT_Describe(ExpectedLegacy), _EKT_Describe(Row["descriptor"]),
+			"the independent historical golden remains authoritative")
+		for Caps in [false, true] {
+			KeylayoutEmulation_ResetDeadKey()
+			Actual := KeylayoutEmulation_Press(Row["scan"], Row["shift"], Caps, true)
+			AssertEqual(Row["selected"], Actual,
+				Identity . ": selected Ergopti+ types the independent neutral output with Caps " . Caps)
+			Observed += 1
+			if ExpectedLegacy.Has("text") {
+				AssertFalse(Actual == ExpectedLegacy["text"],
+					"the current selected text is not the legacy Shift deviation")
+				TextDifferences += 1
+			}
+		}
+	}
+	for Level in ["altgr_plus", "altgr_plus_shift"] {
+		AssertEqual(3, Golden[Level].Count, "the historical plus level has three keys")
+		for Scan in Golden[Level]
+			AssertTrue(Seen.Has(Level . ":" . Scan), "no legacy plus entry may be omitted")
+	}
+	AssertEqual(12, Observed, "each independent output runs with both Caps states")
+	AssertEqual(4, TextDifferences, "both Shift deviations remain distinct with Caps off and on")
+}
+Test("Ergopti+ matrix: selected raw AltGr outputs retain the independently recorded legacy differences (todo96-output-matrix)",
+	_KLT_WithEmulation.Bind(_KLT_PlusOutputMatrixCase))
