@@ -1002,3 +1002,185 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 	end)
 
 end)
+
+helpers.describe("hotstring delay rows: durable owner acknowledgement", function()
+	local function delay_action(config, kind, changed)
+		local builder = helpers.load_module("ui.menu.menu_builder")
+		local ctx = { config = config, _version = "9.9.9", paused = false, on_menu_changed = changed }
+		local key = kind == "global" and "menu.hotstrings.tooltip_default" or "menu.hotstrings.delay_magic_key"
+		local title = require("infra.i18n").get(key) .. " : "
+		local found
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if type(row.title) == "string" and row.title:sub(1, #title) == title then found = row.fn end
+				if row.menu then find(row.menu) end
+			end
+		end
+		find(builder.build(ctx))
+		assert(type(found) == "function", "the actual translated delay provider row is present")
+		return found
+	end
+	local function observe(action, answer, before_return)
+		local prompt, modal = require("ui.text_prompt"), require("ui.modal")
+		local ask, run, execute = prompt.ask, modal.run, os.execute
+		local asks, notices, releases = {}, {}, 0
+		prompt.ask = function(...)
+			asks[#asks + 1] = { ... }
+			if before_return then before_return() end
+			return answer
+		end
+		modal.run = function(callback) releases = releases + 1;return callback() end
+		os.execute = function(command)
+			if command:find("zenity", 1, true) then notices[#notices + 1] = command;return 0 end
+			return execute(command)
+		end
+		local called, result = pcall(action)
+		prompt.ask, modal.run, os.execute = ask, run, execute
+		assert(prompt.ask == ask and modal.run == run and os.execute == execute, "every held modal transport is restored before assertions")
+		return called, result, asks, notices, releases
+	end
+	local function receipt_config(kind, outcome)
+		local calls = {}
+		local function setter(...)
+			calls[#calls + 1] = { n = select("#", ...), ... }
+			if outcome == "throw" then error("inert durable delay refusal") end
+			if outcome == "nil" then return nil end
+			if outcome == "number" then return 2 end
+			if outcome == "text" then return "true" end
+			return outcome == "true"
+		end
+		local config = fake_config({})
+		config.get_global_delay = function() return 0.4 end
+		config.resolve = function() return { delay = 0.3 } end
+		if outcome ~= "missing" then
+			if kind == "global" then config.set_global_delay = setter else config.set_override = setter end
+		end
+		return config, calls
+	end
+	for _, kind in ipairs({ "global", "category" }) do
+		for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
+			helpers.it(kind .. " delay contains exact native setter receipt " .. outcome, function()
+				local config, calls = receipt_config(kind, outcome)
+				local changed = 0
+				local called, result, asks, notices, releases = observe(delay_action(config, kind,
+					function() changed = changed + 1 end), "900")
+				helpers.assert_true(called, "the actual provider contains a native setter refusal")
+				helpers.assert_eq(result, outcome == "true", "only the durable boolean true acknowledges the click")
+				helpers.assert_eq(changed, outcome == "true" and 1 or 0, "refusal cannot repaint a success")
+				helpers.assert_eq(#asks, 1)
+				helpers.assert_eq(asks[1][3], kind == "global" and "400" or "300", "the existing milliseconds prompt remains intact")
+				helpers.assert_eq(#calls, outcome == "missing" and 0 or 1)
+				if #calls > 0 then
+					helpers.assert_eq(calls[1].n, kind == "global" and 1 or 4)
+					helpers.assert_eq(calls[1][kind == "global" and 1 or 4], 0.9)
+					if kind == "category" then
+						helpers.assert_eq(calls[1][1], "magickey");helpers.assert_eq(calls[1][2], nil);helpers.assert_eq(calls[1][3], "delay")
+					end
+				end
+				helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
+				helpers.assert_eq(releases, #notices)
+				if #notices > 0 then
+					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+				end
+			end)
+		end
+		for _, raw in ipairs({ "cancel", "-1", "1.5", "not a delay" }) do
+			helpers.it(kind .. " delay preserves cancellation and invalid input " .. raw, function()
+				local config, calls = receipt_config(kind, "true")
+				local changed = 0
+				local answer = raw
+				if raw == "cancel" then answer = nil end
+				local called, result, asks, notices = observe(delay_action(config, kind,
+					function() changed = changed + 1 end), answer)
+				helpers.assert_true(called);helpers.assert_eq(result, nil)
+				helpers.assert_eq(#calls, 0);helpers.assert_eq(changed, 0);helpers.assert_eq(#asks, 1)
+				helpers.assert_eq(#notices, raw == "cancel" and 0 or 1)
+			end)
+		end
+	end
+
+	local function read(path)
+		local file = assert(io.open(path, "rb"));local content = file:read("*a");assert(file:close());return content
+	end
+	local function write(path, content)
+		local file = assert(io.open(path, "wb"));assert(file:write(content));assert(file:close())
+	end
+	local function with_native_owner(body)
+		local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-ergopti-delay-ack"
+		local quote = require("adapters.shell_runner").quote
+		assert(os.execute("mkdir -p " .. quote(directory)) == 0)
+		local path, config_path = directory .. "/hotstrings_overrides.toml", directory .. "/config.toml"
+		local foreign = '[future]\nlabel = "independent" # unrelated future comment\nnested = { values = [2, 7], on = true }\n'
+		local original = '# hand-written delay preferences\n[_global]\ndelay = 0.4\n[magickey]\ndelay = 0.3\n' .. foreign
+		write(path, original);write(config_path, '[future]\nuser = "kept"\n')
+		local loaded = {};for name, value in pairs(package.loaded) do loaded[name] = value end
+		local called, err = pcall(function()
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			local config = require("modules.hotstrings.hotstrings_config")
+			assert(config._set_config_file_for_test(config_path))
+			assert(config._set_override_config_dir_for_test(directory))
+			assert(config.init(require("hotstring_engine").new(), directory))
+			config._set_categories_for_test({ magickey = { delay = 0.3 } })
+			body({ config = config, path = path, config_path = config_path, original = original, foreign = foreign })
+		end)
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		local removed = os.execute("rm -rf " .. quote(directory))
+		assert(removed == 0, "only the owned private directory is retired")
+		if not called then error(err, 0) end
+	end
+	for _, kind in ipairs({ "global", "category" }) do
+		for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
+			helpers.it(kind .. " delay actual override refusal preserves source and permits an acknowledged retry " .. outcome, function()
+				with_native_owner(function(c)
+					local changed = 0
+					local action = delay_action(c.config, kind, function() changed = changed + 1 end)
+					local rename, writes = os.rename, 0
+					os.rename = function(from, to)
+						if from == c.path .. ".tmp" and to == c.path then
+							writes = writes + 1
+							if outcome == "throw" then error("inert owned delay publication refusal") end
+							if outcome == "nil" then return nil, "inert refusal" end
+							if outcome == "number" then return 2 end
+							return false, "inert refusal"
+						end
+						return rename(from, to)
+					end
+					local called, result, asks, notices, releases = observe(action, "900")
+					os.rename = rename
+					print(string.format("DELAY_REFUSAL kind=%s outcome=%s called=%s result=%s refresh=%d writes=%d source_same=%s",
+						kind, outcome, tostring(called), tostring(result), changed, writes, tostring(read(c.path) == c.original)))
+					helpers.assert_eq(changed, 0, "a refused actual override publication cannot refresh the menu")
+					helpers.assert_true(called);helpers.assert_eq(result, false)
+					helpers.assert_eq(writes, 1, "the actual leaf writer attempted precisely its owned publication")
+					helpers.assert_eq(changed, 0);helpers.assert_eq(read(c.path), c.original)
+					helpers.assert_eq(c.config.get_global_delay(), 0.4);helpers.assert_eq(c.config.resolve("magickey", nil).delay, 0.3)
+					helpers.assert_eq(#asks, 1);helpers.assert_eq(#notices, 1);helpers.assert_eq(releases, 1)
+					local retry, committed, _, retry_notices = observe(action, "900")
+					helpers.assert_true(retry);helpers.assert_eq(committed, true);helpers.assert_eq(changed, 1);helpers.assert_eq(#retry_notices, 0)
+					local disk = read(c.path)
+					helpers.assert_true(disk:find(c.foreign, 1, true) ~= nil, "unknown nested data and comments retain their exact bytes")
+					helpers.assert_eq(read(c.config_path), '[future]\nuser = "kept"\n', "the unrelated canonical config was never written")
+					local decoded = require("toml_codec").decode(disk)
+					helpers.assert_eq(decoded[kind == "global" and "_global" or "magickey"].delay, 0.9)
+					assert(c.config.init(require("hotstring_engine").new(), c.path:match("^(.*)/")))
+					helpers.assert_eq(kind == "global" and c.config.get_global_delay() or c.config.resolve("magickey", nil).delay, 0.9,
+						"a real disk reload agrees with the acknowledged value")
+				end)
+			end)
+		end
+		helpers.it(kind .. " delay refuses a foreign source written while the prompt is held", function()
+			with_native_owner(function(c)
+				local changed = 0
+				local action = delay_action(c.config, kind, function() changed = changed + 1 end)
+				local foreign = c.original .. '# another owner changed the physical source\n'
+				local called, result, _, notices = observe(action, "900", function() write(c.path, foreign) end)
+				helpers.assert_true(called);helpers.assert_eq(result, false);helpers.assert_eq(changed, 0)
+				helpers.assert_eq(read(c.path), foreign, "the captured canonical override source refuses a stale write")
+				helpers.assert_eq(c.config.get_global_delay(), 0.4);helpers.assert_eq(c.config.resolve("magickey", nil).delay, 0.3)
+				helpers.assert_eq(#notices, 1)
+			end)
+		end)
+	end
+end)

@@ -976,6 +976,21 @@ local function _manifest_hotstring_rows(ctx, config)
 		return value / MS_PER_SEC
 	end
 
+	--- Contains the existing durable delay owner's receipt before repainting.
+	--- @param setter function|nil
+	--- @return boolean committed
+	local function commit_delay(setter, ...)
+		local ok, committed = false, false
+		if type(setter) == "function" then ok, committed = pcall(setter, ...) end
+		if not ok or committed ~= true then
+			Logger.error(LOG, "The hotstring delay owner refused publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
+	end
+
 	--- The row for the global default delay — the one every category inherits
 	--- when neither it nor its sections declare one.
 	--- @return table
@@ -998,8 +1013,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
-				if config.set_global_delay then config.set_global_delay(chosen) end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return commit_delay(config.set_global_delay, chosen)
 			end,
 		}
 	end
@@ -1031,8 +1045,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
-				if config.set_override then config.set_override(category, nil, "delay", chosen) end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return commit_delay(config.set_override, category, nil, "delay", chosen)
 			end,
 		}
 	end
