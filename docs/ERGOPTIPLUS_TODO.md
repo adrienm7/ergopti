@@ -34,6 +34,19 @@ native behavior and parity regression tests. Preserve unrelated changes, stage
 exact paths, never force-push `dev`/`main`, and delete only the temporary CI
 branches this session created after their evidence is recorded.
 
+Repository hygiene is complete. The 2026-10-03 cleanup retired 131 obsolete
+CI refs; a read-only 2026-10-04 inspection confirms only `main`, `dev`,
+`gh-pages`, `sparkle-appcasts`, `fix/linux` and `codex/ci-validation` remotely,
+and one registered main checkout. Reuse the single CI ref with distinct manual
+run groups; never create `backup/*` branches. Active source, validation fixtures
+and evidence remain owned work. The overnight handoff marks its former backup,
+force-push and release instructions as superseded.
+
+Historical provenance limitation: the exact uncommitted tooltip DPI-test edit
+reported in `wip/win-tooltip-border-fix` is unavailable and was not recovered.
+Current committed DPI geometry coverage does not establish those old bytes.
+Real Windows 10/11 rendering acceptance remains in items 19 and 38.
+
 The Windows regression backlog (former item 72) is closed: non-release CI
 run [36916568697](https://github.com/adrienm7/ergopti/actions/runs/36916568697)
 at `e5da10fbc` passed native unit tests, engine E2E, packaging, install/launch
@@ -789,28 +802,6 @@ The five-file source slice has 22 portable native-owner cases, seven actual work
       checkpoints 36931498806 and 36940286440. This consolidates former item 99
       under hardware acceptance; it does not establish physical acceptance or
       a new runtime fault from the supplied unpublished snapshot.
-- [~] **39.** Repository hygiene: the maintainer deleted every temporary backup
-  branch on 2026-09-30; agents must not create `backup/*` branches again. The
-  historical `wip/win-tooltip-border-fix` worktree was reported to contain an
-  uncommitted tooltip DPI-radius test edit. Its exact bytes are unavailable in
-  this container and have not been claimed as recovered. The committed tooltip
-  border tests now cover DPI geometry; this proves current coverage rather than
-  the provenance of that historical edit.
-
-The 2026-10-03 branch cleanup removed 131 obsolete `codex/ci-*` refs after
-checking reachability, open pull requests and active manual validations. The
-remaining remote branches are `main`, `dev`, `gh-pages`, `sparkle-appcasts`,
-`fix/linux` and the single reusable `codex/ci-validation`. Future manual runs
-use that CI ref with distinct run groups, so advancing it cannot cancel an
-older validation. No registered worktree or uncommitted source was removed by
-that branch cleanup. A fresh 2026-10-03 inspection found only the main checkout
-registered, with neither `.claude/worktrees/` nor `.git/worktrees/` present.
-Active validation checkouts and evidence remain owned work; there is no
-registered worktree to remove in this checkout. Item 39 remains partial for the
-unavailable historical edit's provenance.
-
-[The overnight handoff](handovers/2026-09-29-overnight/README.md) now marks its former backup, force-push and release instructions as superseded.
-
 - [~] **40.** The packaged-launch gate never builds a Karabiner configuration:
   the CI runners have no Karabiner-Elements, so dev.148 passed every launch
   scenario while every real Mac refused the deploy (« generated rule 1
