@@ -260,6 +260,35 @@ helpers.describe("sqlite_command — arguments", function()
 end)
 
 
+helpers.describe("sqlite_command — native command admission", function()
+	for _, field in ipairs({ "database", "script", "flag" }) do
+		for _, position in ipairs({ "first", "middle", "last" }) do
+			helpers.it("linux-sqlite-nul: refuses " .. field .. " NUL at " .. position .. " before returning a command", function()
+				local secret = "private_sql_payload"
+				local value = position == "first" and ("\0" .. secret)
+					or position == "middle" and (secret .. "\0" .. "suffix") or (secret .. "\0")
+				local database, script, options = "/db/metrics.sqlite", "SELECT 1;", { flags = { "-json" }, capture_exit = true }
+				if field == "database" then database = value
+				elseif field == "script" then script = value
+				else options.flags = { value } end
+				local command, reason = Cmd.build(database, script, options)
+				helpers.assert_nil(command, "libc cannot receive this complete command; no SQL prefix may execute")
+				helpers.assert_type(reason, "string")
+				helpers.assert_contains(reason, "NUL")
+				assert_absent(reason, secret, "refusal must not copy the SQL or database payload")
+			end)
+		end
+	end
+
+	helpers.it("linux-sqlite-nul: retains legal literal bytes and encoded NUL SQL", function()
+		local script = "SELECT 'été\t\r\nquote'' and \"double\"'; SELECT CAST(X'610062' AS TEXT);"
+		local command = assert(Cmd.build([=[/db/été ' \metrics.sqlite]=], script, { flags = { "-json" }, capture_exit = true }))
+		helpers.assert_contains(command, script, "admission must preserve representable input rather than sanitizing SQL")
+		helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
+	end)
+end)
+
+
 helpers.describe("sqlite_command — diagnostics carry no typed text", function()
 	helpers.it("redacts the SQL fragment sqlite3 echoes back", function()
 		local msg = Cmd.sanitise_error('Error: near line 1: near "my secret password": syntax error')

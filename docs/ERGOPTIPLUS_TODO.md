@@ -702,6 +702,21 @@ These are software implementations; final hardware verification remains below.
   validation by source, so they have no matching mutable curl validator file.
   No TOML persistence, reserved source, native cross-OS gate, physical input or
   manual CI was modified or exercised.
+- [~] **L54.** Linux SQLite native script admission: apply the existing native
+  argv validator to the complete composed command before direct popen callers
+  can execute it. Raw NUL in SQL previously persisted a complete INSERT/DDL
+  prefix despite returning failure after losing the terminal exit receipt.
+  Refuse database/script/flag NUL without copying private bytes into diagnostics,
+  staging SQL or amplifying its shell-quote/argv budget. Nine unit refusals fail
+  before and pass after; a positive framing control also passes. Four genuine
+  SQLite prefix-write regressions fail before and all seventeen write receipts
+  pass on LuaJIT and Lua 5.4, retaining large input, exit/signal, retry and privacy
+  controls. Encoded CRLF/NUL data retain exact native hex assertions. Literal
+  CRLF normalization by SQLite's CLI is a separately observed remaining defect.
+  macOS uses native hs.sqlite3 exec and Windows native prepared statements;
+  their embedded-NUL bridging remains unvalidated and is documented for their
+  native owners. No reserved source, cross-OS native gate, physical input or
+  manual CI was modified or exercised.
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

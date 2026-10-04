@@ -77,6 +77,38 @@ check("actual SQLite write needs no temporary receipt directory", function()
 	assert(#rows == 1 and rows[1] == "no temporary receipt")
 end)
 
+for index, script in ipairs({
+	"INSERT INTO receipt VALUES ('nul-write-one');\n\0INSERT INTO receipt VALUES ('suffix');",
+	"CREATE TABLE nul_ddl_receipt(value TEXT);\n\0SELECT 1;",
+	"INSERT INTO receipt VALUES ('nul-write-two');\n-- comment prefix\0suffix",
+}) do
+	check("native SQL NUL " .. index .. " cannot execute its complete prefix", function()
+		assert(Writer.exec_sql("DELETE FROM receipt WHERE value LIKE 'nul-write-%'; DROP TABLE IF EXISTS nul_ddl_receipt;"))
+		assert(Writer.exec_sql(script) == false, "unrepresentable raw SQL reported success")
+		local rows = assert(Writer.query_rows("SELECT value FROM receipt WHERE value LIKE 'nul-write-%';"))
+		assert(#rows == 0, "refused command executed a durable INSERT prefix")
+		local tables = assert(Writer.query_rows("SELECT name FROM sqlite_master WHERE name='nul_ddl_receipt';"))
+		assert(#tables == 0, "refused command executed a durable DDL prefix")
+	end)
+end
+
+check("native query NUL cannot execute its preceding write", function()
+	local rows = Writer.query_rows("INSERT INTO receipt VALUES ('nul-query-prefix');\n\0SELECT value FROM receipt;")
+	assert(rows == nil, "unrepresentable query reported accepted rows")
+	local persisted = assert(Writer.query_rows("SELECT value FROM receipt WHERE value='nul-query-prefix';"))
+	assert(#persisted == 0, "refused query executed a durable write prefix")
+end)
+
+check("native legal SQL retains Unicode, shell literals and encoded NUL bytes", function()
+	assert(Writer.exec_sql("INSERT INTO receipt VALUES ('été\t'||char(13)||char(10)||'quote'' $() `literal` \"double\"'); INSERT INTO receipt VALUES (CAST(X'610062' AS TEXT));"))
+	local encoded = assert(Writer.query_rows("SELECT hex(value) FROM receipt WHERE hex(value)='610062';"))
+	assert(#encoded == 1 and encoded[1] == "610062", "encoded NUL data was rejected or shortened")
+	local literal = assert(Writer.query_rows("SELECT hex(value) FROM receipt WHERE value LIKE 'été%';"))
+	local expected = "été\t\r\nquote' $() `literal` \"double\""
+	local expected_hex = expected:gsub(".", function(byte) return string.format("%02X", string.byte(byte)) end)
+	assert(#literal == 1 and literal[1] == expected_hex, "legal literal SQL bytes were changed: " .. tostring(literal[1]) .. " expected " .. expected_hex)
+end)
+
 Writer.close_db()
 for name in uv.fs_scandir_next, assert(uv.fs_scandir(root)) do assert(uv.fs_unlink(root .. "/" .. name)) end
 assert(uv.fs_rmdir(root))
