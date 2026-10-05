@@ -348,6 +348,38 @@ FSListDirectoryStrict(Path, Directories := false) {
 	return Entries
 }
 
+/**
+ * Resolves an existing directory to an absolute long path without recasing it.
+ * @param {String} Path - Existing directory without wildcard characters.
+ * @returns {String} Absolute long path; volume roots keep their final separator.
+ * @throws {Error|OSError} Missing directories or incomplete native resolution.
+ */
+FSResolveDirectoryPath(Path) {
+	if Path == "" || InStr(Path, "*") || InStr(Path, "?")
+		throw Error("Startup working directory cannot be resolved")
+	if !DirExist(Path)
+		throw Error("Startup working directory does not exist")
+	Size := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Size
+		throw OSError(A_LastError, A_ThisFunc)
+	Full := Buffer(Size * 2)
+	Written := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", Size,
+		"Ptr", Full, "Ptr", 0, "UInt")
+	if !Written || Written >= Size
+		throw Error("Startup working directory resolution did not complete")
+	Size := DllCall("kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", 0, "UInt", 0, "UInt")
+	if !Size
+		throw OSError(A_LastError, A_ThisFunc)
+	Long := Buffer(Size * 2)
+	Written := DllCall("kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", Long, "UInt", Size, "UInt")
+	if !Written || Written >= Size
+		throw Error("Startup working directory long-name resolution did not complete")
+	Resolved := StrGet(Long)
+	if RegExMatch(Resolved, "i)^[a-z]:\\$")
+		return Resolved
+	return RTrim(Resolved, "\")
+}
+
 ; Creates one directory exclusively, without adopting existing paths or parents.
 ; @param Path {String} Non-empty directory path with an existing parent.
 ; @return {Boolean} True only after native exclusive creation succeeds.
@@ -639,17 +671,26 @@ FSAtomicTempOwnerIsGone(FileName, TargetName) {
 
 ; Publishes a complete same-directory stage with one write-through Win32 rename.
 ; Failure retains Source and leaves Destination untouched.
-FSAtomicMoveReplace(Source, Destination) {
+; NativeError reports the immediate Win32 error; zero also denotes unavailable
+; native information on invalid arguments or a DllCall exception.
+FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
+	NativeError := 0
 	if !(Source is String) or Source = ""
 		or !(Destination is String) or Destination = ""
 		return false
 	static MOVEFILE_REPLACE_EXISTING := 0x00000001
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
-	try return DllCall("MoveFileExW", "Str", Source, "Str", Destination,
-		"UInt", MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-		"Int") != 0
-	catch
+	try {
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Moved := DllCall("MoveFileExW", "Str", Source, "Str", Destination,
+			"UInt", MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH, "Int")
+		NativeError := A_LastError
+		return Moved != 0
+	} catch Error {
+		; No completed native receipt is available for a DllCall exception.
+		NativeError := 0
 		return false
+	}
 }
 
 ; Publishes Source only when Destination is still absent. Omitting
@@ -677,6 +718,11 @@ FSMove(Source, Destination, Overwrite := false) {
         } catch {
                 return false
         }
+}
+
+/** Open a BOM-aware UTF-8 reader; native refusal reaches the identity owner. */
+FSOpenReadStrict(Path) {
+	return FileOpen(Path, "r", "UTF-8")
 }
 
 ; Opens a file for STREAMED reading and hands the handle back.

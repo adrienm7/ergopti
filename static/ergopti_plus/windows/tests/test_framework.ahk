@@ -54,8 +54,7 @@ global TEST_FAIL_COUNT := 0
 ; Results file for CI live tailing (same pattern as E2E to guarantee progress logs even
 ; when stdout is buffered or the process has no console handle).
 global _TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
-; Ensure a fresh file at the very start of the run (before any Test() registrations).
-try FileDelete(_TEST_RESULTS_FILE)
+; Including assertion helpers does not acquire or reset a runner receipt.
 
 ; Default false when no runner pre-declares it (run_all sets true for --dry-run).
 if !IsSet(_AHK_DRY_RUN)
@@ -623,12 +622,102 @@ _TestResultsPath(DefaultPath) {
 
 global TEST_RESULTS_CANONICAL := _TestResultsPath(A_Temp . "\ergopti_test_results.txt")
 global TEST_RESULTS_FILE := TEST_RESULTS_CANONICAL
+global _TEST_RESULTS_INITIALIZED_PATH := ""
+
+
+; Entry owners select their receipt before bootstrap; library includes stay inert.
+; Standalone RunTests uses the same owner, preserving legacy PID publication.
+_TestResultsBeginRun() {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	; An explicit launch path owns live progress as well as terminal results.
+	; Legacy ordinary runs still publish through their per-process sidecar.
+	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL && EnvGet("ERGOPTI_AHK_RESULTS_FILE") = "") {
+		TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results_"
+			. DllCall("GetCurrentProcessId") . ".txt"
+	}
+	return _TestResultsInitializeOrExit(TEST_RESULTS_FILE)
+}
+
+; Entry-point initialization precedes the main runner's general error handler.
+; A failed receipt must terminate headlessly even if stderr is also refused.
+_TestResultsInitializeOrExit(Path, ErrorOutputFn := unset, ExitFn := unset) {
+	try {
+		_TestResultsInitialize(Path)
+		return true
+	} catch as Failure {
+		InitializationErrorCode := HasProp(Failure, "Number") ? Failure.Number : 0
+		Message := "not ok 0 - FATAL TAP INITIALIZATION ERROR: " . Type(Failure)
+			. "|" . InitializationErrorCode . ": " . Failure.Message . "`r`n"
+		try {
+			if IsSet(ErrorOutputFn)
+				ErrorOutputFn.Call(Message)
+			else
+				FileAppend(Message, "**")
+		} finally {
+			if IsSet(ExitFn)
+				ExitFn.Call(1)
+			else
+				ExitApp(1)
+		}
+		return false
+	}
+}
+; A selected destination is initialized before bootstrap progress, once only.
+; Keeping the same file prevents a retained CI reader from observing an old inode
+; or losing its consumed bootstrap cursor when the TAP plan starts.
+_TestResultsInitialize(Path, OpenFn := unset) {
+	global _TEST_RESULTS_INITIALIZED_PATH
+	if !(Path is String) || Path == ""
+		throw TypeError("Invalid TAP receipt destination.")
+	if (_TEST_RESULTS_INITIALIZED_PATH = Path)
+		return
+	_TestResultsWrite(Path, "", true, OpenFn?)
+	_TEST_RESULTS_INITIALIZED_PATH := Path
+}
+
+; FileAppend opens exclusively in AHK v2. A string FileOpen mode shares access
+; with the CI reader. Direct raw I/O checks actual completed bytes, including BOM.
+_TestResultsWrite(Path, Text, Reset := false, OpenFn := unset, WriteFn := unset) {
+	if !(Path is String) || Path == "" || !(Text is String)
+		throw TypeError("Invalid TAP receipt destination or text.")
+	Opened := IsSet(OpenFn) ? OpenFn.Call(Path, Reset ? "w" : "a", "UTF-8-RAW")
+		: FileOpen(Path, Reset ? "w" : "a", "UTF-8-RAW")
+	try {
+		Prefix := (Reset || Opened.Length == 0) ? 3 : 0
+		TextBytes := StrPut(Text, "UTF-8") - 1
+		Count := Prefix + TextBytes
+		Bytes := Buffer(Count + 1, 0)
+		if Prefix {
+			NumPut("UChar", 239, "UChar", 187, "UChar", 191, Bytes)
+		}
+		StrPut(Text, Bytes.Ptr + Prefix, TextBytes + 1, "UTF-8")
+		Written := IsSet(WriteFn) ? WriteFn.Call(Opened, Bytes, Count)
+			: _TestResultsNativeWrite(Opened, Bytes, Count)
+		if !(Written is Integer) || Written != Count
+			throw Error("The TAP receipt write was incomplete (" . Written . "/" . Count . " bytes).")
+	} finally {
+		Opened.Close()
+	}
+}
+
+
+; File.RawWrite can buffer data and report acceptance before the native write.
+; This unbuffered boundary keeps sharing failures and short writes observable.
+_TestResultsNativeWrite(Opened, Bytes, Count) {
+	Written := 0
+	Succeeded := DllCall("Kernel32\WriteFile", "Ptr", Opened.Handle, "Ptr", Bytes,
+		"UInt", Count, "UInt*", &Written, "Ptr", 0, "Int")
+	NativeError := A_LastError
+	if !Succeeded
+		throw OSError(NativeError, "The TAP receipt native write was refused")
+	return Written
+}
 
 ; Persist each observation before optional console output. A refused disk write
 ; must stop the runner instead of publishing a successful but incomplete receipt.
 _TestPrint(Line) {
 	global TEST_RESULTS_FILE
-	FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
+	_TestResultsWrite(TEST_RESULTS_FILE, Line . "`r`n")
 	try FileAppend(Line . "`r`n", "*")
 }
 
@@ -648,13 +737,7 @@ RunTests() {
 		_AHK_DRY_RUN := false
 	if !IsSet(_AHK_ONLY_FILTER)
 		_AHK_ONLY_FILTER := ""
-	; An explicit launch path owns live progress as well as terminal results.
-	; Legacy ordinary runs still publish through their per-process sidecar.
-	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL && EnvGet("ERGOPTI_AHK_RESULTS_FILE") = "") {
-		TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results_"
-			. DllCall("GetCurrentProcessId") . ".txt"
-	}
-	try FileDelete(TEST_RESULTS_FILE)
+	_TestResultsBeginRun()
 	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
@@ -757,7 +840,8 @@ _CopyTestResultsForCi() {
 ; the results file and see exactly which phase the runner is in. Writes
 ; to both the CI-results file (for headless monitoring) and stdout.
 _LogBootProgress(msg) {
-	try FileAppend("# [boot] " . msg . "`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+	global TEST_RESULTS_FILE
+	_TestResultsWrite(TEST_RESULTS_FILE, "# [boot] " . msg . "`r`n")
 	try FileAppend("# [boot] " . msg . "`r`n", "*")
 }
 

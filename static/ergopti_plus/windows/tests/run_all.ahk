@@ -71,6 +71,8 @@ while (_riArgIndex <= A_Args.Length) {
 ; Test framework first — Assert / Test / RunTests must exist before any
 ; subsequent file registers its cases or invokes assertions inside lambdas.
 #Include test_framework.ahk
+; Acquire the selected receipt before any bootstrap observation or test include.
+_TestResultsBeginRun()
 
 ; AppState — must come before test_stubs.ahk because the stubs reference
 ; AppState fields directly, and before any infra/ file that reads AppState.
@@ -95,7 +97,9 @@ _FatalErrorHandler(e, mode) {
     msg := "not ok 0 - FATAL STARTUP ERROR: " . e.Message
     try 	msg .= "`r`nSTACK TRACE:`r`n" . e.Stack
 	msg .= "`r`nLikely cause: top-level code or missing stub in a newly added module."
-	try FileAppend(msg . "`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+	global TEST_RESULTS_FILE
+	try _TestResultsWrite(TEST_RESULTS_FILE, msg . "`r`n")
+	try FileAppend(msg . "`r`n", "**")
 	try FileAppend(msg . "`r`n", "*")
     ExitApp(1)
     return 1
@@ -1604,6 +1608,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_plain_paste_clipboard_sequence_ownership.ahk
 #Include meta/test_onboarding_gesture_registration_async.ahk
 #Include unit/test_text_sender_completion_status.ahk
+#Include unit/test_native_editor_completion.ahk
 #Include unit/test_text_sender_sendinput_failure.ahk
 #Include meta/test_deadkey_unmapped_base_char.ahk
 #Include meta/test_savefullconfig_no_delete.ahk

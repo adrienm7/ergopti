@@ -87,6 +87,7 @@ _LCOC_RemoteTransportSchedulesTheCommonReaper() {
 	ReqId := "ahk2_03_remote_sweep"
 	State := Map("sweeps", 0)
 	Port := Map(
+		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,
@@ -100,6 +101,7 @@ _LCOC_RemoteTransportSchedulesTheCommonReaper() {
 		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved,
 			"https://safe.invalid/v1", '{"input":"private"}', (*) => 0,
 			(*) => 0, 1000, Port))
+		AssertEqual(1, State["proxy_resolutions"], "the remote reaper fixture admits its direct route once")
 		AssertEqual(1, State["sweeps"],
 			"(ahk2-03-remote-sweep) remote-only curl use must schedule the common crash-artifact reaper exactly once")
 	} finally {

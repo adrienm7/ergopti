@@ -123,7 +123,7 @@ _ParseGlobalKey(Path, KeyName) {
 		InGlobal := false
 		Pattern  := "^" . KeyName . "\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$"
 		loop read, Path {
-				Line := Trim(A_LoopReadLine, " `t")
+				Line := TOML_StripInlineComment(Trim(A_LoopReadLine, " `t"))
 				if (Line == "[__global__]") {
 						InGlobal := true
 						continue

@@ -920,6 +920,7 @@ _RemoteCancelPublication_Poll(State, ReqId) {
 
 _RemoteCancelPublication_CurlPort(State, RunFn) {
 	return Map(
+		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,
@@ -954,6 +955,7 @@ _RemoteCancelPublication_CurlRunBoundary() {
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
 			(*) => 0, (*) => 0, 1000, Port))
 		Sleep(30)
+		AssertEqual(1, State["proxy_resolutions"], "the real continuation admits the recorded direct route once")
 		AssertFalse(_LLM_Remote_Async.Has(ReqId),
 			"cancellation inside Run must not be overwritten by a live publication")
 		AssertEqual(0, State["polls"],
@@ -991,6 +993,7 @@ _RemoteCancelPublication_CurlOwnedLaunchFailure() {
 		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
 			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(1, State["proxy_resolutions"], "owned launch crosses the direct proxy continuation once")
 		AssertFalse(_LLM_Remote_Async.Has(ReqId),
 			"a launch failure after process creation must retire the reservation")
 		AssertEqual(0, State["polls"],
@@ -1026,6 +1029,7 @@ _RemoteAdoptionFailure_AbortsDispatch() {
 		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
 			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(1, State["proxy_resolutions"], "failed adoption still crosses the real proxy continuation once")
 		AssertEqual(0, State["opens"],
 			"owned curl launch must not use a second fallible OpenProcess step")
 		AssertEqual(1, State["fail_calls"],

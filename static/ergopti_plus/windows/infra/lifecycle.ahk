@@ -461,7 +461,7 @@ Ergopti_OnSuspendEnter() {
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
 	if IsSet(UserHotstringsInvalidate)
-		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"))
+		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
