@@ -38,6 +38,7 @@ local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
+local BindingIdentity = require("config_binding_identity")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
@@ -225,9 +226,9 @@ end
 --- an action that still takes a parameter, and its value must still fit that
 --- parameter (a removed wrap pair, a retired language). The gesture catalogue
 --- judges it once loaded, as for retired actions; without it, or when its own
---- validator cannot judge, every entry is kept. Whether the binding before the
---- action still exists is not judged: no single catalogue lists every binding
---- (gesture slots, keyboard__, tap_key__, script__…).
+--- validator cannot judge, every entry is kept. Bare gesture bindings are
+--- judged only after their actual owner publishes its slot catalogue; other
+--- binding domains remain with their own owners.
 --- @param key string Persisted parameter key.
 --- @param value any Persisted value.
 --- @return boolean known
@@ -236,8 +237,12 @@ local function action_parameter_fits(key, value)
 	local catalogue = package.loaded["modules.gestures.actions"]
 	if type(catalogue) ~= "table" or type(catalogue.split_action_parameter_key) ~= "function"
 		or type(catalogue.validate_action_parameter) ~= "function" then return true end
-	local _, action = catalogue.split_action_parameter_key(key)
+	local binding, action = catalogue.split_action_parameter_key(key)
 	if not action then return false, "no action parameter of this build has this name" end
+	if type(catalogue.action_parameter_binding_fits) == "function"
+		and catalogue.action_parameter_binding_fits(binding) == false then
+		return false, BindingIdentity.RETIRED_GESTURE
+	end
 	local judged, valid = pcall(catalogue.validate_action_parameter, action, value)
 	if judged and not valid then return false, "the value no longer fits its action's parameter" end
 	return true

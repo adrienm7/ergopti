@@ -822,3 +822,98 @@ _GTB_RefusedBoundaryInner() {
 	}
 }
 Test("Gestures menu: missing or effect-bearing boundary refuses atomically without changing native assignment owners", _GTB_RefusedBoundary)
+
+
+; The native equivalent replays the exact hand-authored corpus used by Lua.
+; Default case-insensitive Maps deliberately exercise the helper's exact lookup.
+TestGestures_PublishedBindingIdentityCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_binding_identity\vectors.json", "UTF-8"))
+	AssertEqual(29, Corpus["vectors"].Length, "frozen independent publication corpus")
+	for Vector in Corpus["vectors"] {
+		if Vector.Get("expects_error", false) {
+			AssertThrows(ConfigBindingIdentityGestureStatus.Bind(Vector["binding"], Vector["catalogue"]), Vector["id"])
+			continue
+		}
+		if Vector.Has("published") && !Vector["published"] {
+			Status := ConfigBindingIdentityGestureStatus(Vector["binding"])
+		} else {
+			Slots := Map()
+			for Slot in Vector["slots"]
+				Slots[Slot] := true
+			Status := ConfigBindingIdentityGestureStatus(Vector["binding"], Map("prefix", Vector["prefix"], "slots", Slots))
+		}
+		AssertEqual(Vector["status"], Status, Vector["id"])
+	}
+}
+Test("Gestures: published binding identity replays shared 29-vector corpus (gesture-binding-identity-corpus)",
+	TestGestures_PublishedBindingIdentityCorpus)
+
+TestGestures_PublishedNativeSlotDomain() {
+	Catalogue := TomlConfigGestureSlotCatalogue()
+	AssertEqual("gesture__", Catalogue["prefix"])
+	AssertEqual(10, Catalogue["slots"].Count, "actual complete Windows catalogue")
+	AssertEqual("On", Catalogue["slots"].CaseSense)
+	for Slot in GestureSlotIds()
+		AssertEqual("current", ConfigBindingIdentityGestureStatus(GestureBindingId("gesture", Slot), Catalogue), Slot)
+	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__removed_gesture_slot", Catalogue))
+	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__TAP_3", Catalogue))
+	AssertEqual("unjudged", ConfigBindingIdentityGestureStatus("Gesture__tap_3", Catalogue))
+	for Binding in ["keyboard__ctrl_k", "tap_key__a", "script__pause", "tap_hold__caps_lock", "combination__caps_lock_then_space"]
+		AssertEqual("unjudged", ConfigBindingIdentityGestureStatus(Binding, Catalogue), Binding)
+}
+Test("Gestures: native owner publishes its exact ten-slot domain (gesture-binding-identity-native-catalogue)",
+	TestGestures_PublishedNativeSlotDomain)
+
+TestGestures_RetiredParameterSettersRefuseBeforePorts() {
+	global GestureActionParameters
+	Previous := GestureActionParameters
+	Calls := []
+	Writer := (*) => (Calls.Push("writer"), false)
+	Notify := (*) => Calls.Push("notify")
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["Gesture__tap_3__open_url"] := "https://unjudged.example"
+		AssertFalse(GestureSetActionParameter("gesture__removed_gesture_slot", "open_url", "https://must-not-write.example", Writer, Notify))
+		AssertEqual(0, Calls.Length, "ordinary refusal precedes writer and native notification")
+		AssertEqual(1, GestureActionParameters.Count)
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		Assignments := Map("tap_3", "none")
+		Parameters := GestureActionParameters.Clone()
+		Candidate := Map("has_value", true, "key", "gesture__removed_gesture_slot__open_url", "value", "https://must-not-write.example")
+		AssertFalse(_GestureCommitAssignment(&Assignments, &Parameters, "gestures", "tap_3", "open_url", Candidate, Writer, Notify))
+		AssertEqual(0, Calls.Length, "combined assignment also refuses before persistence")
+		AssertEqual("none", Assignments["tap_3"])
+		AssertEqual(1, Parameters.Count)
+		AssertEqual("On", Parameters.CaseSense)
+	} finally GestureActionParameters := Previous
+}
+Test("Gestures: proven retired parameters refuse both ordinary setter paths before ports (gesture-binding-identity-refusal)",
+	TestGestures_RetiredParameterSettersRefuseBeforePorts)
+
+TestGestures_ParameterSnapshotsKeepCaseTwins() {
+	Known := "gesture__tap_3__open_url"
+	Twin := "Gesture__tap_3__open_url"
+	Source := Map()
+	Source.CaseSense := "On"
+	Source[Known] := "https://known.example"
+	Source[Twin] := "https://unjudged.example"
+	Snapshot := _GestureCloneActionParameters(Source)
+	AssertEqual("On", Snapshot.CaseSense)
+	AssertEqual(2, Snapshot.Count)
+	AssertEqual("https://known.example", Snapshot[Known])
+	AssertEqual("https://unjudged.example", Snapshot[Twin])
+	Revert := Snapshot.Clone()
+	AssertEqual("On", Revert.CaseSense, "native Clone preserves the exact compensation domain")
+	AssertEqual(2, Revert.Count)
+	AssertEqual("https://known.example", Revert[Known])
+	AssertEqual("https://unjudged.example", Revert[Twin])
+	Legacy := Map(Known, "https://legacy.example")
+	Upgraded := _GestureCloneActionParameters(Legacy)
+	AssertEqual("On", Upgraded.CaseSense)
+	AssertEqual("https://legacy.example", Upgraded[Known])
+	AssertEqual("Off", Legacy.CaseSense, "populated legacy Map was never switched in place")
+}
+Test("Gestures: detached snapshots and exact native clones retain both case twins (gesture-binding-identity-snapshots)",
+	TestGestures_ParameterSnapshotsKeepCaseTwins)

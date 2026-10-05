@@ -38,7 +38,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					if initial == "existing" then sentinel = {} end
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
-						"_generated.action_catalogue", "hs", "hs.timer",
+						"_generated.action_catalogue", "config_binding_identity", "hs", "hs.timer",
 						"ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
@@ -49,6 +49,13 @@ helpers.describe("Gesture actions fixture ownership", function()
 					local constructions = 0
 					helpers.load_with_stubs = function(...)
 						local result = loader(...)
+						local identity = package.loaded["config_binding_identity"]
+						helpers.assert_type(identity, "table", "construction loads the real shared admission owner")
+						helpers.assert_type(identity.gesture_binding_fits, "function")
+						local catalogue = { prefix = "", slots = { tap_3 = true } }
+						helpers.assert_eq(identity.gesture_binding_fits("tap_3", catalogue), true)
+						helpers.assert_eq(identity.gesture_binding_fits("removed_slot", catalogue), false)
+						helpers.assert_nil(identity.gesture_binding_fits("keyboard__cmd_1", catalogue))
 						constructions = constructions + 1
 						if mode == "construction failure" then error(marker, 0) end
 						return result

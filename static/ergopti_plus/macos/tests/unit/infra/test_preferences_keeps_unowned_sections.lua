@@ -594,3 +594,118 @@ helpers.describe("Obsolete scalar user-model list preservation", function()
 		end)
 	end
 end)
+
+
+helpers.describe("Published gesture parameter identity source preservation", function()
+	local LeafRows = require("toml_codec.leaf_rows")
+	local Outdated = require("config_outdated")
+	local source = table.concat({
+		"# Independent user comments survive the admission scan.",
+		"[_meta]", "schema_version = 3", "",
+		"[gestures.action_parameters]",
+		'removed_gesture_slot__open_url = "https://obsolete.example" # cleanup owns this row',
+		'tap_3__open_url = "https://valid.example"',
+		'swipe_3_horiz__open_url = "https://axis.example"',
+		'keyboard__cmd_k__open_url = "https://keyboard.example"',
+		'tap_key__a__open_url = "https://tap.example"',
+		'script__reload__open_url = "https://script.example"',
+		'', '[future]', 'keep = "independent"', '',
+	}, "\n")
+
+	local function read_file(path)
+		local file = assert(io.open(path, "rb"))
+		local bytes = assert(file:read("*a")); assert(file:close())
+		return bytes
+	end
+
+	local function with_file(published, body)
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim",
+			"modules.gestures", "modules.gestures.actions" }, function()
+			package.loaded["modules.gestures"], package.loaded["modules.gestures.actions"] = nil, nil
+			local gestures
+			if published then gestures = helpers.load_with_stubs("modules.gestures")
+			else helpers.load_with_stubs("modules.gestures.actions") end
+			local warnings, errors = {}, {}
+			local logger = helpers.make_logger_stub()
+			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["adapters.file_system"] = nil
+			Outdated.reset_for_tests()
+			local preferences = helpers.load_with_stubs("infra.preferences")
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())
+			local ok, err = xpcall(function() body(preferences, gestures, path, warnings, errors) end, debug.traceback)
+			os.remove(path)
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	local function marks_for(preferences)
+		local decoded, shapes = LeafRows.decode_source(source)
+		local marks = {}
+		preferences.mark_config_reads(decoded, function(...)
+			marks[require("toml_codec.key_path").render({ ... })] = true
+		end, shapes)
+		return marks
+	end
+
+	helpers.it("ignores a retired binding, leaves it unconsumed, warns once and keeps exact bytes", function()
+		with_file(true, function(preferences, _, path, warnings, errors)
+			local state, status = preferences.load(path)
+			helpers.assert_eq(status, "ok")
+			helpers.assert_nil(state.gesture_action_parameters.removed_gesture_slot__open_url)
+			helpers.assert_eq(state.gesture_action_parameters.tap_3__open_url, "https://valid.example")
+			helpers.assert_eq(state.gesture_action_parameters.swipe_3_horiz__open_url, "https://axis.example")
+			helpers.assert_eq(state.gesture_action_parameters.keyboard__cmd_k__open_url, "https://keyboard.example")
+			helpers.assert_eq(state.gesture_action_parameters.tap_key__a__open_url, "https://tap.example")
+			helpers.assert_eq(state.gesture_action_parameters.script__reload__open_url, "https://script.example")
+			local marks = marks_for(preferences)
+			helpers.assert_nil(marks["gestures.action_parameters.removed_gesture_slot__open_url"])
+			helpers.assert_eq(marks["gestures.action_parameters.tap_3__open_url"], true)
+			helpers.assert_eq(marks["gestures.action_parameters.keyboard__cmd_k__open_url"], true)
+			preferences.load(path)
+			helpers.assert_eq(#warnings, 1, "read and cleanup agree on one deduplicated warning")
+			helpers.assert_contains(warnings[1], "gestures.action_parameters.removed_gesture_slot__open_url")
+			helpers.assert_contains(warnings[1], "no gesture slot of this build has this name")
+			helpers.assert_eq(#errors, 0)
+			helpers.assert_eq(read_file(path), source, "admission and marking do not rewrite the user file")
+		end)
+	end)
+
+	helpers.it("preserves the obsolete row across a complete save and an ordinary current-binding edit", function()
+		with_file(true, function(preferences, gestures, path, warnings, errors)
+			local state = preferences.load(path)
+			for key, value in pairs(state.gesture_action_parameters) do
+				local binding, action = gestures.split_action_parameter_key(key)
+				helpers.assert_eq(gestures.set_action_parameter(binding, action, value), true, key)
+			end
+			helpers.assert_eq(gestures.set_action_parameter("tap_3", "open_url", "https://changed.example"), true)
+			helpers.assert_eq(gestures.set_action_parameter("removed_gesture_slot", "open_url", "https://must-not-publish.example"), false)
+			helpers.assert_eq(preferences.save(path, state, {}, { gestures = gestures }), true)
+			local saved = read_file(path)
+			helpers.assert_contains(saved, 'removed_gesture_slot__open_url = "https://obsolete.example" # cleanup owns this row')
+			helpers.assert_contains(saved, "# Independent user comments survive the admission scan.")
+			local expected = {
+				removed_gesture_slot__open_url = "https://obsolete.example", tap_3__open_url = "https://changed.example",
+				swipe_3_horiz__open_url = "https://axis.example", keyboard__cmd_k__open_url = "https://keyboard.example",
+				tap_key__a__open_url = "https://tap.example", script__reload__open_url = "https://script.example",
+			}
+			helpers.assert_eq(TomlCodec.decode(saved).gestures.action_parameters, expected, "complete handwritten preserved parameter model")
+			helpers.assert_eq(TomlCodec.decode(saved).future, { keep = "independent" })
+			helpers.assert_eq(#warnings, 1)
+			helpers.assert_eq(#errors, 0)
+		end)
+	end)
+
+	helpers.it("keeps unavailable-catalogue entries without guessing their retirement", function()
+		with_file(false, function(preferences, _, path, warnings, errors)
+			local state = preferences.load(path)
+			helpers.assert_eq(state.gesture_action_parameters.removed_gesture_slot__open_url, "https://obsolete.example")
+			helpers.assert_eq(marks_for(preferences)["gestures.action_parameters.removed_gesture_slot__open_url"], true)
+			helpers.assert_eq(#warnings, 0)
+			helpers.assert_eq(#errors, 0)
+			helpers.assert_eq(read_file(path), source)
+		end)
+	end)
+end)

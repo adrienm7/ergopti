@@ -3127,18 +3127,26 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
-  listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
-  sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
-  (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
-  layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
-  plain string (saves refused with a generic ERROR), native qualification of
-  Linux whole-file layers.toml boot isolation, Windows sites 32, 34, 36, 37-60 and its
-  whole-file installed.json refusal, and the macOS boot-time unread-entries
-  scan cost (36-56 ms on the
-  main thread). Maintainer decisions are resolved: invalid schema stamps
-  retain strict boot and session-write refusal (site 108); retired keys
-  reported for explicit cleanup are exempt from automatic deletion migrations
-  and remain on disk until that cleanup (site 112).
+  listed; see `docs/memory/text-input-and-config.md`. Current source already
+  admits known expert `[script]`/`[features]` values through their published
+  owners, preserves obsolete scalar user-model and section-order rows, and
+  checks gesture action-parameter bindings against each driver's complete
+  native gesture inventory. Other binding owners remain unjudged. Plain-string
+  remap bindings are warned, read as neutral and preserved during unrelated
+  saves; requested replacement still requires explicit source repair. Linux
+  layers.toml boot isolation and obsolete installed-layout entry partitioning
+  are implemented. Remaining software includes complete parameter-binding
+  catalogues for the other owners and publication authority for remaining
+  dynamic model, provider and order identities. The historical review sites
+  14/93, 19, 24, 26, 28 and Windows 32, 34, 36, 37-60 still require exact current
+  owner audits before their closure can be claimed. Native Windows execution,
+  Linux layers.toml startup, Hammerspoon and installed three-OS qualification
+  remain separate acceptance work. The macOS unread-entry scan is deferred
+  off the boot critical path; its native main-thread cost still needs measurement.
+  Maintainer decisions are resolved: invalid schema stamps retain strict boot
+  and session-write refusal (site 108); retired keys reported for explicit
+  cleanup are exempt from automatic deletion migrations and remain on disk
+  until that cleanup (site 112).
 
   Windows tap_hold.toml now reports each obsolete entry once per exact file,
   rendered path and reason during the process, through the shared warning
@@ -3414,6 +3422,8 @@ The 2026-10-05 continuation preserves malformed shortcut-order source rows and s
 The declared macOS-only optional user-model list now reports obsolete scalar source once, keeps it outside runtime and unmarked for explicit cleanup, and preserves it during unrelated default-carried saves and published scope clear. A nonneutral replacement refuses before publication until explicit source repair. All original assertions remain; real typed-file oracles retain signed integers, precise floats, offset dates, literal dots and nested arrays. Linux has no supported owner for this leaf and preserves it; native Windows was inspected only. This bounded correction does not finish the remaining configuration catalogue.
 
 Persisted macOS llm.enabled now uses the actual published feature value validator before cleanup and bootstrap. Obsolete native text/numbers/containers warn once and cannot supply consent; values and TOML remain untouched until explicit cleanup. Valid true/false precedence, independently valid canonical fallback and logger ERROR are preserved. Independent actual-owner/compiled-init controls pass67/0 versus exact predecessor44/23; all44 prior cases and their assertions remain byte-exact. Equivalent typed Windows/Linux seams were inspected without duplicate changes. Actual Hammerspoon and final source/installed qualification remain required.
+
+Parameter-bearing gesture bindings now use a shared current/retired/unjudged identity policy against each actual complete native gesture catalogue. Windows, macOS and Linux loaders preserve but do not activate proven retired entries, warn once, and ordinary setters refuse them before publication; explicit cleanup remains the removal owner. Windows keeps case-distinct parameter Maps, including unjudged qualified identities. The independent29-case corpus and registered native regressions are retained; Windows native execution is still pending. Other keyboard, tap-hold, script and combination identity owners remain unjudged by this bounded cohort, so site76 and the whole item stay open. The actual gesture fixture now restores its new shared dependency through the existing exact owner scope. All old isolation assertions remain; original2/9 and corrected11/0 independently reproduce the prerequisite, including absent/false/existing owners and construction/callback failure.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.

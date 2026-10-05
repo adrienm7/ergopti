@@ -72,6 +72,29 @@ M.AXIS_SLOTS = {
 	"swipe_5_horiz",
 }
 
+--- Publishes the complete parameter-binding gesture domain from this owner's
+--- shipped slot lists. A malformed native inventory is a broken publication,
+--- never evidence that every stored gesture has been retired.
+--- @return table catalogue Native prefix and complete slot-id set.
+function M.gesture_slot_catalogue()
+	assert(type(M.SINGLE_SLOTS) == "table" and type(M.AXIS_SLOTS) == "table",
+		"gestures: invalid published slot catalogue")
+	local slots = {}
+	for _, list in ipairs({ M.SINGLE_SLOTS, M.AXIS_SLOTS }) do
+		assert(type(list) == "table" and #list > 0, "gestures: invalid published slot catalogue")
+		local count = 0
+		for index, slot in pairs(list) do
+			assert(type(index) == "number" and index % 1 == 0 and index >= 1 and index <= #list
+				and type(slot) == "string" and slot ~= "" and not slot:find("__", 1, true)
+				and not slots[slot], "gestures: invalid published slot catalogue")
+			count = count + 1
+			slots[slot] = true
+		end
+		assert(count == #list, "gestures: invalid published slot catalogue")
+	end
+	return { prefix = "", slots = slots }
+end
+
 -- Neutral bindings come from the shared manifest; recommendations are applied
 -- only by an explicit scoped restore.
 M.DEFAULT_GESTURES = {}
