@@ -2023,6 +2023,11 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] On Windows, replay the registered neutral/recommended/clear scope and global composition cases with the pinned native runtime. Check verified backups, exact runtime acknowledgement, stale-source refusal and retryable rollback.
 - [ ] On a disposable Windows profile, exercise category/global Clear and Restore, restart, preserve unknown/outdated entries and verify the effective recommended delays. Record physical keyboard results separately from unit/E2E results.
 
+Partial dev handoff (2026-10-05): complete the remaining global cohort and
+publication/rollback owners in code before device acceptance. On Windows,
+replay fresh/existing/moved folder recommendation and clear with exact backups,
+strict external-write refusal, restart and actual input; retain items 16/38.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -2082,6 +2087,11 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] On Windows, exercise all seven wizard pages, cancellation, Finish/restart/rerun, changed-folder reads, delayed/stale responses and explicit trigger choices on a disposable profile. Preserve untouched obsolete trigger values.
 - [ ] Check actual WebView/native bridge rendering and persistence; report the exact tested SHA and pass/fail/not-executed cases. Native CI alone does not complete physical acceptance.
+
+Partial dev handoff (2026-10-05): actual virtual X11 wizard probes are
+qualified separately. Installed Windows and macOS wizard reruns, restart and
+physical input remain device acceptance; work-machine logs/screenshots need
+not be exported. Follow PARTIAL-DELIVERY.md and record the exact artifact.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
@@ -2587,6 +2597,22 @@ assertion across curl versions. Independent old/new native replays pass; hosted
 final-source qualification remains pending. These are fixture prerequisites,
 not completion of the remaining configuration policy or physical acceptance.
 
+The macOS qualification fixtures now restore the transitive strict UTF-8 owner
+and decode the standard JSON backspace/form-feed escapes in their independent
+Hammerspoon stub. The original twelve hosted failures are reproduced and
+corrected without changing production, corpus expectations or assertions.
+Full selected verification and hosted qualification are recorded separately;
+these fixture repairs do not complete TODO33 or device acceptance.
+
+Windows configuration qualification now seeds the four actual section metadata
+values before testing their preservation, refusing missing seed anchors. The
+semantic snapshot loader no longer incidentally primes the separate raw cache;
+the dynamic publication fixture now establishes that cache precondition
+explicitly. All 151/203 original assertions remain, including pending source,
+refusal, pause and master-state checks. Both are fixture-only changes; native
+Windows CI and conflict-preserving composition with current Hotstrings remain
+required, without expanding group1 into Hotstrings feature implementation.
+
 Linux ordinary TapHold saves and recommended imports now use the existing shared classified reader: only native ENOENT permits an absent document; access, other open, read and close failures refuse before mutation, backup/staging/publication or reload. Malformed-source behavior and unknown fields remain unchanged. The registered real-writer module retains all 26 original cases and adds 13 controls: the original writer gives 28 passes / 11 failures, the corrected writer 39 / 0. macOS and Windows already refuse classified unreadable sources through their existing owners. Full selected verification and hosted native CI remain pending; TODO33 stays partial.
 
 The Linux TapHold owner now ignores and reports obsolete scalar/array parents and
@@ -2769,6 +2795,12 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] Run the native installed-record/member-span cases in test_layout_catalogue.ahk and test_json_object_key_nul.ahk: usable neighbors, warning-once, exact obsolete/future preservation, case identity, native NUL-path refusal, stale-source refusal and install/uninstall.
 - [ ] Replay retired-key and invalid-schema cases in test_config_migrate.ahk and boot/write-fence tests; retain retired keys until explicit cleanup and keep invalid-stamp session refusal strict.
 - [ ] Audit the remaining Windows configuration-reader domains already listed above; add causal regressions before changing them. Do not repeat completed features without evidence.
+
+Partial dev handoff (2026-10-05): the reviewed retired API-provider
+publication candidate is preserved but unapplied. Compose its single Linux
+manifest registration with current dev and qualify actual catalogue publication
+before claiming obsolete-row completion. Windows sites and remaining
+catalogues above still need implementation/qualification, not only device UI.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -3223,6 +3255,11 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] Replay the 30 new native semantic-snapshot cases through the real registered runners, including the unchanged dotted corpus, typed inline/default merges, exact quoted/empty identities, bootstrap, cache generation, source locks, stale-source/full-save behavior and invalid stamps.
 - [ ] Compile the complete ErgoptiPlus.ahk include graph, then run Windows E2E, packaging and installation on the exact source SHA. Check real menu/full-save comment preservation; ordinary saves must refuse obsolete-scalar/new-subtree collisions until explicit cleanup.
+
+Partial dev handoff (2026-10-05): implement and qualify Windows
+document/config dotted assignments with independent expected models. Preserve
+retired scalar collisions until explicit cleanup; ordinary saves must refuse
+them. Installed-driver restart and actual menu persistence remain acceptance.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -3690,6 +3727,13 @@ Items 54/81 remain partial for delay, picker children and other menu families.
 Full selected verification and three-OS native CI are tracked separately;
 physical tray and input acceptance remain required on installed devices.
 
+Windows fixture qualification preserves the sparse disabled-field contract and
+the renderer receipt for three labelled rows, while independently requiring
+four actual Win32 menu positions and their original captions/separator. The
+HIGH07 dispatch guard follows the real shared template/action/registration
+chain and now uses effective regex word boundaries. Every behavioral predicate
+remains; hosted Windows execution is required before native acceptance.
+
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
 shared renderers own its labels, order, checked state and selected-value
@@ -4030,6 +4074,13 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 96). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
+Partial dev handoff (2026-10-05): Metrics V3 is reviewed but unapplied.
+Delay needs the existing Windows timing setter exposed honestly; Wrap needs
+macOS refused-deletion durability before integration. Guidance is reviewed but
+blocked by those predecessors; Gesture mode has no complete test/generation
+qualification. Continue remaining families to the actual zero-site ratchet.
+These are implementation tasks; separate installed tray/input acceptance.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4233,6 +4284,11 @@ pass with all 21 locale catalogues. Full native CI remains required.
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+
+  The Windows qualification successor for the shared Tap-Hold head retains its
+  real four-row Win32 and refusal assertions; item 54 records the precise
+  sparse-field/renderer/dispatch contract corrections. Native CI is pending.
+
   Metrics widget rows are now shared `check` declarations on all three
   drivers. Native getters retain stored colors/graph checks while disabled;
   Windows commands rebuild through the normal tray owner after durable
@@ -4267,6 +4323,12 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.
+
+Partial dev handoff (2026-10-05): use the immutable resumed menu archive
+and its independent reviews; no saved packet qualifies an integrated feature.
+Complete the source steps under item 54, then native E2E/package/install and
+real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
+fix as explicit code work rather than unsupported-platform exceptions.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
