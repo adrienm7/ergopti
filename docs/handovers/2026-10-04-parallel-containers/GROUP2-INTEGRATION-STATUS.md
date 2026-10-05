@@ -2,11 +2,11 @@
 
 # Group 2 delivery and device continuation
 
-The hotstring source candidate is `d561cbf57b0084d3e82cb7a2ea6efc2c098c0096`
+The last published composition is `880d3a5a9cd8bf87ca3430ac5a895d67ba81449f`
 on `feat/hotstrings`. It contains the shared/macOS/Linux implementation and
 prepared Windows sources for TODO 34/37/102/104/105. All five parent items remain
 partial; no item was removed. Items 16/38 remain byte-identical to the latest adopted
-`origin/dev` baseline `3b4afeba128bdcf9fb1155754742792c95f250fc`.
+`origin/dev` baseline `a550193ebc31aa819c369f701a61ebed72d86216`.
 
 Windows-dependent implementation and qualification were explicitly deferred to
 the maintainer PC. Follow [the Windows continuation](GROUP2-WINDOWS-TODO.md);
@@ -102,6 +102,31 @@ provides the real XKB compiler and shared Lua namespace before their first use,
 retaining all original fixtures. Actual local XKB gives64/0+72/0+64/0; absence
 reproduces the exact hosted line83 refusal. Hosted final confirmation is pending.
 
+## Final source composition
+
+The source adopts current dev a550193 without discarding the configuration/menu
+owner's publication inverse. Private hotstring table receipts and ordinary
+configuration cleanup callbacks retain their separate native owners. Actual
+Dunst1.12.2 and1.9.0 each pass13/0 after composing typed D-Bus byte validation,
+exact notification operands and the independent wrong-rule refusal. The six new
+configuration/menu ETag controls remain; a seventh restores the original E2-on-503
+counterexample with the unchanged canonical E1 expectation. Actual Curl8.14 passes
+all seven modes on both Lua ABIs. Supported older Curl still needs hosted proof.
+
+The selected composition passes Linux7,805/0. Mac portable units give14,648/12;
+all twelve failures reproduce the already integrated dev baseline. The bounded
+follow-up fixes three explicit fixture dependency inventories and the JSON stub's
+missing b/f byte escapes. Production strict validation and independent golden
+corpora remain unchanged. Two new independent controls first give1/1 against the
+old stub, distinguishing decoded control bytes from literal backslash examples.
+Final full-suite and integrated hosted results are recorded in the coordination
+receipt; neither the earlier red nor an unexecuted device scenario becomes green.
+
+The final phase was reserved using an actually empty commit from current dev,
+not by taking a foreign reservation. Its owner keeps both CI refs serialized
+through the terminal manual result. Windows is deferred to the maintainer PC;
+manual macOS/Linux qualification does not count Windows as passed.
+
 ## Required continuation
 
 - Follow [the Windows continuation](GROUP2-WINDOWS-TODO.md) and
@@ -109,8 +134,8 @@ reproduces the exact hosted line83 refusal. Hosted final confirmation is pending
   items partial until their real remaining scope and acceptance passes.
 - The Linux native HTTP owner must preserve canonical E1 after an HTTP 503
   carrying E2 on Curl 8.5, without overwriting a foreign winner or discarding
-  cleanup debt. The original six adversarial inputs/expectations remain intact.
-  Curl 8.14 passes six/zero locally; this does not fix older supported Curl.
+  cleanup debt. Keep all seven controls, including the restored original E2-on-503 stimulus
+  and the additional E1-on-503 control. Curl 8.14 passes seven/zero locally; this does not fix older supported Curl.
 - The separate native URL-byte fixture still fails its POST NUL-body dispatch
   acknowledgement at line135; six other actual URL/public-request controls pass.
   The fixture already declares the shared namespace, so the import correction
