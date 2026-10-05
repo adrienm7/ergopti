@@ -5,4 +5,4 @@ description = "A scan code the Windows reader accepted in mixed case keeps its k
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 4
-to_version = 10
+to_version = 11

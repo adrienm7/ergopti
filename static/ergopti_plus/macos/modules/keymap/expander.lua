@@ -80,8 +80,9 @@ end
 --- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
 --- @param source_type string Telemetry label passed to the keylogger.
 --- @param source_variant string|nil Optional sub-type for the keylogger.
+--- @param publication table|nil Retained programmable output guards.
 function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored,
-	source_type, source_variant, is_private, terminator_spec, terminal_target_override)
+	source_type, source_variant, is_private, terminator_spec, terminal_target_override, publication)
 	if not require_state("perform_text_replacement") then return false end
 	local discovered_terminal = terminal_target_override
 	if discovered_terminal == nil and deletes > 0
@@ -116,7 +117,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		local outcome = table.pack(xpcall(function()
 			return M.perform_text_replacement(deletes, emit_action, buffer_action,
 				is_final, is_ignored, source_type, source_variant, is_private,
-				terminator_spec, discovered_terminal)
+				terminator_spec, discovered_terminal, publication)
 		end, debug.traceback))
 		if outcome[1] ~= true or outcome[2] ~= true then
 			pcall(SyntheticInput.abort_callback)
@@ -141,7 +142,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- Every logical producer receives a fresh immutable generation. Terminator
 	-- replay owners remain attached to their own replacement and settle fence;
 	-- SyntheticInput's FIFO preserves their order across overlapping producers.
-	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")
+	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement", publication)
 	local terminal_target = discovered_terminal
 	local paced_owner = nil
 	local paced_settlement_budget = 0

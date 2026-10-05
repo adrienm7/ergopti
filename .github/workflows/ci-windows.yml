@@ -685,6 +685,7 @@ jobs:
         run: node tools/test/test-desktop-ci-evidence.cjs
 
       - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
+        id: compiled-startup
         # The unit test suite (test-ahk job) runs against source .ahk files with
         # A_IsCompiled == false, so it never exercises compiled-mode-only code
         # paths like Bundle_Init(). That gap let a 100%-reproducible startup
@@ -1100,9 +1101,37 @@ jobs:
           node tools/test/desktop-ci-evidence.cjs record-windows $observationFile $exe "$env:RUNNER_TEMP/evidence.json"
           if ($LASTEXITCODE -ne 0) { throw 'The native compiled startup evidence was refused.' }
           Write-Host "OK: the exact packaged ErgoptiPlus.exe reached input/menu readiness and exited cleanly after $markerSeconds s."
+          "bundle_root=$bundleDir" >> $env:GITHUB_OUTPUT
+          "local_app_data=$env:LOCALAPPDATA" >> $env:GITHUB_OUTPUT
           } finally {
               Stop-LaunchedApp $proc
           }
+
+      - name: Qualify programmable hotstrings in the actual compiled package
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 5
+        env:
+          ERGOPTI_PROBE_BUNDLE_ROOT: ${{ steps.compiled-startup.outputs.bundle_root }}
+          ERGOPTI_PROBE_LOCAL_APP_DATA: ${{ steps.compiled-startup.outputs.local_app_data }}
+        run: |
+          ./tools/test/run-compiled-user-hotstrings.ps1 `
+            -Executable "$env:RUNNER_TEMP/package/ergopti_plus/windows/ErgoptiPlus.exe" `
+            -Checkout "$env:GITHUB_WORKSPACE" `
+            -BundleRoot "$env:ERGOPTI_PROBE_BUNDLE_ROOT" `
+            -LocalAppData "$env:ERGOPTI_PROBE_LOCAL_APP_DATA" `
+            -StartupEvidence "$env:RUNNER_TEMP/evidence.json" `
+            -EvidenceDirectory "$env:RUNNER_TEMP/windows-user-hotstrings-package-evidence"
+
+      - name: Upload mandatory compiled programmable package evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-user-hotstrings-package-evidence
+          overwrite: true
+          path: ${{ runner.temp }}/windows-user-hotstrings-package-evidence
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Upload mandatory launch evidence
         if: always()

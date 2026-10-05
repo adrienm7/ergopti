@@ -44,6 +44,7 @@ local OWNED = {
 	"hotstrings.preview_ai_enabled",
 	"hotstrings.preview_colored_tooltips",
 	"hotstrings.dynamic.enabled",
+	"hotstrings.dynamic.user_code.time_activation_seconds",
 }
 for _, entry in ipairs(Manifest.features()) do
 	if entry.section == "hotstrings.dynamic" and entry.type == "feature" then
@@ -53,7 +54,8 @@ end
 local _owned = {}
 for _, path in ipairs(OWNED) do
 	local neutral = Manifest.default_for(path)
-	assert(type(neutral) == "boolean" or type(neutral) == "string", "hotstring preference default is not a scalar: " .. path)
+	assert(type(neutral) == "boolean" or type(neutral) == "string" or type(neutral) == "number",
+		"hotstring preference default is not a scalar: " .. path)
 	_owned[path] = type(neutral)
 end
 
@@ -62,6 +64,9 @@ end
 -- exactly as it is for the owner's reader, which warns with the same words.
 local VALUE_RULES = {
 	["hotstrings.trigger_char"] = function(value) return Terminators.validate_magic_key(value) == true end,
+	["hotstrings.dynamic.user_code.time_activation_seconds"] = function(value)
+		return type(value) == "number" and value == value and value >= 0 and value < math.huge
+	end,
 }
 
 local _document = nil
@@ -142,6 +147,9 @@ end
 --- @return any value
 local function lookup(document, path)
 	local value, outdated, detail = inspect(document, path)
+	if value ~= nil and path == "hotstrings.dynamic.user_code.time_activation_seconds" and not VALUE_RULES[path](value) then
+		outdated, detail, value = path, "the activation interval is not a finite non-negative number", nil
+	end
 	if outdated then ConfigOutdated.report(outdated, detail, Logger) end
 	return value
 end
@@ -276,6 +284,9 @@ function M.set_many(values)
 		for path, value in pairs(values) do
 			owned(path)
 			assert(type(value) == _owned[path], "hotstring preference has the wrong type: " .. path)
+			if path == "hotstrings.dynamic.user_code.time_activation_seconds" then
+				assert(VALUE_RULES[path](value), "programmable hotstring activation interval is invalid")
+			end
 			if value == Manifest.default_for(path) then
 				operations[#operations + 1] = { path = segments(path), delete = true }
 			else

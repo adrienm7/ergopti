@@ -47,6 +47,11 @@ const FAST_MS = 1000;
  * The interval is read from the source, not repeated here — one source of truth.
  */
 const INVENTORY = {
+	'modules/dynamic_hotstrings/user_code.ahk:_UserHotstringsPoll':
+		'Armed only while a programmable worker or exact Job/stage retirement debt is owned. ' +
+		'25 ms bounds cooperative cancellation and stale source/focus/input publication; ' +
+		'the final acknowledged cleanup disarms it. ShellRunner owns process completion, ' +
+		'but exposes no progress subscription for these source and lifecycle receipts.',
 	'adapters/llm_nav_event_owner.ahk:_LLM_NavEventOwnerServiceFn':
 		'Drains receipts from the native navigation owner when its wake message is delayed or ' +
 		'lost, and observes fail-open native delivery faults. 100 ms bounds how long a ' +

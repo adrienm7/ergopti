@@ -78,13 +78,51 @@ if (installer.includes('install -m 0644 "${toml}" "${dest}"')) {
 	fail('install.sh must not seed complete canonical packs into the user override directory');
 }
 const configManager = fs.readFileSync(CONFIG_MANAGER, 'utf8');
-const bundledResolution = configManager.indexOf('Loader.find_toml_files(bundled)');
-const userResolution = configManager.indexOf('Loader.find_toml_files(_config_dir)');
-if (bundledResolution < 0 || userResolution < 0 || bundledResolution >= userResolution) {
+function resolutionLayersOrdered(source) {
+	const resolver = /^local function resolve_paths\(\)\r?\n[\s\S]*?^end\b/m.exec(source)?.[0];
+	if (!resolver) return false;
+	const bundled = [...resolver.matchAll(/Loader\.find_toml_files\(bundled\)/g)];
+	// Additional personal discovery now supplies its shared scan-depth bound.
+	// Admit that precise owner, retaining the same explicit user-directory root;
+	// an arbitrary depth or a different source must not satisfy this guard.
+	const user = [
+		...resolver.matchAll(
+			/Loader\.find_toml_files\(_config_dir(?:, PersonalFiles\.additional_scan_max_depth)?\)/g
+		)
+	];
+	return bundled.length === 1 && user.length === 1 && bundled[0].index < user[0].index;
+}
+if (!resolutionLayersOrdered(configManager)) {
 	fail(
 		'fresh runtime resolution must load the bundle first and overlay explicit user packs second'
 	);
 }
+// Mutate the actual production calls: neither a missing layer nor reversed
+// precedence can inherit a match from another function or an unrelated root.
+const resolver = /^local function resolve_paths\(\)\r?\n[\s\S]*?^end\b/m.exec(configManager)[0];
+const bundledCall = /Loader\.find_toml_files\(bundled\)/.exec(resolver)[0];
+const userCall =
+	/Loader\.find_toml_files\(_config_dir(?:, PersonalFiles\.additional_scan_max_depth)?\)/.exec(
+		resolver
+	)[0];
+for (const [layer, call] of [
+	['bundled', bundledCall],
+	['user', userCall]
+]) {
+	if (resolutionLayersOrdered(resolver.replace(call, 'Loader.find_toml_files(foreign)'))) {
+		fail(`runtime resolution guard accepted a missing ${layer} layer`);
+	}
+}
+const swapped = resolver
+	.replace(bundledCall, '__canonical_bundle_layer__')
+	.replace(userCall, bundledCall)
+	.replace('__canonical_bundle_layer__', userCall);
+if (resolutionLayersOrdered(swapped)) fail('runtime resolution guard accepted reversed precedence');
+if (
+	userCall.includes('PersonalFiles.additional_scan_max_depth') &&
+	resolutionLayersOrdered(resolver.replace(userCall, 'Loader.find_toml_files(_config_dir, 64)'))
+)
+	fail('runtime resolution guard accepted an unowned personal scan-depth bound');
 
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-canonical-upgrade-'));
 const sourceN2 = path.join(sandbox, 'source-n2');
