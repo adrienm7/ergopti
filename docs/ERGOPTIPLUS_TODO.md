@@ -2597,6 +2597,16 @@ assertion across curl versions. Independent old/new native replays pass; hosted
 final-source qualification remains pending. These are fixture prerequisites,
 not completion of the remaining configuration policy or physical acceptance.
 
+Linux native fixture prerequisites now qualify the real GTK launcher in the
+same private X11/D-Bus session before starting each unchanged application-action
+deadline. Application-catalogue isolation retains actual compiled GSettings
+schemas; setup and functional receipts have distinct identities. Independent
+actual launches pass 4/4; a simulated native cold-start delay is explicitly
+separate from the unproven hosted timeout cause. The failed-HTTP ETag control
+now compares exact bytes from an independent direct same-binary curl oracle,
+retaining all seven functional cache/conditional-request/recovery cases across
+curl versions. Hosted Linux E2E, packaging and installation must still finish.
+
 The macOS qualification fixtures now restore the transitive strict UTF-8 owner
 and decode the standard JSON backspace/form-feed escapes in their independent
 Hammerspoon stub. The original twelve hosted failures are reproduced and
