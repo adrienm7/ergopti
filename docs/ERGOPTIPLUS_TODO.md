@@ -3323,8 +3323,10 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   restoration, packaging, per-user installation/restart and physical desktop
   input. Windows steps 1,10,12 and Mac native Hammerspoon qualification remain
   required. Preserve one-shot/cancel timer and native curl-slot assertions.
-  Hosted portable HTTPS/model validation is adopted but unexecuted; cache-copy
-  installation is not a successful official model pull. Items 16/38 remain.
+  Direct-source manual run37306690694 attempted actual HTTPS/model validation.
+  Its native child exited0 with inference6 bytes, but the supervisor rejected
+  its physical-reaping counter; this remains a failed whole acceptance until
+  explicit pending-zero/no-rescue proof qualifies. Items16/38 remain.
 
 - [~] **47.** **Partial: authenticated local-server discovery and menus.** The
   shared catalogue owns optional empty authentication only for declared local
@@ -3349,7 +3351,9 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   pass180/0 plus daemon routing2/0 per ABI; the original fails two behaviors.
   Windows14 source paths include panel/lifecycle and timer relocation. The coherent source tranche is committed; native
   current-source qualification remains pending. Native
-  panel 20 (original 16 plus 4 new) and 4 timer cases are pending. Nine shared
+  panel20 executed19/1; all4 timer cases passed in direct-source run37306690694.
+  The OnExit fixture declaration, balanced log and direct backend builder are
+  corrected from exact failures; their next native replay remains required. Nine shared
   renderer/declaration/test paths use canonical inert fallback rows; generated
   artifacts were regenerated through their owner. Final
   driver qualification remains required. Historical diagnostic
@@ -3365,7 +3369,13 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   file fixture's17 baseline FFI failures are unresolved qualification, not green.
   Corrected root Linux passes8302/0 and E2E189/0. JS361/0, portable macOS
   unit14665/0 and E2E101/0 plus one driver-specific skip qualify their selected
-  sources. Complete native three-OS qualification remains; items16/38 stay.
+  sources. Hosted Linux8337/1 exposed a cache-only fixture admitting an extra runtime
+  offer on trusted-root hosts. Explicit unavailable-runtime isolation preserves
+  every old assertion and passes all58 admission controls per ABI. Six Windows
+  retained writer/JOIN failures are traced to the scope fixture retaining its
+  recovered barrier. Exact-owner fixture restoration and six original native
+  refusal sequences are adopted; their native replay remains pending. Complete native three-OS
+  qualification remains; items16/38 stay.
 
 - [~] **48.** **Partial: owned local-runtime repair and enable admission.** All
   three drivers require a fresh configured /api/version receipt before the
@@ -3385,7 +3395,10 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   passes per ABI; corrected root Linux8302/0 and E2E189/0 complete locally.
   The Linux cancellation fence and faithful managed fixture retain all original
   assertions; current native three-OS CI and physical acceptance remain pending.
-  Portable manual HTTPS/model CI is adopted but unexecuted. Registry CONNECT 403
+  Portable manual HTTPS/model CI ran and failed its outer physical receipt
+  classification after native child exit0; no complete acceptance is claimed.
+  Actual local official HTTPS installation reached typed readiness and durable
+  enable, then failed the model pull with exact child cleanup. Registry CONNECT403
   persists in this container; saved network configuration is not applied.
   Remaining: genuine archive/model HTTPS under system proxy/TLS, cancellation,
   timeout/size/digest/redirect errors, native model/chat and fresh enable,
@@ -4151,9 +4164,16 @@ fix as explicit code work rather than unsupported-platform exceptions.
   native Wayland acceptance. Source/screenshot hashes remain in the handover.
   Mac production formatter/styledtext/canvas diagnostics and independent pixel
   observer are adopted. Mandatory pure/native registration is committed;
-  the hosted three-OS manual run will qualify the exact composed tree. The 38 pure Python observer/supervisor controls pass and remain distinct
-  from12 unexecuted native signed-Hammerspoon captures. Unchanged style/alignment expectations and exact
-  child retirement remain pending manual CI; missing GUI/trust/capture/cleanup must fail, not skip.
+  the hosted three-OS manual run will qualify the exact composed tree. The original38 pure observer/supervisor controls and ten added controls
+  pass48/0. Replaying all12 unchanged signed-Hammerspoon screenshots passes12/0.
+  These image replays do not replace fresh native creator and source-freeze
+  qualification; missing GUI/trust/capture/cleanup must fail, not skip.
+  Direct-source manual run37306690694 produced all12 Mac native captures with
+  exact child retirement, but failed its independent typed-text locator on
+  antialiased marker pixels. The corrected locator and neutral-contrast weight observer preserve unchanged
+  screenshots, independent prefix/font/color/geometry assertions and the1.03
+  bold threshold. Original-source and removal-only controls fail as expected;
+  fresh native replay remains required.
   Remaining: actual Mac canvas qualification, Windows current-source native and
   real-device typography/geometry/retirement, Linux/Mac physical appearance/input,
   packaging/install and desktop acceptance. Preserve Windows PC steps 11,12 and
