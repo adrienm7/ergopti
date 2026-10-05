@@ -82,10 +82,12 @@ local function resolve_platform(path)
 	platform_resolved = true
 end
 
-local function resolve_scope(scope)
+local function resolve_scope(scope, direct_only)
 	local declaration = assert(_manifest.scopes[scope], "unknown configuration scope")
 	for _, prefix in ipairs(declaration.prefixes or {}) do resolve_platform(prefix) end
-	for _, child in ipairs(declaration.includes or {}) do resolve_scope(child) end
+	if not direct_only then
+		for _, child in ipairs(declaration.includes or {}) do resolve_scope(child) end
+	end
 end
 
 Logger.done(LOG, "Features manifest loaded (v%s, %d feature(s)).",
@@ -118,6 +120,14 @@ end
 --- @return table|nil
 function M.find_entry_by_path(path)
 	resolve_platform(path)
+	return _path_index[path]
+end
+
+--- Returns declaration metadata without resolving a native platform default.
+--- Type admission does not need the backend or any hardware-derived value.
+--- @param path string Canonical feature path.
+--- @return table|nil entry Published declaration, or nil when unknown.
+function M.find_declared_entry_by_path(path)
 	return _path_index[path]
 end
 
@@ -189,6 +199,16 @@ function M.scope_inventory(scope, providers, owners) return _defaults.scope_inve
 function M.scope_plan(scope, mode, owned_paths, owners)
 	resolve_scope(scope)
 	return _defaults.scope_plan(scope, mode, owned_paths, owners)
+end
+
+function M.direct_scope_operations(scope, mode, owned_paths, owners)
+	resolve_scope(scope, true)
+	return _defaults.direct_scope_operations(scope, mode, owned_paths, owners)
+end
+
+function M.direct_scope_plan(scope, mode, owned_paths, owners)
+	resolve_scope(scope, true)
+	return _defaults.direct_scope_plan(scope, mode, owned_paths, owners)
 end
 
 
