@@ -1390,6 +1390,18 @@ These are software implementations; final hardware verification remains below.
   adding a framework. Foreign runtime gates remain deferred. Range selection,
   date validation, persistence and reserved surfaces are unchanged.
 
+- [~] **L100.** Linux localectl variant alignment: preserve an empty first
+  variant slot instead of borrowing the second layout's variant. Real native
+  compilation, checked files and libxkbcommon capture/inverse resolution expose
+  three failures in eight controls before the fix and pass all eight after.
+  Three registered units cover empty, explicit and absent first variants plus
+  existing sibling parsers; one fails before and all pass after. Localectl's
+  text is supplied by fixtures; neither systemd nor a physical keyboard is
+  claimed. Register the native matrix for future Linux CI without launching
+  hosted workflows. Windows uses native keyboard-layout handles and macOS TIS
+  identifiers, so neither parses Linux variant lists; foreign runtime gates
+  remain deferred. Multi-group recovery and reserved input paths are unchanged.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
