@@ -2049,6 +2049,19 @@ without skips. The unchanged new failure-fact control fails on the original
 generic helper. These facts do not correct or qualify the unseen native reply
 failure; C compilation and complete native acceptance remain pending.
 
+Manual macOS run [37267530410](https://github.com/adrienm7/ergopti/actions/runs/37267530410)
+tests exact candidate `4d026ba9abbc8449d68f8be932f21a7e9cac6c0b` and finishes
+with five successful jobs, three failed verdict/package jobs and four skipped
+jobs. Shared checks and macOS stubbed units/E2E pass. The native Brew sender
+compiles and reports send status zero, missing nonce reply (-1701), and the
+independently read standard target error -10004 (errAEPrivilegeError) at the
+deny-removal positive control. This does not establish TCC or Seatbelt as its
+cause; full-policy denial and install/upgrade remain unqualified. Native keyboard
+restore assertions also fail outside this group's scope. Sparkle's verdict is
+unknown from the available annotations: the typed artifact download is refused,
+and absence of an annotation cannot prove success. macOS install/launch and
+Release are skipped. Item 36 and transversal requirements 16/38 remain open.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
@@ -3050,6 +3063,19 @@ remote/provider/auth assertions pass in isolation. The registered control module
 keeps those expectations unchanged. This receipt is not a page-safe report and
 does not itself implement failure actions. Final managed transport composition,
 native network/UI behavior, full Linux and packaging/install remain pending.
+
+Actual isolated Linux GIO/curl composition executes eighteen independent cases:
+fifteen pass, two fail functionality and one refuses its prerequisite. Both
+functional refusals admit the actual executable but reject its inode above the
+Lua safe-integer range. An unchanged replay with a byte-identical curl copy at
+an owned representable inode passes seventeen cases; the old-curl negative
+case still refuses because the required version below 8.7 is absent. No case
+is skipped, and both runs exit nonzero. This diagnoses the representability
+boundary; copying curl is not a production fix. The composition remains an
+unintegrated preparation. Exact descriptor identity, installed dependency
+closure, native document actions, per-hop PAC, updater retry ownership,
+installer/server/pull and enterprise CA/auth/WPAD still require qualification.
+The twelve Windows PC steps remain deferred; item 62 stays open.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
