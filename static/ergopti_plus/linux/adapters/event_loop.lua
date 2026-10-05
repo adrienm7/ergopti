@@ -183,6 +183,19 @@ local function _run_luv(opts)
 	local onIdle     = opts.onIdle
 	local onPeriodic = opts.onPeriodic
 	local periodSec  = tonumber(opts.periodSec) or 0.25
+	local periodMs
+	if onPeriodic then
+		-- Admit both units before clamping: libuv bindings can turn nonfinite
+		-- values into a dormant huge timer or an unintended 1 ms repeat.
+		if not NumberPolicy.is_finite(periodSec) then
+			error("Event loop periodic duration must be finite", 0)
+		end
+		periodMs = periodSec * 1000
+		if not NumberPolicy.is_finite(periodMs) then
+			error("Event loop periodic milliseconds must be finite", 0)
+		end
+		periodMs = math.max(1, math.floor(periodMs))
+	end
 
 	-- Idle handle: fires whenever the event loop has nothing else to do.
 	-- This replaces the tight while loop for keyboard-hook + tray pumping.
@@ -206,7 +219,6 @@ local function _run_luv(opts)
 
 	-- Periodic timer: drives process_lifecycle.tick() at a fixed interval.
 	if onPeriodic then
-		local periodMs = math.max(1, math.floor(periodSec * 1000))
 		_timer_handle = luv.new_timer()
 		if not _timer_handle then error("Unable to allocate event loop timer handle", 0) end
 		local timer_started, timer_error = NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
