@@ -4,7 +4,7 @@
 --- MODULE: Shared Lua Release Metadata Contract
 --- DESCRIPTION:
 --- Pins selected-object metadata, tag-wrapper order and established CR removal.
---- Windows still scans raw tag and publication-time fields and has historical notes wrapper/CR
+--- Windows still scans raw tag, publication-time and prerelease fields and has historical notes wrapper/CR
 --- differences. Universal notes escapes remain in the cross-driver corpus;
 --- this owner pins the Lua metadata contract without hiding those differences.
 --- ==============================================================================
@@ -189,6 +189,57 @@ local PUBLISHED = {
 		expected = "" },
 }
 
+local PRERELEASE = {
+	{ id = "escaped_true_key",
+		body = "{\"pre\\u0072elease\":true}",
+		expected = true },
+	{ id = "escaped_false_key",
+		body = "{\"pre\\u0072elease\":false}",
+		expected = false },
+	{ id = "nested_false_before_own_true",
+		body = "{\"author\":{\"prerelease\":false},\"prerelease\":true}",
+		expected = true },
+	{ id = "nested_true_before_own_false",
+		body = "{\"author\":{\"prerelease\":true},\"prerelease\":false}",
+		expected = false },
+	{ id = "nested_only",
+		body = "{\"author\":{\"prerelease\":true}}",
+		expected = false },
+	{ id = "null_field_nested_true",
+		body = "{\"author\":{\"prerelease\":true},\"prerelease\":null}",
+		expected = false },
+	{ id = "string_field",
+		body = "{\"prerelease\":\"true\"}",
+		expected = false },
+	{ id = "number_field",
+		body = "{\"prerelease\":1}",
+		expected = false },
+	{ id = "object_field",
+		body = "{\"prerelease\":{\"prerelease\":true}}",
+		expected = false },
+	{ id = "array_field",
+		body = "{\"prerelease\":[{\"prerelease\":true}]}",
+		expected = false },
+	{ id = "object_only_wrapper",
+		body = "[{\"prerelease\":true}]",
+		expected = false },
+	{ id = "malformed_trailing",
+		body = "{\"prerelease\":true} trailing",
+		expected = false },
+	{ id = "null_release",
+		body = "null",
+		expected = false },
+	{ id = "own_false_before_nested_true",
+		body = "{\"prerelease\":false,\"author\":{\"prerelease\":true}}",
+		expected = false },
+	{ id = "own_true_before_nested_false",
+		body = "{\"prerelease\":true,\"author\":{\"prerelease\":false}}",
+		expected = true },
+	{ id = "field_name_case_exact",
+		body = "{\"Prerelease\":true}",
+		expected = false },
+}
+
 --- Registers the shared Lua object and normalization contract in a driver suite.
 --- @param helpers table Case registration and assertions.
 --- @param Parser table Actual shared release parser under test.
@@ -238,6 +289,22 @@ function M.run(helpers, Parser)
 		for _, row in ipairs(PUBLISHED) do
 			helpers.it("parse_published_at: " .. row.id, function()
 				helpers.assert_eq(Parser.parse_published_at(row.body), row.expected, row.id)
+			end)
+		end
+	end)
+	helpers.describe("shared Lua release prerelease metadata contract", function()
+		helpers.it("parse_prerelease_flag: refuses nonstring input with one false Boolean", function()
+			helpers.assert_eq(#PRERELEASE, 16, "every prerelease metadata vector is retained")
+			for _, value in ipairs({ false, true, 1, {}, function() end }) do
+				helpers.assert_eq(Parser.parse_prerelease_flag(value), false, "release JSON must be a string")
+			end
+			helpers.assert_eq(Parser.parse_prerelease_flag(nil), false)
+			helpers.assert_eq(Parser.parse_prerelease_flag(""), false)
+			helpers.assert_eq(select("#", Parser.parse_prerelease_flag('{"prerelease":true}')), 1)
+		end)
+		for _, row in ipairs(PRERELEASE) do
+			helpers.it("parse_prerelease_flag: " .. row.id, function()
+				helpers.assert_eq(Parser.parse_prerelease_flag(row.body), row.expected, row.id)
 			end)
 		end
 	end)

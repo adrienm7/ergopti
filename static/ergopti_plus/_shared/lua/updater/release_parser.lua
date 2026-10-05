@@ -4,8 +4,8 @@
 --- MODULE: GitHub Release JSON Parser (Shared)
 --- DESCRIPTION:
 --- Pure functions for parsing GitHub Releases API JSON payloads. Tags, assets,
---- notes and publication times decode JSON to preserve metadata boundaries. Extracted
---- from macos/infra/updater.lua (parse_tag,
+--- notes, publication times and flags decode JSON at their metadata boundaries.
+--- Extracted from macos/infra/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
 --- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
 --- _Updater_SplitReleasesArray, _Updater_ParsePrerelease) so both drivers
@@ -98,12 +98,14 @@ function M.parse_published_at(body)
 end
 
 
---- Extracts the boolean "prerelease" flag from a release JSON object.
---- @param body string Raw JSON
+--- Extracts the selected release object's own boolean "prerelease" flag.
+--- Channel membership stays with the tag registry, independently of this flag.
+--- @param body string Raw single-release JSON object.
 --- @return boolean true if prerelease flag is true, false otherwise
 function M.parse_prerelease_flag(body)
-	if not body or body == "" then return false end
-	return body:match('"prerelease"%s*:%s*true') ~= nil
+	if type(body) ~= "string" or body == "" then return false end
+	local release = Json.decode(body)
+	return type(release) == "table" and release.prerelease == true
 end
 
 
