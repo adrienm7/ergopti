@@ -613,7 +613,7 @@ Test("toml config document writer: unchanged owned comments remain byte stable",
 _TBUI_ConfigExplicitNamespaceReplacement() {
 	Path := _TBUI_NewPath()
 	Source := Chr(0xFEFF) . '# source anchor`nhotstrings.modules.magickey = true`n[future]`nold = "001" # retained`n'
-	Expected := Chr(0xFEFF) . '# source anchor`nhotstrings.modules.magickey.enabled = false`n[future]`nold = "001" # retained`n'
+	Expected := Chr(0xFEFF) . '# source anchor`n[future]`nold = "001" # retained`n[hotstrings.modules.magickey]`nenabled = false`n'
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
 		Updates := [{ Section: "hotstrings.modules.magickey", Key: "enabled", Value: TOML_Bool(false) }]
@@ -754,3 +754,28 @@ _TBUI_ConfigNewNamespaceRetainsNativeReadability() {
 }
 Test("toml config document writer: first namespace publication retains native readback (config-semantic-native-readback)",
 	_TBUI_ConfigNewNamespaceRetainsNativeReadability)
+
+; Explicit replacement releases its source declarations before header admission.
+; These complete images are independent of the writer's rendered candidate.
+_TBUI_ConfigReplacedNamespaceRetainsNativeReadability() {
+	for OwnedSource in ['script = "obsolete"`n', '[script]`nlog_level = "INFO"`n', 'script = { log_level = "INFO" }`n'] {
+		Path := _TBUI_NewPath()
+		Source := Chr(0xFEFF) . "# source anchor`n" . OwnedSource . '[private]`nfuture = "keep" # retained`n'
+		Expected := Chr(0xFEFF) . '# source anchor`n[private]`nfuture = "keep" # retained`n[script]`nlog_level = "ERROR"`n'
+		try {
+			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			Updates := [{ Section: "script", Key: "log_level", Value: "ERROR" }]
+			Prefixes := ["script"]
+			Candidate := TOML_BuildConfigUpdatedContent(Path, Updates, Prefixes)
+			AssertEqual("ok", Candidate["status"])
+			AssertEqual(Expected, Candidate["content"])
+			AssertTrue(FSUtf8ExactMatches(Path, Source), "replacement preparation cannot publish")
+			AssertTrue(TOML_ConfigBatchWrite(Path, Updates, Prefixes))
+			AssertTrue(FSUtf8ExactMatches(Path, Expected))
+			AssertEqual("ERROR", TOML_Read(Path, "script", "log_level", "missing"))
+			AssertTrue(TOML_SameValue(TOML_ParseDocument(Expected), TOML_ParseDocument(FSReadUtf8Exact(Path))))
+		} finally FSDelete(Path)
+	}
+}
+Test("toml config document writer: explicit replacement releases native-readable headers (config-semantic-native-readback)",
+	_TBUI_ConfigReplacedNamespaceRetainsNativeReadability)

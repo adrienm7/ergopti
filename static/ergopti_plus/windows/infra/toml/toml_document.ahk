@@ -607,17 +607,25 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 
 	; Find the deepest surviving explicit table for each newly introduced leaf.
 	; Appending a root dotted row after a header would silently change its owner.
-	Headers := [], RecordIndex := 0
+	Headers := [], RecordIndex := 0, HeaderSource := ""
 	for PhysicalRecord in Physical {
 		if PhysicalRecord.Kind == "opaque"
 			throw ValueError("Cannot retain an unclassified configuration source record")
 		if PhysicalRecord.Kind == "header" {
 			Parts := _TOML_ConfigPath(PhysicalRecord.Section)
-			if !_TOML_ConfigPathDropped(Parts, Dropped)
-					&& SubStr(Trim(PhysicalRecord.Text), 1, 2) != "[["
+			if _TOML_ConfigPathDropped(Parts, Dropped)
+				continue
+			if SubStr(Trim(PhysicalRecord.Text), 1, 2) != "[["
 					&& !_ConfigTomlArrayMember(Document, Parts)
 				Headers.Push(Parts)
+		} else if PhysicalRecord.Kind == "assignment" {
+			RecordIndex += 1
+			if _TOML_ConfigPathDropped(Records[RecordIndex].Path, Dropped)
+				continue
 		}
+		if HeaderSource != "" && !RegExMatch(HeaderSource, "[\r\n]$")
+			HeaderSource .= "`n"
+		HeaderSource .= PhysicalRecord.Text
 	}
 	Pending := Map()
 	Pending.CaseSense := "On"
@@ -646,10 +654,11 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		; New sections need explicit headers for the still-live native flat reader.
 		; The semantic parser decides whether that declaration is legal: existing
 		; dotted or inline namespaces may already have closed the requested table.
+		; Explicit replacements first release only their classified physical owners.
 		if SectionParts.Length && !HeaderAdmission.Has(Identity) {
 			HeaderAdmission[Identity] := false
 			try {
-				TOML_ParseDocument(Source . "`n[" . Identity . "]`n")
+				TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
 				HeaderAdmission[Identity] := true
 			} catch ValueError {
 				; Existing physical ownership remains the only legal insertion route.
