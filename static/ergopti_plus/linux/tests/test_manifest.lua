@@ -189,6 +189,7 @@ return {
 	"tests.unit.meta.test_updater_check_schedule",
 	"tests.unit.meta.test_updater_constants_single_source",
 	"tests.unit.meta.test_updater_manager",
+	"tests.unit.meta.test_updater_release_json_admission",
 	"tests.unit.meta.test_updater_channel_and_recheck",
 	"tests.unit.meta.test_updater_restart",
 	"tests.unit.meta.test_updater_version_shared",
