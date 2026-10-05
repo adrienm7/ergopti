@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.ui.test_key_combinations_menu",
+	"tests.unit.infra.test_key_combinations_scope",
 	"tests.unit.modules.test_native_worker_owner",
 	"tests.unit.modules.test_window_switch_owner",
 	"tests.unit.modules.test_key_combinations",

@@ -34,6 +34,7 @@ function M.new(options)
 	end
 	local catalogue = options.actions or require("modules.gestures.manager")
 	local owner, state, lease, generation, busy = {}, nil, nil, 0, false
+	local delivery_fence
 	local function candidate(document, strict)
 		assert(type(document) == "table", "decoded canonical config required")
 		local shortcuts = document.shortcuts
@@ -87,6 +88,31 @@ function M.new(options)
 		local pair = type(binding) == "string" and binding:match("^combination__(.+)$")
 		return pair and known[pair] and "combination" or nil
 	end
+	function owner.get_hold(pair) return known[pair] and state.holds[pair] or Shared.NONE end
+	function owner.is_enabled() return state.enabled == true end
+	--- A private menu receipt; canonical bytes are never sent to the page.
+	function owner.capture_edit_source(token)
+		local function permitted() return delivery_fence == nil or type(token) == "table" and delivery_fence == token end
+		if busy or lease or not permitted() or options.is_paused() ~= false then return nil end
+		local prior, path, bytes, status = safe_read()
+		if not prior then return nil end
+		if prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) then return nil end
+		local captured, revision = state, generation
+		local receipt = { path = path, status = status, content = status == "ok" and bytes or nil }
+		receipt.guard = function()
+			if busy or lease or not permitted() or state ~= captured or generation ~= revision or options.is_paused() ~= false then return false end
+			local routed, current_path = pcall(route)
+			if not routed or current_path ~= path then return false end
+			local called, current, current_status = pcall(files.read_with_status,path)
+			local observed, paused = pcall(options.is_paused)
+			local final_route, final_path = pcall(route)
+			return called and current_status == status and (status ~= "ok" or current == bytes)
+				and final_route and final_path == path and not busy and not lease and permitted()
+				and state == captured and generation == revision and observed and paused == false
+		end
+		if receipt.guard() ~= true then return nil end
+		return receipt
+	end
 	function owner.engine_options(thresholds)
 		return { keys = clone(key_ids), taps = clone(state.taps), holds = clone(state.holds), thresholds = clone(thresholds),
 			enabled = state.enabled and lease == nil and options.is_paused() == false, revision = generation, capture = owner.capture_runtime, capture_action = owner.capture_action }
@@ -95,48 +121,68 @@ function M.new(options)
 		local ok,current = pcall(route); return ok and current == path
 	end
 	function owner.capture_runtime()
-		if busy or lease or not state.enabled or options.is_paused() ~= false then return nil end
+		if busy or lease or delivery_fence or not state.enabled or options.is_paused() ~= false then return nil end
 		local prior, path, bytes, status = safe_read()
 		if not prior or status ~= "ok" or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) then return nil end
 		local captured, revision = state, generation
 		return function()
-			if busy or lease or state ~= captured or generation ~= revision or options.is_paused() ~= false or not same_route(path) then return false end
+			if busy or lease or delivery_fence or state ~= captured or generation ~= revision or options.is_paused() ~= false or not same_route(path) then return false end
 			local current_ok, current, current_status = pcall(files.read_with_status,path)
 			-- Native route and pause getters may acquire a new configuration lease.
 			-- Check private currency only after every external callback has returned.
 			local pause_ok, paused = pcall(options.is_paused)
 			local routed = same_route(path)
 			return current_ok and current_status == "ok" and current == bytes and pause_ok and paused == false and routed
-				and not busy and lease == nil and state == captured and generation == revision
+				and not busy and lease == nil and delivery_fence == nil and state == captured and generation == revision
 		end
 	end
 	function owner.capture_action(binding, action)
 		local pair = type(binding) == "string" and binding:match("^combination__(.+)$")
-		if busy or lease or not pair or not known[pair] or state.taps[pair] ~= action
+		if busy or lease or delivery_fence or not pair or not known[pair] or state.taps[pair] ~= action
 			or not state.enabled or options.is_paused() ~= false then return nil end
 		local prior, path, bytes, status = safe_read()
 		if not prior or status ~= "ok" or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps)
 			or not equal(prior.holds,state.holds) then return nil end
 		local revision, captured = generation, state
 		return function()
-			if busy or lease or state ~= captured or generation ~= revision or not state.enabled
+			if busy or lease or delivery_fence or state ~= captured or generation ~= revision or not state.enabled
 				or options.is_paused() ~= false or state.taps[pair] ~= action or not same_route(path) then return false end
 			local current_ok, current, current_status = pcall(files.read_with_status,path)
 			local pause_ok, paused = pcall(options.is_paused)
 			local routed = same_route(path)
 			return current_ok and current_status == "ok" and current == bytes and pause_ok and paused == false and routed
-				and not busy and lease == nil and state == captured and generation == revision and state.enabled and state.taps[pair] == action
+				and not busy and lease == nil and delivery_fence == nil and state == captured and generation == revision and state.enabled and state.taps[pair] == action
 		end
 	end
 	function owner.acquire_configuration(token)
-		if type(token) ~= "table" or busy or lease ~= nil and lease ~= token then return false end
+		if type(token) ~= "table" or busy or lease ~= nil and lease ~= token
+			or delivery_fence ~= nil and delivery_fence ~= token then return false end
 		lease, generation, busy = token, generation + 1, true
 		local ok, stopped = pcall(options.changed)
 		busy = false
 		if not ok or stopped ~= true then return false end
 		return true
 	end
+	--- Stages native installation without admitting delivery during terminal callbacks.
+	function owner.acquire_delivery_fence(token)
+		if type(token) ~= "table" or token ~= lease or busy
+			or delivery_fence ~= nil and delivery_fence ~= token then return false end
+		delivery_fence = token; return true
+	end
+	function owner.owns_delivery_fence(token) return type(token) == "table" and delivery_fence == token end
+	--- The final private ACK has no external callbacks after it opens delivery.
+	function owner.release_delivery_fence(token)
+		if type(token) ~= "table" or delivery_fence ~= token or lease ~= nil or busy then return false end
+		delivery_fence = nil; return true
+	end
 	function owner.configuration_pending() return lease ~= nil end
+	function owner.owns_configuration(token) return type(token) == "table" and lease == token end
+	function owner.validate_slot(kind, pair, value)
+		if not known[pair] or type(value) ~= "string" then return false end
+		if kind == "tap" then return value == "none" or catalogue.is_assignable(value) == true end
+		if kind == "hold" then return holds[value] == true end
+		return false
+	end
 	function owner.release_configuration(token)
 		if token ~= lease or busy then return false end
 		-- Resume only after the current desired state is physically installed.
@@ -146,6 +192,30 @@ function M.new(options)
 		busy = false
 		if not ok or installed ~= true then lease = prior; return false end
 		return true
+	end
+	--- Reads a coherent source frame while the exact native lease is held.
+	function owner.configuration_source(token)
+		if token ~= lease or busy or options.is_paused() ~= false then return nil end
+		local captured, revision = state, generation
+		local prior, path, bytes, status = safe_read()
+		local observed, paused = pcall(options.is_paused)
+		local routed, current_path = pcall(route)
+		if not prior or not routed or current_path ~= path or not observed or paused ~= false
+			or token ~= lease or busy or state ~= captured or generation ~= revision
+			or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) then return nil end
+		return {path=path,status=status,content=status == "ok" and bytes or nil}
+	end
+	--- Checks source identity after external native callbacks without requiring
+	--- the candidate state to equal the previous unpublished runtime snapshot.
+	function owner.configuration_source_matches(token, source)
+		if token ~= lease or busy or type(source) ~= "table" or options.is_paused() ~= false then return false end
+		local captured, revision = state, generation
+		local prior, path, bytes, status = safe_read()
+		local observed, paused = pcall(options.is_paused)
+		local routed, current_path = pcall(route)
+		return prior ~= nil and routed and current_path == path and observed and paused == false
+			and path == source.path and status == source.status and (status ~= "ok" or bytes == source.content)
+			and token == lease and not busy and state == captured and generation == revision
 	end
 	function owner.configuration_snapshot(token)
 		if lease ~= token then return nil end
@@ -172,8 +242,8 @@ function M.install(options)
 	instance = M.new(options)
 	return true
 end
-for _, name in ipairs({"get_action","has_bindings","configuration_domain","capture_action","engine_options",
-	"capture_runtime","configuration_pending","acquire_configuration","release_configuration","configuration_snapshot","configuration_candidate","apply_configuration"}) do
+for _, name in ipairs({"get_action","get_hold","is_enabled","capture_edit_source","has_bindings","configuration_domain","capture_action","engine_options",
+	"capture_runtime","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","configuration_pending","owns_configuration","validate_slot","acquire_configuration","release_configuration","configuration_snapshot","configuration_source","configuration_source_matches","configuration_candidate","apply_configuration"}) do
 	M[name] = function(...)
 		if not instance then return name == "get_action" and "none" or nil end
 		return instance[name](...)

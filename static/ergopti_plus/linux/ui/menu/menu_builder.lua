@@ -250,14 +250,14 @@ end
 --- @param on_confirm function Transactional assignment callback, given the action
 ---   id and the value the picker's editor collected, if any.
 --- @return boolean opened
-local function open_action_picker(title, current, binding, on_confirm)
+local function open_action_picker(title, current, binding, on_confirm, selected_items)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
 	if not ok_picker or type(Picker.open) ~= "function" or not ok_gestures then
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false
 	end
-	local items = Gestures.get_picker_items()
+	local items = type(selected_items) == "table" and selected_items or Gestures.get_picker_items()
 	local editor = Gestures.get_picker_parameter_fields(items, binding)
 	return Picker.open({
 		title = title,
@@ -3410,6 +3410,30 @@ local function _build_shortcuts(ctx)
 	-- narrowed to the chords; the clear writes "none" in every slot, since an
 	-- absent slot starts with its preset. The title is ticked from the switch.
 	local group_builders = {}
+	group_builders["key_combinations"] = function()
+		return require("ui.menu.key_combinations").build(ctx, {
+			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
+				local label = i18n_safe(entry.label_key); return label == entry.label_key and entry.id or label
+			end,
+			action_label = function(action, gestures) return gestures.get_action_label(action) end,
+			open_picker = open_action_picker, error = show_error,
+			prompt_hold = function(label, current, choices)
+				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
+			end,
+			parameter = function(context, gestures, binding, action, spec)
+				local prior = gestures.get_action_parameter(binding, action)
+				if type(context.prompt_action_parameter) == "function" then
+					return context.prompt_action_parameter(binding, action, spec, prior)
+				end
+				if spec == "program" then return nil end
+				if spec == "app" then
+					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
+				end
+				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
+				return prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+			end,
+		})
+	end
 	group_builders["script_control"] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
 		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
@@ -3548,6 +3572,9 @@ local function _build_shortcuts(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
+	sc_ctx.state_getters["key_combinations_enabled"] = function()
+		return require("modules.shortcuts.key_combinations").is_enabled() == true
+	end
 	-- Ticks « Raccourcis de gestion du script » while its switch is on.
 	sc_ctx.state_getters["script_control_enabled"] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")

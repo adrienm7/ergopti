@@ -4227,8 +4227,9 @@ This deferral does not complete this item or the cross-cutting items16/38.
       physical keys through the same catalogue and invalidates its picker
       cache when the locale changes. The complete 182-entry native matrix,
       action IDs, press order and setter refusal boundaries stay unchanged;
-      the three script-management pairs remain hidden. Linux still has no
-      combination engine and retains the shared availability reason. The
+      the three script-management pairs remain hidden. Linux now provides
+      shared labelled ordered tap/hold pairs; simultaneous chords remain
+      unavailable under the existing translated platform reason. The
       real macOS provider regression covers all 21 locales; shared contracts
       also replay each driver's physical catalogue. Native CI qualification
       remains pending. Find which action left the French magic-key category
@@ -4416,8 +4417,25 @@ This deferral does not complete this item or the cross-cutting items16/38.
   owner and pass after final private currency checks. This first tranche supports ordered tap and hold pairs on one exact
   keyboard, with modifier restoration and source/retirement fences.
   Simultaneous chords, cross-device pairs, native-only caps_word and
-  one_shot_shift actions remain unavailable. Source publication, menu and
-  manifest admission are separate pending tranches. Native hosted input,
+  one_shot_shift actions remain unavailable. The ordered-pair menu and
+  generated manifest now admit the reviewed Linux configuration scope.
+  Its staged delivery fence prevents native output while any participant
+  can still refuse publication or retain inverse debt. Final route currency
+  is checked after pause observations. Reviewed controlled scope/owner
+  fixtures pass 50 scope and 49 pair-owner cases per Lua ABI; six actual
+  menu controls preserve the full 182-pair matrix through a bounded native
+  hold picker. The unchanged whole-tray ceiling is respected: 2,291 rows
+  instead of 8,297. Linux onboarding No explicitly disables its independent
+  pair owner even on a first run or while ordinary shortcuts are off;
+  existing tray choices survive Yes without a new import. Formatting and
+  all 360 JavaScript checks pass, portable macOS units pass 14,895/0 and
+  Linux E2E passes 189/0. The normal-JIT, uninstrumented composed Linux
+  suite passes 8,156/0 across 393 registered modules. Fixture-owned native
+  library caches survive suite restoration, and actual window-action tests
+  use scoped SDK admission rather than accidentally opening GTK headlessly.
+  Portable macOS E2E passes 101 cases with one native-host skip.
+  Global bulk clear/recommended composition
+  awaits the physical shortcut scope tranche. Native hosted input,
   packaging, installation and physical acceptance remain unqualified.
 
 Windows continuation for item93 (explicitly deferred to the maintainer's PC):
