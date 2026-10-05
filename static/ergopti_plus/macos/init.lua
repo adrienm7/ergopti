@@ -1216,11 +1216,10 @@ if mlx_deps_checker.configure_pause_owner(shortcuts) ~= true
 	error("dependency bootstrap pause-owner registration did not commit")
 end
 
--- Fast-path LLM check: if LLM is explicitly disabled in hs.settings, skip the
--- synchronous MLX cleanup (lsof + curl) — its sole consumer is the warmup retry
--- loop which is also gated on LLM being enabled. When the setting is nil (user
--- has never set it), be conservative and run the cleanup so stale servers are
--- evicted regardless. This is a deliberately separate, quick gate; the full
+-- Fast-path LLM check: only admitted native opt-in permits the MLX cleanup
+-- (lsof + curl), whose warmup retry consumer is also gated on LLM being enabled.
+-- Absent or obsolete settings stay untouched and skip this early cleanup.
+-- This is a deliberately separate, quick gate; the full
 -- boot_llm_enabled computation (including the saved-prefs / DEFAULT_STATE
 -- fallback) runs later in Section 3. Named distinctly so the two never shadow
 -- each other and the intent of each is unambiguous.
@@ -1232,7 +1231,7 @@ end
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = Storage.get("llm.enabled") ~= false
+local mlx_cleanup_enabled = config_overrides.read_native_value("llm.enabled") == true
 local mlx_cleanup_settled = not mlx_cleanup_enabled
 local pending_llm_bootstrap = nil
 
@@ -1317,7 +1316,7 @@ end
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = Storage.get("llm.enabled")
+local boot_llm_enabled = config_overrides.read_native_value("llm.enabled")
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled

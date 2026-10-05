@@ -3407,6 +3407,8 @@ The 2026-10-05 continuation preserves malformed shortcut-order source rows and s
 
 The declared macOS-only optional user-model list now reports obsolete scalar source once, keeps it outside runtime and unmarked for explicit cleanup, and preserves it during unrelated default-carried saves and published scope clear. A nonneutral replacement refuses before publication until explicit source repair. All original assertions remain; real typed-file oracles retain signed integers, precise floats, offset dates, literal dots and nested arrays. Linux has no supported owner for this leaf and preserves it; native Windows was inspected only. This bounded correction does not finish the remaining configuration catalogue.
 
+Persisted macOS llm.enabled now uses the actual published feature value validator before cleanup and bootstrap. Obsolete native text/numbers/containers warn once and cannot supply consent; values and TOML remain untouched until explicit cleanup. Valid true/false precedence, independently valid canonical fallback and logger ERROR are preserved. Independent actual-owner/compiled-init controls pass67/0 versus exact predecessor44/23; all44 prior cases and their assertions remain byte-exact. Equivalent typed Windows/Linux seams were inspected without duplicate changes. Actual Hammerspoon and final source/installed qualification remain required.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
