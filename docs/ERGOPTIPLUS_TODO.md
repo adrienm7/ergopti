@@ -3064,6 +3064,15 @@ and the original changed-error ETag E2 stimulus is restored as a seventh case;
 its canonical E1 assertion remains mandatory. Final composed gates and native
 qualification are tracked separately; no lost stimulus is called unchanged.
 
+The latest dev composition at a550193 preserves the configuration inverse and
+private hotstring receipt protocols. Its selected local Linux suite passes7,805/0;
+the twelve macOS portable failures reproduce the dev baseline. Three scenario
+fixtures now explicitly own the strict UTF-8 shim they transitively import, and
+the native JSON stub decodes standard backspace/form-feed escapes as bytes08/0C.
+The production decoder, frozen corpus and every original cache-residue assertion
+remain unchanged. Independent byte and literal-backslash controls distinguish the
+old stub before correction; final full-suite and hosted receipts are separate.
+
 The maintainer now explicitly requests delivery into dev after feasible container
 and CI work, with genuine remaining native/device failures documented rather than
 holding the feature indefinitely. Follow the [device/native continuation](handovers/2026-10-04-parallel-containers/GROUP2-DEVICE-TODO.md)
@@ -3072,9 +3081,10 @@ assertions and cross-cutting item38 remain required.
 
 The [Group 2 integration checkpoint](handovers/2026-10-04-parallel-containers/GROUP2-INTEGRATION-STATUS.md)
 records exact candidate/CI SHAs, passed/failed/skipped results and the remaining
-native and Windows continuation. No final integration lock, shared validation
-movement or dev merge has occurred; the published feature branch is retained
-until mandatory native packaging/installation qualification succeeds.
+native and Windows continuation. Final integration uses the owned empty-commit
+lock and shared validation branch. The maintainer explicitly authorizes partial
+delivery and feature deletion after the terminal integrated CI result, with
+remaining failures and device acceptance preserved as concrete TODO steps.
 
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings

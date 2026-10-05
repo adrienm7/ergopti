@@ -10,6 +10,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
+	"compat.utf8",
 	"actions.assignable",
 	"_generated.action_catalogue",
 	-- The shared script chords' paused actions, read by the control-plane

@@ -54,8 +54,8 @@ SHA, then physical input/refusal recovery and all 21 translated menus.
 - [ ] The native HTTP owner must repair HTTP503 E2 publication on Curl8.5 while
       keeping canonical E1, preserving successful/truncated200 E2 observations,
       refusing cached-page use after transfer failure and preserving private
-      native ownership/cleanup debt. Original six cases stay unchanged. Actual
-      Curl8.14 passes6/0 locally; hosted Curl8.5 previously fails one case.
+      native ownership/cleanup debt. Keep all seven cases, including the original E2-on-503 counterexample
+      and the new E1-on-503 version control. Actual Curl8.14 passes7/0 locally; hosted Curl8.5 previously fails one case.
 - [ ] Preserve the now-qualified audio and notification prerequisite receipts:
       manual37274473330 confirms audio6/0 on each interpreter and notifications
       13/0 on Ubuntu1.9.2. Absence of real gettext gives6/4 locally. Final integrated
