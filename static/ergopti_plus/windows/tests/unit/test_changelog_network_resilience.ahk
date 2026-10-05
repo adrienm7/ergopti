@@ -180,7 +180,11 @@ _CNR_PacFailureKeepsStaticProxy() {
 	_SYSTEM_PROXY_PAC_CACHE := Map()
 	Spawned := []
 	Terminated := []
-	Handle := { start: (*) => true, terminate: (*) => Terminated.Push(1) }
+	Terminate(*) {
+		Terminated.Push(1)
+		return true
+	}
+	Handle := { start: (*) => true, terminate: Terminate }
 	FakeSpawn(Exe, Args, OnDone) {
 		Spawned.Push(OnDone)
 		return Handle
