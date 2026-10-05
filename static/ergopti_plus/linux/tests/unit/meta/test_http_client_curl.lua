@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, handles = {}, requests = {}, closes = {} }
+	local state = { kills = {}, handles = {}, requests = {}, closes = {}, refused_closes = {} }
 	local fake = {}
 
 	local function handle(kind)
@@ -48,6 +48,13 @@ local function fake_luv(config)
 	function fake.read_stop(pipe) pipe.read_stopped = true; return true end
 	function fake.is_closing(value) return value.closing end
 	function fake.close(value, callback)
+		if options.refused_close_callback and not state.allow_closes then
+			state.refused_closes[#state.refused_closes + 1] = callback
+			if options.refused_close_sync then callback() end
+			if options.refused_close_callback == "throw" then error("close refused") end
+			if options.refused_close_callback == "false" then return false end
+			return nil, "close refused"
+		end
 		if options.close_failure and not state.allow_closes then return nil, "close refused" end
 		value.closing = true
 		if callback then
@@ -1201,6 +1208,53 @@ helpers.describe("http_client: cancellation receipt boundary", function()
 end)
 
 helpers.describe("http_client: retained GET settlement", function()
+	for _, refusal in ipairs({ "false", "error", "throw" }) do
+		for _, synchronous in ipairs({ false, true }) do
+			helpers.it("owned-close-admission: refused " .. refusal .. " callback (sync=" .. tostring(synchronous) .. ")", function()
+				local client, state = fresh_client({
+					refused_close_callback = refusal, refused_close_sync = synchronous, defer_close = true,
+				})
+				local terminals, settlements = 0, 0
+				local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+					{ owner = "local-api" }, function() terminals = terminals + 1 end)
+				operation:on_settled(function() settlements = settlements + 1 end)
+				state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+				for _, callback in ipairs(state.refused_closes) do callback() end
+				helpers.assert_eq(operation:is_settled(), false, "a refused close callback cannot release its handle")
+				helpers.assert_eq(terminals, 0)
+				helpers.assert_eq(settlements, 0)
+				local successor = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+					{ owner = "local-api" }, function() end)
+				helpers.assert_eq(successor.started, false, "the exact owner retains unacknowledged resources")
+				state.allow_closes = true
+				helpers.assert_eq(operation:cancel(), false)
+				for _, callback in ipairs(state.refused_closes) do callback() end
+				helpers.assert_eq(operation:is_settled(), false, "an old attempt cannot acknowledge its accepted successor")
+				state.ack_closes()
+				helpers.assert_true(operation:is_settled())
+				helpers.assert_eq(settlements, 1)
+				helpers.assert_eq(terminals, 0, "cancellation suppresses the retained success")
+				state.ack_closes()
+				helpers.assert_eq(settlements, 1)
+			end)
+		end
+	end
+
+	helpers.it("owned-close-admission: accepted synchronous callbacks settle exactly once", function()
+		local client, state = fresh_client()
+		local terminals, settlements = 0, 0
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() terminals = terminals + 1 end)
+		operation:on_settled(function() settlements = settlements + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_eq(settlements, 1)
+		state.ack_closes()
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_eq(settlements, 1)
+	end)
+
 	helpers.it("owned GET waits for actual exit and every native close acknowledgment", function()
 		local client, state = fresh_client({ defer_close = true })
 		local terminals, settled, result = 0, 0, nil

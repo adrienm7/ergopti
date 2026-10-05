@@ -70,13 +70,25 @@ local function close_handle(handle, request)
 		-- Another actor's scheduled close is not our closure acknowledgment.
 		if not ok_closing or closing then return false end
 		receipt.state = "closing"
+		local attempt = { admitted = false, callback_seen = false }
+		receipt.attempt = attempt
 		local ok, accepted, err = pcall(luv.close, handle, function()
-			receipt.state = "closed"
-			settle_owned(request)
+			if receipt.attempt ~= attempt then return end
+			attempt.callback_seen = true
+			if attempt.admitted then
+				receipt.state = "closed"
+				settle_owned(request)
+			end
 		end)
 		if not ok or accepted == false or err ~= nil then
-			if receipt.state ~= "closed" then receipt.state = "open" end
+			receipt.attempt = nil
+			receipt.state = "open"
 			return false
+		end
+		attempt.admitted = true
+		if attempt.callback_seen then
+			receipt.state = "closed"
+			settle_owned(request)
 		end
 		return true
 	end
