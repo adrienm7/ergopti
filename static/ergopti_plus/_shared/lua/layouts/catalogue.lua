@@ -270,6 +270,28 @@ local function installed_entry_problem(id, entry)
 	if type(entry.sha256) ~= "string" or type(entry.version) ~= "string" then
 		return "it has no verified sha256 and version"
 	end
+	if entry.extension ~= nil then
+		local extension = entry.extension
+		if type(extension) ~= "table" or Json.is_null(extension) or Json.is_array(extension) then
+			return "its extension is not an object"
+		end
+		-- The published validator checks inventory contents; retain lossless
+		-- object/array identity here before its generic table checks run.
+		local files = extension.files
+		if type(files) == "table" and not Json.is_null(files) then
+			local count, length = 0, #files
+			for index, file in pairs(files) do
+				if type(index) ~= "number" or index < 1 or index > length or index % 1 ~= 0
+					or type(file) ~= "table" or Json.is_null(file) or Json.is_array(file) then
+					return "its extension files are not an array of objects"
+				end
+				count = count + 1
+			end
+			if count ~= length then return "its extension files are not a complete array" end
+		end
+		local valid, reason = Extension.validate(entry)
+		if not valid then return "its extension is unusable: " .. reason end
+	end
 	return nil
 end
 
@@ -336,6 +358,30 @@ local function writable_copy(record)
 	return copy
 end
 
+-- Fields supplied by the published layout index are replaced as one verified
+-- entry. Omitted future fields have no owner in this build and remain source
+-- data; omitted owned fields must not revive an older extension or metadata.
+local INSTALLED_ENTRY_FIELDS = {
+	id = true, name = true, family = true, keyboard_name = true,
+	version = true, file = true, sha256 = true, size = true,
+	licence = true, homepage = true, author = true,
+	languages = true, variants = true, platforms = true,
+	keycode_convention = true, source_url = true, extension = true,
+	source_sha256 = true, licence_file = true, xkb = true,
+}
+
+local function overlay_verified_entry(installed, entry)
+	local copy = copy_json_value(entry)
+	if installed then
+		for key, value in pairs(installed) do
+			if not INSTALLED_ENTRY_FIELDS[key] and entry[key] == nil then
+				copy[key] = copy_json_value(value)
+			end
+		end
+	end
+	return copy
+end
+
 --- A copy of the record with one entry added or replaced, to write.
 --- @param record table
 --- @param entry table Registry index entry the installed copy was verified against.
@@ -345,7 +391,8 @@ function M.with_installed(record, entry)
 	for id, installed in pairs(record.layouts) do
 		if not _installed_sources[copy].outdated[id] then copy.layouts[id] = copy_json_value(installed) end
 	end
-	copy.layouts[entry.id] = copy_json_value(entry)
+	local installed = not _installed_sources[copy].outdated[entry.id] and record.layouts[entry.id] or nil
+	copy.layouts[entry.id] = overlay_verified_entry(installed, entry)
 	-- A verified same-id install explicitly replaces an obsolete row. A later
 	-- builder must not resurrect that original row after this acknowledged edit.
 	_installed_sources[copy].outdated[entry.id] = nil

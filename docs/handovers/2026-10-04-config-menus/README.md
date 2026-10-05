@@ -124,6 +124,24 @@ and 101 macOS E2E checks with one host-specific skip. Hosted native,
 package/install and physical qualification remain pending; no TODO item is
 removed.
 
+## Continuation: installed-layout record updates
+
+Two independently reviewed additive packets apply after the original Lua
+installed-record preservation packet. Their exact hashes are
+`080142101ff4cf8dc5bda79c07eed31bb75b3179e1841db0d71f5725e7d5efa2`
+and `32ba6fc0355f461e517746c955d58e47ce22e1df4a893b15314ea203576e4b3a`.
+Verified same-id updates preserve omitted future members without reviving old
+owned metadata or obsolete predecessors. Invalid optional extension rows remain
+ignored and preserved before native root discovery. All earlier registered
+tests retain their byte prefixes; the new complete expected models are
+handwritten. Focused checks pass 98 macOS and 88 Linux cases on each available
+Lua runtime. Selected executable local gates pass formatting, 357 JS checks,
+14,202 portable macOS and 6,758 Linux unit cases, 101 macOS E2E checks with
+one host-specific skip, and 188 Linux E2E checks. The selected AHK unit gate
+is not executed on this host. Hosted native/package/install qualification
+remains pending; these Lua-only corrections do not qualify the separate
+Windows record owner.
+
 ## Integration coordination
 
 Feature CI may run concurrently on each group's dedicated branch.
