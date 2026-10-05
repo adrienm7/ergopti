@@ -1882,6 +1882,29 @@ These are software implementations; final hardware verification remains below.
   No collection policy, cache/flush, persistence, reserved surface or physical
   keyboard validation change.
 
+- [~] **L125.** Linux fractional WPM persistence: serialize the admitted rate
+  as a double instead of an integer. A real two-character collector flush with
+  1300 ms elapsed stored 18 instead of 240/13 WPM under LuaJIT; Lua 5.4 threw
+  before writing the raw batch. Keep the shared formula, caller data, ID cursor,
+  dates, other SQL columns and all prior category/metadata/histogram fixes intact.
+  Thirteen real collector/Writer/SQLite checks reproduce nine LuaJIT failures
+  and the Lua 5.4 production exception, then pass under current LuaJIT, signed
+  Ubuntu 22.04 luv/libuv dependencies and Lua 5.4. SQLite/kernel/libc stay current
+  in the mixed profile. Seven independently specified native scalar controls
+  cover fractions, numeric text, integers, zero and existing invalid-text fallback;
+  the first collector check also retains the shared computation assertion.
+  Nonfinite serialization now receives a genuine SQLite refusal instead of an
+  acknowledged coerced integer; unchanged accepted rows and healthy retry are
+  checked, without claiming ID rollback or whole-flush atomicity. Six registered
+  unit cases reproduce three failures and pass on both runtimes. Every original
+  assertion remains intact; existing histogram/category/metadata native fixtures
+  also pass under all three configurations. Register future Linux CI without
+  launching it. macOS and Windows retain their existing one-decimal WPM policy
+  and numeric SQL serialization by source inspection; their native checks remain
+  with the principal agent. Software collector calls are synthetic input and do
+  not validate physical keyboards. No formula, schema, collection, persistence,
+  reserved policy or foreign driver change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
