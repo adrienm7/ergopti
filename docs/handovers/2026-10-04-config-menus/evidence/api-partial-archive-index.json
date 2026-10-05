@@ -1,0 +1,32 @@
+[
+	{
+		"path": "prepared/group1-partial-preparations-2026-10-05.zip",
+		"bytes": 990877,
+		"sha256": "49f706120c8b14a2475524d1ab5bc80557f7e196cd65883ff44e600d4a091561",
+		"status": "inactive preparation; not integrated implementation"
+	},
+	{
+		"path": "prepared/group1-delay-inactive-889091244.zip",
+		"bytes": 448120,
+		"sha256": "7b9881dc870719b112dc41773081031f1582f6dfdb18e99bd35e5b517944b93f",
+		"status": "inactive preparation; not integrated implementation"
+	},
+	{
+		"path": "prepared/full-group1-wrap-handoff.tar.gz",
+		"bytes": 281151,
+		"sha256": "baa4be72c5395b33a67071f7ba6591e2c94185eb334683cd1fd7e965ec0895c0",
+		"status": "inactive preparation; not integrated implementation"
+	},
+	{
+		"path": "evidence/api-partial-local-logs.zip",
+		"bytes": 773167,
+		"sha256": "23f29fa2faf06d21f7c03e341ec32650e3a23a8f296468d5582319dab134a278",
+		"status": "actual local qualification evidence; initial failure retained"
+	},
+	{
+		"path": "evidence/api-partial-hosted-logs.zip",
+		"bytes": 378521,
+		"sha256": "96d0f4589f919b4defffdb8562961999a5fa589924ebdfc72a1ae56391848a3c",
+		"status": "terminal failed hosted qualification, native stdout and exact local baseline replay"
+	}
+]
