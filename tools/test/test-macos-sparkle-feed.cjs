@@ -927,7 +927,7 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 20 tests in /);
+	assert.match(result.stderr, /Ran 23 tests in /);
 	const skipped = process.platform === 'win32' ? 5 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
@@ -1000,6 +1000,19 @@ try {
 		/Set\(packet.keys\) == Set\(\["schema", "code", "helper_pid", "stage"\]\)/
 	);
 	assert.match(annotation, /\["private-root", "library", "inventory", "unexpected"\]/);
+	assert.match(
+		annotation,
+		/Set\(packet.keys\) == Set\(\["schema", "code", "helper_pid", "reason"\]\)/
+	);
+	assert.match(annotation, /integer\("schema", maximum: 4\) == 4/);
+	assert.match(
+		annotation,
+		/\["metadata", "missing", "not-absolute", "not-directory", "mode", "owner", "canonical"\]/
+	);
+	assert.match(
+		annotation,
+		/XCTFail\("Native Sparkle census refusal: code=directory-refused helper_pid=/
+	);
 	assert.match(fixture, /XCTFail\("Native Sparkle census refusal: code=diagnostic-unavailable"\)/);
 
 	assert.doesNotMatch(

@@ -248,6 +248,15 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				value.doubleValue == Double(value.int64Value) else { return nil }
 			return value.int64Value
 		}
+		if packet["code"] as? String == "directory-refused" {
+			let reasons: Set<String> = ["metadata", "missing", "not-absolute", "not-directory", "mode", "owner", "canonical"]
+			guard integer("schema", maximum: 4) == 4,
+				Set(packet.keys) == Set(["schema", "code", "helper_pid", "reason"]),
+				let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
+				let reason = packet["reason"] as? String, reasons.contains(reason) else { return false }
+			XCTFail("Native Sparkle census refusal: code=directory-refused helper_pid=\(helperPID) reason=\(reason)")
+			return true
+		}
 		if packet["code"] as? String == "stage-refused" {
 			let stages: Set<String> = ["private-root", "library", "inventory", "unexpected"]
 			guard integer("schema", maximum: 3) == 3,

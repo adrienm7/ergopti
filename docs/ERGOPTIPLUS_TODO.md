@@ -1980,6 +1980,18 @@ Python controls and existing Swift assertion lines are retained. Twenty
 portable helper controls and ten focused evidence-owner assertions pass;
 these diagnostics do not prove a native cause or qualify the archive lifecycle.
 
+Manual macOS run 37252222886 tests 94924d9e8c7539944d6838da2306b21cf622eeca
+and identifies the Sparkle census refusal at private-root admission. It does
+not identify the rejected predicate or prove an archive/update lifecycle.
+A bounded directory diagnostic now names only the first original metadata,
+missing, absolute-path, directory-kind, mode, owner or canonical-path boundary.
+The same single metadata snapshot and short-circuit predicates preserve their
+order, original exception and refusal. No permission repair, PID exception or
+raw metadata/path is added. All twenty prior Python controls and fifty-five
+Swift assertion lines remain intact; twenty-three portable controls and twelve
+annotation-owner checks pass. Native macOS directory facts and the full
+Sparkle/Brew packaging/install cohort remain pending; item 36 stays open.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

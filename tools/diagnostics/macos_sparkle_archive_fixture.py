@@ -143,16 +143,34 @@ def publish(path, value):
 def private_directory(path):
     """Admit only a physical, exclusively writable private fixture directory."""
     path = Path(path)
-    metadata = path.lstat()
-    if (
-        not path.is_absolute()
-        or not stat.S_ISDIR(metadata.st_mode)
-        or stat.S_IMODE(metadata.st_mode) != 0o700
-        or metadata.st_uid != os.geteuid()
-        or path.resolve() != path
-    ):
-        raise RuntimeError("Private Sparkle directory refused")
-    return path
+    reason = "metadata"
+
+    def observed(fact, predicate):
+        nonlocal reason
+        reason = fact
+        return predicate()
+
+    try:
+        metadata = path.lstat()
+        if (
+            observed("not-absolute", lambda: not path.is_absolute())
+            or observed("not-directory", lambda: not stat.S_ISDIR(metadata.st_mode))
+            or observed("mode", lambda: stat.S_IMODE(metadata.st_mode) != 0o700)
+            or observed("owner", lambda: metadata.st_uid != os.geteuid())
+            or observed("canonical", lambda: path.resolve() != path)
+        ):
+            raise RuntimeError("Private Sparkle directory refused")
+        return path
+    except Exception as failure:
+        # The same snapshot and short-circuit predicates retain their refusal.
+        # Only a fixed fact is attached; the original type/message/errno survive.
+        if reason == "metadata" and isinstance(failure, FileNotFoundError):
+            reason = "missing"
+        try:
+            failure._sparkle_directory_reason = reason
+        except Exception:
+            pass
+        raise
 
 
 def serve(root, nonce):
@@ -310,12 +328,24 @@ def main(arguments):
 
 
 CENSUS_FAILURE_STAGES = frozenset({"private-root", "library", "inventory", "unexpected"})
+DIRECTORY_FAILURE_REASONS = frozenset(
+    {
+        "metadata",
+        "missing",
+        "not-absolute",
+        "not-directory",
+        "mode",
+        "owner",
+        "canonical",
+    }
+)
 
 
 def census_stage_packet(failure):
     """Admit only a closed census stage, never an exception string or path."""
     try:
         stage = getattr(failure, "_sparkle_census_stage", None)
+        reason = getattr(failure, "_sparkle_directory_reason", None)
         helper_pid = os.getpid()
     except Exception:
         return None
@@ -326,7 +356,20 @@ def census_stage_packet(failure):
         or not 0 < helper_pid <= 2147483647
     ):
         return None
-    return {"schema": 3, "code": "stage-refused", "helper_pid": helper_pid, "stage": stage}
+    if stage == "private-root":
+        if type(reason) is str and reason in DIRECTORY_FAILURE_REASONS:
+            return {
+                "schema": 4,
+                "code": "directory-refused",
+                "helper_pid": helper_pid,
+                "reason": reason,
+            }
+    return {
+        "schema": 3,
+        "code": "stage-refused",
+        "helper_pid": helper_pid,
+        "stage": stage,
+    }
 
 
 def entrypoint(arguments):
