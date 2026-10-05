@@ -687,3 +687,46 @@ helpers.describe("Linux About channel durable receipts", function()
 		end)
 	end
 end)
+
+
+local function with_version_fragment(rows, body)
+	local root = require("infra.manifest_menu").get_root()
+	local previous = root.about_version_separator
+	root.about_version_separator = rows
+	local ok, detail = xpcall(body, debug.traceback)
+	root.about_version_separator = previous
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("About version separator shared fragment (Linux)", function()
+	helpers.it("retains actual rendered version-separator-channel order", function()
+		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/about_version_separator.json", "rb"))
+		local expected = assert(require("json").decode(handle:read("*a"))); assert(handle:close())
+		helpers.assert_eq(require("infra.manifest_menu").get_root()[expected.section], expected.rows)
+		local rows = submenu_of(build((fake_updater("dev"))), "menu.about.title")
+		helpers.assert_not_nil(rows[expected.version_index])
+		helpers.assert_eq(rows[expected.separator_index].title, "-")
+		helpers.assert_not_nil(rows[expected.channel_index].menu)
+	end)
+	helpers.it("consumes alternate presentation and platform hiding in the actual provider", function()
+		with_version_fragment({{type = "label", id = "version_fragment_probe", i18n = "menu.about.title"}}, function()
+			local rows = submenu_of(build((fake_updater("dev"))), "menu.about.title")
+			helpers.assert_eq(rows[2].title, require("infra.i18n").get("menu.about.title"))
+			helpers.assert_eq(rows[2].disabled, true)
+			helpers.assert_eq(rows[2].fn, nil)
+		end)
+		with_version_fragment({{type = "---", platforms = {"hs"}, unavailable = "hide"}}, function()
+			local rows = submenu_of(build((fake_updater("dev"))), "menu.about.title")
+			helpers.assert_not_nil(rows[2].menu, "only the unavailable fragment is hidden")
+		end)
+	end)
+	helpers.it("refuses the actual updater block when its required fragment is missing", function()
+		with_version_fragment(nil, function()
+			local up, calls = fake_updater("dev")
+			local actual = helpers.load_module("ui.menu.menu_builder")._about_update_rows({updater = up})
+			helpers.assert_eq(actual, {})
+			helpers.assert_eq(#calls.set, 0)
+			helpers.assert_eq(calls.checks, 0)
+		end)
+	end)
+end)

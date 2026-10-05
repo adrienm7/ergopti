@@ -6768,3 +6768,7 @@ caption_getter = "gesture_sensitivity_current_label"
 disabled_when = ["gesture_mode_incremental_ready"]
 platforms = ["hs"]
 unavailable = "hide"
+
+# The fixed separator after each native About version/build identity row.
+[[menu.about_version_separator]]
+type = "---"

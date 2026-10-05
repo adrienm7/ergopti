@@ -328,3 +328,122 @@ helpers.describe("About actual public owner retirement", function()
 		end)
 	end
 end)
+
+
+--- Observes the actual native-bound renderer; every row still comes from its real builder.
+local function with_declared_packaged_check(definition, offer, body)
+	local renderer = require("infra.manifest_menu")
+	local root = renderer.get_root()
+	local previous, original_build = root.about_source_menu, renderer.build
+	local captured
+	if definition ~= false then root.about_source_menu = definition end
+	renderer.build = function(...)
+		local result = original_build(...)
+		captured = result
+		return result
+	end
+	local recorded
+	local ok, detail = xpcall(function()
+		recorded = build(offer)
+		body(recorded, captured, root)
+	end, debug.traceback)
+	if recorded then recorded.restore() end
+	root.about_source_menu, renderer.build = previous, original_build
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("Packaged About check consumes the existing shared command", function()
+	helpers.it("retains the existing canonical declaration and no-offer native window owner", function()
+		with_declared_packaged_check(false, nil, function(recorded, _, root)
+			local row = root.about_source_menu[1]
+			helpers.assert_eq(row.type, "command")
+			helpers.assert_eq(row.id, "about_source_check")
+			helpers.assert_eq(row.i18n, "menu.about.check_for_updates")
+			helpers.assert_eq(row.disabled_when, {"about_source_release_ready"})
+			helpers.assert_not_nil(recorded.row)
+			recorded.row.fn()
+			helpers.assert_eq(#recorded.opens, 1)
+			helpers.assert_eq(#recorded.requests, 0)
+			helpers.assert_true(recorded.opens[1].checks == recorded.checks)
+			helpers.assert_true(recorded.opens[1].channel_owner == recorded.owner)
+		end)
+	end)
+	helpers.it("consumes the existing shared label through the actual renderer in all21 locales", function()
+		local handle = assert(io.open(helpers.shared("data/locale_order.json"), "rb"))
+		local locales = assert(require("adapters.json_codec").decode(handle:read("*a"))).order; assert(handle:close())
+		helpers.assert_eq(#locales, 21)
+		for _, locale in ipairs(locales) do
+			local file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
+			local labels = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
+			-- The native binding captures its catalogue object at construction.
+			-- Bind each real catalogue before the existing build helper resets stubs.
+			helpers.with_stub_scope({"infra.manifest_menu", "infra.i18n", "ui.menu.menu_about"}, function()
+				local native_i18n = require("infra.i18n")
+				native_i18n.get = function(key) return labels[key] or key end
+				package.loaded["infra.manifest_menu"] = nil
+				local renderer = require("infra.manifest_menu")
+				renderer.get_root().about_source_menu[1].i18n = "common.restore_recommended"
+				with_declared_packaged_check(false, nil, function(recorded, rendered)
+					local found
+					for _, row in ipairs(rendered) do if row.title == labels["common.restore_recommended"] then found = row end end
+					helpers.assert_not_nil(found, "actual shared packaged caption: " .. locale)
+					helpers.assert_eq(found.disabled, nil)
+					found.fn()
+					helpers.assert_eq(#recorded.opens, 1)
+					helpers.assert_eq(#recorded.requests, 0)
+				end)
+			end)
+		end
+	end)
+	for _, offered in ipairs({false, true}) do
+		helpers.it("refuses a missing declared check owner before publication (offer=" .. tostring(offered) .. ")", function()
+			local offer = offered and {tag = "v0.0.0-dev.150", channel = "dev"} or nil
+			with_declared_packaged_check(nil, offer, function(recorded)
+				helpers.assert_nil(recorded.row)
+				helpers.assert_eq(#recorded.opens, 0)
+				helpers.assert_eq(#recorded.requests, 0)
+			end)
+		end)
+	end
+	helpers.it("rechecks the shared declaration before delivering a retained no-offer callback", function()
+		with_declared_packaged_check(false, nil, function(recorded, _, root)
+			root.about_source_menu = {}
+			helpers.assert_eq(recorded.row.fn(), false)
+			helpers.assert_eq(#recorded.opens, 0)
+			helpers.assert_eq(#recorded.requests, 0)
+		end)
+	end)
+	helpers.it("preserves native missing-owner refusal for a valid offered release", function()
+		with_declared_packaged_check(false, {tag = "v0.0.0-dev.150", channel = "dev"}, function(recorded)
+			recorded.owner.get = nil
+			helpers.assert_eq(recorded.row.fn(), false)
+			helpers.assert_eq(#recorded.opens, 0)
+			helpers.assert_eq(#recorded.requests, 0)
+		end)
+	end)
+end)
+
+helpers.describe("Offered About commands retain live shared admission", function()
+	helpers.it("refuses a retained offered callback after declaration withdrawal", function()
+		with_declared_packaged_check(false, {tag = "v0.0.0-dev.150", channel = "dev"}, function(recorded, _, root)
+			root.about_source_menu = {}
+			helpers.assert_eq(recorded.row.fn(), false)
+			helpers.assert_eq(#recorded.opens, 0)
+			helpers.assert_eq(#recorded.requests, 0)
+		end)
+	end)
+	helpers.it("refuses a retained offered callback after its required readiness is withdrawn", function()
+		with_declared_packaged_check(false, {tag = "v0.0.0-dev.150", channel = "dev"}, function(recorded, _, root)
+			local row = root.about_source_menu[1]
+			local previous = row.disabled_when
+			row.disabled_when = {"independent_missing_offered_owner"}
+			local ok, detail = xpcall(function()
+				helpers.assert_eq(recorded.row.fn(), false)
+				helpers.assert_eq(#recorded.opens, 0)
+				helpers.assert_eq(#recorded.requests, 0)
+			end, debug.traceback)
+			row.disabled_when = previous
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)

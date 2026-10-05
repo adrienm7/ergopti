@@ -4152,8 +4152,10 @@ local function _about_update_rows(ctx)
 			label = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n_safe),
 			disabled = true,
 		},
-		{ separator = true },
 	}
+	local separator_rows = ManifestMenu.template_rows("about_version_separator")
+	if not separator_rows then return {} end
+	for _, row in ipairs(separator_rows) do out[#out + 1] = row end
 	if not up then
 		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
 		return out

@@ -3507,3 +3507,126 @@ checkPrivacyTriggerControls();
 		assert.throws(() => assertSwipeGraph(wrong));
 	}
 }
+
+// About's dynamic build identity stays native/shared formatter data; its fixed tail is declared once.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/about_version_separator.json'), 'utf8')
+	);
+	assert.deepEqual(corpus.rows, [{ type: '---' }], 'handwritten original fixed separator');
+	assert.equal(corpus.version_index, 1);
+	assert.equal(corpus.separator_index, 2);
+	assert.equal(corpus.channel_index, 3);
+	const source = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	assert.deepEqual(source[corpus.section], corpus.rows);
+	assert.deepEqual(JSON.parse(readFileSync(MENU_PATH, 'utf8'))[corpus.section], corpus.rows);
+	function sequence(tokens, values) {
+		return tokens.some((_, i) => values.every((value, n) => tokens[i + n]?.value === value));
+	}
+	function wiring(text, driver) {
+		const tokens = scriptTokens(text, driver === 'ahk' ? '.ahk' : '.lua');
+		const call =
+			driver === 'ahk'
+				? [
+						'MenuRenderer_TemplateRows',
+						'(',
+						corpus.section,
+						',',
+						'Map',
+						'(',
+						')',
+						',',
+						'Map',
+						'(',
+						')',
+						',',
+						'Map',
+						'(',
+						')',
+						')'
+					]
+				: ['ManifestMenu', '.', 'template_rows', '(', corpus.section, ')'];
+		assert(sequence(tokens, call), 'actual fixed fragment call: ' + driver);
+		const append =
+			driver === 'ahk'
+				? ['Rows', '.', 'Push', '(', 'Row', ')']
+				: driver === 'hs'
+					? ['table', '.', 'insert', '(', 'menu_items', ',', 'row', ')']
+					: ['out', '[', '#', 'out', '+', '1', ']', '=', 'row'];
+		assert(sequence(tokens, append), 'actual provider materialization: ' + driver);
+	}
+	for (const [driver, file] of [
+		['ahk', 'windows/ui/menu/menu_init.ahk'],
+		['hs', 'macos/ui/menu/menu_about.lua'],
+		['linux', 'linux/ui/menu/menu_builder.lua']
+	]) {
+		const text = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		wiring(text, driver);
+		const wrong = text.replaceAll('"' + corpus.section + '"', '"wrong_fragment"');
+		assert.throws(() => wiring(wrong, driver));
+		const fake =
+			driver === 'ahk'
+				? 'MenuRenderer_TemplateRows("' + corpus.section + '", Map(), Map(), Map())'
+				: 'ManifestMenu.template_rows("' + corpus.section + '")';
+		assert.throws(() => wiring(wrong + '\n' + (driver === 'ahk' ? '; ' : '-- ') + fake, driver));
+		assert.throws(() => wiring(wrong + '\n' + JSON.stringify(fake), driver));
+	}
+	console.log(
+		'About version separator: independent fixed source, shared fragment and three genuine provider consumers.'
+	);
+}
+
+{
+	const assert = require('node:assert/strict');
+	const text = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = text.indexOf('const OPENS_SUBMENU = {');
+	const end = text.indexOf('\n};', start);
+	assert(start >= 0 && end > start);
+	const graph = require('node:vm').runInNewContext(
+		text.slice(start, end + 3) + '; OPENS_SUBMENU',
+		{},
+		{ timeout: 1000 }
+	);
+	function aboutEdges(g) {
+		const rows = g.about_updates;
+		assert(Array.isArray(rows));
+		for (const prior of [
+			'about_update_channel_menu',
+			'about_update_frequency_menu',
+			'about_source_menu'
+		])
+			assert(rows.includes(prior), 'original About edge retained: ' + prior);
+		const row = rows.find((e) => e?.menu === 'about_version_separator');
+		assert(row);
+		assert.equal(row.kind, 'compose');
+		for (const platform of ['ahk', 'hs', 'linux']) assert(row.platforms.includes(platform));
+		for (const [platform, path] of [
+			['ahk', 'windows/ui/menu/menu_init.ahk'],
+			['hs', 'macos/ui/menu/menu_about.lua'],
+			['linux', 'linux/ui/menu/menu_builder.lua']
+		])
+			assert.equal(row.native_sources[platform], path);
+	}
+	aboutEdges(graph);
+	for (const mutate of [
+		(g) => {
+			g.about_updates.find((e) => e?.menu === 'about_version_separator').menu = 'about_menu';
+		},
+		(g) => {
+			g.about_updates.find((e) => e?.menu === 'about_version_separator').kind = 'clicked';
+		},
+		(g) => {
+			g.about_updates.find((e) => e?.menu === 'about_version_separator').native_sources.linux =
+				'linux/ui/menu/agent_rows.lua';
+		},
+		(g) => {
+			g.about_updates = g.about_updates.filter((e) => e !== 'about_update_channel_menu');
+		}
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => aboutEdges(wrong));
+	}
+}
