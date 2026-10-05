@@ -1,5 +1,9 @@
 # Configuration and menus: partial dev delivery
 
+A subsequent API-provider slice and fresh inactive preparations are recorded in
+[API-PARTIAL-MERGE.md](API-PARTIAL-MERGE.md). That checkpoint supersedes only
+the earlier unapplied API-provider status below.
+
 The maintainer requested a rapid partial no-squash integration. Merges
 `a550193ebc31aa819c369f701a61ebed72d86216` and
 `c8e4434a0a1f0e321897621621d8024f27558431` are pushed to dev. They contain the
