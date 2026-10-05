@@ -2567,6 +2567,10 @@ cross-process publication.
 
 The Linux formatting corpus now owns a private instance of the actual shared logger. The existing native shutdown owner retains its live suppression debt; every corpus assertion remains strict. Current and incoming-dev causal cohorts reproduce the old fixture failure, and isolated replay preserves the live singleton and its pending lines. This is validation isolation, not a global-reset behavior change.
 
+The existing installed-Hammerspoon supplementary owner now requires a complete actual Script participant publication and inverse after an otherwise successful Karabiner launch scenario. The smoke measures native void set, exact readback and Boolean clear through nonce-only aliases and a private TOML source; runtime locale, logger and error-dialog views must restore. Original launch failures and strict retirement remain authoritative. Portable bootstrap and receipt tests cannot qualify actual SDK execution; final macOS CI is required.
+
+The existing before-package native Canvas gate now requires the same actual Hammerspoon Script SDK and inverse measurement through a private diagnostic source layout. It starts only after the original Canvas process owner settles and reuses the strict native bootstrap, source hashes and retirement receipts. All original Canvas assertions remain. This makes actual SDK execution possible despite independent Sparkle/Brew package failures, but cannot qualify an installed release application; manual macOS CI remains required.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the

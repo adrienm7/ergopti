@@ -17,6 +17,14 @@ local function aliases()
 	}
 end
 
+--- Returns detached alias descriptors bound to the existing native field owners.
+--- Each call constructs fresh descriptor tables; native module identities remain
+--- the exact live providers used by the ordinary participant, without policy copies.
+--- @return table aliases Canonical path to native alias/field descriptor.
+function M.native_aliases()
+	return aliases()
+end
+
 --- Creates the direct native participant with existing checkpoint/source owners.
 --- @param options table Current menu persistence, pause, backup and writer ports.
 --- @return table owner Apply/revert/release/pending/retry_restore.
