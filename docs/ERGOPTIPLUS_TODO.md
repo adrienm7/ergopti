@@ -2033,6 +2033,11 @@ acknowledged participant receipts through rollback and finalization retries.
 Portable native and shared contracts pass. Direct Script participation and
 physical-device acceptance remain open; this does not complete global reset.
 
+Direct scope planning now preserves the selected declaration while
+leaving included scopes to their native owners. Existing recursive APIs
+retain exclusions and dynamic policies. Script runtime participation and
+physical acceptance remain separate prerequisites.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -2848,6 +2853,10 @@ fixture and production boundaries with group2. Keep strict source fences and
 obsolete-value preservation; do not remove assertions. Full failure annotations
 are truncated; the exact known subjects and limits are in the current partial
 delivery evidence. E2E/package/install remain skipped, not passed.
+
+Published declaration metadata is available without resolving hardware
+defaults, supporting strict expert-value admission through the actual
+catalogue. This additive API does not complete expert-field coverage.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
