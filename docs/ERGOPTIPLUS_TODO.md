@@ -1936,6 +1936,28 @@ These are software implementations; final hardware verification remains below.
   remain separate, unmeasured scopes. No menu, magic, transport, persistence,
   physical hardware or foreign driver change.
 
+- [~] **L127.** Linux raw event calendar days: use the local day for hotstring
+  and shortcut collection and the four raw Writer defaults, matching existing
+  typing and daily aggregates. Keep UTC timestamps and caller-supplied dates
+  unchanged. Genuine public software events, Writer, Reader and dashboard APIs
+  with real SQLite reproduce six mismatches in thirteen checks before and pass
+  after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile.
+  The genuine-clock fixture starts only its process with POSIX TZ=OWN-24, an
+  artificial UTC+24 offset that guarantees distinct real local/UTC days. It
+  replaces no clock or adapter, verifies clock identity and UTC bounds, rejects
+  calendar crossing during setup, and checks repeat flushes and durable IDs.
+  This does not represent a geographic timezone or physical keyboard input.
+  Nineteen additional checks with explicitly simulated Lua clock inputs and real
+  libc/SQLite cover east/west/UTC and midnight boundaries: nine failures before,
+  none after under current and mixed-profile LuaJIT. Their FFI requirement leaves
+  this fixture unexecuted under Lua 5.4. Ten registered unit cases reproduce six
+  failures and pass after on all three profiles. Native fixtures assert their
+  exact check floors; preserve every original test and assertion. Windows
+  KL_Today and macOS aggregator.today already use local calendar days in source;
+  foreign native validation remains with the principal agent. Register future
+  Linux CI without launching it. No migration of historical events, formula,
+  schema, shared policy, physical-input, menu or reserved configuration change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

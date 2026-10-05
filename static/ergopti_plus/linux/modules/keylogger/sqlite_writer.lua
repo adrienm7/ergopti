@@ -415,7 +415,7 @@ function M.insert_typing_events(device_id, events)
 		end
 
 		local ts      = _sql_escape(ev.ts      or os.date("!%Y-%m-%d %H:%M:%S"))
-		local date    = _sql_escape(ev.date    or os.date("!%Y-%m-%d"))
+		local date    = _sql_escape(ev.date    or os.date("%Y-%m-%d"))
 		local app     = _sql_escape(ev.app     or "unknown")
 		local text    = _sql_escape(enc_text)
 		local title   = _sql_escape(ev.title   or "")
@@ -455,7 +455,7 @@ function M.insert_hotstring_events(device_id, events)
 			"('%s',%d,'%s','%s','%s','%s','%s','%s','%s',%d)",
 			_sql_escape(device_id), first_id + i - 1,
 			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.date or os.date("%Y-%m-%d")),
 			_sql_escape(ev.app or "unknown"),
 			_sql_escape(ev.kind or "fired"),
 			_sql_escape(ev.trigger or ""),
@@ -492,7 +492,7 @@ function M.insert_shortcut_events(device_id, events)
 			"('%s',%d,'%s','%s','%s','%s')",
 			_sql_escape(device_id), first_id + i - 1,
 			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.date or os.date("%Y-%m-%d")),
 			_sql_escape(ev.app or "unknown"),
 			_sql_escape(ev.key or "")
 		)
@@ -515,7 +515,7 @@ function M.insert_app_switch_events(device_id, events)
 			"('%s',%d,'%s','%s','%s','%s',%d)",
 			_sql_escape(device_id), first_id + i - 1,
 			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.date or os.date("%Y-%m-%d")),
 			_sql_escape(ev.prev_app or ""),
 			_sql_escape(ev.next_app or ""),
 			tonumber(ev.duration_ms) or 0
