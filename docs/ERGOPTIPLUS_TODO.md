@@ -2873,6 +2873,12 @@ case, and a deliberately wrong native rule must be rejected. Neither product
 adapters nor the existing literal-text/options assertions are weakened. Hosted
 confirmation remains pending until the next exact-source manual run.
 
+The maintainer now explicitly requests delivery into dev after feasible container
+and CI work, with genuine remaining native/device failures documented rather than
+holding the feature indefinitely. Follow the [device/native continuation](handovers/2026-10-04-parallel-containers/GROUP2-DEVICE-TODO.md)
+and the Windows checklist. Keep all five parent items partial; mandatory native
+assertions and cross-cutting item38 remain required.
+
 The [Group 2 integration checkpoint](handovers/2026-10-04-parallel-containers/GROUP2-INTEGRATION-STATUS.md)
 records exact candidate/CI SHAs, passed/failed/skipped results and the remaining
 native and Windows continuation. No final integration lock, shared validation
