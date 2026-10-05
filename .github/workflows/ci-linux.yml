@@ -332,6 +332,14 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_event_loop_stop_receipts.lua
         timeout-minutes: 1
 
+      - name: Retain native event-loop ownership during callback reentry
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_reentry.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_reentry.lua"
+        timeout-minutes: 1
+
       - name: Admit file watches only after native activation succeeds
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

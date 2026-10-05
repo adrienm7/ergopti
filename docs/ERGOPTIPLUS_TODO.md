@@ -1441,6 +1441,23 @@ These are software implementations; final hardware verification remains below.
   This fix depends on L101's shared decoder import. Other parser helpers,
   Markdown policy, native transports and reserved surfaces are unchanged.
 
+- [~] **L103.** Linux event-loop reentry ownership: retain a separate active-run
+  guard until the owning call requests cleanup. Calling stop then run inside
+  idle, periodic or deferred callbacks had overwritten the outer idle handle
+  and leaked it. Preserve stop semantics and reject reentry during that window;
+  normal or raised cleanup still permits later healthy runs. Nine real libuv
+  controls have four original failures and pass after on current LuaJIT,
+  actual stock Lua 5.4 and the signed Ubuntu 22.04 dependency mix. Exact native
+  handle inspection preserves a healthy foreign timer and proves final zero
+  owned handles; throwing callbacks and sequential restarts are exercised.
+  One start-refusal receipt is explicitly simulated after real activation.
+  Eight registered regressions retain every existing assertion and include the
+  native child fixture. Register both native interpreters for future Linux CI
+  without launching workflows. Windows SetTimer and macOS Hammerspoon timers
+  have no equivalent synchronous run/stop owner by source; foreign runtime
+  gates remain deferred. The separately diagnosed no-luv periodic clock issue
+  stays unmodified pending coordination; reserved surfaces are unchanged.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

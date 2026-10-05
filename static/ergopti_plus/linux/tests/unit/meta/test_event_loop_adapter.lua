@@ -52,7 +52,7 @@ local function stop_fixture(source)
 	local ok, loop = pcall(require, "adapters.event_loop")
 	package.loaded.luv, package.loaded["adapters.event_loop"] = previous_backend, previous_loop
 	if not ok then error(loop, 0) end
-	return loop, state
+	return loop, state, backend
 end
 
 helpers.describe("linux-event-stop-receipts", function()
@@ -395,4 +395,60 @@ helpers.describe("event loop backend isolation", function()
   else
     print("  [native luv POSIX integration unavailable; explicit backend fixtures still run]")
   end
+end)
+
+helpers.describe("linux-event-reentry", function()
+	for _, source in ipairs({ "idle", "periodic", "deferred" }) do
+		for _, stopping in ipairs({ false, true }) do
+			helpers.it("linux-event-reentry: " .. source .. " guards " .. (stopping and "stopping" or "running") .. " ownership", function()
+				local loop, state = stop_fixture(source)
+				local outer, nested = 0, 0
+				local function callback()
+					outer = outer + 1
+					if stopping then loop.stop() end
+					loop.run({ onIdle = function() nested = nested + 1; loop.stop() end })
+					loop.stop()
+				end
+				local options = {}
+				if source == "idle" then options.onIdle = callback
+				elseif source == "periodic" then options.onPeriodic = callback
+				else loop.defer(callback); options.onIdle = function() end end
+				loop.run(options)
+				helpers.assert_eq(outer, 1)
+				helpers.assert_eq(nested, 0, "an unreturned run still owns its native handles")
+				helpers.assert_eq(#state.handles, source == "periodic" and 2 or 1,
+					"callback reentry must not acquire another native loop")
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+				helpers.assert_true(not loop.isRunning())
+			end)
+		end
+	end
+
+	helpers.it("linux-event-reentry: raised native run releases the admission guard for retry", function()
+		local loop, state, backend = stop_fixture("idle")
+		-- The retained backend is private to this fixture, so native refusal is
+		-- explicit rather than a claim that libuv itself threw spontaneously.
+		local run = backend.run
+		backend.run = function() error("simulated native run refusal") end
+		local ok, err = pcall(loop.run, { onIdle = function() loop.stop() end })
+		helpers.assert_true(not ok)
+		helpers.assert_contains(tostring(err), "simulated native run refusal")
+		helpers.assert_true(not loop.isRunning())
+		for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+		backend.run = run
+		local calls = 0
+		loop.run({ onIdle = function() calls = calls + 1; loop.stop() end })
+		helpers.assert_eq(calls, 1, "completed error cleanup must permit a later run")
+		for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+	end)
+
+	if native_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-event-reentry: installed libuv retains exact run ownership through stop", function()
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_reentry.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native reentry ownership fixture must succeed")
+		end)
+	end
 end)

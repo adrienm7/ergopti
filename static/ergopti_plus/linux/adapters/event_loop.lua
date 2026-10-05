@@ -99,6 +99,7 @@ end
 -- =========================================
 
 local _running    = false   -- Set by run(), cleared by stop() or on exit.
+local _run_active = false   -- Retained until run() retires its owned handles.
 local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
@@ -309,7 +310,9 @@ end
 ---   .onPeriodic function  Called every periodSec seconds (process_lifecycle.tick, etc.).
 ---   .periodSec  number    Interval in seconds for onPeriodic (default 0.25).
 function M.run(opts)
-	if _running then
+	-- stop() clears the pumping flag inside callbacks, but the outer run still
+	-- owns its native handles until cleanup. Reentry must not replace them.
+	if _run_active then
 		Logger.warn(LOG, "run() called while already running — no-op.")
 		return
 	end
@@ -322,6 +325,7 @@ function M.run(opts)
 		return
 	end
 
+	_run_active = true
 	_running = true
 	local ran, run_error
 
@@ -337,6 +341,7 @@ function M.run(opts)
 	end
 
 	_running = false
+	_run_active = false
 	Logger.debug(LOG, "Event loop exited.")
 	if not ran then error(run_error, 0) end
 end
