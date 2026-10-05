@@ -1064,6 +1064,72 @@ These are software implementations; final hardware verification remains below.
   validation remains pending. Recommended-delay native verification and
   editable handwritten [[hotstrings.terminators]] support remain open under
   item 34.
+
+  2026-10-04 candidate: the Linux Tap-Hold scope retains refused compensation
+  for the navigation layer it imported, including strict native removal and
+  parameter-fence release receipts. Its primary runtime/file inverse settles
+  before layer removal; later requests cannot replace the indebted owner, and
+  valid external edits survive exact-source cleanup. The shared layer helper
+  refuses unreadable sources instead of treating them as foreign edits.
+  All 14 original registered
+  cases remain unchanged; 34 added real-file cases give original 15/33 and
+  corrected 48/0 on LuaJIT and Lua5.4, including shared-participant global
+  recommendation/clear refusal and rejected apply-time fence release before
+  advancing to another category. Selected local verification passed 356 JS
+  checks, 13,886 portable macOS and 6,554 Linux unit cases, plus both driver E2E
+  suites. Hosted native and physical-device qualification remain pending.
+
+  The macOS recommended Tap-Hold scope now retains its exact layers.toml
+  import in the remap bulk journal: backup precedes import, inverse cleanup must
+  be acknowledged before regeneration, and failed cleanup remains retryable.
+  The global participant retains the successful scope receipt and restores that
+  sibling on a later category refusal; a failed parent inverse restores its own
+  removed import before compiling the pre-inverse settings. Observed source changes
+  refuse cleanup; conditional unlink now shares the native cooperative lease.
+  Native recovery alone cannot acknowledge the parent's
+  still-owed inverse. Portable actual-owner tests control filesystem, Karabiner
+  and later-category boundaries; they do not qualify physical macOS input.
+  Full native units, E2E, packaging, installation and real-device validation
+  remain required with the final shared layer-removal prerequisite.
+
+  Conditional macOS removal now rechecks exact source bytes and the resolved
+  route while holding the canonical writer lease. A refused unlock or close
+  retains its exact cleanup capability in the layer, generic scope transaction
+  and remap cohort; neither absence nor a no-effect inverse can acknowledge
+  release debt. Existing assertions remain intact, and real-file cooperating
+  writer, refusal and final-parent regressions fail against the original owners.
+  An editor ignoring the advisory lease can still replace a path between source
+  comparison and unlink. Full selected and hosted native qualification remain
+  required; this bounded correction does not complete item 5.
+
+The native Linux metrics prerequisite now decodes the existing SQLite exit
+receipt before its instrumentation counts JSON rows, then returns the complete
+original output to production admission. It retains every old assertion and
+adds missing/failed/malformed receipt and malformed JSON controls plus an actual
+failed native SELECT. The untouched dev fixture fails before this correction;
+independent real SQLite replays pass with 648 grouped versus 2,808 raw rows.
+This restores validation coverage, not a new metrics feature or TODO5 completion.
+
+The Linux public Tap-Hold scope regression now records and strictly removes only
+its own acknowledged backup publications, without an undeclared LuaFileSystem
+dependency. The unchanged functional assertions passed before the CI fixture's
+cleanup failed: the original case gives 47/1 without lfs, while the corrected
+module passes 48/0 both with and without lfs and with the real libuv adapter.
+Runtime scope ownership and cleanup requirements are unchanged.
+
+Linux native CI prerequisites now give the disposable SQLite account an owned
+home beneath /tmp, rather than an inaccessible runner-private parent; a refused
+chdir also stops before executing from the caller's checkout. CI installs the
+required xdotool before the AT-SPI interpreter fixture. The upstream diagnostic
+run37243988109 reproduces existing native E2E failures, including the inaccessible
+SQLite profile. Other hosted native failures remain under investigation with
+their Linux owners; local native replays do not replace the failed hosted verdict.
+
+Windows workstation handoff (maintainer instruction, 2026-10-04):
+
+- [ ] On Windows, replay the registered neutral/recommended/clear scope and global composition cases with the pinned native runtime. Check verified backups, exact runtime acknowledgement, stale-source refusal and retryable rollback.
+- [ ] On a disposable Windows profile, exercise category/global Clear and Restore, restart, preserve unknown/outdated entries and verify the effective recommended delays. Record physical keyboard results separately from unit/E2E results.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -1077,12 +1143,38 @@ These are software implementations; final hardware verification remains below.
   at its recommendation checked and one of the user's as kept, locks both, and
   every writer refuses to import over the latter and backs up the file it
   replaces. Published in the second 2026-09-30 release. Remaining: a real-device
-  re-run of the wizard on each OS (Windows was verified by CI only), and Linux
-  trigger selection in the wizard. Linux already writes its hotstring section
-  choices into the selected config.toml through the shared answer planner and
-  acknowledged writer. The shared wizard trigger choices remain excluded on
-  Linux because they do not satisfy its keymap validation policy; the tray
-  retains its existing physical-key preference owner.
+  re-run of the wizard on each OS (Windows was verified by CI only), and final
+  qualification of Linux trigger selection. The shared declaration now filters
+  common-character presets to Windows/macOS; Linux offers its accepted ★ preset
+  and custom symbols through the existing rare-symbol validator. The answer
+  planner refuses unsafe or malformed values with existing translated reasons
+  before language/folder preferences, destination preparation or configuration
+  writes, retaining the wizard for retry. Handwritten page/projection checks and
+  twenty real Linux bridge cases cover refusal, retry, sparse saves, future
+  neighbors, fresh runtime reads and wizard re-run. Existing outdated trigger
+  records are preserved without an explicit trigger choice; touching the
+  Hotstrings question or receiving an old-folder callback grants no replacement
+  intent. A changed folder retires prior values and choices immediately; feature
+  navigation and Finish wait for an exact successful read response, while Back
+  and same-folder retry stay available. Handwritten page cases prove missing,
+  stale, malformed and duplicate replies cannot reuse old-folder intent. The
+  macOS publication uses the shared JSON codec to preserve empty value maps as
+  objects at the native LuaSkin boundary, including initial and changed folders.
+  The original source fails all twenty new native cases. Selected local gates
+  passed 356 JS checks, 13,958 portable macOS and 6,586 Linux unit cases,
+  101 macOS E2E checks (one host-specific scenario skipped) and 188 Linux E2E
+  checks. Actual X11 GTK/WebKit2GTK probes passed the seven-page round trip,
+  delayed folder response, refused concurrent-source save with retry, and
+  untouched obsolete-trigger preservation (24/28/29/33 checks). These probes
+  use real DOM, native bridge and file publication; the restart port is an
+  observer, not a restarted daemon. Hosted native qualification, physical input,
+  Wayland and physical-device wizard re-runs remain pending.
+
+Windows workstation handoff (maintainer instruction, 2026-10-04):
+
+- [ ] On Windows, exercise all seven wizard pages, cancellation, Finish/restart/rerun, changed-folder reads, delayed/stale responses and explicit trigger choices on a disposable profile. Preserve untouched obsolete trigger values.
+- [ ] Check actual WebView/native bridge rendering and persistence; report the exact tested SHA and pass/fail/not-executed cases. Native CI alone does not complete physical acceptance.
+
   Legend: `[x]` implemented, reviewed and integrated on
   `integration-2` (published only once `dev` is pushed); `[~]` integrated with
   the precise remainder recorded in the item or in the overnight handoff.
@@ -1682,9 +1774,10 @@ native JSON corpora and all live wire versions are unchanged.
   as a whole still stops the daemon, Windows sites 32, 34, 36, 37-60 and its
   whole-file installed.json refusal, and the macOS boot-time unread-entries
   scan cost (36-56 ms on the
-  main thread). Two maintainer decisions are pending: config_migrate's
-  fail-closed guard for invalid stamps (site 108) and a migrations.toml
-  exception for key removals handled by the cleanup (site 112).
+  main thread). Maintainer decisions are resolved: invalid schema stamps
+  retain strict boot and session-write refusal (site 108); retired keys
+  reported for explicit cleanup are exempt from automatic deletion migrations
+  and remain on disk until that cleanup (site 112).
 
   Windows tap_hold.toml now reports each obsolete entry once per exact file,
   rendered path and reason during the process, through the shared warning
@@ -1702,6 +1795,77 @@ The Linux daemon now isolates only the existing shared loader’s classified who
 After the classified-read prerequisite, Linux TapHold ordinary setters and recommended imports now require an acknowledged temporary-file write and close before rename or reload. Genuine LuaJIT/Lua5.1 Boolean true and Lua5.4 same-file write receipts are both accepted; nil, false, wrong objects/strings and exceptions refuse. Refused candidates are cleaned only at the owned temporary path; cleanup refusal still leaves the original source and runtime untouched. Unknown fields and existing post-publication reload semantics are preserved. All 39 prior registered cases remain exact; 13 added controls give old 40 passes / 12 failures and corrected 52 / 0 on both Lua runtimes. Windows and macOS already require their native staging writer acknowledgements. Full selected/hosted native qualification remains pending; TODO33 stays partial.
 
 The Linux hotstring editor now reads one classified save-time source snapshot, validates those exact bytes with the canonical TOML codec, and requires the hotstring projection’s explicit commit receipt before preserving tuning and replacing its owned model. Publication carries the existing exact-source precondition; malformed/unreadable sources and observed concurrent replacements refuse without reloading or reporting saved. The five old persistence cases, ten existing editor cases, twenty native-file admission cases, five deployed TOML dialects, and three causal mutations were checked privately. The independent 140-rule corpus is unchanged. This is a TODO33 preservation prerequisite; opening-time stale-page ownership, unknown fields/comments, other data-file writers, TODO104 fanout migration, and complete native/root CI remain open.
+
+Shipped retirement-only migrations now advance the schema stamp without deleting
+gestures.space_wrap, any retired AI trigger-shortcut spelling, or
+shortcuts.keys.layer_scroll. Independent expected models retain each value and
+its siblings, including a false shortcut, on all named drivers; the generic
+delete interpreter contract is unchanged. ADR-009 records the explicit-cleanup
+exception. Focused JS replay passes 72 cases / 174 driver replays and 37
+registry defects; isolated shared Lua contracts pass 81 Linux-ID cases on
+LuaJIT and 85 macOS-ID cases on Lua 5.4. The original registry fails five
+macOS preservation vectors. Real-file shared boot, exact backup, restart and
+ordinary-save preservation controls pass on both runtimes. Complete selected
+verification, native Windows and native three-OS qualification remain required;
+TODO33 stays partial.
+
+The macOS config_karabiner.toml owner now preserves obsolete timing leaves and
+an obsolete combination switch when an ordinary full-state save carries their
+neutral runtime read results. Load and save classify them through the shared
+warning owner, once per file/path/reason; unrelated binding edits keep the old
+leaf models and foreign neighbors. A carried non-neutral value is not proof of
+an explicit repair: that candidate still refuses with its exact file/path,
+without publication. Manual repair permits a later retry; explicit leaf-intent
+plumbing remains open. All 22 prior selected cases remain unchanged; fourteen
+new real-file controls give original 24/12 and corrected 36/0 on Lua5.4,
+including stale external edits, the existing source fence and malformed-file
+refusal. Portable LuaJIT execution is unavailable because the existing macOS
+harness requires table.pack; no shim was added. Selected root gates passed
+356 JS checks, 13,972 portable macOS unit cases and 101 macOS E2E checks
+(one host-specific scenario skipped). Hosted native macOS E2E/package/install
+qualification and the separate scalar-binding parent refusal remain pending.
+This bounded preservation change does not complete 33.
+
+The macOS remap owner preserves a known unusable tap-hold scalar when an
+unrelated full-state save carries only its neutral slots. Load and save share
+one precise per-file warning identity; non-neutral binding or timeout candidates
+still refuse with their exact path before publication, until explicit file
+repair. Supported legacy combo strings and all existing typed-parent refusal
+assertions remain unchanged. Nine new real-file controls give the composed
+predecessor 1/8 and corrected 9/0 on Lua5.4; forty-one unchanged focused cases
+also pass. This slice preserves scalar models and foreign fields through the
+existing whole-document serializer, not arbitrary lexical formatting/comments.
+Selected local gates passed 356 JS checks, 13,981 portable macOS unit cases
+and 101 macOS E2E checks (one host-specific scenario skipped). Hosted native
+qualification and broader binding-parent/repair-intent work remain pending;
+TODO33 is not complete.
+
+A bounded Windows installed-layout record candidate partitions obsolete entries
+from usable neighbors and routes process-lifetime warnings through the shared
+file-entry reporter. A narrow native JSON member-span owner preserves obsolete
+Boolean/null/number spellings, future record members and unchanged valid entry
+values while install/uninstall retain their current native owners. Original
+syntax/header refusal assertions remain; independent native source/receipt,
+warning-once, install/uninstall and public span regressions are registered but
+not executed in this Linux container. Case-sensitive record-member exclusions
+preserve future `Layouts`/`SCHEMA_VERSION` siblings; handwritten native controls
+cover ordinary save, in-place updates and explicit obsolete-id replacement.
+Programmatic NUL-containing path segments refuse before native Map lookup,
+without borrowing a truncated prefix or exposing source data. Eight new native
+cases retain all earlier assertions and corpus bytes. The new refusal-loop
+callbacks bind each source explicitly so unrelated unset-variable errors cannot
+satisfy their assertions. Selected local verification passed formatting, 1,814
+AHK BOM/LF files, all 356 JS checks, 13,981 portable macOS unit cases and
+6,586 Linux unit cases. Windows native unit, compile and E2E were not executed
+on this Linux host; native CI and packaging/installation remain required. Shared Lua
+record writes still need qualification of top-level future fields and
+default-decoder null/array identity; this prerequisite does not complete TODO33.
+
+Windows workstation handoff (maintainer instruction, 2026-10-04):
+
+- [ ] Run the native installed-record/member-span cases in test_layout_catalogue.ahk and test_json_object_key_nul.ahk: usable neighbors, warning-once, exact obsolete/future preservation, case identity, native NUL-path refusal, stale-source refusal and install/uninstall.
+- [ ] Replay retired-key and invalid-schema cases in test_config_migrate.ahk and boot/write-fence tests; retain retired keys until explicit cleanup and keep invalid-stamp session refusal strict.
+- [ ] Audit the remaining Windows configuration-reader domains already listed above; add causal regressions before changing them. Do not repeat completed features without evidence.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -1879,7 +2043,8 @@ native observations remain pending.
   an old build's scalar where a table is now expected (`magickey = true` under
   `[hotstrings.modules]`, `groups = "x"`) still makes a menu save fail with «
   the batch cannot address the destination without ambiguous TOML keys » —
-  maintainer decision: may an ordinary save overwrite a value flagged outdated?
+  maintainer decision: preserve outdated scalars until explicit cleanup; an
+  ordinary save must refuse a colliding new subtree without replacing them.
   The shared macOS/Linux decoder now resolves hand-written dotted assignments
   (`a.b = 1`) as semantic nested keys while quoted dots remain literal keys.
   Windows document/config dotted assignments remain unsupported; its existing
@@ -1895,7 +2060,8 @@ native observations remain pending.
   the fix. Local gates passed (349 JS, 4607 Linux unit and 143 Linux E2E
   checks). Full three-OS checkpoint 37033032620 at `6275cac35` passed unit,
   E2E, packaging and installation gates with release skipped. The scalar
-  migration decision and Windows document dotted-key reader remain open.
+  preservation policy is settled; Windows document dotted-key reader remains
+  open.
 
 The shared dotted-key reader now uses the existing strict key-path owner for
 root, section-relative, multiline and inline assignments, including independent
@@ -1932,6 +2098,43 @@ Native Windows checkpoint 37104220317 executes the independent 40 document and i
 TODO 42 remains partial. The Windows ordinary and detached writers now compare their fresh flat source model against the typed semantic document before staging: a genuine no-op preserves an unrepresentable dotted/root/table-array source verbatim, while changes that would lose its namespaces refuse. Exact source readback fences concurrent preparation and staged publication; ordinary source drift invalidates stale reader cache without mutating prior cache objects. Existing canonical output remains for representable sources. Seven registered native cases cover detached/ordinary no-ops, changed/deleted/unrelated leaves, quoted literal dots, duplicate aliases, hidden-root and exact-subtree deletes, and actual concurrent native file mutation. Portable verification: AHK BOM/LF + 353 JS checks passed; native Windows unit/include/E2E qualification pending CI. Bootstrap/cache semantic consumption, full-save physical comment preservation and the scalar migration decision remain pending.
 
 Native Windows checkpoint 37116696443 passed 7,978 unit cases; two historical tests still required the previous serializer to discard unowned comments. Those test contracts now pin independently handwritten complete source images and decode the actual detached/published candidates through the typed document reader, distinguishing Boolean true/false from numeric zero/one. Canonical rendering still owns explicitly changed assignments; unchanged source order, comments and values remain exact. No production writer, parser or scalar migration policy changes in this test alignment. Portable selected verification and a new native Windows checkpoint are required before qualification.
+
+The maintainer resolved the scalar collision policy: obsolete entries remain
+until explicit cleanup. Ordinary saves cannot replace an outdated scalar with a
+new subtree. This decision preserves the existing strict batch-writer refusal;
+it does not qualify the remaining Windows bootstrap or physical-source gaps.
+
+The Windows bootstrap cache and feature owner now consume a configuration-only
+semantic snapshot through the existing typed document reader. Root and section
+relative dotted assignments and declared inline namespaces reach the native
+section/key cache and feature records from the same admitted source generation.
+Owned inline feature records merge through the existing child policies onto
+detached seeded records, keeping unspecified defaults and exact outdated child
+identities. Root presence belongs to the admitted read, so external deletion
+cannot make the two boot consumers select different generations. Quoted literal dots, Unicode
+case-distinct and empty names retain exact identities; dynamic personal names
+keep their Boolean and timing domains independently of static manifest identity.
+Nested native values are
+independent between cache, retained source rows and each feature application.
+Table-array members remain outside scalar settings instead of collapsing their
+owner generations. Malformed semantic boot sources publish no partial cache or
+feature state and retain session write protection after a later readable repair;
+invalid/newer schema-stamp refusals remain owned by migration. Generic data-file
+parsing and ordinary/detached writer admission keep their existing contracts.
+Registered native cases include the unchanged independent dotted corpus with
+handwritten complete cache goldens, actual child bootstrap readers, ordinary and
+full-save no-op preservation, native read locks, stale-source publication and
+version authority. Portable encoding, source registration, closure, startup,
+coercion and convention checks do not qualify those native cases. Windows unit,
+compile/startup, E2E, packaging and installation validation remains required;
+item 42 and physical-source preservation stay partial. Selected local
+verification passed formatting, all 356 JS checks and 1,815 AHK BOM/LF files;
+native Windows unit, compile and E2E were not executed on this Linux host.
+
+Windows workstation handoff (maintainer instruction, 2026-10-04):
+
+- [ ] Replay the 30 new native semantic-snapshot cases through the real registered runners, including the unchanged dotted corpus, typed inline/default merges, exact quoted/empty identities, bootstrap, cache generation, source locks, stale-source/full-save behavior and invalid stamps.
+- [ ] Compile the complete ErgoptiPlus.ahk include graph, then run Windows E2E, packaging and installation on the exact source SHA. Check real menu/full-save comment preservation; ordinary saves must refuse obsolete-scalar/new-subtree collisions until explicit cleanup.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -2301,13 +2504,22 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 103, macOS 180, Linux 111, each
+  drivers still build (current baseline: Windows 96, macOS 153, Linux 97, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+
+The fixed per-key native/no-action command now consumes one shared command
+declaration on all three drivers, with the existing Windows/Linux and macOS
+caption variants and their original native persistence owners. Tap/hold pickers
+and the native separator remain driver-owned. The existing scanner retires one
+fixed caption source per driver: Windows/macOS/Linux 97/154/98 to 96/153/97.
+Independent caption/state/platform corpus and actual menu callback regressions
+cover the bounded slice; hosted Windows execution, physical native validation
+and the final complete three-OS gate remain required. This item stays partial.
 
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
@@ -2630,6 +2842,25 @@ not close the remaining TODO54 menu migration or updater ownership work.
 
 Mac About retained-release callbacks now detach the displayed release tag and channel, re-read the actual channel/check owners before dispatch, and return success only when the launcher accepts with Boolean true. Held rows refuse cleared/replaced offers, a changed channel, mutated borrowed offer data, invalid owners, and launcher refusal or exceptions. The four existing About cases remain byte-exact; 24 new cases exercise the actual menu/renderer and real Channel/AutoCheck public retirement paths with recording infrastructure ports (28/0, original callback 4/24, five causal mutants red). This is separate from the release-channel setter ACK prerequisite. Windows reads its live update request/cache owners and Linux validates the current cached release URL; neither shares this retained Mac feed callback. TODO54/81 remains partial: automatic notification callbacks and global/native acceptance are separate. Native macOS/Sparkle and full selected qualification are pending; no generation identity, readiness, or obsolete-tag-installation claim is made.
 
+Linux's Select Word, Select Line and Paste Plain helpers now consume shared
+command declarations for captions, order, readiness and platform presence.
+Windows and macOS retain their existing binding placement. Retained callbacks
+re-read the current native method and configuration admission, require an exact
+Boolean acknowledgement, and preserve native refusal and retry behavior. The
+independent helper corpus and 24 registered cases cover actual effect ports,
+reservation, withdrawn capabilities, declaration mutation, composed order and
+all 21 locale captions; the original 21 cases fail 19 times against the old
+provider and pass after migration. The original registered module remains an
+exact prefix. The native census stays at 97/154/98: its scanner excluded the
+computed helper captions already, and separator migration remains separate.
+Selected and hosted native qualification are pending; items 54 and 81 remain
+partial.
+
+Windows workstation handoff (maintainer instruction, 2026-10-04):
+
+- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 96). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
+- [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -2719,7 +2950,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 103, macOS 180 and Linux 111 rows are still built by the
+  Windows 96, macOS 153 and Linux 97 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -2757,6 +2988,20 @@ pass with all 21 locale catalogues. Full native CI remains required.
   The update rows greyed on a local version (2026-10-01) were added as
   provider rows and join the About slice.
   The fixed agent Mode choices now use the shared declaration and renderers; see item 54 for the regression and remaining native-row scope.
+
+The fixed Linux selection helper trio is now declared; see item 54 for its
+independent regression evidence and remaining separator/native qualification.
+
+The per-key native/no-action command uses the shared declaration on all three
+drivers, retaining each platform's established caption and native callback.
+Only this fixed command source is retired; tap/hold pickers, separators and
+remaining provider rows keep items 54 and 81 partial. Final native qualification
+is still required.
+
+Windows workstation handoff (maintainer instruction, 2026-10-04):
+
+- [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
+- [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and

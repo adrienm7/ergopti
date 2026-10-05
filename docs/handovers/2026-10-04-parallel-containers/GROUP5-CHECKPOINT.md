@@ -8,13 +8,28 @@ with explicit Windows PC follow-ups; unfinished macOS and Karabiner requirements
 stay open in the TODO rather than being claimed complete.
 The initial inspected base was `689d30293704093feab2e3caa077604e88560eb6`.
 Current synchronization targets actual dev
-`8f4b7ef73e3da1784f25f99f3136763aaee18450`, preserving Group7 and Group4
-integrations. Group7 synchronization already passed formatting, 356 JS checks
+`b9a43969b9ac8917f32bf4af0d19b6f77a31668e`, preserving Group7, Group4 and
+Group1 integrations. Group7 synchronization already passed formatting, 356 JS checks
 and AHK UTF-8 BOM/LF for 1,815 files. Group4 native Windows work remains in its
 imported PC handoff. The resulting non-Windows composition passed formatting,
 356 JS checks, AHK UTF-8 BOM/LF for 1,820 files, 13,954 portable macOS units,
 101 stubbed macOS E2E checks (one explicit skip), 6,516 Linux Lua units and
 188 Linux E2E checks. Native Swift and final packaging remain unqualified.
+Those composition counts qualify the earlier `8f4b7ef` synchronization, not
+the current source. Group1's strict native SQLite receipt fixture is retained
+byte-for-byte; Group5 does not import a competing implementation or Group2's
+unintegrated hotstring delivery claims. All 140 imported upstream source images
+match dev. Group1 and Group5 TODO blocks and global items16/38 are preserved;
+the independent legacy legend is retained and completed items13/35 stay removed.
+The current non-Windows composition passes formatting,356 JS checks, UTF-8
+BOM/LF for1,821 AHK files,14,056 portable macOS units in1,488 modules,
+101 stubbed macOS E2E checks with one explicit skip,6,613 Linux units in360
+modules and188 Linux E2E checks. Real SQLite equivalence reads648 grouped rows
+instead of2,808 raw rows; the native histogram sibling passes60 checks.
+Actual libuv/curl streaming and authentication fixtures pass97 and48 checks.
+The actual private Xvfb source fixture passes28 checks; physical input and a
+native Wayland seat remain outside that evidence. JavaScript and native suites
+are serialized; Windows native execution is deferred to the maintainer's PC.
 No old handover patch belongs to this group. This clone tracks main only:
 fetch dev with `git fetch origin refs/heads/dev:refs/remotes/origin/dev` and
 compare `git ls-remote --heads origin dev` with the tracking ref. A plain
@@ -229,6 +244,25 @@ already emits its failed append stage/errno on stderr. Group5 is preparing a
 bounded failure-only annotation without changing native logger assertions,
 ownership, source checks or the250ms deadline. No dev integration has occurred.
 
+The bounded logger callback reader is independently reviewed and pushed at
+`cd6a9f9c07217471a11d878ad4e104fe62800dc6`. It validates the complete canonical
+native frame but retains only the writer index, entry, closed stage and errno
+for its last three receipts. Inode and directory metadata are not displayed.
+Registered privacy/range/framing controls, the unchanged actual CLI preimage
+control, formatting and all356 JS checks pass. This exposes existing failure
+evidence; it does not fix append loss or qualify native packaging. The next
+macOS+Linux dispatch must test the current composed source.
+
+Group1's final manual run37245806103 is terminal at CI SHA
+`78fdd90ae94c254accc2281f1b599564b03d47ab`, with exactly the devb9a43969b tree.
+Its native release build passes, then the keyboard-character mapping case
+`testFreshKeyboardEventsFollowLayoutAndShiftFlags` does not complete. No logger
+failure is identified by those annotations. Linux native units pass; four
+native E2E subjects fail (GTK application identifiers, failed validator-save
+associations, locale-independent audio and literal notification text).
+Package/install qualification fails or is skipped; Release/Publish is skipped.
+These receipts are not successful qualification of the Group5 composition.
+
 The maintainer now allows feature test CI in parallel: group5 exclusively uses
 `codex/ci-macos-input`, without a lock. Only final integration reserves
 `codex/ci-lock` and `codex/ci-validation`. Group5 deleted its own earlier empty
@@ -283,3 +317,21 @@ and nlohmann headers; Node follows `.node-version`, Ruff is repository-pinned,
 and RTK is checksum-verified. The complete saved installation script passed
 again on the current clean feature. Saved environment settings remain a draft
 until the user saves and publishes them; no fresh-task restoration is claimed.
+The subsequent draft revision11 adds the verified private Xvfb packages,
+wrapper and native fixture instructions while preserving network requirements.
+Its affected package-download/extraction and actual28-check fixture pass;
+the complete extended installation script has not been rerun from a fresh image.
+
+Before2026-10-05 00:39 UTC, previously working GitHub access temporarily stopped:
+the existing origin's read-only `git ls-remote origin HEAD` cannot authenticate,
+and the existing injected GH_TOKEN binding receives API401 Bad credentials.
+Two read-only requests reproduce each refusal. Neither operation establishes
+push access; no credentials are extracted and no duplicate secret is requested.
+Subsequent read-only retries recover both API and native Git access without a
+new secret or credential extraction. This transient refusal is not a current
+external blocker. Remote dev has advanced to Group6 integration
+`02ad69e06ecea424de11facf3dced404a6fdd602`; fetch and compose it after finishing
+the current validated b9a43969b merge. Group6 owns final lockd9d56d6d8f;
+Group5 does not modify it. No Group5 final lock is held and no Group5 commits
+have been merged into dev. Retain the feature branch and every unfinished TODO;
+native qualification and final integration remain outstanding.

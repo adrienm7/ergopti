@@ -652,8 +652,7 @@ Test("layout catalogue: a damaged record is refused, never read as empty (layout
 _LCT_DamagedRecordCase() {
 	Dir := _LCT_TempDir()
 	try {
-		for Text in ["{ damaged", '{"schema_version": 2, "layouts": {}}', '{"schema_version": 1}',
-				'{"schema_version": 1, "layouts": {"ergol": {"id": "other", "sha256": "x", "version": "1", "size": 1}}}'] {
+		for Text in ["{ damaged", '{"schema_version": 2, "layouts": {}}', '{"schema_version": 1}'] {
 			_LCT_WriteRaw(Dir . "installed.json", Text)
 			AssertThrows(() => LayoutCatalogue_ReadInstalled(Dir), "accepted: " . Text)
 		}
@@ -693,3 +692,198 @@ _LCT_InstalledChannelUrls() {
 	}
 }
 Test("layout catalogue follows packaged and local build channels (layout-registry-channel)", _LCT_InstalledChannelUrls)
+
+_LCT_OutdatedCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "/tests/corpus/layouts/installed_record_outdated.json", "UTF-8"))
+}
+
+_LCT_OutdatedSource(Corpus, IncludeValid := true) {
+	Rows := IncludeValid ? Corpus["valid_member"] : ""
+	for Vector in Corpus["outdated"]
+		Rows .= (Rows != "" ? "," : "") . Vector["member"]
+	return '{"schema_version":1,' . Corpus["top_member"] . ',"layouts":{' . Rows . "}}"
+}
+
+_LCT_OutdatedRawMembers(Corpus, Source) {
+	AssertTrue(InStr(Source, Corpus["top_member"], true) > 0, "future header retains its exact JSON identities")
+	for Vector in Corpus["outdated"]
+		AssertTrue(InStr(Source, Vector["member"], true) > 0,
+			"obsolete source member remains exact: " . Vector["id"])
+}
+
+_LCT_EqualSourceBytes(Expected, Actual) {
+	AssertEqual(Expected.Size, Actual.Size, "source byte count remains exact")
+	loop Expected.Size
+		AssertEqual(NumGet(Expected, A_Index - 1, "UChar"), NumGet(Actual, A_Index - 1, "UChar"),
+			"source byte " . A_Index)
+}
+
+_LCT_OutdatedRecordReadsAndWrites() {
+	global _LOGGER_REPEAT_ENABLED
+	Dir := _LCT_TempDir(), Corpus := _LCT_OutdatedCorpus()
+	Captured := [], PreviousRepeat := _LOGGER_REPEAT_ENABLED
+	_LOGGER_REPEAT_ENABLED := false
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := Dir . "installed.json"
+		_LCT_WriteRaw(Path, _LCT_OutdatedSource(Corpus))
+		Before := FileRead(Path, "RAW")
+		loop 3 {
+			Installed := LayoutCatalogue_ReadInstalled(Dir)
+			AssertEqual(1, Installed.Count, "outdated entries cannot hide the usable neighbor or add phantom layouts")
+			AssertTrue(Installed.Has("sample"))
+			AssertEqual("1", Installed["sample"]["version"])
+			for Vector in Corpus["outdated"]
+				AssertFalse(Installed.Has(Vector["id"]), "obsolete entry stays outside runtime membership")
+			LoggerWarn("LayoutCatalogue", "Interleaved catalogue-read fixture warning {1}.", A_Index)
+		}
+		_LCT_EqualSourceBytes(Before, FileRead(Path, "RAW"))
+		Counts := Map(), Errors := 0
+		for Vector in Corpus["outdated"]
+			Counts[Vector["id"]] := 0
+		for Line in Captured {
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+			for Vector in Corpus["outdated"] {
+				EntryPath := "layouts[" . JsonStringLiteral(Vector["id"]) . "]"
+				if InStr(Line, "[WARNING]", true) && InStr(Line, EntryPath, true) {
+					Counts[Vector["id"]] += 1
+					AssertTrue(InStr(Line, Path, true) > 0, "the warning names its actual file")
+					AssertTrue(InStr(Line, Vector["detail"], true) > 0, "independent reason is reported")
+				}
+			}
+		}
+		AssertEqual(0, Errors, "obsolete records are warnings rather than whole-file errors")
+		for Id, Count in Counts
+			AssertEqual(1, Count, "interleaved actual reads warn once: " . Id)
+		Copied := Installed.Clone()
+		AssertTrue(Copied.HasOwnProp("_LayoutCatalogueRecordSource"), "native Map.Clone retains non-enumerable source ownership")
+		LayoutCatalogue_WriteInstalled(Dir, Copied)
+		Written := _LCT_Read(Path)
+		_LCT_OutdatedRawMembers(Corpus, Written)
+		AssertTrue(InStr(Written, Corpus["valid_member"], true) > 0, "an unchanged valid row keeps future source values")
+		Installed := LayoutCatalogue_ReadInstalled(Dir)
+		Installed["sample"] := Map("id", "sample", "sha256", "x", "version", "2", "size", 1)
+		LayoutCatalogue_WriteInstalled(Dir, Installed)
+		Written := _LCT_Read(Path)
+		_LCT_OutdatedRawMembers(Corpus, Written)
+		AssertTrue(InStr(Written, Corpus["valid_future_member"], true) > 0, "updating known fields cannot erase future values")
+		AssertEqual("2", LayoutCatalogue_ReadInstalled(Dir)["sample"]["version"])
+	} finally {
+		_LOGGER_REPEAT_ENABLED := PreviousRepeat
+		LoggerClearTestSink()
+		DirDelete(Dir, true)
+	}
+}
+Test("layout catalogue: obsolete record rows warn once and preserve actual source neighbors (config-outdated-installed)",
+	_LCT_OutdatedRecordReadsAndWrites)
+
+_LCT_OutdatedRecordInstallAndUninstall() {
+	Dir := _LCT_TempDir(), Corpus := _LCT_OutdatedCorpus()
+	try {
+		Path := Dir . "installed.json"
+		_LCT_WriteRaw(Path, _LCT_OutdatedSource(Corpus, false))
+		Result := _LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())
+		AssertTrue(Result[1], "an obsolete neighbor cannot refuse the actual verified installation")
+		AssertEqual(1, LayoutCatalogue_ReadInstalled(Dir).Count)
+		AssertEqual(_LCT_LayoutText("ergol"), LayoutRegistry_ReadLocal("ergol", Dir)["Text"], "the real local owner verifies the installed copy")
+		_LCT_OutdatedRawMembers(Corpus, _LCT_Read(Path))
+		Before := FileRead(Path, "RAW")
+		Rejected := LayoutCatalogue_Uninstall("renamed", Dir)
+		AssertFalse(Rejected["ok"], "an obsolete row cannot become an installed native target")
+		AssertEqual(LAYOUT_CATALOGUE_FAILURE_NOT_INSTALLED, Rejected["code"])
+		_LCT_EqualSourceBytes(Before, FileRead(Path, "RAW"))
+		AssertTrue(FileExist(Dir . "ergol.keylayout"), "refusing an obsolete target leaves valid copies alone")
+		AssertTrue(LayoutCatalogue_Uninstall("ergol", Dir)["ok"], "actual uninstall still commits")
+		AssertFalse(FileExist(Dir . "ergol.keylayout"))
+		AssertEqual(0, LayoutCatalogue_ReadInstalled(Dir).Count, "outdated metadata does not enumerate as a layout")
+		_LCT_OutdatedRawMembers(Corpus, _LCT_Read(Path))
+		AssertEqual(0, LayoutCatalogue_Busy())
+	} finally DirDelete(Dir, true)
+}
+Test("layout catalogue: actual install and uninstall keep obsolete rows and future header data (config-outdated-installed)",
+	_LCT_OutdatedRecordInstallAndUninstall)
+
+_LCT_OutdatedSourceReceiptRefusal() {
+	Dir := _LCT_TempDir(), OtherDir := _LCT_TempDir(), Corpus := _LCT_OutdatedCorpus()
+	try {
+		Path := Dir . "installed.json"
+		_LCT_WriteRaw(Path, _LCT_OutdatedSource(Corpus))
+		Installed := LayoutCatalogue_ReadInstalled(Dir)
+		AssertThrows(() => LayoutCatalogue_WriteInstalled(OtherDir, Installed), "source metadata cannot borrow another file identity")
+		AssertFalse(FileExist(OtherDir . "installed.json"))
+		Changed := _LCT_Read(Path) . " "
+		_LCT_WriteRaw(Path, Changed)
+		Before := FileRead(Path, "RAW")
+		Installed["sample"]["version"] := "2"
+		AssertThrows(() => LayoutCatalogue_WriteInstalled(Dir, Installed), "held source metadata cannot overwrite changed source bytes")
+		_LCT_EqualSourceBytes(Before, FileRead(Path, "RAW"))
+	} finally {
+		DirDelete(Dir, true)
+		DirDelete(OtherDir, true)
+	}
+}
+Test("layout catalogue: raw member metadata cannot cross file identity or source drift (config-outdated-installed)",
+	_LCT_OutdatedSourceReceiptRefusal)
+
+
+_LCT_CaseDistinctFutureMembers() {
+	Dir := _LCT_TempDir()
+	try {
+		Path := Dir . "installed.json"
+		Source := '{"schema_version":1,"Layouts":null,"LAYOUTS":false,"Schema_Version":1.25e+2,"SCHEMA_VERSION":[],"layouts":{"sample":{"id":"sample","sha256":"x","version":"1","size":1,"Case":1,"case":2},"ergol":false}}'
+		Future := ['"Layouts":null', '"LAYOUTS":false', '"Schema_Version":1.25e+2', '"SCHEMA_VERSION":[]']
+		_LCT_WriteRaw(Path, Source)
+		Before := FileRead(Path, "RAW")
+		Installed := LayoutCatalogue_ReadInstalled(Dir)
+		AssertEqual(1, Installed.Count, "cased future headers do not enumerate as layouts")
+		AssertEqual(1, Installed["sample"]["Case"]), AssertEqual(2, Installed["sample"]["case"])
+		AssertEqual("1", Installed._LayoutCatalogueRecordSource.original["sample"]["version"])
+		_LCT_EqualSourceBytes(Before, FileRead(Path, "RAW"))
+		LayoutCatalogue_WriteInstalled(Dir, Installed)
+		for Member in Future
+			AssertTrue(InStr(_LCT_Read(Path), Member, true) > 0, "ordinary save preserves distinct JSON header: " . Member)
+		Installed := LayoutCatalogue_ReadInstalled(Dir)
+		Installed["sample"]["version"] := "2"
+		AssertEqual("1", Installed._LayoutCatalogueRecordSource.original["sample"]["version"],
+			"the original snapshot is detached from an in-place entry mutation")
+		LayoutCatalogue_WriteInstalled(Dir, Installed)
+		AssertEqual("2", LayoutCatalogue_ReadInstalled(Dir)["sample"]["version"])
+		for Member in Future
+			AssertTrue(InStr(_LCT_Read(Path), Member, true) > 0, "in-place update preserves distinct JSON header: " . Member)
+		AssertTrue(InStr(_LCT_Read(Path), '"ergol":false', true) > 0, "unrelated save preserves the obsolete same-id row")
+		Result := _LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())
+		AssertTrue(Result[1], "explicit verified install replaces the obsolete same-id row")
+		AssertEqual(2, LayoutCatalogue_ReadInstalled(Dir).Count)
+		AssertEqual(_LCT_LayoutText("ergol"), LayoutRegistry_ReadLocal("ergol", Dir)["Text"])
+		AssertFalse(InStr(_LCT_Read(Path), '"ergol":false', true) > 0, "only explicit installation retires that obsolete record")
+		for Member in Future
+			AssertTrue(InStr(_LCT_Read(Path), Member, true) > 0, "actual installation preserves distinct JSON header: " . Member)
+		AssertTrue(LayoutCatalogue_Uninstall("ergol", Dir)["ok"])
+		AssertEqual(1, LayoutCatalogue_ReadInstalled(Dir).Count)
+		for Member in Future
+			AssertTrue(InStr(_LCT_Read(Path), Member, true) > 0, "actual uninstall preserves distinct JSON header: " . Member)
+		Written := _LCT_Read(Path)
+		AssertTrue(InStr(Written, '"Case":1', true) > 0), AssertTrue(InStr(Written, '"case":2', true) > 0)
+		AssertEqual(0, LayoutCatalogue_Busy())
+	} finally DirDelete(Dir, true)
+}
+Test("layout catalogue: case-distinct future headers survive real save install and uninstall (config-outdated-installed)",
+	_LCT_CaseDistinctFutureMembers)
+
+
+_LCT_RecordValueStringIdentity() {
+	AssertFalse(_LayoutCatalogueSameValue(JsonParse('"Case"'), JsonParse('"case"')),
+		"JSON string case changes are explicit record changes")
+	AssertFalse(_LayoutCatalogueSameValue(JsonParse('"01"'), JsonParse('"1"')),
+		"distinct numeric-looking JSON strings are distinct record values")
+	AssertFalse(_LayoutCatalogueSameValue(JsonParse('"1"'), JsonParse('1')),
+		"JSON string and number identities stay distinct")
+	AssertTrue(_LayoutCatalogueSameValue(JsonParse('"before\u0000one"'), JsonParse('"before\u0000one"')),
+		"an unchanged NUL-containing JSON value preserves its original token")
+	AssertFalse(_LayoutCatalogueSameValue(JsonParse('"before\u0000one"'), JsonParse('"before\u0000two"')),
+		"the stored UTF-16 suffix after NUL remains part of JSON string identity")
+}
+Test("layout catalogue: raw preservation compares exact JSON string identities (config-outdated-installed)",
+	_LCT_RecordValueStringIdentity)

@@ -1,0 +1,28 @@
+{
+	"base": "375de99fbfdaf0ecf4d4ba06e71be7940fe0470c",
+	"patch_sha256": "8daad075bd4bd0ce806fddfc66fdf29c9c18938f87604cb06913844d2ad3f1f0",
+	"files": [
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+			"preimage_sha256": "5545894500281de9c357b6f2bf2c82c7d58a5130e6b49471e98298a2a297c713",
+			"postimage_sha256": "4e2fdf0c59e075e5eac4cb0b74ca25563a2987db331b49e3f2f2428ddca99c3d"
+		},
+		{
+			"path": "docs/ERGOPTIPLUS_TODO.md",
+			"preimage_sha256": "0b03ba2e50f4e10f58eff4be86eafa656334be19f60843f0f97f4f3b93abc449",
+			"postimage_sha256": "1ce72e0673e82e7ae07585b21198e02733c2b717df6a5b007cf3b2fe6f68af1a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/test_config_bool_leaf_policy.lua",
+			"preimage_sha256": null,
+			"postimage_sha256": "a08013abfdd58d8c4efae8a665ad15f62f08c99fe41a2a851faf75882630654c"
+		}
+	],
+	"protected_owners_unchanged": [
+		"static/ergopti_plus/_shared/lua/config_outdated.lua",
+		"static/ergopti_plus/macos/adapters/file_system.lua",
+		"static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
+		"static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua"
+	],
+	"original_tests": "all seven selected preexisting modules byte-identical"
+}
