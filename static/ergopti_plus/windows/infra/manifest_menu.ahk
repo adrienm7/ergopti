@@ -573,6 +573,22 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting) {
 		}
 		if ItemType == "---"
 			Row := Map("separator", true)
+		else if ItemType == "label" {
+			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true)
+			I18nKey := _MR_Get(Item, "i18n")
+			Unavailable := _MR_Get(Item, "unavailable")
+			Valid := Type(Id) == "String" && Id != "" && Type(I18nKey) == "String" && I18nKey != ""
+				&& (!Item.Has("unavailable") || Unavailable == "hide")
+			for Field in Item {
+				if !Fields.Has(Field)
+					Valid := false
+			}
+			if !Valid {
+				try LoggerError("MenuRenderer", "Invalid inert label in template '{1}' — provider rows refused.", ManifestKey)
+				return false
+			}
+			Row := Map("label", t(I18nKey), "disabled", true)
+		}
 		else if ItemType == "command" {
 			Row := MenuRenderer_CommandRow(ManifestKey, Id, Commands, StateGetters)
 			if !(Row is Map)

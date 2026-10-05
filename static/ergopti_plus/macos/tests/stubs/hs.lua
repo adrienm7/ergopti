@@ -233,8 +233,10 @@ local function _json_decode(s)
 		local kind = type(value)
 		if kind == "table" then return canonical[value] end
 		if kind == "number" then
-			-- NSNumber compares by value: 1 and 1.0 are equal.
-			if math.type(value) == "float" and value == math.floor(value) and math.abs(value) < 2 ^ 53 then
+			-- NSNumber compares by value: 1 and 1.0 are equal. LuaJIT has
+			-- one numeric type and already gives them the same tostring key;
+			-- only Lua 5.3+ needs integer/float kind normalization.
+			if type(math.type) == "function" and math.type(value) == "float" and value == math.floor(value) and math.abs(value) < 2 ^ 53 then
 				value = math.tointeger(value)
 			end
 			return "n" .. tostring(value)
@@ -275,10 +277,10 @@ local function _json_decode(s)
 			if c == '\\' then
 				local e = s:sub(pos + 1, pos + 1)
 				if e == 'n' then buf[#buf + 1] = '\n'
-				elseif e == 't' then buf[#buf + 1] = '\t'
-				elseif e == 'r' then buf[#buf + 1] = '\r'
 				elseif e == 'b' then buf[#buf + 1] = '\b'
 				elseif e == 'f' then buf[#buf + 1] = '\f'
+				elseif e == 't' then buf[#buf + 1] = '\t'
+				elseif e == 'r' then buf[#buf + 1] = '\r'
 				elseif e == '"' or e == '\\' or e == '/' then buf[#buf + 1] = e
 				else buf[#buf + 1] = '\\' ; buf[#buf + 1] = e end
 				pos = pos + 2

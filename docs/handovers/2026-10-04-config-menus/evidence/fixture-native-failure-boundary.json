@@ -1,0 +1,34 @@
+{
+	"source_sha": "709dc545e902682e8d4e287b8a3ce56000a7d6ec",
+	"tested_ci_sha": "c895ae17a809c89f7ac98ba7970da5cb8a23460c",
+	"manual_run": "https://github.com/adrienm7/ergopti/actions/runs/37282444315",
+	"windows_units": {
+		"passed": 9175,
+		"failed": 14,
+		"previous_passed": 9164,
+		"previous_failed": 25,
+		"corrected_group1_failures": 11
+	},
+	"failed_windows_subjects": [
+		"1. api_remote: cancellation during curl Run cannot miss unpublished owner (remote-cancel-publication-race) \u2014 cancellation inside Run must not be overwritten by a live publication - actual: <1> [test_llm_api_remote.ahk:957]",
+		"2. api_remote: a throwing owned launcher cannot leak its child (AHK-079) \u2014 a launch failure after process creation must retire the reservation - actual: <1> [test_llm_api_remote.ahk:994]",
+		"3. api_remote: owned launch failure aborts dispatch without adoption (AHK-079) \u2014 failed owned launch must fail the request exactly once - expected: <1>, actual: <0> [test_llm_api_remote.ahk:1031]",
+		"4. LLM curl artifacts: remote-only dispatch schedules common cleanup (ahk2-03-remote-sweep) \u2014 (ahk2-03-remote-sweep) remote-only curl use must schedule the common crash-artifact reaper exactly once - expected: <1>, actual: <0> [test_llm_crash_orphan_cleanup.ahk:103]",
+		"5. AHK-006 temp artifact ownership: remote launch failure deletes payload stdout token status and exit (ahk-006-temp-artifact-terminal-ownership) \u2014 remote dispatch must invoke its child-process port exactly once - expected: <1>, actual: <0> [test_llm_temp_artifact_terminal_ownership.ahk:217]",
+		"6. Local server publication: native application refusal retains exact WAL and barrier (local-server-private-source) \u2014 expected true - actual: <0> [test_local_server_private_publication.ahk:587]",
+		"7. Local server publication: native cleanup refusal keeps durable debt honest (local-server-private-source) \u2014 expected true - actual: <0> [test_local_server_private_publication.ahk:604]",
+		"8. Local server publication: foreign post-durable bytes retain unresolved ownership (local-server-private-source) \u2014 expected true - actual: <0> [test_local_server_private_publication.ahk:624]",
+		"9. Local server publication: final file reread cannot outlive the retained model claim (local-server-private-source) \u2014 values differ - expected: <1>, actual: <0> [test_local_server_private_publication.ahk:669]",
+		"10. Local server publication: missing durable journal cannot reopen stale RAM authority (local-server-private-source) \u2014 expected true - actual: <0> [test_local_server_private_publication.ahk:716]",
+		"11. system proxy: PAC failure and timeout keep the static proxy \u2014 the deadline must release the waiter - expected: <2>, actual: <1> [test_changelog_network_resilience.ahk:202]",
+		"12. system proxy: malformed PAC receipt cannot publish partial cache \u2014 one malformed answer must reject the whole receipt - expected: <0>, actual: <2> [test_changelog_network_resilience.ahk:495]",
+		"13. system proxy native: actual WinHTTP PAC evaluates exact scheme port path query and DIRECT \u2014 real WinHTTP PAC ABI and destination policy must agree - expected: <0>, actual: <1> [test_changelog_network_resilience.ahk:767]",
+		"14. meta timers: no sub-second repeating timer exists outside the inventory \u2014 a repeating timer fires every unreadable interval on the keystroke-dispatch thread and is not in the inventory: Callback. Add it with its period and a one-line justification, or make it a one-shot. Every poller here is a periodic stall inserted into typing [test_fast_timer_inventory.ahk:245]"
+	],
+	"native_macOS_package_failed_subjects": [
+		"SparkleArchiveUpdateAcceptanceTests.testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch: nativeProcessCensus exit1, cleanup kernel-process-census/server-terminal/server-exit",
+		"HomebrewArchiveAcceptanceTests.testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState: exact owned AppleEvent receiver is no longer live"
+	],
+	"source_scope": "Configuration/menu fixture successors; no Windows AI/network/timer implementation or Swift launcher source changed",
+	"source_equality_limit": "Equal source objects alone do not establish a failure cause; retain the actual native failures and owner investigation. Full old Windows details are truncated after case21."
+}

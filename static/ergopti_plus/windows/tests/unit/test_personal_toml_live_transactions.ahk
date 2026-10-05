@@ -745,14 +745,22 @@ _PT102_WithCase(Mode, Body) {
 		if Mode == "metadata" {
 			RawSeed := Chr(0xFEFF) . FSReadUtf8Exact(Path)
 			RawSeed := StrReplace(RawSeed, "[_meta]`r`n",
-				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , &FileMatches, 1)
-			; The initial writer emits no section-override table without existing overrides.
+				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , &FileInsertions, 1)
+			; The neutral writer omits absent section overrides. Seed a real table
+			; before the first entry rather than replacing a nonexistent header.
 			RawSeed := StrReplace(RawSeed, "[[alpha]]`r`n",
-				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n[[alpha]]`r`n', , &SectionMatches, 1)
-			if FileMatches != 1 || SectionMatches != 1
-				throw Error("opening-source fixture metadata anchors must each occur once")
+				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n[[alpha]]`r`n', , &SectionInsertions, 1)
+			AssertEqual(1, FileInsertions, "opening-source fixture must seed its file overrides")
+			AssertEqual(1, SectionInsertions, "opening-source fixture must seed its section overrides")
 			if !FSWriteDurable(Path, RawSeed)
 				throw Error("opening-source fixture metadata publication refused")
+			SeedOverrides := _PersonalTomlCaptureOverrides(Path)
+			AssertTrue(SeedOverrides["ok"], "opening-source metadata seed must be readable")
+			AssertTrue(SeedOverrides["sections"].Has("alpha"), "opening-source metadata seed must own alpha")
+			for Field, Literal in Map("delay", "0.125", "color", '"#123456"', "priority", "23", "show_tooltip", "false")
+				AssertEqual(Literal, SeedOverrides["file"][Field], "file metadata must exist before the editor opens")
+			for Field, Literal in Map("delay", "0.75", "color", '"#ABCDEF"', "priority", "42", "show_tooltip", "true")
+				AssertEqual(Literal, SeedOverrides["sections"]["alpha"][Field], "section metadata must exist before the editor opens")
 		}
 		if Mode == "cached"
 			_ReadPersonalTomlCache := _PTIOCR_Model("cached")

@@ -1,0 +1,23 @@
+{
+	"source_boundary": "709dc545e902682e8d4e287b8a3ce56000a7d6ec",
+	"archives": [
+		{
+			"name": "group1-resumed-menu-preparations-final.zip",
+			"sha256": "89161b5c97100d653106a7b46d26827804b11834402f537736c9b0f253ef46c0",
+			"entries": 398,
+			"status": "Only Tap-Hold head and Linux certification applied; Metrics V3 reviewed/unapplied; Delay/Wrap blocked; Guidance reviewed but blocked; Gesture unvalidated."
+		},
+		{
+			"name": "retired-api-provider-publication-candidate-final.zip",
+			"sha256": "c249ed787751887890fbc68d7de5a7596732b19d769619d496407506493be20b",
+			"status": "Reviewed source candidate, unapplied; current preimages/manifest composition and full/native qualification required."
+		},
+		{
+			"name": "qualification-fixture-successors.zip",
+			"sha256": "d81a268c542c4745efdcac5704931012122e0595c109ba5462612ff91e70554b",
+			"entries": 97,
+			"status": "Applied fixture-only corrections; source review clear; native Windows/macOS qualification is recorded separately."
+		}
+	],
+	"immutable_history": "Historical author/review statuses and paths remain frozen. PARTIAL-DELIVERY.md and current receipts own subsequent integration/validation statements."
+}

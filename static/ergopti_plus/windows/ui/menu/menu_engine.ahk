@@ -404,6 +404,8 @@ ToggleFeatureV2(V2Path) {
 ; here (they keep the v1 MenuAddItemWithLabel path).
 _HS_TryLiveToggleV2(V2Path) {
 	global Features
+	if V2Path == "hotstrings.dynamic.user_code"
+		return _HS_ToggleProgrammableHotstrings(V2Path)
 	V2Parts := StrSplit(V2Path, ".")
 	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {
 		try LoggerDebug("Menu", "Live-toggle (v2): '{1}' is not a hotstring section → Reload.", V2Path)
@@ -427,6 +429,26 @@ _HS_TryLiveToggleV2(V2Path) {
 		return {handled: true, ok: false}
 	}
 	RebuildHotstringsLive()
+	return {handled: true, ok: true}
+}
+
+; Cancellation must acknowledge ownership before the desired state is written.
+; This avoids publishing disabled preferences while a factory still runs.
+_HS_ToggleProgrammableHotstrings(V2Path) {
+	global Features
+	if A_IsSuspended || !IsCategoryGated("Hotstrings")
+		return {handled: true, ok: false}
+	State := ReadFeatureStateV2(V2Path)
+	WasEnabled := State.Has("enabled") && State["enabled"]
+	if !UserHotstringsSetEnabled(false)
+		return {handled: true, ok: false}
+	if !WriteFeatureV2(Features, V2Path, !WasEnabled) {
+		UserHotstringsSetEnabled(WasEnabled && IsCategoryGated("Hotstrings"))
+		return {handled: true, ok: false}
+	}
+	; Source errors leave the persisted request visible but callback admission
+	; closed; the source owner offers the translated repair action.
+	UserHotstringsSetEnabled(!WasEnabled && IsCategoryGated("Hotstrings"))
 	return {handled: true, ok: true}
 }
 
