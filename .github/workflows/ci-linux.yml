@@ -406,6 +406,14 @@ jobs:
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_callback_siblings.py
         timeout-minutes: 3
 
+      - name: Propagate native fallback wait refusal and retain healthy recovery
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
+        timeout-minutes: 1
+
       - name: Keep manual correction markers out of canonical character totals
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

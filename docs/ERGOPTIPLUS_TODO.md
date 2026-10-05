@@ -2162,6 +2162,31 @@ These are software implementations; final hardware verification remains below.
   No physical hook, timing policy, Writer, Reader, Walker, schema, configuration,
   window-title logic, menu, foreign driver or reserved change.
 
+- [~] **L136.** Linux fallback wait completion: accept the interpreter-native
+  os.execute success receipts true/0 and propagate refusal instead of reporting
+  a completed wait after an ignored command failure. Preserve duration conversion,
+  native nanosleep/EINTR behavior, luv pump/clock/reentry and existing shared timing
+  helpers. Eight actual native controls reproduce four failures and pass after
+  on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile, with
+  the original exact eight-check floor. A private executable returns exit7;
+  genuine sleep recovery completes at least25ms with exact0.020/0.025 arguments.
+  Stock Lua naturally lacks FFI; LuaJIT FFI absence and cdef refusal are explicitly
+  simulated selection seams around real commands. Thirteen registered controls
+  reproduce nine failures and pass after on all three profiles while loading
+  all382 modules without errors. Twelve model CLI/FFI receipts; the thirteenth
+  executes the real native child fixture. Preserve the entire old unit by the
+  remove-only inverse of the unchanged2567-byte internal insertion before the
+  unique backend-isolation block; this is not an appended-prefix claim. macOS
+  uses hs.timer.usleep with a void adapter contract, Windows native timer methods
+  use SetTimer; neither supplies this Linux boolean external-command wait path.
+  The macOS exception suppression is a separate source observation, not foreign
+  native validation or proof of an equivalent completion defect. Shared policies
+  remain unchanged; foreign native gates stay principal-owned. Register future
+  Linux CI without launching it. Real software waits/processes do not validate
+  physical input or new signal/lifecycle behavior. Preserve both language packs
+  and principal notification/HTTP assertions. No shared helper, foreign driver,
+  input hook, configuration, menu or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

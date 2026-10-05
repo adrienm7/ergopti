@@ -414,6 +414,58 @@ helpers.describe("linux-periodic-finite-admission", function()
 	end
 end)
 
+
+helpers.describe("linux-sleep-completion-receipts", function()
+	local receipts = {
+		{ name = "boolean native success", result = true, expected = true },
+		{ name = "numeric native success", result = 0, expected = true },
+		{ name = "nil native failure", result = nil, expected = false },
+		{ name = "numeric native failure", result = 1792, expected = false },
+		{ name = "false native failure", result = false, expected = false },
+		{ name = "raised command failure", raises = true, expected = false },
+	}
+	for _, branch in ipairs({ "explicit FFI absence", "explicit cdef refusal" }) do
+		for _, case in ipairs(receipts) do
+			helpers.it("linux-sleep-completion-receipts: " .. branch .. " honors " .. case.name, function()
+				local dependency = false
+				if branch == "explicit cdef refusal" then
+					dependency = { cdef = function() error("controlled cdef refusal") end }
+				end
+				local loop = helpers.load_module_with_dependency("adapters.event_loop", "ffi", dependency)
+				local execute = os.execute
+				local commands = {}
+				os.execute = function(command)
+					commands[#commands + 1] = command
+					if #commands > 1 then return true, "exit", 0 end
+					if case.raises then error("controlled command exception") end
+					return case.result, "exit", case.expected and 0 or 7
+				end
+				local ok, err = xpcall(function()
+					helpers.assert_eq(loop.sleep_ms(20), case.expected)
+					helpers.assert_eq(commands[1], "sleep 0.020", "native command argument must remain unchanged")
+					helpers.assert_eq(loop.sleep_ms(25), true, "following native success must remain usable")
+					helpers.assert_eq(commands[2], "sleep 0.025")
+					helpers.assert_eq(loop.sleep_ms(-1), false)
+					helpers.assert_eq(loop.sleep_ms("25"), false)
+					helpers.assert_eq(#commands, 2, "invalid typed/negative waits must not execute a command")
+				end, debug.traceback)
+				os.execute = execute
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+end)
+
+if native_ok and package.config:sub(1, 1) == "/" then
+	helpers.it("linux-sleep-completion-receipts: native command wait and refusal receipts are truthful", function()
+		local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+		local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_sleep_receipts.lua"
+		local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+		local result = os.execute(quote(executable) .. " " .. quote(fixture))
+		helpers.assert_true(result == true or result == 0, "native wait completion fixture must succeed")
+	end)
+end
+
 helpers.describe("event loop backend isolation", function()
   helpers.it("dependency fixtures restore cached and preload values after success", function()
     local loaded, preload = package.loaded.luv, package.preload.luv
