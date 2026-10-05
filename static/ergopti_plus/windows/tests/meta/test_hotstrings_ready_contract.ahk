@@ -4,7 +4,17 @@
 Test_HotstringsReadyMeansCompleteRegistryAndPreview() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Main := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
-	RegisterAt := InStr(Main, "RegisterAllHotstrings(false)")
+	RegisterAt := InStr(Main, "RegisterAllHotstrings(false, true)")
+	ReceiptAt := InStr(Main, '_BootHotstringsReceipt := RegisterAllHotstrings(false, true)')
+	GuardAt := InStr(Main, 'if !(_BootHotstringsReceipt is Map) || !_BootHotstringsReceipt.Get("committed", false)', false, ReceiptAt)
+	CompleteAt := InStr(Main, 'if _BootHotstringsReceipt["complete"]', false, GuardAt)
+	PartialAt := InStr(Main, 'BootProfile_Mark("Hotstrings registered (common autocorrection unavailable)")', false, CompleteAt)
+	Assert(ReceiptAt > 0 && GuardAt > ReceiptAt && CompleteAt > GuardAt && PartialAt > CompleteAt,
+		"the sole cold call consumes a committed receipt and classifies partial startup before ready")
+	Assert(InStr(Main, 'LoggerWarn("Hotstrings", "Common autocorrection is unavailable', false, CompleteAt) > CompleteAt,
+		"optional common refusal remains visible without aborting unrelated app startup")
+	Assert(RegExMatch(Main, 'if _BootHotstringsReceipt\["complete"\]\s+BootProfile_Mark\("Hotstrings registered \(HSE complete\)"\)'),
+		"only a complete cold receipt may announce the complete HSE registry")
 	IndexAt := InStr(Main, "HotstringPrefixWatcherRebuildIndex()", false, RegisterAt)
 	ReadyAt := InStr(Main, 'LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")')
 	Assert(RegisterAt > 0 and RegisterAt < ReadyAt,

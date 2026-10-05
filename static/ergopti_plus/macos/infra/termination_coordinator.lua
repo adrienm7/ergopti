@@ -44,6 +44,8 @@ local USER_EXIT_CODE = 0
 
 local _deps = nil
 local _transaction = nil
+local _admission_abort = nil
+local _admission_abort_active = false
 
 local function require_state(func_name)
 	if not _deps then
@@ -64,7 +66,47 @@ local function notify_aborted(transaction, detail)
 	end
 end
 
-local function abort_transaction(transaction, detail)
+local function admission_current(token)
+	if token == nil then return true end
+	local called, accepted = pcall(token.current)
+	return called and accepted == true
+end
+
+--- Retains a refused pre-fence release and its caller compensation together.
+--- A new terminal request may retry that exact abort; it cannot skip the debt.
+local function retry_admission_abort()
+	if _admission_abort == nil then return true end
+	if _admission_abort_active then return false end
+	local transaction = _admission_abort
+	_admission_abort_active = true
+	local called, released = pcall(transaction.admission.abort)
+	_admission_abort_active = false
+	if not called or released ~= true or _admission_abort ~= transaction then return false end
+	_admission_abort = nil
+	notify_aborted(transaction, transaction.abort_detail)
+	return true
+end
+
+local function capture_admission(kind)
+	if not retry_admission_abort() then return false end
+	if _transaction and not _transaction.settled then
+		return admission_current(_transaction.admission), _transaction.admission
+	end
+	if _deps.capture_publication_admission == nil then return true end
+	local called, token = pcall(_deps.capture_publication_admission, kind)
+	if not called or type(token) ~= "table" or type(token.current) ~= "function"
+		or type(token.abort) ~= "function" then return false end
+	-- A valid capability is retained even if its first guard refuses. Only its
+	-- own exact abort can release the producer admission it may already hold.
+	if admission_current(token) ~= true then
+		_admission_abort = { admission = token, abort_detail = "publication admission refused" }
+		retry_admission_abort()
+		return false
+	end
+	return true, token
+end
+
+local function abort_transaction(transaction, detail, legacy_notify)
 	if transaction.settled then return false end
 	transaction.settled = true
 	transaction.completion_ok = false
@@ -73,8 +115,14 @@ local function abort_transaction(transaction, detail)
 		pcall(_deps.clear_reload)
 		transaction.reload_marked = false
 	end
-	Logger.error(LOG, "Controlled %s aborted: %s.", transaction.kind, tostring(detail))
-	notify_aborted(transaction, detail)
+	pcall(Logger.error, LOG, "Controlled %s aborted: %s.", transaction.kind, tostring(detail))
+	if transaction.admission ~= nil then
+		transaction.abort_detail = detail
+		_admission_abort = transaction
+		retry_admission_abort()
+	elseif legacy_notify ~= false then
+		notify_aborted(transaction, detail)
+	end
 	return false
 end
 
@@ -116,6 +164,9 @@ end
 
 local function invoke_terminal(transaction)
 	if _transaction ~= transaction or transaction.settled then return false end
+	if not admission_current(transaction.admission) then
+		return fail_after_teardown(transaction, "hotstring publication admission revoked")
+	end
 	-- No log may be emitted from this point through the terminal action: the
 	-- drain callback proves the native worker has acknowledged the entire queue.
 	local finalizer_ok, finalizer_result = xpcall(_deps.finalize_teardown, debug.traceback)
@@ -424,6 +475,9 @@ local function finish_transaction(transaction, fenced, detail)
 		return
 	end
 	transaction.fenced = true
+	if not admission_current(transaction.admission) then
+		return teardown_then_fail_after_fence(transaction, "hotstring publication admission revoked after fence")
+	end
 	local logged_ok, logged_or_error = xpcall(function()
 		Logger.info(LOG, "Exact Karabiner lease fenced; completing controlled %s.",
 			transaction.kind)
@@ -435,14 +489,17 @@ local function finish_transaction(transaction, fenced, detail)
 	transaction.completion_ok = begin_input_drain(transaction)
 end
 
-local function request(kind, reason, arguments, exit_code, on_aborted, require_fresh)
+local function request(kind, reason, arguments, exit_code, on_aborted, require_fresh, prepared_admission)
 	if not require_state("request_" .. kind) then return false end
 	if type(reason) ~= "string" or reason == "" then
 		Logger.error(LOG, "Controlled %s requires a non-empty reason.", kind)
 		return false
 	end
+	if not retry_admission_abort() then return false end
 
 	if _transaction and not _transaction.settled then
+		if prepared_admission ~= nil and prepared_admission ~= _transaction.admission then return false end
+		if not admission_current(_transaction.admission) then return false end
 		-- An owned reload handoff must never silently join an older terminal
 		-- transition. Its caller has already published reversible state that only
 		-- this exact abort callback can compensate while the Lua environment is
@@ -483,6 +540,9 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 		end
 		return true
 	end
+	local admitted, admission = true, prepared_admission
+	if admission == nil then admitted, admission = capture_admission(kind) end
+	if admitted ~= true then return false end
 
 	local transaction = {
 		kind = kind,
@@ -492,6 +552,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 		settled = false,
 		completion_ok = nil,
 		on_aborted = on_aborted,
+		admission = admission,
 	}
 	_transaction = transaction
 	-- Who asked is the first question about any reload or quit in a user log, and
@@ -499,6 +560,9 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 	-- Protected: a failing logger has no other sink to report to, and must never
 	-- turn a quit into a refusal.
 	pcall(Logger.info, LOG, "Controlled %s requested (reason: %s).", kind, reason)
+	if not admission_current(admission) then
+		return abort_transaction(transaction, "hotstring publication admission revoked before fence")
+	end
 
 	local callback_fired = false
 	local function on_fenced(ok, detail)
@@ -526,10 +590,8 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 					"post-fence lease callback raised: " .. tostring(callback_err))
 				return
 			end
-			if _transaction == transaction then _transaction = nil end
 			if not transaction.settled then
-				Logger.error(LOG, "Controlled %s lease callback failed before fencing: %s.",
-					transaction.kind, tostring(callback_err))
+				abort_transaction(transaction, "lease callback failed before fencing", false)
 			end
 		end
 	end
@@ -548,14 +610,10 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 			-- finalized sink nor orphan an already-owned transition afterwards.
 			if transaction.settled then return transaction.completion_ok == true end
 		end
-		if _transaction == transaction then _transaction = nil end
-		Logger.error(LOG, "Controlled %s lease request raised: %s.", kind, tostring(accepted_or_err))
-		return false
+		return abort_transaction(transaction, "lease request raised: " .. tostring(accepted_or_err), false)
 	end
 	if accepted_or_err ~= true and not callback_fired then
-		_transaction = nil
-		Logger.error(LOG, "Controlled %s lease request was rejected.", kind)
-		return false
+		return abort_transaction(transaction, "lease request was rejected", false)
 	end
 	if callback_fired then return transaction.completion_ok == true end
 	return accepted_or_err == true
@@ -585,6 +643,10 @@ function M.init(deps)
 	if type(deps.fatal_exit_code) ~= "number" or deps.fatal_exit_code % 1 ~= 0
 		or deps.fatal_exit_code < 1 or deps.fatal_exit_code > 255 then
 		Logger.error(LOG, "M.init(): fatal_exit_code must be an integer from 1 to 255.")
+		return false
+	end
+	if deps.capture_publication_admission ~= nil and type(deps.capture_publication_admission) ~= "function" then
+		Logger.error(LOG, "M.init(): optional publication admission must be a function.")
 		return false
 	end
 	if type(deps.user_exit_deadline_seconds) ~= "number" or deps.user_exit_deadline_seconds <= 0 then
@@ -650,13 +712,14 @@ end
 --- @return boolean pending
 function M.is_pending()
 	if not require_state("is_pending") then return false end
-	return _transaction ~= nil and not _transaction.settled
+	return _admission_abort ~= nil or (_transaction ~= nil and not _transaction.settled)
 end
 
 --- Names the stage the active terminal transaction is waiting on. It never logs,
 --- so the quit watchdog may call it after the logger sink was finalized.
 --- @return string stage
 function M.pending_stage()
+	if _admission_abort ~= nil then return "hotstring-publication-admission-abort" end
 	local transaction = _transaction
 	if transaction == nil or transaction.settled then return "none" end
 	if transaction.fenced ~= true then return "karabiner-lease-fence" end
@@ -669,7 +732,8 @@ function M.pending_stage()
 	return "terminal-action"
 end
 
---- Requests a user-initiated exit that can never leave the process running.
+--- Requests a user exit after existing publication debt permits admission.
+--- A refusal before admission keeps the live VM and never arms the watchdog.
 --- The deadline is armed before the exact-fence request; a fence failure, a
 --- rejection, or any stage still pending at the deadline force-exits with the
 --- non-zero fatal code, and native stdin EOF lets the guardian revoke the lease.
@@ -681,7 +745,9 @@ function M.request_user_exit(reason)
 		Logger.error(LOG, "Controlled user exit requires a non-empty reason.")
 		return false
 	end
-	Logger.info(LOG, "User exit '%s' requested; hard deadline %.1f s.",
+	local admitted, admission = capture_admission("exit")
+	if admitted ~= true then return false end
+	pcall(Logger.info, LOG, "User exit '%s' requested; hard deadline %.1f s.",
 		reason, _deps.user_exit_deadline_seconds)
 	return EmergencyExit.request({
 		reason = reason,
@@ -689,7 +755,9 @@ function M.request_user_exit(reason)
 		exit_code = USER_EXIT_CODE,
 		forced_exit_code = _deps.fatal_exit_code,
 		schedule = _deps.schedule,
-		request_exit = M.request_exit,
+		request_exit = function(exit_reason, code, on_aborted)
+			return request("exit", exit_reason, table.pack(), code, on_aborted, false, admission)
+		end,
 		exit = _deps.fatal_exit,
 		describe = M.pending_stage,
 	})

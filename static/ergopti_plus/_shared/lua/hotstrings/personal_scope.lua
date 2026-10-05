@@ -60,4 +60,47 @@ function M.admit(inventory, selected)
 	return { source = Files.copy(found.source), owner = found.owner, path = found.path }
 end
 
+--- Plan explicit owner adoption without assigning one legacy choice to two files.
+--- Candidates contain a source descriptor, exact path, optional physical identity,
+--- and an optional legacy_owner only when migrating a stored legacy preference.
+--- Native adapters still establish and recheck their closed mutation capability.
+--- @param candidates table
+--- @return table|nil inventory Detached evidence; ambiguous candidates are unadmitted.
+--- @return string|nil reason
+function M.plan_adoption(candidates)
+	if not dense(candidates) then return nil, "invalid-request" end
+	local inventory, ids, paths, physical, legacy = {}, {}, {}, {}, {}
+	local function remember(map, key, index)
+		if key == nil then return end
+		map[key] = map[key] or {}
+		map[key][#map[key] + 1] = index
+	end
+	for index, candidate in ipairs(candidates) do
+		if type(candidate) ~= "table" or not Files.is_descriptor(candidate.source)
+			or type(candidate.path) ~= "string" or candidate.path == ""
+			or (candidate.physical ~= nil and (type(candidate.physical) ~= "string" or candidate.physical == ""))
+			or (candidate.legacy_owner ~= nil and (type(candidate.legacy_owner) ~= "string" or candidate.legacy_owner == "")) then
+			return nil, "invalid-inventory"
+		end
+		inventory[index] = { source = Files.copy(candidate.source), owner = candidate.source.id,
+			path = candidate.path, admitted = true, exclusive = true }
+		remember(ids, candidate.source.id, index)
+		remember(paths, candidate.path, index)
+		remember(physical, candidate.physical, index)
+		remember(legacy, candidate.legacy_owner, index)
+	end
+	for _, pair in ipairs({ {ids, "duplicate-source"}, {paths, "path-alias"},
+		{physical, "physical-alias"}, {legacy, "ambiguous-legacy-owner"} }) do
+		for _, indices in pairs(pair[1]) do
+			if #indices > 1 then
+				for _, index in ipairs(indices) do
+					inventory[index].admitted, inventory[index].exclusive = false, false
+					inventory[index].reason = inventory[index].reason or pair[2]
+				end
+			end
+		end
+	end
+	return inventory
+end
+
 return M

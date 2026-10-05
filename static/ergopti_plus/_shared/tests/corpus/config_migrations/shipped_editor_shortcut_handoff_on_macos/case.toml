@@ -3,4 +3,4 @@ description = "An exact old macOS custom editor chord becomes an ordinary bindin
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 8
-to_version = 10
+to_version = 11

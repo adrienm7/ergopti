@@ -793,6 +793,36 @@ function M.plan(source, registry, driver, context)
 	return { outcome = "migrated", version = version, candidate = candidate, model = after }
 end
 
+--- Plans validated record operations for an independently owned TOML file.
+--- Unlike config schema migration, this leaves metadata and version stamps alone.
+--- @param source string Exact file bytes.
+--- @param operations table Dense array of migration operations.
+--- @return table plan Outcome, candidate bytes and detached model, or refusal detail.
+function M.plan_operations(source, operations)
+	if not is_array(operations) then return { outcome = "failed", detail = "operations must be an array" } end
+	for _, op in ipairs(operations) do
+		local valid, detail = validate_op(op)
+		if not valid then return { outcome = "failed", detail = detail } end
+		if op.op == "move_chord_action" then
+			return { outcome = "failed", detail = "independent record operations cannot depend on action context" }
+		end
+	end
+	local before, scan = M.model_from_source(source)
+	if not before then return { outcome = "failed", detail = scan } end
+	local after = clone_model(before)
+	for _, op in ipairs(operations) do APPLY[op.op](after.sections, op, nil, after) end
+	if same_value(M.plain(before), M.plain(after)) then
+		return { outcome = "current", candidate = source, model = after }
+	end
+	local candidate, detail = render(source, scan, before, after)
+	if not candidate then return { outcome = "failed", detail = detail } end
+	local reread = M.model_from_source(candidate)
+	if not reread or not same_value(M.plain(reread), M.plain(after)) then
+		return { outcome = "failed", detail = "independent record operations do not read back as their candidate model" }
+	end
+	return { outcome = "migrated", candidate = candidate, model = after }
+end
+
 --- Load migration identities explicitly before config-dependent native modules.
 --- Missing data is reported to boot's existing read-only refusal owner.
 function M.load_context(path, action_catalogue, file_adapter)

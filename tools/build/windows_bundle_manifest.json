@@ -98,7 +98,8 @@
 		{
 			"name": "compile-time-sources",
 			"globs": ["static/ergopti_plus/windows/vendor/*.ahk"],
-			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them."
+			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them. The programmable-hotstring worker is executed separately by the shipped interpreter and must remain a runtime source.",
+			"except": ["static/ergopti_plus/windows/vendor/ergopti_user_hotstrings.ahk"]
 		},
 		{
 			"name": "runtime-caches",
@@ -171,6 +172,18 @@
 		{
 			"source": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
 			"dest": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_user_hotstrings.ahk",
+			"dest": "vendor/ergopti_user_hotstrings.ahk"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/hotstrings/suffixes_a.toml",
+			"dest": "static/layouts/registry/ergopti/hotstrings/suffixes_a.toml"
+		},
+		{
+			"source": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml",
+			"dest": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml"
 		}
 	]
 }

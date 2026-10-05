@@ -96,7 +96,13 @@ M.features = {
 		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "hotstrings.autocorrection.caps", id = "caps", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.caps", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
+		path = "hotstrings.autocorrection.names", id = "names", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.names", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
+	},
+	{
+		path = "hotstrings.autocorrection.abbreviations", id = "abbreviations", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.abbreviations", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
+	},
+	{
+		path = "hotstrings.autocorrection.technical_terms", id = "technical_terms", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.technical_terms", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
 	},
 	{
 		path = "hotstrings.distances_reduction.qu", id = "qu", section = "hotstrings.distances_reduction", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.distances_reduction.qu", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
@@ -277,6 +283,9 @@ M.features = {
 	},
 	{
 		path = "hotstrings.dynamic.ssn_prefixes", id = "ssn_prefixes", section = "hotstrings.dynamic", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.dynamic.ssn_prefixes", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false }, input_altering = true,
+	},
+	{
+		path = "hotstrings.dynamic.user_code", id = "user_code", section = "hotstrings.dynamic", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.user_code.title", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
 	},
 	{
 		path = "hotstrings.dynamic.text_expansion_personal_information", id = "text_expansion_personal_information", section = "hotstrings.dynamic", default = { enabled = false, pattern_max_length = 1 }, type = "feature", description_key = "menu.hotstrings.dynamic.text_expansion_personal_information", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, pattern_max_length = 1 }, input_altering = true,

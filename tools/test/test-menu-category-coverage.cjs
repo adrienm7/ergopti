@@ -37,6 +37,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -48,17 +49,28 @@ const EXT = { ahk: '.ahk', hs: '.lua', linux: '.lua' };
 const DIR = { ahk: 'windows', hs: 'macos', linux: 'linux' };
 
 function driverSource(driver) {
-	const out = [];
+	const out = [],
+		nativeSources = [];
 	(function walk(d) {
 		if (!fs.existsSync(d)) return;
 		for (const e of fs.readdirSync(d, { withFileTypes: true })) {
 			const p = path.join(d, e.name);
 			if (e.isDirectory()) {
 				if (!['tests', 'vendor', 'node_modules', '_generated'].includes(e.name)) walk(p);
-			} else if (p.endsWith(EXT[driver])) out.push(fs.readFileSync(p, 'utf8'));
+			} else if (p.endsWith(EXT[driver])) {
+				const src = fs.readFileSync(p, 'utf8');
+				out.push(src);
+				nativeSources.push({ rel: p, src });
+			}
 		}
 	})(path.join(SP, DIR[driver]));
-	return out.join('\n');
+	return out
+		.concat(
+			delegatedMenuSources(nativeSources, path.join(SP, '_shared', 'lua')).map(
+				(source) => source.src
+			)
+		)
+		.join('\n');
 }
 
 const src = Object.fromEntries(['ahk', 'hs', 'linux'].map((d) => [d, driverSource(d)]));

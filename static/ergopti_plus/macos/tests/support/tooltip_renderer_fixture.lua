@@ -13,6 +13,7 @@ local OWNERS = {
 	"adapters.json_codec",
 	"infra.logger", "infra.i18n", "infra.paths", "infra.text_utils", "text_utils",
 	"infra.toml.reader", "toml_codec.reader", "toml_codec.basic_string", "toml_codec.bom",
+	"toml_codec.key_path",
 	"infra.vscode_bridge", "tooltip.layout", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
 }
 

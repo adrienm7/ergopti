@@ -64,6 +64,7 @@ local OWNERS = {
 	"text_utils",
 	"toml_codec.basic_string",
 	"toml_codec.bom",
+	"toml_codec.key_path",
 	"toml_codec.reader",
 	"wrap_pair",
 }
