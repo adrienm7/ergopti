@@ -1,5 +1,5 @@
 {
-	"status": "Corrected canonical local checkpoints PASS at stated scope; Windows manual37313187012 RUNNING with unknown outcome; new Linux/Mac manual pending; all four TODO items partial",
+	"status": "Bounded Group4 Windows native cohorts, Mac actual canvas and Linux official acceptance PASS; whole native lanes retain documented failures. Approved GNUV2 targeted44 and full82 per version PASS, future corrected CI/integration not claimed; all four TODOs partial.",
 	"final_source_sha": null,
 	"final_source_tree": null,
 	"final_tested_sha": null,
@@ -64,20 +64,224 @@
 			"lanes": ["windows"],
 			"event": "workflow_dispatch",
 			"source_sha": "b685130a6f154631b90590b123461eb7adc4d0fe",
-			"tested_sha": null,
-			"tested_sha_prefix": "7e80",
-			"source_tree": null,
-			"tested_tree": null,
-			"identical_tree_prefix": "f756",
+			"tested_sha": "7e80a0ba6aa832303778b6b71cfc9fff22284c72",
+			"source_tree": "f756d1a0f46775bf3bab6323ba312eb41c81f4f3",
+			"tested_tree": "f756d1a0f46775bf3bab6323ba312eb41c81f4f3",
 			"diff_paths": [],
 			"fixture_variants": [],
-			"status": "RUNNING",
-			"outcome": null,
-			"provenance": "Active exact-tree receipt supplied by root; unknown full tested/tree identities and outcome are not fabricated"
+			"status": "COMPLETED",
+			"outcome": "FAILURE",
+			"provenance": "Exact tracked dispatch receipt plus root terminal report; no fixture variants",
+			"results": {
+				"passed": 9291,
+				"failed": 56,
+				"skipped": 0,
+				"executed": 9347,
+				"qualified_Group4_cohorts": {
+					"panel": 20,
+					"timers": 4,
+					"logical": 39,
+					"models": 20,
+					"item88_native": 28
+				},
+				"incomplete_cohorts": {
+					"private": {
+						"passed": 38,
+						"total": 42
+					},
+					"JOIN": {
+						"passed": 7,
+						"total": 9
+					},
+					"cohort": {
+						"passed": 0,
+						"total": 6
+					}
+				},
+				"two_G2_marker_fixtures": "source corrections preserve139 assertions, source approved and committed; native replay pending",
+				"other_failures_exonerated": false
+			}
+		},
+		{
+			"run": 37314015214,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37314015214",
+			"lanes": ["macos"],
+			"event": "workflow_dispatch",
+			"source_sha": "aed951939eb0b05a51bf6a3e59a99c793f4c09ec",
+			"source_tree": "5c70b56001a247dd3e60f2ed7003e6b84459c499",
+			"tested_sha": "b574b46fd3b138e65909bd930c96b80a05f85bd6",
+			"tested_tree": "5c70b56001a247dd3e60f2ed7003e6b84459c499",
+			"diff_paths": [],
+			"fixture_variants": [],
+			"provenance": "Exact tracked dispatch receipt plus root terminal report; no fixture variants",
+			"status": "COMPLETED",
+			"outcome": "FAILURE",
+			"results": {
+				"native_tooltip": {
+					"status": "PASS",
+					"job": 111781147547,
+					"pure": {
+						"passed": 48,
+						"failed": 0,
+						"skipped": 0
+					},
+					"captures": {
+						"passed": 12,
+						"failed": 0,
+						"skipped": 0
+					},
+					"owned_PID_PGID": 1767,
+					"retirement": {
+						"closed": true,
+						"escaped_sessions_managed": false,
+						"group_id": 1767,
+						"live_group_members": [],
+						"reservation_lost": false,
+						"signals": [15],
+						"worker_pid": 1767
+					},
+					"source_hashes": {
+						"production_count": 3079,
+						"probe_count": 3,
+						"all_match_immutable_git_blobs": true,
+						"all12_png_hashes_match_native_receipt": true
+					},
+					"audited_total": 3082,
+					"independent_review": "completed",
+					"artifact_digest": "sha256:3f230d413a88a1a02aebb8720bdd0c94962d483f23c2b4d79974d8f4574d3b2b",
+					"official_archive_sha256": "11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa",
+					"original_gatekeeper": "accepted; Notarized Developer ID",
+					"copied_gatekeeper": "UNEXECUTED",
+					"physical_input": "UNMEASURED",
+					"watcher_orchestration": "UNMEASURED",
+					"Launch_Services": "UNMEASURED",
+					"complete_installed_package": "UNMEASURED"
+				},
+				"Swift_package": {
+					"outcome": "failed",
+					"tests": 308,
+					"passed_test_cases": 303,
+					"failed_test_cases": 5,
+					"skipped": 0,
+					"assertion_failures": 17,
+					"unexpected_failures": 4,
+					"failed_cases": [
+						"-[ErgoptiPlusTests.HomebrewArchiveAcceptanceTests testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState]",
+						"-[ErgoptiPlusTests.KeyboardSourceProbeTests testActualSelectedSourcesProveDirectPunctuationAndRejectDeadAccent]",
+						"-[ErgoptiPlusTests.KeyboardSourceProbeTests testShiftAndOptionOnlyGlyphsAreAbsentFromDirectReceipt]",
+						"-[ErgoptiPlusTests.KeyboardSourceProbeTests testSourceChangesAreRejectedBeforeAndAfterTranslation]",
+						"-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch]"
+					]
+				},
+				"source_comparison": "Launcher/helper inputs byte-identical to18c; no baseline native rerun and no failure exemption",
+				"installation": "SKIPPED",
+				"release": "SKIPPED"
+			}
+		},
+		{
+			"run": 37314770405,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37314770405",
+			"lanes": ["linux"],
+			"event": "workflow_dispatch",
+			"source_sha": "d60abbd42d412cf8861a2f1426c20e9352bb0cf4",
+			"source_tree": "361f076f7396b7371f6028445902f7f7e6a0c75c",
+			"tested_sha": "c5bbb03d54324a80971a1bd9cb7fc47b794f8761",
+			"tested_tree": "361f076f7396b7371f6028445902f7f7e6a0c75c",
+			"diff_paths": [],
+			"fixture_variants": [],
+			"provenance": "Exact tracked dispatch receipt plus root terminal report; no fixture variants",
+			"status": "COMPLETED",
+			"outcome": "FAILURE",
+			"results": {
+				"official_archive_model_acceptance_step": "PASS",
+				"actual_proofs": [
+					"official HTTPS archive and pin",
+					"real model pull and inference",
+					"source freeze",
+					"strict physical closure"
+				],
+				"acceptance_public_JSON": "Complete workflow log ZIP obtained after terminal retry; raw model-acceptance JSON artifact bytes remain403",
+				"Linux_units": "PASS",
+				"E2E_steps": {
+					"passed": 119,
+					"failed": 2,
+					"skipped": 2
+				},
+				"E2E_failures": {
+					"foreign_ETag": "503 E1-versus-E2, known Group1 ownership; no automatic exemption",
+					"owned_native82": "raced no-clobber negative fixture expects0; GNU9.4 returns1 versus localGNU9.7 returns0"
+				},
+				"hosted_native82": "FAILED; do not reuse local82 PASS as hosted qualification",
+				"GNU_fixture_fix": "At this historical hosted run the negative fixture failed. Subsequent independently reviewed V2 source7d195155 passed44 targeted and164 full local checks; final corrected hosted result unknown.",
+				"package": "SKIPPED",
+				"installation": "SKIPPED",
+				"release": "SKIPPED"
+			}
+		},
+		{
+			"run": 37316704100,
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/37316704100",
+			"lanes": ["windows"],
+			"event": "workflow_dispatch",
+			"source_sha": "a5fa596f12f2801f983a1788a032284166aeb071",
+			"tested_sha": "65e28f7a1c944837c79b97ff57f16d962a6c3869",
+			"source_tree": "71f6b51419044ad5245b3d2e8874ac9e93c966a7",
+			"tested_tree": "71f6b51419044ad5245b3d2e8874ac9e93c966a7",
+			"diff_paths": [],
+			"fixture_variants": [],
+			"status": "COMPLETED",
+			"outcome": "FAILURE",
+			"provenance": "Read-only exact tree receipt; root active-run checkpoint. Future outcome not inferred.",
+			"results": {
+				"passed": 9303,
+				"failed": 44,
+				"skipped": [
+					"Windows E2E",
+					"package",
+					"install/launch",
+					"isolated LLM",
+					"compile-warning",
+					"startup",
+					"release"
+				],
+				"executed": 9347,
+				"raw_mirrored_TAP_complete": true,
+				"both_mirrors_status_identical": true,
+				"all_Group4_cohorts_PASS": {
+					"private": 42,
+					"JOIN": 9,
+					"scope_cohort": 6,
+					"panel": 20,
+					"models": 20,
+					"timer": 4,
+					"logical": 39,
+					"Windows_item88": 28
+				},
+				"cohort_overlap": "Logical39 and timer/model groups overlap; do not sum overlapping groups",
+				"former_marker_dependent_failures_closed": 12,
+				"remaining_44_failure_names_unchanged": true,
+				"remaining_failures_not_automatically_foreign_or_exempt": true,
+				"real_marker_receipts": {
+					"fixture_acquisition": {
+						"prior_object": 0,
+						"retained_object": 0,
+						"terminal_object": 0
+					},
+					"owned_refusal_points": {
+						"retained_owned": 1,
+						"retained_terminal": 1,
+						"tokens_owned": 1
+					}
+				},
+				"Core_JS": "PASS",
+				"Core_properties": "PASS",
+				"execution_manifest_independent_parse": "UNEXECUTED: artifact downloads403; complete mirrored raw TAP proof is separate",
+				"whole_workflow": "FAILURE"
+			}
 		}
 	],
 	"final_local_selected_verification": {
-		"scope": "Source checkpoint before serialized integration; native device requirements remain",
+		"scope": "Earlier completed local checkpoint at stated sources; current fullJS361 doc verification and encoding1841 PASS; local82 is distinct from failing hosted82",
 		"js": {
 			"passed": 361,
 			"failed": 0,
@@ -109,15 +313,49 @@
 		},
 		"ahk_bom_lf_sources": 1841
 	},
-	"actual_model_https_evidence": null,
-	"mac_canvas_12_png_receipts": null,
-	"windows_unmodified_native_result": null,
+	"actual_model_https_evidence": {
+		"run": 37314770405,
+		"acceptance_step": "PASS",
+		"source_sha": "d60abbd42d412cf8861a2f1426c20e9352bb0cf4",
+		"tested_sha": "c5bbb03d54324a80971a1bd9cb7fc47b794f8761",
+		"tree": "361f076f7396b7371f6028445902f7f7e6a0c75c",
+		"source_freeze": "PASS",
+		"physical_closure": "PASS",
+		"outer_lane": "FAIL",
+		"public_JSON_receipt": "Complete workflow log ZIP obtained after terminal retry; raw model-acceptance JSON artifact bytes remain403"
+	},
+	"mac_canvas_12_png_receipts": {
+		"run": 37314015214,
+		"native_job": 111781147547,
+		"status": "PASS",
+		"captures": 12,
+		"pure_controls": 48,
+		"all_PNG_hashes_match": true,
+		"production_hashes": 3079,
+		"probe_hashes": 3,
+		"total_source_hashes": 3082,
+		"all_match_immutable_Git_blobs": true,
+		"retirement_group": 1767,
+		"live_group_members": [],
+		"scope": "Fresh actual signed Hammerspoon, no physical input or full installed-package acceptance claim"
+	},
+	"windows_unmodified_native_result": {
+		"run": 37316704100,
+		"passed": 9303,
+		"failed": 44,
+		"skipped": 0,
+		"executed": 9347,
+		"all_Group4_cohorts": "PASS",
+		"former_barrier_failures_closed": 12,
+		"remaining_failure_names": "same44 as prior run",
+		"whole_workflow": "FAILURE",
+		"post_unit_steps": "SKIPPED"
+	},
 	"final_merge_commit": null,
 	"latest_partial_integration_authorization": "Maintainer explicitly permits partial dev integration and feature-branch deletion after reviewed terminal CI and serialized ownership coordination; retain incomplete TODO items and receipts",
 	"latest_Mac_corrected_source_replay": {
 		"observer_sha256_prefix": "d494",
 		"test_sha256_prefix": "b329",
-		"full_hashes_not_supplied": true,
 		"pure_controls": {
 			"passed": 48,
 			"failed": 0,
@@ -129,32 +367,11 @@
 			"skipped": 0,
 			"images_edited": false
 		},
-		"fresh_native_CI": "PENDING",
-		"scope": "Canonically formatted corrected sources and untouched existing image replay; not fresh native Hammerspoon capture",
-		"provenance": "Root terminal report; referenced raw log hashes in latest_terminal_host_verification"
-	},
-	"corrected_future_CI": {
-		"windows": {
-			"run": 37313187012,
-			"status": "RUNNING",
-			"outcome": null
-		},
-		"linux": {
-			"run": null,
-			"url": null,
-			"source_sha": null,
-			"tested_sha": null,
-			"tree": null,
-			"outcome": null
-		},
-		"macos": {
-			"run": null,
-			"url": null,
-			"source_sha": null,
-			"tested_sha": null,
-			"tree": null,
-			"outcome": null
-		}
+		"fresh_native_CI": "PASS native tooltip job111781147547 in run37314015214; full lane FAIL",
+		"scope": "Earlier pure/image replay proof is historical; latest actual native producer48+12 and source/retirement audit succeeded separately",
+		"provenance": "Root terminal report; referenced raw log hashes in latest_terminal_host_verification",
+		"observer_sha256": "d494751f8753738f0cd5297f9a8668e51bec917faf7a1a6665b7180109c7b350",
+		"test_sha256": "b329a90b013abfbdcf50b788a4d58c61a35fd3b13d884c35b5cbd50219a198aa"
 	},
 	"latest_local_official_HTTPS_attempt": {
 		"archive_and_pin": "SUCCEEDED",
@@ -277,10 +494,10 @@
 		"Windows_panel_new": 4,
 		"Windows_timer": 4,
 		"Mac_signed_Hammerspoon_canvas_captures": 12,
-		"Linux_official_HTTPS_model": "Historical child/inference controls observed but physical closure refused; corrected parser35+3 source proof PASS, hosted replay pending",
-		"planned_qualification": "Corrected Windows37313187012 RUNNING; new Linux/Mac manual identities and outcomes pending",
-		"Mac_scope": "Corrected pure48 and immutable replay12 PASS; fresh signed-runtime native CI pending",
-		"Windows_scope": "Historical9341 executed/53failed; corrected finite-owned Windows manual37313187012 RUNNING; production gaps remain"
+		"Linux_official_HTTPS_model": "Hosted official acceptance STEP PASS including source freeze and strict closure; original hosted82 failed, approved fixtureV2 now44/164 native PASS; future hosted rerun outcome unknown",
+		"planned_qualification": "Approved GNUV2 qualified44 plus82GNU9.4+82GNU9.7 locally against immutable1164 hashes; next corrected hosted outcome and integration pending; Windows remaining44, package/install/physical requirements remain",
+		"Mac_scope": "Actual signed native48+12 and3079+3 source audit/retirement PASS; package Swift308=303passed/5failed,17 assertions/4unexpected; installed/physical scope remains",
+		"Windows_scope": "Latest exact-source9303/44/0 of9347; private42 JOIN9 cohort6 panel20 models20 timer4 logical39 item8828 PASS; 12 former marker failures closed,44 old failure names unchanged; E2E/package/install/isolatedLLM/startup skipped; Windows production integration gaps remain"
 	},
 	"Windows_production_source_gaps": {
 		"components": [
@@ -299,7 +516,8 @@
 		"earlier_observed": "CONNECT403",
 		"saved_configuration_did_not_itself_apply_network_change": true,
 		"later_local_official_HTTPS": "archive/pin readiness enable succeeded; pull failed with zero allocated model",
-		"cached_install_is_HTTPS_or_model_proof": false
+		"cached_install_is_HTTPS_or_model_proof": false,
+		"hosted_official_HTTPS": "Actual hosted acceptance PASS, distinct from earlier local pull failure/zero model"
 	},
 	"historical_sources": {
 		"d94fd9042d19f8f285cc8f617ada96701cd25cbe": "historical snapshot; not final source/tested commit"
@@ -323,7 +541,7 @@
 	"raw_evidence_to_finalize": {
 		"latest_model_cancel": null,
 		"current_full_Linux_E2E": "Referenced corrective log hashes now in latest_terminal_host_verification; final committed hosted qualification remains pending",
-		"final_all_OS_CI": null,
+		"final_all_OS_CI": "Windows37316704100 completed FAILURE:9303PASS/44FAIL/0SKIP; corrected GNU hosted/integrated all-OS validation not yet dispatched at this checkpoint",
 		"latest_failed_direct_tree_run": "37306690694, exact source6b6/test4bc/tree00aa; terminal counts supplied by root"
 	},
 	"no_tests_native_Git_mutations_or_checkout_writes_by_this_preparation": true,
@@ -391,12 +609,12 @@
 		"strict_physical_receipt_parser": {
 			"controls_passed": 35,
 			"source_guards_passed": 3,
-			"scope": "Bounded parser/source proof; hosted closure replay pending"
+			"scope": "Bounded parser/source proof; hosted actual official acceptance now PASS separately"
 		},
 		"corrective_JS_before_final_Linux_guard": {
 			"passed": 361,
 			"failed": 0,
-			"subsequent_full_JS": "SCHEDULED"
+			"scope": "Full selected JS/doc verification terminalPASS, supplied by root"
 		},
 		"AHK_BOM_LF": {
 			"passed_sources": 1841,
@@ -442,69 +660,307 @@
 			}
 		]
 	},
-	"documentary_update": "Scratch document edits and read-only source/receipt inspection only; no tests, native execution, Git mutation or checkout writes",
+	"documentary_update": "Read current tracked three documents, preserve exact preimages, then prepare scratch-only changes. No tests/native/Git mutations/checkout writes.",
 	"corrective_source_commit": "d60abbd42d412cf8861a2f1426c20e9352bb0cf4",
-	"corrected_native_runs": [
+	"snapshot_scope": "Bounded pre-integration evidence; no future corrected result or final dev integration claimed",
+	"snapshot_feature_source": "a5fa596f12f2801f983a1788a032284166aeb071",
+	"source_gap_scope": "Windows prepared installer/runtime-source/daemon/model proposals and25 unexecuted native controls remain; all12 PC steps retained",
+	"latest_bounded_evidence_references": [
 		{
-			"source_sha": "b685130a6f154631b90590b123461eb7adc4d0fe",
-			"source_tree": "f756d1a0f46775bf3bab6323ba312eb41c81f4f3",
-			"tested_sha": "7e80a0ba6aa832303778b6b71cfc9fff22284c72",
-			"tested_tree": "f756d1a0f46775bf3bab6323ba312eb41c81f4f3",
-			"prior_ci_sha": "4bc8ed23f950ef25698c56c6d742af7623eea2c6",
-			"ci_branch": "codex/ci-ai",
-			"os_lanes": "windows",
-			"integration_lock": "not acquired",
-			"diagnostic_only": true,
-			"workflow_path": ".github/workflows/ci.yml",
-			"workflow_sha256": "9e56f8af02ebdcb1ed6ccd42d454a7194d969c4dcd58cc9aac331bfdbbf03e58",
-			"workflow_blob": "09e645dff4dd49080a580607fee4743b6b3b969d",
-			"manifest_sha256": "52aae305289c0d98b782f9088f639b75254175ffb26dad23408de760a4b5fcf0",
-			"fixture_variants": [],
-			"diff_paths": [],
-			"run_id": 37313187012,
-			"workflow_id": 284301090,
-			"url": "https://github.com/adrienm7/ergopti/actions/runs/37313187012"
+			"source": "/workspace/ergopti-validation/mac-tooltip-ci-37314015214/NATIVE-API-QUALIFICATION.json",
+			"sha256": "40f9590ffad937d0736c77d7951b2eb835e96898c1c0f260a04f050f125a1c5d",
+			"bytes": 4324,
+			"copied": false
 		},
 		{
-			"source_sha": "aed951939eb0b05a51bf6a3e59a99c793f4c09ec",
-			"source_tree": "5c70b56001a247dd3e60f2ed7003e6b84459c499",
-			"tested_sha": "b574b46fd3b138e65909bd930c96b80a05f85bd6",
-			"tested_tree": "5c70b56001a247dd3e60f2ed7003e6b84459c499",
-			"prior_ci_sha": "7e80a0ba6aa832303778b6b71cfc9fff22284c72",
-			"ci_branch": "codex/ci-ai",
-			"os_lanes": "macos",
-			"integration_lock": "not acquired",
-			"diagnostic_only": true,
-			"workflow_path": ".github/workflows/ci.yml",
-			"workflow_sha256": "9e56f8af02ebdcb1ed6ccd42d454a7194d969c4dcd58cc9aac331bfdbbf03e58",
-			"workflow_blob": "09e645dff4dd49080a580607fee4743b6b3b969d",
-			"manifest_sha256": "52aae305289c0d98b782f9088f639b75254175ffb26dad23408de760a4b5fcf0",
-			"fixture_variants": [],
-			"diff_paths": [],
-			"run_id": 37314015214,
-			"workflow_id": 284301090,
-			"url": "https://github.com/adrienm7/ergopti/actions/runs/37314015214"
+			"source": "/workspace/ergopti-validation/mac-tooltip-ci-37314015214/REPORT.md",
+			"sha256": "fc9a46770a58fe2ed42ade213346ad7e2553ce0834c0843d0a9a5d636a90c9ac",
+			"bytes": 6600,
+			"copied": false
 		},
 		{
-			"source_sha": "d60abbd42d412cf8861a2f1426c20e9352bb0cf4",
-			"source_tree": "361f076f7396b7371f6028445902f7f7e6a0c75c",
-			"tested_sha": "c5bbb03d54324a80971a1bd9cb7fc47b794f8761",
-			"tested_tree": "361f076f7396b7371f6028445902f7f7e6a0c75c",
-			"prior_ci_sha": "b574b46fd3b138e65909bd930c96b80a05f85bd6",
-			"ci_branch": "codex/ci-ai",
-			"os_lanes": "linux",
-			"integration_lock": "not acquired",
-			"diagnostic_only": true,
-			"workflow_path": ".github/workflows/ci.yml",
-			"workflow_sha256": "9e56f8af02ebdcb1ed6ccd42d454a7194d969c4dcd58cc9aac331bfdbbf03e58",
-			"workflow_blob": "09e645dff4dd49080a580607fee4743b6b3b969d",
-			"manifest_sha256": "52aae305289c0d98b782f9088f639b75254175ffb26dad23408de760a4b5fcf0",
-			"fixture_variants": [],
-			"diff_paths": [],
-			"run_id": 37314770405,
-			"workflow_id": 284301090,
-			"url": "https://github.com/adrienm7/ergopti/actions/runs/37314770405"
+			"source": "/workspace/ergopti-validation/mac-tooltip-ci-37314015214/SOURCE-AND-PNG-AUDIT.json",
+			"sha256": "2cb984b42dea4bb9031dc555e2d1b5341832af0a65d86eb114608b0d7c2f8fd7",
+			"bytes": 12565,
+			"copied": false
+		},
+		{
+			"source": "/workspace/ergopti-validation/windows-ci-37316704100-classification/tree-equality.json",
+			"sha256": "910a67972314ddf78eaeb4b0bc262b7ddf4c623ee1a1475d42089ec624cd16ae",
+			"bytes": 257,
+			"copied": false
+		},
+		{
+			"source": "/workspace/ergopti-validation/ci-linux-37314770405/7_Run manual official runtime and model acceptance.txt",
+			"sha256": "0a7cff924d0320220c644a9fe90baaee7899b5e5d5f6af56580192e16622148f",
+			"bytes": 1465,
+			"copied": false
+		},
+		{
+			"source": "/workspace/ergopti-validation/ci-linux-37314770405/106_Qualify native runtime prerequisites.txt",
+			"sha256": "fe7d18d4fc470e2f85b19cae37a0a4ef0f8366d32dc038a532efa1e25379dd60",
+			"bytes": 16433,
+			"copied": false
+		},
+		{
+			"source": "/workspace/ergopti-validation/windows-ci-37316704100-classification/REPORT.md",
+			"sha256": "0844a5f979703296d47745fd8dd768b51a1cf90e39bcccd1eb0af1e18f453b4a",
+			"bytes": 4710,
+			"copied": false
+		},
+		{
+			"source": "/workspace/ergopti-validation/windows-ci-37316704100-classification/classification.json",
+			"sha256": "a294d57be1883dc40dae84a693357aa5c21cb6b0a269888871d8007e2d67895b",
+			"bytes": 93933,
+			"copied": false
+		},
+		{
+			"source": "/workspace/ergopti-validation/windows-ci-37316704100-classification/tree-equality.json",
+			"sha256": "910a67972314ddf78eaeb4b0bc262b7ddf4c623ee1a1475d42089ec624cd16ae",
+			"bytes": 257,
+			"copied": false
 		}
 	],
-	"snapshot_scope": "Bounded pre-integration checkpoint. Subsequent integration commits and CI outcomes are recorded by Git and exact manual workflow runs; no future result is claimed."
+	"GNU_no_clobber_fixture_preparation": {
+		"candidate_source_prefix": "7d195155",
+		"candidate_full_hash": "7d195155bf75472a8ae8c7f94824e8deda982ec2eb05cc49820dbe7e0bdbaee4",
+		"version": "V2",
+		"trusted_GNU9_4_vs9_7_native_probe_cases": 16,
+		"observed_refusal_receipts": {
+			"GNU9_4_skip": 1,
+			"GNU9_7_skip": 0
+		},
+		"exact_foreign_and_stage_preservation": "qualified in bounded native probe",
+		"original_GNU9_4": "causal RED both ABIs",
+		"original_GNU9_7_cases_passed": 22,
+		"candidate_source_review": "APPROVED V2",
+		"candidate44_qualification": {
+			"status": "PASS",
+			"passed": 44,
+			"failed": 0,
+			"runs": 4,
+			"ABIs": ["LuaJIT", "Lua5.4"],
+			"GNU_versions": ["9.4", "9.7"]
+		},
+		"candidate82_qualification": {
+			"status": "PASS",
+			"GNU9_4": 82,
+			"GNU9_7": 82,
+			"total_passed": 164,
+			"failed": 0,
+			"sources_unchanged": true,
+			"immutable_source_hashes": 1164,
+			"outer_pending": 0,
+			"outer_rescue": 0
+		},
+		"generic_positive0_assertions": "preserved",
+		"production_normalization": "none claimed",
+		"earlier_setup_attempts": {
+			"status": "FAILED",
+			"causes": ["EROFS", "incomplete source projection"],
+			"POST_probe_execution": "UNEXECUTED during failed preparation",
+			"scope": "Earlier preparation attempts remain distinct from final qualified rerun"
+		},
+		"hosted_corrected_CI": "PENDING; no future hosted outcome claimed",
+		"raw_receipt_references": [
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-82-summary.json",
+				"sha256": "88303880663a32c14d04a19a6084e638f66f53761019ecdf485a0adbb3572880",
+				"bytes": 1272,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-fixture-summary.json",
+				"sha256": "cc08ae4151368c5aa38b6b513e6d324702a964daa498ea3b54de6b506fc283f4",
+				"bytes": 3975,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-82-gnu9.4.stdout",
+				"sha256": "ef2d956d0afb65d5e9204eae5d053659db2a77bedfba93062418da95de852d98",
+				"bytes": 8600,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-82-gnu9.4.stderr",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"bytes": 0,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-82-gnu9.7.stdout",
+				"sha256": "ef2d956d0afb65d5e9204eae5d053659db2a77bedfba93062418da95de852d98",
+				"bytes": 8600,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-82-gnu9.7.stderr",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"bytes": 0,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.4-luajit.stdout",
+				"sha256": "23258c31494bdbb1df137afd1e2c1d20dda05b941a5236dab7b499b217aa6564",
+				"bytes": 889,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.4-luajit.stderr",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"bytes": 0,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.7-luajit.stdout",
+				"sha256": "23258c31494bdbb1df137afd1e2c1d20dda05b941a5236dab7b499b217aa6564",
+				"bytes": 889,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.7-luajit.stderr",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"bytes": 0,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.4-lua54.stdout",
+				"sha256": "23258c31494bdbb1df137afd1e2c1d20dda05b941a5236dab7b499b217aa6564",
+				"bytes": 889,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.4-lua54.stderr",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"bytes": 0,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.7-lua54.stdout",
+				"sha256": "23258c31494bdbb1df137afd1e2c1d20dda05b941a5236dab7b499b217aa6564",
+				"bytes": 889,
+				"copied": false
+			},
+			{
+				"source": "/workspace/ergopti-validation/ci-linux-37314770405/mv-repro/candidate-gnu9.7-lua54.stderr",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"bytes": 0,
+				"copied": false
+			}
+		]
+	},
+	"preintegration_commit_inventory": {
+		"base": "18c71d896a86f616f2c58d8e4e998574211d9162",
+		"source_checkpoint": "2a536c995174c0a00689c107f042e38069ecd0be",
+		"commits": [
+			{
+				"sha": "bb433d45bcfdeebe6489f01f73d9ad7900aa7270",
+				"subject": "fix(linux): bind owned HTTP close receipts to admitted attempts"
+			},
+			{
+				"sha": "c76c95c7f778a9b7ab4541e8addfc22143db22ea",
+				"subject": "merge: preserve current dev native fixes and owned HTTP receipts"
+			},
+			{
+				"sha": "4ba47fba1831dc6d779bea5f42d3dd49a464ab1c",
+				"subject": "fix(windows): restrict models timers to owned one-shots"
+			},
+			{
+				"sha": "063a3591f91313bb4e5b863f87c371cee6452630",
+				"subject": "chore(ai): incorporate current configuration and Linux fixture integration"
+			},
+			{
+				"sha": "12d80462a07f027cdb5325e76517c4e7587a315c",
+				"subject": "fix(linux): retain HTTP ownership until detached group retirement"
+			},
+			{
+				"sha": "d4c39944ec0c1d155f5598fda07fe50bdd2ad718",
+				"subject": "feat(windows): compose owned local-server discovery and private writes"
+			},
+			{
+				"sha": "7a7646ab2d72513f04a0b12b6fb12ed773bfbd28",
+				"subject": "test(windows): keep committed model callbacks free of private I/O"
+			},
+			{
+				"sha": "2af4a8dba43424e88f1e33774f5ca0deefe561c1",
+				"subject": "chore(ai): compose current hotstrings integration and native fixture repairs"
+			},
+			{
+				"sha": "6e7363b247af287337f0fffbc4b7a6a82f4d8672",
+				"subject": "fix(windows): use the canonical serializer in native server join fixtures"
+			},
+			{
+				"sha": "798d22237780de2c91fed80862b18df9e6daa34b",
+				"subject": "fix(linux): fence owned HTTP dispatch and delivery with captured source admission"
+			},
+			{
+				"sha": "646c9a80f70518f34d95e03d2367899d269faf3f",
+				"subject": "chore(ai): preserve current configuration fixture qualification"
+			},
+			{
+				"sha": "d94fd9042d19f8f285cc8f617ada96701cd25cbe",
+				"subject": "chore(ai): preserve current configuration delivery evidence"
+			},
+			{
+				"sha": "ea09a962b823a5495cd0671875ddaefb6f9e8061",
+				"subject": "feat(ai): install and retain user-owned Ollama on Linux"
+			},
+			{
+				"sha": "009dbc331efd935eae6c4c0ee37c17d2c77f8798",
+				"subject": "feat(ai): integrate owned local-server discovery menus on Windows"
+			},
+			{
+				"sha": "304c85a10c6040d9ea43729cbbb1ba76d410f677",
+				"subject": "test(ai): qualify native runtime and tooltip owners"
+			},
+			{
+				"sha": "6b6aa4b110594451a98abfb94f5446cee925f769",
+				"subject": "chore(ai): preserve current configuration delivery"
+			},
+			{
+				"sha": "b685130a6f154631b90590b123461eb7adc4d0fe",
+				"subject": "fix(ai): settle Windows discovery fixtures and panel lifecycle"
+			},
+			{
+				"sha": "48ea5b4afda3fe4dd2176bfcf9c9d46147e37730",
+				"subject": "test(ai): isolate cached-server enable from host runtime offers"
+			},
+			{
+				"sha": "aed951939eb0b05a51bf6a3e59a99c793f4c09ec",
+				"subject": "fix(ai): observe native tooltip text and antialiased weight precisely"
+			},
+			{
+				"sha": "d60abbd42d412cf8861a2f1426c20e9352bb0cf4",
+				"subject": "fix(ai): require measured physical closure in runtime acceptance"
+			},
+			{
+				"sha": "a5fa596f12f2801f983a1788a032284166aeb071",
+				"subject": "fix(ai): retire recovered fixture markers before native debt probes"
+			},
+			{
+				"sha": "2a536c995174c0a00689c107f042e38069ecd0be",
+				"subject": "test(ai): qualify no-clobber refusal on native GNU versions"
+			}
+		],
+		"scope": "Committed source/merge inventory before this documentary commit; final no-ff integration and its exact CI outcome are recorded separately after completion."
+	},
+	"latest_selected_source_verification": {
+		"checkpoint": "2a536c995174c0a00689c107f042e38069ecd0be",
+		"format": "PASS",
+		"js": {
+			"passed": 361,
+			"failed": 0
+		},
+		"linux_runtime_native": {
+			"passed": 82,
+			"failed": 0
+		},
+		"linux": {
+			"passed": 8338,
+			"failed": 0,
+			"modules": 406
+		},
+		"log_sha256": "3ec8b3c9eaf98461e242349a8454d0edd8453c73d623fb2325a2bafd94e314d6",
+		"scope": "Actual verify-change completed every selected gate; X11/native process prerequisites do not prove physical input or Wayland."
+	}
 }

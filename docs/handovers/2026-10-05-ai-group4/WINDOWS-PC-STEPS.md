@@ -15,10 +15,13 @@ The current Linux-hosted BOM/LF check passed for 1841 AHK sources with zero
 failures. This encoding receipt does not qualify native AHK execution, Windows
 GUI or physical input.
 
-Historical exact-tree run 37306690694 executed 9341 Windows cases: 9288 passed,
-53 failed, 0 skipped. Corrected Windows manual run 37313187012 is running on
-source b685/tested prefix 7e80 with identical tree prefix f756 and no fixture
-variants. Its outcome is unknown; source gaps and all twelve steps remain.
+Latest exact-tree native run 37316704100 finished 9303 passed, 44 failed, 0 skipped
+of 9347, with complete agreeing mirrored TAP. All Group4 cohorts pass: private 42,
+JOIN 9, cohort 6, panel 20, models 20, timer 4, logical 39 and native GDI/line 28.
+All 12 prior marker failures are closed; same 44 old failure names remain.
+Core JS/properties pass; E2E/package/install/isolated LLM/startup/release are skipped.
+No skipped device/install behavior is inferred from green native unit cohorts.
+Windows production gaps above and all twelve PC requirements remain.
 
 1. Run actual AHK unit/meta/include/E2E suites with complete registration and
    timer inventory; preserve every original assertion.
