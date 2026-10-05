@@ -237,3 +237,92 @@ helpers.describe("the declared per-key native command", function()
 		end)
 	end
 end)
+
+helpers.describe("the declared complete per-key head", function()
+	local function with_head(mutate, body)
+		with_native_key_menu(true, function(first, observed)
+			local head = require("infra.manifest_menu").get_array("tap_hold_key_head")
+			local saved = {}
+			for index, row in ipairs(head) do
+				saved[index] = {}
+				for key, value in pairs(row) do saved[index][key] = value end
+			end
+			local ok, err = pcall(function()
+				if mutate then mutate(head) end
+				local _, children = first()
+				body(children, observed)
+			end)
+			for index = #head, 1, -1 do head[index] = nil end
+			for index, row in ipairs(saved) do head[index] = row end
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("retains both picker subtrees and the native delay tail (tap-hold-key-head)", function()
+		with_head(nil, function(rows, observed)
+			helpers.assert_eq(#rows, 6, "four shared head rows, native separator and delay")
+			helpers.assert_eq(rows[1].title, "menu.tapholds.nothing_tap_hold")
+			helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_eq(rows[3].title, "menu.tapholds.tap_arrow")
+			helpers.assert_eq(rows[4].title, "menu.tapholds.hold_arrow")
+			helpers.assert_type(rows[3].menu, "table")
+			helpers.assert_type(rows[4].menu, "table")
+			helpers.assert_nil(rows[3].fn, "macOS tap still opens a submenu")
+			helpers.assert_eq(rows[5].title, "-")
+			helpers.assert_eq(rows[6].title, "menu.tapholds.key_tap_delay")
+			helpers.assert_eq(#observed.calls, 0)
+		end)
+	end)
+
+	helpers.it("follows shared Tap/Hold order in the actual per-key provider (tap-hold-key-head)", function()
+		with_head(function(head) head[4], head[6] = head[6], head[4] end, function(rows)
+			helpers.assert_eq(rows[3].title, "menu.tapholds.hold_arrow")
+			helpers.assert_eq(rows[4].title, "menu.tapholds.tap_arrow")
+			helpers.assert_type(rows[3].menu, "table")
+			helpers.assert_type(rows[4].menu, "table")
+		end)
+	end)
+
+	helpers.it("reads a shared caption mutation without changing the native subtree (tap-hold-key-head)", function()
+		with_head(function(head) head[4].i18n = "menu.tapholds.hold_arrow" end, function(rows)
+			helpers.assert_eq(rows[3].title, "menu.tapholds.hold_arrow")
+			helpers.assert_type(rows[3].menu, "table")
+			helpers.assert_true(#rows[3].menu > 0, "the original action picker payload survives")
+		end)
+	end)
+
+	helpers.it("honors declared platform hiding in the actual provider (tap-hold-key-head)", function()
+		with_head(function(head) head[4].platforms = { "ahk", "linux" } end, function(rows)
+			helpers.assert_eq(#rows, 5)
+			helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_eq(rows[3].title, "menu.tapholds.hold_arrow")
+			helpers.assert_type(rows[3].menu, "table")
+			helpers.assert_eq(rows[4].title, "-", "the native delay separator still follows the shared fragment")
+		end)
+	end)
+end)
+
+helpers.describe("declared head retains the macOS picker mutation owners", function()
+	for _, receipt in ipairs({ { name = "true", value = true }, { name = "false", value = false },
+		{ name = "nil" }, { name = "truthy", value = "accepted" } }) do
+		helpers.it("keeps native " .. receipt.name .. " setter receipts for both slots (tap-hold-key-head)", function()
+			helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "infra.i18n",
+				"infra.logger", "ui.menu.menu_utils" }, function()
+				local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+				local native, calls, regenerations, refreshes = remap_double(), {}, 0, 0
+				native.set_tap_action = function(kid, aid) calls[#calls + 1] = { "tap", kid, aid }; return receipt.value end
+				native.set_hold_action = function(kid, aid) calls[#calls + 1] = { "hold", kid, aid }; return receipt.value end
+				native.regenerate = function() regenerations = regenerations + 1; return true end
+				local built = menu.build({ karabiner = native, updateMenu = function() refreshes = refreshes + 1 end }).submenu
+				local key = assert(built[key_index(built, "tap_hold.group.left_shift")])
+				helpers.assert_type(key.menu[3].menu[1].fn, "function")
+				helpers.assert_type(key.menu[4].menu[1].fn, "function")
+				helpers.assert_eq(key.menu[3].menu[1].fn(), receipt.value == true)
+				helpers.assert_eq(key.menu[4].menu[1].fn(), receipt.value == true)
+				helpers.assert_eq(calls, { { "tap", "left_shift", "none" }, { "hold", "left_shift", "none" } })
+				helpers.assert_eq(regenerations, receipt.value == true and 2 or 0, "refused persistence cannot regenerate")
+				helpers.assert_eq(refreshes, receipt.value == true and 2 or 0)
+			end)
+		end)
+	end
+end)
