@@ -262,6 +262,8 @@ global _DefaultLogsDir := _LogsDir
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
+#Include ../infra/program_parameter.ahk
+#Include ../infra/program_actions.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
@@ -1962,6 +1964,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_legacy_state_machine.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk
 #Include unit/test_shell_runner_tree_owned.ahk
+#Include unit/test_run_program_actions.ahk
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk
 #Include unit/test_shell_runner_native_exit_code.ahk

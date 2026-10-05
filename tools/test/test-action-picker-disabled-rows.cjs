@@ -117,7 +117,13 @@ for (const id of [
 	'param-vision-provider',
 	'param-vision-provider-label',
 	'param-vision-model',
-	'param-vision-model-label'
+	'param-vision-model-label',
+	'param-program',
+	'param-program-executable-label',
+	'param-program-executable',
+	'param-program-arguments-label',
+	'param-program-arguments',
+	'param-program-add'
 ]) {
 	byId[id] = new FakeElement('div', id);
 }
@@ -187,6 +193,27 @@ check(
 	posted.length === 1 && posted[0].action === 'confirm' && posted[0].id === 'enter',
 	'an enabled row still confirms'
 );
+
+// Native-unavailable programs retain the same visible/inert DATA contract.
+posted.length = 0;
+vm.runInContext(
+	`init({ title: 'T', current: 'none', noneLabel: 'Nothing', items: [
+ {type:'action', id:'run_program', label:'Run a program [configurable]', parameter:'program', disabled:true, hint:'Unavailable: Native runner'}
+] })`,
+	context
+);
+const program = byId.list.children.find((row) => row.dataset.id === 'run_program');
+check(
+	program && program.classList.contains('disabled'),
+	'unavailable program remains visibly disabled'
+);
+check(
+	program && program.text().includes('Unavailable: Native runner'),
+	'unavailable program carries its closed native reason'
+);
+if (program) program.dispatch('click');
+vm.runInContext("doConfirm('run_program')", context);
+check(posted.length === 0, 'neither click nor direct confirm may acquire an unavailable program');
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] action picker disabled rows:\x1b[0m');

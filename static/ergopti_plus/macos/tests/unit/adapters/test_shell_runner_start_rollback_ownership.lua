@@ -1,10 +1,13 @@
 --- tests/unit/adapters/test_shell_runner_start_rollback_ownership.lua
 
 local helpers = require("tests.helpers")
+local SOURCE = { source_path = "/fixture/config.toml", source_sha256 = string.rep("a", 64) }
 
 local OWNED_MODULES = {
 	"infra.logger",
 	"adapters.shell_runner",
+	"adapters.owned_program_runner",
+	"platform.remap.lease_helper",
 }
 
 local function with_runner(callback)
@@ -12,6 +15,7 @@ local function with_runner(callback)
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(OWNED_MODULES, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/fixture/bundled/ErgoptiPlus" end }
 			local native = {
 				tasks = {},
 				start_mode = "true",
@@ -77,6 +81,8 @@ local function with_runner(callback)
 					if native.terminate_mode == "nil" then return nil end
 					return self
 				end
+				function task:setInput(value) self.input = value; return self end
+				function task:closeInput() self.input_closed = true; return self end
 				function task:isRunning() return self.running end
 				function task:complete(...)
 					self.running = false
@@ -415,6 +421,92 @@ helpers.describe("ShellRunner exact start-refusal rollback ownership", function(
 			local invalid_started, invalid_handle = ShellRunner.open("")
 			helpers.assert_eq(invalid_started, false)
 			helpers.assert_eq(invalid_handle, nil)
+		end)
+	end)
+end)
+
+helpers.describe("private user program native boundary", function()
+	helpers.it("rechecks the captured source after native construction before start", function()
+		with_runner(function(runner, native)
+			local admitted = true
+			local construct = _G.hs.task.new
+			_G.hs.task.new = function(...)
+				local task = construct(...)
+				admitted = false
+				return task
+			end
+			local handle = runner.spawn_private("/private/été program", { "private literal" },
+				function() end, function() return admitted end, SOURCE)
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(native.tasks[1].start_calls, 0)
+			helpers.assert_eq(handle.isSettled(), true)
+		end)
+	end)
+
+	for _, stage in ipairs({ "construct", "environment", "start", "terminate", "observer", "terminal" }) do
+		helpers.it("closes private data in " .. stage .. " native failures", function()
+			with_runner(function(runner, native)
+				local marker = "PRIVATE106_PATH_ARG_STDERR"
+				local logs, crashes = {}, 0
+				local logger = package.loaded["infra.logger"]
+				for _, name in ipairs({ "trace", "done", "error", "warn" }) do
+					logger[name] = function(_, message, ...)
+						logs[#logs + 1] = string.format(message, ...)
+					end
+				end
+				local old_reporter = _G.ergopti_report_crash
+				local ok, failure = xpcall(function()
+					_G.ergopti_report_crash = function() crashes = crashes + 1 end
+					if stage == "construct" then _G.hs.task.new = function() error(marker) end end
+					if stage == "environment" then
+						local construct = _G.hs.task.new
+						_G.hs.task.new = function(...)
+							local task = construct(...)
+							task.setEnvironment = function() error(marker) end
+							return task
+						end
+					end
+					local handle = runner.spawn_private("/" .. marker, { marker },
+						function() if stage == "terminal" then error(marker) end end, function() return true end, SOURCE)
+					if stage == "construct" or stage == "environment" then
+						helpers.assert_eq(handle.start(), false)
+					else
+						local task = native.tasks[1]
+						if stage == "start" then task.start = function() task.running = true; error(marker) end end
+						local started = handle.start()
+						helpers.assert_eq(started, stage ~= "start")
+						if stage == "start" then
+							task:chunk("V1 REFUSED 22\n", "")
+						else
+							task:chunk("V1 HELD\nV1 ACTIVE\n", "")
+							if stage == "terminate" then task.closeInput = function() error(marker) end; handle.terminate() end
+							task:chunk("V1 RETIRED 0\n", "")
+						end
+						if stage == "observer" then handle.onSettled(function() error(marker) end) end
+						task:complete(0, "", "")
+						helpers.assert_eq(task.terminate_calls, 0)
+						helpers.assert_eq(handle.isSettled(), true)
+					end
+				end, debug.traceback)
+				_G.ergopti_report_crash = old_reporter
+				if not ok then error(failure, 0) end
+				helpers.assert_eq(crashes, 0)
+				helpers.assert_eq(table.concat(logs, "\n"):find(marker, 1, true), nil)
+			end)
+		end)
+	end
+
+	helpers.it("refuses a truthy native launch while retaining its unsettled child", function()
+		with_runner(function(runner, native)
+			local handle = runner.spawn_private("/fixture/private", {}, function() end, function() return true end, SOURCE)
+			local task = native.tasks[1]
+			task.start = function() task.running = true; return 2 end
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(handle.isSettled(), false)
+			task:chunk("V1 REFUSED 22\n", "")
+			task:complete(0, "", "")
+			helpers.assert_eq(task.terminate_calls, 0)
+			helpers.assert_eq(handle.isSettled(), true)
 		end)
 	end)
 end)

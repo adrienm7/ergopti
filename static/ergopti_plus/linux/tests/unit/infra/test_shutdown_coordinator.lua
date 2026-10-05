@@ -100,3 +100,33 @@ helpers.describe("shutdown coordinator: daemon integration", function()
 		end
 	end)
 end)
+
+
+helpers.describe("shutdown coordinator: retained user program", function()
+	helpers.it("stops input but retains the event loop until physical settlement", function()
+		local terminal, notify, loop_calls, hook_calls = false, nil, 0, 0
+		local coordinator = ShutdownCoordinator.new({
+			pre_wait = { {
+				name = "user programs",
+				stop = function() return terminal end,
+				when_settled = function(callback) notify = callback; return true end,
+			} },
+			keyboard_hook = {
+				isRunning = function() return true end,
+				stop = function() hook_calls = hook_calls + 1 end,
+				emergency_stop = function() error("unexpected emergency stop") end,
+			},
+			event_loop = { stop = function() loop_calls = loop_calls + 1 end },
+		})
+		helpers.assert_eq(coordinator.request("owned fixture quit"), true)
+		helpers.assert_eq(hook_calls, 1)
+		helpers.assert_eq(loop_calls, 0)
+		notify()
+		helpers.assert_eq(loop_calls, 0, "early observer must not release a live child")
+		terminal = true
+		notify()
+		helpers.assert_eq(loop_calls, 1)
+		notify()
+		helpers.assert_eq(loop_calls, 1, "the physical release is acknowledged once")
+	end)
+end)

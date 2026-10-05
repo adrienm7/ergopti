@@ -21,7 +21,7 @@ helpers.describe("FileSystem publication stays in-process and nonblocking", func
 		-- This declaration is unique to adapters/file_system.lua. Reading by symbol
 		-- keeps the invariant valid if the adapter is moved or renamed.
 		local source = helpers.read_driver_source(
-			"local function write_atomic(path, content, expected_source)"
+			"local function write_atomic(path, content, expected_source, on_error)"
 		)
 		helpers.assert_type(source, "string", "the FileSystem implementation must be locatable")
 		local code = strip_comments(source)

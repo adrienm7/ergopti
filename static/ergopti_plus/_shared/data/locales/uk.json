@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Спочатку цифри",
 	"menu.layout.number_row_symbols": "Спочатку символи",
 	"platform_reason.number_row_override_unsupported": "Не підтримується: Цей драйвер зберігає системний цифровий ряд; примусове введення цифр і символів недоступне.",
-	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Спочатку символи» потребує активної емульованої розкладки з коректними рівнями цифр і символів у кожній позиції ряду."
+	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Спочатку символи» потребує активної емульованої розкладки з коректними рівнями цифр і символів у кожній позиції ряду.",
+	"sg_actions.run_program": "▶️ Запустити програму [налаштовуване]",
+	"dialog.gestures.param_program": "Виберіть абсолютний шлях до програми та введіть кожен аргумент окремо. Для скрипту виберіть інтерпретатор і додайте шлях до скрипту як аргумент.",
+	"dialog.gestures.param_err_program": "Використовуйте абсолютний шлях і текстові аргументи без інтерпретації.",
+	"dialog.action_picker.program_executable": "Виконуваний файл",
+	"dialog.action_picker.program_arguments": "Аргументи (по одному в полі)",
+	"dialog.action_picker.program_add_argument": "Додати аргумент",
+	"dialog.action_picker.program_remove_argument": "Видалити аргумент",
+	"platform_reason.program_runner_unavailable": "Недоступно: Нативний запуск програм або ця прив’язка недоступні."
 }

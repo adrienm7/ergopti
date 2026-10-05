@@ -646,8 +646,8 @@ local function _dispatch_event(ev, source)
 		if not _running then return end
 		-- A callback of that hold may have taken the engine out: the event is
 		-- then the hand's, as with no engine.
-		local out, tap = nil, nil
-		if _remapper then out, tap = _remapper:process(ev.code, ev.value, at_ms) end
+		local out, tap, binding = nil, nil, nil
+		if _remapper then out, tap, binding = _remapper:process(ev.code, ev.value, at_ms) end
 		if ev.value == InputEvent.VALUE_UP then
 			_remap_owned[owned_key] = nil
 			_remap_source_of[ev.code] = nil
@@ -661,7 +661,7 @@ local function _dispatch_event(ev, source)
 					remapped = true }, source)
 				if not _running then return end
 			end
-			if tap and _on_tap then _call_callback("tap action callback", _on_tap, tap) end
+			if tap and _on_tap then _call_callback("tap action callback", _on_tap, tap, binding) end
 			return
 		end
 	end
@@ -870,7 +870,7 @@ _tick_remapper = function(now_ms)
 	for _, due in ipairs(_remapper:tick(now_ms)) do
 		if due.tap ~= nil then
 			-- The action of a key replayed under a hold that just came due.
-			if _on_tap then _call_callback("tap action callback", _on_tap, due.tap) end
+			if _on_tap then _call_callback("tap action callback", _on_tap, due.tap, due.binding) end
 		else
 			_dispatch_event({ type = EVDEV_TYPE_KEY, code = due.code, value = due.value, remapped = true },
 				_remap_source_of[due.owner] or _device)
@@ -1878,7 +1878,7 @@ end
 --- Installs (or removes, with nil) the tap-hold engine. Whatever the previous
 --- engine held is released first.
 --- @param engine table|nil platform/remap/tap_hold_engine instance
---- @param on_tap function|nil Runs a tap action the engine returns by name.
+--- @param on_tap function|nil Runs a tap action and its canonical source binding.
 function M.set_remapper(engine, on_tap)
 	_release_remapped()
 	for key in pairs(_remap_owned) do _remap_orphans[key] = true end

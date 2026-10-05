@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "数字を優先",
 	"menu.layout.number_row_symbols": "記号を優先",
 	"platform_reason.number_row_override_unsupported": "未対応: このドライバーはシステムの数字列を維持します。数字や記号を強制することはできません。",
-	"platform_reason.number_row_source_unavailable": "利用不可: 記号を優先するには、数字列のすべての位置に有効な数字と記号のレベルを持つエミュレーション配列が有効である必要があります。"
+	"platform_reason.number_row_source_unavailable": "利用不可: 記号を優先するには、数字列のすべての位置に有効な数字と記号のレベルを持つエミュレーション配列が有効である必要があります。",
+	"sg_actions.run_program": "▶️ プログラムを実行 [設定可能]",
+	"dialog.gestures.param_program": "実行ファイルの絶対パスを選び、引数を個別に入力してください。スクリプトの場合はインタープリターを選び、スクリプトのパスを引数に追加してください。",
+	"dialog.gestures.param_err_program": "絶対パスと、そのまま渡す文字列の引数を使用してください。",
+	"dialog.action_picker.program_executable": "実行ファイル",
+	"dialog.action_picker.program_arguments": "引数（各欄に1つ）",
+	"dialog.action_picker.program_add_argument": "引数を追加",
+	"dialog.action_picker.program_remove_argument": "引数を削除",
+	"platform_reason.program_runner_unavailable": "利用不可: ネイティブのプログラム実行機能またはこの割り当ては利用できません。"
 }

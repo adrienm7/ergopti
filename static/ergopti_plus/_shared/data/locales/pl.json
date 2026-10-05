@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Najpierw cyfry",
 	"menu.layout.number_row_symbols": "Najpierw symbole",
 	"platform_reason.number_row_override_unsupported": "Nieobsługiwane: Ten sterownik zachowuje systemowy rząd cyfr; wymuszanie cyfr i symboli jest niedostępne.",
-	"platform_reason.number_row_source_unavailable": "Niedostępne: Symbole najpierw wymagają aktywnego emulowanego układu z prawidłowymi poziomami cyfr i symboli na każdej pozycji rzędu."
+	"platform_reason.number_row_source_unavailable": "Niedostępne: Symbole najpierw wymagają aktywnego emulowanego układu z prawidłowymi poziomami cyfr i symboli na każdej pozycji rzędu.",
+	"sg_actions.run_program": "▶️ Uruchom program [konfigurowalne]",
+	"dialog.gestures.param_program": "Wybierz bezwzględną ścieżkę programu i wpisz każdy argument osobno. Dla skryptu wybierz interpreter i dodaj ścieżkę skryptu jako argument.",
+	"dialog.gestures.param_err_program": "Użyj ścieżki bezwzględnej i dosłownych argumentów tekstowych.",
+	"dialog.action_picker.program_executable": "Plik wykonywalny",
+	"dialog.action_picker.program_arguments": "Argumenty (jeden w każdym polu)",
+	"dialog.action_picker.program_add_argument": "Dodaj argument",
+	"dialog.action_picker.program_remove_argument": "Usuń argument",
+	"platform_reason.program_runner_unavailable": "Niedostępne: Natywny mechanizm uruchamiania lub to przypisanie jest niedostępne."
 }

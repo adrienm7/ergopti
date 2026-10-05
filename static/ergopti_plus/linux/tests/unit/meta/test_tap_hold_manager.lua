@@ -41,7 +41,7 @@ local function manager(user_text)
 	Manager.init({
 		keyboard_hook = hook,
 		execute_action = function(action, binding) actions[#actions + 1] = action .. "@" .. binding end,
-		action_names = function() return { "open_url" } end,
+		action_names = require("modules.gestures.manager").get_executable_action_names,
 		on_text_injected = function(text) resets[#resets + 1] = text end,
 		defaults_path = DEFAULTS,
 		user_path = user_path,
@@ -59,6 +59,124 @@ helpers.describe("tap-hold manager", function()
 		helpers.assert_eq(actions[1], "copy@tap_hold")
 		Manager._reset_for_test()
 		os.remove(user_path)
+	end)
+
+	helpers.it("transports the actual monitor tap binding through release and queued rollover", function()
+		local Manager, hook, actions, user_path = manager()
+		local Engine = require("platform.remap.tap_hold_engine")
+		local code = Engine.KEY_CODES.tab
+		local saved_hook, native_hook = package.loaded["adapters.keyboard_hook"], nil
+		local ok, failure = pcall(function()
+			hook.engine:process(code, 1, 0)
+			local _, tap, binding = hook.engine:process(code, 0, 100)
+			helpers.assert_eq(tap, "alt_tab_monitor")
+			helpers.assert_eq(binding, "tap_hold__tab", "the shared key id survives to the native owner")
+			hook.on_tap(tap, binding)
+			helpers.assert_eq(actions[1], "alt_tab_monitor@tap_hold__tab")
+			native_hook = helpers.load_module("adapters.keyboard_hook")
+			local received
+			native_hook.set_remapper(hook.engine, function(action, origin)
+				if action == "alt_tab_monitor" then received = origin end
+			end)
+			native_hook._test_drive({
+				{ type = 1, code = code, value = 1, at_ms = 0 },
+				{ type = 1, code = code, value = 0, at_ms = 100 },
+			}, { onEmitRaw = function() return true end }, true)
+			helpers.assert_eq(received, "tap_hold__tab", "the actual native hook forwards the source identity")
+			-- A native action replayed under a typing roll belongs to the replayed
+			-- key, not the roll key or the later event that settled that roll.
+			local queued = Engine.new({ keys = {
+				space = { tap_action = "", hold_modifier = "ctrl", time_activation_seconds = 0.2 },
+				win = { tap_action = "alt_tab_monitor", time_activation_seconds = 0.2 },
+			}, roll_keys = { "space" }, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+			queued:process(Engine.KEY_CODES.space, 1, 0)
+			queued:process(Engine.KEY_CODES.win, 1, 20)
+			local due = queued:tick(201)
+			local delivered
+			for _, event in ipairs(due) do if event.tap then delivered = event end end
+			helpers.assert_type(delivered, "table")
+			helpers.assert_eq(delivered.tap, "alt_tab_monitor")
+			helpers.assert_eq(delivered.binding, "tap_hold__win")
+		end)
+		if native_hook then native_hook.set_remapper(nil) end
+		package.loaded["adapters.keyboard_hook"] = saved_hook
+		Manager._reset_for_test()
+		os.remove(user_path)
+		assert(ok, failure)
+	end)
+
+	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
+		local names = { "modules.gestures.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
+			"adapters.keyboard_hook", "adapters.file_system", "infra.config_paths", "adapters.storage", "ui.gesture_conflicts" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local user_path, config_path = os.tmpname(), os.tmpname()
+		write(user_path)
+		local file = assert(io.open(config_path, "w")); file:write("[gesture_parameters]\nprivate = 'unchanged'\n"); file:close()
+		local Manager, generation, capture, accepted, on_read = nil, 1, nil, 0, nil
+		local ok, failure = pcall(function()
+			package.loaded["adapters.keyboard_hook"] = { physical_source_receipt = function()
+				return { ready = true, generation = generation }
+			end }
+			package.loaded["adapters.file_system"] = { read_with_status = function(path)
+				if on_read and path == user_path then local callback = on_read; on_read = nil; callback() end
+				local stream = io.open(path, "rb")
+				if not stream then return nil, "absent" end
+				local text = stream:read("*a"); stream:close(); return text, "ok"
+			end }
+			package.loaded["infra.config_paths"] = { config = function() return config_path end }
+			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
+			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["adapters.window_switch"] = { new = function(owner_capture)
+				capture = owner_capture
+				return { run = function(binding)
+					local guard = owner_capture(binding)
+					if type(guard) ~= "function" or guard() ~= true then return false end
+					accepted = accepted + 1; return true
+				end }
+			end }
+			local Gestures = helpers.load_module("modules.gestures.manager")
+			Gestures.init({ persist = true, config_path = config_path, enabled = false })
+			Manager = helpers.load_module("platform.remap.tap_hold_manager")
+			package.loaded["platform.remap.tap_hold_manager"] = Manager
+			local hook = fake_hook()
+			Manager.init({ keyboard_hook = hook, execute_action = Gestures.execute_action,
+				action_names = Gestures.get_executable_action_names, on_text_injected = function() end,
+				defaults_path = DEFAULTS, user_path = user_path })
+			local code = require("platform.remap.tap_hold_engine").KEY_CODES.tab
+			hook.engine:process(code, 1, 0)
+			local _, tap, binding = hook.engine:process(code, 0, 100)
+			hook.on_tap(tap, binding)
+			helpers.assert_eq(accepted, 1, "real engine and dispatcher reach the scoped native capture")
+			local guard, actual_path = capture("tap_hold__tab")
+			helpers.assert_type(guard, "function")
+			helpers.assert_eq(actual_path, user_path, "monitor admission owns tap_hold.toml, not config.toml")
+			helpers.assert_eq(capture("tap_hold"), nil, "a generic callback cannot invent a physical binding")
+			helpers.assert_eq(capture("tap_hold__unknown"), nil)
+			generation = 2
+			helpers.assert_eq(guard(), false, "physical reader replacement revokes a pending operation")
+			generation = 1
+			local source_guard = assert(capture("tap_hold__tab"))
+			local stream = assert(io.open(user_path, "a")); stream:write("\n# foreign source change\n"); stream:close()
+			helpers.assert_eq(source_guard(), false, "even an action-preserving source edit revokes captured admission")
+			write(user_path, '[tap_hold.keys.tab]\ntap_action = "copy"\n')
+			helpers.assert_eq(capture("tap_hold__tab"), nil, "unreloaded canonical source cannot authorize the old runtime tap")
+			write(user_path)
+			local paused_guard = assert(capture("tap_hold__tab"))
+			Manager.set_paused(true); Manager.set_paused(false)
+			helpers.assert_eq(paused_guard(), false, "pause and resume cannot revive an old source receipt")
+			local reentrant_guard = assert(capture("tap_hold__tab"))
+			on_read = function() Manager.set_paused(true); Manager.set_paused(false) end
+			helpers.assert_eq(reentrant_guard(), false, "a source read cannot revive an epoch changed during admission")
+			Manager.set_enabled(false)
+			helpers.assert_eq(capture("tap_hold__tab"), nil, "disabled native engine owns no monitor tap")
+			local stream = assert(io.open(config_path, "rb")); local content = stream:read("*a"); stream:close()
+			helpers.assert_eq(content, "[gesture_parameters]\nprivate = 'unchanged'\n", "source admission never changes parameters")
+		end)
+		if Manager then Manager._reset_for_test() end
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		os.remove(user_path); os.remove(config_path)
+		assert(ok, failure)
 	end)
 
 	-- The live layout says which keys are modifiers (ctrl:nocaps makes CapsLock

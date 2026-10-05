@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Numeri prima",
 	"menu.layout.number_row_symbols": "Simboli prima",
 	"platform_reason.number_row_override_unsupported": "Non supportato: Questo driver mantiene la riga nativa del sistema; non consente di forzare numeri e simboli.",
-	"platform_reason.number_row_source_unavailable": "Non disponibile: Simboli prima richiede un layout emulato attivo con livelli validi di numeri e simboli in ogni posizione della riga."
+	"platform_reason.number_row_source_unavailable": "Non disponibile: Simboli prima richiede un layout emulato attivo con livelli validi di numeri e simboli in ogni posizione della riga.",
+	"sg_actions.run_program": "▶️ Esegui un programma [configurabile]",
+	"dialog.gestures.param_program": "Scegli il percorso assoluto del programma e inserisci ogni argomento separatamente. Per uno script, scegli il suo interprete e aggiungi il percorso dello script come argomento.",
+	"dialog.gestures.param_err_program": "Usa un percorso assoluto e argomenti di testo letterali.",
+	"dialog.action_picker.program_executable": "Eseguibile",
+	"dialog.action_picker.program_arguments": "Argomenti (uno per campo)",
+	"dialog.action_picker.program_add_argument": "Aggiungi argomento",
+	"dialog.action_picker.program_remove_argument": "Rimuovi argomento",
+	"platform_reason.program_runner_unavailable": "Non disponibile: Il lanciatore nativo o questa associazione non è disponibile."
 }
