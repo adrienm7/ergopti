@@ -331,3 +331,46 @@ _THHS_KeyDelayVisible(TargetPath) {
 }
 Test("tap-holds: Windows exposes real per-key delay after the original head (tap-hold-key-delay)",
 	() => _THHS_WithNativeFixture(_THHS_KeyDelayVisible))
+
+; Exercise the real per-key provider and retained command, not a synthetic wrapper call.
+_THHS_KeyDelayProviderContract(TargetPath) {
+	Definition := _MR_GetMenuDef("tap_hold_key_delay_rows")[1]
+	PreviousCaption := Definition["i18n"]
+	PreviousCommand := Definition["id"]
+	try {
+		for Hand in ["left", "right"]
+			AssertEqual(TapHoldKeyDefsOfHand(Hand).Length, _TH_KeyRows(Hand).Length,
+				"the actual provider renders every declared physical key without a construction exception")
+		Definition["i18n"] := "menu.shortcuts.title"
+		Rows := _THHS_KeyChildren("caps_lock")
+		AssertEqual(t("menu.shortcuts.title"), Rows[5]["items"][1]["label"],
+			"the real delay child consumes its shared command caption")
+		Assert(HasMethod(Rows[5]["items"][1]["action"], "Call"),
+			"caption mutation retains the actual native delay owner")
+		Definition["id"] := "unowned_delay_command"
+		AssertEqual(0, _TH_KeyRows("left").Length,
+			"a missing native command owner refuses physical key rows rather than publishing a partial child")
+	} finally {
+		Definition["i18n"] := PreviousCaption
+		Definition["id"] := PreviousCommand
+	}
+	Assert(!FileExist(TargetPath), "building and refusing native rows cannot publish preferences")
+}
+Test("tap-holds: actual delay provider constructs both hands and refuses unowned commands (tap-hold-key-delay)",
+	() => _THHS_WithNativeFixture(_THHS_KeyDelayProviderContract))
+
+_THHS_KeyDelayRetainedOwnerRefusal(TargetPath) {
+	global TapHold
+	Rows := _THHS_KeyChildren("caps_lock")
+	DelayCommand := Rows[5]["items"][1]
+	Previous := TapHold
+	try {
+		TapHold := 0
+		AssertEqual(false, DelayCommand["action"].Call(),
+			"the retained actual delay callback refuses withdrawn native state before opening its prompt")
+		AssertEqual(0, TapHold, "callback refusal cannot rebuild an uninitialized owner")
+		Assert(!FileExist(TargetPath), "callback refusal cannot write the private target")
+	} finally TapHold := Previous
+}
+Test("tap-holds: retained actual delay command refuses native owner withdrawal (tap-hold-key-delay)",
+	() => _THHS_WithNativeFixture(_THHS_KeyDelayRetainedOwnerRefusal))
