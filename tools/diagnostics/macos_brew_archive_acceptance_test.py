@@ -769,6 +769,205 @@ class RegistrationFactControls(unittest.TestCase):
                 child.wait.assert_not_called()
 
 
+class SenderFactControls(unittest.TestCase):
+    """Independent closed outcome records; native reply routing remains unqualified."""
+
+    def line(
+        self,
+        phase="reply-read",
+        send=0,
+        read=-1701,
+        size="unobserved",
+        match="unobserved",
+        error_read=0,
+        error_size=4,
+        error=-1743,
+    ):
+        return (
+            f"Owned AppleEvent outcome admission failed: phase={phase}, send={send}, "
+            f"read={read}, length={size}, match={match}, error_read={error_read}, "
+            f"error_length={error_size}, error_value={error}\n"
+        )
+
+    def test_target_error_is_observed_only_from_successful_exact_sint32_read(self):
+        for error in (-2147483648, -1743, 0, 2147483647):
+            with self.subTest(error=error):
+                self.assertEqual(
+                    probe.appleevent_sender_fact(self.line(error=error)),
+                    {
+                        "phase": "reply-read",
+                        "send_osstatus": 0,
+                        "reply_read_osstatus": -1701,
+                        "reply_length": None,
+                        "reply_match": None,
+                        "error_read_osstatus": 0,
+                        "error_length": 4,
+                        "error_number": error,
+                    },
+                )
+        unavailable = probe.appleevent_sender_fact(
+            self.line(error_read=-1701, error_size="unobserved", error="unobserved")
+        )
+        self.assertIsNone(unavailable["error_number"])
+        self.assertIsNone(unavailable["error_length"])
+        self.assertEqual(unavailable["error_read_osstatus"], -1701)
+        wrong_length = probe.appleevent_sender_fact(self.line(error_size=3, error="unobserved"))
+        self.assertIsNone(wrong_length["error_number"])
+        self.assertEqual(wrong_length["error_length"], 3)
+
+    def test_closed_failure_phases_preserve_transport_read_length_and_match_distinctions(self):
+        for size in (0, 37, 4096, "outside-bound"):
+            with self.subTest(size=size):
+                facts = probe.appleevent_sender_fact(
+                    self.line(phase="reply-length", read=0, size=size)
+                )
+                self.assertEqual(facts["reply_length"], size)
+                self.assertIsNone(facts["reply_match"])
+        facts = probe.appleevent_sender_fact(
+            self.line(phase="reply-match", read=0, size=36, match=0)
+        )
+        self.assertIs(facts["reply_match"], False)
+        for phase, send in (("send", -1712), ("denied-status", -1744)):
+            with self.subTest(phase=phase):
+                facts = probe.appleevent_sender_fact(
+                    self.line(
+                        phase=phase,
+                        send=send,
+                        read="unobserved",
+                        error_read="unobserved",
+                        error_size="unobserved",
+                        error="unobserved",
+                    )
+                )
+                self.assertEqual(facts["send_osstatus"], send)
+                self.assertIsNone(facts["reply_read_osstatus"])
+                self.assertIsNone(facts["error_number"])
+
+    def test_unknown_oversized_noisy_or_contradictory_native_records_are_omitted(self):
+        valid = self.line()
+        invalid = (
+            valid + "extra\n",
+            valid[:-1],
+            valid + "\0",
+            "x" * 257,
+            valid.replace("reply-read", "foreign-phase"),
+            valid.replace("send=0", "send=+0"),
+            valid.replace("read=-1701", "read=-01701"),
+            valid.replace("read=-1701", "read=-2147483649", 1),
+            valid.replace("error_value=-1743", "error_value=2147483648"),
+            valid.replace("error_value=-1743", "error_value=-1743\0"),
+            valid.replace("error_value=-1743", "error_value=unobserved"),
+            valid.replace("error_length=4", "error_length=5"),
+            valid.replace("error_length=4", "error_length=unobserved"),
+            self.line(read=0),
+            self.line(size=0),
+            self.line(match=0),
+            self.line(phase="reply-match", read=0, size=36, match=1),
+            self.line(phase="reply-length", read=0, size=36),
+            self.line(phase="reply-length", read=0, size=4097),
+            self.line(
+                phase="denied-status",
+                send=-1743,
+                read="unobserved",
+                error_read="unobserved",
+                error_size="unobserved",
+                error="unobserved",
+            ),
+            self.line(error_read=-1701),
+            None,
+            b"unowned bytes",
+            "é" * 40,
+        )
+        for value in invalid:
+            with self.subTest(value=value):
+                self.assertEqual(probe.appleevent_sender_fact(value), {})
+
+    def test_nonzero_outcome_stays_refused_without_exporting_unadmitted_capture_bytes(self):
+        for status, value in (
+            (66, self.line()),
+            (66, "private nonce/raw path\0"),
+            (65, self.line()),
+        ):
+            with self.subTest(status=status, value=value):
+                children = Mock()
+                children.run.return_value = subprocess.CompletedProcess(
+                    ["private-path", "private-nonce"], status, "", value
+                )
+                with self.assertRaises(probe.AdmissionError) as failed:
+                    probe.run_appleevent_sender(
+                        children, ["private-path", "private-nonce"], "deny-removal-positive"
+                    )
+                detail = str(failed.exception)
+                self.assertIn("control=deny-removal-positive", detail)
+                self.assertIn("exit=" + str(status), detail)
+                self.assertEqual("sender_fact=" in detail, status == 66 and value == self.line())
+                self.assertNotIn("private nonce/raw path", detail)
+                self.assertNotIn("private-path", detail)
+                self.assertNotIn("private-nonce", detail)
+                children.run.assert_called_once_with(
+                    ["private-path", "private-nonce"], check=False, confined=False
+                )
+                children.settle.assert_not_called()
+
+    def test_zero_exit_alone_cannot_bypass_exact_stdout_stderr_or_denial_oracles(self):
+        for control, expected in (
+            ("unconfined-positive", "native_appleevent_status=0\n"),
+            ("deny-removal-positive", "native_appleevent_status=0\n"),
+            ("full-policy-denial", "native_appleevent_status=-1743\n"),
+        ):
+            with self.subTest(control=control):
+                children = Mock()
+                children.run.return_value = subprocess.CompletedProcess([], 0, expected, "")
+                accepted = probe.run_appleevent_sender(children, [], control, confined=True)
+                self.assertEqual(accepted.stdout, expected)
+                children.run.assert_called_with([], check=False, confined=True)
+                for stdout, stderr in (
+                    ("", ""),
+                    (expected, "private noise"),
+                    ("native_appleevent_status=-1744\n", ""),
+                ):
+                    children.run.return_value = subprocess.CompletedProcess([], 0, stdout, stderr)
+                    with self.assertRaises(probe.AdmissionError):
+                        probe.run_appleevent_sender(children, [], control)
+                children.settle.assert_not_called()
+
+    def test_deny_removal_failure_stops_before_third_send_and_retains_receiver_owner(self):
+        boundary = AppleEventBoundaryControls()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "sandbox.sb").write_text(boundary.policy)
+            children = boundary.model(root, failure=2)
+            execute = children.run
+
+            def run(arguments, **options):
+                completed = execute(arguments, **options)
+                if completed.returncode == 65:
+                    return subprocess.CompletedProcess(arguments, 66, "", self.line())
+                return completed
+
+            children.run = run
+            with (
+                patch.object(probe.uuid, "uuid4", return_value=boundary.nonce),
+                patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
+            ):
+                with self.assertRaises(probe.AppleEventBoundaryError) as failed:
+                    probe.admit_appleevent_boundary(children, root)
+            detail = str(failed.exception)
+            self.assertIn("control=deny-removal-positive", detail)
+            self.assertIn('"error_number": -1743', detail)
+            self.assertNotIn(directory, detail)
+            self.assertNotIn(boundary.nonce, detail)
+            self.assertEqual(len(children.sender_calls), 2)
+            self.assertEqual(len(children.active), 1)
+            receiver = children.active[0]
+            self.assertFalse(children.groups[receiver].reaped)
+            self.assertEqual(children.groups[receiver].observe_exit.call_count, 3)
+            self.assertTrue((root / "appleevent-delivered.1").exists())
+            self.assertFalse((root / "appleevent-delivered.2").exists())
+            self.assertFalse((root / "appleevent-delivered.3").exists())
+            self.assertEqual((root / "sandbox.sb").read_text(), boundary.policy)
+
+
 class PhaseEvidenceControls(unittest.TestCase):
     """Actual bounded filesystem controls; these never substitute native process closure."""
 

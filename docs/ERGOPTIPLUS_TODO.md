@@ -2039,6 +2039,16 @@ the candidate passes twenty-five with no skips. This proves the source bug, not
 the unseen runner socket state. Complete native acceptance and downstream
 packaging/install remain pending; no item is closed.
 
+The native Brew sender now exposes only closed failure-phase, send/read status,
+bounded reply length/match and an independently observed standard SInt32 target
+error. Unavailable data remains unavailable; nonce, reply bytes and raw paths are
+never projected. The unchanged nonce/denial predicates, sandbox and physical
+retirement remain required. Independent source review approves the bounded
+diagnostic; all thirty-five original Python cases and six new controls pass
+without skips. The unchanged new failure-fact control fails on the original
+generic helper. These facts do not correct or qualify the unseen native reply
+failure; C compilation and complete native acceptance remain pending.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

@@ -857,6 +857,127 @@ def appleevent_registration_fact(children, receiver):
                     pass
 
 
+def appleevent_sender_fact(value):
+    """Admit only a closed bounded native failure line, never private reply bytes."""
+    try:
+        if not isinstance(value, str) or len(value) > 256:
+            return {}
+        value.encode("ascii")
+        prefix = "Owned AppleEvent outcome admission failed: "
+        if not value.startswith(prefix) or not value.endswith("\n"):
+            return {}
+        keys = (
+            "phase",
+            "send",
+            "read",
+            "length",
+            "match",
+            "error_read",
+            "error_length",
+            "error_value",
+        )
+        parts = value[len(prefix) : -1].split(", ")
+        if len(parts) != len(keys):
+            return {}
+        raw = {}
+        for key, part in zip(keys, parts):
+            if not part.startswith(key + "="):
+                return {}
+            raw[key] = part[len(key) + 1 :]
+
+        def integer(encoded):
+            value = int(encoded)
+            if not -(2**31) <= value < 2**31 or str(value) != encoded:
+                raise ValueError("Unadmitted integer")
+            return value
+
+        def optional_integer(encoded):
+            return None if encoded == "unobserved" else integer(encoded)
+
+        def length(encoded):
+            if encoded in ("unobserved", "outside-bound"):
+                return None if encoded == "unobserved" else encoded
+            value = integer(encoded)
+            if not 0 <= value <= 4096:
+                raise ValueError("Unadmitted length")
+            return value
+
+        phase = raw["phase"]
+        send = integer(raw["send"])
+        read = optional_integer(raw["read"])
+        size = length(raw["length"])
+        match = {"unobserved": None, "0": False, "1": True}[raw["match"]]
+        error_read = optional_integer(raw["error_read"])
+        error_size = length(raw["error_length"])
+        error_number = optional_integer(raw["error_value"])
+        if send != 0:
+            if (error_read, error_size, error_number) != (None, None, None):
+                return {}
+        elif error_read is None:
+            return {}
+        elif error_read != 0:
+            if (error_size, error_number) != (None, None):
+                return {}
+        elif error_size is None or (error_size == 4) != (error_number is not None):
+            return {}
+        if phase == "send":
+            admitted = send != 0 and (read, size, match) == (None, None, None)
+        elif phase == "denied-status":
+            admitted = send not in (-1742, -1743) and (read, size, match) == (None, None, None)
+        elif phase == "reply-read":
+            admitted = (
+                send == 0 and read is not None and read != 0 and size is None and match is None
+            )
+        elif phase == "reply-length":
+            admitted = send == 0 and read == 0 and size is not None and size != 36 and match is None
+        elif phase == "reply-match":
+            admitted = send == 0 and read == 0 and size == 36 and match is False
+        else:
+            admitted = False
+        if not admitted:
+            return {}
+        return {
+            "phase": phase,
+            "send_osstatus": send,
+            "reply_read_osstatus": read,
+            "reply_length": size,
+            "reply_match": match,
+            "error_read_osstatus": error_read,
+            "error_length": error_size,
+            "error_number": error_number,
+        }
+    except (UnicodeError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def run_appleevent_sender(children, arguments, control, *, confined=False):
+    """Retain normal ownership retirement and admit the exact native sender outcome."""
+    require(
+        control in ("unconfined-positive", "deny-removal-positive", "full-policy-denial"),
+        "Unadmitted AppleEvent control label",
+    )
+    result = children.run(arguments, check=False, confined=confined)
+    if result.returncode != 0:
+        facts = appleevent_sender_fact(result.stderr) if result.returncode == 66 else {}
+        detail = ", sender_fact=" + json.dumps(facts, sort_keys=True) if facts else ""
+        require(
+            False,
+            f"Owned AppleEvent sender failed: control={control}, exit={result.returncode}" + detail,
+        )
+    if control == "full-policy-denial":
+        expected = ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
+        message = "Full native policy did not report a documented AppleEvent refusal"
+    else:
+        expected = ("native_appleevent_status=0\n",)
+        message = (
+            "Owned unconfined AppleEvent route was not independently admitted"
+            if control == "unconfined-positive"
+            else "Same-policy deny-removal AppleEvent route was not independently admitted"
+        )
+    require(result.stdout in expected and not result.stderr, message)
+    return result
+
+
 def _admit_appleevent_boundary(children, repository):
     """Require two real owned deliveries before admitting the full policy's refusal."""
     root = children.root
@@ -954,7 +1075,7 @@ def _admit_appleevent_boundary(children, repository):
         time.sleep(0.02)
     same_live_receiver("before-unconfined-positive")
     sender = [str(executables["sender"]), str(receiver.pid), nonce]
-    positive = children.run([*sender, "success"])
+    positive = run_appleevent_sender(children, [*sender, "success"], "unconfined-positive")
     require(
         positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
         "Owned unconfined AppleEvent route was not independently admitted",
@@ -982,7 +1103,11 @@ def _admit_appleevent_boundary(children, repository):
     )
     removed = root / "sandbox-appleevent-positive.sb"
     removed.write_text(policy.replace(deny, ""), encoding="utf-8", newline="\n")
-    positive = children.run(["/usr/bin/sandbox-exec", "-f", str(removed), *sender, "success"])
+    positive = run_appleevent_sender(
+        children,
+        ["/usr/bin/sandbox-exec", "-f", str(removed), *sender, "success"],
+        "deny-removal-positive",
+    )
     require(
         positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
         "Same-policy deny-removal AppleEvent route was not independently admitted",
@@ -990,7 +1115,9 @@ def _admit_appleevent_boundary(children, repository):
     second = marker_bytes(2)
     require(marker_bytes(1) == first, "Deny-removal delivery altered the first positive marker")
     same_live_receiver("before-full-policy-denial")
-    refused = children.run([*sender, "denied"], confined=True)
+    refused = run_appleevent_sender(
+        children, [*sender, "denied"], "full-policy-denial", confined=True
+    )
     require(
         refused.stdout in ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
         and not refused.stderr,

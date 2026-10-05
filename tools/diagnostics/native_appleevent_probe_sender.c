@@ -59,6 +59,19 @@ int main(int argc, char **argv) {
     status = AESendMessage(&event, &reply,
         kAEWaitReply | kAENeverInteract | kAEDoNotPromptForUserConsent, 5 * 60);
     int result = 66;
+    int nonce_read_attempted = 0;
+    OSStatus nonce_read_status = noErr;
+    Size nonce_length = 0;
+    int nonce_match = 0;
+    int error_read_attempted = 0;
+    OSStatus error_read_status = noErr;
+    Size error_length = 0;
+    SInt32 error_number = 0;
+    if (status == noErr) {
+        error_read_attempted = 1;
+        error_read_status = AEGetParamPtr(&reply, keyErrorNumber, typeSInt32,
+            NULL, &error_number, sizeof(SInt32), &error_length);
+    }
     if (strcmp(argv[3], "denied") == 0) {
         if (status == errAETargetAddressNotPermitted || status == errAEEventNotPermitted) result = 0;
     } else if (status == noErr) {
@@ -66,12 +79,55 @@ int main(int argc, char **argv) {
         Size actual_length = 0;
         const OSStatus read = AEGetParamPtr(&reply, nonce_parameter, typeUTF8Text,
             NULL, echoed, 36, &actual_length);
+        nonce_read_attempted = 1;
+        nonce_read_status = read;
+        nonce_length = actual_length;
+        if (read == noErr && actual_length == 36) {
+            nonce_match = memcmp(echoed, argv[2], 36) == 0;
+        }
         if (read == noErr && actual_length == 36 && memcmp(echoed, argv[2], 36) == 0) {
             result = 0;
         }
     }
     if (result != 0) {
-        fprintf(stderr, "Owned AppleEvent outcome admission failed: %d\n", (int)status);
+        const char *phase = strcmp(argv[3], "denied") == 0 ? "denied-status" :
+            status != noErr ? "send" : nonce_read_status != noErr ? "reply-read" :
+            nonce_length != 36 ? "reply-length" : "reply-match";
+        char read_detail[16] = "unobserved";
+        char length_detail[16] = "unobserved";
+        char match_detail[16] = "unobserved";
+        char error_read_detail[16] = "unobserved";
+        char error_length_detail[16] = "unobserved";
+        char error_value_detail[16] = "unobserved";
+        if (nonce_read_attempted) {
+            snprintf(read_detail, sizeof(read_detail), "%d", (int)nonce_read_status);
+            if (nonce_read_status == noErr) {
+                if (nonce_length >= 0 && nonce_length <= 4096) {
+                    snprintf(length_detail, sizeof(length_detail), "%ld", (long)nonce_length);
+                } else {
+                    strcpy(length_detail, "outside-bound");
+                }
+                if (nonce_length == 36) {
+                    snprintf(match_detail, sizeof(match_detail), "%d", nonce_match);
+                }
+            }
+        }
+        if (error_read_attempted) {
+            snprintf(error_read_detail, sizeof(error_read_detail), "%d", (int)error_read_status);
+            if (error_read_status == noErr) {
+                if (error_length >= 0 && error_length <= 4096) {
+                    snprintf(error_length_detail, sizeof(error_length_detail), "%ld", (long)error_length);
+                } else {
+                    strcpy(error_length_detail, "outside-bound");
+                }
+                if (error_length == sizeof(SInt32)) {
+                    snprintf(error_value_detail, sizeof(error_value_detail), "%d", (int)error_number);
+                }
+            }
+        }
+        fprintf(stderr, "Owned AppleEvent outcome admission failed: phase=%s, send=%d, read=%s, length=%s, match=%s, error_read=%s, error_length=%s, error_value=%s\n",
+            phase, (int)status, read_detail, length_detail, match_detail,
+            error_read_detail, error_length_detail, error_value_detail);
     } else {
         printf("native_appleevent_status=%d\n", (int)status);
     }
