@@ -1119,9 +1119,27 @@ all its prior assertion predicates remain intact. A wrong-source mutant fails
 the new independent fence check. Selected local gates pass formatting, 357 JS
 checks, 14,226 portable macOS and 6,760 Linux unit cases, plus 101 macOS E2E
 checks with one host-specific skip and 188 Linux E2E checks. Hosted native
-qualification remains pending. Nonbulk settings, activation/deactivation,
-startup and detached
-source-generation consumers remain separately prepared or open; TODO5 is partial.
+qualification remains pending. The separately reviewed lifecycle consumers
+are applied below; detached semantic-source admission remains separate. TODO5
+is partial.
+
+The macOS scalar setters and detached recommendation saves now retain the actual
+private file receipt when a refused save published or still owes cleanup. Retry
+settles that exact owner before another mutation or initialization, without
+regenerating a detached runtime. Activation and deactivation retain file debt
+inside their existing native transitions: STOPPED must be proven before an
+aborted enable restores its source, while a refused disable inverse must settle
+before READY restoration. The existing two-return ports retain their previous
+contracts. Startup captures migration/default-publication cleanup before native
+lease/runtime construction, preserving both phase-specific save calls and all
+seven existing literal-false init exits. Pending startup cleanup blocks another
+init; settled retry rereads current source. These capabilities are process-local,
+not a journal surviving VM exit. Independent controls pass 170 setter cases,
+13 enabled cases and 211 composed startup cases; original owners fail the new
+native-file boundaries. Selected local gates pass formatting, 357 JS checks,
+14,253 portable macOS unit cases and 101 macOS E2E checks with one host-specific
+skip. Hosted native/package/install and physical/global acceptance remain
+required. TODO5 stays partial.
 
 The native Linux metrics prerequisite now decodes the existing SQLite exit
 receipt before its instrumentation counts JSON rows, then returns the complete

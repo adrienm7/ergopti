@@ -84,8 +84,11 @@ Release publication was skipped. Final integrated-source CI remains mandatory.
 The continuation feature branch applies the macOS Boolean-leaf packet after
 matching its exact source preimage; its native qualification remains pending.
 The shared Lua installed-record packet is also applied after matching all source
-and test preimages. The other six packets remain unapplied. Frozen patch bytes and review receipts
-are historical evidence and must not be rewritten to reflect new integration.
+and test preimages. The other six historical payloads remain unapplied. The old
+partial-publication packet `19bcc252…` is superseded by the reviewed bulk and
+lifecycle continuation; do not apply its old sources over those owners.
+Frozen patch bytes and review receipts are historical evidence and must not be
+rewritten to reflect new integration.
 Each subdirectory preserves its author's source review, dependency/preimage
 metadata and bounded qualification notes. The shared-menu dependency order is
 Tap-Hold head, Metrics labels, Tap-Hold delay, Wrap controls, then Tap-Hold
@@ -97,9 +100,10 @@ Do not blindly apply obsolete TODO hunks: compose only group1 notes.
 The Mac Boolean packet and the reviewed Linux obsolete-shape successor are
 applied in the continuation feature branch; hosted native acceptance remains
 pending. The exact bulk publication-recovery packet is applied as described
-below. Nonbulk setters, activation, startup and detached semantic-source
-admission remain separate prepared work. A bounded implementation must not be
-reported as a completed global transaction.
+below. Reviewed scalar/detached setters, activation and startup consumers are
+also applied in the lifecycle continuation below. Same-read recommendation
+semantic-source admission remains a separate prepared packet. A bounded
+implementation must not be reported as a completed global transaction.
 
 The remaining menus still have 96 Windows, 153 macOS and 97 Linux counted sites
 in the integrated source checkpoint. Prepared packets lower counts only when
@@ -154,9 +158,35 @@ publisher and adds a handwritten exact malformed-source fence; its previous
 predicates are unchanged and an independently mutated wrong fence is refused.
 Selected local gates pass formatting, 357 JS checks, 14,226 portable macOS and
 6,760 Linux unit cases, macOS E2E101 with one host-specific skip, and Linux
-E2E188. Hosted native qualification remains pending; nonbulk setter,
-activation, startup and detached semantic-source
-admission packets are separate and do not establish complete TODO5 acceptance.
+E2E188. Hosted native qualification remains pending. The separately reviewed
+setter/activation/startup consumer packets are applied in the next continuation;
+same-read recommendation admission remains separate. This bounded source does
+not establish complete TODO5 acceptance.
+
+## Continuation: lifecycle publication recovery
+
+Three independently reviewed source/test packets apply after the exact bulk
+prerequisite:
+
+- Setter/detached V2: `659fe4aac0205d78d95e633ecf3c1327bedd359cfafa250f8464fdc30bf0df78`.
+- Enabled transition: `b95d7028579aa912522e5c28b2dc80ce480cd11d40f6377e4d2c73b2f7d57630`.
+- Startup V2: `aebc8d547e56318536e81d5f5b1c5ed6aec79db0f6736e95345cc85f72588c88`.
+
+Setter and enabled changes reconstruct exactly on their common init preimage;
+conflict-free composition reproduces the independently reviewed `10569b34…`
+source before exact startup application produces `35c342ff…`. Existing test
+assertions remain intact, including both meaningful Config startup save sites
+and all seven false exits. Scalar/detached saves retain the actual native file
+effect on refusal; enabled transitions preserve STOPPED/file-inverse/READY
+ordering and legacy two-return behavior. Startup records cleanup-only debt
+before lease/runtime admission and retries against a fresh source. These private
+capabilities do not survive a VM/process exit; existing emergency teardown and
+EOF policies do not manufacture an acknowledged cleanup. Independent focused
+controls pass 170 setter cases, 13 enabled cases and 211 composed startup cases.
+Selected final-source local gates pass formatting, 357 JS checks, 14,253
+portable macOS unit cases and 101 macOS E2E checks with one host-specific skip.
+Hosted native/package/install and physical/global acceptance remain pending.
+No TODO item is removed.
 
 ## Continuation: Linux obsolete TapHold shapes
 
