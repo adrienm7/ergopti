@@ -1,0 +1,125 @@
+{
+	"cases": [
+		{
+			"id": "install-preserves-complete-unowned-model",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "new",
+						"sha256": "verified",
+						"version": "2"
+					}
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]},\"new\":{\"id\":\"new\",\"sha256\":\"verified\",\"version\":\"2\"}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
+		},
+		{
+			"id": "remove-preserves-complete-unowned-model",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
+			"operations": [
+				{
+					"kind": "remove",
+					"id": "sample"
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
+		},
+		{
+			"id": "chained-builders-retain-source-only-values",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "new",
+						"sha256": "verified",
+						"version": "2"
+					}
+				},
+				{
+					"kind": "remove",
+					"id": "new"
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
+		},
+		{
+			"id": "verified-replacement-does-not-resurrect-obsolete-row",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "retired",
+						"sha256": "verified",
+						"version": "3"
+					}
+				},
+				{
+					"kind": "remove",
+					"id": "retired"
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
+		},
+		{
+			"id": "source-outdated-member-is-not-runtime-classification",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\"},\"retired\":false},\"outdated\":{\"source\":[null,[],false],\"note\":\"retain\"},\"future\":{\"nested\":{\"value\":7}}}",
+			"mutate_runtime": true,
+			"operations": [
+				{
+					"kind": "remove",
+					"id": "sample"
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"retired\":false},\"outdated\":{\"source\":[null,[],false],\"note\":\"retain\"},\"future\":{\"nested\":{\"value\":7}}}"
+		},
+		{
+			"id": "without-internal-classification-leak",
+			"source": "{\"schema_version\":1,\"layouts\":{\"retired\":null,\"empty_row\":[],\"legacy\":{\"id\":\"legacy\",\"version\":1}}}",
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "new",
+						"sha256": "verified",
+						"version": "2"
+					}
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"retired\":null,\"empty_row\":[],\"legacy\":{\"id\":\"legacy\",\"version\":1},\"new\":{\"id\":\"new\",\"sha256\":\"verified\",\"version\":\"2\"}}}"
+		},
+		{
+			"id": "builder-edits-do-not-rewrite-source-only-provenance",
+			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
+			"mutate_builder": true,
+			"operations": [
+				{
+					"kind": "install",
+					"entry": {
+						"id": "new",
+						"sha256": "verified",
+						"version": "2"
+					}
+				},
+				{
+					"kind": "remove",
+					"id": "new"
+				}
+			],
+			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"2\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
+		}
+	],
+	"refusals": [
+		"{ damaged",
+		"{\"schema_version\":2,\"layouts\":{}}",
+		"{\"schema_version\":1}",
+		"{\"schema_version\":1,\"layouts\":[]}",
+		"{\"schema_version\":1,\"layouts\":null}",
+		"[]",
+		"null"
+	],
+	"manager_source": "{\"schema_version\":1,\"layouts\":{\"retired\":false,\"null_row\":null,\"array_row\":[],\"legacy\":{\"version\":2,\"future\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"outdated\":{\"source\":[null,[],false],\"note\":\"retain\"}}"
+}

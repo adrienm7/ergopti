@@ -428,7 +428,7 @@ function M.new(options)
 			return apply_values(values)
 		end,
 		restore = function(snapshot)
-			if snapshot.adopted then
+			if snapshot.adopted or secondary.pending() then
 				if Config.adopt_scope_source(fence, snapshot.config.source, secondary.restore) ~= true then return false end
 				snapshot.adopted = false
 			end

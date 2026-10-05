@@ -1594,6 +1594,7 @@ local function write_atomic(path, content, expected_source)
 	local payload_published = false
 	local write_lock = nil
 	local expected_metadata = nil
+	local owned_staging_cleanup = nil
 
 	local function preserve_staging_area(context, reason)
 		if not staging_area then return false end
@@ -1605,6 +1606,7 @@ local function write_atomic(path, content, expected_source)
 			staging_area,
 			payload_published
 		)
+		owned_staging_cleanup = owner
 		staging_area = nil
 		return retain_staging_cleanup_debt(owner, context, reason)
 	end
@@ -1619,6 +1621,7 @@ local function write_atomic(path, content, expected_source)
 			staging_area,
 			payload_published
 		)
+		owned_staging_cleanup = owner
 		local released, release_err = release_staging_owner(owner, context)
 		staging_area = nil
 		return released, release_err
@@ -1850,6 +1853,7 @@ local function write_atomic(path, content, expected_source)
 					staging_area,
 					payload_published
 				)
+				owned_staging_cleanup = owner
 				local _, retained_err = retain_staging_cleanup_debt(
 					owner,
 					"unexpected cleanup error",
@@ -1870,7 +1874,39 @@ local function write_atomic(path, content, expected_source)
 	end
 
 	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
-	write_lock = nil
+	if lock_released then write_lock = nil end
+	local retry_cleanup = nil
+	if not lock_released or (payload_published and (not ok or result ~= true))
+		or (owned_staging_cleanup ~= nil and _staging_cleanup_debt == owned_staging_cleanup and result ~= true) then
+		-- This private callback owns only this operation's lease and staging debt.
+		-- It never repeats publication or touches a successor's live source.
+		local settled, cleanup_group = false, nil
+		retry_cleanup = function()
+			if settled then return true, nil, payload_published end
+			if write_lock ~= nil then
+				local released, detail = release_cooperative_write_lock(write_lock)
+				if released ~= true then return false, detail end
+				write_lock = nil
+			end
+			if cleanup_group ~= nil then
+				local released, detail = M.release_write_locks(cleanup_group)
+				if released ~= true then return false, detail end
+				cleanup_group = nil
+			end
+			if owned_staging_cleanup ~= nil and _staging_cleanup_debt == owned_staging_cleanup then
+				local group, acquired, acquire_err = M.acquire_write_locks({ owned_staging_cleanup.requested_path })
+				cleanup_group = group
+				if acquired ~= true then return false, acquire_err end
+				local called, cleaned, clean_err = pcall(release_staging_owner, owned_staging_cleanup, "publication retry")
+				local released, release_err = M.release_write_locks(cleanup_group)
+				if released == true then cleanup_group = nil end
+				if not called or cleaned ~= true then return false, tostring(called and clean_err or cleaned) end
+				if released ~= true then return false, release_err end
+			end
+			settled = true
+			return true, nil, payload_published
+		end
+	end
 	if not lock_released then
 		Logger.error(LOG, "write(): cooperative publication lock for '%s' was not released — %s",
 			tostring(resolved_path or path), tostring(lock_release_err))
@@ -1881,13 +1917,13 @@ local function write_atomic(path, content, expected_source)
 
 	if not ok then
 		Logger.error(LOG, "write(): unexpected error on '%s' — %s", path, tostring(result))
-		return false, tostring(result)
+		return false, tostring(result), retry_cleanup
 	end
 	if not lock_released then
-		return false, tostring(lock_release_err or "cooperative write lock release failed")
+		return false, tostring(lock_release_err or "cooperative write lock release failed"), retry_cleanup
 	end
 	if result == true then return true, result_err end
-	return false, result_err or "atomic write failed"
+	return false, result_err or "atomic write failed", retry_cleanup
 end
 
 --- Writes content atomically through the canonical two-argument FileSystem port.
@@ -1896,7 +1932,8 @@ end
 --- @return boolean written
 --- @return string|nil error_message
 function M.write(path, content)
-	return write_atomic(path, content, nil)
+	local written, detail = write_atomic(path, content, nil)
+	return written, detail
 end
 
 --- Performs a last-moment classified-source check before atomic publication.
@@ -1910,6 +1947,7 @@ end
 --- @param expected_source table `{ status = "ok"|"absent", content = string|nil }`.
 --- @return boolean written
 --- @return string|nil error_message
+--- @return function|nil retry_cleanup Private cleanup/effect receipt on refusal.
 function M.write_if_unchanged(path, content, expected_source)
 	if type(expected_source) ~= "table" then
 		return false, "expected_source must be a table"

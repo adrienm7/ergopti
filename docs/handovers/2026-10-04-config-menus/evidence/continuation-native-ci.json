@@ -1,0 +1,235 @@
+{
+	"manual_run": {
+		"source_sha": "594f810aad7dd4f2688357c133e3267d4d2503fb",
+		"tested_ci_sha": "4800d5c83878e653622941b790390e1497cab6c5",
+		"previous_ci_sha": "eb85009310acf2ae43c9f5a49b610cdabba37635",
+		"tree": "1acc5c491fa8bc3864f242c7c25aecbe44d66a6c",
+		"same_source_tree": true,
+		"os_lanes": "macos+linux",
+		"windows": "Explicit maintainer workstation deferral; not executed",
+		"release": "workflow_dispatch emits release=false",
+		"status": "completed",
+		"conclusion": "failure",
+		"databaseId": 37263515985,
+		"headSha": "4800d5c83878e653622941b790390e1497cab6c5",
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/37263515985"
+	},
+	"job_conclusions": [
+		{
+			"name": "Validate / Checks and plan",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / properties",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / js",
+			"conclusion": "success"
+		},
+		{
+			"name": "Linux / Unit tests",
+			"conclusion": "success"
+		},
+		{
+			"name": "macOS / Unit tests (stubbed)",
+			"conclusion": "success"
+		},
+		{
+			"name": "Windows",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Linux / E2E tests",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Linux / Verdict",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Linux / Package",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Linux / Install and launch \u00b7 ${{ matrix.label }}",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "macOS / E2E tests (stubbed)",
+			"conclusion": "success"
+		},
+		{
+			"name": "macOS / Package",
+			"conclusion": "failure"
+		},
+		{
+			"name": "macOS / Verdict",
+			"conclusion": "failure"
+		},
+		{
+			"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Validate / Selected OS verdict",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Release / Publish",
+			"conclusion": "skipped"
+		}
+	],
+	"failed_steps": [
+		{
+			"job": "Linux / E2E tests",
+			"step": "Preserve release-page associations after failed native validator saves",
+			"number": 41
+		},
+		{
+			"job": "Linux / E2E tests",
+			"step": "Parse native virtual audio state independently of user locale",
+			"number": 44
+		},
+		{
+			"job": "Linux / E2E tests",
+			"step": "Preserve literal desktop notification text",
+			"number": 75
+		},
+		{
+			"job": "Linux / Verdict",
+			"step": "Assert all mandatory subjects ran and passed",
+			"number": 5
+		},
+		{
+			"job": "macOS / Package",
+			"step": "Run Swift launcher tests",
+			"number": 12
+		},
+		{
+			"job": "macOS / Verdict",
+			"step": "Verify mandatory jobs and launch scenarios",
+			"number": 5
+		},
+		{
+			"job": "Validate / Selected OS verdict",
+			"step": "Assert selected lanes completed",
+			"number": 4
+		}
+	],
+	"linux_subjects": [
+		"Preserve release-page associations after failed native validator saves",
+		"Parse native virtual audio state independently of user locale",
+		"Preserve literal desktop notification text"
+	],
+	"mac_subjects": [
+		{
+			"test": "SparkleArchiveUpdateAcceptanceTests.testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch",
+			"receipt": "nativeProcessCensus exit 1; kernel/server retirement refused; fixture retained"
+		},
+		{
+			"test": "HomebrewArchiveAcceptanceTests.testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"receipt": "Native AppleEvent boundary unavailable: exact owned receiver no longer live"
+		}
+	],
+	"source_identity": {
+		"baseline": "02ad69e06ecea424de11facf3dced404a6fdd602",
+		"tested": "4800d5c83878e653622941b790390e1497cab6c5",
+		"paths": [
+			{
+				"path": "static/ergopti_plus/macos/launcher",
+				"baseline_object": "502b53d884e90e5fb7868a881e6e5e4ffed4ac7c",
+				"tested_object": "502b53d884e90e5fb7868a881e6e5e4ffed4ac7c",
+				"identical": true
+			},
+			{
+				"path": "tools/diagnostics/macos_sparkle_archive_fixture.py",
+				"baseline_object": "76de13c051b0e620c75b64e7bda444f3d018da69",
+				"tested_object": "76de13c051b0e620c75b64e7bda444f3d018da69",
+				"identical": true
+			},
+			{
+				"path": "tools/diagnostics/macos_brew_archive_acceptance.py",
+				"baseline_object": "bae2f2163fda4a921985c297684c6213688aec43",
+				"tested_object": "bae2f2163fda4a921985c297684c6213688aec43",
+				"identical": true
+			},
+			{
+				"path": "tools/diagnostics/native_appleevent_probe_receiver.c",
+				"baseline_object": "b215fc678543f080950877678a06593608f3e19c",
+				"tested_object": "b215fc678543f080950877678a06593608f3e19c",
+				"identical": true
+			},
+			{
+				"path": "tools/diagnostics/native_appleevent_probe_sender.c",
+				"baseline_object": "881eaf8913996c6624b0e9f5d997ffab1cf473bc",
+				"tested_object": "881eaf8913996c6624b0e9f5d997ffab1cf473bc",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/modules/updater/manager.lua",
+				"baseline_object": "d7f87709d384da83dde747409b6140b70c878181",
+				"tested_object": "d7f87709d384da83dde747409b6140b70c878181",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/adapters/http_client.lua",
+				"baseline_object": "27610ff2d21178f399cea5e7d4470549a3a2702c",
+				"tested_object": "27610ff2d21178f399cea5e7d4470549a3a2702c",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/tests/hardware/run_updater_etag_receipts.py",
+				"baseline_object": "d60a90ba1fa370bf03908faa81c50ccfc9d34ea0",
+				"tested_object": "d60a90ba1fa370bf03908faa81c50ccfc9d34ea0",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/modules/keylogger/system_metrics.lua",
+				"baseline_object": "4c55d15bed07deca7aac9f972635fa99123d62bc",
+				"tested_object": "4c55d15bed07deca7aac9f972635fa99123d62bc",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/adapters/shell_runner.lua",
+				"baseline_object": "66ff9b92eb46bf105fc7f87fc64d571fa9407582",
+				"tested_object": "66ff9b92eb46bf105fc7f87fc64d571fa9407582",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/tests/hardware/run_system_audio_locale_receipts.py",
+				"baseline_object": "4bc9efde1d67e625233bb8b5f8f0b54c2453a0ae",
+				"tested_object": "4bc9efde1d67e625233bb8b5f8f0b54c2453a0ae",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/adapters/notifier.lua",
+				"baseline_object": "2110b1f70b4ed0b5f517c414165bf3a83cbde2c1",
+				"tested_object": "2110b1f70b4ed0b5f517c414165bf3a83cbde2c1",
+				"identical": true
+			},
+			{
+				"path": "static/ergopti_plus/linux/tests/hardware/run_notification_text_receipts.lua",
+				"baseline_object": "34ec000caa1b1eac8a47a863c877b2f0af87d1b6",
+				"tested_object": "34ec000caa1b1eac8a47a863c877b2f0af87d1b6",
+				"identical": true
+			},
+			{
+				"path": ".github/workflows/ci-linux.yml",
+				"baseline_object": "61d52f0eb4c0ad93227b2fcc496b12a4c240540e",
+				"tested_object": "61d52f0eb4c0ad93227b2fcc496b12a4c240540e",
+				"identical": true
+			},
+			{
+				"path": ".github/workflows/ci-macos.yml",
+				"baseline_object": "63daea3550268d2de1c875e800376c0efd149827",
+				"tested_object": "63daea3550268d2de1c875e800376c0efd149827",
+				"identical": true
+			}
+		],
+		"limitation": "Owner identity is not a native baseline replay or proof of the failure cause; other runtime sources differ."
+	},
+	"full_failed_job_logs": "Forbidden; zero bytes retrieved. Annotations retained; exact underlying native cause unresolved.",
+	"release": "Release / Publish skipped",
+	"qualification": "Failed native acceptance; do not equate local or portable suites with package/install qualification."
+}
