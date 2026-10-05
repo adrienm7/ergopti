@@ -20,8 +20,8 @@
  *   3. No driver source keeps the state key, its getter/setter or the row's
  *      command, comments included: a comment naming the setting describes
  *      code that no longer exists.
- *   4. The config migration that deletes gestures.space_wrap from an existing
- *      config.toml is still registered — the one place the old key may appear.
+ *   4. The historical retirement step remains registered without mutation:
+ *      existing gestures.space_wrap data survives until explicit cleanup.
  *
  * Every scan asserts it read something first: an empty scan would pass this
  * gate while checking nothing.
@@ -35,6 +35,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const TOML = require('smol-toml');
 
 const ROOT = path.resolve(process.argv[2] || path.join(__dirname, '..', '..'));
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -49,7 +50,7 @@ const RETIRED_KEY = 'menu.gestures.circular_spaces';
 // Every tree a driver or a generated copy of the manifests lives in. The
 // migration registry, its corpora and the shared migration contract
 // (_shared/lua/test) are the deliberate exception: they must name the old key
-// to delete it from an existing file.
+// to prove its preservation until explicit cleanup.
 const SCANNED = [
 	{ dir: path.join(SP, 'macos'), exts: ['.lua', '.toml', '.json'] },
 	{ dir: path.join(SP, 'windows'), exts: ['.ahk', '.toml', '.json'] },
@@ -130,18 +131,24 @@ for (const file of localeFiles) {
 
 // ==================================================
 // ==================================================
-// ======= 3/ The migration that deletes it =========
+// ======= 3/ Retirement preserves user data ========
 // ==================================================
 // ==================================================
 
-const migrations = fs.readFileSync(MIGRATIONS, 'utf8');
+const migrations = TOML.parse(fs.readFileSync(MIGRATIONS, 'utf8'));
+const retirement = migrations.steps && migrations.steps.v2_to_v3;
 if (
-	!/\{\s*op\s*=\s*"delete",\s*section\s*=\s*"gestures",\s*key\s*=\s*"space_wrap"\s*\}/.test(
-		migrations
-	)
+	!retirement ||
+	retirement.from !== 2 ||
+	retirement.to !== 3 ||
+	!Array.isArray(retirement.drivers) ||
+	retirement.drivers.length !== 1 ||
+	retirement.drivers[0] !== 'hs' ||
+	!Array.isArray(retirement.ops) ||
+	retirement.ops.length !== 0
 ) {
 	errors.push(
-		'migrations.toml no longer deletes gestures.space_wrap: an existing config.toml would keep a key nothing reads.'
+		'migrations.toml must retain the v2→v3 macOS retirement step without operations: existing data belongs to explicit cleanup.'
 	);
 }
 
@@ -159,5 +166,5 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] The circular Spaces toggle stays retired: ${scanned} file(s) and ` +
-		`${localeFiles.length} locales checked, the migration still deletes the old key.\x1b[0m`
+		`${localeFiles.length} locales checked, the retired key survives until explicit cleanup.\x1b[0m`
 );

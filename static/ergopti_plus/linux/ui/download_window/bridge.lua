@@ -19,6 +19,8 @@ local LOG = "bridge.download_window"
 
 local _serial = 0
 local _session = nil
+local _failure_serial = 0
+local _contract = nil
 
 -- The page's kinds (_shared/ui/download_window/script.js) a Linux producer
 -- uses: its heading and layout
@@ -46,11 +48,83 @@ local function evaluate(code)
 		and host.eval_js(APP_NAME, code) == true
 end
 
+--- Loads the one canonical policy through the driver's native file owner.
+local function contract()
+	if not _contract then
+		local path = require("infra.paths").shared("modules/network/managed_network.json")
+		local file = assert(io.open(path, "rb"), "managed network policy unavailable")
+		local ok, source = pcall(file.read, file, "*a")
+		local closed = file:close()
+		assert(ok and closed, "managed network policy read or close refused")
+		_contract = require("network.failure").new(Json.decode(source))
+	end
+	return _contract
+end
+
+local function admits(callback)
+	if type(callback) ~= "function" then return false end
+	local ok, allowed = pcall(callback)
+	return ok and allowed == true
+end
+
+local function owner_current(session)
+	if _session ~= session or session.retired or session.cancelled then return false end
+	local allowed = session.is_current == nil or admits(session.is_current)
+	return allowed and _session == session and not session.retired and not session.cancelled
+end
+
+--- Capabilities come from bound native effects, never the page's retained rows.
+local function capabilities(session)
+	local current = owner_current(session)
+	return {
+		owner_alive = current,
+		retry_available = current and type(session.on_retry) == "function"
+			and (session.can_retry == nil or admits(session.can_retry)),
+		proxy_settings_available = current and type(session.on_proxy_settings) == "function"
+			and admits(session.can_open_proxy_settings),
+		download_folder_available = current and type(session.on_download_folder) == "function"
+			and admits(session.can_open_download_folder),
+		download_folder_owned = current and admits(session.download_folder_owned),
+		diagnostics_available = current and type(session.on_diagnostics) == "function"
+			and admits(session.can_open_diagnostics),
+	}
+end
+
+local function invalidate_failure(session)
+	_failure_serial = _failure_serial + 1
+	session.failure_epoch = _failure_serial
+	session.failure_report = nil
+	evaluate("if(window.clearNetworkFailure)window.clearNetworkFailure();")
+end
+
+local function failure_code(session)
+	if not session.failure_report then
+		return session.terminal and session.succeeded ~= true
+			and "var retry=document.getElementById('btn-retry');if(retry)retry.style.display='none';" or ""
+	end
+	return "if(!window.showNetworkFailure||window.showNetworkFailure("
+		.. literal(session.failure_report) .. "," .. tostring(session.id) .. ","
+		.. tostring(session.failure_epoch) .. ")!==true){"
+		.. "var retry=document.getElementById('btn-retry');if(retry)retry.style.display='none';"
+		.. "console.error('Managed download failure rendering refused');}"
+end
+
 local function push_initial(session)
 	if _session ~= session then return false end
+	if session.failure_report then
+		-- A page readiness replay owns a fresh presentation, rather than reviving
+		-- the epoch retired by the page's reset. Capability checks can reenter.
+		local previous = session.failure_epoch
+		local report = contract().classify(session.failure_receipt, capabilities(session))
+		if _session ~= session or session.retired or not session.terminal
+			or session.succeeded == true or session.failure_epoch ~= previous then return false end
+		_failure_serial = _failure_serial + 1
+		session.failure_epoch = _failure_serial
+		session.failure_report = report
+	end
 	local statements = {
-		"if(window.resetUI){resetUI();",
-		"setKind(" .. literal(session.kind) .. ",null,null);",
+		"if(window.clearNetworkFailure)window.clearNetworkFailure();if(window.resetUI){resetUI();",
+		"setKind(" .. literal(session.kind) .. ",null,null," .. tostring(session.id) .. ");",
 		"setModel(" .. literal(session.label) .. ");",
 		"var terminalButton=document.getElementById('btn-term');",
 		"if(terminalButton)terminalButton.style.display='none';",
@@ -59,14 +133,14 @@ local function push_initial(session)
 	}
 	if session.terminal then
 		statements[#statements + 1] = "done(" .. tostring(session.succeeded == true) .. ","
-			.. literal(session.final_message) .. ",null);"
+			.. literal(session.final_message) .. ",null);" .. failure_code(session)
 	end
 	statements[#statements + 1] = "}"
 	return evaluate(table.concat(statements))
 end
 
 --- Opens one owned progress session.
---- @param opts table { kind, label, on_cancel, on_retry }: kind is one of KINDS.
+--- @param opts table Kind, label, bound callbacks and fresh native capability predicates.
 --- @return number|nil session_id
 function M.show(opts)
 	if type(opts) ~= "table" or type(opts.label) ~= "string" or opts.label == "" then
@@ -87,7 +161,8 @@ function M.show(opts)
 		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
 		return nil
 	end
-	if _session then host.hide(APP_NAME) end
+	if _session then invalidate_failure(_session); _session.retired = true; host.hide(APP_NAME) end
+	contract()
 
 	_serial = _serial + 1
 	local session = {
@@ -98,6 +173,17 @@ function M.show(opts)
 		progress = 0,
 		on_cancel = opts.on_cancel,
 		on_retry = opts.on_retry,
+		is_current = opts.is_current,
+		can_retry = opts.can_retry,
+		classify_failure = opts.classify_failure,
+		on_proxy_settings = opts.on_proxy_settings,
+		can_open_proxy_settings = opts.can_open_proxy_settings,
+		on_download_folder = opts.on_download_folder,
+		can_open_download_folder = opts.can_open_download_folder,
+		download_folder_owned = opts.download_folder_owned,
+		on_diagnostics = opts.on_diagnostics,
+		can_open_diagnostics = opts.can_open_diagnostics,
+		failure_epoch = 0,
 		terminal = false,
 		ready = false,
 		succeeded = nil,
@@ -120,7 +206,7 @@ end
 --- @return boolean
 function M.update(session_id, percentage, detail, log_line)
 	local session = _session
-	if not session or session.id ~= session_id or session.terminal then return false end
+	if not session or session.id ~= session_id or session.terminal or session.retired then return false end
 	if type(percentage) == "number" then
 		session.progress = math.max(0, math.min(99, math.floor(percentage)))
 	end
@@ -138,19 +224,29 @@ end
 --- @param session_id number
 --- @param succeeded boolean
 --- @param message string|nil
+--- @param failure_receipt table|nil Actual typed native receipt, retained privately.
 --- @return boolean
-function M.complete(session_id, succeeded, message)
+function M.complete(session_id, succeeded, message, failure_receipt)
 	local session = _session
-	if not session or session.id ~= session_id or session.terminal then return false end
+	if not session or session.id ~= session_id or session.terminal or session.retired then return false end
 	session.terminal = true
 	local final_message = type(message) == "string" and message or (succeeded
 		and translated("download_window.done_success")
 		or translated("download_window.done_failed"))
 	session.succeeded = succeeded == true
 	session.final_message = final_message
+	if not session.succeeded and not session.cancelled
+		and (session.classify_failure == nil or admits(session.classify_failure)) then
+		_failure_serial = _failure_serial + 1
+		session.failure_epoch = _failure_serial
+		-- Keep native metadata private. Only the shared contract's safe report is sent.
+		session.failure_receipt = type(failure_receipt) == "table" and failure_receipt or {}
+		session.failure_report = contract().classify(session.failure_receipt, capabilities(session))
+	end
+	if _session ~= session or session.retired then return false end
 	if not session.ready then return true end
 	return evaluate("done(" .. tostring(session.succeeded) .. ","
-		.. literal(final_message) .. ",null)")
+		.. literal(final_message) .. ",null);" .. failure_code(session))
 end
 
 --- Reopens or focuses the page owned by an existing background session.
@@ -158,7 +254,7 @@ end
 --- @return boolean
 function M.focus(session_id)
 	local session = _session
-	if not session or session.id ~= session_id then return false end
+	if not session or session.id ~= session_id or session.retired then return false end
 	local host = manager()
 	if not host or type(host.show) ~= "function" then return false end
 	if type(host.is_visible) == "function" and host.is_visible(APP_NAME) == true then
@@ -169,40 +265,75 @@ function M.focus(session_id)
 	return host.show(APP_NAME) == true
 end
 
---- Handles ready/cancel/retry from the shared page.
+--- Retires a native operation's retained actions without signalling another owner.
+--- @param session_id number
+--- @return boolean
+function M.retire(session_id)
+	local session = _session
+	if not session or session.id ~= session_id then return false end
+	invalidate_failure(session)
+	session.retired = true
+	session.terminal = true
+	return true
+end
+
+--- Handles only session-bound page controls and epoch-bound failure actions.
 --- @param payload any
 --- @return table|nil
 function M.on_message(payload)
 	local session = _session
-	if not session then return nil end
+	if not session or session.retired then return nil end
 	if payload == "ready" then
 		session.ready = true
-		return { pushed = push_initial(session), session_id = session.id }
+		return { pushed = push_initial(session), session_id = session.id,
+			failure_epoch = session.failure_epoch }
 	end
-	if payload == "cancel" and not session.terminal then
+	if type(payload) ~= "table" or payload.session ~= session.id then
+		return { cancelled = false, retried = false, accepted = false }
+	end
+	if payload.action == "cancel" and not session.terminal and owner_current(session) then
 		local ok, accepted = pcall(session.on_cancel)
 		if not ok or accepted ~= true then return { cancelled = false } end
+		session.cancelled = true
 		M.complete(session.id, false, translated("ollama.download_cancelled"))
 		return { cancelled = true }
 	end
-	if payload == "retry" and session.terminal and type(session.on_retry) == "function" then
-		-- A queued retry cannot reopen a successful operation or erase its receipt.
-		if session.succeeded == true then return { retried = false } end
-		session.terminal = false
-		session.progress = 0
-		session.detail = translated("download_window.starting")
-		session.succeeded = nil
-		session.final_message = nil
-		local ok, accepted = pcall(session.on_retry)
-		if not ok or accepted ~= true then
-			session.terminal = true
-			return { retried = false }
+	if payload.action == "failure_action" then
+		if payload.epoch ~= session.failure_epoch or not session.terminal
+			or session.succeeded == true or not session.failure_report or not owner_current(session) then
+			return { accepted = false, retried = false }
 		end
-		push_initial(session)
-		return { retried = true }
+		local allowed = false
+		for _, action in ipairs(contract().actions(session.failure_report.cause, capabilities(session))) do
+			if action.id == payload.id then allowed = true end
+		end
+		if not allowed or not owner_current(session) or payload.epoch ~= session.failure_epoch then
+			return { accepted = false, retried = false }
+		end
+		if payload.id == "retry" then
+			local old_message = session.final_message
+			invalidate_failure(session)
+			session.terminal = false
+			session.progress = 0
+			session.detail = translated("download_window.starting")
+			session.succeeded = nil
+			session.final_message = nil
+			-- Reset before calling: a synchronous refusal may publish a new terminal.
+			if session.ready then push_initial(session) end
+			local ok, accepted = pcall(session.on_retry)
+			if not ok or accepted ~= true then
+				if not session.terminal then M.complete(session.id, false, old_message, session.failure_receipt) end
+				return { accepted = false, retried = false }
+			end
+			return { accepted = true, retried = true }
+		end
+		local callback = ({ proxy_settings = session.on_proxy_settings,
+			download_folder = session.on_download_folder, diagnostics = session.on_diagnostics })[payload.id]
+		local ok, accepted = pcall(callback)
+		return { accepted = ok and accepted == true }
 	end
-	if payload == "expand" then return { expanded = true } end
-	Logger.debug(LOG, "Unknown action: %s", tostring(payload))
+	if payload.action == "expand" then return { expanded = true } end
+	Logger.debug(LOG, "Unknown download action refused.")
 	return nil
 end
 
@@ -213,6 +344,7 @@ end
 function M._reset()
 	_session = nil
 	_serial = 0
+	_failure_serial = 0
 end
 
 return M

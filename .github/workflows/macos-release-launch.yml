@@ -69,24 +69,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag || 'v0.0.0-dev.126' }}
         run: |
-          python3 - <<'PY'
-          import hashlib, json, os, pathlib, subprocess
-          repository = os.environ["GITHUB_REPOSITORY"]
-          tag = os.environ["RELEASE_TAG"]
-          release = json.loads(subprocess.check_output(["gh", "release", "view", tag, "--repo", repository, "--json", "assets,tagName"]))
-          asset, = [entry for entry in release["assets"] if entry["name"] == "ErgoptiPlus.app.zip"]
-          target = pathlib.Path(os.environ["RUNNER_TEMP"], "release-download")
-          target.mkdir()
-          subprocess.run(["gh", "release", "download", tag, "--repo", repository, "--pattern", asset["name"], "--dir", str(target)], check=True)
-          archive = target / asset["name"]
-          digest = "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest()
-          if asset.get("digest") != digest:
-              raise RuntimeError("Published application digest is absent or mismatched")
-          pathlib.Path(os.environ["RUNNER_TEMP"], "release-provenance.json").write_text(json.dumps({"tag": tag, "asset": asset, "verified_digest": digest}, indent=2))
-          if pathlib.Path("/Applications/ErgoptiPlus.app").exists():
-              raise RuntimeError("Refusing to replace an existing application")
-          subprocess.run(["ditto", "-x", "-k", str(archive), "/Applications"], check=True)
-          PY
+          python3 tools/diagnostics/macos_release_launch_test.py
+          python3 tools/diagnostics/macos-release-launch.py --install-published
+
       - name: Add the missing production dependency to the verified release
         if: inputs.scenario == 'published_with_dependency'
         run: |

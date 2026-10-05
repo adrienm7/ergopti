@@ -1,0 +1,22 @@
+﻿; adapters/curl_proxy_auth_policy.ahk
+; Native capability receipt, not a version-resource or PAC-auth inference.
+_HTTP_CurlIntegratedProxyAuthConfig(CapabilityReceipt) {
+	if !(CapabilityReceipt is Map) || CapabilityReceipt.Get("schema_version", 0) != 1
+		return ""
+	Quiesced := CapabilityReceipt.Get("child_quiesced", false)
+	if !(Quiesced is Integer) || Quiesced != true
+		return ""
+	if CapabilityReceipt.Get("state", "") != "ready"
+		|| CapabilityReceipt.Get("backend", "") != "curl"
+		return ""
+	Capability := CapabilityReceipt.Get("capability", 0)
+	if !(Capability is Map) || Capability.Get("tls_backend", "") != "schannel"
+		return ""
+	Sspi := Capability.Get("sspi", false)
+	Spnego := Capability.Get("spnego", false)
+	if !(Sspi is Integer) || Sspi != true || !(Spnego is Integer) || Spnego != true
+		return ""
+	; curl's CLI cannot encode a Negotiate|NTLM-only auth mask. Negotiate
+	; permits the current user's SSPI Negotiate package; no ANYAUTH downgrade.
+	return "proxy-negotiate`nproxy-user = " . _HTTP_CurlConfigQuote(":") . "`n"
+}

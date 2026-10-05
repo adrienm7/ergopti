@@ -34,6 +34,7 @@
 #Include ../number.ahk
 #Include toml_inline_tables.ahk
 #Include toml_document.ahk
+#Include config_snapshot.ahk
 
 
 

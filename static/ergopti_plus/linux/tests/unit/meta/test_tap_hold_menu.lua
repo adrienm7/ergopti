@@ -333,3 +333,153 @@ helpers.describe("Linux Tap-Holds menu", function()
 	end)
 
 end)
+
+-- The expected captions and visibility are handwritten in the independent corpus.
+helpers.describe("declared per-key native command", function()
+	for _, configured in ipairs({ true, false }) do
+		helpers.it("keeps configured=" .. tostring(configured) .. " availability (tap-hold-key-native)", function()
+			local calls, picked = {}, {}
+			local section, Manager = build(calls, picked)
+			local ok, err = pcall(function()
+				local i18n = require("infra.i18n")
+				local key = configured and "left_ctrl" or "escape"
+				local parent = assert(find(key_rows(section), i18n.get("tap_hold.group." .. key)))
+				local row = parent.menu[1]
+				helpers.assert_eq(row.title, i18n.get("tap_hold.action.disable"))
+				helpers.assert_eq(row.disabled == true, not configured)
+				helpers.assert_eq(parent.menu[2].title, "-", "the native separator retains its position")
+				helpers.assert_eq(#calls, 0, "building does not mutate")
+				row.fn()
+				helpers.assert_eq(#calls, configured and 1 or 0, "disabled callbacks do not mutate")
+				if configured then helpers.assert_eq(calls[1], { "set_native", "left_ctrl" }) end
+			end)
+			restore(Manager)
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("reads its actual shared caption and retains its selected key (tap-hold-key-native)", function()
+		local definition = require("infra.manifest_menu").get_array("tap_hold_key_native_commands")
+		local previous = definition[1].i18n
+		definition[1].i18n = "menu.shortcuts.title"
+		local Manager
+		local ok, err = pcall(function()
+			local calls, picked = {}, {}
+			local section
+			section, Manager = build(calls, picked)
+			local i18n = require("infra.i18n")
+			local ctrl = assert(find(key_rows(section), i18n.get("tap_hold.group.left_ctrl")))
+			helpers.assert_eq(ctrl.menu[1].title, i18n.get("menu.shortcuts.title"))
+			ctrl.menu[1].fn()
+			helpers.assert_eq(calls[1], { "set_native", "left_ctrl" })
+		end)
+		definition[1].i18n = previous
+		if Manager then restore(Manager) end
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("replays the independent platform captions and states in all 21 locales (tap-hold-key-native)", function()
+		local Json = require("json")
+		local Paths = require("infra.paths")
+		local function read_json(relative)
+			local file = assert(io.open(Paths.shared(relative), "r"))
+			local text = file:read("*a")
+			file:close()
+			return Json.decode(text)
+		end
+		local corpus = read_json("tests/corpus/menus/tap_hold_key_native.json")
+		local locales = read_json("data/locale_order.json").order
+		helpers.assert_eq(#locales, 21)
+		for _, code in ipairs(locales) do
+			local strings = read_json("data/locales/" .. code .. ".json")
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({
+					platform = platform,
+					manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+					json_decode = Json.decode,
+					i18n = { get = function(key) return assert(strings[key], code .. ": " .. key) end,
+						section = function(key) return assert(strings[key], code .. ": " .. key) end },
+					logger = { error = function() end, warn = function() end, debug = function() end },
+				}))
+				for _, state in ipairs(corpus.states) do
+					local calls = {}
+					local rows = renderer.build(corpus.section, "TapHolds", {}, {}, {
+						commands = {
+							tap_hold_key_native = function() calls[#calls + 1] = "tap_hold_key_native"; return true end,
+							tap_hold_key_no_action = function() calls[#calls + 1] = "tap_hold_key_no_action"; return true end,
+						},
+						state_getters = { tap_hold_key_configured = function() return state.configured end },
+					})
+					local expected = corpus.variants[platform == "hs" and 2 or 1]
+					helpers.assert_eq(#rows, 1, code .. ": " .. platform .. " hides the other platform variant")
+					helpers.assert_eq(rows[1].title, strings[expected.label_key])
+					helpers.assert_true(type(strings[expected.label_key]) == "string" and strings[expected.label_key] ~= "")
+					helpers.assert_eq(rows[1].disabled == true, state.disabled)
+					helpers.assert_eq(#calls, 0)
+				end
+			end
+		end
+	end)
+end)
+
+helpers.describe("declared native command reaches the actual Linux writer", function()
+	helpers.it("preserves classified refusal and retries through its retained native owner (tap-hold-key-native)", function()
+		local _, Manager = build({}, {})
+		package.loaded[WRITER] = nil
+		local Writer = require(WRITER)
+		local path = os.tmpname()
+		local reloads, refreshes, notices = 0, 0, 0
+		local previous_execute = os.execute
+		local function write(text)
+			local file = assert(io.open(path, "w"))
+			file:write(text)
+			file:close()
+		end
+		local function read()
+			local file = assert(io.open(path, "r"))
+			local text = file:read("*a")
+			file:close()
+			return text
+		end
+		local ok, err = pcall(function()
+			Writer.init({ path = path,
+				reload = function() reloads = reloads + 1; return true end,
+				is_tap_action = function() return true end,
+				canonical_hold = function() return nil end })
+			os.execute = function(command)
+				if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
+				return previous_execute(command)
+			end
+			local items = helpers.load_module("ui.menu.menu_builder").build({
+				_version = "test", on_quit = function() end, tap_holds = Manager,
+				on_menu_changed = function() refreshes = refreshes + 1 end,
+			})
+			local i18n = require("infra.i18n")
+			local section = assert(find(items, i18n.get("menu.tapholds.title")))
+			local ctrl = assert(find(key_rows(section), i18n.get("tap_hold.group.left_ctrl")))
+			local callback = ctrl.menu[1].fn
+			local malformed = "[tap_hold.keys.left_ctrl\n"
+			write(malformed)
+			helpers.assert_nil(callback(), "the original Linux notification callback has no owner receipt")
+			helpers.assert_eq(read(), malformed, "actual classified refusal preserves source bytes")
+			helpers.assert_eq(reloads, 0, "refusal cannot reach reload")
+			helpers.assert_eq(refreshes, 1, "existing refresh behavior survives refusal")
+			helpers.assert_eq(notices, 1, "native refusal still reaches its error owner")
+			write('[tap_hold]\nenabled = true\n[tap_hold.keys.left_ctrl]\ntap_action = "copy"\nhold_modifier = "ctrl"\n[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n[future]\nkeep = "neighbour"\n')
+			helpers.assert_nil(callback(), "success retains the original callback return policy")
+			local document = assert(require("toml_codec").decode(read()))
+			helpers.assert_eq(document.tap_hold.keys.left_ctrl.tap_action, "")
+			helpers.assert_eq(document.tap_hold.keys.left_ctrl.hold_modifier, "")
+			helpers.assert_eq(document.tap_hold.keys.left_shift.tap_action, "paste", "other key remains untouched")
+			helpers.assert_eq(document.future.keep, "neighbour", "future neighbour remains untouched")
+			helpers.assert_eq(reloads, 1, "retry reaches the configured reload owner once")
+			helpers.assert_eq(refreshes, 2)
+			helpers.assert_eq(notices, 1)
+		end)
+		os.execute = previous_execute
+		Writer._reset_for_test()
+		restore(Manager)
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+end)

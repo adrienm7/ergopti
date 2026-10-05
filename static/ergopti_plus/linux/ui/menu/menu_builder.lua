@@ -3195,15 +3195,26 @@ local function _build_shortcuts(ctx)
 		if row then selection_rows[#selection_rows + 1] = row end
 	end
 	selection_rows[#selection_rows + 1] = { separator = true }
-	for _, helper in ipairs({
-		{ key = "menu.shortcuts.select_word", run = sc.select_word },
-		{ key = "sg_actions.select_line",     run = sc.select_line },
-		{ key = "sg_actions.paste_plain",     run = sc.paste_plain },
-	}) do
-		selection_rows[#selection_rows + 1] = {
-			label  = i18n_safe(helper.key),
-			action = function() helper.run() end,
-		}
+	local helper_methods = {
+		["selection_select_word"] = "select_word",
+		["selection_select_line"] = "select_line",
+		["selection_paste_plain"] = "paste_plain",
+	}
+	local helper_getters = {
+		selection_select_word_ready = function() return case_ready(helper_methods.selection_select_word) end,
+		selection_select_line_ready = function() return case_ready(helper_methods.selection_select_line) end,
+		selection_paste_plain_ready = function() return case_ready(helper_methods.selection_paste_plain) end,
+	}
+	for _, command in ipairs(ManifestMenu.get_array("selection_helper_commands")) do
+		local id, method = command.id, helper_methods[command.id]
+		local ready = assert(helper_getters[id .. "_ready"], "Selection helper command has no native owner")
+		local row = ManifestMenu.command_row("selection_helper_commands", id, {
+			[id] = function()
+				if not ready() or sc[method]() ~= true then return false end
+				return true
+			end,
+		}, helper_getters)
+		if row then selection_rows[#selection_rows + 1] = row end
 	end
 
 	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
@@ -3660,11 +3671,9 @@ local function _build_tap_holds(ctx)
 					.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
 				checked = configured or nil,
 				items = {
-					{
-						label = i18n_safe("tap_hold.action.disable"),
-						disabled = not configured or nil,
-						action = function() changed(Writer.set_native(key_id)) end,
-					},
+					ManifestMenu.command_row("tap_hold_key_native_commands", "tap_hold_key_native", {
+						["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
+					}, { ["tap_hold_key_configured"] = function() return configured end }),
 					{ separator = true },
 					{
 						label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
@@ -4168,16 +4177,7 @@ local function _about_update_rows(ctx)
 				action = function()
 					-- Consent names the release this row shows: the manager refuses
 					-- it if a background check replaced the cached release since.
-					up.download_update(rel.download_url, function(archive, err)
-						local installed = archive ~= nil and up.install_update(archive)
-						if not archive then
-							Logger.error(LOG, "Update download failed: %s.", tostring(err))
-						end
-						-- The daemon restarts on the new version, or tells why not.
-						if type(ctx.on_update_finished) == "function" then
-							ctx.on_update_finished(installed, rel.tag, archive and "install" or "download")
-						end
-					end)
+					require("ui.update_check.bridge").download_offered(up, rel, ctx)
 				end,
 			}
 		end

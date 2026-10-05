@@ -1,0 +1,98 @@
+{
+	"files": [
+		"docs/ERGOPTIPLUS_TODO.md",
+		"static/ergopti_plus/_shared/lua/menu/renderer.lua",
+		"static/ergopti_plus/_shared/modules/features/manifest.toml",
+		"static/ergopti_plus/_shared/modules/menu/menu_manifest.json",
+		"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_menu.lua",
+		"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+		"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_tap_holds_hand_sections.lua",
+		"static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+		"static/ergopti_plus/windows/infra/manifest_menu.ahk",
+		"static/ergopti_plus/windows/tests/unit/test_tap_hold_hand_sections.ahk",
+		"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk",
+		"tools/build/build-menu-manifest.js",
+		"tools/test/native-menu-rows-baseline.json",
+		"tools/test/test-menu-manifest.cjs",
+		"tools/test/test-menu-parity.cjs",
+		"static/ergopti_plus/_shared/tests/corpus/menus/tap_hold_key_delay.json"
+	],
+	"plan": {
+		"format": {
+			"why": "CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files",
+			"sample": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"static/ergopti_plus/_shared/modules/menu/menu_manifest.json",
+				"tools/build/build-menu-manifest.js"
+			]
+		},
+		"ahk-encoding": {
+			"why": "every .ahk must stay UTF-8 BOM + LF; a stray CRLF or a lost BOM breaks the parser in ways that are hard to read",
+			"sample": [
+				"static/ergopti_plus/windows/infra/manifest_menu.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_tap_hold_hand_sections.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
+			]
+		},
+		"ahk-suite": {
+			"why": "the AHK unit + meta suite covers the Windows driver — and replays the shared corpora and port contracts",
+			"sample": [
+				"static/ergopti_plus/windows/infra/manifest_menu.ahk",
+				"static/ergopti_plus/windows/tests/unit/test_tap_hold_hand_sections.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
+			]
+		},
+		"ahk-parse": {
+			"why": "a compile parses the WHOLE #Include graph, including the files run_all.ahk cannot include",
+			"sample": [
+				"static/ergopti_plus/windows/infra/manifest_menu.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
+			]
+		},
+		"ahk-e2e": {
+			"why": "driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end",
+			"sample": [
+				"static/ergopti_plus/windows/infra/manifest_menu.ahk",
+				"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk"
+			]
+		},
+		"js": {
+			"why": "port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only",
+			"sample": [
+				"docs/ERGOPTIPLUS_TODO.md",
+				"static/ergopti_plus/_shared/lua/menu/renderer.lua",
+				"static/ergopti_plus/_shared/modules/features/manifest.toml"
+			]
+		},
+		"hs-e2e": {
+			"why": "driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end",
+			"sample": [
+				"static/ergopti_plus/_shared/lua/menu/renderer.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua"
+			]
+		},
+		"hs": {
+			"why": "the macOS driver, its shared Lua runtime, or a shared corpus/port contract changed",
+			"sample": [
+				"static/ergopti_plus/_shared/lua/menu/renderer.lua",
+				"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_tap_holds_hand_sections.lua",
+				"static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua"
+			]
+		},
+		"linux-e2e": {
+			"why": "driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end",
+			"sample": [
+				"static/ergopti_plus/_shared/lua/menu/renderer.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
+			]
+		},
+		"linux": {
+			"why": "the Linux driver, its shared Lua runtime, or a shared corpus/port contract changed",
+			"sample": [
+				"static/ergopti_plus/_shared/lua/menu/renderer.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_menu.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
+			]
+		}
+	}
+}

@@ -1,0 +1,22 @@
+{
+	"base": "375de99fbfdaf0ecf4d4ba06e71be7940fe0470c",
+	"files": [
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
+			"sha256": "bf24b238e205cb2c8a1bf2d05e39f7a58a0adb9d964a6e5bda9c5f5b506fc955"
+		},
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
+			"sha256": "8ed1450034cac4431830e61bf211a0e0cee1e7ecc9e0bb3345ad37f9232b6325"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/codec.lua",
+			"sha256": "5aa7d28b2b1c15735e11a84bca164b9896db23c0ad7dbc86f7dfbc1025ec6fe3"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/config_outdated.lua",
+			"sha256": "a28f94a9edf8ec70752e65706dd27ef27050fa1f3e75e1876ab96b5f10fe5c18"
+		}
+	],
+	"status": "unmodified-source diagnostic proposal, no correction prepared"
+}
