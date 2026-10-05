@@ -37,7 +37,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		for Name in ["entry", "capture_source", "source_current", "admit", "apply", "clock", "max_age"]
 			if !HasMethod(Options.Get(Name, 0), "Call")
 				throw TypeError("Local server native port is unavailable.", -1, Name)
-		for Name in ["timer", "on_publish", "on_error"]
+		for Name in ["timer", "on_publish", "on_error", "entry_bound"]
 			if Options.Has(Name) && !HasMethod(Options[Name], "Call")
 				throw TypeError("Local server optional port must be callable.", -1, Name)
 		this.Options := Options.Clone()
@@ -66,17 +66,17 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	}
 
 	/** @returns {Map|Integer} Captured configured target; no secret enters shared state. */
-	Target(Id) {
+	Target(Id, Source := unset) {
 		PreviousCritical := Critical("Off")
-		try return this._Target(Id)
+		try return this._Target(Id, Source?)
 		finally Critical(PreviousCritical)
 	}
 
-	_Target(Id) {
+	_Target(Id, Source := unset) {
 		Server := this.Servers.Get(Id, 0)
 		if !(Server is Map)
 			return false
-		Entry := this._Call("entry", Id)
+		Entry := this._Entry(Id, Source?)
 		if Entry is Map {
 			if !(Entry.Get("Id", 0) is String) || !(Entry.Get("Provider", "") == Id)
 					|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
@@ -89,6 +89,19 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Fields := this.Pending.Get(Id, Map())
 		return Map("id", Id, "entry_id", "", "base_url", Fields.Get("base_url", Server["base_url"]),
 			"token", Fields.Get("token", ""))
+	}
+
+	/** Resolves through the declared receipt port; refusal never falls back to absence. */
+	_Entry(Id, Source := unset) {
+		if this.Options.Has("entry_bound") {
+			if !IsSet(Source)
+				throw TypeError("Receipt-bound local target resolution requires an originating source.")
+			Entry := this._Call("entry_bound", Id, Source)
+			if !(Entry is Map) && !((Entry is Integer) && Entry == 0)
+				throw TypeError("Receipt-bound local entry verdict must be a Map or false.")
+			return Entry
+		}
+		return this._Call("entry", Id)
 	}
 
 	/** Starts one shared logical sweep; exact same-provider native debt stays owned. */
@@ -160,7 +173,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			return false
 		PrivateTargets := Map(), Targets := []
 		for Id in this.Order {
-			Target := this._Target(Id)
+			Target := this._Target(Id, Source)
 			if !(Target is Map)
 				throw Error("Local discovery catalogue target is unavailable.")
 			PrivateTargets[Id] := Target
@@ -236,7 +249,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		if !((Valid is Integer) && Valid == true) || !this._Admitted()
 				|| !this._True("source_current", Job["source"])
 			return false
-		Target := this._Target(Job["id"])
+		Target := this._Target(Job["id"], Job["source"])
 		if !this._SameTarget(Job["target"], Target)
 			return false
 		if !this._Admitted() || !this._True("source_current", Job["source"])
@@ -423,8 +436,11 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				Configuration := this.ConfigurationGeneration
 				Models := this.ModelGeneration
 			} finally Critical(ClaimCritical)
-			Source := this._Call("capture_source"), Target := this._Target(Id)
-			if !IsObject(Source) || !(Target is Map)
+			Source := this._Call("capture_source")
+			if !IsObject(Source)
+				return false
+			Target := this._Target(Id, Source)
+			if !(Target is Map)
 				return false
 			Cache := this.Cache
 			CacheCurrent := this._CacheCurrent(Cache)
@@ -460,7 +476,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Held := this.Views.Get(ObjPtr(Receipt), 0)
 		if !(Held is Map) || ObjPtr(Held["receipt"]) != ObjPtr(Receipt)
 				|| !this._True("source_current", Held["source"])
-				|| !this._SameTarget(Held["target"], this._Target(Held["target"]["id"]))
+				|| !this._SameTarget(Held["target"], this._Target(Held["target"]["id"], Held["source"]))
 			return false
 		if Held["view"] != this.ViewGeneration || Held["configuration"] != this.ConfigurationGeneration
 				|| Held["models_generation"] != this.ModelGeneration
@@ -648,7 +664,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				this.Controller.Invalidate()
 				return Map("saved", false, "pending", true)
 			}
-			Entry := this._Call("entry", Id)
+			Entry := this._Entry(Id, Held["source"])
 			Changes := Map("base_url", Fields.Get("base_url", Target["base_url"]),
 				"token", Fields.Get("token", Target["token"]),
 				"model", Model != "" ? Model : Entry["Model"])
@@ -736,7 +752,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		if !(Cache is Map) || !this._Admitted() || !this._True("source_current", Cache["source"])
 			return false
 		for Id, Target in Cache["targets"]
-			if !this._SameTarget(Target, this._Target(Id))
+			if !this._SameTarget(Target, this._Target(Id, Cache["source"]))
 				return false
 		if !this._Admitted() || !this._True("source_current", Cache["source"])
 			return false
@@ -841,7 +857,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			if !this._Admitted() || !this._True("source_current", Sweep["source"])
 				return
 			for Id, Target in Sweep["targets"]
-				if !this._SameTarget(Target, this._Target(Id))
+				if !this._SameTarget(Target, this._Target(Id, Sweep["source"]))
 					return
 			if !this._Admitted() || !this._True("source_current", Sweep["source"])
 				return
