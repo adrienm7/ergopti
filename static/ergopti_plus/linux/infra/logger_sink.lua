@@ -422,19 +422,21 @@ function M.repoint()
 	if not ensure_dir(target) then
 		return false, "the logs folder '" .. target .. "' could not be created"
 	end
-	local previous, previous_stdout_only = _dir, _stdout_only
-	close_handles()
-	_dir = target
-	open_handles(today())
-	if not _main_handle then
-		-- Back to the folder that worked: a sink with no file loses every line.
-		close_handles()
-		_dir = previous
-		open_handles(today())
-		_stdout_only = previous_stdout_only
+	-- Acquired descriptors may still work after their path becomes unwritable.
+	-- Keep them until the candidate is usable; reopening is not a rollback.
+	local date = today()
+	local main_ok, main = pcall(io.open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	local errors_ok, errors = pcall(io.open, target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	if not main_ok or not main then
+		if errors_ok and errors then pcall(function() errors:close() end) end
 		return false, "the logs folder '" .. target .. "' is not writable"
 	end
+	local previous_main, previous_errors = _main_handle, _errors_handle
+	_dir, _date = target, date
+	_main_handle, _errors_handle = main, errors_ok and errors or nil
 	_stdout_only = false
+	if previous_main then pcall(function() previous_main:close() end) end
+	if previous_errors then pcall(function() previous_errors:close() end) end
 	purge_old()
 	return true
 end

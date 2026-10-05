@@ -15,10 +15,17 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, handles = {}, requests = {}, closes = {}, refused_closes = {} }
+	local state = { kills = {}, handles = {}, requests = {}, closes = {}, refused_closes = {},
+		descriptors = {}, descriptor_closes = {}, identities = {} }
 	local fake = {}
+	local function refused(receipt)
+		if receipt == "throw" then error("SIMULATED close refusal") end
+		if receipt == "false" then return false end
+		return nil
+	end
 
 	local function handle(kind)
+		if options.allocation_nil_at == #state.handles + 1 then return nil end
 		if options.allocation_failure_at == #state.handles + 1 then error("allocation refused") end
 		local value = { kind = kind, closing = false }
 		state.handles[#state.handles + 1] = value
@@ -26,6 +33,39 @@ local function fake_luv(config)
 	end
 
 	function fake.new_pipe() return handle("pipe") end
+	function fake.update_time() end -- native void-style clock refresh
+	function fake.pipe()
+		if options.body_pipe_failure then return nil, "pipe refused" end
+		local read, write = 100 + #state.descriptors, 101 + #state.descriptors
+		state.descriptors[#state.descriptors + 1] = read
+		state.descriptors[#state.descriptors + 1] = write
+		state.identities[read] = { dev = 1, ino = read, type = "fifo" }
+		state.identities[write] = { dev = 1, ino = read, type = "fifo" }
+		return { read = read, write = write }
+	end
+	function fake.pipe_open(pipe, descriptor)
+		state.first_body_handle = state.first_body_handle or pipe
+		if options.body_attach_failure then return nil, "attachment refused" end
+		pipe.descriptor = descriptor
+		state.body_pipe = pipe
+		return 0
+	end
+	function fake.fs_close(descriptor)
+		state.descriptor_closes[#state.descriptor_closes + 1] = descriptor
+		if options.raw_close_receipt and not state.allow_closes then
+			if options.close_after_retirement then
+				state.identities[descriptor] = options.reuse_descriptor and { dev = 9, ino = 99, type = "file" } or nil
+			end
+			return refused(options.raw_close_receipt)
+		end
+		state.identities[descriptor] = nil
+		return true
+	end
+	function fake.fs_fstat(descriptor)
+		if options.body_metadata_failure and not state.allow_metadata then return nil, "SIMULATED metadata failure", "EIO" end
+		if state.identities[descriptor] then return state.identities[descriptor] end
+		return nil, "descriptor absent", "EBADF"
+	end
 	function fake.new_timer()
 		state.timer = handle("timer")
 		return state.timer
@@ -40,8 +80,10 @@ local function fake_luv(config)
 	function fake.timer_stop(timer) timer.stopped = true; return true end
 	function fake.read_start(pipe, callback) pipe.read_callback = callback; return true end
 	function fake.write(pipe, data, callback)
+		if pipe == state.body_pipe and options.body_write_failure then return nil, "write refused" end
 		pipe.written = (pipe.written or "") .. data
-		state.config = pipe.written
+		if pipe == state.body_pipe then state.body = pipe.written else state.config = pipe.written end
+		if pipe == state.body_pipe and options.defer_body_write then state.body_written = callback; return true end
 		if callback then callback(nil) end
 		return true
 	end
@@ -55,8 +97,16 @@ local function fake_luv(config)
 			if options.refused_close_callback == "false" then return false end
 			return nil, "close refused"
 		end
+		if value == state.first_body_handle and options.body_handle_close_receipt and not state.allow_closes then
+			return refused(options.body_handle_close_receipt)
+		end
 		if options.close_failure and not state.allow_closes then return nil, "close refused" end
 		value.closing = true
+		if value.descriptor then
+			state.descriptor_closes[#state.descriptor_closes + 1] = value.descriptor
+			state.identities[value.descriptor] = nil
+			value.descriptor = nil
+		end
 		if callback then
 			state.closes[#state.closes + 1] = { handle = value, callback = callback }
 			if not options.defer_close then callback() end
@@ -139,6 +189,65 @@ local function fresh_digest(config)
 	package.loaded["adapters.file_digest"] = previous_digest
 	return digest, state
 end
+
+helpers.describe("http_client: native POST redirect method selection", function()
+	for _, method in ipairs({ "post", "postStream" }) do
+		for _, body in ipairs({ { name = "nil" }, { name = "empty", value = "" }, { name = "literal", value = "{}" } }) do
+			for _, follows in ipairs({ false, true }) do
+				helpers.it("linux-http-redirect-method: " .. method .. " " .. body.name .. " body uses curl's native POST selection (follow=" .. tostring(follows) .. ")", function()
+					local client, state = fresh_client()
+					local result
+					local options = { follow_redirects = follows }
+					local function complete(value) result = value end
+					if method == "post" then helpers.assert_true(client.post("http://127.0.0.1:9000/", {}, body.value, complete, options))
+					else helpers.assert_true(client.postStream("http://127.0.0.1:9000/", {}, body.value, options, function() end, complete)) end
+					for _, argument in ipairs(state.options.args) do
+						helpers.assert_true(argument ~= "--request", "a custom POST word prevents native redirect method changes")
+					end
+					local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+					helpers.assert_eq(joined:find("\n--location\n", 1, true) ~= nil, follows)
+					helpers.assert_true(state.config:find("data-raw = ", 1, true) ~= nil or state.config:find("data-binary = ", 1, true) ~= nil,
+						"the data option must still select POST for nil and empty bodies")
+					if method == "postStream" then state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n"); state.complete()
+					else state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n") end
+					helpers.assert_true(result and result.ok and result.status == 200)
+				end)
+			end
+		end
+	end
+
+	for _, method in ipairs({ "get", "get_owned", "download" }) do
+		helpers.it("linux-http-redirect-method: " .. method .. " retains explicit GET", function()
+			local client, state = fresh_client()
+			local result
+			local function complete(value) result = value end
+			if method == "download" then helpers.assert_true(client.download("http://127.0.0.1:9000/", {}, "/tmp/unit-redirect-method", {}, complete))
+			elseif method == "get_owned" then helpers.assert_true(client.get_owned("http://127.0.0.1:9000/", {}, {}, complete).started)
+			else helpers.assert_true(client.get("http://127.0.0.1:9000/", {}, {}, complete)) end
+			local count = 0
+			for index, argument in ipairs(state.options.args) do
+				if argument == "--request" then count = count + 1; helpers.assert_eq(state.options.args[index + 1], "GET") end
+			end
+			helpers.assert_eq(count, 1)
+			state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_true(result and result.ok)
+		end)
+	end
+
+	for _, method in ipairs({ "post", "postStream" }) do
+		helpers.it("linux-http-redirect-method: " .. method .. " keeps the synthetic credential redirect fence", function()
+			local client, state = fresh_client()
+			local options = { follow_redirects = true }
+			local headers = { ["X-Api-Key"] = "SyntheticFixtureOnly" }
+			if method == "post" then helpers.assert_true(client.post("http://127.0.0.1:9000/", headers, "{}", function() end, options))
+			else helpers.assert_true(client.postStream("http://127.0.0.1:9000/", headers, "{}", options, function() end, function() end)) end
+			local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+			helpers.assert_nil(joined:find("\n--location\n", 1, true))
+			helpers.assert_nil(joined:find("\n--request\n", 1, true))
+			helpers.assert_eq(options.follow_redirects, true)
+		end)
+	end
+end)
 
 helpers.describe("http_client: asynchronous curl ownership", function()
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
@@ -256,9 +365,10 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 				local function complete(value) result = value; callbacks = callbacks + 1 end
 				if method == "post" then helpers.assert_true(client.post("https://example.invalid", {}, body, complete))
 				else helpers.assert_true(client.postStream("https://example.invalid", {}, body, {}, function(bytes) chunks[#chunks + 1] = bytes end, complete)) end
-				helpers.assert_true(state.config:find('data-raw = "' .. body .. '"\n', 1, true) ~= nil,
-					"curl must not interpret caller bytes as a file or stdin reference")
-				helpers.assert_nil(state.config:find("data-binary =", 1, true))
+				helpers.assert_eq(state.body, body, "the dedicated channel carries exact caller bytes")
+				helpers.assert_true(state.config:find('data-binary = "@/dev/fd/3"\n', 1, true) ~= nil,
+					"only the adapter's fixed pipe reference can become a curl filename")
+				helpers.assert_nil(state.config:find('data-binary = "' .. body .. '"\n', 1, true), "caller @ must not select a curl filename")
 				for _, argument in ipairs(state.options.args) do helpers.assert_nil(argument:find(body, 1, true)) end
 				if method == "post" then state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
 				else state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n"); state.complete() end
@@ -385,6 +495,64 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 			end)
 		end
 	end
+
+	for _, case in ipairs(invalid_preflight) do
+		helpers.it("owned-http-preflight: " .. case.name .. " retains its regular predecessor", function()
+			local client, state = fresh_client({ defer_close = true })
+			local good, bad, good_callbacks, bad_callbacks = nil, nil, 0, 0
+			helpers.assert_true(client.get("https://example.invalid/held", {}, { owner = "kept" }, function(value)
+				good, good_callbacks = value, good_callbacks + 1
+			end))
+			local handles, requests = #state.handles, #state.requests
+			local options = { owner = "kept" }
+			for key, value in pairs(case.options or {}) do options[key] = value end
+			if case.download then options.output_path = case.download end
+			local operation = client.get_owned(case.url or "https://example.invalid/direct", case.headers or {}, options,
+				function(value) bad, bad_callbacks = value, bad_callbacks + 1 end)
+			helpers.assert_eq(operation.started, false)
+			helpers.assert_true(operation:is_settled(), "invalid replacement has no native cleanup debt")
+			helpers.assert_eq(bad_callbacks, 1)
+			helpers.assert_true(bad and bad.ok == false and bad.status == 0 and type(bad.error) == "string")
+			helpers.assert_nil(bad.error:find("private-suffix", 1, true))
+			helpers.assert_nil(bad.error:find("Synthetic private header value", 1, true))
+			helpers.assert_eq(#state.handles, handles, "owned replacement preflight precedes native allocation")
+			helpers.assert_eq(#state.requests, requests)
+			helpers.assert_eq(#state.kills, 0, "invalid owned replacement cannot terminate its predecessor")
+			helpers.assert_true(client.isActive("kept"))
+			state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_true(good and good.ok and good.body == "abc")
+			helpers.assert_eq(good_callbacks, 1)
+		end)
+	end
+
+	helpers.it("owned-http-preflight: valid replacement composes once and retains physical cleanup ownership", function()
+		local client, state = fresh_client({ defer_close = true })
+		local previous, result, conversions = nil, nil, 0
+		helpers.assert_true(client.get("https://example.invalid/held", {}, { owner = "kept" },
+			function(value) previous = value end))
+		local header = setmetatable({}, { __tostring = function()
+			conversions = conversions + 1
+			return "Synthetic native header"
+		end })
+		local operation = client.get_owned("https://example.invalid/direct", { ["X-Native"] = header }, { owner = "kept" },
+			function(value) result = value end)
+		helpers.assert_true(operation.started)
+		helpers.assert_eq(conversions, 1, "validated metadata must not be constructed again after displacement")
+		helpers.assert_eq(#state.requests, 2)
+		helpers.assert_eq(#state.kills, 2)
+		state.complete_request(2, "abc\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_nil(result, "owned replacement waits for every native close acknowledgment")
+		helpers.assert_true(not operation:is_settled())
+		local blocked
+		helpers.assert_eq(client.get("https://example.invalid/blocked", {}, { owner = "kept" },
+			function(value) blocked = value end), false)
+		helpers.assert_eq(blocked.error, "previous request cleanup pending")
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_true(result and result.ok and result.body == "abc")
+		state.complete_request(1, "old\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_nil(previous, "the displaced ordinary predecessor cannot publish a stale receipt")
+	end)
 
 	for _, method in ipairs({ "get", "post", "postStream", "download" }) do
 		for _, scheme in ipairs({ "https", "HTTPS" }) do
@@ -737,6 +905,66 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(not client.isActive())
 	end)
 
+	for _, method in ipairs({ "get", "get_owned", "post", "postStream", "download" }) do
+		helpers.it("literal-URL: " .. method .. " disables curl URL expansion", function()
+			local client, state = fresh_client()
+			local result
+			local function done(value) result = value end
+			local target = "http://127.0.0.1:9000/models?filter[name]=value&set={one,two}"
+			local operation
+			if method == "get" then client.get(target, {}, {}, done)
+			elseif method == "get_owned" then operation = client.get_owned(target, {}, {}, done)
+			elseif method == "post" then client.post(target, {}, "{}", done)
+			elseif method == "download" then client.download(target, {}, "/tmp/owned-download", {}, done)
+			else client.postStream(target, {}, "{}", {}, function() end, done) end
+			helpers.assert_eq(#state.requests, 1)
+			helpers.assert_nil(result, "curl must remain asynchronous")
+			helpers.assert_eq(state.options.args[1], "--disable", "personal config stays disabled first")
+			helpers.assert_true(("\n" .. table.concat(state.options.args, "\n") .. "\n"):find("\n--globoff\n", 1, true) ~= nil,
+				"curl's own URL parser must not expand or reject literal caller brackets and braces")
+			helpers.assert_true(state.config:find('url = "' .. target .. '"', 1, true) ~= nil)
+			if method == "postStream" then state.stdout("abc"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
+			else state.stdout("abc\nERGOPTI_HTTP_STATUS:200\n") end
+			state.complete()
+			helpers.assert_true(result.ok and result.status == 200)
+			if operation then helpers.assert_true(operation:is_settled()) end
+		end)
+	end
+
+	helpers.it("enforces the exact buffered body limit after separating the curl receipt", function()
+		for _, status in ipairs({ 200, 401 }) do
+			for _, size in ipairs({ 3, 4, 5, 13 }) do
+				for _, split in ipairs({ false, true }) do
+					local client, state = fresh_client()
+					local result, callbacks = nil, 0
+					client.get("https://api.github.com/releases", {}, { max_body_bytes = 4 }, function(value)
+						result, callbacks = value, callbacks + 1
+					end)
+					local body = string.rep("x", size)
+					local receipt = "\nERGOPTI_HTTP_STATUS:" .. status .. "\n"
+					if split then
+						state.stdout(body)
+						for index = 1, #receipt do state.stdout(receipt:sub(index, index)) end
+					else state.stdout(body .. receipt) end
+					state.complete(status == 200 and 0 or 22)
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_true(not client.isActive())
+					if size > 4 then
+						helpers.assert_eq(result.ok, false)
+						helpers.assert_eq(result.status, 0)
+						helpers.assert_eq(result.error, "response body exceeds limit")
+						helpers.assert_eq(result.body, "")
+						helpers.assert_nil(result.error_body, "oversized refusal bytes must not be published")
+					else
+						helpers.assert_eq(result.status, status)
+						helpers.assert_eq(result.ok, status == 200)
+						helpers.assert_eq(status == 200 and result.body or result.error_body, body)
+					end
+				end
+			end
+		end
+	end)
+
 	helpers.it("keeps requests from independent owners alive concurrently", function()
 		local client, state = fresh_client()
 		local default_result = nil
@@ -753,6 +981,73 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(default_result.ok)
 	end)
 
+	for _, method in ipairs({ "get", "get_owned", "post", "postStream" }) do
+		helpers.it("curl empty headers: " .. method .. " serializes present empty fields without removal directives", function()
+			local client, state = fresh_client()
+			local calls, result = 0, nil
+			local function done(value) result, calls = value, calls + 1 end
+			local headers = { ["X-Empty-Fixture"] = "", Accept = "", ["User-Agent"] = "",
+				["Content-Type"] = "", ["X-Ordinary-Fixture"] = "literal-value" }
+			local operation
+			if method == "get" or method == "get_owned" then
+				operation = client[method]("http://127.0.0.1:9000/", headers, {}, done)
+			elseif method == "post" then
+				operation = client.post("http://127.0.0.1:9000/", headers, "literal-body", done)
+			else
+				operation = client.postStream("http://127.0.0.1:9000/", headers, "literal-body", {}, function() end, done)
+			end
+			helpers.assert_eq(#state.requests, 1)
+			for _, name in ipairs({ "X-Empty-Fixture", "Accept", "User-Agent", "Content-Type" }) do
+				helpers.assert_contains(state.config, 'header = "' .. name .. ';"')
+			end
+			helpers.assert_contains(state.config, 'header = "X-Ordinary-Fixture: literal-value"')
+			helpers.assert_nil(state.config:find("X-Absent-Fixture", 1, true))
+			if method == "postStream" then
+				state.stdout("literal-response")
+				state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
+			else
+				state.stdout("literal-response\nERGOPTI_HTTP_STATUS:200\n")
+			end
+			state.complete(0)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_true(result.ok and result.status == 200)
+			if method == "get_owned" then helpers.assert_true(operation:is_settled()) end
+		end)
+	end
+
+	for _, method in ipairs({ "get", "get_owned", "post", "postStream" }) do
+		for _, value in ipairs({ " ", "\t", " \t " }) do
+			helpers.it("curl OWS headers: " .. method .. " preserves SP/HTAB-empty fields and every nonempty serialized byte", function()
+				local client, state = fresh_client()
+				local result, calls = nil, 0
+				local function done(receipt) result, calls = receipt, calls + 1 end
+				local headers = { ["X-Empty-Fixture"] = value, Accept = value, ["User-Agent"] = value,
+					["Content-Type"] = value, ["X-Ordinary-Fixture"] = " \tliteral \t value \t", ["X-Vertical-Control"] = "\v" }
+				local operation
+				if method == "get" or method == "get_owned" then
+					operation = client[method]("http://127.0.0.1:9000/", headers, {}, done)
+				elseif method == "post" then
+					operation = client.post("http://127.0.0.1:9000/", headers, "literal-body", done)
+				else
+					operation = client.postStream("http://127.0.0.1:9000/", headers, "literal-body", {}, function() end, done)
+				end
+				helpers.assert_eq(#state.requests, 1)
+				for _, name in ipairs({ "X-Empty-Fixture", "Accept", "User-Agent", "Content-Type" }) do
+					helpers.assert_contains(state.config, 'header = "' .. name .. ';"')
+				end
+				helpers.assert_contains(state.config, 'header = "X-Ordinary-Fixture:  \\tliteral \\t value \\t"')
+				helpers.assert_contains(state.config, 'header = "X-Vertical-Control: \\v"', "non-OWS controls retain their original serialization")
+				if method == "postStream" then
+					state.stdout("literal-response"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
+				else state.stdout("literal-response\nERGOPTI_HTTP_STATUS:200\n") end
+				state.complete(0)
+				helpers.assert_true(result.ok and result.status == 200)
+				helpers.assert_eq(calls, 1)
+				if method == "get_owned" then helpers.assert_true(operation:is_settled()) end
+			end)
+		end
+	end
+
 	helpers.it("keeps the headers, the body and the URL off the command line", function()
 		-- Every local process can read /proc/<pid>/cmdline: an API key in a
 		-- header and the typed text in a body were exposed there.
@@ -765,8 +1060,8 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(joined:find("cerebras", 1, true) == nil, "the URL must not be in argv")
 		helpers.assert_true(joined:find("\n--config\n-", 1, true) ~= nil, "curl reads its config from stdin")
 		helpers.assert_true(state.config:find('header = "Authorization: Bearer sk-secret"', 1, true) ~= nil)
-		helpers.assert_true(state.config:find('data-raw = "{\\"q\\":\\"Mon mot de passe \\\\\\"x\\\\\\"\\"}"', 1, true) ~= nil,
-			"quotes and backslashes are escaped for curl's config parser: " .. tostring(state.config))
+		helpers.assert_eq(state.body, '{"q":"Mon mot de passe \\"x\\""}', "the body channel preserves literal quotes and backslashes")
+		helpers.assert_nil(state.config:find("mot de passe", 1, true), "the config carries no caller body")
 		helpers.assert_true(state.config:find('url = "https://api.cerebras.ai/v1/chat/completions"', 1, true) ~= nil)
 	end)
 
@@ -784,8 +1079,7 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_eq(callback_count, 0, "post must return before any network output arrives")
 		helpers.assert_true(client.isActive(), "the adapter owns the live request")
 		helpers.assert_eq(state.timer.timeout_ms, 30000, "timeout is armed before completion")
-		helpers.assert_true(state.config:find([[data-raw = "{'quoted':true}"]], 1, true) ~= nil,
-			"the body must reach curl literally")
+		helpers.assert_eq(state.body, "{'quoted':true}", "the body must reach curl literally")
 		helpers.assert_true(state.options.detached == true,
 			"curl must own a process group that cancellation can target")
 
@@ -916,6 +1210,43 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 			end
 		end
 	end)
+
+	for _, method in ipairs({ "get", "post", "download", "postStream" }) do
+		helpers.it("incomplete-error-body: " .. method .. " publishes only complete HTTP rejection bytes", function()
+			local policy = require("llm.local_model_policy")
+			local url = "http://127.0.0.1:11434/api/chat"
+			local body = require("json").encode({ error = 'model "fixture:latest" not found' })
+			for _, status in ipairs({ 401, 404, 503 }) do
+				for _, exit in ipairs({ { code = 0 }, { code = 22 }, { code = 18 },
+					{ code = 23 }, { code = 56 }, { code = 0, signal = 15 } }) do
+					local client, state = fresh_client()
+					local result, callbacks = nil, 0
+					local function done(value) result, callbacks = value, callbacks + 1 end
+					local marker = "\nERGOPTI_HTTP_STATUS:" .. status .. "\n"
+					if method == "get" then client.get(url, {}, {}, done)
+					elseif method == "post" then client.post(url, {}, "{}", done)
+					elseif method == "download" then client.download(url, {}, "/tmp/owned-download", {}, done)
+					else client.postStream(url, {}, "{}", {}, function() end, done) end
+					if method == "postStream" then state.stdout(body); state.stderr(marker)
+					else state.stdout(body .. marker) end
+					state.stdout(nil); state.stderr(nil); state.exit(exit.code, exit.signal)
+					local completed = not exit.signal and (exit.code == 0 or exit.code == 22)
+					helpers.assert_eq(result.ok, false)
+					helpers.assert_eq(result.status, status, "the HTTP status survives a transfer failure")
+					helpers.assert_eq(result.error, "HTTP " .. status)
+					helpers.assert_eq(result.body, "")
+					helpers.assert_eq(result.error_body, completed and body or nil)
+					local failure = policy.response_failure(result, "http://127.0.0.1:11434")
+					helpers.assert_eq(policy.is_missing(failure), completed and status == 404 or false,
+						"an incomplete transfer cannot authorize a missing-model offer")
+					helpers.assert_eq(callbacks, 1)
+					helpers.assert_true(not client.isActive())
+					state.exit(exit.code, exit.signal)
+					helpers.assert_eq(callbacks, 1, "late native exits cannot republish the refusal")
+				end
+			end
+		end)
+	end
 
 	helpers.it("omits oversized error bodies and retains status after diagnostics exhaust their budget", function()
 		local client, state = fresh_client()
@@ -1084,6 +1415,53 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 end)
 
 helpers.describe("file_digest: asynchronous sha256sum ownership", function()
+	local native_ok = pcall(require, "luv")
+	local ffi_ok = pcall(require, "ffi")
+	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-digest-allocation: actual partial handles retire before refusal returns", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_allocations.lua"
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native digest allocation fixture must pass")
+		end)
+		helpers.it("linux-digest-replacement: rejected paths preserve an actual native incumbent", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_replacement.lua"
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native digest replacement fixture must pass")
+		end)
+		helpers.it("linux-digest-owner: actual updater cancellation preserves another native digest", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_file_digest_owners.lua"
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native digest owner fixture must pass")
+		end)
+	end
+
+	for _, mode in ipairs({ "raised", "nil" }) do
+		for slot = 1, 3 do
+			helpers.it("linux-digest-allocation: " .. mode .. " constructor at " .. slot .. " releases prior handles", function()
+				local options = {}
+				options[mode == "raised" and "allocation_failure_at" or "allocation_nil_at"] = slot
+				local digest, state = fresh_digest(options)
+				local value, failure, callbacks = nil, nil, 0
+				helpers.assert_eq(digest.sha256("/tmp/allocation.part", { owner = "allocation-unit" }, function(hash, err)
+					value, failure, callbacks = hash, err, callbacks + 1
+				end), false)
+				helpers.assert_nil(value)
+				helpers.assert_eq(failure, "libuv handle allocation failed")
+				helpers.assert_eq(callbacks, 1)
+				helpers.assert_eq(#state.requests, 0)
+				helpers.assert_nil(state.command)
+				helpers.assert_true(not digest.isActive("allocation-unit"))
+				helpers.assert_eq(#state.handles, slot - 1)
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing, "partial allocation must close") end
+				helpers.assert_true(digest.cancel("allocation-unit"))
+				helpers.assert_eq(callbacks, 1, "cancelling a refused owner cannot publish another callback")
+			end)
+		end
+	end
+
 	for _, length in ipairs({ 957, 958, 1106, 3500 }) do
 		helpers.it("linux-digest-path-budget: hashes a " .. length .. "-byte path", function()
 			local digest, state = fresh_digest()
@@ -1440,5 +1818,231 @@ helpers.describe("http_client: owned GET construction boundary", function()
 		state.ack_closes()
 		helpers.assert_true(operation:is_settled())
 		helpers.assert_eq(receipt.error, "curl request construction failed")
+	end)
+end)
+
+helpers.describe("http_client: request body pipe refusal boundaries", function()
+	for _, case in ipairs({
+		{ name = "handle allocation", options = { allocation_failure_at = 5 }, descriptors = 0 },
+		{ name = "anonymous pipe allocation", options = { body_pipe_failure = true }, descriptors = 0 },
+		{ name = "pipe attachment", options = { body_attach_failure = true }, descriptors = 2 },
+		{ name = "spawn", options = { spawn_failure = true }, descriptors = 2 },
+	}) do
+		helpers.it("linux-http-body-pipe: simulated " .. case.name .. " refusal retires every admitted resource", function()
+			local client, state = fresh_client(case.options)
+			local result, callbacks = nil, 0
+			helpers.assert_eq(client.post("http://127.0.0.1:9000/", {}, '{"text":"literal"}', function(value)
+				result, callbacks = value, callbacks + 1
+			end), false)
+			helpers.assert_true(result and result.ok == false and result.status == 0)
+			helpers.assert_eq(callbacks, 1)
+			helpers.assert_eq(#state.requests, 0)
+			helpers.assert_eq(#state.descriptor_closes, case.descriptors)
+			for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing, "an admitted native handle was lost") end
+		end)
+	end
+
+	for _, asynchronous in ipairs({ false, true }) do
+		helpers.it("linux-http-body-pipe: simulated " .. (asynchronous and "asynchronous" or "immediate") .. " write refusal fences late receipts", function()
+			local client, state = fresh_client({ body_write_failure = not asynchronous, defer_body_write = asynchronous })
+			local result, callbacks = nil, 0
+			local dispatched = client.post("http://127.0.0.1:9000/", {}, '{"text":"literal"}', function(value)
+				result, callbacks = value, callbacks + 1
+			end)
+			helpers.assert_eq(dispatched, asynchronous)
+			if asynchronous then state.body_written("EPIPE") end
+			helpers.assert_true(result and result.ok == false and result.error == "curl body write failed")
+			helpers.assert_eq(callbacks, 1)
+			helpers.assert_eq(#state.kills, 2)
+			helpers.assert_eq(#state.descriptor_closes, 2)
+			state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_eq(callbacks, 1)
+			for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing) end
+		end)
+	end
+
+	for _, cancelled in ipairs({ false, true }) do
+		helpers.it("linux-http-body-pipe: " .. (cancelled and "cancellation" or "deadline") .. " closes a pending writer without affecting its successor", function()
+			local client, state = fresh_client({ defer_body_write = true })
+			local callbacks, result, successor = 0, nil, nil
+			helpers.assert_true(client.post("http://127.0.0.1:9000/", {}, '{"text":"literal"}', function(value)
+				result, callbacks = value, callbacks + 1
+			end, { owner = "body-owner" }))
+			local completed_write, writer = state.body_written, state.body_pipe
+			helpers.assert_true(not writer.closing)
+			if cancelled then helpers.assert_true(client.cancel("body-owner")) else state.timer.callback() end
+			helpers.assert_true(writer.closing)
+			helpers.assert_eq(callbacks, cancelled and 0 or 1)
+			if not cancelled then helpers.assert_eq(result.error, "timeout") end
+			helpers.assert_eq(#state.descriptor_closes, 2)
+			helpers.assert_true(client.get("http://127.0.0.1:9000/fresh", {}, { owner = "body-owner" },
+				function(value) successor = value end))
+			completed_write("EPIPE")
+			helpers.assert_true(client.isActive("body-owner"), "a stale body write retired its new owner")
+			state.complete_request(1, "old\nERGOPTI_HTTP_STATUS:200\n")
+			state.complete_request(2, "abc\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_true(successor and successor.ok and successor.body == "abc")
+			helpers.assert_eq(callbacks, cancelled and 0 or 1)
+		end)
+	end
+
+	for _, method in ipairs({ "post", "postStream" }) do
+		helpers.it("linux-http-body-pipe: " .. method .. " retains literal NUL refusal before replacing a valid owner", function()
+			local client, state = fresh_client()
+			local good, bad = nil, nil
+			helpers.assert_true(client.get("http://127.0.0.1:9000/held", {}, { owner = "kept" }, function(value) good = value end))
+			local handles = #state.handles
+			local complete = function(value) bad = value end
+			local dispatched
+			if method == "post" then dispatched = client.post("http://127.0.0.1:9000/", {}, "before\0after", complete, { owner = "kept" })
+			else dispatched = client.postStream("http://127.0.0.1:9000/", {}, "before\0after", { owner = "kept" }, function() end, complete) end
+			helpers.assert_eq(dispatched, false)
+			helpers.assert_true(bad and bad.ok == false and bad.status == 0)
+			helpers.assert_eq(#state.handles, handles)
+			helpers.assert_eq(#state.requests, 1)
+			helpers.assert_eq(#state.kills, 0)
+			helpers.assert_true(client.isActive("kept"))
+			state.complete_request(1, "abc\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_true(good and good.ok and good.body == "abc")
+		end)
+	end
+end)
+
+helpers.describe("http_client: exceptional body cleanup ownership", function()
+	for _, receipt in ipairs({ "nil", "false", "throw" }) do
+		for _, raw in ipairs({ false, true }) do
+			helpers.it("linux-http-body-cleanup: simulated " .. receipt .. (raw and " raw rollback" or " reader handle") .. " refusal retains and retries its exact owner", function()
+				local options = { defer_close = true }
+				if raw then options.body_attach_failure = true; options.raw_close_receipt = receipt
+				else options.body_handle_close_receipt = receipt end
+				local client, state = fresh_client(options)
+				local callbacks, blocked = 0, nil
+				helpers.assert_eq(client.post("http://127.0.0.1:9000/", {}, "{}", function() callbacks = callbacks + 1 end, { owner = "body-debt" }), false)
+				state.ack_closes()
+				helpers.assert_eq(callbacks, 0)
+				local candidate = client.get_owned("http://127.0.0.1:9000/", {}, { owner = "body-debt" }, function(value) blocked = value end)
+				helpers.assert_eq(candidate.started, false)
+				helpers.assert_eq(blocked.error, "previous request cleanup pending")
+				helpers.assert_eq(client.cancel("body-debt"), false)
+				state.allow_closes = true
+				if not raw then state.exit(0) end
+				client.cancel("body-debt")
+				state.ack_closes()
+				helpers.assert_true(client.cancel("body-debt"))
+				helpers.assert_eq(callbacks, 0)
+				for _, fd in ipairs(state.descriptors) do helpers.assert_nil(state.identities[fd]) end
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing) end
+			end)
+		end
+		for _, reused in ipairs({ false, true }) do
+			helpers.it("linux-http-body-cleanup: simulated " .. receipt .. " after retirement " .. (reused and "preserves reused descriptor" or "avoids EBADF retry"), function()
+				local client, state = fresh_client({ body_attach_failure = true, raw_close_receipt = receipt,
+					close_after_retirement = true, reuse_descriptor = reused })
+				local callbacks = 0
+				helpers.assert_eq(client.post("http://127.0.0.1:9000/", {}, "{}", function() callbacks = callbacks + 1 end, { owner = "retired-body" }), false)
+				helpers.assert_eq(callbacks, 0)
+				helpers.assert_true(client.cancel("retired-body"))
+				helpers.assert_eq(#state.descriptor_closes, 2, "a retired or reused numeric descriptor must never be closed twice")
+				for _, fd in ipairs(state.descriptors) do
+					if reused then helpers.assert_eq(state.identities[fd].ino, 99) else helpers.assert_nil(state.identities[fd]) end
+				end
+				helpers.assert_eq(callbacks, 0)
+			end)
+		end
+	end
+
+	helpers.it("linux-http-body-cleanup: simulated body partial allocation with close refusal keeps captured handles fenced", function()
+		local client, state = fresh_client({ allocation_failure_at = 2, close_failure = true, defer_close = true })
+		local callbacks, blocked = 0, nil
+		helpers.assert_eq(client.post("http://127.0.0.1:9000/", {}, "{}", function() callbacks = callbacks + 1 end, { owner = "body-allocation" }), false)
+		helpers.assert_eq(#state.handles, 1)
+		helpers.assert_eq(callbacks, 0)
+		local candidate = client.get_owned("http://127.0.0.1:9000/", {}, { owner = "body-allocation" }, function(value) blocked = value end)
+		helpers.assert_eq(candidate.started, false)
+		helpers.assert_eq(blocked.error, "previous request cleanup pending")
+		state.allow_closes = true
+		helpers.assert_eq(client.cancel("body-allocation"), false)
+		state.ack_closes()
+		helpers.assert_true(client.cancel("body-allocation"))
+		helpers.assert_eq(callbacks, 0)
+	end)
+
+	helpers.it("linux-http-body-cleanup: native exit event retries simulated reader close refusal before publishing", function()
+		local client, state = fresh_client({ body_handle_close_receipt = "nil", defer_close = true })
+		local callbacks, result = 0, nil
+		helpers.assert_eq(client.post("http://127.0.0.1:9000/", {}, "{}", function(value) result, callbacks = value, callbacks + 1 end), false)
+		state.ack_closes()
+		helpers.assert_eq(callbacks, 0)
+		state.allow_closes = true
+		state.exit(0)
+		helpers.assert_eq(callbacks, 0)
+		state.ack_closes()
+		helpers.assert_eq(callbacks, 1)
+		helpers.assert_eq(result.error, "curl body pipe retirement failed")
+		state.exit(0); state.ack_closes()
+		helpers.assert_eq(callbacks, 1)
+	end)
+end)
+
+helpers.describe("http_client: native body allocator compatibility", function()
+	helpers.it("linux-http-body-cleanup: current luv allocator requests nonblocking native pipe ends", function()
+		local allocator = dofile("infra/http_body_pipe.lua")
+		local pair = allocator.allocate({ pipe = function(read_flags, write_flags)
+			helpers.assert_true(read_flags.nonblock and write_flags.nonblock)
+			return { read = 40, write = 41 }
+		end })
+		helpers.assert_eq(pair.read, 40)
+		helpers.assert_eq(pair.write, 41)
+	end)
+
+	for _, refused in ipairs({ false, true }) do
+		helpers.it("linux-http-body-cleanup: simulated Jammy binding uses pipe2 with atomic native flags " .. (refused and "refusal" or "success"), function()
+			local previous = package.loaded["ffi"]
+			local calls = 0
+			package.loaded["ffi"] = { os = "Linux", cdef = function() end, new = function() return {} end,
+				C = { pipe2 = function(descriptors, flags)
+					calls = calls + 1
+					helpers.assert_eq(flags, 2048 + 524288)
+					if refused then return -1 end
+					descriptors[0], descriptors[1] = 70, 71
+					return 0
+				end } }
+			local ok, pair, detail = pcall(function() return dofile("infra/http_body_pipe.lua").allocate({}) end)
+			package.loaded["ffi"] = previous
+			helpers.assert_true(ok)
+			helpers.assert_eq(calls, 1)
+			if refused then helpers.assert_nil(pair); helpers.assert_eq(detail, "native body pipe allocation refused")
+			else helpers.assert_eq(pair.read, 70); helpers.assert_eq(pair.write, 71) end
+		end)
+	end
+
+	helpers.it("linux-http-body-cleanup: unavailable native allocation refuses without a synthetic pipe", function()
+		local previous = package.loaded["ffi"]
+		package.loaded["ffi"] = { os = "unavailable" }
+		local ok, pair, detail = pcall(function() return dofile("infra/http_body_pipe.lua").allocate({}) end)
+		package.loaded["ffi"] = previous
+		helpers.assert_true(ok)
+		helpers.assert_nil(pair)
+		helpers.assert_eq(detail, "native body pipe unavailable")
+	end)
+end)
+
+helpers.describe("http_client: unknown raw body identity", function()
+	helpers.it("linux-http-body-cleanup: simulated missing initial identity never authorizes closing a later descriptor", function()
+		local client, state = fresh_client({ body_metadata_failure = true })
+		local callbacks, blocked = 0, nil
+		helpers.assert_eq(client.post("http://127.0.0.1:9000/", {}, "{}", function() callbacks = callbacks + 1 end, { owner = "unknown-body" }), false)
+		helpers.assert_eq(callbacks, 0)
+		for _, fd in ipairs(state.descriptors) do state.identities[fd] = { dev = 9, ino = 99, type = "file" } end
+		state.allow_metadata = true
+		helpers.assert_eq(client.cancel("unknown-body"), false)
+		helpers.assert_eq(#state.descriptor_closes, 0)
+		for _, fd in ipairs(state.descriptors) do helpers.assert_eq(state.identities[fd].ino, 99) end
+		local candidate = client.get_owned("http://127.0.0.1:9000/", {}, { owner = "unknown-body" }, function(value) blocked = value end)
+		helpers.assert_eq(candidate.started, false)
+		helpers.assert_eq(blocked.error, "previous request cleanup pending")
+		for _, fd in ipairs(state.descriptors) do state.identities[fd] = nil end
+		helpers.assert_true(client.cancel("unknown-body"), "EBADF still proves retirement without inventing descriptor ownership")
+		helpers.assert_eq(callbacks, 0)
 	end)
 end)
