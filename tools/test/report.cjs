@@ -164,6 +164,17 @@ function emit(opts, res, code) {
 			process.stdout.write(
 				`::notice title=${ghEscape(opts.name)} all failures::${ghEscape(failureNotice(res.failures))}\n`
 			);
+		// CI-only diagnostic: the annotations API truncates each message at 4 KiB.
+		// Preserve every original assertion and verdict, and duplicate bounded details.
+		for (let first = 0; first < res.failures.length; first += 8) {
+			const details = res.failures
+				.slice(first, first + 8)
+				.map((failure, index) => `${first + index + 1}. ${failure.slice(0, 320)}`)
+				.join('\n');
+			process.stdout.write(
+				`::notice title=${ghEscape(opts.name)} diagnostic causes ${first + 1}::${ghEscape(details)}\n`
+			);
+		}
 		const summary = `${opts.name}: ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`;
 		process.stdout.write(`::notice title=${ghEscape(opts.name)}::${ghEscape(summary)}\n`);
 		if (process.env.GITHUB_STEP_SUMMARY) {

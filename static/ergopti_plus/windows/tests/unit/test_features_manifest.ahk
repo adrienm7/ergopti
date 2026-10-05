@@ -1844,7 +1844,7 @@ _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	AssertEqual("-0", Rows["shortcuts`nscreen"].Raw)
 	AssertEqual("-0", Rows["shortcuts`nmicrosoft_bold"].Raw)
 	AssertEqual("1", Rows["shortcuts`ntitle_case"].Raw)
-	AssertEqual("-0", Rows["hotstrings.autocorrection`ncaps"].ChildRaw["enabled"])
+	AssertEqual("-0", Rows["hotstrings.autocorrection`nnames"].ChildRaw["enabled"])
 	AssertEqual("1", Rows["hotstrings.french_autocorrection`naccents"].ChildRaw["enabled"])
 	Target := ManifestBuildFeaturesMap()
 	AssertEqual(3, ApplyConfigToml(Target, Path, &Rejected, &Migrated, &Outdated))
@@ -1894,7 +1894,8 @@ _FMS_FullSaveChangedInlineSource(Path) {
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
 		ParseConfigTomlFile(Path)
-		AssertEqual(1, ApplyBootConfigToml(Target, Path))
+		AssertEqual(2, ApplyBootConfigToml(Target, Path), "the supported trigger scalar and valid timing record both apply")
+		AssertEqual("@", Target["hotstrings"]["trigger_char"], "the independently supplied trigger leaf also reaches Features")
 		AssertEqual(0, _ConfigBootRejectedOverrides)
 		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.names`nenabled"))
 		Names := Target["hotstrings"]["autocorrection"]["names"]
