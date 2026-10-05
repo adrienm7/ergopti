@@ -5,6 +5,7 @@ schema_version = 10
 
 [gestures]
 enabled = true
+space_wrap = false
 swipe_3_left = "words"
 
 [hotstrings]

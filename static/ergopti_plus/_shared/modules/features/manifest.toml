@@ -6184,17 +6184,18 @@ settings_label_key = "menu.hotstrings.preview_bubbles"
 
 [onboarding.pages.hotstrings.magic_key]
 path = "hotstrings.trigger_char"
-# Linux accepts only the symbols of keymap/terminators.validate_magic_key,
-# which refuses the proposed ; and ù: its tray chooses the trigger, which it
-# keeps as config.toml's hotstrings.trigger_char.
-platforms = ["ahk", "hs"]
+# Linux keeps its existing rare-symbol policy; common-character presets are
+# offered only where the runtime accepts them. Custom Linux answers go through
+# the same shared validator as the tray before the wizard changes preferences.
+platforms = ["ahk", "hs", "linux"]
+validation = { linux = "safe_magic_key" }
 label_key = "onboarding.magic_key.desc"
 hint_key = "onboarding.magic_key.choose_freely"
 custom_label_key = "onboarding.magic_key.option_custom"
 # One code point, as config.schema.json and every runtime validate it: a longer
 # custom trigger would be saved, then stop the Windows driver at every start.
 max_characters = 1
-options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave" }, { value = ";", label_key = "onboarding.magic_key.option_semicolon" }]
+options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave", platforms = ["ahk", "hs"] }, { value = ";", label_key = "onboarding.magic_key.option_semicolon", platforms = ["ahk", "hs"] }]
 
 [onboarding.pages.llm]
 title_key = "menu.llm.title"
@@ -6286,6 +6287,50 @@ id = "titlecase_selection"
 i18n = "menu.shortcuts.to_titlecase"
 disabled_when = ["titlecase_selection_ready"]
 platforms = ["linux"]
+unavailable = "hide"
+
+# Linux exposes these immediate selection operations in its tray. The other
+# drivers keep their existing keyboard bindings rather than duplicate rows.
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_select_word"
+i18n = "menu.shortcuts.select_word"
+disabled_when = ["selection_select_word_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_select_line"
+i18n = "sg_actions.select_line"
+disabled_when = ["selection_select_line_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.selection_helper_commands]]
+type = "command"
+id = "selection_paste_plain"
+i18n = "sg_actions.paste_plain"
+disabled_when = ["selection_paste_plain_ready"]
+platforms = ["linux"]
+unavailable = "hide"
+
+# A key's native/no-action command keeps its established caption per platform.
+# Native binding persistence and reload/deployment remain owned by each driver.
+[[menu.tap_hold_key_native_commands]]
+type = "command"
+id = "tap_hold_key_native"
+i18n = "tap_hold.action.disable"
+disabled_when = ["tap_hold_key_configured"]
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_native_commands]]
+type = "command"
+id = "tap_hold_key_no_action"
+i18n = "menu.tapholds.nothing_tap_hold"
+disabled_when = ["tap_hold_key_configured"]
+platforms = ["hs"]
 unavailable = "hide"
 
 # Native prompts and modifier picker subtrees retain their own settings owners.

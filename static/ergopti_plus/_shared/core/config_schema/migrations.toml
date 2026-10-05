@@ -55,8 +55,9 @@
 # A section left without keys by an op disappears. Every op is idempotent, so
 # replaying a step on its own output changes nothing.
 #
-# Policy: a key rename, move or removal ships in the SAME commit as its step
-# here; readers drop the old spelling at once (no runtime aliases). The
+# Policy: a key rename or move ships in the SAME commit as its step here;
+# readers drop the old spelling at once (no runtime aliases). Retired keys
+# reported by the explicit cleanup remain untouched until that cleanup runs. The
 # registry, its corpus (_shared/tests/corpus/config_migrations/), the registry
 # defects every loader rejects (_shared/tests/corpus/config_migration_registries/)
 # and the three interpreters are pinned together by
@@ -81,9 +82,8 @@ from = 2
 to = 3
 drivers = ["hs"]
 reason = "The circular Spaces navigation toggle is retired: Space actions carry the wrap choice."
-ops = [
-	{ op = "delete", section = "gestures", key = "space_wrap" },
-]
+# The retired setting remains on disk for the explicit outdated-key cleanup.
+ops = []
 
 [steps.v3_to_v4]
 from = 3
@@ -92,13 +92,9 @@ drivers = ["ahk", "hs"]
 reason = "The AI menu's dedicated trigger shortcut is retired: a prediction on demand is the llm_generate_prediction action in a keyboard slot."
 # macOS saves an unset shortcut as the key `shortcut = false` and a bound one as
 # the [llm.trigger.shortcut] table (mods, key); Windows saves the chord text as
-# [llm] trigger_shortcut. Every spelling goes, and each is absent on the other
-# driver, where its delete is a no-op.
-ops = [
-	{ op = "delete", section = "llm.trigger", key = "shortcut" },
-	{ op = "delete", section = "llm.trigger.shortcut" },
-	{ op = "delete", section = "llm", key = "trigger_shortcut" },
-]
+# [llm] trigger_shortcut. Every spelling remains on disk for the explicit
+# outdated-key cleanup; readers never use it as a runtime alias.
+ops = []
 
 [steps.v4_to_v5]
 from = 4
@@ -234,9 +230,8 @@ reason = "Layer + Scroll is retired on macOS: the navigation layer's wheel bindi
 # (a loader never falls back to the preset), so the wheel keeps scrolling while
 # the layer is held until the user binds it in the layer editor or restores the
 # recommended layer, whose wheel is volume up and down.
-ops = [
-	{ op = "delete", section = "shortcuts.keys", key = "layer_scroll" },
-]
+# The retired switch remains on disk for the explicit outdated-key cleanup.
+ops = []
 
 [steps.v7_to_v8]
 from = 7
