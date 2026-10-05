@@ -3154,6 +3154,17 @@ delivery and retirement controls pass. The complete Linux-hosted Hammerspoon
 suite passes 14,129 tests in 1,487 modules, and its E2E suite passes. These
 controlled ports do not qualify physical macOS installation or close item 36.
 
+Manual run 37309897244 at 055afc3f94377f119c8c1b589ef590b6d0295e11
+finishes with six successful, five failed and five skipped jobs. Native Brew
+still refuses its positive AppleEvent control with target error -10004;
+Sparkle explicitly fails server retirement. Neither cause is proved, and
+macOS packaging/install acceptance remains incomplete. The XCTest reporter
+now emits closed per-case archive outcomes only from an authentic complete
+transcript, independently of another test's failure. Its original suite
+verdict and process exit remain unchanged. All 125 original reporter
+assertions and 48 additional controls pass; the unchanged reporter fails
+the new causal control. Actual native annotation transport remains pending.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
