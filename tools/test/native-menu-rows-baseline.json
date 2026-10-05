@@ -1,7 +1,7 @@
 {
 	"_comment": "Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). Lower with --update-baseline as rows move to the shared manifest; never raise.",
 	"windows": {
-		"count": 83,
+		"count": 82,
 		"sites": [
 			"windows/infra/tray_bootstrap.ahk:54 add",
 			"windows/ui/editors.ahk:372 static",
@@ -36,7 +36,6 @@
 			"windows/ui/menu/menu_init.ahk:46 separator",
 			"windows/ui/menu/menu_init.ahk:47 static",
 			"windows/ui/menu/menu_init.ahk:66 add",
-			"windows/ui/menu/menu_init.ahk:513 separator",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:98 separator",
@@ -89,7 +88,7 @@
 		]
 	},
 	"macos": {
-		"count": 125,
+		"count": 124,
 		"sites": [
 			"macos/ui/menu/builder.lua:320 separator",
 			"macos/ui/menu/builder.lua:354 separator",
@@ -100,8 +99,7 @@
 			"macos/ui/menu/builder.lua:718 separator",
 			"macos/ui/menu/builder.lua:765 separator",
 			"macos/ui/menu/canvas_badge.lua:123 separator",
-			"macos/ui/menu/menu_about.lua:182 separator",
-			"macos/ui/menu/menu_about.lua:197 static",
+			"macos/ui/menu/menu_about.lua:199 static",
 			"macos/ui/menu/menu_apps.lua:318 static",
 			"macos/ui/menu/menu_gestures.lua:205 static",
 			"macos/ui/menu/menu_gestures.lua:257 static",
@@ -219,7 +217,7 @@
 		]
 	},
 	"linux": {
-		"count": 93,
+		"count": 92,
 		"sites": [
 			"linux/ui/menu/agent_rows.lua:109 separator",
 			"linux/ui/menu/agent_rows.lua:195 separator",
@@ -307,13 +305,12 @@
 			"linux/ui/menu/menu_builder.lua:3971 static",
 			"linux/ui/menu/menu_builder.lua:4043 static",
 			"linux/ui/menu/menu_builder.lua:4089 static",
-			"linux/ui/menu/menu_builder.lua:4155 separator",
-			"linux/ui/menu/menu_builder.lua:4261 static",
-			"linux/ui/menu/menu_builder.lua:4333 static",
-			"linux/ui/menu/menu_builder.lua:4391 static",
-			"linux/ui/menu/menu_builder.lua:4429 static",
-			"linux/ui/menu/menu_builder.lua:4550 separator",
-			"linux/ui/menu/menu_builder.lua:4574 separator"
+			"linux/ui/menu/menu_builder.lua:4263 static",
+			"linux/ui/menu/menu_builder.lua:4335 static",
+			"linux/ui/menu/menu_builder.lua:4393 static",
+			"linux/ui/menu/menu_builder.lua:4431 static",
+			"linux/ui/menu/menu_builder.lua:4552 separator",
+			"linux/ui/menu/menu_builder.lua:4576 separator"
 		]
 	}
 }
