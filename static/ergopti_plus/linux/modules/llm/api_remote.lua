@@ -280,7 +280,8 @@ function M.normalize_base_url(raw)
 	if scheme ~= "http" and scheme ~= "https" then return nil, "base URL scheme must be http or https" end
 	if authority:find("@", 1, true) then return nil, "base URL must not contain userinfo" end
 	if suffix:find("[?#]") then return nil, "base URL must not contain a query or fragment" end
-	local host, port = authority:match("^([^:]+):(%d+)$")
+	local host, port = authority:match("^(%[[%x:%.]+%]):(%d+)$")
+	if not host then host, port = authority:match("^([^:]+):(%d+)$") end
 	host = host or authority
 	if not host:match("^[%w%._%-]+$") and not host:match("^%[[%x:%.]+%]$") then
 		return nil, "base URL host is invalid"

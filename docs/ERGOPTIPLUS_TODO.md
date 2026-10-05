@@ -1637,6 +1637,23 @@ These are software implementations; final hardware verification remains below.
   reporting contract. Foreign runtime gates remain deferred, and no reserved
   dynamic-hotstring owner, physical input or foreign source is changed.
 
+- [~] **L113.** Linux bracketed IPv6 provider ports: split the already admitted
+  bracketed host before its numeric port, retaining DNS/IPv4 parsing and all
+  existing guards and reason strings. Valid local IPv6 inference endpoints
+  previously failed host admission before native dispatch. Eight public provider
+  checks have four original failures and pass after on current LuaJIT, stock
+  Lua 5.4 and signed Ubuntu 22.04 luv/libuv dependencies. Four independent real
+  IPv6 curl controls verify owned TLS; eight public IPv4/IPv6 requests then
+  retain exact model, authentication, Unicode prompt and generation fields,
+  terminal callbacks, child exits and zero remaining native handles. Forty
+  registered cases pass on both runtimes; the seven baseline failures comprise
+  five valid-address cases and two invalid-port diagnostic-routing checks.
+  Invalid ports remain refused. Preserve every earlier provider assertion and
+  callback manifest entry; register future Linux CI without launching it.
+  macOS already splits bracketed hosts explicitly, and Windows has no matching
+  DNS-only splitter by source inspection; foreign native behavior is untested.
+  No persistence, transport, menu, general URL grammar or physical input change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

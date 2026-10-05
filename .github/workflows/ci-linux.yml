@@ -376,6 +376,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Dispatch provider requests through verified IPv4 and IPv6 TLS
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_ipv6_endpoints.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_ipv6_endpoints.py
+        timeout-minutes: 1
+
       - name: Admit file watches only after native activation succeeds
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
