@@ -102,7 +102,7 @@ applied in the continuation feature branch; hosted native acceptance remains
 pending. The exact bulk publication-recovery packet is applied as described
 below. Reviewed scalar/detached setters, activation and startup consumers are
 also applied in the lifecycle continuation below. Same-read recommendation
-semantic-source admission remains a separate prepared packet. A bounded
+semantic-source admission is applied in its own continuation below. A bounded
 implementation must not be reported as a completed global transaction.
 
 The remaining menus still have 96 Windows, 153 macOS and 97 Linux counted sites
@@ -159,8 +159,8 @@ predicates are unchanged and an independently mutated wrong fence is refused.
 Selected local gates pass formatting, 357 JS checks, 14,226 portable macOS and
 6,760 Linux unit cases, macOS E2E101 with one host-specific skip, and Linux
 E2E188. Hosted native qualification remains pending. The separately reviewed
-setter/activation/startup consumer packets are applied in the next continuation;
-same-read recommendation admission remains separate. This bounded source does
+setter/activation/startup consumer packets and the separate same-read
+recommendation admission packet are applied in the following continuations. This bounded source does
 not establish complete TODO5 acceptance.
 
 ## Continuation: lifecycle publication recovery
@@ -187,6 +187,24 @@ Selected final-source local gates pass formatting, 357 JS checks, 14,253
 portable macOS unit cases and 101 macOS E2E checks with one host-specific skip.
 Hosted native/package/install and physical/global acceptance remain pending.
 No TODO item is removed.
+
+## Continuation: same-read recommendation admission
+
+The independently reviewed admission V2 packet is
+`f24489e19f47f883840ed0384e1c059f97cf8173d73c8daf3f83e749bf0a5060`.
+All three exact preimages/postimages match after startup V2. Config's native read
+returns optional raw-source evidence from the same bytes used by its model;
+detached recommendations bind their backup/publication to that evidence. A/B
+source-race controls preserve the personalized successor instead of replacing
+its paste action with an older neutral escape candidate. Focused owners pass
+266 cases; the same new admission controls give original 5/4 and corrected 9/0,
+and an independent actual-file race gives original 54/1 and corrected 55/0.
+Existing return values, legacy two-return producers, conditional publication
+and retained recovery remain unchanged. The receipt covers requested path/raw
+bytes, not an inode/symlink ABA identity promise. Selected final-source local
+gates pass formatting, 357 JS checks, 14,262 portable macOS unit cases and
+101 macOS E2E checks with one host-specific skip. Hosted native/package/install
+and physical qualification remain pending. No TODO item is removed.
 
 ## Continuation: Linux obsolete TapHold shapes
 

@@ -133,11 +133,16 @@ local TomlCodec = require("infra.toml.codec")
 --- Load a TOML user-config file.
 --- Returns the decoded table on success, nil when the file is genuinely absent,
 --- and a classified error when an existing path is unsafe or cannot be decoded
---- (so callers can distinguish first-launch from corruption).
+--- (so callers can distinguish first-launch from corruption). The optional
+--- third result binds admission to these exact native-read bytes and route.
+--- @param path string Native settings path.
+--- @return table|nil data Parsed model when safe.
+--- @return string|nil err Existing classified read or parse failure.
+--- @return table|nil source Exact same-read path/status/raw receipt when admitted.
 function M._load_toml_file(path)
 	local raw, read_status = FileSystem.read_with_status(path)
 	if read_status ~= "ok" then
-		if read_status == "absent" then return nil, "absent" end
+		if read_status == "absent" then return nil, "absent", { path = path, status = "absent" } end
 		Logger.error(LOG, "Cannot read Karabiner user config; treating it as unavailable "
 			.. "(failure content withheld).")
 		return nil, "read_error"
@@ -147,7 +152,7 @@ function M._load_toml_file(path)
 		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing to silently reset user config.", path)
 		return nil, "parse_error"
 	end
-	return data
+	return data, nil, { path = path, status = "ok", content = raw }
 end
 
 local function load_json_file(path)
@@ -499,8 +504,9 @@ end
 --- @param user_config_path string Absolute path to config_karabiner.toml.
 --- @return table|nil state Full state, or nil when the persisted source is unsafe.
 --- @return string status One of "ok", "absent", or "error".
+--- @return table|nil source Optional exact same-read path/status/raw admission receipt.
 function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
-	local data, err = M._load_toml_file(user_config_path)
+	local data, err, source = M._load_toml_file(user_config_path)
 
 	if not data then
 		if err == "parse_error" or err == "read_error" then
@@ -510,7 +516,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 			return nil, "error"
 		end
 		Logger.info(LOG, "No user config found — initializing from defaults.")
-		return M.build_default_state(tap_hold_keys, mod_combos), "absent"
+		return M.build_default_state(tap_hold_keys, mod_combos), "absent", source
 	end
 
 	-- The switch decides whether any lease or guardian may be acquired, so an
@@ -630,7 +636,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		sticky_timeout_ms         = sticky_ms,
 		simultaneous_threshold_ms = simultaneous_ms,
 		combo_symmetric           = combo_symmetric,
-	}, "ok"
+	}, "ok", source
 end
 
 --- Persists the non-neutral state sparsely to config_karabiner.toml.
