@@ -275,7 +275,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 35 tests in /);
+	assert.match(result.stderr, /Ran 41 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -395,6 +395,45 @@ check(
 		assert.equal((registration.match(/return 65;/g) || []).length, 2);
 		assert.match(registration, /phase=get-current-process, osstatus=%d/);
 		assert.match(registration, /phase=transform-process-type, osstatus=%d/);
+	}
+);
+
+check(
+	'owned sender reports closed reply facts without weakening nonce or refusal admission',
+	() => {
+		const sender = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_sender.c'),
+			'utf8'
+		);
+		const helper = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+			'utf8'
+		);
+		assert.match(
+			sender,
+			/read == noErr && actual_length == 36 && memcmp\(echoed, argv\[2\], 36\) == 0/
+		);
+		assert.match(sender, /AEGetParamPtr\(&reply, keyErrorNumber, typeSInt32/);
+		assert.match(sender, /sizeof\(SInt32\), &error_length/);
+		assert.match(sender, /if \(error_length == sizeof\(SInt32\)\)/);
+		assert.match(sender, /nonce_length >= 0 && nonce_length <= 4096/);
+		assert.match(sender, /error_length >= 0 && error_length <= 4096/);
+		assert.match(sender, /char error_value_detail\[16\] = "unobserved"/);
+		assert.match(
+			sender,
+			/phase=%s, send=%d, read=%s, length=%s, match=%s, error_read=%s, error_length=%s, error_value=%s/
+		);
+		const begin = helper.indexOf('def run_appleevent_sender(');
+		const admission = helper.slice(begin, helper.indexOf('def _admit_appleevent_boundary', begin));
+		assert.match(admission, /children\.run\(arguments, check=False, confined=confined\)/);
+		assert.match(admission, /result\.returncode != 0/);
+		assert.match(admission, /result\.returncode == 66/);
+		assert.match(admission, /result\.stdout in expected and not result\.stderr/);
+		assert.doesNotMatch(admission, /result\.stderr\[:|\.(?:poll|wait|settle)\(/);
+		assert.match(helper, /len\(value\) > 256/);
+		for (const control of ['unconfined-positive', 'deny-removal-positive', 'full-policy-denial']) {
+			assert.ok(admission.includes(`"${control}"`));
+		}
 	}
 );
 
