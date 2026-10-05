@@ -123,3 +123,5 @@ helpers.describe("canonical special numeric source tokens", function()
 		helpers.assert_eq(Codec.encode_value_with_shapes(document.value, receipt), "[+nan, -nan, +inf, -inf]")
 	end)
 end)
+
+require("test.toml_document_shapes_contract")(helpers)

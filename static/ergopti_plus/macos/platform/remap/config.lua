@@ -46,6 +46,7 @@ local STICKY_TIMEOUT_MS_DEFAULT         = Defaults.sticky_timeout_ms
 local SIMULTANEOUS_THRESHOLD_MS_DEFAULT = Defaults.simultaneous_threshold_ms
 local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 local OUTDATED_BINDING_REASON = "a binding is a table of actions; the neutral one is used"
+local OUTDATED_ARRAY_REASON = "a remap dictionary is not an array; the neutral state is used"
 
 --- Reads one timing leaf without treating obsolete data as a file failure.
 --- @return number value The existing numeric policy or the canonical default.
@@ -139,6 +140,7 @@ local TomlCodec = require("infra.toml.codec")
 --- @return table|nil data Parsed model when safe.
 --- @return string|nil err Existing classified read or parse failure.
 --- @return table|nil source Exact same-read path/status/raw receipt when admitted.
+--- @return table|nil shapes Canonical parser identities for array dictionary admission.
 function M._load_toml_file(path)
 	local raw, read_status = FileSystem.read_with_status(path)
 	if read_status ~= "ok" then
@@ -147,12 +149,12 @@ function M._load_toml_file(path)
 			.. "(failure content withheld).")
 		return nil, "read_error"
 	end
-	local ok, data = pcall(TomlCodec.decode, raw)
+	local ok, data, shapes = pcall(TomlCodec.decode_with_shapes, raw)
 	if not ok or type(data) ~= "table" then
 		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing to silently reset user config.", path)
 		return nil, "parse_error"
 	end
-	return data, nil, { path = path, status = "ok", content = raw }
+	return data, nil, { path = path, status = "ok", content = raw }, shapes
 end
 
 local function load_json_file(path)
@@ -506,7 +508,7 @@ end
 --- @return string status One of "ok", "absent", or "error".
 --- @return table|nil source Optional exact same-read path/status/raw admission receipt.
 function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
-	local data, err, source = M._load_toml_file(user_config_path)
+	local data, err, source, shapes = M._load_toml_file(user_config_path)
 
 	if not data then
 		if err == "parse_error" or err == "read_error" then
@@ -522,7 +524,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	-- The switch decides whether any lease or guardian may be acquired, so an
 	-- unreadable value is refused like a corrupt file rather than read as on.
 	local integration = data[INTEGRATION_SECTION]
-	if integration ~= nil and type(integration) ~= "table" then
+	if integration ~= nil and (type(integration) ~= "table"
+		or (shapes and shapes.arrays[integration])) then
 		Logger.error(LOG, "[%s] in '%s' is not a table — refusing the unsafe user config.",
 			INTEGRATION_SECTION, user_config_path)
 		return nil, "error"
@@ -541,12 +544,23 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	-- Saves are sparse against the neutral state: an absent table, key, slot or
 	-- timing IS the neutral value, so it is completed silently. Only a present
 	-- value of the wrong type is an anomaly worth a warning.
-	local tap_holds = type(data.tap_holds) == "table" and data.tap_holds or {}
-	local combos    = type(data.mod_combos) == "table" and data.mod_combos or {}
+	local function source_array(value, segments)
+		if not shapes or not shapes.arrays[value] then return false end
+		Outdated.report_in_file(user_config_path, segments,
+			OUTDATED_ARRAY_REASON, Logger)
+		return true
+	end
+	local tap_holds = type(data.tap_holds) == "table"
+		and not source_array(data.tap_holds, { "tap_holds" }) and data.tap_holds or {}
+	local combos = type(data.mod_combos) == "table"
+		and not source_array(data.mod_combos, { "mod_combos" }) and data.mod_combos or {}
 
-	local function owned_table(parent, key, label)
+	local function owned_table(parent, key, label, section)
 		if parent[key] == nil then return {} end
-		if type(parent[key]) == "table" then return parent[key] end
+		if type(parent[key]) == "table" then
+			if source_array(parent[key], { section, key }) then return {} end
+			return parent[key]
+		end
 		Logger.warn(LOG, "Ignoring the non-table %s in the saved config — using neutral bindings.", label)
 		return {}
 	end
@@ -557,17 +571,24 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 	end
 
-	local tap_hold_config = owned_table(tap_holds, "config", "[tap_holds.config]")
+	local tap_hold_config = owned_table(tap_holds, "config", "[tap_holds.config]", "tap_holds")
 	for _, key_def in ipairs(tap_hold_keys) do
 		if tap_hold_config[key_def.id] == nil then tap_hold_config[key_def.id] = {} end
+		if source_array(tap_hold_config[key_def.id], { "tap_holds", "config", key_def.id }) then
+			tap_hold_config[key_def.id] = {}
+		end
 		if type(tap_hold_config[key_def.id]) == "table" then
 			complete_slots(tap_hold_config[key_def.id], { "tap", "hold" })
 		end
 	end
 
-	local combos_config = owned_table(combos, "config", "[mod_combos.config]")
+	local combos_config = owned_table(combos, "config", "[mod_combos.config]", "mod_combos")
+	local known_combos = {}
+	for _, def in ipairs(mod_combos) do known_combos[def.id] = true end
 	for id, entry in pairs(combos_config) do
-		if type(entry) == "string" then
+		if known_combos[id] and source_array(entry, { "mod_combos", "config", tostring(id) }) then
+			combos_config[id] = {}
+		elseif type(entry) == "string" then
 			Logger.info(LOG, "Migrating combo '%s' from legacy string format.", id)
 			combos_config[id] = { tap = "none", hold = entry, combo = "none" }
 		end
@@ -658,6 +679,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		and (expected_source.status == "absent" or (expected_source.status == "ok"
 			and type(expected_source.content) == "string"))), "invalid remap source precondition")
 	local document = {}
+	local document_shapes
 	local source, source_status
 	if not overwrite_corrupt then
 		-- Re-reading before every save is cheap (a few KB, only on user action)
@@ -675,7 +697,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			return false
 		end
 		if source_status == "ok" then
-			local decoded_ok, decoded = pcall(TomlCodec.decode, source)
+			local decoded_ok, decoded, shapes = pcall(TomlCodec.decode_with_shapes, source)
 			if not decoded_ok or type(decoded) ~= "table" then
 				if not expected_source then
 					Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or use Tap-Holds › Restore recommended values, which backs it up and rewrites it.",
@@ -686,9 +708,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				-- candidate may replace them: the only menu path that repairs the file.
 				Logger.warn(LOG, "Rewriting the unparseable user config at '%s'; its exact bytes are in the scope backup.",
 					user_config_path)
-				decoded = {}
+				decoded, shapes = {}, nil
 			end
-			document = decoded
+			document, document_shapes = decoded, shapes
 		elseif source_status ~= "absent" then
 			Logger.error(LOG, "Refusing to overwrite user config at '%s' after an unclassified read.",
 				user_config_path)
@@ -708,7 +730,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 	local ok, payload = pcall(function()
 		local function table_at(parent, key)
 			if parent[key] == nil then parent[key] = {} end
-			assert(type(parent[key]) == "table", "owned remap table conflicts with a scalar")
+			assert(type(parent[key]) == "table" and not (document_shapes and document_shapes.arrays[parent[key]]),
+				"owned remap table conflicts with a scalar or array")
 			return parent[key]
 		end
 		local function assign(target, key, value, neutral)
@@ -740,11 +763,13 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		local function merge_bindings(target, updates, fields, section)
 			for id, values in pairs(updates or {}) do
 				assert(type(id) == "string" and type(values) == "table", "invalid remap binding candidate")
+				local preserve_array = not overwrite_corrupt and document_shapes and document_shapes.arrays[target[id]]
 				local preserve_scalar = not overwrite_corrupt and section == "tap_holds"
 					and target[id] ~= nil and type(target[id]) ~= "table"
-				if preserve_scalar then
+				if preserve_scalar or preserve_array then
 					Outdated.report_in_file(user_config_path, { section, "config", id },
-						OUTDATED_BINDING_REASON, Logger)
+						(preserve_array and OUTDATED_ARRAY_REASON
+							or OUTDATED_BINDING_REASON), Logger)
 					for _, field in ipairs(fields) do
 						local neutral = field ~= "timeout_ms" and "none" or nil
 						if values[field] ~= nil and values[field] ~= neutral then
@@ -762,6 +787,26 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				end
 			end
 		end
+		local function bindings_neutral(updates, fields)
+			for id, values in pairs(updates or {}) do
+				assert(type(id) == "string" and type(values) == "table", "invalid remap binding candidate")
+				for _, field in ipairs(fields) do
+					local neutral = field ~= "timeout_ms" and "none" or nil
+					if values[field] ~= nil and values[field] ~= neutral then return false end
+				end
+			end
+			return true
+		end
+		local function preserve_array(value, segments, neutral)
+			if overwrite_corrupt or not document_shapes or not document_shapes.arrays[value] then return false end
+			Outdated.report_in_file(user_config_path, segments,
+				OUTDATED_ARRAY_REASON, Logger)
+			if not neutral then
+				candidate_refusal = "candidate has no explicit repair owner for " .. table.concat(segments, ".")
+				error(candidate_refusal, 0)
+			end
+			return true
+		end
 		local integration = document[INTEGRATION_SECTION]
 		report_retired_integration(integration, user_config_path)
 		-- A settings-only candidate carries no switch: only an explicit boolean
@@ -770,31 +815,52 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			assert(type(state.enabled) == "boolean", "the Karabiner integration switch must be a boolean")
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
-		local tap_holds = table_at(document, "tap_holds")
-		assign_boolean(tap_holds, "tap_holds", "enabled", state.tap_holds_enabled,
-			Manifest.default_for("tap_holds.enabled"), tap_holds_switch)
-		assign_timing(tap_holds, "tap_holds", "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
-		assign_timing(tap_holds, "tap_holds", "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
-		merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, "tap_holds")
-		local mod_combos = table_at(document, "mod_combos")
-		-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
-		local _, outdated_enabled = combinations_enabled(mod_combos, user_config_path)
-		if not overwrite_corrupt and outdated_enabled then
-			if state.mod_combos_enabled ~= nil then
-				candidate_refusal = "candidate has no explicit repair owner for mod_combos.enabled"
-				error(candidate_refusal, 0)
+		if not preserve_array(document.tap_holds, { "tap_holds" },
+			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for("tap_holds.enabled"))
+			and (state.tap_hold_timeout_ms == nil or state.tap_hold_timeout_ms == TAP_HOLD_TIMEOUT_MS_DEFAULT)
+			and (state.sticky_timeout_ms == nil or state.sticky_timeout_ms == STICKY_TIMEOUT_MS_DEFAULT)
+			and bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
+			local tap_holds = table_at(document, "tap_holds")
+			assign_boolean(tap_holds, "tap_holds", "enabled", state.tap_holds_enabled,
+				Manifest.default_for("tap_holds.enabled"), tap_holds_switch)
+			assign_timing(tap_holds, "tap_holds", "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
+			assign_timing(tap_holds, "tap_holds", "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+			if not preserve_array(tap_holds.config, { "tap_holds", "config" },
+				bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
+				merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, "tap_holds")
+				if next(tap_holds.config) == nil then tap_holds.config = nil end
 			end
-		else
-			mod_combos.enabled = state.mod_combos_enabled
+			if next(tap_holds) == nil then document.tap_holds = nil end
 		end
-		assign_timing(mod_combos, "mod_combos", "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
-		assign_boolean(mod_combos, "mod_combos", "symmetric", state.combo_symmetric,
-			COMBO_SYMMETRIC_DEFAULT, combinations_symmetric)
-		merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" }, "mod_combos")
-		if next(tap_holds.config) == nil then tap_holds.config = nil end
-		if next(mod_combos.config) == nil then mod_combos.config = nil end
-		if next(tap_holds) == nil then document.tap_holds = nil end
-		if next(mod_combos) == nil then document.mod_combos = nil end
+		if not preserve_array(document.mod_combos, { "mod_combos" },
+			state.mod_combos_enabled == nil
+			and (state.simultaneous_threshold_ms == nil or state.simultaneous_threshold_ms == SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+			and (state.combo_symmetric == nil or state.combo_symmetric == COMBO_SYMMETRIC_DEFAULT)
+			and bindings_neutral(state.mod_combos_config, { "tap", "hold", "combo" })) then
+			local mod_combos = table_at(document, "mod_combos")
+			-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
+			local _, outdated_enabled = combinations_enabled(mod_combos, user_config_path)
+			if not overwrite_corrupt and outdated_enabled then
+				if state.mod_combos_enabled ~= nil then
+					candidate_refusal = "candidate has no explicit repair owner for mod_combos.enabled"
+					error(candidate_refusal, 0)
+				end
+			else
+				mod_combos.enabled = state.mod_combos_enabled
+			end
+			assign_timing(mod_combos, "mod_combos", "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+			assign_boolean(mod_combos, "mod_combos", "symmetric", state.combo_symmetric,
+				COMBO_SYMMETRIC_DEFAULT, combinations_symmetric)
+			if not preserve_array(mod_combos.config, { "mod_combos", "config" },
+				bindings_neutral(state.mod_combos_config, { "tap", "hold", "combo" })) then
+				merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" }, "mod_combos")
+				if next(mod_combos.config) == nil then mod_combos.config = nil end
+			end
+			if next(mod_combos) == nil then document.mod_combos = nil end
+		end
+		-- Only an ordinary valid-source read owns the parsed identities. Explicit
+		-- resets, absent files and backed corrupt repair keep their default encoder.
+		if document_shapes then return TomlCodec.encode_with_shapes(document, document_shapes) end
 		return TomlCodec.encode(document)
 	end)
 	if not ok or type(payload) ~= "string" then

@@ -206,6 +206,45 @@ gates pass formatting, 357 JS checks, 14,262 portable macOS unit cases and
 101 macOS E2E checks with one host-specific skip. Hosted native/package/install
 and physical qualification remain pending. No TODO item is removed.
 
+## Continuation: ordinary source value preservation
+
+Two independently reviewed packets compose in order on the exact same-read
+recommendation prerequisite:
+
+- Full-document V4: `ab8f09dd1e43024b6cee8102d2a7ae030bb11dbebc2d71081c93950e3f338654`.
+- Native array admission: `ea71410a73ddc9827aafbe6dcaafc80d3cbd9a45f6a72e282418451bf3a0db39`.
+
+All seven then three declared pre/post images match; their union owns nine
+source/test files. Canonical codec receipts preserve unchanged numeric kinds,
+precision, signed zero, existing temporal tokens and array identities during
+ordinary macOS saves. Default APIs, model-only consumers and independent
+corpora are unchanged. Native Config consumes same-read array evidence for its
+own dictionary paths, neutralizes ignored bindings and preserves their complete
+obsolete values. Colliding candidates refuse before publication until explicit
+source repair; unsafe Karabiner arrays do not grant consent. The historical
+model fixture forwards optional codec APIs, retaining all 81 old assertion
+lines; removing the corruption fixture's single added decoder forwarder restores
+its exact original bytes. The separate stronger malformed-source write fence
+is unchanged.
+
+Independent source review and actual-private-file controls are clear: V4's
+handwritten Python full model gives predecessor 1/11 and candidate 11/11;
+separate sign/type controls cover both Lua runtimes. Native array controls give
+predecessor 1/42 and candidate 43/0, including actual silent loss, precise
+warnings, complete future neighbors, consent refusal, explicit repair and source
+fencing. These portable POSIX observations do not qualify installed Hammerspoon,
+packaging, installation or physical devices. Selected root native gates pass
+14,339 portable macOS and 6,878 Linux unit cases, macOS E2E101 with one
+host-specific skip, and Linux E2E188. The first covering JS run correctly refused
+two bare optional math subtype calls in the new shared test helper. The reviewed
+one-file successor `78f5a401…` captures the same optional function once, retaining
+every predicate, expected value and case order; reversing only its declaration
+and six identifier references restores the complete predecessor module. Its
+covering JS rerun passes all 357 checks, and all 25 focused contract cases pass
+on both Lua runtimes. No TODO item is removed. Frozen patches,
+exact manifests and bounded independent review evidence are saved outside the
+checkout for recovery.
+
 ## Continuation: Linux obsolete TapHold shapes
 
 The independently reviewed V3 packet has SHA256

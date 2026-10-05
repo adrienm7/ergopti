@@ -1792,6 +1792,26 @@ and 101 macOS E2E checks (one host-specific scenario skipped). Hosted native
 qualification and broader binding-parent/repair-intent work remain pending;
 TODO33 is not complete.
 
+The macOS ordinary remap saver now preserves unchanged source numeric kinds,
+precision, signed zero, temporal values and complete arrays through optional
+canonical full-document receipts. Default codec APIs and independent corpora
+remain unchanged. Same-read array identities also distinguish obsolete arrays
+at native tap-hold/combination dictionaries and known bindings: runtime reads
+are neutral with one precise warning, unrelated saves retain their complete
+original values, and colliding candidates refuse before publication until
+explicit source repair. Unsafe Karabiner array parents retain the existing
+strict consent refusal. Historical scalar-parent refusals and every corruption
+fixture predicate remain intact. Independently reviewed real-file and Python
+typed-model controls reproduce predecessor loss and pass on the candidate;
+selected root verification passes 14,339 portable macOS and 6,878 Linux unit
+cases, plus 101 macOS and 188 Linux E2E checks with one macOS host-specific
+skip. The shared test helper retains every predicate while using the codec's
+existing optional math subtype alias; 25 focused cases pass on each Lua runtime,
+and its covering JS repair passes all 357 checks.
+Hosted native/package/install qualification remains pending. This bounded
+correction does not complete TODO33 or explicit cleanup and repair-intent
+ownership.
+
 The shared Lua installed-layout record owner now preserves omitted unowned
 members during verified same-id updates while removing omitted publisher-owned
 metadata, including an old extension replaced by a base layout. Verified
