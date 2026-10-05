@@ -49,8 +49,7 @@ global LLM_MENU_POST_PULL_REBUILD_MS := 3000
 
 /**
  * Builds the backend selection submenu.
- * Currently only Ollama is supported on Windows; the list is structured so
- * future backends (e.g., LM Studio, llama.cpp) can be added without refactoring.
+ * Offers Ollama, saved APIs and discovered local OpenAI-compatible servers.
  * @returns {Menu} Populated backend submenu.
  */
 LLM_Menu_BuildBackendMenu() {
@@ -92,9 +91,11 @@ _LLM_Menu_OptionHead(Label) {
  */
 _LLM_Menu_BackendRowLabel() {
 	global _LLM_Menu
-	for Row in _LLM_Menu_BackendRows() {
-		if Row.Get("checked", false)
-			return _LLM_Menu_OptionHead(Row["label"])
+	; Label lookup must not create a second local-server row view.
+	for BackendId in LLM_MENU_BACKEND_OPTIONS {
+		if BackendId == _LLM_Menu.Get("backend", "")
+			return LLM_Menu_LocalServersBackendLabel(
+				_LLM_Menu_OptionHead(_LLM_Menu_BackendOptionLabel(BackendId)))
 	}
 	try LoggerWarn("LLM", "The Backend submenu offers no option for backend '{1}'.",
 		_LLM_Menu.Get("backend", ""))
@@ -127,6 +128,8 @@ _LLM_Menu_BackendRows() {
 		port_display,
 		_LLM_DefaultFor("llm_ollama_port"),
 		(*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port")))
+	for Row in LLM_Menu_LocalServersRows()
+		Rows.Push(Row)
 	return Rows
 }
 

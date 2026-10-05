@@ -549,9 +549,38 @@ MenuRenderer_TemplateRows(ManifestKey, Commands, StateGetters, Children) {
 	return _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Map())
 }
 
+/**
+ * Supplies inert status declared on an existing live provider row.
+ * @param {String} ManifestKey Owning menu declaration.
+ * @param {String} RowId Existing provider identity.
+ * @param {String} Status Named native status to project.
+ * @returns {Array|false} Translated inactive data or a refused declaration.
+ */
+MenuRenderer_StatusRows(ManifestKey, RowId, Status) {
+	Owner := _MR_FindItemById(ManifestKey, RowId)
+	Statuses := Owner is Map ? Owner.Get("status_rows", false) : false
+	Def := Statuses is Map ? Statuses.Get(Status, false) : false
+	if !(Def is Array) || Def.Length == 0 {
+		try LoggerError("MenuRenderer", "Missing provider status '{1}.{2}.{3}' — rows refused.", ManifestKey, RowId, Status)
+		return false
+	}
+	for Item in Def {
+		if !(Item is Map)
+			return false
+		ItemType := Item.Get("type", "")
+		Label := ItemType == "label" && Item.Get("i18n", false) is String && Item["i18n"] != ""
+		if ItemType != "---" && !Label
+			return false
+		for Field in Item
+			if Field != "type" && !(Label && Field == "i18n")
+				return false
+	}
+	return _MR_TemplateRows(ManifestKey, Map(), Map(), Map(), Map(), Def)
+}
+
 ; Includes retain their declaration's original command readiness policy.
-_MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting) {
-	Def := _MR_GetMenuDef(ManifestKey)
+_MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, StatusDefinition := unset) {
+	Def := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)
 	if Visiting.Has(ManifestKey) || Def.Length == 0 {
 		try LoggerError("MenuRenderer", "Missing or cyclic child template '{1}' — provider rows refused.", ManifestKey)
 		return false
@@ -573,6 +602,8 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting) {
 		}
 		if ItemType == "---"
 			Row := Map("separator", true)
+		else if IsSet(StatusDefinition) && ItemType == "label"
+			Row := Map("label", t(Item["i18n"]), "disabled", true)
 		else if ItemType == "command" {
 			Row := MenuRenderer_CommandRow(ManifestKey, Id, Commands, StateGetters)
 			if !(Row is Map)

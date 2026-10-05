@@ -89,7 +89,7 @@ for (const platform of ['windows', 'macos']) {
 		const jobs =
 			platform === 'windows'
 				? ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
-				: ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
+				: ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'tooltip-canvas'];
 		const runners =
 			platform === 'windows'
 				? ['windows-latest']
