@@ -545,6 +545,31 @@ Test("wrap-symbols-global-transaction-20260813: inherited Critical cannot wrap d
 
 
 ; Independent provider expectations complement the existing native transaction ports.
+; Only declared-menu cases need the actual shared catalogue. The existing
+; transaction tests retain their two-pair fixture and every old assertion.
+_WSGT20260813_WithControlCatalogue(TestFn, Path) {
+	global _WS_BUILTIN_PAIRS, _WS_BUILTIN_GROUPS, _WS_ACTIVE_PAIRS, _WS_Disabled, _WS_Custom
+	SavedPairs := _WS_BUILTIN_PAIRS, SavedGroups := _WS_BUILTIN_GROUPS
+	SavedActive := _WS_ACTIVE_PAIRS
+	try {
+		_WS_LoadBuiltinCatalogue()
+		Corpus := _WSGT20260813_WrapControlsCorpus()
+		AssertEqual(7, Corpus["catalogue_groups"].Length, "the independent corpus describes all seven native groups")
+		AssertEqual(Corpus["catalogue_groups"].Length, _WS_BUILTIN_GROUPS.Length,
+			"the actual production loader must admit the complete shared catalogue")
+		_WS_ACTIVE_PAIRS := _WS_BuildActivePairs(_WS_Disabled, _WS_Custom)
+		return TestFn.Call(Path)
+	} finally {
+		_WS_BUILTIN_PAIRS := SavedPairs
+		_WS_BUILTIN_GROUPS := SavedGroups
+		_WS_ACTIVE_PAIRS := SavedActive
+	}
+}
+
+_WSGT20260813_WithControls(TestFn) {
+	return _WSGT20260813_WithState((Path) => _WSGT20260813_WithControlCatalogue(TestFn, Path))
+}
+
 _WSGT20260813_WrapControlsCorpus() {
 	global _SharedDir
 	return JsonParse(FileRead(_SharedDir . "/tests/corpus/menus/wrap_symbol_controls.json", "UTF-8"))
@@ -585,7 +610,16 @@ _WSGT20260813_ControlDeclarationAndDrawing(Path) {
 	AssertEqual(t("menu.shortcuts.wrap_symbols_add_custom"), Rows[Rows.Length]["label"])
 	Rendered := Menu()
 	try {
-		AssertEqual(Rows.Length, _MR_RenderRows(Rendered, Rows, "wrap_controls_native_test", 1), "actual native owner draws every row")
+		; Renderer receipts count labelled rows; native separators remain real items.
+		AssertEqual(Rows.Length - 3, _MR_RenderRows(Rendered, Rows, "wrap_controls_native_test", 1),
+			"actual native owner acknowledges every labelled row")
+		AssertEqual(Rows.Length, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"actual Win32 item count retains all fifteen rows including three separators")
+		for Index, Expected in Corpus["catalogue_groups"]
+			AssertEqual(t(Expected["i18n"]), _WSGT20260813_ControlLabelAt(Rendered, Index + 3),
+				"every actual native catalogue group keeps its independent caption and position")
+		AssertTrue(TrayMenuIsSeparatorAt(Rendered, 11), "the native custom separator remains in position")
+		AssertTrue(TrayMenuIsSeparatorAt(Rendered, Rows.Length - 2), "the native add-control separator remains in position")
 		AssertEqual(Rows[1]["label"], _WSGT20260813_ControlLabelAt(Rendered, 0))
 		AssertTrue(TrayMenuIsSeparatorAt(Rendered, 3))
 		AssertEqual(Rows[Rows.Length]["label"], _WSGT20260813_ControlLabelAt(Rendered, Rows.Length - 1))
@@ -595,7 +629,7 @@ _WSGT20260813_ControlDeclarationAndDrawing(Path) {
 	}
 }
 Test("wrap symbols: actual provider consumes complete declared controls and native drawing (wrap-controls)",
-	() => _WSGT20260813_WithState(_WSGT20260813_ControlDeclarationAndDrawing))
+	() => _WSGT20260813_WithControls(_WSGT20260813_ControlDeclarationAndDrawing))
 
 _WSGT20260813_ControlMetadataMutations(Path) {
 	Definition := _MR_GetMenuDef("wrap_symbols_global_controls")
@@ -616,7 +650,7 @@ _WSGT20260813_ControlMetadataMutations(Path) {
 	}
 }
 Test("wrap symbols: actual provider reads order caption and platform metadata mutations (wrap-controls)",
-	() => _WSGT20260813_WithState(_WSGT20260813_ControlMetadataMutations))
+	() => _WSGT20260813_WithControls(_WSGT20260813_ControlMetadataMutations))
 
 _WSGT20260813_ControlNativeRefusal(Path) {
 	global _WSGT20260813_WriterCalls, _WSGT20260813_ReplaceCalls, _WSGT20260813_RebuildCalls
@@ -636,7 +670,7 @@ _WSGT20260813_ControlNativeRefusal(Path) {
 	} finally _ConfigWriteTerminalRelease(Terminal)
 }
 Test("wrap symbols: actual declared callbacks retain native admission refusal and Bind payloads (wrap-controls)",
-	() => _WSGT20260813_WithState(_WSGT20260813_ControlNativeRefusal))
+	() => _WSGT20260813_WithControls(_WSGT20260813_ControlNativeRefusal))
 
 _WSGT20260813_ControlMissingOwnership(Path) {
 	Corpus := _WSGT20260813_WrapControlsCorpus()
@@ -658,7 +692,7 @@ _WSGT20260813_ControlMissingOwnership(Path) {
 	}
 }
 Test("wrap symbols: actual provider refuses every broken fixed section without partial rows (wrap-controls)",
-	() => _WSGT20260813_WithState(_WSGT20260813_ControlMissingOwnership))
+	() => _WSGT20260813_WithControls(_WSGT20260813_ControlMissingOwnership))
 
 _WSGT20260813_ControlReadiness(Path) {
 	global _WSGT20260813_WriterCalls, _WSGT20260813_ReplaceCalls, _WSGT20260813_RebuildCalls
@@ -676,4 +710,4 @@ _WSGT20260813_ControlReadiness(Path) {
 	} finally Definition["disabled_when"] := Original
 }
 Test("wrap symbols: retained actual command rechecks declared native readiness (wrap-controls)",
-	() => _WSGT20260813_WithState(_WSGT20260813_ControlReadiness))
+	() => _WSGT20260813_WithControls(_WSGT20260813_ControlReadiness))
