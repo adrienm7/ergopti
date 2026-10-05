@@ -1536,6 +1536,25 @@ These are software implementations; final hardware verification remains below.
   Foreign runtime gates remain deferred. Depends on L104's shared tag decoding;
   no timestamp policy, transport, frontend or reserved surface is changed.
 
+- [~] **L108.** Shared release prerelease metadata: decode the selected object's
+  own Boolean through the existing JSON owner. Escaped keys previously lost true;
+  nested true fields could override an own false or populate absent/null/string
+  metadata. Return true exclusively for an own Boolean true, preserving existing
+  false refusals and tag-registry channel/badge policies. Eight real verified
+  TLS/public Linux updater checks have five original failures and pass after on
+  current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 dependencies; complete
+  responses, callback settlement and offered/cache identity are retained. No
+  artifact is fetched or installed. Sixteen additive shared Lua vectors and one
+  typed/single-return case preserve all earlier 115 contracts: 132 focused checks
+  have ten original failures and pass after. All six other parser helpers remain
+  byte-identical. Register both native interpreters for future Linux CI without
+  launching it. Windows reads the first raw true/false token, with related key and
+  boundary flaws by source; the bounded proposal uses existing root-member spans
+  to distinguish Boolean true from numeric one. macOS shares the Lua corpus; no
+  additional live flag consumer or foreign runtime validation is claimed. Foreign
+  runtime gates remain deferred. Depends on L107's parser-contract stack; no
+  visible channel/badge correction, draft policy, transport or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
