@@ -232,7 +232,7 @@ _HBC_WithScratchConfig(Gates, Body) {
 		_FLAT_HOTSTRING_V1_CATS := ["Rolls"]
 		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
 		ConfigurationFile := ConfigPath
-		Features := _HSDeepCloneMap(Features)
+		Features := ManifestBuildFeaturesMap()
 		CategoryEnabled := CategoryEnabled.Clone()
 		for Gate, Value in Gates
 			CategoryEnabled[Gate] := Value
