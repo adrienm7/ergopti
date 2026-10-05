@@ -1983,6 +1983,28 @@ These are software implementations; final hardware verification remains below.
   driver changes or native gates here. Register future Linux CI without launching
   it. No NULL policy, completion cache, schema, Writer, menu or reserved change.
 
+- [~] **L129.** Linux SQLite NULL boundary: use the existing shared lossless JSON
+  decoder for native result rows and remove only top-level tagged NULL scalars.
+  Legacy empty-table sentinels defeated numeric zero defaults and published absent
+  optional extrema or first/last minutes as objects. Keep arrays, ordinary objects,
+  nested tagged NULL and embedded JSON text unchanged; do not change the shared
+  decoder contract or SQL queries. Eight genuine public Writer/Reader checks with
+  native SQLite reproduce three failures and pass after under current LuaJIT,
+  Lua 5.4 and the signed Jammy luv/libuv mixed profile. Optional manifest fields
+  reach the runtime projection; read_system_days is a public API with no current
+  Linux runtime caller. Native tests assert their exact eight-check floor and all
+  original assertions remain unchanged. Three registered CLI-response unit cases
+  reproduce three failures and pass after on all three profiles. Forty-seven
+  complete Reader owner checks, including n-gram byte identity and canonical
+  modifier-hold fields, pass after; replay all twenty-nine native n-gram checks
+  on each profile. Windows already uses COALESCE for system totals and removes
+  absent battery extrema represented by empty strings in source; macOS uses
+  binding-native nullable values. Foreign binding and driver execution remains
+  untested here and belongs to the principal agent. Register future Linux CI
+  without launching it. Preserve both PulseAudio language packs and principal
+  notification/HTTP fixtures from dev. No global codec, query, numeric policy,
+  schema, cache, configuration, menu, physical-input or foreign driver change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

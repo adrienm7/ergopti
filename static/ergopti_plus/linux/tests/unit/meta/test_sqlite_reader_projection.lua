@@ -576,3 +576,57 @@ helpers.describe("sqlite reader: the ergonomics record", function()
 	end)
 
 end)
+
+helpers.describe("linux-sqlite-null-boundary", function()
+
+	helpers.it("linux-sqlite-null-boundary: only the tagged null scalar is removed", function()
+		local Json = require("json")
+		with_stubbed_sqlite(function()
+			-- Controlled JSON shape checks are units, not native SQLite output.
+			return '[{"date":"2026-10-03","battery_min":[],"battery_max":{},"battery_sum":{"keep":null},"battery_count":0}]'
+		end, function(reader)
+			local day = reader.read_system_days("/db/metrics.sqlite", nil, nil)["2026-10-03"]
+			helpers.assert_true(Json.is_array(day.battery_min), "typed empty array identity was removed")
+			helpers.assert_type(day.battery_max, "table", "ordinary empty objects must survive")
+			helpers.assert_true(not Json.is_array(day.battery_max))
+			helpers.assert_true(Json.is_null(day.battery_sum.keep), "the scalar boundary must not recursively normalize")
+			helpers.assert_eq(day.battery_count, 0)
+		end)
+	end)
+
+	helpers.it("linux-sqlite-null-boundary: nullable system scalars retain absent extrema and zero totals", function()
+		with_stubbed_sqlite(function()
+			return '[{"date":"2026-10-03","wifi_changes":3,"battery_sum":null,"battery_count":null,"battery_min":null,"battery_max":null}]'
+		end, function(reader)
+			local day = reader.read_system_days("/db/metrics.sqlite", nil, nil)["2026-10-03"]
+			helpers.assert_eq(day.wifi_changes, 3)
+			helpers.assert_eq(day.battery_sum, 0)
+			helpers.assert_eq(day.battery_count, 0)
+			helpers.assert_nil(day.battery_min)
+			helpers.assert_nil(day.battery_max)
+		end)
+	end)
+
+	helpers.it("linux-sqlite-null-boundary: optional manifest minutes stay absent without changing nested JSON text", function()
+		local Json = require("json")
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_chars_class", 1, true) then
+				return '[{"date":"2026-10-03","app":"café","letter":3,"first_min":null,"last_min":null}]'
+			elseif sql:find("FROM agg_app_day_burst", 1, true) then
+				return Json.encode({ { date = "2026-10-03", app = "café", source_rows = 1,
+					length_buckets_json = Json.encode({ ["nul\0é"] = 2 }) } })
+			end
+			return "[]"
+		end, function(reader)
+			local entry = reader.read_manifest("/db/metrics.sqlite", nil, nil)["2026-10-03"]["café"]
+			helpers.assert_eq(entry.char_letter, 3)
+			helpers.assert_nil(entry.first_typed_min)
+			helpers.assert_nil(entry.last_typed_min)
+			helpers.assert_eq(entry.burst_length_buckets["nul\0é"], 2)
+			-- The legacy decoder contract belongs to its existing callers.
+			helpers.assert_type(Json.decode('{"legacy":null}').legacy, "table")
+			helpers.assert_true(Json.is_null(Json.decode_lossless('{"tagged":null}').tagged))
+		end)
+	end)
+
+end)
