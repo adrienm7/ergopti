@@ -51,6 +51,12 @@ SHA, then physical input/refusal recovery and all 21 translated menus.
 
 ## Linux
 
+The former POST NUL-body failure is now qualified locally on both Lua ABIs:
+unchanged production synchronously refuses those bytes before allocation. The
+corrected fixture requires exactfalse, immediate single callback and no request,
+retaining all seven cases and cleanup assertions (six passed/one failed before, seven/zero after). Hosted
+confirmation remains pending until the integrated CI receipt; no product bypass exists.
+
 - [ ] The native HTTP owner must repair HTTP503 E2 publication on Curl8.5 while
       keeping canonical E1, preserving successful/truncated200 E2 observations,
       refusing cached-page use after transfer failure and preserving private
@@ -60,11 +66,6 @@ SHA, then physical input/refusal recovery and all 21 translated menus.
       manual37274473330 confirms audio6/0 on each interpreter and notifications
       13/0 on Ubuntu1.9.2. Absence of real gettext gives6/4 locally. Final integrated
       native confirmation remains separate; no byte or urgency output is fabricated.
-- [ ] The native HTTP owner must diagnose the POST NUL-body dispatch ACK failure
-      at run_http_url_nul_receipts.lua135. Six other URL/public-request controls
-      pass; this step already has the proper shared namespace. Keep its original
-      assertion and all inputs, and obtain a causal fix rather than interpreting
-      it as another import or compiler prerequisite.
 - [ ] Investigate any recurrence of the ordinary GTK application launch failure
       using its actual launcher stderr/exit and selected-entry identity. All four
       original cases pass locally; no deadline or assertion was relaxed.
