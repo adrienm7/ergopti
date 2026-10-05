@@ -223,16 +223,57 @@ _PICR_PackIndexingIsNotGatedOnPerSectionFeatures() {
 ; ==========================================
 
 ; The guarantee that keeps this fixed: both sides read the same enumeration.
+/** Read a unique static owner method through the canonical source snapshot. */
+_PICR_PersonalMethodCode(Name) {
+	Source := _DriverSourceConcat()
+	Assert(Source != "", "the complete driver source must exist")
+	Code := _DriverMaskNonCode(&Source)
+	Assert(RegExMatch(Code, "im)^class PersonalFileControls\s*\{", &ClassDef) > 0,
+		"the adopted personal-file owner must exist")
+	AssertEqual(0, RegExMatch(Code, "im)^class PersonalFileControls\s*\{", , ClassDef.Pos + ClassDef.Len),
+		"the adopted personal-file owner must be unique")
+	ClassBody := _DriverExtractDefinedBody(&Source,
+		{Idx: ClassDef.Pos, OpenPos: ClassDef.Pos + InStr(ClassDef[0], "{") - 1})
+	Assert(ClassBody != "", "the actual adopted owner body must be readable")
+	ClassCode := _DriverMaskNonCode(&ClassBody)
+	Pattern := "im)^[ \t]*static " . Name . "\([^\n]*\)\s*\{"
+	Assert(RegExMatch(ClassCode, Pattern, &Method) > 0, "the adopted owner method must exist: " . Name)
+	AssertEqual(0, RegExMatch(ClassCode, Pattern, , Method.Pos + Method.Len),
+		"the adopted owner method must be unique: " . Name)
+	Body := _DriverExtractDefinedBody(&ClassBody,
+		{Idx: Method.Pos, OpenPos: Method.Pos + InStr(Method[0], "{") - 1})
+	Assert(Body != "", "the adopted owner method cannot be empty: " . Name)
+	return _DriverMaskNonCode(&Body)
+}
+
+; Registration adopts one inventory; previews consume that exact inventory rather
+; than performing another filesystem walk with potentially different membership.
 _PICR_BothSidesShareOneEnumeration() {
 	Rebuild := _DriverFuncBody("HotstringPrefixWatcherRebuildIndex")
 	Assert(Rebuild != "", "HotstringPrefixWatcherRebuildIndex() must exist in the driver source")
-	Assert(InStr(Rebuild, "HS_EnumeratePersonalExtFiles(") > 0,
-		"the index rebuild must enumerate the extension packs. Without it the index covers only the six bundled categories and every pack expands with no tooltip — the defect this test exists for")
-
+	RebuildCode := _DriverMaskNonCode(&Rebuild)
+	Assert(RegExMatch(RebuildCode, "i)PersonalFileControls\.BuildPreview\s*\(") > 0,
+		"the index rebuild must project extension packs from the adopted inventory")
 	Register := _DriverFuncBody("_HS_RegisterPersonal")
 	Assert(Register != "", "_HS_RegisterPersonal() must exist in the driver source")
-	Assert(InStr(Register, "HS_EnumeratePersonalExtFiles(") > 0,
-		"the engine registration must walk the packs through the SAME enumeration as the index. Two independent walks is exactly how the two sides came to disagree, and a private copy here would let them drift apart again")
+	RegisterCode := _DriverMaskNonCode(&Register)
+	Assert(RegExMatch(RegisterCode, "i)PersonalFileControls\.Register\s*\(") > 0,
+		"engine registration must use the same adopted personal-file owner")
+	Scan := _PICR_PersonalMethodCode("Scan")
+	Refresh := _PICR_PersonalMethodCode("Refresh")
+	NativeRegister := _PICR_PersonalMethodCode("Register")
+	Preview := _PICR_PersonalMethodCode("BuildPreview")
+	Assert(RegExMatch(Scan, "i)HS_EnumeratePersonalExtFiles\s*\(") > 0,
+		"the adopted inventory must originate from the authoritative extension enumeration")
+	Assert(RegExMatch(Refresh, "i)this\.Scan\s*\(") > 0
+		&& RegExMatch(Refresh, "i)this\.inventory\s*:=\s*Inventory\b") > 0,
+		"refresh must publish the actual scanned inventory")
+	Assert(RegExMatch(NativeRegister, "i)this\.Refresh\s*\(") > 0
+		&& InStr(NativeRegister, "this.inventory") > 0,
+		"native registration must refresh and consume that exact inventory")
+	Assert(InStr(Preview, "this.inventory") > 0
+		&& RegExMatch(Preview, "i)_RegisterExtPackTriggers\s*\(") > 0,
+		"preview registration must consume that same inventory through the actual indexer")
 }
 
 Test("preview index: extension packs are enumerated, the root personal file is not (preview-index-covers-every-registration)",

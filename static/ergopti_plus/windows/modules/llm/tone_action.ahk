@@ -19,8 +19,8 @@
 ; 4. An answer is typed only into the window that asked for it: the focus is
 ;    compared when the answer arrives and again, as the sender's admission, at
 ;    the instant the keys are sent.
-; 5. A new step supersedes the one in flight: each step takes a generation, and
-;    an answer whose generation is no longer the current one is ignored.
+; 5. A new step supersedes the one in flight: its generation is retained
+;    through queued output admission and courtesy selection completion.
 ;
 ; The refusals (paused, AI off, backend not ready) and their notices are those
 ; of the manual prediction trigger (ui/menu/menu_llm/menu_settings.ahk).
@@ -208,7 +208,8 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 ; @param {String} Focus The focus identity at dispatch.
 ; @param {String} Raw The model's answer.
 ; @param {Map} Meta Usage metadata (remote backend), unused.
-_LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "") {
+; @param {Func} SendFn Optional sender; resolved at call time.
+_LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "", SendFn := unset) {
 	global _LLM_Tone_Generation
 	if (Generation != _LLM_Tone_Generation) {
 		LoggerInfo("LLM", "Tone answer ignored: a newer step superseded it.")
@@ -224,8 +225,8 @@ _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "") {
 			(Raw is String) ? StrLen(Raw) : 0)
 		return
 	}
-	if !_LLM_Tone_FocusUnchanged(Focus) {
-		LoggerInfo("LLM", "Tone answer dropped: the focus moved to another window.")
+	if !_LLM_Tone_OutputCurrent(Generation, Focus) {
+		LoggerInfo("LLM", "Tone answer dropped: its step was superseded or the focus moved to another window.")
 		return
 	}
 	Opts := Map(
@@ -233,24 +234,45 @@ _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "") {
 		"mode", "auto",
 		"atomic_input", true,
 		; Checked again at the instant the keys are sent
-		"admission", _LLM_Tone_FocusUnchanged.Bind(Focus)
+		"admission", _LLM_Tone_OutputCurrent.Bind(Generation, Focus)
 	)
-	TextSend(Text, Opts, _LLM_Tone_OnTyped.Bind(Plan, Text))
+	if !IsSet(SendFn)
+		SendFn := TextSend
+	if !HasMethod(SendFn, "Call")
+		throw TypeError("Tone output requires a callable sender.")
+	SendFn.Call(Text, Opts, _LLM_Tone_OnTyped.Bind(Generation, Plan, Focus, Text))
 }
 
 ; The rewrite was typed (or refused): select it again and remember it.
+; @param {Integer} Generation The step which owns this completion.
 ; @param {Map} Plan The step's plan.
+; @param {String} Focus The focused window and control at dispatch.
 ; @param {String} Text The typed rewrite.
 ; @param {Boolean} Ok Whether the text was sent.
 ; @param {String} ErrorMessage Why it was not.
-_LLM_Tone_OnTyped(Plan, Text, Ok, ErrorMessage := "") {
+; @param {Func} SelectFn Optional courtesy selection sender; resolved at call time.
+_LLM_Tone_OnTyped(Generation, Plan, Focus, Text, Ok, ErrorMessage := "", SelectFn := unset) {
 	global _LLM_Tone_Memory
 	if !Ok {
 		LoggerInfo("LLM", "Tone rewrite not typed: {1}.", ErrorMessage)
 		return
 	}
-	if !TextSelectBack(LLM_Rewrite_CodepointLength(Text))
+	if !_LLM_Tone_OutputCurrent(Generation, Focus) or A_IsSuspended {
+		LoggerInfo("LLM", "Tone completion dropped: its step or focused control is no longer current, or the driver is paused.")
+		return
+	}
+	if !IsSet(SelectFn)
+		SelectFn := TextSelectBack
+	if !HasMethod(SelectFn, "Call")
+		throw TypeError("Tone completion requires a callable selection sender.")
+	if !SelectFn.Call(LLM_Rewrite_CodepointLength(Text))
 		LoggerWarn("LLM", "Tone rewrite typed but not selected again.")
+	; The selection sender may finish yielding effects before it returns. A
+	; newer step owns the memory even when the old selection was admitted.
+	if !_LLM_Tone_OutputCurrent(Generation, Focus) or A_IsSuspended {
+		LoggerInfo("LLM", "Tone completion memory dropped: its output owner was retired during selection.")
+		return
+	}
 	_LLM_Tone_Memory := LLM_Tone_Remember(Plan, Text)
 	LoggerInfo("LLM", "Tone rewrite applied with '{1}' ({2} character(s)).",
 		Plan["profile_id"], StrLen(Text))
@@ -297,4 +319,17 @@ _LLM_Tone_CurrentFocus() {
 _LLM_Tone_FocusUnchanged(Focus) {
 	Current := _LLM_Tone_CurrentFocus()
 	return (Focus != "" && Current == Focus) ? true : false
+}
+
+; Admission of queued output and its courtesy selection share the step owner.
+; Recheck after the focus probe: the probe can finish a newer callback.
+; @param {Integer} Generation The step which produced the rewrite.
+; @param {String} Focus The focused window and control captured at dispatch.
+; @returns {Integer} True only while the same step and focus remain current.
+_LLM_Tone_OutputCurrent(Generation, Focus) {
+	global _LLM_Tone_Generation
+	if Generation != _LLM_Tone_Generation
+		return false
+	FocusCurrent := _LLM_Tone_FocusUnchanged(Focus)
+	return FocusCurrent and Generation == _LLM_Tone_Generation
 }

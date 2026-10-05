@@ -47,7 +47,7 @@ class OwnedProcessControls(unittest.TestCase):
         with self.assertRaisesRegex(owner.OwnedProcessInterrupted, "cancel"):
             group.observe_exit()
         self.assertFalse(group.reservation_lost)
-        with patch.object(owner.os, "killpg") as signalling:
+        with patch.object(owner.os, "killpg", create=True) as signalling:
             self.assertTrue(group.settle())
         signalling.assert_not_called()
         process.wait.assert_called_once_with(timeout=1)

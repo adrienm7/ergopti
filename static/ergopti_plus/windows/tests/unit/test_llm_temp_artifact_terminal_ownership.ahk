@@ -203,6 +203,7 @@ _LTATO_RemoteLaunchFailureDeletesEveryArtifact() {
 	Paths := [Base . ".json", Base . ".out", Base . ".conf", Base . ".out.status", Base . ".out.exit"]
 	State := Map("fail_calls", 0, "run_calls", 0, "launch_paths", [Paths[2], Paths[4], Paths[5]])
 	Port := Map(
+		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
 		"file_exists", (*) => true,
 		"temp_dir", (*) => Dir,
 		"write", FSWrite,
@@ -214,6 +215,7 @@ _LTATO_RemoteLaunchFailureDeletesEveryArtifact() {
 		Owned := _LLMRemote_DispatchCurl(ReqId, Resolved, "https://example.invalid/v1", '{"input":"private"}',
 			(*) => 0, _LTATO_RecordFailure.Bind(State), 1000, Port)
 		AssertTrue(Owned, "curl availability transfers terminal failure to the dispatcher callback")
+		AssertEqual(1, State["proxy_resolutions"], "temporary artifact ownership crosses direct proxy admission once")
 		AssertEqual(1, State["run_calls"], "remote dispatch must invoke its child-process port exactly once")
 		AssertEqual(1, State["fail_calls"], "launch failure must invoke on_fail exactly once")
 		_LTATO_AssertAbsent(Paths, "remote launch failure")

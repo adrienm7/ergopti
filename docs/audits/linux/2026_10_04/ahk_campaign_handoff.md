@@ -287,3 +287,54 @@ included. When integrating any fix, use current source bytes, one atomic
 root-cause commit with meaningful regression coverage, and actual native Linux
 qualification selected for that change. A green targeted receipt is not a
 certificate that the installed driver is bug-free.
+
+## LNX-HANDOFF-05: external clipboard writes are not fenced before restoration
+
+**Status:** source-only external-writer overwrite risk observed on 2026-10-05.
+No Linux or macOS runtime, clipboard, driver or suite was executed. This is a
+separate handoff for `fix/linux`, not a qualified Linux fix or reproduced user
+clipboard loss. The earlier reference table does not bind this new source scan.
+
+**Linux owner and actual caller:**
+`static/ergopti_plus/linux/adapters/clipboard.lua`, `M.paste_text`, lines 292-334;
+`static/ergopti_plus/linux/modules/hotstrings/injector.lua`, line 269. The adapter
+saves the prior value, publishes its payload, waits, emits the paste chord,
+waits again, then calls `write_backend_checked(b, saved)` at line 328. That path
+checks backend success, but neither the last writer nor current content before
+restoring. Adapter SHA-256: 1b865cfdb61c91c5bd840378c396407ad21b4f225b65a494e03079e52a2b8bf0. Caller SHA-256: f5d32e73be890328e794ae65dbb4760f2f66219223d34d44ab213c50f18f3887.
+
+**Narrow source witness:** save A, publish B, let an external copy publish C
+inside the injected restore-delay sleep, then return to the actual owner. Its
+next restoration still requests A. This proves the absence of an external
+ownership decision in the source path; it does not observe a native overwrite.
+A recording backend/sleep regression should call the actual `M.paste_text`,
+record each publication and inject C during that existing wait. Preserve an
+unchanged-payload restoration positive control, originally empty snapshot,
+write/refusal cases, exact callback results and genuine caller coverage. Do not
+copy the Windows sequence-number predicate into a backend without that contract.
+The Linux owner must choose and qualify the supported backend ownership policy.
+
+**Windows comparator:** `CB_RetryRestoreDebt` formerly exempted attempt one
+when ExpectedSequence was zero and Force was true. The private Windows delta
+removes only that exemption when a positive sequence becomes observable; the
+actual recording-owner proof is original 9/1, fixed 10/0, inverse 9/1. The
+forced-zero observation path remains unresolved, and a matching sequence read
+is not an atomic guarantee against a later external write. These Windows
+receipts do not qualify Linux clipboard behavior.
+
+**macOS comparator:** `static/ergopti_plus/macos/adapters/text_sender.lua`,
+`restore_clipboard`, lines 176-182, calls `Clipboard.restore` while its local
+`_paste_owns_clipboard` flag is set; it does not compare a current external
+pasteboard generation there. Timer and failure callers use that helper.
+Source SHA-256: 312426306010af8395d662739aab179df41ec78aa9d594b85308840c3d95d59c. This is likewise a separate source observation,
+not macOS native-loss proof or permission to edit that driver in this handoff.
+
+**Frozen provenance:** the four cross-driver source snapshots and exact hashes
+are recorded in the private first-fence review
+`D:/Temp/ergopti-clipboard-first-fence-delivery-review-c938a205-63fd-4a3b-a9f0-708c7094049c/review.json`
+(SHA-256 `681d74bd9351c8394083a3fa3847ca5dd26fbea11e4e5b9c12d764323bfbd7d7`).
+The Windows passive receipt is
+`D:/Temp/ergopti-root-audit-ca55cd2fb8d24de2a3089b45cd7dbe3e/passive-clock-i6siyX/receipt.json`
+(SHA-256 `4b6bd03a5076adf3f34ec3ad9600e957be22a700e94de3d875fd40beebce7510`).
+Its malformed auxiliary JSON was not admitted as metadata; the TAP evidence
+remains distinct from the serializer-only successor.

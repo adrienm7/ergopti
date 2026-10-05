@@ -34,6 +34,7 @@ global HSE_RepeatEnabled := true
 
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
+#Include ..\..\adapters\file_system.ahk
 #Include ..\..\infra\toml\toml_helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk
 #Include ..\..\infra\feature_state.ahk
