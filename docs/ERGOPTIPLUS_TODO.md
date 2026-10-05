@@ -5518,6 +5518,20 @@ run still fails the updater validator, locale-audio and notification scenarios,
 so packaging and installation remain unexecuted. Virtual RandR regions do not
 qualify physical input or genuine dual displays; item111 remains partial.
 
+A separate native macOS global-switcher probe is registered in CI. It verifies
+an official signed Hammerspoon 1.1.1 instance, independently owned fixture apps,
+exact tagged Command/Tab event observations and an independent frontmost change.
+Hardware-only samples and posted combined-session release receipts remain
+separate requirements; posting success cannot acknowledge Dock consumption or
+modifier retirement. The controller retains exact process/input/tap/timer
+capabilities through source revocation and cleanup refusal. It requests no TCC
+grant; missing native permission is an unqualified CI failure rather than a skip.
+Twenty-six portable Python controls and forty Lua 5.4 cases pass on the actual
+committed-candidate sources. CI owns a fresh temporary-fixture control runner;
+genuine native execution and product SyntheticInput broker integration remain
+unfinished. This probe does not implement the product global action or complete
+physical dual-display acceptance.
+
 Windows continuation for item111 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
