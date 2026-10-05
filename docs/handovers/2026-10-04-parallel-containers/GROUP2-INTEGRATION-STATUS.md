@@ -114,8 +114,8 @@ counterexample with the unchanged canonical E1 expectation. Actual Curl8.14 pass
 all seven modes on both Lua ABIs. Supported older Curl still needs hosted proof.
 
 The selected composition passes Linux7,805/0. Mac portable units give14,648/12;
-all twelve failures reproduce the already integrated dev baseline. The bounded
-follow-up fixes three explicit fixture dependency inventories and the JSON stub's
+all twelve failures reproduce the already integrated dev baseline. The independently reviewed follow-up passes formatting, JS359/0 and the full
+Mac portable suite14,662/0. It fixes three explicit fixture dependency inventories and the JSON stub's
 missing b/f byte escapes. Production strict validation and independent golden
 corpora remain unchanged. Two new independent controls first give1/1 against the
 old stub, distinguishing decoded control bytes from literal backslash examples.
@@ -124,8 +124,17 @@ receipt; neither the earlier red nor an unexecuted device scenario becomes green
 
 The final phase was reserved using an actually empty commit from current dev,
 not by taking a foreign reservation. Its owner keeps both CI refs serialized
-through the terminal manual result. Windows is deferred to the maintainer PC;
-manual macOS/Linux qualification does not count Windows as passed.
+through the terminal manual result. Shared changes select all three native OS
+lanes. Remaining Windows implementation and physical acceptance are deferred to
+the maintainer PC; hosted automated results are reported independently.
+
+The native POST NUL-body failure is now causally qualified: production already
+refuses these bytes synchronously before allocation. The old fixture incorrectly
+expected positive dispatch; it now requires exactfalse, immediate single callback
+and no active/native request. All seven URL/inflight/literal-percent/header/body
+cases, socket counts, error receipts and final cleanup assertions remain. Actual
+Lua5.4 and LuaJIT each give6/1 before this fixture correction and7/0 afterward.
+No production HTTP policy is changed and the distinct ETag control remains open.
 
 ## Required continuation
 
@@ -136,10 +145,6 @@ manual macOS/Linux qualification does not count Windows as passed.
   carrying E2 on Curl 8.5, without overwriting a foreign winner or discarding
   cleanup debt. Keep all seven controls, including the restored original E2-on-503 stimulus
   and the additional E1-on-503 control. Curl 8.14 passes seven/zero locally; this does not fix older supported Curl.
-- The separate native URL-byte fixture still fails its POST NUL-body dispatch
-  acknowledgement at line135; six other actual URL/public-request controls pass.
-  The fixture already declares the shared namespace, so the import correction
-  cannot explain or qualify this distinct refusal. Request a causal HTTP-owner fix.
 - Group 6 retains Homebrew/Sparkle archive acceptance. Latest inspected manual
   run [37267530410](https://github.com/adrienm7/ergopti/actions/runs/37267530410)
   at `4d026ba9abbc8449d68f8be932f21a7e9cac6c0b` still fails: 309 Swift cases,

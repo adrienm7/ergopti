@@ -3044,15 +3044,20 @@ Python children. Terminal manual run37274473330 proves seven newly adopted
 controls otherwise fail at real app_dirs/json/logger imports; three more lack
 xkbcli. Audio gives6/0 on each interpreter, notifications13/0 and unchanged
 GTK4/4 on that runner. Source module imports and native compiler readiness are
-runner prerequisites; no fixture/assertion is rewritten. The distinct POST NUL
-body dispatch assertion and HTTP503 ETag control remain with the HTTP owner.
+runner prerequisites; those import/compiler assertions remain unchanged.
+The distinct POST NUL-body failure is an obsolete fixture dispatch premise:
+the published production owner already refuses these bytes synchronously. The
+fixture now requires exact false, an immediate single failure callback and no
+active/native request, keeping all seven cases and socket/cleanup assertions.
+Actual Lua5.4 and LuaJIT each reproduce6/1 before correction and pass7/0 after.
+The separate HTTP503 ETag control remains with the HTTP owner.
 
 The subsequent native XKB controls adopted from dev now receive the actual
 xkbcli compiler before their first execution. Their unchanged symbol-list,
 key-definition and block fixtures pass64/0,72/0 and64/0 with the signed native
 compiler; absence refuses the original admission. Manual run37274473330 confirms
 the audio and notification corrections on Ubuntu while its remaining verdict
-is still tracked separately. No foreign product or fixture source is changed.
+is still tracked separately. All three XKB fixture sources remain unchanged.
 
 Composition with the partial configuration/menu delivery preserves both native
 publication protocols: private hotstring receipts retain exact source identity
