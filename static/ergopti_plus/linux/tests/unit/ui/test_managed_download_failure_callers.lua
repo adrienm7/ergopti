@@ -10,16 +10,25 @@
 
 local helpers = require("tests.helpers")
 
+local fixture_cleanups
+
 local function isolated(body)
 	local saved = {}
+	local previous_cleanups = fixture_cleanups
+	fixture_cleanups = {}
 	local function replace(name, value)
 		if saved[name] == nil then saved[name] = package.loaded[name] or false end
 		package.loaded[name] = value
 	end
 	replace("logger.shim", { debug = function() end, info = function() end, warn = function() end,
-		error = function() end, start = function() end, success = function() end })
+		error = function() end, start = function() end, success = function() end, done = function() end })
 	replace("infra.i18n", { get = function(key) return key end })
 	local ok, err = xpcall(function() body(replace) end, debug.traceback)
+	for index = #fixture_cleanups, 1, -1 do
+		local closed, failure = pcall(fixture_cleanups[index])
+		if not closed and ok then ok, err = false, failure end
+	end
+	fixture_cleanups = previous_cleanups
 	for name, value in pairs(saved) do package.loaded[name] = value ~= false and value or nil end
 	if not ok then error(err, 0) end
 end
@@ -27,12 +36,31 @@ end
 local function bridge_fixture(replace)
 	local world = { current = true, retry_allowed = true, retries = 0, diagnostics = 0,
 		diagnostics_available = false, evaluated = {} }
-	replace("ui.webview_manager", {
-		show = function() return true end, hide = function() return true end,
-		eval_js = function(_, code) world.evaluated[#world.evaluated + 1] = code; return true end,
-	})
+	-- Restore exact known native fixture ports even if construction throws
+	-- before the fixture can return its owned close callback.
+	for _, name in ipairs({ "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
+		"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
+		"infra.manifest_reader" }) do
+		replace(name, package.loaded[name])
+	end
 	replace("ui.download_window.bridge", nil)
-	local bridge = require("ui.download_window.bridge")
+	local native_bridge = require("ui.download_window.bridge")
+	local native_message = native_bridge.on_message
+	native_bridge.on_message = function(...)
+		world.native_result = native_message(...)
+		return world.native_result
+	end
+	local document = require("tests.support.document_fixture").new("download_window", native_bridge, {})
+	fixture_cleanups[#fixture_cleanups + 1] = document.close
+	document.on_effect = function(code) world.evaluated[#world.evaluated + 1] = code end
+	local routed = document.proxy()
+	-- Existing cases assert the native caller's actual rejection value. The
+	-- real manager separately drops a stale response after native retirement.
+	local bridge = setmetatable({ on_message = function(payload, state)
+		world.native_result = nil
+		world.host_result = routed.on_message(payload, state)
+		return world.native_result or world.host_result
+	end }, { __index = native_bridge })
 	local id = bridge.show({ kind = "ollama_model", label = "Independent model fixture",
 		is_current = function() return world.current end,
 		can_retry = function() return world.retry_allowed end,
@@ -224,6 +252,7 @@ helpers.describe("managed download caller ownership", function()
 			local epoch = bridge.on_message("ready").failure_epoch
 			armed = true
 			helpers.assert_eq(bridge.on_message(action(old, epoch)).accepted, false)
+			helpers.assert_eq(world.host_result, nil, "actual manager drops the retired document response")
 			helpers.assert_eq(world.retries, 0)
 		end)
 	end)

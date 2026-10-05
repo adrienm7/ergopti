@@ -225,6 +225,15 @@ function M.notifier(opts)
 		}
 	end
 
+	--- Owned native notices require a literal current-owner receipt.
+	function fake.send_owned(message, options, native_admit)
+		if type(native_admit) ~= "function" then return false end
+		local ok, current = pcall(native_admit)
+		if not ok or current ~= true then return false end
+		fake.send(message, options)
+		return true
+	end
+
 	--- The last message shown, or nil.
 	--- @return table|nil
 	function fake.test.last()

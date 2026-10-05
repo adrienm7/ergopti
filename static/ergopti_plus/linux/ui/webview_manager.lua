@@ -73,6 +73,100 @@ local _gtk_windows = {}
 -- replacement.
 local _next_window_epoch = 0
 
+-- Only the actual Versions and network progress producers require this protocol.
+local DOCUMENT_APPS = { changelog = true, download_window = true }
+local _document_windows, _document_debts = {}, {}
+
+--- Announces a native initialization error without writing to the failed page.
+--- The notifier admits a command only; no actual desktop delivery is claimed.
+local function notify_document_refusal(private_current)
+	local state = _daemon_state
+	local pause = type(state) == "table" and state.is_paused or nil
+	if type(private_current) ~= "function" or type(pause) ~= "function" then return false end
+	local function admit()
+		if _daemon_state ~= state or state.is_paused ~= pause or private_current() ~= true then return false end
+		local ok, paused = pcall(pause)
+		return ok and paused == false and _daemon_state == state and state.is_paused == pause
+			and private_current() == true
+	end
+	local loaded, admitted = pcall(function()
+		local I18n, Notifier = require("infra.i18n"), require("adapters.notifier")
+		if type(Notifier.send_owned) ~= "function" or not admit() then return false end
+		local title, message = I18n.get("error_dialog.heading"), I18n.get("error_dialog.intro")
+		if type(title) ~= "string" or title == "" or title == "error_dialog.heading"
+			or type(message) ~= "string" or message == "" or message == "error_dialog.intro"
+			or not admit() then return false end
+		return Notifier.send_owned(message, { title = title, level = "error" }, admit) == true
+	end)
+	return loaded and admitted == true
+end
+
+local function retire_document_entry(entry)
+	if not entry or entry.retired then return end
+	entry.retired = true
+	-- Compare-and-clear this private entry before cancellation can reenter.
+	if _document_windows[entry.app_name] == entry then _document_windows[entry.app_name] = nil end
+	if entry.owner then
+		_document_debts[entry] = true
+		entry.owner.on_settled(function() _document_debts[entry] = nil end)
+		if entry.owner.close() then _document_debts[entry] = nil end
+	end
+end
+
+local function retire_document(app_name, epoch, view)
+	local entry = _document_windows[app_name]
+	if not entry or (epoch ~= nil and entry.epoch ~= epoch) or (view ~= nil and entry.view ~= view) then return end
+	retire_document_entry(entry)
+end
+
+function M.capture_document_owner(app_name)
+	local entry = _document_windows[app_name]
+	return entry and entry.owner and entry.owner.capture() or nil
+end
+
+function M.document_owner_current(lease)
+	if type(lease) ~= "table" then return false end
+	for _, entry in pairs(_document_windows) do
+		if entry.owner and entry.owner.current(lease) then return _document_windows[entry.app_name] == entry end
+	end
+	return false
+end
+
+--- Pure final owner fence; fresh native observations remain required separately.
+function M.document_owner_retained(lease)
+	if type(lease) ~= "table" then return false end
+	for _, entry in pairs(_document_windows) do
+		local native = _gtk_windows[entry.app_name]
+		if entry.owner and entry.owner.retains(lease) then
+			return _document_windows[entry.app_name] == entry and not entry.retired
+				and native ~= nil and native.epoch == entry.epoch
+				and native.webview == entry.view and native.window == entry.window
+				and M.current_epoch(entry.app_name) == entry.epoch
+		end
+	end
+	return false
+end
+
+--- Writes only to the exact retained native document, with a page-nonce guard.
+function M.eval_owned_js(app_name, lease, js_code)
+	local entry = _document_windows[app_name]
+	if not entry or not entry.owner or type(js_code) ~= "string" or js_code == ""
+		or not entry.owner.current(lease) then return false end
+	local arguments = Json.encode({ entry.bridge, lease.generation, lease.token, lease.page_nonce })
+	if type(arguments) ~= "string" then return false end
+	local code = "if(typeof runLinuxOwnedDocumentEffect==='function')runLinuxOwnedDocumentEffect.apply(null,"
+		.. arguments .. ".concat([function(){" .. js_code .. "}]));"
+	local ok = pcall(entry.view.run_javascript, entry.view, code, nil, nil, nil)
+	return ok and _document_windows[app_name] == entry and entry.owner.current(lease)
+end
+
+local function poll_documents()
+	for _, entry in pairs(_document_windows) do if entry.owner then entry.owner.poll() end end
+	for entry in pairs(_document_debts) do
+		if entry.owner.is_settled() then _document_debts[entry] = nil end
+	end
+end
+
 -- Try to load lgi for GTK/WebKit2GTK access (only available on Linux).
 local function _probe_gtk()
 	local ok, lgi = pcall(require, "lgi")
@@ -296,15 +390,22 @@ function M.show(app_name, active_locale)
 	-- while displaying nothing, and left is_visible() reporting a fictional
 	-- window. The exported creator is invoked unconditionally so unit tests can
 	-- inject a native boundary without weakening the production contract.
+	local creation_owner = _windows[app_name]
 	local create_ok, created, create_err = xpcall(function()
 		return M._create_gtk_window(app_name, html, handler)
 	end, debug.traceback)
 	if not create_ok or created ~= true then
-		_windows[app_name] = nil
+		if _windows[app_name] == creation_owner then _windows[app_name] = nil end
 		Logger.error(LOG, "show(): native window creation failed for '%s': %s",
 			app_name, tostring(create_ok and (create_err or "native creator refused") or created))
+		if DOCUMENT_APPS[app_name] then
+			notify_document_refusal(function()
+				return _windows[app_name] == nil and _next_window_epoch == creation_owner.epoch
+			end)
+		end
 		return false
 	end
+	if _windows[app_name] ~= creation_owner then return false end
 
 	_windows[app_name].visible = true
 	Logger.info(LOG, "Webview '%s' opened in %.0f ms.", app_name,
@@ -442,6 +543,10 @@ end
 --- @param js_code string JavaScript source to evaluate in the page.
 --- @return boolean True when the call was handed to WebKit.
 function M.eval_js(app_name, js_code)
+	if DOCUMENT_APPS[app_name] then
+		local lease = M.capture_document_owner(app_name)
+		return lease ~= nil and M.eval_owned_js(app_name, lease, js_code)
+	end
 	if type(app_name) ~= "string" or type(js_code) ~= "string" or js_code == "" then
 		Logger.warn(LOG, "eval_js: bad arguments (app=%s).", tostring(app_name))
 		return false
@@ -501,12 +606,27 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 
+	local document_owner = nil
+	if DOCUMENT_APPS[app_name] then
+		local entry = _document_windows[app_name]
+		if not entry or not entry.owner or source_epoch ~= entry.epoch then return nil end
+		if type(payload) ~= "table" then return nil end
+		if payload.__ergopti_document_ack ~= nil then
+			entry.owner.ack(payload.__ergopti_document_ack)
+			return nil
+		end
+		document_owner = entry.owner.admit(payload.__ergopti_document, payload.payload)
+		if not document_owner or _document_windows[app_name] ~= entry then return nil end
+		payload = payload.payload
+	end
 	local routed_epoch = source_epoch or M.current_epoch(app_name)
 	local context = {
 		app_name = app_name,
 		epoch = routed_epoch,
+		document_owner = document_owner,
 	}
 	context.close_owned_window = function()
+		if document_owner and not M.document_owner_current(document_owner) then return false end
 		if routed_epoch ~= nil and M.current_epoch(app_name) ~= routed_epoch then return false end
 		M.hide(app_name)
 		return M.is_visible(app_name) ~= true
@@ -517,7 +637,8 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 
-	return result
+	if document_owner and not M.document_owner_current(document_owner) then return nil end
+	return result, document_owner
 end
 
 
@@ -563,7 +684,7 @@ end
 --- @param webview WebKit2.WebView The target webview.
 --- @param bridge_name string The bridge handler name.
 --- @param value any Lua value to send (converted to JSON then base64).
-local function _send_response_to_js(webview, bridge_name, value)
+local function _send_response_to_js(webview, bridge_name, value, app_name, document_owner)
 	if not webview or value == nil then return end
 	-- Encode the value as JSON, then base64 to avoid any escaping hazards.
 	local json_str = Json.encode(value)
@@ -577,7 +698,11 @@ local function _send_response_to_js(webview, bridge_name, value)
 		[[if(window.__hostBridgeResponse)window.__hostBridgeResponse('%s',%s,'%s')]],
 		bridge_name, use_b64 and "true" or "false", encoded:gsub("'", "\\'")
 	)
-	pcall(function() webview:run_javascript(js_code, nil, nil, nil) end)
+	if document_owner then
+		M.eval_owned_js(app_name, document_owner, js_code)
+	else
+		pcall(function() webview:run_javascript(js_code, nil, nil, nil) end)
+	end
 end
 
 --- Reads per-app geometry from _shared/ui/apps.manifest.json.
@@ -693,9 +818,9 @@ function M._create_gtk_window(app_name, html, handler)
 	local function handle_script_message(js_result)
 		local js_value = js_result:get_js_value()
 		local payload = _js_value_to_lua(js_value)
-		local response = M.route_message(app_name, bridge_name, payload, window_epoch)
+		local response, document_owner = M.route_message(app_name, bridge_name, payload, window_epoch)
 		if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
-			_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response)
+			_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response, app_name, document_owner)
 		end
 	end
 
@@ -719,6 +844,72 @@ function M._create_gtk_window(app_name, html, handler)
 		visible              = true,
 	})
 
+	local document_entry = nil
+	if DOCUMENT_APPS[app_name] then
+		local previous_document = _document_windows[app_name]
+		if previous_document then retire_document_entry(previous_document) end
+		if M.current_epoch(app_name) ~= window_epoch or _document_windows[app_name] ~= nil then
+			pcall(window.destroy, window)
+			return false, "document window replaced during initialization"
+		end
+		document_entry = { app_name = app_name, bridge = bridge_name, epoch = window_epoch, view = webview, window = window }
+		_document_windows[app_name] = document_entry
+		local loaded, err = pcall(function()
+			local Lease = require("webview.document_lease")
+			local Deadline = require("infra.managed_http_deadline")
+			local Timings = require("infra.timings")
+			assert(Monotonic.has_hires(), "document admission requires an actual monotonic clock")
+			local function native_current()
+				local native = _gtk_windows[app_name]
+				return _document_windows[app_name] == document_entry and M.current_epoch(app_name) == window_epoch
+					and native ~= nil and native.epoch == window_epoch and native.webview == webview and native.window == window
+			end
+			local function evaluate(name, generation, token, page_nonce)
+				local arguments = Json.encode({ bridge_name, generation, token, page_nonce })
+				if not native_current() or type(arguments) ~= "string" then return false end
+				webview:run_javascript("if(typeof " .. name .. "==='function')" .. name .. ".apply(null," .. arguments .. ");", nil, nil, nil)
+				return native_current()
+			end
+			document_entry.owner = Lease.new({
+				timeout_ms = Timings.ms("ui", "document_initialization_ack_timeout_ms"), uri = "file:///",
+				clock = Monotonic.now_ms, current = native_current,
+				on_refused = function(record, reason)
+					Logger.error(LOG, "Managed document initialization refused for '%s' (%s).", app_name, reason)
+					notify_document_refusal(function()
+						return native_current() and document_entry.owner ~= nil
+							and document_entry.owner.refusal_current(record) == true
+					end)
+				end,
+				read_document = function() return webview:get_uri(), webview:is_loading() end,
+				nonce = webkit_host.native_nonce, deadline = Deadline.start,
+				read_nonce = function(done)
+					if not native_current() then return false end
+					local code = "typeof getLinuxDocumentNonce==='function'?getLinuxDocumentNonce(" .. Json.encode(bridge_name) .. "):null"
+					webview:run_javascript(code, nil, function(_, result)
+						-- The ledger's callback captures exact load generation. Native result
+						-- reads may reenter; it validates that captured owner again afterward.
+						if not native_current() then return end
+						local ok, value = pcall(function() return _js_value_to_lua(webview:run_javascript_finish(result):get_js_value()) end)
+						if native_current() then done(ok and value or nil) end
+					end)
+					return native_current()
+				end,
+				challenge = function(generation, token, page_nonce)
+					return evaluate("initializeLinuxDocumentBridge", generation, token, page_nonce)
+				end,
+				confirm = function(generation, token, page_nonce)
+					return evaluate("confirmLinuxDocumentBridge", generation, token, page_nonce)
+				end,
+			})
+		end)
+		if not loaded or _document_windows[app_name] ~= document_entry or M.current_epoch(app_name) ~= window_epoch then
+			retire_document_entry(document_entry)
+			pcall(window.destroy, window)
+			Logger.error(LOG, "Managed document admission unavailable: %s", tostring(err))
+			return false, "document admission unavailable"
+		end
+	end
+
 	-- Load the inline HTML with an explicit base URI.
 	--
 	-- It was nil, and the comment called that "no file:// origin" as though the
@@ -738,6 +929,10 @@ function M._create_gtk_window(app_name, html, handler)
 	local load_started_ms = Monotonic.now_ms()
 	local ok_load_signal, load_signal_err = pcall(function()
 		webview.on_load_changed = function(_view, event)
+			if document_entry and document_entry.owner then
+				if event == "STARTED" or event == WebKit2.LoadEvent.STARTED then document_entry.owner.start_load() end
+				if event == "FINISHED" or event == WebKit2.LoadEvent.FINISHED then document_entry.owner.finished_load() end
+			end
 			if event == "FINISHED" or event == WebKit2.LoadEvent.FINISHED then
 				Logger.info(LOG, "Webview '%s' page loaded in %.0f ms.", app_name,
 					Monotonic.now_ms() - load_started_ms)
@@ -747,11 +942,17 @@ function M._create_gtk_window(app_name, html, handler)
 	if not ok_load_signal then
 		Logger.warn(LOG, "Load-completion signal unavailable for '%s': %s.", app_name,
 			tostring(load_signal_err))
+		if document_entry then
+			retire_document_entry(document_entry)
+			pcall(function() window:destroy() end)
+			return false, "document admission unavailable"
+		end
 	end
 	webview:load_html(html, "file:///")
 
 	-- ── Window lifecycle: close → destroy the page context ──
 	window.on_destroy = function()
+		retire_document_entry(document_entry)
 		Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
 		_release_app_ownership(app_name, window_epoch)
 		if _gtk_windows[app_name] and _gtk_windows[app_name].epoch == window_epoch then
@@ -769,6 +970,7 @@ function M._create_gtk_window(app_name, html, handler)
 	-- window object alive. Release only the epoch owned by this WebView.
 	pcall(function()
 		webview.on_web_process_terminated = function()
+			retire_document_entry(document_entry)
 			Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
 			_release_app_ownership(app_name, window_epoch)
 		end
@@ -792,6 +994,7 @@ function M._create_gtk_window(app_name, html, handler)
 		local event_loop = require("adapters.event_loop")
 		if event_loop and event_loop.add_idle_handler then
 			event_loop.add_idle_handler(function()
+				poll_documents()
 				if _gtk_windows[app_name] then
 					local ctx = GLib.MainContext.default()
 					if ctx then ctx:iteration(false) end
@@ -817,6 +1020,7 @@ function M._destroy_gtk_window(app_name, expected_epoch)
 	local wref = _gtk_windows[app_name]
 	if not wref or not wref.window then return false end
 	if expected_epoch ~= nil and wref.epoch ~= expected_epoch then return false end
+	retire_document(app_name, wref.epoch, wref.webview)
 	local ok, err = pcall(function() wref.window:destroy() end)
 	if not ok then
 		Logger.error(LOG, "Could not destroy GTK window '%s': %s", app_name, tostring(err))

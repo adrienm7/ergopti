@@ -122,7 +122,7 @@ end
 ---        notification is posted and cannot report a click without holding the
 ---        process open, which this daemon will not do on a keystroke path.
 --- @return boolean Whether the notification command was admitted; not a delivery receipt.
-function M.send(message, opts)
+local function send(message, opts, native_admit)
 	if type(message) ~= "string" or message == "" then
 		Logger.error(LOG, "send(): a message is required — nothing was shown.")
 		return false
@@ -157,11 +157,25 @@ function M.send(message, opts)
 		Shell.quote(DEFAULT_TITLE), urgency, TIMEOUT_MS,
 		Shell.quote(title), Shell.quote(message))
 
+	-- Owned native notices can be invalidated by the capability probe or quoting.
+	-- Admission is checked at the actual effect boundary, never supplied by JS.
+	if native_admit then
+		local admitted, current = pcall(native_admit)
+		if not admitted or current ~= true then return false end
+	end
 	local ok = Shell.run(command)
 	if not ok then
 		Logger.error(LOG, "send(): notify-send failed — the message stays in the log: %s", message)
 	end
 	return ok == true
+end
+
+function M.send(message, opts) return send(message, opts, nil) end
+
+--- Native owned notice. true admits notify-send; it is not a delivery receipt.
+function M.send_owned(message, opts, native_admit)
+	if type(native_admit) ~= "function" then return false end
+	return send(message, opts, native_admit)
 end
 
 return M

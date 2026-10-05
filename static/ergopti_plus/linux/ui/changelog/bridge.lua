@@ -42,6 +42,9 @@ local ReleaseSources = require("updater.release_sources")
 local Parser = require("updater.release_parser")
 local ReleaseInstall = require("updater.release_install")
 local VersionOrder = require("updater.version")
+local NetworkFailure = require("network.failure")
+local Paths = require("infra.paths")
+local FileSystem = require("adapters.file_system")
 
 -- The owner and the repository come from the shared updater defaults, their
 -- single source (tools/test/test-repo-url-single-source.cjs). The loader is
@@ -59,7 +62,9 @@ local _sources = nil
 local _last_list = nil
 -- The one install session of this window (created on the first request).
 local _install_session = nil
+local _failure_contract = nil
 local _daemon_state = nil
+local _page_epoch, _page_document = nil, nil
 
 --- The repository's web root, from the shared updater defaults.
 --- @return string|nil url
@@ -220,16 +225,18 @@ end
 --- Default page channel: the host->page response hook of the shared UI.
 --- @param payload table
 --- @return boolean pushed
-local function default_push(payload)
+local function default_push(payload, document_owner)
 	local ok_manager, Manager = pcall(require, "ui.webview_manager")
 	if not ok_manager or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push releases: webview_manager.eval_js is unavailable.")
 		return false
 	end
 	local encoded = Base64.encode(Json.encode(payload))
-	return Manager.eval_js(APP_NAME, string.format(
-		"if(window.__hostBridgeResponse)window.__hostBridgeResponse('%s',true,'%s')",
-		M.bridge_name, encoded)) == true
+	local script = string.format("if(window.__hostBridgeResponse)window.__hostBridgeResponse('%s',true,'%s')", M.bridge_name, encoded)
+	if document_owner ~= nil then
+		return type(Manager.eval_owned_js) == "function" and Manager.eval_owned_js(APP_NAME, document_owner, script) == true
+	end
+	return Manager.eval_js(APP_NAME, script) == true
 end
 
 -- Injectable seams for tests; production uses the curl adapter and WebKit.
@@ -242,36 +249,69 @@ M._push = default_push
 --- @param channel string Registry channel id.
 --- @return number generation
 function M.start_fetch(channel)
+	local loaded, host = pcall(require, "ui.webview_manager")
+	local document, epoch = _page_document, _page_epoch
 	_fetch_generation = _fetch_generation + 1
 	local generation = _fetch_generation
+	local function fetch_current()
+		if not loaded or not host or document == nil or epoch == nil
+			or type(host.document_owner_current) ~= "function"
+			or type(host.document_owner_retained) ~= "function" then return false end
+		local function identity()
+			return generation == _fetch_generation and document == _page_document and epoch == _page_epoch
+				and package.loaded["ui.webview_manager"] == host
+		end
+		if not identity() then return false end
+		local ok, current = pcall(host.document_owner_current, document)
+		return ok and current == true and identity() and host.document_owner_retained(document) == true and identity()
+	end
+	local function push(payload)
+		if not fetch_current() then return false end
+		return M._push(payload, document)
+	end
+	if not fetch_current() then return generation end
 	if not registry_channel(channel) then
 		Logger.error(LOG, "Refused a release fetch for a channel outside the registry.")
-		M._push({ action = "releases_error", error_key = "changelog_window.error_network" })
+		push({ action = "releases_error", error_key = "changelog_window.error_network" })
 		return generation
 	end
 	local sources, err = load_sources()
+	if not fetch_current() then return generation end
 	if not sources then
 		Logger.error(LOG, "Release sources unavailable: %s.", tostring(err))
-		M._push({ action = "releases_error", channel = channel, error_key = "changelog_window.error_network" })
+		push({ action = "releases_error", channel = channel, error_key = "changelog_window.error_network" })
 		return generation
 	end
 	Logger.start(LOG, "Fetching releases (channel=%s)…", channel)
-	ReleaseSources.fetch(sources, M._http_get, Logger, LOG, function(result)
-		if generation ~= _fetch_generation then
+	if not fetch_current() then return generation end
+	local transport = M._http_get
+	local function owned_get(url, headers, timeout_ms, callback)
+		if not fetch_current() then return false end
+		return transport(url, headers, timeout_ms, function(...)
+			-- Shared source policy may log and admit a feed fallback before its
+			-- final publication. Refuse stale completions before that policy runs.
+			if not fetch_current() then return end
+			callback(...)
+		end)
+	end
+	ReleaseSources.fetch(sources, owned_get, Logger, LOG, function(result)
+		if not fetch_current() then
 			Logger.debug(LOG, "Discarded a superseded release fetch (generation %d).", generation)
 			return
 		end
 		if result.error then
 			Logger.done(LOG, "Release fetch ended with an error (channel=%s).", channel)
+			if not fetch_current() then return end
 			_last_list = nil
-			M._push({ action = "releases_error", channel = channel, error_key = result.error_key })
+			push({ action = "releases_error", channel = channel, error_key = result.error_key })
 			return
 		end
 		Logger.success(LOG, "Releases fetched from %s (channel=%s).", result.source, channel)
+		if not fetch_current() then return end
 		_last_list = { kind = result.kind, body = result.body }
 		local payload = { action = "releases", channel = channel }
 		if result.kind == "feed" then payload.feed = result.body else payload.json = result.body end
-		M._push(payload)
+		push(payload)
 	end)
 	return generation
 end
@@ -389,11 +429,66 @@ end
 
 --- The install session of this window, over the updater manager's update path.
 --- @return table session
+local function trusted_page_epoch(context)
+	if type(context) ~= "table" or context.app_name ~= APP_NAME or type(context.epoch) ~= "number" then return nil end
+	local ok, host = pcall(require, "ui.webview_manager")
+	if not ok or type(host.current_epoch) ~= "function" or type(host.is_visible) ~= "function" then return nil end
+	if context.document_owner == nil or type(host.document_owner_current) ~= "function"
+		or host.document_owner_current(context.document_owner) ~= true then return nil end
+	return host.current_epoch(APP_NAME) == context.epoch and host.is_visible(APP_NAME) == true and context.epoch or nil
+end
+
+local function failure_contract()
+	if _failure_contract then return _failure_contract end
+	local path = Paths.shared("modules/network/managed_network.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
+	_failure_contract = NetworkFailure.new(Json.decode(raw))
+	return _failure_contract
+end
+
+--- Captures actual admitted document and pause owners, privately.
+local function failure_owner()
+	local ok, host = pcall(require, "ui.webview_manager")
+	local state, epoch, document = _daemon_state, _page_epoch, _page_document
+	if not ok or type(state) ~= "table" then return nil end
+	return { list = _last_list, generation = _fetch_generation, state = state, epoch = epoch,
+		host = host, document = document, pause = state.is_paused }
+end
+
+local function failure_current(owner)
+	if type(owner) ~= "table" or type(owner.state) ~= "table" or type(owner.pause) ~= "function"
+		or owner.document == nil or not owner.host or owner.epoch == nil then return false end
+	local host = owner.host
+	for _, name in ipairs({ "get_daemon_state", "document_owner_current", "document_owner_retained", "current_epoch", "is_visible" }) do
+		if type(host[name]) ~= "function" then return false end
+	end
+	local function identity()
+		local state, epoch = host.get_daemon_state(), host.current_epoch(APP_NAME)
+		local visible = host.is_visible(APP_NAME)
+		return state == owner.state and epoch == owner.epoch and visible == true
+			and package.loaded["ui.webview_manager"] == host and owner.document == _page_document
+			and owner.list ~= nil and owner.list == _last_list and owner.generation == _fetch_generation
+			and owner.state == _daemon_state and owner.state.is_paused == owner.pause
+	end
+	if not identity() then return false end
+	local ok, paused = pcall(owner.pause)
+	if not ok or paused ~= false or not identity() or host.document_owner_current(owner.document) ~= true
+		or not identity() then return false end
+	ok, paused = pcall(owner.pause)
+	return ok and paused == false and identity() and host.document_owner_retained(owner.document) == true and identity()
+end
+
 local function install_session()
 	if _install_session then return _install_session end
 	_install_session = ReleaseInstall.new({
 		logger = Logger,
 		log = LOG,
+		failure_contract = failure_contract,
+		acceptance_owner = failure_owner,
+		acceptance_current = failure_current,
+		failure_owner = failure_owner,
+		failure_current = failure_current,
 		blocked = function() return install_blocked(updater()) end,
 		find_release = function(tag) return find_release(tag) end,
 		backup = function(chunk)
@@ -426,10 +521,16 @@ local function install_session()
 			end
 			return restart(Parser.parse_tag(chunk)) == true
 		end,
-		report = function(message)
+		report = function(message, retained_owner)
 			local payload = { action = "install_progress" }
 			for key, value in pairs(message) do payload[key] = value end
-			M._push(payload)
+			-- Keep the original operation's document private. Missing/stale leases
+			-- cannot select a successor document through the default push channel.
+			if retained_owner ~= nil then
+				if type(retained_owner) ~= "table" or retained_owner.document == nil then return false end
+				return M._push(payload, retained_owner.document)
+			end
+			return M._push(payload)
 		end,
 	})
 	return _install_session
@@ -466,6 +567,7 @@ function M._reset()
 	_last_list = nil
 	_install_session = nil
 	_daemon_state = nil
+	_page_epoch, _page_document = nil, nil
 	M._config_backup = nil
 	M._http_get = default_http_get
 	M._push = default_push
@@ -485,7 +587,10 @@ end
 --- @param payload any  String or table from host_bridge.js.
 --- @param state  table Daemon state.
 --- @return any|nil  Response to send back to JS.
-function M.on_message(payload, state)
+function M.on_message(payload, state, context)
+	local page_epoch = trusted_page_epoch(context)
+	if page_epoch == nil then return nil end
+	if page_epoch ~= nil then _page_epoch, _page_document = page_epoch, context.document_owner end
 	if type(state) == "table" then _daemon_state = state end
 	if type(payload) == "string" then
 		if payload == "ready" or payload == "refresh" then
@@ -502,6 +607,7 @@ function M.on_message(payload, state)
 			return _build_initial_payload(state, channel)
 		end
 		if payload == "close" then
+			if _install_session then _install_session.retire() end
 			Logger.info(LOG, "Changelog close requested.")
 			return nil
 		end
@@ -528,6 +634,13 @@ function M.on_message(payload, state)
 	-- Only this click installs a chosen release: nothing else calls the session.
 	if action == "install_release" then
 		install_session().install(payload.tag, payload.channel)
+		return nil
+	end
+
+	if action == "install_failure_action" then
+		if page_epoch ~= nil and _install_session then
+			_install_session.failure_action(payload.operation, payload.epoch, payload.id)
+		end
 		return nil
 	end
 

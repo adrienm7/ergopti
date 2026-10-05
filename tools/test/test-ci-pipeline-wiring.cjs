@@ -161,6 +161,7 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 const STEP_CONDITIONS = [
 	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
 	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
+	[ENTRY, 'core', 'Test shared Versions installation rendering', "matrix.suite == 'js'"],
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[

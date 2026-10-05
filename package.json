@@ -372,6 +372,8 @@
 		"test:update-schedule-contract": "node ./tools/test/test-update-schedule-contract.cjs",
 		"test:changelog-channel-sync": "node ./tools/test/test-changelog-channel-sync.cjs",
 		"test:changelog-release-install": "node ./tools/test/test-changelog-release-install.cjs",
+		"test:changelog-managed-failure": "node ./tools/test/test-changelog-managed-failure.cjs",
+		"test:linux-document-lease": "node ./tools/test/test-linux-document-lease.cjs",
 		"test:browser:changelog-install": "node ./tools/test/browser/changelog-release-install.playwright.cjs",
 		"test:browser:layer-editor": "node ./tools/test/browser/layer-editor.playwright.cjs",
 		"test:release-install-contract": "node ./tools/test/test-release-install-contract.cjs",
