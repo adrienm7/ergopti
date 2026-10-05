@@ -2604,6 +2604,13 @@ corrected without changing production, corpus expectations or assertions.
 Full selected verification and hosted qualification are recorded separately;
 these fixture repairs do not complete TODO33 or device acceptance.
 
+The Hammerspoon JSON fixture now admits LuaJIT's single numeric model without
+calling absent Lua 5.3 numeric-kind APIs. Independent number, exponent and
+array/object interning controls retain the native LuaSkin value contract and
+all prior assertions. Both focused runtimes pass; the complete portable macOS
+suite passes 14,667 cases. This is test-runtime qualification; actual hosted
+Hammerspoon and installed-device behavior remain separately required.
+
 Windows configuration qualification now seeds the four actual section metadata
 values before testing their preservation, refusing missing seed anchors. The
 semantic snapshot loader no longer incidentally primes the separate raw cache;
