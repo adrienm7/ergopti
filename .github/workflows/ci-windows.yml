@@ -224,6 +224,18 @@ jobs:
               Write-Error "Test suite failed (exit $exit)."; exit $exit
           }
 
+      - name: Qualify native inline source and original-route controls
+        if: always() && !cancelled()
+        shell: pwsh
+        timeout-minutes: 11
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { throw "AutoHotkey64.exe not found." }
+          node "${{ github.workspace }}\tools\test\run-windows-inline-causal.cjs" `
+              --ahk $ahk --main-receipt "$env:TEMP\ergopti_test_results.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # The isolated LLM suites. They cannot join run_all.ahk: each installs
       # its own global stubs (a WebView2 stand-in, a fake model index) that would
       # collide with the shared harness, which is why they were written as

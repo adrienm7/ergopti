@@ -1,0 +1,11 @@
+--- a/static/ergopti_plus/windows/infra/toml/toml_document.ahk
++++ b/static/ergopti_plus/windows/infra/toml/toml_document.ahk
+@@ -148,7 +148,7 @@
+ 			|| SubStr(Raw, 1, 3) == Chr(39) . Chr(39) . Chr(39)
+ 		return _TOML_DocumentMultilineBody(Raw)
+ 	if SubStr(Raw, 1, 1) == "{"
+-		return TOML_ParseInlineTable(Raw, _TOML_DocumentValue, _TOML_DocumentSplit)
++		return TOML_ParseInlineTable(Raw, _TOML_DocumentValue)
+ 	if SubStr(Raw, 1, 1) == "[" {
+ 		if SubStr(Raw, -1) != "]"
+ 			throw ValueError("Unterminated TOML array")
