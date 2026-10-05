@@ -135,6 +135,16 @@ local function _exec(sql)
 	return true
 end
 
+--- Commits one raw-event batch without exposing partially refused rows.
+--- SQLite FAIL can retain earlier rows and trigger effects in autocommit mode.
+--- A failed script exits before COMMIT and its connection rolls the batch back;
+--- the existing receipt acknowledges COMMIT, not merely the INSERT statement.
+--- @param sql string One composed raw INSERT statement.
+--- @return boolean
+local function _exec_raw_batch(sql)
+	return _exec("BEGIN IMMEDIATE;\n" .. sql .. "\nCOMMIT;")
+end
+
 --- Runs a read query and rejects any rows from a failed native CLI.
 --- @param sql string Complete SELECT statement.
 --- @return string|nil Complete output, or nil when the query fails.
@@ -439,7 +449,7 @@ function M.insert_typing_events(device_id, events)
 		.. "VALUES %s;",
 		table.concat(parts, ",")
 	)
-	return _exec(sql)
+	return _exec_raw_batch(sql)
 end
 
 --- Inserts canonical hotstring events matching the macOS/Windows table shape.
@@ -464,7 +474,7 @@ function M.insert_hotstring_events(device_id, events)
 			tonumber(ev.net_saved_chars) or 0
 		)
 	end
-	return _exec("INSERT OR IGNORE INTO events_hotstring "
+	return _exec_raw_batch("INSERT OR IGNORE INTO events_hotstring "
 		.. "(device_id,id,ts,date,app,kind,trigger,replacement,h_type,net_saved_chars) VALUES "
 		.. table.concat(parts, ",") .. ";")
 end
@@ -497,7 +507,7 @@ function M.insert_shortcut_events(device_id, events)
 			_sql_escape(ev.key or "")
 		)
 	end
-	return _exec("INSERT OR IGNORE INTO events_shortcut "
+	return _exec_raw_batch("INSERT OR IGNORE INTO events_shortcut "
 		.. "(device_id,id,ts,date,app,key) VALUES "
 		.. table.concat(parts, ",") .. ";")
 end
@@ -521,7 +531,7 @@ function M.insert_app_switch_events(device_id, events)
 			tonumber(ev.duration_ms) or 0
 		)
 	end
-	return _exec("INSERT OR IGNORE INTO events_app_switch "
+	return _exec_raw_batch("INSERT OR IGNORE INTO events_app_switch "
 		.. "(device_id,id,ts,date,prev_app,next_app,duration_ms) VALUES "
 		.. table.concat(parts, ",") .. ";")
 end
