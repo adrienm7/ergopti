@@ -973,6 +973,73 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(default_result.ok)
 	end)
 
+	for _, method in ipairs({ "get", "get_owned", "post", "postStream" }) do
+		helpers.it("curl empty headers: " .. method .. " serializes present empty fields without removal directives", function()
+			local client, state = fresh_client()
+			local calls, result = 0, nil
+			local function done(value) result, calls = value, calls + 1 end
+			local headers = { ["X-Empty-Fixture"] = "", Accept = "", ["User-Agent"] = "",
+				["Content-Type"] = "", ["X-Ordinary-Fixture"] = "literal-value" }
+			local operation
+			if method == "get" or method == "get_owned" then
+				operation = client[method]("http://127.0.0.1:9000/", headers, {}, done)
+			elseif method == "post" then
+				operation = client.post("http://127.0.0.1:9000/", headers, "literal-body", done)
+			else
+				operation = client.postStream("http://127.0.0.1:9000/", headers, "literal-body", {}, function() end, done)
+			end
+			helpers.assert_eq(#state.requests, 1)
+			for _, name in ipairs({ "X-Empty-Fixture", "Accept", "User-Agent", "Content-Type" }) do
+				helpers.assert_contains(state.config, 'header = "' .. name .. ';"')
+			end
+			helpers.assert_contains(state.config, 'header = "X-Ordinary-Fixture: literal-value"')
+			helpers.assert_nil(state.config:find("X-Absent-Fixture", 1, true))
+			if method == "postStream" then
+				state.stdout("literal-response")
+				state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
+			else
+				state.stdout("literal-response\nERGOPTI_HTTP_STATUS:200\n")
+			end
+			state.complete(0)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_true(result.ok and result.status == 200)
+			if method == "get_owned" then helpers.assert_true(operation:is_settled()) end
+		end)
+	end
+
+	for _, method in ipairs({ "get", "get_owned", "post", "postStream" }) do
+		for _, value in ipairs({ " ", "\t", " \t " }) do
+			helpers.it("curl OWS headers: " .. method .. " preserves SP/HTAB-empty fields and every nonempty serialized byte", function()
+				local client, state = fresh_client()
+				local result, calls = nil, 0
+				local function done(receipt) result, calls = receipt, calls + 1 end
+				local headers = { ["X-Empty-Fixture"] = value, Accept = value, ["User-Agent"] = value,
+					["Content-Type"] = value, ["X-Ordinary-Fixture"] = " \tliteral \t value \t", ["X-Vertical-Control"] = "\v" }
+				local operation
+				if method == "get" or method == "get_owned" then
+					operation = client[method]("http://127.0.0.1:9000/", headers, {}, done)
+				elseif method == "post" then
+					operation = client.post("http://127.0.0.1:9000/", headers, "literal-body", done)
+				else
+					operation = client.postStream("http://127.0.0.1:9000/", headers, "literal-body", {}, function() end, done)
+				end
+				helpers.assert_eq(#state.requests, 1)
+				for _, name in ipairs({ "X-Empty-Fixture", "Accept", "User-Agent", "Content-Type" }) do
+					helpers.assert_contains(state.config, 'header = "' .. name .. ';"')
+				end
+				helpers.assert_contains(state.config, 'header = "X-Ordinary-Fixture:  \\tliteral \\t value \\t"')
+				helpers.assert_contains(state.config, 'header = "X-Vertical-Control: \\v"', "non-OWS controls retain their original serialization")
+				if method == "postStream" then
+					state.stdout("literal-response"); state.stderr("\nERGOPTI_HTTP_STATUS:200\n")
+				else state.stdout("literal-response\nERGOPTI_HTTP_STATUS:200\n") end
+				state.complete(0)
+				helpers.assert_true(result.ok and result.status == 200)
+				helpers.assert_eq(calls, 1)
+				if method == "get_owned" then helpers.assert_true(operation:is_settled()) end
+			end)
+		end
+	end
+
 	helpers.it("keeps the headers, the body and the URL off the command line", function()
 		-- Every local process can read /proc/<pid>/cmdline: an API key in a
 		-- header and the typed text in a body were exposed there.
