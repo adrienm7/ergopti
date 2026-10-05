@@ -1723,6 +1723,23 @@ and 101 macOS E2E checks (one host-specific scenario skipped). Hosted native
 qualification and broader binding-parent/repair-intent work remain pending;
 TODO33 is not complete.
 
+The shared Lua installed-layout record owner now preserves omitted unowned
+members during verified same-id updates while removing omitted publisher-owned
+metadata, including an old extension replaced by a base layout. Verified
+incoming fields take precedence; obsolete predecessors contribute no ignored
+data. Invalid optional extensions are classified before root discovery through
+the existing published validator, with lossless object/array/null admission.
+Their complete rows remain on disk beside usable neighbors, and ordinary
+install/remove operations do not grant native deletion authority over them.
+Independent full-model vectors and real-file manager controls pass 98 macOS
+and 88 Linux focused cases on each available Lua runtime. All previous
+registered cases and corpus expectations remain intact. Selected executable
+local gates pass formatting, 357 JS checks, 14,202 portable macOS and 6,758
+Linux unit cases, plus 101 macOS and 188 Linux E2E checks; one macOS
+host-specific scenario is skipped. The selected AHK unit gate is not executed
+on this Linux host and remains a Windows workstation step. Hosted
+native/package/install qualification remains pending; TODO33 stays partial.
+
 The macOS remap owner now ignores and warns once about the retired
 `[karabiner] enabled` entry while preserving its complete original value in
 ordinary saves and explicit integration-consent changes. Only

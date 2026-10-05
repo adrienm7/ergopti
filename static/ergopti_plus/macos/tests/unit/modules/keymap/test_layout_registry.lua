@@ -418,3 +418,29 @@ require("test.layout_installed_manager_contract")(helpers, Json, {
 		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
 	end,
 })
+
+require("test.layout_installed_update_manager_contract")(helpers, Json, {
+	manager = manager,
+	run = run,
+	entry = entry_of("ergol"),
+	files = shipped_files,
+	local_dir = LOCAL_DIR,
+	-- Explicitly repair only the earlier controlled native-port copy. The
+	-- production foreign-file policy and the actual private record stay strict.
+	repair_partial_copy = function(state)
+		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
+	end,
+})
+
+require("test.layout_installed_extension_manager_contract")(helpers, Json, {
+	manager = manager,
+	run = run,
+	entry = entry_of("ergol"),
+	files = shipped_files,
+	local_dir = LOCAL_DIR,
+	-- Explicitly repair only the earlier controlled native-port copy. The
+	-- production foreign-file policy and the actual private record stay strict.
+	repair_partial_copy = function(state)
+		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
+	end,
+})

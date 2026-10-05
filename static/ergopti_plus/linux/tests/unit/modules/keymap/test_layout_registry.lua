@@ -503,3 +503,23 @@ require("test.layout_installed_manager_contract")(helpers, Json, {
 	probe_receipt = OK_RUN,
 	install_receipt = INSTALLED_RUN,
 })
+
+require("test.layout_installed_update_manager_contract")(helpers, Json, {
+	manager = manager,
+	run = run,
+	entry = entry_of("ergol"),
+	files = shipped_files,
+	local_dir = LOCAL_DIR,
+	probe_receipt = OK_RUN,
+	install_receipt = INSTALLED_RUN,
+})
+
+require("test.layout_installed_extension_manager_contract")(helpers, Json, {
+	manager = manager,
+	run = run,
+	entry = entry_of("ergol"),
+	files = shipped_files,
+	local_dir = LOCAL_DIR,
+	probe_receipt = OK_RUN,
+	install_receipt = INSTALLED_RUN,
+})
