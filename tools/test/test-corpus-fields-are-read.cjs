@@ -29,7 +29,8 @@
  * NOT inert either: all three **e2e** runners inject it as a real keystroke.
  * A narrow reader scan does not under-report, it over-reports, and each false
  * positive invites deleting a field that something depends on. Hence: every
- * `.lua`, `.ahk`, `.cjs` and `.js` under the three suites and `tools/`.
+ * `.lua`, `.ahk`, `.cjs` and `.js` under the three suites, their shared Lua
+ * replay helpers and `tools/`.
  *
  * WHY "DOCUMENTED" IS A VALID ANSWER:
  * `field_semantics` already existed for this — `backspace_count` is documented
@@ -73,12 +74,14 @@ function corpora(dir, acc = []) {
 // Every consumer a corpus can have. Driver suites replay most vectors, but some
 // are read by a JS gate instead — test-metrics-category-ids.cjs reads
 // `expected_ids` — so scoping this to the three drivers reported a field as
-// inert while a gate was asserting on it.
+// inert while a gate was asserting on it. Shared Lua replay helpers execute
+// through both native suites; excluding them hides real input-field consumers.
 const readerFiles = [];
 const readerRoots = [
 	path.join(SP, 'windows', 'tests'),
 	path.join(SP, 'macos', 'tests'),
 	path.join(SP, 'linux', 'tests'),
+	path.join(SP, '_shared', 'lua', 'test'),
 	path.join(ROOT, 'tools')
 ];
 for (const base of readerRoots) {

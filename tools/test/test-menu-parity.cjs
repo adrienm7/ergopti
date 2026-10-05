@@ -60,6 +60,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+	delegatedMenuSources,
+	combineMenuVisibility
+} = require('../lib/menu-shared-delegation.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -98,14 +102,25 @@ const OPENS_SUBMENU = {
 	number_row_policy: 'number_row_policy_rows',
 	hotstrings: 'hotstrings_menu',
 	// The personal provider renders the shared editor command head on every driver.
-	hotstring_personal: 'personal_hotstring_commands',
+	hotstring_personal: [
+		'personal_hotstring_commands',
+		'personal_file_controls',
+		'personal_file_unavailable',
+		'personal_directory_unavailable'
+	],
+	// Lua category providers build the parent; Windows publishes its child inline.
+	hotstring_category_sections: [
+		{ menu: 'programmable_hotstring_entry', platforms: ['hs', 'linux'] },
+		{ menu: 'programmable_hotstrings', platforms: ['ahk'] }
+	],
+	programmable_hotstrings: { menu: 'programmable_hotstrings', platforms: ['hs', 'linux'] },
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
 	// Both hand providers render this declared fixed command under every native key.
-	tap_hold_keys_left: 'tap_hold_key_native_commands',
-	tap_hold_keys_right: 'tap_hold_key_native_commands',
+	tap_hold_keys_left: 'tap_hold_key_head',
+	tap_hold_keys_right: 'tap_hold_key_head',
 	key_combinations: 'key_combinations_group',
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
@@ -322,7 +337,7 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 		const parentVisibility = reachableOn[menuKey];
 		if (!parentVisibility) continue;
 		for (const row of manifest[menuKey]) {
-			const published = OPENS_SUBMENU[row.id];
+			const published = row.type === 'include' ? row.section : OPENS_SUBMENU[row.id];
 			if (!published) continue;
 			// One provider can publish multiple independently declared children.
 			// Every existing platform restriction still applies to its own edge.
@@ -333,8 +348,9 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
 				);
 				const before = (reachableOn[target] || []).join(',');
-				if (before !== effective.join(',')) {
-					reachableOn[target] = effective;
+				const combined = combineMenuVisibility(PLATFORMS, reachableOn[target], effective);
+				if (before !== combined.join(',')) {
+					reachableOn[target] = combined;
 					changed = true;
 				}
 				openedBy[target] = `${menuKey}/${row.id}`;
@@ -655,6 +671,7 @@ const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux')
  */
 function driverSource(root) {
 	let out = '';
+	const sources = [];
 	const walk = (dir) => {
 		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 			const full = path.join(dir, entry.name);
@@ -662,12 +679,14 @@ function driverSource(root) {
 				if (entry.name === 'tests' || entry.name === '_generated') continue;
 				walk(full);
 			} else if (entry.name.endsWith('.lua')) {
-				out += fs.readFileSync(full, 'utf8');
+				const src = fs.readFileSync(full, 'utf8');
+				out += src;
+				sources.push({ rel: path.relative(root, full), src });
 			}
 		}
 	};
 	walk(root);
-	return out;
+	return { src: out, delegated: delegatedMenuSources(sources, path.join(SP, '_shared', 'lua')) };
 }
 
 /** Resolve only the actual read-only number-row provider's shared getter owner. */
@@ -800,7 +819,7 @@ function numberRowGetterSource(source) {
 
 const renderedCounts = {};
 for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
-	const src = driverSource(root);
+	const { src, delegated } = driverSource(root);
 	const keys = new Set([...src.matchAll(/ManifestMenu\.build\(\s*"([a-z_]+)"/g)].map((m) => m[1]));
 	renderedCounts[driver] = keys.size;
 
@@ -822,7 +841,8 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 			if (row.type === 'choice' && typeof row.path === 'string') needed.add(row.path);
 		}
 	}
-	const getterSource = src + numberRowGetterSource(src);
+	const getterSource =
+		src + numberRowGetterSource(src) + delegated.map((source) => source.src).join('\n');
 	const absent = [...needed].filter((key) => !getterSource.includes(key));
 	if (absent.length > 0) {
 		errors.push(

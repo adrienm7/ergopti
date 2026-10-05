@@ -299,6 +299,45 @@ jobs:
             ${{ steps.swift-launcher-tests.outputs.tis_session_dir }}/refusal.json
           if-no-files-found: error
 
+      # Native inventory remains observable even when the separate XCTest suite fails.
+      - name: Run signed Hammerspoon program provider inventory
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/native_hs_program_providers -p test_receipt.py -v
+          python3 tools/diagnostics/native_hs_program_providers/run_native.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/native-hs-program-providers" \
+            --download
+        timeout-minutes: 5
+
+      - name: Retain native Hammerspoon provider inventory
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-hs-program-providers-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-hs-program-providers
+          if-no-files-found: error
+
+      # Observe the native structured API without invoking or importing automations.
+      - name: Observe native Apple Shortcuts discovery
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe -p test_probe.py -v
+          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe"
+        timeout-minutes: 2
+
+      - name: Retain native Apple Shortcuts observation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-apple-shortcuts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/group3-apple-shortcuts-probe
+          if-no-files-found: error
+
       # LauncherLogTests append to the real launcher log,
       # ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke below
       # refuses to judge a launch over a launcher log it did not start fresh.

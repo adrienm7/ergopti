@@ -30,6 +30,10 @@ enabled = false
 [hotstrings.dynamic.ssn_prefixes]
 enabled = false
 
+[hotstrings.dynamic.user_code]
+enabled = false
+time_activation_seconds = 0.5
+
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = false
 pattern_max_length = 1
@@ -43,7 +47,15 @@ preview_autocorrect_enabled = false
 preview_colored_tooltips = false
 preview_star_enabled = false
 
-[hotstrings.autocorrection.caps]
+[hotstrings.autocorrection.names]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.abbreviations]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.technical_terms]
 enabled = false
 time_activation_seconds = 0.5
 

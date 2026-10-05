@@ -34,9 +34,9 @@ _AHK04M_Count(Haystack, Needle) {
 _AHK04M_AllDispatchCallersConsumeTheVerdict() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-04 class guard")
-	; One definition plus the three user-reachable callers. A fourth caller raises
-	; the count and must be added below with its own state/metric verdict checks.
-	AssertEqual(4, _AHK04M_Count(Src, "HSE_DispatchMatch("),
+	; One definition plus four user-reachable callers. A new caller raises the
+	; count and must join these exact state/publication verdict checks.
+	AssertEqual(5, _AHK04M_Count(Src, "HSE_DispatchMatch("),
 		"every HSE_DispatchMatch caller must join the send-transaction guard")
 
 	Activate := _DriverFuncBody("ActivateHotstrings")
@@ -64,6 +64,15 @@ _AHK04M_AllDispatchCallersConsumeTheVerdict() {
 		and InStr(SpaceTap, "&CommittedScreenEffect") > 0
 		and InStr(SpaceTap, "_PrefixCommitPostFireEffect(CommittedScreenEffect)") > 0,
 		"_SpaceTap must consume the verdict and canonical effect before committing fire-only state")
+	Programmable := _DriverFuncBody("_UserHotstringsCommit")
+	DispatchAt := InStr(Programmable, 'Verdict := HSE_DispatchMatch(Spec, "", &Effect)')
+	PendingAt := InStr(Programmable, 'return Verdict.Has("Pending")', true, DispatchAt)
+	RefusalAt := InStr(Programmable, "if !Verdict", true, PendingAt)
+	CommitAt := InStr(Programmable, "_PrefixCommitPostFireEffect(Effect)", true, RefusalAt)
+	Assert(DispatchAt > 0 && PendingAt > DispatchAt && RefusalAt > PendingAt && CommitAt > RefusalAt,
+		"programmable output must transfer deferred ownership or consume successful dispatch before publishing canonical effects")
+	Assert(InStr(Programmable, "PublicationCurrent: _UserHotstringsPublicationCurrent.Bind(") > 0,
+		"programmable output must retain its source/control/enable receipt through deferred terminal publication")
 	ReplayVisible := _DriverFuncBody("_HSE_ReplayVisibleTerminalChars")
 	Assert(InStr(ReplayVisible, "_OnPrefixChar(0, Char)") > 0,
 		"visible pre-admission suffixes must re-enter the real matcher after canonical commit")

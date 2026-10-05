@@ -19,15 +19,18 @@
  *   2. `<file> --preview` formats deterministically — sections and keys are
  *      sorted alphabetically and styled headers are emitted — while leaving the
  *      input file byte-for-byte untouched (preview must never write to disk).
+ *   3. Explicitly ordered hotstrings retain their physical rule sequence and
+ *      repeated array boundaries while normal format/check enforce layout,
+ *      syntax admission and unchanged decoded values.
  *
  * FEATURES & RATIONALE:
  * 1. Interpreter-agnostic: probes `python3` then `python` and uses the first
  *    that answers `--version` with status 0, so it runs unchanged on the ubuntu
  *    CI runner (python3) and a Windows dev box (python; the Store `python3` shim
  *    exits non-zero and is skipped).
- * 2. Zero side effects: the fixture lives in an OS temp dir removed in `finally`,
- *    and --preview is asserted to leave it unmodified — the repo tree is never
- *    touched whether the test passes or fails.
+ * 2. Owned fixtures: the preview fixture lives in an OS temp directory. Ordered
+ *    hotstrings use a temporary directory under this root for repository-relative
+ *    CLI diagnostics. Both are removed in `finally`; tracked sources stay intact.
  * ==============================================================================
  */
 
@@ -106,6 +109,42 @@ if (!PYTHON) {
 
 const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-fmttoml-'));
 const fixturePath = path.join(fixtureDir, 'fixture.toml');
+// Hotstring diagnostics use repository-relative paths, so own one temporary
+// directory under this root and remove it after every outcome.
+const hotstringDir = fs.mkdtempSync(path.join(ROOT, '.format-hotstrings-'));
+const hotstringPath = path.join(hotstringDir, 'ordered.toml');
+const directive = '# format_toml: preserve-rule-order';
+const orderedInput = `${directive}
+[_meta]
+description = "Ordered fixture"
+
+# Keep the first family comment.
+  [[names]]\x20\x20
+  "zeta"    =    { output = "Zeta", is_word = true }\x20\x20\x20
+# Keep the intervening family comment.
+[[abbreviations]]
+"alpha" = { output = "ALPHA", is_word = true }
+[[names]]
+"beta"  =  { output = "Beta", is_word = true }   # inline note
+`;
+const orderedExpected = `${directive}
+[_meta]
+description = "Ordered fixture"
+
+# Keep the first family comment.
+[[names]]
+"zeta" = { output = "Zeta", is_word = true }
+# Keep the intervening family comment.
+[[abbreviations]]
+"alpha" = { output = "ALPHA", is_word = true }
+[[names]]
+"beta" = { output = "Beta", is_word = true } # inline note
+`;
+const hotstrings = (check = false) =>
+	spawnSync(PYTHON, [SCRIPT, '--hotstrings', hotstringPath, ...(check ? ['--check'] : [])], {
+		cwd: ROOT,
+		encoding: 'utf8'
+	});
 
 try {
 	// 1) Bare invocation is a usage error — exit 1 and print the usage banner.
@@ -163,8 +202,97 @@ try {
 		fs.readFileSync(fixturePath, 'utf8') === FIXTURE_CONTENT,
 		fs.readFileSync(fixturePath, 'utf8')
 	);
+
+	fs.writeFileSync(hotstringPath, orderedInput, 'utf8');
+	const unformatted = hotstrings(true);
+	test(
+		'marked misformatted rules fail --check without mutation',
+		unformatted.status === 1 && fs.readFileSync(hotstringPath, 'utf8') === orderedInput,
+		unformatted.stdout + unformatted.stderr
+	);
+	const formatted = hotstrings();
+	test(
+		'marked rules normalize layout while preserving sequence, metadata, comments and repeated arrays',
+		formatted.status === 0 && fs.readFileSync(hotstringPath, 'utf8') === orderedExpected,
+		formatted.stdout + formatted.stderr + fs.readFileSync(hotstringPath, 'utf8')
+	);
+	const repeated = hotstrings();
+	const canonicalCheck = hotstrings(true);
+	test(
+		'ordered normal formatting is idempotent and canonical --check passes',
+		repeated.status === 0 &&
+			canonicalCheck.status === 0 &&
+			fs.readFileSync(hotstringPath, 'utf8') === orderedExpected,
+		repeated.stdout + repeated.stderr + canonicalCheck.stdout + canonicalCheck.stderr
+	);
+
+	const malformed = orderedExpected + '"broken" = { output = "unterminated }\n';
+	fs.writeFileSync(hotstringPath, malformed, 'utf8');
+	const invalid = hotstrings();
+	test(
+		'marked invalid TOML is refused before any file write',
+		invalid.status !== 0 &&
+			/Invalid ordered hotstring TOML/.test(invalid.stderr) &&
+			fs.readFileSync(hotstringPath, 'utf8') === malformed,
+		invalid.stdout + invalid.stderr
+	);
+	const inlineHeader = `${directive}\n[_meta]\ndescription = "Header comment fixture"\n[[names]] # first header note\n"zeta"    =    { output = "Zeta" }\n`;
+	fs.writeFileSync(hotstringPath, inlineHeader, 'utf8');
+	const unsupportedHeaderCheck = hotstrings(true);
+	const unsupportedHeaderWrite = hotstrings();
+	test(
+		'an unsupported first array header refuses normal format and --check without treating rules as metadata',
+		unsupportedHeaderCheck.status !== 0 &&
+			unsupportedHeaderWrite.status !== 0 &&
+			/Unsupported ordered hotstring array header/.test(unsupportedHeaderWrite.stderr) &&
+			fs.readFileSync(hotstringPath, 'utf8') === inlineHeader,
+		unsupportedHeaderCheck.stdout +
+			unsupportedHeaderCheck.stderr +
+			unsupportedHeaderWrite.stdout +
+			unsupportedHeaderWrite.stderr
+	);
+	const multilineMetadata = `${directive}\n[_meta]\ndescription = """meaningful trailing spaces  \nnext line"""\n[[names]]\n"zeta"    =    { output = "Zeta" }\n`;
+	fs.writeFileSync(hotstringPath, multilineMetadata, 'utf8');
+	const multiline = hotstrings();
+	test(
+		'multiline metadata retains meaningful trailing spaces by refusing a value-changing normalization',
+		multiline.status !== 0 &&
+			/would change TOML values/.test(multiline.stderr) &&
+			fs.readFileSync(hotstringPath, 'utf8') === multilineMetadata,
+		multiline.stdout + multiline.stderr
+	);
+	const unsupported = orderedExpected + 'unquoted = { output = "Unsupported record" }\n';
+	fs.writeFileSync(hotstringPath, unsupported, 'utf8');
+	const unsupportedResult = hotstrings();
+	test(
+		'marked valid TOML outside the existing quoted-rule dialect is refused without dropping bytes',
+		unsupportedResult.status !== 0 &&
+			/Unsupported ordered hotstring record/.test(unsupportedResult.stderr) &&
+			fs.readFileSync(hotstringPath, 'utf8') === unsupported,
+		unsupportedResult.stdout + unsupportedResult.stderr
+	);
+
+	// The same three rules without the directive retain the ordinary sorter.
+	// Inline comments are part of the ordered contract; use the ordinary
+	// formatter's established comment-free entry dialect for this control.
+	const unmarked = orderedExpected.replace(directive + '\n', '').replace(' # inline note', '');
+	fs.writeFileSync(hotstringPath, unmarked, 'utf8');
+	const sorted = hotstrings();
+	const sortedText = fs.readFileSync(hotstringPath, 'utf8');
+	test(
+		'unmarked files still sort and group sections rather than inherit an order exemption',
+		sorted.status === 0 &&
+			sortedText.indexOf('[[abbreviations]]') >= 0 &&
+			sortedText.indexOf('[[abbreviations]]') < sortedText.indexOf('[[names]]') &&
+			sortedText.indexOf('"alpha"') >= 0 &&
+			sortedText.indexOf('"beta"') >= 0 &&
+			sortedText.indexOf('"beta"') < sortedText.indexOf('"zeta"') &&
+			(sortedText.match(/\[\[names\]\]/g) ?? []).length === 1,
+		sorted.stdout + sorted.stderr + sortedText
+	);
 } finally {
 	fs.rmSync(fixtureDir, { recursive: true, force: true });
+	fs.rmSync(hotstringDir, { recursive: true, force: true });
 }
 
 report();

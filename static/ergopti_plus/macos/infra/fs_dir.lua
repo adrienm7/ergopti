@@ -75,4 +75,34 @@ function M.try_entries(dir)
 	return collect_entries(dir)
 end
 
+--- Collects bounded private names without logging native pathname or error text.
+--- The bundled Lua 5.4 directory factory supplies its fourth closing value;
+--- generic-for closes that exact state on exhaustion, early break and errors.
+--- This observes the public API close, not an unavailable closedir errno receipt.
+--- @param dir string Absolute directory path.
+--- @param limit number Maximum retained entry count.
+--- @return table|nil listing Dense names and an explicit truncation flag.
+--- @return string|nil reason Closed failure category.
+function M.collect_private(dir, limit)
+	if type(dir) ~= "string" or dir:sub(1, 1) ~= "/" or dir:find("\0", 1, true)
+		or type(limit) ~= "number" or limit < 1 or limit > 256 or limit % 1 ~= 0 then
+		return nil, "listing_refused"
+	end
+	local listing = { names = {}, truncated = false }
+	local ok = pcall(function()
+		for name in hs.fs.dir(dir) do
+			if type(name) ~= "string" or name == "" or #name > 4096
+				or name:find("\0", 1, true) or name:find("/", 1, true) then
+				error("listing_refused", 0)
+			end
+			if name ~= "." and name ~= ".." then
+				if #listing.names == limit then listing.truncated = true; break end
+				listing.names[#listing.names + 1] = name
+			end
+		end
+	end)
+	if not ok then return nil, "listing_refused" end
+	return listing
+end
+
 return M

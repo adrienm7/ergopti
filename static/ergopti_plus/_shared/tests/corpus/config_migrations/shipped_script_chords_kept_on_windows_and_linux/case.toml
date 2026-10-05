@@ -5,4 +5,4 @@ description = "The v6 to v7 step renames macOS keys only: Windows and Linux alre
 drivers = ["ahk", "linux"]
 outcome = "migrated"
 from_version = 6
-to_version = 10
+to_version = 11

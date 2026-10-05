@@ -1,0 +1,148 @@
+{
+	"group": 1,
+	"origin_dev_inspected": "02ad69e06ecea424de11facf3dced404a6fdd602",
+	"initial_integration": "b9a43969b9ac8917f32bf4af0d19b6f77a31668e",
+	"previous_group_commits_integrated": 15,
+	"continuation_source": "594f810aad7dd4f2688357c133e3267d4d2503fb",
+	"continuation_commits_not_in_dev": [
+		{
+			"sha": "62f4005cad8def25b5abe9bbe1e0769a7a84a77a",
+			"subject": "fix(config): preserve obsolete macOS boolean leaves"
+		},
+		{
+			"sha": "dd79404e9d59729f8ae2892b482c40d69afe1363",
+			"subject": "fix(config): preserve installed layout record models"
+		},
+		{
+			"sha": "ba2f964972bd25ab0d7b27657fce4287e6dcc854",
+			"subject": "fix(config): retain retired Karabiner preferences"
+		},
+		{
+			"sha": "a4ebd2819e06a73084d3bd265f5a15b861a49097",
+			"subject": "fix(config): preserve installed updates and obsolete extensions"
+		},
+		{
+			"sha": "9b618010e7f9b71d96df161cf98e9a896cef4f56",
+			"subject": "fix(config): retain bulk publication recovery receipts"
+		},
+		{
+			"sha": "98e319576088dc7ba00dfc5d67c37dfdacd801d5",
+			"subject": "fix(config): preserve obsolete Linux tap-hold shapes"
+		},
+		{
+			"sha": "4e7caf9788431afd56b1e66d17116109870d63a1",
+			"subject": "fix(config): retain lifecycle publication recovery"
+		},
+		{
+			"sha": "69d65c4bd4d48701d1406c0198074fbae557da8d",
+			"subject": "fix(config): bind recommendations to the admitted source"
+		},
+		{
+			"sha": "594f810aad7dd4f2688357c133e3267d4d2503fb",
+			"subject": "fix(config): preserve ordinary source value shapes"
+		}
+	],
+	"todo_items_removed": [],
+	"todo_items_remaining": [5, 7, 33, 42, 54, 81],
+	"windows": "Explicit maintainer workstation deferral",
+	"native_ci": {
+		"source_sha": "594f810aad7dd4f2688357c133e3267d4d2503fb",
+		"tested_ci_sha": "4800d5c83878e653622941b790390e1497cab6c5",
+		"previous_ci_sha": "eb85009310acf2ae43c9f5a49b610cdabba37635",
+		"tree": "1acc5c491fa8bc3864f242c7c25aecbe44d66a6c",
+		"same_source_tree": true,
+		"os_lanes": "macos+linux",
+		"windows": "Explicit maintainer workstation deferral; not executed",
+		"release": "workflow_dispatch emits release=false",
+		"status": "completed",
+		"conclusion": "failure",
+		"databaseId": 37263515985,
+		"headSha": "4800d5c83878e653622941b790390e1497cab6c5",
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/37263515985"
+	},
+	"previously_integrated_commits": [
+		{
+			"sha": "f90206b6fc88dc25f844ff5010bb46bbe248de60",
+			"subject": "refactor(menu): declare Linux selection helper commands"
+		},
+		{
+			"sha": "792884ed0088a276c5f9a3c3f45daf295264ce76",
+			"subject": "fix(config): preserve retired keys until explicit cleanup"
+		},
+		{
+			"sha": "905b4789f6297b65a765a31724997940d339bcd8",
+			"subject": "fix(config): retain navigation layer rollback debt"
+		},
+		{
+			"sha": "b7a3495536a616ba0e368c8061bd8d6b0df0ee75",
+			"subject": "refactor(menu): declare per-key native tap hold commands"
+		},
+		{
+			"sha": "523e6a38871df04cf018f13f166f49b9f1e56afd",
+			"subject": "fix(config): retain macOS scope navigation layer inverses"
+		},
+		{
+			"sha": "5514f8b357daeb0e7c05eb317784d1c14df1eb66",
+			"subject": "fix(config): fence removals with native writer leases"
+		},
+		{
+			"sha": "ef278416ee26c74c1ffd88b3ec86416b2b7036e4",
+			"subject": "fix(onboarding): fence folder reads and Linux trigger choices"
+		},
+		{
+			"sha": "bd4bb3a44d723ecd31c7d5653b9202f1b21f45b9",
+			"subject": "fix(config): retain obsolete Karabiner scalar leaves"
+		},
+		{
+			"sha": "375de99fbfdaf0ecf4d4ba06e71be7940fe0470c",
+			"subject": "fix(config): preserve neutral obsolete tap hold bindings"
+		},
+		{
+			"sha": "68a66ff2069681da0e323a95b29b8613cce8b992",
+			"subject": "fix(config): preserve obsolete Windows installed records"
+		},
+		{
+			"sha": "7339f6fc097286b557a469d6637f6dcdd9a3efd9",
+			"subject": "fix(config): load Windows settings from semantic snapshots"
+		},
+		{
+			"sha": "691628d3d0b7cd0f7bfab3eed13933b3795461df",
+			"subject": "docs(config): prepare Windows workstation TODO handoff"
+		},
+		{
+			"sha": "68d536e1e5d0180a498792587fbb2a0d7c6db9f0",
+			"subject": "fix(test): admit SQLite receipts before counting rows"
+		},
+		{
+			"sha": "1940608c0bf1249551f5b38e749c7fa4ad57a127",
+			"subject": "fix(test): clean only owned Tap-Hold scope backups"
+		},
+		{
+			"sha": "c0d8b5735589f43780576ea23462725aee680304",
+			"subject": "fix(ci): provision independent Linux native fixtures"
+		}
+	],
+	"status": "Continuation pushed; native CI failed; no new dev integration and feature retained.",
+	"remaining_implementation": [
+		"Shared-menu migration and five prepared menu packets",
+		"Retired API-provider eligibility after coordinated cloud/local publication receipts",
+		"Broader obsolete-reader and explicit repair-intent domains"
+	],
+	"external_validation_dependencies": [
+		"Three Linux native E2E subjects",
+		"Sparkle process census and Homebrew owned AppleEvent receiver",
+		"Windows workstation steps and real-device acceptance"
+	],
+	"local_passed": {
+		"js": 357,
+		"mac_units": 14339,
+		"linux_units": 6878,
+		"mac_e2e": 101,
+		"linux_e2e": 188,
+		"format": true
+	},
+	"skipped": {
+		"local_mac_host_specific_e2e": 1,
+		"hosted_windows": "Maintainer workstation deferral"
+	}
+}

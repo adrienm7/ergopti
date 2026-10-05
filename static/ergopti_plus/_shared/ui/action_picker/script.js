@@ -104,6 +104,8 @@ function init(data) {
 	sendVocabulary = data.sendVocabulary || null;
 	hostPlatform = data.platform || '';
 	paramStrings = data.parameterStrings || null;
+	programProviders = data.programProviders || null;
+	programProviderStrings = data.programProviderStrings || {};
 	promptChoices = Array.isArray(data.promptChoices) ? data.promptChoices : null;
 	defaultCount = typeof data.defaultCount === 'number' ? data.defaultCount : null;
 	visionChoices = Array.isArray(data.visionChoices) ? data.visionChoices : null;
@@ -479,6 +481,8 @@ const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 let sendVocabulary = null;
 let hostPlatform = '';
 let paramStrings = null;
+let programProviders = null;
+let programProviderStrings = {};
 
 // Host-supplied for llm_prompt: the prompt profiles a binding may run
 // ([{value: id, label}], built-in then custom) and the AI menu's prediction
@@ -796,6 +800,7 @@ function openParamEditor(entry) {
 		el('param-program-arguments').replaceChildren();
 		for (const argument of current === null ? [] : current.arguments)
 			appendProgramArgument(argument);
+		fillProgramProviders();
 		el('param-program-executable').focus();
 		return;
 	}
@@ -818,6 +823,53 @@ function openParamEditor(entry) {
 	el('param-input').focus();
 	// Selected, the current value is replaced by the first key typed or captured.
 	el('param-input').select();
+}
+
+// Discovery keys stay opaque: only the owning native session can resolve them.
+function fillProgramProviders() {
+	const container = el('param-program-provider');
+	container.hidden = programProviders === null;
+	el('param-program-executable').hidden = false;
+	el('param-program-executable-label').hidden = false;
+	if (programProviders === null) return;
+	const select = el('param-program-provider-select');
+	select.replaceChildren();
+	const manual = document.createElement('option');
+	manual.value = '';
+	manual.textContent = programProviderStrings.manual || '';
+	select.appendChild(manual);
+	for (const choice of Array.isArray(programProviders.choices) ? programProviders.choices : []) {
+		if (typeof choice.key !== 'string' || typeof choice.label !== 'string') continue;
+		const option = document.createElement('option');
+		option.value = choice.key;
+		option.textContent = choice.label;
+		select.appendChild(option);
+	}
+	select.value = '';
+	el('param-program-provider-label').textContent = programProviderStrings.label || '';
+	el('param-program-provider-hint').textContent = programProviderStrings.hint || '';
+	el('param-program-provider-status').textContent = programProviders.unavailable
+		? programProviderStrings.unavailable || ''
+		: programProviders.truncated
+			? programProviderStrings.truncated || ''
+			: select.children.length === 1
+				? programProviderStrings.empty || ''
+				: '';
+	updateProgramProvider();
+}
+
+function updateProgramProvider() {
+	const selected = programProviders !== null && el('param-program-provider-select').value !== '';
+	el('param-program-executable').hidden = selected;
+	el('param-program-executable-label').hidden = selected;
+	el('param-error').hidden = true;
+}
+
+// Called only by the still-owned native page after a refused identity check.
+function programProviderRefused() {
+	if (!editing || editing.parameter !== 'program') return;
+	el('param-error').textContent = programProviderStrings.changed || '';
+	el('param-error').hidden = false;
 }
 
 function appendProgramArgument(value) {
@@ -846,6 +898,22 @@ function closeParamEditor() {
 
 function saveParameter() {
 	if (!editing) return;
+	if (
+		editing.parameter === 'program' &&
+		programProviders !== null &&
+		el('param-program-provider-select').value !== ''
+	) {
+		post({
+			action: 'confirm',
+			id: editing.id,
+			providerKey: el('param-program-provider-select').value,
+			programArguments: Array.from(
+				el('param-program-arguments').querySelectorAll('textarea'),
+				(input) => input.value
+			)
+		});
+		return;
+	}
 	const value =
 		editing.parameter === 'program'
 			? ProgramParameter.encode(
@@ -991,6 +1059,7 @@ document.addEventListener('DOMContentLoaded', function () {
 	el('param-program-add').addEventListener('click', function () {
 		appendProgramArgument('').focus();
 	});
+	el('param-program-provider-select').addEventListener('change', updateProgramProvider);
 	el('param-save').addEventListener('click', function () {
 		saveParameter();
 	});

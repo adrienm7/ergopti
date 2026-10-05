@@ -119,6 +119,35 @@ helpers.describe("linux-sqlite-readonly", function()
 	end
 end)
 
+helpers.describe("linux-sqlite-calendar-split", function()
+	local fixtures = {
+		{ name = "ordinary", day = { year = 2026, month = 5, day = 14, hour = 12 }, previous = "2026-05-13" },
+		{ name = "midnight", day = { year = 2026, month = 5, day = 14, hour = 0, min = 1 }, previous = "2026-05-13" },
+		{ name = "leap", day = { year = 2024, month = 3, day = 1, hour = 12 }, previous = "2024-02-29" },
+		{ name = "year", day = { year = 2027, month = 1, day = 1, hour = 12 }, previous = "2026-12-31" },
+		{ name = "month", day = { year = 2026, month = 5, day = 1, hour = 12 }, previous = "2026-04-30" },
+		{ name = "clock crosses midnight after captured today", day = { year = 2026, month = 12, day = 31, hour = 23, min = 59, sec = 59 }, advance = 2, previous = "2026-12-30" },
+	}
+	for _, fixture in ipairs(fixtures) do
+		helpers.it("linux-sqlite-calendar-split: " .. fixture.name .. " uses the preceding captured calendar day", function()
+			local native_date, native_time = os.date, os.time
+			local captured = native_time(fixture.day)
+			os.date = function(format, timestamp) return native_date(format, timestamp or captured) end
+			os.time = function(date) return date and native_time(date) or (captured + (fixture.advance or 0)) end
+			local ok, err = xpcall(function()
+				local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+					reader.read_range_split_today("/db/metrics.sqlite")
+				end)
+				-- The CLI is a declared test double; date normalization delegates
+				-- to the runtime's native calendar functions rather than a fake.
+				helpers.assert_contains(statements[1], "date <= '" .. fixture.previous .. "'")
+			end, debug.traceback)
+			os.date, os.time = native_date, native_time
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 helpers.describe("linux-sqlite-read-receipts", function()
 	for _, status in ipairs({ 1, 7, 127, 137, 255 }) do
 		helpers.it("linux-sqlite-read-receipts: dashboard rejects valid JSON with status " .. status, function()

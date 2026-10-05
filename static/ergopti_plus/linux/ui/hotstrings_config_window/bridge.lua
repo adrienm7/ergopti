@@ -21,6 +21,18 @@ local APP_NAME = "hotstrings_config_window"
 -- The category id holding the user's own hotstrings, which the window puts in a
 -- group of its own rather than among the shipped packs.
 local PERSONAL_CATEGORY = "personal"
+local PersonalFiles = require("hotstrings.personal_files")
+local _rendered_personal
+
+--- Checks the trusted native page epoch, which is recreated in each route context.
+--- @param context table|nil Native route context.
+--- @param manager table Actual webview owner.
+--- @return boolean current
+local function window_current(context, manager)
+	return type(context) == "table" and context.app_name == APP_NAME
+		and type(context.epoch) == "number" and context.epoch % 1 == 0
+		and type(manager.current_epoch) == "function" and manager.current_epoch(APP_NAME) == context.epoch
+end
 
 -- The colour palette the window offers. Deliberately identical to
 -- macos/ui/hotstrings_config_window/init.lua COLOR_PRESETS, and duplicated rather
@@ -157,7 +169,7 @@ end
 --- @param category table Loader metadata.
 --- @param group string "common" | "personal" | "ext:<id>"
 --- @return table
-local function build_category_entry(config, id, category, group)
+local function build_category_entry(config, id, category, group, bindings)
 	--- @param section string|nil
 	--- @return table
 	local function fields_for(section)
@@ -189,14 +201,35 @@ local function build_category_entry(config, id, category, group)
 	entry.name     = id
 	entry.group    = group
 	entry.title    = category_title(id, category)
+	if PersonalFiles.components(id) then
+		local source = category.personal_source
+		entry.title = source and (source.label ~= "" and source.label or source.components[#source.components]) or entry.title
+		local binding = type(config.personal_file_scope_binding) == "function" and config.personal_file_scope_binding(id)
+		entry.readonly = not binding or binding.current() ~= true
+		if not entry.readonly and bindings then bindings[id] = binding end
+		if entry.readonly then entry.title = entry.title .. " — " .. i18n_label("menu.hotstrings.personal_source_unavailable") end
+		if not entry.readonly and type(config.personal_metadata_controls) == "function" then
+			local controls = config.personal_metadata_controls(id)
+			if controls then
+				entry.readonly_metadata = controls.file
+				entry.readonly_metadata_sections = controls.sections
+				entry.readonly_metadata_reason = i18n_label("menu.hotstrings.personal_metadata_unavailable")
+			end
+		end
+	end
 	entry.sections = {}
 
 	for _, name in ipairs(category and category.sections_order or {}) do
 		local section = fields_for(name)
 		section.name  = name
 		section.title = name
+		if entry.readonly_metadata_sections then
+			section.readonly_metadata = entry.readonly_metadata_sections[name]
+			section.readonly_metadata_reason = entry.readonly_metadata_reason
+		end
 		entry.sections[#entry.sections + 1] = section
 	end
+	entry.readonly_metadata_sections = nil
 
 	return entry
 end
@@ -211,7 +244,7 @@ end
 --- blank entries even on the one call site that reached it with a bridge attached.
 --- @param state table Daemon state.
 --- @return table
-local function _build_initial_payload(state)
+local function _build_initial_payload(state, bindings)
 	local config = state and state.config
 	-- The page wants { label, hex }; the constant holds the i18n key so the label
 	-- is resolved in the user's language at build time rather than baked in.
@@ -262,13 +295,13 @@ local function _build_initial_payload(state)
 			local group, label_key
 			if extension_id then
 				group, label_key = "ext:" .. extension_id, "hs_config.group_extensions"
-			elseif id == PERSONAL_CATEGORY then
+			elseif id == PERSONAL_CATEGORY or PersonalFiles.components(id) then
 				group, label_key = "personal", "hs_config.group_personal"
 			else
 				group, label_key = "common", "hs_config.group_common"
 			end
 			ensure_group(group, label_key)
-			out.categories[#out.categories + 1] = build_category_entry(config, id, category, group)
+			out.categories[#out.categories + 1] = build_category_entry(config, id, category, group, bindings)
 		end
 	end
 
@@ -282,15 +315,17 @@ end
 --- `window.__hostBridgeResponse` at all — this is not one of them. So a returned
 --- payload reached nobody. macOS pushes `setData(...)`; so does this now.
 --- @param state table Daemon state.
+--- @param context table|nil Trusted native page owner.
 --- @return boolean
-local function push_state(state)
+local function push_state(state, context)
 	local ok_json, json_mod = pcall(require, "json")
 	if not ok_json or type(json_mod.encode) ~= "function" then
 		Logger.error(LOG, "Cannot push setData(): the shared json module is unavailable.")
 		return false
 	end
+	local candidate = { state = state, config = state and state.config, epoch = context and context.epoch, bindings = {} }
 	local ok_payload, encoded = pcall(function()
-		return json_mod.encode(_build_initial_payload(state))
+		return json_mod.encode(_build_initial_payload(state, candidate.bindings))
 	end)
 	if not ok_payload or type(encoded) ~= "string" then
 		Logger.error(LOG, "Cannot push setData(): payload encoding failed (%s).", tostring(encoded))
@@ -302,7 +337,10 @@ local function push_state(state)
 		Logger.error(LOG, "Cannot push setData(): webview_manager.eval_js is unavailable.")
 		return false
 	end
-	return Manager.eval_js(APP_NAME, "if(window.setData)setData(" .. encoded .. ")")
+	local routed = window_current(context, Manager)
+	local acknowledged = Manager.eval_js(APP_NAME, "if(window.setData)setData(" .. encoded .. ")")
+	if acknowledged == true and routed and window_current(context, Manager) then _rendered_personal = candidate end
+	return acknowledged
 end
 
 --- Applies one override through the config module, if this driver has one.
@@ -315,13 +353,35 @@ end
 --- @param section string|nil
 --- @param field string
 --- @param value any
-local function set_override(state, category, section, field, value)
+--- @param context table|nil Trusted native page owner.
+local function set_override(state, category, section, field, value, context)
 	if not state.config or type(state.config.set_override) ~= "function" then
 		Logger.warn(LOG, "set_override unavailable — '%s' for '%s' was not applied.",
 			tostring(field), tostring(category))
 		return
 	end
-	state.config.set_override(category, section, field, value)
+	local rendered, manager
+	if PersonalFiles.components(category) then
+		rendered = _rendered_personal
+		manager = require("ui.webview_manager")
+		if not rendered or rendered.state ~= state or rendered.config ~= state.config
+			or not window_current(context, manager) or rendered.epoch ~= context.epoch then return false end
+		local binding = rendered.bindings[category]
+		if not binding or binding.current() ~= true or not window_current(context, manager)
+			or _rendered_personal ~= rendered then return false end
+	end
+	local committed, receipt = state.config.set_override(category, section, field, value)
+	if rendered and committed == true and _rendered_personal == rendered and window_current(context, manager) then
+		-- Acknowledged edits within one page intent may continue to their next
+		-- field. An external catalogue replacement never refreshes this owner.
+		local previous = rendered.bindings[category]
+		if type(receipt) == "table" and type(receipt.source) == "table" and receipt.source.id == category
+			and receipt.path == previous.path and type(receipt.current) == "function" and receipt.current() == true
+			and _rendered_personal == rendered and window_current(context, manager) then
+			rendered.bindings[category] = receipt
+		else rendered.bindings[category] = nil end
+	end
+	return committed
 end
 
 --- Handles an incoming JS message.
@@ -333,10 +393,10 @@ function M.on_message(payload, state, context)
 	if type(payload) == "string" then
 		if payload == "ready" then
 			Logger.info(LOG, "Hotstrings config UI ready.")
-			return push_state(state)
+			return push_state(state, context)
 		end
 		if payload == "refresh" then
-			return push_state(state)
+			return push_state(state, context)
 		end
 		return nil
 	end
@@ -376,15 +436,15 @@ function M.on_message(payload, state, context)
 		if not ms or ms < 0 then
 			Logger.warn(LOG, "Refusing delay %s for '%s' — not a non-negative number of milliseconds.",
 				tostring(payload.ms), tostring(payload.category))
-			return push_state(state)
+			return push_state(state, context)
 		end
-		set_override(state, payload.category, section_of(payload), "delay", ms / MS_PER_SEC)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "delay", ms / MS_PER_SEC, context)
+		return push_state(state, context)
 	end
 
 	if action == "clear_delay" and payload.category then
-		set_override(state, payload.category, section_of(payload), "delay", nil)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "delay", nil, context)
+		return push_state(state, context)
 	end
 
 	if action == "set_color" and payload.category then
@@ -394,15 +454,15 @@ function M.on_message(payload, state, context)
 		if type(hex) ~= "string" or hex == "" then
 			Logger.warn(LOG, "Refusing colour %s for '%s' — not a colour string.",
 				tostring(hex), tostring(payload.category))
-			return push_state(state)
+			return push_state(state, context)
 		end
-		set_override(state, payload.category, section_of(payload), "color", hex)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "color", hex, context)
+		return push_state(state, context)
 	end
 
 	if action == "clear_color" and payload.category then
-		set_override(state, payload.category, section_of(payload), "color", nil)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "color", nil, context)
+		return push_state(state, context)
 	end
 
 	if action == "set_tooltip" and payload.category then
@@ -411,13 +471,13 @@ function M.on_message(payload, state, context)
 		-- for a user who had just turned it off.
 		local value = payload.show_tooltip
 		if type(value) == "string" then value = (value == "true") end
-		set_override(state, payload.category, section_of(payload), "show_tooltip", value == true)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "show_tooltip", value == true, context)
+		return push_state(state, context)
 	end
 
 	if action == "clear_tooltip" and payload.category then
-		set_override(state, payload.category, section_of(payload), "show_tooltip", nil)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "show_tooltip", nil, context)
+		return push_state(state, context)
 	end
 
 	-- Collision priority. The window validates 0-100 before sending, and this
@@ -429,15 +489,15 @@ function M.on_message(payload, state, context)
 		if not value or value < PRIORITY_MIN or value > PRIORITY_MAX then
 			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
 				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
-			return push_state(state)
+			return push_state(state, context)
 		end
-		set_override(state, payload.category, section_of(payload), "priority", value)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "priority", value, context)
+		return push_state(state, context)
 	end
 
 	if action == "clear_priority" and payload.category then
-		set_override(state, payload.category, section_of(payload), "priority", nil)
-		return push_state(state)
+		set_override(state, payload.category, section_of(payload), "priority", nil, context)
+		return push_state(state, context)
 	end
 
 	if action == "set_all_grey" then
@@ -457,15 +517,15 @@ function M.on_message(payload, state, context)
 			-- the user's categories a shade nothing else in the product uses.
 			local neutral = config.get_neutral_color()
 			for id, category in pairs(config.get_categories()) do
-				set_override(state, id, nil, "color", neutral)
+				set_override(state, id, nil, "color", neutral, context)
 				for _, section in ipairs(type(category) == "table" and category.sections_order or {}) do
-					set_override(state, id, section, "color", nil)
+					set_override(state, id, section, "color", nil, context)
 				end
 			end
 		else
 			Logger.error(LOG, "'set_all_grey' needs get_categories and get_neutral_color — nothing changed.")
 		end
-		return push_state(state)
+		return push_state(state, context)
 	end
 
 	if action == "reset_all" then
@@ -487,7 +547,7 @@ function M.on_message(payload, state, context)
 				end
 			end
 		end
-		return push_state(state)
+		return push_state(state, context)
 	end
 
 	if action == "close" then

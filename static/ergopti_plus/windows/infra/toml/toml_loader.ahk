@@ -19,6 +19,8 @@
 ;    containing French letters (e.g. ``IÉ``) with lowercase TOML keys.
 ; ==============================================================================
 
+#Include ../hotstrings/common_autocorrection_migration.ahk
+
 ; Holds the raw UTF-8 content of every TOML file that has been read this
 ; session, keyed by absolute file path. Large category files (autocorrection.toml,
 ; magickey.toml) are read at most once even when many sections are loaded.
@@ -341,6 +343,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				FeatureConfig := _V1Compat
 		}
 
+		HotstringsCommonRequireAdmission(CategoryName, FeatureConfig.HasOwnProp("Enabled") ? FeatureConfig.Enabled : false)
+
 		; Delay and the section/file/source priority both come from the same override
 		; cascade as color (HotstringsResolve). The resolved priority already folds in
 		; the source-default fallback (personal 50 > package 30 > common 10); the
@@ -476,6 +480,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 ; Callers own the admission map; unknown and disabled sections do not register.
 LoadHotstringsCategory(CategoryName, Sections, ExtraOptions := Map()) {
 	global _HS_CACHE_ROWS
+	for Section, Config in Sections
+		HotstringsCommonRequireAdmission(CategoryName, (Config is Map) ? Config.Get("enabled", false) : false)
 	; Bound sources keep their native section owner and its existing order policy.
 	; A missing bound file never grants permission to use the bundled cache.
 	if HotstringsBoundTomlPath(CategoryName) != "" || HotstringsBoundSections(CategoryName).Count {
@@ -506,7 +512,10 @@ LoadHotstringsCategory(CategoryName, Sections, ExtraOptions := Map()) {
 }
 
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
-LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource := unset) {
+LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource := unset, AdoptedOwner := unset) {
+		if IsSet(AdoptedOwner) && (!IsSet(PersonalSource) || !(AdoptedOwner is PersonalFileAdoptedOwner)
+				|| !AdoptedOwner.Authorize(FilePath, PersonalSource))
+				throw Error("The explicit personal-file activation owner is unavailable.")
 		if IsSet(PersonalSource) && !PersonalFileDescriptorValid(PersonalSource)
 				throw TypeError("Invalid personal hotstring source descriptor.")
 		global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
@@ -521,7 +530,7 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 		TotalLoaded := 0
 		CurrentSection := ""
 		SplitPath FilePath, , , , &CategoryName
-		FileContent := ReadTomlFile(FilePath)
+		FileContent := IsSet(AdoptedOwner) ? AdoptedOwner.parsedContent : ReadTomlFile(FilePath)
 		if SelectedSection != "" && TOML_UnreadableFile(FilePath)
 				throw Error("The selected extension source could not be read: " . FilePath)
 		SelectedFound := false
@@ -534,7 +543,7 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 				; LoadHotstringsSection: an anchored pattern silently mis-attributes
 				; every following entry when a header carries a trailing comment.
 				if RegExMatch(TOML_StripInlineComment(Line), HS_TOML_SECTION_HEADER_PATTERN, &SecM) {
-						CurrentSection := StrLower(Trim(SecM[1]))
+						CurrentSection := IsSet(AdoptedOwner) ? PersonalFileControls.SectionName(SecM[1]) : StrLower(Trim(SecM[1]))
 						if CurrentSection == SelectedSection
 								SelectedFound := true
 						continue
@@ -551,6 +560,8 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 				if (CurrentSection == "_meta" or InStr(CurrentSection, "_meta.")) {
 						continue
 				}
+				if IsSet(AdoptedOwner) && !AdoptedOwner.Enabled(CurrentSection)
+						continue
 				if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
 						if RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleM) {
 								Trigger := UnescapeTomlString(
@@ -562,17 +573,23 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 								; user's key, not the corpus placeholder.
 								Output  := StrReplace(Output, "★", ScriptInformation["MagicKey"])
 								Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
-								Options["Category"] := CategoryLabel
+								Options["Category"] := IsSet(AdoptedOwner) ? AdoptedOwner.id : CategoryLabel
 								Options["Section"] := CurrentSection
 								if IsSet(PersonalSource)
 									Options["PersonalSource"] := PersonalSource
 								; Provenance must not adopt a new activation owner for whole-file packs.
-								if SelectedSection == ""
+								if SelectedSection == "" && !IsSet(AdoptedOwner)
 										Options["Group"] := "default"
 								if SelectedSection != "" {
 										Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
 										Options["Priority"] := Resolved.Priority
 										Options["TimeActivationSeconds"] := Resolved.Delay
+								}
+								if IsSet(AdoptedOwner) {
+									Resolved := AdoptedOwner.Resolve(CurrentSection)
+									Options["Group"] := AdoptedOwner.id . "." . CurrentSection
+									Options["Priority"] := Resolved.Priority
+									Options["TimeActivationSeconds"] := Resolved.Delay
 								}
 								CreateCaseSensitiveHotstrings("", Trigger, Output, Options)
 								TotalLoaded += 1
@@ -601,17 +618,23 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 						and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
 				EntryPriority := _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE)
 				Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
-				Options["Category"] := CategoryLabel
+				Options["Category"] := IsSet(AdoptedOwner) ? AdoptedOwner.id : CategoryLabel
 				Options["Section"] := CurrentSection
 				if IsSet(PersonalSource)
 					Options["PersonalSource"] := PersonalSource
 				; Provenance must not adopt a new activation owner for whole-file packs.
-				if SelectedSection == ""
+				if SelectedSection == "" && !IsSet(AdoptedOwner)
 						Options["Group"] := "default"
 				if SelectedSection != "" {
 						Resolved := HotstringsResolve(CategoryLabel, CurrentSection)
 						Options["Priority"] := _ParseEntryPriority(Line, Resolved.Priority)
 						Options["TimeActivationSeconds"] := Resolved.Delay
+				}
+				if IsSet(AdoptedOwner) {
+					Resolved := AdoptedOwner.Resolve(CurrentSection)
+					Options["Group"] := AdoptedOwner.id . "." . CurrentSection
+					Options["Priority"] := _ParseEntryPriority(Line, Resolved.Priority)
+					Options["TimeActivationSeconds"] := Resolved.Delay
 				}
 				HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
 				TotalLoaded += 1
