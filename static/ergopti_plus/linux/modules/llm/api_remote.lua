@@ -34,6 +34,7 @@ local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
 local PromptBuilder = require("llm.prompt_builder")
+local TextUtils = require("text_utils")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
@@ -280,7 +281,8 @@ function M.normalize_base_url(raw)
 	if scheme ~= "http" and scheme ~= "https" then return nil, "base URL scheme must be http or https" end
 	if authority:find("@", 1, true) then return nil, "base URL must not contain userinfo" end
 	if suffix:find("[?#]") then return nil, "base URL must not contain a query or fragment" end
-	local host, port = authority:match("^([^:]+):(%d+)$")
+	local host, port = authority:match("^(%[[%x:%.]+%]):(%d+)$")
+	if not host then host, port = authority:match("^([^:]+):(%d+)$") end
 	host = host or authority
 	if not host:match("^[%w%._%-]+$") and not host:match("^%[[%x:%.]+%]$") then
 		return nil, "base URL host is invalid"
@@ -431,8 +433,8 @@ end
 --- @param body string
 --- @return string|nil
 function M.extract_text(format, body)
-	local root = type(body) == "string" and Json.decode(body) or nil
-	if type(root) ~= "table" then return nil end
+	local root = type(body) == "string" and Json.decode_lossless(body) or nil
+	if type(root) ~= "table" or Formats.response_has_error(root) then return nil end
 	if format == "anthropic" then
 		for _, block in ipairs(type(root.content) == "table" and root.content or {}) do
 			if type(block) == "table" and block.type == "text" and type(block.text) == "string" then return block.text end
@@ -461,7 +463,7 @@ function M.server_message(body)
 	local message = type(root.error) == "table" and root.error.message or root.message
 	if type(message) ~= "string" and type(root.error) == "string" then message = root.error end
 	if type(message) ~= "string" or message == "" then return nil end
-	return message:sub(1, MAX_SERVER_MESSAGE)
+	return TextUtils.utf8_byte_prefix(message, MAX_SERVER_MESSAGE)
 end
 
 

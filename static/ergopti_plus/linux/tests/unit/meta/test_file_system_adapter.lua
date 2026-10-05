@@ -9,6 +9,107 @@
 local helpers = require("tests.helpers")
 local fs      = helpers.load_module("adapters.file_system")
 
+helpers.describe("generic file write admission", function()
+	for _, method in ipairs({ "write", "append" }) do
+		local mode = method == "write" and "w" or "a"
+		for _, backend in ipairs({ "luv", "ffi" }) do
+			for _, receipt in ipairs({ "regular", "fifo", "missing-type", "stat-failure", "stat-throw", "open-failure", "stream-throw", "close-failure" }) do
+				helpers.it("linux-file-write-special: " .. method .. " " .. backend .. " " .. receipt, function()
+					local Writer = require("infra.regular_file_writer")
+					local previous_uv, previous_ffi, previous_open = package.loaded.luv, package.loaded.ffi, io.open
+					local admissions, queries, closes, streams, stream_closes = 0, 0, 0, 0, 0
+					local flags_seen, creation_mode
+					local stream = { close = function() stream_closes = stream_closes + 1; return true end }
+					local function admit(path, flags, permissions)
+						helpers.assert_eq(path, "/synthetic/destination")
+						admissions = admissions + 1; flags_seen, creation_mode = flags, permissions
+						if receipt == "open-failure" then return nil, "permission denied", "EACCES" end
+						return 42
+					end
+					local function inspect()
+						queries = queries + 1
+						if receipt == "stat-throw" then error("native metadata failed") end
+						return receipt ~= "fifo" and receipt ~= "missing-type" and receipt ~= "stat-failure"
+					end
+					local function close()
+						closes = closes + 1; return receipt ~= "close-failure"
+					end
+					if backend == "luv" then
+						package.loaded.luv = {
+							fs_open = admit,
+							fs_fstat = function(fd)
+								helpers.assert_eq(fd, 42)
+								local regular = inspect()
+								if receipt == "stat-failure" then return nil, "metadata denied" end
+								return { type = regular and "file" or (receipt == "fifo" and "fifo" or nil) }
+							end,
+							fs_close = close,
+						}
+					else
+						package.loaded.luv = {}
+						package.loaded.ffi = {
+							os = "Linux", cdef = function() end,
+							new = function(kind, value)
+								if kind == "unsigned int" then return value end
+								return { mode = receipt == "fifo" and 4480 or 33152, mask = receipt == "missing-type" and 0 or 1 }
+							end,
+							-- Linux statx has a fixed UAPI, unlike struct stat.
+							sizeof = function() return 256 end, offsetof = function() return 28 end,
+							C = {
+									ergopti_write_open = function(path, flags, permissions)
+									local fd = admit(path, flags, permissions); return fd or -1
+								end,
+								statx = function(fd, path, flags, mask)
+									helpers.assert_eq(fd, 42); helpers.assert_eq(path, "")
+									helpers.assert_eq(flags, 4096); helpers.assert_eq(mask, 1)
+									inspect(); return receipt == "stat-failure" and -1 or 0
+								end,
+								close = function(fd) helpers.assert_eq(fd, 42); return close() and 0 or -1 end,
+							},
+							errno = function() return 13 end,
+						}
+					end
+					io.open = function(path, stream_mode)
+						helpers.assert_eq(path, "/proc/self/fd/42", "a competing path edit cannot redirect the admitted inode")
+						helpers.assert_eq(stream_mode, mode)
+						streams = streams + 1
+						if receipt == "stream-throw" then error("stdio open failed") end
+						return stream
+					end
+					local ok, result = pcall(Writer.open, "/synthetic/destination", mode)
+					package.loaded.luv, package.loaded.ffi, io.open = previous_uv, previous_ffi, previous_open
+					helpers.assert_true(ok, tostring(result))
+					helpers.assert_eq(result, receipt == "regular" and stream or nil)
+					helpers.assert_eq(admissions, 1)
+					helpers.assert_eq(flags_seen, 1 + 64 + 2048 + 524288 + (mode == "a" and 1024 or 0),
+						"admission must be nonblocking, append-aware and have no O_TRUNC")
+					helpers.assert_eq(creation_mode, 438, "creation permissions retain native umask policy")
+					helpers.assert_eq(queries, receipt == "open-failure" and 0 or 1)
+					helpers.assert_eq(closes, receipt == "open-failure" and 0 or 1)
+					local admitted = receipt == "regular" or receipt == "stream-throw" or receipt == "close-failure"
+					helpers.assert_eq(streams, admitted and 1 or 0, "nonregular or unproven descriptors cannot reach buffered stdio")
+					helpers.assert_eq(stream_closes, receipt == "close-failure" and 1 or 0)
+				end)
+			end
+		end
+		helpers.it("linux-file-write-special: " .. method .. " contains admission refusal", function()
+			local Writer = require("infra.regular_file_writer")
+			local previous = Writer.open
+			local admissions = 0
+			Writer.open = function(path, stream_mode)
+				admissions = admissions + 1
+				helpers.assert_eq(path, "/synthetic/fifo"); helpers.assert_eq(stream_mode, mode)
+				return nil, "destination is not a regular file", 22
+			end
+			local ok, result = pcall(fs[method], "/synthetic/fifo", "payload")
+			Writer.open = previous
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(admissions, 1, "every write/append must pass descriptor admission")
+		end)
+	end
+end)
+
 helpers.describe("generic file read admission", function()
 	local metadata_cases = {
 		{ mode = 33152, mask = 1, status = 0, accepted = true },
@@ -269,7 +370,8 @@ helpers.describe("linux-native-write-receipts", function()
 	for _, method in ipairs({ "write", "append" }) do
 		for _, failure in ipairs({ "write_return", "write_throw", "close_return", "close_throw" }) do
 			helpers.it("linux-native-write-receipts: " .. method .. " rejects " .. failure .. " and closes its file", function()
-				local original_open = io.open
+				local Writer = require("infra.regular_file_writer")
+				local original_open = Writer.open
 				local closes = 0
 				local handle = {}
 				function handle:write()
@@ -283,12 +385,12 @@ helpers.describe("linux-native-write-receipts", function()
 					if failure == "close_throw" then error("close failed") end
 					return true
 				end
-				io.open = function(path, mode)
+				Writer.open = function(path, mode)
 					if path == "native-write-receipt" then return handle end
 					return original_open(path, mode)
 				end
 				local ok, result = pcall(fs[method], "native-write-receipt", "payload")
-				io.open = original_open
+				Writer.open = original_open
 				helpers.assert_true(ok, "native errors do not escape the adapter")
 				helpers.assert_eq(result, false, "a failed native receipt cannot report success")
 				helpers.assert_eq(closes, 1, "the file is closed even after a failed write")
@@ -515,3 +617,18 @@ helpers.describe("file_system adapter", function()
   end)
 
 end)
+
+local write_has_ffi = pcall(require, "ffi")
+if write_has_ffi or pcall(require, "luv") then
+	helpers.describe("native regular-file write admission", function()
+		helpers.it("linux-file-write-special: actual file endpoints and partial-write receipts retain no owned descriptors", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local backend = write_has_ffi and "ffi" or "luv"
+			local fixture = helpers.driver_root() .. "/tests/hardware/run_file_write_special_receipts.py"
+			local command = "ERGOPTI_WRITE_BACKEND=" .. backend .. " ERGOPTI_FILE_WRITE_TEST_LUA="
+				.. quote(assert(arg[-1])) .. " python3 " .. quote(fixture)
+			local result = os.execute(command)
+			helpers.assert_true(result == true or result == 0, "all twenty-four native/resource-seam checks must pass")
+		end)
+	end)
+end

@@ -16,26 +16,51 @@
 local helpers = require("tests.helpers")
 
 --- A libuv double that records the child it starts.
+--- @param config string|table|nil Spawn error or explicit simulated admission refusal.
 --- @return table luv, table state
-local function fake_luv(spawn_error)
-	local state = { kills = {} }
+local function fake_luv(config)
+	local options = type(config) == "table" and config or { spawn_error = config }
+	local state = { kills = {}, handles = {}, allocations = 0, spawns = 0, reads = 0 }
 	local luv = {}
-	local function handle(kind) return { kind = kind, closing = false } end
-	function luv.new_pipe() return handle("pipe") end
-	function luv.new_timer() state.timer = handle("timer"); return state.timer end
+	local function handle(kind)
+		local value = { kind = kind, closing = false }
+		state.handles[#state.handles + 1] = value
+		return value
+	end
+	local function refusal()
+		if options.refusal == "raised" then error("explicitly simulated native admission failure") end
+		if options.refusal == "false" then return false, "simulated admission refusal" end
+		return nil, "simulated admission refusal"
+	end
+	local function allocate(kind)
+		state.allocations = state.allocations + 1
+		if options.allocation_at == state.allocations then return refusal() end
+		return handle(kind)
+	end
+	function luv.new_pipe() return allocate("pipe") end
+	function luv.update_time() end -- native void-style clock refresh
+	function luv.new_timer() state.timer = allocate("timer"); return state.timer end
 	function luv.timer_start(timer, timeout_ms, _, callback)
+		if options.start == "timer" then return refusal() end
 		timer.timeout_ms, timer.callback = timeout_ms, callback
-		return true
+		return 0
 	end
 	function luv.timer_stop(timer) timer.stopped = true; return true end
-	function luv.read_start(pipe, callback) pipe.read_callback = callback; return true end
+	function luv.read_start(pipe, callback)
+		state.reads = state.reads + 1
+		if (options.start == "stdout" and state.reads == 1)
+			or (options.start == "stderr" and state.reads == 2) then return refusal() end
+		pipe.read_callback = callback
+		return 0
+	end
 	function luv.read_stop(pipe) pipe.stopped = true; return true end
 	function luv.is_closing(value) return value.closing end
 	function luv.close(value) value.closing = true end
 	function luv.kill(pid, signal) state.kills[#state.kills + 1] = { pid = pid, signal = signal }; return true end
-	function luv.spawn(command, options, on_exit)
-		state.command, state.options, state.on_exit = command, options, on_exit
-		if spawn_error then return nil, spawn_error end
+	function luv.spawn(command, spawn_options, on_exit)
+		state.spawns = state.spawns + 1
+		state.command, state.options, state.on_exit = command, spawn_options, on_exit
+		if options.spawn_error then return nil, options.spawn_error end
 		state.process = handle("process")
 		return state.process, 4321
 	end
@@ -64,6 +89,64 @@ local function fresh_runner(luv)
 end
 
 helpers.describe("shell_runner.run_async (linux)", function()
+	for _, receipt in ipairs({ "nil", "false", "raised" }) do
+		for allocation = 1, 3 do
+			helpers.it("linux-shell-async-admission: allocation " .. allocation .. " " .. receipt .. " refuses without losing earlier handles", function()
+				local luv, state = fake_luv({ allocation_at = allocation, refusal = receipt })
+				local runner, callbacks = fresh_runner(luv), 0
+				local returned, token, reason = pcall(runner.run_async, "df", {}, { timeout_ms = 1000 },
+					function() callbacks = callbacks + 1 end)
+				helpers.assert_true(returned, "explicit constructor refusal must not escape the admission transaction")
+				helpers.assert_nil(token)
+				helpers.assert_contains(reason, "allocation")
+				helpers.assert_eq(callbacks, 0)
+				helpers.assert_eq(state.spawns, 0, "constructor refusal must precede child dispatch")
+				helpers.assert_eq(#state.handles, allocation - 1, "fixture must acquire every preceding native allocation")
+				for _, value in ipairs(state.handles) do helpers.assert_true(value.closing, "earlier allocation was lost") end
+			end)
+		end
+		for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
+			helpers.it("linux-shell-async-admission: " .. operation .. " " .. receipt .. " refuses once and retires the acquired run", function()
+				local luv, state = fake_luv({ start = operation, refusal = receipt })
+				local runner, callbacks = fresh_runner(luv), 0
+				local returned, token, reason = pcall(runner.run_async, "df", {}, { timeout_ms = 1000 },
+					function() callbacks = callbacks + 1 end)
+				helpers.assert_true(returned, "explicit start refusal must stay inside the admission transaction")
+				helpers.assert_nil(token)
+				helpers.assert_contains(reason, "activation failed")
+				helpers.assert_eq(callbacks, 0, "nil/error and callback must not report the same refusal twice")
+				helpers.assert_true(state.timer.stopped)
+				if operation == "timer" then
+					helpers.assert_eq(state.spawns, 0)
+					helpers.assert_eq(#state.handles, 3)
+					helpers.assert_eq(#state.kills, 0)
+				else
+					helpers.assert_eq(state.spawns, 1)
+					helpers.assert_eq(#state.handles, 4)
+					helpers.assert_eq(state.reads, operation == "stdout" and 1 or 2, "stop admission at the failed reader")
+					helpers.assert_eq(state.kills, {
+						{ pid = -4321, signal = "sigterm" }, { pid = -4321, signal = "sigkill" },
+					})
+					helpers.assert_eq(state.process.closing, false, "a started child must remain owned until its late exit")
+					state.on_exit(0, 0)
+					helpers.assert_true(state.process.closing)
+					state.on_exit(0, 0)
+					helpers.assert_eq(callbacks, 0, "late exit must preserve the silent refusal")
+				end
+				for _, value in ipairs(state.handles) do helpers.assert_true(value.closing, "admission left an owned handle") end
+			end)
+		end
+	end
+
+	if pcall(require, "luv") and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-shell-async-admission: actual children and handles retire on five explicit native refusal seams", function()
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_shell_async_admission.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native ShellRunner admission fixture must pass")
+		end)
+	end
+
 	helpers.it("refuses a failed spawn without calling back (linux-spawn-refusal-once)", function()
 		local luv, state = fake_luv("ENOENT: no such file or directory")
 		local runner = fresh_runner(luv)

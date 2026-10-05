@@ -18,6 +18,7 @@ local Logger = require("logger.shim")
 local Sink = require("infra.logger_sink")
 local checks, failures = 0, 0
 local directories = {}
+local restricted_directories = {}
 
 local function full_descriptors()
 	local count = 0
@@ -56,10 +57,42 @@ local function paths(path)
 		path .. "/" .. dirs.files.errors_prefix .. date .. dirs.files.extension
 end
 
+local function descriptors(path)
+	local count = 0
+	for name in uv.fs_scandir_next, assert(uv.fs_scandir("/proc/self/fd")) do
+		if uv.fs_readlink("/proc/self/fd/" .. name) == path then count = count + 1 end
+	end
+	return count
+end
+
+local function configured_directory(name)
+	local state = directory(name)
+	directory(name .. "/ergopti_plus")
+	local dir = directory(name .. "/ergopti_plus/logs")
+	assert(uv.os_setenv("XDG_STATE_HOME", state))
+	assert(require("infra.config_paths").get_logs_dir() == dir)
+	return dir
+end
+
+local function restrict_channels(dir)
+	assert(uv.getuid() ~= 0, "native permission receipts require a non-root process")
+	local main, errors = paths(dir)
+	assert(uv.fs_chmod(main, 256)) -- owner read, no write; acquired FDs stay writable
+	assert(uv.fs_chmod(errors, 256))
+	return main, errors
+end
+
+local function refuse_directory(dir)
+	assert(uv.fs_chmod(dir, 320)) -- owner read/execute, no write
+	restricted_directories[#restricted_directories + 1] = dir
+end
+
 local function check(name, test)
 	checks = checks + 1
 	local ok, err = xpcall(test, debug.traceback)
 	Sink.uninstall(Logger)
+	for _, dir in ipairs(restricted_directories) do assert(uv.fs_chmod(dir, 448)) end
+	restricted_directories = {}
 	assert(full_descriptors() == baseline_full_descriptors, "fixture retained a failed descriptor")
 	if ok then print("PASS " .. name) else
 		failures = failures + 1
@@ -122,6 +155,87 @@ check("ordinary native channels retain complete independent lines", function()
 	assert(not read(errors):find("Normal main channel receipt.", 1, true))
 	assert(read(errors):find("Normal mirrored channel receipt.", 1, true))
 	assert(Sink.is_file_sink_active())
+end)
+
+check("refused repoint keeps acquired handles after their paths become read-only", function()
+	local old = directory("repoint-refused-old")
+	assert(Sink.install(Logger, { log_dir = old }))
+	local main, errors = restrict_channels(old)
+	Logger.warn("native-repoint-before", "Acquired old channels still append after chmod.")
+	assert(read(main):find("still append after chmod", 1, true))
+	assert(read(errors):find("still append after chmod", 1, true))
+	local target = configured_directory("repoint-refused-state")
+	refuse_directory(target)
+	local moved, reason = Sink.repoint()
+	assert(moved == false and type(reason) == "string")
+	assert(Sink.log_dir() == old and Sink.is_file_sink_active(), "refusal discarded the durable old owner")
+	assert(descriptors(main) == 1 and descriptors(errors) == 1, "refusal closed an acquired old descriptor")
+	Logger.warn("native-repoint-after", "Refused destination preserves both old channels.")
+	assert(read(main):find("preserves both old channels", 1, true))
+	assert(read(errors):find("preserves both old channels", 1, true))
+end)
+
+check("repeated refused repoints keep the same acquired native pair", function()
+	local old = directory("repoint-repeated-old")
+	assert(Sink.install(Logger, { log_dir = old }))
+	local main, errors = restrict_channels(old)
+	refuse_directory(configured_directory("repoint-repeated-state"))
+	for attempt = 1, 2 do
+		assert(Sink.repoint() == false)
+		assert(descriptors(main) == 1 and descriptors(errors) == 1, "retry replaced the healthy old pair")
+		Logger.warn("native-repoint-retry", "Old native owner remains writable after refusal " .. attempt)
+		assert(read(main):find("after refusal " .. attempt, 1, true))
+		assert(read(errors):find("after refusal " .. attempt, 1, true))
+	end
+end)
+
+check("partial candidate is closed without retiring the old native owner", function()
+	local old = directory("repoint-partial-old")
+	assert(Sink.install(Logger, { log_dir = old }))
+	local main, errors = restrict_channels(old)
+	local target = configured_directory("repoint-partial-state")
+	local candidate_main, candidate_errors = paths(target)
+	write(candidate_main, "Existing refused main bytes.\n")
+	assert(uv.fs_chmod(candidate_main, 256))
+	assert(not uv.fs_stat(candidate_errors))
+	assert(Sink.repoint() == false)
+	assert(uv.fs_stat(candidate_errors).size == 0, "partial mirror was not genuinely acquired")
+	assert(descriptors(candidate_errors) == 0, "partial candidate retained its append descriptor")
+	assert(read(candidate_main) == "Existing refused main bytes.\n")
+	assert(Sink.is_file_sink_active() and descriptors(main) == 1 and descriptors(errors) == 1,
+		"partial acquisition retired the healthy old owner")
+end)
+
+check("successful repoint switches both native channels and retires the old pair", function()
+	local old = directory("repoint-success-old")
+	assert(Sink.install(Logger, { log_dir = old }))
+	local main, errors = restrict_channels(old)
+	local target = configured_directory("repoint-success-state")
+	assert(Sink.repoint())
+	assert(Sink.log_dir() == target and Sink.is_file_sink_active())
+	assert(descriptors(main) == 0 and descriptors(errors) == 0, "successful switch retained the old pair")
+	Logger.warn("native-repoint-success", "Both candidate native channels own the new line.")
+	local new_main, new_errors = paths(target)
+	assert(read(new_main):find("own the new line", 1, true))
+	assert(read(new_errors):find("own the new line", 1, true))
+	assert(not read(main):find("own the new line", 1, true))
+	assert(not read(errors):find("own the new line", 1, true))
+end)
+
+check("refused optional mirror keeps successful native main repoint usable", function()
+	local old = directory("repoint-mirror-old")
+	assert(Sink.install(Logger, { log_dir = old }))
+	local main, errors = restrict_channels(old)
+	local target = configured_directory("repoint-mirror-state")
+	local new_main, new_errors = paths(target)
+	write(new_errors, "Existing refused mirror bytes.\n")
+	assert(uv.fs_chmod(new_errors, 256))
+	assert(Sink.repoint() and Sink.is_file_sink_active())
+	assert(descriptors(main) == 0 and descriptors(errors) == 0)
+	Logger.warn("native-repoint-mirror", "The accepted native main channel remains durable.")
+	assert(read(new_main):find("remains durable", 1, true))
+	assert(read(new_errors) == "Existing refused mirror bytes.\n")
+	assert(descriptors(new_errors) == 0, "refused mirror acquired a native descriptor")
 end)
 
 for _, operation in ipairs({ "install", "prepare", "repoint" }) do
