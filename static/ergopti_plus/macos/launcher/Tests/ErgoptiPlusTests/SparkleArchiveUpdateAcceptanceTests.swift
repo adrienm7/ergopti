@@ -240,7 +240,6 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 	private func annotateCensusRefusal(_ stdout: String) {
 		guard stdout.utf8.count <= 512,
 			let packet = try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any],
-			Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno"]),
 			packet["code"] as? String == "path-unavailable" else { return }
 		func integer(_ key: String, maximum: Int64) -> Int64? {
 			guard let value = packet[key] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
@@ -248,11 +247,28 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				value.doubleValue == Double(value.int64Value) else { return nil }
 			return value.int64Value
 		}
-		guard integer("schema", maximum: 1) == 1,
+		guard let schema = integer("schema", maximum: 2), schema == 1 || schema == 2,
 			let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
 			let pathErrno = integer("path_errno", maximum: 4095) else { return }
-		// The helper's PID is a diagnostic fact, not an ownership-closure ACK.
-		print("Native Sparkle census refusal: code=path-unavailable helper_pid=\(helperPID) path_errno=\(pathErrno)")
+		var summary = "Native Sparkle census refusal: code=path-unavailable helper_pid=\(helperPID) path_errno=\(pathErrno)"
+		if schema == 1 {
+			guard Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno"]) else { return }
+		} else {
+			let states: Set<String> = ["creating", "runnable", "sleeping", "stopped", "zombie",
+				"unavailable", "identity-refused", "state-refused", "abi-refused", "diagnostic-refused"]
+			guard Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno",
+				"bsd_bytes", "bsd_errno", "bsd_state"]),
+				let bytes = integer("bsd_bytes", maximum: 4095),
+				let nativeErrno = integer("bsd_errno", maximum: 4095),
+				let state = packet["bsd_state"] as? String, states.contains(state) else { return }
+			if ["creating", "runnable", "sleeping", "stopped", "zombie"].contains(state) {
+				guard bytes == 136, nativeErrno == 0 else { return }
+			}
+			summary += " bsd_bytes=\(bytes) bsd_errno=\(nativeErrno) bsd_state=\(state)"
+		}
+		// These are snapshot facts, never an ownership-closure ACK or PID skip.
+		// XCTest evidence must carry them even when raw CI logs are unavailable.
+		XCTFail(summary)
 	}
 
 	private func privateDirectory(_ url: URL) throws {
