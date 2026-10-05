@@ -134,6 +134,7 @@ local _agent_timer = nil
 local _agent_generation = 0
 local _model_consent_owner = nil
 local _modal_resync_owner = nil
+local _enable_modal_resync_owner = nil
 local _agent_triage = nil
 local _agent_triaged = {}
 -- The application the user last typed in, for the menu's exclusion row
@@ -2427,6 +2428,9 @@ end
 --- Cancels pending/in-flight work and discards the current engine buffer.
 function M.cancel()
 	if _scope_owner then return false end
+	-- Only the one reset bracketed by this enable dialog's native restoration
+	-- may continue its unchanged receipt. Every other cancellation still revokes it.
+	if _enable_modal_resync_owner then _enable_modal_resync_owner.claim() end
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.withdraw(_modal_resync_owner)
@@ -2631,12 +2635,14 @@ function M.enable(on_changed)
 	if _enabled then return true end
 	if _enable_admission and _enable_admission.pending() then return false end
 	local Preferences = require("infra.llm_preferences")
+	local modal_generation_offset = 0
 	local function snapshot()
 		local values, source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
 		local backend = M.get_backend()
 		return {
 			backend = backend, model = values["llm.models.ollama"], origin = M.get_base_url(),
-			generation = Preferences.generation() + _enable_generation, source = source,
+			generation = Preferences.generation() + _enable_generation
+				- modal_generation_offset, source = source,
 			enabled = values["llm.enabled"], paused = _is_paused(),
 			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values["llm.enabled"]
 				or (backend == "ollama" and M.get_current_model() ~= values["llm.models.ollama"]),
@@ -2654,13 +2660,100 @@ function M.enable(on_changed)
 			Logger.info(LOG, "Prediction engine enabled after current admission.")
 			return true
 		end,
-		reject = function(origin)
-			local _, retry = require("ui.llm_enable_refusal").show(origin)
+		reject = function(origin, _, _, captured, current)
+			local Servers = require("modules.llm.local_servers")
+			local Entries = require("modules.llm.api_entries")
+			local Discovery = require("llm.local_server_discovery")
+			local I18n = require("infra.i18n")
+			local replacements = {}
+			local function current_cached()
+				return current() and not Servers.is_stale() and not Servers.is_sweeping()
+			end
+			-- The Models menu owns discovery. A refused enable consumes only its
+			-- current cached verdicts, never treating logical publication as proof
+			-- that the HTTP owner's process and native handles have retired.
+			if current_cached() then
+				for _, id in ipairs(Servers.detected()) do
+					local verdict = Servers.result(id)
+					local server = Servers.servers()[id]
+					local model = verdict and verdict.models and verdict.models[1]
+					local receipt = verdict and Servers.capture(id)
+					if server and verdict and verdict.status == Discovery.STATUS_UP and model
+						and receipt and Servers.is_current(receipt, model) then
+						local values = { server.label, model,
+							require("llm.local_server_menu").host_of(verdict.base_url) }
+						replacements[#replacements + 1] = {
+							label = (I18n.get("llm.unreachable.use_server"):gsub("{(%d+)}",
+								function(index) return tostring(values[tonumber(index)] or "") end)),
+							value = { id = id, model = model, receipt = receipt },
+						}
+					end
+				end
+			end
+			local continuation = { claimed = false }
+			function continuation.claim()
+				if continuation.claimed or not current() then return false end
+				continuation.claimed = true
+				modal_generation_offset = modal_generation_offset + 1
+				return true
+			end
+			local function modal_observer(stage, receipt)
+				if stage == "before" then
+					if type(receipt) ~= "table" or receipt.ok ~= true or not current() then return false end
+					_enable_modal_resync_owner = continuation
+				elseif stage == "after" or stage == "refused" then
+					_enable_modal_resync_owner = nil
+					if stage == "refused" or type(receipt) ~= "table" or receipt.ok ~= true then return false end
+					return current()
+				end
+				return true
+			end
+			local shown, _, retry, replacement = pcall(require("ui.llm_enable_refusal").show,
+				origin, replacements, modal_observer)
+			_enable_modal_resync_owner = nil
+			if not shown then
+				Logger.error(LOG, "The local AI refusal dialog failed: %s.", tostring(_))
+				return nil
+			end
+			if replacement and current_cached() then
+				local selection_revision = _enable_generation
+				local preference_revision = Preferences.generation()
+				local result = Servers.apply(replacement.receipt, { model = replacement.model }, current_cached)
+				if not result or not result.saved or not result.entry then return nil end
+				local source = Entries.capture_source()
+				local function selection_current(phase)
+					local values, live_source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
+					local active = Entries.active()
+					-- Only the backend owner's second admission observes its one revision
+					-- advance. A reset or preference rewrite during dismissal cannot borrow
+					-- that advance, even when the resulting source bytes happen to match.
+					local expected_revision = selection_revision + (phase == "after" and 1 or 0)
+					return not _is_paused() and M.can_configure_local_servers() and not _enabled
+						and _enable_generation == expected_revision and Preferences.generation() == preference_revision
+						and values["llm.enabled"] == false and values[BACKEND_KEY] == captured.backend
+						and values["llm.models.ollama"] == captured.model
+						and live_source.status == captured.source.status and live_source.content == captured.source.content
+						and source ~= nil and Entries.source_is_current(source)
+						and active ~= nil and active.id == result.entry.id and active.model == replacement.model
+				end
+				if selection_current() and M.set_backend("api", selection_current) == true then
+					if M.enable() ~= true then
+						Logger.warn(LOG, "The replacement backend was selected; AI enable was refused.")
+					end
+				else
+					Logger.warn(LOG, "The replacement server was saved; its backend selection was refused.")
+				end
+				if type(on_changed) == "function" then on_changed() end
+			end
 			return retry == true and "retry" or nil
 		end,
 		changed = on_changed,
 	})
-	return _enable_admission.enable()
+	local dispatched = _enable_admission.enable()
+	-- A refused synchronous probe can open the repair dialog before returning.
+	-- Its explicit replacement may already have acknowledged API enable through
+	-- the same preference owner; report that actual enabled state to the caller.
+	return dispatched == true or _enabled == true
 end
 
 function M.disable()
@@ -2734,20 +2827,21 @@ end
 
 --- Selects the backend.
 --- @param kind string "ollama" or "api"
+--- @param admit function|nil Receives "before" or "after" the owner's revision advance.
 --- @return boolean
 function M.set_backend(kind, admit)
-	local function admitted()
+	local function admitted(phase)
 		if admit == nil then return true end
 		if type(admit) ~= "function" then return false end
-		local ok, value = pcall(admit)
+		local ok, value = pcall(admit, phase)
 		return ok and value == true
 	end
-	if _scope_owner or not admitted() then return false end
+	if _scope_owner or not admitted("before") then return false end
 	if not BACKENDS[kind] then return false end
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.dismiss()
-	if _scope_owner or not admitted() then return false end
+	if _scope_owner or not admitted("after") then return false end
 	if require("infra.llm_preferences").set(BACKEND_KEY, kind) ~= true then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
 	return true

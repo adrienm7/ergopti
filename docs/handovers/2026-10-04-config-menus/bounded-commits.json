@@ -1,0 +1,58 @@
+[
+	{
+		"sha": "f90206b6fc88dc25f844ff5010bb46bbe248de60",
+		"subject": "refactor(menu): declare Linux selection helper commands"
+	},
+	{
+		"sha": "792884ed0088a276c5f9a3c3f45daf295264ce76",
+		"subject": "fix(config): preserve retired keys until explicit cleanup"
+	},
+	{
+		"sha": "905b4789f6297b65a765a31724997940d339bcd8",
+		"subject": "fix(config): retain navigation layer rollback debt"
+	},
+	{
+		"sha": "b7a3495536a616ba0e368c8061bd8d6b0df0ee75",
+		"subject": "refactor(menu): declare per-key native tap hold commands"
+	},
+	{
+		"sha": "523e6a38871df04cf018f13f166f49b9f1e56afd",
+		"subject": "fix(config): retain macOS scope navigation layer inverses"
+	},
+	{
+		"sha": "5514f8b357daeb0e7c05eb317784d1c14df1eb66",
+		"subject": "fix(config): fence removals with native writer leases"
+	},
+	{
+		"sha": "ef278416ee26c74c1ffd88b3ec86416b2b7036e4",
+		"subject": "fix(onboarding): fence folder reads and Linux trigger choices"
+	},
+	{
+		"sha": "bd4bb3a44d723ecd31c7d5653b9202f1b21f45b9",
+		"subject": "fix(config): retain obsolete Karabiner scalar leaves"
+	},
+	{
+		"sha": "375de99fbfdaf0ecf4d4ba06e71be7940fe0470c",
+		"subject": "fix(config): preserve neutral obsolete tap hold bindings"
+	},
+	{
+		"sha": "68a66ff2069681da0e323a95b29b8613cce8b992",
+		"subject": "fix(config): preserve obsolete Windows installed records"
+	},
+	{
+		"sha": "7339f6fc097286b557a469d6637f6dcdd9a3efd9",
+		"subject": "fix(config): load Windows settings from semantic snapshots"
+	},
+	{
+		"sha": "691628d3d0b7cd0f7bfab3eed13933b3795461df",
+		"subject": "docs(config): prepare Windows workstation TODO handoff"
+	},
+	{
+		"sha": "68d536e1e5d0180a498792587fbb2a0d7c6db9f0",
+		"subject": "fix(test): admit SQLite receipts before counting rows"
+	},
+	{
+		"sha": "1940608c0bf1249551f5b38e749c7fa4ad57a127",
+		"subject": "fix(test): clean only owned Tap-Hold scope backups"
+	}
+]

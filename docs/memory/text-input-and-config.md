@@ -185,9 +185,12 @@ canonical values, not keep logging the same startup error forever.
 
 `config.toml` carries `[_meta] schema_version`, read at boot by every driver
 against `_shared/core/config_schema/migrations.toml` (ADR-009). Renaming,
-moving, retyping or removing a config key ships a registry step in the same
-commit, with a corpus case each named driver replays; readers drop the old
-spelling at once. A writer stamps only a file it creates; an existing file
+moving or retyping a config key ships a registry step in the same commit, with
+a corpus case each named driver replays. Retired keys reported by the explicit
+cleanup remain on disk until that cleanup; boot migrations and ordinary saves
+preserve them (ADR-009's retirement exception). Readers drop the old spelling
+at once. Invalid schema stamps retain strict boot and session-write refusal.
+A writer stamps only a file it creates; an existing file
 keeps the stamp the boot migration gave it, or its remaining steps are skipped.
 The Windows full save is the one exception: it always writes the current
 version, which is safe only because it runs after the boot migration and never
