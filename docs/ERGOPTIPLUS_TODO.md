@@ -4167,6 +4167,7 @@ fix as explicit code work rather than unsupported-platform exceptions.
   observer are adopted. Mandatory pure/native registration is committed;
   the hosted three-OS manual run will qualify the exact composed tree. The original38 pure observer/supervisor controls and ten added controls
   pass48/0. Replaying all12 unchanged signed-Hammerspoon screenshots passes12/0.
+  The canonically formatted final observer also passes48/0 and12/0 replay.
   These image replays do not replace fresh native creator and source-freeze
   qualification; missing GUI/trust/capture/cleanup must fail, not skip.
   Direct-source manual run37306690694 produced all12 Mac native captures with

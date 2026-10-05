@@ -142,7 +142,37 @@ def validate_pixels(case, directory):
                 counts["green"] == 0 and counts["orange"] == 0,
                 "unselected row contains selected-role color",
             )
-        left = min(x for y in band for x, kind in ink[y] if kind == "gray")
+        gray = [x for y in band for x, kind in ink[y] if kind == "gray"]
+        left = min(gray)
+        if index == case["selected"]:
+            # Emoji antialiasing can contain gray pixels before the typed text.
+            # The independently observed correction color and regular MMMM
+            # advance bound the complete typed run, not the marker's pixels.
+            green_left = min(x for y in band for x, kind in ink[y] if kind == "green")
+            normal_width = case["glyph_widths"][0] * sx
+            tolerance = 2.5 * sx
+            body = [x for x in gray if green_left - normal_width - tolerance <= x < green_left]
+            require(len(body) >= 25, "native gray typed body missing")
+            # Glyph advances describe origins, not antialiased ink bounds.
+            # Four separate regular M glyphs must span the typed run before
+            # the first green M; a fragment or shifted run cannot borrow it.
+            columns = sorted(set(body))
+            starts = [
+                x for offset, x in enumerate(columns) if offset == 0 or x > columns[offset - 1] + 1
+            ]
+            require(
+                len(starts) == 4
+                and all(
+                    abs(right - left - normal_width / 4) <= tolerance
+                    for left, right in zip(starts, starts[1:])
+                ),
+                "native typed body width does not match independent regular glyphs",
+            )
+            left = starts[0]
+            require(
+                abs(green_left - left - normal_width) <= tolerance,
+                "native typed body is not adjacent to its correction",
+            )
         observations.append(
             {"row": index, "counts": counts, "typed_left": left, "top": band[0], "bottom": band[-1]}
         )
@@ -161,17 +191,35 @@ def validate_pixels(case, directory):
         start = row["typed_left"]
         normal_width = case["glyph_widths"][0] * sx
         bold_width = case["glyph_widths"][1] * sx
-        regular_ink = sum(
-            color_class(pixels[x, y]) == "gray"
-            for y in band
-            for x in range(start, min(x1, math.floor(start + normal_width)))
+        # The role classifier deliberately recognizes a narrow gray band. Its
+        # count excludes solid antialiased cores on color-managed captures and
+        # therefore measures edges, not glyph weight. Integrate neutral contrast
+        # above the same row's empty backplate in the unchanged native windows.
+        require(start > x0, "native row backplate missing")
+        backplate = {y: pixels[x0, y] for y in band}
+        require(
+            all(
+                pixel[3] >= 200
+                and max(pixel[:3]) - min(pixel[:3]) <= 5
+                and color_class(pixel) is None
+                for pixel in backplate.values()
+            ),
+            "native row backplate is not opaque neutral background",
         )
+
+        def contrast_mass(left, right):
+            total = 0
+            for y in band:
+                background = sum(backplate[y][:3]) / 3
+                for x in range(left, min(x1, right)):
+                    pixel = pixels[x, y]
+                    if pixel[3] >= 200 and max(pixel[:3]) - min(pixel[:3]) <= 5:
+                        total += max(0, sum(pixel[:3]) / 3 - background)
+            return total
+
+        regular_ink = contrast_mass(start, math.floor(start + normal_width))
         bold_start = math.ceil(start + normal_width)
-        bold_ink = sum(
-            color_class(pixels[x, y]) == "gray"
-            for y in band
-            for x in range(bold_start, min(x1, math.floor(bold_start + bold_width)))
-        )
+        bold_ink = contrast_mass(bold_start, math.floor(bold_start + bold_width))
         require(
             bold_ink > regular_ink * 1.03, "native unselected correction is not visibly heavier"
         )
