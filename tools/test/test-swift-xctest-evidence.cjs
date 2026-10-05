@@ -661,3 +661,240 @@ try {
 console.log(
 	'[OK] Six lossless closed records, Unicode, source identity and twenty-one mandatory refusal cases are admitted independently of raw XCTest.'
 );
+
+// Fixed archive outcomes are independently judged from authentic XCTest terminals.
+// These fixtures are authored here, not regenerated from the reporter projection.
+{
+	const {
+		archiveAnnotation,
+		archiveOutcomes,
+		main
+	} = require('../diagnostics/swift_xctest_evidence.cjs');
+	const brewCase =
+		'-[ErgoptiPlusTests.HomebrewArchiveAcceptanceTests testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState]';
+	const sparkleCase =
+		'-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch]';
+	const mixed = [
+		"Test Suite 'All tests' started at 2026-10-05 01:00:00.000.",
+		`Test Case '${brewCase}' started.`,
+		'private helper exited zero; receipt.checked; cleanup.closed',
+		`Test Case '${brewCase}' failed (0.100 seconds).`,
+		`Test Case '${sparkleCase}' started.`,
+		`Test Case '${sparkleCase}' passed (0.200 seconds).`,
+		"Test Suite 'All tests' failed at 2026-10-05 01:00:01.000.",
+		'\t Executed 2 tests, with 1 failure (0 unexpected) in 0.300 (0.310) seconds',
+		'◇ Test run started.',
+		'✔ Test run with 0 tests passed after 0.001 seconds.'
+	].join('\n');
+	const expectedMixed = [
+		{
+			schema: 1,
+			case: 'brew',
+			outcome: 'FAIL',
+			basis: 'exact-xctest-completion',
+			script_status: 1,
+			capture_status: 0
+		},
+		{
+			schema: 1,
+			case: 'sparkle',
+			outcome: 'PASS',
+			basis: 'exact-xctest-completion',
+			script_status: 1,
+			capture_status: 0
+		}
+	];
+	assert.deepEqual(
+		archiveOutcomes(mixed, 1, 0),
+		expectedMixed,
+		'authentic Sparkle PASS is visible while Brew makes the global suite FAIL'
+	);
+	assert.equal(
+		evaluate(mixed, 1, 0).exit_status,
+		1,
+		'case PASS cannot override the global verdict'
+	);
+	assert.equal(evaluate(mixed, 1, 0).complete, false);
+	assert.equal(
+		archiveOutcomes(mixed, 1, 0)[0].outcome,
+		'FAIL',
+		'failure after helper/cleanup progress remains the actual case FAIL'
+	);
+	const allPassed = mixed
+		.replace(`Test Case '${brewCase}' failed`, `Test Case '${brewCase}' passed`)
+		.replace("Test Suite 'All tests' failed", "Test Suite 'All tests' passed")
+		.replace('with 1 failure', 'with 0 failures');
+	assert.deepEqual(
+		archiveOutcomes(allPassed, 0, 0).map((receipt) => receipt.outcome),
+		['PASS', 'PASS']
+	);
+	assert.equal(evaluate(allPassed, 0, 0).exit_status, 0);
+	assert.deepEqual(
+		archiveOutcomes('\x1b[32m' + allPassed.replaceAll('\n', '\r\n') + '\x1b[0m', 0, 0),
+		archiveOutcomes(allPassed, 0, 0),
+		'styling and PTY CRLF retain the same authentic receipts'
+	);
+	const skipped = allPassed
+		.replace(`Test Case '${brewCase}' passed`, `Test Case '${brewCase}' skipped`)
+		.replace('with 0 failures', 'with 1 test skipped and 0 failures');
+	assert.deepEqual(
+		archiveOutcomes(skipped, 0, 0).map((receipt) => receipt.outcome),
+		['SKIP', 'PASS']
+	);
+	assert.equal(
+		evaluate(skipped, 0, 0).exit_status,
+		1,
+		'genuine SKIP remains distinct and globally refused'
+	);
+	const unavailable = [
+		['missing transcript/API absence', '', 0, 0],
+		['capture failure', allPassed, 0, 17],
+		['capture failure during failed suite', mixed, 1, 17],
+		['native nonzero contradicts successful suite', allPassed, 42, 0],
+		['missing case start', mixed.replace(`Test Case '${sparkleCase}' started.\n`, ''), 1, 0],
+		[
+			'missing case terminal',
+			mixed.replace(`Test Case '${sparkleCase}' passed (0.200 seconds).\n`, ''),
+			1,
+			0
+		],
+		[
+			'duplicate case start',
+			mixed.replace(
+				`Test Case '${sparkleCase}' started.`,
+				`Test Case '${sparkleCase}' started.\nTest Case '${sparkleCase}' started.`
+			),
+			1,
+			0
+		],
+		[
+			'duplicate terminal',
+			mixed.replace(
+				`Test Case '${sparkleCase}' passed (0.200 seconds).`,
+				`Test Case '${sparkleCase}' passed (0.200 seconds).\nTest Case '${sparkleCase}' passed (0.200 seconds).`
+			),
+			1,
+			0
+		],
+		[
+			'conflicting terminal',
+			mixed.replace(
+				`Test Case '${sparkleCase}' passed (0.200 seconds).`,
+				`Test Case '${sparkleCase}' passed (0.200 seconds).\nTest Case '${sparkleCase}' failed (0.200 seconds).`
+			),
+			1,
+			0
+		],
+		['truncated suite', mixed.slice(0, mixed.indexOf("Test Suite 'All tests' failed")), 1, 0],
+		[
+			'missing root start',
+			mixed.replace("Test Suite 'All tests' started at 2026-10-05 01:00:00.000.\n", ''),
+			1,
+			0
+		],
+		[
+			'restarted root',
+			mixed + "\nTest Suite 'All tests' started at 2026-10-05 01:00:02.000.",
+			1,
+			0
+		],
+		['terminal after root', mixed + `\nTest Case '${sparkleCase}' passed (0.200 seconds).`, 1, 0],
+		['case before root', `Test Case '${sparkleCase}' started.\n` + mixed, 1, 0],
+		['malformed terminal', mixed.replace('(0.200 seconds).', '(unknown seconds).'), 1, 0],
+		['count mismatch', mixed.replace('Executed 2 tests', 'Executed 3 tests'), 1, 0],
+		[
+			'missing summary',
+			mixed.replace(
+				'\t Executed 2 tests, with 1 failure (0 unexpected) in 0.300 (0.310) seconds\n',
+				''
+			),
+			1,
+			0
+		],
+		['malformed summary', mixed.replace('(0 unexpected)', '(unknown unexpected)'), 1, 0],
+		['failed root without failures', mixed.replace('with 1 failure', 'with 0 failures'), 1, 0],
+		[
+			'passed root with failure',
+			mixed.replace("Test Suite 'All tests' failed", "Test Suite 'All tests' passed"),
+			0,
+			0
+		],
+		['unexpected exceeds failures', mixed.replace('(0 unexpected)', '(2 unexpected)'), 1, 0],
+		['vacuous Swift Testing success', '✔ Test run with 0 tests passed after 0.001 seconds.', 0, 0]
+	];
+	for (const [reason, text, scriptStatus, captureStatus] of unavailable)
+		assert.deepEqual(
+			archiveOutcomes(text, scriptStatus, captureStatus).map((receipt) => receipt.outcome),
+			['UNAVAILABLE', 'UNAVAILABLE'],
+			reason
+		);
+	const unrelated =
+		allPassed
+			.replaceAll(brewCase, '-[ErgoptiPlusTests.OtherTests testOther]')
+			.replaceAll(sparkleCase, '-[ErgoptiPlusTests.OtherTests testOtherTwo]') +
+		'\n::notice::sparkle PASS';
+	assert.deepEqual(
+		archiveOutcomes(unrelated, 0, 0).map((receipt) => receipt.outcome),
+		['UNAVAILABLE', 'UNAVAILABLE'],
+		'arbitrary tests and annotation text cannot supply archive success'
+	);
+	assert.equal(
+		archiveAnnotation({
+			...expectedMixed[1],
+			private: 'https://private.invalid/path?nonce=secret'
+		}),
+		'::notice title=Native archive XCTest outcome::{"schema":1,"case":"sparkle","outcome":"PASS","basis":"exact-xctest-completion","script_status":1,"capture_status":0}'
+	);
+	for (const change of [
+		{ case: 'private/path' },
+		{ outcome: 'unknown' },
+		{ basis: 'helper-zero' },
+		{ capture_status: 256 }
+	])
+		assert.throws(() => archiveAnnotation({ ...expectedMixed[1], ...change }));
+	for (const status of [-1, 256, '01', '', '0\n::notice::PASS'])
+		assert.throws(() => archiveOutcomes(mixed, status, 0));
+	const archiveRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-archive-outcomes-'));
+	try {
+		const transcriptPath = path.join(archiveRoot, 'native.log');
+		const verdictPath = path.join(archiveRoot, 'verdict.json');
+		fs.writeFileSync(transcriptPath, mixed);
+		const output = [];
+		assert.equal(
+			main([transcriptPath, '1', '0', verdictPath], (line) => output.push(line)),
+			1
+		);
+		assert.deepEqual(
+			JSON.parse(fs.readFileSync(verdictPath, 'utf8')).archive_outcomes,
+			expectedMixed
+		);
+		assert.deepEqual(
+			output.filter((line) => line.startsWith('::notice ')),
+			[
+				'::notice title=Native archive XCTest outcome::{"schema":1,"case":"brew","outcome":"FAIL","basis":"exact-xctest-completion","script_status":1,"capture_status":0}',
+				'::notice title=Native archive XCTest outcome::{"schema":1,"case":"sparkle","outcome":"PASS","basis":"exact-xctest-completion","script_status":1,"capture_status":0}'
+			]
+		);
+		assert.ok(
+			output.some((line) => line.startsWith('::error ')),
+			'old global failure annotations remain present'
+		);
+		const lost = [];
+		assert.equal(
+			main([path.join(archiveRoot, 'missing'), '42', '0', verdictPath], (line) => lost.push(line)),
+			42
+		);
+		assert.deepEqual(
+			lost
+				.filter((line) => line.startsWith('::notice '))
+				.map((line) => JSON.parse(line.split('::')[2]).outcome),
+			['UNAVAILABLE', 'UNAVAILABLE'],
+			'lost transcript cannot publish success'
+		);
+	} finally {
+		fs.rmSync(archiveRoot, { recursive: true, force: true });
+	}
+	console.log(
+		'[OK] Exact native Brew/Sparkle XCTest outcomes remain bounded, retrievable and independent of the global failure verdict.'
+	);
+}
