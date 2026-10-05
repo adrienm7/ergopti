@@ -2594,6 +2594,15 @@ corrected without changing production, corpus expectations or assertions.
 Full selected verification and hosted qualification are recorded separately;
 these fixture repairs do not complete TODO33 or device acceptance.
 
+Windows configuration qualification now seeds the four actual section metadata
+values before testing their preservation, refusing missing seed anchors. The
+semantic snapshot loader no longer incidentally primes the separate raw cache;
+the dynamic publication fixture now establishes that cache precondition
+explicitly. All 151/203 original assertions remain, including pending source,
+refusal, pause and master-state checks. Both are fixture-only changes; native
+Windows CI and conflict-preserving composition with current Hotstrings remain
+required, without expanding group1 into Hotstrings feature implementation.
+
 Linux ordinary TapHold saves and recommended imports now use the existing shared classified reader: only native ENOENT permits an absent document; access, other open, read and close failures refuse before mutation, backup/staging/publication or reload. Malformed-source behavior and unknown fields remain unchanged. The registered real-writer module retains all 26 original cases and adds 13 controls: the original writer gives 28 passes / 11 failures, the corrected writer 39 / 0. macOS and Windows already refuse classified unreadable sources through their existing owners. Full selected verification and hosted native CI remain pending; TODO33 stays partial.
 
 The Linux TapHold owner now ignores and reports obsolete scalar/array parents and
