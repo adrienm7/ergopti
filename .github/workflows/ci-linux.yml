@@ -1082,6 +1082,16 @@ jobs:
           npm run test:linux:http-stream | tee "$RUNNER_TEMP/linux-http-stream.log"
         timeout-minutes: 3
 
+      # This lane qualifies native runtime admission and installed helper paths.
+      # Its four actual groups are distinct from factory models and HTTP receipts.
+      - name: Qualify native managed network runtime
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
+          npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"
+        timeout-minutes: 3
+
       # The AI a user runs locally, run: the official Ollama serving a small
       # model, asked through the production modules and the real curl transport
       # for its model list, a download, streamed predictions, and — on its
@@ -1333,6 +1343,7 @@ jobs:
           e2e_assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
           xkb_source_assertions=$(sed -n 's/^=== \([0-9][0-9]*\) check(s), 0 failure(s) ===$/\1/p' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)
           http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
+          network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
           node tools/test/linux-ci-evidence.cjs record \
               --job e2e-linux \
               --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
@@ -1346,6 +1357,7 @@ jobs:
               --subject system-keymaps=1 \
               --subject "xkb-source-qualification=$xkb_source_assertions" \
               --subject "http-stream-receipts=$http_stream_assertions" \
+              --subject "managed-network-runtime=$network_runtime_assertions" \
               --subject x11-display=1 \
               --subject wayland-display=1 \
               --subject tray-symbols=1 \

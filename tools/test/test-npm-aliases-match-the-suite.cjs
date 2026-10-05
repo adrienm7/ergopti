@@ -61,6 +61,8 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Actual libuv/curl loopback receipts run under verify-change and Linux CI,
 	// independently of the Node-only static registration contract.
 	'tools/test/run-linux-http-stream-receipts.cjs',
+	// Actual GIO/runtime admission has its own planner gate and mandatory Linux lane.
+	'tools/test/run-linux-network-runtime.cjs',
 	// Real-browser render runs separately from the Node-only suite;
 	// test-changelog-release-install.cjs runs the same page scripts against
 	// a recording DOM inside the suite.

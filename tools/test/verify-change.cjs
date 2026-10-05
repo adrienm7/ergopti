@@ -500,6 +500,19 @@ const RULES = [
 		why: 'streaming HTTP receipts require actual libuv/curl status, complete error bodies and native owner settlement',
 		match: (f) =>
 			[
+				'static/ergopti_plus/_shared/lua/network/proxy_policy.lua',
+				'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+				'static/ergopti_plus/linux/adapters/curl_http_client.lua',
+				'static/ergopti_plus/linux/adapters/system_proxy.lua',
+				'static/ergopti_plus/linux/infra/curl_identity.lua',
+				'static/ergopti_plus/linux/infra/http_body_pipe.lua',
+				'static/ergopti_plus/linux/infra/managed_http.lua',
+				'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
+				'static/ergopti_plus/linux/infra/native_timer.lua',
+				'static/ergopti_plus/linux/infra/proxy_policy.lua',
+				'static/ergopti_plus/linux/platform/network/system_proxy_probe.lua',
+				'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
+				'static/ergopti_plus/linux/_generated/native_runtime.lua',
 				'static/ergopti_plus/linux/adapters/http_client.lua',
 				'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
 				'static/ergopti_plus/linux/modules/llm/local_model_probe.lua',
@@ -516,6 +529,28 @@ const RULES = [
 				'tools/test/run-linux-http-stream-receipts.cjs',
 				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
+			].includes(f)
+	},
+	{
+		gate: 'linux-network-runtime',
+		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
+		match: (f) =>
+			[
+				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'static/ergopti_plus/linux/_generated/native_runtime.lua',
+				'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
+				'static/ergopti_plus/linux/platform/network/runtime_probe.lua',
+				'static/ergopti_plus/linux/platform/network/system_proxy_probe.lua',
+				'static/ergopti_plus/linux/install.sh',
+				'tools/codegen/codegen-linux-native-runtime.cjs',
+				'tools/build/nix/flake.nix',
+				'tools/test/run-linux-network-runtime.cjs',
+				'tools/test/test-linux-network-runtime.cjs',
+				'tools/test/test-linux-network-runtime-registration.cjs',
+				'tools/test/linux-network-runtime-evidence.cjs',
+				'tools/test/fixtures/linux-network-runtime-factory.lua',
+				'.github/linux-ci-coverage.json',
+				'.github/workflows/ci-linux.yml'
 			].includes(f)
 	},
 	{
@@ -589,6 +624,7 @@ const GATE_COMMANDS = {
 	'linux-e2e': { npm: 'test:linux:e2e' },
 	'linux-xkb-source': { npm: 'test:linux:xkb-source' },
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
+	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }

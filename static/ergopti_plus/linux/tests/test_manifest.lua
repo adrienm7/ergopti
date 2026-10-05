@@ -9,6 +9,26 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.infra.test_curl_identity_exact",
+	"tests.unit.adapters.test_system_proxy_exact_identity",
+	"tests.unit.adapters.test_managed_http_exact_forwarding",
+	"tests.unit.meta.test_managed_http_fixture_import_isolation",
+	"tests.unit.adapters.test_curl_identity_helper",
+	"tests.unit.adapters.test_managed_http_public",
+	"tests.unit.adapters.test_system_proxy",
+	"tests.unit.adapters.test_system_proxy_callbacks",
+	"tests.unit.adapters.test_system_proxy_runtime_executable",
+	"tests.unit.infra.test_curl_identity_forwarding",
+	"tests.unit.infra.test_managed_http",
+	"tests.unit.infra.test_managed_http_aggregate_cancel",
+	"tests.unit.infra.test_managed_http_cancelled_admission",
+	"tests.unit.infra.test_managed_http_deadline",
+	"tests.unit.infra.test_managed_http_deadline_arm",
+	"tests.unit.infra.test_managed_http_deadline_native",
+	"tests.unit.infra.test_managed_http_queued_deadline",
+	"tests.unit.infra.test_network_proxy_policy_contract",
+	"tests.unit.meta.test_curl_engine_scan",
+
 	"tests.unit.adapters.test_user_hotstring_destination",
 	"tests.unit.infra.test_user_hotstring_runtime",
 	"tests.unit.ui.test_ergopti_extension_selection",

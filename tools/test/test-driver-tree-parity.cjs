@@ -172,7 +172,10 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    three drivers; the shared ratio rises from 59.3 %.
 //   34/56 (60.7 %) — ui/update_check hosts the shared update-check window on
 //                    all three drivers (the union took the path with macOS).
-const BASELINE_SHARED = 34;
+//   35/58 (60.3 %) — platform/network records native proxy/runtime ownership on
+//                    all three drivers. Linux binds GIO in an owned child; macOS
+//                    and Windows document their existing native adapter owners.
+const BASELINE_SHARED = 35;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -213,7 +216,11 @@ const BASELINE_SHARED = 34;
 //   the TCC entry of the embedded runtime), which neither Windows nor Linux
 //   has: a counterpart folder there would host nothing. The geometry gate
 //   records the same exemption for Windows.
-const BASELINE_UNION = 57;
+//   57 → 58 on 2026-10-05 — platform/network is added on all three drivers,
+//   paired with BASELINE_SHARED 35. Native GIO runtime/child probes need an
+//   explicit seam; the sibling README files identify their existing native
+//   HTTP/proxy owners without pretending to load GIO or adding wrapper code.
+const BASELINE_UNION = 58;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

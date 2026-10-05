@@ -158,12 +158,12 @@ end
 local function fresh_client(config)
 	local fake, state = fake_luv(config)
 	local previous_luv = package.loaded["luv"]
-	local previous_client = package.loaded["adapters.http_client"]
+	local previous_client = package.loaded["adapters.curl_http_client"]
 	package.loaded["luv"] = fake
-	package.loaded["adapters.http_client"] = nil
-	local client = require("adapters.http_client")
+	package.loaded["adapters.curl_http_client"] = nil
+	local client = require("adapters.curl_http_client")
 	package.loaded["luv"] = previous_luv
-	package.loaded["adapters.http_client"] = previous_client
+	package.loaded["adapters.curl_http_client"] = previous_client
 	return client, state
 end
 
@@ -1540,19 +1540,19 @@ helpers.describe("http_client: unavailable async runtime", function()
 	helpers.it("fails explicitly without ever calling io.popen", function()
 		local previous_luv = package.loaded["luv"]
 		local previous_preload = package.preload["luv"]
-		local previous_client = package.loaded["adapters.http_client"]
+		local previous_client = package.loaded["adapters.curl_http_client"]
 		local previous_popen = io.popen
 		package.loaded["luv"] = nil
 		package.preload["luv"] = function() error("missing luv") end
-		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.curl_http_client"] = nil
 		io.popen = function() error("a synchronous fallback must never run") end
-		local client = require("adapters.http_client")
+		local client = require("adapters.curl_http_client")
 		local result = nil
 		client.post("http://127.0.0.1:11434/api/chat", {}, "", function(value) result = value end)
 		io.popen = previous_popen
 		package.preload["luv"] = previous_preload
 		package.loaded["luv"] = previous_luv
-		package.loaded["adapters.http_client"] = previous_client
+		package.loaded["adapters.curl_http_client"] = previous_client
 		helpers.assert_eq(result.error, "asynchronous HTTP unavailable")
 	end)
 end)
@@ -1989,5 +1989,508 @@ helpers.describe("http_client: unknown raw body identity", function()
 		for _, fd in ipairs(state.descriptors) do state.identities[fd] = nil end
 		helpers.assert_true(client.cancel("unknown-body"), "EBADF still proves retirement without inventing descriptor ownership")
 		helpers.assert_eq(callbacks, 0)
+	end)
+end)
+
+-- Append these independent controls to the exact preserved native HTTP suite.
+-- Its existing fake_luv/fresh_client helpers are explicit model ports, not
+-- production transport overrides. This file is inert and has not run.
+
+local EXECUTABLE_IDENTITY = { device = 42, inode = 123, size = 456,
+	mtime_sec = 100, mtime_nsec = 200, ctime_sec = 300, ctime_nsec = 400 }
+
+-- Independent native file observation port with fixed, manually chosen facts.
+local function private_client(config)
+	local options = config or {}
+	local fake, state = fake_luv(options)
+	state.stat_calls = {}
+	function fake.fs_stat(path)
+		state.stat_calls[#state.stat_calls + 1] = path
+		if options.stat_case == "missing" then return nil, "SIMULATED missing file" end
+		if options.stat_case == "throw" then error("SIMULATED stat refusal") end
+		local stat = { dev = 42, ino = options.stat_case == "changed" and 124 or 123, size = 456,
+			mtime = { sec = 100, nsec = 200 }, ctime = { sec = 300, nsec = 400 } }
+		if options.stat_case == "error-ack" then return stat, "SIMULATED EIO", "EIO" end
+		if options.stat_case == "status-ack" then return stat, nil, "EINVAL" end
+		return stat
+	end
+	local previous_luv, previous_client = package.loaded["luv"], package.loaded["adapters.curl_http_client"]
+	package.loaded["luv"], package.loaded["adapters.curl_http_client"] = fake, nil
+	local client = require("adapters.curl_http_client")
+	package.loaded["luv"], package.loaded["adapters.curl_http_client"] = previous_luv, previous_client
+	return client, state
+end
+
+helpers.describe("native-private managed HTTP bridge", function()
+	for _, invalid in ipairs({ { value = nil }, { value = false } }) do
+		helpers.it("private-options: typed refusal cannot cancel or acquire from an incumbent (" .. tostring(invalid.value) .. ")", function()
+			local client, state = fresh_client()
+			helpers.assert_true(client.get("http://127.0.0.1/", {}, { owner = "kept" }, function() end))
+			local handles, kills, result = #state.handles, #state.kills, nil
+			local allowed, err = client.preflight("http://127.0.0.1/", {}, nil, invalid.value)
+			helpers.assert_eq(allowed, false)
+			helpers.assert_eq(err, "native HTTP options are invalid")
+			local operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, invalid.value, nil, function(value) result = value end)
+			helpers.assert_eq(operation.started, false)
+			helpers.assert_true(operation:is_settled())
+			helpers.assert_eq(result.error, "native HTTP options are invalid")
+			helpers.assert_eq(#state.handles, handles)
+			helpers.assert_eq(#state.kills, kills)
+			helpers.assert_true(client.isActive("kept"))
+		end)
+	end
+
+	helpers.it("private-preflight: established truthy redirect admission is preserved", function()
+		local client, state = fresh_client()
+		local options = { method = "GET", follow_redirects = "truthy", timeout_ms = 500, buffered = true }
+		helpers.assert_true(client.preflight("http://127.0.0.1/", {}, nil, options))
+		helpers.assert_eq(options.follow_redirects, "truthy")
+		local operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, options, nil, function() end)
+		helpers.assert_true(operation.started)
+		helpers.assert_true(table.concat(state.options.args, "\n"):find("--location", 1, true) ~= nil)
+	end)
+
+	helpers.it("private-preflight: invalid body metadata cannot replace an incumbent", function()
+		local client, state = fresh_client()
+		helpers.assert_true(client.get("http://127.0.0.1/", {}, { owner = "kept" }, function() end))
+		local handles, kills = #state.handles, #state.kills
+		local options = { owner = "kept", method = "POST", timeout_ms = 500, buffered = true }
+		local allowed, err = client.preflight("http://127.0.0.1/", {}, "a\0b", options)
+		helpers.assert_eq(allowed, false)
+		helpers.assert_eq(err, "curl request body cannot contain NUL")
+		helpers.assert_eq(#state.handles, handles)
+		helpers.assert_eq(#state.kills, kills)
+		helpers.assert_true(client.isActive("kept"))
+	end)
+
+	helpers.it("private-preflight: admitted redirect normalization does not mutate caller options", function()
+		local client, state = fresh_client()
+		local options = { method = "GET", follow_redirects = true, timeout_ms = 500, buffered = true }
+		helpers.assert_true(client.preflight("https://example.invalid/", { ["X-API-Key"] = "private" }, nil, options))
+		helpers.assert_eq(options.follow_redirects, true)
+		helpers.assert_eq(#state.handles, 0)
+		helpers.assert_eq(#state.requests, 0)
+	end)
+
+	for _, buffered in ipairs({ true, false }) do
+		helpers.it("private-dispatch: POST body keeps owned anonymous pipe and native method (buffered=" .. tostring(buffered) .. ")", function()
+			local client, state = fresh_client({ defer_close = true })
+			local operation = client.dispatch_owned("http://127.0.0.1/", {}, "@literal\r\n", {
+				owner = "private-post", method = "POST", buffered = buffered, timeout_ms = 500,
+			}, function() end, function() end)
+			helpers.assert_true(operation.started)
+			helpers.assert_eq(state.body, "@literal\r\n")
+			helpers.assert_true(state.config:find('data-binary = "@/dev/fd/3"', 1, true) ~= nil)
+			helpers.assert_true(state.options.stdio[4] ~= nil)
+			helpers.assert_eq(state.options.args[1], "--disable")
+			helpers.assert_true(table.concat(state.options.args, "\n"):find("--globoff", 1, true) ~= nil)
+			helpers.assert_true(table.concat(state.options.args, "\n"):find("--request", 1, true) == nil)
+			helpers.assert_true(operation:request_cancel())
+			helpers.assert_eq(operation:is_settled(), false)
+			state.exit(0); state.ack_closes()
+			helpers.assert_true(operation:is_settled())
+		end)
+	end
+
+	helpers.it("private-cancel: boolean signal refusal keeps delivery eligible and activity", function()
+		local client, state = fresh_client({ kill_failure = true, defer_close = true })
+		local delivered = 0
+		local operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, {
+			owner = "legacy-private", owned_api = false, method = "GET", buffered = true, timeout_ms = 500,
+		}, nil, function() delivered = delivered + 1 end)
+		helpers.assert_eq(operation:request_cancel(), false)
+		helpers.assert_true(client.isActive("legacy-private"))
+		state.stdout("ok\nERGOPTI_HTTP_STATUS:200\n"); state.complete()
+		helpers.assert_eq(delivered, 0)
+		state.ack_closes()
+		helpers.assert_eq(delivered, 1)
+	end)
+
+	helpers.it("private-cancel: owned refusal fences delivery while preserving physical debt", function()
+		local client, state = fresh_client({ kill_failure = true, defer_close = true })
+		local delivered = 0
+		local operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, {
+			owner = "owned-private", owned_api = true, method = "GET", buffered = true, timeout_ms = 500,
+		}, nil, function() delivered = delivered + 1 end)
+		helpers.assert_eq(operation:request_cancel(), false)
+		helpers.assert_eq(operation:is_settled(), false)
+		state.stdout("ok\nERGOPTI_HTTP_STATUS:200\n"); state.complete(); state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(delivered, 0)
+	end)
+
+	helpers.it("private-cancel: reaped leader cannot release a still-nonterminal group", function()
+		local client, state = fresh_client({ kill_failure = true, defer_close = true })
+		local operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, {
+			owner = "descendants", method = "GET", buffered = true, timeout_ms = 500,
+		}, nil, function() end)
+		state.exit(0)
+		helpers.assert_eq(operation:request_cancel(), false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(#state.kills, 1)
+		helpers.assert_eq(state.kills[1].pid, -state.requests[1].pid)
+		state.stdout("exact\nERGOPTI_HTTP_STATUS:200\n"); state.stdout(nil); state.stderr(nil)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+	end)
+
+	helpers.it("private-observer: snapshot mutation cannot alter pending physical completion", function()
+		local client, state = fresh_client({ defer_close = true })
+		local observed, delivered, operation = 0, nil, nil
+		local settled_inside, active_inside
+		operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, {
+			owner = "observed", method = "GET", buffered = true, timeout_ms = 500,
+			on_native_terminal = function(value)
+				observed = observed + 1
+				settled_inside = operation:is_settled()
+				active_inside = client.isActive("observed")
+				value.body, value.status = "MUTATED", 599
+			end,
+		}, nil, function(value) delivered = value end)
+		state.stdout("exact\nERGOPTI_HTTP_STATUS:200\n"); state.complete()
+		helpers.assert_eq(observed, 1)
+		helpers.assert_eq(settled_inside, false)
+		helpers.assert_eq(active_inside, false)
+		helpers.assert_nil(delivered)
+		state.ack_closes()
+		helpers.assert_eq(delivered.body, "exact")
+		helpers.assert_eq(delivered.status, 200)
+		state.exit(0)
+		helpers.assert_eq(observed, 1)
+	end)
+
+	helpers.it("private-observer: reentrant cleanup cannot settle until the observer returns", function()
+		local client, state = fresh_client()
+		local observed, settled, operation, delivered = 0, 0, nil, 0
+		local accepted_inside, physically_settled_inside, listeners_inside
+		operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, {
+			owner = "reentrant", method = "GET", buffered = true, timeout_ms = 500,
+			on_native_terminal = function()
+				observed = observed + 1
+				accepted_inside = operation:request_cancel()
+				physically_settled_inside = operation:is_settled()
+				listeners_inside = settled
+			end,
+		}, nil, function() delivered = delivered + 1 end)
+		operation:on_settled(function() settled = settled + 1 end)
+		state.stdout("exact\nERGOPTI_HTTP_STATUS:200\n"); state.complete()
+		helpers.assert_eq(observed, 1)
+		helpers.assert_true(accepted_inside)
+		helpers.assert_eq(physically_settled_inside, false)
+		helpers.assert_eq(listeners_inside, 0)
+		helpers.assert_eq(settled, 1)
+		helpers.assert_eq(delivered, 0)
+		helpers.assert_true(operation:is_settled())
+	end)
+
+	helpers.it("private-routing: selected proxy preserves environment bypass and stays outside argv", function()
+		local client, state = fresh_client()
+		local private = "http://owner:secret@127.0.0.1:8765"
+		local selection = { mode = "selected", proxy = private, bypass = "environment" }
+		local operation = client.dispatch_owned("https://example.invalid/", {}, nil, {
+			owner = "selected", method = "GET", buffered = true, timeout_ms = 500, proxy_selection = selection,
+		}, nil, function() end)
+		helpers.assert_true(operation.started)
+		helpers.assert_true(state.config:find('proxy = "' .. private .. '"', 1, true) ~= nil)
+		helpers.assert_true(state.config:find("noproxy", 1, true) == nil)
+		helpers.assert_true(table.concat(state.options.args, "\n"):find("secret", 1, true) == nil)
+		selection.proxy = "http://mutated.invalid/"
+		helpers.assert_true(state.config:find("mutated", 1, true) == nil)
+	end)
+
+	helpers.it("private-routing: explicit DIRECT disables inherited proxy use", function()
+		local client, state = fresh_client()
+		local operation = client.dispatch_owned("http://127.0.0.1/", {}, nil, {
+			owner = "direct", method = "GET", buffered = true, timeout_ms = 500, proxy_selection = { mode = "direct" },
+		}, nil, function() end)
+		helpers.assert_true(operation.started)
+		helpers.assert_true(state.config:find('proxy = ""', 1, true) ~= nil)
+		helpers.assert_true(state.config:find('noproxy = "*"', 1, true) ~= nil)
+	end)
+
+	for _, metrics in ipairs({ "000:1", "000:0", "000:?", "MALFORMED" }) do
+		helpers.it("private-metrics: only actual complete proxy receipts qualify connect failure (" .. metrics .. ")", function()
+			local client, state = private_client()
+			local observed, result = nil, nil
+			client.dispatch_owned("https://example.invalid/", {}, nil, {
+				owner = "metrics", method = "GET", buffered = true, timeout_ms = 500,
+				proxy_selection = { mode = "selected", proxy = "http://proxy.invalid:80", bypass = "environment" },
+				proxy_metrics_available = true, on_native_terminal = function(value) observed = value end,
+				curl_executable = "/usr/bin/curl",
+				curl_executable_identity = EXECUTABLE_IDENTITY,
+			}, nil, function(value) result = value end)
+			for character in ("PRIVATE credential suffix\nERGOPTI_PROXY_STATUS:" .. metrics .. "\n"):gmatch(".") do state.stderr(character) end
+			state.stdout("\nERGOPTI_HTTP_STATUS:000\n"); state.complete(7)
+			helpers.assert_eq(result.error, "curl exited with code 7")
+			helpers.assert_eq(result.failure_receipt.curl_exit, 7)
+			helpers.assert_eq(observed.failure_receipt.curl_exit, 7)
+			if metrics == "000:1" then
+				helpers.assert_eq(result.proxy_used, true)
+				helpers.assert_eq(result.failure_receipt.failure_provenance, "verified")
+			elseif metrics == "000:0" then
+				helpers.assert_eq(result.proxy_used, false)
+				helpers.assert_eq(result.failure_receipt.failure_provenance, "unavailable")
+			else
+				helpers.assert_nil(result.proxy_used)
+				helpers.assert_eq(result.failure_receipt.failure_provenance, "unavailable")
+			end
+		end)
+	end
+
+	helpers.it("private-metrics: unpinned capability hint cannot request or publish proxy-used", function()
+		local client, state = fresh_client()
+		local result
+		client.dispatch_owned("https://example.invalid/", {}, nil, {
+			owner = "unpinned", method = "GET", buffered = true, timeout_ms = 500,
+			proxy_selection = { mode = "selected", proxy = "http://proxy.invalid:80", bypass = "environment" },
+			proxy_metrics_available = true,
+		}, nil, function(value) result = value end)
+		helpers.assert_eq(state.command, "curl")
+		helpers.assert_true(table.concat(state.options.args, "\n"):find("%{proxy_used}", 1, true) == nil)
+		state.stderr("\nERGOPTI_PROXY_STATUS:000:1\n")
+		state.stdout("\nERGOPTI_HTTP_STATUS:000\n"); state.complete(7)
+		helpers.assert_nil(result.proxy_used)
+		helpers.assert_eq(result.failure_receipt.failure_provenance, "unavailable")
+	end)
+
+	helpers.it("private-executable: pinned curl path is the actual admitted spawn target", function()
+		local client, state = private_client()
+		local options = { owner = "pinned", method = "GET", buffered = true, timeout_ms = 500,
+			curl_executable = "/opt/owned/curl", proxy_metrics_available = true,
+			curl_executable_identity = EXECUTABLE_IDENTITY,
+			proxy_selection = { mode = "selected", proxy = "http://proxy.invalid:80", bypass = "environment" } }
+		helpers.assert_true(client.preflight("https://example.invalid/", {}, nil, options))
+		helpers.assert_eq(#state.stat_calls, 0, "preflight must stay free of native file observations")
+		local operation = client.dispatch_owned("https://example.invalid/", {}, nil, options, nil, function() end)
+		helpers.assert_true(operation.started)
+		helpers.assert_eq(state.command, "/opt/owned/curl")
+		helpers.assert_eq(#state.stat_calls, 1)
+		helpers.assert_eq(state.stat_calls[1], "/opt/owned/curl")
+		helpers.assert_true(table.concat(state.options.args, "\n"):find("%{proxy_used}", 1, true) ~= nil)
+	end)
+
+	for _, stat_case in ipairs({ "missing", "throw", "changed", "error-ack", "status-ack" }) do
+		helpers.it("private-executable: " .. stat_case .. " identity disables only the new native feature", function()
+			local client, state = private_client({ stat_case = stat_case })
+			local operation = client.dispatch_owned("https://example.invalid/", {}, nil, {
+				owner = "identity", method = "GET", buffered = true, timeout_ms = 500,
+				curl_executable = "/opt/owned/curl", curl_executable_identity = EXECUTABLE_IDENTITY,
+				proxy_metrics_available = true, proxy_selection = { mode = "selected", proxy = "http://proxy.invalid:80", bypass = "environment" },
+			}, nil, function() end)
+			helpers.assert_true(operation.started)
+			helpers.assert_eq(state.command, "/opt/owned/curl")
+			helpers.assert_eq(#state.stat_calls, 1)
+			helpers.assert_true(table.concat(state.options.args, "\n"):find("%{proxy_used}", 1, true) == nil)
+		end)
+	end
+
+	for _, malformed in ipairs({ {}, { device = 42, inode = 123, size = 456,
+		mtime_sec = 100, mtime_nsec = 1000000000, ctime_sec = 300, ctime_nsec = 400 } }) do
+		helpers.it("private-executable: malformed identity cannot admit a native metric", function()
+			local client, state = private_client()
+			local operation = client.dispatch_owned("https://example.invalid/", {}, nil, {
+				owner = "malformed-identity", method = "GET", buffered = true, timeout_ms = 500,
+				curl_executable = "/opt/owned/curl", curl_executable_identity = malformed,
+				proxy_metrics_available = true, proxy_selection = { mode = "selected", proxy = "http://proxy.invalid:80", bypass = "environment" },
+			}, nil, function() end)
+			helpers.assert_true(operation.started)
+			helpers.assert_eq(#state.stat_calls, 0)
+			helpers.assert_true(table.concat(state.options.args, "\n"):find("%{proxy_used}", 1, true) == nil)
+		end)
+	end
+
+	helpers.it("private-metrics: ordinary HTTP407 cannot assert a CONNECT authentication target", function()
+		local client, state = fresh_client()
+		local result
+		client.dispatch_owned("http://example.invalid/", {}, nil, {
+			owner = "http407", method = "GET", buffered = true, timeout_ms = 500,
+			proxy_selection = { mode = "selected", proxy = "http://proxy.invalid:80", bypass = "environment" },
+		}, nil, function(value) result = value end)
+		state.stderr("\nERGOPTI_PROXY_STATUS:000:?\n")
+		state.stdout("rejected\nERGOPTI_HTTP_STATUS:407\n"); state.complete(22)
+		helpers.assert_eq(result.failure_receipt.stage, "http")
+		helpers.assert_eq(result.failure_receipt.proxy_connect_status, 0)
+		helpers.assert_nil(result.failure_receipt.response_source)
+		helpers.assert_eq(result.error_body, "rejected")
+	end)
+end)
+
+-- Append to the byte-preserved foreign owner suite behind its eight loader
+-- substitutions and exact 28 original additive controls. No original body,
+-- expectation, native BodyPipe/Timer source or public assertion is changed.
+local ExactPorts = require("tests.support.exact_identity_ports")
+
+local function exact_core_client(config)
+	local options = config or {}
+	local fake, state = fake_luv(options)
+	local native, fd_state = ExactPorts.new(options.identity or {})
+	for name, value in pairs(native) do
+		if name == "fs_fstat" or name == "fs_close" then
+			local original = fake[name]
+			fake[name] = function(fd, ...)
+				if fd_state.descriptors[fd] then return value(fd, ...) end
+				return original(fd, ...)
+			end
+		else fake[name] = value end
+	end
+	if options.identity and options.identity.missing_constants then fake.constants = nil end
+	if options.identity and options.identity.missing_port then fake[options.identity.missing_port] = nil end
+	state.fd_state = fd_state
+	local exact_module = require("infra.curl_identity")
+	local previous_identity = package.loaded["infra.curl_identity"]
+	if options.constructor_throw then
+		package.loaded["infra.curl_identity"] = { copy = exact_module.copy, equal = exact_module.equal,
+			new = function() error("independent constructor refusal") end }
+	end
+	local previous_luv, previous_client = package.loaded.luv, package.loaded["adapters.curl_http_client"]
+	package.loaded.luv, package.loaded["adapters.curl_http_client"] = fake, nil
+	local loaded, client = pcall(require, "adapters.curl_http_client")
+	package.loaded.luv, package.loaded["adapters.curl_http_client"] = previous_luv, previous_client
+	package.loaded["infra.curl_identity"] = previous_identity
+	if not loaded then error(client) end
+	return client, state
+end
+
+local function exact_options(owner, inode)
+	return { owner = owner or "exact-native", method = "GET", buffered = true, timeout_ms = 1000,
+		proxy_selection = { mode = "selected", proxy = "http://first.invalid:81", bypass = "environment" },
+		curl_executable = "/independent/bin/curl", curl_executable_identity_exact = ExactPorts.identity(inode),
+		proxy_metrics_available = true }
+end
+
+local function native_write_out(state)
+	local field, count = nil, 0
+	for index, value in ipairs(state.options.args) do
+		if value == "--write-out" then field, count = state.options.args[index + 1], count + 1 end
+	end
+	helpers.assert_eq(count, 1, "Exactly one native write-out field must be admitted")
+	helpers.assert_true(type(field) == "string" and field ~= "", "Native write-out field must be nonempty text")
+	return field
+end
+
+helpers.describe("sole native core exact identity composition", function()
+	helpers.it("pure preflight validates exact metadata without descriptors or native handles", function()
+		local client, state = exact_core_client()
+		helpers.assert_true(client.preflight("https://corporate.invalid/", {}, nil, exact_options()))
+		helpers.assert_eq(#state.fd_state.opens, 0)
+		helpers.assert_eq(#state.handles, 0)
+		helpers.assert_eq(#state.requests, 0)
+	end)
+	helpers.it("new native feature requires an independently equal exact uint64 descriptor at actual composition", function()
+		local client, state = exact_core_client({ defer_close = true })
+		local operation = client.dispatch_owned("https://corporate.invalid/", {}, nil, exact_options(), nil, function() end)
+		helpers.assert_true(operation.started)
+		helpers.assert_eq(state.command, "/independent/bin/curl")
+		helpers.assert_eq(#state.fd_state.opens, 2)
+		helpers.assert_eq(#state.fd_state.closes, 2)
+		helpers.assert_true(native_write_out(state):find("%{proxy_used}", 1, true) ~= nil)
+		operation:request_cancel(); state.exit(0); state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+	end)
+	helpers.it("a literal adjacent high inode never compares equal or requests proxy_used", function()
+		local client, state = exact_core_client()
+		local operation = client.dispatch_owned("https://corporate.invalid/", {}, nil,
+			exact_options("exact-adjacent", "9223372036855093010"), nil, function() end)
+		helpers.assert_true(operation.started)
+		helpers.assert_eq(native_write_out(state):find("%{proxy_used}", 1, true), nil)
+		helpers.assert_true(native_write_out(state):find("%{http_connect}:?", 1, true) ~= nil)
+		operation:request_cancel(); state.exit(0)
+		helpers.assert_true(operation:is_settled())
+	end)
+	for _, config in ipairs({ { missing_constants = true }, { missing_port = "fs_open" },
+		{ fail_method = "fs_fstat", fail_shape = "status" }, { fail_method = "fs_read", fail_shape = "error" },
+		{ no_eof = true } }) do
+		local fixed = config
+		helpers.it("ordinary pinned curl remains usable when exact observation is unavailable with all descriptors retired", function()
+			local client, state = exact_core_client({ identity = fixed })
+			local operation = client.dispatch_owned("https://corporate.invalid/", {}, nil, exact_options(), nil, function() end)
+			helpers.assert_true(operation.started)
+			helpers.assert_eq(native_write_out(state):find("%{proxy_used}", 1, true), nil)
+			helpers.assert_eq(#state.fd_state.opens, #state.fd_state.closes)
+			operation:request_cancel(); state.exit(0)
+			helpers.assert_true(operation:is_settled())
+		end)
+	end
+	helpers.it("mixed private formats refuse before owner replacement or native acquisition", function()
+		local client, state = exact_core_client()
+		local options = exact_options()
+		options.curl_executable_identity = { device = 11, inode = 123, size = 71,
+			mtime_sec = 123, mtime_nsec = 456, ctime_sec = 789, ctime_nsec = 12 }
+		local allowed, message = client.preflight("https://corporate.invalid/", {}, nil, options)
+		helpers.assert_eq(allowed, false)
+		helpers.assert_eq(message, "native curl exact identity is invalid")
+		helpers.assert_eq(#state.handles, 0)
+		helpers.assert_eq(#state.fd_state.opens, 0)
+	end)
+	helpers.it("constructor refusal resets construction fencing and retires every already-armed native handle", function()
+		local client, state = exact_core_client({ defer_close = true, constructor_throw = true })
+		local options, terminals, receipt = exact_options("exact-constructor"), 0, nil
+		options.on_native_terminal = function(value) terminals = terminals + 1; receipt = value end
+		local operation = client.dispatch_owned("https://corporate.invalid/", {}, nil, options, nil, function() end)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_eq(receipt.error, "curl exact identity observation failed")
+		helpers.assert_eq(#state.fd_state.opens, 0)
+		helpers.assert_eq(#state.requests, 0)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		local successor = client.get_owned("http://127.0.0.1/", {}, { owner = "exact-constructor" }, function() end)
+		helpers.assert_true(successor.started)
+		successor:request_cancel(); state.exit(0); state.ack_closes()
+		helpers.assert_true(successor:is_settled())
+		helpers.assert_eq(terminals, 1)
+	end)
+	helpers.it("retirement refusal retains the same owner and never retries a removed bare descriptor", function()
+		local client, state = exact_core_client({ defer_close = true,
+			identity = { fail_method = "fs_close", fail_shape = "status" } })
+		local terminals, result = 0, nil
+		local options = exact_options("uncertain-exact")
+		options.on_native_terminal = function(value) terminals = terminals + 1; result = value end
+		local operation = client.dispatch_owned("https://corporate.invalid/", {}, nil, options, nil, function() end)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_true(client.isActive("uncertain-exact"))
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_eq(result.error, "curl exact identity retirement unavailable")
+		helpers.assert_eq(#state.requests, 0)
+		state.ack_closes()
+		local closes = #state.fd_state.closes
+		helpers.assert_eq(operation:cancel(), false)
+		helpers.assert_eq(client.cancel("uncertain-exact"), false)
+		helpers.assert_eq(#state.fd_state.closes, closes)
+		local refused
+		local successor = client.get_owned("http://127.0.0.1/", {}, { owner = "uncertain-exact" }, function(value) refused = value end)
+		helpers.assert_eq(successor.started, false)
+		helpers.assert_true(successor:is_settled())
+		helpers.assert_eq(refused.error, "previous request cleanup pending")
+		helpers.assert_eq(#state.requests, 0)
+		helpers.assert_eq(terminals, 1)
+	end)
+	helpers.it("filesystem cancellation reentry sees a registered native owner and cannot resurrect curl", function()
+		local client, state, accepted, refused, hook_calls
+		hook_calls = 0
+		client, state = exact_core_client({ defer_close = true, identity = { hook = function(method)
+			if method == "fs_fstat" then
+				hook_calls = hook_calls + 1
+				accepted = client.cancel("exact-reentry")
+				local child = client.get_owned("http://127.0.0.1/", {}, { owner = "exact-reentry" }, function(value) refused = value end)
+				if child.started then hook_calls = hook_calls + 100 end
+			end
+		end } })
+		local terminals = 0
+		local options = exact_options("exact-reentry")
+		options.on_native_terminal = function() terminals = terminals + 1 end
+		local operation = client.dispatch_owned("https://corporate.invalid/", {}, nil, options, nil, function() end)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(accepted, false, "Native cancel returns physical settlement while construction remains retained")
+		helpers.assert_eq(refused.error, "previous request cleanup pending")
+		helpers.assert_eq(hook_calls, 1)
+		helpers.assert_eq(#state.requests, 0)
+		helpers.assert_eq(#state.fd_state.opens, 1)
+		helpers.assert_eq(#state.fd_state.closes, 1)
+		helpers.assert_eq(terminals, 1)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
 	end)
 end)

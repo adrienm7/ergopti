@@ -23,6 +23,19 @@ const ROOT = path.resolve(__dirname, '../..');
 const NATIVE = 'tools/test/run-linux-http-stream-receipts.cjs';
 const CONTRACT = 'tools/test/test-linux-http-stream-registration.cjs';
 const SOURCES = [
+	'static/ergopti_plus/_shared/lua/network/proxy_policy.lua',
+	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+	'static/ergopti_plus/linux/adapters/curl_http_client.lua',
+	'static/ergopti_plus/linux/adapters/system_proxy.lua',
+	'static/ergopti_plus/linux/infra/curl_identity.lua',
+	'static/ergopti_plus/linux/infra/http_body_pipe.lua',
+	'static/ergopti_plus/linux/infra/managed_http.lua',
+	'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
+	'static/ergopti_plus/linux/infra/native_timer.lua',
+	'static/ergopti_plus/linux/infra/proxy_policy.lua',
+	'static/ergopti_plus/linux/platform/network/system_proxy_probe.lua',
+	'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
+	'static/ergopti_plus/linux/_generated/native_runtime.lua',
 	'static/ergopti_plus/linux/adapters/http_client.lua',
 	'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
 	'static/ergopti_plus/linux/modules/llm/local_model_probe.lua',
