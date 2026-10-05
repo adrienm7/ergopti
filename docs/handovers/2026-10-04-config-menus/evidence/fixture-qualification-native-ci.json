@@ -1,0 +1,14 @@
+{
+	"source_sha": "709dc545e902682e8d4e287b8a3ce56000a7d6ec",
+	"tested_ci_sha": "c895ae17a809c89f7ac98ba7970da5cb8a23460c",
+	"previous_ci_sha": "4800d5c83878e653622941b790390e1497cab6c5",
+	"tree": "986e60b762c06509adab958353727e33e51de993",
+	"same_source_tree": true,
+	"os_lanes": "windows+macos",
+	"release": "workflow_dispatch emits release=false",
+	"status": "in_progress",
+	"conclusion": "",
+	"databaseId": 37282444315,
+	"headSha": "c895ae17a809c89f7ac98ba7970da5cb8a23460c",
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/37282444315"
+}
