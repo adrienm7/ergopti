@@ -1,0 +1,2006 @@
+﻿; modules/llm/api_remote.ahk
+
+; ==============================================================================
+; MODULE: LLM API — Remote API Backend
+; DESCRIPTION:
+; Synchronous HTTP client for remote LLM APIs (OpenAI, Anthropic, Google Gemini,
+; and any OpenAI-Chat-Completions-compatible endpoint such as Groq, OpenRouter,
+; LM Studio, vLLM, llama.cpp's HTTP server, …). Sits next to api_ollama.ahk and
+; exposes the same async surface as api_ollama.ahk.
+;
+; FEATURES & RATIONALE:
+; 1. Provider catalogue defines per-provider base URL + auth scheme + request
+;    formatter + response parser. Adding a new provider = one entry in the
+;    catalogue; the prediction engine and tray UI stay unchanged.
+; 2. Sync WinHTTP, same as Ollama — keeps the wire protocol single-threaded and
+;    the AHK main loop predictable. The engine-level rate-limit floor
+;    (``LLM_BACKEND_MIN_REQUEST_INTERVAL_MS["api"] = 500``) is what protects
+;    paid providers from token-burn on a per-keystroke debounce.
+; 3. No async streaming yet — every call is request/response, which keeps error
+;    handling trivial and matches the rest of the AHK LLM pipeline. Streaming
+;    can be layered on later without changing the public signature.
+;    Backboard (assistant/thread API, key in X-API-Key) and the decisions
+;    providers (TypeSafe's Jev, typed questions only) go through the same curl
+;    transport; their shapes live in remote_formats.ahk, and a decisions
+;    provider is never sent a chat request.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; =======================================
+; =======================================
+; ======= 1/ Provider Catalogue =========
+; =======================================
+; =======================================
+
+; Loaded from _shared/modules/llm/api_providers.json at boot (see _LLMRemote_LoadCatalog).
+; Each provider ID maps to Label / BaseUrl / DefaultModel / Format — same
+; schema as the HS twin. Adding a provider = one entry in api_providers.json
+; plus (optionally) a new Format branch in _LLMRemoteBuildPayload /
+; _LLMRemoteParseResponse.
+global LLM_API_PROVIDERS := Map()
+global LLM_LOCAL_API_SERVERS := Map()
+global LLM_API_PROVIDER_ORDER := []
+
+; The formats a catalogue provider may declare, each with what it serves:
+; "chat" (text in, text out), "images" (a chat that also reads a screenshot).
+; "backboard" chats through Backboard's assistant/thread API and
+; "decisions" answers typed questions only (TypeSafe's Jev): see
+; modules/llm/remote_formats.ahk for their shapes.
+global LLM_REMOTE_CATALOG_FORMATS := Map(
+    "openai",    Map("chat", true,  "images", true),
+    "anthropic", Map("chat", true,  "images", true),
+    "gemini",    Map("chat", true,  "images", true),
+    "backboard", Map("chat", true,  "images", false),
+    "decisions", Map("chat", false, "images", false))
+
+; The formats whose answer is read whole by remote_formats.ahk, not as a chat
+; completion: their classified text is the JSON body itself.
+global LLM_REMOTE_RAW_FORMATS := Map("backboard", true, "decisions", true)
+
+; Backboard assistant id per base URL and key, created by the first request
+; with that key and kept for the session. A failed creation stores nothing, so
+; the next request tries again.
+global _LLM_Remote_BackboardAssistants := Map()
+
+; Test seam, 0 in production: the transport of the Backboard and decisions
+; requests, with LLM_RemotePostBody_Async's signature.
+global _LLM_Remote_PostBodyFn := 0
+
+; The shared decisions probe of the Test-API action (api_providers.json
+; decisions_test): Map("state", "questions"). Empty until the catalogue
+; validates it; the action then refuses a decisions entry loudly.
+global LLM_REMOTE_DECISIONS_TEST := Map()
+
+; Shared Test-API probe (system/user prompt, temperature, token budget) from
+; api_providers.json test_request — the exact request both drivers send
+; verbatim for the Test-active-entry action. Empty until _LLMRemote_LoadCatalog
+; validates the section; the menu refuses loudly while it is empty instead of
+; inventing probe values (single-source contract, see test-llm-test-request).
+global LLM_REMOTE_TEST_REQUEST := Map()
+
+global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] request_timeout_ms)
+
+
+
+
+; ============================================
+; ============================================
+; ======= 2/ Public API =====================
+; ============================================
+; ============================================
+
+
+
+; =========================
+; ===== Async surface =====
+; =========================
+
+; Registry of in-flight async remote requests (parallel to _LLM_Ollama_Async).
+global _LLM_Remote_Async := Map()
+global _LLM_Remote_AsyncCounter := 0
+; Single source for the owned-probe kind: the Test-selected-API action tags its
+; reservation with this, and the engine cancel paths spare it. Without the tag
+; every keystroke during the probe (ResetPredictions, per-keystroke
+; CancelInflight) silently kills it — the poller sees a missing reservation
+; and fires neither callback, so the click ends with no log and no popup.
+global LLM_REMOTE_KIND_API_TEST := "api_test"
+global LLM_REMOTE_POLL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] poll_interval_ms)
+global LLM_REMOTE_MAX_INFLIGHT := 16
+; WinHttpRequest does the DNS resolve + TCP connect SYNCHRONOUSLY on the message-loop
+; thread (its "async" mode only makes the RESPONSE wait async), so a stalled remote host
+; freezes typing for the whole connect. This caps the resolve+connect phase so the worst-
+; case freeze is bounded; the COMPLETE fix is to move the POST onto a curl child process
+; (mirror _LLM_Ollama_DispatchAsync) - see remote-generate-connect-blocks (needs a live
+; remote-API key to validate end-to-end).
+global LLM_REMOTE_CONNECT_TIMEOUT_MS := 5000
+
+/**
+ * Non-blocking remote LLM generation. Mirrors hs.http.asyncPost on
+ * the HS side: fire-and-forget dispatch, callbacks fire when ready. See
+ * LLM_OllamaGenerate_Async for the polling model — both share the same
+ * WinHTTP-async + SetTimer-poll pattern.
+ *
+ * @param {Map|Object} Entry        - Active API entry record.
+ * @param {string}     SystemPrompt - Resolved system prompt.
+ * @param {string}     UserText     - User context.
+ * @param {number}     Temperature  - Sampling temperature.
+ * @param {function}   on_success   - Called with the generated text.
+ * @param {function}   on_fail      - Called on HTTP / parse failure.
+ * @param {string}     Kind         - Reservation kind; LLM_REMOTE_KIND_API_TEST
+ *   exempts the request from the engine's keystroke cancels.
+ * @param {number}     TimeoutMs    - Override for this request only (0 keeps
+ *   the shared prediction timeout). The API test passes its own longer
+ *   budget: cold models need more than 30 s.
+ * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
+ */
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "", Kind := "", TimeoutMs := 0) {
+    global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
+
+    _LLM_Remote_AsyncCounter += 1
+    req_id := _LLM_Remote_AsyncCounter
+    timeout_ms := (TimeoutMs > 0) ? TimeoutMs
+        : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
+    reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+        timeout_ms, A_TickCount)
+    reservation["kind"] := Kind
+
+    resolved := _LLMRemoteResolveEntry(Entry)
+    if (resolved == "") {
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return req_id
+    }
+    reservation["format"] := resolved["Format"]
+    reservation["model_id_at_dispatch"] := resolved["Model"]
+    if !LLM_RemoteFormatServes(resolved["Format"], "chat") {
+        try LoggerWarn("LLM.remote",
+            "Remote generation refused: '{1}' answers typed questions only, it is not a chat model.",
+            resolved["Provider"])
+        _LLMRemote_FailReserved(req_id, reservation, on_fail, "not_chat")
+        return req_id
+    }
+
+    req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
+    if (resolved["Format"] == "backboard") {
+        ; Backboard's own two-step exchange owns its requests from here
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return LLM_RemoteBackboardChat_Async(resolved, req["system"], req["user"],
+            on_success, on_fail, Kind, timeout_ms)
+    }
+    Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
+        resolved.Has("Extras") ? resolved["Extras"] : Map())
+
+    ; The curl child is the only production transport. Falling back to WinHTTP
+    ; would put DNS/connect/Send back on the cooperative AHK thread.
+    if (_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+            on_fail, timeout_ms, 0, reservation))
+        return req_id
+    try LoggerError("LLM.remote",
+        "Remote generation refused because the non-blocking curl transport is unavailable.")
+    _LLMRemote_FailReserved(req_id, reservation, on_fail)
+    return req_id
+}
+
+/**
+ * Non-blocking POST of a request body the caller wrote whole (the screen
+ * reading's image request), through the same curl transport, reservation and
+ * response classifier as LLM_RemoteGenerate_Async. The credential still
+ * travels in the curl config file only.
+ *
+ * @param {Map}      Resolved   - _LLMRemoteResolveEntry's record.
+ * @param {string}   Url        - Endpoint, from _LLMRemoteBuildUrl.
+ * @param {string}   Payload    - JSON body in the provider's dialect.
+ * @param {function} on_success - Called with the completion text and usage.
+ * @param {function} on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {number}   TimeoutMs  - Override for this request (0 keeps the shared one).
+ * @param {string}   Kind       - Reservation kind, as LLM_RemoteGenerate_Async's.
+ * @returns {Integer} Request id, usable with LLM_RemoteCancelAsync.
+ */
+LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0, Kind := "") {
+    global _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
+    if !(Resolved is Map)
+        throw TypeError("LLM_RemotePostBody_Async needs a resolved entry.")
+    _LLM_Remote_AsyncCounter += 1
+    req_id := _LLM_Remote_AsyncCounter
+    timeout_ms := (TimeoutMs > 0) ? TimeoutMs
+        : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
+    reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+        timeout_ms, A_TickCount, Resolved)
+    reservation["kind"] := Kind
+    if (_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload, on_success,
+            on_fail, timeout_ms, 0, reservation))
+        return req_id
+    try LoggerError("LLM.remote",
+        "Remote request refused because the non-blocking curl transport is unavailable.")
+    _LLMRemote_FailReserved(req_id, reservation, on_fail)
+    return req_id
+}
+
+
+
+; ===================================
+; ===== Backboard and decisions =====
+; ===================================
+
+/**
+ * Tells whether a catalogue format serves a capability.
+ * @param {String} Fmt A provider's format.
+ * @param {String} Capability "chat" or "images".
+ * @returns {Boolean} False for an unknown format.
+ */
+LLM_RemoteFormatServes(Fmt, Capability) {
+    global LLM_REMOTE_CATALOG_FORMATS
+    if !(Fmt is String) || !LLM_REMOTE_CATALOG_FORMATS.Has(Fmt)
+        return false
+    return LLM_REMOTE_CATALOG_FORMATS[Fmt].Get(Capability, false) ? true : false
+}
+
+/**
+ * The format of a catalogue provider.
+ * @param {String} ProviderId The provider.
+ * @returns {String} Its format, "" for an unknown provider.
+ */
+LLM_RemoteProviderFormat(ProviderId) {
+    global LLM_API_PROVIDERS
+    if !(ProviderId is String) || !LLM_API_PROVIDERS.Has(ProviderId)
+        return ""
+    return LLM_API_PROVIDERS[ProviderId]["Format"]
+}
+
+/**
+ * Tells whether the save-time reachability ping knows a provider's format:
+ * the chat APIs list their models, Backboard and the decisions endpoints have
+ * no such verified route, and only the Test action probes them.
+ * @param {String} ProviderId The provider.
+ * @returns {Boolean}
+ */
+LLM_RemoteHasReadyPing(ProviderId) {
+    Fmt := LLM_RemoteProviderFormat(ProviderId)
+    return Fmt == "openai" || Fmt == "anthropic" || Fmt == "gemini"
+}
+
+/**
+ * Names the top-level keys of a decoded answer, never its values: what a log
+ * may say about an answer whose shape was not the expected one.
+ * @param {Any} Response The decoded answer.
+ * @returns {String} The keys, comma-separated, or the answer's type.
+ */
+LLM_RemoteTopLevelKeys(Response) {
+    if !(Response is Map)
+        return "(" . Type(Response) . ")"
+    Keys := ""
+    for Key in Response
+        Keys .= (Keys == "" ? "" : ", ") . Key
+    return (Keys == "") ? "(none)" : Keys
+}
+
+/**
+ * Sends one Backboard message and hands its decoded answer on. The first
+ * request with a key creates the driver's assistant; its id is kept for the
+ * session, and a failed creation fails this request, the next one trying again.
+ * Backboard's message API takes no temperature and no token budget.
+ * @param {Map}      Resolved   - _LLMRemoteResolveEntry's record of a backboard provider.
+ * @param {Map}      Spec       - Map("model", "system", "text"[, "questions"]).
+ * @param {Func}     on_success - Called with the decoded answer Map and the usage.
+ * @param {Func}     on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {String}   Kind       - Reservation kind of every request of the exchange.
+ * @param {Integer}  TimeoutMs  - Override per request (0 keeps the shared one).
+ * @returns {Integer} Id of the first request, 0 when nothing was sent.
+ */
+LLM_RemoteBackboard_Async(Resolved, Spec, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+    global _LLM_Remote_BackboardAssistants
+    if !(Resolved is Map) || Resolved["Format"] != "backboard"
+        throw ValueError("LLM_RemoteBackboard_Async needs a resolved backboard entry.")
+    if !(LLM_RemoteFormats_BackboardSplitModel(Spec["model"]) is Map) {
+        try LoggerWarn("LLM.remote",
+            "Backboard request refused: the model '{1}' names no provider (expected <llm_provider>/<model_name>).",
+            Spec["model"])
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("invalid_model"))
+        return 0
+    }
+    Key := _LLMRemote_BackboardKey(Resolved)
+    if _LLM_Remote_BackboardAssistants.Has(Key)
+        return _LLMRemote_BackboardMessage(Resolved, _LLM_Remote_BackboardAssistants[Key], Spec,
+            on_success, on_fail, Kind, TimeoutMs)
+    Request := LLM_RemoteFormats_BackboardAssistantRequest(RTrim(Resolved["BaseUrl"], "/"))
+    try LoggerInfo("LLM.remote", "Backboard: creating the driver's assistant for this key.")
+    return _LLMRemote_PostBody(Resolved, Request["url"], LLM_RemoteFormats_Encode(Request["body"]),
+        _LLMRemote_OnBackboardAssistant.Bind(Resolved, Key, Spec, on_success, on_fail, Kind, TimeoutMs),
+        _LLMRemote_OnBackboardAssistantFail.Bind(on_fail), TimeoutMs, Kind)
+}
+
+/**
+ * Sends one chat message through Backboard: the entry's model answers the
+ * system prompt and the text, and on_success gets the answer's text.
+ * @param {Map}     Resolved   - _LLMRemoteResolveEntry's record of a backboard provider.
+ * @param {String}  System     - The system prompt.
+ * @param {String}  Text       - The user turn.
+ * @param {Func}    on_success - Called with the answer text and the usage.
+ * @param {Func}    on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {String}  Kind       - Reservation kind.
+ * @param {Integer} TimeoutMs  - Override per request (0 keeps the shared one).
+ * @returns {Integer} Id of the first request, 0 when nothing was sent.
+ */
+LLM_RemoteBackboardChat_Async(Resolved, System, Text, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+    return LLM_RemoteBackboard_Async(Resolved,
+        Map("model", Resolved["Model"], "system", System, "text", Text),
+        _LLMRemote_OnBackboardChat.Bind(on_success, on_fail), on_fail, Kind, TimeoutMs)
+}
+
+/**
+ * Asks a decisions provider typed questions about a state. The provider's
+ * base_url is the full endpoint and the key travels as a Bearer header.
+ * @param {Map}        Resolved   - _LLMRemoteResolveEntry's record of a decisions provider.
+ * @param {String|Map} State      - What the questions are about.
+ * @param {Map}        Questions  - question_id -> Map("type", "instructions"[, "criteria"]).
+ * @param {Func}       on_success - Called with the decoded answers and the usage.
+ * @param {Func}       on_fail    - Called with _LLMRemote_FailInfo's Map.
+ * @param {String}     Kind       - Reservation kind.
+ * @param {Integer}    TimeoutMs  - Override (0 keeps the shared one).
+ * @returns {Integer} Request id.
+ */
+LLM_RemoteDecisions_Async(Resolved, State, Questions, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+    if !(Resolved is Map) || Resolved["Format"] != "decisions"
+        throw ValueError("LLM_RemoteDecisions_Async needs a resolved decisions entry.")
+    Body := LLM_RemoteFormats_Encode(LLM_RemoteFormats_DecisionsBody(Resolved["Model"], State, Questions))
+    Url := _LLMRemoteBuildUrl(Resolved["BaseUrl"], Resolved["Format"], Resolved["Token"], Resolved["Model"])
+    return _LLMRemote_PostBody(Resolved, Url, Body,
+        _LLMRemote_OnJsonObject.Bind(_LLMRemote_OnDecisions.Bind(on_success, on_fail), on_fail),
+        on_fail, TimeoutMs, Kind)
+}
+
+; The transport of the Backboard and decisions requests, or the test seam.
+_LLMRemote_PostBody(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind) {
+    global _LLM_Remote_PostBodyFn
+    Post := HasMethod(_LLM_Remote_PostBodyFn, "Call") ? _LLM_Remote_PostBodyFn : LLM_RemotePostBody_Async
+    return Post.Call(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind)
+}
+
+; The assistant cache key: one assistant per address and key.
+_LLMRemote_BackboardKey(Resolved) {
+    return RTrim(Resolved["BaseUrl"], "/") . "`n" . Resolved["Token"]
+}
+
+; Sends the message of a Backboard exchange once the assistant is known.
+_LLMRemote_BackboardMessage(Resolved, AssistantId, Spec, on_success, on_fail, Kind, TimeoutMs) {
+    MessageSpec := Map("assistant_id", AssistantId, "model", Spec["model"],
+        "system", Spec["system"], "text", Spec["text"])
+    if Spec.Has("questions")
+        MessageSpec["questions"] := Spec["questions"]
+    Request := LLM_RemoteFormats_BackboardMessageRequest(RTrim(Resolved["BaseUrl"], "/"), MessageSpec)
+    return _LLMRemote_PostBody(Resolved, Request["url"], LLM_RemoteFormats_Encode(Request["body"]),
+        _LLMRemote_OnJsonObject.Bind(on_success, on_fail), on_fail, TimeoutMs, Kind)
+}
+
+; The assistant was created: keep its id, then send the message.
+_LLMRemote_OnBackboardAssistant(Resolved, Key, Spec, on_success, on_fail, Kind, TimeoutMs, Body, Usage := "") {
+    global _LLM_Remote_BackboardAssistants
+    Response := _LLMRemote_DecodeObject(Body)
+    Id := LLM_RemoteFormats_BackboardAssistantId(Response)
+    if (Id == "") {
+        try LoggerWarn("LLM.remote",
+            "Backboard assistant creation failed: the answer carries no assistant_id (keys: {1}); the next request tries again.",
+            LLM_RemoteTopLevelKeys(Response))
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("backboard_assistant"))
+        return
+    }
+    _LLM_Remote_BackboardAssistants[Key] := Id
+    try LoggerInfo("LLM.remote", "Backboard assistant created, kept for this session.")
+    _LLMRemote_BackboardMessage(Resolved, Id, Spec, on_success, on_fail, Kind, TimeoutMs)
+}
+
+; The assistant creation failed: nothing is cached, the request fails.
+_LLMRemote_OnBackboardAssistantFail(on_fail, Info := "") {
+    Reason := (Info is Map) ? Info.Get("reason", "unknown") : "unknown"
+    try LoggerWarn("LLM.remote", "Backboard assistant creation failed ({1}); the next request tries again.", Reason)
+    _LLM_InvokeCallback(on_fail, "on_fail", (Info is Map) ? Info : _LLMRemote_FailInfo("backboard_assistant"))
+}
+
+; A Backboard chat answer: its text, or a failure when it carries none.
+_LLMRemote_OnBackboardChat(on_success, on_fail, Response, Usage := "") {
+    if !LLM_RemoteFormats_BackboardText(Response, &Text) || Text == "" {
+        Status := Response.Get("status", "")
+        try LoggerWarn("LLM.remote", "Backboard answer carried no text (status: {1}).",
+            (Status is String) ? Status : "none")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("canonical_empty"))
+        return
+    }
+    _LLM_InvokeCallback(on_success, "on_success", Text, Usage)
+}
+
+; A decisions answer: its answers, or a failure naming the keys it holds.
+_LLMRemote_OnDecisions(on_success, on_fail, Response, Usage := "") {
+    Answers := LLM_RemoteFormats_DecisionsAnswers(Response)
+    if !IsObject(Answers) {
+        try LoggerWarn("LLM.remote", "Decisions answer carried no answers (keys: {1}).",
+            LLM_RemoteTopLevelKeys(Response))
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("unsupported_shape"))
+        return
+    }
+    _LLM_InvokeCallback(on_success, "on_success", Answers, Usage)
+}
+
+; Decodes the JSON object a raw-format request answered, then hands it on.
+_LLMRemote_OnJsonObject(on_success, on_fail, Body, Usage := "") {
+    Response := _LLMRemote_DecodeObject(Body)
+    if !(Response is Map) {
+        try LoggerWarn("LLM.remote", "Remote answer is not a JSON object ({1} character(s)).",
+            (Body is String) ? StrLen(Body) : 0)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("unsupported_json_root"))
+        return
+    }
+    _LLM_InvokeCallback(on_success, "on_success", Response, Usage)
+}
+
+; @returns {Map|String} The decoded JSON object, "" when Body is not one.
+_LLMRemote_DecodeObject(Body) {
+    if !(Body is String) || Body == ""
+        return ""
+    try Decoded := JsonParse(Body)
+    catch
+        return ""
+    return (Decoded is Map) ? Decoded : ""
+}
+
+_LLMRemote_ReserveRequest(req_id, on_success, on_fail, timeout_ms, start_tick,
+        Resolved := 0) {
+    global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+    ResolvedFormat := Resolved is Map ? Resolved["Format"] : ""
+    ResolvedModel := Resolved is Map ? Resolved["Model"] : ""
+    reservation := Map(
+        "transport", "pending",
+        "format", ResolvedFormat,
+        "model_id_at_dispatch", ResolvedModel,
+        "on_success", on_success, "on_fail", on_fail,
+        "cancelled", false, "start_tick", start_tick, "timeout_ms", timeout_ms)
+    ; Publish before trim or transport work so a reentrant CancelAll always sees
+    ; this invocation. Critical closes the only gap between the capacity snapshot
+    ; and ownership publication; trim callbacks run after the owner is visible.
+    PreviousCritical := Critical("On")
+    try {
+        needs_trim := _LLM_Remote_Async.Count >= LLM_REMOTE_MAX_INFLIGHT
+        _LLM_Remote_Async[req_id] := reservation
+    } finally Critical(PreviousCritical)
+    if needs_trim
+        _LLMRemote_TrimAsyncRegistry()
+    return reservation
+}
+
+_LLMRemote_RequestOwns(req_id, reservation) {
+    global _LLM_Remote_Async
+    return _LLM_Remote_Async.Has(req_id)
+        && ObjPtr(_LLM_Remote_Async[req_id]) == ObjPtr(reservation)
+}
+
+_LLMRemote_DeleteOwned(req_id, reservation) {
+    global _LLM_Remote_Async
+    Deleted := false
+    PreviousCritical := Critical("On")
+    try {
+        if (_LLM_Remote_Async.Has(req_id)
+                and ObjPtr(_LLM_Remote_Async[req_id]) == ObjPtr(reservation)) {
+            _LLM_Remote_Async.Delete(req_id)
+            Deleted := true
+        }
+    } finally Critical(PreviousCritical)
+    return Deleted
+}
+
+; Builds the failure payload every remote on_fail receives: a machine reason,
+; the HTTP status (0 when no response arrived) and the provider's own error
+; text ("" when none). Callers accept it as an optional trailing argument,
+; so zero-arg closures keep working where the info is not threaded yet.
+_LLMRemote_FailInfo(Reason, Status := 0, Message := "") {
+    return Map("reason", Reason, "status", Status, "message", Message)
+}
+
+_LLMRemote_FailReserved(req_id, reservation, on_fail, Reason := "dispatch") {
+    if reservation.Has("capability_owner") {
+        try reservation["capability_owner"].Cancel()
+        reservation.Delete("capability_owner")
+    }
+    if reservation.Has("proxy_deadline")
+        SetTimer(reservation["proxy_deadline"], 0)
+    if !_LLMRemote_DeleteOwned(req_id, reservation)
+        return false
+    if !reservation["cancelled"]
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo(Reason))
+    return true
+}
+
+_LLMRemote_CancelCurlReservation(req_id, reservation, Port := 0) {
+    _LLM_CurlReleaseEntryProcess(reservation, true, Port)
+    _LLMRemote_CurlCleanup(reservation)
+    _LLMRemote_DeleteOwned(req_id, reservation)
+}
+
+_LLMRemote_QueueCurlReservationCancel(req_id, reservation, Port := 0) {
+    if reservation.Get("cancel_cleanup_queued", false)
+        return
+    reservation["cancel_cleanup_queued"] := true
+    LLM_DeferCancelKills([Map("cancel",
+        _LLMRemote_CancelCurlReservation.Bind(req_id, reservation, Port))])
+}
+
+_LLMRemote_DispatchWinHttp(req_id, resolved, Url, Payload, on_success, on_fail,
+        timeout_ms, Port := 0, Reservation := 0) {
+    global LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS
+    CreateHttpFn := _LLM_CurlArtifactPortFn(Port, "create_http",
+        (*) => ComObject("WinHttp.WinHttpRequest.5.1"))
+    PollFn := _LLM_CurlArtifactPortFn(Port, "poll", _LLMRemote_PollRequest)
+    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+    reservation := Reservation is Map ? Reservation
+        : _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+            timeout_ms, TickFn.Call(), resolved)
+    if !_LLMRemote_RequestOwns(req_id, reservation)
+        return false
+    if reservation["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return true
+    }
+    try {
+        http := CreateHttpFn.Call()
+        reservation["transport"] := "winhttp"
+        reservation["http"] := http
+        if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+            _LLMRemote_DeleteOwned(req_id, reservation)
+            return true
+        }
+        http.Open("POST", Url, true)
+        http.SetTimeouts(LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS,
+            LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
+        http.SetRequestHeader("Content-Type", "application/json")
+        _LLMRemoteSetAuthHeaders(http, resolved["Format"], resolved["Token"])
+        if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+            _LLMRemote_DeleteOwned(req_id, reservation)
+            return true
+        }
+        http.Send(Payload)
+    } catch as err {
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if !_LLMRemote_RequestOwns(req_id, reservation) or reservation["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return true
+    }
+    PollFn.Call(req_id)
+    return true
+}
+
+; True iff curl.exe is present and can stop an unknown-length response while it
+; is still being received.
+_LLMRemote_CurlAvailable() {
+    CurlExe := A_WinDir . "\System32\curl.exe"
+    return FileExist(CurlExe) != ""
+        && _HTTP_CurlRuntimeLimitSupported(CurlExe)
+}
+
+; Quotes a value for a curl config file. curl unescapes `\\` and `\"` inside a
+; quoted value, so both have to be escaped here — an unescaped backslash or quote
+; in a provider token would truncate the header and ship a malformed credential.
+_LLMRemote_ConfigScalarIsSafe(Value) {
+    return Value is String
+        && !RegExMatch(Value, "[\x00-\x1F\x7F-\x9F]")
+}
+
+_LLMRemote_CurlConfQuote(Value) {
+    Escaped := StrReplace(Value, '\', '\\')
+    Escaped := StrReplace(Escaped, '"', '\"')
+    return '"' . Escaped . '"'
+}
+
+; Builds the curl config-file text carrying the request URL and every auth header,
+; mirroring _LLMRemoteSetAuthHeaders for the child-process transport.
+;
+; The credential must never travel on the command line: Win32_Process.CommandLine
+; is readable by any same-user process with no elevation, and process-creation
+; telemetry (Sysmon event 1, EDR, several AV products) copies argv verbatim into
+; logs the driver does not control. A file in the per-PID temp directory is the
+; same boundary the request payload already accepted, and it is deleted on every
+; completion path.
+_LLMRemote_BuildCurlConfig(Format, Token, Url) {
+    global LLM_BACKBOARD_KEY_HEADER, LLM_DECISIONS_KEY_HEADER
+    if !_LLMRemote_ConfigScalarIsSafe(Format)
+            || !_LLMRemote_ConfigScalarIsSafe(Token)
+            || !_LLMRemote_ConfigScalarIsSafe(Url)
+        return ""
+    ; Gemini carries the key inside the URL, which is why the URL travels through
+    ; this file too rather than being spliced into the command line.
+    cfg := "url = " . _LLMRemote_CurlConfQuote(Url) . "`n"
+    cfg .= "header = " . _LLMRemote_CurlConfQuote("Content-Type: application/json") . "`n"
+    if (Format == "anthropic") {
+        if (Token != "")
+            cfg .= "header = " . _LLMRemote_CurlConfQuote("x-api-key: " . Token) . "`n"
+        cfg .= "header = " . _LLMRemote_CurlConfQuote("anthropic-version: 2023-06-01") . "`n"
+        return cfg
+    }
+    if (Format == "gemini")
+        return cfg
+    if (Format == "backboard") {
+        if (Token != "")
+            cfg .= "header = " . _LLMRemote_CurlConfQuote(LLM_BACKBOARD_KEY_HEADER . ": " . Token) . "`n"
+        return cfg
+    }
+    if (Format == "decisions") {
+        if (Token != "")
+            cfg .= "header = " . _LLMRemote_CurlConfQuote(LLM_DECISIONS_KEY_HEADER . ": "
+                . LLM_RemoteFormats_DecisionsKeyValue(Token)) . "`n"
+        return cfg
+    }
+    if (Token != "")
+        cfg .= "header = " . _LLMRemote_CurlConfQuote("Authorization: Bearer " . Token) . "`n"
+    return cfg
+}
+
+; Removes the per-request temp files (the payload carries the user's typed PII and
+; the config file carries the provider token, so neither must linger). A locked
+; artifact transfers to the shared retry owner instead of becoming an orphan.
+_LLMRemote_CurlCleanup(entry) {
+    Paths := [entry["tmp_payload"], entry["tmp_stdout"]]
+    if entry.Has("tmp_status")
+        Paths.Push(entry["tmp_status"])
+    if entry.Has("tmp_exit")
+        Paths.Push(entry["tmp_exit"])
+    ; The token lives in tmp_config; it has to be reaped on the cancelled, deadline,
+    ; trim and completion paths alike, which all funnel through here.
+    if entry.Has("tmp_config")
+        Paths.Push(entry["tmp_config"])
+    return LLM_CurlCleanupPaths(Paths)
+}
+
+_LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn) {
+    return LLM_CurlCleanupPaths(
+        [tmp_payload, tmp_stdout, tmp_config, terminal["status"], terminal["exit"]], DeleteFn)
+}
+
+; Dispatch the POST through a curl child process so the connect happens in curl's own
+; process — the AHK message loop only polls its durable terminal sidecar. Mirrors
+; _LLM_Ollama_DispatchAsync.
+; Returns true once it owns the request (dispatched, or failed and fired on_fail); returns
+; false ONLY when curl is unavailable, so the caller falls back to WinHTTP.
+_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
+        timeout_ms, Port := 0, Reservation := 0, ProxySelection := 0) {
+    global _LLM_Remote_Async
+    FileExistsFn := _LLM_CurlArtifactPortFn(Port, "file_exists", FileExist)
+    TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
+    WriteFn := _LLM_CurlArtifactPortFn(Port, "write", FSWrite)
+    DeleteFn := _LLM_CurlArtifactPortFn(Port, "delete", FSDelete)
+    RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
+    PollFn := _LLM_CurlArtifactPortFn(Port, "poll", _LLMRemote_PollCurl)
+    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+    SweepFn := _LLM_CurlArtifactPortFn(Port, "schedule_orphan_sweep",
+        _LLM_Ollama_ScheduleOrphanSweep)
+    reservation := Reservation is Map ? Reservation
+        : _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+            timeout_ms, TickFn.Call(), resolved)
+    owns_fallback_reservation := !(Reservation is Map)
+    curl_exe := A_WinDir . "\System32\curl.exe"
+    if !FileExistsFn.Call(curl_exe) {
+        if owns_fallback_reservation
+            _LLMRemote_DeleteOwned(req_id, reservation)
+        return false
+    }
+    if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
+        try LoggerWarn("LLM.remote", "curl cannot enforce the live response-size limit.")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if !_LLMRemote_RequestOwns(req_id, reservation)
+        return true
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
+    if Remaining <= 0
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+    timeout_ms := Remaining
+    reservation["transport"] := "curl"
+    config_image := _LLMRemote_BuildCurlConfig(
+        resolved["Format"], resolved["Token"], Url)
+    if (config_image == "") {
+        try LoggerWarn("LLM.remote", "Rejected curl config input containing control characters.")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if !(ProxySelection is Map) {
+        reservation["proxy_resolution_done"] := false
+        DeadlineFn := _LLMRemote_ProxyDeadline.Bind(req_id, reservation, on_fail)
+        reservation["proxy_deadline"] := DeadlineFn
+        SetTimer(DeadlineFn, -Max(1, timeout_ms))
+        ResolveFn := _LLM_CurlArtifactPortFn(Port, "resolve_proxy", SystemProxy_ResolveCurlAsync)
+        ContinueFn := _LLMRemote_ContinueProxyDispatch.Bind(req_id, reservation, resolved,
+            Url, Payload, on_success, on_fail, timeout_ms, Port)
+        try {
+            if !ResolveFn.Call(Url, ContinueFn)
+                _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+        } catch {
+            try LoggerError("LLM.remote", "System proxy admission failed.")
+            _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+        }
+        return true
+    }
+    if !ProxySelection.Get("inherit", false) && ProxySelection.Get("proxy", "") != ""
+            && !reservation.Has("curl_capability_receipt") {
+        CreateCapabilityFn := _LLM_CurlArtifactPortFn(Port, "create_curl_capability", _HTTP_CurlCapabilityCreate)
+        ContinueCapabilityFn := _LLMRemote_ContinueCurlCapability.Bind(req_id, reservation,
+            resolved, Url, Payload, on_success, on_fail, Port)
+        try {
+            CapabilityOwner := CreateCapabilityFn.Call(ContinueCapabilityFn,
+                reservation["start_tick"], reservation["timeout_ms"], TickFn)
+            reservation["capability_owner"] := CapabilityOwner
+            if reservation["cancelled"] || !_LLMRemote_RequestOwns(req_id, reservation) {
+                CapabilityOwner.Cancel()
+                _LLMRemote_DeleteOwned(req_id, reservation)
+                return true
+            }
+            if !CapabilityOwner.Start()
+                _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+        } catch {
+            _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+        }
+        return true
+    }
+    if !ProxySelection.Get("inherit", false) {
+        Proxy := ProxySelection.Get("proxy", "")
+        if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy)) {
+            _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+            return true
+        }
+        config_image .= "proxy = " . _LLMRemote_CurlConfQuote(Proxy) . "`n"
+        if Proxy != "" {
+            AuthConfig := _HTTP_CurlIntegratedProxyAuthConfig(reservation.Get("curl_capability_receipt", 0))
+            if AuthConfig == "" || !RegExMatch(Proxy, "i)^https?://")
+                return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+            config_image .= AuthConfig
+        }
+    }
+    ; Remote-only users never enter either Ollama dispatcher. Schedule the same
+    ; bounded common reaper here so a prior crash cannot retain provider tokens,
+    ; typed payloads, bodies or terminal sidecars indefinitely.
+    try SweepFn.Call()
+    uid := req_id . "_" . TickFn.Call() . "_" . _HTTP_CurlNextRequestId()
+    try tmp_dir := TempDirFn.Call()
+    catch as err {
+        try LoggerWarn("LLM.remote", "Private curl directory unavailable: {1}.", err.Message)
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"
+    tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
+    tmp_config  := tmp_dir . "\ergopti_remote_" . uid . ".conf"
+    terminal    := _LLM_CurlTerminalPaths(tmp_stdout)
+    reservation["tmp_payload"] := tmp_payload
+    reservation["tmp_stdout"] := tmp_stdout
+    reservation["tmp_config"] := tmp_config
+    reservation["tmp_status"] := terminal["status"]
+    reservation["tmp_exit"] := terminal["exit"]
+    if !WriteFn.Call(tmp_payload, Payload) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        try LoggerWarn("LLM.remote", "Failed to write curl payload file.")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return true
+    }
+    if !WriteFn.Call(tmp_config, config_image) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        try LoggerWarn("LLM.remote", "Failed to write curl config file — request abandoned rather than sent with the token on the command line.")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return true
+    }
+    CurrentFn := ProxySelection.Get("current", 0)
+    try Current := !IsObject(CurrentFn) || CurrentFn.Call()
+    catch
+        Current := false
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
+    if !Current || Remaining <= 0 {
+        Cleaned := _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        if Remaining <= 0 || !Cleaned
+            return _LLMRemote_FailReserved(req_id, reservation, on_fail, Remaining <= 0 ? "timeout" : "dispatch")
+        reservation["proxy_resolution_done"] := false
+        return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+            on_fail, Remaining, Port, reservation)
+    }
+    ; URL and auth headers come from --config, never from argv (see
+    ; _LLMRemote_BuildCurlConfig): argv has no ACL for a same-user reader.
+    curlCmd := '"' . curl_exe . '" --disable -s -S -m '
+        . Format("{:.3f}", Remaining / 1000) . ' '
+        . _LLM_CurlMaxFileSizeArg() . '-X POST '
+        . '--config ' . _Q(tmp_config) . ' '
+        . '--data-binary @' . _Q(tmp_payload) . ' '
+        . '-o ' . _Q(tmp_stdout)
+    cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
+    pid := 0
+    process_owner := 0
+    try {
+        PreviousCritical := Critical("On")
+        try {
+            process_owner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)
+            reservation["pid"] := pid
+            reservation["process_owner"] := process_owner
+        } finally Critical(PreviousCritical)
+    } catch as err {
+        if process_owner is Map
+            _LLM_CurlReleaseProcess(process_owner, true, Port)
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        try LoggerWarn("LLM.remote", "curl launch failed: {1}.", err.Message)
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+        _LLMRemote_QueueCurlReservationCancel(req_id, reservation, Port)
+        return true
+    }
+    PollFn.Call(req_id)
+    return true
+}
+
+; Actual build observation owns a separate exact child. Its continuation
+; obtains a new exact-URL PAC answer after observation, before private staging.
+_LLMRemote_ContinueCurlCapability(req_id, reservation, resolved, Url, Payload,
+        on_success, on_fail, Port, CapabilityOwner, Receipt) {
+    if !reservation.Has("capability_owner")
+            || ObjPtr(reservation["capability_owner"]) != ObjPtr(CapabilityOwner)
+        return false
+    reservation.Delete("capability_owner")
+    if !_LLMRemote_RequestOwns(req_id, reservation)
+        return false
+    if reservation["cancelled"] || A_IsSuspended {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return false
+    }
+    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"], TickFn)
+    if Remaining <= 0
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+    if _HTTP_CurlIntegratedProxyAuthConfig(Receipt) == ""
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+    reservation["curl_capability_receipt"] := Receipt
+    reservation["proxy_resolution_done"] := false
+    return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+        on_fail, Remaining, Port, reservation)
+}
+
+; The resolver can yield to pause, cancellation, trim or a replacement owner.
+; Revalidate the captured request before allocating any credential artifacts.
+_LLMRemote_ContinueProxyDispatch(req_id, reservation, resolved, Url, Payload,
+        on_success, on_fail, timeout_ms, Port, ProxySelection) {
+    if !_LLMRemote_RequestOwns(req_id, reservation)
+        return false
+    if reservation["cancelled"] || A_IsSuspended {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return false
+    }
+    if reservation.Get("proxy_resolution_done", false)
+        return false
+    reservation["proxy_resolution_done"] := true
+    if reservation.Has("proxy_deadline")
+        SetTimer(reservation["proxy_deadline"], 0)
+    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+    Elapsed := TickElapsed64(reservation["start_tick"], TickFn.Call())
+    if Elapsed >= reservation["timeout_ms"]
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+    if !(ProxySelection is Map) || !ProxySelection.Get("ok", false)
+        return _LLMRemote_FailReserved(req_id, reservation, on_fail, "proxy_resolution")
+    return _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+        on_fail, reservation["timeout_ms"] - Elapsed, Port, reservation, ProxySelection)
+}
+
+_LLMRemote_ProxyDeadline(req_id, reservation, on_fail) {
+    if !_LLMRemote_RequestOwns(req_id, reservation) || reservation.Get("proxy_resolution_done", false)
+        return false
+    reservation["proxy_resolution_done"] := true
+    return _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+}
+
+; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollCurl.
+_LLMRemoteClassifyTerminal(Format, Terminal, Model := "") {
+    global LLM_REMOTE_RAW_FORMATS
+    if !_LLM_CurlTerminalOk(Terminal) {
+        ; The readable body still goes through classification (never promotion:
+        ; error content cannot become completion text) so a 4xx provider
+        ; verdict reaches the user instead of a bare transport failure. The
+        ; transport reason stays for curl-level failures and unread bodies;
+        ; an answered non-2xx keeps the classifier's own reason.
+        ReadBody := (Terminal.Has("body_read") && Terminal["body_read"]
+            && Terminal.Has("body")) ? Terminal["body"] : ""
+        Result := _LLMRemoteClassifyResponse(Format, ReadBody, Model)
+        Result["terminal_ok"] := false
+        ; A Backboard or decisions body is handed on whole, so a readable
+        ; non-2xx one classifies as a completion: it is the provider's verdict
+        if (Result["reason"] == "completion" && LLM_REMOTE_RAW_FORMATS.Has(Format))
+            Result["reason"] := "provider_error"
+        if (Terminal["exit"] != 0 || !Terminal["body_read"])
+            Result["reason"] := "transport"
+        return Result
+    }
+    Result := _LLMRemoteClassifyResponse(Format, Terminal["body"], Model)
+    Result["terminal_ok"] := true
+    return Result
+}
+
+_LLMRemote_PollCurl(req_id, Port := 0) {
+    global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
+    ReadTerminalFn := _LLM_CurlArtifactPortFn(Port, "read_terminal", _LLM_CurlReadTerminal)
+    CleanupFn := _LLM_CurlArtifactPortFn(Port, "cleanup", _LLMRemote_CurlCleanup)
+    if !_LLM_Remote_Async.Has(req_id)
+        return
+    entry := _LLM_Remote_Async[req_id]
+    terminal := ReadTerminalFn.Call(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
+    ; The exit sidecar is written last by _LLM_CurlOwnedCommand. Resolve that
+    ; durable receipt before cancellation, deadline or PID state: the numeric PID
+    ; may already name an unrelated process by the time this timer runs.
+    if _LLM_CurlTerminalComplete(terminal) {
+        _LLM_CurlReleaseEntryProcess(entry, false, Port)
+        if entry["cancelled"] {
+            CleanupFn.Call(entry)
+            _LLM_Remote_Async.Delete(req_id)
+            return
+        }
+        on_success := entry["on_success"]
+        on_fail    := entry["on_fail"]
+        fmt        := entry["format"]
+        model_id   := entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : ""
+        body := terminal["body"]
+        Classified := _LLMRemoteClassifyTerminal(fmt, terminal, model_id)
+        if !Classified["terminal_ok"] {
+            try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4} reason={5} server_msg={6}.",
+                req_id, terminal["exit"], terminal["status"], StrLen(body), Classified["reason"], Classified["server_message"])
+            CleanupFn.Call(entry)
+            _LLM_Remote_Async.Delete(req_id)
+            _LLM_InvokeCallback(on_fail, "on_fail",
+                _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
+            return
+        }
+        if !Classified["ok"] {
+            try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, status={3}, body_chars={4}, server_msg={5}).",
+                req_id, Classified["reason"], terminal["status"], StrLen(body), Classified["server_message"])
+            CleanupFn.Call(entry)
+            _LLM_Remote_Async.Delete(req_id)
+            _LLM_InvokeCallback(on_fail, "on_fail",
+                _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
+            return
+        }
+        CleanupFn.Call(entry)
+        _LLM_Remote_Async.Delete(req_id)
+        _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
+        return
+    }
+    if entry["cancelled"] {
+        _LLM_CurlReleaseEntryProcess(entry, true, Port)
+        CleanupFn.Call(entry)
+        _LLM_Remote_Async.Delete(req_id)
+        return
+    }
+    if (_LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
+        ; Hoisted above the Delete so the wrapper still has the callback, matching
+        ; the sibling branches in _LLMRemote_PollRequest.
+        on_fail := entry["on_fail"]
+        _LLM_CurlReleaseEntryProcess(entry, true, Port)
+        CleanupFn.Call(entry)
+        _LLM_Remote_Async.Delete(req_id)
+        try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
+        return
+    }
+    ; No terminal receipt yet. Poll the receipt itself until its bounded deadline;
+    ; ProcessExist(pid) cannot distinguish the original child from a recycled PID.
+    SetTimer(() => _LLMRemote_PollCurl(req_id, Port), -LLM_REMOTE_POLL_MS)
+}
+
+LLM_RemoteCancelAsync(req_id) {
+    global _LLM_Remote_Async
+    if !_LLM_Remote_Async.Has(req_id)
+        return
+    entry := _LLM_Remote_Async[req_id]
+    ; Flip the flag inline — the poll tick reads it — but release the transport
+    ; off-thread, exactly as the plural sibling does. This is reached from the
+    ; per-keystroke Critical, where both a blocking TerminateProcess and a WinHTTP
+    ; Abort (a cross-apartment COM call) starve the keyboard hook while the
+    ; message pump is suspended. The poll tick still cleans up the curl temp files
+    ; carrying request PII on its next iteration, exactly as before.
+    entry["cancelled"] := true
+    Kills := []
+    if entry.Has("capability_owner") {
+        Kills.Push(Map("cancel", ObjBindMethod(entry["capability_owner"], "Abort")))
+        _LLMRemote_DeleteOwned(req_id, entry)
+    }
+    if (entry.Has("transport") and entry["transport"] == "curl") {
+        if entry.Has("process_owner")
+            Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
+                entry["process_owner"], true)))
+    } else if entry.Has("http") {
+        Kills.Push(Map("http", entry["http"]))
+    }
+    LLM_DeferCancelKills(Kills)
+}
+
+; @param {string} SpareKind - Reservation kind to leave running (the engine
+;   passes LLM_REMOTE_KIND_API_TEST so typing never kills an explicit user
+;   probe). Empty keeps the historical blanket semantics.
+LLM_RemoteCancelAllAsync(SpareKind := "") {
+    global _LLM_Remote_Async
+    ; Flip the flags inline — the per-request poll ticks read them — but snapshot
+    ; the transports and release them off-thread. This is reached from the
+    ; per-keystroke Critical, where both a blocking TerminateProcess and a WinHTTP
+    ; Abort (a cross-apartment COM call) starve the keyboard hook while the
+    ; message pump is suspended. The poll tick still performs the temp-file
+    ; cleanup on its next iteration, exactly as before.
+    Kills := []
+    PendingDeletes := []
+    for _id, entry in _LLM_Remote_Async {
+        if (SpareKind != "" && entry.Has("kind") && entry["kind"] == SpareKind)
+            continue
+        entry["cancelled"] := true
+        if entry.Has("capability_owner") {
+            Kills.Push(Map("cancel", ObjBindMethod(entry["capability_owner"], "Abort")))
+            PendingDeletes.Push([_id, entry])
+        }
+        if (entry.Has("transport") and entry["transport"] == "curl") {
+            if entry.Has("process_owner")
+                Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
+                    entry["process_owner"], true)))
+        } else if entry.Has("http") {
+            Kills.Push(Map("http", entry["http"]))
+        }
+    }
+    for PendingDelete in PendingDeletes
+        _LLMRemote_DeleteOwned(PendingDelete[1], PendingDelete[2])
+    LLM_DeferCancelKills(Kills)
+}
+
+_LLMRemote_PollRequest(req_id) {
+    global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
+    if !_LLM_Remote_Async.Has(req_id)
+        return
+    entry := _LLM_Remote_Async[req_id]
+    if entry["cancelled"] {
+        ; Abort the in-flight WinHTTP request before dropping our reference.
+        ; Without this the COM object + its socket stay resident until WinHTTP's
+        ; own receive timeout fires — a provider that accepts the connection but
+        ; never responds keeps the request alive far longer than intended.
+        if entry.Has("http")
+            try entry["http"].Abort()
+        _LLM_Remote_Async.Delete(req_id)
+        return
+    }
+    ; Wrap-safe deadline guard: if the response never arrives (CDN silent drop,
+    ; network change mid-request), the poll loop would run forever without this
+    ; cap. Uses elapsed-delta arithmetic via _LLM_DeadlineExpired so the guard
+    ; remains correct across the 32-bit A_TickCount wrap (~49.7 days uptime).
+    if _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"]) {
+        on_fail := entry["on_fail"]
+        ; Abort the stalled request so the COM object + socket are released now
+        ; rather than lingering until WinHTTP's internal receive timeout fires.
+        if entry.Has("http")
+            try entry["http"].Abort()
+        _LLM_Remote_Async.Delete(req_id)
+        try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
+        return
+    }
+    http := entry["http"]
+    ready := false
+    ; A COM exception from WaitForResponse (connection dropped mid-request: WiFi cut,
+    ; provider socket reset, VPN flap) must abort the dead request immediately rather than
+    ; swallow the error and keep waking the message loop every poll interval for the full
+    ; deadline. Mirrors the Ollama fix (ollama-com-exception-busy-loop), which the remote
+    ; twin never received.
+    try {
+        ready := http.WaitForResponse(0)
+    } catch as com_err {
+        on_fail := entry["on_fail"]
+        try http.Abort()
+        _LLM_Remote_Async.Delete(req_id)
+        try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
+        ComMsg := SubStr(com_err.Message, 1, 120)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport", 0, ComMsg))
+        return
+    }
+    if !ready {
+        SetTimer(() => _LLMRemote_PollRequest(req_id), -LLM_REMOTE_POLL_MS)
+        return
+    }
+    on_success := entry["on_success"]
+    on_fail    := entry["on_fail"]
+    entryFormat := entry["format"]
+    _LLM_Remote_Async.Delete(req_id)
+    try {
+        status := http.Status
+        body   := http.ResponseText
+    } catch {
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport"))
+        return
+    }
+    Classified := _LLMRemoteClassifyTerminal(entryFormat,
+        Map("exit", 0, "status", status, "body_read", true, "body", body),
+        entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
+    if !Classified["terminal_ok"] {
+        _LLM_InvokeCallback(on_fail, "on_fail",
+            _LLMRemote_FailInfo("transport", status))
+        return
+    }
+    if !Classified["ok"] {
+        _LLM_InvokeCallback(on_fail, "on_fail",
+            _LLMRemote_FailInfo(Classified["reason"], status, Classified["server_message"]))
+        return
+    }
+    _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
+}
+
+; Token + cost extraction. Each provider exposes the same numeric fields
+; under a top-level ``usage`` block (OpenAI / Anthropic / Cohere / Mistral
+; / xAI / Cerebras / DeepSeek) or under ``usageMetadata`` (Gemini). We
+; pull prompt + completion + total when present and compute an estimated
+; cost in USD from the per-model price table below.
+_LLMRemoteEmptyUsage() {
+    return Map("prompt_tokens", 0, "completion_tokens", 0, "total_tokens", 0, "est_cost_usd", 0.0)
+}
+
+_LLMRemoteExtractUsageRoot(format, root, model) {
+    out := _LLMRemoteEmptyUsage()
+    if !(root is Map)
+        return out
+    usageKey := format == "gemini" ? "usageMetadata" : "usage"
+    if !root.Has(usageKey) or !(root[usageKey] is Map)
+        return out
+    usage := root[usageKey]
+    promptKey := format == "gemini" ? "promptTokenCount"
+        : (format == "anthropic" ? "input_tokens" : "prompt_tokens")
+    completionKey := format == "gemini" ? "candidatesTokenCount"
+        : (format == "anthropic" ? "output_tokens" : "completion_tokens")
+    totalKey := format == "gemini" ? "totalTokenCount" : "total_tokens"
+    if usage.Has(promptKey) and usage[promptKey] is Number and usage[promptKey] >= 0
+        out["prompt_tokens"] := Integer(usage[promptKey])
+    if usage.Has(completionKey) and usage[completionKey] is Number and usage[completionKey] >= 0
+        out["completion_tokens"] := Integer(usage[completionKey])
+    if usage.Has(totalKey) and usage[totalKey] is Number and usage[totalKey] >= 0
+        out["total_tokens"] := Integer(usage[totalKey])
+    if (out["total_tokens"] == 0 and out["prompt_tokens"] > 0)
+        out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
+    out["est_cost_usd"] := _LLMRemoteEstimateCost(model, out["prompt_tokens"], out["completion_tokens"])
+    return out
+}
+
+_LLMRemoteExtractUsage(format, body, model) {
+    out := _LLMRemoteEmptyUsage()
+    if (body == "")
+        return out
+    try root := JsonParse(body)
+    catch
+        return out
+    return _LLMRemoteExtractUsageRoot(format, root, model)
+}
+
+; Per-model USD price table (per 1M tokens) — loaded from api_providers.json.
+global LLM_REMOTE_MODEL_PRICES := Map()
+
+_LLMRemoteEstimateCost(model, in_tokens, out_tokens) {
+    global LLM_REMOTE_MODEL_PRICES
+    if (model == "" or !LLM_REMOTE_MODEL_PRICES.Has(model))
+        return 0.0
+    p := LLM_REMOTE_MODEL_PRICES[model]
+    return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
+}
+
+_LLMRemote_TrimAsyncRegistry() {
+    global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+    if (_LLM_Remote_Async.Count < LLM_REMOTE_MAX_INFLIGHT)
+        return
+    oldest_id := 0x7FFFFFFFFFFFFFFF
+    for id in _LLM_Remote_Async {
+        if (id < oldest_id)
+            oldest_id := id
+    }
+    if !_LLM_Remote_Async.Has(oldest_id)
+        return
+    oldest_entry := _LLM_Remote_Async[oldest_id]
+    ; Detach before cleanup or callbacks: either boundary can re-enter dispatch,
+    ; and the terminated owner must no longer participate in successor trimming.
+    _LLM_Remote_Async.Delete(oldest_id)
+        ; Abort the live WinHTTP request so the COM object + socket are
+        ; released now rather than lingering until WinHTTP's own timeout.
+        if oldest_entry.Has("http")
+            try oldest_entry["http"].Abort()
+        if (oldest_entry.Has("transport") and oldest_entry["transport"] == "curl") {
+            _LLM_CurlReleaseEntryProcess(oldest_entry, true)
+            _LLMRemote_CurlCleanup(oldest_entry)
+        }
+        ; Honour the async contract: exactly one of on_success / on_fail must
+        ; fire. Without this the caller (e.g. the prediction engine slot state
+        ; machine) hangs forever waiting for a callback that will never arrive.
+        if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
+            _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail",
+                _LLMRemote_FailInfo("trimmed"))
+        return
+}
+
+; Resolves an entry record to a normalised Map(Provider, Format, BaseUrl,
+; Token, Model). Returns "" when the entry is unusable (missing token /
+; model / unknown provider) so the caller can fail cleanly on a single
+; check instead of repeating the same six guards everywhere.
+_LLMRemoteResolveEntry(Entry) {
+    global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
+    NetworkStart := A_TickCount
+    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    if !LLM_API_PROVIDERS.Has(ProviderId)
+        return ""
+    Provider := LLM_API_PROVIDERS[ProviderId]
+    ProvFmt  := Provider["Format"]
+    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
+    if (BaseUrl == "")
+        BaseUrl := Provider["BaseUrl"]
+    if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
+        return ""
+    Token := _LLMRemoteEntryGet(Entry, "Token", "")
+    if !LocalServerAuthTokenAllowed(ProviderId, Token, LLM_LOCAL_API_SERVERS)
+        return ""
+    Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
+    if (Model == "")
+        return ""
+    for Scalar in [ProviderId, ProvFmt, BaseUrl, Token, Model] {
+        if !_LLMRemote_ConfigScalarIsSafe(Scalar)
+            return ""
+    }
+    ModelExtras := Provider.Has("ModelExtras") ? Provider["ModelExtras"] : Map()
+    Extras := (ModelExtras is Map && ModelExtras.Has(Model)) ? ModelExtras[Model] : Map()
+    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model, "Extras", Extras)
+}
+
+; Per-phase timeout (ms) for the readiness ping. Same value the sync path
+; used, but here it is non-blocking: curl runs in its own process and we poll
+; for completion, so even a hung connect never freezes
+; the main message pump.
+global LLM_REMOTE_READY_PING_TIMEOUT_MS := 2000
+; Absolute-time cap (ms) for the readiness poll loop. Sized one cadence above
+; the per-phase timeout so a silent connection drop (no WinHTTP timeout fires)
+; still ends the timer chain promptly instead of polling forever.
+global LLM_REMOTE_READY_PING_DEADLINE_MS := 3000
+; Poll cadence (ms) for the readiness ping. A reachability check does not need
+; sub-100 ms reactivity, so a relaxed cadence keeps timer pressure off the
+; message loop (mirrors LLM_OllamaIsRunning_Async's 500 ms).
+global LLM_REMOTE_READY_PING_POLL_MS := 250
+
+/**
+ * Probes the provider /models endpoint in a tree-owned curl child, so the caller
+ * (the tray
+ * save path) returns immediately and the message pump keeps running. Invokes
+ * ``on_result(bool)`` from a polling tick once the ping resolves, times out,
+ * or fails. Mirrors LLM_OllamaIsRunning_Async.
+ *
+ * @param {Map|Object} Entry     - API entry record (Provider / BaseUrl / Token).
+ * @param {function}   on_result - Callback receiving the boolean reachability.
+ */
+_LLMRemote_ReadyOwnerIsCurrent(Owner) {
+    return Owner is Map && LLM_AuxIsCurrent(Owner)
+}
+
+_LLMRemote_CompleteReady(Owner, on_result, reachable) {
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
+        return false
+    try _LLM_InvokeCallback(on_result, "on_result", reachable)
+    finally {
+        if Owner is Map
+            LLM_AuxFinish(Owner)
+    }
+    return true
+}
+
+LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
+    global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
+    global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+
+    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    if !(Owner is Map) {
+        EntryId := _LLMRemoteEntryGet(Entry, "Id", "")
+        OwnerKind := EntryId != "" ? "api_validation:" . EntryId : "remote_ready"
+        Owner := LLM_AuxBegin(OwnerKind, Map(
+            "backend", "api",
+            "endpoint", _LLMRemoteEntryGet(Entry, "BaseUrl", ""),
+            "identity", EntryId))
+    }
+    if !LLM_API_PROVIDERS.Has(ProviderId) {
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return Owner
+    }
+    Provider := LLM_API_PROVIDERS[ProviderId]
+    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
+    if (BaseUrl == "")
+        BaseUrl := Provider["BaseUrl"]
+    Token    := _LLMRemoteEntryGet(Entry, "Token", "")
+    if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
+            || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
+            || !LocalServerAuthTokenAllowed(ProviderId, Token, LLM_LOCAL_API_SERVERS)
+            || !_LLMRemote_ConfigScalarIsSafe(Token) {
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return Owner
+    }
+
+    Owner["network_start_tick"] := NetworkStart
+    LLM_AuxSchedule(Owner, _LLMRemote_ReadyDeadline.Bind(Owner, on_result),
+        -LLM_REMOTE_READY_PING_DEADLINE_MS)
+    Owner["local_server"] := LocalServerAuthTokenAllowed(ProviderId, "", LLM_LOCAL_API_SERVERS)
+    ProvFmt := Provider["Format"]
+    PingUrl := ""
+    if (ProvFmt == "openai" or ProvFmt == "anthropic") {
+        PingUrl := RTrim(BaseUrl, "/") . "/models"
+    } else if (ProvFmt == "gemini") {
+        PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
+    }
+    if (PingUrl == "") {
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return Owner
+    }
+
+    ResolveFn := _LLM_CurlArtifactPortFn(Port, "resolve_proxy", SystemProxy_ResolveCurlAsync)
+    CreateFn := _LLM_CurlArtifactPortFn(Port, "create_http", () => CurlAsyncRequest())
+    BindFn := (Http) => LLM_AuxBindResources(Owner, Map("cancel", (*) => Http.Abort()))
+    try {
+        if !ResolveFn.Call(PingUrl, _LLMRemote_DispatchReady.Bind(
+                Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ResolveFn))
+            _LLMRemote_CompleteReady(Owner, on_result, false)
+    } catch {
+        try LoggerError("LLM.remote", "Readiness proxy admission failed.")
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+    }
+    return Owner
+}
+
+; Only the still-current auxiliary owner may create or send the readiness child.
+_LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ResolveFn, ProxySelection) {
+    global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
+        return false
+    if _HTTP_CurlRemaining(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS) <= 0
+        return _LLMRemote_CompleteReady(Owner, on_result, false)
+    if A_IsSuspended || !(ProxySelection is Map) || !ProxySelection.Get("ok", false)
+        return _LLMRemote_CompleteReady(Owner, on_result, false)
+    if Owner.Get("proxy_admitted", false)
+        return false
+    Owner["proxy_admitted"] := true
+    try {
+        Http := CreateFn.Call()
+        if !BindFn.Call(Http)
+            return false
+        Http.Open("GET", PingUrl, true)
+        Http.SetTimeouts(LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS,
+                        LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS)
+        if !ProxySelection.Get("inherit", false)
+            Http.SetProxy(ProxySelection.Get("proxy", ""))
+        if HasMethod(Http, "SetDeadline")
+            Http.SetDeadline(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS)
+        if HasMethod(Http, "SetProxyAdmission")
+            Http.SetProxyAdmission(ProxySelection, ResolveFn)
+        _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
+        if !_LLMRemote_ReadyOwnerIsCurrent(Owner) || A_IsSuspended {
+            Http.Abort()
+            return false
+        }
+        Http.Send()
+    } catch {
+        if IsSet(Http)
+            try Http.Abort()
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return false
+    }
+    PollFn := _LLM_CurlArtifactPortFn(Port, "poll_ready", _LLMRemote_PollReady)
+    PollFn.Call(Http, on_result, Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
+    return true
+}
+
+_LLMRemote_ReadyDeadline(Owner, on_result) {
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
+        return false
+    return _LLMRemote_CompleteReady(Owner, on_result, false)
+}
+
+; Polling tick for LLM_RemoteIsReady_Async. Re-arms itself on a relaxed cadence
+; until the response is ready or the elapsed time exceeds timeout_ms, then aborts
+; the in-flight request and reports the result exactly once. Uses wrap-safe
+; elapsed-delta arithmetic via _LLM_DeadlineExpired.
+_LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms, Owner := 0) {
+    global LLM_REMOTE_READY_PING_POLL_MS
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner) {
+        try Http.Abort()
+        return
+    }
+    ready := false
+    try {
+        ready := Http.WaitForResponse(0)
+    } catch as com_err {
+        ; The last uncovered site of the ollama-com-exception invariant. A COM
+        ; exception means the connection dropped; the bare `try` this replaces
+        ; swallowed it and re-armed the poll, so a dead readiness ping kept
+        ; polling to its deadline against a socket that would never answer, with
+        ; nothing in the log to say why the backend looked unreachable.
+        try LoggerWarn("LLM.remote", "PollReady WaitForResponse threw COM error — abandoning: {1}", com_err.Message)
+        try Http.Abort()
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return
+    }
+    if !ready {
+        if _LLM_DeadlineExpired(start_tick, timeout_ms) {
+            ; Abort the stalled request so the COM object + socket are released
+            ; now rather than lingering until WinHTTP's own timeout fires.
+            try Http.Abort()
+            _LLMRemote_CompleteReady(Owner, on_result, false)
+            return
+        }
+        LLM_AuxSchedule(Owner,
+            () => _LLMRemote_PollReady(Http, on_result, start_tick,
+                timeout_ms, Owner), -LLM_REMOTE_READY_PING_POLL_MS)
+        return
+    }
+    status := 0
+    try status := Http.Status
+    if (Owner is Map) && Owner.Get("local_server", false) {
+        Body := ""
+        try Body := Http.ResponseText
+        Models := LocalServerAuthModelsReceipt(Map("ok", status == 200, "status", status, "body", Body))
+        _LLMRemote_CompleteReady(Owner, on_result, Models is Array)
+        return
+    }
+    _LLMRemote_CompleteReady(Owner, on_result, status >= 200 and status < 300)
+}
+
+
+
+
+; ============================================
+; ============================================
+; ======= 3/ Internal helpers ===============
+; ============================================
+; ============================================
+
+; Mirrors macOS api_remote.lua post_and_parse and api_ollama build_request_context.
+_LLMRemote_BuildRequestContext(system_prompt, full_text, tail_text) {
+    sys := system_prompt
+    user := full_text
+    tail := (tail_text != "") ? tail_text : full_text
+    if (InStr(sys, "PREFIX") and InStr(sys, "TAIL")) {
+        user := Format('PREFIX: "{1}"`nTAIL: "{2}"', full_text, tail)
+    } else if (sys != "" and InStr(sys, "{context}")) {
+        sys := StrReplace(sys, "{context}", full_text)
+        user := ""
+    } else {
+        user := full_text
+    }
+    return Map("system", sys, "user", user)
+}
+
+_LLMRemoteEntryGet(Entry, Key, Default := "") {
+    if (Entry is Map) {
+        return Entry.Has(Key) ? Entry[Key] : Default
+    }
+    try {
+        return Entry.%Key%
+    } catch {
+        return Default
+    }
+}
+
+; URL builder. Gemini bakes the model + API key into the path (no Authorization
+; header), so it needs a custom shape. OpenAI / Anthropic / OpenAI-compat all
+; use POST against a fixed endpoint with the model in the JSON payload.
+_LLMRemoteBuildUrl(BaseUrl, Fmt, Token, Model) {
+    Trimmed := RTrim(BaseUrl, "/")
+    if (Fmt == "anthropic") {
+        return Trimmed . "/messages"
+    }
+    if (Fmt == "decisions") {
+        ; A decisions provider's base_url is its full endpoint.
+        return BaseUrl
+    }
+    if (Fmt == "backboard") {
+        ; Backboard's routes (/assistants, /threads/messages) hang off the
+        ; base; remote_formats.ahk writes each one.
+        return Trimmed
+    }
+    if (Fmt == "gemini") {
+        ; Gemini's path is /models/<model>:generateContent?key=<token>.
+        ; Google API keys are alphanumeric + dash + underscore (URL-safe by
+        ; construction), so we send the token raw. An earlier version tried
+        ; to call ``Shlwapi\UrlEscapeW`` with a broken signature AND then
+        ; used ``Token`` instead of the (never-produced) escaped value — the
+        ; whole branch was dead code that fortunately happened to do the
+        ; right thing in practice. Replaced by an explicit comment so the
+        ; intent is obvious to future readers.
+        return Trimmed . "/models/" . Model . ":generateContent?key=" . Token
+    }
+    ; Default OpenAI Chat Completions shape.
+    return Trimmed . "/chat/completions"
+}
+
+; Sets the per-provider auth headers on a WinHTTP request. Gemini's auth is in
+; the query string; everything else uses a header.
+_LLMRemoteSetAuthHeaders(Http, Format, Token) {
+    global LLM_BACKBOARD_KEY_HEADER, LLM_DECISIONS_KEY_HEADER
+    if (Format == "anthropic") {
+        if (Token != "")
+            Http.SetRequestHeader("x-api-key", Token)
+        Http.SetRequestHeader("anthropic-version", "2023-06-01")
+        return
+    }
+    if (Format == "gemini") {
+        ; Token is in the URL; nothing to set on the header.
+        return
+    }
+    if (Format == "backboard") {
+        if (Token != "")
+            Http.SetRequestHeader(LLM_BACKBOARD_KEY_HEADER, Token)
+        return
+    }
+    if (Format == "decisions") {
+        if (Token != "")
+            Http.SetRequestHeader(LLM_DECISIONS_KEY_HEADER, LLM_RemoteFormats_DecisionsKeyValue(Token))
+        return
+    }
+    ; OpenAI / OpenAI-compatible all use bearer auth.
+    if (Token != "") {
+        Http.SetRequestHeader("Authorization", "Bearer " . Token)
+    }
+}
+
+; Build the JSON payload for the chosen provider format. Each branch produces a
+; minimal-but-correct body: a single system message + a single user message,
+; plus the temperature. Streaming is intentionally OFF so the call is a single
+; request/response round-trip (matches Ollama's non-streaming path).
+; The parameter is named ``Fmt`` (not ``Format``) on purpose: AHK v2 lets a
+; parameter name shadow the built-in ``Format()`` function, and we need the
+; built-in available below to render the JSON payload templates. Using
+; ``Format`` as a parameter would silently break every API request — the
+; call ``Format("{:.2f}", ...)`` would try to invoke the parameter (a
+; string, e.g. "openai") as a function and throw at runtime.
+; @param {Map} Extras - Per-model body fields from the catalogue
+;   (model_extras), merged into OpenAI-shape payloads only. Anthropic and
+;   Gemini branches never receive them: an unknown field can fail those
+;   endpoints, and each extra is documented for one provider model.
+_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "", Extras := Map()) {
+    SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
+    UserEsc := _LLMRemoteJsonEscape(UserText)
+    ModelEsc := _LLMRemoteJsonEscape(Model)
+    Temp := Format("{:.2f}", Temperature)
+    ; Output-token cap threaded from the shared PromptBuilder budget. The number
+    ; is never re-declared here: an unset ("") or out-of-range value resolves to
+    ; PB_DEFAULT_MAX_TOKENS — the single shared constant (codegen'd from the
+    ; domain DEFAULT_MAX_TOKENS) the engine also threads. One source, no literal.
+    MaxTok := (max_tokens is Number and max_tokens > 0) ? Integer(max_tokens) : PB_DEFAULT_MAX_TOKENS
+
+    if (Fmt == "anthropic") {
+        ; Anthropic Messages API: top-level ``system`` field, ``messages`` is
+        ; user/assistant turns only. ``max_tokens`` is REQUIRED by Anthropic.
+        return Format('{"model":"{1}","system":"{2}","messages":[{"role":"user","content":"{3}"}],"max_tokens":{5},"temperature":{4}}',
+            ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
+    }
+    if (Fmt == "gemini") {
+        ; Gemini wraps the system instruction in ``systemInstruction`` and the
+        ; user turn in ``contents.parts.text``.
+        return Format('{"systemInstruction":{"parts":[{"text":"{1}"}]},"contents":[{"role":"user","parts":[{"text":"{2}"}]}],"generationConfig":{"temperature":{3},"maxOutputTokens":{4}}}',
+            SysEsc, UserEsc, Temp, MaxTok)
+    }
+    ; OpenAI Chat Completions shape — covers OpenAI itself plus every
+    ; OpenAI-compatible endpoint (Groq, OpenRouter, LM Studio, vLLM, …).
+    ; Catalogue extras render generically from data: no per-model literal may
+    ; ever be restated here (single-sourced in api_providers.json).
+    ExtraFrag := ""
+    if (Extras is Map) {
+        for Field, Val in Extras {
+            if (Type(Field) != "String" || !RegExMatch(Field, "^[A-Za-z_][A-Za-z0-9_]*$"))
+                continue
+            if (Val is String)
+                ExtraFrag .= Format(',"{1}":"{2}"', Field, _LLMRemoteJsonEscape(Val))
+            else if (Val is Number)
+                ExtraFrag .= Format(',"{1}":{2}', Field, Val)
+        }
+    }
+    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false{6}}',
+        ModelEsc, SysEsc, UserEsc, Temp, MaxTok, ExtraFrag)
+}
+
+; Parse one immutable provider root and classify both the completion and usage
+; owned by that root. Canonical containers own an empty result too: falling back
+; after ``content:null`` or an empty parts array would promote reasoning/metadata
+; decoys that are not assistant output. Compatibility extraction is allowed only
+; for valid JSON maps that carry no canonical container and no provider error.
+_LLMRemoteClassifyResponse(Format, Body, Model := "") {
+    global LLM_REMOTE_RAW_FORMATS
+    Result := Map(
+        "ok", false, "valid_json", false, "recognized", false,
+        "text", "", "usage", _LLMRemoteEmptyUsage(), "reason", "empty_body",
+        "server_message", "")
+    if (Body == "")
+        return Result
+    try Root := JsonParse(Body)
+    catch {
+        Result["reason"] := "malformed_json"
+        return Result
+    }
+    Result["valid_json"] := true
+    if !(Root is Map) {
+        Result["reason"] := "unsupported_json_root"
+        return Result
+    }
+    ; Provider error text for the user: error.message (OpenAI / Anthropic /
+    ; Gemini shape), else a top-level message (Cerebras error shape). Content
+    ; decoys are never messages. Trimmed: a popup is not a log viewer.
+    ServerMsg := ""
+    if (Root.Has("error") && Root["error"] is Map && Root["error"].Has("message")
+        && Root["error"]["message"] is String)
+        ServerMsg := Root["error"]["message"]
+    else if (Root.Has("message") && Root["message"] is String)
+        ServerMsg := Root["message"]
+    else if (LLM_REMOTE_RAW_FORMATS.Has(Format) && Root.Has("detail") && Root["detail"] is String)
+        ServerMsg := Root["detail"]
+    if (StrLen(ServerMsg) > 200)
+        ServerMsg := SubStr(ServerMsg, 1, 200) . "..."
+    Result["server_message"] := ServerMsg
+    ; Backboard and decisions answers are no chat completion: the caller reads
+    ; the decoded object (remote_formats.ahk), so the body itself is the text.
+    if LLM_REMOTE_RAW_FORMATS.Has(Format) {
+        Result["recognized"] := true
+        if Root.Has("error") {
+            Result["reason"] := "provider_error"
+            return Result
+        }
+        Result["text"] := Body
+        Result["ok"] := true
+        Result["reason"] := "completion"
+        return Result
+    }
+    State := _LLMRemoteParseStructuredRootState(Format, Root)
+    Result["recognized"] := State["recognized"]
+    Result["usage"] := _LLMRemoteExtractUsageRoot(Format, Root, Model)
+    if State["recognized"]
+        Result["text"] := State["text"]
+    else
+        Result["text"] := _LLMRemoteParseResponseRegex(Format, Body)
+    Result["ok"] := Result["text"] != ""
+    Result["reason"] := Result["ok"] ? "completion"
+        : (State["recognized"] ? State["reason"] : "unsupported_shape")
+    ; A body carrying a provider message is a provider verdict, not an
+    ; unknown shape — even without an "error" envelope (Cerebras 4xx).
+    if (!Result["ok"] && Result["reason"] == "unsupported_shape"
+        && Result["server_message"] != "")
+        Result["reason"] := "provider_error"
+    return Result
+}
+
+_LLMRemoteParseResponse(Format, Body) {
+    return _LLMRemoteClassifyResponse(Format, Body)["text"]
+}
+
+_LLMRemoteParseStructuredRootState(Format, Root) {
+    if Root.Has("error")
+        return Map("recognized", true, "text", "", "reason", "provider_error")
+    if (Format == "anthropic") {
+        if !Root.Has("content")
+            return Map("recognized", false, "text", "", "reason", "unsupported_shape")
+        if Root["content"] is Array {
+            for _, Block in Root["content"] {
+                if !(Block is Map) or !Block.Has("type") or Block["type"] != "text"
+                    continue
+                Text := Block.Has("text") and Type(Block["text"]) == "String" ? Block["text"] : ""
+                return Map("recognized", true, "text", Text, "reason", "canonical_empty")
+            }
+        }
+        return Map("recognized", true, "text", "", "reason", "canonical_empty")
+    }
+    if (Format == "gemini") {
+        if !Root.Has("candidates")
+            return Map("recognized", false, "text", "", "reason", "unsupported_shape")
+        if Root["candidates"] is Array and Root["candidates"].Length {
+            Candidate := Root["candidates"][1]
+            if (Candidate is Map) and Candidate.Has("content") and (Candidate["content"] is Map) {
+                Content := Candidate["content"]
+                if Content.Has("parts") and (Content["parts"] is Array) {
+                    for _, Part in Content["parts"] {
+                        if (Part is Map) and Part.Has("thought") and Part["thought"] == true
+                            continue
+                        if (Part is Map) and Part.Has("text") {
+                            Text := Type(Part["text"]) == "String" ? Part["text"] : ""
+                            return Map("recognized", true, "text", Text, "reason", "canonical_empty")
+                        }
+                    }
+                }
+            }
+        }
+        return Map("recognized", true, "text", "", "reason", "canonical_empty")
+    }
+    if !Root.Has("choices")
+        return Map("recognized", false, "text", "", "reason", "unsupported_shape")
+    if Root["choices"] is Array and Root["choices"].Length {
+        Choice := Root["choices"][1]
+        if (Choice is Map) and Choice.Has("message") and (Choice["message"] is Map) {
+            Message := Choice["message"]
+            if Message.Has("content") {
+                Text := Type(Message["content"]) == "String" ? Message["content"] : ""
+                return Map("recognized", true, "text", Text, "reason", "canonical_empty")
+            }
+        }
+    }
+    return Map("recognized", true, "text", "", "reason", "canonical_empty")
+}
+
+; Compatibility extraction is intentionally limited to syntactically valid
+; JSON maps without a canonical response container or provider-error envelope.
+_LLMRemoteParseResponseRegex(Format, Body) {
+    if (Format == "anthropic") {
+        ; { "content": [ { "type": "text", "text": "..." } ], ... }
+        if RegExMatch(Body, 'm)"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &m)
+            return _LLMRemoteJsonUnescape(m[1])
+        return ""
+    }
+    if (Format == "gemini") {
+        ; { "candidates": [ { "content": { "parts": [ { "text": "..." } ] } } ] }
+        if RegExMatch(Body, 'm)"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &m)
+            return _LLMRemoteJsonUnescape(m[1])
+        return ""
+    }
+    ; OpenAI shape: { "choices": [ { "message": { "content": "..." } } ] }
+    if RegExMatch(Body, 'm)"content"\s*:\s*"((?:[^"\\]|\\.)*)"', &m)
+        return _LLMRemoteJsonUnescape(m[1])
+    return ""
+}
+
+; Escapes a string for embedding between caller-owned JSON quotes.
+_LLMRemoteJsonEscape(s) {
+    return JsonStringContents(s)
+}
+
+; Decodes captured contents from a valid provider JSON string token.
+_LLMRemoteJsonUnescape(s) {
+    return JsonStringDecodeContents(s)
+}
+
+; ============================================
+; ======= 4/ Shared catalogue loader =========
+; ============================================
+
+_LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
+    global LLM_REMOTE_CATALOG_FORMATS
+    if !(desc is Map)
+        return false
+    for req in ["label", "base_url", "default_model", "format"] {
+        if (!desc.Has(req) or Type(desc[req]) != "String")
+            return false
+    }
+
+    label := desc["label"]
+    baseUrl := desc["base_url"]
+    defaultModel := desc["default_model"]
+    format := desc["format"]
+    if (Trim(label) = "" or !LLM_REMOTE_CATALOG_FORMATS.Has(format))
+        return false
+
+    ; The compatibility row is a user-supplied endpoint/model template. Every
+    ; shipped concrete provider must be immediately usable from the catalogue.
+    if (providerId != "openai_compat" and (Trim(baseUrl) = "" or Trim(defaultModel) = ""))
+        return false
+    if (baseUrl != "" and !RegExMatch(baseUrl, "i)^https?://[^[:space:]]+$"))
+        return false
+    return true
+}
+
+
+_LLMRemote_CatalogPriceIsValid(value) {
+    ; JsonParse normally produces finite doubles, but keep the publication
+    ; boundary explicit so an alternate decoder/test port cannot inject NaN or
+    ; infinity into the later arithmetic callback.
+    return value is Number and value >= 0 and value <= 1.7976931348623157e308
+}
+
+; Normalizes the optional per-provider model_extras section (Map model id ->
+; Map field -> value) into publishable tables. Fail-closed per piece: doc
+; keys, non-map models, non-scalar values and field names that would break
+; JSON are dropped with the provider still loading — a bad extra must never
+; disable a whole provider. Values are strings or numbers (JsonParse decodes
+; JSON booleans as 0/1, which travel as numbers).
+_LLMRemote_NormalizeModelExtras(Raw) {
+    Norm := Map()
+    if !(Raw is Map)
+        return Norm
+    for Model, Fields in Raw {
+        if (Type(Model) != "String" || Model == "" || SubStr(Model, 1, 1) == "_")
+            continue
+        if !(Fields is Map)
+            continue
+        Kept := Map()
+        for Field, Val in Fields {
+            if (Type(Field) != "String" || !RegExMatch(Field, "^[A-Za-z_][A-Za-z0-9_]*$"))
+                continue
+            if (Val is String || Val is Number)
+                Kept[Field] := Val
+        }
+        if (Kept.Count > 0)
+            Norm[Model] := Kept
+    }
+    return Norm
+}
+
+/**
+ * Loads provider descriptors + model prices from _shared/modules/llm/api_providers.json.
+ * Fail-fast when the file is missing or malformed — same contract as the HS twin.
+ */
+; Validates the shared Test-API probe section. Soft-degrade like the HS twin:
+; a malformed section disables only the Test-API action (loud refusal at
+; click time), never the remote backend and its predictions.
+_LLMRemote_CatalogTestRequestIsValid(req) {
+    if !(req is Map)
+        return false
+    if !(req.Has("system_prompt") and req["system_prompt"] is String)
+        return false
+    if !(req.Has("user_text") and req["user_text"] is String)
+        return false
+    if (req["system_prompt"] == "" or req["user_text"] == "")
+        return false
+    if !(req.Has("temperature") and (req["temperature"] is Integer or req["temperature"] is Float))
+        return false
+    if (req["temperature"] < 0 or req["temperature"] > 2)
+        return false
+    if !(req.Has("max_tokens") and (req["max_tokens"] is Integer))
+        return false
+    if (req["max_tokens"] < 1 or req["max_tokens"] > 64)
+        return false
+    return true
+}
+
+; Validates the shared decisions probe section: a non-empty state and at least
+; one question, each with a type and instructions. Soft-degrade like
+; test_request: a malformed section disables only the Test action of a
+; decisions entry.
+_LLMRemote_CatalogDecisionsTestIsValid(Section) {
+    if !(Section is Map)
+        return false
+    if !(Section.Get("state", "") is String) || Section["state"] == ""
+        return false
+    Questions := Section.Get("questions", "")
+    if !(Questions is Map) || Questions.Count == 0
+        return false
+    for QuestionId, Question in Questions {
+        if !(Question is Map)
+            return false
+        for Field in ["type", "instructions"] {
+            if !(Question.Get(Field, "") is String) || Question[Field] == ""
+                return false
+        }
+    }
+    return true
+}
+
+_LLMRemote_LoadCatalog() {
+    global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
+    global LLM_LOCAL_API_SERVERS
+    global LLM_REMOTE_DECISIONS_TEST
+    path := _SharedDir . "\modules\llm\api_providers.json"
+    if !FileExist(path)
+        throw Error("api_providers.json not found at " . path)
+    try {
+        root := JsonParse(FileRead(path, "UTF-8"))
+    } catch as err {
+        throw Error("api_providers.json parse failed: " . err.Message)
+    }
+    if !(root is Map)
+        throw Error("api_providers.json root must be an object")
+    order := root.Has("provider_order") ? root["provider_order"] : ""
+    providers := root.Has("providers") ? root["providers"] : ""
+    prices := root.Has("model_prices") ? root["model_prices"] : ""
+    if !(order is Array) or order.Length = 0
+        throw Error("api_providers.json: provider_order must be a non-empty array")
+    if !(providers is Map) or providers.Count = 0
+        throw Error("api_providers.json: providers must be a non-empty object")
+    if !(prices is Map)
+        throw Error("api_providers.json: model_prices must be an object")
+
+    candidateProviders := Map()
+    candidateOrder := []
+    seenProviders := Map()
+    for _, pid in order {
+        if (Type(pid) != "String" or Trim(pid) = "")
+            continue
+        if seenProviders.Has(pid) {
+            try LoggerWarn("LLM.remote", "api_providers.json: duplicate provider_order entry '{1}' skipped.", pid)
+            continue
+        }
+        seenProviders[pid] := true
+        if !providers.Has(pid) {
+            try LoggerWarn("LLM.remote", "api_providers.json: unknown provider '{1}' skipped.", pid)
+            continue
+        }
+        desc := providers[pid]
+        if !_LLMRemote_CatalogDescriptorIsValid(pid, desc) {
+            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has an invalid descriptor and was skipped.", pid)
+            continue
+        }
+        candidateProviders[pid] := Map(
+            "Label", desc["label"],
+            "BaseUrl", desc["base_url"],
+            "DefaultModel", desc["default_model"],
+            "Format", desc["format"],
+            "ModelExtras", _LLMRemote_NormalizeModelExtras(
+                desc.Has("model_extras") ? desc["model_extras"] : Map()))
+        candidateOrder.Push(pid)
+    }
+
+    LocalCatalogue := Map("order", [], "servers", Map())
+    try LocalCatalogue := LocalServerAuthCatalogue(JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json")), candidateProviders)
+    catch as Err
+        try LoggerError("LLM.remote", "The local API catalogue is unavailable; optional authentication is refused.")
+    for Id in LocalCatalogue["order"] {
+        Desc := LocalCatalogue["servers"][Id]
+        candidateProviders[Id] := Map("Label", Desc["label"], "BaseUrl", Desc["base_url"],
+            "DefaultModel", "", "Format", "openai", "ModelExtras", Map())
+        candidateOrder.Push(Id)
+    }
+    LLM_LOCAL_API_SERVERS := LocalCatalogue["servers"]
+
+    candidatePrices := Map()
+    for model, row in prices {
+        validModel := Type(model) = "String" and model != ""
+        validRow := row is Map and row.Has("in") and row.Has("out")
+        if validRow
+            validRow := _LLMRemote_CatalogPriceIsValid(row["in"])
+                and _LLMRemote_CatalogPriceIsValid(row["out"])
+        if (!validModel or !validRow) {
+            try LoggerWarn("LLM.remote", "api_providers.json: invalid price row '{1}' skipped.", model)
+            continue
+        }
+        candidatePrices[model] := Map("in", row["in"], "out", row["out"])
+    }
+
+    ; The probe section degrades soft, unlike the provider catalogue above:
+    ; a missing or malformed test_request must disable only the Test-API
+    ; action (which refuses loudly at click time), never the whole remote
+    ; backend and its predictions.
+    testReq := root.Has("test_request") ? root["test_request"] : ""
+    candidateTestRequest := Map()
+    if _LLMRemote_CatalogTestRequestIsValid(testReq) {
+        candidateTestRequest := Map(
+            "system_prompt", testReq["system_prompt"],
+            "user_text", testReq["user_text"],
+            "temperature", testReq["temperature"],
+            "max_tokens", Integer(testReq["max_tokens"]))
+    } else {
+        try LoggerWarn("LLM.remote", "api_providers.json: test_request section missing or invalid — Test-API action disabled.")
+    }
+
+    DecisionsTest := root.Has("decisions_test") ? root["decisions_test"] : ""
+    candidateDecisionsTest := Map()
+    if _LLMRemote_CatalogDecisionsTestIsValid(DecisionsTest) {
+        candidateDecisionsTest := Map(
+            "state", DecisionsTest["state"],
+            "questions", DecisionsTest["questions"])
+    } else {
+        try LoggerWarn("LLM.remote", "api_providers.json: decisions_test section missing or invalid — Test-API action disabled for decisions providers.")
+    }
+
+    ; Publish only the completely validated candidates. A failed/partial parse
+    ; can never leak raw catalogue scalars to the menu or inference path.
+    LLM_API_PROVIDERS := candidateProviders
+    LLM_API_PROVIDER_ORDER := candidateOrder
+    LLM_REMOTE_MODEL_PRICES := candidatePrices
+    LLM_REMOTE_TEST_REQUEST := candidateTestRequest
+    LLM_REMOTE_DECISIONS_TEST := candidateDecisionsTest
+}
+
+; AHK-05: a corrupt or user-edited api_providers.json must disable only the remote
+; backend, not abort the whole driver boot. Mirror the graceful-degradation pattern
+; used by _LLM_LoadPresets (models.ahk) and LLM_LoadProfilesJSON (profiles.ahk).
+try _LLMRemote_LoadCatalog()
+catch as _e {
+	LLM_API_PROVIDERS := Map()
+	LLM_API_PROVIDER_ORDER := []
+	LLM_REMOTE_MODEL_PRICES := Map()
+	LLM_REMOTE_TEST_REQUEST := Map()
+	LLM_REMOTE_DECISIONS_TEST := Map()
+	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _e.Message)
+}

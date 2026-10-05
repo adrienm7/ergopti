@@ -1,0 +1,10 @@
+{
+	"frozen": true,
+	"paths": 14,
+	"patch": "managed-versions-failure.patch",
+	"patch_sha256": "58b9282525fe1060dce52fc547330ca9b53bd235e2f6303f8a879857b88dd68a",
+	"preimages": "preimages.json",
+	"sources": "sources.json",
+	"validation": "validation.json",
+	"dependency": "Linux changelog base is prior frozen Linux caller packet source; apply that first."
+}

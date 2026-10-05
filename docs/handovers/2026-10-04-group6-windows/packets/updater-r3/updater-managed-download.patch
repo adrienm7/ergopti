@@ -1,0 +1,1821 @@
+--- a/static/ergopti_plus/windows/modules/updater/self_update.ahk
++++ b/static/ergopti_plus/windows/modules/updater/self_update.ahk
+@@ -1495,22 +1495,39 @@
+ ; The Versions window's observer of the install it asked for (a release chosen
+ ; there, modules/updater/release_install.ahk), or 0. While one is set, the
+ ; phases and failures of the transaction go to that window, which shows them
+-; with a Retry button, instead of a modal box. Called as (Phase, ReasonKey).
++; with a Retry button. Called as (Phase, ReasonKey, optional FailureReceipt).
+ global _UpdaterInstallObserver := 0
++; The shared failure interpreter and host presenter are initialized once at boot.
++; The private terminal owner never crosses a WebView or a worker command line.
++global _UpdaterManagedFailureContract := 0
++global _UpdaterManagedFailurePresenter := 0
++global _UpdaterManagedFailureRetireFn := 0
++global _UpdaterManagedFailureOwner := 0
+ 
+ ; Tells the Versions window one phase of the install it follows: "installing",
+ ; "restarting" or "failed" (which ends the following).
+ ; @param Phase {String}
+ ; @param ReasonKey {String} Page locale key of a failure.
+ ; @returns {Boolean} True when a window follows this install.
+-_Updater_NotifyInstallPhase(Phase, ReasonKey := "") {
++_Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, ExpectedObserver := unset) {
+ 	global _UpdaterInstallObserver
+-	Observer := _UpdaterInstallObserver
++	PreviousCritical := Critical("On")
++	try {
++		Observer := IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver
++		if IsObject(Observer) && Phase == "failed"
++			&& IsObject(_UpdaterInstallObserver) && _UpdaterInstallObserver == Observer
++			_UpdaterInstallObserver := 0
++	} finally {
++		Critical(PreviousCritical)
++	}
+ 	if !IsObject(Observer)
+ 		return false
+-	if (Phase == "failed")
+-		_UpdaterInstallObserver := 0
+-	try Observer.Call(Phase, ReasonKey)
++	try {
++		if FailureReceipt is Map
++			Observer.Call(Phase, ReasonKey, FailureReceipt)
++		else
++			Observer.Call(Phase, ReasonKey)
++	}
+ 	catch as Err
+ 		try LoggerError("Updater", "The Versions window's install observer raised: {1}.", Err.Message)
+ 	return true
+@@ -1521,8 +1538,8 @@
+ ; @param MessageKey {String} Updater locale key of the modal box.
+ ; @param ReasonKey {String} Page locale key of the window's failure.
+ ; @param Icon {String} Modal box icon option.
+-_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!") {
+-	if _Updater_NotifyInstallPhase("failed", ReasonKey)
++_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!", FailureReceipt := 0) {
++	if _Updater_NotifyInstallPhase("failed", ReasonKey, FailureReceipt)
+ 		return
+ 	Ui_MsgBox(t(MessageKey), t("updater.window_title"), Icon)
+ }
+@@ -1536,12 +1553,275 @@
+ 	return (Stdout is String) && (InStr(Stdout, "SHA-256") || InStr(Stdout, "too small"))
+ }
+ 
++
++; Configures only native callbacks. The UI translates the shared contract's
++; safe report; neither the envelope nor the retained owner is a page payload.
++Updater_ConfigureManagedFailurePresenter(Contract, Presenter, RetireFn := 0) {
++	global _UpdaterManagedFailureContract, _UpdaterManagedFailurePresenter
++	global _UpdaterManagedFailureRetireFn
++	if !HasMethod(Contract, "Classify") || !HasMethod(Contract, "Actions")
++		|| !HasMethod(Presenter, "Call")
++		throw TypeError("Invalid managed updater failure presenter")
++	_UpdaterManagedFailureContract := Contract
++	_UpdaterManagedFailurePresenter := Presenter
++	_UpdaterManagedFailureRetireFn := RetireFn
++}
++
++_Updater_GetManagedFailureOwner() {
++	global _UpdaterManagedFailureOwner
++	return _UpdaterManagedFailureOwner
++}
++
++; Versions binds its own private request and original release at dispatch; a
++; newer menu failure cannot become that window's safe report or retry owner.
++_Updater_GetManagedFailureOwnerFor(Request, Release) {
++	Owner := _Updater_GetManagedFailureOwner()
++	if !_Updater_ManagedFailureOwnerIsCurrent(Owner) || Type(Release) != "Object"
++		|| !Release.HasProp("RawJson") || !Release.HasProp("Tag")
++		|| Owner["request"] != Request
++		|| !(Release.RawJson is String) || !(Release.Tag is String)
++		|| StrCompare(Owner["release"].RawJson, Release.RawJson, true) != 0
++		|| StrCompare(Owner["release"].Tag, Release.Tag, true) != 0
++		return 0
++	return Owner
++}
++
++_Updater_ExactFailureField(Record, Name, Default := 0) {
++	if !(Record is Map)
++		return Default
++	for Key, Value in Record
++		if Key is String && StrCompare(Key, Name, true) == 0
++			return Value
++	return Default
++}
++
++; Parsing is after the existing epoch and process-completion fences. Unknown,
++; malformed or extra worker fields can never turn stdout text into a diagnosis.
++; The JSON codec maps both booleans and numbers to AHK integers. Admit this
++; private flag from its actual top-level JSON token, never from truthiness or
++; a regex that can borrow text from a nested receipt string.
++_Updater_StagingNativeDebtToken(Stdout) {
++	NativeDebt := false
++	Seen := Map()
++	Seen.CaseSense := "On"
++	Position := 1
++	_JsonSkipWs(&Stdout, &Position)
++	Position += 1
++	loop {
++		_JsonSkipWs(&Stdout, &Position)
++		if SubStr(Stdout, Position, 1) == "}"
++			return NativeDebt
++		Key := _JsonParseString(&Stdout, &Position, true)
++		if Seen.Has(Key)
++			throw ValueError("Duplicate private staging envelope field")
++		Seen[Key] := true
++		_JsonSkipWs(&Stdout, &Position)
++		Position += 1
++		_JsonSkipWs(&Stdout, &Position)
++		Start := Position
++		_JsonParseValue(&Stdout, &Position, 1)
++		if StrCompare(Key, "native_cleanup_debt", true) == 0 {
++			Token := SubStr(Stdout, Start, Position - Start)
++			if StrCompare(Token, "true", true) == 0
++				NativeDebt := true
++			else if StrCompare(Token, "false", true) == 0
++				NativeDebt := false
++			else
++				throw ValueError("Native cleanup flag is not a JSON boolean")
++		}
++		_JsonSkipWs(&Stdout, &Position)
++		if SubStr(Stdout, Position, 1) == ","
++			Position += 1
++	}
++}
++
++_Updater_ParseStagingFailure(Stdout) {
++	global _UpdaterManagedFailureContract
++	Unknown := Map("valid", false, "reason", "download", "receipt", Map(), "cleanup_debt", [], "native_cleanup_debt", false)
++	if !(Stdout is String) || StrLen(Stdout) > 4096 || InStr(Stdout, Chr(0))
++		return Unknown
++	try Envelope := JsonParse(Stdout)
++	catch
++		return Unknown
++	if !(Envelope is Map) || Envelope.Count < 5 || Envelope.Count > 7
++		return Unknown
++	for Key in Envelope
++		if !(Key is String) || !RegExMatch(Key, "^(?:schema_version|state|operation|reason|receipt|cleanup_debt|native_cleanup_debt)$")
++			return Unknown
++	try NativeDebt := _Updater_StagingNativeDebtToken(Stdout)
++	catch
++		return Unknown
++	Version := _Updater_ExactFailureField(Envelope, "schema_version")
++	State := _Updater_ExactFailureField(Envelope, "state")
++	Operation := _Updater_ExactFailureField(Envelope, "operation")
++	if !(Version is Integer) || Version != 1 || !(State is String) || !(Operation is String)
++		|| StrCompare(State, "failed", true) != 0 || StrCompare(Operation, "download", true) != 0
++		return Unknown
++	Reason := _Updater_ExactFailureField(Envelope, "reason", "")
++	if !(Reason is String) || (StrCompare(Reason, "download", true) != 0
++		&& StrCompare(Reason, "verify", true) != 0 && StrCompare(Reason, "deadline", true) != 0)
++		return Unknown
++	Contract := _UpdaterManagedFailureContract
++	Admitted := _Updater_AdmitStagingReceipt(_Updater_ExactFailureField(Envelope, "receipt"), Contract)
++	if !(Admitted is Map)
++		return Unknown
++	Debt := []
++	if _Updater_ExactFailureField(Envelope, "cleanup_debt", -1) != -1 {
++		RawDebt := _Updater_ExactFailureField(Envelope, "cleanup_debt")
++		if !(RawDebt is Array) || RawDebt.Length > 6
++			return Unknown
++		for Entry in RawDebt {
++			if !(Entry is Map) || Entry.Count != 2
++				return Unknown
++			Resource := _Updater_ExactFailureField(Entry, "resource")
++			if !(Resource is String) || !RegExMatch(Resource,
++				"^(?:request|output|input|response|staged_executable|swap_worker)$")
++				return Unknown
++			CleanReceipt := _Updater_AdmitStagingReceipt(_Updater_ExactFailureField(Entry, "receipt"), Contract)
++			if !(CleanReceipt is Map)
++				return Unknown
++			Debt.Push(Map("resource", Resource, "receipt", CleanReceipt))
++		}
++	}
++	return Map("valid", true, "reason", Reason, "receipt", Admitted, "cleanup_debt", Debt, "native_cleanup_debt", NativeDebt)
++}
++
++_Updater_AdmitStagingReceipt(Receipt, Contract) {
++	if !(Receipt is Map) || Receipt.Count > 16
++		return 0
++	if !HasMethod(Contract, "Classify") || !Contract.HasProp("Policy")
++		return Map()
++	Admitted := Map()
++	Admitted.CaseSense := "On"
++	for Field, Value in Receipt {
++		Definition := _ManagedNetwork_Get(Contract.Policy["fields"], Field)
++		if !(Definition is Map) || !_ManagedNetwork_Scalar(Value, Definition)
++			|| (Value is String && StrLen(Value) > 128)
++			return 0
++		Admitted[Field] := Value
++	}
++	return Admitted
++}
++
++_Updater_NewManagedFailureOwner(Release, Request, AssetUrl, Digest, StagingEpoch, ExpectedObserver := unset) {
++	global _UpdaterInstallObserver
++	if !_Updater_RequestContextValid(Request) || Type(Release) != "Object"
++		|| !Release.HasProp("RawJson") || !Release.HasProp("Tag")
++		return 0
++	return Map("release", { RawJson: Release.RawJson, Tag: Release.Tag },
++		"request", Request, "asset_url", AssetUrl, "digest", Digest,
++		"staging_epoch", StagingEpoch, "terminal", false, "retired", false,
++		"install_observer", IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver)
++}
++
++_Updater_DispatchManagedFailureRetirement(Owner) {
++	global _UpdaterManagedFailureRetireFn
++	if HasMethod(_UpdaterManagedFailureRetireFn, "Call") {
++		try _UpdaterManagedFailureRetireFn.Call(Owner)
++		catch as Err
++			try LoggerWarn("Updater", "Managed failure retirement callback raised {1}; the old owner remains revoked.", Type(Err))
++	}
++}
++
++_Updater_RetireManagedFailure(ExpectedOwner := unset) {
++	global _UpdaterManagedFailureOwner
++	PreviousCritical := Critical("On")
++	try {
++		Owner := _UpdaterManagedFailureOwner
++		if IsSet(ExpectedOwner) && (!(Owner is Map) || Owner != ExpectedOwner)
++			return false
++		_UpdaterManagedFailureOwner := 0
++		if Owner is Map
++			Owner["retired"] := true
++	} finally {
++		Critical(PreviousCritical)
++	}
++	if Owner is Map
++		SetTimer(_Updater_DispatchManagedFailureRetirement.Bind(Owner), -1)
++	return true
++}
++
++; Old pause/channel generations and a newer same-tag request cannot borrow this
++; terminal request's release identity or consent, even if its dialog stays open.
++_Updater_ManagedFailureOwnerIsCurrent(Owner) {
++	global _UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch
++	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterSwapOwner
++	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_POLICY_ALLOW
++	if !(Owner is Map) || !(_UpdaterManagedFailureOwner is Map)
++		|| Owner != _UpdaterManagedFailureOwner || !Owner.Get("terminal", false)
++		|| Owner.Get("retired", true) || Owner.Get("staging_epoch", 0) != _UpdaterSelfUpdateEpoch
++		|| _UpdaterDownloadInProgress || IsObject(_UpdaterDownloadWorker)
++		|| (_UpdaterSwapOwner is Map) || _UpdaterRecoveryPublishTarget != ""
++		return false
++	return _Updater_RequestPolicy(Owner["request"]) == UPDATER_REQUEST_POLICY_ALLOW
++}
++
++_Updater_RetryManagedFailure(Owner) {
++	global BUNDLE_RELEASE_ASSET
++	if !_Updater_ManagedFailureOwnerIsCurrent(Owner)
++		return false
++	Release := Owner["release"]
++	Asset := _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag)
++	if !IsObject(Asset) || StrCompare(Asset.Url, Owner["asset_url"], true) != 0
++		|| StrCompare(Asset.Digest, Owner["digest"], true) != 0
++		|| !_Updater_ManagedFailureOwnerIsCurrent(Owner)
++		return false
++	; The existing Critical reservation compares and claims this exact owner.
++	return Updater_DownloadAndInstall(Release, Owner["request"], , 0, 0, Owner) == true
++}
++
++_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
++	global _UpdaterManagedFailureOwner, _UpdaterManagedFailurePresenter
++	global _UpdaterSelfUpdateEpoch, _UpdaterInstallObserver
++	Observer := Owner is Map ? Owner.Get("install_observer", 0) : _UpdaterInstallObserver
++	if Failure.Get("native_cleanup_debt", false)
++		try LoggerWarn("Updater", "Staging reported native resolver retirement debt; its owned process tree has physically retired.")
++	if Failure.Get("cleanup_debt", []).Length > 0
++		try LoggerWarn("Updater", "Staging reported {1} cleanup refusal(s); its process tree has physically retired.",
++			Failure["cleanup_debt"].Length)
++	if !_Updater_EndDownloadTransaction(StagingEpoch)
++		return false
++	PreviousCritical := Critical("On")
++	try {
++		if _UpdaterSelfUpdateEpoch != StagingEpoch
++			return false
++		if Owner is Map && Owner["staging_epoch"] == StagingEpoch {
++			Owner["terminal"] := true
++			Owner["failure"] := Failure
++			_UpdaterManagedFailureOwner := Owner
++		}
++	} finally {
++		Critical(PreviousCritical)
++	}
++	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
++		return false
++	if Failure["reason"] == "verify" {
++		if !_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_verify",
++			Failure["receipt"], Observer)
++			Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
++		return true
++	}
++	Observed := _Updater_NotifyInstallPhase("failed",
++		"changelog_window.install_error_download", Failure["receipt"], Observer)
++	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
++		return false
++	if !Observed && HasMethod(_UpdaterManagedFailurePresenter, "Call") {
++		try {
++			if _UpdaterManagedFailurePresenter.Call(Failure, Owner) == true
++				return true
++		}
++	}
++	if !Observed
++		Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
++	return true
++}
++
+ ; Dispatches the whole staging transaction to a child process. AHK's one
+ ; interpreter thread is also the keyboard hook thread, so response-body COM,
+ ; disk persistence, integrity checks and swap-script creation must never run here.
+ ; This side only validates the request, launches/polls the worker and performs
+ ; the final non-blocking process hand-off after the worker reports READY.
+-_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
++_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0) {
+ 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+ 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
+ 	global _UpdaterDownloadStartedTick
+@@ -1551,11 +1831,15 @@
+ 		ShouldDrop: false,
+ 		RecoveryBusy: false,
+ 		DuplicateDownload: false,
++		RetryStale: false,
+ 		Epoch: 0
+ 	}
+ 	PreviousCritical := Critical("On")
+ 	try {
+-		if (_Updater_RequestPolicy(Request, BoundarySuspended)
++		if ExpectedFailureOwner is Map && (!_Updater_ManagedFailureOwnerIsCurrent(ExpectedFailureOwner)
++			|| ExpectedFailureOwner["request"] != Request) {
++			Outcome.RetryStale := true
++		} else if (_Updater_RequestPolicy(Request, BoundarySuspended)
+ 			!= UPDATER_REQUEST_POLICY_ALLOW) {
+ 			Outcome.ShouldDrop := true
+ 		} else if (_UpdaterRecoveryPublishTarget != "") {
+@@ -1563,6 +1847,10 @@
+ 		} else if _UpdaterDownloadInProgress {
+ 			Outcome.DuplicateDownload := true
+ 		} else {
++			if ExpectedFailureOwner is Map
++				_Updater_RetireManagedFailure(ExpectedFailureOwner)
++			else
++				_Updater_RetireManagedFailure()
+ 			_UpdaterDownloadInProgress := true
+ 			Outcome.Epoch := ++_UpdaterSelfUpdateEpoch
+ 			_UpdaterDownloadRequest := Request
+@@ -1579,18 +1867,20 @@
+ ; can pump lifecycle callbacks: if START itself is interrupted by Pause, there
+ ; is deliberately no transaction for cancellation to terminate. The resumed
+ ; reservation then observes stale provenance and closes START with WARNING.
+-_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl) {
++_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, ExpectedFailureOwner := 0) {
+ 	try LoggerStart("Updater", "Downloading update '{1}' from {2}…", Tag, AssetUrl)
+ 	try {
+ 		Outcome := _Updater_TryReserveDownloadTransaction(
+-			Request, BoundarySuspended)
++			Request, BoundarySuspended, ExpectedFailureOwner)
+ 	} catch as Err {
+ 		try LoggerError("Updater", "Download reservation failed after START: {1}.", Err.Message)
+ 		throw Err
+ 	}
+ 	if Outcome.Reserved
+ 		return Outcome
+-	if Outcome.ShouldDrop {
++	if Outcome.RetryStale {
++		try LoggerWarn("Updater", "Download retry cancelled because its exact terminal owner changed.")
++	} else if Outcome.ShouldDrop {
+ 		try LoggerWarn("Updater", "Download start cancelled before reservation because request policy changed.")
+ 	} else if Outcome.RecoveryBusy {
+ 		try LoggerWarn("Updater", "Update reservation refused while rollback recovery became active.")
+@@ -1602,10 +1892,12 @@
+ 	return Outcome
+ }
+ 
+-Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0) {
++Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0, ExpectedFailureOwner := 0) {
+ 	global BUNDLE_RELEASE_ASSET
+ 	global _UpdaterDownloadInProgress
+ 	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_ORIGIN_MANUAL
++	global _UpdaterInstallObserver
++	InstallObserver := _UpdaterInstallObserver
+ 	HasSuspendOverride := IsSet(IsSuspended)
+ 	if !IsSet(Request) {
+ 		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+@@ -1723,7 +2015,9 @@
+ 	; atomically claims the exact request + epoch.
+ 	BoundarySuspended := HasSuspendOverride ? IsSuspended : A_IsSuspended
+ 	Reservation := _Updater_BeginDownloadTransaction(
+-		Request, BoundarySuspended, Release.Tag, AssetUrl)
++		Request, BoundarySuspended, Release.Tag, AssetUrl, ExpectedFailureOwner)
++	if Reservation.RetryStale
++		return false
+ 	if Reservation.ShouldDrop {
+ 		_Updater_RequestMayPublish(Request, BoundarySuspended, NotifyFn)
+ 		return false
+@@ -1748,7 +2042,7 @@
+ 	}
+ 
+ 	_Updater_StartStagingWorker(AssetUrl, Asset.Digest, NewExe, SwapScriptPath,
+-		CurrentExe, Release.Tag, StagingEpoch)
++		CurrentExe, Release.Tag, StagingEpoch, Release, Request, InstallObserver)
+ 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+ 		return false
+ 	if IsObject(RebuildFn)
+@@ -1800,7 +2094,8 @@
+ ; release metadata as data rather than interpolating it into PowerShell syntax.
+ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
+ 	SwapScriptPath, CurrentExe,
+-	MinimumSize, TimeoutMs) {
++	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
++	ProxyPolicyPath := "", UpdaterDefaultsPath := "") {
+ 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
+ 	_UpdaterStagingTransportCounter += 1
+ 	Prefix := "ERGOPTI_UPDATER_" . DllCall("GetCurrentProcessId", "UInt")
+@@ -1820,7 +2115,12 @@
+ 		{ Name: Prefix . "_SWAP_PATH", Value: SwapScriptPath },
+ 		{ Name: Prefix . "_CURRENT", Value: CurrentExe },
+ 		{ Name: Prefix . "_MINIMUM", Value: MinimumSize },
+-		{ Name: Prefix . "_TIMEOUT", Value: TimeoutMs }
++		{ Name: Prefix . "_TIMEOUT", Value: TimeoutMs },
++		{ Name: Prefix . "_DOWNLOAD_MODULE", Value: DownloadModulePath },
++		{ Name: Prefix . "_DEADLINE", Value: DeadlineMs },
++		{ Name: Prefix . "_STARTED_TICK", Value: StartedTick },
++		{ Name: Prefix . "_PROXY_POLICY", Value: ProxyPolicyPath },
++		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath }
+ 	]
+ 	SwapChunkCount := Ceil(StrLen(SwapScriptPayload)
+ 		/ UPDATER_STAGING_ENV_MAX_CHARS)
+@@ -1845,7 +2145,7 @@
+ 		. '$worker=[ScriptBlock]::Create($source);'
+ 		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
+ 		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
+-		. ') $swapPayload'
++		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS'
+ 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+ 		"-EncodedCommand", _Updater_EncodePowerShellCommand(Bootstrap)]
+ 	for Arg in Args {
+@@ -1880,14 +2180,20 @@
+ 		try EnvSet(Pair.Name, "")
+ }
+ 
+-_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch) {
++_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset) {
+ 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
++	global _VendorDir, _SharedDir, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, _UpdaterDownloadStartedTick
+ 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+ 	StagingScript := _Updater_BuildStagingWorkerScript()
+ 	SwapScript := _Updater_BuildSwapWorkerScript()
++	FailureOwner := IsSet(InstallObserver)
++		? _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
++			ExpectedSha256, StagingEpoch, InstallObserver)
++		: _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
++			ExpectedSha256, StagingEpoch)
+ 	_OnDone := (ExitCode, Stdout, Stderr) => _Updater_PollDownloadAsync(
+ 		ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag,
+-		StagingEpoch)
++		StagingEpoch, FailureOwner)
+ 	Transport := 0
+ 	Worker := 0
+ 	Started := false
+@@ -1896,7 +2202,11 @@
+ 	try {
+ 		Transport := _Updater_BuildStagingTransport(
+ 			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
+-			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)
++			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
++			_VendorDir . "\ergopti_updater_download.ps1", UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
++			_UpdaterDownloadStartedTick,
++			_SharedDir . "\modules\network\proxy_policy.json",
++			_SharedDir . "\modules\updater\defaults.json")
+ 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
+ 			Worker := ShellRunner_SpawnTreeOwned(
+ 				_Updater_PowerShellPath(), Transport.Args, _OnDone)
+@@ -1999,7 +2309,7 @@
+ 	return _Updater_RetrySwapCleanupDebt()
+ }
+ 
+-_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false) {
++_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
+ 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
+ 	global _UpdaterDownloadRequest
+ 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
+@@ -2012,6 +2322,8 @@
+ 	HadTransaction := false
+ 	PreviousCritical := Critical("On")
+ 	try {
++		if ExpectedEpoch && _UpdaterSelfUpdateEpoch != ExpectedEpoch
++			return false
+ 		HadTransaction := _UpdaterDownloadInProgress
+ 			or IsObject(_UpdaterDownloadWorker) or (_UpdaterSwapOwner is Map)
+ 			or IsObject(_UpdaterDownloadRequest)
+@@ -2027,6 +2339,7 @@
+ 		_UpdaterSwapOwner := 0
+ 		_UpdaterExitIntent := 0
+ 		_UpdaterExitInvocation := 0
++		_Updater_RetireManagedFailure()
+ 		_UpdaterDownloadInProgress := false
+ 		_UpdaterSelfUpdateEpoch += 1
+ 	} finally {
+@@ -2060,20 +2373,30 @@
+ ; Enforces one monotonic wall-clock budget for the entire hidden download
+ ; process. This is independent from HttpWebRequest's per-operation timeouts.
+ _Updater_EnforceDownloadDeadline(NowTick := unset, RebuildMenu := true,
+-	NotifyFn := 0, CancelFn := _Updater_CancelSelfUpdateTransaction) {
+-	global _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick
++	NotifyFn := 0, CancelFn := _Updater_CancelSelfUpdateTransaction, ExpectedEpoch := 0) {
++	global _UpdaterSelfUpdateEpoch, _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick
+ 	global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+-	if !_UpdaterDownloadInProgress or !_UpdaterDownloadStartedTick
+-		return false
+-	StartedTick := _UpdaterDownloadStartedTick
++	PreviousCritical := Critical("On")
++	try {
++		if ExpectedEpoch && (!_UpdaterDownloadInProgress || _UpdaterSelfUpdateEpoch != ExpectedEpoch)
++			return false
++		if !_UpdaterDownloadInProgress || !_UpdaterDownloadStartedTick
++			return false
++		StartedTick := _UpdaterDownloadStartedTick
++	} finally {
++		Critical(PreviousCritical)
++	}
+ 	if !IsSet(NowTick)
+ 		NowTick := A_TickCount
+ 	if !TickExpired64(StartedTick,
+ 		UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, NowTick)
+ 		return false
+-	if !CancelFn.Call(
+-		"Update download exceeded its absolute wall-clock deadline.",
+-		RebuildMenu, false)
++	Cancelled := ExpectedEpoch
++		? CancelFn.Call("Update download exceeded its absolute wall-clock deadline.",
++			RebuildMenu, false, ExpectedEpoch)
++		: CancelFn.Call("Update download exceeded its absolute wall-clock deadline.",
++			RebuildMenu, false)
++	if !Cancelled
+ 		return false
+ 	_Updater_SurfaceFailure("updater.install_error_download",
+ 		"Absolute download deadline exceeded.", NotifyFn)
+@@ -2083,12 +2406,25 @@
+ ; The only staging completion callback running in AHK. The worker's READY
+ ; token means it has already persisted and verified the executable plus the
+ ; UTF-8 PowerShell swap worker.
+-_Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag, StagingEpoch) {
++_Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag, StagingEpoch, FailureOwner := 0, CompletionTick := unset, DeadlineNotifyFn := 0) {
+ 	global _UpdaterDownloadWorker
+ 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+ 		return
+-	_UpdaterDownloadWorker := 0
+-	SetTimer(_Updater_MonitorStagingWorker, 0)
++	; Completion can arrive after the deadline but before the monitor's tick.
++	; Keep the exact worker/monitor until the original parent budget is admitted.
++	NowTick := IsSet(CompletionTick) ? CompletionTick : A_TickCount
++	if _Updater_EnforceDownloadDeadline(NowTick, true, DeadlineNotifyFn,
++		_Updater_CancelSelfUpdateTransaction, StagingEpoch)
++		return
++	PreviousCritical := Critical("On")
++	try {
++		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
++			return
++		_UpdaterDownloadWorker := 0
++		SetTimer(_Updater_MonitorStagingWorker, 0)
++	} finally {
++		Critical(PreviousCritical)
++	}
+ 	if A_IsSuspended {
+ 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
+ 		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
+@@ -2096,13 +2432,9 @@
+ 		return
+ 	}
+ 	if (ExitCode != 0 or Stdout != "READY") {
+-		try LoggerError("Updater", "Update staging worker failed (exit {1}): {2}.", ExitCode, Stdout)
+-		; The worker reports a digest or size refusal in its ERR line: that is a
+-		; failed verification, anything else a failed download.
+-		_Updater_ReportInstallFailure("updater.install_error_download",
+-			_Updater_StagingFailureIsVerification(Stdout)
+-				? "changelog_window.install_error_verify" : "changelog_window.install_error_download")
+-		_Updater_EndDownloadTransaction(StagingEpoch)
++		try LoggerError("Updater", "Update staging worker failed (exit {1}); private output omitted.", ExitCode)
++		Failure := _Updater_ParseStagingFailure(Stdout)
++		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch)
+ 		return
+ 	}
+ 	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)
+@@ -2119,41 +2451,42 @@
+ 	global UPDATER_LAST_NOTIFIED_TAG := ""
+ }
+ 
+-; Returns a self-contained worker script. Paths and URLs are passed as argv,
+-; never interpolated into the script, so release metadata cannot alter commands.
++; Returns the compact staging orchestrator. Trusted helper paths and release
++; data use the private inherited environment, never PowerShell interpolation.
+ _Updater_BuildStagingWorkerScript() {
+-	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)' . "`n"
++	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null)' . "`n"
+ 		. '$ErrorActionPreference = "Stop"' . "`n"
++		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()}' . "`n"
++		. 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}' . "`n"
+ 		. 'try {' . "`n"
+-		. '  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $NewExe) | Out-Null' . "`n"
+-		. '  Remove-Item -LiteralPath $NewExe -Force -ErrorAction SilentlyContinue' . "`n"
+-		. '  Remove-Item -LiteralPath $SwapScriptPath -Force -ErrorAction SilentlyContinue' . "`n"
+-		. '  $Request = [System.Net.HttpWebRequest]::Create($Url)' . "`n"
+-		. '  $Request.Method = "GET"' . "`n"
+-		. '  $Request.UserAgent = "ErgoptiPlus-Updater/1.0"' . "`n"
+-		. '  $Request.Timeout = $TimeoutMs' . "`n"
++		. '  . $DownloadModulePath' . "`n"
++		. '  . (Join-Path (Split-Path -Parent $DownloadModulePath) "ergopti_network_routes.ps1")' . "`n"
++		. '  $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}' . "`n"
++		. '  $Request=[System.Net.HttpWebRequest]::Create($Url)' . "`n"
+ 		. '  $Request.ReadWriteTimeout = $TimeoutMs' . "`n"
+-		. '  $Response = $Request.GetResponse()' . "`n"
+-		. '  if ([int]$Response.StatusCode -ne 200) { throw ("HTTP " + [int]$Response.StatusCode) }' . "`n"
+-		. '  $ExpectedSize = [int64]$Response.ContentLength' . "`n"
+-		. '  $Input = $Response.GetResponseStream()' . "`n"
+-		. '  $Output = [System.IO.File]::Open($NewExe, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)' . "`n"
+-		. '  try { $Input.CopyTo($Output) } finally { $Output.Dispose(); $Input.Dispose(); $Response.Dispose() }' . "`n"
+-		. '  $ActualSize = (Get-Item -LiteralPath $NewExe).Length' . "`n"
+-		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Content-Length mismatch" }' . "`n"
+-		. '  if ($ActualSize -lt $MinimumSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Downloaded file is too small" }' . "`n"
+-		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { Remove-Item -LiteralPath $NewExe -Force; throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
+-		. '  $ActualDigest = (Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()' . "`n"
+-		. '  if ($ActualDigest -cne $ExpectedSha256) { Remove-Item -LiteralPath $NewExe -Force; throw "SHA-256 digest mismatch" }' . "`n"
+-		. '  $SwapSource = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
+-		. '  $Utf8 = [Text.UTF8Encoding]::new($false)' . "`n"
+-		. '  [System.IO.File]::WriteAllText($SwapScriptPath, $SwapSource, $Utf8)' . "`n"
++		. '  $ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick' . "`n"
++		. '  $State.Stage="file_read"' . "`n"
++		. '  $ActualSize=(Get-Item -LiteralPath $NewExe).Length' . "`n"
++		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }' . "`n"
++		. '  if ($ActualSize -lt $MinimumSize) { $State.Reason="verify";throw "Downloaded file is too small" }' . "`n"
++		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { $State.Reason="verify";throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
++		. '  $ActualDigest=(Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()' . "`n"
++		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
++		. '  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }' . "`n"
++		. '  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
++		. '  $State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)' . "`n"
++		. '  $State.Stage="file_write"' . "`n"
++		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
++		. '  [IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))' . "`n"
++		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
+ 		. '  Write-Output "READY"' . "`n"
+ 		. '  exit 0' . "`n"
+ 		. '} catch {' . "`n"
+-		. '  try { if ($NewExe -and (Test-Path -LiteralPath $NewExe)) { Remove-Item -LiteralPath $NewExe -Force } } catch {}' . "`n"
+-		. '  try { if ($SwapScriptPath -and (Test-Path -LiteralPath $SwapScriptPath)) { Remove-Item -LiteralPath $SwapScriptPath -Force } } catch {}' . "`n"
+-		. '  Write-Output ("ERR:" + $_.Exception.Message)' . "`n"
++		. '  $Receipt=@{}' . "`n"
++		. '  if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }' . "`n"
++		. '  CleanWorker $NewExe "staged_executable"' . "`n"
++		. '  CleanWorker $SwapScriptPath "swap_worker"' . "`n"
++		. '  @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress' . "`n"
+ 		. '  exit 1' . "`n"
+ 		. '}'
+ }
+--- a/static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1
++++ b/static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1
+@@ -6,9 +6,10 @@
+ )
+ $ErrorActionPreference = 'Stop'
+ $ProgressPreference = 'SilentlyContinue'
+-$Source = Get-Content -LiteralPath $WorkerPath -Raw -Encoding UTF8
++$NativePath = Join-Path (Split-Path -Parent $WorkerPath) 'ergopti_native_proxy.ps1'
++$Source = Get-Content -LiteralPath $NativePath -Raw -Encoding UTF8
+ $Match = [regex]::Match($Source, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@")
+-if (-not $Match.Success -or $Match.Groups[1].Value -eq '') { throw 'Native worker source owner not found.' }
++if (-not $Match.Success -or $Match.Groups[1].Value -eq '') { throw 'Canonical native proxy source owner not found.' }
+ Add-Type -TypeDefinition $Match.Groups[1].Value
+ Add-Type -TypeDefinition @'
+ using System;
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/fixtures/updater_download_receipts.ps1
+@@ -0,0 +1,128 @@
++# tests/fixtures/updater_download_receipts.ps1
++# Native Windows filesystem control plus independent typed receipt controls.
++# Synthetic WebException controls do not claim real TLS/proxy qualification.
++param([Parameter(Mandatory = $true)][string]$HelperPath)
++$ErrorActionPreference = 'Stop'
++. $HelperPath
++Add-Type -TypeDefinition @'
++using System;
++using System.IO;
++public sealed class ErgoptiUpdaterDisposeRefusal : IDisposable
++{
++    public void Dispose() { throw new IOException("private cleanup diagnostic"); }
++}
++'@
++
++function Require([bool]$Condition, [string]$Message) {
++    if (-not $Condition) { throw $Message }
++}
++function Receipt([Exception]$Exception, [string]$Stage) {
++    return Get-ErgoptiUpdaterFailureReceipt $Exception @{ Stage = $Stage; Receipt = @{} }
++}
++
++$Fixture = Join-Path ([IO.Path]::GetTempPath()) ('ErgoptiUpdaterReceipt.' + [Guid]::NewGuid().ToString('N'))
++$Created = $false
++$Passed = 0
++try {
++    [IO.Directory]::CreateDirectory($Fixture) | Out-Null
++    $Created = $true
++    $Native = $null
++    try {
++        # Opening our real directory as a writable file is denied by Windows.
++        $Unexpected = [IO.File]::Open($Fixture, [IO.FileMode]::Create,
++            [IO.FileAccess]::Write, [IO.FileShare]::None)
++        $Unexpected.Dispose()
++    } catch {
++        $Native = Get-ErgoptiUpdaterNativeException $_.Exception
++    }
++    Require ($Native -is [UnauthorizedAccessException]) 'Owned filesystem permission control did not fail natively.'
++    $Result = Receipt $Native 'file_create'
++    Require ($Result.stage -eq 'file_create' -and $Result.failure_provenance -eq 'verified' -and
++        $Result.native_errno_domain -eq 'win32' -and $Result.native_errno -eq '5') 'Actual owned file denial was not preserved.'
++    $Passed++
++
++    $NetworkRead = [IO.IOException]::new('disk full permission denied SHA-256 secret-url')
++    $Result = Receipt $NetworkRead 'connect'
++    Require (-not $Result.ContainsKey('native_errno') -and $Result.failure_provenance -eq 'unknown' -and
++        $Result.stage -eq 'connect') 'Network-read IOException borrowed a file diagnosis.'
++    $Passed++
++    $Result = Receipt $NetworkRead 'file_write'
++    Require (-not $Result.ContainsKey('native_errno') -and $Result.failure_provenance -eq 'unknown') 'Managed IOException low word was mistaken for Win32 provenance.'
++    $Passed++
++
++    $Trust = [System.Net.WebException]::new('private-path', [System.Net.WebExceptionStatus]::TrustFailure)
++    $Result = Receipt $Trust 'connect'
++    Require ($Result.stage -eq 'tls' -and $Result.tls_status -eq 'untrusted_certificate' -and
++        $Result.tls_verification -eq 'enforced' -and $Result.failure_provenance -eq 'verified') 'Typed TrustFailure lost its actual verification status.'
++    $Passed++
++    $GenericTls = [System.Net.WebException]::new('certificate text', [System.Net.WebExceptionStatus]::SecureChannelFailure)
++    $Result = Receipt $GenericTls 'connect'
++    Require ($Result.stage -eq 'tls' -and -not $Result.ContainsKey('tls_status') -and
++        $Result.failure_provenance -eq 'unknown') 'Generic secure-channel failure became certificate refusal.'
++    $Passed++
++
++    $Wrapped = [System.Management.Automation.MethodInvocationException]::new('wrapper secret', $Native)
++    $Result = Receipt $Wrapped 'file_write'
++    Require ($Result.native_errno -eq '5' -and $Result.stage -eq 'file_write') 'PowerShell native invocation wrapper lost filesystem provenance.'
++    $Passed++
++    foreach ($Pair in $Result.GetEnumerator()) {
++        Require ([string]$Pair.Value -notmatch 'secret|private-path|secret-url') 'A raw native message escaped the receipt.'
++    }
++    $Passed++
++
++    $State = @{ Stage = 'connect'; Receipt = @{
++        backend = 'dotnet'; stage = 'http'; failure_provenance = 'verified';
++        http_status = 407; http_response_source = 'unavailable' } }
++    $Result = Get-ErgoptiUpdaterFailureReceipt ([Exception]::new('Proxy-Authenticate')) $State
++    Require ($Result.http_status -eq 407 -and $Result.http_response_source -eq 'unavailable' -and
++        -not $Result.ContainsKey('proxy_connect_status')) 'Observed HTTP407 became fabricated CONNECT/proxy evidence.'
++    $Passed++
++
++    # Controlled disposable failure tests the debt ledger, not actual OS close.
++    $Primary = $State.Receipt
++    Close-ErgoptiUpdaterResource ([ErgoptiUpdaterDisposeRefusal]::new()) 'output' 'file_write' $State
++    Require ($State.CleanupDebt.Count -eq 1 -and $State.CleanupDebt[0].resource -eq 'output') 'Cleanup refusal disappeared instead of becoming bounded debt.'
++    $Passed++
++    Require ([Object]::ReferenceEquals($Primary, $State.Receipt) -and
++        $State.Receipt.http_status -eq 407) 'Cleanup overwrote the primary native failure.'
++    $Passed++
++    Require ($State.CleanupDebt[0].receipt.failure_provenance -eq 'unknown' -and
++        -not $State.CleanupDebt[0].receipt.ContainsKey('native_errno')) 'Managed cleanup IOException fabricated Win32 evidence.'
++    $Passed++
++    $OriginalTick = [int64][ErgoptiUpdaterMonotonicClock]::GetTickCount64()
++    Require ($OriginalTick -gt 2) 'Native original monotonic tick is unavailable.'
++    $Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $OriginalTick 10000
++    Require ($Remaining -gt 0 -and $Remaining -le 10000) 'Native clock must preserve the original nonexpired budget.'
++    $Passed++
++    $Expired = $null
++    $DeadlineState = @{ Reason = 'download' }
++    try { $null = Get-ErgoptiUpdaterRemainingMilliseconds ($OriginalTick - 2) 1 $DeadlineState }
++    catch { $Expired = Get-ErgoptiUpdaterNativeException $_.Exception }
++    Require ($Expired -is [TimeoutException] -and $DeadlineState.Reason -ceq 'deadline') 'An expired original clock was replaced by a fresh startup budget.'
++    $Passed++
++    # Controlled resolver retirement refusal exercises the actual downloader
++    # refusal path. It does not prove native WinHTTP callback closure.
++    $PrimaryResolverReceipt = @{ backend = 'dotnet'; stage = 'http';
++        failure_provenance = 'verified'; http_status = 407; http_response_source = 'unavailable' }
++    $Selection = @{ Ok = $false; Receipt = $PrimaryResolverReceipt; CleanupDebt = $true }
++    $Resolver = { param($Destination, $Budget) return $Selection }.GetNewClosure()
++    $ResolverState = @{ Stage = 'proxy_resolve'; Reason = 'download'; Receipt = @{} }
++    $Refused = $false
++    try {
++        $Request = [Net.HttpWebRequest]::Create('https://owned-updater.invalid/private-download')
++        $null = Invoke-ErgoptiUpdaterDownload $Request (Join-Path $Fixture 'staged.exe') 1000 $ResolverState $Resolver 10000 ([int64][ErgoptiUpdaterMonotonicClock]::GetTickCount64())
++    } catch { $Refused = $true }
++    Require ($Refused -and $ResolverState.NativeCleanupDebt -is [bool] -and
++        $ResolverState.NativeCleanupDebt) 'Native resolver retirement debt disappeared at downloader refusal.'
++    $Passed++
++    Require ([Object]::ReferenceEquals($PrimaryResolverReceipt, $ResolverState.Receipt) -and
++        $ResolverState.Receipt.http_status -eq 407 -and
++        -not $ResolverState.Receipt.ContainsKey('proxy_connect_status')) 'Native retirement debt replaced the primary receipt or invented CONNECT provenance.'
++    $Passed++
++    Write-Output ('UPDATER_RECEIPT_CONTROLS:' + $Passed)
++} finally {
++    if ($Created) {
++        # No recursive removal: this fixture owns one empty directory only.
++        [IO.Directory]::Delete($Fixture, $false)
++    }
++}
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/unit/test_updater_managed_failure.ahk
+@@ -0,0 +1,328 @@
++﻿; tests/unit/test_updater_managed_failure.ahk
++#Requires AutoHotkey v2.0
++
++_UMF_WithContract(Callback) {
++	global _UpdaterManagedFailureContract, _SharedDir
++	Saved := _UpdaterManagedFailureContract
++	try {
++		_UpdaterManagedFailureContract := ManagedNetworkFailureContract(
++			JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8")))
++		Callback.Call(_UpdaterManagedFailureContract)
++	} finally {
++		_UpdaterManagedFailureContract := Saved
++	}
++}
++
++_UMF_IndependentEnvelopes(Contract) {
++	Cases := [
++		['{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"tls","failure_provenance":"verified","tls_verification":"enforced","tls_status":"untrusted_certificate"}}', "certificate"],
++		['{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"tls","failure_provenance":"unknown","tls_verification":"enforced"}}', "unknown"],
++		['{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"http","failure_provenance":"verified","http_status":407,"http_response_source":"unavailable"}}', "unknown"],
++		['{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"file_write","failure_provenance":"verified","native_errno_domain":"win32","native_errno":"112"}}', "disk"],
++		['{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"connect","failure_provenance":"verified","native_errno_domain":"win32","native_errno":"112"}}', "unknown"],
++		['{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"file_create","failure_provenance":"verified","native_errno_domain":"win32","native_errno":"5"}}', "permission"]
++	]
++	for Case in Cases {
++		Failure := _Updater_ParseStagingFailure(Case[1])
++		Assert(Failure["valid"], "independent native envelope must be admitted")
++		Report := Contract.Classify(Failure["receipt"], Map())
++		AssertEqual(Case[2], Report["cause"], "native operation and provenance must remain distinct")
++	}
++	Refused := [
++		'ERR:certificate disk full permission denied SHA-256 mismatch',
++		'{"schema_version":1,"state":"FAILED","operation":"download","reason":"download","receipt":{}}',
++		'{"schema_version":1,"state":{},"operation":"download","reason":"download","receipt":{}}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"verify","receipt":{"private_url":"https://secret.invalid/token"}}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"tls","failure_provenance":"verified","tls_status":[]}}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},"message":"private"}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},"native_cleanup_debt":1}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},"native_cleanup_debt":"true"}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},"native_cleanup_debt":null}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},"native_cleanup_debt":[],"cleanup_debt":[]}',
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},"native_cleanup_debt":false,"native_cleanup_debt":true}'
++	]
++	for Raw in Refused {
++		Failure := _Updater_ParseStagingFailure(Raw)
++		Assert(!Failure["valid"], "malformed or text-only output must be refused")
++		AssertEqual("unknown", Contract.Classify(Failure["receipt"], Map())["cause"],
++			"refusal must not manufacture a network cause")
++	}
++	Verified := _Updater_ParseStagingFailure(
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"verify","receipt":{}}')
++	AssertEqual("verify", Verified["reason"], "logical verification stays separate from native receipt stage")
++	NativeDebt := _Updater_ParseStagingFailure(
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"http","failure_provenance":"verified","http_status":407,"http_response_source":"unavailable"},"native_cleanup_debt":true}')
++	Assert(NativeDebt["valid"] && NativeDebt["native_cleanup_debt"], "private resolver debt survives completion")
++	AssertEqual(407, NativeDebt["receipt"]["http_status"], "private resolver debt cannot replace the primary receipt")
++	AssertEqual("unknown", Contract.Classify(NativeDebt["receipt"], Map())["cause"], "native cleanup cannot invent proxy or CONNECT provenance")
++	NoDebt := _Updater_ParseStagingFailure(
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},"native_cleanup_debt":false,"cleanup_debt":[]}')
++	Assert(NoDebt["valid"] && !NoDebt["native_cleanup_debt"], "explicit closed flag remains false")
++	Debt := _Updater_ParseStagingFailure(
++		'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"http","failure_provenance":"verified","http_status":407,"http_response_source":"unavailable"},"cleanup_debt":[{"resource":"output","receipt":{"backend":"dotnet","stage":"file_write","failure_provenance":"unknown"}}]}')
++	Assert(Debt["valid"] && Debt["cleanup_debt"].Length == 1, "bounded cleanup debt must survive process completion")
++	AssertEqual(407, Debt["receipt"]["http_status"], "cleanup debt cannot replace primary failure")
++	AssertEqual("unknown", Contract.Classify(Debt["receipt"], Map())["cause"],
++		"deferred cleanup cannot manufacture proxy provenance")
++}
++
++Test("Updater managed failure: independent bounded native receipts (updater-managed-failure)",
++	(*) => _UMF_WithContract(_UMF_IndependentEnvelopes))
++
++_UMF_ReceiptObserver() {
++	global _UpdaterInstallObserver
++	Saved := _UpdaterInstallObserver
++	Calls := []
++	Receipt := Map("backend", "dotnet", "stage", "file_write", "native_errno", "112")
++	try {
++		_UpdaterInstallObserver := (Phase, Reason, NativeReceipt) => Calls.Push(NativeReceipt)
++		Assert(_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download", Receipt))
++		AssertEqual(1, Calls.Length, "one terminal observer owns one native receipt")
++		Assert(Calls[1] == Receipt, "the actual typed receipt must reach Versions unchanged")
++		AssertEqual(0, _UpdaterInstallObserver, "terminal observation retires the old phase observer")
++	} finally {
++		_UpdaterInstallObserver := Saved
++	}
++}
++Test("Updater managed failure: actual receipt survives native observer (updater-managed-failure)",
++	_UMF_ReceiptObserver)
++
++_UMF_ObserverIdentitySurvivesNewRequest() {
++	global _UpdaterInstallObserver
++	Saved := _UpdaterInstallObserver
++	Calls := []
++	OldObserver := (Phase, Reason, Receipt) => Calls.Push("old")
++	NewObserver := (Phase, Reason, Receipt) => Calls.Push("new")
++	try {
++		_UpdaterInstallObserver := NewObserver
++		Assert(_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download",
++			Map("backend", "dotnet", "stage", "connect"), OldObserver))
++		AssertEqual(1, Calls.Length, "only the captured failed request observer is notified")
++		AssertEqual("old", Calls[1], "old completion cannot borrow a newer observer")
++		Assert(_UpdaterInstallObserver == NewObserver, "old terminal cannot clear newer Versions operation")
++	} finally {
++		_UpdaterInstallObserver := Saved
++	}
++}
++Test("Updater managed failure: exact observer identity survives retirement (updater-managed-failure)",
++	_UMF_ObserverIdentitySurvivesNewRequest)
++
++_UMF_StaleCompletionCannotPublish() {
++	global _UpdaterManagedFailurePresenter, _UpdaterManagedFailureOwner
++	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadWorker
++	Saved := [_UpdaterManagedFailurePresenter, _UpdaterManagedFailureOwner,
++		_UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadWorker]
++	Calls := []
++	Worker := { Token: "new-owned-worker" }
++	try {
++		_UpdaterManagedFailurePresenter := (Failure, Owner) => Calls.Push(Failure)
++		_UpdaterManagedFailureOwner := 0
++		_UpdaterDownloadInProgress := true
++		_UpdaterSelfUpdateEpoch := 8124
++		_UpdaterDownloadWorker := Worker
++		_Updater_PollDownloadAsync(1,
++			'{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"tls","failure_provenance":"verified","tls_verification":"enforced","tls_status":"untrusted_certificate"}}',
++			"", "old-swap", "old-new", "old-current", "v1.0.0", 8123)
++		AssertEqual(0, Calls.Length, "old typed receipt cannot cross the existing staging epoch fence")
++		Assert(_UpdaterDownloadWorker == Worker, "stale completion cannot retire a newer exact worker")
++		AssertEqual(0, _UpdaterManagedFailureOwner, "stale receipt cannot publish a terminal retry owner")
++	} finally {
++		_UpdaterManagedFailurePresenter := Saved[1]
++		_UpdaterManagedFailureOwner := Saved[2]
++		_UpdaterDownloadInProgress := Saved[3]
++		_UpdaterSelfUpdateEpoch := Saved[4]
++		_UpdaterDownloadWorker := Saved[5]
++	}
++}
++Test("Updater managed failure: typed stale completion stays inert (updater-managed-failure)",
++	_UMF_StaleCompletionCannotPublish)
++
++_UMF_TerminalOwnerFences() {
++	global _UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch
++	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterSwapOwner
++	global _UpdaterRecoveryPublishTarget, _UpdaterPauseGeneration, _UpdaterChannelEpoch
++	global UPDATER_REQUEST_ORIGIN_MANUAL
++	Saved := [_UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch,
++		_UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterSwapOwner,
++		_UpdaterRecoveryPublishTarget, _UpdaterPauseGeneration, _UpdaterChannelEpoch]
++	try {
++		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
++		_UpdaterSelfUpdateEpoch := 8123
++		_UpdaterDownloadInProgress := false
++		_UpdaterDownloadWorker := 0
++		_UpdaterSwapOwner := 0
++		_UpdaterRecoveryPublishTarget := ""
++		Owner := _Updater_NewManagedFailureOwner({RawJson: "{}", Tag: "v1.0.0"},
++			Request, "https://github.com/adrienm7/ergopti/releases/download/v1.0.0/ErgoptiPlus.exe",
++			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 8123)
++		Owner["terminal"] := true
++		_UpdaterManagedFailureOwner := Owner
++		Assert(_Updater_ManagedFailureOwnerIsCurrent(Owner), "positive control: exact current terminal owner")
++		Release := {RawJson: "{}", Tag: "v1.0.0"}
++		Assert(_Updater_GetManagedFailureOwnerFor(Request, Release) == Owner,
++			"Versions can bind its exact private request and original release")
++		DifferentRequest := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
++		AssertEqual(0, _Updater_GetManagedFailureOwnerFor(DifferentRequest, Release),
++			"matching release and generation cannot borrow a different request object")
++		AssertEqual(0, _Updater_GetManagedFailureOwnerFor(Request, {RawJson: "{ }", Tag: "v1.0.0"}),
++			"matching tag cannot borrow different original release bytes")
++		Assert(!_Updater_RetryManagedFailure(Owner), "missing authenticated asset must refuse retry before download")
++		Assert(_Updater_ManagedFailureOwnerIsCurrent(Owner), "asset refusal cannot borrow or retire a different owner")
++		_UpdaterSelfUpdateEpoch += 1
++		Assert(!_Updater_ManagedFailureOwnerIsCurrent(Owner), "new same-tag staging epoch must refuse old dialog")
++		_UpdaterSelfUpdateEpoch := 8123
++		_UpdaterDownloadInProgress := true
++		Assert(!_Updater_ManagedFailureOwnerIsCurrent(Owner), "active download must refuse retry")
++		_UpdaterDownloadInProgress := false
++		_UpdaterSwapOwner := Map("Id", 1)
++		Assert(!_Updater_ManagedFailureOwnerIsCurrent(Owner), "active swap must refuse retry")
++		_UpdaterSwapOwner := 0
++		_UpdaterRecoveryPublishTarget := "owned-recovery"
++		Assert(!_Updater_ManagedFailureOwnerIsCurrent(Owner), "active recovery must refuse retry")
++		_UpdaterRecoveryPublishTarget := ""
++		_UpdaterPauseGeneration += 1
++		Assert(!_Updater_ManagedFailureOwnerIsCurrent(Owner), "pause and resume cannot revive old retry consent")
++		_UpdaterPauseGeneration := Saved[7]
++		_UpdaterChannelEpoch += 1
++		Assert(!_Updater_ManagedFailureOwnerIsCurrent(Owner), "channel round trip must refuse old terminal owner")
++		_UpdaterChannelEpoch := Saved[8]
++		Owner["retired"] := true
++		Assert(!_Updater_ManagedFailureOwnerIsCurrent(Owner), "retired native owner must stay inert")
++	} finally {
++		_UpdaterManagedFailureOwner := Saved[1]
++		_UpdaterSelfUpdateEpoch := Saved[2]
++		_UpdaterDownloadInProgress := Saved[3]
++		_UpdaterDownloadWorker := Saved[4]
++		_UpdaterSwapOwner := Saved[5]
++		_UpdaterRecoveryPublishTarget := Saved[6]
++		_UpdaterPauseGeneration := Saved[7]
++		_UpdaterChannelEpoch := Saved[8]
++	}
++}
++Test("Updater managed failure: exact owner and lifecycle retry fences (updater-managed-failure)",
++	_UMF_TerminalOwnerFences)
++
++_UMF_ActualOwnedFileReceipt() {
++	global _VendorDir, _DriverDir
++	Observed := []
++	Handle := 0
++	try {
++		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
++			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
++				_DriverDir . "\tests\fixtures\updater_download_receipts.ps1", "-HelperPath",
++				_VendorDir . "\ergopti_updater_download.ps1"],
++			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
++		Assert(Handle.start(), "native filesystem receipt fixture must actually start")
++		Started := A_TickCount
++		while Observed.Length == 0 && !TickExpired64(Started, 10000) {
++			_SR_TreePoll()
++			Sleep(10)
++		}
++		AssertEqual(1, Observed.Length, "exact native fixture must settle within deadline")
++		AssertEqual(0, Observed[1]["exit"], "actual file denial and independent receipt controls must pass")
++		AssertEqual("", Observed[1]["stderr"], "native errors cannot escape through stderr")
++		AssertEqual("UPDATER_RECEIPT_CONTROLS:15", Observed[1]["stdout"],
++			"all declared native/type controls must execute")
++	} finally {
++		if IsObject(Handle)
++			Assert(Handle.terminate(), "private fixture tree must physically retire")
++	}
++}
++Test("Updater managed failure: actual owned filesystem refusal (updater-managed-failure)",
++	_UMF_ActualOwnedFileReceipt)
++
++_UMF_LateReadyCannotBeatMonitor() {
++	global _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch
++	global _UpdaterDownloadWorker, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
++	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
++	global _UpdaterInstallObserver, _UpdaterManagedFailureOwner, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
++	Saved := [_UpdaterDownloadInProgress, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch,
++		_UpdaterDownloadWorker, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts,
++		_UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation,
++		_UpdaterInstallObserver, _UpdaterManagedFailureOwner]
++	State := { Terminations: 0, Notices: 0, Message: "" }
++	Phases := []
++	try {
++		_UpdaterDownloadInProgress := true
++		_UpdaterDownloadStartedTick := 100
++		_UpdaterSelfUpdateEpoch := 8123
++		; This unit worker represents the already completed private Job callback;
++		; real tree quiescence remains the independent ShellRunner native gate.
++		_UpdaterDownloadWorker := _UpdaterTestDeadlineWorker(State)
++		_UpdaterDownloadRequest := 0
++		_UpdaterDownloadArtifacts := 0
++		_UpdaterSwapOwner := 0
++		_UpdaterExitIntent := 0
++		_UpdaterExitInvocation := 0
++		_UpdaterManagedFailureOwner := 0
++		_UpdaterInstallObserver := (Phase, Reason) => Phases.Push(Phase)
++		_Updater_PollDownloadAsync(0, "READY", "", "", "", "", "v1.0.0", 8123,
++			0, 100 + UPDATER_HTTP_DOWNLOAD_DEADLINE_MS + 1,
++			_UpdaterTest_RecordDeadlineFailure.Bind(State))
++		AssertEqual(1, State.Terminations, "late READY must retain exact worker until deadline cancellation")
++		AssertEqual(false, _UpdaterDownloadInProgress, "original expired transaction must retire")
++		AssertEqual(1, Phases.Length, "late READY has one failed phase, no installing/restarting")
++		AssertEqual("failed", Phases[1])
++		AssertEqual(0, _UpdaterSwapOwner, "late READY cannot dispatch a swap before the next monitor tick")
++		AssertEqual(1, State.Notices, "original deadline remains the visible primary terminal")
++		AssertEqual(0, _UpdaterManagedFailureOwner, "expired READY cannot create retry consent")
++	} finally {
++		_UpdaterDownloadInProgress := Saved[1]
++		_UpdaterDownloadStartedTick := Saved[2]
++		_UpdaterSelfUpdateEpoch := Saved[3]
++		_UpdaterDownloadWorker := Saved[4]
++		_UpdaterDownloadRequest := Saved[5]
++		_UpdaterDownloadArtifacts := Saved[6]
++		_UpdaterSwapOwner := Saved[7]
++		_UpdaterExitIntent := Saved[8]
++		_UpdaterExitInvocation := Saved[9]
++		_UpdaterInstallObserver := Saved[10]
++		_UpdaterManagedFailureOwner := Saved[11]
++	}
++}
++Test("Updater managed failure: late READY cannot beat monitor deadline (updater-managed-failure)",
++	_UMF_LateReadyCannotBeatMonitor)
++
++_UMF_RetryReservationCannotRetireSuccessor() {
++	global _UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch, _UpdaterDownloadInProgress
++	global _UpdaterDownloadWorker, _UpdaterSwapOwner, _UpdaterRecoveryPublishTarget
++	global UPDATER_REQUEST_ORIGIN_MANUAL
++	Saved := [_UpdaterManagedFailureOwner, _UpdaterSelfUpdateEpoch, _UpdaterDownloadInProgress,
++		_UpdaterDownloadWorker, _UpdaterSwapOwner, _UpdaterRecoveryPublishTarget]
++	try {
++		_UpdaterSelfUpdateEpoch := 8123
++		_UpdaterDownloadInProgress := false
++		_UpdaterDownloadWorker := 0
++		_UpdaterSwapOwner := 0
++		_UpdaterRecoveryPublishTarget := ""
++		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
++		Old := _Updater_NewManagedFailureOwner({RawJson: "{}", Tag: "v1.0.0"},
++			Request, "owned-url", "owned-digest", 8123)
++		Old["terminal"] := true
++		_UpdaterManagedFailureOwner := Old
++		Assert(_Updater_ManagedFailureOwnerIsCurrent(Old), "positive preliminary retry validation")
++		; Independent race: another request settles after preliminary validation.
++		_UpdaterSelfUpdateEpoch := 8124
++		Successor := _Updater_NewManagedFailureOwner({RawJson: "{}", Tag: "v1.0.0"},
++			_Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false), "other-url", "other-digest", 8124)
++		Successor["terminal"] := true
++		_UpdaterManagedFailureOwner := Successor
++		Outcome := _Updater_TryReserveDownloadTransaction(Request, false, Old)
++		Assert(Outcome.RetryStale && !Outcome.Reserved, "Critical reservation must refuse replaced owner")
++		Assert(_UpdaterManagedFailureOwner == Successor && !Successor["retired"],
++			"old retry cannot retire the newer terminal owner")
++		AssertEqual(8124, _UpdaterSelfUpdateEpoch, "old retry cannot reserve another old-release epoch")
++		Assert(!_UpdaterDownloadInProgress, "old retry cannot dispatch a download")
++		Assert(!_Updater_RetireManagedFailure(Old), "exact retirement must reject foreign current owner")
++		Assert(_UpdaterManagedFailureOwner == Successor)
++	} finally {
++		_UpdaterManagedFailureOwner := Saved[1]
++		_UpdaterSelfUpdateEpoch := Saved[2]
++		_UpdaterDownloadInProgress := Saved[3]
++		_UpdaterDownloadWorker := Saved[4]
++		_UpdaterSwapOwner := Saved[5]
++		_UpdaterRecoveryPublishTarget := Saved[6]
++	}
++}
++Test("Updater managed failure: retry reservation rejects successor ownership (updater-managed-failure)",
++	_UMF_RetryReservationCannotRetireSuccessor)
+--- /dev/null
++++ b/static/ergopti_plus/windows/vendor/ergopti_native_proxy.ps1
+@@ -0,0 +1,174 @@
++# vendor/ergopti_native_proxy.ps1
++# Native WinHTTP discovery definitions only; no input reads, receipts or requests.
++# Imported by the private tree-owned worker and updater staging owner.
++if (-not ('ErgoptiNativeProxy' -as [type])) {
++    Add-Type -TypeDefinition @'
++using System;
++using System.Runtime.InteropServices;
++
++public static class ErgoptiNativeProxy
++{
++    // Layout follows the Microsoft WinSDK winhttp.h declarations. Windows BOOL
++    // is a four-byte Int32; LPWSTR fields use the current process pointer size.
++    [StructLayout(LayoutKind.Sequential)]
++    public struct AutoProxyOptions
++    {
++        public UInt32 Flags;
++        public UInt32 AutoDetectFlags;
++        public IntPtr AutoConfigUrl;
++        public IntPtr Reserved;
++        public UInt32 ReservedFlags;
++        public Int32 AutoLogonIfChallenged;
++    }
++
++    [StructLayout(LayoutKind.Sequential)]
++    public struct ProxyInfo
++    {
++        public UInt32 AccessType;
++        public IntPtr Proxy;
++        public IntPtr Bypass;
++    }
++
++    public sealed class Result
++    {
++        public bool Ok;
++        public string Kind = "refused";
++        public UInt32 AccessType;
++        public string Proxy = "";
++        public string Bypass = "";
++        public int NativeError;
++        public string Stage = "lookup";
++    }
++
++    private const UInt32 NoProxy = 1;
++    private const UInt32 NamedProxy = 3;
++    private const UInt32 AutoDetect = 0x00000001;
++    private const UInt32 ConfigUrl = 0x00000002;
++    private const UInt32 NoCacheClient = 0x00080000;
++    private const UInt32 NoCacheService = 0x00100000;
++    private const UInt32 DetectDhcp = 1;
++    private const UInt32 DetectDnsA = 2;
++    private const int AutoDetectionFailed = 12180;
++
++    [DllImport("winhttp.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
++    private static extern IntPtr WinHttpOpen(string agent, UInt32 access,
++        IntPtr proxy, IntPtr bypass, UInt32 flags);
++
++    [DllImport("winhttp.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
++    [return: MarshalAs(UnmanagedType.Bool)]
++    private static extern bool WinHttpGetProxyForUrl(IntPtr session, string url,
++        ref AutoProxyOptions options, ref ProxyInfo info);
++
++    [DllImport("winhttp.dll", SetLastError = true, ExactSpelling = true)]
++    [return: MarshalAs(UnmanagedType.Bool)]
++    private static extern bool WinHttpCloseHandle(IntPtr handle);
++
++    [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
++    private static extern IntPtr GlobalFree(IntPtr memory);
++
++    public static Result Resolve(string url, string pacUrl, bool autoDetect)
++    {
++        Result result = new Result();
++        IntPtr session = IntPtr.Zero;
++        IntPtr configUrl = IntPtr.Zero;
++        ProxyInfo info = new ProxyInfo();
++        try
++        {
++            // WinHttpOpen initializes an explicit-direct session; it sends no
++            // destination request. Only GetProxyForUrl performs PAC discovery.
++            session = WinHttpOpen("ErgoptiPlus system proxy discovery", NoProxy,
++                IntPtr.Zero, IntPtr.Zero, 0);
++            if (session == IntPtr.Zero)
++            {
++                result.NativeError = Marshal.GetLastWin32Error();
++                result.Stage = "open";
++                return result;
++            }
++            AutoProxyOptions options = new AutoProxyOptions();
++            // Disable native host-result caches so path/query decisions remain
++            // per URL even when the autoproxy service is reused across workers.
++            options.Flags = NoCacheClient | NoCacheService;
++            if (pacUrl.Length != 0)
++            {
++                configUrl = Marshal.StringToHGlobalUni(pacUrl);
++                options.Flags |= ConfigUrl;
++                options.AutoConfigUrl = configUrl;
++            }
++            else if (autoDetect)
++            {
++                options.Flags |= AutoDetect;
++                options.AutoDetectFlags = DetectDhcp | DetectDnsA;
++            }
++            else
++            {
++                result.Stage = "input";
++                return result;
++            }
++            // No explicit credential is accepted. WinHTTP may answer a trusted
++            // configured PAC NTLM/Negotiate challenge as the signed-in user.
++            options.AutoLogonIfChallenged = 1;
++            bool resolved = WinHttpGetProxyForUrl(session, url, ref options, ref info);
++            int error = resolved ? 0 : Marshal.GetLastWin32Error();
++            result.NativeError = error;
++            if (!resolved)
++            {
++                // Discovery absence is not a PAC DIRECT evaluation. It permits
++                // the parent's validated WinINet static fallback on home LANs.
++                if (pacUrl.Length == 0 && autoDetect && error == AutoDetectionFailed)
++                    result.Kind = "no_auto_proxy";
++                return result;
++            }
++            result.AccessType = info.AccessType;
++            result.Proxy = info.Proxy == IntPtr.Zero ? "" : Marshal.PtrToStringUni(info.Proxy);
++            result.Bypass = info.Bypass == IntPtr.Zero ? "" : Marshal.PtrToStringUni(info.Bypass);
++            if (info.AccessType == NoProxy && result.Proxy.Length == 0)
++            {
++                result.Kind = "no_proxy";
++                result.Ok = true;
++            }
++            else if (info.AccessType == NamedProxy && result.Proxy.Length != 0)
++            {
++                // The parent validates every endpoint before selecting curl's
++                // supported representation; native success alone is not enough.
++                result.Kind = "named_proxy";
++                result.Ok = true;
++            }
++            else
++            {
++                result.Stage = "answer";
++            }
++            return result;
++        }
++        finally
++        {
++            bool released = true;
++            int releaseError = 0;
++            if (info.Proxy != IntPtr.Zero && GlobalFree(info.Proxy) != IntPtr.Zero)
++            {
++                released = false;
++                releaseError = Marshal.GetLastWin32Error();
++            }
++            if (info.Bypass != IntPtr.Zero && GlobalFree(info.Bypass) != IntPtr.Zero)
++            {
++                released = false;
++                releaseError = Marshal.GetLastWin32Error();
++            }
++            if (configUrl != IntPtr.Zero)
++                Marshal.FreeHGlobal(configUrl);
++            if (session != IntPtr.Zero && !WinHttpCloseHandle(session))
++            {
++                released = false;
++                releaseError = Marshal.GetLastWin32Error();
++            }
++            if (!released)
++            {
++                result.Ok = false;
++                result.Kind = "refused";
++                result.Stage = "release";
++                result.NativeError = releaseError;
++            }
++        }
++    }
++}
++'@ -ErrorAction Stop
++}
+--- a/static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1
++++ b/static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1
+@@ -30,175 +30,7 @@
+             throw 'Invalid automatic proxy configuration URL.'
+         }
+     }
+-    Add-Type -TypeDefinition @'
+-using System;
+-using System.Runtime.InteropServices;
+-
+-public static class ErgoptiNativeProxy
+-{
+-    // Layout follows the Microsoft WinSDK winhttp.h declarations. Windows BOOL
+-    // is a four-byte Int32; LPWSTR fields use the current process pointer size.
+-    [StructLayout(LayoutKind.Sequential)]
+-    public struct AutoProxyOptions
+-    {
+-        public UInt32 Flags;
+-        public UInt32 AutoDetectFlags;
+-        public IntPtr AutoConfigUrl;
+-        public IntPtr Reserved;
+-        public UInt32 ReservedFlags;
+-        public Int32 AutoLogonIfChallenged;
+-    }
+-
+-    [StructLayout(LayoutKind.Sequential)]
+-    public struct ProxyInfo
+-    {
+-        public UInt32 AccessType;
+-        public IntPtr Proxy;
+-        public IntPtr Bypass;
+-    }
+-
+-    public sealed class Result
+-    {
+-        public bool Ok;
+-        public string Kind = "refused";
+-        public UInt32 AccessType;
+-        public string Proxy = "";
+-        public string Bypass = "";
+-        public int NativeError;
+-        public string Stage = "lookup";
+-    }
+-
+-    private const UInt32 NoProxy = 1;
+-    private const UInt32 NamedProxy = 3;
+-    private const UInt32 AutoDetect = 0x00000001;
+-    private const UInt32 ConfigUrl = 0x00000002;
+-    private const UInt32 NoCacheClient = 0x00080000;
+-    private const UInt32 NoCacheService = 0x00100000;
+-    private const UInt32 DetectDhcp = 1;
+-    private const UInt32 DetectDnsA = 2;
+-    private const int AutoDetectionFailed = 12180;
+-
+-    [DllImport("winhttp.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
+-    private static extern IntPtr WinHttpOpen(string agent, UInt32 access,
+-        IntPtr proxy, IntPtr bypass, UInt32 flags);
+-
+-    [DllImport("winhttp.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
+-    [return: MarshalAs(UnmanagedType.Bool)]
+-    private static extern bool WinHttpGetProxyForUrl(IntPtr session, string url,
+-        ref AutoProxyOptions options, ref ProxyInfo info);
+-
+-    [DllImport("winhttp.dll", SetLastError = true, ExactSpelling = true)]
+-    [return: MarshalAs(UnmanagedType.Bool)]
+-    private static extern bool WinHttpCloseHandle(IntPtr handle);
+-
+-    [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+-    private static extern IntPtr GlobalFree(IntPtr memory);
+-
+-    public static Result Resolve(string url, string pacUrl, bool autoDetect)
+-    {
+-        Result result = new Result();
+-        IntPtr session = IntPtr.Zero;
+-        IntPtr configUrl = IntPtr.Zero;
+-        ProxyInfo info = new ProxyInfo();
+-        try
+-        {
+-            // WinHttpOpen initializes an explicit-direct session; it sends no
+-            // destination request. Only GetProxyForUrl performs PAC discovery.
+-            session = WinHttpOpen("ErgoptiPlus system proxy discovery", NoProxy,
+-                IntPtr.Zero, IntPtr.Zero, 0);
+-            if (session == IntPtr.Zero)
+-            {
+-                result.NativeError = Marshal.GetLastWin32Error();
+-                result.Stage = "open";
+-                return result;
+-            }
+-            AutoProxyOptions options = new AutoProxyOptions();
+-            // Disable native host-result caches so path/query decisions remain
+-            // per URL even when the autoproxy service is reused across workers.
+-            options.Flags = NoCacheClient | NoCacheService;
+-            if (pacUrl.Length != 0)
+-            {
+-                configUrl = Marshal.StringToHGlobalUni(pacUrl);
+-                options.Flags |= ConfigUrl;
+-                options.AutoConfigUrl = configUrl;
+-            }
+-            else if (autoDetect)
+-            {
+-                options.Flags |= AutoDetect;
+-                options.AutoDetectFlags = DetectDhcp | DetectDnsA;
+-            }
+-            else
+-            {
+-                result.Stage = "input";
+-                return result;
+-            }
+-            // No explicit credential is accepted. WinHTTP may answer a trusted
+-            // configured PAC NTLM/Negotiate challenge as the signed-in user.
+-            options.AutoLogonIfChallenged = 1;
+-            bool resolved = WinHttpGetProxyForUrl(session, url, ref options, ref info);
+-            int error = resolved ? 0 : Marshal.GetLastWin32Error();
+-            result.NativeError = error;
+-            if (!resolved)
+-            {
+-                // Discovery absence is not a PAC DIRECT evaluation. It permits
+-                // the parent's validated WinINet static fallback on home LANs.
+-                if (pacUrl.Length == 0 && autoDetect && error == AutoDetectionFailed)
+-                    result.Kind = "no_auto_proxy";
+-                return result;
+-            }
+-            result.AccessType = info.AccessType;
+-            result.Proxy = info.Proxy == IntPtr.Zero ? "" : Marshal.PtrToStringUni(info.Proxy);
+-            result.Bypass = info.Bypass == IntPtr.Zero ? "" : Marshal.PtrToStringUni(info.Bypass);
+-            if (info.AccessType == NoProxy && result.Proxy.Length == 0)
+-            {
+-                result.Kind = "no_proxy";
+-                result.Ok = true;
+-            }
+-            else if (info.AccessType == NamedProxy && result.Proxy.Length != 0)
+-            {
+-                // The parent validates every endpoint before selecting curl's
+-                // supported representation; native success alone is not enough.
+-                result.Kind = "named_proxy";
+-                result.Ok = true;
+-            }
+-            else
+-            {
+-                result.Stage = "answer";
+-            }
+-            return result;
+-        }
+-        finally
+-        {
+-            bool released = true;
+-            int releaseError = 0;
+-            if (info.Proxy != IntPtr.Zero && GlobalFree(info.Proxy) != IntPtr.Zero)
+-            {
+-                released = false;
+-                releaseError = Marshal.GetLastWin32Error();
+-            }
+-            if (info.Bypass != IntPtr.Zero && GlobalFree(info.Bypass) != IntPtr.Zero)
+-            {
+-                released = false;
+-                releaseError = Marshal.GetLastWin32Error();
+-            }
+-            if (configUrl != IntPtr.Zero)
+-                Marshal.FreeHGlobal(configUrl);
+-            if (session != IntPtr.Zero && !WinHttpCloseHandle(session))
+-            {
+-                released = false;
+-                releaseError = Marshal.GetLastWin32Error();
+-            }
+-            if (!released)
+-            {
+-                result.Ok = false;
+-                result.Kind = "refused";
+-                result.Stage = "release";
+-                result.NativeError = releaseError;
+-            }
+-        }
+-    }
+-}
+-'@
++    . (Join-Path $PSScriptRoot 'ergopti_native_proxy.ps1')
+     foreach ($Destination in $InputRecord.urls) {
+         $Native = [ErgoptiNativeProxy]::Resolve($Destination, $InputRecord.pac_url, $InputRecord.auto_detect)
+         $Receipt.results += @{
+--- /dev/null
++++ b/static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1
+@@ -0,0 +1,312 @@
++# vendor/ergopti_updater_download.ps1
++# Download mechanics for the private tree-owned updater staging process.
++# Route policy is supplied by the canonical network owner, once per exact URL.
++# Defines only a native clock and functions; no input, request or file operation
++# happens on load. It never publishes raw exceptions.
++if (-not ('ErgoptiUpdaterMonotonicClock' -as [type])) {
++    Add-Type -TypeDefinition @'
++using System;
++using System.Runtime.InteropServices;
++public static class ErgoptiUpdaterMonotonicClock
++{
++    [DllImport("kernel32.dll", ExactSpelling = true)]
++    public static extern UInt64 GetTickCount64();
++}
++'@ -ErrorAction Stop
++}
++
++function Get-ErgoptiUpdaterNativeException {
++    param([Exception]$Exception)
++    while ($Exception -is [System.Management.Automation.MethodInvocationException] -and
++        $null -ne $Exception.InnerException) {
++        $Exception = $Exception.InnerException
++    }
++    return $Exception
++}
++
++function Get-ErgoptiUpdaterFailureReceipt {
++    param([Exception]$Exception, [hashtable]$State)
++    if ($State.Receipt -is [hashtable] -and $State.Receipt.Count -ne 0) {
++        return $State.Receipt
++    }
++    $Native = Get-ErgoptiUpdaterNativeException $Exception
++    $Stage = if ($State.Stage -in @('proxy_resolve', 'connect', 'http', 'tls',
++        'file_read', 'file_write', 'file_create', 'file_remove')) { $State.Stage } else { 'connect' }
++    $Receipt = @{ backend = 'dotnet'; stage = $Stage; failure_provenance = 'unknown' }
++    if ($State.Stage -in @('file_read', 'file_write', 'file_create', 'file_remove')) {
++        $Receipt.stage = $State.Stage
++        if ($Native -is [System.IO.IOException] -or
++            $Native -is [UnauthorizedAccessException]) {
++            # HRESULT_FROM_WIN32, not every managed IOException's low word.
++            $Bits = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$Native.HResult), 0)
++            if (($Bits -band 4294901760) -eq 2147942400) {
++                $Receipt.failure_provenance = 'verified'
++                $Receipt.native_errno_domain = 'win32'
++                $Receipt.native_errno = [string]($Bits -band 65535)
++            }
++        }
++        return $Receipt
++    }
++    if ($Native -is [System.Net.WebException]) {
++        if ($Native.Status -eq [System.Net.WebExceptionStatus]::TrustFailure) {
++            $Receipt.stage = 'tls'
++            $Receipt.failure_provenance = 'verified'
++            $Receipt.tls_verification = 'enforced'
++            $Receipt.tls_status = 'untrusted_certificate'
++        } elseif ($Native.Status -eq [System.Net.WebExceptionStatus]::SecureChannelFailure) {
++            $Receipt.stage = 'tls'
++            $Receipt.tls_verification = 'enforced'
++        } elseif ($Native.Response -is [System.Net.HttpWebResponse]) {
++            $Receipt.stage = 'http'
++            $Receipt.failure_provenance = 'verified'
++            $Receipt.http_status = [int]$Native.Response.StatusCode
++            $Receipt.http_response_source = 'unavailable'
++        }
++    }
++    return $Receipt
++}
++
++function Get-ErgoptiUpdaterRemainingMilliseconds {
++    param([int64]$StartedTick, [int]$DeadlineMs, [hashtable]$State = $null)
++    $NowTick = [ErgoptiUpdaterMonotonicClock]::GetTickCount64()
++    if ($StartedTick -le 0 -or $NowTick -lt $StartedTick -or $DeadlineMs -le 0) {
++        throw [ArgumentException]::new('Original updater monotonic deadline was refused.')
++    }
++    $Remaining = [int64]$DeadlineMs - ([int64]$NowTick - $StartedTick)
++    if ($Remaining -le 0) {
++        if ($null -ne $State) { $State.Reason = 'deadline' }
++        throw [TimeoutException]::new('Updater download deadline expired.')
++    }
++    return [int][Math]::Min($Remaining, [int]::MaxValue)
++}
++
++function Add-ErgoptiUpdaterCleanupDebt {
++    param([hashtable]$State, [string]$Resource, [string]$Stage, [Exception]$Exception)
++    if (-not $State.ContainsKey('CleanupDebt')) { $State.CleanupDebt = @() }
++    $CleanState = @{ Stage = $Stage; Receipt = @{} }
++    $State.CleanupDebt += @{ resource = $Resource;
++        receipt = (Get-ErgoptiUpdaterFailureReceipt $Exception $CleanState) }
++}
++
++function Close-ErgoptiUpdaterResource {
++    param([IDisposable]$Resource, [string]$Name, [string]$Stage, [hashtable]$State)
++    if ($null -eq $Resource) { return }
++    try { $Resource.Dispose() } catch {
++        # The primary error remains unchanged. The parent's private Job owner
++        # must physically retire this process before publishing any retry.
++        Add-ErgoptiUpdaterCleanupDebt $State $Name $Stage $_.Exception
++    }
++}
++
++function Assert-ErgoptiUpdaterDestination {
++    param([Uri]$Destination)
++    if (-not $Destination.IsAbsoluteUri -or $Destination.Scheme -ne 'https' -or
++        $Destination.UserInfo -ne '' -or $Destination.Fragment -ne '') {
++        throw [ArgumentException]::new('Updater destination was refused.')
++    }
++}
++
++function Invoke-ErgoptiUpdaterDownload {
++    param(
++        [System.Net.HttpWebRequest]$InitialRequest,
++        [string]$NewExe,
++        [int]$TimeoutMs,
++        [hashtable]$State,
++        [scriptblock]$ResolveRoutes,
++        [int]$DeadlineMs,
++        [int64]$StartedTick
++    )
++    if ($null -eq $ResolveRoutes -or $TimeoutMs -le 0 -or $DeadlineMs -le 0 -or $StartedTick -le 0) {
++        throw [ArgumentException]::new('Canonical updater routing owner is unavailable.')
++    }
++    $Destination = $InitialRequest.RequestUri
++    $MaximumHops = $null
++    $Response = $null
++    $Input = $null
++    $Output = $null
++    try {
++        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++        $State.Stage = 'file_create'
++        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($NewExe)) | Out-Null
++        $State.Stage = 'file_remove'
++        [IO.File]::Delete($NewExe)
++        $Hop = 0
++        while ($true) {
++            Assert-ErgoptiUpdaterDestination $Destination
++            $State.Stage = 'proxy_resolve'
++            $Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++            $Selection = & $ResolveRoutes $Destination.AbsoluteUri $Remaining
++            if ($null -ne $Selection -and $Selection.CleanupDebt -is [bool] -and
++                $Selection.CleanupDebt) {
++                # This is native resolver retirement debt, not a filesystem or
++                # HTTP receipt resource. The parent's owned Job remains the fence.
++                $State.NativeCleanupDebt = $true
++            }
++            if ($null -eq $Selection -or $Selection.Ok -isnot [bool] -or
++                -not $Selection.Ok -or $Selection.Routes -isnot [array] -or
++                $Selection.Routes.Count -eq 0 -or
++                ($Selection.MaxRoutes -isnot [int] -and $Selection.MaxRoutes -isnot [long]) -or
++                $Selection.MaxRoutes -le 0 -or $Selection.MaxRoutes -gt [int]::MaxValue -or
++                $Selection.Routes.Count -gt $Selection.MaxRoutes -or
++                ($Selection.MaxRedirects -isnot [int] -and $Selection.MaxRedirects -isnot [long]) -or
++                $Selection.MaxRedirects -lt 0 -or $Selection.MaxRedirects -gt [int]::MaxValue) {
++                # Only a canonical, validated receipt can name a resolver cause.
++                if ($null -ne $Selection -and $Selection.Receipt -is [hashtable]) {
++                    $State.Receipt = $Selection.Receipt
++                }
++                throw [InvalidOperationException]::new('Canonical updater route was refused.')
++            }
++            if ($null -eq $MaximumHops) { $MaximumHops = $Selection.MaxRedirects }
++            elseif ($MaximumHops -ne $Selection.MaxRedirects) {
++                throw [InvalidOperationException]::new('Updater route policy changed during the operation.')
++            }
++            # Admit the whole ordered native list before using any entry. The
++            # transport cannot reinterpret SOCKS or HTTPS proxies as direct.
++            foreach ($Route in $Selection.Routes) {
++                if ($Route.Kind -isnot [string] -or $Route.Kind -cnotin @('direct', 'proxy') -or
++                    $Route.Endpoint -isnot [string]) {
++                    throw [ArgumentException]::new('Updater route descriptor was refused.')
++                }
++                if ($Route.Kind -eq 'direct') {
++                    if ($Route.Endpoint -ne '') { throw [ArgumentException]::new('Invalid direct route.') }
++                } else {
++                    if ($Route.Authentication -isnot [string] -or
++                        $Route.Authentication -cne 'current_user_proxy_only') {
++                        throw [NotSupportedException]::new('Updater proxy authentication policy was refused.')
++                    }
++                    [Uri]$Endpoint = $null
++                    if (-not [Uri]::TryCreate($Route.Endpoint, [UriKind]::Absolute, [ref]$Endpoint) -or
++                        $Endpoint.Scheme -ne 'http' -or $Endpoint.UserInfo -ne '' -or
++                        $Endpoint.AbsolutePath -ne '/' -or $Endpoint.Query -ne '' -or
++                        $Endpoint.Fragment -ne '') {
++                        throw [NotSupportedException]::new('Updater proxy protocol was refused.')
++                    }
++                }
++            }
++            for ($RouteIndex = 0; $RouteIndex -lt $Selection.Routes.Count; $RouteIndex++) {
++                $Route = $Selection.Routes[$RouteIndex]
++                $Request = if ($Hop -eq 0 -and $RouteIndex -eq 0) {
++                    $InitialRequest
++                } else {
++                    [System.Net.HttpWebRequest]::Create($Destination)
++                }
++                $Request.Method = 'GET'
++                $Request.UserAgent = 'ErgoptiPlus-Updater/1.0'
++                $Request.AllowAutoRedirect = $false
++                $Request.UseDefaultCredentials = $false
++                $Request.Credentials = $null
++                $Request.PreAuthenticate = $false
++                $Request.KeepAlive = $false
++                $Request.Pipelined = $false
++                $Request.ConnectionGroupName = 'ErgoptiUpdater.' + [Guid]::NewGuid().ToString('N')
++                $Request.Proxy = $null
++                if ($Route.Kind -eq 'proxy') {
++                    $ProxyUri = [Uri]$Route.Endpoint
++                    $Proxy = [System.Net.WebProxy]::new($ProxyUri, $false)
++                    $Credentials = [System.Net.CredentialCache]::new()
++                    $Credentials.Add($ProxyUri, 'Negotiate', [System.Net.CredentialCache]::DefaultNetworkCredentials)
++                    $Credentials.Add($ProxyUri, 'NTLM', [System.Net.CredentialCache]::DefaultNetworkCredentials)
++                    $Proxy.Credentials = $Credentials
++                    $Request.Proxy = $Proxy
++                }
++                $Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++                $Request.Timeout = [Math]::Min($Remaining, $TimeoutMs)
++                $Request.ReadWriteTimeout = [Math]::Min($Remaining, $TimeoutMs)
++                $State.Stage = 'connect'
++                try {
++                    $Response = $Request.GetResponse()
++                    break
++                } catch {
++                    $Failure = $_
++                    $Native = Get-ErgoptiUpdaterNativeException $Failure.Exception
++                    # This GET-only retry does not claim zero previously sent
++                    # bytes or CONNECT provenance under .NET's internal auth.
++                    # HTTP, TLS/authentication and body failures stay terminal.
++                    $RetryableGetConnection = $Native -is [System.Net.WebException] -and
++                        $null -eq $Native.Response -and $Native.Status -in @(
++                            [System.Net.WebExceptionStatus]::NameResolutionFailure,
++                            [System.Net.WebExceptionStatus]::ProxyNameResolutionFailure,
++                            [System.Net.WebExceptionStatus]::ConnectFailure)
++                    $AbortFailed = $false
++                    try { $Request.Abort() } catch {
++                        $State.Receipt = Get-ErgoptiUpdaterFailureReceipt $Native $State
++                        Add-ErgoptiUpdaterCleanupDebt $State 'request' 'connect' $_.Exception
++                        $AbortFailed = $true
++                    }
++                    if ($AbortFailed -or -not $RetryableGetConnection -or $RouteIndex + 1 -eq $Selection.Routes.Count) {
++                        if ($Native -is [System.Net.WebException] -and $null -ne $Native.Response) {
++                            $State.Receipt = Get-ErgoptiUpdaterFailureReceipt $Native $State
++                            Close-ErgoptiUpdaterResource $Native.Response 'response' 'http' $State
++                        }
++                        throw $Failure
++                    }
++                }
++            }
++            if ($null -eq $Response) { throw [InvalidOperationException]::new('No updater response.') }
++            $State.Stage = 'http'
++            $Status = [int]$Response.StatusCode
++            if ($Status -in @(301, 302, 303, 307, 308)) {
++                $Location = $Response.Headers['Location']
++                if ($Hop -eq $MaximumHops -or [string]::IsNullOrEmpty($Location) -or
++                    $Location -match '[\x00-\x1f\x7f]') {
++                    throw [InvalidOperationException]::new('Updater redirect was refused.')
++                }
++                $Next = [Uri]::new($Destination, $Location)
++                Assert-ErgoptiUpdaterDestination $Next
++                $Response.Dispose()
++                $Response = $null
++                $Destination = $Next
++                $Hop++
++                continue
++            }
++            if ($Status -ne 200) {
++                $State.Receipt = @{ backend = 'dotnet'; stage = 'http';
++                    failure_provenance = 'verified'; http_status = $Status;
++                    http_response_source = 'unavailable' }
++                throw [InvalidOperationException]::new('Updater response was refused.')
++            }
++            break
++        }
++        $ExpectedSize = [int64]$Response.ContentLength
++        $State.Stage = 'connect'
++        $Input = $Response.GetResponseStream()
++        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++        $State.Stage = 'file_create'
++        $Output = [IO.File]::Open($NewExe, [IO.FileMode]::CreateNew,
++            [IO.FileAccess]::Write, [IO.FileShare]::None)
++        $Bytes = New-Object byte[] 65536
++        while ($true) {
++            $State.Stage = 'connect'
++            $Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++            $Input.ReadTimeout = [Math]::Min($Remaining, $TimeoutMs)
++            $Count = $Input.Read($Bytes, 0, $Bytes.Length)
++            $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++            if ($Count -eq 0) { break }
++            $State.Stage = 'file_write'
++            $Output.Write($Bytes, 0, $Count)
++        }
++        $State.Stage = 'file_write'
++        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++        $Output.Flush($true)
++        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++        $Output.Dispose()
++        $Output = $null
++        $State.Stage = 'connect'
++        $Input.Dispose()
++        $Input = $null
++        $State.Stage = 'http'
++        $Response.Dispose()
++        $Response = $null
++        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
++        return $ExpectedSize
++    } catch {
++        # Freeze actual failing-operation provenance before cleanup can fail.
++        $State.Receipt = Get-ErgoptiUpdaterFailureReceipt $_.Exception $State
++        throw
++    } finally {
++        # Retirement must not turn a network failure into a file-write receipt.
++        Close-ErgoptiUpdaterResource $Output 'output' 'file_write' $State
++        Close-ErgoptiUpdaterResource $Input 'input' 'connect' $State
++        Close-ErgoptiUpdaterResource $Response 'response' 'http' $State
++    }
++}

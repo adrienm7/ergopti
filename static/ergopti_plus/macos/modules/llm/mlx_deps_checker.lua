@@ -110,6 +110,10 @@ local _last_failure_message = nil
 -- repair offer turns into its dialog. Nil after a success.
 local _last_failure_cause = nil
 
+-- Monotonic receipt revision; copies carry this identity through modal dialogs.
+-- Failure publication and a cleared/retried failure invalidate earlier actions.
+local _failure_revision = 0
+
 -- Cause of a failed import probe on a venv that is still on disk. While set,
 -- runtime_installed() reads false whatever the filesystem says: removing the
 -- fingerprint can itself be refused, and a runtime that cannot import mlx_lm
@@ -419,6 +423,7 @@ end
 --- Records a failure cause and the explanation callers show for it.
 --- @param cause table Cause from mlx_bootstrap_diagnosis.classify().
 local function publish_failure_cause(cause)
+	_failure_revision = _failure_revision + 1
 	_last_failure_cause = cause
 	_last_failure_message = Diagnosis.describe(cause, {
 		venv = M.venv_dir(),
@@ -1064,6 +1069,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		if installed then
 			_bootstrap_state = "ready"
 			_last_failure_message = nil
+			_failure_revision = _failure_revision + 1
 			_last_failure_cause = nil
 			Logger.info(LOG, "MLX runtime already installed (%s); reusing it.", tostring(venv_python))
 		else
@@ -1117,6 +1123,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 				publish_failure_cause(cause)
 			else
 				_last_failure_message = message
+				_failure_revision = _failure_revision + 1
 				_last_failure_cause = { kind = "exit", line = message, repairable = true }
 			end
 			_pause_controller.complete(token)
@@ -1317,6 +1324,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 			end
 			_bootstrap_state = "ready"
 			_last_failure_message = nil
+			_failure_revision = _failure_revision + 1
 			_last_failure_cause = nil
 			_runtime_broken = nil
 			_terminal_outcome = true
@@ -1568,13 +1576,28 @@ function M.is_missing() return _bootstrap_state == "missing" end
 
 --- @return table|nil cause Copy of the last failure's cause (kind, line, path,
 --- exit_code, machine, repairable), or of the failed import probe's while the
---- runtime is flagged broken; nil when nothing failed.
+--- runtime is flagged broken, plus its monotonic failure_revision; nil when nothing failed.
 function M.get_failure_cause()
 	local cause = _last_failure_cause or _runtime_broken
 	if type(cause) ~= "table" then return nil end
 	local copy = {}
 	for key, value in pairs(cause) do copy[key] = value end
+	copy.failure_revision = _failure_revision
 	return copy
+end
+
+--- Admits a retained failure action only while its exact revision is current.
+--- The existing native task and pause owners decide whether another install
+--- can start; a modal dialog cannot borrow a replacement task's authorization.
+--- @param revision number Captured get_failure_cause().failure_revision.
+--- @return boolean admitted
+function M.failure_action_admitted(revision)
+	if type(revision) ~= "number" or revision <= 0 or revision >= math.huge
+		or revision ~= math.floor(revision) or revision ~= _failure_revision
+		or (_last_failure_cause == nil and _runtime_broken == nil)
+		or _task_running == true or _task_owner ~= nil then return false end
+	if _pause_controller.is_admitted() ~= true then return false end
+	return revision == _failure_revision and _task_running ~= true and _task_owner == nil
 end
 
 --- @return boolean True while a failed import probe flags the runtime broken.
@@ -1611,6 +1634,7 @@ function M.invalidate_runtime(cause)
 	if type(cause) == "table" then
 		publish_failure_cause(cause)
 	else
+		_failure_revision = _failure_revision + 1
 		_last_failure_cause = nil
 		_last_failure_message = i18n.get("mlx.runtime_broken_body")
 	end
@@ -1631,13 +1655,20 @@ end
 --- repair is asked for, is removed and rebuilt. A definitive failure is
 --- cleared first, since the selection is the retry.
 --- @param on_complete function|nil Called once with the terminal result.
---- @param opts table|nil { repair = true } to rebuild even an installed runtime.
+--- @param opts table|nil { repair = true } to rebuild even an installed runtime;
+---   { failure_revision = integer } gates a retained failure retry against its native owner.
 --- @return boolean accepted
 function M.install_for_selection(on_complete, opts)
+	local revision = type(opts) == "table" and opts.failure_revision or nil
+	if revision ~= nil and not M.failure_action_admitted(revision) then
+		Logger.debug(LOG, "MLX failure retry refused: its modal receipt is stale or its native owner is unavailable.")
+		return false
+	end
 	local repair = (type(opts) == "table" and opts.repair == true) or _runtime_broken ~= nil
 	Logger.info(LOG, repair
 		and "MLX repair requested; the runtime is removed and rebuilt."
 		or "MLX backend selected; bootstrap authorized if the runtime is absent.")
+	if revision ~= nil and not M.failure_action_admitted(revision) then return false end
 	-- A running task already is the selection's bootstrap: joining it needs no
 	-- grant, and a leftover one must not leak to a later non-selection check.
 	_install_granted = not _task_running
@@ -1647,6 +1678,7 @@ function M.install_for_selection(on_complete, opts)
 	if not _task_running and stale then
 		_bootstrap_state = "pending"
 		_last_failure_message = nil
+		_failure_revision = _failure_revision + 1
 		_last_failure_cause = nil
 		_terminal_outcome = nil
 	end
@@ -1684,6 +1716,7 @@ function M.reset_bootstrap_state()
 	Logger.info(LOG, "Resetting MLX bootstrap state from 'failed' back to 'pending' — retry now possible.")
 	_bootstrap_state      = "pending"
 	_last_failure_message = nil
+	_failure_revision = _failure_revision + 1
 	_last_failure_cause   = nil
 	_terminal_outcome     = nil
 	return true
