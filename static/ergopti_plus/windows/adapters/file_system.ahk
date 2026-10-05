@@ -671,17 +671,26 @@ FSAtomicTempOwnerIsGone(FileName, TargetName) {
 
 ; Publishes a complete same-directory stage with one write-through Win32 rename.
 ; Failure retains Source and leaves Destination untouched.
-FSAtomicMoveReplace(Source, Destination) {
+; NativeError reports the immediate Win32 error; zero also denotes unavailable
+; native information on invalid arguments or a DllCall exception.
+FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
+	NativeError := 0
 	if !(Source is String) or Source = ""
 		or !(Destination is String) or Destination = ""
 		return false
 	static MOVEFILE_REPLACE_EXISTING := 0x00000001
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
-	try return DllCall("MoveFileExW", "Str", Source, "Str", Destination,
-		"UInt", MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-		"Int") != 0
-	catch
+	try {
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Moved := DllCall("MoveFileExW", "Str", Source, "Str", Destination,
+			"UInt", MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH, "Int")
+		NativeError := A_LastError
+		return Moved != 0
+	} catch Error {
+		; No completed native receipt is available for a DllCall exception.
+		NativeError := 0
 		return false
+	}
 }
 
 ; Publishes Source only when Destination is still absent. Omitting
