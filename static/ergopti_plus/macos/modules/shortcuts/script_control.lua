@@ -2058,12 +2058,15 @@ end
 ---@param capacity integer Positive native receipt budget.
 ---@param receive function Literal-true acknowledger receiving record and exact token.
 ---@param on_refused function|nil Receives terminal reason and the exact source token after revocation.
+---@param initial_snapshot boolean|nil Opt-in readonly pause ledger, never a resume commit.
 ---@return table|nil token Exact observer token, or nil on refusal.
 ---@return string|nil reason Explicit acquisition refusal, preserving the actual actor reason.
 ---@return table|nil scope Exact subscription current, detach and post-frame retirement, including acquired bootstrap refusal.
-function M.bind_physical_pause_observer(owner, capacity, receive, on_refused)
+function M.bind_physical_pause_observer(owner, capacity, receive, on_refused, initial_snapshot)
+	if initial_snapshot ~= nil and type(initial_snapshot) ~= "boolean" then return nil, "Invalid initial lifecycle observation option" end
 	if math.type(capacity) ~= "integer" then return nil, "Invalid native pause receipt budget" end
-	return _physical_pause.bind(owner, capacity, receive, on_refused)
+	return _physical_pause.bind(owner, capacity, receive, on_refused,
+		initial_snapshot == true and physical_pause_snapshot or nil)
 end
 
 --- Detaches only the exact additive pause observer, never the legacy singleton.

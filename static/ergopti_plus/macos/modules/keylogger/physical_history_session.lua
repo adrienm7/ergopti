@@ -70,7 +70,7 @@ function M.init(capacity, on_refused)
 		frames = frames - 1
 		if not ok then reason = reason or "physical_history_capture_stop_failed" end
 	end
-	local function native_binder(operation, boolean_result, correlation)
+	local function native_binder(operation, boolean_result, correlation, initial_snapshot)
 		return function(owner, budget, receive, refused)
 			if correlation then
 				local ok, token, scope = operation(owner, budget, receive, refused, may_persist)
@@ -82,6 +82,7 @@ function M.init(capacity, on_refused)
 				if ok == true then return token, nil, scope end
 				return nil, token, scope
 			end
+			if initial_snapshot then return operation(owner, budget, receive, refused, true) end
 			return operation(owner, budget, receive, refused)
 		end
 	end
@@ -105,7 +106,8 @@ function M.init(capacity, on_refused)
 				binders = {
 					configuration = native_binder(configuration_bind, true),
 					context = native_binder(context_bind, true, true),
-					engine = native_binder(engine_bind), system = native_binder(system_bind), pause = native_binder(pause_bind),
+					engine = native_binder(engine_bind, nil, nil, true), system = native_binder(system_bind, nil, nil, true),
+					pause = native_binder(pause_bind, nil, nil, true),
 				},
 				projection = function(history)
 					return project(subscriber, history, { capture = capture_scope, clock = clock_scope }, information)

@@ -738,7 +738,33 @@ local _physical_lifecycle = PhysicalLifecycle.new("system", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
 
-local function physical_lifecycle_snapshot()
+local function physical_lifecycle_snapshot(initial)
+	if initial then
+		local generation, refresh_generation = _hardware_generation, _context_refresh_generation
+		local state, pause_port, hardware = _state, _is_paused, _hardware_watchers_enabled
+		local enabled = state and state.is_enabled
+		local refreshing = next(_context_refresh_timers) ~= nil
+		local function cleanup_pending()
+			return not hardware and (_wifi_watcher ~= nil or _battery_watcher ~= nil
+				or _spaces_watcher ~= nil or _audio_watcher_active or _audio_callback_installed)
+		end
+		local cleanup_owed = cleanup_pending()
+		if type(pause_port) ~= "function" then return {} end
+		local function stable()
+			return generation == _hardware_generation and refresh_generation == _context_refresh_generation
+				and rawequal(state, _state) and rawequal(pause_port, _is_paused)
+				and enabled == (state and state.is_enabled) and hardware == _hardware_watchers_enabled
+				and refreshing == (next(_context_refresh_timers) ~= nil)
+				and cleanup_owed == cleanup_pending()
+		end
+		local paused = pause_port()
+		if not stable() then return {} end
+		local paused_after = pause_port()
+		if not stable() or paused ~= paused_after then return {} end
+		return { enabled = enabled, paused = paused, hardware_committed = hardware,
+			hardware_generation = generation, context_refresh_generation = refresh_generation,
+			settled = not refreshing and not cleanup_owed }
+	end
 	local generation, refresh_generation = _hardware_generation, _context_refresh_generation
 	local paused = _is_paused and _is_paused()
 	if generation ~= _hardware_generation or refresh_generation ~= _context_refresh_generation then return {} end
@@ -755,12 +781,15 @@ end
 ---@param capacity integer Positive native receipt budget.
 ---@param receive function Literal-true receipt acknowledger.
 ---@param on_refused function|nil Receives terminal reason and the exact source token.
+---@param initial_snapshot boolean|nil Opt-in readonly state at an actual observed clock point.
 ---@return table|nil token Exact observer token.
 ---@return string|nil reason Explicit binding refusal.
 ---@return table|nil scope Exact callback current, detach and post-frame retirement ports.
-function M.bind_physical_lifecycle_observer(owner, capacity, receive, on_refused)
+function M.bind_physical_lifecycle_observer(owner, capacity, receive, on_refused, initial_snapshot)
+	if initial_snapshot ~= nil and type(initial_snapshot) ~= "boolean" then return nil, "Invalid initial lifecycle observation option" end
 	if math.type(capacity) ~= "integer" then return nil, "Invalid native lifecycle receipt budget" end
-	return _physical_lifecycle.bind(owner, capacity, receive, on_refused)
+	return _physical_lifecycle.bind(owner, capacity, receive, on_refused,
+		initial_snapshot == true and function() return physical_lifecycle_snapshot(true) end or nil)
 end
 
 --- Detaches only the exact lifecycle owner and token.

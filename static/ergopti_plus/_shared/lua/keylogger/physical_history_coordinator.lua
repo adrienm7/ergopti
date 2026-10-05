@@ -115,7 +115,15 @@ function M.new(owner, capacity, dependencies)
 		return history.observe(capture_token, clock_token, component, observer, record)
 	end
 	local function facts(record)
-		local allowed = record.engine.writer_complete == true and record.system.writer_complete == true
+		local function scalar_ready(state)
+			-- Readonly startup state qualifies only at its actual observed callback.
+			-- Its source still reports writer_complete=false, without a fake start.
+			return state.writer_complete == true or state.source == "initial_snapshot" and state.stage == "observed"
+				and state.writer_complete == false and state.fields_complete == true
+				and state.observation_complete == true and state.qualification == "observed" and state.settled == true
+		end
+		local engine_ready, system_ready = scalar_ready(record.engine), scalar_ready(record.system)
+		local allowed = engine_ready and system_ready
 			and record.engine.enabled == true and record.engine.paused == false
 			and record.system.enabled == true and record.system.paused == false
 			and record.system.hardware_committed == true
@@ -128,7 +136,7 @@ function M.new(owner, capacity, dependencies)
 		lifecycle_qualification = known and "observed_only" or "unknown"
 		lifecycle_revision = lifecycle_revision + 1
 		return observe("lifecycle", lifecycle_observer, { kind = "physical_lifecycle", revision = lifecycle_revision,
-			at = lifecycle_at, complete = known and record.engine.writer_complete == true and record.system.writer_complete == true,
+			at = lifecycle_at, complete = known and engine_ready and system_ready,
 			allowed = allowed == true })
 	end
 	local function pause(record)
@@ -137,10 +145,14 @@ function M.new(owner, capacity, dependencies)
 		assert(type(record.complete) == "boolean" and type(record.fields_complete) == "boolean", "Unknown pause writer completion")
 		local complete = record.stage == "complete" and record.complete and record.fields_complete
 		local allowed = false
+		local observed = record.source == "initial_snapshot" and record.stage == "observed" and record.revision == 2 and record.complete == false
+			and record.fields_complete == true and record.observation_complete == true
+			and record.qualification == "observed" and record.settled == true
+		complete = complete or observed
 		if complete then
 			assert(type(record.paused) == "boolean" and type(record.admission_released) == "boolean"
 				and type(record.settled) == "boolean" and integer(record.transition_generation), "Invalid actual pause release fields")
-			allowed = record.source == "resume" and record.paused == false and record.admission_released and record.settled
+			allowed = (record.source == "resume" or observed) and record.paused == false and record.admission_released and record.settled
 		end
 		return observe("pause", bindings.pause.token, { kind = "physical_pause", revision = record.revision,
 			at = record.at, complete = complete == true, allowed = allowed == true })

@@ -671,6 +671,38 @@ rejects the original and a CLI-only mutation. These controlled products do not p
 or a speedup. Final local formatting/JS checks and a fresh exact-SHA native
 macOS/Linux run remain required; TODO31 stays partial.
 
+The dormant native history owner now explicitly requests readonly initial local
+engine, system and pause observations at the retained clock point. These receipts
+are distinct from completed writer transactions; unknown OS posture, local cleanup
+debt, pause admission debt and unstable generation/state remain denied. The shared
+coordinator consumes only exact settled observations and still requires actual
+positive posture, matching source capabilities and completed capture baseline.
+Every hold crossing unknown or forbidden state remains cancelled in full.
+
+Focused portable validation passes23 initial-state and49 session cases, preserving
+all32 original session cases. Pure initial-state13 and session39 controls pass on
+both Lua54/LuaJIT;10 native-adapter cases in each cohort are excluded from those
+pure replays. Independent review passes20 initial-state and8 consumer controls.
+A frozen retained-hardware cleanup-debt regression fails the earlier candidate;
+the corrected observation preserves denial without starting or stopping hardware.
+The separately approved independent fixture repair changes missing-generation
+inputs only and preserves all8 assertion bodies and expected outcomes. The selected local gates pass formatting226 files,361 JS checks,15,205 macOS
+unit cases,101 macOS E2E checks with one driver-specific exclusion,8,562 Linux
+unit cases and189 Linux E2E checks. The initial test file adds only its required
+path header before the unchanged frozen controls. Exact-source hosted
+qualification of this slice remains required; it does not enable capture, invent
+an OS snapshot, implement recovery/rotation, or complete TODO31 and WP4-WP10.
+
+Manual native run37386519040 at835962e984 passes the actual full pinned
+Core-Service/CLI/Console calibration in294.637 seconds within the unchanged
+300-second bound, plus all13 native policy and5 posture cases. This is the first
+source build prerequisite; promotion still requires a second full native build
+on the promoted SHA. The complete Swift suite has327 passing and2 failing cases
+(7 failure assertions); the unchanged Brew/Sparkle acceptance cases fail. Linux
+has8,561 passing and1 failing native callback-idle case. Packaging and
+installation are skipped, as is Release. This checkpoint qualifies neither the
+new initial-observation slice nor complete installation.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native

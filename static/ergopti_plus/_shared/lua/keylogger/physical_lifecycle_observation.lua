@@ -74,7 +74,7 @@ function M.new(domain, clock, on_refused)
 		end
 		return at
 	end
-	local function publish(candidate, source, fields, committed, reserved_at)
+	local function publish(candidate, source, fields, committed, reserved_at, initial)
 		if not current(candidate) then return false end
 		if candidate.dispatching then return refuse(candidate, "Lifecycle publication reentered") end
 		if candidate.revision >= candidate.capacity then return refuse(candidate, "Lifecycle receipt budget exhausted") end
@@ -112,8 +112,15 @@ function M.new(domain, clock, on_refused)
 					if integral(generation) then record[name] = generation else known = false end
 				end
 			end
+			if initial then
+				local settled = rawget(fields, "settled")
+				if type(settled) == "boolean" then record.settled = settled else known = false end
+				record.stage = "observed"
+				record.observation_complete = known and settled == true
+				record.qualification = record.observation_complete and "observed" or "unknown"
+			end
 			record.fields_complete = known
-			record.complete = known and committed == true and source.source ~= "unknown_event"
+			record.complete = not initial and known and committed == true and source.source ~= "unknown_event"
 			if record.complete then record.stage = "complete" end
 		end
 		local delivered, accepted = pcall(candidate.receive, record, candidate.token)
@@ -124,17 +131,39 @@ function M.new(domain, clock, on_refused)
 		return true
 	end
 
+	local function initial_observation(candidate, snapshot)
+		if not current(candidate) then return false end
+		if frame or candidate.dispatching then return refuse(candidate, "Lifecycle initial observation reentered") end
+		if candidate.revision >= candidate.capacity then return refuse(candidate, "Lifecycle receipt budget exhausted") end
+		-- The exact subscription frame already owns clock, snapshot and delivery.
+		local ticket = { binding = candidate }
+		frame = ticket
+		local delivered = false
+		local at = sample(candidate)
+		if at ~= nil and current(candidate) and rawequal(frame, ticket) then
+			local observed, fields = pcall(snapshot)
+			if current(candidate) and rawequal(frame, ticket) then
+				if not observed or type(fields) ~= "table" then fields = {} end
+				delivered = publish(candidate, { source = "initial_snapshot" }, fields, false, at, true)
+			end
+		end
+		if rawequal(frame, ticket) then frame = nil end
+		return delivered
+	end
+
 	--- Claims the single exact owner without starting or sampling runtime state.
 	---@param owner table Exact owner capability.
 	---@param capacity number Positive finite integral receipt budget.
 	---@param receive function Receives copied records and exact binding token.
 	---@param refusal_observer function|nil Exact callback receiving terminal reason and source token.
+	---@param initial_snapshot function|nil Opt-in readonly observed point, never a writer commit.
 	---@return table|nil token Owned detach capability, or nil on refusal.
 	---@return string|nil reason Explicit refusal reason when binding fails.
 	---@return table|nil scope Exact callback ownership, detach and post-frame retirement.
-	function actor.bind(owner, capacity, receive, refusal_observer)
+	function actor.bind(owner, capacity, receive, refusal_observer, initial_snapshot)
 		if type(owner) ~= "table" or not integral(capacity) or capacity < 1 or type(receive) ~= "function"
-			or (refusal_observer ~= nil and type(refusal_observer) ~= "function") then
+			or (refusal_observer ~= nil and type(refusal_observer) ~= "function")
+			or (initial_snapshot ~= nil and type(initial_snapshot) ~= "function") then
 			return nil, "Invalid lifecycle subscription"
 		end
 		if binding ~= nil then return nil, "Lifecycle observer already owned" end
@@ -143,7 +172,8 @@ function M.new(domain, clock, on_refused)
 		candidate.lifetime = require("keylogger.physical_subscription_lifetime").new(owner, candidate.token)
 		candidate.lifetime.bind_detach(function(exact_owner, exact_token) return actor.unbind(exact_owner, exact_token) end)
 		binding = candidate
-		if candidate.lifetime.run(publish, candidate, { source = "binding" }) ~= true then
+		if candidate.lifetime.run(publish, candidate, { source = "binding" }) ~= true
+			or (initial_snapshot ~= nil and candidate.lifetime.run(initial_observation, candidate, initial_snapshot) ~= true) then
 			if rawequal(binding, candidate) then binding = nil end
 			candidate.active = false; candidate.lifetime.detach()
 			return nil, "Lifecycle bootstrap refused", candidate.lifetime.capability()

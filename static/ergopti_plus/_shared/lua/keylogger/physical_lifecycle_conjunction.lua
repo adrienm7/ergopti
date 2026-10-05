@@ -12,8 +12,8 @@ local EVENT_FACTS = {
 	lock = { "unlocked", false }, unlock = { "unlocked", true },
 }
 local SOURCES = {
-	engine = { binding = true, start = true, stop = true, shutdown = true, resync = true },
-	system = { binding = true, initialization = true, hardware_start = true, hardware_stop = true,
+	engine = { binding = true, initial_snapshot = true, start = true, stop = true, shutdown = true, resync = true },
+	system = { binding = true, initial_snapshot = true, initialization = true, hardware_start = true, hardware_stop = true,
 		system_sleep = true, system_wake = true, screens_sleep = true, screens_wake = true,
 		lock = true, unlock = true, unknown_event = true },
 }
@@ -134,6 +134,17 @@ function M.new(sources, capacity, receive, on_refused)
 				end
 				assert(not next_state.fields_complete or value ~= nil, "Incomplete lifecycle writer fields")
 			end
+			if next_state.stage == "observed" then
+				next_state.settled = rawget(record, "settled")
+				next_state.observation_complete = rawget(record, "observation_complete")
+				next_state.qualification = rawget(record, "qualification")
+				assert(next_state.settled == nil or type(next_state.settled) == "boolean", "Invalid lifecycle settlement field")
+				assert(not next_state.fields_complete or next_state.settled ~= nil, "Missing observed settlement")
+				assert(type(next_state.observation_complete) == "boolean"
+					and next_state.observation_complete == (next_state.fields_complete and next_state.settled == true)
+					and next_state.qualification == (next_state.observation_complete and "observed" or "unknown"),
+					"Invalid lifecycle observation qualification")
+			end
 			local source = { source = next_state.source, event = rawget(record, "event"),
 				component = rawget(record, "component"), value = rawget(record, "value") }
 			local event = EVENT_FACTS[source.source]
@@ -143,13 +154,18 @@ function M.new(sources, capacity, receive, on_refused)
 			else assert(source.event == nil and source.component == nil and source.value == nil,
 				"Unexpected lifecycle notification fields") end
 			local next_pending = pending[domain]
-			if next_state.stage == "boundary" then
+			if next_state.stage == "observed" then
+				assert(source.source == "initial_snapshot" and next_state.revision == 2
+					and state[domain].revision == 1 and state[domain].source == "binding"
+					and next_pending == nil and not next_state.writer_complete, "Invalid initial lifecycle observation")
+			elseif next_state.stage == "boundary" then
+				assert(source.source ~= "initial_snapshot", "Snapshot cannot declare a writer boundary")
 				assert(not next_state.writer_complete and not next_state.fields_complete, "Boundary claims writer completion")
 				assert(next_pending == nil, "Lifecycle boundary reentered")
 				if source.source == "binding" then assert(next_state.revision == 1, "Repeated lifecycle bootstrap")
 				else next_pending = source; next_pending.revision = next_state.revision end
 			else
-				assert(next_state.stage == "complete" or next_state.stage == "incomplete", "Invalid lifecycle writer stage")
+				assert(source.source ~= "initial_snapshot" and (next_state.stage == "complete" or next_state.stage == "incomplete"), "Invalid lifecycle writer stage")
 				assert(next_pending and next_pending.revision + 1 == next_state.revision, "Missing lifecycle writer boundary")
 				for _, name in ipairs({ "source", "event", "component", "value" }) do
 					assert(rawequal(next_pending[name], source[name]), "Lifecycle completion source changed")
@@ -167,7 +183,7 @@ function M.new(sources, capacity, receive, on_refused)
 					end
 					next_generation = next_state.hardware_generation
 				end
-				if source.source == "binding" or source.source == "initialization" or source.source == "hardware_start"
+				if source.source == "binding" or source.source == "initial_snapshot" or source.source == "initialization" or source.source == "hardware_start"
 					or source.source == "hardware_stop" or source.source == "unknown_event" then next_posture = unknown_posture()
 				elseif event then
 					next_posture[source.component] = { qualification = "unknown" }

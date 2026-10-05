@@ -1901,7 +1901,31 @@ local _physical_lifecycle = require("keylogger.physical_lifecycle_observation").
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
 
-local function physical_lifecycle_snapshot()
+local function physical_lifecycle_snapshot(initial)
+	if initial then
+		local generation, enabled, control = _runtime_generation, CoreState.is_enabled, _script_control
+		local paused_port = type(control) == "table" and rawget(control, "is_paused")
+		local pending_port = type(control) == "table" and rawget(control, "is_pause_transition_pending")
+		if type(paused_port) ~= "function" or type(pending_port) ~= "function" then return {} end
+		local teardown, running = _teardown_state, _teardown_state.running
+		local function stable()
+			return generation == _runtime_generation and enabled == CoreState.is_enabled
+				and rawequal(control, _script_control) and rawequal(teardown, _teardown_state)
+				and running == _teardown_state.running
+				and rawequal(paused_port, rawget(control, "is_paused"))
+				and rawequal(pending_port, rawget(control, "is_pause_transition_pending"))
+		end
+		local paused = paused_port()
+		if not stable() then return {} end
+		local pending = pending_port()
+		if not stable() then return {} end
+		local paused_after = paused_port()
+		if not stable() or paused ~= paused_after then return {} end
+		local pending_after = pending_port()
+		if not stable() or pending ~= pending_after then return {} end
+		return { enabled = enabled, paused = paused, runtime_generation = generation,
+			settled = type(pending) == "boolean" and pending == false and running == false }
+	end
 	local generation = _runtime_generation
 	local paused = _is_paused()
 	if generation ~= _runtime_generation then return {} end
@@ -2267,12 +2291,15 @@ end
 ---@param capacity integer Positive native receipt budget.
 ---@param receive function Literal-true receipt acknowledger.
 ---@param on_refused function|nil Receives terminal reason and the exact source token.
+---@param initial_snapshot boolean|nil Opt-in readonly state at an actual observed clock point.
 ---@return table|nil token Exact observer token.
 ---@return string|nil reason Explicit binding refusal.
 ---@return table|nil scope Exact callback current, detach and post-frame retirement ports.
-function M.bind_physical_lifecycle_observer(owner, capacity, receive, on_refused)
+function M.bind_physical_lifecycle_observer(owner, capacity, receive, on_refused, initial_snapshot)
+	if initial_snapshot ~= nil and type(initial_snapshot) ~= "boolean" then return nil, "Invalid initial lifecycle observation option" end
 	if math.type(capacity) ~= "integer" then return nil, "Invalid native lifecycle receipt budget" end
-	return _physical_lifecycle.bind(owner, capacity, receive, on_refused)
+	return _physical_lifecycle.bind(owner, capacity, receive, on_refused,
+		initial_snapshot == true and function() return physical_lifecycle_snapshot(true) end or nil)
 end
 
 --- Detaches only the exact engine lifecycle owner and token.
