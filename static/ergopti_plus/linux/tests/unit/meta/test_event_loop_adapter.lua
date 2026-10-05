@@ -452,3 +452,31 @@ helpers.describe("linux-event-reentry", function()
 		end)
 	end
 end)
+
+helpers.describe("linux-defer-finite-admission", function()
+	for _, case in ipairs({ { name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge } }) do
+		helpers.it("linux-defer-finite-admission: rejects " .. case.name .. " without queue ownership", function()
+			local loop = load_pump_loop()
+			local weak = setmetatable({}, { __mode = "v" })
+			local calls = 0
+			local function owned_callback()
+				local marker = {}
+				weak[1] = marker
+				return function() calls = calls + 1; return marker end
+			end
+			local callback = owned_callback()
+			helpers.assert_eq(loop.defer(callback, case.value), false)
+			callback = nil
+			collectgarbage("collect")
+			collectgarbage("collect")
+			helpers.assert_eq(weak[1], nil, "refused work must not remain owned by the deferred queue")
+			loop._run_idle_tick()
+			helpers.assert_eq(calls, 0)
+			loop.defer(function() calls = calls + 1 end)
+			loop._run_idle_tick()
+			helpers.assert_eq(calls, 1, "an invalid delay must not starve following healthy work")
+		end)
+	end
+end)

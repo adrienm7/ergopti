@@ -1475,6 +1475,26 @@ These are software implementations; final hardware verification remains below.
   flaw is documented with a source-only proposal, without editing its reserved
   native work. Foreign runtime gates remain deferred. Depends on L101/L102.
 
+- [~] **L105.** Linux finite timer admission: use a tiny pure shared finite-number
+  predicate before native allocation. NaN or infinite seconds, and finite
+  seconds whose millisecond conversion overflows, had armed invalid timers;
+  NaN/infinite deferred work could remain permanently queued. Preserve ordinary
+  finite negative clamps, zero/fractional delivery and large finite delays;
+  introduce no native range ceiling. Twenty-four genuine libuv controls have
+  twelve original failures on current LuaJIT and signed Ubuntu 22.04 dependencies,
+  eight on stock Lua 5.4, then all pass. Stock54's four existing native conversion
+  refusals remain healthy controls. Callback delivery, cancellation, following
+  healthy work, deferred payload GC and exact final resources are exercised;
+  no backend is replaced in that fixture. Twenty-three registered checks have
+  twenty-one original failures and pass after; their adapter seams are explicitly
+  simulated and the native child is included. Preserve every existing assertion
+  and replay all nine native reentry controls across the three runtimes. Register
+  both native interpreters for future Linux CI without running workflows. Windows
+  already bounds native milliseconds by source; macOS protected construction
+  remains unexecuted and has a proposal reusing the common predicate. Foreign
+  gates stay deferred. The separate native huge-range and no-luv clock diagnoses
+  remain unmodified; physical input and reserved surfaces are unchanged.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

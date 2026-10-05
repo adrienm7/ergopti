@@ -456,3 +456,56 @@ helpers.describe("timer_scheduler armed ownership", function()
     end)
   end)
 end)
+
+helpers.describe("linux-timer-finite-admission", function()
+	local invalid = {
+		{ name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge },
+		{ name = "positive conversion overflow", value = 1e308 },
+		{ name = "negative conversion overflow", value = -1e308 },
+		{ name = "numeric string", value = "0.1" },
+		{ name = "boolean", value = false },
+		{ name = "nil" },
+		{ name = "table", value = {} },
+	}
+	for _, method in ipairs({ "after", "every" }) do
+		for _, case in ipairs(invalid) do
+			helpers.it("linux-timer-finite-admission: " .. method .. " rejects " .. case.name .. " before allocation", function()
+				local scheduler, state = timer_fixture()
+				local calls = 0
+				local handle = scheduler[method](case.value, function() calls = calls + 1 end)
+				helpers.assert_eq(handle.armed, false)
+				helpers.assert_eq(handle.fired, true)
+				helpers.assert_eq(handle.timer, nil)
+				helpers.assert_eq(#state.timers, 0, "invalid arithmetic must not acquire native resources")
+				helpers.assert_eq(scheduler.activeCount(), 0)
+				helpers.assert_eq(calls, 0)
+			end)
+		end
+	end
+end)
+
+helpers.describe("linux-timer-finite-admission", function()
+	helpers.it("linux-timer-finite-admission: shared policy preserves finite magnitude and signed values", function()
+		local policy = require("number_policy")
+		for _, value in ipairs({ 0, -1, 0.125, 1e308 }) do
+			helpers.assert_eq(policy.is_finite(value), true)
+		end
+		for _, case in ipairs({ { value = 0 / 0 }, { value = math.huge }, { value = -math.huge },
+			{ value = "1" }, { value = false }, {}, { value = {} } }) do
+			helpers.assert_eq(policy.is_finite(case.value), false)
+		end
+	end)
+
+	local native_ok = pcall(require, "luv")
+	if native_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-timer-finite-admission: native admission and delivery preserve healthy successors", function()
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_timer_finite_admission.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native numeric admission fixture must succeed")
+		end)
+	end
+end)

@@ -27,6 +27,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local NativeTimer = require("infra.native_timer")
+local NumberPolicy = require("number_policy")
 local LOG = "adapters.event_loop"
 
 
@@ -393,7 +394,7 @@ end
 --- For work that must not hold up what the current callback returns: a bridge
 --- answers a window with what it already has and refreshes it after the page
 --- has painted. Runs on the daemon's own loop, with or without luv, so it needs
---- no timer backend. Fail-fast: a non-function or a negative delay is refused.
+--- no timer backend. Fail-fast: a non-function, non-finite or negative delay is refused.
 --- @param fn function Zero-arity callback.
 --- @param delay_ms number|nil Minimum delay in milliseconds (default 0).
 --- @return boolean True when the callback was queued.
@@ -403,8 +404,8 @@ function M.defer(fn, delay_ms)
 		return false
 	end
 	local delay = delay_ms == nil and 0 or delay_ms
-	if type(delay) ~= "number" or delay < 0 then
-		Logger.error(LOG, "defer() delay must be a non-negative number — got %s; ignoring.", tostring(delay_ms))
+	if not NumberPolicy.is_finite(delay) or delay < 0 then
+		Logger.error(LOG, "defer() delay must be a finite non-negative number — got %s; ignoring.", tostring(delay_ms))
 		return false
 	end
 	_deferred[#_deferred + 1] = { fn = fn, due_ms = Monotonic.now_ms() + delay }
