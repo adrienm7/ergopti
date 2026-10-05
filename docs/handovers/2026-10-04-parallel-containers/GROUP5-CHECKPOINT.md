@@ -630,6 +630,34 @@ byte-exact. This repairs the independently reproduced baseline qualification
 blocker without changing production metrics or another group's TODO. Final
 selected gates and hosted Linux qualification remain required; TODO31 is partial.
 
+The dormant physical-history session now composes the five actual source
+subscriptions, one retained History/CaptureScope/CLOCK2 owner and the accepted
+context projection. The actual final-baseline callback must return exact true
+before delivery; admission alone cannot replace that notification. Context
+lookup selects application/privacy from original HID ticks, samples and freezes
+the local calendar at accepted press publication, then retains that date and
+uses HID duration at release. Any pause, private interval or gap cancels the
+whole hold. Revocation fences every external callback, including stop reentry,
+and retirement waits for the exact retained native owner.
+
+Focused portable validation passes21 accepted-context cases,15 baseline cases
+and32 session cases, with existing186/422/429-case cohorts preserved. Independent
+controls pass22/15/8 respectively; pure accepted-context12 and session24 cases
+pass on both Lua54/LuaJIT, excluding9 and8 modeled native cases respectively.
+The original17 accepted-context cases retain four appended frozen regressions;
+the session retains its original27 expectations and adds the independently
+frozen notification assertion, which fails the real relay-bypass mutant.
+Health inventory and the architecture diagram now describe this composition.
+This is explicit dormant software wiring, without default activation or an
+installed-runtime claim. Initial lifecycle snapshots, recovery, rotation,
+shutdown integration, native qualification and WP4-WP10 remain required; TODO31
+stays partial. Hosted runs37370528061/37372466505 acquired no checks runner.
+Run37376590825 at935cb05d62 executed native macOS tests: shared and Lua checks
+and12 native tooltip captures passed, but the full producer exceeded its
+existing300-second owned deadline. The Brew receiver and Sparkle retirement
+also failed; packaging/installation and Release were skipped. These failures
+remain open, and this run does not qualify the later local composition.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native

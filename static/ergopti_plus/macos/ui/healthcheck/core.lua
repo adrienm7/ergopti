@@ -226,6 +226,12 @@ end
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
 	{
+		id       = "adapters.physical_history_context",
+		contract = { "new" },
+		-- Explicit retained history uses this factory; loading never enables capture.
+		wired    = true,
+	},
+	{
 		id       = "adapters.physical_observation_clock",
 		contract = { "now" },
 		-- Reached by explicit configuration binding; loading never samples time.

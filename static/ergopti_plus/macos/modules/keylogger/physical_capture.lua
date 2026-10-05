@@ -63,7 +63,8 @@ end
 ---@return boolean settled
 local function finish_stop(candidate)
 	if not current(candidate) or not candidate.stop_requested or candidate.acquiring
-		or candidate.accounting_transition or candidate.clock_starting or candidate.clock_publishing then return false end
+		or candidate.accounting_transition or candidate.clock_starting or candidate.clock_publishing
+		or candidate.baseline_publishing or candidate.baseline_revocation_pending then return false end
 	if candidate.state == "stopped" then return true end
 	if candidate.verifier and not candidate.verifier_settled then return false end
 	if candidate.clock and not candidate.clock_settled then return false end
@@ -285,7 +286,9 @@ end
 --- native timebase; context still resolves original ticks through that owner.
 --- context_interval(first_ticks, last_ticks, device) must resolve the entire
 --- retained interval; emit_release transfers the approved match to its FIFO.
----@param ports table spawn, decode, encode, clock_ready, context, context_interval, keycode, emit and emit_release.
+--- Optional baseline_ready() observes actual completed admission before any raw batch.
+--- It receives no identity payload and must acknowledge with literal true.
+---@param ports table spawn, decode, encode, clock_ready, context, context_interval, keycode, emit and emit_release; optional baseline_ready.
 ---@return boolean initialized
 function M.init(ports)
 	if dependencies then return false end
@@ -296,6 +299,9 @@ function M.init(ports)
 		assert(type(ports[name]) == "function", "Missing physical capture port: " .. name)
 		snapshot[name] = ports[name]
 	end
+	local baseline_ready = rawget(ports, "baseline_ready")
+	assert(baseline_ready == nil or type(baseline_ready) == "function", "Invalid physical baseline observer")
+	snapshot.baseline_ready = baseline_ready
 	Logger.start(LOG, "Initializing dormant physical capture owner…")
 	dependencies = snapshot
 	Logger.success(LOG, "Dormant physical capture owner initialized.")
@@ -328,6 +334,31 @@ function M.start(options)
 			end
 			candidate.state = "capturing"
 			return capture
+		end,
+		baseline_ready = dependencies.baseline_ready and function()
+			local original_capture = candidate.capture
+			assert(current(candidate) and candidate.state == "capturing" and not candidate.stop_requested
+				and not candidate.failure and candidate.clock_published and original_capture ~= nil
+				and Accounting.admitted_capture() == original_capture and candidate.receiver.ready() == true,
+				"Physical baseline completion owner was revoked")
+			candidate.baseline_publishing = true
+			local published, accepted = pcall(dependencies.baseline_ready)
+			candidate.baseline_publishing = false
+			if candidate.stop_requested then
+				-- The owning Transport dispatch will terminate its revoked receiver once.
+				-- Keep an explicit refused accounting obligation through native settlement.
+				candidate.baseline_revocation_pending = true
+				if revoke(candidate) then
+					candidate.baseline_revocation_pending = nil
+					finish_stop(candidate)
+				end
+			end
+			if not published then error(accepted, 0) end
+			assert(current(candidate) and candidate.state == "capturing" and not candidate.stop_requested
+				and not candidate.failure and candidate.capture == original_capture
+				and Accounting.admitted_capture() == original_capture and candidate.receiver.ready() == true,
+				"Physical baseline completion was revoked")
+			return accepted
 		end,
 		context = dependencies.context, keycode = dependencies.keycode,
 		emit = function(press)
@@ -434,8 +465,10 @@ function M.stop(on_stopped)
 		Logger.start(LOG, "Stopping physical capture session…")
 	end
 	if candidate.receiver then candidate.receiver.stop() end
-	if candidate.accounting_transition or candidate.acquiring or candidate.clock_publishing then return false, "pending" end
+	if candidate.accounting_transition or candidate.acquiring or candidate.clock_publishing
+		or candidate.baseline_publishing then return false, "pending" end
 	if revoke(candidate) ~= true then return false, "settlement_refused" end
+	candidate.baseline_revocation_pending = nil
 	local ok, failure = pcall(function()
 		if candidate.transport and not candidate.transport.isSettled() then candidate.transport.stop() end
 		if candidate.clock and not candidate.clock_settled then
@@ -458,6 +491,7 @@ function M.status()
 	if not session then return { state = dependencies and "idle" or "uninitialized", settled = true } end
 	local settled = not session.acquiring and not session.accounting_transition
 		and not session.clock_starting and not session.clock_publishing
+		and not session.baseline_publishing and not session.baseline_revocation_pending
 		and (not session.verifier or session.verifier_settled == true)
 		and (not session.clock or session.clock_settled == true)
 		and (not session.transport or session.transport.isSettled())
@@ -499,7 +533,8 @@ function M.bind_history_scope(owner)
 	local function settled()
 		return candidate.state == "stopped" and candidate.accounting_owned ~= true and candidate.capture == nil
 			and not candidate.acquiring and not candidate.accounting_transition and not candidate.clock_starting
-			and not candidate.clock_publishing and (not candidate.verifier or candidate.verifier_settled == true)
+			and not candidate.clock_publishing and not candidate.baseline_publishing and not candidate.baseline_revocation_pending
+			and (not candidate.verifier or candidate.verifier_settled == true)
 			and (not candidate.clock or candidate.clock_settled == true)
 	end
 	local scoped_convert = function(ticks)

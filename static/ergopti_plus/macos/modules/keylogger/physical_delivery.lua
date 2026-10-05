@@ -28,7 +28,7 @@ end
 --- capture.
 --- Explicit holds ports enable matching; legacy diagnostic callers remain press-only.
 --- Production capture always supplies convert, interval context and exact-true release emit.
----@param dependencies table admit, context, keycode and emit; batch_limit; optional holds ports.
+---@param dependencies table admit, context, keycode and emit; batch_limit; optional holds and baseline_ready ports.
 ---@return table receiver
 function M.new(dependencies)
 	local ports = {}
@@ -36,6 +36,9 @@ function M.new(dependencies)
 		assert(type(dependencies[name]) == "function", "Missing physical delivery callback: " .. name)
 		ports[name] = dependencies[name]
 	end
+	local baseline_ready = rawget(dependencies, "baseline_ready")
+	assert(baseline_ready == nil or type(baseline_ready) == "function", "Invalid physical baseline observer")
+	ports.baseline_ready = baseline_ready
 	local limit = dependencies.batch_limit
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "Invalid physical batch limit")
 	local state, ownership, sequence = "new", nil, "0"
@@ -55,12 +58,16 @@ function M.new(dependencies)
 
 	--- Returns whether this receiver still owns delivery.
 	---@return boolean
-	function receiver.active() return state == "baselining" or state == "active" or state == "delivering" end
+	function receiver.active()
+		return state == "baselining" or state == "completing" or state == "active" or state == "delivering"
+	end
 
 	--- Reports completed initial-state admission, including an owned batch delivery.
+	--- During a completion observer this reports the real baseline for exact scope pulls;
+	--- raw batch delivery remains fenced until its literal-true acknowledgement.
 	--- Opening state alone cannot authorize a history adapter or physical credit.
 	---@return boolean ready Whether this exact receiver completed its baseline.
-	function receiver.ready() return state == "active" or state == "delivering" end
+	function receiver.ready() return state == "completing" or state == "active" or state == "delivering" end
 
 	--- Revokes delivery before any successor capture can begin.
 	function receiver.stop() state, ownership, initial, held = "stopped", nil, nil, {} end
@@ -108,7 +115,16 @@ function M.new(dependencies)
 				and frame.incarnation == ownership.incarnation and frame.lease == ownership.lease
 				and frame.coverage == ownership.coverage, "Physical capture ownership changed or ended")
 			local cursor = initial.accept(frame)
-			if initial.ready() then state = "active" end
+			if initial.ready() then
+				if ports.baseline_ready then
+					local owner = ownership
+					state = "completing"
+					local accepted = ports.baseline_ready()
+					assert(state == "completing" and ownership == owner, "Physical baseline completion was revoked")
+					assert(accepted == true, "Physical baseline observer refused completion")
+				end
+				state = "active"
+			end
 			return cursor
 		end)
 		if not ok then state, ownership, initial, held = "failed", nil, nil, {}; error(result, 0) end
