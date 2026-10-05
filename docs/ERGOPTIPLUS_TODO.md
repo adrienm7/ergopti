@@ -4553,6 +4553,8 @@ The 2026-10-05 Swipe continuation declares its fixed action separator, mode grou
 
 Native Linux metrics equivalence now retains the established JSON-quoted token column in its independent raw-row SQL transport. All twenty-one assertions, aggregation rules and date/application filters remain unchanged. Real SQLite compares 648 grouped rows with 2808 raw rows; this repairs a validation prerequisite and changes no production metrics policy.
 
+The native Windows DelayRows provider now supplies all four required renderer arguments. The previous candidate failed loading before any native unit case; all eight production call sites retain the unchanged four-argument API. Two actual-provider regression cases cover complete physical rows, caption propagation, missing commands and withdrawn callback ownership. Native Windows qualification remains required on this successor.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote

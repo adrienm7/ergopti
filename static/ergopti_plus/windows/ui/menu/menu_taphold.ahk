@@ -86,7 +86,7 @@ _TH_KeyRows(Hand) {
 		_HoldRowsBuilder := _TH_HoldPickerRows
 
 		DelayRows := MenuRenderer_TemplateRows("tap_hold_key_delay_rows",
-			Map("tap_hold_key_delay_set", _TH_MakeDelayPickerFn(KeyId)))
+			Map("tap_hold_key_delay_set", _TH_MakeDelayPickerFn(KeyId)), Map(), Map())
 		if !(DelayRows is Array)
 			continue
 		DelayCaption := Round(TapHoldDuration(MasterGateDesiredTapHold(TapHold), KeyId) * 1000) . " ms"
