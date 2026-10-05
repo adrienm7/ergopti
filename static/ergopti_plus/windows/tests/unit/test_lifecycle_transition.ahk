@@ -235,3 +235,108 @@ _LT_BrightnessAcknowledgesRetirement() {
 }
 Test("lifecycle transition: brightness retirement acknowledgement and refusal gate suspend",
 	_LT_BrightnessAcknowledgesRetirement)
+
+
+_LT_UserHotstringsOwnerIsAdmitted() {
+	global _LifecycleLatestTransition, _LifecycleTransitionsByPhase
+	SavedLatest := _LifecycleLatestTransition
+	SavedPhases := _LifecycleTransitionsByPhase
+	try {
+		_LifecycleTransitionsByPhase := Map()
+		for Refuses in [false, true] {
+			State := { calls: [] }
+			Transaction := LifecycleTransitionBegin("suspend")
+			Action := Refuses ? _LT_Throw.Bind(State, "user-hotstrings")
+				: _LT_Succeed.Bind(State, "user-hotstrings")
+			Accepted := _LifecycleRunRequiredStep(Transaction, "user-hotstrings", Action)
+			AssertEqual(1, State.calls.Length, "the registered programmable owner must actually run")
+			AssertEqual(!Refuses, Accepted, "only the successful owner acknowledges suspension")
+			AssertEqual(!Refuses, LifecycleTransitionFinish(Transaction), "owner failure remains lifecycle debt")
+			Debt := LifecycleTransitionDebtSnapshot("suspend")
+			AssertEqual(Refuses ? 1 : 0, Debt.Length, "exactly the refusing owner creates debt")
+			if Refuses {
+				AssertEqual("user-hotstrings", Debt[1].owner, "the programmable owner identity must be retained")
+				AssertEqual("forced user-hotstrings failure", Debt[1].message, "the original failure must remain visible")
+			}
+		}
+	} finally {
+		_LifecycleLatestTransition := SavedLatest
+		_LifecycleTransitionsByPhase := SavedPhases
+	}
+}
+Test("lifecycle transition: programmable owner admission retains exact failure debt (user-hotstrings-lifecycle)",
+	_LT_UserHotstringsOwnerIsAdmitted)
+
+
+_LT_UserHotstringsCancellationDebt() {
+	global _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs, _UserHotstringsLoadEpoch
+	global _HSE_TerminalOwner, _HSE_TerminalReplayPending
+	global _LifecycleLatestTransition, _LifecycleTransitionsByPhase
+	AssertEqual(0, _UserHotstringsJobs.Count, "the lifecycle fixture cannot replace live native jobs")
+	AssertFalse(IsObject(_UserHotstringsLoader), "the lifecycle fixture cannot replace a live loader")
+	AssertFalse(HSE_TerminalTransactionPending(), "the lifecycle fixture cannot replace pending output")
+	Saved := { Owner: _UserHotstringsOwner, Loader: _UserHotstringsLoader,
+		Jobs: _UserHotstringsJobs, Epoch: _UserHotstringsLoadEpoch,
+		Terminal: _HSE_TerminalOwner, Replay: _HSE_TerminalReplayPending,
+		Latest: _LifecycleLatestTransition, Phases: _LifecycleTransitionsByPhase }
+	Body := _DriverFuncBody("Ergopti_OnSuspendEnter")
+	Assert(Body != "", "the actual suspend owner must exist")
+	Assert(RegExMatch(Body,
+		'_LifecycleRunRequiredStep\(\s*Transition\s*,\s*"user-hotstrings"\s*,\s*UserHotstringsInvalidate\.Bind\("suspend"\)\s*(,\s*true\s*)?\)',
+		&Step) > 0, "the actual suspend reactor must call the programmable invalidator")
+	RequireTrue := Step[1] != ""
+	try {
+		_UserHotstringsLoader := 0
+		_UserHotstringsJobs := Map()
+		_HSE_TerminalOwner := 0
+		_HSE_TerminalReplayPending := 0
+		_LifecycleTransitionsByPhase := Map()
+		for Refuses in [false, true] {
+			Fixture := _UCHFixture()
+			_UserHotstringsOwner := Fixture.owner
+			Assert(Fixture.owner.Request("@clock"), "a genuine programmable task must be pending before suspend")
+			AssertEqual(1, Fixture.tasks.Length, "the real owner must acquire its task")
+			Fixture.cancelAck := !Refuses
+			EpochBefore := _UserHotstringsLoadEpoch
+			Transition := LifecycleTransitionBegin("suspend")
+			LifecycleTransitionMarkStarted(Transition)
+			Accepted := _LifecycleRunRequiredStep(Transition, "user-hotstrings",
+				UserHotstringsInvalidate.Bind("suspend"), RequireTrue)
+			AssertTrue(Fixture.tasks[1].cancelled, "the actual invalidator must cancel its pending task")
+			AssertEqual(EpochBefore + 1, _UserHotstringsLoadEpoch, "the actual invalidator must revoke its load epoch")
+			AssertEqual(!Refuses, Accepted, "retained programmable completion debt cannot acknowledge suspension")
+			AssertEqual(!Refuses, LifecycleTransitionFinish(Transition), "retained completion debt must block lifecycle success")
+			Debt := LifecycleTransitionDebtSnapshot("suspend")
+			AssertEqual(Refuses ? 1 : 0, Debt.Length, "only actual cancellation refusal creates lifecycle debt")
+			if Refuses {
+				Assert(Fixture.owner.debt.Length > 0, "the genuine owner must retain unacknowledged task debt")
+				AssertEqual("user-hotstrings", Debt[1].owner, "debt must retain the programmable owner identity")
+				AssertEqual("returned false", Debt[1].message, "debt must retain the precise cancellation refusal")
+			}
+			Fixture.tasks[1].Run()
+			AssertEqual(0, Fixture.calls, "cancelled task completion must not execute user code")
+			AssertEqual(0, Fixture.output.Length, "cancelled task completion must not publish output")
+			Fixture.cancelAck := true
+			AssertTrue(UserHotstringsInvalidate("fixture-retry"), "an acknowledged retry must actually settle the retained owner")
+			AssertEqual(0, Fixture.owner.debt.Length, "the acknowledged retry must remove genuine task debt")
+		}
+	} finally {
+		try {
+			if IsSet(Fixture) {
+				Fixture.cancelAck := true
+				UserHotstringsInvalidate("fixture-cleanup")
+			}
+		} finally {
+			_UserHotstringsOwner := Saved.Owner
+			_UserHotstringsLoader := Saved.Loader
+			_UserHotstringsJobs := Saved.Jobs
+			_UserHotstringsLoadEpoch := Saved.Epoch
+			_HSE_TerminalOwner := Saved.Terminal
+			_HSE_TerminalReplayPending := Saved.Replay
+			_LifecycleLatestTransition := Saved.Latest
+			_LifecycleTransitionsByPhase := Saved.Phases
+		}
+	}
+}
+Test("lifecycle transition: real programmable cancellation debt gates suspend acknowledgment (user-hotstrings-lifecycle)",
+	_LT_UserHotstringsCancellationDebt)
