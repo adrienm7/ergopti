@@ -333,11 +333,15 @@ _ScopeOwnerRetainsRollbackDebt() {
 		Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
 		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
 	} finally {
-		if (Bundle is Object) && _ConfigWriteLeaseState().terminal == Bundle {
-			_ConfigWriteTerminalRelease(Bundle)
-			; Retire only this experiment's marker; preserve an outer owner.
-			if _ConfigTransitionRetainedBarrier == Bundle
-				_ConfigTransitionRetainedBarrier := PriorRetained
+		if Bundle is Object {
+			if _ConfigWriteLeaseState().terminal == Bundle
+				_ConfigWriteTerminalRelease(Bundle)
+			; Retire only this fixture marker, even if its native lease already settled.
+			PreviousCritical := Critical("On")
+			try {
+				if _ConfigTransitionRetainedBarrier == Bundle
+					_ConfigTransitionRetainedBarrier := PriorRetained
+			} finally Critical(PreviousCritical)
 		}
 		_ScopeOwnerCleanup(Fixture)
 	}

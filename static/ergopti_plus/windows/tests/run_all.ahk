@@ -199,6 +199,7 @@ global _DefaultLogsDir := _LogsDir
 ; date formatters). Definitions only — _DynHS_RegisterAll() is not called here,
 ; so no registration happens at harness load.
 #Include ../modules/dynamic_hotstrings/dynamic_hotstrings.ahk
+#Include ../modules/dynamic_hotstrings/user_code.ahk
 #Include ../infra/feature_io.ahk
 ; EnsurePersonalHotstringFeature is exercised directly by the F4 regression
 ; test (test_feature_io_locator.ahk) — RegisterPersonalFeature in the same file
@@ -427,6 +428,7 @@ InstallSendNoOps()
 #Include unit/test_hotstring_language_packs.ahk
 #Include unit/test_menu_languages_and_global_separator.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
+#Include unit/test_user_hotstrings.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk
 #Include unit/test_hotstring_override_global_transaction_20260813.ahk
@@ -459,6 +461,7 @@ InstallSendNoOps()
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_personal_file_controls.ahk
 #Include unit/test_hotstring_delimiter_scope_preservation.ahk
 #Include unit/test_hotstring_category_scope.ahk
 #Include unit/test_global_config_scope.ahk
@@ -698,6 +701,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
 #Include unit/test_local_server_private_publication.ahk
+#Include unit/test_local_server_retained_fixture_join.ahk
 #Include unit/test_local_server_write_admission.ahk
 #Include unit/test_local_server_join.ahk
 #Include unit/test_llm_enable_admission.ahk

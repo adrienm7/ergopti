@@ -16,10 +16,11 @@
 ---
 --- Category and section choices are canonical config.toml preferences,
 --- `hotstrings.groups.<group>` and `hotstrings.modules.<group>.<section>`, read
---- through the manifest's neutral defaults: an empty configuration switches
---- every catalogue off. A choice reaches the engine before it is written, and
---- the previous catalogue is republished when the write is refused, so the menu,
---- the file and the typing path never disagree about what fires.
+--- through the manifest's neutral defaults. Fresh independently admitted personal
+--- sources start enabled; known historical owners retain their explicit choices
+--- and historical missing-group false. A choice reaches the engine before it is
+--- written. Refused personal choices restore the exact prior runtime image and
+--- retain their lease until its native inverse is acknowledged.
 --- ==============================================================================
 
 local M = {}
@@ -41,10 +42,22 @@ local KeyPath = require("toml_codec.key_path")
 local Languages = require("hotstrings.languages")
 local BulkScope = require("hotstrings.bulk_scope")
 local PersonalFiles = require("hotstrings.personal_files")
+local PersonalAdoption = require("infra.personal_file_adoption")
 local ManifestReader = require("infra.manifest_reader")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 local _personal_sources = {}
+local _personal_adoptions = {}
+
+--- Finds only a source explicitly admitted by the current native catalogue.
+--- @param id string
+--- @param inventory table|nil
+--- @return table|nil record
+local function personal_adoption(id, inventory)
+	for _, record in ipairs(inventory or _personal_adoptions) do
+		if record.owner == id then return record end
+	end
+end
 
 -- Where per-category and per-section overrides are persisted. A TOML beside the
 -- packs rather than a storage key, because it is a file the user is expected to
@@ -90,6 +103,11 @@ local _choices = nil
 --- The transaction that owns hotstring configuration while it is set; ordinary
 --- setters are refused until it releases, so they cannot interleave its inverse.
 local _scope_owner = nil
+local _scope_owner_epoch = 0
+local _personal_transaction_owner, _prepared_personal_sources, _personal_debt
+local _personal_gate_debt
+local restore_personal_runtime
+local _live_mappings = {}
 
 --- Test seam: the canonical configuration file, nil for the XDG location.
 local _config_file = nil
@@ -241,8 +259,14 @@ end
 --- @param choices table Canonical choices.
 --- @param id string Runtime category identity.
 --- @return boolean
-local function group_choice(choices, id)
+local function group_choice(choices, id, inventory)
 	if not addressable(id) then return false end
+	if PersonalFiles.components(id) then
+		local record = personal_adoption(id, inventory)
+		if not record then return false end
+		local enabled = PersonalAdoption.preferences(record, choices)
+		return enabled
+	end
 	local value = choices.groups[id]
 	if value == nil then value = ManifestReader.default_for("hotstrings.groups." .. id) end
 	return value
@@ -253,11 +277,18 @@ end
 --- @param id string Runtime category identity.
 --- @param section string Section name.
 --- @return boolean
-local function section_choice(choices, id, section)
-	if not addressable(id) or not addressable(section) then return false end
+local function section_choice(choices, id, section, inventory)
+	if not addressable(id) or not (PersonalFiles.components(id) and type(section) == "string" and section ~= ""
+		or addressable(section)) then return false end
 	local sections = choices.modules[id]
+	if PersonalFiles.components(id) then
+		local record = personal_adoption(id, inventory)
+		if not record or record.admitted ~= true then return false end
+		local _, supplied = PersonalAdoption.preferences(record, choices)
+		sections = supplied
+	end
 	local value = sections and sections[section]
-	if value == nil then value = ManifestReader.default_for("hotstrings.modules." .. id .. "." .. section) end
+	if value == nil then value = ManifestReader.default_for(KeyPath.render({ "hotstrings", "modules", id, section })) end
 	return value
 end
 
@@ -355,6 +386,7 @@ local _overrides = {}
 
 --- Exact classified bytes from the last acknowledged override publication.
 local _override_source = { status = "error" }
+local _common_override_admitted = false
 
 --- Memoised resolutions, cleared by every writer below. The tooltip preview
 --- resolves once per candidate on every keystroke, so the cascade would
@@ -427,20 +459,25 @@ local function load_overrides()
 	_overrides = {}
 	_resolve_cache = {}
 	_override_source = { status = "error" }
+	_common_override_admitted = false
 
 	local path = overrides_path()
-	local content, status = Writer.read_classified(path)
+	local migration = require("hotstrings.common_autocorrection_migration")
+	local migrated = migration.run(path, Paths.shared(migration.POLICY_PATH))
+	local content, status = migrated.content, migrated.status
 	if status == "absent" then
 		_override_source = { status = "absent" }
+		_common_override_admitted = true
 		return
 	end
 	local ok, parsed = pcall(parse_override_content, content)
-	if status ~= "ok" or not ok then
+	if (status ~= "current" and status ~= "migrated") or not ok then
 		Logger.error(LOG, "Override file '%s' is unreadable or malformed — user delays and colours ignored.", path)
 		return
 	end
 	_overrides = parsed
 	_override_source = { status = "ok", content = content }
+	_common_override_admitted = migrated.common_admitted ~= false
 end
 
 --- Copies the override tree for a persistence transaction.
@@ -537,6 +574,10 @@ function M.resolve(category, section)
 	if cached then return cached end
 
 	local user = _overrides[category] or {}
+	local adopted = personal_adoption(category)
+	if adopted and adopted.admitted and adopted.legacy_name and _overrides[category] == nil then
+		user = _overrides[adopted.legacy_name] or {}
+	end
 	local meta = _categories[category] or {}
 
 	local resolved = DelayResolver.resolve({
@@ -544,7 +585,8 @@ function M.resolve(category, section)
 		user_section   = section and (user.sections or {})[section] or nil,
 		meta_category  = meta,
 		meta_section   = section and (meta.sections or {})[section] or nil,
-		default_delay  = M.get_global_delay(),
+		default_delay  = PersonalFiles.components(category) and PersonalFiles.additional_default_delay_seconds
+			or M.get_global_delay(),
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 		default_priority = Priority.source_priority(category),
@@ -598,6 +640,7 @@ end
 --- @return boolean
 function M.set_override(category, section, field, value)
 	if type(category) ~= "string" or category == "" then return false end
+	if PersonalFiles.components(category) then return M.set_personal_metadata(category, section, field, value) end
 	-- A pending scope restores the override file only while it still holds the
 	-- scope's candidate bytes; a rewrite here would strand that inverse for good.
 	if _scope_owner ~= nil then
@@ -696,6 +739,10 @@ end
 --- @param field string|nil nil clears every field of that scope.
 --- @return boolean
 function M.clear_override(category, section, field)
+	if PersonalFiles.components(category) then
+		if field == nil then return false end
+		return M.set_personal_metadata(category, section, field, nil)
+	end
 	if _scope_owner ~= nil then
 		Logger.error(LOG, "clear_override() refused: a hotstring configuration scope is still pending.")
 		return false
@@ -791,6 +838,7 @@ end
 --- @param config_dir string|nil Explicit config path; nil resolves the XDG one.
 --- @param on_change function|nil Called whenever the menu's view of the config changes.
 function M.init(engine, config_dir, on_change)
+	if _scope_owner ~= nil then return false end
 	_engine = engine
 	_on_change = type(on_change) == "function" and on_change or nil
 	_magic_key = nil
@@ -804,6 +852,9 @@ function M.init(engine, config_dir, on_change)
 		if fh then fh:close(); _config_dir = xdg end
 	end
 	_scope_owner = nil
+	_personal_transaction_owner, _prepared_personal_sources, _personal_debt = nil, nil, nil
+	_personal_gate_debt = nil
+	_live_mappings = {}
 	load_overrides()
 	local read, choices = pcall(read_choices)
 	if not read then
@@ -1079,10 +1130,12 @@ end
 --- no longer seeds those files; its one-time migration retires only copies that
 --- are byte-identical to the previously installed canonical bundle. The user's
 --- copies stay overrides when an extension binds their category, so they are
---- handed to route_bound_sources by path.
+--- handed to route_bound_sources by path. Independently owned additional files
+--- use exact descriptor identities instead of overlaying another personal stem.
 --- @return table Array of absolute paths.
 local function resolve_paths()
 	local by_stem, order, user_paths = {}, {}, {}
+	local shipped_stems, additional = {}, {}
 	local personal_sources, descriptors_by_path = {}, {}
 	local function discover_personal(path, root)
 		local relative = path:sub(#root + 1):gsub("^/+", "")
@@ -1102,9 +1155,16 @@ local function resolve_paths()
 		by_stem[stem] = path
 	end
 
-	-- A single file as the config is the explicit-path case, and it means exactly
-	-- that file — no merge, because the user named one thing.
+	-- A user-selected physical file stays exact. Selecting the actual shipped
+	-- file names its logical category, including sections supplied by its bound
+	-- extension; loading only its common fragment would lose the native controls.
 	if _config_dir and _config_dir:match("%.toml$") then
+		local category = _config_dir:match("([^/\\]+)%.toml$")
+		local canonical = category and Paths.shared("modules/hotstrings/" .. category .. ".toml")
+		if canonical and type(Loader.same_file) == "function" and Loader.same_file(_config_dir, canonical) then
+			local found = Extensions.category_bindings(M.discover_extensions(), category)
+			return M.route_bound_sources({ _config_dir }, found), personal_sources
+		end
 		local root = _config_dir:match("^(.*)/[^/]+$") or ""
 		discover_personal(_config_dir, root)
 		local descriptor = descriptors_by_path[_config_dir]
@@ -1117,16 +1177,35 @@ local function resolve_paths()
 	-- its own group, not a second copy of the neutral autocorrection.toml.
 	if bundled then
 		for _, path in ipairs(Loader.find_toml_files(bundled)) do
-			if not in_language_folder(path, bundled) then add(path) end
+			if not in_language_folder(path, bundled) then
+				add(path)
+				local stem = path:match("([^/\\]+)%.toml$")
+				if stem then shipped_stems[stem] = true end
+			end
+		end
+	end
+
+	-- Bound files keep their historical category identity even when the shared
+	-- folder no longer carries them. Use one discovery receipt for classification
+	-- and routing so the user's same-category copy remains its explicit override.
+	local found = M.discover_extensions()
+	for _, extension in ipairs(found) do
+		for _, file in ipairs(extension.bound_files or {}) do
+			shipped_stems[file.binding.category] = true
 		end
 	end
 
 	-- Second, so the user's copy of a category replaces the bundled one.
 	if _config_dir then
-		for _, path in ipairs(Loader.find_toml_files(_config_dir)) do
+		for _, path in ipairs(Loader.find_toml_files(_config_dir, PersonalFiles.additional_scan_max_depth)) do
 			if not in_language_folder(path, _config_dir) then
-				add(path)
 				discover_personal(path, _config_dir:gsub("/+$", ""))
+				local stem = path:match("([^/\\]+)%.toml$")
+				if shipped_stems[stem] or not descriptors_by_path[path] then
+					add(path)
+				else
+					additional[#additional + 1] = { path = path, category = descriptors_by_path[path].id }
+				end
 				user_paths[path] = true
 			end
 		end
@@ -1134,6 +1213,7 @@ local function resolve_paths()
 
 	local paths = {}
 	for _, stem in ipairs(order) do paths[#paths + 1] = by_stem[stem] end
+	for _, source in ipairs(additional) do paths[#paths + 1] = source end
 
 	-- Language packs, each under its group id "<language>_<stem>". The user's copy
 	-- in the same sub-folder replaces the bundled one, as for the neutral packs.
@@ -1159,7 +1239,6 @@ local function resolve_paths()
 	-- namespaced category key so a third party shipping `rolls.toml` cannot
 	-- replace the bundled category of that name. Appended rather than merged for
 	-- the same reason — an extension adds categories, it never substitutes one.
-	local found = M.discover_extensions()
 	paths = M.route_bound_sources(paths, found, user_paths)
 	for _, entry in ipairs(M.extension_packs(found)) do
 		paths[#paths + 1] = entry
@@ -1179,14 +1258,41 @@ local function resolve_paths()
 			paths[position] = owned
 		end
 	end
-	return paths, personal_sources
+	local records, represented = {}, {}
+	for _, source in ipairs(paths) do
+		local path = type(source) == "table" and source.path or source
+		if type(source) == "table" and source.category and PersonalFiles.components(source.category) then
+			represented[path] = true
+		end
+	end
+	for _, source in ipairs(personal_sources) do
+		local legacy = source.path:match("([^/\\]+)%.toml$")
+		records[#records + 1] = { source = source.descriptor, path = source.path,
+			legacy_name = legacy, legacy_stored = _overrides[legacy] ~= nil }
+	end
+	if #records == 0 then return paths, personal_sources, {} end
+	local inventory, refusal = PersonalAdoption.stage(records, _choices,
+		_config_dir:gsub("/+$", "") .. "/personal_hotstrings.toml")
+	assert(inventory, "personal source adoption refused: " .. tostring(refusal))
+	for _, record in ipairs(inventory) do
+		if not represented[record.path] then
+			record.admitted, record.exclusive, record.reason = false, false, "unavailable-owner"
+		end
+	end
+	return paths, personal_sources, inventory
 end
 
 --- Loads one complete catalogue and reports whether runtime publication succeeded.
 --- @return number Retained or newly accepted mapping count.
 --- @return boolean True only after the engine acknowledges publication.
+--- @param personal_owner any Reserved native publication owner slot.
+--- @param cold_boot boolean|nil Explicit partial registration mode for the sole startup caller.
 --- @return string|nil Refusal reason.
-function M.load_all()
+--- @return table|nil Classified receipt only after native publication.
+function M.load_all(personal_owner, cold_boot)
+	if _personal_transaction_owner and personal_owner ~= _personal_transaction_owner then
+		return #_mappings, false, "personal-source-pending"
+	end
 	if not _engine then
 		Logger.error(LOG, "load_all(): engine not initialised.")
 		return 0, false, "engine-not-initialized"
@@ -1196,8 +1302,27 @@ function M.load_all()
 		Logger.error(LOG, "load_all(): hotstring choices are unavailable; the catalogue was not published.")
 		return #_mappings, false, "choices-unavailable"
 	end
+	local common_requested = group_choice(choices, "autocorrection") == true
+		and (section_choice(choices, "autocorrection", "names") == true
+			or section_choice(choices, "autocorrection", "abbreviations") == true
+			or section_choice(choices, "autocorrection", "technical_terms") == true)
+	local common_unavailable = not _common_override_admitted and common_requested
+	if common_unavailable and cold_boot ~= true then
+		Logger.error(LOG, "Common autocorrection override migration is unacknowledged; the catalogue was not published.")
+		return #_mappings, false, "common-autocorrection-overrides-unadmitted"
+	end
 
-	local staged_paths, staged_personal_sources = resolve_paths()
+	local staged_paths, staged_personal_sources, staged_personal_adoptions = resolve_paths()
+	if common_unavailable then
+		local admitted_paths = {}
+		for _, source in ipairs(staged_paths) do
+			local path = type(source) == "table" and source.path or source
+			local category = type(source) == "table" and source.category or nil
+			category = category or (type(path) == "string" and path:match("([^/\\]+)%.toml$"))
+			if category ~= "autocorrection" then admitted_paths[#admitted_paths + 1] = source end
+		end
+		staged_paths = admitted_paths
+	end
 
 	-- An empty catalogue is not an empty load. This used to return here, which
 	-- meant a machine whose hotstring TOMLs were missing or unreadable also lost
@@ -1210,7 +1335,7 @@ function M.load_all()
 	local catalogue = Loader.load_catalogue(staged_paths, {
 		magic_key = _magic_key,
 		canonical_magic_key = _canonical_magic_key,
-	})
+	}, _prepared_personal_sources)
 	_parse_errors = tonumber(catalogue.errors) or 0
 	if catalogue.committed ~= true then
 		Logger.error(LOG,
@@ -1250,6 +1375,10 @@ function M.load_all()
 	for _, mapping in ipairs(staged_mappings) do
 		if mapping._catalogue_priority == true then
 			local user = _overrides[mapping.group] or {}
+			local record = personal_adoption(mapping.group, staged_personal_adoptions)
+			if record and record.admitted and record.legacy_name and _overrides[mapping.group] == nil then
+				user = _overrides[record.legacy_name] or {}
+			end
 			local meta = staged_categories[mapping.group] or {}
 			local user_section = mapping.section and (user.sections or {})[mapping.section] or nil
 			local meta_section = mapping.section and (meta.sections or {})[mapping.section] or nil
@@ -1274,7 +1403,7 @@ function M.load_all()
 		if not keep and type(m.group) == "string" then
 			keep = groups_on[m.group]
 			if keep == nil then
-				keep = group_choice(choices, m.group)
+				keep = group_choice(choices, m.group, staged_personal_adoptions)
 				groups_on[m.group] = keep
 				if not addressable(m.group) then unaddressable[m.group] = true end
 			end
@@ -1282,12 +1411,13 @@ function M.load_all()
 				local key = m.group .. "\0" .. m.section
 				local checked = sections_on[key]
 				if checked == nil then
-					checked = section_choice(choices, m.group, m.section)
+					checked = section_choice(choices, m.group, m.section, staged_personal_adoptions)
 					sections_on[key] = checked
 				end
 				keep = checked
 			end
 		end
+		if common_unavailable and m.group == "autocorrection" then keep = false end
 		if keep then filtered[#filtered + 1] = m end
 	end
 	for id in pairs(unaddressable) do
@@ -1304,16 +1434,23 @@ function M.load_all()
 	end
 	_toml_paths = staged_paths
 	_personal_sources = staged_personal_sources
+	_personal_adoptions = staged_personal_adoptions or {}
 	_mappings = staged_mappings
+	_live_mappings = filtered
 	_categories = staged_categories
 	_published = true
 	_resolve_cache = {}
 	report_retired_choices(choices)
 	report_retired_overrides()
 
-	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
-		#filtered, _count_groups(filtered), _parse_errors)
-	return #filtered, true
+	if common_unavailable then
+		Logger.warn(LOG, "Common autocorrection is unavailable; loaded %d unrelated mapping(s).", #filtered)
+	else
+		Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
+			#filtered, _count_groups(filtered), _parse_errors)
+	end
+	return #filtered, true, nil, { committed = true, complete = not common_unavailable,
+		unavailable = common_unavailable and { "autocorrection" } or {} }
 end
 
 function M.reload()
@@ -1326,6 +1463,33 @@ end
 -- =========================================
 -- ======= 6/ Category Management ==========
 -- =========================================
+
+local function engine_generation(engine)
+	if type(engine) ~= "table" or type(engine.mapping_state) ~= "function" then return nil end
+	local ok, state = pcall(engine.mapping_state, engine)
+	local value = ok and type(state) == "table" and state.generation
+	if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then return nil end
+	return value
+end
+
+--- Settles only the exact candidate engine image owned by a refused gate edit.
+--- Foreign runtime generations keep the lease closed rather than being replaced.
+--- @return boolean restored
+function M.retry_personal_gate_cleanup()
+	local debt = _personal_gate_debt
+	if not debt then return true end
+	if _scope_owner ~= debt.owner or _personal_transaction_owner ~= debt.owner
+		or _engine ~= debt.engine then return false end
+	if not debt.restored then
+		if engine_generation(_engine) ~= debt.generation or _live_mappings ~= debt.live then return false end
+		if restore_personal_runtime(debt.snapshot) ~= true then return false end
+		_choices = debt.snapshot.choices
+		debt.restored = true
+	end
+	if M.release(debt.owner) ~= true then return false end
+	_personal_transaction_owner, _personal_gate_debt = nil, nil
+	return true
+end
 -- =========================================
 
 --- Publishes candidate choices to the engine, then to config.toml.
@@ -1339,6 +1503,7 @@ end
 --- @return boolean committed
 --- @return string|nil reason Refusal reason.
 local function commit_choices(changes, label)
+	if M.retry_personal_gate_cleanup() ~= true then return false, "personal-gate-inverse-pending" end
 	if _scope_owner ~= nil then
 		Logger.error(LOG, "%s refused: a hotstring configuration scope is still pending.", label)
 		return false, "scope-pending"
@@ -1347,18 +1512,42 @@ local function commit_choices(changes, label)
 		Logger.error(LOG, "%s refused: engine not initialised.", label)
 		return false, "engine-not-initialized"
 	end
+	local canonical = false
+	for _, change in ipairs(changes) do
+		if PersonalFiles.components(change.group) then
+			canonical = true
+			local binding = M.personal_file_scope_binding(change.group)
+			if not binding or binding.current() ~= true then
+				Logger.error(LOG, "%s refused: the personal source binding is unavailable or stale.", label)
+				return false, "stale-personal-source"
+			end
+		end
+	end
 	local previous = _choices
+	local owner, snapshot, candidate_generation, candidate_live
+	if canonical then
+		if engine_generation(_engine) == nil then return false, "native-generation-unavailable" end
+		owner = {}
+		if M.acquire(owner) ~= true then return false, "scope-pending" end
+		_personal_transaction_owner = owner
+		snapshot = { paths = _toml_paths, sources = _personal_sources, adoptions = _personal_adoptions,
+			mappings = _mappings, live = _live_mappings, categories = _categories, overrides = _overrides,
+			override_source = _override_source, errors = _parse_errors, published = _published, choices = previous }
+	end
 	local called, committed, reason = pcall(function()
 		local current, source = read_choices()
 		local candidate, operations = copy_choices(current), {}
 		for _, change in ipairs(changes) do
 			local id, section, enabled = change.group, change.section, change.enabled
-			assert(addressable(id) and (section == nil or addressable(section)) and type(enabled) == "boolean",
+			assert(addressable(id) and (section == nil or addressable(section)
+				or PersonalFiles.components(id) and type(section) == "string" and section ~= "") and type(enabled) == "boolean",
 				"invalid hotstring choice")
 			local path = section and { "hotstrings", "modules", id, section } or { "hotstrings", "groups", id }
-			local neutral = ManifestReader.default_for(table.concat(path, "."))
+			local neutral = ManifestReader.default_for(KeyPath.render(path))
 			local explicit = nil
 			if enabled ~= neutral then explicit = enabled end
+			local adopted = personal_adoption(id)
+			if adopted and adopted.admitted and adopted.legacy_name then explicit = enabled end
 			if section then
 				candidate.modules[id] = candidate.modules[id] or {}
 				candidate.modules[id][section] = explicit
@@ -1372,24 +1561,77 @@ local function commit_choices(changes, label)
 				operations[#operations + 1] = { path = path, value = explicit }
 			end
 		end
+		local personal_rows = {}
+		for _, operation in ipairs(operations) do
+			if PersonalFiles.preference_default(KeyPath.render(operation.path)) ~= nil then
+				local parent = {}
+				for index = 1, #operation.path - 1 do parent[index] = operation.path[index] end
+				personal_rows[#personal_rows + 1] = { section = KeyPath.render(parent), key = operation.path[#operation.path],
+					value = operation.value, delete = operation.delete }
+			end
+		end
+		if not require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal_rows) then
+			return false, "ambiguous-personal-preference-owner"
+		end
 		local rows = LeafRows.prepare(source.content or "", operations)
+		for _, row in ipairs(rows) do
+			local parts = KeyPath.parse(row.section, true)
+			if parts and #parts == 3 and parts[1] == "hotstrings" and parts[2] == "modules"
+				and PersonalFiles.components(parts[3]) and row.key:find(".", 1, true) then row.literal_key = true end
+			local id = parts and ((#parts == 2 and parts[1] == "hotstrings" and parts[2] == "groups" and row.key)
+				or (#parts == 3 and parts[1] == "hotstrings" and parts[2] == "modules" and parts[3]))
+			local record = id and personal_adoption(id)
+			if record and record.admitted and record.legacy_name and row.value == true and row.delete == nil then
+				row.personal_choice = true
+			end
+		end
 		local directory = config_file():match("^(.*)/[^/]+$")
 		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end
 		_choices = candidate
-		local _, published, refusal = M.load_all()
+		local _, published, refusal = M.load_all(owner)
 		if published ~= true then return false, refusal end
+		if canonical then
+			candidate_generation, candidate_live = engine_generation(_engine), _live_mappings
+			if candidate_generation == nil then return false, "native-generation-unavailable" end
+			for _, change in ipairs(changes) do
+				if PersonalFiles.components(change.group) then
+					local binding = M.personal_file_scope_binding(change.group)
+					if not binding or binding.current() ~= true then return false, "stale-personal-source" end
+				end
+			end
+		end
+		if not require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal_rows) then
+			return false, "ambiguous-personal-preference-owner"
+		end
 		local written, detail = Writer.batch_write(config_file(), rows, nil, source)
 		if written ~= true then return false, tostring(detail) end
 		return true
 	end)
 	if called and committed == true then
+		if owner then
+			if M.release(owner) ~= true then return false, "scope-release-refused" end
+			_personal_transaction_owner = nil
+		end
 		Logger.info(LOG, "%s committed (%d choice(s)).", label, #changes)
 		return true
 	end
 	reason = called and reason or tostring(committed)
-	if _choices ~= previous then
+	if canonical then
+		if candidate_generation then
+			_personal_gate_debt = { owner = owner, engine = _engine, snapshot = snapshot,
+				generation = candidate_generation, live = candidate_live }
+			M.retry_personal_gate_cleanup()
+		else
+			_choices = previous
+			_toml_paths, _personal_sources, _personal_adoptions = snapshot.paths, snapshot.sources, snapshot.adoptions
+			_mappings, _live_mappings, _categories = snapshot.mappings, snapshot.live, snapshot.categories
+			_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, {}
+			_parse_errors, _published = snapshot.errors, snapshot.published
+			if M.release(owner) == true then _personal_transaction_owner = nil end
+		end
+	elseif _choices ~= previous then
 		_choices = previous
 		local _, restored = M.load_all()
 		if restored ~= true then
@@ -1461,7 +1703,7 @@ function M.enable_all()
 		if addressable(id) then
 			if not M.is_group_enabled(id) then changes[#changes + 1] = { group = id, enabled = true } end
 			for _, name in ipairs(known_sections(id)) do
-				if addressable(name) and not M.is_section_checked(id, name) then
+				if (addressable(name) or PersonalFiles.components(id)) and not M.is_section_checked(id, name) then
 					changes[#changes + 1] = { group = id, section = name, enabled = true }
 				end
 			end
@@ -1517,6 +1759,202 @@ function M.personal_file_sources()
 		sources[index] = { path = source.path, descriptor = PersonalFiles.copy(source.descriptor) }
 	end
 	return sources
+end
+
+--- Returns read-only native directory diagnostics without activating sources.
+--- @return table directories Skipped native links and depth-boundary paths.
+function M.personal_unavailable_directories()
+	return Loader.unavailable_directories(_config_dir, PersonalFiles.additional_scan_max_depth)
+end
+
+--- Captures the current independently admitted native file gate owner.
+--- @param id string Canonical descriptor identity.
+--- @return table|nil binding Fresh source/path fields and an exact-current checker.
+function M.personal_file_scope_binding(id)
+	if _personal_debt or _personal_gate_debt then return nil end
+	local record = personal_adoption(id)
+	if not record or record.admitted ~= true or not _categories[id] then return nil end
+	local inventory, category, root = _personal_adoptions, _categories[id], _config_dir
+	local engine, generation = _engine, engine_generation(_engine)
+	if generation == nil then return nil end
+	return { source = PersonalFiles.copy(record.source), path = record.path,
+		current = function()
+			if _personal_debt or _personal_gate_debt or _personal_adoptions ~= inventory or _categories[id] ~= category or _config_dir ~= root
+				or _engine ~= engine or engine_generation(engine) ~= generation
+				or PersonalAdoption.current(inventory, record) ~= true then return false end
+			local _, _, fresh = resolve_paths()
+			if not fresh or #fresh ~= #inventory then return false end
+			local expected = {}
+			for _, source in ipairs(inventory) do expected[source.owner] = source end
+			for _, source in ipairs(fresh) do
+				local previous = expected[source.owner]
+				if not previous or previous.path ~= source.path or previous.admitted ~= source.admitted
+					or previous.exclusive ~= source.exclusive or previous.legacy_name ~= source.legacy_name then return false end
+				expected[source.owner] = nil
+			end
+			return next(expected) == nil
+		end }
+end
+
+--- Projects field availability only from the current captured native owner.
+--- @param id string Canonical additional-personal identity.
+--- @return table|nil controls File and literal-section unavailable field flags.
+function M.personal_metadata_controls(id)
+	local binding, record = M.personal_file_scope_binding(id), personal_adoption(id)
+	if not binding or binding.current() ~= true then return nil end
+	local Metadata = require("hotstrings.personal_metadata")
+	local active = _overrides[id] ~= nil and id or record.legacy_name
+	local legacy = active and _overrides[active] or {}
+	local result = { file = Metadata.readonly_fields(record.content, nil, legacy), sections = {} }
+	for name in pairs(_categories[id].sections or {}) do
+		result.sections[name] = Metadata.readonly_fields(record.content, name, legacy)
+	end
+	return result
+end
+
+restore_personal_runtime = function(snapshot)
+	local engine, generation = _engine, engine_generation(_engine)
+	if generation == nil then return false end
+	local ok, restored = pcall(engine.load_mappings, engine, snapshot.live)
+	if not ok or restored ~= true or _engine ~= engine or engine_generation(engine) ~= generation + 1 then return false end
+	_toml_paths, _personal_sources, _personal_adoptions = snapshot.paths, snapshot.sources, snapshot.adoptions
+	_mappings, _live_mappings, _categories = snapshot.mappings, snapshot.live, snapshot.categories
+	_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, {}
+	_parse_errors, _published = snapshot.errors, snapshot.published
+	return true
+end
+
+local function personal_runtime_current(debt)
+	local generation = engine_generation(debt.engine)
+	return _scope_owner == debt.owner and _scope_owner_epoch == debt.owner_epoch
+		and _personal_transaction_owner == debt.owner and _engine == debt.engine and generation == debt.generation
+		and _config_dir == debt.root and _choices == debt.choices
+		and _mappings == debt.mappings and _toml_paths == debt.paths and _personal_sources == debt.sources
+		and _live_mappings == debt.live and _personal_adoptions == debt.adoptions
+		and _categories == debt.categories and _overrides == debt.overrides and _override_source == debt.override_source
+end
+
+--- Retains the native lease until both exact file and engine inverses commit.
+function M.retry_personal_cleanup()
+	local debt = _personal_debt
+	if not debt then return true end
+	if personal_runtime_current(debt) ~= true then return false end
+	if debt.release_only then
+		if M.release(debt.owner) ~= true then return false end
+		_personal_debt, _personal_transaction_owner, _prepared_personal_sources = nil, nil, nil
+		return true
+	end
+	if not debt.runtime_restored then
+		if restore_personal_runtime(debt.snapshot) ~= true then return false end
+		debt.generation, debt.live = engine_generation(debt.engine), _live_mappings
+		debt.adoptions, debt.categories, debt.overrides = _personal_adoptions, _categories, _overrides
+		debt.mappings, debt.paths, debt.sources = _mappings, _toml_paths, _personal_sources
+		debt.override_source = _override_source
+		debt.runtime_restored = true
+	end
+	if debt.source_published then
+		if not debt.source_inverse_acknowledged then
+			if Writer.publish_if_unchanged(debt.record.path, debt.record.content, nil,
+				{ status = "ok", content = debt.content }) ~= true then return false end
+			debt.source_inverse_acknowledged = true
+		end
+		if personal_runtime_current(debt) ~= true
+			or PersonalAdoption.advance(debt.snapshot.adoptions, debt.record, debt.record.content) ~= true
+			or personal_runtime_current(debt) ~= true then return false end
+		debt.source_published = false
+	end
+	if debt.override_published then
+		if debt.snapshot.override_source.status ~= "ok" or Writer.publish_if_unchanged(overrides_path(),
+			debt.snapshot.override_source.content, nil, debt.override_target) ~= true then return false end
+		if personal_runtime_current(debt) ~= true then return false end
+		debt.override_published = false
+	end
+	if personal_runtime_current(debt) ~= true or M.release(debt.owner) ~= true then return false end
+	_personal_debt, _personal_transaction_owner, _prepared_personal_sources = nil, nil, nil
+	return true
+end
+
+--- Source metadata reaches the real engine before conditional source replacement.
+--- A recognized legacy override may be removed only within this held cohort.
+function M.set_personal_metadata(id, section, field, value)
+	if M.retry_personal_cleanup() ~= true then return false end
+	local binding, record = M.personal_file_scope_binding(id), personal_adoption(id)
+	if not binding or binding.current() ~= true or _override_source.status == "error" then return false end
+	local active = _overrides[id] ~= nil and id or record.legacy_name
+	local legacy = active and _overrides[active] or {}
+	local plan = require("hotstrings.personal_metadata").prepare(record.content, section, field, value, legacy)
+	if not plan then return false end
+	local rows, candidate_overrides = {}, copy_overrides(_overrides)
+	local candidate_legacy = active and candidate_overrides[active]
+	if plan.remove_file then
+		candidate_legacy[field] = nil
+		rows[#rows + 1] = { section = KeyPath.render({ active }), key = field, delete = true }
+	end
+	if plan.remove_section then
+		candidate_legacy.sections[section][field] = nil
+		rows[#rows + 1] = { section = KeyPath.render({ active, section }), key = field, delete = true }
+	end
+	local prepared, _, override_content = Writer.prepare_batch(overrides_path(), rows, nil, _override_source)
+	if prepared ~= true then return false end
+	local owner, snapshot = {}, { paths = _toml_paths, sources = _personal_sources, adoptions = _personal_adoptions,
+		mappings = _mappings, live = _live_mappings, categories = _categories, overrides = _overrides,
+		override_source = _override_source, errors = _parse_errors, published = _published }
+	local root = _config_dir
+	if M.acquire(owner) ~= true then return false end
+	_personal_transaction_owner, _prepared_personal_sources = owner, { [record.path] = plan.content }
+	_overrides, _resolve_cache = candidate_overrides, {}
+	local override_changed = override_content ~= (snapshot.override_source.content or "")
+	local override_target = { status = "ok", content = override_content }
+	local override_published, source_published = false, false
+	local engine, original_generation = _engine, engine_generation(_engine)
+	local runtime = { owner = owner, owner_epoch = _scope_owner_epoch, engine = engine, snapshot = snapshot,
+		generation = original_generation, root = root, choices = _choices,
+		live = snapshot.live, adoptions = snapshot.adoptions, categories = snapshot.categories, overrides = candidate_overrides,
+		mappings = snapshot.mappings, paths = snapshot.paths, sources = snapshot.sources, override_source = _override_source }
+	local published_binding
+	local ok, committed = pcall(function()
+		local _, loaded = M.load_all(owner)
+		if loaded ~= true or _config_dir ~= root or _engine ~= engine
+			or engine_generation(engine) ~= original_generation + 1 then return false end
+		runtime.generation, runtime.live = engine_generation(engine), _live_mappings
+		runtime.adoptions, runtime.categories = _personal_adoptions, _categories
+		runtime.mappings, runtime.paths, runtime.sources = _mappings, _toml_paths, _personal_sources
+		local selected = personal_adoption(id)
+		if not selected or selected.admitted ~= true or PersonalAdoption.current(_personal_adoptions, selected) ~= true then return false end
+		if value ~= nil and M.resolve(id, section)[field] ~= value then return false end
+		if personal_runtime_current(runtime) ~= true then return false end
+		if override_changed then
+			if Writer.publish_if_unchanged(overrides_path(), override_content, nil, snapshot.override_source) ~= true then return false end
+			override_published = true
+			if personal_runtime_current(runtime) ~= true then return false end
+		end
+		local final_binding = M.personal_file_scope_binding(id)
+		if not final_binding or final_binding.current() ~= true then return false end
+		published_binding = final_binding
+		if Writer.publish_if_unchanged(record.path, plan.content, nil,
+			{ status = "ok", content = record.content }) ~= true then return false end
+		source_published = true
+		return personal_runtime_current(runtime) == true
+			and PersonalAdoption.advance(_personal_adoptions, selected, plan.content) == true
+			and final_binding.current() == true
+	end)
+	_prepared_personal_sources = nil
+	if not ok or committed ~= true then
+		runtime.override_target, runtime.override_published = override_target, override_published
+		runtime.source_published, runtime.record, runtime.content = source_published, record, plan.content
+		_personal_debt = runtime
+		M.retry_personal_cleanup()
+		return false
+	end
+	if override_changed then _override_source = override_target; runtime.override_source = override_target end
+	if personal_runtime_current(runtime) ~= true or M.release(owner) ~= true then
+		runtime.runtime_restored, runtime.release_only = true, true
+		_personal_debt = runtime
+		return false
+	end
+	_personal_transaction_owner = nil
+	notify_change()
+	return true, published_binding
 end
 
 function M.get_groups()
@@ -1588,7 +2026,9 @@ end
 --- @param section string
 --- @return boolean committed
 function M.toggle_section(category, section)
-	if not addressable(category) or not addressable(section) then return false end
+	if not addressable(category) or not (addressable(section)
+		or PersonalFiles.components(category) and type(section) == "string" and _categories[category]
+		and (_categories[category].sections or {})[section]) then return false end
 	local committed = commit_choices({ { group = category, section = section,
 		enabled = not M.is_section_checked(category, section) } }, "Section '" .. category .. "." .. section .. "' toggle")
 	if committed then notify_change() end
@@ -1611,7 +2051,9 @@ local function section_changes(categories, enabled)
 		end
 		if enabled then changes[#changes + 1] = { group = category, enabled = true } end
 		for _, name in ipairs(known_sections(category)) do
-			if addressable(name) then changes[#changes + 1] = { group = category, section = name, enabled = enabled } end
+			if addressable(name) or PersonalFiles.components(category) then
+				changes[#changes + 1] = { group = category, section = name, enabled = enabled }
+			end
 		end
 	end
 	return changes
@@ -1654,7 +2096,7 @@ end
 function M.set_category_scope_enabled(targets, enabled)
 	local inventory = {}
 	for id in pairs(_categories) do inventory[id] = known_sections(id) end
-	local changes, reason = BulkScope.plan(inventory, targets, enabled)
+	local changes, reason = PersonalAdoption.plan_selection(inventory, targets, enabled)
 	if not changes then
 		Logger.error(LOG, "Category selection refused: %s.", reason)
 		return false, reason
@@ -1681,6 +2123,29 @@ function M.set_category_gates_enabled(targets, enabled)
 		return false, reason
 	end
 	local committed, refusal = commit_choices(changes, "Hotstring category gate selection")
+	if committed then notify_change() end
+	return committed, refusal
+end
+
+--- Sets whole category gates and exact sections supplied by one extension.
+--- A bound native feature participates in the same durable transaction without
+--- changing unrelated sections of its common category.
+--- @param targets table Dense whole-category ids.
+--- @param bound table Dense `{ group, section }` bindings.
+--- @param enabled boolean Explicit target state.
+--- @return boolean committed
+--- @return string|nil reason
+function M.set_extension_sections_enabled(targets, bound, enabled)
+	local inventory = {}
+	for id in pairs(_categories) do inventory[id] = known_sections(id) end
+	-- This driver's existing extension commands preserve each whole pack's
+	-- section choices while switching its category gate.
+	if type(targets) == "table" then
+		for _, id in ipairs(targets) do if inventory[id] then inventory[id] = {} end end
+	end
+	local changes, reason = BulkScope.plan(inventory, targets, enabled, bound)
+	if not changes then return false, reason end
+	local committed, refusal = commit_choices(changes, "Extension hotstring selection")
 	if committed then notify_change() end
 	return committed, refusal
 end
@@ -1759,6 +2224,7 @@ end
 function M.acquire(owner)
 	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
 	_scope_owner = owner
+	_scope_owner_epoch = _scope_owner_epoch + 1
 	return true
 end
 
@@ -1768,6 +2234,7 @@ end
 function M.release(owner)
 	if _scope_owner ~= owner then return false end
 	_scope_owner = nil
+	_scope_owner_epoch = _scope_owner_epoch + 1
 	return true
 end
 

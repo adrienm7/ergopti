@@ -11,6 +11,8 @@
 --- ==============================================================================
 
 local PersonalFileScope = require("infra.personal_file_scope")
+local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFileMenu = require("menu.personal_files")
 local M = {}
 local hs     = hs
 local i18n   = require("infra.i18n")
@@ -93,6 +95,11 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label, admission)
 			end
 		end
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
+		if PersonalFiles.components(group_name) and require("infra.preferences").personal_choices_available({
+			{ group = group_name, section = sec_name, enabled = will_enable },
+		}) ~= true then
+			return KeymapLifecycle.commit_mutation(ctx, "admit canonical personal section choice", function() return false end)
+		end
 		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable custom hotstring section") then return end
 		local mutator
 		if ctx.keymap then
@@ -166,6 +173,16 @@ end
 --- @param admission function|nil Current exclusive personal-file owner check.
 --- @return function
 function M.category_scope_fn(ctx, group_names, enabled, admission)
+	local file_checks = {}
+	for _, name in ipairs(group_names) do
+		if PersonalFiles.components(name) then
+			local selected
+			for _, record in ipairs(ctx.personal_files or {}) do
+				if record.name == name then selected = record; break end
+			end
+			file_checks[#file_checks + 1] = PersonalFileScope.bind(ctx, selected)
+		end
+	end
 	return function()
 		local prior = {}
 		for _, name in ipairs(group_names) do
@@ -176,6 +193,7 @@ function M.category_scope_fn(ctx, group_names, enabled, admission)
 			local km = ctx.keymap
 			if not km or type(km.set_category_scope_enabled) ~= "function" then return false end
 			if admission ~= nil and admission() ~= true then return false end
+			for _, check in ipairs(file_checks) do if check() ~= true then return false end end
 			module_choices = category_module_choices(ctx, group_names)
 			local result = km.set_category_scope_enabled(group_names, enabled, function()
 				if apply_category_modules(module_choices, enabled) ~= true then return false end
@@ -275,7 +293,7 @@ local function get_personal_ext_groups(ctx)
 	local ext = {}
 	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 		local name = ctx.get_group_name(f)
-		if name:sub(1, 13) == "personal_ext_" then
+		if name:sub(1, 13) == "personal_ext_" or PersonalFiles.components(name) then
 			table.insert(ext, name)
 		end
 	end
@@ -592,7 +610,7 @@ function M.build_custom(ctx, counts)
 				["hotstring_category_sections"] = function() return section_rows end,
 			})
 	end
-	local function file_menu_for_group(gname, rows, check)
+	local function file_menu_for_group(gname, rows, check, readonly)
 		local file_rows = {}
 		local path = toml_path_for_group(ctx, gname)
 		if path then
@@ -601,7 +619,7 @@ function M.build_custom(ctx, counts)
 				action = function() open_toml_path(path) end,
 			}
 		end
-		return ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
 				["hotstring_category_enable_all"] = M.category_scope_fn(ctx, { gname }, true, check),
 				["hotstring_category_disable_all"] = M.category_scope_fn(ctx, { gname }, false, check),
@@ -609,6 +627,48 @@ function M.build_custom(ctx, counts)
 				["hotstring_category_file"] = function() return file_rows end,
 				["hotstring_category_sections"] = function() return rows end,
 			})
+		local personal_current
+		if PersonalFiles.components(gname) then
+			local Controller = require("infra.personal_file_controls")
+			local Config = require("modules.hotstrings.hotstrings_config")
+			local binding = Controller.capture(gname)
+			local unavailable = binding and require("hotstrings.personal_metadata").readonly_fields(binding.record.content,
+				nil, Config.get_user_override(gname, nil) or {}) or {}
+			personal_current = function() return not readonly and binding ~= nil and check ~= nil and check() == true
+				and binding.native.current() == true end
+			local controls = PersonalFileMenu.build({ manifest = ManifestMenu,
+				current = personal_current,
+				enabled = function() return groupEnabled(ctx, gname) end,
+				available = function(field) return unavailable[field] ~= true end,
+				enable = function(enabled)
+					local choices = { { group = gname, enabled = enabled } }
+					if require("infra.preferences").personal_choices_available(choices) ~= true then return false end
+					local previous = ctx.state.hotstrings[gname]
+					return KeymapLifecycle.commit_mutation(ctx, "set personal file gate", function()
+						if check() ~= true then return false end
+						local committed = ctx.keymap.set_groups_sections_enabled({
+							{ name = gname, sections = {}, group_enabled = enabled } }, false, function()
+							if require("infra.personal_hotstrings").adoption_current(binding.record) ~= true
+								or require("infra.preferences").personal_choices_available(choices) ~= true then return false end
+							ctx.state.hotstrings[gname] = enabled
+							if ctx.save_prefs() == true then return true end
+							ctx.state.hotstrings[gname] = previous; return false
+						end)
+						if committed ~= true then ctx.state.hotstrings[gname] = previous end
+						return committed
+					end)
+				end,
+				tooltip_enabled = function() return Config.resolve(gname, nil).show_tooltip == true end,
+				tooltip = function(value) return Controller.apply(binding, nil, "show_tooltip", value) end,
+				edit = function() return require("ui.hotstrings_config_window").open() == true end,
+				metadata_reason = function() return i18n.get("menu.hotstrings.personal_metadata_unavailable") end,
+				changed = function() ctx.updateMenu() end,
+			})
+			for index = #controls, 1, -1 do table.insert(rendered, 1, controls[index]) end
+		end
+		return PersonalFileMenu.apply_category_admission(rendered, {
+			manifest = ManifestMenu, translate = i18n.get, readonly = readonly, current = personal_current,
+		})
 	end
 	local function sorted_keys(tbl)
 		local keys = {}
@@ -672,13 +732,19 @@ function M.build_custom(ctx, counts)
 		local admission = gname ~= "personal" and PersonalFileScope.bind(ctx, record) or nil
 		append_section_rows(g_rows, gname, g_secs, g_enabled, admission)
 
-		if #g_rows > 0 then
+		if #g_rows > 0 or PersonalFiles.components(gname) then
 			if gname == "personal" then
 				table.insert(menu_items, { separator = true })
 				for _, row in ipairs(g_rows) do table.insert(menu_items, row) end
 			else
-				local stem = gname:sub(14)
-				local parts = split_personal_ext_stem(stem)
+				local parts = PersonalFiles.components(gname)
+				if parts then
+					local filename = parts[#parts]
+					local stem = filename:sub(1, -6)
+					parts[#parts] = stem ~= "" and stem or filename
+				else
+					parts = split_personal_ext_stem(gname:sub(14))
+				end
 				if #parts > 0 then
 					local node = ext_tree
 					for i = 1, #parts - 1 do
@@ -702,14 +768,21 @@ function M.build_custom(ctx, counts)
 						end
 					end
 					local file_label = parts[#parts] .. (g_count > 0 and (" (" .. fmt_count(g_count) .. ")") or "")
+					local readonly = record and record.admitted == false
+					if readonly then file_label = file_label .. " — " .. i18n.get("menu.hotstrings.personal_source_unavailable") end
 					node.files[#node.files + 1] = {
 						label = file_label,
 						count = g_count,
-						submenu = file_menu_for_group(gname, g_rows, admission),
+						submenu = file_menu_for_group(gname, g_rows, admission, readonly),
 					}
 				end
 			end
 		end
+	end
+
+	for _, blocked in ipairs(require("infra.personal_hotstrings").unavailable_directories()) do
+		menu_items[#menu_items + 1] = { label = blocked.label,
+			submenu = PersonalFileMenu.directory_unavailable(ManifestMenu) }
 	end
 
 	if #ext_tree.files > 0 or next(ext_tree.folders) ~= nil then

@@ -44,6 +44,14 @@ local function assert_guards(source)
 				guarded = guarded + 1
 			elseif line:match("local%s+[%w_]+%s*=%s*[%w_%.]*save_prefs%s*%(%s*%)%s*==%s*true") then
 				guarded = guarded + 1
+			elseif line:match("^%s*return%s+[%w_%.]*save_prefs%s*%(%s*%)%s*==%s*true%s*$") then
+				-- A journal publisher returns its exact acknowledgement to the
+				-- native transaction owner; no truthy or appended fallback qualifies.
+				guarded = guarded + 1
+			elseif line:match("^%s*if%s+[%w_%.]*save_prefs%s*%(%s*%)%s*==%s*true%s+then%s+return%s+true%s+end%s*$") then
+				-- A native journal may acknowledge only this exact conditional return.
+				-- A truthy result, appended fallback or additional effect is rejected.
+				guarded = guarded + 1
 			else
 				unguarded[#unguarded + 1] = line
 			end
@@ -53,9 +61,15 @@ local function assert_guards(source)
 	-- The reviewed pre-retirement census had 59 calls. Exactly the one call in
 	-- apply_metrics_shortcut and the one in apply_apps_time_shortcut left with
 	-- those dedicated owners. The baseline delay transaction adds one protected
-	-- call to those 57 sites. All 58 strict predicates stay in this complete scan;
-	-- a missing call is a failure, not new slack.
-	helpers.assert_eq(calls, 58,
+	-- call to those 57 sites. The extension selection transaction adds one
+	-- strict returned acknowledgement, so all 59 predicates stay in this complete
+	-- scan. Moving replacement out of Layout removed no writer: its old callback
+	-- delegated to do_reload(). A missing call remains a failure, not new slack.
+	-- Two independently reviewed publishers add exactly one call each: the
+	-- additional-personal file gate and the programmable-source preference owner.
+	-- Their separate remove/weaken/fallback mutations below keep both additions
+	-- in the full inventory without granting another call a census exception.
+	helpers.assert_eq(calls, 59 + 2,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
@@ -105,6 +119,58 @@ helpers.describe("menu preference call sites fail closed", function()
 			helpers.assert_eq(source:find(owner, owner_start + 1, true), nil)
 			local changed = source:sub(1, owner_start - 1) .. altered_owner
 				.. source:sub(owner_start + #owner)
+			local ok, err = pcall(assert_guards, changed)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(err):find(mutation.reason, 1, true) ~= nil)
+		end)
+	end
+
+	for _, owner_symbol in ipairs({ "set personal file gate", "MODULE: Programmable Hotstring Menu (macOS Native Ports)" }) do
+		for _, mutation in ipairs({
+			{ name = "removing", after = "return true", reason = "reviewed post-retirement census" },
+			{ name = "weakening", after = "if ctx.save_prefs() then return true end", reason = "every menu preference writer" },
+			{ name = "appending a truthy fallback to", after = "if ctx.save_prefs() == true or true then return true end",
+				reason = "every menu preference writer" },
+		}) do
+			helpers.it("rejects " .. mutation.name .. " the " .. owner_symbol .. " acknowledgement", function()
+				local owner, owner_error = helpers.read_driver_unit(owner_symbol)
+				helpers.assert_not_nil(owner, owner_error)
+				local before = "if ctx.save_prefs() == true then return true end"
+				local first = owner:find(before, 1, true)
+				helpers.assert_not_nil(first, "the mutation must reach the actual new publisher")
+				helpers.assert_nil(owner:find(before, first + 1, true), "the new publisher acknowledgement is unique")
+				local altered_owner = owner:sub(1, first - 1) .. mutation.after .. owner:sub(first + #before)
+				local source = helpers.read_driver_source("save_prefs")
+				local owner_start = source:find(owner, 1, true)
+				helpers.assert_not_nil(owner_start, "the full census includes the newly reviewed publisher")
+				helpers.assert_nil(source:find(owner, owner_start + 1, true))
+				local changed = source:sub(1, owner_start - 1) .. altered_owner .. source:sub(owner_start + #owner)
+				local ok, err = pcall(assert_guards, changed)
+				helpers.assert_eq(ok, false)
+				helpers.assert_true(tostring(err):find(mutation.reason, 1, true) ~= nil)
+			end)
+		end
+	end
+
+	for _, mutation in ipairs({
+		{ name = "removing", after = "return true", reason = "reviewed post-retirement census" },
+		{ name = "weakening", after = "return ctx.save_prefs()", reason = "every menu preference writer" },
+		{ name = "appending a truthy fallback to", after = "return ctx.save_prefs() == true or true",
+			reason = "every menu preference writer" },
+	}) do
+		helpers.it("rejects " .. mutation.name .. " the extension publisher acknowledgement", function()
+			local owner, owner_error = helpers.read_driver_unit("function M.commit_extension_selection")
+			helpers.assert_not_nil(owner, owner_error)
+			local before = "return ctx.save_prefs() == true"
+			local first = owner:find(before, 1, true)
+			helpers.assert_not_nil(first, "the mutation must reach the actual extension publisher")
+			helpers.assert_nil(owner:find(before, first + 1, true), "the publisher acknowledgement is unique")
+			local altered_owner = owner:sub(1, first - 1) .. mutation.after .. owner:sub(first + #before)
+			local source = helpers.read_driver_source("save_prefs")
+			local owner_start = source:find(owner, 1, true)
+			helpers.assert_not_nil(owner_start, "the complete census includes the extension transaction")
+			helpers.assert_nil(source:find(owner, owner_start + 1, true))
+			local changed = source:sub(1, owner_start - 1) .. altered_owner .. source:sub(owner_start + #owner)
 			local ok, err = pcall(assert_guards, changed)
 			helpers.assert_eq(ok, false)
 			helpers.assert_true(tostring(err):find(mutation.reason, 1, true) ~= nil)

@@ -2,6 +2,8 @@
 
 ; One real WAL and detached owners; only the terminal replacement is injected.
 _GlobalScopeComposition(Mode, Scenario := "late") {
+	global _ConfigTransitionRetainedBarrier
+	PriorRetained := _ConfigTransitionRetainedBarrier
 	global _PersonalShortcutsRegistry, KeyboardShortcutAssignments, GestureActionParameters, _SharedDir
 	global _MenuDispatchCallbacks
 	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
@@ -140,8 +142,16 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		AssertEqual('{"token":"keep"}', FSReadUtf8Exact(CredentialPath))
 	} finally {
 		Rendered.Delete()
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
+		if Bundle is Object {
+			if _ConfigWriteLeaseState().terminal == Bundle
+				_ConfigWriteTerminalRelease(Bundle)
+			; Retire only this fixture marker, even if its native lease already settled.
+			PreviousCritical := Critical("On")
+			try {
+				if _ConfigTransitionRetainedBarrier == Bundle
+					_ConfigTransitionRetainedBarrier := PriorRetained
+			} finally Critical(PreviousCritical)
+		}
 		_PersonalShortcutsRegistry := IsSet(OldRegistry) ? OldRegistry : unset
 		KeyboardShortcutAssignments := IsSet(OldKeyboard) ? OldKeyboard : unset
 		GestureActionParameters := IsSet(OldParameters) ? OldParameters : unset

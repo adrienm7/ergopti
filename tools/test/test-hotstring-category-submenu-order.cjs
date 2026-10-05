@@ -17,6 +17,7 @@
 const fs = require('fs');
 const assert = require('node:assert/strict');
 const path = require('path');
+const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -133,8 +134,10 @@ const PERSONAL_REGIONS = [
 			'"hotstring_category_disable_all"',
 			'M.category_scope_fn(ctx, names,',
 			'submenu = scope_menu(scope_names, {}, menu_items)',
-			'submenu = file_menu_for_group(gname, g_rows, admission)',
-			'PersonalFileScope.bind(ctx, record)'
+			'submenu = file_menu_for_group(gname, g_rows, admission, readonly)',
+			'PersonalFileScope.bind(ctx, record)',
+			'PersonalFiles.components(gname)',
+			'record and record.admitted == false'
 		]
 	},
 	{
@@ -310,6 +313,52 @@ for (const region of PERSONAL_REGIONS) {
 	const text = slice(region.driver, region);
 	if (text === null) continue;
 	regions += 1;
+	// Keep the native canonical binding causal: removing either identity
+	// admission or its captured callback must make this same oracle reject it.
+	if (region.driver === 'macos') {
+		const executableRange = (source, fragment) => {
+			const tokens = scriptTokens(source, '.lua');
+			const expected = scriptTokens(fragment, '.lua');
+			const index = tokens.findIndex((_, index) =>
+				expected.every(
+					(token, offset) =>
+						tokens[index + offset]?.kind === token.kind &&
+						tokens[index + offset]?.value === token.value
+				)
+			);
+			return index < 0
+				? null
+				: { start: tokens[index].start, end: tokens[index + expected.length - 1].end };
+		};
+		const actualRoute = [
+			'local parts = PersonalFiles.components(gname)',
+			'local admission = gname ~= "personal" and PersonalFileScope.bind(ctx, record) or nil',
+			'local readonly = record and record.admitted == false',
+			'submenu = file_menu_for_group(gname, g_rows, admission, readonly)',
+			'M.category_scope_fn(ctx, { gname }, true, check)',
+			'M.category_scope_fn(ctx, { gname }, false, check)',
+			'local controls = PersonalFileMenu.build({ manifest = ManifestMenu, current = personal_current'
+		];
+		const validatesBinding = (source) =>
+			region.tokens.every((token) => source.includes(token)) &&
+			actualRoute.every((fragment) => executableRange(source, fragment) !== null);
+		assert.equal(
+			actualRoute.length,
+			7,
+			'the owner, admission, destination and callbacks all have causal controls'
+		);
+		assert.equal(validatesBinding(text), true);
+		for (const removed of actualRoute) {
+			const range = executableRange(text, removed);
+			assert.notEqual(range, null, 'the mutation must replace the actual executable owner route');
+			for (const dormant of ['-- ' + removed + '\n', 'local dormant = [[' + removed + ']]\n']) {
+				assert.equal(
+					validatesBinding(text.slice(0, range.start) + dormant + text.slice(range.end)),
+					false
+				);
+			}
+		}
+	}
 	for (const token of region.tokens) {
 		if (!text.includes(token))
 			errors.push(`${region.driver}: personal binding is missing ${token}`);

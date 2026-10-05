@@ -18,8 +18,8 @@
  *     category (its menu title is that category's);
  *   - every section of that file has a [[features.hotstrings.<group>]] row, and
  *     the manifest has a hotstring_category_keys gate for the group;
- *   - no section appears both in a language file and in its neutral file, so a
- *     split can never leave a duplicate behind.
+ *   - each full category/section identity has one source; language and neutral
+ *     categories may use the same leaf name for different rule families.
  *
  * It also pins the opt-in contract: every bundled hotstring section ships
  * disabled. The one hotstrings.* row that stays on is the magic key's layout
@@ -85,6 +85,39 @@ const gateKeys = manifest.menu?.hotstring_category_keys ?? {};
 /** Sections a hotstring file declares, in its [_meta] order, without separators. */
 const sectionsOf = (doc) => (doc._meta?.sections_order ?? []).filter((s) => s !== '-');
 
+/** A runtime identity has one source, even when two files share leaf labels. */
+function claimRuntimeOwner(owners, identity, source) {
+	if (owners.has(identity)) return false;
+	owners.set(identity, source);
+	return true;
+}
+
+// Independent controls preserve true duplicate ownership refusal while allowing
+// the new common names family beside the existing French names family.
+{
+	const owners = new Map();
+	assert.strictEqual(claimRuntimeOwner(owners, 'autocorrection.names', 'neutral'), true);
+	assert.strictEqual(claimRuntimeOwner(owners, 'french_autocorrection.names', 'French'), true);
+	assert.strictEqual(claimRuntimeOwner(owners, 'autocorrection.names', 'French'), false);
+	assert.strictEqual(claimRuntimeOwner(owners, 'french_autocorrection.names', 'neutral'), false);
+	assert.deepStrictEqual(
+		[...owners],
+		[
+			['autocorrection.names', 'neutral'],
+			['french_autocorrection.names', 'French']
+		]
+	);
+}
+const categoryOwners = new Map(neutralFiles);
+const sectionOwners = new Map();
+for (const [category, file] of neutralFiles) {
+	for (const section of sectionsOf(readToml(file))) {
+		const identity = `${category}.${section}`;
+		if (!claimRuntimeOwner(sectionOwners, identity, file))
+			errors.push(`${identity}: duplicate neutral section source`);
+	}
+}
+
 // This capture predates the proposed section split. It must stay independent of
 // its source and classification: an edited rule cannot bless its own expectation.
 try {
@@ -109,7 +142,24 @@ try {
 	assert.match(reference.source_sha256, /^[a-f0-9]{64}$/);
 	assert.deepStrictEqual(reference.section_counts, { caps: 140 });
 	assert.strictEqual(reference.entries.length, 140);
-	const document = readToml(path.join(HS, 'autocorrection.toml'));
+	const document = readToml(
+		path.join(SHARED, 'tests/corpus/hotstrings/common_autocorrection_legacy/autocorrection.toml')
+	);
+	assert.strictEqual(
+		require('crypto')
+			.createHash('sha256')
+			.update(
+				fs.readFileSync(
+					path.join(
+						SHARED,
+						'tests/corpus/hotstrings/common_autocorrection_legacy/autocorrection.toml'
+					)
+				)
+			)
+			.digest('hex'),
+		reference.source_sha256,
+		'the legacy reader input retains its independently captured bytes'
+	);
 	assert.deepStrictEqual(document._meta, reference.meta, 'all historical metadata remains exact');
 	const actualEntries = Object.entries(document)
 		.filter(([section]) => section !== '_meta')
@@ -160,12 +210,47 @@ try {
 	);
 	assert.deepStrictEqual(
 		featureRows.autocorrection.map((row) => row.id),
-		['caps']
+		['names', 'abbreviations', 'technical_terms']
 	);
-	assert.deepStrictEqual(featureRows.autocorrection[0].default, {
-		enabled: false,
-		time_activation_seconds: 0.5
-	});
+	for (const row of featureRows.autocorrection) {
+		assert.deepStrictEqual(row.default, { enabled: false, time_activation_seconds: 0.5 });
+	}
+	const current = readToml(path.join(HS, 'autocorrection.toml'));
+	const sectionIds = classification.sections.map((section) => section.id);
+	assert.deepStrictEqual(sectionsOf(current), sectionIds);
+	const assignment = new Map(
+		classification.sections.flatMap((section) =>
+			section.triggers.map((trigger) => [trigger, section.id])
+		)
+	);
+	const currentEntries = [];
+	let section;
+	for (const line of fs.readFileSync(path.join(HS, 'autocorrection.toml'), 'utf8').split('\n')) {
+		const header = line.match(/^\[\[([a-z_]+)\]\]$/);
+		if (header) section = header[1];
+		if (/^".*" = \{ output = /.test(line)) {
+			const [trigger, fields] = Object.entries(parse(line))[0];
+			currentEntries.push({ ordinal: currentEntries.length + 1, section, trigger, ...fields });
+		}
+	}
+	assert.deepStrictEqual(
+		currentEntries,
+		reference.entries.map((row) => ({ ...row, section: assignment.get(row.trigger) })),
+		'the shipped split preserves all 140 original rules, flags and physical order'
+	);
+	for (const key of ['color', 'delay', 'show_tooltip', 'description']) {
+		assert.deepStrictEqual(current._meta[key], reference.meta[key]);
+	}
+	for (const entry of classification.sections) {
+		assert.strictEqual(
+			current[entry.id].reduce((sum, block) => sum + Object.keys(block).length, 0),
+			entry.triggers.length
+		);
+		assert.deepStrictEqual(
+			Object.keys(current._meta.sections[entry.id]).sort(),
+			Object.keys(reference.meta.sections.caps).sort()
+		);
+	}
 } catch (error) {
 	errors.push(`common autocorrection independent reference: ${error.message}`);
 }
@@ -187,6 +272,8 @@ for (const lang of languages) {
 	for (const stem of pack.categories_order ?? []) {
 		const group = `${lang}_${stem}`;
 		const file = path.join(HS, lang, `${stem}.toml`);
+		if (!claimRuntimeOwner(categoryOwners, group, file))
+			errors.push(`${group}: duplicate language/common category source`);
 		if (!neutralStems.has(stem))
 			errors.push(`${group}: '${stem}' is not a neutral category, so it has no title`);
 		if (!fs.existsSync(file)) {
@@ -199,13 +286,11 @@ for (const lang of languages) {
 		if (!(manifest.sections?.hotstrings?.subsections ?? []).includes(group)) {
 			errors.push(`${group}: missing from [sections.hotstrings] subsections`);
 		}
-		const neutral = readToml(neutralFiles.get(stem));
-		const neutralSections = new Set(sectionsOf(neutral));
 		for (const section of sectionsOf(doc)) {
 			if (!rows.has(section))
 				errors.push(`${group}.${section}: no [[features.hotstrings.${group}]] row`);
-			if (neutralSections.has(section))
-				errors.push(`${group}.${section}: also declared in the neutral ${stem}.toml`);
+			if (!claimRuntimeOwner(sectionOwners, `${group}.${section}`, file))
+				errors.push(`${group}.${section}: duplicate language/common section source`);
 			if (!Array.isArray(doc[section]) && section !== 'replace') {
 				errors.push(
 					`${group}.${section}: listed in sections_order but has no [[${section}]] entries`
