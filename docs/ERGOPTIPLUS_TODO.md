@@ -3565,6 +3565,19 @@ Final focused Lua validation passes macOS runtime53/scope30/shared40/transport86
 
 Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo105-programmable-hotstrings) for this item; prepared sources and portable checks do not establish Windows runtime success.
 
+Hosted Linux qualification of candidate `caa1ef045` exposed a real startup
+regression: the new file-scope programmable-runtime import raised `main()` to
+61 captured variables, above the runner LuaJIT limit of 60. Both main-only hotstring imports
+remain mandatory inside the startup function before argument parsing, leaving
+59 LuaJIT captures and 60 in the unchanged PUC compiler gate. The budget guard
+now inspects actual nested LuaJIT prototypes as well as the existing PUC compiler
+listing, so a newer local LuaJIT cannot conceal this portability ceiling. The
+existing syntax and CLI help assertions remain mandatory and unchanged. Native
+CI qualification and the explicit Windows continuation remain separate gates.
+The same completed run also refuses native macOS packaging in the two existing
+Homebrew/Sparkle archive acceptance methods; those owned item36 prerequisites
+and installation qualification are still required.
+
 - [ ] **106.** Expand the shared gesture/keyboard action catalogue for user
       automation. Discover and offer Apple Shortcuts on macOS; inventory and
       expose available Windows/Linux equivalents, installed automation tools,

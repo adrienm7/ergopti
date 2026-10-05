@@ -106,7 +106,6 @@ local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("modules.hotstrings.magic_key")
 local MagicKeySource    = require("modules.hotstrings.magic_key_source")
-local PreviewSettings   = require("modules.hotstrings.preview_settings")
 local RepeatKey         = require("modules.hotstrings.repeat_key")
 
 -- The user's own modifier chords. Hard require rather than optional: the module
@@ -161,7 +160,6 @@ local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_
 -- Dynamic hotstrings engine (optional — loads personal_info.toml, registers
 -- @-tag letter shortcuts and date expansion rules).
 local dyn_hotstrings = RuntimeGuard.optional_require("modules.dynamic_hotstrings.manager")
-local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 
 -- Updater engine (optional — checks GitHub releases, downloads and installs updates).
 local updater = RuntimeGuard.optional_require("modules.updater.manager")
@@ -570,6 +568,9 @@ end
 -- =========================================
 
 local function main()
+	-- Keep main within older LuaJIT's 60-upvalue budget; these dependencies remain mandatory.
+	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
+	local PreviewSettings = require("modules.hotstrings.preview_settings")
 	local opts = parse_args()
 
 	if opts.help then
