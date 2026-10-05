@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Een programma uitvoeren [instelbaar]",
 	"menu.hotstrings.personal_metadata_unavailable": "Hier niet beschikbaar: bewerk dit veld rechtstreeks in het bronbestand.",
 	"menu.gestures.mode_current": "Modus: %s",
-	"menu.gestures.sensitivity_current": "Gevoeligheid: %s"
+	"menu.gestures.sensitivity_current": "Gevoeligheid: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "Deze bedieningselementen beheren de opgeslagen lijst ‘Mijn modellen’ op macOS. Windows en Linux gebruiken hun eigen modellijsten."
 }

@@ -421,6 +421,7 @@ local function with_delete_fixture(options, body)
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
+			template_rows = renderer.template_rows,
 			get_array = renderer.get_array,
 		}
 		package.loaded["infra.notifications"] = {notify = function() return true end}

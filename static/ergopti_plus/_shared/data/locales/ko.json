@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ 프로그램 실행 [설정 가능]",
 	"menu.hotstrings.personal_metadata_unavailable": "여기에서는 사용할 수 없습니다. 원본 파일에서 이 항목을 직접 수정하세요.",
 	"menu.gestures.mode_current": "모드: %s",
-	"menu.gestures.sensitivity_current": "감도: %s"
+	"menu.gestures.sensitivity_current": "감도: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "이 컨트롤은 macOS에 저장된 ‘내 모델’ 목록을 관리합니다. Windows와 Linux는 각자의 모델 목록을 사용합니다."
 }

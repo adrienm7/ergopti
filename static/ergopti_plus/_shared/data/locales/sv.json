@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Kör ett program [konfigurerbart]",
 	"menu.hotstrings.personal_metadata_unavailable": "Inte tillgängligt här: redigera fältet direkt i källfilen.",
 	"menu.gestures.mode_current": "Läge: %s",
-	"menu.gestures.sensitivity_current": "Känslighet: %s"
+	"menu.gestures.sensitivity_current": "Känslighet: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "De här kontrollerna hanterar den sparade listan ”Mina modeller” på macOS. Windows och Linux använder sina egna modellistor."
 }

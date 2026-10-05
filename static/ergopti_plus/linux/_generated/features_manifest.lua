@@ -608,7 +608,7 @@ M.unavailable = {
 		path = "llm.app_profile_overrides", section = "llm", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "llm.models.user_models", section = "llm.models", reason_key = "", platforms = { "hs" },
+		path = "llm.models.user_models", section = "llm.models", reason_key = "platform_reason.llm_saved_user_models_are_macos", platforms = { "hs" },
 	},
 	{
 		path = "llm.models.mlx", section = "llm.models", reason_key = "platform_reason.llm_mlx_is_apple_silicon", platforms = { "hs" },

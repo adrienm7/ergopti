@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ 运行程序 [可配置]",
 	"menu.hotstrings.personal_metadata_unavailable": "此处无法修改：请直接在源文件中编辑此字段。",
 	"menu.gestures.mode_current": "模式：%s",
-	"menu.gestures.sensitivity_current": "灵敏度：%s"
+	"menu.gestures.sensitivity_current": "灵敏度：%s",
+	"platform_reason.llm_saved_user_models_are_macos": "这些控件管理 macOS 上保存的“我的模型”列表。Windows 和 Linux 使用各自的模型列表。"
 }

@@ -4205,7 +4205,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 81, macOS 120, Linux 91, each
+  drivers still build (current baseline: Windows 81, macOS 113, Linux 84, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4625,6 +4625,8 @@ The Windows gesture-slot tap-group separator now belongs to its existing shared 
 
 macOS missing-bundle and macOS/Linux empty installed-layout statuses now consume the existing shared status fragments. Native discovery and installation owners are preserved; independent handwritten expectations cover all21 translated captions. The owning generators reproduce the census Windows81/macOS120/Linux91. Selected container checks are recorded separately from native installed/device acceptance; remaining native row families keep this item open. The empty macOS Input Sources provider also consumes a shared Open preferences command with the unchanged native callback; retained declaration withdrawal refuses before launch, and no true launch acknowledgement is fabricated.
 
+Custom-profile actions, saved-user-model children and Linux free-entry numeric tails now use shared ordered child declarations. Native action, prompt, save, disable and rollback owners remain in their drivers. Existing labels and handwritten caption/order corpora cover all 21 languages; the saved macOS My models capability has a truthful translated reason, while OS-specific child presentations explicitly hide. The compiler and availability report share one strict classifier; the unexplained-capability ledger preserves exactly 104 historical identities and rejects new debt even below the count ceiling. The owning scanner measures Windows81/macOS113/Linux84 remaining fixed native sites. Whole profile frames/list splicing and the other native families remain software work; native runner, packaging/install and physical menu acceptance remain separate qualifications.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4810,7 +4812,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 81, macOS 120 and Linux 91 rows are still built by the
+  Windows 81, macOS 113 and Linux 84 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -4885,6 +4887,8 @@ Windows Wrap validation now observes its actual shared catalogue and separately 
 The declared Windows gesture tap boundary retires one more fixed native separator site. The canonical census is Windows81/macOS123/Linux92, reproduced by its owning scanner. Actual Win32 and fail-closed behavioral assertions are registered but not executed locally; remaining families and installed/native acceptance keep this item open.
 
 The missing layout-bundle status and empty installed-layout status rows have moved to their existing shared declarations. The unchanged owning scanner now counts Windows81/macOS120/Linux91 remaining fixed native sites. Earlier corpora and native selection/installation behavior are retained; this is a bounded software slice, not complete menu migration. The empty macOS Input Sources provider also consumes a shared Open preferences command with the unchanged native callback; retained declaration withdrawal refuses before launch, and no true launch acknowledgement is fabricated.
+
+The custom-profile, saved-model and numeric-tail slices retire seven macOS and seven Linux fixed native sites from the preceding 81/120/91 census, yielding 81/113/84. This is a bounded migration using existing child-template APIs, not the complete ordered profile parent frame. The remaining scanner sites, native qualification and item38 device acceptance keep this item open.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey

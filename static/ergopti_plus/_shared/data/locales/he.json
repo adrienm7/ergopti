@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ הפעלת תוכנית [ניתן להגדרה]",
 	"menu.hotstrings.personal_metadata_unavailable": "לא זמין כאן: יש לערוך שדה זה ישירות בקובץ המקור.",
 	"menu.gestures.mode_current": "מצב: %s",
-	"menu.gestures.sensitivity_current": "רגישות: %s"
+	"menu.gestures.sensitivity_current": "רגישות: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "פקדים אלה מנהלים את הרשימה השמורה „המודלים שלי” ב-macOS. Windows ו-Linux משתמשים ברשימות מודלים משלהם."
 }

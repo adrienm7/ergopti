@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Programm ausführen [konfigurierbar]",
 	"menu.hotstrings.personal_metadata_unavailable": "Hier nicht verfügbar: Bearbeiten Sie dieses Feld direkt in der Quelldatei.",
 	"menu.gestures.mode_current": "Modus: %s",
-	"menu.gestures.sensitivity_current": "Empfindlichkeit: %s"
+	"menu.gestures.sensitivity_current": "Empfindlichkeit: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "Diese Bedienelemente verwalten die gespeicherte Liste „Meine Modelle“ unter macOS. Windows und Linux verwenden ihre eigenen Modelllisten."
 }

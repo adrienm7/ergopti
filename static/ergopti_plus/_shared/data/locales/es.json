@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Ejecutar un programa [configurable]",
 	"menu.hotstrings.personal_metadata_unavailable": "No disponible aquí: edite este campo directamente en el archivo de origen.",
 	"menu.gestures.mode_current": "Modo: %s",
-	"menu.gestures.sensitivity_current": "Sensibilidad: %s"
+	"menu.gestures.sensitivity_current": "Sensibilidad: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "Estos controles gestionan la lista guardada «Mis modelos» en macOS. Windows y Linux usan sus propias listas de modelos."
 }

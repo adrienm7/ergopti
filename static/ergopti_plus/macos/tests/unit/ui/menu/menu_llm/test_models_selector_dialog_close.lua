@@ -48,7 +48,11 @@ local function with_fixture(callback, initial_state)
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.dialog_util"] = {
 			alert = function() return true end,
-			block_alert = function() return "button.remove" end,
+			block_alert = function()
+				if controls.confirmation_mode == "cancel" then return "button.cancel" end
+				if controls.confirmation_mode == "throw" then error("synthetic confirmation refusal") end
+				return "button.remove"
+			end,
 		}
 		package.loaded["infra.deferred_work"] = {
 			after = function(_delay, deferred_callback) deferred_callback(); return true end,
@@ -89,6 +93,7 @@ local function with_fixture(callback, initial_state)
 				if controls.disable_mode == "false" then return false end
 				if controls.disable_mode == "nil" then return nil end
 				if controls.disable_mode == "throw" then error("synthetic model disable refusal") end
+				if controls.disable_mode == "truthy" then return 1 end
 				return true
 			end,
 			save_prefs = function()
@@ -96,6 +101,7 @@ local function with_fixture(callback, initial_state)
 				if controls.save_mode == "false" then return false end
 				if controls.save_mode == "nil" then return nil end
 				if controls.save_mode == "throw" then error("synthetic preferences save refusal") end
+				if controls.save_mode == "truthy" then return 1 end
 				return true
 			end,
 			update_menu = function() context.updates = context.updates + 1; return true end,
@@ -234,6 +240,46 @@ helpers.describe("models selector custom dialog ownership", function()
 				helpers.assert_eq(state.llm_user_models[3], last)
 				helpers.assert_eq(fixture.context.disables, 1)
 				helpers.assert_eq(fixture.context.saves, 0)
+				helpers.assert_eq(fixture.context.updates, 0)
+			end, state)
+		end)
+	end
+end)
+
+
+helpers.describe("shared user-model child preserves native removal acknowledgement", function()
+	for _, mode in ipairs({"cancel", "throw"}) do
+		helpers.it("retains the actual model when confirmation " .. mode, function()
+			local exact = {backend = "ollama", name = "owner/model", future = "retain"}
+			local state = {llm_backend = "ollama", llm_model = "", llm_user_models = {exact}}
+			with_fixture(function(fixture)
+				fixture.controls.confirmation_mode = mode
+				helpers.assert_type(fixture.remove_action, "function")
+				helpers.assert_eq(fixture.remove_action(), nil)
+				helpers.assert_eq(#state.llm_user_models, 1)
+				helpers.assert_eq(state.llm_user_models[1], exact)
+				helpers.assert_eq(fixture.context.saves, 0)
+				helpers.assert_eq(fixture.context.disables, 0)
+				helpers.assert_eq(fixture.context.updates, 0)
+			end, state)
+		end)
+	end
+	for _, active in ipairs({false, true}) do
+		helpers.it("retains exact removal rollback after truthy acknowledgement " .. tostring(active), function()
+			local first = {backend = "ollama", name = "first/model"}
+			local exact = {backend = "ollama", name = "owner/model", future = "retain"}
+			local last = {backend = "ollama", name = "last/model"}
+			local state = {llm_backend = "ollama", llm_model = active and "owner/model" or "",
+				llm_user_models = {first, exact, last}}
+			with_fixture(function(fixture)
+				fixture.controls[active and "disable_mode" or "save_mode"] = "truthy"
+				helpers.assert_eq(fixture.remove_action(), false)
+				helpers.assert_eq(#state.llm_user_models, 3)
+				helpers.assert_eq(state.llm_user_models[1], first)
+				helpers.assert_eq(state.llm_user_models[2], exact)
+				helpers.assert_eq(state.llm_user_models[3], last)
+				helpers.assert_eq(fixture.context.saves, active and 0 or 1)
+				helpers.assert_eq(fixture.context.disables, active and 1 or 0)
 				helpers.assert_eq(fixture.context.updates, 0)
 			end, state)
 		end)

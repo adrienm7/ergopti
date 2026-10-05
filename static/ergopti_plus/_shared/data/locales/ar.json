@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ تشغيل برنامج [قابل للضبط]",
 	"menu.hotstrings.personal_metadata_unavailable": "غير متاح هنا: عدّل هذا الحقل مباشرة في ملف المصدر.",
 	"menu.gestures.mode_current": "الوضع: %s",
-	"menu.gestures.sensitivity_current": "الحساسية: %s"
+	"menu.gestures.sensitivity_current": "الحساسية: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "تدير عناصر التحكم هذه قائمة «نماذجي» المحفوظة على macOS. يستخدم Windows وLinux قوائم النماذج الخاصة بهما."
 }

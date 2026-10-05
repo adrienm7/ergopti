@@ -1056,17 +1056,9 @@ local function build_profile_menu(
 			}
 			
 			-- User profiles get a sub-menu for Editing/Deleting
-			item.items = {
-				{
-					label    = i18n.get("menu.profiles.use_profile"),
-					checked  = (state.llm_active_profile == pid) or nil,
-					disabled = paused or nil,
-					action       = not paused and function() return select_profile(deps, state, pid) end or nil,
-				},
-				{
-					label    = i18n.get("menu.profiles.shortcut_prefix"),
-					disabled = paused or nil,
-					action       = not paused and function()
+			local child_commands = {
+				["llm_profile_use"] = function() return select_profile(deps, state, pid) end,
+				["llm_profile_shortcut"] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
 							title = i18n.get("menu.profiles.shortcut_title"),
@@ -1081,13 +1073,8 @@ local function build_profile_menu(
 								return false
 							end,
 						})
-					end or nil,
-				},
-				{ separator = true },
-				{
-					label    = i18n.get("menu.profiles.edit_profile"),
-					disabled = paused or nil,
-					action       = not paused and function()
+					end,
+				["llm_profile_edit"] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 						local timer_fired = false
@@ -1120,12 +1107,8 @@ local function build_profile_menu(
 						end
 						local _, timer_committed = schedule_editor(open_profile_editor)
 						return timer_committed == true
-					end or nil,
-				},
-				{
-					label    = i18n.get("menu.profiles.delete_profile"),
-					disabled = paused or nil,
-					action       = not paused and function()
+					end,
+				["llm_profile_delete"] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						local ok_c, choice = pcall(dialog.block_alert,
 							string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label),
@@ -1136,9 +1119,27 @@ local function build_profile_menu(
 							return delete_profile(pid)
 						end
 						return false
-					end or nil,
-				},
+					end,
 			}
+			local function child_ready()
+				if paused or type(deps.script_control) ~= "table"
+					or type(deps.script_control.is_paused) ~= "function" then return false end
+				local ok, current = pcall(deps.script_control.is_paused)
+				if not ok or current ~= false then return false end
+				local count = 0
+				for _, current_profile in ipairs(state.llm_user_profiles or {}) do
+					if rawequal(current_profile, profile) then count = count + 1 end
+				end
+				return count == 1
+			end
+			item.items = ManifestMenu.template_rows("llm_custom_profile_controls", child_commands, {
+				["llm_custom_profile_active"] = function() return state.llm_active_profile == pid end,
+				["llm_custom_profile_ready"] = child_ready,
+			}, {}) or {}
+			-- Preserve the native paused-construction contract: disabled leaves have no action.
+			if paused then
+				for _, row in ipairs(item.items) do row.action = nil end
+			end
 			table.insert(rows, item)
 		end
 	end
