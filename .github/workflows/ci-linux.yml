@@ -402,6 +402,14 @@ jobs:
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_callback_siblings.py
         timeout-minutes: 3
 
+      - name: Publish native layout counts in the canonical shared manifest field
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_layouts_seen.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_layouts_seen.lua
+        timeout-minutes: 1
+
       - name: Recover same-revision native reads without caching a refused manifest
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

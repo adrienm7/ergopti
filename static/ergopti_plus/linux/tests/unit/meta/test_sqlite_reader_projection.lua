@@ -672,3 +672,68 @@ helpers.describe("linux-manifest-completion", function()
 		end)
 	end)
 end)
+
+helpers.describe("linux-sqlite-layouts-seen", function()
+	helpers.it("linux-sqlite-layouts-seen: grouped counts use the canonical shared field without a dead alias", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_layouts", 1, true) then
+				helpers.assert_contains(sql, "SUM(count) AS count")
+				helpers.assert_contains(sql, "GROUP BY date, app, layout")
+				return Json.encode({
+					{ date = "2000-01-01", app = "owned", layout = "qwerty", count = 5 },
+					{ date = "2000-01-01", app = "owned", layout = "café'owned", count = 2 },
+				})
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			local entry = manifest["2000-01-01"].owned
+			helpers.assert_eq(entry.layouts_seen.qwerty, 5)
+			helpers.assert_eq(entry.layouts_seen["café'owned"], 2)
+			helpers.assert_nil(entry.layouts)
+			helpers.assert_eq(entry.chars, 0)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-layouts-seen: existing date and app filters remain on the grouped metadata query", function()
+		local apps = { "owned' app" }
+		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+			reader.read_manifest("/db/metrics.sqlite", "1999-12-31", "2000-01-01", apps)
+		end)
+		local matches = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_app_day_layouts", 1, true) then
+				matches = matches + 1
+				helpers.assert_contains(sql, "date >= '1999-12-31'")
+				helpers.assert_contains(sql, "date <= '2000-01-01'")
+				helpers.assert_contains(sql, "app IN ('owned'' app')")
+			end
+		end
+		helpers.assert_eq(matches, 1)
+		helpers.assert_eq(apps[1], "owned' app")
+	end)
+	helpers.it("linux-sqlite-layouts-seen: control apps without layout rows retain absent optional maps", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2000-01-01","app":"owned","chars":3}]' end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.chars, 3)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts_seen)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-layouts-seen: refused receipt preserves the partial first return", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_layouts", 1, true) then return { body = "[]", status = 1 } end
+			if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2000-01-01","app":"owned","chars":3}]' end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.chars, 3)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts_seen)
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)

@@ -239,8 +239,8 @@ SELECT date, app, layout, SUM(count) AS count
 FROM agg_app_day_layouts%s GROUP BY date, app, layout;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
-		entry.layouts = entry.layouts or {}
-		entry.layouts[row.layout] = (entry.layouts[row.layout] or 0) + (row.count or 0)
+		entry.layouts_seen = entry.layouts_seen or {}
+		entry.layouts_seen[row.layout] = (entry.layouts_seen[row.layout] or 0) + (row.count or 0)
 	end
 
 	for _, row in ipairs(query(string.format([[

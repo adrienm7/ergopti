@@ -2064,6 +2064,31 @@ These are software implementations; final hardware verification remains below.
   Preserve both language packs and principal notification/HTTP fixtures. No
   Writer, schema, menus, configuration, foreign driver or reserved change.
 
+- [~] **L132.** Linux layout-count projection: publish persisted counts as the
+  canonical layouts_seen map consumed by the shared Apps/Typing dashboard.
+  Linux previously emitted layouts, leaving healthy native metadata invisible
+  to that consumer. Change only the two field statements; preserve SQL grouping,
+  filters, optional absence, numeric zero, revision-cache completion and stored
+  event/aggregate bytes. Ten genuine public collector/SQLite/Reader/dashboard
+  checks reproduce seven failures and pass after on current LuaJIT, Lua 5.4 and
+  the signed Jammy luv/libuv mixed profile. The actual keyboard module supplies
+  its default qwerty label without hook initialization; two software key calls
+  produce a durable count2 independently observed in native SQL. Explicit metadata
+  covers multiple devices, quoted UTF-8 labels, date/app filters and recovery.
+  This proves software metadata persistence/projection, not physical input,
+  desktop-layout discovery or an initialized XKB/Wayland keyboard hook. Preserve
+  all fifty-one original native assertion lines and enforce the exact ten-check
+  floor. Four registered CLI-response unit cases reproduce one failure and pass
+  after on all three profiles. All fifty-nine checks from the existing Reader
+  owners remain green; retain the entire old unit prefix and every assertion.
+  Replay native NULL8, completion10 and independent public-cache3 on each profile.
+  macOS and Windows already publish layouts_seen in source, and shared consumers
+  already read it; no shared policy or UI change is required. Their native gates
+  remain with the principal agent. Register future Linux CI without launching
+  it. Preserve both language packs and principal notification/HTTP fixtures.
+  No Writer, Keylogger, SQL, schema, UI labels, menu, configuration, physical-input,
+  foreign driver or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
