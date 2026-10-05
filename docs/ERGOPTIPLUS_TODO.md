@@ -2015,6 +2015,17 @@ calls remain byte-identical and pass; the source guard rejects the old target
 and an independently injected front-activation call. Native registration,
 delivery, containment, physical retirement and Brew lifecycle remain pending.
 
+The same native run refuses the Sparkle census at its unchanged canonical
+directory boundary; it does not identify the root/cache argument or prove a
+permission failure. The fixture now retains POSIX directory spellings and
+device/inode identity at acquisition, rechecks them before census, and refuses
+replacement directories or final-component symlinks. It passes the retained
+String without a Foundation URL round-trip. An independent native parent-alias
+control requires the old argument to fail and the retained argument to pass the
+unchanged Python admission, then requires replacements to fail. All existing
+Swift assertions and executable-path comparisons remain intact. Swift
+compilation, real census and complete update/install acceptance remain pending.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

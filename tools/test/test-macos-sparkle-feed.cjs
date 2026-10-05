@@ -1020,6 +1020,15 @@ try {
 		/(?:print|XCTFail)\(stdout|summary \+= stdout|packet\["(?:argv|path|stderr|comm|name)"\]/
 	);
 	assert.doesNotMatch(annotation, /print\(stdout|stderr|String\(reflecting|ownedPIDs/);
+	assert.match(fixture, /testOwnedCensusPathAdmitsParentAliasWithoutAdoptingDirectoryReplacement/);
+	assert.match(fixture, /let paths = try roots\.map \{ try ownedCensusPath\(\$0\) \}/);
+	assert.match(fixture, /\["python3", helper\.path, "census"\] \+ paths/);
+	assert.match(fixture, /Darwin\.realpath\(spelling, nil\)/);
+	assert.match(fixture, /target\.st_dev == original\.st_dev, target\.st_ino == original\.st_ino/);
+	assert.match(fixture, /metadata\.st_dev == owned\.device, metadata\.st_ino == owned\.inode/);
+	assert.match(fixture, /String\(cString: resolved\) == owned\.physicalSpelling/);
+	assert.match(fixture, /return owned\.physicalSpelling/);
+	assert.match(fixture, /XCTAssertThrowsError\(try ownedCensusPath\(child\)\)/);
 	assert.match(fixture, /macos_owned_process\.py/);
 	assert.match(fixture, /packet\["closed"\] as\? Bool == true/);
 	assert.match(fixture, /packet\["exit_status"\] as\? NSNumber/);
