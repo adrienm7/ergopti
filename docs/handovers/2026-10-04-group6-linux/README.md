@@ -23,13 +23,13 @@ Latest diagnostic follow-up: actual fixed12 privacy controls before6passed/6fail
 
 The supplemental adapter callback body is also preserved, with only the same independently fixed executable fixture migration; this composed test loader is source-only and unexecuted. No whole final composed packet/full suite or relocated portable runner was executed after the privacy follow-up. Earlier snapshot evidence must not be relabeled as final validation. Packaging, installed AppImage/Nix/Flatpak dependency closure, per-hop PAC redirects, real corporate PAC/auth/trust/WPAD environments, file retry lease admission and owned Ollama proxy environment remain unqualified or outside this bounded packet. No native Windows/macOS claim is made.
 
-## Preparation and deferred commands
-
 ## Native CI acceptance follow-up
 
 Manual Linux run [37243798345](https://github.com/adrienm7/ergopti/actions/runs/37243798345) tested `846eb713514b3921b35594dbca92cc3cb5525aef`. Shared JS, properties and Linux unit jobs passed. The actual GTK/WebKit/luv/curl model-pull scenario passed with the corrected session/failed-epoch retry records and every original assertion and retirement requirement unchanged. Six other native E2E steps failed; packaging and installation were skipped. No release ran.
 
 The accessible annotations report only exit status 1. Archived job logs are inaccessible from this container (HTTP 403). Reference run [37242348817](https://github.com/adrienm7/ergopti/actions/runs/37242348817) failed Linux units before E2E, so it cannot prove the six E2E failures are historical. Their fixtures and directly compared production paths match the reference sources, except optional updater download receipt forwarding outside its unchanged release-fetch path. Byte equivalence does not establish runtime causes or rule out transitive regressions.
+
+New reference [37245806103](https://github.com/adrienm7/ergopti/actions/runs/37245806103) tests `78fdd90ae94c254accc2281f1b599564b03d47ab`, whose complete tree `57d5e37f2c8c9ca7c7a5f99cd668635703e69188` is identical to dev `b9a43969b9ac8917f32bf4af0d19b6f77a31668e`. It actually executes and fails four scenarios: GTK operands, updater ETag associations, virtual-audio locales and notifications. This establishes existing failing scenarios, not identical failure causes. SQLite and AT-SPI now pass with upstream private-HOME/xdotool fixture provisioning retained by this branch. Its older model fixture/protocol also passes; our managed protocol's successful run is not a baseline failure-to-success claim. Final candidate native qualification remains required.
 
 Before changing assertions or assigning a cause, replay each exact fixture on isolated current dev and candidate sources with equivalent native prerequisites. Capture the first actual failure without credentials, private URLs or raw environment dumps. Coordinate any proven baseline correction with the fix/Linux owner. Keep requirements 16/38 and report passes, failures, skips and unexecuted cases separately.
 

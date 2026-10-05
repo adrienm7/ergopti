@@ -2900,9 +2900,18 @@ unchanged. Actual Linux CI run 37243798345 on 846eb713514b3921b35594dbca92cc3cb5
 passes this native GTK/WebKit/luv/curl scenario. The shared JS and Linux unit
 jobs also pass. Six other native E2E steps fail with unknown first assertions;
 Linux packaging and installation are consequently skipped. The available
-reference run skips E2E after its unit failure and cannot prove these causes
+earlier reference run skips E2E after its unit failure and cannot prove these causes
 are historical. Preserve the focused follow-up steps in the Linux handover;
 this successful scenario does not qualify the whole lane or close item 62.
+
+New reference run 37245806103 executes the exact tree of dev b9a43969b9ac8917f32bf4af0d19b6f77a31668e.
+GTK application operands, updater ETag associations, virtual-audio locales and
+notifications fail there as executed scenarios. Their exact first assertions
+and causes remain unknown; matching source bytes are not causal diagnosis.
+SQLite profile and AT-SPI interpreter-option scenarios now pass after upstream
+fixture provisioning, which this branch preserves. The reference's older model
+protocol also passes; do not claim a baseline failure-to-success for that case.
+Final candidate and integrated native qualification remain required.
 
 The unintegrated Linux HTTP producer is preserved in the
 [Linux continuation](handovers/2026-10-04-group6-linux/README.md), with exact
