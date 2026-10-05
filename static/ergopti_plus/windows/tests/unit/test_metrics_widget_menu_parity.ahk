@@ -86,3 +86,81 @@ _MWMP_Register() {
 			_MWMP_RenderVector.Bind(Vector, Fixture["fields"], Fixture["rows"]))
 }
 _MWMP_Register()
+
+; A native label is explicitly inert and carries no callback or picker data.
+_MWMP_InertMigrationLabels() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\metrics\migration_status_menu.json", "UTF-8"))
+	for Status in Corpus["statuses"] {
+		Section := Status["section"]
+		Id := Status["row"]["id"]
+		Calls := Map("delivery", 0)
+		Commands := Map(Id, (*) => Calls["delivery"] += 1)
+		Children := Map(Id, [Map("label", "unowned child")])
+		Hidden := MenuRenderer_TemplateRows(Section, Commands, Map(), Children)
+		AssertEqual(0, Hidden.Length, "Linux-only label stays hidden on Windows")
+		Definition := _MR_GetMenuDef(Section)[1]
+		Previous := Definition["platforms"]
+		Target := 0
+		try {
+			Definition["platforms"] := ["ahk"]
+			Rows := MenuRenderer_TemplateRows(Section, Commands, Map(), Children)
+			AssertEqual(1, Rows.Length, "native port renders an applicable declared label")
+			AssertEqual(t(Status["row"]["i18n"]), Rows[1]["label"], "caption remains shared")
+			Assert(Rows[1]["disabled"], "the label primitive is always disabled")
+			AssertEqual(2, Rows[1].Count, "label data contains only its caption and inert state")
+			Assert(!Rows[1].Has("action") && !Rows[1].Has("items") && !Rows[1].Has("checked"),
+				"callback or child payload cannot turn the label into a command")
+			Target := Menu()
+			AssertEqual(1, _MR_RenderRows(Target, Rows, "metrics_inert_label_test", 1), "actual Win32 renderer draws the label")
+			AssertEqual(0, _MWMP_AnchorPosition(Target, Rows[1]["label"]), "real caption is drawn first")
+			State := DllCall("GetMenuState", "Ptr", Target.Handle, "UInt", 0, "UInt", 0x400, "UInt")
+			Assert((State & 0x3) != 0, "native label is disabled")
+			AssertEqual(0, State & 0x800, "inert status is a label, not a separator")
+			AssertEqual(0, Calls["delivery"], "inert construction and drawing never deliver native callbacks")
+		} finally {
+			Definition["platforms"] := Previous
+			if Target is Menu {
+				Target.Delete()
+				MenuDispatcher_PruneMenu(Target)
+			}
+		}
+	}
+}
+Test("metrics: native label templates preserve platform hiding and inertness (metrics-migration-label)",
+	_MWMP_InertMigrationLabels)
+
+_MWMP_InertLabelRefusals() {
+	Definition := _MR_GetMenuDef("metrics_migration_unavailable_rows")[1]
+	PreviousPlatforms := Definition["platforms"]
+	PreviousId := Definition["id"]
+	PreviousCaption := Definition["i18n"]
+	try {
+		Definition["platforms"] := ["ahk"]
+		for Field, Value in Map("command", "unowned_command", "caption_getter", "unowned_getter",
+			"checked_when", [], "disabled", false, "foreign_field", "future", "I18N", "wrong_case") {
+			Definition[Field] := Value
+			try AssertEqual(false, MenuRenderer_TemplateRows("metrics_migration_unavailable_rows", Map(), Map(), Map()),
+				"an inert label refuses behavior or foreign field metadata: " . Field)
+			finally Definition.Delete(Field)
+		}
+		PreviousUnavailable := Definition["unavailable"]
+		Definition["unavailable"] := ""
+		try AssertEqual(false, MenuRenderer_TemplateRows("metrics_migration_unavailable_rows", Map(), Map(), Map()),
+			"an inert label refuses an explicitly empty unavailable policy")
+		finally Definition["unavailable"] := PreviousUnavailable
+		Definition["id"] := ""
+		AssertEqual(false, MenuRenderer_TemplateRows("metrics_migration_unavailable_rows", Map(), Map(), Map()),
+			"an inert label needs a declared identity")
+		Definition["id"] := PreviousId
+		Definition["i18n"] := ""
+		AssertEqual(false, MenuRenderer_TemplateRows("metrics_migration_unavailable_rows", Map(), Map(), Map()),
+			"an inert label needs a declared caption")
+	} finally {
+		Definition["platforms"] := PreviousPlatforms
+		Definition["id"] := PreviousId
+		Definition["i18n"] := PreviousCaption
+	}
+}
+Test("metrics: native label templates refuse invalid declarations (metrics-migration-label)",
+	_MWMP_InertLabelRefusals)

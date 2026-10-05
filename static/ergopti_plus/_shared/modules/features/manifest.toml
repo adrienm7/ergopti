@@ -6479,6 +6479,22 @@ caption_getter = "tap_hold_key_hold_caption"
 platforms = ["hs"]
 unavailable = "hide"
 
+# Linux's idle/unavailable migration readouts are inert, not dummy commands.
+# The native provider retains progress-state selection and the running callback.
+[[menu.metrics_migration_unavailable_rows]]
+type = "label"
+id = "metrics_migration_unavailable"
+i18n = "menu.metrics.migration_unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.metrics_migration_idle_rows]]
+type = "label"
+id = "metrics_migration_idle"
+i18n = "menu.metrics.migration_idle"
+platforms = ["linux"]
+unavailable = "hide"
+
 # Native prompts and modifier picker subtrees retain their own settings owners.
 [[menu.llm_navigation_rows]]
 type = "list"

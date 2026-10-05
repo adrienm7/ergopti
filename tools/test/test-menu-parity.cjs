@@ -60,6 +60,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { scriptTokens } = require('../lib/script-source.cjs');
 const {
 	delegatedMenuSources,
 	combineMenuVisibility
@@ -98,6 +99,15 @@ const OPENS_SUBMENU = {
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',
 	metrics: 'metrics_menu',
+	// Its native state branches compose readouts into the existing Metrics menu.
+	metrics_migration: ['metrics_migration_unavailable_rows', 'metrics_migration_idle_rows'].map(
+		(menu) => ({
+			menu,
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		})
+	),
 	keyboard_layout: 'layout_menu',
 	number_row_policy: 'number_row_policy_rows',
 	hotstrings: 'hotstrings_menu',
@@ -311,7 +321,7 @@ function project(menuKey, platform) {
  * @returns {object[]}
  */
 function actionable(menuKey, platform) {
-	return project(menuKey, platform).filter((row) => !isSeparator(row));
+	return project(menuKey, platform).filter((row) => !isSeparator(row) && row.type !== 'label');
 }
 
 // ==================================================
@@ -326,6 +336,102 @@ function actionable(menuKey, platform) {
 // opening it says so, and its children inherit that without repeating it.
 const reachableOn = { top_level: PLATFORMS.slice() };
 const openedBy = {};
+const reachedByKinds = {};
+
+/** Distinguishes actual composed readouts from a clicked, empty submenu. */
+function isComposedFragment(rows, kinds) {
+	if (kinds.size !== 1 || !kinds.has('compose') || rows.length === 0) return false;
+	return rows.every((row) => {
+		if (row.type === SEPARATOR)
+			return Object.keys(row).every((key) => ['type', 'platforms', 'unavailable'].includes(key));
+		return (
+			row.type === 'label' &&
+			typeof row.id === 'string' &&
+			row.id !== '' &&
+			typeof row.i18n === 'string' &&
+			row.i18n !== '' &&
+			Object.keys(row).every((key) =>
+				['type', 'id', 'i18n', 'platforms', 'unavailable'].includes(key)
+			)
+		);
+	});
+}
+
+/** Credits executable template calls, never a comment, string or declaration. */
+function publishesTemplate(source, extension, section) {
+	const tokens = scriptTokens(source, extension);
+	return tokens.some((token, i) => {
+		if (token.kind !== 'identifier' || tokens[i - 1]?.value === 'function') return false;
+		const method =
+			extension === '.lua' &&
+			token.value === 'template_rows' &&
+			tokens[i - 1]?.value === '.' &&
+			tokens[i - 2]?.value === 'ManifestMenu' &&
+			!['function', '.', ':'].includes(tokens[i - 3]?.value);
+		const native =
+			extension === '.ahk' &&
+			token.value === 'MenuRenderer_TemplateRows' &&
+			!['.', ':'].includes(tokens[i - 1]?.value);
+		return (
+			(method || native) &&
+			tokens[i + 1]?.value === '(' &&
+			tokens[i + 2]?.kind === 'string' &&
+			tokens[i + 2]?.value === section &&
+			[',', ')'].includes(tokens[i + 3]?.value)
+		);
+	});
+}
+
+// An inert readout is admissible only through composition. A clicked parent,
+// including one sharing the same target, still owes a usable child on that OS.
+const readout = { type: 'label', id: 'readout', i18n: 'menu.metrics.status' };
+const separator = { type: SEPARATOR };
+for (const rows of [[readout], [separator], [readout, separator]]) {
+	if (!isComposedFragment(rows, new Set(['compose'])))
+		throw new Error('Rejected a declared composed readout.');
+	for (const kinds of [new Set(), new Set(['submenu']), new Set(['compose', 'submenu'])]) {
+		if (isComposedFragment(rows, kinds)) throw new Error('Accepted an empty clicked submenu.');
+	}
+}
+for (const rows of [
+	[],
+	[{ ...readout, callback: 'invoke' }],
+	[{ ...readout, id: '' }],
+	[{ ...readout, i18n: '' }],
+	[{ type: 'check', id: 'readout', i18n: 'menu.metrics.status' }],
+	[{ ...separator, id: 'command' }],
+	[readout, { type: 'section_header', i18n: 'menu.metrics.status' }]
+]) {
+	if (isComposedFragment(rows, new Set(['compose'])))
+		throw new Error('Accepted an undeclared composed readout shape.');
+}
+const platformKinds = { linux: new Set(['compose']), ahk: new Set(['submenu']) };
+if (
+	!isComposedFragment([readout], platformKinds.linux) ||
+	isComposedFragment([readout], platformKinds.ahk)
+)
+	throw new Error('Composition leaked across platform projections.');
+for (const [extension, method, comment] of [
+	['.lua', 'ManifestMenu.template_rows', '-- '],
+	['.ahk', 'MenuRenderer_TemplateRows', '; ']
+]) {
+	const call = `${method}("declared_readout", options)`;
+	if (!publishesTemplate(call, extension, 'declared_readout'))
+		throw new Error(`Missed executable ${extension} template publication.`);
+	for (const source of [
+		comment + call,
+		JSON.stringify(call),
+		call.replace('declared_readout', 'another_readout'),
+		call.replace(method, 'Unowned.template_rows'),
+		'Foreign.' + call,
+		'Foreign:' + call,
+		call.replace('"declared_readout"', '"declared_readout" .. suffix'),
+		`function ${call}`
+	]) {
+		if (publishesTemplate(source, extension, 'declared_readout'))
+			throw new Error(`Credited non-publication ${extension} template evidence.`);
+	}
+}
 
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
@@ -344,9 +450,30 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 			for (const opened of Array.isArray(published) ? published : [published]) {
 				const target = typeof opened === 'string' ? opened : opened.menu;
 				const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
+				const kind = row.type === 'include' || opened.kind === 'compose' ? 'compose' : 'submenu';
 				const effective = PLATFORMS.filter(
 					(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
 				);
+				for (const platform of effective) {
+					if (!reachedByKinds[target]) reachedByKinds[target] = {};
+					if (!reachedByKinds[target][platform]) reachedByKinds[target][platform] = new Set();
+					reachedByKinds[target][platform].add(kind);
+					if (kind !== 'compose' || row.type === 'include') continue;
+					const file = opened.native_sources?.[platform];
+					const driver = { ahk: 'windows', hs: 'macos', linux: 'linux' }[platform];
+					if (
+						typeof file !== 'string' ||
+						!file.startsWith(driver + '/') ||
+						!publishesTemplate(
+							fs.readFileSync(path.join(SP, file), 'utf8'),
+							path.extname(file),
+							target
+						)
+					)
+						errors.push(
+							`${menuKey}/${row.id}: composed ${target} has no native template publication on ${platform}`
+						);
+				}
 				const before = (reachableOn[target] || []).join(',');
 				const combined = combineMenuVisibility(PLATFORMS, reachableOn[target], effective);
 				if (before !== combined.join(',')) {
@@ -377,6 +504,13 @@ for (const menuKey of MENU_KEYS) {
 	if (!visibility || menuKey === 'top_level') continue;
 	for (const platform of visibility) {
 		if (actionable(menuKey, platform).length > 0) continue;
+		if (
+			isComposedFragment(
+				project(menuKey, platform),
+				reachedByKinds[menuKey]?.[platform] || new Set()
+			)
+		)
+			continue;
 		errors.push(
 			`${DRIVER_OF[platform]}: "${openedBy[menuKey]}" is visible, and the "${menuKey}" it opens ` +
 				`projects no actionable row for ${DRIVER_OF[platform]} — the user clicks an entry and gets an ` +
