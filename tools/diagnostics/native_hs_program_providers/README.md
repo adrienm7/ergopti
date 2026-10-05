@@ -2,7 +2,7 @@
 
 # Actual Hammerspoon provider inventory qualification
 
-This preparation has not run on macOS. Its eleven portable Python parser controls passed in the Linux cloud container; they validate receipts and never produce a native PASS. The hosted runner must execute the native command below against the final committed source SHA.
+Hosted run `37288850992` executed the 16 full-inventory cases: 14 passed and `actual_native_runtime` plus `real_interpreter_symlink` failed. The five shim cases were not executed because the first scenario refused admission. Recursive artifact collection then failed on the deliberately literal newline script filename. The corrected collection and closed diagnostics below have portable qualification only: all eleven original Python controls plus six diagnostic controls pass in the Linux cloud container. They never produce a native PASS. The hosted runner must execute the native command below against the final committed source SHA.
 
 The subject is actual Hammerspoon 1.1.1 `hs.fs`, native Lua file IO, the repository macOS provider adapter, shared policy, and central `FsDir.collect_private`. Only ConfigPaths, Paths and the logger are isolated configuration ports. Filesystem functions, directory state, source modules, native stat values and IO remain real. No Accessibility permission, TCC grant or shell script execution is requested.
 
@@ -48,4 +48,26 @@ This proves inventory and lowering only. It does not execute scripts, qualify ef
 
 ## Evidence
 
-Retain the output directory as its own CI artifact even if a later XCTest/build/package step fails. `summary.json` is created only after both native receipts, post-run source pins, persistent config comparison and physical settlement succeed. Each process has its bounded native `receipt.json` and `physical-group.json`. Portable controls reject duplicate JSON fields/cases, zero/missing cases, stale source/nonce/PID, malformed counters, fabricated scope, failures/skips, oversized receipts, timeout and early exit without a receipt. They do not stand in for the hosted native command.
+Retain only `summary.json`, per-scenario `receipt.json`, `physical-group.json` and `diagnostic-facts.json` as the CI artifact, even when qualification or a later XCTest/build/package step fails. Never recursively upload the fixture directory: its deliberately literal script corpus contains newline filenames and unnecessary private fixture contents. `summary.json` is created only after both native receipts, post-run source pins, persistent config comparison and physical settlement succeed. Each process has its bounded native `receipt.json` and `physical-group.json`. Portable controls reject duplicate JSON fields/cases, zero/missing cases, stale source/nonce/PID, malformed counters, fabricated scope, failures/skips, oversized receipts, timeout and early exit without a receipt. They do not stand in for the hosted native command.
+
+## Closed failure facts
+
+Each full/shim process also attempts to write a separate `diagnostic-facts.json` before its original native receipt. The original receipt fields, 16/5 case census, check conditions and PASS admission remain unchanged. The auxiliary facts have their own closed schema, source SHA, nonce and PID. The runner independently pins both Lua fixture templates and itself against that committed SHA before launch and again before a successful summary.
+
+For each original case, the auxiliary file records `none` with ordinal zero when it passed, `check` with the one-based check invocation ordinal when the original check refused, or `raised` with ordinal zero when the callback raised outside a check. It never retains an exception value. Runtime observations contain only finite Lua-version and function-debug-kind labels. Interpreter observations contain only booleans for a returned scalar string, exact expected interpreter, one argument, exact script argument, and exact injected PATH. No resolved interpreter string, path, environment value, username or raw error is emitted.
+
+An auxiliary open/write/close/rename refusal is contained so the unchanged primary receipt is still attempted; missing facts still fail admission. Valid diagnostic facts never convert a failed original receipt into a PASS. Malformed, stale, extra-field or missing auxiliary facts fail closed; the original receipt still requires every case passed, zero failures and zero skips. Portable parser and instrumentor controls qualify these privacy and verdict boundaries only. The native runtime failures still require a hosted macOS rerun with the unchanged original conditions; these diagnostics provide evidence rather than weakening them.
+
+## Official filesystem-wrapper provenance
+
+The official 1.1.1 public `hs.fs.symlinkAttributes` function is a Lua wrapper
+at packaged `fs.lua:140–151`, around the native `hs.libfs.link_info` C function.
+The original public-function-C premise is false on that authenticated runtime.
+Its replacement verifies the signed-bundle script and native-library bytes, exact
+public closure/upvalues and independently captured wrapper bytecode, loader
+identities and a real owned symlink lstat/stat witness. The other original
+conditions, 21 case identities and primary verdict schema remain unchanged.
+Debug metadata alone does not identify a C symbol's DSO address; these are
+cooperative runtime provenance and native behavior checks. Nine controlled
+Linux-origin cases and four independent omission controls pass. Actual Darwin
+loader, Hammerspoon hashing and lstat observations still require native CI.

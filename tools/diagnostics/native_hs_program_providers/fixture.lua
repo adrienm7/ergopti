@@ -15,11 +15,51 @@ package.loaded["infra.paths"] = { shared = function(relative)
 end }
 local Adapter = require("adapters.program_providers")
 local Directories = require("infra.fs_dir")
-local cases = {}
-local function check(condition) if condition ~= true then error("case_refused", 0) end end
+local cases, case_facts = {}, {}
+local active_case, check_ordinal, check_failure
+local interpreter_facts = {
+    resolved_scalar_observed = false, interpreter_equal = false,
+    argv_count_equal = false, script_argument_equal = false,
+}
+local function check(condition)
+    if active_case then check_ordinal = check_ordinal + 1 end
+    if condition ~= true then
+        if active_case then check_failure = check_ordinal end
+        error("case_refused", 0)
+    end
+end
 local function case(id, callback)
+    active_case, check_ordinal, check_failure = id, 0, nil
     local ok = pcall(callback)
     cases[#cases + 1] = { id = id, status = ok and "passed" or "failed" }
+    case_facts[#case_facts + 1] = {
+        case = id, kind = ok and "none" or (check_failure and "check" or "raised"),
+        ordinal = not ok and check_failure or 0,
+    }
+    active_case = nil
+end
+local function debug_kind(value)
+    if type(value) ~= "function" then return "missing" end
+    local ok, info = pcall(debug.getinfo, value, "S")
+    local kind = ok and type(info) == "table" and info.what or nil
+    if kind == "C" or kind == "Lua" or kind == "main" then return kind end
+    return "unknown"
+end
+local function runtime_facts()
+    local version = _VERSION
+    if version ~= "Lua 5.1" and version ~= "Lua 5.2" and version ~= "Lua 5.3"
+        and version ~= "Lua 5.4" and version ~= "Lua 5.5" then version = "other" end
+    return {
+        lua_version = version, dir = debug_kind(native_fs.dir),
+        attributes = debug_kind(native_fs.attributes),
+        symlink_attributes = debug_kind(native_fs.symlinkAttributes),
+        path_to_absolute = debug_kind(native_fs.pathToAbsolute),
+        file_open = debug_kind(native_open),
+    }
+end
+local function observe_scalar(...)
+    interpreter_facts.resolved_scalar_observed = type((...)) == "string"
+    return ...
 end
 local function source_pins()
     for path, digest in pairs(input.source_hashes) do
@@ -41,12 +81,93 @@ local function fd_count()
     for name in native_fs.dir("/dev/fd") do if name ~= "." and name ~= ".." then result = result + 1 end end
     return result
 end
+local OfficialFsOrigin = (function()
+local M = {}
+local SCRIPT_SHA = "7006e6d4917d1cd9d2eefdcdfe8de99ab6ee8242d5da3b2d656b0fdede959b45"
+local NATIVE_SHA = "a1e0626a5ce6f013033fdc7fe0ff74dfc242d72e98b3620bf328c82af46775f6"
+-- Independent official 1.1.1 wrapper body, verified against packaged fs.lua.
+-- Parent-local slots and definition bounds match the official chunk. Only this
+-- pure closure constructor is evaluated; no module top-level code is repeated.
+local GOLDEN = "local module, host, hs_fs_symlinkAttributes = ...\n" .. string.rep("\n", 138) .. [[return function(...)
+    local args = table.pack(...)
+    if args[2] == "target" then
+        return module.pathToAbsolute(args[1])
+    else
+        local ans = table.pack(hs_fs_symlinkAttributes(...))
+        if ans.n == 1 and type(ans[1]) == "table" then
+            ans[1].target = module.pathToAbsolute(args[1])
+        end
+        return table.unpack(ans)
+    end
+end]]
+local function exact_file(pin, expected, fs, open, hash)
+    if type(pin) ~= "table" or type(pin.path) ~= "string" or type(pin.dev) ~= "number"
+        or type(pin.ino) ~= "number" or pin.sha256 ~= expected then return false end
+    local before = fs.attributes(pin.path)
+    if type(before) ~= "table" or before.mode ~= "file" or before.dev ~= pin.dev or before.ino ~= pin.ino then return false end
+    local input = open(pin.path, "rb"); if not input then return false end
+    local raw = input:read(1024 * 1024 + 1); local closed = input:close()
+    if closed ~= true or type(raw) ~= "string" or #raw > 1024 * 1024 or hash(raw) ~= expected then return false end
+    local after = fs.attributes(pin.path)
+    return type(after) == "table" and after.mode == "file" and after.dev == pin.dev and after.ino == pin.ino
+end
+local function same_identity(value, expected, mode)
+    return type(value) == "table" and type(expected) == "table"
+        and type(expected.dev) == "number" and type(expected.ino) == "number" and expected.dev >= 0 and expected.ino >= 0 and value.mode == mode
+        and value.dev == expected.dev and value.ino == expected.ino
+end
+function M.verify(fs, captured_public, pins, witness, open, hash)
+    local ok, result = pcall(function()
+        if type(fs) ~= "table" or fs.symlinkAttributes ~= captured_public or type(captured_public) ~= "function"
+            or type(pins) ~= "table" or type(witness) ~= "table" or type(open) ~= "function" or type(hash) ~= "function" then return false end
+        if not exact_file(pins.script, SCRIPT_SHA, fs, open, hash)
+            or not exact_file(pins.native, NATIVE_SHA, fs, open, hash) then return false end
+        local info = debug.getinfo(captured_public, "Su")
+        if info.what ~= "Lua" or info.source ~= "@" .. pins.script.path or info.linedefined ~= 140
+            or info.lastlinedefined ~= 151 or info.nups ~= 3 then return false end
+        local expected_names = { "_ENV", "module", "hs_fs_symlinkAttributes" }
+        local up = {}
+        for i, name in ipairs(expected_names) do
+            local observed, value = debug.getupvalue(captured_public, i)
+            if observed ~= name then return false end
+            up[i] = value
+        end
+        if type(up[1]) ~= "table" or up[1].table ~= table or up[1].type ~= type or up[2] ~= fs or type(up[3]) ~= "function"
+            or debug.getinfo(up[3], "S").what ~= "C" then return false end
+        local golden = assert(load(GOLDEN, "@" .. pins.script.path, "t", up[1]))(fs, false, up[3])
+        if string.dump(captured_public, true) ~= string.dump(golden, true) then return false end
+        -- Runtime loader table identities supplement the verified signed archive;
+        -- no claim is made that debug.getinfo alone identifies a C symbol's DSO.
+        if package.loaded["hs.fs"] ~= fs or package.loaded["hs.libfs"] ~= fs
+            or package.searchpath("hs.libfs", package.cpath) ~= pins.native.path then return false end
+        if type(witness.link) ~= "string" or type(witness.target) ~= "string" then return false end
+        local raw, error_value = up[3](witness.link)
+        if error_value ~= nil or not same_identity(raw, witness.link_identity, "link") then return false end
+        local target = fs.attributes(witness.link)
+        if not same_identity(target, witness.target_identity, "file") then return false end
+        local wrapped, wrapped_error = captured_public(witness.link)
+        if wrapped_error ~= nil or not same_identity(wrapped, witness.link_identity, "link")
+            or wrapped.target ~= witness.target or captured_public(witness.link, "target") ~= witness.target then return false end
+        if fs.symlinkAttributes ~= captured_public then return false end
+        return exact_file(pins.script, SCRIPT_SHA, fs, open, hash)
+            and exact_file(pins.native, NATIVE_SHA, fs, open, hash)
+    end)
+    return ok and result == true
+end
+return M
+end)()
+local captured_public_symlink = native_fs.symlinkAttributes
 local owner, initial
 case("actual_native_runtime", function()
     check(_VERSION == "Lua 5.4")
     check(debug.getinfo(native_fs.dir).what == "C")
     check(debug.getinfo(native_fs.attributes).what == "C")
-    check(debug.getinfo(native_fs.symlinkAttributes).what == "C")
+    check(OfficialFsOrigin.verify(native_fs, captured_public_symlink, input.runtime_origin, input.runtime_link_witness, native_open, function(raw)
+        local context = hs.hash.new("SHA256")
+        if not context or context:append(raw) ~= context or context:finish() ~= context then return "" end
+        local digest = context:value()
+        return type(digest) == "string" and digest:match("^[0-9a-fA-F]+$") and #digest == 64 and digest:lower() or ""
+    end))
     check(debug.getinfo(native_fs.pathToAbsolute).what == "C")
     check(debug.getinfo(native_open).what == "C")
     check(hs.screen.mainScreen() ~= nil)
@@ -76,7 +197,11 @@ case("literal_v1_independent_argv", function()
     check(native_fs.symlinkAttributes(input.config .. "/INTERPOLATION") == nil)
 end)
 case("real_interpreter_symlink", function()
-    local value = hs.json.decode(assert(owner.resolve(choices_by_name(initial)["literal.py"].key, {})))
+    local value = hs.json.decode(assert(observe_scalar(owner.resolve(choices_by_name(initial)["literal.py"].key, {}))))
+    interpreter_facts.interpreter_equal = value.executable == input.expected_python
+    interpreter_facts.argv_count_equal = type(value.arguments) == "table" and #value.arguments == 1
+    interpreter_facts.script_argument_equal = type(value.arguments) == "table"
+        and value.arguments[1] == input.config .. "/scripts/literal.py"
     check(value.executable == input.expected_python and #value.arguments == 1)
     check(value.arguments[1] == input.config .. "/scripts/literal.py")
 end)
@@ -156,6 +281,19 @@ local packet = {
     scope = { inventory = true, program_execution = false, effective_acl_verified = false,
         closedir_errno_observed = false, atomic_execution_lease = false },
 }
+local facts = {
+    schema = 1, contract = "macos-native-hs-program-provider-diagnostic-facts",
+    source_sha = input.source_sha, nonce = input.nonce, pid = hs.processInfo.processID,
+    scenario = input.scenario, source_hashes = input.diagnostic_source_hashes,
+    case_facts = case_facts, runtime = runtime_facts(), interpreter = interpreter_facts,
+    expected_path_equal = os.getenv("PATH") == input.expected_path,
+}
+-- Auxiliary IO must not suppress the original primary failure receipt.
+pcall(function()
+    local diagnostic = assert(native_open(input.diagnostic_facts .. ".partial", "wb"))
+    check(diagnostic:write(hs.json.encode(facts)) ~= nil); check(diagnostic:close() == true)
+    check(os.rename(input.diagnostic_facts .. ".partial", input.diagnostic_facts) == true)
+end)
 local output = assert(native_open(input.receipt .. ".partial", "wb"))
 check(output:write(hs.json.encode(packet)) ~= nil); check(output:close() == true)
 check(os.rename(input.receipt .. ".partial", input.receipt) == true)

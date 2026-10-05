@@ -316,7 +316,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-hs-program-providers-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/native-hs-program-providers
+          # Retain closed evidence only; fixture paths intentionally include newlines.
+          path: |
+            ${{ runner.temp }}/native-hs-program-providers/summary.json
+            ${{ runner.temp }}/native-hs-program-providers/*/receipt.json
+            ${{ runner.temp }}/native-hs-program-providers/*/physical-group.json
+            ${{ runner.temp }}/native-hs-program-providers/*/diagnostic-facts.json
           if-no-files-found: error
 
       # Observe the native structured API without invoking or importing automations.

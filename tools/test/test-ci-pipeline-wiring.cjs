@@ -1251,6 +1251,82 @@ function stepProblems(files) {
 	return problems;
 }
 
+// Upload only closed receipts: the owned script corpus contains newline names,
+// and recursively uploading its private fixture tree also exposes unnecessary data.
+const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';
+const NATIVE_INVENTORY_PATHS = [
+	'${{ runner.temp }}/native-hs-program-providers/summary.json',
+	'${{ runner.temp }}/native-hs-program-providers/*/receipt.json',
+	'${{ runner.temp }}/native-hs-program-providers/*/physical-group.json',
+	'${{ runner.temp }}/native-hs-program-providers/*/diagnostic-facts.json'
+];
+
+/** Rejects missing failure receipts and recursive private-fixture uploads. */
+function nativeInventoryArtifactProblems(files) {
+	const found = files
+		.filter((entry) => entry.rel === MACOS_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'package-macos')
+		.flatMap((job) => pipeline.steps(job.body))
+		.filter((step) => step.name === NATIVE_INVENTORY_ARTIFACT);
+	if (found.length !== 1) return ['native inventory artifact step must exist exactly once'];
+	const body = found[0].body;
+	const lines = body.split('\n');
+	const pathAt = lines.indexOf('          path: |');
+	const paths = [];
+	if (pathAt >= 0) {
+		for (const line of lines.slice(pathAt + 1)) {
+			if (line.trim() === '') continue;
+			if (!/^ {12}\S/.test(line)) break;
+			paths.push(line.trim());
+		}
+	}
+	const problems = [];
+	if (JSON.stringify(paths) !== JSON.stringify(NATIVE_INVENTORY_PATHS))
+		problems.push(
+			'native inventory artifact must whitelist only summary and per-scenario closed receipts'
+		);
+	if (
+		pipeline.stepField(body, 'if') !== '${{ always() }}' ||
+		pipeline.stepField(body, 'uses') !== 'actions/upload-artifact@v4' ||
+		!/^ {10}if-no-files-found: error$/m.test(body)
+	)
+		problems.push(
+			'native inventory failure evidence must upload with always() and fail on missing files'
+		);
+	return problems;
+}
+
+errors.push(...nativeInventoryArtifactProblems(pipeline.files()));
+const nativeInventoryPathBlock =
+	'          path: |\n' + NATIVE_INVENTORY_PATHS.map((item) => `            ${item}\n`).join('');
+for (const replacement of [
+	'          path: ${{ runner.temp }}/native-hs-program-providers\n',
+	'          path: ${{ runner.temp }}/native-hs-program-providers/**\n',
+	nativeInventoryPathBlock +
+		'            ${{ runner.temp }}/native-hs-program-providers/*/configuration/**\n',
+	...NATIVE_INVENTORY_PATHS.map((item) =>
+		nativeInventoryPathBlock.replace(`            ${item}\n`, '')
+	)
+]) {
+	mustCatch(
+		'native inventory closed evidence whitelist',
+		MACOS_BOX,
+		nativeInventoryPathBlock,
+		replacement,
+		nativeInventoryArtifactProblems
+	);
+}
+for (const replacement of ['', '          if-no-files-found: warn\n']) {
+	mustCatch(
+		'native inventory missing-file refusal',
+		MACOS_BOX,
+		nativeInventoryPathBlock + '          if-no-files-found: error\n',
+		nativeInventoryPathBlock + replacement,
+		nativeInventoryArtifactProblems
+	);
+}
+
 errors.push(...stepProblems(pipeline.files()));
 for (const name of [
 	'Run signed Hammerspoon program provider inventory',
