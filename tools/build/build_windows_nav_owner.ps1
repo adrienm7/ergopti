@@ -636,9 +636,11 @@ $sourceDir = Join-Path $repoRoot "static\ergopti_plus\windows\native\nav_event_o
 $buildDir = Join-Path $repoRoot "static\ergopti_plus\windows\build\native\nav_event_owner"
 $vendorDir = Join-Path $repoRoot "static\ergopti_plus\windows\vendor"
 $sourcePath = Join-Path $sourceDir "nav_event_owner.c"
+$editorSourcePath = Join-Path $sourceDir "editor_replace.c"
 $headerPath = Join-Path $sourceDir "nav_event_owner.h"
 $definitionPath = Join-Path $sourceDir "nav_event_owner.def"
 $testSourcePath = Join-Path $sourceDir "nav_event_owner_test.c"
+$editorTestSourcePath = Join-Path $sourceDir "editor_replace_test.c"
 $cmakePath = Join-Path $sourceDir "CMakeLists.txt"
 $testExePath = Join-Path $buildDir "ergopti_nav_event_owner_test.exe"
 $buildDllPath = Join-Path $buildDir "ergopti_nav_owner.dll"
@@ -648,7 +650,7 @@ $manifestSchemaVersion = 1
 $vendorDllRelativePath = "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll"
 $buildScriptRelativePath = "tools/build/build_windows_nav_owner.ps1"
 
-foreach ($requiredSource in @($sourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
+foreach ($requiredSource in @($sourcePath, $editorSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
 	if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
 		throw "Required native source is missing: $requiredSource"
 	}
@@ -693,6 +695,7 @@ $commonLinkerRecipeFlags = @(
 $dllRecipeArguments = $commonCompilerRecipeFlags + @(
 	"/LD",
 	"{source_dir}\nav_event_owner.c",
+	"{source_dir}\editor_replace.c",
 	"/link",
 	"/DEF:{source_dir}\nav_event_owner.def",
 	"/OUT:{build_dir}\ergopti_nav_owner.dll",
@@ -725,7 +728,9 @@ try {
 	$testArguments = $commonCompilerFlags + @(
 		"/DERGOPTI_NAV_TESTING=1",
 		$testSourcePath,
+		$editorTestSourcePath,
 		$sourcePath,
+		$editorSourcePath,
 		"/Fe:$testExePath",
 		"/link"
 	) + $commonLinkerFlags

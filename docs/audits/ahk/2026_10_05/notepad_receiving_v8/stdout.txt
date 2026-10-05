@@ -1,0 +1,103 @@
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\webview_browser_warmup.ahk (41) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Promise  (in function WebViewBrowserWarmup.Prototype.Begin)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\adapters\crypto.ahk (218) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: mode  (in function CryptoAesCbc)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\adapters\system_control.ahk (143) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Enumerator  (in function SystemControl.Prototype._CaptureVolume)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\issue_link.ahk (153) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Max  (in function IssueLink_BuildUrl)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\redact.ahk (44) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: IsAlnum  (in function _Redact_CharIs)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\toml\toml_document.ahk (31) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Run  (in function _TOML_DocumentToken)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\window_utils.ahk (108) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: WindowTitle  (in function _AltTabCycle)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\key_combinations.ahk (445) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Run  (in function _KeyCombinationRunTap)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\hotstring_dispatch.ahk (1206) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: WindowTitle  (in function HSE_DispatchMatch)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\toml\toml_loader.ahk (673) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mode  (in function ParseTomlGroupConfig)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\extension_packs.ahk (129) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function HotstringExtensions_RouteBound)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\extension_packs.ahk (356) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function HotstringExtensions_Source)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\extension_packs.ahk (402) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function HotstringExtensions_Seed)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\extension_packs.ahk (430) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function HotstringExtensions_RegistrationPlan)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\extension_packs.ahk (466) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function Operations)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\extension_packs.ahk (499) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function Operations)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\extension_packs.ahk (537) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function HotstringExtensions_Count)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\menu\menu_submenus.ahk (279) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: PersonalTomlPath  (in function _CollectAllHotstringsV2Paths)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\hotstrings\hotstrings_scope.ahk (157) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function _HotstringsScopeCatalogue)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\keymap\layout\layout_ergopti.ahk (291) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Terminators  (in function ErgoptiLayout_BuildSpec)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\_shared\modules\features\number_row_policy.ahk (19) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mode  (in function NumberRowPolicyMode)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\_shared\modules\features\number_row_policy.ahk (66) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Number  (in function NumberRowPolicyReady)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\keymap\layout\layout_shift_caps.ahk (274) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mode  (in function NumberRowEffectiveMode)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\updater\config_backup.ahk (255) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function _ConfigBackup_Load)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\infra\uninstall.ahk (24) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Thread  (in function _UninstallClose)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\adapters\editor_replace.ahk (64) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: OsError  (in function _TextSenderNativePollReceipt)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\adapters\text_sender.ahk (195) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mod  (in function _TextSenderKeystroke)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\adapters\text_sender.ahk (826) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mode  (in function TextSend)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\adapters\screen_brightness.ahk (149) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Notify  (in function ScreenBrightnessCompleted)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\llm\api_remote.ahk (1680) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: format  (in function _LLMRemote_CatalogDescriptorIsValid)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\llm\option_validation.ahk (406) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mode  (in function LLM_Option_TryNormalize)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\llm\prediction_exec.ahk (1237) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: edit  (in function _LLM_Engine_ParseSlots)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\llm\prediction_exec.ahk (1354) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Edit  (in function LLM_Engine_OnResults)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\menu\menu_layout.ahk (95) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mode  (in function _LAY_NumberRowRuntime)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\menu\menu_llm\menu_models.ahk (671) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: t  (in function _LLM_Menu_IsNumber)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\menu\menu_llm\enable_admission.ahk (166) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Notify  (in function _LLM_Menu_EnableOnReceipt)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\prompt_editor\init.ahk (282) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mode  (in function _PromptEdWeb_PushInit)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\keylogger\keylogger_prefetch.ahk (817) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: mode  (in function KLPF_WorkerMain)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\keylogger\keylogger_prefetch.ahk (1011) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function KLPF_ReadHistorySeed)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\keylogger\keylogger_webview.ahk (1127) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: T  (in function KLWV_MonitorFromPoint)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\modules\keylogger\keylogger_webview.ahk (1465) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: mode  (in function KLWV_DrainPendingIngest)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\platform\remap\constants.ahk (1302) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Mod  (in function _TapHoldKeyTapModifiers)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\healthcheck\core.ahk (273) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Features  (in function HealthCheck_Run)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\healthcheck\helpers.ahk (433) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Type  (in function _HealthCheck_Peripherals)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\healthcheck\helpers.ahk (518) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function _HealthCheck_ReadTail)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\healthcheck\probes.ahk (54) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Run  (in function HealthCheck_StartProbes)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\healthcheck\probes.ahk (70) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: Run  (in function HealthCheck_CancelProbes)
+D:\Documents\GitHub\ergopti\static\ergopti_plus\windows\ui\healthcheck\report.ahk (51) : ==> Warning: This local variable has the same name as a global variable.
+     Specifically: File  (in function _HCReport_Save)
+1..6
+ok 1 - llm-insertion actual_caller=LLM phase=4 retired=1
+ok 2 - llm-incident-16-50 actual_caller=LLM phase=4 retired=1
+ok 3 - llm-supplementary-tail actual_caller=LLM phase=4 retired=1
+ok 4 - hse-ct-star actual_caller=HSE phase=4 retired=1
+ok 5 - hse-uppercase actual_caller=HSE phase=4 retired=1
+ok 6 - hse-consumed-delimiter actual_caller=HSE phase=4 retired=1
