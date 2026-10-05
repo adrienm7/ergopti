@@ -41,3 +41,19 @@ The tracked entry subsequently ran all six cases successfully on the same
 receiver and DLL, with natural sender exit 0, empty stderr, unchanged source/DLL
 hashes, and acknowledged retirement of both owned Notepad processes. Its receipt
 SHA-256 is `753f7817c604685e555e98904baa7e2b53e6e3e5cfc7a1408fdbaace5097cdd1`. The output retains the same 48 warnings.
+
+The normal source resident subsequently reached its logged ready state. An
+independent child sent one marked `SendEvent` text burst at level 3, traversing
+the resident's actual InputHook rather than calling HSE functions. The exact
+owned receiving document became `c’était` with a collapsed DWORD caret at 7.
+The corrected observer exited naturally with status 0, empty stderr and no
+warnings, while resident PID/creation, source and DLL identities remained stable.
+A separate exact-document read then closed the synthetic window normally; both
+Notepad processes exited. The resident remained running.
+
+The first observer had refused a length change between WM_GETTEXTLENGTH and
+WM_GETTEXT during normal replacement. That failed observation is retained. Its
+successor treats an unstable bounded snapshot as pending observation, with one
+input burst and the same five-second deadline; it never resends input. This
+resident result proves injected ingress and receiving, not physical typing,
+actual model-server prediction admission, installed startup, or journal storage.
