@@ -648,35 +648,49 @@ function M.upsert_errors(device_id, row)
 	return _exec(sql)
 end
 
+--- Merges cumulative numeric histogram deltas using the existing burst SQL policy.
+--- @param column string Owned histogram column.
+--- @return string
+local function number_map_merge_sql(column)
+	return column .. " = (SELECT json_group_object(k, v) FROM ("
+		.. "SELECT key AS k, SUM(value) AS v FROM ("
+		.. "SELECT key, value FROM json_each(" .. column .. ") "
+		.. "UNION ALL SELECT key, value FROM json_each(excluded." .. column .. ")"
+		.. ") GROUP BY key))"
+end
+
 --- Upserts one hour of the activity histogram.
---- @param row table { date, app, hour, c, e, em, es }
+--- @param row table { date, app, hour, c, e, em, es, e_buckets? }
 function M.upsert_hourly(device_id, row)
 	if not M.is_available() or type(row) ~= "table" then return end
 	local sql = string.format(
-		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es) "
-		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d) "
+		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d,'%s') "
 		.. "ON CONFLICT(device_id, date, app, hour) DO UPDATE SET "
-		.. "c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es;",
+		.. "c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es, "
+		.. number_map_merge_sql("e_buckets_json") .. ";",
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		_sql_escape(tostring(row.hour or "")),
 		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
-		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0))
+		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0),
+		_sql_escape(Json.encode(row.e_buckets or {})))
 	return _exec(sql)
 end
 
 --- Upserts one five-minute slot of the fine-grained activity histogram.
---- @param row table { date, app, slot, c, e, es }
+--- @param row table { date, app, slot, c, e, es, e_buckets? }
 function M.upsert_hourly_min5(device_id, row)
 	if not M.is_available() or type(row) ~= "table" then return end
 	local sql = string.format(
-		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es) "
-		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d) "
+		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,'%s') "
 		.. "ON CONFLICT(device_id, date, app, slot) DO UPDATE SET "
-		.. "c = c + excluded.c, e = e + excluded.e, es = es + excluded.es;",
+		.. "c = c + excluded.c, e = e + excluded.e, es = es + excluded.es, "
+		.. number_map_merge_sql("e_buckets_json") .. ";",
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		_sql_escape(tostring(row.slot or "")),
 		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
-		math.floor(tonumber(row.es) or 0))
+		math.floor(tonumber(row.es) or 0), _sql_escape(Json.encode(row.e_buckets or {})))
 	return _exec(sql)
 end
 
@@ -728,11 +742,7 @@ function M.upsert_burst(device_id, row)
 		-- Merged key by key rather than replaced: each flush sees only its own
 		-- bursts, so overwriting would leave the histogram describing the last
 		-- few seconds of the day.
-		.. "length_buckets_json = (SELECT json_group_object(k, v) FROM ("
-		.. "SELECT key AS k, SUM(value) AS v FROM ("
-		.. "SELECT key, value FROM json_each(length_buckets_json) "
-		.. "UNION ALL SELECT key, value FROM json_each(excluded.length_buckets_json)"
-		.. ") GROUP BY key)), "
+		.. number_map_merge_sql("length_buckets_json") .. ", "
 		.. "inter_delay_count = inter_delay_count + excluded.inter_delay_count, "
 		.. "inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum, "
 		.. "inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;",

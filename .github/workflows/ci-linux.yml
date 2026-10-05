@@ -406,6 +406,14 @@ jobs:
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_callback_siblings.py
         timeout-minutes: 3
 
+      - name: Preserve hourly manual corrections and cumulative error histograms
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_hourly_manual_errors.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_hourly_manual_errors.lua
+        timeout-minutes: 1
+
       - name: Project directed application transitions with independent native SQL controls
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

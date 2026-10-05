@@ -341,7 +341,8 @@ function M.walk(events, date_str, app, batch, clock)
 
 	--- Credits one keystroke to its hour and its five-minute slot.
 	--- @param index number Position in the stream, to look the timestamp up.
-	local function bump_time_of_day(index)
+	--- @param error_delay number|nil Manual correction delay; excludes typed-character totals.
+	local function bump_time_of_day(index, error_delay)
 		if type(clock) ~= "table" or type(clock.times) ~= "table" then return end
 		local monotonic = tonumber(clock.times[index])
 		if not monotonic then return end
@@ -357,21 +358,28 @@ function M.walk(events, date_str, app, batch, clock)
 		-- because they answer the same question: what the day looked like, rather
 		-- than how much of it there was.
 		local minute_label = string.format("%s:%02d", hour, minute)
-		if not classes.first_typed_min or minute_label < classes.first_typed_min then
+		if error_delay == nil and (not classes.first_typed_min or minute_label < classes.first_typed_min) then
 			classes.first_typed_min = minute_label
 		end
-		if not classes.last_typed_min or minute_label > classes.last_typed_min then
+		if error_delay == nil and (not classes.last_typed_min or minute_label > classes.last_typed_min) then
 			classes.last_typed_min = minute_label
 		end
 
 		local hourly = Helpers.gc(batch.hourly, app_day_key .. SEPARATOR .. hour, {
-			date = date_str, app = app, hour = hour, c = 0, e = 0, em = 0, es = 0,
+			date = date_str, app = app, hour = hour, c = 0, e = 0, em = 0, es = 0, e_buckets = {},
 		})
-		hourly.c = hourly.c + 1
 		local min5 = Helpers.gc(batch.hourly_min5, app_day_key .. SEPARATOR .. slot, {
-			date = date_str, app = app, slot = slot, c = 0, e = 0, es = 0,
+			date = date_str, app = app, slot = slot, c = 0, e = 0, es = 0, e_buckets = {},
 		})
-		min5.c = min5.c + 1
+		if error_delay ~= nil then
+			hourly.e, hourly.em = hourly.e + 1, hourly.em + 1
+			min5.e = min5.e + 1
+			Helpers.bucket_add(hourly.e_buckets, error_delay, 1)
+			Helpers.bucket_add(min5.e_buckets, error_delay, 1)
+		else
+			hourly.c = hourly.c + 1
+			min5.c = min5.c + 1
+		end
 	end
 
 	--- Ends the current word, if there is one.
@@ -408,6 +416,7 @@ function M.walk(events, date_str, app, batch, clock)
 			if not is_synthetic then
 				errors.bs_total = errors.bs_total + 1
 				backspace_run = backspace_run + 1
+				bump_time_of_day(index, delay)
 			end
 		elseif is_synthetic then
 			-- Counted so the source histogram stays honest about how much of the

@@ -2112,6 +2112,31 @@ These are software implementations; final hardware verification remains below.
   Preserve both language packs and principal notification/HTTP assertions.
   No Writer, Keylogger, schema, UI, configuration or reserved change.
 
+- [~] **L134.** Linux hourly manual corrections: credit the existing software
+  [BS] protocol to local hourly/min5 error counters and cumulative delay bins,
+  while preserving typed-character totals and synthetic exclusion. Persist
+  numeric histogram deltas through the existing native SQLite merge policy;
+  extract the existing burst expression without changing its behavior.
+  Twelve genuine public collector/SQLite/Reader/dashboard checks reproduce
+  eight failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy
+  luv/libuv mixed profile. Enforce the exact twelve-check floor and preserve
+  every original assertion. Literal SQL controls cover raw bytes, daily errors,
+  cumulative thresholds, multiple flushes/devices, repeated direct deltas,
+  caller preservation, filters and RAISE(ABORT) statement refusal/recovery.
+  This proves that tested statement rollback, not general transaction recovery
+  or automatic retry durability. Four registered Walker cases reproduce three
+  failures and pass after; all forty-five Walker owner cases remain green with
+  the entire old unit prefix preserved. Replay native burst18, WPM13, raw-batch12
+  and completion10 on each profile. macOS/Windows already count manual corrections
+  in hour/min5 bins and persist their histograms in source; native foreign gates
+  remain with the principal agent. Reuse shared bucket thresholds/helpers and
+  the canonical schema, with no new policy or shared-data change. Register future
+  Linux CI without launching it. Real clocks/native processes/databases with
+  explicit software event timestamps do not validate physical Backspace capture,
+  which currently does not supply this marker. Preserve both language packs and
+  principal notification/HTTP assertions. No input hook, Reader, Keylogger, schema,
+  configuration, menu, foreign driver or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
