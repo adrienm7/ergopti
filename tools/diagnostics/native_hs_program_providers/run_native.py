@@ -256,6 +256,24 @@ def validate_diagnostic_facts(value, primary, scenario, source_sha, nonce, pid, 
     )
 
 
+def report_diagnostic_facts(value, primary, scenario, source_sha, nonce, pid, hashes):
+    """Print validated closed facts; no private identity or native verdict escapes."""
+    validate_diagnostic_facts(value, primary, scenario, source_sha, nonce, pid, hashes)
+    print(
+        json.dumps(
+            {
+                "contract": DIAGNOSTIC_CONTRACT,
+                "scenario": scenario,
+                "case_facts": value["case_facts"],
+                "runtime": value["runtime"],
+                "interpreter": value["interpreter"],
+                "expected_path_equal": value["expected_path_equal"],
+            }
+        ),
+        flush=True,
+    )
+
+
 def lua_string(value):
     return '"' + "".join("\\%03d" % byte for byte in value.encode("utf-8")) + '"'
 
@@ -605,7 +623,7 @@ def run_case(
                     flush=True,
                 )
         facts = read_packet(Path(value["diagnostic_facts"]))
-        validate_diagnostic_facts(
+        report_diagnostic_facts(
             facts, packet, scenario, sha, nonce, group.process.pid, diagnostic_hashes
         )
         validate_receipt(packet, scenario, sha, nonce, group.process.pid, hashes)
