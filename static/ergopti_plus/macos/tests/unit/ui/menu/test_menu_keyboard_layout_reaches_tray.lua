@@ -44,7 +44,8 @@ end
 local function make_ctx()
 	return {
 		base_dir   = helpers.driver_root(),
-		state      = { layout_pause_switch_enabled = true },
+		state      = { layout_pause_switch_enabled = true, hotstrings = { magickey = true } },
+		applyTriggerChar = function(text) return text end,
 		save_prefs = function() return true end,
 		updateMenu = function() end,
 		do_reload  = function() end,
@@ -79,10 +80,24 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			"`layout_switching` rendered nothing — the provider was read before its rows were collected")
 	end)
 
-	helpers.it("the magic-key replacement row is placed by the renderer", function()
-		local row = tray_row(make_ctx())
+	helpers.it("places replacement in the extension while Layout retains its physical picker", function()
+		local ctx = make_ctx()
+		local row = tray_row(ctx)
 		local seen = titles(row and row.menu)
-		helpers.assert_true(seen["Replace J with the magic key"],
-			"the magic-key replacement row must reach the rendered submenu")
+		helpers.assert_nil(seen["Replace J with the magic key"],
+			"the relocated replacement control must have no second Layout owner")
+		local physical_picker = false
+		for title in pairs(seen) do
+			if title:sub(1, #"menu.layout.magic_key_source : ") == "menu.layout.magic_key_source : " then
+				physical_picker = true
+			end
+		end
+		helpers.assert_true(physical_picker, "the actual Layout renderer still exposes physical-key selection")
+		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ManifestMenu = require("infra.manifest_menu")
+		local rows = Hotstrings.build_bound_section_rows(ctx, { { group = "magickey", section = "replace" } })
+		local rendered = ManifestMenu.render_rows(rows, "extension_hotstrings")
+		helpers.assert_true(titles(rendered)["Replace J with the magic key"],
+			"the actual extension provider's replacement row must reach the native renderer")
 	end)
 end)

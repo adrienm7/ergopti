@@ -872,6 +872,16 @@ function M.new()
 		return table.concat(_buf_cps)
 	end
 
+	--- Captures timing for an exact tail from this engine's physical input owner.
+	--- @param count number Positive integer of retained codepoints.
+	--- @return table|nil Detached timing summary, or nil for an invalid tail.
+	function engine:tail_timing_receipt(count)
+		if type(count) ~= "number" or count < 1 or count % 1 ~= 0 or count > #_buf_cps then
+			return nil
+		end
+		return { max_interkey_gap_ms = max_tail_gap_ms(count) }
+	end
+
 	--- The mappings the engine is currently considering, for the preview bubble.
 	---
 	--- Reads the instance's own buffer and boundary state so a caller does not

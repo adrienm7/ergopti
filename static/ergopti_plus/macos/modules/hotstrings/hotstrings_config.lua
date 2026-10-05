@@ -37,7 +37,10 @@ local Extensions = require("hotstrings.extensions")
 local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
+local PersonalFiles = require("hotstrings.personal_files")
 local BasicString = require("toml_codec.basic_string")
+local TomlCodec = require("toml_codec.codec")
+local PublicationRecovery = require("hotstrings.publication_recovery")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
@@ -80,7 +83,26 @@ local CATEGORY_DEFAULT_COLORS = {}
 local DEFAULT_WORD_DELIMITERS = " \t\r\n.,;:?!'’-=()[]/\\+*"
 
 local _state = nil
+local _terminal_owner = nil
 local delay_projection
+
+local function personal_override_owner(category, overrides)
+	if not PersonalFiles.components(category) or overrides[category] ~= nil then return category end
+	local record = require("infra.personal_hotstrings").adoption(category)
+	return record and record.admitted == true and record.legacy_name or category
+end
+
+local function personal_section_metadata(meta, section)
+	local selected = (meta.sections or {})[section]
+	local delay = (meta.section_delays or {})[section]
+	if delay ~= nil and (type(selected) ~= "table" or selected.delay == nil) then
+		local copy = {}
+		for key, value in pairs(selected or {}) do copy[key] = value end
+		copy.delay = delay
+		return copy
+	end
+	return selected
+end
 
 --- Returns the first non-nil argument. Module-level rather than a closure built
 --- inside M.resolve: it captures nothing, and the preview path calls resolve once
@@ -109,6 +131,14 @@ end
 --- @param func_name string Caller name for the diagnostic.
 --- @return boolean admitted
 local function scope_admits(func_name)
+	if _terminal_owner ~= nil then
+		Logger.error(LOG, "'%s' refused: controlled termination holds hotstring publication admission.", func_name)
+		return false
+	end
+	if _state.operation_active or (_state.recovery and _state.recovery.has_pending() and func_name ~= "reload") then
+		Logger.error(LOG, "'%s' refused: native override publication recovery retains admission.", func_name)
+		return false
+	end
 	if _state.scope_owner ~= nil then
 		Logger.error(LOG, "'%s' refused: a hotstrings scope holds the override file.", func_name)
 		return false
@@ -238,6 +268,9 @@ local function parse_override_content(content)
 			end
 		end
 
+		-- Global passthrough keeps its original, narrower lexical ownership.
+		-- Standard scalar and header comments belong to the canonical codec.
+		line = TomlCodec.strip_inline_comment(raw):match("^%s*(.-)%s*$")
 		if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
 
 		-- [ext.name.section] — extension section override (3 dotted segments)
@@ -330,6 +363,73 @@ local function parse_override_content(content)
 	return result, word_delimiters, global_passthrough
 end
 
+--- Checks every captured logical field without entering a path callback.
+local function same_publication_owner(captured)
+	if type(captured) ~= "table" or _state ~= captured.state then return false end
+	local state = _state
+	if state.path ~= captured.path or state.epoch ~= captured.epoch
+		or state.owner_epoch ~= captured.owner_epoch or state.scope_owner ~= captured.scope_owner
+		or state.source_snapshot ~= captured.source_object or state.overrides ~= captured.overrides
+		or state.word_delimiters ~= captured.word_delimiters then return false end
+	local source = state.source_snapshot
+	return (source and source.status) == captured.source_status
+		and (source and source.content) == captured.source_content
+end
+
+--- Captures the exact logical override owner before any native callback.
+local function capture_publication_owner(state)
+	local source = state.source_snapshot
+	local captured = { state = state, path = state.path, epoch = state.epoch,
+		owner_epoch = state.owner_epoch, scope_owner = state.scope_owner,
+		source_object = source, source_status = source and source.status,
+		source_content = source and source.content, overrides = state.overrides,
+		word_delimiters = state.word_delimiters }
+	if state.current_override_path then
+		local called, current = pcall(state.current_override_path)
+		if not called or current ~= captured.path then return nil end
+	end
+	if not same_publication_owner(captured) then return nil end
+	return captured
+end
+
+local function publication_owner_current(captured)
+	if not same_publication_owner(captured) then return false end
+	local state = captured.state
+	if state.current_override_path then
+		local called, path = pcall(state.current_override_path)
+		if not called or path ~= captured.path then return false end
+	end
+	return same_publication_owner(captured)
+end
+
+--- Reserves a source attempt before reads, planning or physical publication.
+local function begin_publication_attempt()
+	if _terminal_owner ~= nil or not _state or _state.operation_active then return false end
+	_state.operation_active = true
+	_state.common_admitted = false
+	_state.writes_blocked = true
+	if _state.recovery.has_pending() and _state.recovery.retry() ~= true then
+		_state.operation_active = false
+		return false
+	end
+	if _state.recovery.begin() ~= true then
+		_state.operation_active = false
+		return false
+	end
+	return true
+end
+
+--- Existing ordinary writes keep the native conditional owner's call boundary.
+local function publish_native_override(path, content, files, expected, on_error)
+	return files.write_if_unchanged(path, content, expected, on_error)
+end
+
+local function finish_publication_attempt(accepted)
+	local accepted = _state.recovery.finish(accepted)
+	_state.operation_active = false
+	return accepted == true
+end
+
 --- Reads and parses the user override file.
 --- @param path string Absolute path to the override file.
 --- @return table overrides The parsed overrides.
@@ -337,22 +437,32 @@ end
 --- @return string status `committed`, `absent`, or `error`.
 --- @return table|nil source_snapshot Exact classified bytes used to build the result.
 --- @return string[] global_passthrough Exact raw records for unowned [__global__] keys.
+--- @return boolean|nil common_admitted Exact common activation admission after migration.
 local function parse_overrides(path)
-	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, path)
+	if not begin_publication_attempt() then return {}, nil, "error", nil, {} end
+	local Migration = require("hotstrings.common_autocorrection_migration")
+	local read_ok, migrated = pcall(Migration.run, path, Paths.shared(Migration.POLICY_PATH), FileSystem,
+		_state.on_publication_error, _state.recovery.publish)
+	local accepted = read_ok and type(migrated) == "table"
+		and (migrated.status == "absent" or migrated.status == "current" or migrated.status == "migrated")
+	if not finish_publication_attempt(accepted) then return {}, nil, "error", nil, {} end
+	local content = read_ok and migrated.content or nil
+	local read_status = read_ok and migrated.status or "error"
+	local read_detail = read_ok and migrated.detail or tostring(migrated)
 	if not read_ok or read_status == "error" then
 		Logger.error(LOG, "Override source read did not commit: %s.",
 			tostring(read_ok and read_detail or content))
 		return {}, nil, "error", nil, {}
 	end
 	if read_status == "absent" then
-		return {}, nil, "absent", { status = "absent" }, {}
+		return {}, nil, "absent", { status = "absent" }, {}, true
 	end
-	if read_status ~= "ok" or type(content) ~= "string" then
+	if (read_status ~= "current" and read_status ~= "migrated") or type(content) ~= "string" then
 		Logger.error(LOG, "Override source returned an invalid read status: %s.", tostring(read_status))
 		return {}, nil, "error", nil, {}
 	end
 	local result, word_delimiters, global_passthrough = parse_override_content(content)
-	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough
+	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough, migrated.common_admitted ~= false
 end
 
 --- Serializes the in-memory override table back to TOML.
@@ -501,9 +611,15 @@ end
 --- Ordinary I/O failures retain the last committed memo; only a proven source
 --- change replaces it. An unreadable revalidation blocks later writes.
 local function refresh_after_failed_publication()
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough =
+	if _state.recovery.has_pending() or _state.operation_active then
+		_state.common_admitted = false
+		_state.writes_blocked = true
+		return false
+	end
+	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(_state.path)
 	if read_status == "error" then
+		_state.common_admitted = false
 		_state.writes_blocked = true
 		Logger.error(LOG, "Override publication failed and source revalidation did not commit; writes blocked.")
 		return
@@ -512,6 +628,7 @@ local function refresh_after_failed_publication()
 	if _state.delay_transaction
 		and _state.delay_transaction(delay_projection(overrides), function() return true end) ~= true then
 		_state.writes_blocked = true
+		_state.common_admitted = false
 		Logger.error(LOG, "Override source adoption refused by the delay owner.")
 		return false
 	end
@@ -519,6 +636,8 @@ local function refresh_after_failed_publication()
 	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
+	_state.epoch = _state.epoch + 1
+	_state.common_admitted = common_admitted
 	_state.writes_blocked  = false
 	_state.resolve_cache   = {}
 	Logger.warn(LOG, "Override publication lost a source race; newer external bytes were adopted.")
@@ -640,8 +759,11 @@ local function save_to_disk(overrides, word_delimiters)
 		return false
 	end
 	content = prepared
+	local previous_common_admission = _state.common_admitted
+	if not begin_publication_attempt() then return false end
 	local function publish()
-		return FileSystem.write_if_unchanged(_state.path, content, _state.source_snapshot) == true
+		return _state.recovery.publish(_state.path, content, FileSystem,
+			_state.source_snapshot, _state.on_publication_error, publish_native_override)
 	end
 	local ok, committed = pcall(function()
 		if _state.delay_transaction then
@@ -649,11 +771,14 @@ local function save_to_disk(overrides, word_delimiters)
 		end
 		return publish()
 	end)
-	if not ok or committed ~= true then
+	local accepted = finish_publication_attempt(ok and committed == true)
+	if not accepted then
 		Logger.error(LOG, "Failed to commit override file against its loaded source snapshot.")
 		refresh_after_failed_publication()
 		return false
 	end
+	_state.common_admitted = previous_common_admission
+	_state.writes_blocked = false
 	Logger.debug(LOG, "Override file written: '%s'.", _state.path)
 	return true, content
 end
@@ -717,6 +842,9 @@ local function get_toml_meta(category)
 	-- Copied before merging: the reader may hand back a snapshot other readers share.
 	local sections = {}
 	for name, meta in pairs(parsed.meta.sections or {}) do sections[name] = meta end
+	if PersonalFiles.components(category) then
+		for name in pairs(parsed.meta.section_delays or {}) do sections[name] = personal_section_metadata(parsed.meta, name) end
+	end
 	for _, bound in ipairs(bound_sections(category, toml_path)) do sections[bound.name] = bound.meta end
 	cache[category] = {
 		delay        = parsed.meta.delay,
@@ -743,39 +871,51 @@ end
 ---   section_sources_resolver = function(category, path) -> { { path, sections } }|nil (optional):
 ---   the sections other files supply for a category, as the keymap loads them }
 function M.init(opts)
+	if _terminal_owner ~= nil then return false end
 	Logger.start(LOG, "Initializing…")
 	if type(opts) ~= "table"
 		or type(opts.override_path) ~= "string" or opts.override_path == ""
 		or type(opts.toml_resolver) ~= "function"
 		or (opts.delay_transaction ~= nil and type(opts.delay_transaction) ~= "function")
 		or (opts.section_sources_resolver ~= nil and type(opts.section_sources_resolver) ~= "function")
+		or (opts.current_override_path ~= nil and type(opts.current_override_path) ~= "function")
 	then
 		Logger.error(LOG, "M.init(): opts.override_path and opts.toml_resolver are required.")
 		return
 	end
 	if _state then
+		if _state.operation_active or _state.recovery.has_pending() then return false end
 		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
 		return
 	end
 
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough =
-		parse_overrides(opts.override_path)
 	_state = {
 		path            = opts.override_path,
 		toml_resolver   = opts.toml_resolver,
 		section_sources_resolver = opts.section_sources_resolver,
 		delay_transaction = opts.delay_transaction,
-		overrides       = overrides,
-		word_delimiters = word_delimiters,
-		global_passthrough = global_passthrough,
-		source_snapshot = source_snapshot,
-		writes_blocked  = read_status == "error",
+		overrides       = {},
+		global_passthrough = {},
+		common_admitted = false,
+		writes_blocked  = true,
+		epoch = 1,
+		owner_epoch = 0,
+		current_override_path = opts.current_override_path,
 		toml_cache      = {},
 		-- Memo for M.resolve, cleared by the three writers that can change an
 		-- answer. Living in _state means M.init() resets it without a separate
 		-- lifecycle to remember.
 		resolve_cache   = {},
 	}
+	local state = _state
+	state.on_publication_error = function()
+		Logger.error(LOG, "Conditional override publication reported a native refusal.")
+	end
+	state.recovery = PublicationRecovery.new({ files = FileSystem,
+		capture = function() return capture_publication_owner(state) end,
+		current = publication_owner_current })
+	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
+		parse_overrides(opts.override_path)
 	if read_status == "error" then
 		Logger.error(LOG, "Initialization degraded: override source is unreadable and writes are blocked.")
 		return false
@@ -786,6 +926,13 @@ function M.init(opts)
 		Logger.error(LOG, "Override delay owner initialization was refused.")
 		return false
 	end
+	_state.overrides = overrides
+	_state.word_delimiters = word_delimiters
+	_state.global_passthrough = global_passthrough
+	_state.source_snapshot = source_snapshot
+	_state.epoch = _state.epoch + 1
+	_state.common_admitted = common_admitted == true
+	_state.writes_blocked = false
 	Logger.success(LOG, "Initialized (override file: '%s').", opts.override_path)
 	return true
 end
@@ -834,10 +981,15 @@ delay_projection = function(overrides)
 			source_category = assert(ConfigSchema.normalize_category("ext." .. extension_id),
 				"extension has no supported override owner")
 		end
+		if PersonalFiles.components(category) then
+			source_category = personal_override_owner(category, overrides)
+		end
 		local user = overrides[source_category] or {}
 		local user_section = (user.sections or {})[section]
 		local meta_section = meta.sections and meta.sections[section]
-		if type(meta_section) ~= "table" and meta.section_delays then
+		if PersonalFiles.components(category) then
+			meta_section = personal_section_metadata(meta, section)
+		elseif type(meta_section) ~= "table" and meta.section_delays then
 			meta_section = { delay = meta.section_delays[section] }
 		end
 		return DelayResolver.resolve({
@@ -845,7 +997,8 @@ delay_projection = function(overrides)
 			user_section = sanitized_resolution_entry(user_section),
 			meta_category = sanitized_resolution_entry(meta),
 			meta_section = sanitized_resolution_entry(meta_section),
-			default_delay = GLOBAL_DEFAULT_DELAY,
+			default_delay = PersonalFiles.components(category) and PersonalFiles.additional_default_delay_seconds
+				or GLOBAL_DEFAULT_DELAY,
 		}).delay
 	end
 end
@@ -880,21 +1033,27 @@ function M.resolve(category, section)
 			return M.resolve_ext(extension_id, pack_path, section)
 		end
 	end
-	local canonical_category = ConfigSchema.normalize_category(category)
-	if not canonical_category or not ConfigSchema.is_section(section) then
+	local personal = PersonalFiles.components(category) ~= nil
+	local canonical_category = personal and category or ConfigSchema.normalize_category(category)
+	if not canonical_category or (not personal and not ConfigSchema.is_section(section))
+		or (personal and section ~= nil and type(section) ~= "string") then
 		Logger.error(LOG, "resolve(): category and section must be supported bare identifiers.")
 		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true,
 			priority = HotstringPriority.source_priority(category), has_override = false }
 	end
 	local requested_section = section
 	category = canonical_category
-	section = ConfigSchema.normalize_section(section)
+	section = personal and section or ConfigSchema.normalize_section(section)
 
 	local cache_key = category .. "\0" .. tostring(requested_section or "")
 	local cached = _state.resolve_cache and _state.resolve_cache[cache_key]
 	if cached then return cached end
 
-	local user = _state.overrides[category] or { sections = {} }
+	local override_category = category
+	if personal then
+		override_category = personal_override_owner(category, _state.overrides)
+	end
+	local user = _state.overrides[override_category] or { sections = {} }
 	local user_sec = section and (user.sections or {})[section] or nil
 	local meta = get_toml_meta(category)
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
@@ -909,7 +1068,7 @@ function M.resolve(category, section)
 		user_section   = sanitized_resolution_entry(user_sec),
 		meta_category  = sanitized_resolution_entry(meta),
 		meta_section   = sanitized_resolution_entry(meta_sec),
-		default_delay  = GLOBAL_DEFAULT_DELAY,
+		default_delay  = personal and PersonalFiles.additional_default_delay_seconds or GLOBAL_DEFAULT_DELAY,
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 		default_priority = HotstringPriority.source_priority(category),
@@ -1020,6 +1179,7 @@ function M.set_override(category, section, field, value)
 	if not committed then return false end
 	_state.overrides = candidate
 	_state.source_snapshot = { status = "ok", content = content }
+	_state.epoch = _state.epoch + 1
 	_state.resolve_cache = {}
 	Logger.debug(LOG, "Override set: %s%s.%s = %s.",
 		category, section and ("." .. section) or "", field, tostring(value))
@@ -1063,6 +1223,7 @@ function M.clear_override(category, section, field)
 	if not committed then return false end
 	_state.overrides = candidate
 	_state.source_snapshot = { status = "ok", content = content }
+	_state.epoch = _state.epoch + 1
 	_state.resolve_cache = {}
 	Logger.debug(LOG, "Override cleared: %s%s%s.",
 		category,
@@ -1089,9 +1250,10 @@ end
 --- @return boolean
 function M.reload()
 	if not require_state("reload") or not scope_admits("reload") then return false end
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough =
+	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(_state.path)
 	if read_status == "error" then
+		_state.common_admitted = false
 		_state.writes_blocked = true
 		Logger.error(LOG, "Override reload failed; prior memory retained and writes blocked.")
 		return false
@@ -1099,6 +1261,7 @@ function M.reload()
 	if _state.delay_transaction
 		and _state.delay_transaction(delay_projection(overrides), function() return true end) ~= true then
 		_state.writes_blocked = true
+		_state.common_admitted = false
 		Logger.error(LOG, "Override source adoption refused by the delay owner.")
 		return false
 	end
@@ -1106,6 +1269,8 @@ function M.reload()
 	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
+	_state.epoch = _state.epoch + 1
+	_state.common_admitted = common_admitted
 	_state.writes_blocked  = false
 	_state.resolve_cache   = {}
 	Logger.debug(LOG, "Overrides reloaded from disk.")
@@ -1133,8 +1298,10 @@ end
 --- @param owner table Transaction identity.
 --- @return boolean acquired
 function M.acquire(owner)
-	if not require_state("acquire") or type(owner) ~= "table" or _state.scope_owner ~= nil then return false end
+	if _terminal_owner ~= nil or not require_state("acquire") or type(owner) ~= "table" or _state.scope_owner ~= nil
+		or _state.operation_active or _state.recovery.has_pending() then return false end
 	_state.scope_owner = owner
+	_state.owner_epoch = _state.owner_epoch + 1
 	return true
 end
 
@@ -1142,9 +1309,21 @@ end
 --- @param owner table Transaction identity.
 --- @return boolean released
 function M.release(owner)
-	if not require_state("release") or _state.scope_owner ~= owner then return false end
+	if not require_state("release") or type(owner) ~= "table" or _state.scope_owner ~= owner then return false end
 	_state.scope_owner = nil
+	_state.owner_epoch = _state.owner_epoch + 1
 	return true
+end
+
+--- Captures one actual held scope and its committed override memo generation.
+--- Transient scope_candidate runtime phases remain the holding controller's own.
+--- @param owner table Exact admitted scope identity.
+--- @return function|nil current Bound strict admission check.
+function M.capture_scope_owner(owner)
+	if not require_state("capture_scope_owner") or type(owner) ~= "table" or _state.scope_owner ~= owner then return nil end
+	local captured = capture_publication_owner(_state)
+	if not captured or captured.scope_owner ~= owner then return nil end
+	return function() return publication_owner_current(captured) end
 end
 
 --- The committed override state a scope may restore, or nil when the source
@@ -1153,6 +1332,62 @@ end
 function M.scope_snapshot()
 	if not require_state("scope_snapshot") or _state.writes_blocked then return nil end
 	return { source = clone_value(_state.source_snapshot), overrides = clone_value(_state.overrides) }
+end
+
+--- Prepares one admitted source edit together with only its masking legacy leaves.
+--- The caller holds this override owner until publication or a verified inverse.
+function M.prepare_personal_metadata(owner, record, section, field, value)
+	if not require_state("prepare_personal_metadata") or _state.scope_owner ~= owner or _state.writes_blocked
+		or type(record) ~= "table" or record.admitted ~= true or not PersonalFiles.components(record.owner) then return nil end
+	local loader = require("infra.personal_hotstrings")
+	if loader.adoption_current(record) ~= true then return nil end
+	local overrides = clone_value(_state.overrides)
+	local legacy_name = personal_override_owner(record.owner, overrides)
+	local legacy = overrides[legacy_name] or {}
+	local plan = require("hotstrings.personal_metadata").prepare(record.content, section, field, value, legacy)
+	if not plan then return nil end
+	if legacy_name and legacy then
+		if plan.remove_file then legacy[field] = nil end
+		if plan.remove_section then legacy.sections[section][field] = nil end
+	end
+	local override_content = prepare_override_content(overrides, _state.word_delimiters)
+	if not override_content then return nil end
+	plan.override_path = _state.path
+	plan.override_source = clone_value(_state.source_snapshot)
+	plan.override_target = (_state.source_snapshot.status == "absent" and override_content == "")
+		and { status = "absent" } or { status = "ok", content = override_content }
+	plan.delay_resolver = delay_projection(overrides)
+	plan.priority_reader = function(requested)
+		local entry = overrides[personal_override_owner(record.owner, overrides)] or {}
+		local leaf = requested and (entry.sections or {})[requested] or entry
+		return type(leaf) == "table" and leaf.priority or nil
+	end
+	return plan
+end
+
+--- Reads the staged native catalogue and this held override owner, even disabled.
+--- @param record table Captured canonical source owner.
+--- @param section string|nil Declared literal section or file metadata.
+--- @return table|nil effective
+function M.personal_catalogue_effective(record, section)
+	if not require_state("personal_catalogue_effective") or not _state.scope_owner
+		or type(record) ~= "table" or record.admitted ~= true
+		or require("infra.personal_hotstrings").adoption_current(record) ~= true then return nil end
+	local catalogue = require("modules.keymap").hotstring_delay_inventory()
+	local registered = type(catalogue) == "table" and catalogue[record.owner]
+	if not registered or type(registered.metadata) ~= "table" then return nil end
+	local candidate = _state.scope_candidate
+	local overrides = candidate and candidate.owner == _state.scope_owner and candidate.overrides or _state.overrides
+	local user = overrides[personal_override_owner(record.owner, overrides)] or {}
+	return DelayResolver.resolve({
+		user_category = sanitized_resolution_entry(user),
+		user_section = sanitized_resolution_entry(section and (user.sections or {})[section] or nil),
+		meta_category = sanitized_resolution_entry(registered.metadata),
+		meta_section = sanitized_resolution_entry(section and personal_section_metadata(registered.metadata, section) or nil),
+		default_delay = PersonalFiles.additional_default_delay_seconds,
+		default_color = GLOBAL_DEFAULT_COLOR,
+		default_priority = HotstringPriority.source_priority(record.owner),
+	})
 end
 
 --- Adopts classified override bytes for the scope that holds the file: their
@@ -1164,19 +1399,24 @@ end
 --- @param publish function Exact conditional publication, returning true.
 --- @return boolean adopted
 function M.adopt_scope_source(owner, source, publish)
-	if not require_state("adopt_scope_source") or _state.scope_owner ~= owner or _state.writes_blocked then
+	if _terminal_owner ~= nil or type(owner) ~= "table" or not require_state("adopt_scope_source")
+		or _state.scope_owner ~= owner or _state.writes_blocked then
 		return false
 	end
+	if _state.scope_candidate ~= nil then return false end
 	assert(type(source) == "table" and (source.status == "absent"
 		or (source.status == "ok" and type(source.content) == "string")), "scope override source is not classified")
 	assert(type(publish) == "function", "scope override adoption needs its publication")
 	local overrides, word_delimiters, global_passthrough = parse_override_content(source.content or "")
+	local candidate = { owner = owner, overrides = overrides }
+	_state.scope_candidate = candidate
 	local ok, committed = pcall(function()
 		if _state.delay_transaction then
 			return _state.delay_transaction(delay_projection(overrides), publish)
 		end
 		return publish()
 	end)
+	if _state.scope_candidate == candidate then _state.scope_candidate = nil end
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Scope override adoption did not commit: %s.", tostring(committed))
 		return false
@@ -1186,7 +1426,9 @@ function M.adopt_scope_source(owner, source, publish)
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot    = source.status == "ok" and { status = "ok", content = source.content }
 		or { status = "absent" }
+	_state.epoch = _state.epoch + 1
 	_state.resolve_cache      = {}
+	_state.toml_cache         = {}
 	Logger.debug(LOG, "Scope override source adopted (%s).", source.status)
 	return true
 end
@@ -1245,8 +1487,10 @@ function M.get_toml_defaults(category, section)
 	if not require_state("get_toml_defaults") then
 		return { delay = GLOBAL_DEFAULT_DELAY, color = nil }
 	end
-	local canonical_category = ConfigSchema.normalize_category(category)
-	if not canonical_category or not ConfigSchema.is_section(section) then
+	local personal = PersonalFiles.components(category) ~= nil
+	local canonical_category = personal and category or ConfigSchema.normalize_category(category)
+	if not canonical_category or (not personal and not ConfigSchema.is_section(section))
+		or (personal and section ~= nil and type(section) ~= "string") then
 		return { delay = GLOBAL_DEFAULT_DELAY, color = nil }
 	end
 	local requested_section = section
@@ -1254,10 +1498,51 @@ function M.get_toml_defaults(category, section)
 	local meta = get_toml_meta(category)
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 	return {
-		delay = (meta_sec and meta_sec.delay) or meta.delay or GLOBAL_DEFAULT_DELAY,
+		delay = (meta_sec and meta_sec.delay) or meta.delay
+			or (personal and PersonalFiles.additional_default_delay_seconds or GLOBAL_DEFAULT_DELAY),
 		color = (meta_sec and meta_sec.color) or meta.color,
 		priority = (meta_sec and meta_sec.priority) or meta.priority,
 	}
+end
+
+--- Whether initialized common override data permits native common activation.
+--- Nil represents a resolver that has not initialized an override source yet.
+--- @return boolean|nil admitted
+--- Returns whether this controller still owns an unsettled native publication.
+--- The native capability and original source remain private to recovery.
+function M.has_pending_publication()
+	return _state ~= nil and _state.recovery.has_pending()
+end
+
+--- Holds publication admission across a controlled terminal transition.
+--- Existing source/scope recovery is never consumed here. An uninitialized
+--- controller may grant early-boot recovery, but cannot initialize under that
+--- exact token. Only a pre-fence abort may release the same live owner.
+--- @return table|nil token Private zero-argument current/abort capabilities.
+function M.capture_terminal_admission()
+	if _terminal_owner ~= nil then return nil end
+	local state = _state
+	if state and (state.operation_active or state.recovery.has_pending()
+		or state.scope_owner ~= nil or state.scope_candidate ~= nil) then return nil end
+	local owner = {}
+	_terminal_owner = owner
+	local function current()
+		return _terminal_owner == owner and _state == state
+			and (not state or (not state.operation_active and not state.recovery.has_pending()
+				and state.scope_owner == nil and state.scope_candidate == nil))
+	end
+	return {
+		current = current,
+		abort = function()
+			if current() ~= true then return false end
+			_terminal_owner = nil
+			return true
+		end,
+	}
+end
+
+function M.common_autocorrection_admitted()
+	return _state and _state.common_admitted
 end
 
 --- Returns the raw user override entry (or nil) for a (category, section)
@@ -1268,9 +1553,17 @@ end
 --- @return table|nil { delay = number|nil, color = string|nil }
 function M.get_user_override(category, section)
 	if not require_state("get_user_override") then return nil end
-	category = ConfigSchema.normalize_category(category)
-	if not category or not ConfigSchema.is_section(section) then return nil end
-	section = ConfigSchema.normalize_section(section)
+	local personal = PersonalFiles.components(category) ~= nil
+	if personal then
+		if section ~= nil and type(section) ~= "string" then return nil end
+		local record = require("infra.personal_hotstrings").adoption(category)
+		if not record or record.admitted ~= true then return nil end
+		category = personal_override_owner(category, _state.overrides)
+	else
+		category = ConfigSchema.normalize_category(category)
+		if not category or not ConfigSchema.is_section(section) then return nil end
+		section = ConfigSchema.normalize_section(section)
+	end
 	local cat = _state.overrides[category]
 	if not cat then return nil end
 	local target = section and (cat.sections or {})[section] or cat
@@ -1346,19 +1639,21 @@ function M.set_word_delimiters(delimiters)
 		Logger.error(LOG, "Failed to patch word_delimiters: %s.", tostring(patch_err))
 		return false
 	end
-	local write_ok, committed = pcall(
-		FileSystem.write_if_unchanged,
-		_state.path,
-		content,
-		snapshot
-	)
-	if not write_ok or committed ~= true then
+	local previous_common_admission = _state.common_admitted
+	if not begin_publication_attempt() then return false end
+	local write_ok, committed = pcall(_state.recovery.publish,
+		_state.path, content, FileSystem, snapshot, _state.on_publication_error, publish_native_override)
+	local accepted = finish_publication_attempt(write_ok and committed == true)
+	if not accepted then
 		Logger.error(LOG, "Failed to commit word_delimiters against its loaded source snapshot.")
 		refresh_after_failed_publication()
 		return false
 	end
+	_state.common_admitted = previous_common_admission
+	_state.writes_blocked = false
 	_state.word_delimiters = candidate
 	_state.source_snapshot = { status = "ok", content = content }
+	_state.epoch = _state.epoch + 1
 	Logger.debug(LOG, "word_delimiters persisted: %s.", candidate and
 		('"' .. tostring(candidate) .. '"') or "(default — key removed)")
 	return true

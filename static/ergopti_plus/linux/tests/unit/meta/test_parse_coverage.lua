@@ -126,6 +126,47 @@ end
 -- ==========================================
 -- ==========================================
 
+--- Inspects compiled nested prototypes without executing any driver code.
+--- LuaJIT versions differ in their compiler limit; the portable budget is 60.
+--- @param chunk function Compiled root function.
+--- @param limit integer Portable upvalue budget.
+--- @return table Prototype count, largest upvalue count and over-budget locations.
+local function jit_upvalue_budget(chunk, limit)
+	local util = require("jit.util")
+	local result = { count = 0, maximum = 0, over = {} }
+	local function visit(proto)
+		local info = assert(util.funcinfo(proto), "compiled Lua prototype metadata is required")
+		assert(type(info.upvalues) == "number" and type(info.gcconsts) == "number",
+			"compiled Lua prototype counts are required")
+		result.count = result.count + 1
+		result.maximum = math.max(result.maximum, info.upvalues)
+		if info.upvalues > limit then
+			result.over[#result.over + 1] = string.format("%s:%s: %d upvalues",
+				tostring(info.source), tostring(info.linedefined), info.upvalues)
+		end
+		for index = -1, -info.gcconsts, -1 do
+			local child = util.funck(proto, index)
+			if type(child) == "proto" then visit(child) end
+		end
+	end
+	visit(chunk)
+	return result
+end
+
+--- Produces an independent nested function that captures exactly the given count.
+--- @param count integer Number of outer locals captured by the nested function.
+--- @return string Lua source with three compiled prototype levels.
+local function nested_upvalue_source(count)
+	local names, values = {}, {}
+	for index = 1, count do
+		names[index] = "value_" .. index
+		values[index] = tostring(index)
+	end
+	return "return function()\nlocal " .. table.concat(names, ",") .. " = "
+		.. table.concat(values, ",") .. "\nreturn function() return "
+		.. table.concat(names, ",") .. " end\nend\n"
+end
+
 helpers.describe("linux: every production Lua file compiles", function()
 	local files = production_files()
 
@@ -171,10 +212,28 @@ helpers.describe("linux: every production Lua file compiles", function()
 		-- LuaJIT refuses to compile a function with more than 60 upvalues, which
 		-- PUC Lua accepts up to 255: four file-scope requires pushed main() of the
 		-- entry point to 62, the local suite stayed green and only CI's LuaJIT
-		-- failed. Under LuaJIT loadfile above already enforces the limit; under
-		-- PUC Lua the compiler's own listing gives every function's count.
-		if jit then return end
+		-- failed. Newer LuaJIT accepts larger functions, so inspect its compiled
+		-- prototypes too; PUC Lua's compiler listing supplies the same counts.
 		local LIMIT = 60
+		if jit then
+			local over = {}
+			local inspected = 0
+			for _, path in ipairs(files) do
+				local chunk, err = loadfile(path)
+				if not chunk then
+					over[#over + 1] = tostring(err)
+				else
+					local result = jit_upvalue_budget(chunk, LIMIT)
+					inspected = inspected + 1
+					for _, location in ipairs(result.over) do over[#over + 1] = location end
+				end
+			end
+			helpers.assert_true(inspected >= MIN_FILES, "the prototype scan must reach the production source")
+			helpers.assert_eq(#over, 0, "function(s) over LuaJIT's " .. LIMIT
+				.. "-upvalue limit (move file-scope requires into the function that uses them):\n  "
+				.. table.concat(over, "\n  "))
+			return
+		end
 		local BATCH = 30
 		local luac_probe = io.popen("luac -v 2>&1", "r")
 		local banner = luac_probe and luac_probe:read("*a") or ""
@@ -205,5 +264,30 @@ helpers.describe("linux: every production Lua file compiles", function()
 		helpers.assert_eq(#over, 0, "function(s) over LuaJIT's " .. LIMIT
 			.. "-upvalue limit (move file-scope requires into the function that uses them):\n  "
 			.. table.concat(over, "\n  "))
+	end)
+
+	helpers.it("LuaJIT's upvalue inspection reaches a nested function at the 60 boundary", function()
+		if not jit then return end
+		local chunk, err = loadstring(nested_upvalue_source(60), "=independent-upvalue-boundary")
+		helpers.assert_not_nil(chunk, tostring(err))
+		local result = jit_upvalue_budget(chunk, 60)
+		helpers.assert_eq(result.count, 3, "root, outer and nested function must all be inspected")
+		helpers.assert_eq(result.maximum, 60)
+		helpers.assert_eq(#result.over, 0)
+	end)
+
+	helpers.it("LuaJIT's upvalue inspection rejects an independent nested function with 61", function()
+		if not jit then return end
+		local chunk, err = loadstring(nested_upvalue_source(61), "=independent-upvalue-rejection")
+		if not chunk then
+			-- Older LuaJIT rejects this source before a prototype can exist.
+			helpers.assert_true(tostring(err):find("upvalue", 1, true) ~= nil,
+				"only an explicit compiler upvalue refusal proves this fixture was rejected")
+			return
+		end
+		local result = jit_upvalue_budget(chunk, 60)
+		helpers.assert_eq(result.count, 3)
+		helpers.assert_eq(result.maximum, 61)
+		helpers.assert_eq(#result.over, 1, "the over-budget nested prototype must be rejected")
 	end)
 end)
