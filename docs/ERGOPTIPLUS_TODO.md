@@ -1714,6 +1714,26 @@ These are software implementations; final hardware verification remains below.
   legacy caller, foreign native gate, transport, Backboard/decisions, menu,
   persistence, multipart policy or physical input change.
 
+- [~] **L117.** Linux provider error-message UTF-8 boundaries: use one shared
+  byte-prefix helper at the existing selected diagnostic field. Retain the
+  200-byte ceiling and longest complete prefix of valid source text instead of
+  cutting a multibyte scalar in half. Preserve field priority, empty explanations
+  and pre-existing malformed-source raw-prefix behavior; this does not repair or
+  newly admit malformed provider strings. Forty-five actual verified TLS/public
+  provider HTTP 401 calls have twenty-four original boundary failures and pass
+  after on current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 curl/luv/libuv
+  dependencies. Independent Python prefixes, complete `error_body`, empty success
+  body, curl exit 22/signal zero, one callback, no chunks and zero native handles
+  remain checked. Six shared-helper cases and forty-seven provider cases pass
+  on both runtimes, covering scalar splits, byte budgets, invalid arguments,
+  ordinary controls and explicit unchanged malformed-source behavior. Preserve
+  earlier helpers, provider owners and manual callback/IPv6 manifest entries;
+  register future Linux CI without launching it. macOS has the same source byte
+  cut and can adopt the shared helper after native validation. Windows has a
+  different UTF-16 unit ceiling and ellipsis; supplementary-pair safety needs
+  its own native proof. No foreign source/runtime, decoder policy, transport,
+  menu, persistence, physical input or character-budget expansion.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
