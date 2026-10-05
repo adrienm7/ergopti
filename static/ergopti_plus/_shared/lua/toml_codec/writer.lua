@@ -265,9 +265,10 @@ local function publish_content(path, content, file_adapter, expected_source)
 		if type(publisher) ~= "function" then
 			return false, "explicit file adapter has no compatible publication method"
 		end
-		local call_ok, written, write_detail = pcall(publisher, path, content, expected_source)
+		local call_ok, written, write_detail, retry_cleanup = pcall(publisher, path, content, expected_source)
 		if call_ok and written == true then return true end
-		return false, tostring((call_ok and write_detail) or written or "adapter write failed")
+		return false, tostring((call_ok and write_detail) or written or "adapter write failed"),
+			call_ok and retry_cleanup or nil
 	end
 
 	return publish(path, content, expected_source)
@@ -847,12 +848,30 @@ end
 --- @param expected_source table `{ status, content }` precondition.
 --- @return boolean committed
 --- @return string|nil error_message
+--- @return function|nil retry_cleanup Exact native cleanup/effect capability on refusal.
 function M.publish_if_unchanged(path, content, file_adapter, expected_source)
 	if type(path) ~= "string" or path == "" or type(content) ~= "string"
 		or type(expected_source) ~= "table" then
 		return false, "publish_if_unchanged needs a path, a string payload and a source precondition"
 	end
 	return publish_content(path, content, file_adapter, expected_source)
+end
+
+--- Settles one private native publication cleanup receipt without writing a file.
+--- The owner retains a refused or malformed terminal; only literal settlement
+--- and effect flags can acknowledge its exact publication boundary.
+--- @param record table Owner's private publication_cleanup and effect state.
+--- @return boolean settled
+--- @return string|nil detail
+--- @return boolean|nil published Effect receipt, nil when no cleanup was owed.
+function M.retry_publication_cleanup(record)
+	if record.publication_cleanup == nil then return true, nil, record.publication_effect end
+	local called, settled, detail, published = pcall(record.publication_cleanup)
+	if not called or settled ~= true or type(published) ~= "boolean" then
+		return false, tostring(called and detail or settled or "publication cleanup remains pending")
+	end
+	record.publication_cleanup, record.publication_effect = nil, published
+	return true, nil, published
 end
 
 --- Removes a file only while it still holds exactly the bytes a caller published.

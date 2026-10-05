@@ -143,7 +143,7 @@ function M.new(options)
 		owned_paths = inventory, owners = validators,
 		presets = { tap_hold = {
 			path = options.tap_hold_path, backup_path = options.tap_hold_backup_path, prefixes = { "tap_holds" },
-			render = function(mode, document, rows) return writer.render_scope(mode, document, rows, preset) end,
+			render = function(mode, document, rows, shapes) return writer.render_scope(mode, document, rows, preset, shapes) end,
 		} },
 		prepare_batch = function(path, updates, adapter)
 			local operations = {}
@@ -165,7 +165,7 @@ function M.new(options)
 				if parameter_domain("gesture_parameters." .. key) then candidate[key] = nil end
 			end
 			if parameters.apply_parameter_configuration(owner, candidate) ~= true then return false end
-			return manager.apply_configuration(presets.tap_hold.decoded) == true
+			return manager.apply_configuration(presets.tap_hold.decoded, presets.tap_hold.shapes) == true
 		end,
 		restore = apply_state,
 	})

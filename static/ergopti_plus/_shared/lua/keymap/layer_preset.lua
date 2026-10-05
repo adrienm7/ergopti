@@ -112,6 +112,7 @@ end
 --- @return table|nil result { status = IMPORTED|KEPT, path, content, detail|nil }:
 ---   `detail` says why an existing file was kept without being read.
 --- @return string|nil err Why the absent file could not be created.
+--- @return table|nil failed Private failed-import cleanup record, never a successful receipt.
 function M.import_if_absent(opts)
 	if type(opts) ~= "table" or type(opts.toml_decode) ~= "function" then
 		error("layer_preset.import_if_absent needs the TOML decoder", 2)
@@ -123,19 +124,30 @@ function M.import_if_absent(opts)
 		return { status = M.KEPT, path = path,
 			detail = status ~= "ok" and tostring(detail or status) or nil }
 	end
-	local written, err = TomlWriter.publish_if_unchanged(path, preset.text, opts.file_adapter, { status = "absent" })
-	if not written then return nil, path .. ": " .. tostring(err) end
+	local written, err, retry_cleanup = TomlWriter.publish_if_unchanged(path, preset.text, opts.file_adapter, { status = "absent" })
+	if written ~= true then
+		local failed = type(retry_cleanup) == "function" and {
+			status = M.IMPORTED, path = path, content = preset.text, publication_cleanup = retry_cleanup,
+		} or nil
+		return nil, path .. ": " .. tostring(err), failed
+	end
 	return { status = M.IMPORTED, path = path, content = preset.text }
 end
 
---- Settles only the native removal lock retained by a previous undo attempt.
+--- Settles native import cleanup and the removal lock retained by an undo attempt.
 --- Participants call this before any absence shortcut or inverse publication;
 --- a cleanup retry never removes or replaces content.
 --- @param result table|nil Private import record.
 --- @return boolean settled True only after exact native release acknowledgement.
 --- @return string|nil err Why cleanup remains pending.
 function M.retry_undo_cleanup(result)
-	if type(result) ~= "table" or result.removal_cleanup == nil then return true end
+	if type(result) ~= "table" then return true end
+	if result.publication_cleanup ~= nil then
+		local settled, detail, published = TomlWriter.retry_publication_cleanup(result)
+		if settled ~= true then return false, detail end
+		if published == false then result.status = M.KEPT end
+	end
+	if result.removal_cleanup == nil then return true end
 	local call_ok, settled, detail = pcall(result.removal_cleanup)
 	if not call_ok or settled ~= true then
 		return false, tostring((call_ok and detail) or settled or "removal cleanup remains pending")
@@ -151,9 +163,10 @@ end
 --- @return boolean undone True when no file of the import's own is left.
 --- @return string|nil err Why the created file could not be removed.
 function M.undo(result, file_adapter)
-	if type(result) ~= "table" or result.status ~= M.IMPORTED then return true end
+	if type(result) ~= "table" then return true end
 	local settled, settle_err = M.retry_undo_cleanup(result)
 	if settled ~= true then return false, settle_err end
+	if result.status ~= M.IMPORTED then return true end
 	local current, status, detail = TomlWriter.read_classified(result.path, file_adapter)
 	if status == "absent" then return true end
 	if status ~= "ok" then return false, "the imported layer cannot be read: " .. tostring(detail or status) end
