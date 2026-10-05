@@ -57,7 +57,7 @@ class _LSJ_Fixture extends _LSM_Fixture {
 				AssertTrue(Token is String && LLM_ApiToken_IsValidEnvelope(Token))
 				Entry["Token"] := Token
 			}
-			this.World.ApiImage := JsonStringify(Encrypted)
+			this.World.ApiImage := _LLM_Menu_SerializeApiEntries(Map("api_entries", Encrypted), (Value) => Value)
 			AssertTrue(FSWriteDurable(this.World.ApiPath, this.World.ApiImage))
 			this.World.Port["read"] := ObjBindMethod(this, "Read")
 			; Production defaults own acquisition, settlement, the FULL collector,
@@ -170,7 +170,7 @@ class _LSJ_Fixture extends _LSM_Fixture {
 			case "foreign_image":
 				Records := JsonParse(this.World.ApiImage)
 				Records[1]["Name"] := "Independent foreign writer"
-				this.ForeignImage := JsonStringify(Records)
+				this.ForeignImage := _LLM_Menu_SerializeApiEntries(Map("api_entries", Records), (Value) => Value)
 				if !FSWriteDurable(this.World.ApiPath, this.ForeignImage)
 					throw Error("The fixture-owned independent source replacement was refused.")
 				this.Mutated := true
