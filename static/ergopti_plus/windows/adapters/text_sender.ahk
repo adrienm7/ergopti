@@ -590,15 +590,11 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	OwnedSequence := CB_GetSequenceNumber()
 	if !OwnedSequence {
 		LoggerError("TextSender", "TextSend: clipboard sequence is unavailable - skipping paste because ownership cannot be proven.")
-		; CB_Write above SUCCEEDED, so the payload is already sitting in the user's
-		; clipboard. Every other bail-out hands this to _TextSendRestoreClipboard,
-		; which refuses to act without a sequence number — so on this one path the
-		; injected text would survive until the user next copied something, which is
-		; how a password or an expansion ends up pasted into an unrelated window.
-		; Restore directly. The sequence guard exists to avoid clobbering a NEWER
-		; user copy and cannot answer here; leaving our own payload behind is the
-		; certain harm, a user copy landing in the microseconds since CB_Write is
-		; the speculative one.
+		; Delegate rollback to the central clipboard owner. The process generation
+		; excludes newer driver injections, but cannot exclude an external copy.
+		; With no recorded ownership sequence, any positive observable sequence
+		; wins even on the first attempt. An observed zero retains the existing
+		; unfenced rollback policy; it does not prove that this payload is still ours.
 		_TextSendForceRestoreClipboard(Saved, Generation)
 		_TextSenderInvokeCallback(Callback, false, "clipboard ownership unavailable")
 		return
@@ -704,11 +700,11 @@ _TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
 		: "restore-owner-pending", 0, 0, Generation, OwnedSequence)
 }
 
-; Restores the pre-injection snapshot WITHOUT the ownership proof its sibling
-; requires. Reserved for the one bail-out where CB_GetSequenceNumber() itself
-; failed: no proof can exist there, and the sibling would therefore no-op and
-; leave the injected payload in the user's clipboard. The generation check is
-; kept — a newer injection owning the slot must still win.
+; Delegates the ownership-unavailable rollback to the central clipboard owner.
+; The generation check rejects newer driver injections, not external copies.
+; Without a recorded sequence, a positive observable sequence wins on every
+; attempt, including the first. A zero observation preserves the existing
+; unfenced rollback policy and remains unresolved ownership risk.
 ; @param Saved      {ClipboardAll|String} Snapshot returned by CB_SaveAll().
 ; @param Generation {Integer}             Counter value captured before the write.
 _TextSendForceRestoreClipboard(Saved, Generation) {
