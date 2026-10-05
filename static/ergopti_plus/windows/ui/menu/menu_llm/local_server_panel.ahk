@@ -389,7 +389,7 @@ class LLM_LocalServerPanel {
 	_PromptAddress(Owner, Id) {
 		if !this._Current(Owner, Id)
 			return false
-		Target := this.Native.Target(Id), Server := this.Servers[Id]
+		Target := this.Native.Target(Id, Owner["source"]), Server := this.Servers[Id]
 		if !(Target is Map) || !this._Current(Owner, Id)
 			return false
 		Answer := Ui_InputBox(this._Format("dialog.local_servers.address_prompt", Server["label"], Server["base_url"]),

@@ -81,4 +81,17 @@ function M.pop_utf8(s)
 	return s:sub(1, off - 1)
 end
 
+-- ============================================================================
+-- 3. Synthetic source taxonomy
+-- ============================================================================
+
+--- Returns whether a source label belongs to the additional synthetic bucket.
+--- Hotstrings and LLM output have dedicated buckets; none denotes manual input.
+--- Only string object keys are labels, so numeric JSON array keys are excluded.
+--- @param label any Source-map key.
+--- @return boolean Whether the source belongs to the other bucket.
+function M.is_other_synthetic_source(label)
+	return type(label) == "string" and label ~= "hotstring" and label ~= "llm" and label ~= "none"
+end
+
 return M

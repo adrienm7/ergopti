@@ -125,6 +125,19 @@ ConfigTransitionNormalizeConfigDir(Path) {
 	return Root . "\"
 }
 
+; Selects the boot configuration root without validating an unused default.
+; An absent profile must never redirect personal writes to a drive-relative root.
+; @param Overrides {Map} Flat locator values returned by ReadPathsToml.
+; @param DefaultDir {String} Already-derived ordinary or isolated smoke default.
+; @return {String} Exact selected directory; boot preserves separator handling.
+ConfigTransitionSelectBootConfigDir(Overrides, DefaultDir) {
+	if Overrides.Has("ConfigDirPath") && Overrides["ConfigDirPath"] != ""
+		return Overrides["ConfigDirPath"]
+	if !(ConfigTransitionNormalizeConfigDir(DefaultDir) is String)
+		throw ValueError("The selected default configuration directory is invalid.")
+	return DefaultDir
+}
+
 ; The LogsDirPath override a paths.toml rewrite must keep: the resolved logs
 ; folder when it differs from the default, else "". Onboarding and a
 ; configuration-folder change rebuild the whole locator, which would otherwise

@@ -15,7 +15,7 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"keylogger-prefetch-typing", "keylogger-prefetch-apps",
 		"keylogger-prefetch-range", "uia-selection-worker",
 		"keylogger-text-migration", "keep-awake", "gesture-left-hold",
-		"gesture-right-hold", "caps-word", "hotstring-engine",
+		"gesture-right-hold", "caps-word", "hotstring-engine", "user-hotstrings",
 		"llm-dependency-poll"
 	],
 	"resume", [
