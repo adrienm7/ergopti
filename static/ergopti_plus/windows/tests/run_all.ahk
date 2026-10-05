@@ -686,6 +686,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/backend_lifecycle.ahk
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/local_server_panel.ahk
 #Include ../ui/menu/menu_llm/menu_main.ahk
 #Include ../ui/menu/menu_llm/enable_admission.ahk
 #Include ../ui/menu/menu_llm/actions.ahk
@@ -703,6 +704,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_local_server_private_publication.ahk
 #Include unit/test_local_server_write_admission.ahk
 #Include unit/test_local_server_join.ahk
+#Include unit/test_local_server_panel.ahk
 #Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
 #Include unit/test_llm_fixture_setup.ahk

@@ -21,7 +21,7 @@
 ; =============================================
 
 /** Native ownership proposal; private publication remains an injected existing owner. */
-class LocalServersOwner {
+class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 
 	/**
 	 * @param {Map} Options Catalogue, transport, timings and native private-owner ports.
@@ -895,16 +895,7 @@ class LocalServersOwner {
 		}
 	}
 
-	_NativeTimer(Callback, Period) {
-		; Logical queue observation only rearms an exact job's one-shot.
-		if !(Period is Integer) || Period > 0
-			throw TypeError("Local server queue timers require cancellation or a negative one-shot period.")
-		if Period == 0
-			SetTimer(Callback, 0)
-		else
-			SetTimer(Callback, -Abs(Period))
-		return true
-	}
+
 
 	_Report(Kind, Detail, Id := "") {
 		Report := this.Options.Get("on_error", 0)

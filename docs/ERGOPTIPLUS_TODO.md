@@ -3337,7 +3337,8 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   bridge passes all 13 original/new controls per ABI. Synchronous cancellation
   retains its own UI completion before retirement: faithful composed controls
   pass180/0 plus daemon routing2/0 per ABI; the original fails two behaviors.
-  Windows14 source paths include panel/lifecycle and timer relocation. Native
+  Windows14 source paths include panel/lifecycle and timer relocation. The coherent source tranche is committed; native
+  current-source qualification remains pending. Native
   panel 20 (original 16 plus 4 new) and 4 timer cases are pending. Nine shared
   renderer/declaration/test paths use canonical inert fallback rows; generated
   artifacts were regenerated through their owner. Final
