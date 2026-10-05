@@ -185,7 +185,7 @@ function verify({ platform, needs, evidence, sha, scenarios, release }) {
 	const jobs =
 		platform === 'windows'
 			? ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
-			: ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
+			: ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'tooltip-canvas'];
 	assert.deepEqual(Object.keys(needs).sort(), jobs.sort(), 'Mandatory jobs differ');
 	for (const job of jobs) assert.equal(needs[job].result, 'success', `${job} did not succeed`);
 	assert.match(sha, /^[a-f0-9]{40}$/, 'Invalid commit');
