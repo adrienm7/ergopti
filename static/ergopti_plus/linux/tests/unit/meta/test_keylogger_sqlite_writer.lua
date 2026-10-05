@@ -20,7 +20,7 @@ local function with_writer_read_receipts(body, status, test)
 	assert(file:write("existing native database fixture") and file:close())
 	os.execute = function() return 0 end
 	io.popen = function(command)
-		local content, code = body, status
+		local content, code = type(body) == "function" and body(command) or body, status
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
 			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
 		end
@@ -167,6 +167,40 @@ helpers.describe("linux-sqlite-read-receipts", function()
 					helpers.assert_eq(table.concat(rows, "|"), "one|two")
 				end
 			end)
+		end)
+	end
+end)
+
+helpers.describe("linux-sqlite-wpm-fraction", function()
+	for _, fixture in ipairs({
+		{ label = "fraction", value = 18.461538461538463, expected = 18.461538461538463 },
+		{ label = "sub-unit fraction", value = 0.125, expected = 0.125 },
+		{ label = "numeric text", value = "2.75", expected = 2.75 },
+		{ label = "integer", value = 60, expected = 60 },
+		{ label = "zero", value = 0, expected = 0 },
+		{ label = "invalid text fallback", value = "not a number", expected = 0 },
+	}) do
+		it("linux-sqlite-wpm-fraction: typing SQL preserves " .. fixture.label, function()
+			local command = require("modules.keylogger.sqlite_command")
+			local previous_build, inserted = command.build, nil
+			command.build = function(path, sql, options)
+				if sql:find("INSERT OR IGNORE INTO events_typing", 1, true) then inserted = sql end
+				return previous_build(path, sql, options)
+			end
+			local ok, err = xpcall(function()
+				with_writer_read_receipts(function(cmd)
+					return cmd:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or ""
+				end, 0, function(writer)
+					helpers.assert_true(writer.insert_typing_events("owned", {
+						{ app = "owned", text = "owned text", events_json = "[]", wpm = fixture.value },
+					}))
+				end)
+			end, debug.traceback)
+			command.build = previous_build
+			if not ok then error(err, 0) end
+			helpers.assert_type(inserted, "string", "the actual writer must compose a typing INSERT")
+			local scalar = inserted:match(",0%.0,([^,]+),'owned text'")
+			helpers.assert_eq(tonumber(scalar), fixture.expected, "REAL WPM must retain the admitted numeric value")
 		end)
 	end
 end)

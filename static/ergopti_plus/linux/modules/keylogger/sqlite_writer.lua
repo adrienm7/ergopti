@@ -419,12 +419,13 @@ function M.insert_typing_events(device_id, events)
 		local app     = _sql_escape(ev.app     or "unknown")
 		local text    = _sql_escape(enc_text)
 		local title   = _sql_escape(ev.title   or "")
+		-- WPM is a fractional rate in a REAL column, not an integer counter.
 		local wpm     = tonumber(ev.wpm) or 0
 		local layout  = _sql_escape(ev.layout  or "")
 		local events_json = _sql_escape(enc_json)
 
 		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,0,0,0,0,0,0.0,%d,'%s','','%s')",
+			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,0,0,0,0,0,0.0,%.17g,'%s','','%s')",
 			_sql_escape(device_id), event_id, ts, date, app, title,
 			layout, wpm, text, events_json
 		)
