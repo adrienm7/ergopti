@@ -202,7 +202,9 @@ function loadPage(platform, current) {
 		fs.readFileSync(path.join(SP, '_shared', 'ui', 'program_parameter.js'), 'utf8'),
 		context
 	);
-	vm.runInContext(fs.readFileSync(SCRIPT, 'utf8'), context, { filename: SCRIPT });
+	vm.runInContext(fs.readFileSync(SCRIPT, 'utf8'), context, {
+		filename: SCRIPT
+	});
 	for (const fn of docListeners.DOMContentLoaded || []) fn();
 	posted.length = 0;
 	context.__vocabulary = JSON.parse(fs.readFileSync(VOCABULARY, 'utf8'));
@@ -869,6 +871,53 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 	check(
 		/Ran 11 tests in /.test(controls.stderr) && /\nOK\s*$/.test(controls.stderr),
 		'all eleven parser controls execute without skip'
+	);
+}
+
+// These independent parser/API controls do not qualify native Shortcuts invocation.
+{
+	const controls = spawnSync(
+		process.execPath,
+		['tools/diagnostics/apple_shortcuts_probe/test_probe.cjs'],
+		{
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 30000
+		}
+	);
+	check(
+		!controls.error && controls.signal === null && controls.status === 0,
+		'Shortcuts structured API controls complete'
+	);
+	check(
+		/Controlled JXA cases: 12 passed, 0 failed; native execution untested/.test(controls.stdout),
+		'all twelve independent Shortcuts API controls execute'
+	);
+	const parser = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		[
+			'-m',
+			'unittest',
+			'discover',
+			'-s',
+			'tools/diagnostics/apple_shortcuts_probe',
+			'-p',
+			'test_probe.py'
+		],
+		{
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+		}
+	);
+	check(
+		!parser.error && parser.signal === null && parser.status === 0,
+		'Shortcuts parser and owned registration controls complete'
+	);
+	check(
+		/Ran 8 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
+		'all eight Shortcuts parser controls execute without skip'
 	);
 }
 
