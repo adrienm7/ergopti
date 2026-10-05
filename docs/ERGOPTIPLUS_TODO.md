@@ -3165,6 +3165,14 @@ verdict and process exit remain unchanged. All 125 original reporter
 assertions and 48 additional controls pass; the unchanged reporter fails
 the new causal control. Actual native annotation transport remains pending.
 
+Sparkle server-exit failures now report only fixed failure classes and native
+termination facts already acknowledged by the process owner. The transparent
+diagnostic rethrows the original error; all waits, signals, retirement checks
+and original assertions remain intact. Fifty-three portable source/reporter
+assertions pass, while the original source and four independent mutations
+refuse. The new Swift formatter controls and actual server retirement still
+require macOS compilation and execution; no functional cause is inferred.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
