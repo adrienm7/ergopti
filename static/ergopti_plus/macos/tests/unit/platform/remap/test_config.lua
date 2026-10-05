@@ -141,12 +141,24 @@ local function encoded_document(state, merge_existing)
 	local codec = package.loaded["infra.toml.codec"]
 	local encoded = nil
 	local original_encode = codec.encode
+	local original_decode_shapes, original_encode_shapes = codec.decode_with_shapes, codec.encode_with_shapes
+	-- Keep this model-only capture seam on the fake APIs its caller controls.
+	-- Actual receipt authority is tested through the real codec and private files.
+	codec.decode_with_shapes = function(source)
+		local document = codec.decode(source)
+		return document, { document = document, arrays = {}, numbers = {}, strings = {} }
+	end
+	codec.encode_with_shapes = function(document, receipt)
+		assert(receipt.document == document, "fixture receipt must own this document")
+		return codec.encode(document)
+	end
 	codec.encode = function(value)
 		encoded = value
 		error("stop before the disk write")
 	end
 	pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", merge_existing ~= true)
 	codec.encode = original_encode
+	codec.decode_with_shapes, codec.encode_with_shapes = original_decode_shapes, original_encode_shapes
 	return encoded
 end
 
