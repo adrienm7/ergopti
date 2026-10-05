@@ -220,12 +220,17 @@ _CBRF_GuardPrecedesTheWrite() {
 	Assert(GuardBody != "", "the shared full-state admission guard must exist")
 	Assert(InStr(GuardBody, "_ConfigBootReadFailed") > 0,
 		"shared admission must retain unreadable-boot protection")
-	WritePos := InStr(Body, "TOML_BatchWrite")
+	WritePos := RegExMatch(Body, "m)^[ `t]*Written := TOML_ConfigBatchWrite\(BoundPath, Updates\)[ `t]*$")
 	Assert(GuardPos > 0,
 		"SaveFullConfig must consult _ConfigBootReadFailed — without it a boot that could not read config.toml persists manifest defaults over the user's settings")
-	Assert(WritePos > 0, "SaveFullConfig must still reach TOML_BatchWrite on the nominal path")
+	Assert(WritePos > 0, "SaveFullConfig must still reach its actual semantic publisher on the nominal path")
 	Assert(GuardPos < WritePos,
-		"the _ConfigBootReadFailed guard must come BEFORE TOML_BatchWrite — after it, the user's config has already been replaced")
+		"the _ConfigBootReadFailed guard must come BEFORE its actual semantic publisher — after it, the user's config has already been replaced")
+	Assert(_CBRF_SemanticGuardAndStrictAck(Body),
+		"the current publisher remains after admission and before its strict Integer-1 ACK")
+	Publisher := _StripFullLineComments(_DriverFuncBody("TOML_ConfigBatchWrite"))
+	Assert(InStr(Publisher, 'return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)') > 0,
+		"the current gateway returns the semantic native writer result unchanged")
 }
 
 
@@ -239,3 +244,30 @@ Test("meta config-boot-read-failed: the persist declines while the sentinel is r
 	_CBRF_SaveDeclinesWhileFlagged)
 Test("meta config-boot-read-failed: the persist guard precedes the write",
 	_CBRF_GuardPrecedesTheWrite)
+
+; These mutations consume the same actual body as the positional guard.
+_CBRF_SemanticGuardAndStrictAck(Body) {
+	GuardPos := RegExMatch(Body, "m)^[ `t]*if !ConfigFullStateCanPersist\(\) \{[ `t]*$")
+	WritePos := RegExMatch(Body, "m)^[ `t]*Written := TOML_ConfigBatchWrite\(BoundPath, Updates\)[ `t]*$")
+	if !GuardPos || !WritePos
+		return false
+	AckPos := RegExMatch(Body, "m)^[ `t]*if \(\(Written is Integer\) && Written == 1\)[ `t]*$",, WritePos)
+	return WritePos > GuardPos && AckPos > WritePos
+}
+
+_CBRF_CurrentPublisherGuardMutations() {
+	Body := _StripFullLineComments(_DriverFuncBody("SaveFullConfig"))
+	AssertTrue(_CBRF_SemanticGuardAndStrictAck(Body), "the actual nominal path remains admitted")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
+		"Written := TOML_ConfigBatchWrite(BoundPath, Updates)",
+		"UnrelatedWritten := TOML_ConfigBatchWrite(BoundPath, Updates)")),
+		"a suffix-sharing assignment cannot lend an unresolved Written result binding")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
+		"if !ConfigFullStateCanPersist()", "if true")), "removing boot admission cannot pass")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck("Written := TOML_ConfigBatchWrite(BoundPath, Updates)`n" . Body),
+		"publishing before boot admission cannot pass")
+	AssertFalse(_CBRF_SemanticGuardAndStrictAck(StrReplace(Body,
+		"if ((Written is Integer) && Written == 1)", "if Written")), "truthy malformed receipts cannot pass")
+}
+Test("meta config-boot-read-failed: actual semantic publisher retains causal guard and strict-ACK controls",
+	_CBRF_CurrentPublisherGuardMutations)
