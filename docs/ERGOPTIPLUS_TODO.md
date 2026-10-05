@@ -2579,6 +2579,14 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   their caller's Critical state and reentry observes the claimed report.
   Native Windows and complete three-OS acceptance remain pending.
 
+Native Linux qualification fixtures now observe real Notify wire byte hints
+and exact owned service identities, preserving the text/history assertions on
+Dunst 1.9 and newer versions. The failed HTTP 503 unchanged-validator control
+explicitly returns the previous ETag, retaining every corrupt-body/follow-up
+assertion across curl versions. Independent old/new native replays pass; hosted
+final-source qualification remains pending. These are fixture prerequisites,
+not completion of the remaining configuration policy or physical acceptance.
+
 Linux ordinary TapHold saves and recommended imports now use the existing shared classified reader: only native ENOENT permits an absent document; access, other open, read and close failures refuse before mutation, backup/staging/publication or reload. Malformed-source behavior and unknown fields remain unchanged. The registered real-writer module retains all 26 original cases and adds 13 controls: the original writer gives 28 passes / 11 failures, the corrected writer 39 / 0. macOS and Windows already refuse classified unreadable sources through their existing owners. Full selected verification and hosted native CI remain pending; TODO33 stays partial.
 
 The Linux TapHold owner now ignores and reports obsolete scalar/array parents and
