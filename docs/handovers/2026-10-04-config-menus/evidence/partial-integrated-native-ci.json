@@ -1,0 +1,138 @@
+{
+	"source_sha": "a550193ebc31aa819c369f701a61ebed72d86216",
+	"tested_ci_sha": "ab142045e4c3460ad184ddf8c1ca09482fa835a7",
+	"previous_ci_sha": "d993de4fc26d8febceac685a334246bb9bdce998",
+	"tree": "e81b6544720c382f4521f6ec094062e88f60e786",
+	"same_source_tree": true,
+	"os_lanes": "all",
+	"release": "workflow_dispatch emits release=false",
+	"status": "completed",
+	"conclusion": "failure",
+	"databaseId": 37276807199,
+	"headSha": "ab142045e4c3460ad184ddf8c1ca09482fa835a7",
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/37276807199",
+	"completed_at": "2026-10-05T07:28:39Z",
+	"jobs": [
+		{
+			"name": "Validate / Checks and plan",
+			"status": "completed",
+			"conclusion": "success",
+			"id": 111655515287
+		},
+		{
+			"name": "Core / js",
+			"status": "completed",
+			"conclusion": "success",
+			"id": 111655772895
+		},
+		{
+			"name": "Core / properties",
+			"status": "completed",
+			"conclusion": "success",
+			"id": 111655772994
+		},
+		{
+			"name": "macOS / Unit tests (stubbed)",
+			"status": "completed",
+			"conclusion": "failure",
+			"id": 111655773033
+		},
+		{
+			"name": "Windows / Unit tests",
+			"status": "completed",
+			"conclusion": "failure",
+			"id": 111655773082
+		},
+		{
+			"name": "Linux / Unit tests",
+			"status": "completed",
+			"conclusion": "success",
+			"id": 111655773094
+		},
+		{
+			"name": "Linux / E2E tests",
+			"status": "completed",
+			"conclusion": "failure",
+			"id": 111656280064
+		},
+		{
+			"name": "macOS / Verdict",
+			"status": "completed",
+			"conclusion": "failure",
+			"id": 111657622534
+		},
+		{
+			"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111657623134
+		},
+		{
+			"name": "macOS / E2E tests (stubbed)",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111657623392
+		},
+		{
+			"name": "macOS / Package",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111657623607
+		},
+		{
+			"name": "Linux / Verdict",
+			"status": "completed",
+			"conclusion": "failure",
+			"id": 111658365902
+		},
+		{
+			"name": "Linux / Package",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111658367011
+		},
+		{
+			"name": "Linux / Install and launch \u00b7 ${{ matrix.label }}",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111658367283
+		},
+		{
+			"name": "Windows / Verdict",
+			"status": "completed",
+			"conclusion": "failure",
+			"id": 111658925199
+		},
+		{
+			"name": "Windows / E2E tests (engine)",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111658925671
+		},
+		{
+			"name": "Windows / Package",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111658926597
+		},
+		{
+			"name": "Windows / Install and launch",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111658926704
+		},
+		{
+			"name": "Validate / Selected OS verdict",
+			"status": "completed",
+			"conclusion": "failure",
+			"id": 111659016346
+		},
+		{
+			"name": "Release / Publish",
+			"status": "completed",
+			"conclusion": "skipped",
+			"id": 111659017921
+		}
+	],
+	"integration_lock_released_after_terminal_ci": true
+}
