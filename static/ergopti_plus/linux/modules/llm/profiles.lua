@@ -57,15 +57,16 @@ local _base_url = nil
 --- @param key string
 --- @param value any
 --- @param expected_source table|nil Captured exact preference source.
+--- @param admission function|nil Captured final writer admission.
 --- @return boolean
-local function persist(key, value, expected_source)
+local function persist(key, value, expected_source, admission)
 	local ok, storage = pcall(require, "infra.llm_preferences")
 	if not ok or not storage or type(storage.set) ~= "function" then
 		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
 		return false
 	end
-	local committed = expected_source and storage.set_many({ [key] = value }, expected_source)
-		or (expected_source == nil and storage.set(key, value))
+	local committed = expected_source and storage.set_many({ [key] = value }, expected_source, admission)
+		or (expected_source == nil and admission == nil and storage.set(key, value))
 	if committed ~= true then
 		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", key)
 		return false
@@ -186,10 +187,13 @@ end
 
 ---- Sets the current model and persists the choice.
 --- @param model_name string Model name as reported by Ollama.
+--- @param expected_source table|nil Exact preference image used for guarded selection.
+--- @param admission function|nil Pure final native writer admission.
 --- @return boolean
-function M.set_model(model_name)
+function M.set_model(model_name, expected_source, admission)
 	if type(model_name) ~= "string" or model_name == "" then return false end
-	if not persist("llm.models.ollama", model_name) then return false end
+	if not persist("llm.models.ollama", model_name, expected_source, admission) then return false end
+	if admission and admission() ~= true then return false end
 	_current_model = model_name
 	Logger.info(LOG, "Model set to: %s", model_name)
 	return true
@@ -210,17 +214,21 @@ end
 
 --- Enables the LLM feature only after its existing writer acknowledges.
 --- @param expected_source table|nil Exact source used by an enable admission.
+--- @param admission function|nil Captured final writer admission.
 --- @return boolean
-function M.enable(expected_source)
-	if not persist("llm.enabled", true, expected_source) then return false end
+function M.enable(expected_source, admission)
+	if not persist("llm.enabled", true, expected_source, admission) then return false end
 	_enabled = true
 	Logger.info(LOG, "LLM enabled.")
 	return true
 end
 
---- Disables the LLM feature and persists.
-function M.disable()
-	if not persist("llm.enabled", false) then return false end
+--- Disables the LLM feature after its existing writer acknowledges.
+--- @param expected_source table|nil Exact source used for conditional compensation.
+--- @param admission function|nil Captured final writer admission.
+--- @return boolean acknowledged
+function M.disable(expected_source, admission)
+	if not persist("llm.enabled", false, expected_source, admission) then return false end
 	_enabled = false
 	Logger.info(LOG, "LLM disabled.")
 	return true

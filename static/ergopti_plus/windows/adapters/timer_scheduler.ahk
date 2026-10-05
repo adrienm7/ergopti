@@ -411,3 +411,44 @@ global ADAPTER_TIMER_SCHEDULER := Map(
     "cancelAll",   TimerCancelAll,
     "activeCount", TimerActiveCount,
 )
+
+
+
+
+
+; ========================================================
+; ========================================================
+; ======= 4/ Local Server Owned Callback Producers =======
+; ========================================================
+; ========================================================
+
+; Native callback producers retain the caller-owned identity and strict
+; cancellation/one-shot contract. Domain owners inherit these exact methods;
+; no scheduler handle, wrapper callback or repeating interval is introduced.
+
+class _LocalServerModelsTimerNativeAdapter {
+	_NativeTimer(Callback, Period) {
+		; This owner only cancels or rearms one exact record's one-shot. An
+		; opaque positive interval must never become an idle repeating poller.
+		if !(Period is Integer) || Period > 0
+			throw TypeError("Models timers require cancellation or a negative one-shot period.")
+		if Period == 0
+			SetTimer(Callback, 0)
+		else
+			SetTimer(Callback, -Abs(Period))
+		return true
+	}
+}
+
+class _LocalServersTimerNativeAdapter {
+	_NativeTimer(Callback, Period) {
+		; Logical queue observation only rearms an exact job's one-shot.
+		if !(Period is Integer) || Period > 0
+			throw TypeError("Local server queue timers require cancellation or a negative one-shot period.")
+		if Period == 0
+			SetTimer(Callback, 0)
+		else
+			SetTimer(Callback, -Abs(Period))
+		return true
+	}
+}

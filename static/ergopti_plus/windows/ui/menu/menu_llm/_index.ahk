@@ -283,6 +283,7 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 #Include menu_main.ahk
 #Include menu_models.ahk
 #Include menu_api_entries.ahk
+#Include local_server_panel.ahk
 #Include menu_profiles.ahk
 #Include hotkey_identity.ahk
 #Include menu_settings.ahk
