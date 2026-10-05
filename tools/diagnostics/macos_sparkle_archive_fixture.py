@@ -181,6 +181,9 @@ def serve(root, nonce):
     state = {"stopping": False, "requests": 0}
 
     class Handler(http.server.BaseHTTPRequestHandler):
+        # Apply the I/O timeout before reading the first request line or headers.
+        timeout = 5
+
         def log_message(self, *_arguments):
             pass
 
