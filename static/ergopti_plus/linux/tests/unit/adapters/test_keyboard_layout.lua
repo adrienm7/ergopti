@@ -379,6 +379,87 @@ helpers.describe("keyboard_layout: planning a string", function()
 				.. "wrong characters")
 	end)
 
+	helpers.it("(layout-plan-utf8) refuses malformed bytes instead of skipping them", function()
+		local layout = loaded()
+		for _, text in ipairs({
+			string.char(0x80) .. "az",
+			string.char(0xFF) .. "az",
+			"a" .. string.char(0xC0, 0xAF) .. "z",
+			"az" .. string.char(0xF5, 0x80, 0x80, 0x80),
+		}) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan, "every input byte must belong to a validated character")
+			helpers.assert_nil(blocker, "malformed input has no valid blocking character to report")
+		end
+	end)
+
+	helpers.it("(layout-plan-utf8) refuses incomplete and invalid scalar sequences", function()
+		local layout = loaded()
+		for _, text in ipairs({
+			"a" .. string.char(0xC2),
+			string.char(0xC2) .. "az",
+			string.char(0xE0, 0x80, 0xAF) .. "az",
+			string.char(0xED, 0xA0, 0x80) .. "az",
+			string.char(0xF4, 0x90, 0x80, 0x80) .. "az",
+		}) do
+			helpers.assert_nil((layout.plan(text)), "malformed UTF-8 has no complete keystroke plan")
+		end
+	end)
+
+	helpers.it("(layout-plan-utf8) keeps healthy and unavailable-input contracts", function()
+		local layout = loaded()
+		local empty, empty_blocker = layout.plan("")
+		helpers.assert_eq(#empty, 0, "an available layout still permits an empty plan")
+		helpers.assert_nil(empty_blocker)
+		local supported, supported_blocker = layout.plan("aé")
+		helpers.assert_eq(#supported, 2)
+		helpers.assert_nil(supported_blocker)
+		local unsupported, unsupported_blocker = layout.plan("a😀z")
+		helpers.assert_nil(unsupported)
+		helpers.assert_eq(unsupported_blocker, "😀", "a valid unsupported scalar retains the old blocker")
+		local invalid_type, invalid_type_blocker = layout.plan(false)
+		helpers.assert_nil(invalid_type)
+		helpers.assert_nil(invalid_type_blocker)
+		layout._set_table_for_test(nil)
+		local absent, absent_blocker = layout.plan("é")
+		helpers.assert_nil(absent)
+		helpers.assert_eq(absent_blocker, ("é"):sub(1, 1))
+		local absent_empty, absent_empty_blocker = layout.plan("")
+		helpers.assert_nil(absent_empty)
+		helpers.assert_eq(absent_empty_blocker, "")
+	end)
+
+	helpers.it("(layout-plan-utf8-missing) refuses malformed blockers before a map is available", function()
+		local layout = helpers.load_module("adapters.keyboard_layout")
+		layout._set_table_for_test(nil)
+		for _, text in ipairs({ string.char(0x80) .. "az", string.char(0xFF) .. "az",
+			"a" .. string.char(0xC0, 0xAF) .. "z", "az" .. string.char(0xF5, 0x80, 0x80, 0x80),
+			"a" .. string.char(0xC2), string.char(0xC2) .. "az", string.char(0xE0, 0x80, 0xAF) .. "az",
+			string.char(0xED, 0xA0, 0x80) .. "az", string.char(0xF4, 0x90, 0x80, 0x80) .. "az" }) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan)
+			helpers.assert_nil(blocker, "the malformed-input receipt cannot depend on layout availability")
+		end
+	end)
+
+	helpers.it("(layout-plan-utf8-missing) preserves valid unavailable and nonstring receipts", function()
+		local layout = helpers.load_module("adapters.keyboard_layout")
+		layout._set_table_for_test(nil)
+		for _, text in ipairs({ "", "a", "é", "\0", "😀" }) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan)
+			helpers.assert_eq(blocker, text:sub(1, 1), "valid input retains its existing unavailable-layout blocker")
+		end
+		for _, text in ipairs({ false, 17, {} }) do
+			local plan, blocker = layout.plan(text)
+			helpers.assert_nil(plan)
+			helpers.assert_nil(blocker)
+		end
+		local nil_plan, nil_blocker = layout.plan(nil)
+		helpers.assert_nil(nil_plan)
+		helpers.assert_nil(nil_blocker)
+	end)
+
 	helpers.it("builds a plausible number of characters from a real dump", function()
 		local layout = helpers.load_module("adapters.keyboard_layout")
 		local _, count = layout.build(AZERTY_DUMP)
