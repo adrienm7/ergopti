@@ -24,6 +24,7 @@
 ; Sibling folder, not a hotstrings/ sub-file: the three drivers name this
 ; subsystem modules/dynamic_hotstrings/ and the tree-parity gate counts it.
 #Include dynamic_hotstrings\dynamic_hotstrings.ahk
+#Include dynamic_hotstrings\user_code.ahk
 
 
 
@@ -43,11 +44,19 @@
 ; ``DeferHeavy`` remains for compatibility with explicit live callers. The boot
 ; passes false: the driver may publish ready only after every advertised trigger
 ; and its preview index are available. A live rebuild also passes false so it
-; atomically returns a complete registry.
-RegisterAllHotstrings(DeferHeavy := false) {
+; atomically returns a complete registry. ColdBoot is reserved for the sole
+; startup call: unavailable common families are classified while unrelated
+; registrars still run. Live callers refuse before the first registry mutation.
+RegisterAllHotstrings(DeferHeavy := false, ColdBoot := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
 	global _HotstringExtensionPacks
+
+	CommonRefusal := HotstringsCommonAdmissionRefusal(Features)
+	if CommonRefusal != "" && !ColdBoot {
+		try LoggerError("Hotstrings", CommonRefusal)
+		return false
+	}
 
 	if (!DeferHeavy) {
 		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
@@ -70,4 +79,9 @@ RegisterAllHotstrings(DeferHeavy := false) {
 	_HS_RegisterTextExpansionAndDynamic(DeferHeavy)
 	_HS_RegisterPersonal()
 	HotstringExtensions_Register(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings"))
+	UserHotstringsInit()
+	if ColdBoot
+		return Map("committed", true, "complete", CommonRefusal == "",
+			"unavailable", CommonRefusal == "" ? [] : ["autocorrection"])
+	return true
 }

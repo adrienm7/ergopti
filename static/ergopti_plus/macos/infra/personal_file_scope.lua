@@ -31,6 +31,9 @@ function M.bind(ctx, record)
 		if type(root) ~= "string" then return false end
 		root = root:gsub("/+$", "")
 		if root ~= ctx.personal_root then return false end
+		if Files.components(selected.owner) then
+			if require("infra.personal_hotstrings").adoption_current(selected) ~= true then return false end
+		end
 		local evidence, identities, owners = {}, {}, {}
 		for _, source in ipairs(ctx.personal_files or {}) do
 			if source.personal_source ~= nil then

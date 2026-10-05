@@ -1,5 +1,5 @@
 [_meta]
-schema_version = 10
+schema_version = 11
 
 [shortcuts.keyboard]
 hs_ctrl_d = "open_hotstrings_editor"

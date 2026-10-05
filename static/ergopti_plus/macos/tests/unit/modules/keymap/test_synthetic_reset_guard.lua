@@ -54,7 +54,10 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 	local producers = {
 		clipboard_restore = 'SyntheticInput.begin("clipboard_restore", "replacement")',
 		expander_replacement =
-			'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")',
+			-- Same replacement owner; the optional publication retains programmable
+			-- source/context guards through its actual queued native settlement.
+			-- test_user_code_native independently exercises cancellation and cleanup.
+			'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement", publication)',
 		external_replacement = 'SyntheticInput.begin("external_replacement", "replacement")',
 		keep_awake = 'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
 		text_reselect = 'SyntheticInput.begin("shortcuts.text.reselect", "action")',

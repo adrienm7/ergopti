@@ -21,6 +21,7 @@
 ;
 ; Included by infra/hotstrings/hotstring_prefix_watcher.ahk.
 #Include %A_LineFile%\..\..\..\_generated\personal_file_descriptors.ahk
+#Include personal_file_controls.ahk
 ; ==============================================================================
 
 
@@ -70,6 +71,9 @@ global HS_PREFIX_ENTRY_PATTERN :=
 _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "", PathOverride := "", OnlySection := "") {
 	global ScriptInformation, Features, _V1CatToV2CatMap, _PrefixIndex, _TriggerSet
 	global HS_PREFIX_ENTRY_PATTERN
+	Admission := HotstringsCommonOverrideAdmitted()
+	if StrLower(Category) == "autocorrection" && (Admission is Integer) && Admission == false
+		return 0
 	if !IsObject(IndexTarget)
 		IndexTarget := _PrefixIndex
 	if !IsObject(SetTarget)
@@ -176,6 +180,14 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "", PathOver
 ; Extracted so catalogue consumers share one recursive walk. Visible preview no
 ; longer depends on this filesystem projection.
 ; @returns {Array} Items of Map("Path", <full path>, "Label", <category label>).
+; Both native registration and the menu use the same admitted directory policy.
+; Root is depth one. Reparse children never acquire recursive source ownership.
+HS_PersonalDirectoryAdmitted(Path, Depth) {
+	Attributes := DllCall("GetFileAttributesW", "wstr", Path, "uint")
+	return Depth <= PersonalFileScanMaxDepth() && Attributes != 0xffffffff
+		&& (Attributes & 0x10) && !(Attributes & 0x400)
+}
+
 HS_EnumeratePersonalExtFiles() {
 	global ScriptInformation
 	Found := []
@@ -198,6 +210,10 @@ HS_EnumeratePersonalExtFiles() {
 			Components := Node["Components"].Clone()
 			Components.Push(A_LoopFileName)
 			if (A_LoopFileAttrib ~= "D") {
+				if !HS_PersonalDirectoryAdmitted(A_LoopFileFullPath, Components.Length + 1) {
+					try LoggerWarn("Hotstrings", "Personal pack directory is unavailable or exceeds the admitted depth — skipped.")
+					continue
+				}
 				Pending.Push(Map("Dir", A_LoopFileFullPath, "Prefix", Child, "Components", Components))
 				continue
 			}
@@ -226,7 +242,10 @@ HS_EnumeratePersonalExtFiles() {
 ; @param IndexTarget {Map}    Index being built.
 ; @param SetTarget   {Map}    Trigger set being built.
 ; @returns {Integer} Number of triggers indexed.
-_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection := "", PersonalSource := unset) {
+_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection := "", PersonalSource := unset, AdoptedOwner := unset) {
+	if IsSet(AdoptedOwner) && (!IsSet(PersonalSource) || !(AdoptedOwner is PersonalFileAdoptedOwner)
+		|| !AdoptedOwner.Authorize(Path, PersonalSource))
+		throw Error("The explicit personal-file preview owner is unavailable.")
 	if IsSet(PersonalSource) && !PersonalFileDescriptorValid(PersonalSource)
 		throw TypeError("Invalid personal preview source descriptor.")
 	global ScriptInformation, HS_PREFIX_ENTRY_PATTERN
@@ -239,7 +258,8 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 
 	CurrentSection := ""
 	Count := 0
-	loop parse, ReadTomlFile(Path), "`n", "`r" {
+	Content := IsSet(AdoptedOwner) ? AdoptedOwner.parsedContent : ReadTomlFile(Path)
+	loop parse, Content, "`n", "`r" {
 		Line := Trim(A_LoopField, " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#")
 			continue
@@ -250,7 +270,7 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 		; pack expanded and could never be previewed.
 		; Otherwise commented metadata inherits the previous hotstring section.
 		if RegExMatch(TOML_StripInlineComment(Line), HS_TOML_SECTION_HEADER_PATTERN, &SectionMatch) {
-			CurrentSection := StrLower(Trim(SectionMatch[1]))
+			CurrentSection := IsSet(AdoptedOwner) ? PersonalFileControls.SectionName(SectionMatch[1]) : StrLower(Trim(SectionMatch[1]))
 			continue
 		}
 		if (CurrentSection == "")
@@ -262,6 +282,9 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 		; for that, so accepting single brackets above means the skip has to become
 		; explicit too — otherwise a [_meta] description would index as a trigger.
 		if (CurrentSection == "_meta" or InStr(CurrentSection, "_meta."))
+			continue
+
+		if IsSet(AdoptedOwner) && !AdoptedOwner.Enabled(CurrentSection)
 			continue
 
 		Trigger := ""
@@ -301,8 +324,10 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget, SelectedSection :=
 		; bundled one therefore previewed as the LOSER and fired as the winner:
 		; the tooltip named one expansion and the user got another
 		; (ext-pack-preview-ranked-below-its-fire).
-		_AddTriggerVariants(Trigger, Output, Label, CurrentSection, IsCaseSensitive, IsStrict,
-			Individual, IndexTarget, SetTarget, HSE_PRIORITY_PACKAGE, IsSet(PersonalSource) ? PersonalSource : unset)
+		Category := IsSet(AdoptedOwner) ? AdoptedOwner.id : Label
+		Priority := IsSet(AdoptedOwner) ? AdoptedOwner.Resolve(CurrentSection).Priority : HSE_PRIORITY_PACKAGE
+		_AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict,
+			Individual, IndexTarget, SetTarget, Priority, IsSet(PersonalSource) ? PersonalSource : unset)
 		Count += 1
 	}
 	return Count
@@ -337,6 +362,9 @@ _PrefixWatcherCategoryIsCached(Category) {
 _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "") {
 	global Features, ScriptInformation, _HS_CACHE_ROWS, _PrefixIndex, _TriggerSet, HS_CACHE_MARKER
 	global HSE_PRIORITY_COMMON
+	Admission := HotstringsCommonOverrideAdmitted()
+	if StrLower(Category) == "autocorrection" && (Admission is Integer) && Admission == false
+		return 0
 	if !IsObject(IndexTarget)
 		IndexTarget := _PrefixIndex
 	if !IsObject(SetTarget)

@@ -9,6 +9,8 @@ Features:
 - Handles nested sections [section.subsection] and arrays [[array]]
 - Generates TOML from JSON/Python dict input (for Hammerspoon/AHK integration)
 - Hotstring mode: locale-aware French sort (é/è/ê grouped with e, not after z)
+- Ordered hotstrings: a header directive preserves rule and array-block order
+  while validating TOML syntax and normalizing rule layout (Python 3.11+).
 
 Usage:
   Format existing TOML (generic):
@@ -341,6 +343,63 @@ def dict_to_toml(data: dict) -> str:
 
 _HS_ARRAY_RE = re.compile(r"^\[\[([^\[\]]+)\]\]$")
 _HS_ENTRY_RE = re.compile(r'^"((?:[^"\\]|\\.)*)"\s*=\s*(\{.*\})\s*$')
+_HS_ORDERED_ENTRY_RE = re.compile(r'^"((?:[^"\\]|\\.)*)"\s*=\s*(\{.*\})(\s+#.*)?$')
+_HS_ORDER_DIRECTIVE = "# format_toml: preserve-rule-order"
+
+
+def _hs_preserves_rule_order(content: str) -> bool:
+    """Admit the tooling directive only in the comment preamble, before TOML."""
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped == _HS_ORDER_DIRECTIVE:
+            return True
+        if stripped and not stripped.startswith("#"):
+            return False
+    return False
+
+
+def _hs_parse_ordered(content: str) -> list[str]:
+    """Validate and canonically render physical rule records without regrouping.
+
+    Cross-family order can decide equal-priority matches. Keep every repeated
+    array header and comment in place; normalize only line/rule layout. The
+    metadata follows the existing hotstring formatter's verbatim-line contract.
+    """
+    try:
+        import tomllib
+    except ImportError as error:
+        raise ValueError("Ordered hotstrings require Python 3.11+ for syntax admission") from error
+    try:
+        original_values = tomllib.loads(content)
+    except tomllib.TOMLDecodeError as error:
+        raise ValueError(f"Invalid ordered hotstring TOML: {error}") from error
+
+    lines: list[str] = []
+    in_rules = False
+    for number, line in enumerate(content.splitlines(), start=1):
+        stripped = line.strip()
+        header = _HS_ARRAY_RE.fullmatch(stripped)
+        if header:
+            in_rules = True
+            lines.append(f"[[{header.group(1).strip()}]]")
+        elif stripped.startswith("[["):
+            raise ValueError(f"Unsupported ordered hotstring array header at line {number}")
+        elif not in_rules or not stripped or stripped.startswith("#"):
+            lines.append(line.rstrip())
+        else:
+            entry = _HS_ORDERED_ENTRY_RE.fullmatch(stripped)
+            if entry is None:
+                raise ValueError(f"Unsupported ordered hotstring record at line {number}")
+            trigger, value, comment = entry.groups()
+            lines.append(f'"{trigger}" = {value}' + (f" {comment.lstrip()}" if comment else ""))
+    while lines and lines[-1] == "":
+        lines.pop()
+    # Metadata is verbatim apart from the existing line-rstrip convention.
+    # That convention can touch a multiline string's meaningful spaces, so
+    # refuse before publication if any normalization changed decoded values.
+    if tomllib.loads("\n".join(lines) + "\n") != original_values:
+        raise ValueError("Ordered hotstring formatting would change TOML values")
+    return lines
 
 
 def _locale_sort_key(s: str) -> tuple:
@@ -366,6 +425,9 @@ def _hs_parse(content: str) -> dict:
             "sections":   {name: [(trigger, value), ...]},
         }
     """
+    if _hs_preserves_rule_order(content):
+        return {"ordered_lines": _hs_parse_ordered(content)}
+
     lines = content.splitlines()
     meta_lines: list[str] = []
     sections: dict[str, list[tuple[str, str]]] = {}
@@ -404,6 +466,9 @@ def _hs_parse(content: str) -> dict:
 
 def _hs_rebuild(parsed: dict) -> str:
     """Reassemble the hotstring TOML with sorted sections and entries."""
+    if "ordered_lines" in parsed:
+        return "\n".join(parsed["ordered_lines"]) + "\n"
+
     out: list[str] = []
 
     meta = list(parsed["meta_lines"])
