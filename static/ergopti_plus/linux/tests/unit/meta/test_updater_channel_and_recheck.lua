@@ -104,7 +104,8 @@ helpers.describe("updater: a found release stays found", function()
 		M._http_client = {
 			get = function(_url, _headers, _options, callback)
 				respond(function(body, status, err)
-					callback({ ok = status == 200 or status == 304, body = body, status = status, error = err })
+					callback({ ok = status == 200, body = body or "", status = status, error = err,
+					error_body = status == 304 and "" or nil })
 				end)
 				return true
 			end,

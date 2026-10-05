@@ -2130,6 +2130,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-keylogger-timings-single-source.cjs'
 	},
 	{
+		name: 'SQLite event cursor numeric policy single source',
+		cmd: 'node',
+		args: ['tools/test/test-sqlite-event-id-single-source.cjs'],
+		repro: 'node tools/test/test-sqlite-event-id-single-source.cjs'
+	},
+	{
 		name: 'no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)',
 		cmd: 'node',
 		args: ['tools/test/test-no-plan-refs-in-source.cjs'],

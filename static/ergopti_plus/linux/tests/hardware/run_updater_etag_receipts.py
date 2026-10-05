@@ -139,6 +139,9 @@ def main():
                         separators=(",", ":"),
                     ).encode()
                 elif phase in (2, 3) and mode == "http-error":
+                    # The unchanged-validator control supplies its original tag
+                    # explicitly: curl versions differ on saving ETags from 503.
+                    tag = '"E1"'
                     status, body = 503, b"Synthetic unavailable response"
                 self.send_response(status)
                 self.send_header("ETag", tag)

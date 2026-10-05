@@ -27,8 +27,13 @@
 
 local Registry = require("layouts.registry")
 local Extension = require("layouts.extension")
+local Json = require("json")
 
 local M = {}
+
+-- Source-only fields and obsolete rows must not share the public runtime
+-- classification table, whose name may itself occur in a future source.
+local _installed_sources = setmetatable({}, { __mode = "k" })
 
 --- Version of the installed-layouts record this module reads and writes.
 M.INSTALLED_SCHEMA_VERSION = 1
@@ -242,16 +247,50 @@ function M.empty_installed()
 	return { schema_version = M.INSTALLED_SCHEMA_VERSION, layouts = {} }
 end
 
+--- Detaches a JSON model while retaining explicit null and array identities.
+--- @param value any
+--- @return any copy
+local function copy_json_value(value)
+	if type(value) ~= "table" or Json.is_null(value) then return value end
+	local copy = {}
+	for key, child in pairs(value) do copy[key] = copy_json_value(child) end
+	return Json.is_array(value) and Json.array(copy) or copy
+end
+
 --- Why one entry of the installed-layouts record cannot be used, if it cannot.
 --- @param id any The entry's key.
 --- @param entry any The entry.
 --- @return string|nil problem
 local function installed_entry_problem(id, entry)
 	if not Registry.is_valid_id(id) then return "'" .. tostring(id) .. "' is not a layout id" end
-	if type(entry) ~= "table" then return "the entry is not an object" end
+	if type(entry) ~= "table" or Json.is_array(entry) or Json.is_null(entry) then
+		return "the entry is not an object"
+	end
 	if entry.id ~= id then return "its id field does not name this entry" end
 	if type(entry.sha256) ~= "string" or type(entry.version) ~= "string" then
 		return "it has no verified sha256 and version"
+	end
+	if entry.extension ~= nil then
+		local extension = entry.extension
+		if type(extension) ~= "table" or Json.is_null(extension) or Json.is_array(extension) then
+			return "its extension is not an object"
+		end
+		-- The published validator checks inventory contents; retain lossless
+		-- object/array identity here before its generic table checks run.
+		local files = extension.files
+		if type(files) == "table" and not Json.is_null(files) then
+			local count, length = 0, #files
+			for index, file in pairs(files) do
+				if type(index) ~= "number" or index < 1 or index > length or index % 1 ~= 0
+					or type(file) ~= "table" or Json.is_null(file) or Json.is_array(file) then
+					return "its extension files are not an array of objects"
+				end
+				count = count + 1
+			end
+			if count ~= length then return "its extension files are not a complete array" end
+		end
+		local valid, reason = Extension.validate(entry)
+		if not valid then return "its extension is unusable: " .. reason end
 	end
 	return nil
 end
@@ -270,11 +309,19 @@ end
 function M.decode_installed(text, decode_json)
 	if text == nil then return M.empty_installed(), nil end
 	local ok, record = pcall(decode_json, text)
-	if not ok or type(record) ~= "table" then return nil, "the installed-layouts record is not valid JSON" end
+	if not ok or type(record) ~= "table" or Json.is_array(record) or Json.is_null(record) then
+		return nil, "the installed-layouts record is not valid JSON"
+	end
 	if record.schema_version ~= M.INSTALLED_SCHEMA_VERSION then
 		return nil, "the installed-layouts record has schema version " .. tostring(record.schema_version)
 	end
-	if type(record.layouts) ~= "table" then return nil, "the installed-layouts record has no layouts table" end
+	if type(record.layouts) ~= "table" or Json.is_array(record.layouts) or Json.is_null(record.layouts) then
+		return nil, "the installed-layouts record has no layouts table"
+	end
+	local root_members = {}
+	for key, value in pairs(record) do
+		if key ~= "schema_version" and key ~= "layouts" then root_members[key] = copy_json_value(value) end
+	end
 	local layouts, outdated = {}, {}
 	for id, entry in pairs(record.layouts) do
 		local problem = installed_entry_problem(id, entry)
@@ -282,6 +329,7 @@ function M.decode_installed(text, decode_json)
 		else layouts[id] = entry end
 	end
 	record.layouts, record.outdated = layouts, outdated
+	_installed_sources[record] = { root_members = root_members, outdated = copy_json_value(outdated) }
 	return record, nil
 end
 
@@ -290,8 +338,47 @@ end
 --- @param record table A decoded record.
 --- @return table copy
 local function writable_copy(record)
+	local source = _installed_sources[record]
+	if not source then
+		-- Existing programmatic records may carry the public obsolete registry.
+		-- Their remaining root members are ordinary source model values.
+		local root_members = {}
+		for key, value in pairs(record) do
+			if key ~= "schema_version" and key ~= "layouts" and key ~= "outdated" then
+				root_members[key] = copy_json_value(value)
+			end
+		end
+		source = { root_members = root_members, outdated = copy_json_value(record.outdated or {}) }
+	end
 	local copy = M.empty_installed()
-	for id, item in pairs(record.outdated or {}) do copy.layouts[id] = item.entry end
+	local retained = copy_json_value(source)
+	for key, value in pairs(retained.root_members) do copy[key] = copy_json_value(value) end
+	for id, item in pairs(retained.outdated) do copy.layouts[id] = copy_json_value(item.entry) end
+	_installed_sources[copy] = retained
+	return copy
+end
+
+-- Fields supplied by the published layout index are replaced as one verified
+-- entry. Omitted future fields have no owner in this build and remain source
+-- data; omitted owned fields must not revive an older extension or metadata.
+local INSTALLED_ENTRY_FIELDS = {
+	id = true, name = true, family = true, keyboard_name = true,
+	version = true, file = true, sha256 = true, size = true,
+	licence = true, homepage = true, author = true,
+	languages = true, variants = true, platforms = true,
+	keycode_convention = true, source_url = true, extension = true,
+	source_sha256 = true, licence_file = true, xkb = true,
+}
+
+local function overlay_verified_entry(installed, entry)
+	local copy = copy_json_value(entry)
+	if installed then
+		for key, value in pairs(installed) do
+			if not INSTALLED_ENTRY_FIELDS[key] and entry[key] == nil then
+				copy[key] = copy_json_value(value)
+			end
+		end
+	end
 	return copy
 end
 
@@ -301,8 +388,14 @@ end
 --- @return table
 function M.with_installed(record, entry)
 	local copy = writable_copy(record)
-	for id, installed in pairs(record.layouts) do copy.layouts[id] = installed end
-	copy.layouts[entry.id] = entry
+	for id, installed in pairs(record.layouts) do
+		if not _installed_sources[copy].outdated[id] then copy.layouts[id] = copy_json_value(installed) end
+	end
+	local installed = not _installed_sources[copy].outdated[entry.id] and record.layouts[entry.id] or nil
+	copy.layouts[entry.id] = overlay_verified_entry(installed, entry)
+	-- A verified same-id install explicitly replaces an obsolete row. A later
+	-- builder must not resurrect that original row after this acknowledged edit.
+	_installed_sources[copy].outdated[entry.id] = nil
 	return copy
 end
 
@@ -313,7 +406,9 @@ end
 function M.without_installed(record, id)
 	local copy = writable_copy(record)
 	for installed_id, installed in pairs(record.layouts) do
-		if installed_id ~= id then copy.layouts[installed_id] = installed end
+		if installed_id ~= id and not _installed_sources[copy].outdated[installed_id] then
+			copy.layouts[installed_id] = copy_json_value(installed)
+		end
 	end
 	return copy
 end

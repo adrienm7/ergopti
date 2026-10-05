@@ -50,6 +50,95 @@ local function with_writer_read_receipts(body, status, test)
 	if not ok then error(err, 0) end
 end
 
+--- Models CLI exit receipts while retaining the production builder and writer.
+local function with_category_commands(refusal, test)
+	local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+	local previous_execute, previous_popen = os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	assert(file:write("existing native database fixture") and file:close())
+	local commands = {}
+	os.execute = function() return 0 end
+	io.popen = function(command)
+		local content, status = "", 0
+		if command:find("SELECT sql FROM sqlite_master", 1, true) then
+			content = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n"
+		else
+			commands[#commands + 1] = command
+			if refusal == "score" and command:find("INSERT OR REPLACE INTO meta", 1, true) then status = 7 end
+			if refusal == "category" and command:find("UPDATE agg_app_day", 1, true) then status = 7 end
+		end
+		return {
+			read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+			close = function() return true end,
+		}
+	end
+	local ok, reason = xpcall(function()
+		helpers.assert_true(writer.open_db(path))
+		test(writer, commands)
+	end, debug.traceback)
+	os.execute, io.popen = previous_execute, previous_popen
+	writer.close_db()
+	os.remove(path)
+	if not ok then error(reason, 0) end
+end
+
+helpers.describe("linux-sqlite-category-transaction", function()
+	it("linux-sqlite-category-transaction: score receipt refusal cannot acknowledge an edit", function()
+		with_category_commands("score", function(writer)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), false)
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: category and score use one checked native transaction", function()
+		with_category_commands(nil, function(writer, commands)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), true)
+			helpers.assert_eq(#commands, 1)
+			helpers.assert_contains(commands[1], "BEGIN;")
+			helpers.assert_contains(commands[1], "UPDATE agg_app_day")
+			helpers.assert_contains(commands[1], "INSERT OR REPLACE INTO meta")
+			helpers.assert_contains(commands[1], "COMMIT;")
+			helpers.assert_contains(commands[1], "'-bail'")
+			helpers.assert_contains(commands[1], "ERGOPTI_SQL_EXIT_STATUS=")
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: UTF-8 and quote bytes retain canonical SQL escaping", function()
+		with_category_commands(nil, function(writer, commands)
+			helpers.assert_eq(writer.set_app_category("owned '", "été ' app", "Updated ' été", 1), true)
+			local all = table.concat(commands, "\n")
+			helpers.assert_contains(all, "device_id = 'owned '''")
+			helpers.assert_contains(all, "app = 'été '' app'")
+			helpers.assert_contains(all, "category = 'Updated '' été'")
+			helpers.assert_contains(all, "'app_score.été '' app'")
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: absent and fractional scores preserve their existing defaults and floors", function()
+		for _, case in ipairs({ { false, "0" }, { -0.25, "-1" }, { "1.9", "1" } }) do
+			with_category_commands(nil, function(writer, commands)
+				local score = case[1] ~= false and case[1] or nil
+				helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", score), true)
+				helpers.assert_contains(table.concat(commands, "\n"), "'app_score.owned-app', '" .. case[2] .. "'")
+			end)
+		end
+	end)
+
+	it("linux-sqlite-category-transaction: category receipt refusal remains a failed edit", function()
+		with_category_commands("category", function(writer)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), false)
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: invalid labels refuse before any native command", function()
+		with_category_commands(nil, function(writer, commands)
+			helpers.assert_eq(writer.set_app_category("owned", "", "Updated", 1), false)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "", 1), false)
+			helpers.assert_eq(#commands, 0)
+		end)
+	end)
+end)
+
 helpers.describe("linux-sqlite-read-receipts", function()
 	for _, status in ipairs({ 1, 7, 127, 137, 255, "missing" }) do
 		it("linux-sqlite-read-receipts: migration rows reject receipt " .. status, function()
@@ -201,14 +290,15 @@ helpers.describe("sqlite_writer", function()
       local seed = io.open(tmp, "w")
       if seed then seed:write("x") seed:close() end
       os.execute = function() return 0 end
-      io.popen = function()
+      io.popen = function(command)
         return {
           read = function(_, mode)
             if mode == "*l" then
               return "CREATE TABLE devices (os CHECK (os IN ('darwin','windows','linux')))"
             end
-            -- Mirror the shell's actual terminal status, not LuaJIT's pclose.
-            return "\nERGOPTI_SQL_EXIT_STATUS=0\n"
+            -- Mirror the reservation SELECT and the actual terminal status.
+            local body = command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or ""
+            return body .. "\nERGOPTI_SQL_EXIT_STATUS=0\n"
           end,
           close = function() return true end,
         }
@@ -402,4 +492,141 @@ helpers.describe("sqlite_writer", function()
     end)
   end)
 
+end)
+
+
+--- Models the native CLI's two scalar representations without replacing the
+--- production builder, checked receipt parser or shared JSON decoder.
+local function with_meta_value_output(value, status, test)
+	local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+	local previous_execute, previous_popen = os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	assert(file:write("existing native database fixture") and file:close())
+	os.execute = function() return 0 end
+	io.popen = function(command)
+		local content, code = "", status
+		if command:find("SELECT sql FROM sqlite_master", 1, true) then
+			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
+		elseif command:find("SELECT json_quote(value)", 1, true) then
+			content = value == nil and "" or require("json").encode(value) .. "\n"
+		elseif command:find("SELECT value FROM meta", 1, true) then
+			-- sqlite3's raw TEXT printer stops at NUL; scalar Lua framing stops at LF.
+			content = value == nil and "" or (value:match("^[^%z]*") .. "\n")
+		else
+			error("metadata test received an unexpected query")
+		end
+		return {
+			read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. code .. "\n" end,
+			close = function() return true end,
+		}
+	end
+	local ok, reason = xpcall(function()
+		helpers.assert_true(writer.open_db(path))
+		test(writer)
+	end, debug.traceback)
+	os.execute, io.popen = previous_execute, previous_popen
+	writer.close_db()
+	os.remove(path)
+	if not ok then error(reason, 0) end
+end
+
+helpers.describe("linux-sqlite-meta-framing", function()
+	for _, case in ipairs({
+		{ "compact cursor", '{"table":"events_typing","id":7}' },
+		{ "empty", "" },
+		{ "UTF-8 CR quote tab", "été ' \r\t literal" },
+		{ "LF", "one\ntwo" },
+		{ "leading LF", "\ntwo" },
+		{ "trailing LF", "one\n" },
+		{ "CRLF", "one\r\ntwo" },
+		{ "NUL suffix", "one\0two" },
+		{ "leading NUL", "\0two" },
+		{ "trailing NUL", "one\0" },
+		{ "JSON-looking text", "null" },
+	}) do
+		it("linux-sqlite-meta-framing: " .. case[1] .. " retains the complete stored string", function()
+			with_meta_value_output(case[2], 0, function(writer)
+				helpers.assert_eq(writer.get_meta("owned-key"), case[2])
+			end)
+		end)
+	end
+
+	it("linux-sqlite-meta-framing: missing rows retain nil", function()
+		with_meta_value_output(nil, 0, function(writer) helpers.assert_nil(writer.get_meta("owned-key")) end)
+	end)
+
+	it("linux-sqlite-meta-framing: failed receipts refuse even complete encoded rows", function()
+		with_meta_value_output("one\0two", 7, function(writer) helpers.assert_nil(writer.get_meta("owned-key")) end)
+	end)
+
+	for _, body in ipairs({ "not JSON\n", "null\n", "false\n", "42\n", "{}\n", "[]\n", '"unfinished\n' }) do
+		it("linux-sqlite-meta-framing: refuses malformed or non-string scalar " .. body:sub(1, -2), function()
+			with_writer_read_receipts(body, 0, function(writer) helpers.assert_nil(writer.get_meta("owned-key")) end)
+		end)
+	end
+end)
+
+
+--- Captures the production histogram statement while modeling only CLI receipts.
+--- The shared decoder independently checks the key bytes supplied to SQLite.
+local function with_burst_histogram_statement(row, test)
+	local command = require("modules.keylogger.sqlite_command")
+	local previous_build = command.build
+	local statement
+	command.build = function(path, sql, options)
+		if sql:find("INSERT INTO agg_app_day_burst", 1, true) then statement = sql end
+		return previous_build(path, sql, options)
+	end
+	local ok, reason = xpcall(function()
+		with_writer_read_receipts("", 0, function(writer)
+			helpers.assert_true(writer.upsert_burst("owned-device", row))
+			helpers.assert_eq(type(statement), "string")
+			local encoded = statement:match("VALUES %('owned%-device','2000%-01%-01','owned%-app',0,0%.000000,0,'(.-)',0,0,0%)")
+			helpers.assert_eq(type(encoded), "string", "existing counter defaults remain zero")
+			local decoded = require("json").decode((encoded:gsub("''", "'")))
+			helpers.assert_eq(type(decoded), "table", "SQLite receives a JSON object")
+			test(decoded)
+		end)
+	end, debug.traceback)
+	command.build = previous_build
+	if not ok then error(reason, 0) end
+end
+
+helpers.describe("linux-sqlite-burst-histogram-keys", function()
+	for _, key in ipairs({ "owned\\bucket", "owned\\literal", 'quoted" clé', "LF\nCR\rtab\tcontrol\1\31", "apostrophe's" }) do
+		it("linux-sqlite-burst-histogram-keys: supplied key retains " .. require("json").encode(key), function()
+			local row = { date = "2000-01-01", app = "owned-app", length_buckets = { [key] = 2.9 } }
+			with_burst_histogram_statement(row, function(decoded)
+				helpers.assert_eq(decoded[key], 2, "positive counts retain their existing floor")
+				local seen = 0
+				for stored in pairs(decoded) do
+					seen = seen + 1
+					helpers.assert_eq(stored, key, "the decoded key retains the supplied bytes")
+				end
+				helpers.assert_eq(seen, 1)
+				helpers.assert_eq(row.length_buckets[key], 2.9, "caller counts remain unchanged")
+			end)
+		end)
+	end
+
+	it("linux-sqlite-burst-histogram-keys: filtering, numeric labels and floors remain unchanged", function()
+		with_burst_histogram_statement({ date = "2000-01-01", app = "owned-app",
+			length_buckets = { [10] = 2.9, ["500+"] = 1, small = 0.9, zero = 0,
+				negative = -2, numeric_text = "3", boolean = true } }, function(decoded)
+			helpers.assert_eq(decoded, { ["10"] = 2, ["500+"] = 1, small = 0 })
+		end)
+	end)
+
+	it("linux-sqlite-burst-histogram-keys: missing histogram keeps the empty-object default", function()
+		with_burst_histogram_statement({ date = "2000-01-01", app = "owned-app" }, function(decoded)
+			helpers.assert_eq(next(decoded), nil)
+		end)
+	end)
+
+	it("linux-sqlite-burst-histogram-keys: empty histogram keeps the empty-object default", function()
+		with_burst_histogram_statement({ date = "2000-01-01", app = "owned-app", length_buckets = {} }, function(decoded)
+			helpers.assert_eq(next(decoded), nil)
+		end)
+	end)
 end)

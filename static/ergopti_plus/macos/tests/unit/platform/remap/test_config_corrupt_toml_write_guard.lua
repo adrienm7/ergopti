@@ -285,24 +285,27 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 		local path = os.tmpname()
 		write_file(path, CORRUPT_TOML)
 
-		-- The reset-to-defaults escape hatch intentionally uses the ordinary
-		-- two-argument overwrite port. Without it a user
-		-- whose file went bad could never repair it from the UI.
+		-- Explicit reset may replace malformed content, while conditional
+		-- publication still protects the exact raw bytes admitted for repair.
 		local payload
 		local write_assertion
-		local original_write = FileSystem.write
-		FileSystem.write = function(candidate, content)
+		local publication_source
+		local original_write = FileSystem.write_if_unchanged
+		FileSystem.write_if_unchanged = function(candidate, content, expected_source)
 			write_assertion = candidate == path
+			publication_source = expected_source
 			payload = content
 			return true
 		end
 		local saved = Config.save_user_config(make_state(), path, true)
-		FileSystem.write = original_write
+		FileSystem.write_if_unchanged = original_write
 		cleanup(path)
 
 		helpers.assert_eq(saved, true)
 		helpers.assert_true(write_assertion,
 			"the explicit reset intentionally discards the corrupt source snapshot")
+		helpers.assert_eq(publication_source, { status = "ok", content = CORRUPT_TOML },
+			"repair authority must retain the exact malformed-source publication fence")
 		helpers.assert_true(payload ~= nil,
 			"the explicit reset must be allowed to overwrite an unparseable config")
 		helpers.assert_true(payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,

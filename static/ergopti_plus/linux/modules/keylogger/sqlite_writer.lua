@@ -36,6 +36,8 @@ local M = {}
 local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
 local TextCipher    = require("modules.keylogger.text_cipher")
+local EventIdPolicy = require("sqlite.event_id_policy")
+local Json          = require("json")
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -60,10 +62,6 @@ local _available = nil
 
 -- Whether the schema has been bootstrapped for the current db_path.
 local _bootstrapped = false
-
--- Monotonic per-device event IDs. Stored in meta so a daemon restart cannot
--- reuse an ID and silently overwrite a previously persisted raw event.
-local _next_event_id = nil
 
 
 -- =========================================
@@ -165,22 +163,34 @@ local function _query_scalar(sql)
 	return output:match("^([^\n]*)")
 end
 
---- Reserves consecutive event IDs transactionally within this writer process.
+--- Reserves consecutive event IDs durably across independent writer processes.
 --- @param count number Number of IDs required.
---- @return number|nil First reserved ID.
+--- @return number|nil First reserved ID after the transaction commits.
 local function _reserve_event_ids(count)
 	count = math.max(1, math.floor(tonumber(count) or 1))
 	if not M.is_available() then return nil end
-	if not _next_event_id then
-		_exec("INSERT OR IGNORE INTO meta (key, value) VALUES ('linux_next_event_id', '1');")
-		_next_event_id = tonumber(_query_scalar("SELECT value FROM meta WHERE key = 'linux_next_event_id';")) or 1
-	end
-	local first = _next_event_id
-	_next_event_id = first + count
-	if not _exec(string.format("UPDATE meta SET value = '%d' WHERE key = 'linux_next_event_id';", _next_event_id)) then
-		_next_event_id = first
-		return nil
-	end
+	-- Read and advance the shared cursor under one native write lock. A cached
+	-- cursor reused another collector's IDs, and INSERT OR IGNORE then silently
+	-- discarded acknowledged raw rows. The exit receipt also covers COMMIT:
+	-- an emitted SELECT result alone never acknowledges the reservation.
+	-- SQLite CAST accepts numeric prefixes and clamps overflowing integers. Admit
+	-- decimal positive cursor text before casting, and keep the advanced cursor
+	-- within Lua's exact integer range. A rejected UPDATE emits no allocated ID.
+	local first = tonumber(_query_scalar(string.format([[
+BEGIN IMMEDIATE;
+INSERT OR IGNORE INTO meta (key, value) VALUES ('linux_next_event_id', '1');
+UPDATE meta SET value = CAST(value AS INTEGER) + %d
+WHERE key = 'linux_next_event_id'
+  AND instr(value, char(0)) = 0
+  AND trim(value) <> '' AND trim(value) NOT GLOB '*[^0-9]*'
+  AND CAST(value AS INTEGER) > 0
+  AND typeof(CAST(value AS INTEGER) + %d) = 'integer'
+  AND CAST(value AS INTEGER) <= %d - %d;
+SELECT CAST(value AS INTEGER) - %d FROM meta
+WHERE key = 'linux_next_event_id' AND changes() = 1;
+COMMIT;
+]], count, count, EventIdPolicy.MAX_EXACT_LUA_CURSOR, count, count)))
+	if not first then Logger.error(LOG, "Event ID reservation was not acknowledged.") end
 	return first
 end
 
@@ -265,7 +275,6 @@ function M.open_db(db_path)
 	if not _check_sqlite3() then return false end
 
 	_db_path = db_path
-	_next_event_id = nil
 
 	-- Ensure the parent directory exists.
 	local dir = db_path:match("^(.*)[/\\]") or "."
@@ -314,7 +323,6 @@ end
 function M.close_db()
 	_db_path = nil
 	_bootstrapped = false
-	_next_event_id = nil
 	Logger.debug(LOG, "SQLite database closed.")
 end
 
@@ -336,13 +344,22 @@ end
 --- @param os_name        string "linux".
 --- @param os_version     string Kernel version or distro name.
 --- @param host_signature string Host-specific fingerprint.
+--- @return boolean True only when the native registration write is acknowledged.
 function M.register_device(device_id, device_name, os_name, os_version, host_signature)
-	if not M.is_available() then return end
+	if not M.is_available() then return false end
 
 	local now = os.date("!%Y-%m-%dT%H:%M:%SZ")
 	local sql = string.format([[
-INSERT OR REPLACE INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at)
-VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s');
+BEGIN IMMEDIATE;
+INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at)
+VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s')
+ON CONFLICT(device_id) DO UPDATE SET
+  name = excluded.name,
+  os = excluded.os,
+  os_version = excluded.os_version,
+  host_signature = excluded.host_signature,
+  updated_at = excluded.updated_at;
+COMMIT;
 ]],
 		_sql_escape(device_id),
 		_sql_escape(device_name or device_id),
@@ -351,8 +368,14 @@ VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s');
 		_sql_escape(host_signature or device_id),
 		now, now
 	)
-	_exec(sql)
-	Logger.debug(LOG, "Device '%s' registered.", device_id)
+	-- Refresh host metadata without replacing creation/import fields or schema
+	-- extensions this registration does not own. REPLACE deleted that history.
+	-- FAIL in an AFTER trigger can retain a partial autocommit update. Keep the
+	-- registration in one explicit transaction; -bail closes and rolls it back
+	-- after a refused statement or COMMIT, before the terminal receipt returns.
+	local accepted = _exec(sql)
+	if accepted then Logger.debug(LOG, "Device '%s' registered.", device_id) end
+	return accepted
 end
 
 --- Inserts a batch of keystroke events into the events_typing table.
@@ -678,8 +701,8 @@ function M.upsert_burst(device_id, row)
 	local parts = {}
 	for label, count in pairs(row.length_buckets or {}) do
 		if type(count) == "number" and count > 0 then
-			parts[#parts + 1] = string.format('"%s":%d',
-				tostring(label):gsub('"', '\\"'), math.floor(count))
+			parts[#parts + 1] = string.format('%s:%d',
+				Json.encode(tostring(label)), math.floor(count))
 		end
 	end
 	local buckets_json = "{" .. table.concat(parts, ",") .. "}"
@@ -726,12 +749,17 @@ function M.set_app_category(device_id, app_name, category, score)
 	if not M.is_available() then return false end
 	if type(app_name) ~= "string" or app_name == "" then return false end
 	if type(category) ~= "string" or category == "" then return false end
-	local sql = string.format(
-		"UPDATE agg_app_day SET category = '%s' WHERE device_id = '%s' AND app = '%s';",
-		_sql_escape(category), _sql_escape(device_id), _sql_escape(app_name))
-	local ok = _exec(sql)
-	if ok then M.set_meta("app_score." .. app_name, tostring(math.floor(tonumber(score) or 0))) end
-	return ok
+	-- Category and score are one edit. Native -bail closes an unfinished
+	-- transaction after a statement error, undoing even an AFTER trigger FAIL.
+	local sql = string.format([[
+BEGIN;
+UPDATE agg_app_day SET category = '%s' WHERE device_id = '%s' AND app = '%s';
+INSERT OR REPLACE INTO meta (key, value) VALUES ('%s', '%s');
+COMMIT;
+]],
+		_sql_escape(category), _sql_escape(device_id), _sql_escape(app_name),
+		_sql_escape("app_score." .. app_name), _sql_escape(tostring(math.floor(tonumber(score) or 0))))
+	return _exec(sql)
 end
 
 -- How many window titles one application-day keeps. From the shared accumulator
@@ -1083,7 +1111,17 @@ end
 --- @return string|nil The stored value, or nil when absent.
 function M.get_meta(key)
 	if not M.is_available() or type(key) ~= "string" or key == "" then return nil end
-	return _query_scalar(string.format("SELECT value FROM meta WHERE key = '%s';", _sql_escape(key)))
+	-- Native raw TEXT output stops at NUL and scalar line framing stops at LF.
+	-- Quote just this value so the existing checked scalar path carries one line
+	-- while the shared decoder restores every byte, including an empty string.
+	local encoded = _query_scalar(string.format("SELECT json_quote(value) FROM meta WHERE key = '%s';", _sql_escape(key)))
+	if encoded == nil then return nil end
+	local ok, value = pcall(Json.decode, encoded)
+	if not ok or type(value) ~= "string" then
+		Logger.warn(LOG, "SQLite metadata read returned an invalid JSON string.")
+		return nil
+	end
+	return value
 end
 
 --- Writes one meta key.

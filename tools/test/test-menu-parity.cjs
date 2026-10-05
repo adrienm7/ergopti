@@ -104,8 +104,8 @@ const OPENS_SUBMENU = {
 	gestures: 'gestures_menu',
 	tap_holds: 'tap_holds_menu',
 	// Both hand providers render this declared fixed command under every native key.
-	tap_hold_keys_left: 'tap_hold_key_native_commands',
-	tap_hold_keys_right: 'tap_hold_key_native_commands',
+	tap_hold_keys_left: 'tap_hold_key_head',
+	tap_hold_keys_right: 'tap_hold_key_head',
 	key_combinations: 'key_combinations_group',
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
@@ -322,7 +322,7 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 		const parentVisibility = reachableOn[menuKey];
 		if (!parentVisibility) continue;
 		for (const row of manifest[menuKey]) {
-			const published = OPENS_SUBMENU[row.id];
+			const published = row.type === 'include' ? row.section : OPENS_SUBMENU[row.id];
 			if (!published) continue;
 			// One provider can publish multiple independently declared children.
 			// Every existing platform restriction still applies to its own edge.
