@@ -1458,6 +1458,23 @@ These are software implementations; final hardware verification remains below.
   gates remain deferred. The separately diagnosed no-luv periodic clock issue
   stays unmodified pending coordination; reserved surfaces are unchanged.
 
+- [~] **L104.** Shared selected-release tag decoding: read the release object's
+  own tag through the existing JSON decoder. Valid escaped tags were ignored,
+  while a preceding nested author tag could offer the wrong version. Preserve
+  the documented first-entry array wrapper, raw decoded string identity and
+  existing version/channel admission; do not fall through an unusable first
+  wrapper entry. Ten real verified TLS/public Linux updater controls have six
+  original failures and pass after on current LuaJIT, stock Lua 5.4 and the
+  signed Ubuntu 22.04 dependency mix. Full-list selection and stable/beta
+  controls remain intact; the server sees only release-list requests, with no
+  artifact fetch, installation or publication. Twenty shared Lua vectors and
+  one typed/single-return case retain all earlier corpus assertions: 94 focused
+  checks have 14 original failures and pass after. Register both native
+  interpreters for future Linux CI without launching it. macOS production
+  checks consume the corrected shared helper; Windows' analogous raw regex
+  flaw is documented with a source-only proposal, without editing its reserved
+  native work. Foreign runtime gates remain deferred. Depends on L101/L102.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
