@@ -82,7 +82,7 @@
 			"subject": "test(config): establish Windows source preservation preconditions"
 		}
 	],
-	"followup_status": "Pushed to feat/config-menus; dedicated Windows/macOS manual qualification is running; final serialized integration pending",
+	"followup_status": "Four commits pushed; fixture-only native run completed with failure. Eleven group1 Windows failures and twelve macOS failures corrected; final serialized integration remains pending.",
 	"todo_items": [5, 7, 33, 42, 54, 81],
 	"removed_items": [],
 	"transverse_items_retained": [16, 38],
@@ -102,7 +102,7 @@
 			"failed": 0,
 			"format": "UTF-8 BOM plus LF"
 		},
-		"ahk_native": "not executed on Linux host; Windows CI pending",
+		"ahk_native": "Windows runner executed: 9175 passed, 14 failed; engine E2E/package/install skipped. Physical acceptance remains unexecuted.",
 		"environment_retries": "Read-only /var/tmp and protected ancestor .git markers produced failing local runs. Exact gates were rerun with writable/native temporary directories without source/assertion changes."
 	},
 	"hosted_integrated_ci": "evidence/partial-integrated-native-ci.json",
@@ -120,5 +120,13 @@
 		"removed_items": [],
 		"other_numbered_blocks_exact": true,
 		"transverse_16_38_exact": true
-	}
+	},
+	"followup_native_results": {
+		"passed": 9175,
+		"failed": 14,
+		"previous_passed": 9164,
+		"previous_failed": 25,
+		"corrected_group1_failures": 11
+	},
+	"native_failure_boundary": "evidence/fixture-native-failure-boundary.json"
 }
