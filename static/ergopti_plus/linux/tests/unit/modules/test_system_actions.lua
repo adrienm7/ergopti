@@ -313,7 +313,7 @@ helpers.describe("Linux system actions", function()
 				},
 				["modules.gestures.combo_emitter"] = { press = function() return true end },
 				["adapters.event_loop"] = { sleep_ms = function() return true end },
-				["adapters.notifier"] = { send = function() return true end },
+				["adapters.application_notifier"] = { send = function() return true end },
 			}, function()
 				with_recorded_shell(function(commands)
 					Gestures.execute_action("make_executable_selection", "tap_3")

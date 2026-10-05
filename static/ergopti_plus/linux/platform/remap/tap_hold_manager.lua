@@ -23,6 +23,8 @@ local M = {}
 local Logger = require("logger.shim")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
+local Combinations = require("modules.shortcuts.key_combinations")
+local CombinationEngine = require("platform.remap.key_combination_engine")
 local Timings = require("infra.timings")
 local HoldOptions = require("tap_hold.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
@@ -54,6 +56,8 @@ local _engine = nil          -- Built from _loaded; nil when there is nothing to
 local _one_shot = nil        -- The shared one-shot Shift results, read with _loaded.
 local _enabled = true        -- The runtime feature switch (« Disable all »).
 local _paused = false        -- The daemon's pause.
+local _combinations = nil
+local _installed_engine = nil
 local _generation = 0       -- Revokes queued actions across every runtime installation.
 
 
@@ -119,17 +123,40 @@ end
 --- Whether the engine should be in the hook now.
 --- @return boolean
 local function _active()
-	return _enabled and not _paused and _engine ~= nil and _loaded ~= nil and _loaded.enabled
+	return not _paused and not (_combinations and _combinations.configuration_pending()) and _engine ~= nil and _loaded ~= nil
+		and (_enabled and _loaded.enabled or _combinations and _combinations.has_bindings())
+end
+
+local function _pair_thresholds(loaded)
+	local thresholds = {}
+	for _, row in ipairs(loaded.catalog) do
+		local key = loaded.keys[row.id]
+		thresholds[row.id] = math.floor((key and key.time_activation_seconds or Config.FALLBACK_THRESHOLD_SECONDS) * MS_PER_SECOND + 0.5)
+	end
+	return thresholds
 end
 
 --- Installs or removes the engine to match the current state.
 local function _apply()
 	_generation = _generation + 1
-	if _active() then
-		_hook.set_remapper(_engine, _run_tap)
-	else
-		_hook.set_remapper(nil)
+	if _engine and _combinations and _combinations.has_bindings() and not _engine.has_combinations then
+		if _hook.set_remapper(nil) == false then return false end
+		_engine = CombinationEngine.new(_engine, _combinations.engine_options(_pair_thresholds(_loaded)))
 	end
+	if _engine and _engine.has_combinations then
+		if _hook.set_remapper(nil) ~= true then return false end
+		if _engine:configure(_combinations.engine_options(_pair_thresholds(_loaded))) ~= true then return false end
+		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled) ~= true then return false end
+	end
+	if _active() then
+		local installed = _hook.set_remapper(_engine, _run_tap)
+		if installed == false or _engine.has_combinations and installed ~= true then return false end
+	else
+		if _hook.set_remapper(nil) == false then return false end
+	end
+	_installed_engine = _active() and _engine or nil
+	if _combinations then Combinations.set_instance(_combinations) end
+	return true
 end
 
 --- The ids a tap can be set to, as a set: the key taps the engine types
@@ -216,14 +243,20 @@ local function _build(loaded, boot)
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
 	})
+	local combinations = Combinations.new({ keys = loaded.catalog, hold_picker = loaded.hold_picker,
+		is_paused = function() return _paused end, changed = _apply,
+		actions = { is_assignable = function(action) return action ~= "one_shot_shift" and action ~= "caps_word" and _tap_action_set()[action] == true end } })
+	if combinations.has_bindings() then
+		engine = CombinationEngine.new(engine, combinations.engine_options(_pair_thresholds(loaded)))
+	end
 	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, loaded.enabled and "on" or "off")
-	return loaded, one_shot, engine
+	return loaded, one_shot, engine, combinations
 end
 
 --- Reads the files and builds a fresh engine; the old one stays until _apply().
 --- @param boot boolean|nil Whether this is the initial daemon load.
 local function _load(boot)
-	_loaded, _one_shot, _engine = _build(Config.load(_defaults_path, _user_path), boot)
+	_loaded, _one_shot, _engine, _combinations = _build(Config.load(_defaults_path, _user_path), boot)
 end
 
 local function _require_init()
@@ -270,8 +303,9 @@ function M.init(opts)
 	_enabled, _paused = true, false
 	_load(true)
 	_initialized = true
-	_apply()
-	Logger.success(LOG, "Tap-holds initialised (%s).", _active() and "active" or "inactive")
+	local installed = _apply()
+	Logger.success(LOG, "Tap-holds initialised (%s).", M.is_active() and "active" or "inactive")
+	return installed
 end
 
 --- Re-reads the configuration and swaps the engine in place.
@@ -283,15 +317,14 @@ function M.reload()
 		Logger.error(LOG, "Tap-hold reload failed, the previous configuration stays: %s.", tostring(err))
 		return false
 	end
-	_apply()
-	return true
+	return _apply()
 end
 
 --- Captures the configuration in force, for a scope transaction's inverse.
 --- @return table snapshot Opaque, detached from later loads.
 function M.configuration_snapshot()
 	_require_init()
-	return { loaded = _loaded, one_shot = _one_shot, engine = _engine }
+	return { loaded = _loaded, one_shot = _one_shot, engine = _engine, combinations = _combinations }
 end
 
 --- Puts a candidate user document in force before its file is published, so a
@@ -305,16 +338,15 @@ function M.apply_configuration(document, shapes)
 		Logger.error(LOG, "Tap-hold scope candidate must be a decoded document — nothing changed.")
 		return false
 	end
-	local ok, loaded, one_shot, engine = pcall(function()
+	local ok, loaded, one_shot, engine, combinations = pcall(function()
 		return _build(Config.load_document(_defaults_path, document, nil, _user_path, shapes))
 	end)
 	if not ok then
 		Logger.error(LOG, "Tap-hold scope candidate refused, the previous configuration stays: %s.", tostring(loaded))
 		return false
 	end
-	_loaded, _one_shot, _engine = loaded, one_shot, engine
-	_apply()
-	return true
+	_loaded, _one_shot, _engine, _combinations = loaded, one_shot, engine, combinations
+	return _apply()
 end
 
 --- Reinstalls a configuration captured by configuration_snapshot().
@@ -326,9 +358,8 @@ function M.restore_configuration(snapshot)
 		Logger.error(LOG, "Tap-hold configuration snapshot is invalid — nothing restored.")
 		return false
 	end
-	_loaded, _one_shot, _engine = snapshot.loaded, snapshot.one_shot, snapshot.engine
-	_apply()
-	return true
+	_loaded, _one_shot, _engine, _combinations = snapshot.loaded, snapshot.one_shot, snapshot.engine, snapshot.combinations
+	return _apply()
 end
 
 --- Whether the runtime feature switch is on.
@@ -347,9 +378,9 @@ function M.set_enabled(enabled)
 		return false
 	end
 	_enabled = enabled
-	_apply()
+	local installed = _apply()
 	Logger.info(LOG, "Tap-holds switched %s.", enabled and "on" or "off")
-	return true
+	return installed
 end
 
 --- Follows the daemon's pause: a paused script remaps nothing.
@@ -357,13 +388,13 @@ end
 function M.set_paused(paused)
 	_require_init()
 	_paused = paused == true
-	_apply()
+	return _apply()
 end
 
 --- Whether the engine is in the hook right now.
 --- @return boolean
 function M.is_active()
-	return _initialized and _active()
+	return _initialized and _active() and _installed_engine == _engine
 end
 
 --- The effective keys, key id → fields, as the engine runs them.
@@ -518,10 +549,12 @@ end
 
 --- Test seam: forgets the initialisation so a test can init again.
 function M._reset_for_test()
-	if _hook then _hook.set_remapper(nil) end
+	if _hook and _hook.set_remapper(nil) == false then return false end
 	_initialized, _hook, _execute_action, _action_names, _loaded, _engine = false, nil, nil, nil, nil, nil
 	_on_text_injected = nil
+	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false
+	return true
 end
 
 return M

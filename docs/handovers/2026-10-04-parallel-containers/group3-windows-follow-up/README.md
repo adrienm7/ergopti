@@ -135,6 +135,27 @@ strict exit/stderr and physical retirement; extracted-source checks alone do not
 prove the live driver. Run the current unit/E2E and actual resident-entry/startup
 checks as well. These tests were prepared, not executed here.
 
+## Observed native failures to repair first
+
+Manual run [37288850992](https://github.com/adrienm7/ergopti/actions/runs/37288850992)
+tested `2625ae225113a874bc95df64dbca938c61bb6c02`, whose complete source tree
+matched feature commit `5bf40c0a9a22f28a200d14852b536f1897b02200`.
+Windows units recorded 9216 passes and 65 failures. The exact 13 Group 3
+checkpoints are retained in [native-ci-37288850992.json](native-ci-37288850992.json).
+
+Repair and rerun the nine registered program-action failures before admitting the
+inactive constructor packet: case 8988 rejects the independent Windows-literal
+JSON scalar, and cases 8989–8992/8995–8998 encounter an unassigned global at
+`test_run_program_actions.ahk:38`. Establish the actual native cause without
+changing independent expected values. Register `user-programs` with the existing
+lifecycle owner and inventory `ProgramActions_Poll` through its proper owner.
+Route the additional native calls through adapters; the OS-purity ceilings stay
+252/601, rather than being raised to the observed 261/607.
+
+Source E2E, compiled E2E, packaging and installation did not execute after the
+unit failure. These checkpoints are observed failures, not completed Windows
+work or substitutes for the 12 still unexecuted constructor-fault cases.
+
 ## Inactive constructor packet: exact capability, not empty acknowledgement
 
 `inactive/windows106-ctor-handoff/` contains the complete producer preimage,

@@ -131,7 +131,7 @@ function M.notify(title_or_msg, body, kind, on_click)
 	if on_click ~= nil and type(on_click) ~= "function" then
 		return false, "notification click action must be a function"
 	end
-	local title_text = "Ergopti+"
+	local title_text = ""
 	local info_text = tostring(title_or_msg)
 
 	if body ~= nil then
@@ -144,7 +144,7 @@ function M.notify(title_or_msg, body, kind, on_click)
 
 	local owner_id = nil
 	local created, notification_or_err = xpcall(function()
-		return hs.notify.new(function()
+		return require("adapters.application_notifier").new(function()
 			if owner_id then release_notification(owner_id) end
 			if type(on_click) == "function" then
 				run_click_step("action", on_click)

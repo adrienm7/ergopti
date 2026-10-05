@@ -33,6 +33,7 @@ local M = {}
 M.EXIT_ACCESS = 78
 
 M.TITLE_KEY = "startup.linux_input_access_title"
+M.NOTIFICATION_LABEL_KEY = "startup.linux_input_access_label"
 M.BODY_KEY = "startup.linux_input_access_body"
 
 -- errno for a node that exists but this user may not open.
@@ -63,12 +64,15 @@ function M.report(deps, detail)
 	deps = type(deps) == "table" and deps or {}
 	local i18n = deps.i18n
 	local title, body = M.TITLE_KEY, M.BODY_KEY
+	local notification_label = M.NOTIFICATION_LABEL_KEY
 	if i18n then
 		pcall(i18n.init)
 		local ok_title, translated_title = pcall(i18n.get, M.TITLE_KEY)
 		local ok_body, translated_body = pcall(i18n.get, M.BODY_KEY)
+		local ok_label, translated_label = pcall(i18n.get, M.NOTIFICATION_LABEL_KEY)
 		if ok_title and type(translated_title) == "string" then title = translated_title end
 		if ok_body and type(translated_body) == "string" then body = translated_body end
+		if ok_label and type(translated_label) == "string" then notification_label = translated_label end
 	end
 	if body:find("{1}", 1, true) then
 		local root = deps.script_dir or require("infra.paths").driver_root()
@@ -81,7 +85,7 @@ function M.report(deps, detail)
 	out(body)
 
 	if deps.notifier and type(deps.notifier.send) == "function" then
-		pcall(deps.notifier.send, body, { title = title, level = "error" })
+		pcall(deps.notifier.send, body, { title = notification_label, level = "error" })
 	end
 	return M.EXIT_ACCESS
 end

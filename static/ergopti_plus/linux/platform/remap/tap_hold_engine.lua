@@ -964,4 +964,38 @@ function M:release_all()
 	return out
 end
 
+--- Narrow composition ports for configured ordered pairs. These retain the
+--- existing reference counts: lifting one owner's Ctrl cannot lift another's.
+function M:combination_hold(spec)
+	local out, state = {}, { emitted = {}, layer = false }
+	for _, code in ipairs(spec.mods or {}) do press(self, out, code); state.emitted[#state.emitted + 1] = code end
+	if spec.layer then self.layer_depth = self.layer_depth + 1; state.layer = true end
+	return out, state
+end
+function M:combination_release(state)
+	local out = {}
+	for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
+	if state.layer then self.layer_depth = self.layer_depth - 1 end
+	state.emitted, state.layer = {}, false
+	return out
+end
+function M:combination_lift(code)
+	local first = self.held[code]
+	if not first or first.undecided then return {}, nil end
+	first.cancelled = true
+	local frame = { first = first, code = code, emitted = first.emitted, layer = first.layer }
+	first.emitted, first.layer = {}, false
+	local out = {}
+	for index = #frame.emitted, 1, -1 do release(self, out, frame.emitted[index]) end
+	if frame.layer then self.layer_depth = self.layer_depth - 1 end
+	return out, frame
+end
+function M:combination_restore(frame)
+	local out = {}
+	if not frame or self.held[frame.code] ~= frame.first then return out end
+	for _, code in ipairs(frame.emitted) do press(self, out, code) end
+	if frame.layer then self.layer_depth = self.layer_depth + 1 end
+	frame.first.emitted, frame.first.layer = frame.emitted, frame.layer
+	return out
+end
 return M

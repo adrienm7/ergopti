@@ -1,5 +1,11 @@
 # Configuration and menus: Windows workstation handoff
 
+Current partial delivery (2026-10-05): [PARTIAL-DELIVERY.md](PARTIAL-DELIVERY.md)
+and the current partial-delivery receipt supersede the historical unmerged
+continuation statements below. Merges `a550193eb` and `c8e4434a0` are pushed to dev;
+items 5/7/33/42/54/81 remain partial. Frozen preparations are preserved in
+[the resumed delivery index](prepared/resumed-delivery-index.json).
+
 The maintainer requested integration of the completed group1 corrections and
 explicit TODO steps for Windows work to be resumed on their workstation.
 The six assigned items (5, 7, 33, 42, 54, 81) remain partial; none is removed.
