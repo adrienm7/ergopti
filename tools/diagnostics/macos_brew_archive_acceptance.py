@@ -785,6 +785,78 @@ def native_compiler(children):
     ]
 
 
+def appleevent_registration_fact(children, receiver):
+    """Project one closed failure line; unknown capture bytes never leave the fixture."""
+    directory = descriptor = None
+    try:
+        if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+            return {}
+        capture = children.captures[receiver][1]
+        root = children.root
+        if capture.parent != root:
+            return {}
+        name = capture.name
+        sequence = name.removeprefix("child-").removesuffix(".stderr")
+        if (
+            name != f"child-{sequence}.stderr"
+            or not sequence
+            or any(digit not in "0123456789" for digit in sequence)
+        ):
+            return {}
+        directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        info = os.fstat(directory)
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            return {}
+        descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        info = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_nlink != 1
+            or not 0 < info.st_size <= 128
+        ):
+            return {}
+        value = os.read(descriptor, 129)
+        if len(value) != info.st_size or len(value) > 128:
+            return {}
+        for phase in ("get-current-process", "transform-process-type"):
+            prefix = (
+                "Owned AppleEvent recipient registration failed: phase=" + phase + ", osstatus="
+            ).encode("ascii")
+            if not value.startswith(prefix) or not value.endswith(b"\n"):
+                continue
+            encoded = value[len(prefix) : -1]
+            digits = encoded[1:] if encoded.startswith(b"-") else encoded
+            if not digits or not digits.isdigit() or len(encoded) > 11:
+                return {}
+            status = int(encoded)
+            if (
+                not -(2**31) <= status < 2**31
+                or status == 0
+                or str(status).encode("ascii") != encoded
+            ):
+                return {}
+            return {"phase": phase, "osstatus": status}
+        return {}
+    except OwnedProcessInterrupted:
+        raise
+    except (OSError, KeyError, AttributeError, ValueError, TypeError):
+        return {}
+    finally:
+        try:
+            if descriptor is not None:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+        finally:
+            if directory is not None:
+                try:
+                    os.close(directory)
+                except OSError:
+                    pass
+
+
 def _admit_appleevent_boundary(children, repository):
     """Require two real owned deliveries before admitting the full policy's refusal."""
     root = children.root
@@ -836,18 +908,28 @@ def _admit_appleevent_boundary(children, repository):
         observation = group.observe_exit()
         if observation is not None:
             # This is the existing exact-PID WNOWAIT observation. Do not poll,
-            # reap or read child streams while its reservation is still owned.
+            # reap while its reservation is still owned. Only the closed fixed
+            # registration line below may contribute typed diagnostic facts.
             kind = {
                 os.CLD_EXITED: "CLD_EXITED",
                 os.CLD_KILLED: "CLD_KILLED",
                 os.CLD_DUMPED: "CLD_DUMPED",
             }[observation.si_code]
+            registration = {}
+            if observation.si_code == os.CLD_EXITED and observation.si_status == 65:
+                registration = appleevent_registration_fact(children, receiver)
+            detail = (
+                f", registration_phase={registration['phase']}, "
+                f"registration_osstatus={registration['osstatus']}"
+                if registration
+                else ""
+            )
             require(
                 False,
                 "The exact owned AppleEvent receiver is no longer live: "
                 f"checkpoint={checkpoint}, receiver_pid={receiver.pid}, "
                 f"waitid_kind={kind}, waitid_code={observation.si_code}, "
-                f"waitid_status={observation.si_status}",
+                f"waitid_status={observation.si_status}" + detail,
             )
 
     deadline = time.monotonic() + 10

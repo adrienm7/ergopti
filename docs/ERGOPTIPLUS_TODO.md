@@ -1992,6 +1992,18 @@ Swift assertion lines remain intact; twenty-three portable controls and twelve
 annotation-owner checks pass. Native macOS directory facts and the full
 Sparkle/Brew packaging/install cohort remain pending; item 36 stays open.
 
+The same native run observes the exact AppleEvent receiver as CLD_EXITED,
+status 65, at readiness before either positive delivery. Registration diagnostics
+now distinguish only GetCurrentProcess from TransformProcessType and retain
+its nonzero signed-int32 OSStatus. They read only the ledger-owned, bounded,
+no-follow regular capture after that existing termination observation; unknown,
+foreign or unsafe bytes omit facts. Both native status guards and exit 65,
+all thirty-one previous test methods and 150 assertions remain unchanged.
+Thirty-five portable controls pass without skips; the old helper fails the new
+projection control. Native C registration, positive AppleEvent delivery,
+sandbox containment and Brew install/upgrade remain pending; no runtime fix
+or full item-36 qualification is claimed.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

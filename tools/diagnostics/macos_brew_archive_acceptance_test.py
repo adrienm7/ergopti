@@ -613,6 +613,162 @@ class AppleEventBoundaryControls(unittest.TestCase):
                     self.assertEqual((root / "sandbox.sb").read_text(), self.policy)
 
 
+class RegistrationFactControls(unittest.TestCase):
+    """Real bounded capture admission; native registration remains unqualified."""
+
+    def capture(self, root, value):
+        root.chmod(0o700)
+        receiver = Mock(pid=73136)
+        path = root / "child-1.stderr"
+        path.write_bytes(value)
+        children = Mock(root=root, captures={receiver: (root / "child-1.stdout", path)})
+        return children, receiver, path
+
+    def line(self, phase, status):
+        return (
+            "Owned AppleEvent recipient registration failed: phase="
+            + phase
+            + ", osstatus="
+            + str(status)
+            + "\n"
+        ).encode("ascii")
+
+    def test_only_two_closed_phases_and_canonical_nonzero_int32_are_projected(self):
+        for phase in ("get-current-process", "transform-process-type"):
+            for status in (-2147483648, -600, -50, 1, 2147483647):
+                with self.subTest(phase=phase, status=status), TemporaryDirectory() as directory:
+                    children, receiver, _path = self.capture(
+                        Path(directory), self.line(phase, status)
+                    )
+                    expected = {"phase": phase, "osstatus": status}
+                    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+                        expected = {}
+                    self.assertEqual(
+                        probe.appleevent_registration_fact(children, receiver), expected
+                    )
+                    receiver.poll.assert_not_called()
+                    receiver.wait.assert_not_called()
+
+    def test_unknown_nul_noise_overflow_and_noncanonical_statuses_omit_facts(self):
+        valid = self.line("get-current-process", -50)
+        invalid = (
+            self.line("unowned-stage", -50),
+            self.line("get-current-process", 0),
+            self.line("get-current-process", -2147483649),
+            self.line("get-current-process", 2147483648),
+            valid.replace(b"-50", b"+50"),
+            valid.replace(b"-50", b"-050"),
+            valid.replace(b"-50", b"-0"),
+            valid.replace(b"-50", b"-50\0"),
+            valid + b"noise\n",
+            valid + valid,
+            valid[:-1],
+            b"x" * 129,
+            b"",
+        )
+        for value in invalid:
+            with self.subTest(value=value), TemporaryDirectory() as directory:
+                children, receiver, _path = self.capture(Path(directory), value)
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+
+    def test_foreign_symlink_nonregular_and_unclosed_captures_omit_facts(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            children, receiver, capture = self.capture(
+                root, self.line("transform-process-type", -50)
+            )
+            capture.unlink()
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            foreign = root / "foreign"
+            foreign.mkdir()
+            other = foreign / "child-1.stderr"
+            other.write_bytes(self.line("transform-process-type", -50))
+            children.captures[receiver] = (root / "child-1.stdout", other)
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            children.captures[receiver] = (root / "child-1.stdout", capture)
+            if hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY"):
+                capture.symlink_to(other)
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                capture.unlink()
+                capture.mkdir()
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                capture.rmdir()
+                if hasattr(os, "mkfifo"):
+                    os.mkfifo(capture)
+                    self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                    capture.unlink()
+                capture.write_bytes(self.line("get-current-process", -600))
+                with patch.object(probe.os, "read", return_value=b"partial"):
+                    self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                with patch.object(probe.os, "read", return_value=b"x" * 129):
+                    self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+
+    def test_exit65_projects_only_typed_facts_and_never_changes_failure_ownership(self):
+        boundary = AppleEventBoundaryControls()
+        for code, status, value in (
+            (21, 65, self.line("transform-process-type", -50)),
+            (21, 65, b"unknown private bytes\0\n"),
+            (21, 68, self.line("transform-process-type", -50)),
+            (22, 65, self.line("transform-process-type", -50)),
+        ):
+            with self.subTest(code=code, status=status), TemporaryDirectory() as directory:
+                root = Path(directory)
+                root.chmod(0o700)
+                (root / "sandbox.sb").write_text(boundary.policy)
+                children = boundary.model(root)
+                children.captures = {}
+                acquire = children.start
+
+                def start(arguments):
+                    child = acquire(arguments)
+                    capture = root / "child-1.stderr"
+                    capture.write_bytes(value)
+                    children.captures[child] = (root / "child-1.stdout", capture)
+                    children.groups[child].observe_exit.return_value = Mock(
+                        si_pid=73136, si_code=code, si_status=status
+                    )
+                    return child
+
+                children.start = start
+                with (
+                    patch.object(probe.uuid, "uuid4", return_value=boundary.nonce),
+                    patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
+                    patch.multiple(
+                        probe.os, CLD_EXITED=21, CLD_KILLED=22, CLD_DUMPED=23, create=True
+                    ),
+                ):
+                    with self.assertRaises(probe.AppleEventBoundaryError) as failure:
+                        probe.admit_appleevent_boundary(children, root)
+                detail = str(failure.exception)
+                admitted = (
+                    code == 21
+                    and status == 65
+                    and value == self.line("transform-process-type", -50)
+                    and hasattr(os, "O_NOFOLLOW")
+                    and hasattr(os, "O_DIRECTORY")
+                )
+                if admitted:
+                    self.assertTrue(
+                        detail.endswith(
+                            ", registration_phase=transform-process-type, registration_osstatus=-50"
+                        )
+                    )
+                else:
+                    self.assertNotIn("registration_phase=", detail)
+                self.assertIn("checkpoint=readiness", detail)
+                self.assertIn("waitid_status=" + str(status), detail)
+                self.assertNotIn(directory, detail)
+                self.assertNotIn(boundary.nonce, detail)
+                self.assertNotIn("unknown private bytes", detail)
+                self.assertEqual(children.sender_calls, [])
+                self.assertEqual(len(children.active), 1)
+                child = children.active[0]
+                self.assertEqual(children.groups[child].observe_exit.call_count, 1)
+                self.assertFalse(children.groups[child].reaped)
+                child.poll.assert_not_called()
+                child.wait.assert_not_called()
+
+
 class PhaseEvidenceControls(unittest.TestCase):
     """Actual bounded filesystem controls; these never substitute native process closure."""
 

@@ -275,7 +275,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 31 tests in /);
+	assert.match(result.stderr, /Ran 35 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -336,6 +336,39 @@ check('owned AppleEvent liveness refusal preserves its nonreaping numeric observ
 	]) {
 		assert.equal(helper.split(`same_live_receiver("${checkpoint}")`).length - 1, 1);
 	}
+});
+
+check('owned registration diagnosis projects only a closed bounded native failure fact', () => {
+	const helper = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+		'utf8'
+	);
+	const receiver = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+		'utf8'
+	);
+	const begin = helper.indexOf('def appleevent_registration_fact(');
+	assert.ok(begin >= 0);
+	const projection = helper.slice(begin, helper.indexOf('def _admit_appleevent_boundary', begin));
+	assert.match(projection, /children\.captures\[receiver\]\[1\]/);
+	assert.match(projection, /os\.O_NOFOLLOW/);
+	assert.match(projection, /os\.O_NONBLOCK/);
+	assert.match(projection, /stat\.S_ISREG\(info\.st_mode\)/);
+	assert.match(projection, /info\.st_size <= 128/);
+	assert.match(projection, /os\.read\(descriptor, 129\)/);
+	assert.match(projection, /len\(value\) != info\.st_size/);
+	assert.ok(projection.includes('not -(2**31) <= status < 2**31'));
+	assert.doesNotMatch(projection, /observe_exit|\.(?:poll|wait|settle)\(/);
+	assert.match(helper, /observation\.si_code == os\.CLD_EXITED and observation\.si_status == 65/);
+	for (const phase of ['get-current-process', 'transform-process-type']) {
+		assert.ok(receiver.includes(`phase=${phase}, osstatus=%d`));
+	}
+	const registration = receiver.slice(
+		receiver.indexOf('OSStatus status = GetCurrentProcess'),
+		receiver.indexOf('const AEEventHandlerUPP')
+	);
+	assert.equal((registration.match(/if \(status != noErr\)/g) || []).length, 2);
+	assert.equal((registration.match(/return 65;/g) || []).length, 2);
 });
 
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
