@@ -297,3 +297,38 @@ Merge without squash, preserve other groups, push immediately and cancel
 automatic exact-SHA runs. Final manual validation must test the integrated
 sources; do not substitute unrelated unmerged feature sources from an old CI
 aggregate. The CI workflow's manual event must keep release publication off.
+
+## Continuation delivery and remaining blockers
+
+The nine additional configuration corrections through `594f810aa` are pushed
+on `feat/config-menus`. [The delivery receipt](continuation-delivery.json)
+lists their exact commits and the fifteen earlier commits confirmed in current
+`origin/dev`. No assigned TODO item is removed. The Windows workstation steps
+remain explicit; five prepared menu packets and the broader shared migration
+remain implementation work, not completed features.
+
+Manual [run37263515985](https://github.com/adrienm7/ergopti/actions/runs/37263515985)
+tested exact-tree projection `4800d5c83` of source `594f810aa`, with
+`os_lanes=macos+linux`, and finished in failure. Shared JS/properties, Linux
+units and portable macOS unit/E2E pass. Linux E2E fails its ETag, audio-locale
+and literal-notification subjects. The native macOS XCTest fails Sparkle's
+process census and Homebrew's owned AppleEvent receiver acceptance. Dependent
+Linux packaging and both installations are skipped, Windows is deferred and
+Release / Publish is skipped. [The native receipt](evidence/continuation-native-ci.json)
+records exact job/subject conclusions. All fifteen inspected native owner
+objects match current dev; that does not establish the native failure cause or
+replace a baseline replay. Detailed failed-job logs remain Forbidden; annotations
+are retained. No assertions or mandatory gates were removed or weakened.
+
+The continuation is not newly merged into dev and its feature branch is retained.
+No integration lock or another group's CI ref is held or modified. A qualified
+future integration still needs current dev, conflict-preserving composition,
+serialized no-squash merge and exact integrated-source manual validation.
+Transverse items16/38 remain mandatory. This documentation follow-up changes no
+native source input and does not require another native dispatch.
+
+[The retired-provider dependency](prepared/retired-api-provider-dependency.md)
+preserves two current-source causal failures and the coordinated catalogue-port
+proposal. Real wizard/global-scope and physical-device acceptance remain open;
+this container has X11 virtual-session support but no `/dev/input` or
+`/dev/uinput`, so it cannot establish physical Linux keyboard behavior.
