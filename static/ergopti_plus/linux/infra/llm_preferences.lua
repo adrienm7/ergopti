@@ -18,6 +18,14 @@ local _observed_source = nil
 --- @return boolean admitted
 function M.admit() return _scope_owner == nil end
 
+--- Rechecks only the originating acknowledged revision and ordinary owner.
+--- No IO or user callback occurs after this check in final write admission.
+--- @param revision integer Captured source revision.
+--- @return boolean current
+function M.is_current_revision(revision)
+	return _scope_owner == nil and _generation == revision
+end
+
 --- Acquires exclusive ownership before cancelling or changing AI runtime.
 --- @param owner table Transaction identity.
 --- @return boolean acquired
@@ -167,9 +175,10 @@ end
 --- Publishes one complete batch using the exact source observed before writing.
 --- @param values table Canonical path to desired value.
 --- @param expected_source table|nil Exact snapshot used to build a cached candidate.
+--- @param admission function|nil Captured final writer admission.
 --- @return boolean committed
-function M.set_many(values, expected_source)
-	if not M.admit() then return false end
+function M.set_many(values, expected_source, admission)
+	if not M.admit() or (admission ~= nil and type(admission) ~= "function") then return false end
 	local called, committed, detail = pcall(function()
 		assert(type(values) == "table", "AI preference batch requires a table")
 		assert(expected_source == nil or type(expected_source) == "table", "AI preferences require an exact source snapshot")
@@ -179,7 +188,7 @@ function M.set_many(values, expected_source)
 			operations[#operations + 1] = Manifest.sparse_operation(path, value)
 		end
 		local _, source = read()
-		return Writer.batch_write(Paths.config("config.toml"), operations, nil, expected_source or source)
+		return Writer.batch_write(Paths.config("config.toml"), operations, nil, expected_source or source, nil, admission)
 	end)
 	if not called or committed ~= true then
 		Logger.error(LOG, "AI preferences were not persisted: %s.", tostring(called and detail or committed))

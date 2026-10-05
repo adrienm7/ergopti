@@ -32,6 +32,7 @@
 
 local helpers = require("tests.helpers")
 local NativeCommand = require("modules.keylogger.sqlite_command")
+local Json = require("json")
 
 -- Every table the schema declares for character sequences, and the code the
 -- dashboard envelope uses for each.
@@ -170,6 +171,27 @@ helpers.describe("linux-sqlite-read-receipts", function()
 	end)
 end)
 
+helpers.describe("sqlite-ngram-text-receipts", function()
+	helpers.it("sqlite-ngram-text-receipts: escaped native token bytes remain distinct", function()
+		with_stubbed_sqlite(function(sql)
+			if not sql:find("FROM ngram_chars", 1, true) then return "[]" end
+			local rows = {}
+			for index, token in ipairs({ "a", "a\0b", "\0", "été" }) do
+				rows[index] = { token_json = Json.encode(token), c = index, td = index * 10,
+					e = index, esrc_json = '{}', source_rows = 1 }
+			end
+			return Json.encode(rows)
+		end, function(reader)
+			local chars = reader.read_ngrams("/owned/metrics.sqlite").c
+			for index, token in ipairs({ "a", "a\0b", "\0", "été" }) do
+				helpers.assert_not_nil(chars[token], "native JSON token must retain all original bytes")
+				helpers.assert_eq(chars[token].c, index, "distinct tokens cannot merge counters")
+				helpers.assert_eq(chars[token].t, index * 10)
+			end
+		end)
+	end)
+end)
+
 --- Whether any statement selects from the given table.
 --- @param statements table
 --- @param table_name string
@@ -267,7 +289,7 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_bigrams", 1, true) then
-				return '[{"token":"ab","c":7,"td":840,"e":1,"esrc_json":"{}"}]'
+				return '[{"token_json":"\\\"ab\\\"","c":7,"td":840,"e":1,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
@@ -285,7 +307,7 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_trigrams", 1, true) then
-				return '[{"token":"abc","c":4,"td":1200,"e":2,"esrc_json":"{}"}]'
+				return '[{"token_json":"\\\"abc\\\"","c":4,"td":1200,"e":2,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
@@ -303,8 +325,8 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_words", 1, true) then
-				return '[{"token":"bonjour","c":3,"td":900,"e":0,"esrc_json":"{}"},'
-					.. '{"token":"bonjour","c":5,"td":1500,"e":1,"esrc_json":"{}"}]'
+				return '[{"token_json":"\\\"bonjour\\\"","c":3,"td":900,"e":0,"esrc_json":"{}"},'
+					.. '{"token_json":"\\\"bonjour\\\"","c":5,"td":1500,"e":1,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
@@ -321,7 +343,7 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_bigrams", 1, true) and sql:find("app,", 1, true) then
-				return '[{"app":"firefox","token":"ab","c":2,"td":200,"e":0,"esrc_json":"{}"}]'
+				return '[{"app":"firefox","token_json":"\\\"ab\\\"","c":2,"td":200,"e":0,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
@@ -553,4 +575,307 @@ helpers.describe("sqlite reader: the ergonomics record", function()
 		helpers.assert_eq(entry.same_hand_streak_max, 9)
 	end)
 
+end)
+
+helpers.describe("linux-sqlite-null-boundary", function()
+
+	helpers.it("linux-sqlite-null-boundary: only the tagged null scalar is removed", function()
+		local Json = require("json")
+		with_stubbed_sqlite(function()
+			-- Controlled JSON shape checks are units, not native SQLite output.
+			return '[{"date":"2026-10-03","battery_min":[],"battery_max":{},"battery_sum":{"keep":null},"battery_count":0}]'
+		end, function(reader)
+			local day = reader.read_system_days("/db/metrics.sqlite", nil, nil)["2026-10-03"]
+			helpers.assert_true(Json.is_array(day.battery_min), "typed empty array identity was removed")
+			helpers.assert_type(day.battery_max, "table", "ordinary empty objects must survive")
+			helpers.assert_true(not Json.is_array(day.battery_max))
+			helpers.assert_true(Json.is_null(day.battery_sum.keep), "the scalar boundary must not recursively normalize")
+			helpers.assert_eq(day.battery_count, 0)
+		end)
+	end)
+
+	helpers.it("linux-sqlite-null-boundary: nullable system scalars retain absent extrema and zero totals", function()
+		with_stubbed_sqlite(function()
+			return '[{"date":"2026-10-03","wifi_changes":3,"battery_sum":null,"battery_count":null,"battery_min":null,"battery_max":null}]'
+		end, function(reader)
+			local day = reader.read_system_days("/db/metrics.sqlite", nil, nil)["2026-10-03"]
+			helpers.assert_eq(day.wifi_changes, 3)
+			helpers.assert_eq(day.battery_sum, 0)
+			helpers.assert_eq(day.battery_count, 0)
+			helpers.assert_nil(day.battery_min)
+			helpers.assert_nil(day.battery_max)
+		end)
+	end)
+
+	helpers.it("linux-sqlite-null-boundary: optional manifest minutes stay absent without changing nested JSON text", function()
+		local Json = require("json")
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_chars_class", 1, true) then
+				return '[{"date":"2026-10-03","app":"café","letter":3,"first_min":null,"last_min":null}]'
+			elseif sql:find("FROM agg_app_day_burst", 1, true) then
+				return Json.encode({ { date = "2026-10-03", app = "café", source_rows = 1,
+					length_buckets_json = Json.encode({ ["nul\0é"] = 2 }) } })
+			end
+			return "[]"
+		end, function(reader)
+			local entry = reader.read_manifest("/db/metrics.sqlite", nil, nil)["2026-10-03"]["café"]
+			helpers.assert_eq(entry.char_letter, 3)
+			helpers.assert_nil(entry.first_typed_min)
+			helpers.assert_nil(entry.last_typed_min)
+			helpers.assert_eq(entry.burst_length_buckets["nul\0é"], 2)
+			-- The legacy decoder contract belongs to its existing callers.
+			helpers.assert_type(Json.decode('{"legacy":null}').legacy, "table")
+			helpers.assert_true(Json.is_null(Json.decode_lossless('{"tagged":null}').tagged))
+		end)
+	end)
+
+end)
+
+helpers.describe("linux-manifest-completion", function()
+	for _, body in ipairs({ "", "[]", '[{"date":"2026-10-03","app":"owned","llm_chars":3}]' }) do
+		helpers.it("linux-manifest-completion: successful CLI body " .. body .. " acknowledges every projection pass", function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM agg_app_day ", 1, true) then return body end
+				return "[]"
+			end, function(reader)
+				local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+				helpers.assert_type(manifest, "table")
+				helpers.assert_eq(complete, true)
+			end)
+		end)
+	end
+	for _, table_name in ipairs({ "agg_app_day", "agg_app_day_errors", "agg_app_day_session" }) do
+		helpers.it("linux-manifest-completion: refusal in " .. table_name .. " cannot acknowledge a partial projection", function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM " .. table_name .. "[%s;]") then return { body = "[]", status = 1 } end
+				if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2026-10-03","app":"owned","llm_chars":3}]' end
+				return "[]"
+			end, function(reader)
+				local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+				helpers.assert_eq(complete, false)
+				if table_name ~= "agg_app_day" then helpers.assert_eq(manifest["2026-10-03"].owned.llm_chars, 3) end
+			end)
+		end)
+	end
+	helpers.it("linux-manifest-completion: malformed native JSON refuses completion", function()
+		with_stubbed_sqlite(function() return "[invalid JSON" end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_nil(next(manifest))
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+	helpers.it("linux-manifest-completion: invalid path keeps the empty first return and refuses completion", function()
+		with_stubbed_sqlite(function() error("invalid path must not spawn") end, function(reader)
+			local manifest, complete = reader.read_manifest("")
+			helpers.assert_nil(next(manifest))
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)
+
+helpers.describe("linux-sqlite-layouts-seen", function()
+	helpers.it("linux-sqlite-layouts-seen: grouped counts use the canonical shared field without a dead alias", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_layouts", 1, true) then
+				helpers.assert_contains(sql, "SUM(count) AS count")
+				helpers.assert_contains(sql, "GROUP BY date, app, layout")
+				return Json.encode({
+					{ date = "2000-01-01", app = "owned", layout = "qwerty", count = 5 },
+					{ date = "2000-01-01", app = "owned", layout = "café'owned", count = 2 },
+				})
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			local entry = manifest["2000-01-01"].owned
+			helpers.assert_eq(entry.layouts_seen.qwerty, 5)
+			helpers.assert_eq(entry.layouts_seen["café'owned"], 2)
+			helpers.assert_nil(entry.layouts)
+			helpers.assert_eq(entry.chars, 0)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-layouts-seen: existing date and app filters remain on the grouped metadata query", function()
+		local apps = { "owned' app" }
+		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+			reader.read_manifest("/db/metrics.sqlite", "1999-12-31", "2000-01-01", apps)
+		end)
+		local matches = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_app_day_layouts", 1, true) then
+				matches = matches + 1
+				helpers.assert_contains(sql, "date >= '1999-12-31'")
+				helpers.assert_contains(sql, "date <= '2000-01-01'")
+				helpers.assert_contains(sql, "app IN ('owned'' app')")
+			end
+		end
+		helpers.assert_eq(matches, 1)
+		helpers.assert_eq(apps[1], "owned' app")
+	end)
+	helpers.it("linux-sqlite-layouts-seen: control apps without layout rows retain absent optional maps", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2000-01-01","app":"owned","chars":3}]' end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.chars, 3)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts_seen)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-layouts-seen: refused receipt preserves the partial first return", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_layouts", 1, true) then return { body = "[]", status = 1 } end
+			if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2000-01-01","app":"owned","chars":3}]' end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.chars, 3)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts_seen)
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)
+
+helpers.describe("linux-sqlite-switch-projection", function()
+	helpers.it("linux-sqlite-switch-projection: grouped destinations reach the shared map without inventing other totals", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then
+				helpers.assert_contains(sql, "SUM(count) AS count")
+				helpers.assert_contains(sql, "GROUP BY date, app, app_to")
+				return Json.encode({
+					{ date = "2026-10-05", app = "owned-source", app_to = "owned-destination", count = 7 },
+					{ date = "2026-10-05", app = "owned-source", app_to = "café'owned", count = 2 },
+				})
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			local source = manifest["2026-10-05"]["owned-source"]
+			helpers.assert_eq(source.switches_to["owned-destination"], 7)
+			helpers.assert_eq(source.switches_to["café'owned"], 2)
+			helpers.assert_eq(source.chars, 0)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-destination"])
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-switch-projection: existing date and source app filters cover the alternate schema keys", function()
+		local apps = { "owned' source", "café" }
+		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+			reader.read_manifest("/db/metrics.sqlite", "2026-10-01", "2026-10-05", apps)
+		end)
+		local matches = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then
+				matches = matches + 1
+				helpers.assert_contains(sql, "app_from AS app")
+				helpers.assert_contains(sql, "date >= '2026-10-01'")
+				helpers.assert_contains(sql, "date <= '2026-10-05'")
+				helpers.assert_contains(sql, "app IN ('owned'' source','café')")
+			end
+		end
+		helpers.assert_eq(matches, 1)
+		helpers.assert_eq(#apps, 2)
+		helpers.assert_eq(apps[1], "owned' source")
+	end)
+	helpers.it("linux-sqlite-switch-projection: absent transitions retain optional maps and healthy completion", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return '[{"date":"2026-10-05","app":"owned-control","chars":3}]'
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2026-10-05"]["owned-control"].chars, 3)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-control"].switches_to)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-switch-projection: failed destination read refuses complete cache admission", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then return { body = "[]", status = 1 } end
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return '[{"date":"2026-10-05","app":"owned-control","chars":3}]'
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2026-10-05"]["owned-control"].chars, 3)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-control"].switches_to)
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)
+
+helpers.describe("linux-ngram-extra-sources", function()
+	local cases = {
+		{ "extra labels across identical source blobs", '{"hotstring":1,"llm":3,"other":2,"none":9,"case-transform":4,"owned-extension":1}', 2, 2, 6, 14 },
+		{ "known sources and manual none exclusion", '{"hotstring":1,"llm":2,"other":3,"none":4}', 1, 1, 2, 3 },
+		{ "safe recognized scalar admission", '{"hotstring":"3","llm":"4","other":"2","none":100,"string":"owned","table":{},"bool":true,"nil":null,"array":[9]}', 1, 3, 4, 2 },
+		{ "extra scalar admission", '{"hotstring":1.5,"llm":2.5,"other":"3","case-transform":4.5,"owned-extension":"5","none":100}', 1, 1.5, 2.5, 12.5 },
+		{ "array keys are not labels", '[1,2,3]', 1, 0, 0, 0 },
+		{ "JSON null blob", 'null', 1, 0, 0, 0 },
+		{ "JSON null values", '{"hotstring":null,"llm":null,"other":null,"owned":null}', 1, 0, 0, 0 },
+		{ "JSON scalar blob", 'false', 1, 0, 0, 0 },
+		{ "malformed legacy literal fallback", '{"hotstring":3,"llm":4,"other":5,owned', 1, 3, 4, 5 },
+	}
+	for _, case in ipairs(cases) do
+		helpers.it("linux-ngram-extra-sources: " .. case[1], function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM ngram_chars", 1, true) then
+					return Json.encode({ { token_json = Json.encode("owned"), c = 40, td = 90, e = 6,
+						esrc_json = case[2], source_rows = case[3] } })
+				end
+				return "[]"
+			end, function(reader)
+				local item = reader.read_ngrams("/db/owned.sqlite").c.owned
+				helpers.assert_eq(item.c, 40)
+				helpers.assert_eq(item.t, 90)
+				helpers.assert_eq(item.e, 6)
+				helpers.assert_eq(item.hs, case[4])
+				helpers.assert_eq(item.llm, case[5])
+				helpers.assert_eq(item.o, case[6])
+			end)
+		end)
+	end
+	helpers.it("linux-ngram-extra-sources: split-today uses the same source taxonomy", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM ngram_chars", 1, true) and sql:find("app,", 1, true) then
+				return Json.encode({ { app = "owned", token_json = Json.encode("x"), c = 8, td = 20, e = 1,
+					esrc_json = '{"hotstring":1,"llm":2,"none":99,"case-transform":5}', source_rows = 1 } })
+			end
+			return "[]"
+		end, function(reader)
+			local split = reader.read_range_split_today("/db/owned.sqlite")
+			local item = split.today.owned.c.x
+			helpers.assert_eq(item.c, 8)
+			helpers.assert_eq(item.hs, 1)
+			helpers.assert_eq(item.llm, 2)
+			helpers.assert_eq(item.o, 5)
+		end)
+	end)
+end)
+
+helpers.describe("linux-ngram-source-policy", function()
+	helpers.it("linux-ngram-source-policy: shared other-source membership excludes dedicated and nonlabel keys", function()
+		local Utils = require("keylogger.utils")
+		local cases = {
+			{ label = "other", expected = true },
+			{ label = "case-transform", expected = true },
+			{ label = "owned-extension", expected = true },
+			{ label = "", expected = true },
+			{ label = "hotstring", expected = false },
+			{ label = "llm", expected = false },
+			{ label = "none", expected = false },
+			{ label = 1, expected = false },
+			{ label = true, expected = false },
+			{ label = false, expected = false },
+			{ label = {}, expected = false },
+			{ expected = false },
+		}
+		for _, case in ipairs(cases) do
+			helpers.assert_eq(Utils.is_other_synthetic_source(case.label), case.expected)
+		end
+	end)
 end)

@@ -414,7 +414,8 @@ const RULES = [
 		why: 'port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only',
 		match: (f) =>
 			!isPerformanceReport(f) &&
-			(f.includes('/adapters/') ||
+			(f === '.github/workflows/ci-macos.yml' ||
+				f.includes('/adapters/') ||
 				f.includes('_shared/') ||
 				f.startsWith('static/ergopti_plus/macos/launcher/') ||
 				// A .keylayout edit alone changes the registry checksums the drivers verify.
@@ -427,6 +428,14 @@ const RULES = [
 				f.endsWith('.cjs') ||
 				f.endsWith('.svelte') ||
 				f.endsWith('.md'))
+	},
+	{
+		gate: 'macos-tooltip-canvas',
+		why: 'native canvas diagnostic ownership and independent observer controls require their complete pure Python suite',
+		match: (f) =>
+			f.startsWith('tools/diagnostics/macos_tooltip_canvas') ||
+			f === 'tools/diagnostics/macos_owned_process.py' ||
+			f === 'tools/test/run-macos-tooltip-canvas-tests.cjs'
 	},
 	{
 		gate: 'xkb-python',
@@ -545,6 +554,33 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'linux-runtime-native',
+		why: 'runtime prerequisites require actual process/file receipts on both Linux ABIs and physical wrapper teardown',
+		match: (f) =>
+			[
+				'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
+				'static/ergopti_plus/_shared/lua/llm/process_port.lua',
+				'static/ergopti_plus/_shared/lua/llm/finite_process_port.lua',
+				'static/ergopti_plus/_shared/lua/llm/process_limits.lua',
+				'static/ergopti_plus/_shared/lua/llm/ollama_archive_installer.lua',
+				'static/ergopti_plus/linux/adapters/owned_process.lua',
+				'static/ergopti_plus/linux/modules/llm/ollama_install_files.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_owned_process_native.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_finite_process_port_native.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_service_process_port_native.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_service_running_native.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.py',
+				'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
+				'static/ergopti_plus/linux/tests/hardware/run_native_subreaper_teardown.py',
+				'static/ergopti_plus/linux/adapters/http_client.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_http_owned_post_native.lua',
+				'static/ergopti_plus/linux/tests/hardware/run_http_owned_post_native.py',
+				'tools/test/run-linux-runtime-native.cjs',
+				'.github/workflows/ci-linux.yml'
+			].includes(f)
+	},
+	{
 		gate: 'linux',
 		why: 'the Linux driver, its shared Lua runtime, or a shared corpus/port contract changed',
 		match: (f) =>
@@ -611,6 +647,7 @@ const GATE_COMMANDS = {
 	'ahk-encoding': { npm: 'test:ahk-encoding' },
 	'report-style': { npm: 'lint:conventions:strict', coveredBy: 'js' },
 	js: { npm: 'test:js' },
+	'macos-tooltip-canvas': { npm: 'test:macos-tooltip-canvas' },
 	'swift-launcher': { npm: 'test:macos-swift-launcher' },
 	'xkb-python': { npm: 'test:xkb' },
 	hs: { npm: 'test:hs' },
@@ -620,6 +657,7 @@ const GATE_COMMANDS = {
 	'linux-xkb-source': { npm: 'test:linux:xkb-source' },
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
 	'linux-window-switch': { npm: 'test:linux:window-switch', platform: 'linux' },
+	'linux-runtime-native': { npm: 'test:linux:runtime-native' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }

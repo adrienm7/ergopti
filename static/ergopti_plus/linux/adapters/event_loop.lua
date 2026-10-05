@@ -41,6 +41,13 @@ local LOG = "adapters.event_loop"
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
+--- Completes the interpreter fallback wait or propagates its native refusal.
+--- @param seconds number Wait duration in seconds.
+local function command_nap(seconds)
+	local result = os.execute(string.format("sleep %.3f", seconds))
+	if result ~= true and result ~= 0 then error("sleep command failed", 0) end
+end
+
 --- A sleep that neither forks nor spins, bound once.
 ---
 --- The pump fallback below runs when luv is absent, and it used to fork
@@ -51,18 +58,14 @@ if not ok_luv then luv = nil end
 local nap = (function()
 	local ok_ffi, ffi = pcall(require, "ffi")
 	if not ok_ffi or type(ffi) ~= "table" then
-		return function(seconds)
-			pcall(os.execute, string.format("sleep %.3f", seconds))
-		end
+		return command_nap
 	end
 	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
 		struct timespec { long tv_sec; long tv_nsec; };
 		int nanosleep(const struct timespec *req, struct timespec *rem);
 	]])
 	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then
-		return function(seconds)
-			pcall(os.execute, string.format("sleep %.3f", seconds))
-		end
+		return command_nap
 	end
 	local req = ffi.new("struct timespec[1]")
 	local remaining = ffi.new("struct timespec[1]")
