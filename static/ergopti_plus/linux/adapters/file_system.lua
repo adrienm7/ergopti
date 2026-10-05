@@ -151,6 +151,7 @@ local function write_and_close(fh, content, path, operation)
 end
 
 --- Writes content to a file, overwriting any existing content.
+--- Admits a pinned regular destination before truncation; FIFOs cannot block.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
@@ -162,7 +163,7 @@ function M.write(path, content)
 	content = type(content) == "string" and content or ""
 
 	local ok, result = pcall(function()
-		local fh, err = io.open(path, "w")
+		local fh, err = require("infra.regular_file_writer").open(path, "w")
 		if not fh then
 			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", path, tostring(err))
 			return false
@@ -178,6 +179,7 @@ function M.write(path, content)
 end
 
 --- Appends content to a file, creating it if it does not exist.
+--- Admits a pinned regular destination before any buffered write.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to append.
 --- @return boolean true on success, false on any error.
@@ -189,7 +191,7 @@ function M.append(path, content)
 	content = type(content) == "string" and content or ""
 
 	local ok, result = pcall(function()
-		local fh, err = io.open(path, "a")
+		local fh, err = require("infra.regular_file_writer").open(path, "a")
 		if not fh then
 			Logger.error(LOG, "append(): cannot open '%s' for appending — %s", path, tostring(err))
 			return false

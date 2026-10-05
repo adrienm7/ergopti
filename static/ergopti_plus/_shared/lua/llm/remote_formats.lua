@@ -15,6 +15,9 @@
 ---   OpenRouter at /api/alpha/decisions): typed questions in, answers with
 ---   probabilities out. Jev, the model it serves, is not a chat model.
 ---
+--- Also classify own root error fields in decoded chat responses, including
+--- explicit null and false; nested and inherited metadata remain independent.
+---
 --- FEATURES & RATIONALE:
 --- 1. The shapes come from the providers' own clients (Backboard-R-CLI,
 ---    the TypeSafe SDK wrapper pi-typesafe), since their documentation hosts are
@@ -163,6 +166,26 @@ function M.decisions_answers(response)
 	local answers = type(response) == "table" and response.answers or nil
 	if type(answers) ~= "table" then return nil end
 	return answers
+end
+
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Response error fields ========
+-- =========================================
+-- =========================================
+
+--- Whether a decoded provider response owns a top-level error field.
+--- An explicit null or false still names an error envelope; nested metadata
+--- and inherited fields cannot invalidate an otherwise ordinary completion.
+--- @param response any Decoded response root.
+--- @return boolean
+function M.response_has_error(response)
+	return type(response) == "table" and rawget(response, "error") ~= nil
 end
 
 return M

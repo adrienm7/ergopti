@@ -92,6 +92,37 @@ helpers.describe("xkb_rmlvo: system defaults", function()
 		helpers.assert_eq(desc.options, "compose:menu")
 	end)
 
+	helpers.it("(localectl-variant-slots) preserves an empty first variant", function()
+		local R = helpers.load_module("infra.xkb_rmlvo")
+		for _, variants in ipairs({ ",dvorak", " , dvorak", ",,intl", "," }) do
+			local desc = R.parse_localectl("X11 Layout: us,us\nX11 Variant: " .. variants .. "\n")
+			helpers.assert_eq(desc.layout, "us")
+			helpers.assert_eq(desc.variant, "", "the first layout must keep its own default variant")
+			helpers.assert_eq(desc.source, "localectl")
+		end
+	end)
+
+	helpers.it("(localectl-variant-slots) preserves explicit and absent first variants", function()
+		local R = helpers.load_module("infra.xkb_rmlvo")
+		local explicit = R.parse_localectl("X11 Layout: us,us\nX11 Variant: dvorak,intl\nX11 Options: caps:escape\n")
+		helpers.assert_eq(explicit.variant, "dvorak")
+		helpers.assert_eq(explicit.options, "caps:escape")
+		local absent = R.parse_localectl("X11 Layout: us,us\n")
+		helpers.assert_eq(absent.variant, "")
+	end)
+
+	helpers.it("(localectl-variant-slots) keeps sibling source alignment unchanged", function()
+		local R = helpers.load_module("infra.xkb_rmlvo")
+		local defaults = R.parse_keyboard_defaults('XKBLAYOUT="us,us"\nXKBVARIANT=",dvorak"\n')
+		local plasma = R.parse_kxkbrc("[Layout]\nUse=true\nLayoutList=us,us\nVariantList=,dvorak\n")
+		local values = { XKB_DEFAULT_LAYOUT = "us,us", XKB_DEFAULT_VARIANT = ",dvorak" }
+		local environment = R.from_env(function(name) return values[name] end)
+		for _, desc in ipairs({ defaults, plasma, environment }) do
+			helpers.assert_eq(desc.layout, "us")
+			helpers.assert_eq(desc.variant, "")
+		end
+	end)
+
 	helpers.it("answers nil when localectl reports no X11 layout", function()
 		local R = helpers.load_module("infra.xkb_rmlvo")
 		helpers.assert_nil(R.parse_localectl("   System Locale: LANG=C\n       VC Keymap: n/a\n"))

@@ -691,6 +691,19 @@ do
 	}, { driver = driver_root, interpreter = arg and arg[-1] or "luajit" })
 end
 
+do
+	local native_ok = pcall(require, "luv")
+	local ffi_ok = pcall(require, "ffi")
+	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
+		local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+		local fixture = driver_root .. "/tests/fixtures/native_file_digest_owners.lua"
+		local result = os.execute(quote(assert(arg[-1])) .. " " .. quote(fixture))
+		assert_true("linux-digest-owner: updater cancellation preserves a real unrelated digest", result == true or result == 0)
+	else
+		print("  SKIP  native digest owner isolation requires libuv and LuaJIT FFI")
+	end
+end
+
 -- Final summary.
 local total = pass_count + fail_count
 print(string.format("\n1..%d", total))
