@@ -5,6 +5,8 @@
 
 #include <sys/types.h>
 
+#include "OwnedProgramCompatibility.h"
+
 int ergopti_flock_compat(int descriptor, int operation);
 int ergopti_process_exit_monitor_open(pid_t process_identifier, int *error_code);
 int ergopti_process_exit_monitor_read(
