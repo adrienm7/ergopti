@@ -33,26 +33,30 @@ HotstringsScopeApply(Mode, Options := unset) {
  * @param {Array} Targets Category ids selected by the menu.
  * @param {Integer} Enabled Boolean target, never inferred from mixed state.
  * @param {String} Reason Stable refusal identifier without user values.
+ * @param {Array} BoundSections Optional exact group/section leaves of an extension.
  * @returns {Array|Integer} Detached choice batch, or false before any side effect.
  */
-HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason) {
+HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason, BoundSections := unset) {
 	Reason := ""
-	if !(Inventory is Map) || !(Targets is Array) || !(Enabled is Integer)
+	if !IsSet(BoundSections)
+		BoundSections := []
+	if !(Inventory is Map) || !_HotstringsScopeDenseArray(Targets)
+			|| !_HotstringsScopeDenseArray(BoundSections) || !(Enabled is Integer)
 			|| (Enabled != 0 && Enabled != 1) {
 		Reason := "invalid-request"
 		return false
 	}
-	if !Targets.Length {
+	if !Targets.Length && !BoundSections.Length {
 		Reason := "empty-scope"
 		return false
 	}
-	Changes := [], Selected := Map()
+	Changes := [], Selected := Map(), Leaves := Map(), BoundSeen := Map()
 	for Id in Targets {
 		if !_HotstringsScopeAddressable(Id) || Selected.Has(Id) {
 			Reason := "invalid-category"
 			return false
 		}
-		if !Inventory.Has(Id) || !(Inventory[Id] is Array) {
+		if !Inventory.Has(Id) || !_HotstringsScopeDenseArray(Inventory[Id]) {
 			Reason := "unknown-category"
 			return false
 		}
@@ -65,9 +69,48 @@ HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason) {
 				return false
 			}
 			Sections[Name] := true
-			; This legacy remapping belongs to Layout, outside Hotstrings controls.
-			if !(StrLower(StrReplace(Id, "_")) == "magickey" && Name == "replace")
-				Changes.Push(Map("group", Id, "section", Name, "enabled", Enabled))
+			Changes.Push(Map("group", Id, "section", Name, "enabled", Enabled))
+		}
+		Leaves[Id] := Sections
+	}
+	for Leaf in BoundSections {
+		if !(Leaf is Map) || !Leaf.Has("group") || !Leaf.Has("section")
+				|| !_HotstringsScopeAddressable(Leaf["group"])
+				|| !_HotstringsScopeAddressable(Leaf["section"]) || Leaf["section"] == "-" {
+			Reason := "invalid-section"
+			return false
+		}
+		Id := Leaf["group"], Section := Leaf["section"]
+		if !Inventory.Has(Id) || !_HotstringsScopeDenseArray(Inventory[Id]) {
+			Reason := "unknown-category"
+			return false
+		}
+		Names := Map()
+		for Name in Inventory[Id] {
+			if !_HotstringsScopeAddressable(Name) || Name == "-" || Names.Has(Name) {
+				Reason := "invalid-section"
+				return false
+			}
+			Names[Name] := true
+		}
+		if !Names.Has(Section) || (BoundSeen.Has(Id) && BoundSeen[Id].Has(Section)) {
+			Reason := "invalid-section"
+			return false
+		}
+		if !BoundSeen.Has(Id)
+			BoundSeen[Id] := Map()
+		BoundSeen[Id][Section] := true
+		; Opening a bound leaf needs its group. Closing it leaves unrelated
+		; symbol choices and the group's gate untouched.
+		if Enabled && !Selected.Has(Id) {
+			Changes.Push(Map("group", Id, "enabled", true))
+			Selected[Id] := true
+		}
+		if !Leaves.Has(Id)
+			Leaves[Id] := Map()
+		if !Leaves[Id].Has(Section) {
+			Changes.Push(Map("group", Id, "section", Section, "enabled", Enabled))
+			Leaves[Id][Section] := true
 		}
 	}
 	return Changes
@@ -75,6 +118,15 @@ HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason) {
 
 _HotstringsScopeAddressable(Value) {
 	return Value is String && Value != "" && !InStr(Value, ".")
+}
+
+_HotstringsScopeDenseArray(Values) {
+	if !(Values is Array)
+		return false
+	loop Values.Length
+		if !Values.Has(A_Index)
+			return false
+	return true
 }
 
 ; The legacy tray map also contains Layout, Gestures and Shortcuts. Only the
@@ -98,31 +150,104 @@ _HotstringsCategoryScopeInventory(Categories, ReadSections := ManifestFeaturesFo
  * @param {Array} Targets Native category ids from the discovered tray catalogue.
  * @param {Integer} Enabled Explicit Boolean target.
  * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
+ * @param {Array} BoundSections Optional exact native leaves, alongside whole groups.
  * @returns {Map} Pending or terminal reload receipt; native refusal restores bytes.
  */
-HotstringsCategoryScopeApply(Targets, Enabled, Options := unset) {
+HotstringsCategoryScopeApply(Targets, Enabled, Options := unset, BoundSections := unset) {
 	if !IsSet(Options)
 		Options := Map()
+	if !IsSet(BoundSections)
+		BoundSections := []
 	Operations() {
-		global Features, _LegacyTopCategoryMap
+		global _LegacyTopCategoryMap
 		Inventory := _HotstringsCategoryScopeInventory(_LegacyTopCategoryMap)
-		Choices := HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason)
+		Choices := HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason, BoundSections)
 		if !(Choices is Array)
 			throw Error("Hotstring category selection refused: " . Reason)
-		Candidate := _HSDeepCloneMap(Features)
-		Rows := [], Entries := []
-		for Choice in Choices {
-			Id := Choice["group"]
-			if Choice.Has("section") {
-				Entries.Push(Map("path", _LegacyTopCategoryMap[Id] . "." . Choice["section"],
-					"value", Choice["enabled"]))
-			} else {
-				Rows.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Id), Choice["enabled"]))
+		return _HotstringsScopeChoiceOperations(Choices)
+	}
+	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+}
+
+; Native bound leaves and pack-owned features join one detached journal image.
+_HotstringsScopeChoiceOperations(Choices, ExtensionGroups := unset) {
+	global Features, _LegacyTopCategoryMap
+	if !IsSet(ExtensionGroups)
+		ExtensionGroups := Map()
+	Candidate := _HSDeepCloneMap(Features), Rows := [], Entries := []
+	for Choice in Choices {
+		Id := Choice["group"]
+		if ExtensionGroups.Has(Id) {
+			Path := Choice.Has("section") ? "hotstrings.modules." . Id . "." . Choice["section"]
+				: "hotstrings.groups." . Id
+			Rows.Push(ManifestSparseOperation(Path, Choice["enabled"]))
+		} else if Choice.Has("section") {
+			Entries.Push(Map("path", _LegacyTopCategoryMap[Id] . "." . Choice["section"],
+				"value", Choice["enabled"]))
+		} else {
+			Rows.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Id), Choice["enabled"]))
+		}
+	}
+	if _ConfigStageFeatureEntries(Candidate, Entries, Rows) != Entries.Length
+		throw Error("A category scope feature could not be resolved.")
+	return Rows
+}
+
+/**
+ * Selects a discovered extension's whole groups and exact native bound leaves.
+ * Discovery and ownership are checked inside the existing configuration lease.
+ * @param {String} ExtensionId Shipped or installed pack id captured by the menu.
+ * @param {Integer} Enabled Explicit Boolean preference.
+ * @param {Map} Options Existing journal ports and optional discovery roots.
+ * @returns {Map} Pending or terminal receipt; refusal restores the whole cohort.
+ */
+HotstringsExtensionScopeApply(ExtensionId, Enabled, Options := unset) {
+	if !IsSet(Options)
+		Options := Map()
+	RootsFn := Options.Get("roots", _HotstringExtensions_CurrentRoots)
+	Operations() {
+		global _LegacyTopCategoryMap
+		if A_IsSuspended
+			throw Error("An extension selection cannot change while paused.")
+		Inventory := _HotstringsCategoryScopeInventory(_LegacyTopCategoryMap)
+		NativeIds := Map(), ExtensionGroups := Map(), Targets := [], Bound := []
+		for Id in Inventory
+			NativeIds[StrLower(StrReplace(Id, "_"))] := Id
+		OwnedPack := false
+		for Pack in HotstringExtensions_Scan(RootsFn.Call()) {
+			if Pack.id != ExtensionId
+				continue
+			if OwnedPack
+				throw Error("Extension ownership is ambiguous.")
+			OwnedPack := true
+			for File in Pack.toml_files {
+				if Inventory.Has(File.category)
+					throw Error("Extension category ownership is ambiguous.")
+				Inventory[File.category] := [], ExtensionGroups[File.category] := true
+				Targets.Push(File.category)
+				for Section in File.sections
+					Inventory[File.category].Push(Section["name"])
+			}
+			for File in (Pack.HasOwnProp("bound_files") ? Pack.bound_files : []) {
+				Binding := File.binding
+				Key := StrLower(StrReplace(Binding["category"], "_"))
+				if !NativeIds.Has(Key)
+					throw Error("An extension binding has no native category owner.")
+				Id := NativeIds[Key]
+				if Binding.Has("sections") {
+					for Section in Binding["sections"]
+						Bound.Push(Map("group", Id, "section", Section))
+				} else {
+					Targets.Push(Id)
+				}
 			}
 		}
-		if _ConfigStageFeatureEntries(Candidate, Entries, Rows) != Entries.Length
-			throw Error("A category scope feature could not be resolved.")
-		return Rows
+		if !OwnedPack
+			throw Error("The extension no longer owns this selection.")
+		Choices := HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason, Bound)
+		if !(Choices is Array)
+			throw Error("Extension selection refused: " . Reason)
+		return _HotstringsScopeChoiceOperations(Choices, ExtensionGroups)
 	}
 	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
 }

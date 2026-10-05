@@ -235,6 +235,12 @@ const CHECKS = [
 		repro: 'npm run test:typing-metrics-reset'
 	},
 	{
+		name: 'shared menu delegation follows reachable methods and refuses dormant or removed providers',
+		cmd: 'node',
+		args: ['tools/test/test-menu-shared-delegation.cjs'],
+		repro: 'node tools/test/test-menu-shared-delegation.cjs'
+	},
+	{
 		name: 'every menu-manifest field and section has a driver that reads it (no decorative declarations)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-manifest-keys-have-readers.cjs'],

@@ -32,6 +32,8 @@ local MODULE_NAMES = {
 	"infra.teardown_transaction",
 	"infra.startup_transaction",
 	"infra.config_paths",
+	"infra.paths",
+	"modules.hotstrings.hotstrings_config",
 	"infra.factory_reset_journal",
 	"modules.gestures",
 	"modules.keymap",
@@ -299,9 +301,15 @@ local function run_isolated(options, assertions)
 			["modules.shortcuts"] = { stop = function() return true end },
 			["modules.dynamic_hotstrings"] = {},
 			["adapters.toml_cache"] = { init = function() return true end },
-			["infra.toml.reader"] = { set_cache_provider = function() end },
-			-- The fake TOML reader cannot parse the shared registry; the root
-			-- coordinator only reads the user-quit deadline from it
+			["infra.toml.reader"] = {
+				set_cache_provider = function() end,
+				-- The real cold hotstring controller grants terminal admission before
+				-- its init phase. Its mandatory shipped defaults still need a real,
+				-- acknowledged parser; this fixture never opens a user override file.
+				parse = function(path) return require("toml_codec.reader").parse(path) end,
+			},
+			-- Keep this deadline independent of the native timing loader; the root
+			-- coordinator reads no other timing in this early-boot fixture.
 			["infra.timings"] = {
 				sec = function(section, key)
 					helpers.assert_eq(section .. "." .. key, "ui.user_quit_deadline_ms")
@@ -413,6 +421,13 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
 			local accepted = hs_stub.reload("mlx-callback-pending")
 			helpers.assert_eq(accepted, true)
+			local Hotstrings = require("modules.hotstrings.hotstrings_config")
+			helpers.assert_nil(Hotstrings.get_override_path(), "the real first-run controller is still uninitialized")
+			helpers.assert_nil(Hotstrings.capture_terminal_admission(), "root holds the exact cold admission during MLX cleanup")
+			helpers.assert_eq(Hotstrings.init({ override_path = "/virtual/hotstrings_config.toml",
+				toml_resolver = function() return nil end }), false,
+				"a delayed root terminal cannot admit a new override publisher")
+			helpers.assert_nil(Hotstrings.get_override_path())
 			helpers.assert_eq(state.mlx_stop_calls, 1)
 			helpers.assert_eq(type(state.mlx_stop_callback), "function")
 			helpers.assert_eq(state.drain_calls, 0,

@@ -36,7 +36,10 @@ local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
+local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
+local PersonalFiles = require("hotstrings.personal_files")
+local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
@@ -71,6 +74,10 @@ local KEY_MAP = {
 	magic_key_source                     = { sec = "hotstrings", enum = true                           },
 	-- Dynamic hotstrings sub-section
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
+	dynamichotstrings_user_code_enabled  = { sec = "hotstrings", path = "dynamic.user_code", key = "enabled" },
+	dynamichotstrings_user_code_time_activation_seconds = {
+		sec = "hotstrings", path = "dynamic.user_code", key = "time_activation_seconds",
+	},
 	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
 	dynamichotstrings_datefr             = { sec = "hotstrings", path = "dynamic", key = "datefr"       },
 	dynamichotstrings_datelongfr         = { sec = "hotstrings", path = "dynamic", key = "datelongfr"   },
@@ -423,6 +430,14 @@ end
 --- Owners' rules for scalars whose value set is closed beyond the manifest's
 --- Lua type. The agent's modes are shared with every driver (llm.agent).
 local SCALAR_VALUE_RULES = {
+	dynamichotstrings_user_code_enabled = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the programmable hotstring gate is not a boolean"
+	end,
+	dynamichotstrings_user_code_time_activation_seconds = function(value)
+		if type(value) == "number" and value == value and value >= 0 and value < math.huge then return true end
+		return false, "the activation interval is not a finite non-negative number"
+	end,
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end
 		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
@@ -560,10 +575,27 @@ local function sparse_updates(flat)
 	local function visit(node, path)
 		for key, value in pairs(node) do
 			local leaf = path == "" and key or path .. "." .. key
+			local segments = require("toml_codec.key_path").parse(path, true)
+			if segments and #segments == 3 and segments[1] == "hotstrings" and segments[2] == "modules"
+				and PersonalFiles.components(segments[3]) then
+				segments[#segments + 1] = key
+				leaf = require("toml_codec.key_path").render(segments)
+			end
 			if type(value) == "table" and #value == 0 and next(value) ~= nil then
 				visit(value, leaf)
 			elseif type(value) ~= "table" or next(value) ~= nil or table_paths[leaf] then
-				if Manifest.has_default(leaf) then
+				local canonical = PersonalFiles.preference_default(leaf) ~= nil
+				local path_parts = canonical and require("toml_codec.key_path").parse(leaf, true)
+				local id = path_parts and path_parts[3]
+				local personal = canonical and require("infra.personal_hotstrings").adoption(id)
+				if canonical and (not personal or not personal.admitted) then
+					-- Unavailable sources own no disk preference leaves in this snapshot.
+				elseif personal and personal.admitted and personal.legacy_name and value == true then
+					assert(require("infra.personal_hotstrings").adoption_current(personal) == true,
+						"personal legacy source changed before preferences publication")
+					updates[#updates + 1] = require("hotstrings.personal_adoption").preference_row(personal,
+						path_parts[2] == "modules" and path_parts[4] or nil, value)
+				elseif Manifest.has_default(leaf) then
 					updates[#updates + 1] = Manifest.sparse_operation(leaf, value)
 				else
 					updates[#updates + 1] = { section = path, key = key, value = value }
@@ -636,6 +668,23 @@ local function flatten_from_disk(grouped, mark)
 		end
 		flat[flat_key] = value
 		take(...)
+	end
+
+	-- Only declared scalar paths gain ownership when a feature nests below a
+	-- family table. Unknown neighbors and arrays remain with their own readers.
+	local function take_scalar_descendants(section, path, node, parts)
+		for key, value in pairs(node) do
+			local child_path = path .. "." .. key
+			local child_parts = {}
+			for index, part in ipairs(parts) do child_parts[index] = part end
+			child_parts[#child_parts + 1] = key
+			local flat_key = _reverse_scalar[section .. ":" .. child_path]
+			if flat_key then
+				take_value(flat_key, value, table.unpack(child_parts))
+			elseif type(value) == "table" and #value == 0 then
+				take_scalar_descendants(section, child_path, value, child_parts)
+			end
+		end
 	end
 
 	for sec_name, sec_val in pairs(grouped) do
@@ -720,6 +769,9 @@ local function flatten_from_disk(grouped, mark)
 										local nfk = _reverse_nested[lookup]
 										if nfk then
 											take_value(nfk, inner_val, sec_name, disk_key, inner_key)
+										else
+											take_scalar_descendants(sec_name, disk_key .. "." .. inner_key,
+												inner_val, { sec_name, disk_key, inner_key })
 										end
 									end
 								end
@@ -1167,13 +1219,22 @@ local function prepare_inline_updates(source, updates, root)
 	local decoded = TomlCodec.decode(source.content or "")
 	local inline, candidates, rows = {}, {}, {}
 	local function parts(path)
+		if root == "hotstrings" then
+			return assert(require("toml_codec.key_path").parse(path, true), "invalid semantic hotstring preference path")
+		end
 		local result = {}
 		for key in path:gmatch("[^.]+") do result[#result + 1] = key end
 		return result
 	end
+	local function leaf_path(section, key)
+		if root ~= "hotstrings" then return section == "" and key or section .. "." .. key end
+		local segments = section == "" and {} or parts(section)
+		segments[#segments + 1] = key
+		return require("toml_codec.key_path").render(segments)
+	end
 	for _, record in ipairs(scanned.records) do
 		if record.addressable then
-			local path = record.section == "" and record.key or record.section .. "." .. record.key
+			local path = leaf_path(record.section, record.key)
 			if path == root or path:sub(1, #root + 1) == root .. "." then
 				local value = decoded
 				for _, key in ipairs(parts(path)) do value = type(value) == "table" and value[key] or nil end
@@ -1183,9 +1244,15 @@ local function prepare_inline_updates(source, updates, root)
 		end
 	end
 	for _, row in ipairs(updates) do
-		local path = row.section .. "." .. row.key
+		local path = leaf_path(row.section, row.key)
 		local parent = row.section
-		while parent ~= "" and not inline[parent] do parent = parent:match("^(.*)%.[^.]+$") or "" end
+		while parent ~= "" and not inline[parent] do
+			if root == "hotstrings" then
+				local segments = parts(parent)
+				table.remove(segments)
+				parent = #segments > 0 and require("toml_codec.key_path").render(segments) or ""
+			else parent = parent:match("^(.*)%.[^.]+$") or "" end
+		end
 		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
 			-- An empty runtime dictionary owns no unknown profile leaves on disk.
 		elseif inline[parent] then
@@ -1258,6 +1325,16 @@ end
 --- @param updates table Owned leaf operations.
 --- @return table Prepared writer operations.
 function M.prepare_hotstring_updates(source, updates)
+	local personal = {}
+	for _, row in ipairs(updates) do
+		local path = require("toml_codec.key_path").parse(row.section, true)
+		if path then path[#path + 1] = row.key end
+		if path and PersonalFiles.preference_default(require("toml_codec.key_path").render(path)) ~= nil then
+			personal[#personal + 1] = row
+		end
+	end
+	assert(require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal),
+		"canonical personal preferences have an ambiguous case alias")
 	return prepare_inline_updates(source, updates, "hotstrings")
 end
 
@@ -1288,6 +1365,31 @@ local function handoff_native_publication(path, expected, candidate, native, on_
 		OperationReporter.new(on_error, Logger, LOG)("publication_receipt", "error", "Private publication receipt handoff was refused.")
 	end
 	return true
+end
+
+--- Preflights canonical personal choices through this preferences source owner.
+--- Native callers separately hold the actual source and registry bindings.
+--- @param changes table Declared canonical group/section Boolean choices.
+--- @return boolean available
+function M.personal_choices_available(changes)
+	local path = require("infra.config_paths").get("ConfigTomlPath")
+	if type(path) ~= "string" or type(changes) ~= "table" then return false end
+	local baseline, current = _source_snapshots[path], classify_source(path)
+	if not current or baseline and not same_source(baseline, current) then return false end
+	local rows = {}
+	for _, choice in ipairs(changes) do
+		if PersonalFiles.components(choice.group) then
+			if type(choice.enabled) ~= "boolean" or choice.section ~= nil
+				and (type(choice.section) ~= "string" or choice.section == "") then return false end
+			local record = require("infra.personal_hotstrings").adoption(choice.group)
+			if not record or record.admitted ~= true
+				or require("infra.personal_hotstrings").adoption_current(record) ~= true then return false end
+			rows[#rows + 1] = { section = require("toml_codec.key_path").render(choice.section
+				and { "hotstrings", "modules", choice.group } or { "hotstrings", "groups" }),
+				key = choice.section or choice.group }
+		end
+	end
+	return require("hotstrings.personal_metadata").exact_rows_available(current.content or "", rows)
 end
 
 --- Publishes a domain owner's exact batch and advances the ordinary save baseline.
@@ -1329,19 +1431,34 @@ function M.project_hotstring_preferences(saved, groups, get_sections)
 	for name in pairs(groups) do
 		assert(type(name) == "string" and name ~= "", "hotstring group identity is invalid")
 		local enabled = saved.hotstrings and saved.hotstrings[name]
+		local personal_record, personal_sections
+		if PersonalFiles.components(name) then
+			personal_record = require("infra.personal_hotstrings").adoption(name)
+			if personal_record then
+				enabled, personal_sections = PersonalAdoption.preferences(personal_record, saved)
+			else
+				-- Valid provenance alone cannot admit a native mutation or live gate.
+				enabled, personal_sections = false, {}
+			end
+		end
 		if enabled == nil then enabled = Manifest.default_for("hotstrings.groups." .. name) end
 		assert(type(enabled) == "boolean", "hotstring group preference must be boolean")
 		desired.hotstrings[name] = enabled
 		local supplied = saved.section_states and saved.section_states[name]
+		if personal_sections ~= nil then supplied = personal_sections end
 		assert(supplied == nil or type(supplied) == "table", "hotstring section preferences must be a table")
 		local sections = get_sections(name)
 		assert(sections == nil or type(sections) == "table", "hotstring section inventory is malformed")
 		local projected = {}
 		for _, section in ipairs(sections or {}) do
 			assert(type(section) == "table" and type(section.name) == "string", "hotstring section descriptor is invalid")
-			if section.name ~= "-" and not section.is_module_placeholder then
+			if HotstringLanguages.section_actionable(Manifest.features(), name, section) then
 				local selected = supplied and supplied[section.name]
-				if selected == nil then selected = Manifest.default_for("hotstrings.modules." .. name .. "." .. section.name) end
+				if PersonalFiles.components(name) and (not personal_record or personal_record.admitted ~= true) then
+					selected = false
+				end
+				if selected == nil then selected = Manifest.default_for(require("toml_codec.key_path").render(
+					{ "hotstrings", "modules", name, section.name })) end
 				assert(type(selected) == "boolean", "hotstring section preference must be boolean")
 				projected[section.name] = selected
 			end
@@ -1375,7 +1492,7 @@ function M.snapshot(state, hotfiles, core_mods)
 		if type(secs) == "table" then
 			section_states[name] = {}
 			for _, sec in ipairs(secs) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+				if HotstringLanguages.section_actionable(Manifest.features(), name, sec) then
 					local is_en = keymap and type(keymap.is_section_enabled) == "function"
 						and keymap.is_section_enabled(name, sec.name) or false
 					section_states[name][sec.name] = is_en

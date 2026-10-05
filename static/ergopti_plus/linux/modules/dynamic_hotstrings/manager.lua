@@ -25,6 +25,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ManifestReader = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
+local UserCode = require("modules.dynamic_hotstrings.user_code")
 
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
@@ -152,6 +153,7 @@ end
 --- dynamic_hotstrings engine.
 --- @param opts table|nil { trigger_char?, personal_info_path? }
 function M.init(opts)
+	UserCode.invalidate("dynamic initialization")
 	local options = type(opts) == "table" and opts or {}
 
 	-- Resolve trigger character (default "★").
@@ -337,6 +339,7 @@ function M.set_enabled(state)
 		Logger.error(LOG, "Dynamic hotstring activation requires a boolean preference.")
 		return false
 	end
+	if UserCode.invalidate("dynamic activation") ~= true then return false end
 	if not Preferences.set(MASTER_PATH, state) then
 		Logger.error(LOG, "The dynamic hotstring master was not persisted; the runtime was not changed.")
 		return false
@@ -349,10 +352,24 @@ end
 --- Adopts the master's canonical value after another owner published it.
 --- The family switches are read from the same owner at match time.
 --- @return boolean True when the runtime reached the desired state.
-function M.refresh()
+function M.refresh(snapshot, inverse)
+	if UserCode.invalidate("dynamic preference refresh") ~= true then return false, "programmable-refused" end
 	_desired_enabled = Preferences.get(MASTER_PATH)
 	_enabled = _desired_enabled and _rules_count > 0
-	return _enabled == _desired_enabled
+	if UserCode.time_activation() ~= nil then
+		if snapshot and inverse then
+			if UserCode.scope_restore(snapshot) ~= true then return false, "programmable-refused" end
+		elseif snapshot then
+			if UserCode.scope_adopt(snapshot, Preferences.get("hotstrings.dynamic.user_code.time_activation_seconds"),
+				Preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then return false, "programmable-refused" end
+		elseif UserCode.set_time_activation(Preferences.get("hotstrings.dynamic.user_code.time_activation_seconds")) ~= true
+			or UserCode.set_enabled(Preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then
+			return false, "programmable-refused"
+		end
+	end
+	_enabled = _desired_enabled and (_rules_count > 0 or (UserCode.is_enabled() and UserCode.count() > 0))
+	if _enabled == _desired_enabled then return true end
+	return false, "builtin-unavailable"
 end
 
 
@@ -462,7 +479,10 @@ function M.on_trigger(buffer, trigger)
 		-- Nothing registered claimed the sequence. Only now try the multi-letter
 		-- @-combo, so a registered tag always wins: "@dt" spells two valid alias
 		-- letters AND is the short-date rule, and the registration is what decides.
-		return _fire_combo(prefix, t)
+		local expanded, event = _fire_combo(prefix, t)
+		if expanded then return expanded, event end
+		if UserCode.request(prefix) then return true, { pending_user = true } end
+		return false
 	end
 
 	-- Inject: erase the suffix + trigger, type the result.
@@ -540,6 +560,13 @@ end
 function M.preview_candidates(buffer)
 	local rows = {}
 	if not _enabled then return rows end
+	if not require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled) then
+		local user = UserCode.preview(buffer)
+		if user then
+			rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
+				group = DYNAMIC_GROUP, section = "user_code", fires = true }
+		end
+	end
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return rows end
 
 	local tag = M.trailing_tag(buffer)
@@ -551,6 +578,8 @@ function M.preview_candidates(buffer)
 	-- A single-letter tag is a registered rule and reaches the bubble through the
 	-- ordinary path; offering it here too would draw the same row twice.
 	if #fields < 2 then return rows end
+	-- Builtin personal combinations have the same precedence at preview and fire.
+	rows = {}
 
 	local parts = {}
 	for index, field in ipairs(fields) do parts[index] = _info[field] end
@@ -644,6 +673,23 @@ function M.active_count()
 
 	return total
 end
+
+-- Native facade bindings keep source execution owned by the daemon generation.
+M.start_user_code = UserCode.start
+M.stop_user_code = UserCode.stop
+M.reload_user_code = UserCode.reload
+M.set_user_code_enabled = UserCode.set_enabled
+M.user_code_source_path = UserCode.source_path
+M.user_code_count = UserCode.count
+M.create_user_code_example = UserCode.create_example
+M.set_user_code_time_activation = UserCode.set_time_activation
+M.user_code_is_enabled = UserCode.is_enabled
+M.user_code_time_activation = UserCode.time_activation
+M.user_code_scope_snapshot = UserCode.scope_snapshot
+M.user_code_scope_current = UserCode.scope_current
+M.user_code_scope_adopt = UserCode.scope_adopt
+M.user_code_scope_restore = UserCode.scope_restore
+M.invalidate_user_code = UserCode.invalidate
 
 --- Returns a copy of the parsed personal info (for testing/diagnostics).
 --- @return table

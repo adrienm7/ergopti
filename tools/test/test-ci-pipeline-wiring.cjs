@@ -226,6 +226,18 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[
+		WINDOWS_BOX,
+		'launch-windows',
+		'Qualify programmable hotstrings in the actual compiled package',
+		NOT_CANCELLED
+	],
+	[
+		WINDOWS_BOX,
+		'launch-windows',
+		'Upload mandatory compiled programmable package evidence',
+		'always()'
+	],
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
 	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],

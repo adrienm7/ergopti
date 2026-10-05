@@ -247,7 +247,9 @@ local function interceptor(event, km_buffer, ctx)
 		if lease_ok then match = snapshot.match end
 	end
 	if not match then match = SharedEngine.match_buffer(buffer, GROUP_NAME, guard) end
-	if not match then return nil end
+	if not match then
+		return require("modules.dynamic_hotstrings.user_code").request(buffer) and "consume" or nil
+	end
 
 	local rule   = match.rule
 	local result = match.result
@@ -355,7 +357,7 @@ local function preview_provider(buf)
 		and function(grp, sec) return is_sec_enabled(grp, sec) end
 		or nil
 	local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard)
-	if not match then return nil end
+	if not match then return require("modules.dynamic_hotstrings.user_code").preview(buf) end
 	local token = {}
 	_preview_snapshot = {
 		buffer = buf,

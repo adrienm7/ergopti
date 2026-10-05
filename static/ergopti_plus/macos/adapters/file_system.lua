@@ -2107,7 +2107,7 @@ local function write_atomic(path, content, expected_source, on_error)
 
 	local native_lock = write_lock
 	local native_staging = owned_staging_cleanup
-	if native_staging and (_staging_cleanup_debt ~= native_staging
+	if native_staging and (native_staging.released == true or _staging_cleanup_debt ~= native_staging
 		or native_staging.requested_path ~= path or native_staging.on_error ~= on_error) then native_staging = nil end
 	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
 	if lock_released then write_lock = nil end
@@ -2154,7 +2154,7 @@ local function write_atomic(path, content, expected_source, on_error)
 	end
 	local function finish(written, detail)
 		if receipt ~= nil then return written, detail, receipt end
-		if retry_cleanup ~= nil then return written, detail, retry_cleanup end
+		if written ~= true and retry_cleanup ~= nil then return written, detail, retry_cleanup end
 		return written, detail
 	end
 	if not lock_released then

@@ -735,6 +735,12 @@ _HSLR_DrainOwner(RebuildOnceFn := 0, BeforeIdleReleaseFn := 0,
 ; call this function. The coordinator holds HSE_RebuildInProgress across every
 ; coalesced pass and lowers it atomically with final owner release.
 _RebuildHotstringsLiveOnce() {
+	global Features
+	CommonRefusal := HotstringsCommonAdmissionRefusal(Features)
+	if CommonRefusal != "" {
+		try LoggerError("Menu", CommonRefusal)
+		return false
+	}
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
 	try {
 		try SetTimer(RegisterEmojisSymbolsDeferred, 0)

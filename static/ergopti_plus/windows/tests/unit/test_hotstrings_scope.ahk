@@ -309,12 +309,13 @@ _HotstringsScopeDelayVectors() {
 }
 Test("hotstrings-scope: independent delay vectors agree with both Lua drivers", _HotstringsScopeDelayVectors)
 
-_HotstringsScopeMeasuredDelayRoundTrip() {
+_HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
+	OwnedSection := "autocorrection." . SelectedFamily
 	global _HotstringsOverrides, _HSResolveCache, _HSResolveGen, HotstringGroupConfig
 	Saved := { overrides: _HotstringsOverrides, cache: _HSResolveCache, generation: _HSResolveGen,
 		groups: HotstringGroupConfig }
 	Fixture := _HotstringsScopeFixture()
-	Fixture.options["sections"] := (Entry) => [{ Name: Entry.IsPersonal ? "words" : "caps" }]
+	Fixture.options["sections"] := (Entry) => [{ Name: Entry.IsPersonal ? "words" : SelectedFamily }]
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed
@@ -326,9 +327,9 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 		; Other resolver fixtures deliberately seed empty metadata. This real-corpus
 		; round trip owns a fresh cache so the actual TOML parser supplies inheritance.
 		HotstringGroupConfig := Map()
-		AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", "caps"),
+		AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", SelectedFamily),
 			"the real corpus makes deletion inherit 1.0 seconds")
-		AssertEqual(0.5, ManifestValueFor("hotstrings.autocorrection.caps.time_activation_seconds", "recommended"),
+		AssertEqual(0.5, ManifestValueFor("hotstrings." . OwnedSection . ".time_activation_seconds", "recommended"),
 			"the real shared manifest recommends 0.5 seconds")
 		for Mode in ["recommended", "clear"] {
 			Fixture.options["stamp"] := "measured-delay-" . Mode
@@ -336,15 +337,15 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 			AssertEqual("pending", Receipt["status"])
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
 			if Mode == "recommended"
-				AssertEqual(0.5, Overrides["autocorrection.caps"]["delay"],
+				AssertEqual(0.5, Overrides[OwnedSection]["delay"],
 					"the acknowledged candidate explicitly stores the recommendation")
 			else
-				Assert(!Overrides.Has("autocorrection.caps") || !Overrides["autocorrection.caps"].Has("delay"),
+				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay"),
 					"clear removes the recommendation and returns to corpus inheritance")
 			_HotstringsOverrides := _ParseOverrides(Fixture.overrides)
 			HotstringsResolveBumpGen()
 			AssertEqual(Mode == "recommended" ? 0.5 : 1.0,
-				HotstringsResolve("autocorrection", "caps").Delay,
+				HotstringsResolve("autocorrection", SelectedFamily).Delay,
 				"the actual native resolver delivers the requested delay")
 			AssertEqual("keep", Overrides["autocorrection"]["unknown"])
 			AssertEqual(9, Overrides["foreign"]["delay"])
@@ -370,4 +371,6 @@ _HotstringsScopeMeasuredDelayRoundTrip() {
 	}
 	Assert(HotstringGroupConfig == Saved.groups, "the original metadata cache identity is restored")
 }
-Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal", _HotstringsScopeMeasuredDelayRoundTrip)
+for _hsScopeFamily in ["names", "abbreviations", "technical_terms"]
+	Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal — " . _hsScopeFamily,
+		_HotstringsScopeMeasuredDelayRoundTrip.Bind(_hsScopeFamily))

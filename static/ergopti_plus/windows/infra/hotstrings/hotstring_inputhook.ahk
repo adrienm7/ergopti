@@ -902,10 +902,8 @@ HotstringPrefixWatcherRebuildIndex() {
 	; and could never be previewed — and the config window still offered it a
 	; per-pack tooltip colour, a setting with nothing behind it.
 	_extPacks := 0
-	for _, Pack in HS_EnumeratePersonalExtFiles() {
-		_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], NewIndex, NewSet, "", Pack["PersonalSource"])
-		_extPacks += 1
-	}
+	PersonalFileControls.BuildPreview(NewIndex, NewSet)
+	_extPacks := PersonalFileControls.inventory.Length
 	global _HotstringExtensionPacks, Features
 	for Request in HotstringExtensions_RegistrationPlan(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings")) {
 		_RegisterExtPackTriggers(Request.path, Request.category, NewIndex, NewSet, Request.section)
@@ -1399,6 +1397,12 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				HSEMatch := HSE_TryPersonalInfoCombo(ScriptInformation["MagicKey"])
 			}
 			if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+				if IsSet(UserHotstringsOnChar) && UserHotstringsOnChar(HSE_Buffer) {
+					_PrefixCancelRender()
+					_PrefixAppendTypedChar(Char)
+					_PrefixRecordMagicOutcome(Char, "user_code_pending")
+					return
+				}
 				HSEMatch := HSE_TryRepeatKey(ScriptInformation["MagicKey"])
 			}
 			if (HSEMatch != "") {
@@ -1540,6 +1544,8 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; acceptance before HookDispatcher sees the same physical down. Record it
 	; here; the shared key-state owner deduplicates the later dispatcher callback.
 	KS_RecordPhysicalKeyDown(VK, SC, "prefix")
+	if IsSet(UserHotstringsObserveInput)
+		UserHotstringsObserveInput()
 	; Inert while paused — pairs with the _OnPrefixChar guard so this watcher's
 	; private InputHook is fully silent during suspend.
 	if A_IsSuspended
@@ -1880,6 +1886,9 @@ _PrefixFireDecisionStillCurrent(Decision, CompletedBuffer := unset,
 	; same characters is an ABA transition and can change the engine's word-start
 	; context. The decision must retain both epochs through pixel publication and
 	; the later dispatch claim.
+	if Decision.HasOwnProp("UserCodeGeneration")
+		&& (!IsSet(UserHotstringsPreviewStillCurrent) || !UserHotstringsPreviewStillCurrent(Decision))
+		return false
 	if (Decision.PrefixContentGeneration != _PrefixContentGeneration
 		or Decision.PrefixInputContextGeneration
 			!= _PrefixInputContextGeneration)

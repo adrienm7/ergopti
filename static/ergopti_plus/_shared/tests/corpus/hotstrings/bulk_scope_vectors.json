@@ -238,7 +238,7 @@
 			"refusal": "invalid-section"
 		},
 		{
-			"name": "retain-layout-remapping-magic_key",
+			"name": "disable-native-replacement-magic_key",
 			"inventory": {
 				"magic_key": ["text_expansion_symbols", "replace"]
 			},
@@ -253,11 +253,16 @@
 					"group": "magic_key",
 					"section": "text_expansion_symbols",
 					"enabled": false
+				},
+				{
+					"group": "magic_key",
+					"section": "replace",
+					"enabled": false
 				}
 			]
 		},
 		{
-			"name": "retain-layout-remapping-magickey",
+			"name": "disable-native-replacement-magickey",
 			"inventory": {
 				"magickey": ["text_expansion_symbols", "replace"]
 			},
@@ -272,11 +277,16 @@
 					"group": "magickey",
 					"section": "text_expansion_symbols",
 					"enabled": false
+				},
+				{
+					"group": "magickey",
+					"section": "replace",
+					"enabled": false
 				}
 			]
 		},
 		{
-			"name": "retain-layout-remapping-MagicKey",
+			"name": "disable-native-replacement-MagicKey",
 			"inventory": {
 				"MagicKey": ["text_expansion_symbols", "replace"]
 			},
@@ -290,6 +300,11 @@
 				{
 					"group": "MagicKey",
 					"section": "text_expansion_symbols",
+					"enabled": false
+				},
+				{
+					"group": "MagicKey",
+					"section": "replace",
 					"enabled": false
 				}
 			]

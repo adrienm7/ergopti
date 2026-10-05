@@ -85,3 +85,45 @@ helpers.describe("toml publication dual receipt boundary", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("merged hotstring and program publication boundary", function()
+	helpers.it("does not expose an unrelated opaque table to an ordinary publication caller", function()
+		with_writer(function(writer)
+			for _, acknowledged in ipairs({ false, true }) do
+				local adapter = source_adapter()
+				local foreign = setmetatable({}, { __index = function() error("must not inspect another owner") end })
+				adapter.write_if_unchanged = function() return acknowledged, "fixture", foreign end
+				local written, _, receipt = writer.publish_if_unchanged("config", "candidate", adapter,
+					{ status = "ok", content = "original source" })
+				helpers.assert_eq(written, acknowledged)
+				helpers.assert_nil(receipt)
+			end
+		end)
+	end)
+
+	helpers.it("keeps the ordinary function receipt a refusal-only capability", function()
+		with_writer(function(writer)
+			local adapter, calls = source_adapter(), 0
+			local cleanup = function() calls = calls + 1; return true, nil, true end
+			adapter.write_if_unchanged = function() return true, nil, cleanup end
+			local written, _, receipt = writer.publish_if_unchanged("config", "candidate", adapter,
+				{ status = "ok", content = "original source" })
+			helpers.assert_eq(written, true)
+			helpers.assert_nil(receipt)
+			helpers.assert_eq(calls, 0, "publication cannot invoke an ordinary cleanup owner implicitly")
+		end)
+	end)
+
+	helpers.it("updates a literal dotted hotstring leaf without borrowing the distinct dotted TOML path", function()
+		with_writer(function(writer)
+			local original = '[custom]\n"a.b" = true\na.b = true\nkeep = 41\n'
+			local adapter = { read_with_status = function() return original, "ok" end }
+			local prepared, _, candidate = writer.prepare_batch("config", {
+				{ section = "custom", key = "a.b", value = false, literal_key = true }
+			}, adapter, { status = "ok", content = original })
+			helpers.assert_eq(prepared, true)
+			helpers.assert_eq(candidate, '[custom]\n"a.b" = false\na.b = true\nkeep = 41\n')
+		end)
+	end)
+end)
