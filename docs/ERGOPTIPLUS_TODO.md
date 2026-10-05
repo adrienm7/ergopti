@@ -3515,6 +3515,13 @@ Items 54/81 remain partial for delay, picker children and other menu families.
 Full selected verification and three-OS native CI are tracked separately;
 physical tray and input acceptance remain required on installed devices.
 
+Windows fixture qualification preserves the sparse disabled-field contract and
+the renderer receipt for three labelled rows, while independently requiring
+four actual Win32 menu positions and their original captions/separator. The
+HIGH07 dispatch guard follows the real shared template/action/registration
+chain and now uses effective regex word boundaries. Every behavioral predicate
+remains; hosted Windows execution is required before native acceptance.
+
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
 shared renderers own its labels, order, checked state and selected-value
@@ -4058,6 +4065,11 @@ pass with all 21 locale catalogues. Full native CI remains required.
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+
+  The Windows qualification successor for the shared Tap-Hold head retains its
+  real four-row Win32 and refusal assertions; item 54 records the precise
+  sparse-field/renderer/dispatch contract corrections. Native CI is pending.
+
   Metrics widget rows are now shared `check` declarations on all three
   drivers. Native getters retain stored colors/graph checks while disabled;
   Windows commands rebuild through the normal tray owner after durable
