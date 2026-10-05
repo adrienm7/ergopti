@@ -1,0 +1,69 @@
+{
+	"base": "ef278416ee26c74c1ffd88b3ec86416b2b7036e4",
+	"patch_sha256": "1ff70d8d757215bab7c057bfec2e073867faf421a0844cc74de18d32dfdf343e",
+	"files": [
+		{
+			"path": "static/ergopti_plus/_shared/lua/layouts/catalogue.lua",
+			"preimage_sha256": "98d1d6d40f9f5a8784f3c6ea8753574b5f3f288a6f763df07377f58cb9ba5077",
+			"postimage_sha256": "be246c427faa93d736a476309f46f2c3a606e678f9004a20720322f16ee2140a"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/keymap/layout_registry.lua",
+			"preimage_sha256": "ce7dcc5333b5a319b2bc1198b29b9916ad541525c234ae8756a310e326c5c36d",
+			"postimage_sha256": "e3582f8d8121286397a74197022e21fbc816204c82930f4cae97e188d14b5928"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/layout_registry.lua",
+			"preimage_sha256": "8d56b647d25a0dfc1014782a44756033178f6fb3d19298a402c7123022ae5fbb",
+			"postimage_sha256": "24137690b99e9d2786a4b9570882d8a4ae0db3689080a3591ffa3a8e1088f55b"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_catalogue.lua",
+			"preimage_sha256": "79e7f94915cc98045bfc658dcc11d23fe4d5f72554876f10d137619be6a7a230",
+			"postimage_sha256": "a16ef956d85538735f74ced9a1e739259e3bd77014d7d6c6e16e068f3d0a2e50"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua",
+			"preimage_sha256": "765decf6a53bf94e49309be4823dd03c5868687514a8d0aafa38655c0263c986",
+			"postimage_sha256": "ddf95da2e21dc0107a6e4ae22016f30c8f65a16f4bdbdcb9059335a4a4ce6c90"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua",
+			"preimage_sha256": "d765ad66232806a7d0e4229ecd9c8d088a7fd8409a545477d758ee2e3afa7c93",
+			"postimage_sha256": "84cd2a5c0954506756cf701017f71ffc76fa765a99db3bd5f22cda0ec39c6428"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua",
+			"preimage_sha256": "69af430b29e93a594e9093a0fc88ebcf682a4450692db1d5d7dfbe37781fcbe7",
+			"postimage_sha256": "3fbb23c6b869d9cfb3de5342a248ed646eaf4b0428af0d75195d20aa6e0d37cd"
+		},
+		{
+			"path": "docs/ERGOPTIPLUS_TODO.md",
+			"preimage_sha256": "0ff2612fa76553b693511893de8afb59b005961780610551013ef54e50ed9593",
+			"postimage_sha256": "065b5b81185ed34098ed040d71c7e71cc66adf721ce11977dbc9093b3dfb16d9"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/test/layout_installed_record_contract.lua",
+			"preimage_sha256": null,
+			"postimage_sha256": "aacef0092a2cb9953c87b53a3828ebcd0e924854e2e59db650be2bdec85b0d69"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/test/layout_installed_manager_contract.lua",
+			"preimage_sha256": null,
+			"postimage_sha256": "1b150139824c8d3b0c6bd4e5183603f1bced6bd30285d2366c9e5b91665ab108"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/layouts/installed_record_preservation.json",
+			"preimage_sha256": null,
+			"postimage_sha256": "f8e03ea258a64ff013bea9c51f2faca2f746e5ba17b63c7322573e384a09faa2"
+		}
+	],
+	"protected_owners_unchanged": [
+		"static/ergopti_plus/_shared/lua/json.lua",
+		"static/ergopti_plus/windows/infra/json.ahk",
+		"static/ergopti_plus/windows/modules/keymap/keylayout/layout_catalogue.ahk",
+		"static/ergopti_plus/_shared/tests/corpus/layouts/catalogue_vectors.json",
+		"static/ergopti_plus/macos/platform/remap/config.lua"
+	],
+	"original_test_assertions": "four original registered modules are exact prefixes"
+}

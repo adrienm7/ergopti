@@ -157,10 +157,10 @@ _PTS_BatchWriteRefusesWhileUnreadable() {
 ; widest-blast-radius reader of config.toml is asserted against the source.
 _PTS_BootSnapshotLatchesTheSessionSentinel() {
 	Src := _DriverSourceNoComments()
-	Anchor := "_IniCache := ParseTomlFile(ConfigurationFile)"
+	Anchor := "_IniCache := ParseConfigTomlFile(ConfigurationFile)"
 	Pos := InStr(Src, Anchor)
 	Assert(Pos > 0,
-		"the boot snapshot of config.toml must still be taken through ParseTomlFile — if this anchor moved, the guard below is silently guarding nothing")
+		"the boot snapshot of config.toml must still be taken through ParseConfigTomlFile — if this anchor moved, the guard below is silently guarding nothing")
 
 	Window := SubStr(Src, Pos, 500)
 	Assert(InStr(Window, "_ConfigBootReadFailed") > 0,
