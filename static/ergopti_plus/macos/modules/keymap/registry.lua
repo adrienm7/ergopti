@@ -263,6 +263,7 @@ M.remove_custom_terminator = Terminators.remove_custom_terminator
 --- Must be called after any structural change to _state.mappings.
 local function rebuild_lookup()
 	if not _state then return end
+	Groups.note_registry_mutation("lookup")
 	_state.mappings_lookup = {}
 	for _, m in ipairs(_state.mappings) do
 		-- Key must match add_raw's exactly, group segment included, so a rebuilt
@@ -270,6 +271,7 @@ local function rebuild_lookup()
 		local k = m.trigger .. "\0" .. tostring(m.is_word) .. "\0" .. tostring(m.auto) .. "\0" .. (m.group or "")
 		_state.mappings_lookup[k] = m
 	end
+	return true
 end
 
 --- Rebuilds the per-tail-char bucket indexes from the (already sorted)
@@ -286,6 +288,7 @@ end
 --- from ~10-15k entries to a handful.
 local function rebuild_tail_indexes()
 	if not _state then return end
+	Groups.note_registry_mutation("tail")
 	local tail_idx = {}
 	local star_idx = {}
 	local literal_magic_idx = {}
@@ -355,6 +358,7 @@ local function rebuild_tail_indexes()
 	_state.mappings_by_star_tail_char = star_idx
 	_state.mappings_by_first_char     = first_idx
 	_state.mappings_by_literal_magic_tail = literal_magic_idx
+	return true
 end
 
 
@@ -364,6 +368,7 @@ end
 --- Rebuilds the tail-char bucket indexes at the end so they stay in sync.
 function M.sort_mappings()
 	if not require_state("sort_mappings") then return end
+	Groups.note_registry_mutation()
 	-- Dropped BEFORE the deferral check: a deferred sort still means the corpus
 	-- has changed, and the memo must not survive that even if the sort itself
 	-- is coalesced to later.
@@ -454,7 +459,9 @@ end
 --- that answer to decide whether a trigger is already claimed — so a stale true
 --- silently suppressed collection for the rest of the session.
 function M.drop_classify_cache()
+	Groups.note_registry_mutation("cache")
 	_classify_cache = {}
+	return true
 end
 
 function M.classify_trigger(str)
@@ -548,6 +555,7 @@ end
 --- a no-op that only marks a sort as pending. Paired with flush_sort() at the end
 --- of a batch (e.g. the initial TOML load loop) to avoid 6+ O(N log N) passes.
 function M.defer_sort()
+	Groups.note_registry_mutation()
 	_sort_deferred = true
 	_sort_pending  = false
 	Logger.debug(LOG, "Sort deferred.")
@@ -556,6 +564,7 @@ end
 --- Resumes automatic sorting and performs one final sort if one was requested
 --- while sorting was deferred. Safe to call even when defer_sort() was not used.
 function M.flush_sort()
+	Groups.note_registry_mutation()
 	_sort_deferred = false
 	if _sort_pending then
 		_sort_pending = false
@@ -595,6 +604,7 @@ function M.add(trigger, replacement, opts)
 		Logger.error(LOG, "add: invalid personal source descriptor.")
 		return false
 	end
+	Groups.note_registry_mutation()
 	local owns_magic = owns_canonical_magic(trigger) or opts.is_magic_trigger == true
 
 	-- Substitute the canonical magic-key when a non-default trigger char is configured.
@@ -1010,6 +1020,7 @@ function M.update_trigger_char(char)
 		return false
 	end
 	if not require_state("update_trigger_char") then return false end
+	Groups.note_registry_mutation()
 
 	local old_char = _state.magic_key
 	if Terminators.update_magic_key(char) ~= true then

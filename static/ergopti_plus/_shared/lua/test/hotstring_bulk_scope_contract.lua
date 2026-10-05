@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- The Lua drivers replay the same independent expected batches and refusals
 --- as Windows. Every selected category and section has an explicit Boolean;
---- another category, the engine master and layout remapping are excluded.
+--- another category and the engine master are excluded. The native replacement
+--- choice belongs to its extension's Hotstrings section and participates there.
 --- ==============================================================================
 
 local M = {}

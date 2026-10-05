@@ -13,6 +13,7 @@ local command = require('modules.keylogger.sqlite_command')
 local reader = require('modules.keylogger.sqlite_reader')
 local original_build, original_popen = command.build, io.popen
 local row_count = 0
+local first_native_output
 local function native_rows(output)
 	local accepted, body, reason = command.read_exit_receipt(output)
 	assert(accepted == true, 'native SQLite exit receipt failed: ' .. tostring(reason))
@@ -45,6 +46,7 @@ io.popen = function(...)
 		read = function(_, mode)
 			local output = pipe:read(mode)
 			local rows = native_rows(output)
+			first_native_output = first_native_output or output
 			row_count = row_count + #rows
 			return output
 		end,
@@ -76,6 +78,14 @@ local function workload()
 end
 local candidate = workload()
 local grouped_rows = row_count
+-- Mutate an actual successful native output as well as the independent literals.
+assert(type(first_native_output) == 'string', 'real native output control required')
+local missing_receipt, removed = first_native_output:gsub('\n[^\n]+\n$', '')
+assert(removed == 1 and missing_receipt ~= first_native_output, 'missing-receipt control must change native output')
+refuses_rows(missing_receipt, 'native SQLite exit receipt failed:')
+local refused_receipt, replaced = first_native_output:gsub('0\n$', '7\n')
+assert(replaced == 1 and refused_receipt ~= first_native_output, 'refused-receipt control must change native output')
+refuses_rows(refused_receipt, 'native SQLite exit receipt failed:')
 -- Freeze the previous two SQL projections, not a second copy of Lua merge logic.
 command.build = function(db, sql, options)
 	if sql:find('FROM ngram_', 1, true) and not sql:find('FROM ngram_scancodes', 1, true) then

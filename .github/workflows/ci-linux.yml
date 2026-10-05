@@ -66,7 +66,7 @@ jobs:
         # back to io.popen("find") when lfs is unavailable — no luarocks needed.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit lua-luv sqlite3
+          sudo apt-get install -y luajit lua-luv lua-filesystem sqlite3
           luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
 
       - name: Verify native metrics aggregation equivalence
@@ -109,15 +109,19 @@ jobs:
     name: 'E2E tests'
     needs: [test-linux]
     runs-on: ubuntu-latest
+    env:
+      # Python-owned native children also resolve the production shared modules.
+      LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
     steps:
       - uses: actions/checkout@v4
 
       - name: Install LuaJIT
-        # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
-        # back to io.popen("find") when lfs is unavailable — no luarocks needed.
+        # Bound extension sections require actual no-follow source identity.
+        # Test discovery alone does not prove their filesystem admission.
+        # Canonical XKB controls below require xkbcli before their first use.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit sqlite3
+          sudo apt-get install -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool
@@ -781,6 +785,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          # Ubuntu ships PulseAudio gettext catalogs in language packs.
           sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de
           sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8
           python3 tests/hardware/run_system_audio_locale_receipts.py

@@ -283,6 +283,11 @@ HotstringsLanguageName(Locale) {
 ; id. Underscores and case are ignored when matching so the file-stem, config and
 ; menu spellings of one group resolve to the same file.
 HotstringsBundledTomlPath(Category) {
+	if IsSet(PersonalFileControls) {
+		Adopted := PersonalFileControls.Path(Category)
+		if Adopted != ""
+			return Adopted
+	}
 	global _SharedDir
 	; A category a layout extension binds whole loads from the extension's file.
 	Bound := HotstringsBoundTomlPath(Category)

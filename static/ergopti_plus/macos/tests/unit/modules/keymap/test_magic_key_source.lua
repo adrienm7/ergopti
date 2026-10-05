@@ -171,9 +171,9 @@ helpers.describe("magic key source: the keymap keyDown tap", function()
 		helpers.assert_type(tap and tap.callback, "function", "the keyDown tap must be captured")
 		local Registry = require("modules.keymap.registry")
 		local replace = true
-		Registry.is_group_enabled = function(name) return name == "magic_key" end
+		Registry.is_group_enabled = function(name) return name == "magickey" end
 		Registry.is_section_enabled = function(group, section)
-			return group == "magic_key" and section == "replace" and replace
+			return group == "magickey" and section == "replace" and replace
 		end
 		local magic = keymap.get_trigger_char()
 
@@ -238,8 +238,8 @@ helpers.describe("magic key source: acknowledged tap dispatcher", function()
   package.loaded["modules.keylogger.kc_bridge"] = nil
   local keymap, keymap_tap = load_keymap()
   local Registry = require("modules.keymap.registry")
-  Registry.is_group_enabled = function(name) return name == "magic_key" end
-  Registry.is_section_enabled = function(group, section) return group == "magic_key" and section == "replace" end
+  Registry.is_group_enabled = function(name) return name == "magickey" end
+  Registry.is_section_enabled = function(group, section) return group == "magickey" and section == "replace" end
   assert(keymap.set_magic_key_source("Backquote"))
   local fixture = require("tests.support.system_actions_fixture")
   fixture.with_fixture(function()

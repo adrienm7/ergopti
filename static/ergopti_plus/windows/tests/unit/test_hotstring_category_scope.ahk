@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays the independent shared corpus through the native policy port. A
 ; refused scope cannot emit a partial batch, and every valid category/section
-; choice matches both Lua drivers, including the excluded layout remapping.
+; choice matches both Lua drivers, including the extension's native replacement.
 ; ==============================================================================
 
 _HSCS_CheckVector(Vector) {
@@ -14,7 +14,8 @@ _HSCS_CheckVector(Vector) {
 	Before := Map()
 	for Id, Sections in Inventory
 		Before[Id] := Sections.Clone()
-	Choices := HotstringsCategoryScopePlan(Inventory, Vector["targets"], Vector["enabled"], &Reason)
+	Choices := HotstringsCategoryScopePlan(Inventory, Vector["targets"], Vector["enabled"], &Reason,
+		Vector.Get("bound_sections", []))
 	if Vector.Has("refusal") {
 		AssertFalse(Choices, "no partial batch may escape a refusal")
 		AssertEqual(Vector["refusal"], Reason)
@@ -46,6 +47,241 @@ _HSCS_CheckVector(Vector) {
 ; Registered individually so native CI names the exact cross-driver vector.
 for _HSCS_Vector in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\bulk_scope_vectors.json", "UTF-8"))["vectors"]
 	Test("hotstring-category-scope: " . _HSCS_Vector["name"], _HSCS_CheckVector.Bind(_HSCS_Vector))
+
+; Independent bound-leaf batches match the shared extension-selection contract.
+_HSCS_BoundVector(Enabled) {
+	Bindings := [Map("group", "magickey", "section", "replace"),
+		Map("group", "magickey", "section", "repeat_corrections")]
+	Expected := Enabled ? [Map("group", "rolls", "enabled", true),
+		Map("group", "rolls", "section", "hc", "enabled", true),
+		Map("group", "magickey", "enabled", true),
+		Map("group", "magickey", "section", "replace", "enabled", true),
+		Map("group", "magickey", "section", "repeat_corrections", "enabled", true)]
+		: [Map("group", "magickey", "section", "replace", "enabled", false),
+		Map("group", "magickey", "section", "repeat_corrections", "enabled", false)]
+	_HSCS_CheckVector(Map("inventory", Map("rolls", ["hc"],
+		"magickey", ["replace", "repeat_corrections", "symbols"]),
+		"targets", Enabled ? ["rolls"] : [], "enabled", Enabled,
+		"bound_sections", Bindings, "expected", Expected))
+	AssertEqual(2, Bindings.Length)
+	AssertEqual("replace", Bindings[1]["section"], "the bound catalogue remains unchanged")
+}
+for _HSCS_Enabled in [true, false]
+	Test("hotstring-extension-scope: exact bound batch " . _HSCS_Enabled, _HSCS_BoundVector.Bind(_HSCS_Enabled))
+
+_HSCS_BoundRefusal(Bound, ExpectedReason) {
+	_HSCS_CheckVector(Map("inventory", Map("magickey", ["replace"]), "targets", [],
+		"enabled", true, "bound_sections", Bound, "refusal", ExpectedReason))
+}
+Test("hotstring-extension-scope: missing native category refuses without a partial batch",
+	_HSCS_BoundRefusal.Bind([Map("group", "missing", "section", "replace")], "unknown-category"))
+Test("hotstring-extension-scope: missing section refuses without a partial batch",
+	_HSCS_BoundRefusal.Bind([Map("group", "magickey", "section", "missing")], "invalid-section"))
+Test("hotstring-extension-scope: duplicate bound section refuses without a partial batch",
+	_HSCS_BoundRefusal.Bind([Map("group", "magickey", "section", "replace"),
+		Map("group", "magickey", "section", "replace")], "invalid-section"))
+Test("hotstring-extension-scope: malformed bound scope refuses without a partial batch",
+	_HSCS_BoundRefusal.Bind(false, "invalid-request"))
+
+_HSCS_DenseAndOverlappingBindings() {
+	Hole := [], Hole.Length := 1
+	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", ["replace"]), Hole, true, &Reason))
+	AssertEqual("invalid-request", Reason)
+	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", ["replace"]), [], true, &Reason, Hole))
+	AssertEqual("invalid-request", Reason)
+	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", Hole), [], true, &Reason,
+		[Map("group", "magickey", "section", "replace")]))
+	AssertEqual("unknown-category", Reason)
+	_HSCS_CheckVector(Map("inventory", Map("magickey", ["replace"]),
+		"targets", ["magickey"], "enabled", true,
+		"bound_sections", [Map("group", "magickey", "section", "replace")],
+		"expected", [Map("group", "magickey", "enabled", true),
+			Map("group", "magickey", "section", "replace", "enabled", true)]))
+}
+Test("hotstring-extension-scope: dense arrays and overlapping ownership retain strict validation",
+	_HSCS_DenseAndOverlappingBindings)
+
+; Real shipped discovery and native menu dispatch, with only replacement launch
+; injected. No installed layout record is needed to select the Ergopti pack.
+_HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
+	_HSCS_WithDynamicBootState(Boot)
+	Boot() {
+		global Features, CategoryEnabled, HotstringCategoriesStd, HotstringCategoriesErgopti, SubMenus
+		global _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache, _LegacyTopCategoryMap, HS_LANGUAGE_GATE_KEYS
+		global _FmtCountCache, _MenuDispatchCallbacks
+		SavedCategories := CategoryEnabled, SavedStd := IsSet(HotstringCategoriesStd) ? HotstringCategoriesStd : unset
+		SavedErgopti := IsSet(HotstringCategoriesErgopti) ? HotstringCategoriesErgopti : unset
+		SavedMenus := IsSet(SubMenus) ? SubMenus : unset
+		SavedCache := [_HS_ExtensionsCacheLoaded, _HS_ExtensionsCache], SavedLanguageKeys := HS_LANGUAGE_GATE_KEYS
+		SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset, SavedSuspend := A_IsSuspended
+		State := MasterGateState(), SavedState := State.Clone()
+		Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Launches := 0, OwnedMenus := Map()
+		InitialChoice := Enabled ? "false" : "true"
+		Fixture.source := '[category_enabled]`nhotstrings = false`nmagic_key = ' . InitialChoice . '`n'
+			. 'rolls = ' . InitialChoice . '`ndistances_reduction = ' . InitialChoice . '`n'
+			. 'sfbs_reduction = ' . InitialChoice . '`nfrench_distancesreduction = ' . InitialChoice . '`n'
+			. '[hotstrings.magic_key.replace]`nenabled = ' . InitialChoice . '`n'
+			. '[hotstrings.magic_key.repeat_corrections]`nenabled = ' . InitialChoice . '`n'
+			. '[hotstrings.magic_key.text_expansion_symbols]`nenabled = true`n'
+			. '[hotstrings.magic_key.text_expansion_symbols_typst]`nenabled = true`n'
+			. '[private]`ncredential = "retain-extension-fixture"`n'
+		Launch(_Success, Borrowed, Refused) {
+			Launches += 1, Bundle := Borrowed, Refusal := Refused
+			return LateRefusal
+		}
+		Fixture.options["reload"] := Launch
+		Fixture.options["roots"] := (*) => [_LCT_RegistryDir()]
+		try {
+			Suspend(false)
+			Assert(FSWriteDurable(Fixture.path, Fixture.source))
+			ApplyConfigToml(Features, Fixture.path)
+			CategoryEnabled := Map("Hotstrings", false, "MagicKey", !Enabled)
+			HS_LANGUAGE_GATE_KEYS := Map()
+			HotstringsSeedLanguageCategoryGates(CategoryEnabled)
+			for Pack in HotstringsLanguageCategories()
+				for Cat in Pack["categories"]
+					_LegacyTopCategoryMap[Cat["v1"]] := "hotstrings." . Cat["v2"]
+			State["initialized"] := false
+			MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
+			Groups := MenuManifest_LoadHotstringGroups()
+			HotstringCategoriesStd := Groups.standard, HotstringCategoriesErgopti := Groups.ergopti
+			SubMenus := OwnedMenus, _FmtCountCache := Map()
+			for Category in HotstringCategoriesErgopti
+				SubMenus[Category] := Menu()
+			_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+		} finally {
+			Suspend(SavedSuspend)
+			if Built is Menu
+				_CTC_ReleaseMenu(Built)
+			for Owned in OwnedMenus
+				_CTC_ReleaseMenu(OwnedMenus[Owned])
+			if Bundle is Object
+				_ConfigWriteTerminalRelease(Bundle)
+			CategoryEnabled := SavedCategories, HotstringCategoriesStd := IsSet(SavedStd) ? SavedStd : unset
+			HotstringCategoriesErgopti := IsSet(SavedErgopti) ? SavedErgopti : unset
+			SubMenus := IsSet(SavedMenus) ? SavedMenus : unset
+			_HS_ExtensionsCacheLoaded := SavedCache[1], _HS_ExtensionsCache := SavedCache[2]
+			HS_LANGUAGE_GATE_KEYS := SavedLanguageKeys, _FmtCountCache := IsSet(SavedCounts) ? SavedCounts : unset
+			State.Clear()
+			for Key, Value in SavedState
+				State[Key] := Value
+			_ScopeOwnerCleanup(Fixture)
+		}
+		Check(Packs) {
+			global _HS_ExtensionsCache, _HS_ExtensionsCacheLoaded
+			_HS_ExtensionsCache := Packs, _HS_ExtensionsCacheLoaded := true
+			Rows := _HS_ExtensionRows(Fixture.options), ErgoptiRows := false
+			for Row in Rows {
+				if InStr(Row["label"], StrReplace(t("menu.extensions.hotstrings_of"), "%s", "Ergopti+")) == 1
+					ErgoptiRows := Row["items"]
+			}
+			Assert(ErgoptiRows is Array, "the shipped pack is present without installing its layout")
+			Built := Menu()
+			Assert(MenuRenderer_AppendRows(Built, "hotstrings_menu", "hotstring_personal_ext", ErgoptiRows) > 2)
+			AssertEqual(0, CountTomlSection("magickey", "replace"), "the real native replacement is a metadata-only section")
+			AssertEqual(24, CountTomlSection("french_distancesreduction", "suffixes_a"))
+			ReplacementLabel := MenuLabelFromDescriptionKey("menu.hotstrings.magic_key.replace", "hotstrings.magic_key.replace")
+			AssertEqual(1, _CTC_CountLabel(Built, ReplacementLabel), "the localized native replacement row belongs to the shipped extension")
+			CommandLabel := t(Enabled ? "menu.hotstrings.scope_enable_all" : "menu.hotstrings.scope_disable_all")
+			AssertEqual(1, _CTC_CountLabel(Built, CommandLabel), "one actual extension command owns the entire selection")
+			Action := _L4M_MenuAction(Built, CommandLabel)
+			if Paused
+				Suspend(true)
+			Receipt := Action.Call()
+			if Paused {
+				AssertEqual("refused", Receipt["status"])
+				AssertEqual(0, Launches, "a retained command cannot launch while paused")
+				AssertFalse(FSStrictExists(Receipt["backup"]))
+			} else {
+				AssertEqual(1, Launches, "one extension click admits one staged cohort")
+				if LateRefusal {
+					AssertEqual("pending", Receipt["status"])
+					Parsed := TOML_ParseFreshFile(Fixture.path)
+					AssertEqual(Enabled, Parsed["hotstrings.magic_key.replace"]["enabled"])
+					AssertEqual(Enabled, Parsed["hotstrings.magic_key.repeat_corrections"]["enabled"])
+					AssertEqual(!Enabled, ReadFeatureStateV2("hotstrings.magic_key.replace")["enabled"],
+						"pending publication leaves the real runtime's desired feature map unchanged")
+					AssertTrue(Parsed["category_enabled"]["magic_key"], "closing bound leaves retains the category gate")
+					for Name in ["text_expansion_symbols", "text_expansion_symbols_typst"]
+						AssertTrue(Parsed["hotstrings.magic_key." . Name]["enabled"], "unrelated MagicKey symbols remain selected")
+					for Key in ["rolls", "distances_reduction", "sfbs_reduction", "french_distancesreduction"]
+						AssertEqual(Enabled, Parsed["category_enabled"][Key], "every whole bound group is in the same cohort")
+					AssertFalse(Parsed["category_enabled"]["hotstrings"], "the engine master keeps its independent choice")
+					AssertEqual("retain-extension-fixture", Parsed["private"]["credential"])
+					Refusal.Call("native extension selection refused")
+				}
+				AssertEqual("refused", Receipt["status"])
+				AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
+			}
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path), "refusal restores exact bytes for the entire extension")
+		}
+	}
+}
+for _HSCS_Enabled in [true, false]
+	for _HSCS_Late in [true, false]
+		Test("hotstring-extension-menu-owner: real shipped command " . _HSCS_Enabled . " rollback " . _HSCS_Late,
+			_HSCS_ExtensionMenuOwner.Bind(_HSCS_Enabled, _HSCS_Late))
+Test("hotstring-extension-menu-owner: retained native command refuses after pause",
+	_HSCS_ExtensionMenuOwner.Bind(true, true, true))
+
+_HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
+	_HSCS_WithDynamicBootState(Boot)
+	Boot() {
+		_L4R_WithPack(Check)
+	}
+	Check(Root, SourcePath) {
+		Fixture := _ScopeOwnerFixture(), Bundle := 0, Refusal := 0, Launches := 0
+		Available := true
+		Fixture.source .= '[hotstrings.groups]`n"ext:sample:words" = false`n"ext:foreign:words" = true`n'
+			. '[hotstrings.modules."ext:sample:words"]`nwanted = false`nhidden = true`n'
+			. '[hotstrings.magic_key.replace]`nenabled = true`n'
+		OriginalRules := FSReadUtf8Exact(SourcePath)
+		Launch(_Success, Borrowed, Refused) {
+			Launches += 1, Bundle := Borrowed, Refusal := Refused
+			return true
+		}
+		Fixture.options["reload"] := Launch
+		Fixture.options["roots"] := (*) => Available ? [Root] : []
+		try {
+			Assert(FSWriteDurable(Fixture.path, Fixture.source))
+			Rows := _HS_ExtensionScopeCommandRows("sample", Fixture.options)
+			AssertEqual(2, Rows.Length)
+			Action := Rows[Enabled ? 1 : 2]["action"]
+			if Removed
+				Available := false
+			Receipt := Action.Call()
+			if Removed {
+				AssertEqual("refused", Receipt["status"])
+				AssertEqual(0, Launches, "current discovery rejects an uninstalled retained pack before reload")
+				AssertFalse(FSStrictExists(Receipt["backup"]))
+			} else {
+				AssertEqual("pending", Receipt["status"])
+				AssertEqual(1, Launches)
+				Parsed := TOML_ParseFreshFile(Fixture.path)
+				AssertEqual(Enabled, Parsed["hotstrings.groups"]["ext:sample:words"])
+				for Name in ["wanted", "hidden"]
+					AssertEqual(Enabled, Parsed['hotstrings.modules."ext:sample:words"'][Name],
+						"all pack-owned sections share the group transaction")
+				AssertTrue(Parsed["hotstrings.groups"]["ext:foreign:words"])
+				AssertTrue(Parsed["hotstrings.magic_key.replace"]["enabled"], "a different extension cannot alter replacement")
+				Refusal.Call("native pack-owned selection refused")
+				AssertEqual("refused", Receipt["status"])
+				AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
+			}
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+			AssertEqual(OriginalRules, FSReadUtf8Exact(SourcePath), "selection never edits source rules")
+		} finally {
+			if Bundle is Object
+				_ConfigWriteTerminalRelease(Bundle)
+			_ScopeOwnerCleanup(Fixture)
+		}
+	}
+}
+for _HSCS_Enabled in [true, false]
+	Test("hotstring-extension-scope: pack-owned staged cohort " . _HSCS_Enabled,
+		_HSCS_ExtensionPackOwnedOwner.Bind(_HSCS_Enabled))
+Test("hotstring-extension-scope: retained command cannot activate an uninstalled pack",
+	_HSCS_ExtensionPackOwnedOwner.Bind(true, true))
 
 ; The existing journal owns runtime admission and conditional rollback. Only
 ; replacement launch is injected; the typed source, backup and journal are real.
@@ -91,7 +327,7 @@ _HSCS_PendingAndNativeRefusal(Enabled) {
 			AssertEqual(false, Parsed["category_enabled"]["hotstrings"], "the engine master stays disabled")
 			AssertEqual(true, Parsed["category_enabled"]["autocorrection"], "another category keeps its choice")
 			AssertEqual(0.75, Parsed["hotstrings.rolls.hc"]["time_activation_seconds"])
-			AssertEqual(true, Parsed["hotstrings.magic_key.replace"]["enabled"], "layout remapping is retained")
+			AssertEqual(true, Parsed["hotstrings.magic_key.replace"]["enabled"], "an unrelated replacement choice is retained")
 			AssertEqual("retain-fixture-value", Parsed["private"]["credential"])
 			Assert(!(_ConfigWriteLeaseTryAcquire(Fixture.path, "concurrent-category")))
 			Refusal.Call("native category reload refused")
@@ -410,6 +646,8 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
 		Suspend(Paused)
 		RuntimeBefore := KL_JsonEncode(Features)
+		; Semantic feature loading does not populate the separate live-text cache.
+		AssertEqual(Source, ReadTomlFile(Fixture.path), "fixture primes the live text cache before publication")
 		Cached := ParseTomlFile(Fixture.path)
 		Built := _BuildDynamicHotstringsSubmenu(Fixture.options)
 		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven families and their editor")

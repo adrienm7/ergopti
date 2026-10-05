@@ -13,6 +13,7 @@
 
 #Requires AutoHotkey v2.0
 #Include test_config_migrate_records.ahk
+#Include test_common_autocorrection_migration.ahk
 
 global _CMG_STAMP := "20990101-000000"
 global _CMG_MIN_CASES := 10
