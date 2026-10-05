@@ -319,6 +319,25 @@ jobs:
           path: ${{ runner.temp }}/native-hs-program-providers
           if-no-files-found: error
 
+      # Observe the native structured API without invoking or importing automations.
+      - name: Observe native Apple Shortcuts discovery
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe -p test_probe.py -v
+          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe"
+        timeout-minutes: 2
+
+      - name: Retain native Apple Shortcuts observation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-apple-shortcuts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/group3-apple-shortcuts-probe
+          if-no-files-found: error
+
       # LauncherLogTests append to the real launcher log,
       # ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke below
       # refuses to judge a launch over a launcher log it did not start fresh.

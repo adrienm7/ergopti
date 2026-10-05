@@ -212,6 +212,8 @@ const STEP_CONDITIONS = [
 		'${{ always() }}'
 	],
 	[MACOS_BOX, 'package-macos', 'Retain native Hammerspoon provider inventory', '${{ always() }}'],
+	[MACOS_BOX, 'package-macos', 'Observe native Apple Shortcuts discovery', '${{ always() }}'],
+	[MACOS_BOX, 'package-macos', 'Retain native Apple Shortcuts observation', '${{ always() }}'],
 	[MACOS_BOX, 'package-macos', 'Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
@@ -1108,7 +1110,10 @@ const WINDOWS_GATES = [
 		name: 'Build and test native navigation event owner',
 		run: './tools/build/build_windows_nav_owner.ps1'
 	},
-	{ name: 'Manifest parity (AHK ↔ HS codegen equivalence)', run: 'npm run test:manifest-parity' },
+	{
+		name: 'Manifest parity (AHK ↔ HS codegen equivalence)',
+		run: 'npm run test:manifest-parity'
+	},
 	{
 		name: 'Verify AHK source encoding (UTF-8 BOM + LF)',
 		exits: [['if ($failures.Count -gt 0) {', '1']]
@@ -1249,7 +1254,9 @@ function stepProblems(files) {
 errors.push(...stepProblems(pipeline.files()));
 for (const name of [
 	'Run signed Hammerspoon program provider inventory',
-	'Retain native Hammerspoon provider inventory'
+	'Retain native Hammerspoon provider inventory',
+	'Observe native Apple Shortcuts discovery',
+	'Retain native Apple Shortcuts observation'
 ]) {
 	const head = `      - name: ${name}\n`;
 	for (const condition of ['', 'false', 'success()']) {
@@ -1881,7 +1888,10 @@ const choices = [
 const nativeKeys = ['windows', 'macos', 'linux'];
 for (const [choice, mask] of choices) {
 	assert.deepEqual(Object.values(manual.selectLanes('workflow_dispatch', choice)), mask);
-	const jobs = { validate: { result: 'success', outputs: {} }, core: { result: 'success' } };
+	const jobs = {
+		validate: { result: 'success', outputs: {} },
+		core: { result: 'success' }
+	};
 	for (const [index, os] of nativeKeys.entries()) {
 		jobs[os] = { result: mask[index] ? 'success' : 'skipped' };
 		jobs.validate.outputs[`lane_${os}`] = String(mask[index]);

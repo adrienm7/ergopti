@@ -4919,6 +4919,15 @@ parser controls are not native qualification. Hosted execution of that fixture,
 Apple Shortcuts, installed automation/application providers, Windows discovery,
 consumer parity and full packaging/installation remain unfinished.
 
+A separately owned read-only Apple Shortcuts observer is registered after the
+native Hammerspoon inventory in hosted macOS CI. It calls the actual structured
+native catalogue API and records typed refusal, CLI identifier-help and exact
+owned query retirement without storing names or identifiers. Twelve independent
+JXA API controls and eight parser/cleanup controls remain portable evidence.
+Native catalogue retrieval itself is unbounded; empty discovery does not qualify
+invocation. No automation is imported or executed, and service cancellation,
+chosen-ID revalidation and a safe native invocation fixture remain unfinished.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
