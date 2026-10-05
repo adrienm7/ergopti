@@ -1495,6 +1495,27 @@ These are software implementations; final hardware verification remains below.
   gates stay deferred. The separate native huge-range and no-luv clock diagnoses
   remain unmodified; physical input and reserved surfaces are unchanged.
 
+- [~] **L106.** Linux UTF-8 inverse-plan admission: validate the complete input
+  with the existing strict shared UTF-8 owner before checking layout availability
+  or walking characters. Malformed bytes could be skipped and return a partial
+  successful plan; rejected malformed sequences also reported invalid blockers.
+  Refuse every malformed input with nil/nil in both genuinely absent and loaded
+  map states. Preserve valid unsupported characters, empty/nonstring receipts
+  and the established first-byte blocker when a valid input has no loaded map.
+  Genuine native French compilation, owned file loading and libxkbcommon replay
+  pass all sixteen loaded-map controls after nine original failures; the public
+  absent/loaded availability fixture passes thirty-eight checks after eighteen
+  original failures. These cover the same nine malformed categories in both
+  states, not eighteen separate defects. Five registered cases have two original
+  failures and pass under LuaJIT and Lua 5.4, retaining every earlier assertion.
+  Registered table injection is simulated; actual native compilation and library
+  events require LuaJIT FFI and are not physical keyboard injection. Register the
+  two native fixtures for future Linux CI without launching it. No graphical
+  session or physical device is used. Shared scalar-validation policy is unchanged;
+  foreign adapters do not share this missing-table/plan API by source, and their
+  runtime gates remain deferred. Physical selection and reserved surfaces stay
+  unmodified.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
