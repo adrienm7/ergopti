@@ -479,8 +479,8 @@ Test("toml writer admission: semantic no-ops do not hide ignored-root deletes or
 
 
 ; Independent complete images pin the configuration-only writer's new boundary.
-; Inline member order follows the unchanged native Map contract also pinned by
-; the existing _TIT_Render fixture, rather than source insertion order.
+; Descendant edits preserve unowned inline source tokens; explicit whole-cell
+; updates retain the generic native Map rendering contract in _TIT_Render.
 ; The generic writer's historical namespace-loss refusals above remain intact.
 _TBUI_ConfigDocumentVectors() {
 	return [
@@ -492,7 +492,7 @@ _TBUI_ConfigDocumentVectors() {
 			Expected: '[hotstrings]`nautocorrection.caps.enabled = false`ntrigger_char = "@" # retained`n' },
 		{ Id: "inline namespace", Source: 'layout = { ergopti_base = true, future = "001" }`n# retained after inline`n',
 			Updates: [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }],
-			Expected: 'layout = {ergopti_base = false, future = "001"}`n# retained after inline`n' },
+			Expected: 'layout = { ergopti_base = false, future = "001" }`n# retained after inline`n' },
 		{ Id: "table array neighbors", Source: '[[future]]`nname="first" # generation one`n[[future]]`nname="second" # generation two`n[layout]`nergopti_base = true`n',
 			Updates: [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }],
 			Expected: '[[future]]`nname="first" # generation one`n[[future]]`nname="second" # generation two`n[layout]`nergopti_base = false`n' },
@@ -510,7 +510,7 @@ _TBUI_ConfigDocumentVectors() {
 			Expected: 'layout.ergopti_altgr = false # retained`n' },
 		{ Id: "inline leaf addition", Source: 'layout = { ergopti_base = true, future = "001" }`n',
 			Updates: [{ Section: "layout", Key: "ergopti_altgr", Value: TOML_Bool(false) }],
-			Expected: 'layout = {ergopti_altgr = false, ergopti_base = true, future = "001"}`n' },
+			Expected: 'layout = { ergopti_base = true, future = "001", ergopti_altgr = false }`n' },
 		{ Id: "exact Unicode quoted identities", Source: 'hotstrings.personal."é.Case".enabled = true`nhotstrings.personal."É.Case".enabled = false # distinct retained owner`n',
 			Updates: [{ Section: 'hotstrings.personal."é.Case"', Key: "enabled", Value: TOML_Bool(false) }],
 			Expected: 'hotstrings.personal."é.Case".enabled = false`nhotstrings.personal."É.Case".enabled = false # distinct retained owner`n' },
@@ -781,3 +781,180 @@ _TBUI_ConfigReplacedNamespaceRetainsNativeReadability() {
 }
 Test("toml config document writer: explicit replacement releases native-readable headers (config-semantic-native-readback)",
 	_TBUI_ConfigReplacedNamespaceRetainsNativeReadability)
+
+
+; These complete images are hand-authored from the original source and explicit
+; owned edits. Foreign token spellings, order and trivia never come from rendering.
+_TBUI_ConfigInlineSpanVectors() {
+	return [
+		{ Id: 'actual names timing order', Source: 'hotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'hotstrings.autocorrection.names', Key: 'time_activation_seconds', Value: 0.75 }],
+			Expected: 'hotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'API entry descendant tokens', Source: 'llm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'llm', Key: 'enabled', Value: TOML_Bool(true) }, { Section: 'llm', Key: 'api_entry_id', Value: 'api_new' }],
+			Expected: 'llm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'wizard locale descendant tokens', Source: 'script = {locale = "en", future = "retain"}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'script', Key: 'locale', Value: 'fr' }],
+			Expected: 'script = {locale = "fr", future = "retain"}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'assignment spaces and inline trivia', Source: '`tsettings`t=`t{  owned`t=`tfalse , foreign = "001"  } # exact tail`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }],
+			Expected: '`tsettings`t=`t{  owned`t=`ttrue , foreign = "001"  } # exact tail`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'quoted equals delimiter authority', Source: 'settings = { "a.b" = { "x=y,#}" = 1, future = `'001`' }, a = { b = { "x=y,#}" = 2 } } }`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings."a.b"', Key: 'x=y,#}', Value: 3 }],
+			Expected: 'settings = { "a.b" = { "x=y,#}" = 3, future = `'001`' }, a = { b = { "x=y,#}" = 2 } } }`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'case twins retain actual owners', Source: 'settings={A={enabled=false,keep="upper"}, a={enabled=true,keep="lower"}}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.A', Key: 'enabled', Value: TOML_Bool(true) }],
+			Expected: 'settings={A={enabled=true,keep="upper"}, a={enabled=true,keep="lower"}}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'unknown exact numeric spellings', Source: 'settings = {owned=false, huge=9223372036854775807, tiny=1e-308, hex=0x0010, decimal=1_000.00, quoted="001"}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }],
+			Expected: 'settings = {owned=true, huge=9223372036854775807, tiny=1e-308, hex=0x0010, decimal=1_000.00, quoted="001"}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'nested array future containers', Source: 'settings = {owned=false, future=[{id="a", enabled=false}, {id="b", payload=["x,}#=", {empty={}}]}]}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }],
+			Expected: 'settings = {owned=true, future=[{id="a", enabled=false}, {id="b", payload=["x,}#=", {empty={}}]}]}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'multiline basic string tokens', Source: 'settings = {owned=false, future=' . Chr(34) . Chr(34) . Chr(34) . 'first`nsecond,#=}`nthird' . Chr(34) . Chr(34) . Chr(34) . '}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }],
+			Expected: 'settings = {owned=true, future=' . Chr(34) . Chr(34) . Chr(34) . 'first`nsecond,#=}`nthird' . Chr(34) . Chr(34) . Chr(34) . '}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'multiline literal string tokens', Source: 'settings = {owned=false, future=`'`'`'first`nsecond,#=}`nthird`'`'`'}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }],
+			Expected: 'settings = {owned=true, future=`'`'`'first`nsecond,#=}`nthird`'`'`'}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'dotted inline destination', Source: 'settings = {a.b=1, a.c = 2, "a.b" = 7}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.a', Key: 'b', Value: 3 }],
+			Expected: 'settings = {a.b=3, a.c = 2, "a.b" = 7}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'new dotted descendant', Source: 'settings = {a.b=1, a.c = 2, "a.b" = 7 }`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.a', Key: 'd', Value: 3 }],
+			Expected: 'settings = {a.b=1, a.c = 2, "a.b" = 7, a.d = 3 }`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'owned deletion retains neighbors', Source: 'settings={first=1,remove=2,last=3}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'remove', Delete: 1 }],
+			Expected: 'settings={first=1,last=3}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'owned deletion retains unowned trivia', Source: 'settings={ first=1, remove=2, last=3 }`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'remove', Delete: 1 }],
+			Expected: 'settings={ first=1,  last=3 }`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'explicit whole cell stays canonical', Source: 'settings = {future="release by explicit ownership", owned=false}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: '', Key: 'settings', Value: Map('owned', TOML_Bool(true), 'first', 1) }],
+			Expected: 'settings = {first = 1, owned = true}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'semantic no-op retains raw image', Source: 'settings = {owned=false, future = "001" } # exact no-op`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(false) }],
+			Expected: 'settings = {owned=false, future = "001" } # exact no-op`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'empty inline insertion retains closing trivia', Source: 'settings = { }`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }],
+			Expected: 'settings = {owned = true }`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'empty quoted nested identity', Source: 'settings={""={enabled=false, future="retain"}, other="unchanged"}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.""', Key: 'enabled', Value: TOML_Bool(true) }],
+			Expected: 'settings={""={enabled=true, future="retain"}, other="unchanged"}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'escaped quotes and unsafe delimiters', Source: 'settings={"a\"=b"={value="x,}#=\"y", future="001"}, stable=0}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings."a\"=b"', Key: 'value', Value: 'replacement' }],
+			Expected: 'settings={"a\"=b"={value="replacement", future="001"}, stable=0}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'Unicode literal identity spans', Source: 'settings={"é.😀"={owned=false, future="é😀"}, stable="001"}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings."é.😀"', Key: 'owned', Value: TOML_Bool(true) }],
+			Expected: 'settings={"é.😀"={owned=true, future="é😀"}, stable="001"}`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'explicit owned child container', Source: 'settings={ owned = {future="release explicitly", value=1}, neighbor="retain" }`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: Map('value', 2) }],
+			Expected: 'settings={ owned = {value = 2}, neighbor="retain" }`n[future]`nold = "retain" # user data`n' },
+		{ Id: 'last dotted descendant deletion', Source: 'settings={a.b=1}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.a', Key: 'b', Delete: 1 }],
+			Expected: 'settings={a = {}}`n[future]`nold = "retain" # user data`n' }
+	]
+}
+
+_TBUI_ConfigInlineSpanVector(Vector) {
+	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
+	Expected := Chr(0xFEFF) . Vector.Expected
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		FileSetTime("20000101000000", Path, "M")
+		BeforeTime := FileGetTime(Path, "M")
+		Cached := ParseTomlFile(Path)
+		Candidate := TOML_BuildConfigUpdatedContent(Path, Vector.Updates)
+		AssertEqual("ok", Candidate["status"], Vector.Id)
+		AssertEqual(Expected, Candidate["content"], "only explicit owned source spans change")
+		AssertEqual(Source, Candidate["source_content"])
+		AssertEqual(1, Candidate["source_present"])
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "detached inline edits do not publish")
+		AssertTrue(Cached == ParseTomlFile(Path), "detached inline preparation retains the cache identity")
+		AssertTrue(TOML_ConfigBatchWrite(Path, Vector.Updates) == 1,
+			"the actual native publisher strictly acknowledges the owned edit")
+		AssertTrue(FSUtf8ExactMatches(Path, Expected), "native publication preserves every independent unowned byte")
+		AssertTrue(TOML_SameValue(TOML_ParseDocument(Expected), TOML_ParseDocument(FSReadUtf8Exact(Path))))
+		AssertEqual(Expected, TOML_BuildConfigUpdatedContent(Path, Vector.Updates)["content"],
+			"subsequent semantic no-op retains the qualified complete image")
+		if Source == Expected
+			AssertEqual(BeforeTime, FileGetTime(Path, "M"), "a no-op retains the original modification time")
+		Stages := 0
+		Loop Files, Path . ".*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages, "publication and no-op settle every owned stage")
+	} finally FSDelete(Path)
+}
+for _TBUI_InlineSpanVector in _TBUI_ConfigInlineSpanVectors()
+	Test("toml config inline source spans: " . _TBUI_InlineSpanVector.Id,
+		_TBUI_ConfigInlineSpanVector.Bind(_TBUI_InlineSpanVector))
+
+_TBUI_ConfigInlineSpanRefusalVectors() {
+	return [
+		{ Id: 'retained scalar collision', Source: 'settings={blocked=1, future={keep="001"}}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.blocked', Key: 'leaf', Value: 2 }] },
+		{ Id: 'retained array collision', Source: 'settings={blocked=[1,2], future={keep="001"}}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings.blocked', Key: 'leaf', Value: 2 }] },
+		{ Id: 'duplicate inline semantic alias', Source: 'settings={owned=false, "owned"=true}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }] },
+		{ Id: 'invalid quoted equals source', Source: 'settings={"bad=key=1, future="retain"}`n[future]`nold = "retain" # user data`n',
+			Updates: [{ Section: 'settings', Key: 'owned', Value: TOML_Bool(true) }] }
+	]
+}
+
+_TBUI_ConfigInlineSpanRefusal(Vector) {
+	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		FileSetTime("20000101000000", Path, "M")
+		BeforeTime := FileGetTime(Path, "M")
+		AssertEqual("error", TOML_BuildConfigUpdatedContent(Path, Vector.Updates)["status"])
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		AssertFalse(TOML_ConfigBatchWrite(Path, Vector.Updates), "unprovable inline ownership cannot publish")
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "refusal retains the exact complete source")
+		AssertEqual(BeforeTime, FileGetTime(Path, "M"), "refusal retains the modification time")
+		Stages := 0
+		Loop Files, Path . ".*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages, "refusal precedes all staging")
+	} finally FSDelete(Path)
+}
+for _TBUI_InlineSpanRefusal in _TBUI_ConfigInlineSpanRefusalVectors()
+	Test("toml config inline source spans refusal: " . _TBUI_InlineSpanRefusal.Id,
+		_TBUI_ConfigInlineSpanRefusal.Bind(_TBUI_InlineSpanRefusal))
+
+_TBUI_ConfigInlineTokenOffsets() {
+	for Raw in ['  "x,}#=\"y"  # exact comment`n',
+		'  ' . Chr(34) . Chr(34) . Chr(34) . 'first`nsecond,#=}' . Chr(34) . Chr(34) . Chr(34) . '  # exact multiline comment`n',
+		"  " . Chr(39) . Chr(39) . Chr(39) . "first`nsecond,#=}"
+			. Chr(39) . Chr(39) . Chr(39) . "  # exact literal comment`n"] {
+		Position := 1
+		Token := _TOML_DocumentToken(Raw, &Position, "", , &SpanStart, &SpanEnd)
+		AssertEqual(Token, SubStr(Raw, SpanStart, SpanEnd - SpanStart + 1),
+			"the actual canonical lexical owner reports the complete quoted token")
+		AssertEqual(StrLen(Raw) + 1, Position)
+		AssertEqual("  ", SubStr(Raw, 1, SpanStart - 1))
+		AssertTrue(InStr(SubStr(Raw, SpanEnd + 1), "# exact") > 0)
+	}
+}
+Test("toml config inline source spans: actual lexer reports escaped and multiline offsets", _TBUI_ConfigInlineTokenOffsets)
+
+
+_TBUI_ConfigInlineCanonicalReader() {
+	Literal := Chr(39) . Chr(39) . Chr(39)
+	Raw := 'settings={owned=false, future=' . Literal . "first`nsecond,#=}`nthird" . Literal . "}`n"
+	Document := TOML_ParseDocument(Raw)
+	AssertTrue(TOML_SameValue(Document["settings"]["owned"], TOML_Bool(false)),
+		"the actual semantic reader retains Boolean intent before any source edit")
+	AssertEqual("first`nsecond,#=}`nthird", Document["settings"]["future"],
+		"the canonical lexer protects every literal multiline structural character")
+	Simple := '{a=false, b={future="001"}, c=[1,2]}'
+	AssertTrue(TOML_SameValue(TOML_ParseInlineTable(Simple, _TOML_DocumentValue),
+		TOML_ParseInlineTable(Simple, _TOML_DocumentValue, _TOML_DocumentSplit)),
+		"ordinary generic caller behavior and semantic delegation agree")
+	for Invalid in ['settings={a=1,}`n', 'settings={,a=1}`n', 'settings={a=1,,b=2}`n']
+		AssertThrows(TOML_ParseDocument.Bind(Invalid),
+			"canonical delegation cannot admit empty or trailing inline members")
+}
+Test("toml config inline source spans: semantic reader reuses the actual canonical multiline lexer",
+	_TBUI_ConfigInlineCanonicalReader)
