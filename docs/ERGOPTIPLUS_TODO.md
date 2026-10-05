@@ -5431,6 +5431,17 @@ refusal caption remains deferred until the AI owner publishes its active runtime
 projection; its unchanged fixture passes10 cases on each ABI. Native Windows
 console identity, native delivery, packaging and installation remain unfinished.
 
+A separate native macOS constructor-only probe is now registered in CI with
+independent failure evidence. It retains genuine Hammerspoon notification
+userdata, reads caption/body/options through native getters, checks the exact
+callback registry and unregisters owned tags without invoking callbacks. It
+never sends, schedules or withdraws a notification; the private runtime's exact
+native retirement owns the final object boundary. Thirteen portable Python
+controls and both Lua ABI safety profiles pass, including independent rejected
+delivery-guard omissions. All nine genuine native cases still require hosted
+execution on the final committed SHA. Constructor qualification does not prove
+user delivery/clicks or complete the remaining native panel-title boundaries.
+
 Windows continuation for item109 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate

@@ -324,6 +324,31 @@ jobs:
             ${{ runner.temp }}/native-hs-program-providers/*/diagnostic-facts.json
           if-no-files-found: error
 
+      # Observe genuine constructor userdata without delivering notifications.
+      - name: Observe native notification constructors
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/native_notification_constructors -p test_receipt.py -v
+          python3 tools/diagnostics/native_notification_constructors/run_native.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/native-notification-constructors" \
+            --download
+        timeout-minutes: 5
+
+      - name: Retain native notification constructor observations
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-notification-constructors-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-notification-constructors/receipt.json
+            ${{ runner.temp }}/native-notification-constructors/physical-group.json
+            ${{ runner.temp }}/native-notification-constructors/summary.json
+            ${{ runner.temp }}/native-notification-constructors/failure.json
+            ${{ runner.temp }}/native-notification-constructors/pending-retirement.json
+          if-no-files-found: error
+
       # Observe the native structured API without invoking or importing automations.
       - name: Observe native Apple Shortcuts discovery
         if: ${{ always() }}
