@@ -2587,6 +2587,8 @@ Root dotted scalar settings now retain their exact requested finite value throug
 
 The first owned Linux storage publication now prepares the configuration directory through the existing quoted shell owner. Fresh user homes reproduce and fix the two actual configuration restore failures. Directory acknowledgement, source bytes and producer/file callbacks are revalidated before spending the write receipt or staging a backup; reread-time callback withdrawals refuse without publication and remain retryable. Native real-file regressions pass on LuaJIT and Lua 5.4. Packaging, installation and installed-device acceptance remain separate checks.
 
+The Windows fresh-bootstrap control now reads the real autocorrection names record at its parent section and asserts its complete three-child shape, refusing the unrelated flattened-section lookup. Float timing, obsolete scalar, future data and read-only assertions are retained. This repairs the fixture consumer; native snapshot publication and fresh process qualification still require Windows CI.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -2658,6 +2660,8 @@ U+10FFFF refuse before writes on macOS, while valid BMP/non-BMP symbols and the
 existing Linux rare-symbol policy retain their previous behavior. Independent
 actual-catalogue controls pass on both Lua runtimes; this source qualification
 does not establish native WebView transport or installed-device acceptance.
+
+The wizard WAL control now observes the current terminal-bundle token that owns the actual candidate path during hand-off, with exact token identity and unrelated-path refusal checks. It retains the ordinary Busy=false contract for an active terminal bundle and all original wizard assertions. Native Windows execution and real first-run device acceptance remain pending.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad

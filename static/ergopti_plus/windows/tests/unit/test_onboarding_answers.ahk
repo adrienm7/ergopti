@@ -562,7 +562,15 @@ _TOAN_FullSemanticCommit() {
 		Seen["content"] := FSReadUtf8Exact(ConfigurationFile)
 		Seen["path"] := ConfigurationFile
 		Seen["terminal"] := _ConfigWriteTerminalIsActive()
-		Seen["lease"] := ConfigWriteLeaseBusy()
+		Bundle := _ConfigWriteLeaseState().terminal
+		Token := _ConfigWriteLeaseSelectOwner(Bundle, ConfigurationFile)
+		Seen["bundle"] := Bundle
+		Seen["token"] := Token
+		Seen["current"] := _ConfigWriteLeaseCurrent(ConfigurationFile)
+		Seen["lease"] := _ConfigWriteLeaseOwns(Token, ConfigurationFile)
+		Seen["ordinary_busy"] := ConfigWriteLeaseBusy()
+		Seen["unrelated"] := _ConfigWriteLeaseSelectOwner(Bundle, ConfigurationFile . ".unrelated")
+		Seen["wrong_path"] := _ConfigWriteLeaseOwns(Token, ConfigurationFile . ".unrelated")
 		Seen["wal"] := FSStrictExists(ConfigTransitionWalPath(_PathsFile))
 		Seen["journal"] := ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort())
 	}
@@ -587,6 +595,13 @@ _TOAN_FullSemanticCommit() {
 		AssertEqual(Path, Seen["path"])
 		AssertTrue(Seen["terminal"], "the actual transaction retains terminal authority through hand-off")
 		AssertTrue(Seen["lease"], "the actual transaction retains source ownership through hand-off")
+		AssertTrue(Seen["bundle"] is Object, "the hand-off retains the actual terminal bundle")
+		AssertEqual("terminal_bundle", Seen["bundle"].kind)
+		AssertTrue(Seen["token"] is Object, "the candidate path has an actual native lease token")
+		AssertTrue(Seen["token"] == Seen["current"], "the selected token is the exact live candidate-path owner")
+		AssertFalse(Seen["ordinary_busy"], "terminal ownership is not the deferrable ordinary-writer busy state")
+		AssertFalse(Seen["unrelated"], "the bundle cannot borrow an undeclared sibling path")
+		AssertFalse(Seen["wrong_path"], "the actual candidate token refuses an unrelated path")
 		AssertEqual(1, Seen["wal"], "the accepted hand-off retains its journal for refused-reload rollback")
 		AssertTrue(ConfigTransitionResultIs(Seen["journal"], "ready"))
 		AssertEqual("committed_new", Seen["journal"]["record"]["phase"])
