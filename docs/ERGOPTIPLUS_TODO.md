@@ -1841,6 +1841,22 @@ history, process-incarnation or stream correlation,
 native AX acceptance or capture admission. Full root/native qualification,
 pause/sleep/start/stop bindings and retained-history composition remain required.
 
+The dormant SDK prerequisites add seven authored serial XCTest cases for real
+C++17/C++23 compilation, native CoreFoundation type decoding, malformed probe
+arguments and missing-object refusal. They retain the exact native process
+guardian, strict closed terminal receipts and all six initial test methods;
+only five helper access declarations change to share the final binding test.
+The binding checks the original borrowed IOHID object and its registry identity
+before inventory/property reads, and revalidates type and inventory on start.
+Independent source review is clear. Portable policy and observation controls
+pass92 and93 assertions respectively, including refused and mutation controls.
+The native binding adds nine missing-object assertions and three compile-time
+traits; those are authored controls, not executed Darwin evidence here.
+Actual Swift discovery, SDK compilation and non-null device correlation remain
+unexecuted on this Linux host. The full Core-Service build, native acquisition,
+namespace/authentication, coverage, installation and default activation remain
+separate requirements. Source/CLI baseline1 stays unchanged; TODO31 stays open.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former

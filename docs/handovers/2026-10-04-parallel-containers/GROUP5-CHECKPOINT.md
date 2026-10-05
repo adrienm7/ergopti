@@ -121,6 +121,28 @@ stream correlation, real AX, lifecycle subscriptions and capture admission remai
 unqualified; full root gates must
 qualify the final source before publication.
 
+The context composition passes final formatting,357 JS checks,14,270 portable
+macOS units in1,494 modules,101 stubbed E2E cases with one explicit skip,
+6,696 Linux units in363 modules and188 Linux E2E cases. Swift is explicitly
+deferred off macOS. This source qualification does not establish native AX,
+retained-history integration or capture admission.
+
+The dormant SDK prerequisites add seven authored serial XCTest cases for real
+C++17/C++23 compilation, native CoreFoundation type decoding, malformed probe
+arguments and missing-object refusal. They retain the exact native process
+guardian, strict closed terminal receipts and all six initial test methods;
+only five helper access declarations change to share the final binding test.
+The binding checks the original borrowed IOHID object and its registry identity
+before inventory/property reads, and revalidates type and inventory on start.
+Independent source review is clear. Portable policy and observation controls
+pass92 and93 assertions respectively, including refused and mutation controls.
+The native binding adds nine missing-object assertions and three compile-time
+traits; those are authored controls, not executed Darwin evidence here.
+Actual Swift discovery, SDK compilation and non-null device correlation remain
+unexecuted on this Linux host. The full Core-Service build, native acquisition,
+namespace/authentication, coverage, installation and default activation remain
+separate requirements. Source/CLI baseline1 stays unchanged; TODO31 stays open.
+
 ## Pushed changes
 
 | Commit                                     | Scope                                                                                 |
