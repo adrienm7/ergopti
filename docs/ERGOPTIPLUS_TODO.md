@@ -4153,6 +4153,19 @@ owns the real Magic dependency left cached by an earlier missing-default test;
 the independent two-failure causal prefix remains preserved. Source-port controls
 and virtual X11 checks do not establish physical tap-hold/display behavior.
 
+Manual run37262044694 at3efd4eb8c87758f540b064b78f2563ded42a724e passes
+all five native fixture-supervision cases and the additional external-owner
+recovery case, but fails the later paused-snapshot routing case: the Lua worker
+reports refusal and zero handles while the outer family still refuses retirement.
+The reviewed correction keeps all three GNU timeout children in the worker's
+owned process group with `--foreground`. The actual picker now requires a
+literal native capability acknowledgement; unsupported timeout implementations
+remain greyed with the existing translated reason. Six appended adapter cases
+and six actual-manager admission controls retain all original assertions.
+Controlled old/new receipts pass; actual hosted supervision, recovery and all34
+window cases remain required. No physical input or dual-display qualification
+is inferred from these controls, and item111 remains partial.
+
 Windows continuation for item111 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate

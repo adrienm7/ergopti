@@ -361,3 +361,40 @@ helpers.describe("Cursor-window source and asynchronous ownership", function()
 	end
 
 end)
+
+helpers.describe("GNU timeout capability admission", function()
+	local Runner = require("adapters.program_runner")
+	local Shell = require("adapters.shell_runner")
+	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
+		helpers.it("requires exact GNU timeout capability receipt: " .. receipt, function()
+			local previous = Display.kind()
+			local supported, has_command, exec_checked = Runner.supported, Shell.has_command, Shell.exec_checked
+			local probes = 0
+			Display._set_for_test(Display.X11, "capability fixture")
+			Runner.supported = function() return true end
+			Shell.has_command = function() return true end
+			Shell.exec_checked = function(command)
+				probes = probes + 1
+				helpers.assert_eq(command, "timeout --foreground 1 sh -c ':' 2>/dev/null")
+				if receipt == "throw" then error("controlled capability refusal") end
+				if receipt == "supported" then return true, "" end
+				if receipt == "refused" then return false, "" end
+				if receipt == "numeric" then return 0, "" end
+				if receipt == "text" then return "true", "" end
+				return nil
+			end
+			local checked, failure = pcall(function()
+				local available, reason, tool = Switch.available()
+				helpers.assert_eq(available, receipt == "supported")
+				helpers.assert_eq(probes, 1)
+				if receipt ~= "supported" then
+					helpers.assert_eq(reason, "dialog.action_picker.requires_tool")
+					helpers.assert_eq(tool, "GNU timeout")
+				end
+			end)
+			Runner.supported, Shell.has_command, Shell.exec_checked = supported, has_command, exec_checked
+			Display._set_for_test(previous, "restored")
+			if not checked then error(failure, 0) end
+		end)
+	end
+end)

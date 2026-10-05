@@ -872,6 +872,14 @@ function M.get_picker_items()
 		if action_name == "run_program" and not ProgramOwner.available() then
 			return false, i18n.get("platform_reason.program_runner_unavailable")
 		end
+		if action_name == "alt_tab_monitor" then
+			local available, reason, tool = WindowSwitch.available()
+			if available ~= true then
+				local hint = i18n.get(reason)
+				if tool then hint = hint:gsub("{1}", function() return tool end) end
+				return false, hint
+			end
+		end
 		local meta = Catalogue.actions[action_name]
 		for _, token in ipairs(meta and meta.requires or {}) do
 			if probed[token] == nil then
