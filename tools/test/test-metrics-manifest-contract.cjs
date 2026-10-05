@@ -213,6 +213,19 @@ const typingContext = {
 	INFO_SVG: '',
 	render_charts: () => {}
 };
+// Execute the real selection dependencies alongside the extracted consumer.
+// Loading shared state keeps the selection constants owned by production code.
+typingContext.APP_SELECTION_MODE = vm.runInNewContext(
+	read('static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js') +
+		'\n' +
+		read('static/ergopti_plus/_shared/ui/metrics_typing/state.js') +
+		'\nAPP_SELECTION_MODE;',
+	{ window: {} }
+);
+typingState.app_selection_mode = typingContext.APP_SELECTION_MODE.SUBSET;
+for (const name of ['has_typing_app_selection', 'matches_typing_app_selection']) {
+	typingContext[name] = compileFunction(typingSource, name, typingContext);
+}
 const computeManifestMetrics = compileFunction(
 	typingSource,
 	'compute_manifest_metrics',

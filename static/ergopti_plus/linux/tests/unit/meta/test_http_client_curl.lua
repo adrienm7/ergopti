@@ -15,7 +15,8 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, handles = {}, requests = {}, closes = {}, descriptors = {}, descriptor_closes = {}, identities = {} }
+	local state = { groups = {}, probes = {}, timer_starts = {}, kills = {}, handles = {}, requests = {}, closes = {}, refused_closes = {},
+		descriptors = {}, descriptor_closes = {}, identities = {} }
 	local fake = {}
 	local function refused(receipt)
 		if receipt == "throw" then error("SIMULATED close refusal") end
@@ -70,7 +71,9 @@ local function fake_luv(config)
 		return state.timer
 	end
 	function fake.timer_start(timer, timeout_ms, repeat_ms, callback)
-		if options.timer_failure then return nil, "timer refused" end
+		state.timer_starts[#state.timer_starts + 1] = { timer = timer, timeout = timeout_ms, repeat_ms = repeat_ms, callback = callback }
+		if options.timer_failure or (repeat_ms > 0 and state.monitor_refused) then return nil, "timer refused" end
+		timer.stopped = false
 		timer.timeout_ms = timeout_ms
 		timer.repeat_ms = repeat_ms
 		timer.callback = callback
@@ -89,10 +92,18 @@ local function fake_luv(config)
 	function fake.read_stop(pipe) pipe.read_stopped = true; return true end
 	function fake.is_closing(value) return value.closing end
 	function fake.close(value, callback)
+		if options.refused_close_callback and not state.allow_closes then
+			state.refused_closes[#state.refused_closes + 1] = callback
+			if options.refused_close_sync then callback() end
+			if options.refused_close_callback == "throw" then error("close refused") end
+			if options.refused_close_callback == "false" then return false end
+			return nil, "close refused"
+		end
 		if value == state.first_body_handle and options.body_handle_close_receipt and not state.allow_closes then
 			return refused(options.body_handle_close_receipt)
 		end
 		if options.close_failure and not state.allow_closes then return nil, "close refused" end
+		if value.kind == "timer" and state.monitor_close_refused then return nil, "monitor close refused" end
 		value.closing = true
 		if value.descriptor then
 			state.descriptor_closes[#state.descriptor_closes + 1] = value.descriptor
@@ -114,6 +125,16 @@ local function fake_luv(config)
 	end
 	function fake.kill(pid, signal)
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
+		if signal == 0 then
+			state.probes[#state.probes + 1] = { pid = pid, signal = signal }
+			if state.probe_mode == "throw" then error("probe refused") end
+			if state.probe_mode == "false" then return false end
+			if state.probe_mode == "nil" then return nil end
+			if state.probe_mode == "text-only" then return nil, "ESRCH: no such process" end
+			if state.probe_mode == "unknown-code" then return nil, "probe refused", "EPERM" end
+			if state.groups[-pid] == false then return nil, "ESRCH: no such process", "ESRCH" end
+			return true
+		end
 		if options.kill_missing then return nil, "ESRCH: no such process", "ESRCH" end
 		if options.kill_failure and not state.allow_kills then return nil, "EPERM: operation not permitted", "EPERM" end
 		return true
@@ -121,6 +142,7 @@ local function fake_luv(config)
 	function fake.spawn(command, options, callback)
 		if config and config.spawn_failure then return nil, "EACCES", "permission denied" end
 		local pid = 4320 + #state.requests + 1
+		state.groups[pid] = true
 		state.command = command
 		state.options = options
 		state.exit_callback = callback
@@ -136,7 +158,10 @@ local function fake_luv(config)
 
 	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
 	function state.stderr(chunk) state.options.stdio[3].read_callback(nil, chunk) end
-	function state.exit(code, signal) state.exit_callback(code or 0, signal or 0) end
+	function state.exit(code, signal)
+		if not options.descendants_alive then state.groups[state.requests[#state.requests].pid] = false end
+		state.exit_callback(code or 0, signal or 0)
+	end
 	function state.complete(code)
 		state.stdout(nil)
 		state.stderr(nil)
@@ -147,6 +172,7 @@ local function fake_luv(config)
 		if stdout_text ~= nil then request.options.stdio[2].read_callback(nil, stdout_text) end
 		request.options.stdio[2].read_callback(nil, nil)
 		request.options.stdio[3].read_callback(nil, nil)
+		if not options.descendants_alive then state.groups[request.pid] = false end
 		request.exit_callback(code or 0, 0)
 	end
 	return fake, state
@@ -1578,6 +1604,53 @@ helpers.describe("http_client: cancellation receipt boundary", function()
 end)
 
 helpers.describe("http_client: retained GET settlement", function()
+	for _, refusal in ipairs({ "false", "error", "throw" }) do
+		for _, synchronous in ipairs({ false, true }) do
+			helpers.it("owned-close-admission: refused " .. refusal .. " callback (sync=" .. tostring(synchronous) .. ")", function()
+				local client, state = fresh_client({
+					refused_close_callback = refusal, refused_close_sync = synchronous, defer_close = true,
+				})
+				local terminals, settlements = 0, 0
+				local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+					{ owner = "local-api" }, function() terminals = terminals + 1 end)
+				operation:on_settled(function() settlements = settlements + 1 end)
+				state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+				for _, callback in ipairs(state.refused_closes) do callback() end
+				helpers.assert_eq(operation:is_settled(), false, "a refused close callback cannot release its handle")
+				helpers.assert_eq(terminals, 0)
+				helpers.assert_eq(settlements, 0)
+				local successor = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+					{ owner = "local-api" }, function() end)
+				helpers.assert_eq(successor.started, false, "the exact owner retains unacknowledged resources")
+				state.allow_closes = true
+				helpers.assert_eq(operation:cancel(), false)
+				for _, callback in ipairs(state.refused_closes) do callback() end
+				helpers.assert_eq(operation:is_settled(), false, "an old attempt cannot acknowledge its accepted successor")
+				state.ack_closes()
+				helpers.assert_true(operation:is_settled())
+				helpers.assert_eq(settlements, 1)
+				helpers.assert_eq(terminals, 0, "cancellation suppresses the retained success")
+				state.ack_closes()
+				helpers.assert_eq(settlements, 1)
+			end)
+		end
+	end
+
+	helpers.it("owned-close-admission: accepted synchronous callbacks settle exactly once", function()
+		local client, state = fresh_client()
+		local terminals, settlements = 0, 0
+		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
+			{ owner = "local-api" }, function() terminals = terminals + 1 end)
+		operation:on_settled(function() settlements = settlements + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_eq(settlements, 1)
+		state.ack_closes()
+		helpers.assert_eq(terminals, 1)
+		helpers.assert_eq(settlements, 1)
+	end)
+
 	helpers.it("owned GET waits for actual exit and every native close acknowledgment", function()
 		local client, state = fresh_client({ defer_close = true })
 		local terminals, settled, result = 0, 0, nil
@@ -1990,4 +2063,610 @@ helpers.describe("http_client: unknown raw body identity", function()
 		helpers.assert_true(client.cancel("unknown-body"), "EBADF still proves retirement without inventing descriptor ownership")
 		helpers.assert_eq(callbacks, 0)
 	end)
+end)
+
+--- Independent owned-group regressions: expected group absence is authored here,
+--- never regenerated from the implementation. These are native-port doubles.
+
+local function retired_leader_with_live_descendant(config)
+	config = config or {}
+	config.descendants_alive = true
+	config.defer_close = true
+	local client, state = fresh_client(config)
+	local calls = 0
+	local operation = client.get_owned("http://127.0.0.1:9000/models", {},
+		{ owner = "group-receipt", timeout_ms = 1500 }, function() calls = calls + 1 end)
+	return client, state, operation, function() return calls end
+end
+
+local function complete_owned_leader(state)
+	state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+	state.ack_closes()
+end
+
+local function nonzero_signals(state)
+	local count = 0
+	for _, receipt in ipairs(state.kills) do if receipt.signal ~= 0 then count = count + 1 end end
+	return count
+end
+
+local function assert_successor_blocked(client, state)
+	local successor = client.get_owned("http://127.0.0.1:9000/models", {},
+		{ owner = "group-receipt" }, function() end)
+	helpers.assert_eq(successor.started, false)
+	helpers.assert_true(successor:is_settled(), "refusal acquires no physical work")
+	helpers.assert_eq(client.get("http://127.0.0.1:9000/models", {},
+		{ owner = "group-receipt" }, function() end), false)
+	helpers.assert_eq(#state.requests, 1, "both APIs must preserve the pending group owner")
+end
+
+helpers.describe("http_client: independent owned detached-group absence", function()
+	helpers.it("owned-group: leader exit, both EOFs and stream/process ACKs leave a live descendant pending", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		helpers.assert_eq(operation:is_settled(), false, "leader exit is not detached-group absence")
+		helpers.assert_eq(calls(), 0)
+		for _, handle in ipairs(state.handles) do
+			if handle.kind ~= "timer" then helpers.assert_true(handle.closing, "every other native close is admitted") end
+		end
+		assert_successor_blocked(client, state)
+		helpers.assert_eq(state.timer.closing, false)
+		helpers.assert_eq(state.timer.timeout_ms, 50)
+		helpers.assert_eq(state.timer.repeat_ms, 50)
+		helpers.assert_eq(#state.handles, 5, "cleanup reuses the acquired request timer")
+		helpers.assert_true(nonzero_signals(state) >= 2)
+	end)
+
+	helpers.it("owned-group: accepted TERM and KILL retain debt until native ESRCH and monitor close ACK", function()
+		local _, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false, "signal acceptance cannot settle live descendants")
+		helpers.assert_eq(calls(), 0)
+		state.groups[4321] = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false, "the cleanup monitor still owns its close callback")
+		helpers.assert_true(state.timer.closing)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 1)
+	end)
+
+	for _, mode in ipairs({ "throw", "false", "nil", "text-only", "unknown-code" }) do
+		helpers.it("owned-group: " .. mode .. " probe refusal is not a native absence receipt", function()
+			local client, state, operation, calls = retired_leader_with_live_descendant()
+			state.probe_mode = mode
+			complete_owned_leader(state)
+			helpers.assert_eq(operation:is_settled(), false)
+			helpers.assert_eq(calls(), 0)
+			helpers.assert_eq(nonzero_signals(state), 0, "an unadmitted group probe cannot authorize cleanup signals")
+			assert_successor_blocked(client, state)
+			state.probe_mode = nil
+			state.groups[4321] = false
+			state.timer.callback()
+			state.ack_closes()
+			helpers.assert_true(operation:is_settled())
+		end)
+	end
+
+	helpers.it("owned-group: termination refusal and later signal acceptance both preserve descendant debt", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant({ kill_failure = true })
+		complete_owned_leader(state)
+		helpers.assert_eq(operation:is_settled(), false)
+		state.timer.callback()
+		assert_successor_blocked(client, state)
+		state.allow_kills = true
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(calls(), 0)
+		state.groups[4321] = false
+		state.timer.callback()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+	end)
+
+	helpers.it("owned-group: a refused cleanup monitor stays owned and manual retry arms the same handle", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		state.monitor_refused = true
+		complete_owned_leader(state)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(calls(), 0)
+		assert_successor_blocked(client, state)
+		state.monitor_refused = false
+		helpers.assert_eq(operation:cancel(), false)
+		helpers.assert_eq(#state.handles, 5)
+		helpers.assert_eq(state.timer.repeat_ms, 50)
+		state.groups[4321] = false
+		state.timer.callback()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 0, "cancel intent suppresses the pending response")
+	end)
+
+	helpers.it("owned-group: refused monitor close rearms its referenced handle and waits for its own ACK", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		state.monitor_close_refused = true
+		state.groups[4321] = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(calls(), 0)
+		helpers.assert_eq(state.timer.stopped, false, "refused close must retain progress on the same timer")
+		assert_successor_blocked(client, state)
+		state.monitor_close_refused = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 1)
+	end)
+
+	helpers.it("owned-group: native group absence still waits for the exact leader exit receipt", function()
+		local _, state, operation, calls = retired_leader_with_live_descendant()
+		helpers.assert_eq(operation:cancel(), false)
+		state.ack_closes()
+		state.groups[4321] = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		local signals = #state.kills
+		state.timer.callback()
+		helpers.assert_eq(#state.kills, signals, "acknowledged absence forbids later signals on a reused PGID")
+		state.exit()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 0)
+	end)
+
+	helpers.it("owned-group: stale old monitor and close callbacks cannot signal or settle a new owner", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		local old_monitor = state.timer.callback
+		state.groups[4321] = false
+		old_monitor()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		local old_closes = {}
+		for _, receipt in ipairs(state.closes) do old_closes[#old_closes + 1] = receipt.callback end
+		local successor = client.get_owned("http://127.0.0.1:9000/models", {},
+			{ owner = "group-receipt" }, function() end)
+		helpers.assert_true(successor.started)
+		local signals = #state.kills
+		old_monitor()
+		for _, callback in ipairs(old_closes) do callback() end
+		helpers.assert_eq(#state.kills, signals)
+		helpers.assert_eq(successor:is_settled(), false)
+		helpers.assert_true(client.isActive("group-receipt"))
+		helpers.assert_eq(calls(), 1)
+		state.groups[4322] = false
+		state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		state.ack_closes()
+		helpers.assert_true(successor:is_settled())
+	end)
+
+	helpers.it("owned-group: already absent completed groups need no retirement signals", function()
+		local client, state = fresh_client({ defer_close = true })
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {}, {}, function() end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(nonzero_signals(state), 0)
+		helpers.assert_true(#state.probes > 0)
+	end)
+
+	helpers.it("owned-group: exceptional legacy body cleanup retains its existing boolean ABI and no group monitor", function()
+		local config = { descendants_alive = true, defer_close = true }
+		local client, state = fresh_client(config)
+		local result
+		helpers.assert_true(client.post("http://127.0.0.1:9000/models", {}, "{}", function(value) result = value end))
+		config.close_failure = true -- Refuse terminal cleanup only after successful admission.
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_eq(result, nil)
+		state.allow_closes = true
+		helpers.assert_eq(client.cancel(), false)
+		state.ack_closes()
+		helpers.assert_true(client.cancel())
+		helpers.assert_eq(#state.probes, 0, "_body_cleanup is the retained historical internal operation")
+		for _, receipt in ipairs(state.timer_starts) do helpers.assert_eq(receipt.repeat_ms, 0) end
+	end)
+end)
+
+--- Independent source-capability cases. Expected admission/delivery decisions
+--- are authored here, never generated from the adapter. All native ports below
+--- are controlled doubles; these cases are not native installation evidence.
+
+local function authorizer_client(config, hook)
+	local fake, state = fake_luv(config)
+	if hook then hook(fake, state) end
+	local previous_luv, previous_client = package.loaded["luv"], package.loaded["adapters.http_client"]
+	package.loaded["luv"], package.loaded["adapters.http_client"] = fake, nil
+	local client = require("adapters.http_client")
+	package.loaded["luv"], package.loaded["adapters.http_client"] = previous_luv, previous_client
+	return client, state
+end
+
+helpers.describe("http_client: captured owned source capability", function()
+	for _, invalid in ipairs({ false, true, "callable", {} }) do
+		helpers.it("owned-authorizer: wrong capability type " .. type(invalid) .. " refuses without allocation or response", function()
+			local client, state = fresh_client()
+			local responses = 0
+			local operation = client.get_owned("http://127.0.0.1:9000/models", {},
+				{ authorized = invalid }, function() responses = responses + 1 end)
+			helpers.assert_eq(operation.started, false)
+			helpers.assert_true(operation:is_settled(), "a wrong typed capability acquires no physical work")
+			helpers.assert_eq(#state.handles, 0)
+			helpers.assert_eq(#state.requests, 0)
+			helpers.assert_eq(responses, 0)
+		end)
+	end
+
+	for _, mode in ipairs({ "false", "nil", "number", "string", "throw" }) do
+		helpers.it("owned-authorizer: initial " .. mode .. " is a settled noncallback refusal", function()
+			local client, state = fresh_client()
+			local responses, calls = 0, 0
+			local operation = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+				calls = calls + 1
+				if mode == "throw" then error("synthetic authorizer exception") end
+				if mode == "false" then return false elseif mode == "number" then return 1 elseif mode == "string" then return "true" end
+			end }, function() responses = responses + 1 end)
+			helpers.assert_eq(operation.started, false)
+			helpers.assert_true(operation:is_settled())
+			helpers.assert_eq(#state.requests, 0)
+			helpers.assert_eq(#state.handles, 0)
+			helpers.assert_eq(responses, 0)
+			helpers.assert_eq(calls, 1)
+			local successor = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source" }, function() end)
+			helpers.assert_true(successor.started, "no nonexistent cleanup debt can retain the source owner")
+			state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		end)
+	end
+
+	helpers.it("owned-authorizer: reserves before initial capability reentry and never calls a blocked successor capability", function()
+		local client, state = fresh_client()
+		local nested, nested_calls, nested_responses, entered = nil, 0, 0, false
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+			if not entered then
+				entered = true
+				nested = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+					nested_calls = nested_calls + 1; return true
+				end }, function() nested_responses = nested_responses + 1 end)
+			end
+			return true
+		end }, function() end)
+		helpers.assert_true(operation.started)
+		helpers.assert_eq(nested.started, false)
+		helpers.assert_true(nested:is_settled())
+		helpers.assert_eq(nested_calls, 0)
+		helpers.assert_eq(nested_responses, 0, "a blocked authorized successor cannot publish a rejection receipt")
+		helpers.assert_eq(#state.requests, 1)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+	end)
+
+	helpers.it("owned-authorizer: captures the originating function once despite caller option replacement", function()
+		local client, state = fresh_client()
+		local calls, replacement_calls, responses = 0, 0, 0
+		local options = { owner = "source" }
+		options.authorized = function()
+			calls = calls + 1
+			options.authorized = function() replacement_calls = replacement_calls + 1; return false end
+			return true
+		end
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {}, options, function() responses = responses + 1 end)
+		helpers.assert_true(operation.started)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls, 3, "initial, last dispatch and physically settled delivery use the original capability")
+		helpers.assert_eq(replacement_calls, 0)
+		helpers.assert_eq(responses, 1)
+	end)
+
+	helpers.it("owned-authorizer: credential construction withdrawal refuses before spawn and waits for allocated ACKs", function()
+		local client, state = fresh_client({ defer_close = true })
+		local current, responses, constructions = true, 0, 0
+		local header = setmetatable({}, { __tostring = function()
+			constructions = constructions + 1; current = false; return "SyntheticCredential"
+		end })
+		local operation = client.get_owned("http://127.0.0.1:9000/models", { Authorization = header },
+			{ owner = "source", authorized = function() return current end }, function() responses = responses + 1 end)
+		helpers.assert_eq(#state.requests, 0, "the last credential callback can withdraw physical dispatch")
+		helpers.assert_eq(constructions, 1)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		local successor = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source" }, function() end)
+		helpers.assert_eq(successor.started, false)
+		helpers.assert_eq(#state.handles, 4)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(responses, 0)
+	end)
+
+	helpers.it("owned-authorizer: native setup withdrawal is checked after timer admission before spawn", function()
+		local current = true
+		local client, state = authorizer_client({ defer_close = true }, function(fake)
+			local start = fake.timer_start
+			fake.timer_start = function(...)
+				local accepted = start(...); current = false; return accepted
+			end
+		end)
+		local responses = 0
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {},
+			{ owner = "source", authorized = function() return current end }, function() responses = responses + 1 end)
+		helpers.assert_eq(#state.requests, 0)
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_eq(operation:is_settled(), false)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(responses, 0)
+	end)
+
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("owned-authorizer: last dispatch " .. mode .. " suppresses callback without discarding refused-close debt", function()
+			local client, state = fresh_client({ defer_close = true, close_failure = true })
+			local calls, responses = 0, 0
+			local operation = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+				calls = calls + 1
+				if calls == 1 then return true end
+				if mode == "throw" then error("last admission revoked") end
+				return false
+			end }, function() responses = responses + 1 end)
+			helpers.assert_eq(#state.requests, 0)
+			helpers.assert_eq(operation.started, false)
+			helpers.assert_eq(operation:is_settled(), false)
+			state.allow_closes = true
+			operation:cancel()
+			state.ack_closes()
+			helpers.assert_true(operation:is_settled())
+			helpers.assert_eq(responses, 0)
+		end)
+	end
+
+	helpers.it("owned-authorizer: late source withdrawal suppresses response after exact native close acknowledgments", function()
+		local client, state = fresh_client({ defer_close = true })
+		local current, responses, settled = true, 0, 0
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {},
+			{ owner = "source", authorized = function() return current end }, function() responses = responses + 1 end)
+		operation:on_settled(function() settled = settled + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_eq(operation:is_settled(), false)
+		current = false
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(responses, 0)
+		helpers.assert_eq(settled, 1)
+		current = true
+		state.ack_closes(); state.exit(0)
+		helpers.assert_eq(responses, 0, "a restored predicate cannot resurrect an already withdrawn delivery")
+	end)
+
+	helpers.it("owned-authorizer: descendant and refused close debts remain independent of revoked source", function()
+		local client, state = fresh_client({ defer_close = true, descendants_alive = true })
+		local current, responses = true, 0
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {},
+			{ owner = "source", authorized = function() return current end }, function() responses = responses + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n'); state.ack_closes()
+		current = false
+		helpers.assert_eq(operation:is_settled(), false)
+		local successor = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source" }, function() end)
+		helpers.assert_eq(successor.started, false)
+		state.groups[4321] = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false, "native absence does not acknowledge the referenced monitor close")
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(responses, 0)
+	end)
+
+	helpers.it("owned-authorizer: delivery reentry cannot start a successor before the predicate returns", function()
+		local client, state = fresh_client({ defer_close = true })
+		local calls, nested, responses = 0, nil, 0
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+			calls = calls + 1
+			if calls == 3 then nested = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source" }, function() end) end
+			return true
+		end }, function() responses = responses + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n'); state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(nested.started, false)
+		helpers.assert_true(nested:is_settled())
+		helpers.assert_eq(#state.requests, 1)
+		helpers.assert_eq(responses, 1)
+	end)
+
+	helpers.it("owned-authorizer: cancelling inside final capability cannot recurse or publish after cancel intent", function()
+		local client, state = fresh_client({ defer_close = true })
+		local calls, responses, operation, nested_cancel = 0, 0, nil, nil
+		operation = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+			calls = calls + 1
+			if calls == 3 then nested_cancel = operation:cancel() end
+			return true
+		end }, function() responses = responses + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n'); state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls, 3)
+		helpers.assert_eq(nested_cancel, false, "foreign authorization remains in flight until it returns")
+		helpers.assert_eq(responses, 0)
+	end)
+
+	helpers.it("owned-authorizer: cancelled requests never invoke a final capability or deliver a late result", function()
+		local client, state = fresh_client({ defer_close = true })
+		local calls, responses = 0, 0
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+			calls = calls + 1; return true
+		end }, function() responses = responses + 1 end)
+		operation:cancel()
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n'); state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls, 2)
+		helpers.assert_eq(responses, 0)
+	end)
+
+	helpers.it("owned-authorizer: metadata exception after reservation releases only its own source owner", function()
+		local client, state = fresh_client()
+		local responses, response = 0, nil
+		local policy = require("infra.http_redirect_policy")
+		local original_policy = policy.allows_native_follow
+		policy.allows_native_follow = function() error("synthetic metadata policy exception") end
+		local called, operation = pcall(client.get_owned, "http://127.0.0.1:9000/models", {},
+			{ owner = "source", follow_redirects = true, authorized = function() return true end }, function(value)
+				responses = responses + 1; response = value
+			end)
+		policy.allows_native_follow = original_policy
+		helpers.assert_true(called, "metadata exceptions must retire the exact reserved operation rather than escape")
+		helpers.assert_eq(operation.started, false)
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(#state.requests, 0)
+		helpers.assert_eq(responses, 1)
+		helpers.assert_type(response, "table")
+		helpers.assert_eq(response.ok, false)
+	end)
+
+	helpers.it("owned-authorizer: throwing final capability settles physical debt without publishing", function()
+		local client, state = fresh_client({ defer_close = true })
+		local calls, responses = 0, 0
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+			calls = calls + 1
+			if calls == 3 then error("source capability withdrawn at final acknowledgment") end
+			return true
+		end }, function() responses = responses + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n'); state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls, 3)
+		helpers.assert_eq(responses, 0)
+	end)
+
+	helpers.it("owned-authorizer: late old callbacks cannot consult old source or affect an admitted successor", function()
+		local client, state = fresh_client({ defer_close = true })
+		local current, old_calls, old_responses, new_responses = true, 0, 0, 0
+		local old = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "source", authorized = function()
+			old_calls = old_calls + 1; return current
+		end }, function() old_responses = old_responses + 1 end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n'); current = false; state.ack_closes()
+		helpers.assert_true(old:is_settled())
+		helpers.assert_eq(old_responses, 0)
+		local calls, kills = old_calls, #state.kills
+		local successor = client.get_owned("http://127.0.0.1:9000/models", {},
+			{ owner = "source", authorized = function() return true end }, function() new_responses = new_responses + 1 end)
+		helpers.assert_true(successor.started)
+		state.complete_request(1, 'stale\nERGOPTI_HTTP_STATUS:200\n'); state.ack_closes()
+		helpers.assert_eq(old_calls, calls)
+		helpers.assert_eq(#state.kills, kills)
+		helpers.assert_eq(successor:is_settled(), false)
+		helpers.assert_eq(new_responses, 0)
+		state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n'); state.ack_closes()
+		helpers.assert_true(successor:is_settled())
+		helpers.assert_eq(new_responses, 1)
+	end)
+
+	helpers.it("owned-authorizer: legacy boolean GET ignores the optional owned-only capability", function()
+		local client, state = fresh_client()
+		local calls, responses = 0, 0
+		helpers.assert_true(client.get("http://127.0.0.1:9000/models", {}, { authorized = function()
+			calls = calls + 1; return false
+		end }, function() responses = responses + 1 end))
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_eq(calls, 0)
+		helpers.assert_eq(responses, 1)
+	end)
+end)
+
+--- Independent additive owned streaming POST admission/retirement controls.
+helpers.describe("http_client: owned streaming POST", function()
+	for _, invalid in ipairs({false,true,"callable",{}}) do
+		helpers.it("owned-post: malformed capability " .. type(invalid) .. " owns no resources",function()
+			local client,state=fresh_client();local chunks,results=0,0
+			local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{authorized=invalid},function()chunks=chunks+1 end,function()results=results+1 end)
+			helpers.assert_eq(op.started,false);helpers.assert_true(op:is_settled());helpers.assert_eq(#state.handles,0);helpers.assert_eq(#state.requests,0);helpers.assert_eq(chunks,0);helpers.assert_eq(results,0)
+		end)
+	end
+	for _,mode in ipairs({"false","nil","number","string","throw"}) do
+		helpers.it("owned-post: initial " .. mode .. " admission precedes body/header allocation",function()
+			local client,state=fresh_client();local constructions,results=0,0
+			local header=setmetatable({},{__tostring=function()constructions=constructions+1;return "credential" end})
+			local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{Authorization=header},"{}",{authorized=function()
+				if mode=="throw" then error("independent refusal") end
+				if mode=="false" then return false elseif mode=="number" then return 1 elseif mode=="string" then return "true" end
+			end},function()end,function()results=results+1 end)
+			helpers.assert_eq(op.started,false);helpers.assert_true(op:is_settled());helpers.assert_eq(#state.handles,0);helpers.assert_eq(#state.descriptors,0);helpers.assert_eq(constructions,0);helpers.assert_eq(results,0)
+		end)
+	end
+	helpers.it("owned-post: reservation prevents same-owner authorizer reentry and sends exact private body",function()
+		local client,state=fresh_client();local entered,nested,nested_calls=false,nil,0
+		local body='@literal\n{"escaped":"\\u0000"}'
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},body,{owner="post",buffered=true,authorized=function()
+			if not entered then entered=true;nested=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"nested",{owner="post",authorized=function()nested_calls=nested_calls+1;return true end},function()end,function()end) end;return true
+		end},function()end,function()end)
+		helpers.assert_true(op.started);helpers.assert_eq(nested.started,false);helpers.assert_true(nested:is_settled());helpers.assert_eq(nested_calls,0);helpers.assert_eq(#state.requests,1);helpers.assert_eq(state.body,body)
+		helpers.assert_true(state.config:find('data-binary = "@/dev/fd/3"',1,true)~=nil);helpers.assert_eq(state.config:find(body,1,true),nil)
+		helpers.assert_true(table.concat(state.options.args," "):find("%{stderr}",1,true)~=nil,"caller buffered option cannot alter owned streaming protocol")
+		state.stderr("\nERGOPTI_HTTP_STATUS:200\n");state.complete();helpers.assert_true(op:is_settled())
+	end)
+	helpers.it("owned-post: original source capability remains captured through option replacement and chunks",function()
+		local client,state=fresh_client();local calls,replacement_calls,chunk,result=0,0,nil,nil;local options={owner="post"}
+		options.authorized=function()calls=calls+1;options.authorized=function()replacement_calls=replacement_calls+1;return false end;return true end
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",options,function(value)chunk=value end,function(value)result=value end)
+		state.stdout("{\"status\":\"success\"}\n");state.stderr("\nERGOPTI_HTTP_STATUS:200\n");state.complete()
+		helpers.assert_true(op:is_settled());helpers.assert_eq(calls,4);helpers.assert_eq(replacement_calls,0);helpers.assert_eq(chunk,'{"status":"success"}\n');helpers.assert_true(result and result.ok);helpers.assert_eq(result.status,200)
+	end)
+	helpers.it("owned-post: final credential revocation retains every acquired body handle ACK",function()
+		local client,state=fresh_client({defer_close=true});local current,results=true,0
+		local header=setmetatable({},{__tostring=function()current=false;return "credential" end})
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{Authorization=header},"{}",{owner="post",authorized=function()return current end},function()end,function()results=results+1 end)
+		helpers.assert_eq(op.started,false);helpers.assert_eq(#state.requests,0);helpers.assert_eq(#state.handles,6);helpers.assert_eq(#state.descriptors,2);helpers.assert_eq(op:is_settled(),false)
+		local successor=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post"},function()end,function()end);helpers.assert_eq(successor.started,false)
+		state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(results,0)
+	end)
+	helpers.it("owned-post: revoked chunks never dispatch and leader exit cannot retire descendants or monitor",function()
+		local client,state=fresh_client({defer_close=true,descendants_alive=true});local current,chunks,results,settled=true,0,0,0
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post",authorized=function()return current end},function()chunks=chunks+1 end,function()results=results+1 end);op:on_settled(function()settled=settled+1 end)
+		current=false;state.stdout("stale");helpers.assert_eq(chunks,0);helpers.assert_eq(op:is_settled(),false)
+		state.exit();state.ack_closes();helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(settled,0)
+		local successor=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post"},function()end,function()end);helpers.assert_eq(successor.started,false)
+		state.groups[4321]=false;state.timer.callback();helpers.assert_eq(op:is_settled(),false);state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(settled,1);helpers.assert_eq(results,0)
+	end)
+	helpers.it("owned-post: raw body FD close refusal cannot masquerade as complete admission failure",function()
+		local client,state=fresh_client({defer_close=true,body_attach_failure=true,raw_close_receipt="false"});local result
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post"},function()end,function(value)result=value end)
+		helpers.assert_eq(op.started,false);helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(#state.descriptors,2);helpers.assert_eq(#state.requests,0);helpers.assert_eq(result,nil)
+		state.ack_closes();helpers.assert_eq(op:is_settled(),false);state.allow_closes=true;op:cancel();state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(result,nil)
+	end)
+	helpers.it("owned-post: response source fence happens after every physical close ACK",function()
+		local client,state=fresh_client({defer_close=true});local current,result,settled=true,nil,0
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{authorized=function()return current end},function()end,function(value)result=value end);op:on_settled(function()settled=settled+1 end)
+		state.stderr("\nERGOPTI_HTTP_STATUS:200\n");state.complete();helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(result,nil);current=false;state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(result,nil);helpers.assert_eq(settled,1)
+	end)
+end)
+
+helpers.describe("http_client: synchronous owned publication",function()
+ helpers.it("owned-post: eager revoked chunk cannot republish its terminal logical owner",function()
+  local calls,chunks,result=0,0,nil
+  local client,state=authorizer_client({defer_close=true},function(fake,state)
+   local native_close=fake.close
+   fake.close=function(handle,callback)
+    if not state.allow_closes and state.options and (handle==state.options.stdio[2] or handle==state.options.stdio[3] or handle==state.body_pipe) then return nil,"independent post-read terminal close refusal" end
+    return native_close(handle,callback)
+   end
+   local read_start=fake.read_start
+   fake.read_start=function(pipe,callback)
+    local admitted=read_start(pipe,callback)
+    if state.options and pipe==state.options.stdio[2] then callback(nil,"eager") end
+    return admitted
+   end
+  end)
+  local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="eager",authorized=function()calls=calls+1;return calls<3 end},function()chunks=chunks+1 end,function(value)result=value end)
+  helpers.assert_eq(op.started,false);helpers.assert_eq(client.isActive("eager"),false);helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(chunks,0);helpers.assert_eq(result,nil)
+  state.allow_closes=true;state.exit();state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(client.isActive("eager"),false)
+ end)
+ helpers.it("owned-post: synchronous last body-write failure cannot resurrect terminal activity",function()
+  local result
+  local client,state=authorizer_client({defer_close=true},function(fake,state)
+   local write=fake.write
+   fake.write=function(pipe,data,callback)
+    if pipe==state.body_pipe then callback("independent final body write refusal");return true end
+    return write(pipe,data,callback)
+   end
+  end)
+  local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="last-write"},function()end,function(value)result=value end)
+  helpers.assert_eq(op.started,false);helpers.assert_eq(client.isActive("last-write"),false);helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(result,nil)
+  local successor=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="last-write"},function()end,function()end);helpers.assert_eq(successor.started,false)
+  state.exit();state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(client.isActive("last-write"),false);helpers.assert_true(result and not result.ok);helpers.assert_eq(result.error,"curl body write failed")
+ end)
 end)

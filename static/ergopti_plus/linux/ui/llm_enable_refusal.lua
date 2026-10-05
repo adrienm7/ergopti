@@ -31,10 +31,11 @@ local LOG = "ui.llm_enable_refusal"
 --- @return boolean shown
 --- @return boolean retry Explicit choice after acknowledged native restoration.
 --- @return any replacement An opaque choice only after native restoration.
-function M.show(origin, replacements, modal_observer)
+function M.show(origin, replacements, modal_observer, runtime_note)
 	local title = require("window_titles").compose((I18n.get("llm.unreachable.title"):gsub("{1}", function() return "Ollama" end)))
 	local body = (I18n.get("llm.unreachable.body_unconfirmed"):gsub("{1}", function() return "Ollama" end)
 		:gsub("{2}", function() return origin end))
+	if type(runtime_note)=='string' and runtime_note~='' then body=body .. '\n\n' .. runtime_note end
 	local keep_off = I18n.get("llm.unreachable.keep_off")
 	local retry = I18n.get("button.retry")
 	local command

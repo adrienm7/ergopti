@@ -159,3 +159,63 @@ helpers.describe("shared command provider policy", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("inert existing-provider status data", function()
+	local function status_definition(Menu)
+		for _, item in ipairs(Menu.get_array("llm_menu")) do
+			if item.id == "llm_backend" then return item.status_rows.unavailable end
+		end
+		error("Canonical backend status declaration is missing")
+	end
+	local document = [[
+{
+	"llm_menu": [{ "type": "dynamic", "id": "llm_backend", "status_rows": { "unavailable": [
+		{ "type": "---" },
+		{ "type": "label", "i18n": "menu.llm.local_servers.header" },
+		{ "type": "label", "i18n": "menu.llm.unavailable" }
+	] } }]
+}
+]]
+	local function assert_inert_rows(Menu, Mutate)
+		local definition = status_definition(Menu)
+		helpers.assert_eq(#definition, 3)
+		local header, unavailable = definition[2], definition[3]
+		local old_caption = unavailable.i18n
+		local outcome = table.pack(pcall(function()
+			if Mutate then
+				unavailable.i18n = "menu.llm.local_servers.rescan"
+				definition[2], definition[3] = unavailable, header
+			end
+			local rows = Menu.status_rows("llm_menu", "llm_backend", "unavailable")
+			helpers.assert_type(rows, "table")
+			helpers.assert_eq(#rows, 3)
+			helpers.assert_true(rows[1].separator)
+			local tr = require("infra.i18n").get
+			helpers.assert_eq(rows[2].label, tr(Mutate and "menu.llm.local_servers.rescan" or "menu.llm.local_servers.header"))
+			helpers.assert_eq(rows[3].label, tr(Mutate and "menu.llm.local_servers.header" or "menu.llm.unavailable"))
+			for index = 2, 3 do
+				helpers.assert_eq(rows[index].disabled, true)
+				helpers.assert_nil(rows[index].action)
+				helpers.assert_nil(rows[index].items)
+				helpers.assert_nil(rows[index].submenu)
+			end
+		end))
+		definition[2], definition[3] = header, unavailable
+		unavailable.i18n = old_caption
+		if not outcome[1] then error(outcome[2], 0) end
+	end
+
+	helpers.it("returns only exact translated inactive data without command owners", function()
+		fixture.with_manifest(document, nil, function(Menu) assert_inert_rows(Menu, false) end)
+	end)
+	helpers.it("reads caption and order from the current child declaration", function()
+		fixture.with_manifest(document, nil, function(Menu) assert_inert_rows(Menu, true) end)
+	end)
+	helpers.it("refuses a malformed label without partial template data", function()
+		fixture.with_manifest(document, nil, function(Menu)
+			status_definition(Menu)[3].i18n = ""
+			helpers.assert_nil(Menu.status_rows("llm_menu", "llm_backend", "unavailable"))
+		end)
+	end)
+end)

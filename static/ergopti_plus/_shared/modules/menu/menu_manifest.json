@@ -353,6 +353,21 @@
 		{
 			"type": "dynamic",
 			"id": "llm_backend",
+			"status_rows": {
+				"unavailable": [
+					{
+						"type": "---"
+					},
+					{
+						"type": "label",
+						"i18n": "menu.llm.local_servers.header"
+					},
+					{
+						"type": "label",
+						"i18n": "menu.llm.unavailable"
+					}
+				]
+			},
 			"disabled_when_off": false,
 			"health_dot": false,
 			"platforms": [

@@ -163,6 +163,8 @@ _HotstringsScopeRefusals() {
 Test("hotstrings-scope: inventory backup and foreign edits refuse without partial publication", _HotstringsScopeRefusals)
 
 _HotstringsScopeRecoveryDebt() {
+	global _ConfigTransitionRetainedBarrier
+	PriorRetained := _ConfigTransitionRetainedBarrier
 	Fixture := _HotstringsScopeFixture()
 	Bundle := 0, RefuseMove := false
 	Port := ConfigTransitionProductionPort()
@@ -191,8 +193,17 @@ _HotstringsScopeRecoveryDebt() {
 		AssertEqual(FSReadUtf8Exact(Fixture.overrides), Fixture.overrideSource)
 		AssertEqual(FSReadUtf8Exact(Fixture.personal[1]), Fixture.personalSource)
 	} finally {
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
+		try {
+			if Bundle is Object
+				_ConfigWriteTerminalRelease(Bundle)
+		} finally {
+			PreviousCritical := A_IsCritical
+			Critical("On")
+			try {
+				if Bundle is Object && _ConfigTransitionRetainedBarrier == Bundle
+					_ConfigTransitionRetainedBarrier := PriorRetained
+			} finally Critical(PreviousCritical)
+		}
 		_ScopeOwnerCleanup(Fixture)
 	}
 }

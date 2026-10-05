@@ -36,7 +36,7 @@ function M.new(options)
 		if committed == true then revision = revision + 1 end
 		return committed
 	end
-	function port.set_many(values, expected_source)
+	function port.set_many(values, expected_source, admission)
 		if options.writes_fail then return false end
 		if expected_source and expected_source.content ~= tostring(revision) then return false end
 		local next_values = {}
@@ -44,6 +44,11 @@ function M.new(options)
 		for path, value in pairs(values) do
 			local operation = Manifest.sparse_operation(path, value)
 			if operation.delete then next_values[path] = nil else next_values[path] = value end
+		end
+		if admission ~= nil then
+			if type(admission) ~= "function" then return false end
+			local ok, allowed = pcall(admission)
+			if not ok or allowed ~= true then return false end
 		end
 		port.values = next_values
 		revision = revision + 1
