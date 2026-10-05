@@ -1061,3 +1061,72 @@ _TH_UnknownHoldModifierKeepsTheTap() {
 }
 Test("LoadTapHoldToml: an unknown hold_modifier drops the hold and keeps the tap (unknown-hold-keeps-tap-2026-09-26)",
 	_TH_UnknownHoldModifierKeepsTheTap)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 8/ Semantic key source ownership =======
+; ================================================
+; ================================================
+
+_TH_SemanticAliasRoundtrip() {
+	Sources := [
+		'tap_hold.keys.caps_lock.tap_action = "escape"`ntap_hold.keys.caps_lock.hold_modifier = "ctrl"`n'
+			. 'tap_hold.keys.caps_lock.time_activation_seconds = 0.375`ntap_hold.keys.caps_lock.enabled = true`n',
+		'["tap_hold"."keys"."caps_lock"]`n"tap_action" = "escape"`nhold_modifier = "ctrl"`n'
+			. 'time_activation_seconds = 0.375`nenabled = true`n',
+		'[tap_hold]`nkeys = { caps_lock = { tap_action = "escape", hold_modifier = "ctrl", time_activation_seconds = 0.375, enabled = true } }`n'
+	]
+	for Source in Sources {
+		try {
+			Path := _TH_Write(Source)
+			Loaded := LoadTapHoldToml(Path)
+			AssertEqual("escape", TapHoldTapAction(Loaded, "caps_lock"), "the actual reader owns the admitted semantic key")
+			AssertEqual("ctrl", TapHoldHoldModifier(Loaded, "caps_lock"))
+			AssertEqual(0.375, TapHoldDuration(Loaded, "caps_lock"), "the runtime receives the published milliseconds after restart")
+			AssertTrue(TapHoldIsActive(Loaded, "caps_lock"))
+		} finally _TH_Clean()
+	}
+}
+Test("TapHoldLoader: root dotted, quoted and inline sources roundtrip through actual runtime getters (tap-hold-key-delay)",
+	_TH_SemanticAliasRoundtrip)
+
+_TH_SemanticFieldTypesStayStrict() {
+	Sources := [
+		'tap_hold.keys.caps_lock.tap_action = true`ntap_hold.keys.caps_lock.enabled = 1`n'
+			. 'tap_hold.keys.tab.tap_action = "alt_tab_monitor"`n',
+		'["tap_hold"."keys"."caps_lock"]`ntap_action = escape`nhold_modifier = "ctrl"`n'
+			. '[tap_hold.keys.tab]`ntap_action = "alt_tab_monitor"`n',
+		'[tap_hold]`nkeys = { caps_lock = { tap_action = escape, hold_modifier = "ctrl" }, tab = { tap_action = "alt_tab_monitor" } }`n'
+	]
+	for Source in Sources {
+		try {
+			Path := _TH_Write(Source)
+			Loaded := LoadTapHoldToml(Path)
+			AssertFalse(TapHoldIsActive(Loaded, "caps_lock"), "typed aliases do not manufacture valid Boolean or quoted string intent")
+			AssertEqual("", TapHoldTapAction(Loaded, "caps_lock"))
+			AssertTrue(TapHoldIsActive(Loaded, "tab"), "an invalid known field never suppresses a valid sibling")
+			AssertEqual("alt_tab_monitor", TapHoldTapAction(Loaded, "tab"))
+		} finally _TH_Clean()
+	}
+}
+Test("TapHoldLoader: semantic aliases retain strict Boolean and quoted-string field admission (tap-hold-key-delay)",
+	_TH_SemanticFieldTypesStayStrict)
+
+_TH_LiteralDottedNamesDoNotBorrowKnownNamespace() {
+	for Source in ['["tap_hold.keys.caps_lock"]`ntap_action = "escape"`n',
+		'[tap_hold."keys.caps_lock"]`ntap_action = "escape"`n',
+		'"tap_hold.keys.caps_lock.tap_action" = "escape"`n'] {
+		try {
+			Path := _TH_Write(Source)
+			Loaded := LoadTapHoldToml(Path)
+			AssertEqual(0, Loaded["keys"].Count, "literal dotted names stay foreign semantic identities")
+			AssertFalse(TapHoldIsActive(Loaded, "caps_lock"))
+		} finally _TH_Clean()
+	}
+}
+Test("TapHoldLoader: literal dotted foreign keys cannot borrow a native key namespace (tap-hold-key-delay)",
+	_TH_LiteralDottedNamesDoNotBorrowKnownNamespace)

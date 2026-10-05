@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "ضغط → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "مهلة الضغط القصير / المطوّل لهذا المفتاح بالمللي ثانية\n(الحالي: %d مللي ثانية)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -3213,5 +3214,7 @@
 	"menu.hotstrings.user_code.title": "اختصارات نصية قابلة للبرمجة",
 	"platform_reason.program_runner_unavailable": "غير متاح: مشغّل البرامج الأصلي أو هذا الربط غير متاح.",
 	"sg_actions.run_program": "▶️ تشغيل برنامج [قابل للضبط]",
-	"menu.hotstrings.personal_metadata_unavailable": "غير متاح هنا: عدّل هذا الحقل مباشرة في ملف المصدر."
+	"menu.hotstrings.personal_metadata_unavailable": "غير متاح هنا: عدّل هذا الحقل مباشرة في ملف المصدر.",
+	"menu.gestures.mode_current": "الوضع: %s",
+	"menu.gestures.sensitivity_current": "الحساسية: %s"
 }

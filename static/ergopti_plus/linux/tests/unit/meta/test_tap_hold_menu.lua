@@ -624,3 +624,215 @@ helpers.describe("declared complete per-key head", function()
 		end)
 	end
 end)
+
+helpers.describe("declared complete per-key delay tail", function()
+	helpers.it("replays handwritten delay projection and inherited state in all 21 locales (tap-hold-key-delay)", function()
+		local Json, Paths = require("json"), require("infra.paths")
+		local function read(relative)
+			local file = assert(io.open(Paths.shared(relative), "r"))
+			local value = Json.decode(file:read("*a")); file:close(); return value
+		end
+		local corpus = read("tests/corpus/menus/tap_hold_key_delay.json")
+		local locales = read("data/locale_order.json").order
+		helpers.assert_eq(#locales, 21)
+		for _, code in ipairs(locales) do
+			local strings = read("data/locales/" .. code .. ".json")
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				for _, inherited in ipairs({ false, true }) do
+					local renderer = assert(require("menu.renderer").new({ platform = platform,
+						manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+						json_decode = Json.decode, i18n = { get = function(key) return assert(strings[key]) end,
+							section = function(key) return assert(strings[key]) end },
+						logger = { error = function() end, warn = function() end, debug = function() end } }))
+					local calls = {}
+					local commands = {
+						tap_hold_key_native = function() return true end,
+						tap_hold_key_no_action = function() return true end,
+						tap_hold_key_tap = function() return true end,
+						tap_hold_key_delay_set = function() calls[#calls + 1] = "set" end,
+						tap_hold_key_delay_use_global = function() calls[#calls + 1] = "reset"; return true end,
+					}
+					local getters = {
+						tap_hold_key_configured = function() return true end,
+						tap_hold_key_tap_caption = function() return "copy 100%" end,
+						tap_hold_key_hold_caption = function() return "Ctrl / {}" end,
+						tap_hold_key_delay_caption = function() return "1,5 s" end,
+						tap_hold_key_global_delay_caption = function() return "200 ms" end,
+						tap_hold_key_delay_is_global = function() return inherited end,
+						tap_hold_key_delay_has_override = function() return not inherited end,
+					}
+					local delay = assert(renderer.template_rows(corpus.children_section, commands, getters))
+					local rows = assert(renderer.template_rows(corpus.complete_section, commands, getters, {
+						tap_hold_key_delay = delay, tap_hold_key_tap_picker = {},
+						tap_hold_key_hold_picker = {}, tap_hold_key_hold = {},
+					}))
+					local expected = corpus.platforms[platform]
+					helpers.assert_eq(#rows, expected.key_rows, code .. ": " .. platform)
+					helpers.assert_eq(#delay, expected.delay_children)
+					helpers.assert_eq(#calls, 0, "construction never invokes native mutations")
+					if expected.delay_index then
+						local parent = rows[expected.delay_index]
+						helpers.assert_eq(parent.label, string.format(strings["menu.tapholds.key_tap_delay"], "1,5 s"))
+						helpers.assert_eq(parent.items[1].label, strings["menu.tapholds.key_tap_delay_set"])
+						helpers.assert_nil(parent.items[1].action(), "original notification callback has no receipt")
+						helpers.assert_eq(calls, { "set" })
+					end
+					if platform == "hs" then
+						helpers.assert_true(rows[5].separator, "only macOS retains a separator before delay")
+						local reset = delay[2]
+						helpers.assert_eq(reset.label, string.format(strings["menu.tapholds.key_tap_delay_use_global"], "200 ms"))
+						helpers.assert_eq(reset.checked == true, inherited)
+						helpers.assert_eq(reset.disabled == true, inherited)
+						inherited = true
+						helpers.assert_eq(reset.action(), false, "retained reset rechecks declared readiness")
+						helpers.assert_eq(calls, { "set" })
+						inherited = false
+						helpers.assert_eq(reset.action(), true, "the same native callback can retry")
+						helpers.assert_eq(calls, { "set", "reset" })
+					end
+				end
+			end
+		end
+	end)
+
+	helpers.it("actual Linux provider follows delay caption and platform mutations (tap-hold-key-delay)", function()
+		local declaration = require("infra.manifest_menu").get_array("tap_hold_key_delay_tail")
+		local group = declaration[2]
+		local caption, getter, platforms = group.i18n, group.caption_getter, group.platforms
+		local Manager
+		local ok, err = pcall(function()
+			group.i18n, group.caption_getter = "tap_hold.picker.hold", "tap_hold_key_hold_caption"
+			local section, current = build({}, {})
+			Manager = current
+			local i18n = require("infra.i18n")
+			local key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
+			helpers.assert_eq(key.menu[5].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
+			helpers.assert_type(key.menu[5].menu[1].fn, "function", "caption retains original dialog owner")
+			restore(Manager); Manager = nil
+			group.platforms = { "hs" }
+			section, Manager = build({}, {})
+			key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
+			helpers.assert_eq(#key.menu, 4, "shared absence policy hides the whole delay group")
+		end)
+		group.i18n, group.caption_getter, group.platforms = caption, getter, platforms
+		if Manager then restore(Manager) end
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("actual delay callback preserves malformed-source refusal and retry (tap-hold-key-delay)", function()
+		local _, Manager = build({}, {})
+		package.loaded[WRITER] = nil
+		local Writer = require(WRITER)
+		local path = os.tmpname()
+		local reloads, refreshes, notices = 0, 0, 0
+		local TextPrompt = require("ui.text_prompt")
+		local previous_ask, previous_execute = TextPrompt.ask, os.execute
+		local answer, prompts = "375.4", {}
+		local function write(text) local file = assert(io.open(path, "w")); file:write(text); file:close() end
+		local function read() local file = assert(io.open(path, "r")); local text = file:read("*a"); file:close(); return text end
+		local ok, err = pcall(function()
+			Writer.init({ path = path, reload = function() reloads = reloads + 1; return true end,
+				is_tap_action = function() return true end, canonical_hold = function() return nil end })
+			TextPrompt.ask = function(title, prompt, initial)
+				prompts[#prompts + 1] = { title, prompt, initial }; return answer
+			end
+			os.execute = function(command)
+				if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
+				return previous_execute(command)
+			end
+			local items = helpers.load_module("ui.menu.menu_builder").build({ _version = "test",
+				on_quit = function() end, tap_holds = Manager,
+				on_menu_changed = function() refreshes = refreshes + 1 end })
+			local i18n = require("infra.i18n")
+			local section = assert(find(items, i18n.get("menu.tapholds.title")))
+			local ctrl = assert(find(key_rows(section), i18n.get("tap_hold.group.left_ctrl")))
+			local callback = ctrl.menu[5].menu[1].fn
+			local malformed = "[tap_hold.keys.left_ctrl\n"
+			write(malformed)
+			helpers.assert_eq(callback(), false, "refused native duration has an explicit refusal receipt")
+			helpers.assert_eq(read(), malformed, "native classification refuses before publication")
+			helpers.assert_eq(reloads, 0)
+			helpers.assert_eq(refreshes, 1, "existing refusal refresh is retained")
+			helpers.assert_eq(notices, 1)
+			write('[tap_hold]\nenabled = true\n[tap_hold.keys.left_ctrl]\ntime_activation_seconds = 0.2\n[tap_hold.keys.left_shift]\ntime_activation_seconds = 0.4\n[future]\nkeep = "neighbour"\n')
+			helpers.assert_eq(callback(), true, "only durable native acceptance acknowledges the chosen delay")
+			local document = assert(require("toml_codec").decode(read()))
+			helpers.assert_eq(document.tap_hold.keys.left_ctrl.time_activation_seconds, 0.375)
+			helpers.assert_eq(document.tap_hold.keys.left_shift.time_activation_seconds, 0.4)
+			helpers.assert_eq(document.future.keep, "neighbour")
+			helpers.assert_eq(reloads, 1)
+			helpers.assert_eq(refreshes, 2)
+			helpers.assert_eq(#prompts, 2)
+			local stable = read()
+			answer = nil; callback()
+			helpers.assert_eq(read(), stable, "cancellation is side-effect free")
+			answer = "-1"; callback()
+			helpers.assert_eq(read(), stable, "invalid delay is side-effect free")
+			helpers.assert_eq(reloads, 1)
+			helpers.assert_eq(refreshes, 2)
+			helpers.assert_eq(notices, 2)
+		end)
+		TextPrompt.ask, os.execute = previous_ask, previous_execute
+		Writer._reset_for_test(); os.remove(path); restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("native per-key delay acknowledgement", function()
+	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" },
+		{ name = "truthy", value = "accepted" }, { name = "throw", throws = true } }) do
+		helpers.it("refuses " .. receipt.name .. " and retries the retained native owner (tap-hold-key-delay)", function()
+			local section, Manager = build({}, {})
+			local TextPrompt = require("ui.text_prompt")
+			local original_ask, original_execute = TextPrompt.ask, os.execute
+			local i18n = require("infra.i18n")
+			local calls, notices = {}, 0
+			local current = receipt
+			local ok, err = pcall(function()
+				TextPrompt.ask = function() return "375.5" end
+				os.execute = function(command)
+					if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
+					return original_execute(command)
+				end
+				package.loaded[WRITER].set_threshold = function(key, seconds)
+					calls[#calls + 1] = { key, seconds }
+					if current.throws then error("controlled native threshold refusal") end
+					return current.value
+				end
+				local key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
+				local callback = key.menu[5].menu[1].fn
+				helpers.assert_eq(callback(), false)
+				helpers.assert_eq(calls, { { "left_shift", 0.376 } })
+				helpers.assert_eq(notices, 1, "the existing native failure notification remains visible")
+				current = { value = true }
+				helpers.assert_eq(callback(), true)
+				helpers.assert_eq(calls, { { "left_shift", 0.376 }, { "left_shift", 0.376 } })
+				helpers.assert_eq(notices, 1, "accepted retry adds no false failure notification")
+			end)
+			TextPrompt.ask, os.execute = original_ask, original_execute
+			restore(Manager)
+			if not ok then error(err, 0) end
+		end)
+	end
+	for _, value in ipairs({ "0.49", "0", "-1", "1e309", "nan" }) do
+		helpers.it("refuses invalid " .. value .. " before the native threshold writer (tap-hold-key-delay)", function()
+			local calls = {}
+			local section, Manager = build(calls, {})
+			local TextPrompt = require("ui.text_prompt")
+			local original_ask, original_execute = TextPrompt.ask, os.execute
+			local ok, err = pcall(function()
+				TextPrompt.ask = function() return value end
+				os.execute = function(command)
+					if command:find("zenity --error", 1, true) then return 1 end
+					return original_execute(command)
+				end
+				local key = assert(find(key_rows(section), require("infra.i18n").get("tap_hold.group.left_shift")))
+				helpers.assert_eq(key.menu[5].menu[1].fn(), false)
+				helpers.assert_eq(#calls, 0, "invalid input reaches no mutation owner")
+			end)
+			TextPrompt.ask, os.execute = original_ask, original_execute
+			restore(Manager)
+			if not ok then error(err, 0) end
+		end)
+	end
+end)

@@ -85,13 +85,18 @@ _THRD_KeyRowsReturnData() {
 		"_TH_KeyRows must not register menu items itself (HIGH-07)")
 	; The provider binds each native owner to its shared command identity. The
 	; template materializes action data through the same renderer as every list.
-	Assert(InStr(Body, 'MenuRenderer_TemplateRows("tap_hold_key_head"') > 0,
+	Assert(InStr(Body, 'MenuRenderer_TemplateRows("tap_hold_key_rows"') > 0,
 		"_TH_KeyRows must delegate the complete child head to the shared template")
 	for Id, Fn in Map("tap_hold_key_native", "_TH_MakeDisableFn",
 		"tap_hold_key_tap", "_TH_MakeTapPickerFn") {
 		Assert(RegExMatch(Body, Chr(34) . Id . Chr(34) . "\s*,\s*" . Fn),
 			"_TH_KeyRows must bind " . Fn . " to its declared command " . Id . " (HIGH-07)")
 	}
+	Complete := _MR_GetMenuDef("tap_hold_key_rows")
+	Assert(Complete.Length == 2 && Complete[1]["type"] == "include"
+		&& Complete[1]["section"] == "tap_hold_key_head"
+		&& Complete[2]["type"] == "include" && Complete[2]["section"] == "tap_hold_key_delay_tail",
+		"the complete template must retain the actual head before its delay tail")
 	Head := _MR_GetMenuDef("tap_hold_key_head")
 	Assert(Head.Length > 0 && Head[1]["type"] == "include"
 		&& Head[1]["section"] == "tap_hold_key_native_commands",

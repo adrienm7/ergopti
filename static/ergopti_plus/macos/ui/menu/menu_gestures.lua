@@ -324,28 +324,26 @@ function M.build(ctx)
 		-- renderer materialises. These rows used to be built in this driver's own
 		-- dialect and translated one by one on the way out, so the tree was still
 		-- assembled here and every row of it counted as built outside the renderer.
-		local modeSubmenu = {
-			{
-				label = i18n.get("menu.gestures.mode_single"),
-				checked = (currentMode == "x1") or nil,
-				action = function()
+		local modeSubmenu
+		if slot:match("swipe") then
+			modeSubmenu = ManifestMenu.template_rows("gesture_slot_mode_commands", {
+				["gesture_mode_single"] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "x1", "mode")
-				end
-			},
-			{
-				label = i18n.get("menu.gestures.mode_incremental"),
-				checked = (currentMode == "incremental") or nil,
-				action = function()
+				end,
+				["gesture_mode_incremental"] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "incremental", "mode")
-				end
-			}
-		}
+				end,
+			}, {
+				["gesture_mode_is_single"] = function() return currentMode == "x1" end,
+				["gesture_mode_is_incremental"] = function() return currentMode == "incremental" end,
+			})
+		end
 
-		local sensSubmenu = {
-			{ label = i18n.section("menu.gestures.sensitivity_label"), disabled = true },
-			{ label = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
-			{ separator = true },
-		}
+		local sensSubmenu = {}
+		if slot:match("swipe") then
+			sensSubmenu = ManifestMenu.template_rows("gesture_sensitivity_head")
+			if not sensSubmenu then return nil end
+		end
 		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0 }
 		for _, s in ipairs(sensitivities) do
 			local label = string.format("%.1f", s)
@@ -365,24 +363,27 @@ function M.build(ctx)
 			and i18n.get("menu.gestures.mode_incremental")
 			or  i18n.get("menu.gestures.mode_single")
 
-		local change_action_item = {
-			label  = i18n.get("menu.gestures.change_action"),
-			action = (state.gestures and not paused) and function()
+		local slot_commands = {
+			["gesture_slot_change_action"] = function()
 				DeferredWork.after(0.05,
 					function() open_action_chooser(slot, names, current) end,
 					"menu_gestures.action_chooser")
-			end or nil,
-			disabled = not state.gestures or paused or nil,
+			end,
+		}
+		local slot_getters = {
+			["gesture_slot_choice_ready"] = function() return state.gestures and not paused end,
+			["gesture_mode_current_label"] = function() return mode_display end,
+			["gesture_sensitivity_current_label"] = function() return string.format("%.1f", currentSens) end,
+			["gesture_mode_incremental_ready"] = function() return currentMode == "incremental" end,
 		}
 
 		-- Swipe slots expose an action-picker entry + mode + sensitivity in a sub-menu.
 		if slot:match("swipe") then
-			local swipeSubmenu = {
-				change_action_item,
-				{ separator = true },
-				{ label = i18n.get("menu.gestures.mode_prefix") .. mode_display, items = modeSubmenu },
-				{ label = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), items = sensSubmenu, disabled = (currentMode ~= "incremental") or nil },
-			}
+			local swipeSubmenu = ManifestMenu.template_rows("gesture_swipe_slot_menu", slot_commands, slot_getters, {
+				["gesture_mode_options"] = modeSubmenu,
+				["gesture_sensitivity_options"] = sensSubmenu,
+			})
+			if not swipeSubmenu then return nil end
 			return {
 				label    = slotLbl .. " : " .. actionLbl,
 				disabled = not state.gestures or paused or nil,
@@ -391,10 +392,12 @@ function M.build(ctx)
 		end
 
 		-- Tap slots: only the action matters, open the chooser directly.
+		local change_action_rows = ManifestMenu.template_rows("gesture_change_action", slot_commands, slot_getters)
+		if not change_action_rows then return nil end
 		return {
 			label    = slotLbl .. " : " .. actionLbl,
 			disabled = not state.gestures or paused or nil,
-			items    = { change_action_item },
+			items    = change_action_rows,
 		}
 	end
 
@@ -448,9 +451,13 @@ function M.build(ctx)
 						or (pinch and "menu.common.enabled" or "common.disabled")),
 				action = gestures.open_system_gestures,
 			}
-			rows[#rows + 1] = { label = i18n.get("ui_apps.btn_refresh"), action = function()
-				return gestures.refresh_system_gestures(ctx.updateMenu)
-			end }
+			local controls = ManifestMenu.template_rows("gesture_system_status_controls", {
+				["gesture_system_refresh"] = function()
+					return gestures.refresh_system_gestures(ctx.updateMenu)
+				end,
+			})
+			if type(controls) ~= "table" then return {} end
+			for _, row in ipairs(controls) do rows[#rows + 1] = row end
 			return { { label = #conflicts == 0 and i18n.get("gestures.system.clear")
 				or i18n.get("gestures.system.conflicts"):gsub("{1}", function() return tostring(#conflicts) end), items = rows } }
 		end,

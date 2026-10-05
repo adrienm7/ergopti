@@ -152,8 +152,22 @@ function validateChildTemplates(menu) {
 					`${where}: inert label needs an identity and caption without behavior metadata`
 				);
 			if (
+				row.type === 'section_header' &&
+				((row.id !== undefined && (typeof row.id !== 'string' || row.id === '')) ||
+					typeof row.i18n !== 'string' ||
+					row.i18n === '' ||
+					(row.unavailable !== undefined && !['hide', 'grey'].includes(row.unavailable)) ||
+					(row.reason_key !== undefined &&
+						(typeof row.reason_key !== 'string' || row.reason_key === '')) ||
+					Object.keys(row).some(
+						(field) =>
+							!['type', 'id', 'i18n', 'platforms', 'unavailable', 'reason_key'].includes(field)
+					))
+			)
+				throw new Error(`${where}: section header needs a caption without behavior metadata`);
+			if (
 				row.caption_getter !== undefined &&
-				(!['command', 'group'].includes(row.type) ||
+				(!['command', 'check', 'group'].includes(row.type) ||
 					typeof row.caption_getter !== 'string' ||
 					row.caption_getter === '' ||
 					typeof row.id !== 'string' ||
@@ -161,7 +175,9 @@ function validateChildTemplates(menu) {
 					typeof row.i18n !== 'string' ||
 					row.i18n === '')
 			)
-				throw new Error(`${where}: caption_getter needs a labelled command or group identity`);
+				throw new Error(
+					`${where}: caption_getter needs a labelled command, check or group identity`
+				);
 		}
 	}
 	const visiting = new Set();

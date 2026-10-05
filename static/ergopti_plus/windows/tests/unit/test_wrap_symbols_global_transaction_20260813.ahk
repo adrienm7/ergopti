@@ -542,3 +542,138 @@ _WSGT20260813_InheritedCritical() {
 }
 Test("wrap-symbols-global-transaction-20260813: inherited Critical cannot wrap disk IO or tray rebuild",
 	_WSGT20260813_InheritedCritical)
+
+
+; Independent provider expectations complement the existing native transaction ports.
+_WSGT20260813_WrapControlsCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "/tests/corpus/menus/wrap_symbol_controls.json", "UTF-8"))
+}
+
+_WSGT20260813_ControlLabelAt(MenuObj, Position) {
+	Length := DllCall("GetMenuStringW", "ptr", MenuObj.Handle, "uint", Position,
+		"ptr", 0, "int", 0, "uint", 0x400, "int")
+	Label := Buffer((Length + 1) * 2, 0)
+	DllCall("GetMenuStringW", "ptr", MenuObj.Handle, "uint", Position,
+		"ptr", Label.Ptr, "int", Length + 1, "uint", 0x400, "int")
+	return StrGet(Label, "UTF-16")
+}
+
+_WSGT20260813_ControlDeclarationAndDrawing(Path) {
+	global _WS_BUILTIN_GROUPS, _WS_Custom
+	Corpus := _WSGT20260813_WrapControlsCorpus()
+	Rows := _WS_BuildSymbolRows()
+	AssertEqual(4 + Corpus["catalogue_groups"].Length + 1 + _WS_Custom.Length + 2,
+		Rows.Length, "complete fixed head, catalogue groups, custom data and tail")
+	AssertEqual(t("menu.shortcuts.wrap_symbols_check_all"), Rows[1]["label"])
+	AssertEqual(t("menu.shortcuts.wrap_symbols_uncheck_all"), Rows[2]["label"])
+	AssertEqual(t("common.restore_recommended"), Rows[3]["label"])
+	AssertTrue(Rows[4]["separator"])
+	for Index, Expected in Corpus["catalogue_groups"] {
+		Group := Rows[Index + 4]
+		AssertEqual(t(Expected["i18n"]), Group["label"])
+		AssertEqual(t("menu.shortcuts.wrap_symbols_check_all"), Group["items"][1]["label"])
+		AssertEqual(t("menu.shortcuts.wrap_symbols_uncheck_all"), Group["items"][2]["label"])
+		AssertTrue(Group["items"][3]["separator"])
+		AssertEqual(Expected["lefts"].Length + 3, Group["items"].Length)
+		for PairIndex, Left in Expected["lefts"]
+			AssertEqual(Left, _WS_BUILTIN_GROUPS[Index]["pairs"][PairIndex]["left"], "original shared symbol order")
+	}
+	AssertTrue(Rows[12]["separator"])
+	AssertEqual(t("button.delete"), Rows[13]["items"][1]["label"], "custom delete consumes its declaration")
+	AssertTrue(Rows[Rows.Length - 1]["separator"])
+	AssertEqual(t("menu.shortcuts.wrap_symbols_add_custom"), Rows[Rows.Length]["label"])
+	Rendered := Menu()
+	try {
+		AssertEqual(Rows.Length, _MR_RenderRows(Rendered, Rows, "wrap_controls_native_test", 1), "actual native owner draws every row")
+		AssertEqual(Rows[1]["label"], _WSGT20260813_ControlLabelAt(Rendered, 0))
+		AssertTrue(TrayMenuIsSeparatorAt(Rendered, 3))
+		AssertEqual(Rows[Rows.Length]["label"], _WSGT20260813_ControlLabelAt(Rendered, Rows.Length - 1))
+	} finally {
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+	}
+}
+Test("wrap symbols: actual provider consumes complete declared controls and native drawing (wrap-controls)",
+	() => _WSGT20260813_WithState(_WSGT20260813_ControlDeclarationAndDrawing))
+
+_WSGT20260813_ControlMetadataMutations(Path) {
+	Definition := _MR_GetMenuDef("wrap_symbols_global_controls")
+	First := Definition[1], Second := Definition[2]
+	OriginalKey := First["i18n"], OriginalPlatforms := First["platforms"]
+	try {
+		First["i18n"] := "button.delete"
+		Definition[1] := Second, Definition[2] := First
+		Rows := _WS_BuildSymbolRows()
+		AssertEqual(t("menu.shortcuts.wrap_symbols_uncheck_all"), Rows[1]["label"])
+		AssertEqual(t("button.delete"), Rows[2]["label"], "actual provider reads caption and shared source order")
+		First["platforms"] := ["hs"]
+		Rows := _WS_BuildSymbolRows()
+		AssertEqual(t("common.restore_recommended"), Rows[2]["label"], "only the hidden command retires")
+	} finally {
+		First["i18n"] := OriginalKey, First["platforms"] := OriginalPlatforms
+		Definition[1] := First, Definition[2] := Second
+	}
+}
+Test("wrap symbols: actual provider reads order caption and platform metadata mutations (wrap-controls)",
+	() => _WSGT20260813_WithState(_WSGT20260813_ControlMetadataMutations))
+
+_WSGT20260813_ControlNativeRefusal(Path) {
+	global _WSGT20260813_WriterCalls, _WSGT20260813_ReplaceCalls, _WSGT20260813_RebuildCalls
+	Rows := _WS_BuildSymbolRows()
+	Before := _WSGT20260813_LiveIdentity()
+	Terminal := _ConfigWriteTerminalTryAcquire(Path . ".wrap-control-terminal")
+	AssertTrue(Terminal is Object)
+	try {
+		for Index in [1, 2, 3]
+			_WSGT20260813_AssertRefused(Rows[Index]["action"].Call("discarded menu arg", 99), "actual global control")
+		for Index in [1, 2]
+			_WSGT20260813_AssertRefused(Rows[5]["items"][Index]["action"].Call("discarded menu arg", 99), "captured group control")
+		_WSGT20260813_AssertRefused(Rows[13]["items"][1]["action"].Call("discarded menu arg", 99), "captured custom delete")
+		_WSGT20260813_AssertNoPublication(Before, "actual provider callbacks under terminal admission refusal")
+		AssertFalse(FileExist(Path), "no record can be written by a refused native owner")
+		AssertEqual(0, _WSGT20260813_WriterCalls + _WSGT20260813_ReplaceCalls + _WSGT20260813_RebuildCalls)
+	} finally _ConfigWriteTerminalRelease(Terminal)
+}
+Test("wrap symbols: actual declared callbacks retain native admission refusal and Bind payloads (wrap-controls)",
+	() => _WSGT20260813_WithState(_WSGT20260813_ControlNativeRefusal))
+
+_WSGT20260813_ControlMissingOwnership(Path) {
+	Corpus := _WSGT20260813_WrapControlsCorpus()
+	for Section in Corpus["sections"] {
+		Definition := _MR_GetMenuDef(Section["section"])
+		if Definition[1]["type"] == "---" {
+			OriginalType := Definition[1]["type"]
+			try {
+				Definition[1]["type"] := "unowned_fixed_control"
+				AssertEqual(0, _WS_BuildSymbolRows().Length, "a broken declared section cannot return a partial picker")
+			} finally Definition[1]["type"] := OriginalType
+		} else {
+			OriginalId := Definition[1]["id"]
+			try {
+				Definition[1]["id"] := "unowned_wrap_command"
+				AssertEqual(0, _WS_BuildSymbolRows().Length, "a missing native command refuses the complete picker")
+			} finally Definition[1]["id"] := OriginalId
+		}
+	}
+}
+Test("wrap symbols: actual provider refuses every broken fixed section without partial rows (wrap-controls)",
+	() => _WSGT20260813_WithState(_WSGT20260813_ControlMissingOwnership))
+
+_WSGT20260813_ControlReadiness(Path) {
+	global _WSGT20260813_WriterCalls, _WSGT20260813_ReplaceCalls, _WSGT20260813_RebuildCalls
+	Definition := _MR_GetMenuDef("wrap_symbols_global_controls")[1]
+	Original := Definition["disabled_when"]
+	Rows := _WS_BuildSymbolRows()
+	Before := _WSGT20260813_LiveIdentity()
+	try {
+		Definition["disabled_when"] := ["missing_native_wrap_readiness"]
+		Current := _WS_BuildSymbolRows()
+		AssertTrue(Current[1]["disabled"], "absent readiness getter refuses drawing eligibility")
+		_WSGT20260813_AssertRefused(Rows[1]["action"].Call(), "retained declared callback rechecks current readiness metadata")
+		_WSGT20260813_AssertNoPublication(Before, "retained callback cannot bypass current declaration")
+		AssertEqual(0, _WSGT20260813_WriterCalls + _WSGT20260813_ReplaceCalls + _WSGT20260813_RebuildCalls)
+	} finally Definition["disabled_when"] := Original
+}
+Test("wrap symbols: retained actual command rechecks declared native readiness (wrap-controls)",
+	() => _WSGT20260813_WithState(_WSGT20260813_ControlReadiness))

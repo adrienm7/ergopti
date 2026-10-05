@@ -27,6 +27,7 @@ local Builder       = require("ui.menu.builder")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
+local WrapMutation  = require("menu.wrap_mutation")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("adapters.storage")
@@ -942,9 +943,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local ok_txt, text_acts_mod = pcall(require, "modules.shortcuts.actions.text")
 			if ok_txt and type(text_acts_mod.build_active_wrap_pairs) == "function" then
 				pcall(core_mods.shortcuts_mod.set_wrap_pairs_getter, function()
+					local wrap = WrapMutation.view(state)
 					return text_acts_mod.build_active_wrap_pairs(
-						state.wrap_symbol_states  or {},
-						state.custom_wrap_symbols or {}
+						wrap.wrap_symbol_states  or {},
+						wrap.custom_wrap_symbols or {}
 					)
 				end)
 			end

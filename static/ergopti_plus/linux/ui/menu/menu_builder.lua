@@ -3680,14 +3680,20 @@ local function _build_tap_holds(ctx)
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
 			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
 			tostring(current_ms))
-		if value == nil then return end
+		if value == nil then return false end
 		local ms = tonumber(value)
-		if not ms or ms <= 0 then
+		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
 			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
 			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
-			return
+			return false
 		end
-		changed(Writer.set_threshold(key_id, math.floor(ms + 0.5) / 1000))
+		local call_ok, persisted = pcall(Writer.set_threshold, key_id, math.floor(ms + 0.5) / 1000)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
 	end
 
 	--- The rows of one hand: its keys in the shared catalogue's order, each
@@ -3717,24 +3723,22 @@ local function _build_tap_holds(ctx)
 				}
 			end
 
-			local key_rows = ManifestMenu.template_rows("tap_hold_key_head", {
+			local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
+				["tap_hold_key_delay_set"] = function() return ask_delay(key_id, ms) end,
+			})
+			if not delay_rows then return nil end
+
+			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
 				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
 				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
-			}, { ["tap_hold_key_hold"] = hold_rows })
+				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
+			}, { ["tap_hold_key_hold"] = hold_rows, ["tap_hold_key_delay"] = delay_rows })
 			if key_rows then
-				key_rows[#key_rows + 1] = {
-					label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
-					items = {
-						{
-							label = i18n_safe("menu.tapholds.key_tap_delay_set"),
-							action = function() ask_delay(key_id, ms) end,
-						},
-					},
-				}
+
 				rows[#rows + 1] = {
 					label = _tap_hold_key_label(catalog_entry) .. "  :  "
 						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),

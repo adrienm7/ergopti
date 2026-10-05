@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "홀드 → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "이 키의 짧게 / 길게 누르기 지연(밀리초)\n(현재: %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -3213,5 +3214,7 @@
 	"menu.hotstrings.user_code.title": "프로그래밍 가능한 텍스트 단축키",
 	"platform_reason.program_runner_unavailable": "사용 불가: 기본 프로그램 실행 기능 또는 이 할당을 사용할 수 없습니다.",
 	"sg_actions.run_program": "▶️ 프로그램 실행 [설정 가능]",
-	"menu.hotstrings.personal_metadata_unavailable": "여기에서는 사용할 수 없습니다. 원본 파일에서 이 항목을 직접 수정하세요."
+	"menu.hotstrings.personal_metadata_unavailable": "여기에서는 사용할 수 없습니다. 원본 파일에서 이 항목을 직접 수정하세요.",
+	"menu.gestures.mode_current": "모드: %s",
+	"menu.gestures.sensitivity_current": "감도: %s"
 }

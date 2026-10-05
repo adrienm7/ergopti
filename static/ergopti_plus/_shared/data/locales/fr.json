@@ -1664,6 +1664,7 @@
 	"menu.tapholds.hold_arrow": "Hold → %s",
 	"menu.tapholds.key_tap_delay": "Délai de tap : %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Délai tap / hold pour cette touche, en millisecondes\n(global : %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Délai d’appui court / long pour cette touche, en millisecondes\n(actuel : %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Délai de tap par touche",
 	"menu.tapholds.key_tap_delay_set": "Définir un délai propre…",
 	"menu.tapholds.key_tap_delay_use_global": "Utiliser le délai global (%s)",
@@ -3213,5 +3214,7 @@
 	"menu.hotstrings.user_code.title": "Hotstrings programmables",
 	"platform_reason.program_runner_unavailable": "Indisponible : le lanceur natif ou cette association est indisponible.",
 	"sg_actions.run_program": "▶️ Exécuter un programme [configurable]",
-	"menu.hotstrings.personal_metadata_unavailable": "Indisponible ici : modifiez ce champ directement dans le fichier source."
+	"menu.hotstrings.personal_metadata_unavailable": "Indisponible ici : modifiez ce champ directement dans le fichier source.",
+	"menu.gestures.mode_current": "Mode : %s",
+	"menu.gestures.sensitivity_current": "Sensibilité : %s"
 }
