@@ -9,6 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
+	"compat.utf8",
 	"adapters.webview_result",
 	"adapters.file_system", "adapters.timer_scheduler", "infra.logger", "infra.paths",
 	"infra.i18n", "infra.fs_dir", "infra.text_utils", "text_utils",

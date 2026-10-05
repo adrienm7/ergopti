@@ -2587,6 +2587,13 @@ assertion across curl versions. Independent old/new native replays pass; hosted
 final-source qualification remains pending. These are fixture prerequisites,
 not completion of the remaining configuration policy or physical acceptance.
 
+The macOS qualification fixtures now restore the transitive strict UTF-8 owner
+and decode the standard JSON backspace/form-feed escapes in their independent
+Hammerspoon stub. The original twelve hosted failures are reproduced and
+corrected without changing production, corpus expectations or assertions.
+Full selected verification and hosted qualification are recorded separately;
+these fixture repairs do not complete TODO33 or device acceptance.
+
 Linux ordinary TapHold saves and recommended imports now use the existing shared classified reader: only native ENOENT permits an absent document; access, other open, read and close failures refuse before mutation, backup/staging/publication or reload. Malformed-source behavior and unknown fields remain unchanged. The registered real-writer module retains all 26 original cases and adds 13 controls: the original writer gives 28 passes / 11 failures, the corrected writer 39 / 0. macOS and Windows already refuse classified unreadable sources through their existing owners. Full selected verification and hosted native CI remain pending; TODO33 stays partial.
 
 The Linux TapHold owner now ignores and reports obsolete scalar/array parents and

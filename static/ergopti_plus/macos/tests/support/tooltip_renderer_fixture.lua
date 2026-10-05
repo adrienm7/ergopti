@@ -9,6 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
+	"compat.utf8",
 	"adapters.json_codec",
 	"infra.logger", "infra.i18n", "infra.paths", "infra.text_utils", "text_utils",
 	"infra.toml.reader", "toml_codec.reader", "toml_codec.basic_string", "toml_codec.bom",
