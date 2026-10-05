@@ -59,6 +59,7 @@ _LSMT_CheckOneShot(Owner, TimeoutMs) {
 		AssertTrue(Owner._NativeTimer(Callback, 0))
 		Sleep(Period * 2)
 		AssertEqual(1, State.Calls, "exact cancellation must disarm the retained native callback")
+		return State.Calls
 	} finally Owner._NativeTimer(Callback, 0)
 }
 
