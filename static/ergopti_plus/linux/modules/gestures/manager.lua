@@ -1286,6 +1286,7 @@ local function binding_action(binding)
 		{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
 		{ "script__", "modules.shortcuts.script_chords", "script_control" },
 		{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
+		{ "combination__", "modules.shortcuts.key_combinations", "key_combination_taps" },
 	}
 	for _, descriptor in ipairs(descriptors) do
 		if binding:sub(1, #descriptor[1]) == descriptor[1] then
@@ -1305,6 +1306,11 @@ local function capture_program(binding)
 
 	local runtime, section, id = binding_action(binding)
 	if runtime ~= "run_program" then return nil end
+	local pair_guard
+	if section == "key_combination_taps" then
+		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, "run_program")
+		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
+	end
 	local scalar = M.get_action_parameter(binding, "run_program")
 	if ProgramParameter.parse(scalar, "linux") == nil then return nil end
 	local content, status = FileSystem.read_with_status(_config_path)
@@ -1319,6 +1325,7 @@ local function capture_program(binding)
 	local revision = _program_revision
 	return scalar, function()
 		local paused_ok, paused = pcall(_is_paused)
+		if pair_guard and pair_guard() ~= true then return false end
 		if not paused_ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
 			or M.get_action_parameter(binding, "run_program") ~= scalar or binding_action(binding) ~= "run_program" then return false end
 		local current, current_status = FileSystem.read_with_status(_config_path)
@@ -1355,6 +1362,11 @@ local function capture_window(binding)
 	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
 	local action, section, id = binding_action(binding)
 	if action ~= "alt_tab_monitor" then return nil end
+	local pair_guard
+	if section == "key_combination_taps" then
+		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, action)
+		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
+	end
 	local FileSystem = require("adapters.file_system")
 	local Keyboard = require("adapters.keyboard_hook")
 	local physical = Keyboard.physical_source_receipt()
@@ -1381,6 +1393,7 @@ local function capture_window(binding)
 	local revision = _program_revision
 	return function()
 		local ok, paused = pcall(_is_paused)
+		if pair_guard and pair_guard() ~= true then return false end
 		if not ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
 			or binding_action(binding) ~= "alt_tab_monitor" then return false end
 		local current = Keyboard.physical_source_receipt()

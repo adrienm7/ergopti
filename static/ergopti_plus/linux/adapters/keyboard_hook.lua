@@ -424,9 +424,21 @@ local function _shortcut_modifier_held()
 	return _ctrl_held or _alt_held or _meta_held
 end
 
+local _owned_row_receipt = nil
+local _dispatch_owned_rows
+local _deliver_owned_rows
+local function _combination_source(source)
+	local receipt = M.physical_source_receipt()
+	return { source = source, generation = receipt.generation, ready = receipt.ready, physical = _physical_sources[source] == true }
+end
+
 local function _forward_raw(ev, source)
 	if not _intercept or not _emit_raw or ev.type ~= EVDEV_TYPE_KEY then return true end
 	local ok_emit, emitted = pcall(_emit_raw, ev.code, ev.value)
+	if _owned_row_receipt and _owned_row_receipt.code == ev.code and _owned_row_receipt.value == ev.value then
+		_owned_row_receipt.count = _owned_row_receipt.count + 1
+		_owned_row_receipt.accepted = ok_emit and emitted == true
+	end
 	if ok_emit and emitted == true then
 		local key = source_key(source, ev.code)
 		if ev.value == InputEvent.VALUE_UP then
@@ -471,7 +483,8 @@ local function _resynchronise(source)
 	-- replaying a held CapsLock as itself would toggle the lock, where the user
 	-- was holding it for Ctrl.
 	if _remapper then
-		_release_remapped()
+		if _release_remapped() == false then return false, "combination key retirement refused" end
+		if _remapper.activate and _remapper:activate() ~= true then return false, "combination activation refused" end
 		for key, current in pairs(pressed) do
 			if _remapper:handles(current.code) then
 				_remap_orphans[key] = true
@@ -646,8 +659,11 @@ local function _dispatch_event(ev, source)
 		if not _running then return end
 		-- A callback of that hold may have taken the engine out: the event is
 		-- then the hand's, as with no engine.
-		local out, tap, binding = nil, nil, nil
-		if _remapper then out, tap, binding = _remapper:process(ev.code, ev.value, at_ms) end
+		local out, tap, binding, frame = nil, nil, nil, nil
+		if _remapper then
+			local receipt = _remapper.has_combinations and _combination_source(source) or nil
+			out, tap, binding, frame = _remapper:process(ev.code, ev.value, at_ms, receipt)
+		end
 		if ev.value == InputEvent.VALUE_UP then
 			_remap_owned[owned_key] = nil
 			_remap_source_of[ev.code] = nil
@@ -656,11 +672,35 @@ local function _dispatch_event(ev, source)
 			_remap_source_of[ev.code] = source
 		end
 		if out then
+			if frame and frame.owned then
+				local exact = _remapper
+				local accepted = _deliver_owned_rows(exact, out, source)
+				if frame.ack(accepted) ~= true then return end
+				if frame.replay then
+					_remap_owned[owned_key] = nil
+					_dispatch_event(ev, source)
+					return
+				end
+				if tap and _on_tap then frame.run(_on_tap, _combination_source(source)) end
+				local restored, restore_frame = frame.restore(_combination_source(source))
+				if restore_frame then
+					local restored_ack = _deliver_owned_rows(exact, restored, source)
+					restore_frame.ack(restored_ack)
+				end
+				return
+			end
+			local exact = _remapper
+			local delivery = exact and exact.begin_delivery and exact:begin_delivery(out) or nil
+			if exact and exact.begin_delivery and not delivery then return end
 			for _, remapped in ipairs(out) do
 				_dispatch_event({ type = EVDEV_TYPE_KEY, code = remapped.code, value = remapped.value,
 					remapped = true }, source)
-				if not _running then return end
+				if not _running then
+					if delivery then exact:end_delivery(delivery) end
+					return
+				end
 			end
+			if delivery and exact:end_delivery(delivery) ~= true then return end
 			if tap and _on_tap then _call_callback("tap action callback", _on_tap, tap, binding) end
 			return
 		end
@@ -849,8 +889,37 @@ end
 --- Releases every key the tap-hold engine holds (a hold modifier, a layer
 --- chord, a one-shot Shift) through the normal path, so the virtual keyboard
 --- and the modifier state both see the key-ups.
+_dispatch_owned_rows = function(rows, source)
+	if #rows == 0 then return true end
+	if not _running or not _intercept or type(_emit_raw) ~= "function" then return false end
+	for _, row in ipairs(rows) do
+		local prior = _owned_row_receipt
+		local receipt = { code = row.code, value = row.value, count = 0, accepted = false }
+		_owned_row_receipt = receipt
+		local dispatched = pcall(_dispatch_event, { type = EVDEV_TYPE_KEY, code = row.code, value = row.value, remapped = true }, source)
+		_owned_row_receipt = prior
+		if not dispatched then return false end
+		if receipt.count ~= 1 or receipt.accepted ~= true then return false end
+	end
+	return true
+end
+
+_deliver_owned_rows = function(exact, rows, source)
+	local token = exact:begin_delivery(rows)
+	if not token then return false end
+	local accepted = _dispatch_owned_rows(rows, source)
+	if exact:end_delivery(token) ~= true then return false end
+	return accepted
+end
+
 _release_remapped = function()
-	if not _remapper then return end
+	if not _remapper then return true end
+	if _remapper.has_combinations then
+		local exact = _remapper
+		local rows = exact:release_all()
+		local accepted = _deliver_owned_rows(exact, rows, _device)
+		return exact:ack_retirement(accepted, rows) == true
+	end
 	for _, released in ipairs(_remapper:release_all()) do
 		local source = _device
 		for _, entry in pairs(_forwarded_down) do
@@ -868,7 +937,10 @@ end
 _tick_remapper = function(now_ms)
 	if not (_remapper and _intercept) then return end
 	for _, due in ipairs(_remapper:tick(now_ms)) do
-		if due.tap ~= nil then
+		if due.owned_rows then
+			local exact = _remapper
+			due.frame.ack(_deliver_owned_rows(exact, due.owned_rows, _device))
+		elseif due.tap ~= nil then
 			-- The action of a key replayed under a hold that just came due.
 			if _on_tap then _call_callback("tap action callback", _on_tap, due.tap, due.binding) end
 		else
@@ -1748,7 +1820,10 @@ end
 
 function M.stop()
 	if not _running and not _reacquiring then return end
-	_release_remapped()
+	if _release_remapped() == false then
+		M.emergency_stop("combination key retirement refused during stop")
+		return false
+	end
 	local released, release_err = _release_forwarded_sources(_devices)
 	if not released then
 		M.emergency_stop("could not release virtual keys during stop: " .. tostring(release_err))
@@ -1828,10 +1903,21 @@ function M.while_released(fn, opts)
 		if type(observer) ~= "function" then return true end
 		return _call_callback("modal restoration observer", observer, stage, receipt)
 	end
-	if not _running or not _intercept then return fn() end
+	if not _running or not _intercept then
+		if _remapper and _remapper.has_combinations then
+			if _release_remapped() ~= true or _remapper:activate() ~= true then
+				observe("refused", { ok = false, reason = "release_failed" })
+				return nil, "combination key retirement refused"
+			end
+		end
+		return fn()
+	end
 	local paths = {}
 	for index, path in ipairs(_devices) do paths[index] = path end
-	_release_remapped()
+	if _release_remapped() == false then
+		observe("refused", { ok = false, reason = "release_failed" })
+		return nil, "combination key retirement refused"
+	end
 	local released, release_err = _release_forwarded_sources(paths)
 	if not released then
 		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
@@ -1880,17 +1966,19 @@ end
 --- @param engine table|nil platform/remap/tap_hold_engine instance
 --- @param on_tap function|nil Runs a tap action and its canonical source binding.
 function M.set_remapper(engine, on_tap)
-	_release_remapped()
+	if _release_remapped() == false then return false end
 	for key in pairs(_remap_owned) do _remap_orphans[key] = true end
 	_remap_owned = {}
 	_remap_source_of = {}
+	if engine and engine.activate and engine:activate() ~= true then return false end
 	_remapper = engine
 	_on_tap = type(on_tap) == "function" and on_tap or nil
+	return true
 end
 
 --- Releases every key the tap-hold engine holds (pause, feature switch).
 function M.release_remapped()
-	_release_remapped()
+	return _release_remapped()
 end
 
 --- Returns true if the keyboard hook is currently active.
