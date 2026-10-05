@@ -135,11 +135,11 @@ local function _exec(sql)
 	return true
 end
 
---- Commits one raw-event batch without exposing partially refused rows.
+--- Commits one raw or derived batch without exposing partially refused rows.
 --- SQLite FAIL can retain earlier rows and trigger effects in autocommit mode.
 --- A failed script exits before COMMIT and its connection rolls the batch back;
 --- the existing receipt acknowledges COMMIT, not merely the INSERT statement.
---- @param sql string One composed raw INSERT statement.
+--- @param sql string One composed raw or derived INSERT statement.
 --- @return boolean
 local function _exec_raw_batch(sql)
 	return _exec("BEGIN IMMEDIATE;\n" .. sql .. "\nCOMMIT;")
@@ -1109,7 +1109,7 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 		.. number_map_merge_sql("esrc_json") .. ";",
 		table.concat(parts, ",")
 	)
-	return _exec(sql)
+	return _exec_raw_batch(sql)
 end
 
 --- Upserts physical Linux evdev scancodes. This is intentionally distinct

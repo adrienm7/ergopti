@@ -2373,6 +2373,31 @@ These are software implementations; final hardware verification remains below.
   both language packs and principal notification/HTTP assertions. No schema,
   raw-event, menu, title, configuration or reserved implementation change.
 
+- [~] **L145.** Linux ngram group refusal atomicity: reuse the existing checked
+  batch transaction for the single multirow upsert. Actual SQLite RAISE(FAIL)
+  previously retained earlier additive token updates and trigger effects despite
+  a false receipt; a later retry duplicated those earlier contributions. Preserve
+  the native bail/connection settlement and helper body, literal source encoder,
+  source-map merging, count admission and scalar fields. Each LuaJIT, Lua 5.4 and
+  signed Jammy mixed profile runs one successful native Writer producer and one
+  independent readonly Python oracle: eight checks with four failures before,
+  then eight passes after. These are not two eight-subject suites. Refusal at the
+  first token preserves counts but leaves a trigger effect; refusal at the last
+  token additionally retains an earlier update. Both become unchanged rows and
+  zero effects, followed by exactly-once healthy retry. ABORT and untriggered
+  controls retain all scalar and known/arbitrary source values. Two registered
+  units reproduce one failure before and pass after; the entire old122-subject
+  Writer prefix and assertions remain intact, and all124 subjects pass on every
+  profile. Unit CLI receipts are simulated; native processes, triggers, files and
+  SQLite reads/writes are real. No physical input or foreign native validation.
+  Foreign source inspection finds outer aggregate transactions/rollback paths,
+  without claiming every foreign caller's FAIL behavior. This slice does not
+  implement a collector derived retry queue, raw replay, session cursor changes,
+  whole-flush atomicity or post-COMMIT lost-receipt recovery. Register future
+  Linux CI commands without launching workflows. Preserve both language packs
+  and principal notification/HTTP assertions. No schema, configuration, menu,
+  foreign source or reserved implementation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -446,6 +446,14 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
         timeout-minutes: 1
 
+      - name: Roll back refused ngram groups and trigger effects in native SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py lua5.4
+        timeout-minutes: 1
+
       - name: Preserve cumulative system-day metrics across native restarts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

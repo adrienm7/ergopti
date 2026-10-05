@@ -1024,3 +1024,28 @@ helpers.describe("linux-system-day-owned-read", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("linux-sqlite-ngram-group-transaction", function()
+	helpers.it("linux-sqlite-ngram-group-transaction: one checked transaction owns admitted tokens", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				alpha = { c = 3, td = 20, cd = 2, e = 1, sources = { hotstring = 1, addon = 2 } },
+				beta = { c = 5, td = 40, cd = 3, e = 2, sources = { llm = 2, addon = 3 } },
+				rejected = 0,
+			}))
+			helpers.assert_eq(#statements, 1)
+			helpers.assert_contains(statements[1], "BEGIN IMMEDIATE;\nINSERT INTO ngram_chars")
+			helpers.assert_contains(statements[1], ";\nCOMMIT;")
+			helpers.assert_contains(statements[1], "'alpha',3,20,2,1,")
+			helpers.assert_contains(statements[1], "'beta',5,40,3,2,")
+			helpers.assert_true(not statements[1]:find("'rejected'", 1, true))
+		end)
+	end)
+
+	helpers.it("linux-sqlite-ngram-group-transaction: native refusal remains false", function()
+		with_writer_read_receipts("", 7, function(writer)
+			helpers.assert_eq(writer.upsert_ngrams("owned", "2000-01-01", "owned", { alpha = 3, beta = 5 }), false)
+		end)
+	end)
+end)
