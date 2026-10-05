@@ -26,6 +26,7 @@ local M = {}
 local Logger = require("logger.shim")
 local NativeTimer = require("infra.native_timer")
 local NumberPolicy = require("number_policy")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.timer_scheduler"
 
@@ -128,7 +129,7 @@ function M.after(delaySec, fn)
 			end
 			local ok_fn, err = pcall(fn)
 			if not ok_fn then
-				Logger.error(LOG, "after() callback raised: %s", tostring(err))
+				Logger.error(LOG, "after() callback raised: %s", ErrorDescription.describe(err))
 			end
 		end)
 		if started == false or started == nil then error("luv.timer_start rejected the timer") end
@@ -176,7 +177,7 @@ function M.every(intervalSec, fn)
 		local started = NativeTimer.start(luv, t, interval_ms, interval_ms, function()
 			local ok_fn, err = pcall(fn)
 			if not ok_fn then
-				Logger.error(LOG, "every() callback raised: %s", tostring(err))
+				Logger.error(LOG, "every() callback raised: %s", ErrorDescription.describe(err))
 			end
 		end)
 		if started == false or started == nil then error("luv.timer_start rejected the timer") end
