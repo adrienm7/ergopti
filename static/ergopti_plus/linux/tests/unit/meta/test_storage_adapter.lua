@@ -542,6 +542,10 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 		local real_getenv = os.getenv
 		local real_open = io.open
 		local real_rename = os.rename
+		local native_uv = _VERSION ~= "Lua 5.1" and require("luv") or nil
+		local uv_open = native_uv and native_uv.fs_open
+		local uv_write = native_uv and native_uv.fs_write
+		local uv_close = native_uv and native_uv.fs_close
 		local Shell = require("adapters.shell_runner")
 		os.getenv = function(name)
 			if name == "XDG_CONFIG_HOME" then return temp_root end
@@ -552,6 +556,9 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 			Shell._reset_runner()
 			io.open = real_open
 			os.rename = real_rename
+			if native_uv then
+				native_uv.fs_open, native_uv.fs_write, native_uv.fs_close = uv_open, uv_write, uv_close
+			end
 		end
 
 		local ok, err = pcall(function()
@@ -565,11 +572,23 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 						if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "missing dir" end
 						return real_open(path, mode)
 					end
+					if native_uv then
+						native_uv.fs_open = function(path, mode, permissions)
+							if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "missing dir" end
+							return uv_open(path, mode, permissions)
+						end
+					end
 				end,
 				open = function()
 					io.open = function(path, mode)
 						if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "refused" end
 						return real_open(path, mode)
+					end
+					if native_uv then
+						native_uv.fs_open = function(path, mode, permissions)
+							if path:match("storage%.json%.tmp$") and mode == "wx" then return nil, "refused" end
+							return uv_open(path, mode, permissions)
+						end
 					end
 				end,
 				write = function()
@@ -579,6 +598,7 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 						end
 						return real_open(path, mode)
 					end
+					if native_uv then native_uv.fs_write = function() return nil, "short write" end end
 				end,
 				close = function()
 					io.open = function(path, mode)
@@ -586,6 +606,12 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 							return { write = function() return true end, close = function() return nil, "refused" end }
 						end
 						return real_open(path, mode)
+					end
+					if native_uv then
+						native_uv.fs_close = function(fd)
+							uv_close(fd)
+							return nil, "refused"
+						end
 					end
 				end,
 				rename = function()
@@ -964,7 +990,7 @@ helpers.describe("script storage opaque owner identity", function()
 end)
 
 helpers.describe("script storage numeric source admission", function()
-	helpers.it("script-storage-cohort unsafe future decimal tokens refuse before any native effect", function()
+	helpers.it("script-storage-cohort unsafe future decimal tokens survive source-bound owned effects", function()
 		local cases = {
 			'{"a":false,"future":9007199254740993}',
 			'{"a":false,"future":0.1}',
@@ -973,15 +999,25 @@ helpers.describe("script storage numeric source admission", function()
 			'{"a":false,"future":{"nested":9007199254740993}}',
 		}
 		for _, source in ipairs(cases) do
-			storage_cohort_fixture(source, function(storage, _, path, backup, _, read)
+			storage_cohort_fixture(source, function(storage, files, path, backup, _, read)
 				local owner = { pending = function() return false end }
 				helpers.assert_true(storage.acquire_owned(owner, { "a" }))
-				helpers.assert_nil(storage.capture_owned(owner), "unsafe token source refuses untouched: " .. source)
+				local receipt, cells = storage.capture_owned(owner)
+				helpers.assert_true(type(receipt) == "table"); helpers.assert_eq(cells.a.value, false)
 				helpers.assert_eq(storage.set("a", true), false)
-				helpers.assert_eq(storage.set("foreign", true), false, "held-cohort foreign writes must not reencode unsafe source")
 				helpers.assert_eq(read(path), source); helpers.assert_nil(read(backup))
+				helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
+				local expected = source:gsub('"a":false', '"a":true', 1)
+				helpers.assert_eq(read(path), expected)
+				helpers.assert_eq(require("json").decode_lossless(read(backup)).source.content, source)
+				helpers.assert_true(storage.set("foreign", true))
+				helpers.assert_eq(read(path), expected:sub(1, -2) .. ',"foreign":true}')
+				helpers.assert_true(storage.restore_owned(owner, receipt))
+				helpers.assert_eq(read(path), source:sub(1, -2) .. ',"foreign":true}')
 				helpers.assert_nil(read(path .. ".tmp")); helpers.assert_nil(read(path .. ".corrupt"))
 				helpers.assert_nil(storage.recovery_status()); helpers.assert_true(storage.release_owned(owner))
+				helpers.assert_true(storage.forget_owned(owner, receipt))
+				helpers.assert_eq(helpers.load_module("adapters.storage").get("a"), false)
 			end)
 		end
 	end)
@@ -1060,5 +1096,668 @@ helpers.describe("script storage raw producer identity", function()
 				helpers.assert_eq(read(path), '{"a":false,"future":[]}'); helpers.assert_true(storage.release_owned(owner))
 			end)
 		end
+	end)
+end)
+
+helpers.describe("native storage exact root-member source publication", function()
+	local source = ' \n{ "a" : false, "future" : [0.1,{"i":9223372036854775807,"empty":[],"map":{},"n":null,"e":1.230000e-20}], "\\u0066oreign" : 1 }\t'
+	helpers.it("preserves full handwritten bytes through owned effect, held writes and inverse", function()
+		storage_cohort_fixture(source, function(storage, files, path, backup, _, read)
+			local owner = { pending = function() return false end }
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner))
+			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
+			helpers.assert_eq(read(path), ' \n{ "a" : true, "future" : [0.1,{"i":9223372036854775807,"empty":[],"map":{},"n":null,"e":1.230000e-20}], "\\u0066oreign" : 1 }\t')
+			helpers.assert_true(storage.set("foreign", 2))
+			helpers.assert_eq(read(path), ' \n{ "a" : true, "future" : [0.1,{"i":9223372036854775807,"empty":[],"map":{},"n":null,"e":1.230000e-20}], "\\u0066oreign" : 2 }\t')
+			helpers.assert_true(storage.set_many({ appended = false, other = "x" }))
+			helpers.assert_eq(read(path), ' \n{ "a" : true, "future" : [0.1,{"i":9223372036854775807,"empty":[],"map":{},"n":null,"e":1.230000e-20}], "\\u0066oreign" : 2 ,"appended":false,"other":"x"}\t')
+			helpers.assert_true(storage.delete("other")); helpers.assert_true(storage.delete("missing"))
+			helpers.assert_true(storage.restore_owned(owner, receipt))
+			helpers.assert_eq(read(path), ' \n{ "a" : false, "future" : [0.1,{"i":9223372036854775807,"empty":[],"map":{},"n":null,"e":1.230000e-20}], "\\u0066oreign" : 2 ,"appended":false}\t')
+			helpers.assert_true(storage.release_owned(owner)); helpers.assert_true(storage.forget_owned(owner, receipt))
+		end)
+	end)
+	for _, token in ipairs({ "0.1", "9007199254740993", "1e-400", "-0" }) do
+		helpers.it("refuses an unsafe captured numeric cell " .. token .. " before native effects", function()
+			local input = '{"a":' .. token .. ',"future":0.1}'
+			storage_cohort_fixture(input, function(storage, _, path, backup, _, read)
+				local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				local receipt = storage.capture_owned(owner)
+				local decoded = require("json").decode_lossless(token)
+				if token == "-0" and 1 / decoded == -math.huge then
+					helpers.assert_true(type(receipt) == "table", "runtime retains exact negative-zero inverse")
+				else helpers.assert_nil(receipt) end
+				helpers.assert_eq(read(path), input)
+				helpers.assert_nil(read(backup)); helpers.assert_nil(read(path .. ".tmp"))
+				helpers.assert_true(storage.release_owned(owner))
+			end)
+		end)
+	end
+	helpers.it("rejects actual codec instance or method replacement without equality callbacks", function()
+		for _, mode in ipairs({ "instance", "method" }) do
+			storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, files, path, backup, _, read)
+				local json = require("json"); local owner = {}
+				helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				local receipt = assert(storage.capture_owned(owner))
+				local original = json.splice_root_object_source
+				if mode == "instance" then package.loaded["json"] = setmetatable({}, { __eq = function() error("forged equality") end })
+				else json.splice_root_object_source = function() return '{}', {}, {} end end
+				local result = storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files)
+				package.loaded["json"], json.splice_root_object_source = json, original
+				helpers.assert_eq(result, false); helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
+				helpers.assert_nil(read(backup)); helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+				helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
+				helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_true(storage.release_owned(owner))
+			end)
+		end
+	end)
+end)
+
+helpers.describe("storage source-read foreign publication fences", function()
+	helpers.it("retains alias ownership and refuses source-read writer reentry", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
+			local owner, competing = {}, {}
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local reader = require("infra.regular_file_reader")
+			local open, observed, entered = reader.open, {}, false
+			reader.open = function(name, ...)
+				if name == path and not entered then
+					entered = true
+					observed.set = storage.set("reentered", true)
+					observed.claim = storage.acquire_owned(competing, { "foreign" })
+				end
+				return open(name, ...)
+			end
+			local okay, committed = pcall(storage.set, "foreign", true)
+			reader.open = open
+			helpers.assert_true(okay); helpers.assert_true(committed)
+			helpers.assert_eq(observed.set, false); helpers.assert_eq(observed.claim, false)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1,"foreign":true}')
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("refuses a codec successor inserted by actual classified source read", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local json, reader = require("json"), require("infra.regular_file_reader")
+			local open = reader.open
+			reader.open = function(name, ...)
+				local handle, detail, errno = open(name, ...)
+				if name == path then package.loaded["json"] = {} end
+				return handle, detail, errno
+			end
+			local okay, committed = pcall(storage.set, "foreign", true)
+			reader.open, package.loaded["json"] = open, json
+			helpers.assert_true(okay); helpers.assert_eq(committed, false)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
+			helpers.assert_true(storage.set("foreign", true))
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1,"foreign":true}')
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+end)
+
+helpers.describe("storage native backup transitive codec authority", function()
+	helpers.it("rejects source-read quote replacement before backup and permits the repaired same owner", function()
+		local source = '{"a":false,"future":0.1}'
+		storage_cohort_fixture(source, function(storage, files, path, backup, _, read)
+			local json, reader = require("json"), require("infra.regular_file_reader")
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner))
+			local open, quote, replaced = reader.open, json.quote, false
+			reader.open = function(name, ...)
+				local handle, detail, errno = open(name, ...)
+				if name == path and not replaced then
+					replaced = true
+					json.quote = function(value)
+						return quote(value == source and "tampered" or value)
+					end
+				end
+				return handle, detail, errno
+			end
+			local okay, result = pcall(storage.publish_owned, owner, receipt, { a = { present = true, value = true } }, backup, files)
+			reader.open, json.quote = open, quote
+			helpers.assert_true(okay); helpers.assert_true(replaced); helpers.assert_eq(result, false)
+			helpers.assert_eq(read(path), source); helpers.assert_nil(read(backup))
+			helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
+			helpers.assert_eq(require("json").decode_lossless(read(backup)).source.content, source)
+			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_eq(read(path), source)
+			helpers.assert_true(storage.release_owned(owner)); helpers.assert_true(storage.forget_owned(owner, receipt))
+		end)
+	end)
+end)
+
+-- These controls retain actual native Reader/Writer/FileSystem publication. The
+-- wrapper changes only its terminal receipt after an independently observed file
+-- effect; assertions run outside protected native callbacks.
+local function ordinary_debt_fixture(mode, callback)
+	storage_cohort_fixture('{"a":false,"future":0.1,"huge":9007199254740993}', function(storage, files, path, backup, write, read)
+		local native = files.write_if_unchanged
+		local state = { writes = 0, cleanups = 0, mode = mode, effect = true, native_effect = true }
+		files.write_if_unchanged = function(name, content, expected)
+			if name ~= path then return native(name, content, expected) end
+			state.writes = state.writes + 1
+			if state.native_effect then
+				local result, detail = native(name, content, expected)
+				if result ~= true then return result, detail end
+			end
+			if state.mode == "normal" then return true end
+			if state.mode == "no_receipt" then return false, "unacknowledged native effect" end
+			return false, "retained native cleanup", function()
+				state.cleanups = state.cleanups + 1
+				if state.observe then state.observe() end
+				if state.mode == "raise" then error("native cleanup raised") end
+				if state.mode == "refuse" then return false, "cleanup refused" end
+				return true, nil, state.effect
+			end
+		end
+		local okay, detail = xpcall(function() callback(storage, files, path, backup, write, read, state) end, debug.traceback)
+		files.write_if_unchanged = native
+		if not okay then error(detail, 0) end
+	end)
+end
+
+helpers.describe("storage ordinary native cleanup journal", function()
+	for _, failure in ipairs({ "refuse", "raise" }) do
+		helpers.it("ordinary-native-debt: retains " .. failure .. " cleanup and retries only its terminal", function()
+			ordinary_debt_fixture(failure, function(storage, files, path, backup, _, read, state)
+				local owner, competitor = {}, {}
+				helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				local receipt = assert(storage.capture_owned(owner))
+				helpers.assert_eq(storage.set("foreign", false), false)
+				helpers.assert_eq(read(path), '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":false}')
+				helpers.assert_eq(storage.get("foreign", "old"), "old")
+				helpers.assert_eq(state.writes, 1); helpers.assert_eq(state.cleanups, 1)
+				helpers.assert_nil(storage.capture_owned(owner))
+				helpers.assert_eq(storage.acquire_owned(competitor, { "other" }), false)
+				helpers.assert_eq(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files), false)
+				helpers.assert_eq(storage.restore_owned(owner, receipt), false)
+				helpers.assert_eq(storage.delete("foreign"), false)
+				helpers.assert_eq(state.writes, 1); helpers.assert_nil(read(backup))
+				state.mode = "settle"
+				helpers.assert_true(storage.set("foreign", false))
+				helpers.assert_eq(storage.get("foreign"), false)
+				helpers.assert_eq(state.writes, 1)
+				helpers.assert_true(storage.release_owned(owner))
+			end)
+		end)
+	end
+	helpers.it("ordinary-native-debt: settles an unrelated request without acknowledging or replaying it", function()
+		ordinary_debt_fixture("refuse", function(storage, _, path, _, _, read, state)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.set_many({ foreign = true, second = false }), false)
+			state.mode = "settle"
+			helpers.assert_eq(storage.set("third", true), false)
+			helpers.assert_eq(state.writes, 1); helpers.assert_eq(storage.get("second"), false)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":true,"second":false}')
+			state.mode = "normal"
+			helpers.assert_true(storage.set("third", true)); helpers.assert_eq(state.writes, 2)
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("ordinary-native-debt: preserves a foreign successor and retires only the old settled intent", function()
+		ordinary_debt_fixture("refuse", function(storage, _, path, _, write, read, state)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.set("foreign", true), false)
+			local successor = '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":"external","neighbor":[]}'
+			write(path, successor); state.mode = "settle"
+			helpers.assert_eq(storage.set("foreign", true), false)
+			helpers.assert_eq(read(path), successor); helpers.assert_eq(state.writes, 1)
+			helpers.assert_eq(storage.get("foreign"), "external")
+			state.mode = "normal"
+			helpers.assert_true(storage.set("fresh", true)); helpers.assert_eq(state.writes, 2)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":"external","neighbor":[],"fresh":true}')
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	for _, invalid in ipairs({ "missing", "string" }) do
+		helpers.it("ordinary-native-debt: retains cleanup after " .. invalid .. " effect receipt and requires actual repair", function()
+			ordinary_debt_fixture("settle", function(storage, _, path, _, _, read, state)
+				local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				if invalid == "missing" then state.effect = nil else state.effect = "true" end
+				helpers.assert_eq(storage.set("foreign", true), false)
+				helpers.assert_eq(storage.set("foreign", true), false)
+				helpers.assert_eq(state.writes, 1)
+				state.effect = true
+				helpers.assert_true(storage.set("foreign", true))
+				helpers.assert_eq(state.writes, 1)
+				helpers.assert_eq(read(path), '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":true}')
+				helpers.assert_true(storage.release_owned(owner))
+			end)
+		end)
+	end
+	helpers.it("ordinary-native-debt: refuses candidate acknowledgement when the native effect flag is false", function()
+		ordinary_debt_fixture("settle", function(storage, _, path, _, write, read, state)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			state.effect = false
+			helpers.assert_eq(storage.set("foreign", true), false)
+			helpers.assert_eq(storage.set("foreign", true), false)
+			helpers.assert_eq(state.writes, 1)
+			-- A fresh external source can retire the old proven nonpublication;
+			-- it cannot retroactively turn a false native effect into success.
+			write(path, '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":"other"}')
+			helpers.assert_eq(storage.set("foreign", true), false)
+			helpers.assert_eq(storage.get("foreign"), "other"); helpers.assert_eq(state.writes, 1)
+			state.mode = "normal"
+			helpers.assert_true(storage.delete("foreign"))
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1,"huge":9007199254740993}')
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("ordinary-native-debt: starts a fresh explicit retry only after proven no-effect settlement", function()
+		ordinary_debt_fixture("refuse", function(storage, _, _, _, _, _, state)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			state.native_effect = false; state.effect = false
+			helpers.assert_eq(storage.set("foreign", true), false); helpers.assert_eq(state.writes, 1)
+			state.mode = "normal"; state.native_effect = true
+			helpers.assert_true(storage.set("foreign", true)); helpers.assert_eq(state.writes, 2)
+			helpers.assert_eq(storage.get("foreign"), true)
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("ordinary-native-debt: does not infer publication from unacknowledged partial native effects", function()
+		ordinary_debt_fixture("no_receipt", function(storage, _, path, _, write, read, state)
+			local source = read(path); local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.set("foreign", true), false)
+			helpers.assert_eq(storage.set("foreign", true), false); helpers.assert_eq(state.writes, 1)
+			helpers.assert_nil(storage.capture_owned(owner))
+			-- Unknown native acknowledgement retains the attempt. Restoring its
+			-- exact prior source is an explicit repair, not an automatic inverse.
+			write(path, source); state.mode = "normal"
+			helpers.assert_true(storage.set("foreign", true)); helpers.assert_eq(state.writes, 2)
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("ordinary-native-debt: keeps native terminal identity across actual method successors", function()
+		ordinary_debt_fixture("refuse", function(storage, files, _, _, _, _, state)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.set("foreign", true), false)
+			local method, count = files.write_if_unchanged, state.cleanups
+			files.write_if_unchanged = function() error("successor must not publish") end
+			state.mode = "settle"
+			local result = storage.set("foreign", true)
+			files.write_if_unchanged = method
+			helpers.assert_eq(result, false); helpers.assert_eq(state.cleanups, count)
+			helpers.assert_true(storage.set("foreign", true)); helpers.assert_eq(state.writes, 1)
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("ordinary-native-debt: refuses source-read and native-cleanup owned reentry without effects", function()
+		ordinary_debt_fixture("refuse", function(storage, files, path, backup, _, _, state)
+			local owner, competitor = {}, {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner)); local observed = {}
+			local function observe()
+				observed.capture = storage.capture_owned(owner)
+				observed.publish = storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files)
+				observed.restore = storage.restore_owned(owner, receipt)
+				observed.acquire = storage.acquire_owned(competitor, { "neighbor" })
+				observed.set = storage.set("neighbor", true)
+			end
+			local reader = require("infra.regular_file_reader"); local open, entered = reader.open, false
+			reader.open = function(name, ...)
+				if name == path and not entered then entered = true; observe() end
+				return open(name, ...)
+			end
+			local okay, result = pcall(storage.set, "foreign", true)
+			reader.open = open
+			helpers.assert_true(okay); helpers.assert_eq(result, false); helpers.assert_true(entered)
+			helpers.assert_nil(observed.capture)
+			for _, key in ipairs({ "publish", "restore", "acquire", "set" }) do helpers.assert_eq(observed[key], false) end
+			observed = {}; state.observe = observe; state.mode = "settle"
+			helpers.assert_true(storage.set("foreign", true))
+			helpers.assert_nil(observed.capture)
+			for _, key in ipairs({ "publish", "restore", "acquire", "set" }) do helpers.assert_eq(observed[key], false) end
+			helpers.assert_eq(state.writes, 1); helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("ordinary-native-debt: blocks released ordinary effects until prior held cleanup settles", function()
+		ordinary_debt_fixture("refuse", function(storage, _, path, _, _, read, state)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.set("foreign", true), false); helpers.assert_true(storage.release_owned(owner))
+			helpers.assert_eq(storage.clear(), false); helpers.assert_eq(state.writes, 1)
+			state.mode = "settle"
+			helpers.assert_eq(storage.clear(), false); helpers.assert_eq(state.writes, 1)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":true}')
+			helpers.assert_eq(storage.get("foreign"), true)
+		end)
+	end)
+end)
+
+helpers.describe("storage final ordinary publication admission", function()
+	helpers.it("ordinary-native-debt: refuses a codec replacement during Writer final source read", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local json, reader = require("json"), require("infra.regular_file_reader")
+			local open, samples = reader.open, 0
+			reader.open = function(name, ...)
+				local handle, detail, errno = open(name, ...)
+				if name == path then samples = samples + 1; if samples == 2 then package.loaded["json"] = {} end end
+				return handle, detail, errno
+			end
+			local okay, committed = pcall(storage.set, "foreign", true)
+			reader.open, package.loaded["json"] = open, json
+			helpers.assert_true(okay); helpers.assert_eq(committed, false); helpers.assert_eq(samples, 2)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
+			helpers.assert_true(storage.set("foreign", true))
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1,"foreign":true}')
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+end)
+
+helpers.describe("storage released ordinary source publication", function()
+	helpers.it("released-source: preserves full foreign precision and kinds across ordinary mutations and restart", function()
+		local source = ' \n{ "future" : [0.1,{"i":9223372036854775807,"long":1.234567890123456789,"empty":[],"map":{},"n":null,"e":1.2300e-20}], "\\u0061" : false }\t'
+		storage_cohort_fixture(source, function(storage, _, path, _, _, read)
+			helpers.assert_true(storage.set("a", true))
+			helpers.assert_eq(read(path), ' \n{ "future" : [0.1,{"i":9223372036854775807,"long":1.234567890123456789,"empty":[],"map":{},"n":null,"e":1.2300e-20}], "\\u0061" : true }\t')
+			helpers.assert_true(storage.set_many({ new = false, other = "x" }))
+			helpers.assert_true(storage.delete("other"))
+			local expected = ' \n{ "future" : [0.1,{"i":9223372036854775807,"long":1.234567890123456789,"empty":[],"map":{},"n":null,"e":1.2300e-20}], "\\u0061" : true ,"new":false}\t'
+			helpers.assert_eq(read(path), expected)
+			local restarted = helpers.load_module("adapters.storage")
+			helpers.assert_eq(restarted.get("a"), true); helpers.assert_eq(restarted.get("new"), false)
+			helpers.assert_true(restarted.set("a", false))
+			helpers.assert_eq(read(path), ' \n{ "future" : [0.1,{"i":9223372036854775807,"long":1.234567890123456789,"empty":[],"map":{},"n":null,"e":1.2300e-20}], "\\u0061" : false ,"new":false}\t')
+		end)
+	end)
+	for _, vector in ipairs({
+		{ key = "a", expected = ' \n{\t"b":0.1,\n"c":9007199254740993 }\t' },
+		{ key = "b", expected = ' \n{  "a" :1 ,\n"c":9007199254740993 }\t' },
+		{ key = "c", expected = ' \n{  "a" :1 ,\t"b":0.1}\t' },
+	}) do
+		helpers.it("released-source: deletes " .. vector.key .. " while retaining complete adjacent bytes", function()
+			storage_cohort_fixture(' \n{  "a" :1 ,\t"b":0.1,\n"c":9007199254740993 }\t', function(storage, _, path, _, _, read)
+				helpers.assert_true(storage.delete(vector.key)); helpers.assert_eq(read(path), vector.expected)
+			end)
+		end)
+	end
+	helpers.it("released-source: keeps decoded case and escaped literal key identities", function()
+		storage_cohort_fixture('{"Key":1,"key":2,"\\u0061":false,"literal.dot":[],"future":0.1}', function(storage, _, path, _, _, read)
+			helpers.assert_true(storage.set_many({ Key = false, a = true }))
+			helpers.assert_eq(read(path), '{"Key":false,"key":2,"\\u0061":true,"literal.dot":[],"future":0.1}')
+			helpers.assert_true(storage.delete("literal.dot"))
+			helpers.assert_eq(read(path), '{"Key":false,"key":2,"\\u0061":true,"future":0.1}')
+		end)
+	end)
+	helpers.it("released-source: samples a fresh external source rather than stale loaded cache", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, write, read)
+			helpers.assert_eq(storage.get("a"), false)
+			write(path, '{"a":false,"future":0.1,"external":9007199254740993,"empty":[]}')
+			helpers.assert_true(storage.set("a", true))
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1,"external":9007199254740993,"empty":[]}')
+			write(path, '{"a":true,"future":0.1,"external":9007199254740993,"empty":[],"new":false}')
+			helpers.assert_true(storage.delete("new"))
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1,"external":9007199254740993,"empty":[]}')
+		end)
+	end)
+	helpers.it("released-source: clear owns all actual root members and keeps outside trivia", function()
+		storage_cohort_fixture(' \n{ "future":0.1, "empty":[], "map":{}, "null":null }\t', function(storage, _, path, _, _, read)
+			helpers.assert_true(storage.clear()); helpers.assert_eq(read(path), ' \n{}\t')
+			helpers.assert_true(storage.clear()); helpers.assert_eq(read(path), ' \n{}\t')
+		end)
+	end)
+	helpers.it("released-source: actual final source change refuses publication and safely admits a later explicit request", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, write, read)
+			storage.get("a")
+			local reader = require("infra.regular_file_reader"); local open, samples = reader.open, 0
+			local successor = '{"a":false,"future":0.1,"external":9007199254740993}'
+			reader.open = function(name, ...)
+				if name == path then samples = samples + 1; if samples == 2 then write(path, successor) end end
+				return open(name, ...)
+			end
+			local okay, result = pcall(storage.set, "a", true)
+			reader.open = open
+			helpers.assert_true(okay); helpers.assert_eq(result, false); helpers.assert_true(samples >= 2)
+			helpers.assert_eq(read(path), successor); helpers.assert_nil(read(path .. ".tmp"))
+			-- Native admission proved no call to rename; its Boolean false receipt
+			-- retires the old intent but cannot acknowledge its value.
+			helpers.assert_true(storage.set("a", true))
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1,"external":9007199254740993}')
+		end)
+	end)
+	helpers.it("released-source: refuses codec changes during final read and permits exact capability repair", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
+			storage.get("a")
+			local json, reader = require("json"), require("infra.regular_file_reader")
+			local open, samples = reader.open, 0
+			reader.open = function(name, ...)
+				local handle, detail, errno = open(name, ...)
+				if name == path then samples = samples + 1; if samples == 2 then package.loaded["json"] = {} end end
+				return handle, detail, errno
+			end
+			local okay, result = pcall(storage.set, "a", true)
+			reader.open, package.loaded["json"] = open, json
+			helpers.assert_true(okay); helpers.assert_eq(result, false)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
+			helpers.assert_nil(read(path .. ".tmp")); helpers.assert_true(storage.set("a", true))
+		end)
+	end)
+	helpers.it("released-source: retains an exclusive temporary inode claimed by another writer", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, write, read)
+			write(path .. ".tmp", "foreign staging bytes")
+			helpers.assert_eq(storage.set("a", true), false)
+			helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
+			helpers.assert_eq(read(path .. ".tmp"), "foreign staging bytes")
+		end)
+	end)
+	helpers.it("released-source: rejects decoded duplicate-key sources before ordinary effects", function()
+		for _, source in ipairs({ '{"a":false,"\\u0061":true}', '{"a":{"x":1,"x":2},"future":0.1}' }) do
+			storage_cohort_fixture(source, function(storage, _, path, _, _, read)
+				helpers.assert_eq(storage.set("new", true), false); helpers.assert_eq(read(path), source)
+				helpers.assert_nil(read(path .. ".tmp"))
+			end)
+		end
+	end)
+	helpers.it("released-source: native rename reentry cannot acquire or mutate another alias", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
+			local rename, observed = os.rename, {}
+			os.rename = function(from, to)
+				if to == path then
+					observed.claim = storage.acquire_owned({}, { "neighbor" })
+					observed.set = storage.set("neighbor", true)
+				end
+				return rename(from, to)
+			end
+			local okay, result = pcall(storage.set, "a", true)
+			os.rename = rename
+			helpers.assert_true(okay); helpers.assert_true(result)
+			helpers.assert_eq(observed.claim, false); helpers.assert_eq(observed.set, false)
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1}')
+		end)
+	end)
+end)
+
+helpers.describe("storage released ordinary native receipt recovery", function()
+	helpers.it("released-source: unknown partial rename acknowledgement cannot be replayed or inferred", function()
+		local source = '{"a":false,"future":0.1}'
+		storage_cohort_fixture(source, function(storage, _, path, _, write, read)
+			storage.get("a")
+			local rename, calls = os.rename, 0
+			os.rename = function(from, to)
+				local result, detail, errno = rename(from, to)
+				if to == path then calls = calls + 1; return false, "native effect without ACK" end
+				return result, detail, errno
+			end
+			local okay, result = pcall(storage.set, "a", true)
+			os.rename = rename
+			helpers.assert_true(okay); helpers.assert_eq(result, false); helpers.assert_eq(calls, 1)
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1}'); helpers.assert_eq(storage.get("a"), false)
+			helpers.assert_eq(storage.set("a", true), false); helpers.assert_eq(calls, 1)
+			helpers.assert_eq(storage.acquire_owned({}, { "neighbor" }), false)
+			write(path, source) -- Explicit actual-source repair, never an automatic inverse.
+			helpers.assert_true(storage.set("a", true)); helpers.assert_eq(read(path), '{"a":true,"future":0.1}')
+		end)
+	end)
+	helpers.it("released-source: acknowledged native rename retries only failed readback", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
+			storage.get("a")
+			local reader = require("infra.regular_file_reader")
+			local rename, open, effect, renames = os.rename, reader.open, false, 0
+			os.rename = function(from, to)
+				local result, detail, errno = rename(from, to)
+				if to == path and result == true then effect = true; renames = renames + 1 end
+				return result, detail, errno
+			end
+			reader.open = function(name, ...)
+				if name == path and effect then return nil, "readback EACCES", 13 end
+				return open(name, ...)
+			end
+			local okay, result = pcall(storage.set, "a", true)
+			reader.open, os.rename = open, rename
+			helpers.assert_true(okay); helpers.assert_eq(result, false); helpers.assert_eq(renames, 1)
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1}'); helpers.assert_eq(storage.get("a"), false)
+			helpers.assert_true(storage.set("a", true)); helpers.assert_eq(renames, 1)
+			helpers.assert_eq(storage.get("a"), true); helpers.assert_nil(read(path .. ".tmp"))
+		end)
+	end)
+end)
+
+helpers.describe("storage lazy recovery permission under native ownership", function()
+	for _, vector in ipairs({
+		{ label = "valid", source = '{"a":false,"future":0.1}' },
+		{ label = "malformed", source = '{malformed foreign bytes' },
+		{ label = "absent" },
+	}) do
+		helpers.it("held-read: claim-only " .. vector.label .. " source refuses every lazy reader without effects", function()
+			storage_cohort_fixture(vector.source, function(storage, _, path, _, _, read)
+				local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				local reader = require("infra.regular_file_reader"); local open, calls = reader.open, 0
+				reader.open = function(name, ...)
+					if name == path then calls = calls + 1 end
+					return open(name, ...)
+				end
+				local called, value, present, keys = pcall(function()
+					return storage.get("a", "guarded-default"), storage.has("a"), storage.keys()
+				end)
+				reader.open = open
+				helpers.assert_true(called); helpers.assert_eq(value, "guarded-default")
+				helpers.assert_eq(present, false); helpers.assert_eq(keys, {})
+				helpers.assert_eq(calls, 0); helpers.assert_eq(read(path), vector.source)
+				helpers.assert_nil(read(path .. ".corrupt")); helpers.assert_nil(read(path .. ".tmp"))
+				helpers.assert_nil(storage.recovery_status()); helpers.assert_true(storage.release_owned(owner))
+			end)
+		end)
+	end
+	helpers.it("held-read: refused claim initialization permits later source repair and released ordinary initialization", function()
+		storage_cohort_fixture('{malformed original source', function(storage, _, path, _, write, read)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.get("a", "refused"), "refused")
+			helpers.assert_true(storage.release_owned(owner))
+			write(path, '{"a":false,"future":0.1}')
+			helpers.assert_true(storage.set("a", true))
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1}')
+			helpers.assert_eq(storage.get("a"), true); helpers.assert_nil(read(path .. ".corrupt"))
+		end)
+	end)
+	helpers.it("held-read: active ordinary cleanup preserves a malformed successor during all lazy reads", function()
+		ordinary_debt_fixture("refuse", function(storage, _, path, _, write, read, state)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.set("foreign", true), false)
+			local malformed = '{malformed external successor'
+			write(path, malformed)
+			helpers.assert_eq(storage.get("foreign", "refused"), "refused")
+			helpers.assert_eq(storage.has("foreign"), false); helpers.assert_eq(storage.keys(), {})
+			helpers.assert_eq(read(path), malformed); helpers.assert_nil(read(path .. ".corrupt"))
+			helpers.assert_nil(storage.recovery_status()); helpers.assert_eq(state.writes, 1)
+			helpers.assert_true(storage.release_owned(owner))
+			helpers.assert_eq(storage.get("foreign", "still-refused"), "still-refused")
+			helpers.assert_eq(read(path), malformed); helpers.assert_nil(read(path .. ".corrupt"))
+			local candidate = '{"a":false,"future":0.1,"huge":9007199254740993,"foreign":true}'
+			write(path, candidate); state.mode = "settle"
+			helpers.assert_true(storage.set("foreign", true))
+			helpers.assert_eq(state.writes, 1); helpers.assert_eq(read(path), candidate)
+			helpers.assert_eq(storage.get("foreign"), true)
+		end)
+	end)
+	helpers.it("held-read: ordinary boot initialization does not grant reentrant readers its private permission", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
+			local reader = require("infra.regular_file_reader"); local open, entered, observed = reader.open, false, {}
+			reader.open = function(name, ...)
+				if name == path and not entered then
+					entered = true
+					observed.get = storage.get("a", "refused")
+					observed.has = storage.has("a")
+					observed.keys = storage.keys()
+				end
+				return open(name, ...)
+			end
+			local called, result = pcall(storage.set, "a", true)
+			reader.open = open
+			helpers.assert_true(called); helpers.assert_true(result); helpers.assert_true(entered)
+			helpers.assert_eq(observed.get, "refused"); helpers.assert_eq(observed.has, false); helpers.assert_eq(observed.keys, {})
+			helpers.assert_eq(read(path), '{"a":true,"future":0.1}'); helpers.assert_nil(read(path .. ".corrupt"))
+		end)
+	end)
+	helpers.it("held-read: cached reads remain read-only while ownership is active", function()
+		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, write, read)
+			helpers.assert_eq(storage.get("a"), false)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			write(path, '{malformed external bytes')
+			helpers.assert_eq(storage.get("a"), false); helpers.assert_eq(storage.has("a"), true)
+			local keys = storage.keys(); table.sort(keys)
+			helpers.assert_eq(keys, { "a", "future" })
+			helpers.assert_eq(read(path), '{malformed external bytes'); helpers.assert_nil(read(path .. ".corrupt"))
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+end)
+
+helpers.describe("storage ordinary initialization lifetime", function()
+	for _, vector in ipairs({
+		{ label = "valid", source = '{"a":false,"future":0.1}' },
+		{ label = "malformed", source = '{malformed actual recovery source' },
+	}) do
+		helpers.it("held-load: " .. vector.label .. " native read callbacks cannot acquire overlapping ownership", function()
+			storage_cohort_fixture(vector.source, function(storage, _, path, _, _, read)
+				local reader = require("infra.regular_file_reader"); local open, entered = reader.open, false
+				local owner, observed = {}, {}
+				reader.open = function(name, ...)
+					if name == path and not entered then
+						entered = true
+						observed.acquire = storage.acquire_owned(owner, { "a" })
+						observed.get = storage.get("a", "reentry-refused")
+						observed.set = storage.set("foreign", true)
+					end
+					return open(name, ...)
+				end
+				local called, value = pcall(storage.get, "a", "ordinary-default")
+				reader.open = open
+				helpers.assert_true(called); helpers.assert_true(entered)
+				helpers.assert_eq(observed.acquire, false); helpers.assert_eq(observed.set, false)
+				helpers.assert_eq(observed.get, "reentry-refused")
+				if vector.label == "valid" then
+					helpers.assert_eq(value, false); helpers.assert_eq(read(path), vector.source)
+					helpers.assert_nil(storage.recovery_status())
+				else
+					helpers.assert_eq(value, "ordinary-default"); helpers.assert_nil(read(path))
+					helpers.assert_eq(read(path .. ".corrupt"), vector.source)
+					helpers.assert_eq(storage.recovery_status().preserved, true)
+				end
+				helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				helpers.assert_true(storage.release_owned(owner))
+			end)
+		end)
+	end
+	helpers.it("held-load: throwing recovery logger releases initialization lifetime without hiding the exception", function()
+		storage_cohort_fixture('{malformed unclaimed source', function(storage, _, path, _, _, read)
+			local logger = require("logger.shim"); local error_log = logger.error
+			local owner, observed = {}, {}
+			logger.error = function()
+				observed.acquire = storage.acquire_owned(owner, { "a" })
+				observed.set = storage.set("foreign", true)
+				error("controlled actual recovery logger failure")
+			end
+			local called, failure = pcall(storage.get, "a")
+			logger.error = error_log
+			helpers.assert_eq(called, false)
+			helpers.assert_true(tostring(failure):find("controlled actual recovery logger failure", 1, true) ~= nil)
+			helpers.assert_eq(observed.acquire, false); helpers.assert_eq(observed.set, false)
+			helpers.assert_eq(read(path .. ".corrupt"), '{malformed unclaimed source')
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_true(storage.release_owned(owner))
+		end)
 	end)
 end)

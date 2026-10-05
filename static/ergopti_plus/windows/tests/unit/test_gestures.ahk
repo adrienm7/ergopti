@@ -691,3 +691,229 @@ TestGestures_SharedSystemRefreshDeclaration() {
 	}
 }
 Test("Gestures: actual system refresh provider follows declaration order caption and platform", TestGestures_SharedSystemRefreshDeclaration)
+
+
+; The independent three-slot vector crosses the original tap_4 boundary once.
+_GTB_WithSlots(Callback) {
+	global GESTURE_SLOTS, GestureAssignments, Features
+	PreviousSlots := GESTURE_SLOTS, PreviousAssignments := GestureAssignments, PreviousFeatures := Features
+	try {
+		GESTURE_SLOTS := ["swipe_3_up", "tap_4", "tap_3"]
+		GestureAssignments := Map("swipe_3_up", "none", "tap_4", "none", "tap_3", "none")
+		Features := Map("gestures", Map("enabled", true))
+		return Callback.Call()
+	} finally {
+		GESTURE_SLOTS := PreviousSlots, GestureAssignments := PreviousAssignments, Features := PreviousFeatures
+	}
+}
+
+_GTB_Owner() {
+	Owner := _MR_FindItemById("gestures_menu", "gesture_slots_ahk")
+	Assert(Owner is Map, "the actual flat Windows provider must be declared")
+	return Owner
+}
+
+_GTB_AssertSlotRows(Rows, ExpectedLength, TapPosition) {
+	Assert(Rows is Array)
+	AssertEqual(ExpectedLength, Rows.Length)
+	for Pair in [[1, "swipe_3_up"], [TapPosition, "tap_4"], [TapPosition + 1, "tap_3"]] {
+		Row := Rows[Pair[1]]
+		AssertTrue(InStr(Row["label"], t("gesture.slots." . Pair[2]) . " : ") == 1)
+		Assert(Row["action"] is Func, "the existing slot action remains its native callback")
+		AssertFalse(Row["disabled"])
+	}
+}
+
+_GTB_DeclaredBoundary() {
+	_GTB_WithSlots(() => _GTB_DeclaredBoundaryInner())
+}
+_GTB_DeclaredBoundaryInner() {
+	Owner := _GTB_Owner()
+	Assert(Owner.Get("status_rows", false) is Map)
+	Boundary := Owner["status_rows"]["tap_group_boundary"]
+	Assert(Boundary is Array)
+	AssertEqual(1, Boundary.Length)
+	AssertEqual(1, Boundary[1].Count)
+	AssertEqual("---", Boundary[1]["type"])
+	Rows := _GES_SlotRows()
+	_GTB_AssertSlotRows(Rows, 4, 3)
+	AssertTrue(Rows[2]["separator"])
+	AssertFalse(Rows[2].Has("action"), "a fixed separator has no click owner")
+	Native := Menu()
+	try {
+		AssertEqual(3, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts named rows only")
+		AssertEqual(4, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+		Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 1, "UInt", 0x400, "UInt")
+		Assert(Flags != 0xFFFFFFFF, "GetMenuState must acknowledge the actual separator position")
+		AssertTrue((Flags & 0x800) != 0, "the actual Win32 item between swipe and tap is a separator")
+		AssertEqual(Rows[3]["label"], _CTC_LabelAt(Native, 2), "tap_4 follows the actual separator")
+	} finally _CTC_ReleaseMenu(Native)
+}
+Test("Gestures menu: the actual flat provider materializes its shared tap boundary", _GTB_DeclaredBoundary)
+
+_GTB_PublishedBoundary() {
+	_GTB_WithSlots(() => _GTB_PublishedBoundaryInner())
+}
+_GTB_PublishedBoundaryInner() {
+	Owner := _GTB_Owner(), HadStatus := Owner.Has("status_rows"), Previous := Owner.Get("status_rows", false)
+	try {
+		Owner["status_rows"] := Map("tap_group_boundary", [
+			Map("type", "label", "i18n", "common.restore_recommended"), Map("type", "---")])
+		Rows := _GES_SlotRows()
+		_GTB_AssertSlotRows(Rows, 5, 4)
+		AssertEqual(t("common.restore_recommended"), Rows[2]["label"])
+		AssertTrue(Rows[2]["disabled"])
+		AssertFalse(Rows[2].Has("action"))
+		AssertTrue(Rows[3]["separator"])
+		AssertFalse(Rows[3].Has("action"))
+		Owner["status_rows"]["tap_group_boundary"][1]["i18n"] := "common.clear_to_system"
+		AssertEqual(t("common.restore_recommended"), Rows[2]["label"], "held materialized data is detached from later source mutation")
+		AssertEqual(t("common.clear_to_system"), _GES_SlotRows()[2]["label"], "a fresh native provider consumes current shared source")
+		Owner.Delete("status_rows")
+		AssertEqual(0, _GES_SlotRows().Length, "a missing required boundary refuses a rebuilt provider")
+		Native := Menu()
+		try {
+			AssertEqual(4, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts the inert label and slots")
+			AssertEqual(5, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+			AssertEqual(t("common.restore_recommended"), _CTC_LabelAt(Native, 1))
+			Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 1, "UInt", 0x400, "UInt")
+			Assert(Flags != 0xFFFFFFFF, "GetMenuState must acknowledge the actual held-label position")
+			AssertTrue((Flags & 3) != 0, "the held inert label remains actually disabled")
+		} finally _CTC_ReleaseMenu(Native)
+	} finally {
+		if HadStatus
+			Owner["status_rows"] := Previous
+		else if Owner.Has("status_rows")
+			Owner.Delete("status_rows")
+	}
+}
+Test("Gestures menu: current declared boundary order is consumed and held inert data is detached", _GTB_PublishedBoundary)
+
+_GTB_RefusedBoundary() {
+	_GTB_WithSlots(() => _GTB_RefusedBoundaryInner())
+}
+_GTB_RefusedBoundaryInner() {
+	global GESTURE_SLOTS, GestureAssignments, Features
+	Owner := _GTB_Owner(), HadStatus := Owner.Has("status_rows"), Previous := Owner.Get("status_rows", false)
+	Assignments := GestureAssignments, FeatureOwner := Features
+	try {
+		for Invalid in [false, Map(), Map("tap_group_boundary", []),
+			Map("tap_group_boundary", [Map("type", "command", "id", "foreign_action")]),
+			Map("tap_group_boundary", [Map("type", "---", "action", (*) => true)]),
+			Map("tap_group_boundary", [Map("type", "label", "i18n", "common.restore_recommended", "checked_when", ["foreign_state"])])] {
+			Owner["status_rows"] := Invalid
+			AssertEqual(0, _GES_SlotRows().Length, "missing, empty or effect-bearing status cannot publish a partial slot list")
+			AssertTrue(GestureAssignments == Assignments)
+			AssertEqual("none", GestureAssignments["tap_4"])
+			AssertTrue(Features == FeatureOwner)
+			AssertTrue(Features["gestures"]["enabled"])
+		}
+		Owner.Delete("status_rows")
+		GESTURE_SLOTS := ["swipe_3_up", "tap_3"]
+		Rows := _GES_SlotRows()
+		AssertEqual(2, Rows.Length, "an absent tap_4 needs no boundary or invented separator")
+		AssertFalse(Rows[1].Get("separator", false))
+		AssertFalse(Rows[2].Get("separator", false))
+	} finally {
+		if HadStatus
+			Owner["status_rows"] := Previous
+		else if Owner.Has("status_rows")
+			Owner.Delete("status_rows")
+	}
+}
+Test("Gestures menu: missing or effect-bearing boundary refuses atomically without changing native assignment owners", _GTB_RefusedBoundary)
+
+
+; The native equivalent replays the exact hand-authored corpus used by Lua.
+; Default case-insensitive Maps deliberately exercise the helper's exact lookup.
+TestGestures_PublishedBindingIdentityCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_binding_identity\vectors.json", "UTF-8"))
+	AssertEqual(29, Corpus["vectors"].Length, "frozen independent publication corpus")
+	for Vector in Corpus["vectors"] {
+		if Vector.Get("expects_error", false) {
+			AssertThrows(ConfigBindingIdentityGestureStatus.Bind(Vector["binding"], Vector["catalogue"]), Vector["id"])
+			continue
+		}
+		if Vector.Has("published") && !Vector["published"] {
+			Status := ConfigBindingIdentityGestureStatus(Vector["binding"])
+		} else {
+			Slots := Map()
+			for Slot in Vector["slots"]
+				Slots[Slot] := true
+			Status := ConfigBindingIdentityGestureStatus(Vector["binding"], Map("prefix", Vector["prefix"], "slots", Slots))
+		}
+		AssertEqual(Vector["status"], Status, Vector["id"])
+	}
+}
+Test("Gestures: published binding identity replays shared 29-vector corpus (gesture-binding-identity-corpus)",
+	TestGestures_PublishedBindingIdentityCorpus)
+
+TestGestures_PublishedNativeSlotDomain() {
+	Catalogue := TomlConfigGestureSlotCatalogue()
+	AssertEqual("gesture__", Catalogue["prefix"])
+	AssertEqual(10, Catalogue["slots"].Count, "actual complete Windows catalogue")
+	AssertEqual("On", Catalogue["slots"].CaseSense)
+	for Slot in GestureSlotIds()
+		AssertEqual("current", ConfigBindingIdentityGestureStatus(GestureBindingId("gesture", Slot), Catalogue), Slot)
+	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__removed_gesture_slot", Catalogue))
+	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__TAP_3", Catalogue))
+	AssertEqual("unjudged", ConfigBindingIdentityGestureStatus("Gesture__tap_3", Catalogue))
+	for Binding in ["keyboard__ctrl_k", "tap_key__a", "script__pause", "tap_hold__caps_lock", "combination__caps_lock_then_space"]
+		AssertEqual("unjudged", ConfigBindingIdentityGestureStatus(Binding, Catalogue), Binding)
+}
+Test("Gestures: native owner publishes its exact ten-slot domain (gesture-binding-identity-native-catalogue)",
+	TestGestures_PublishedNativeSlotDomain)
+
+TestGestures_RetiredParameterSettersRefuseBeforePorts() {
+	global GestureActionParameters
+	Previous := GestureActionParameters
+	Calls := []
+	Writer := (*) => (Calls.Push("writer"), false)
+	Notify := (*) => Calls.Push("notify")
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["Gesture__tap_3__open_url"] := "https://unjudged.example"
+		AssertFalse(GestureSetActionParameter("gesture__removed_gesture_slot", "open_url", "https://must-not-write.example", Writer, Notify))
+		AssertEqual(0, Calls.Length, "ordinary refusal precedes writer and native notification")
+		AssertEqual(1, GestureActionParameters.Count)
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		Assignments := Map("tap_3", "none")
+		Parameters := GestureActionParameters.Clone()
+		Candidate := Map("has_value", true, "key", "gesture__removed_gesture_slot__open_url", "value", "https://must-not-write.example")
+		AssertFalse(_GestureCommitAssignment(&Assignments, &Parameters, "gestures", "tap_3", "open_url", Candidate, Writer, Notify))
+		AssertEqual(0, Calls.Length, "combined assignment also refuses before persistence")
+		AssertEqual("none", Assignments["tap_3"])
+		AssertEqual(1, Parameters.Count)
+		AssertEqual("On", Parameters.CaseSense)
+	} finally GestureActionParameters := Previous
+}
+Test("Gestures: proven retired parameters refuse both ordinary setter paths before ports (gesture-binding-identity-refusal)",
+	TestGestures_RetiredParameterSettersRefuseBeforePorts)
+
+TestGestures_ParameterSnapshotsKeepCaseTwins() {
+	Known := "gesture__tap_3__open_url"
+	Twin := "Gesture__tap_3__open_url"
+	Source := Map()
+	Source.CaseSense := "On"
+	Source[Known] := "https://known.example"
+	Source[Twin] := "https://unjudged.example"
+	Snapshot := _GestureCloneActionParameters(Source)
+	AssertEqual("On", Snapshot.CaseSense)
+	AssertEqual(2, Snapshot.Count)
+	AssertEqual("https://known.example", Snapshot[Known])
+	AssertEqual("https://unjudged.example", Snapshot[Twin])
+	Revert := Snapshot.Clone()
+	AssertEqual("On", Revert.CaseSense, "native Clone preserves the exact compensation domain")
+	AssertEqual(2, Revert.Count)
+	AssertEqual("https://known.example", Revert[Known])
+	AssertEqual("https://unjudged.example", Revert[Twin])
+	Legacy := Map(Known, "https://legacy.example")
+	Upgraded := _GestureCloneActionParameters(Legacy)
+	AssertEqual("On", Upgraded.CaseSense)
+	AssertEqual("https://legacy.example", Upgraded[Known])
+	AssertEqual("Off", Legacy.CaseSense, "populated legacy Map was never switched in place")
+}
+Test("Gestures: detached snapshots and exact native clones retain both case twins (gesture-binding-identity-snapshots)",
+	TestGestures_ParameterSnapshotsKeepCaseTwins)

@@ -1,0 +1,29 @@
+{
+	"section": "layout_menu",
+	"provider": "custom_layouts",
+	"status": "none_installed",
+	"row": { "type": "label", "i18n": "menu.layout.none_installed" },
+	"captions": {
+		"ar": "لا يوجد تخطيط مثبّت",
+		"cs": "Není nainstalováno žádné rozložení",
+		"da": "Intet layout installeret",
+		"de": "Kein Layout installiert",
+		"en": "No layout installed",
+		"es": "Ninguna distribución instalada",
+		"fr": "Aucune disposition installée",
+		"he": "לא הותקנה פריסה",
+		"hi": "कोई लेआउट इंस्टॉल नहीं है",
+		"it": "Nessun layout installato",
+		"ja": "インストール済みの配列はありません",
+		"ko": "설치된 자판 없음",
+		"nl": "Geen indeling geïnstalleerd",
+		"no": "Ingen tastaturoppsett installert",
+		"pl": "Brak zainstalowanych układów",
+		"pt": "Nenhuma disposição instalada",
+		"ru": "Нет установленных раскладок",
+		"sv": "Ingen layout installerad",
+		"tr": "Yüklü düzen yok",
+		"uk": "Немає встановлених розкладок",
+		"zh": "未安装布局"
+	}
+}

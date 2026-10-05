@@ -40,6 +40,7 @@
 
 
 #Include ../../_generated/action_catalogue.ahk
+#Include ../../../_shared/ahk/config_binding_identity.ahk
 
 
 
@@ -139,6 +140,81 @@ TomlConfigKeyCombinationKeys() {
 	return Keys
 }
 
+/**
+ * Publishes the gesture parameter domain from its complete native slot accessor.
+ * This accessor is available before gesture initialization; mutable runtime
+ * assignments cannot prove that a saved binding has been retired.
+ * @returns {Map} Native prefix and complete case-exact slot-id set.
+ * @throws {ValueError} If the native owner publishes an invalid inventory.
+ */
+TomlConfigGestureSlotCatalogue() {
+	Ids := GestureSlotIds()
+	if !(Ids is Array) || Ids.Length == 0
+		throw ValueError("gestures: invalid published slot catalogue")
+	Slots := Map()
+	Slots.CaseSense := "On"
+	Count := 0
+	for Index, Slot in Ids {
+		if Type(Slot) != "String" || Slot == "" || InStr(Slot, "__", true) || Slots.Has(Slot)
+			throw ValueError("gestures: invalid published slot catalogue")
+		Slots[Slot] := true
+		Count += 1
+	}
+	if Count != Ids.Length
+		throw ValueError("gestures: invalid published slot catalogue")
+	return Map("prefix", GestureBindingId("gesture", ""), "slots", Slots)
+}
+
+/**
+ * Judges only a recognized parameter-action suffix against the native domain.
+ * Other binding owners retain their current admission and source ownership.
+ * @param {String} Key Persisted parameter key.
+ * @param {Map} Catalogue Optional already-published native gesture domain.
+ * @returns {String} Shared current/retired/unjudged identity decision.
+ */
+TomlConfigActionParameterBindingStatus(Key, Catalogue?) {
+	if Type(Key) != "String"
+		return "unjudged"
+	if !IsSet(Catalogue)
+		Catalogue := TomlConfigGestureSlotCatalogue()
+	for Action, Metadata in GestureActionCatalogueData().Actions {
+		if Metadata.Parameter == ""
+			continue
+		Suffix := "__" . Action
+		if StrLen(Key) >= StrLen(Suffix) && SubStr(Key, -StrLen(Suffix)) == Suffix
+			return ConfigBindingIdentityGestureStatus(SubStr(Key, 1, StrLen(Key) - StrLen(Suffix)), Catalogue)
+	}
+	return "unjudged"
+}
+
+/**
+ * Reports a retired gesture parameter from config.toml once per file and key.
+ * Both the boot loader and direct gesture reload use this configuration owner;
+ * the other-file reporter must not deny that config.toml cleanup owns the row.
+ * @param {String} FilePath Exact persisted configuration identity.
+ * @param {String} Key Retired parameter key.
+ * @returns {Boolean} True when this call records the first warning.
+ */
+TomlConfigReportRetiredGestureParameter(FilePath, Key) {
+	static Reported := Map()
+	if Type(FilePath) != "String" || FilePath == "" || Type(Key) != "String" || Key == ""
+		throw ValueError("A retired gesture parameter requires its configuration file and key.")
+	PreviousCritical := Critical("On")
+	try {
+		if !Reported.Has(FilePath) {
+			Keys := Map()
+			Keys.CaseSense := "On"
+			Reported[FilePath] := Keys
+		}
+		if Reported[FilePath].Has(Key)
+			return false
+		Reported[FilePath][Key] := true
+	} finally Critical(PreviousCritical)
+	try LoggerWarn("TomlConfigLoader", "Outdated configuration entry '[action_parameters].{1}' in '{2}' ignored "
+		. "(no gesture slot of this build has this name); it is offered for explicit cleanup.", TOML_RenderKey(Key), FilePath)
+	return true
+}
+
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
 TomlConfigActionParameterIsOwned(Key) {
@@ -146,6 +222,7 @@ TomlConfigActionParameterIsOwned(Key) {
 	if !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
 		return false
 	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
+		&& TomlConfigActionParameterBindingStatus(Key) != "retired"
 }
 
 TomlConfigForeignOwner(SectionPath, Key) {
@@ -594,6 +671,10 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		; version. Apply the remaining valid keys and summarize unused entries
 		; once below. TomlConfigUnknownKind owns that rule; the menu's unused-key
 		; cleanup offers to remove exactly these keys.
+		if CurrentSection == "action_parameters" && TomlConfigActionParameterBindingStatus(Key) == "retired" {
+			TomlConfigReportRetiredGestureParameter(FilePath, Key)
+			continue
+		}
 		UnknownKind := TomlConfigUnknownKind(Features, CurrentSection, Key,
 			&ForeignOwner)
 		if (UnknownKind != "") {

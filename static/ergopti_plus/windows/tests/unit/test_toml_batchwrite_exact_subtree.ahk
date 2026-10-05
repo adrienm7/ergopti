@@ -189,3 +189,84 @@ _TBES_DuplicateSemanticSourceRefuses() {
 }
 Test("toml writer admission: malformed semantic aliases refuse even a flat no-op (toml-writer-document)",
 	_TBES_DuplicateSemanticSourceRefuses)
+
+
+; These handwritten physical images distinguish declared tables from ancestry
+; created only to reach an assignment or descendant header.
+_TBES_ConfigDeletionAncestorVectors() {
+	return [
+		{ Id: 'implicit header parent', Source: '[stale.section]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.section'],
+			Expected: '[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'explicit empty parent', Source: '[stale]`n[stale.section]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.section'],
+			Expected: '[stale]`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'multiple implicit ancestors', Source: '[stale.section.inner]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.section.inner'],
+			Expected: '[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'populated sibling', Source: '[stale.keep]`nflag=false # exact sibling`n[stale.section]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.section'],
+			Expected: '[stale.keep]`nflag=false # exact sibling`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'root dotted leaf', Source: 'stale.section.label="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [{ Section: 'stale.section', Key: 'label', Delete: 1 }], Prefixes: [],
+			Expected: '[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'relative dotted leaf', Source: '[stale]`nsection.label="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [{ Section: 'stale.section', Key: 'label', Delete: 1 }], Prefixes: [],
+			Expected: '[stale]`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'quoted literal twin', Source: '["stale.section"]`nkeep="literal" # exact quoted sibling`n[stale.section]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.section'],
+			Expected: '["stale.section"]`nkeep="literal" # exact quoted sibling`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'case twin', Source: '[Stale.section]`nkeep="case" # exact case sibling`n[stale.section]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.section'],
+			Expected: '[Stale.section]`nkeep="case" # exact case sibling`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'empty quoted segment', Source: '[stale.""]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.""'],
+			Expected: '[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'inline explicit empty container', Source: 'stale = {section = {label = "old"}, empty = {}}`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [{ Section: 'stale.section', Key: 'label', Delete: 1 }], Prefixes: [],
+			Expected: 'stale = {section = {}, empty = {}}`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'removed inline container parent', Source: 'stale = {section = {label = "old"}}`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [], Prefixes: ['stale.section'],
+			Expected: 'stale = {}`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'table array neighbor generations', Source: '[stale.section]`nlabel="old"`n[[future]]`nflag=false # first generation`n[[future]]`ntext="001" # second generation`n',
+			Updates: [], Prefixes: ['stale.section'],
+			Expected: '[[future]]`nflag=false # first generation`n[[future]]`ntext="001" # second generation`n' },
+		{ Id: 'missing delete exact no-op', Source: '[stale]`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [{ Section: 'stale.missing', Key: 'label', Delete: 1 }], Prefixes: [],
+			Expected: '[stale]`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+		{ Id: 'replacement recreates implicit ancestry', Source: '[stale.section]`nlabel="old"`n[future]`ntext="001" # exact neighbor`nflag=false`n',
+			Updates: [{ Section: 'stale.section', Key: 'label', Value: 'new' }], Prefixes: ['stale.section'],
+			Expected: '[future]`ntext="001" # exact neighbor`nflag=false`n[stale.section]`nlabel = "new"`n' }
+	]
+}
+
+_TBES_ConfigDeletionAncestorVector(Vector) {
+	Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Vector.Source
+	Expected := Chr(0xFEFF) . Vector.Expected
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+		FileSetTime("20000101000000", Path, "M")
+		BeforeTime := FileGetTime(Path, "M")
+		Cached := ParseTomlFile(Path)
+		Candidate := TOML_BuildConfigUpdatedContent(Path, Vector.Updates, Vector.Prefixes)
+		AssertEqual("ok", Candidate["status"], Vector.Id)
+		AssertEqual(Expected, Candidate["content"], "the independent complete physical image matches")
+		AssertEqual(Source, Candidate["source_content"])
+		AssertEqual(1, Candidate["source_present"])
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "detached deletion never publishes")
+		AssertTrue(Cached == ParseTomlFile(Path), "detached deletion retains the cache owner")
+		AssertTrue(TOML_ConfigBatchWrite(Path, Vector.Updates, Vector.Prefixes) == 1,
+			"the actual guarded configuration writer acknowledges deletion")
+		AssertTrue(FSUtf8ExactMatches(Path, Expected), "publication retains the exact independent image")
+		AssertTrue(TOML_SameValue(TOML_ParseDocument(Expected), TOML_ParseDocument(FSReadUtf8Exact(Path))))
+		if Source == Expected
+			AssertEqual(BeforeTime, FileGetTime(Path, "M"), "a missing deletion retains the physical inode")
+		Stages := 0
+		Loop Files, Path . ".*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages, "the exact deletion leaves no owned staging file")
+	} finally FSDelete(Path)
+}
+for _TBES_ConfigDeletionVector in _TBES_ConfigDeletionAncestorVectors()
+	Test("toml config deletion ancestry: " . _TBES_ConfigDeletionVector.Id,
+		_TBES_ConfigDeletionAncestorVector.Bind(_TBES_ConfigDeletionVector))

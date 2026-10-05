@@ -2577,6 +2577,12 @@ The canonical JSON codec now offers private strict root-object source receipts a
 
 Windows semantic publication meta controls now follow the actual strict full-save and claimed cleanup gateways. The historical29 callers are independently audited:27 unchanged, two migrated. Coverage expands to28 public plus8 private gateways, retaining the separate private8 guard and distinguishing Map preparation receipts from Boolean publication. Exact binding/order/Integer acknowledgement and causal suffix-renaming controls preserve prior safety predicates. Portable63 source predicates pass; native AHK rerun remains required.
 
+The Windows semantic configuration builder now prunes only empty implicit ancestors of explicit deletions, while retaining source-owned explicit headers, sealed inline containers, populated siblings and update-owned Maps. The generic setter, physical renderer, strict whole-document readback, source fences and backup/publication owners remain unchanged. Fourteen handwritten registered builder/writer subjects retain the entire earlier test prefix; independent tomllib57/0 reproduces eight old expected-model mismatches. Actual AHK and old-native inverse execution remain required; this does not yet attribute the previously observed native cleanup failures.
+
+Linux storage now publishes held projections and ordinary set/set_many/delete/clear requests through authentic shared JSON source spans, preserving unowned raw numeric tokens, order and container kinds. The actual native writer remains the owner; stale terminal/cleanup debt cannot acknowledge a foreign successor. Read recovery is fenced throughout active claims and initialization reentry, while ordinary unclaimed recovery remains available. Independent focused suites pass136/0 on Lua5.4 and LuaJIT, including actual native fault and foreign-source probes. Unsafe values inside captured owned projections still refuse conservatively; no exact floating-point cache or cross-process atomic-CAS guarantee is claimed. Final selected container/native CI and installed acceptance remain separately required.
+
+The Windows semantic builder now retains unowned inline member order, raw tokens and trivia while changing or deleting only owned descendants. This addresses the exact source-image discrepancy observed in native diagnostic failure2; whole-cell explicit updates keep canonical serialization. The strict canonical lexical owner also supplies semantic inline splitting, including the independently authored triple-literal case. Final whole-document typed readback, source/publication fences and backup owners are unchanged. Independent109 plus20 portable/source predicates and the unchanged canonical syntax/loop guards pass; all28 new AHK cases and two original-production-route causal controls remain pending actual native CI.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -3123,18 +3129,26 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
-  listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
-  sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
-  (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
-  layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
-  plain string (saves refused with a generic ERROR), native qualification of
-  Linux whole-file layers.toml boot isolation, Windows sites 32, 34, 36, 37-60 and its
-  whole-file installed.json refusal, and the macOS boot-time unread-entries
-  scan cost (36-56 ms on the
-  main thread). Maintainer decisions are resolved: invalid schema stamps
-  retain strict boot and session-write refusal (site 108); retired keys
-  reported for explicit cleanup are exempt from automatic deletion migrations
-  and remain on disk until that cleanup (site 112).
+  listed; see `docs/memory/text-input-and-config.md`. Current source already
+  admits known expert `[script]`/`[features]` values through their published
+  owners, preserves obsolete scalar user-model and section-order rows, and
+  checks gesture action-parameter bindings against each driver's complete
+  native gesture inventory. Other binding owners remain unjudged. Plain-string
+  remap bindings are warned, read as neutral and preserved during unrelated
+  saves; requested replacement still requires explicit source repair. Linux
+  layers.toml boot isolation and obsolete installed-layout entry partitioning
+  are implemented. Remaining software includes complete parameter-binding
+  catalogues for the other owners and publication authority for remaining
+  dynamic model, provider and order identities. The historical review sites
+  14/93, 19, 24, 26, 28 and Windows 32, 34, 36, 37-60 still require exact current
+  owner audits before their closure can be claimed. Native Windows execution,
+  Linux layers.toml startup, Hammerspoon and installed three-OS qualification
+  remain separate acceptance work. The macOS unread-entry scan is deferred
+  off the boot critical path; its native main-thread cost still needs measurement.
+  Maintainer decisions are resolved: invalid schema stamps retain strict boot
+  and session-write refusal (site 108); retired keys reported for explicit
+  cleanup are exempt from automatic deletion migrations and remain on disk
+  until that cleanup (site 112).
 
   Windows tap_hold.toml now reports each obsolete entry once per exact file,
   rendered path and reason during the process, through the shared warning
@@ -3410,6 +3424,8 @@ The 2026-10-05 continuation preserves malformed shortcut-order source rows and s
 The declared macOS-only optional user-model list now reports obsolete scalar source once, keeps it outside runtime and unmarked for explicit cleanup, and preserves it during unrelated default-carried saves and published scope clear. A nonneutral replacement refuses before publication until explicit source repair. All original assertions remain; real typed-file oracles retain signed integers, precise floats, offset dates, literal dots and nested arrays. Linux has no supported owner for this leaf and preserves it; native Windows was inspected only. This bounded correction does not finish the remaining configuration catalogue.
 
 Persisted macOS llm.enabled now uses the actual published feature value validator before cleanup and bootstrap. Obsolete native text/numbers/containers warn once and cannot supply consent; values and TOML remain untouched until explicit cleanup. Valid true/false precedence, independently valid canonical fallback and logger ERROR are preserved. Independent actual-owner/compiled-init controls pass67/0 versus exact predecessor44/23; all44 prior cases and their assertions remain byte-exact. Equivalent typed Windows/Linux seams were inspected without duplicate changes. Actual Hammerspoon and final source/installed qualification remain required.
+
+Parameter-bearing gesture bindings now use a shared current/retired/unjudged identity policy against each actual complete native gesture catalogue. Windows, macOS and Linux loaders preserve but do not activate proven retired entries, warn once, and ordinary setters refuse them before publication; explicit cleanup remains the removal owner. Windows keeps case-distinct parameter Maps, including unjudged qualified identities. The independent29-case corpus and registered native regressions are retained; Windows native execution is still pending. Other keyboard, tap-hold, script and combination identity owners remain unjudged by this bounded cohort, so site76 and the whole item stay open. The actual gesture fixture now restores its new shared dependency through the existing exact owner scope. All old isolation assertions remain; original2/9 and corrected11/0 independently reproduce the prerequisite, including absent/false/existing owners and construction/callback failure.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -3904,6 +3920,12 @@ Native Windows diagnostics executed the complete root cleanup subjects but three
 
 Explicit cleanup meta controls now inspect the authenticated RootReceipt through the actual private publisher and claimed ConfigCommitBuilt chain, retaining backup, exact-current-source and strict acknowledgement gates. Anchored lexical binding controls reject renamed unresolved Publisher/Writer/Receipt aliases. Native Windows execution is still required; no production cleanup rule or assertion was disabled.
 
+Explicit Windows namespace deletion now normalizes its semantic expectation only for emptied implicit parents. Real retained header and inline-container identities are preserved, including quoted literal dots, empty quoted segments and case twins. Two independent source reviews pass57/0 portable predicates and preserve every old assertion; no-op checks measure exact source and modification time, not inode identity. Actual Windows syntax, all14 subjects and native cleanup causality remain pending.
+
+The shared physical record scanner now reuses the existing strict quote-aware assignment splitter instead of taking the first equals sign inside quoted keys. Actual Linux cleanup admits the proven ahk root beside an unowned quoted key containing equals, verifies the exact backup and preserves the complete independently handwritten survivor, including empty-array kind. The original valid-source limitation fixture now has stronger identity/removal/backup predicates; malformed, forged and stale refusals and447 earlier corpora remain unchanged. Independent Linux201/0 on both number models and portable macOS222/0 reproduce18 predecessor failures; actual Hammerspoon and final selected/native CI remain separately required.
+
+Windows inline descendant updates now preserve source-owned order and trivia instead of rebuilding the complete enclosing Map. Three obsolete normalization premises have independently handwritten source-fidelity expectations; all assertions remain, with exact reverse reconstruction and unchanged independent corpora. The new optional canonical lexical splitter is used only by semantic document admission; generic APIs retain their earlier bytes and behavior. Source review and canonical guards pass, but native AHK execution and the original-route causality probes are not yet claimed.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -4165,7 +4187,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 82, macOS 123, Linux 92, each
+  drivers still build (current baseline: Windows 81, macOS 120, Linux 91, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4581,6 +4603,10 @@ The packaged macOS About check row now consumes its existing shared command and 
 
 The newly registered Windows Wrap provider controls now load the actual seven-group shared catalogue, while the older two-pair transaction fixture and all its assertions remain untouched. Actual renderer acknowledgement counts labelled rows, and independent Win32 item/position/caption checks require all15 native rows including3 separators. The handwritten corpus is unchanged; source review is clear and native rerun remains required.
 
+The Windows gesture-slot tap-group separator now belongs to its existing shared gesture_slots_ahk status fragment. Actual native rows retain all action and persistence owners; three new registered tests measure Win32 positions, declaration withdrawal and invalid effect-free status admission. Every prior test/corpus is unchanged. Owner generators reproduce the artifacts and the unchanged scanner lowers only Windows82 to81, leaving macOS123/Linux92. Available selected format, BOM/LF and361 JS gates pass; AHK unit, parse and E2E are skipped on this Linux container and require targeted native CI.
+
+macOS missing-bundle and macOS/Linux empty installed-layout statuses now consume the existing shared status fragments. Native discovery and installation owners are preserved; independent handwritten expectations cover all21 translated captions. The owning generators reproduce the census Windows81/macOS120/Linux91. Selected container checks are recorded separately from native installed/device acceptance; remaining native row families keep this item open. The empty macOS Input Sources provider also consumes a shared Open preferences command with the unchanged native callback; retained declaration withdrawal refuses before launch, and no true launch acknowledgement is fabricated.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4766,7 +4792,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 82, macOS 123 and Linux 92 rows are still built by the
+  Windows 81, macOS 120 and Linux 91 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -4837,6 +4863,10 @@ The About build/version separator now consumes the same shared fragment on all t
 The packaged macOS About check uses the existing shared command for both native callbacks, preserving offered-release consent and declaration withdrawal refusal. Its actual owning scanner lowers only macOS124 to123 fixed sites; Windows82 and Linux92 remain. Final native qualification and the remaining fixed families stay open.
 
 Windows Wrap validation now observes its actual shared catalogue and separately checks labelled acknowledgement and all15 Win32 rows with3 separators. Production rendering and independent catalogue expectations remain unchanged; this fixture correction needs actual Windows rerun and does not complete the remaining menu families.
+
+The declared Windows gesture tap boundary retires one more fixed native separator site. The canonical census is Windows81/macOS123/Linux92, reproduced by its owning scanner. Actual Win32 and fail-closed behavioral assertions are registered but not executed locally; remaining families and installed/native acceptance keep this item open.
+
+The missing layout-bundle status and empty installed-layout status rows have moved to their existing shared declarations. The unchanged owning scanner now counts Windows81/macOS120/Linux91 remaining fixed native sites. Earlier corpora and native selection/installation behavior are retained; this is a bounded software slice, not complete menu migration. The empty macOS Input Sources provider also consumes a shared Open preferences command with the unchanged native callback; retained declaration withdrawal refuses before launch, and no true launch acknowledgement is fabricated.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey

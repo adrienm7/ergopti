@@ -245,12 +245,12 @@ CB_RetryRestoreDebt(*) {
 				Debt["source"], Err.Message)
 			return false
 		}
-		; A force restore with no sequence proof is allowed only on its immediate
-		; rollback attempt. If that assignment was blocked and a later retry can
-		; observe any clipboard sequence, ownership is no longer provable: the
-		; user may have copied while the debt waited. Their visible clipboard wins.
+		; Without a recorded sequence, even the first rollback cannot prove that
+		; observable clipboard content still belongs to this producer. A positive
+		; sequence therefore wins before any restore attempt. The existing forced
+		; zero-sequence path remains unfenced and provides no ownership guarantee.
 		if (!Debt["expected_sequence"] and Debt["force"]
-				and Debt["attempts"] > 1 and CurrentSequence) {
+				and CurrentSequence) {
 			try LoggerWarn("Clipboard",
 				"Unfenced restore debt from {1} yielded to observable clipboard content.",
 				Debt["source"])

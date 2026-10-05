@@ -133,7 +133,7 @@ _CAO_NativeAdmission() {
 	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters,
 		HotstringsCommonOverrideAdmitted()]
 	Directory := _CMG_NewDir(), Path := Directory . "\foreign.toml"
-	Source := '[__global__]`nfuture = "bad\q" # retain unrelated historical native bytes`n'
+	Source := '[__global__]`nfuture = "bad\uD800" # retain unrelated unsupported scalar bytes`n'
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, Source))
 		HotstringsConfigInit(Path)
@@ -233,11 +233,15 @@ _CAO_NativeColdBoot() {
 		HotstringsCommonOverrideAdmitted(), _HS_CACHE_LOADED, _HS_CACHE_ROWS, _GENERATED_HOTSTRINGS,
 		HotstringGroupConfig, _HotstringBoundSources, _HotstringExtensionPacks]
 	OptionalOwners := _CAO_IsolateOptionalOwners()
-	global PersonalFileControls
+	global PersonalFileControls, PersonalInformation
+	HadPersonalInformation := IsSet(PersonalInformation)
+	SavedPersonalInformation := HadPersonalInformation ? PersonalInformation : 0
 	SavedPersonalControls := IsSet(PersonalFileControls) ? [PersonalFileControls.owners, PersonalFileControls.inventory] : false
 	Directory := _CMG_NewDir(), Path := Directory . "\overrides.toml"
-	Source := '[autocorrection.caps]`ncolor = "bad\q"`n'
+	Source := '[autocorrection.caps]`ncolor = "bad\uD800"`n'
 	try {
+		BootSource := _StripFullLineComments(FileRead(_DriverDir . "\ErgoptiPlus.ahk", "UTF-8"))
+		PersonalInformation := _HSCS_TrayMapLiteral(BootSource, "PersonalInformation")
 		if SavedPersonalControls is Array
 			PersonalFileControls.owners := Map(), PersonalFileControls.inventory := []
 		Features := _HSDeepCloneMap(SavedFeatures)
@@ -307,6 +311,7 @@ _CAO_NativeColdBoot() {
 		AssertTrue(HSE_RegistryByGroup.Has("autocorrection.names"))
 		AssertTrue(HSE_RegistryByGroup.Has("french_autocorrection.names"))
 	} finally {
+		PersonalInformation := HadPersonalInformation ? SavedPersonalInformation : unset
 		Features := SavedFeatures, ScriptInformation := SavedInformation, ConfigurationFile := SavedConfiguration
 		_HotstringsOverridesPath := Saved[1], _HotstringsOverrides := Saved[2]
 		_HotstringsWordDelimiters := Saved[3], _HotstringsConsumedDelimiters := Saved[4]

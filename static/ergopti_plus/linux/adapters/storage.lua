@@ -29,6 +29,19 @@ local NoReplaceMove = require("infra.no_replace_move")
 -- bespoke encoder/decoder this replaces silently flattened nested tables and
 -- dropped arrays on the decode path, corrupting any non-flat stored value
 local json = require("json")
+local JSON_METHODS = {}
+for _, name in ipairs({ "decode", "decode_lossless", "encode", "quote", "is_array", "is_null",
+	"decode_root_object_source", "splice_root_object_source" }) do JSON_METHODS[name] = json[name] end
+
+--- Admits the actual canonical codec instance and its original capabilities.
+--- @return boolean current
+local function owned_json_live()
+	if not rawequal(package.loaded["json"], json) then return false end
+	for name, callback in pairs(JSON_METHODS) do
+		if type(callback) ~= "function" or not rawequal(json[name], callback) then return false end
+	end
+	return type(json.decode_root_object_source) == "function" and type(json.splice_root_object_source) == "function"
+end
 
 local _owned_writer = nil
 
@@ -85,6 +98,9 @@ local _recovery = nil
 
 
 local _owned_io_busy = false
+local _ordinary_commit_busy = false
+local _ordinary_debt = nil
+local settle_ordinary_debt -- Public entry points must capture this local owner.
 local _owned_file_debt = nil
 local _owned_effect_paths = {}
 
@@ -181,7 +197,8 @@ end
 --- @param aliases table Dense logical keys.
 --- @return boolean acquired
 function M.acquire_owned(owner, aliases)
-	if type(owner) ~= "table" or _owned_gates[owner] ~= nil or _owned_finalizing[owner] then return false end
+	if _ordinary_commit_busy or (_ordinary_debt and not settle_ordinary_debt()) then return false end
+	if type(owner) ~= "table" or _owned_gates[owner] ~= nil or _owned_finalizing[owner] or _ordinary_commit_busy then return false end
 	local keys = owned_alias_list(aliases)
 	if not keys then return false end
 	for _, key in ipairs(keys) do if _owned_aliases[key] ~= nil then return false end end
@@ -230,8 +247,9 @@ end
 --- @return table|nil gate
 --- @return table|nil record
 local function owned_authority(owner, receipt, publishing)
+	if _ordinary_commit_busy or (_ordinary_debt and not settle_ordinary_debt()) then return nil end
 	local gate, record = _owned_gates[owner], _owned_receipts[receipt]
-	if not rawequal(package.loaded["adapters.storage"], M) then return nil end
+	if not rawequal(package.loaded["adapters.storage"], M) or not owned_json_live() then return nil end
 	if not gate or gate.busy or not record or not rawequal(record.owner, owner) or not owned_equal(gate.keys, record.keys) then return nil end
 	if gate.debt ~= nil and not rawequal(gate.debt, record) then return nil end
 	if publishing and (record.used or record.epoch ~= gate.epoch or record.sequence ~= gate.sequence) then return nil end
@@ -262,7 +280,7 @@ end
 --- @param record table
 --- @return boolean current
 local function owned_live(record)
-	if not rawequal(package.loaded["adapters.storage"], M) then return false end
+	if not rawequal(package.loaded["adapters.storage"], M) or not owned_json_live() then return false end
 	for name, callback in pairs(record.methods) do if not rawequal(M[name], callback) then return false end end
 	if record.file_owner then
 		for name, callback in pairs(record.file_methods) do if not rawequal(record.file_owner[name], callback) then return false end end
@@ -431,15 +449,13 @@ end
 
 --- Persists a staged cache to disk atomically.
 --- @param staged table Candidate store that is not yet published in memory.
+--- @param prepared table Private source payload, admission and native effect journal.
 --- @return boolean
 --- @return table|nil snapshot Owned representation of the persisted JSON.
-local function _flush(staged)
-	if type(staged) ~= "table" or _load_blocked then return false end
-	local encode_ok, payload = pcall(json.encode, staged)
-	if not encode_ok or type(payload) ~= "string" then
-		Logger.error(LOG, "_flush(): store could not be encoded.")
-		return false
-	end
+local function _flush(staged, prepared)
+	if type(staged) ~= "table" or type(prepared) ~= "table" or _load_blocked
+		or type(prepared.payload) ~= "string" or type(prepared.admit) ~= "function" then return false end
+	local payload = prepared.payload
 	-- Own the same representation a subsequent process will read, rather than
 	-- publishing caller tables whose later mutations bypass durable writes.
 	local decode_ok, snapshot = pcall(json.decode, payload)
@@ -475,48 +491,43 @@ local function _flush(staged)
 		Logger.error(LOG, "_flush(): temporary file could not be closed.")
 		return false
 	end
+	local called, admitted = pcall(prepared.admit)
+	if not called or admitted ~= true then
+		pcall(os.remove, _TMP_PATH)
+		return false
+	end
+	prepared.effect = nil -- Native rename may have a partial effect.
 	local rename_ok, renamed = pcall(os.rename, _TMP_PATH, _STORE_PATH)
 	if not rename_ok or renamed ~= true then
 		pcall(os.remove, _TMP_PATH)
 		Logger.error(LOG, "_flush(): atomic rename failed.")
 		return false
 	end
+	prepared.effect = true
 	return true, snapshot
 end
 
---- Ensures the in-memory cache is populated.
-local function _ensure_loaded()
-	if _cache == nil then _load() end
-end
-
---- Returns a shallow store copy suitable for top-level key transactions.
---- @return table
-local function _staged_cache()
-	local staged = {}
-	for key, value in pairs(_cache) do staged[key] = value end
-	return staged
-end
-
---- Commits one cache mutation and publishes it only after durable persistence.
---- @param mutate function Receives the staged table.
---- @return boolean
-local function _commit(mutate)
-	_ensure_loaded()
-	if _load_blocked then return false end
-	local staged = _staged_cache()
-	local ok, err = pcall(mutate, staged)
-	if not ok then
-		Logger.error(LOG, "Storage mutation staging failed — %s", tostring(err))
+--- Initialises the ordinary cache only while native recovery is permitted.
+--- Cached reads stay read-only. A refused initialization leaves the cache unset,
+--- so release and actual source repair can admit a later fresh ordinary read.
+--- @param ordinary_init boolean|nil Private unclaimed ordinary bootstrap only.
+--- @return boolean initialized
+local function _ensure_loaded(ordinary_init)
+	if _cache ~= nil then return true end
+	if next(_owned_aliases) ~= nil or _ordinary_debt ~= nil or _owned_file_debt ~= nil
+		or _owned_io_busy or (_ordinary_commit_busy and ordinary_init ~= true) then
+		Logger.error(LOG, "Storage cache initialization refused while native ownership or cleanup is active.")
 		return false
 	end
-	local flushed, snapshot = _flush(staged)
-	if not flushed then return false end
-	_cache = snapshot
+	-- Reserve ordinary initialization through every actual read/recovery callback.
+	-- An enclosing ordinary publisher keeps its own phase after this load.
+	local enclosing_busy = _ordinary_commit_busy
+	_ordinary_commit_busy = true
+	local called, failure = pcall(_load)
+	_ordinary_commit_busy = enclosing_busy
+	if not called then error(failure, 0) end
 	return true
 end
-
-
-
 
 --- Reads only admitted regular native files, never recovering an invalid store.
 --- Symlinks are refused here because publication cannot preserve their source kind.
@@ -598,12 +609,11 @@ end
 --- @return table|nil document
 local function owned_store_source()
 	local bytes, status = owned_read_file(_STORE_PATH)
-	if status == "absent" then return { status = status }, {} end
-	if status ~= "ok" or not bytes:match("^%s*{") then return nil end
-	local okay, document = pcall(json.decode_lossless, bytes)
-	if not okay or type(document) ~= "table" or json.is_array(document) or json.is_null(document)
-		or not owned_numeric_source_safe(bytes) then return nil end
-	return { status = "ok", content = bytes }, document
+	if not owned_json_live() then return nil end
+	if status ~= "ok" and status ~= "absent" then return nil end
+	local okay, document, proof = pcall(json.decode_root_object_source, status == "absent" and "{}" or bytes)
+	if not okay or type(document) ~= "table" or type(proof) ~= "table" then return nil end
+	return status == "absent" and { status = status } or { status = "ok", content = bytes }, document, proof
 end
 
 --- Keeps terminal native readback inside the same backing-file reentry guard.
@@ -612,10 +622,25 @@ end
 local function owned_store_readback()
 	if _owned_io_busy then return nil end
 	_owned_io_busy = true
-	local okay, source, document = pcall(owned_store_source)
+	local okay, source, document, proof = pcall(owned_store_source)
 	_owned_io_busy = false
-	if okay then return source, document end
+	if okay then return source, document, proof end
 	return nil
+end
+
+--- Checks only cells whose original numeric values enter the owned inverse.
+--- Foreign members are deleted through authentic canonical spans in a private
+--- projection; their raw numeric tokens never need to survive Lua re-encoding.
+--- @param keys table Captured aliases.
+--- @param document table Strict actual document.
+--- @param proof table Opaque canonical exact-source receipt.
+--- @return boolean safe
+local function owned_source_cells_safe(keys, document, proof)
+	local retained, prune = {}, {}
+	for _, key in ipairs(keys) do retained[key] = true end
+	for key in pairs(document) do if not retained[key] then prune[key] = { present = false } end end
+	local source = json.splice_root_object_source(proof, prune)
+	return type(source) == "string" and owned_numeric_source_safe(source)
 end
 
 --- Projects exact document cells without aliasing the persistence snapshot.
@@ -634,8 +659,8 @@ end
 --- @param record table
 --- @param document table
 --- @return boolean current
-local function owned_store_current(record, document)
-	if not owned_live(record) then return false end
+local function owned_store_current(record, document, proof)
+	if not owned_live(record) or not owned_source_cells_safe(record.keys, document, proof) then return false end
 	local cells = owned_document_cells(record.keys, document)
 	for _, key in ipairs(record.keys) do
 		if not owned_cell_equal(cells[key], record.expected[key])
@@ -699,12 +724,13 @@ end
 --- @return table|nil receipt
 --- @return table|nil cells Detached actual native present/value cells.
 function M.capture_owned(owner)
+	if _ordinary_commit_busy or (_ordinary_debt and not settle_ordinary_debt()) then return nil end
 	local gate = _owned_gates[owner]
 	if not rawequal(package.loaded["adapters.storage"], M) or not gate or gate.busy or gate.debt ~= nil or _load_blocked then return nil end
 	local captured, cells = owned_guard(gate, function()
 		local identity = { methods = owned_methods() }
-		local source, document = owned_store_source()
-		if not source or not owned_live(identity) then return nil end
+		local source, document, proof = owned_store_source()
+		if not source or not owned_live(identity) or not owned_source_cells_safe(gate.keys, document, proof) then return nil end
 		local snapshot, generations = owned_document_cells(gate.keys, document), {}
 		for _, key in ipairs(gate.keys) do generations[key] = _owned_generations[key] or 0 end
 		gate.sequence = gate.sequence + 1
@@ -750,15 +776,13 @@ function M.publish_owned(owner, receipt, updates, backup_path, files)
 		or backup_path:find("\0", 1, true) or type(files) ~= "table"
 		or type(files.write_if_unchanged) ~= "function" or type(files.delete) ~= "function" then return false end
 	return owned_guard(gate, function()
-		local source, document = owned_store_source()
-		if not source or not owned_store_current(record, document) then return false end
+		local source, document, proof = owned_store_source()
+		if not source or not owned_store_current(record, document, proof) then return false end
 		-- Normalize update values through the same lossless JSON identities used
 		-- for the actual source, after strict validation ruled out silent losses.
 		for _, cell in pairs(detached) do if cell.present then cell.value = json.decode_lossless(assert(json.encode(cell.value))) end end
-		local candidate_document = owned_copy(document)
-		for key, cell in pairs(detached) do if cell.present then candidate_document[key] = cell.value else candidate_document[key] = nil end end
-		local candidate = assert(json.encode(candidate_document))
-		if not owned_numeric_source_safe(candidate) then return false end
+		local candidate, candidate_document, candidate_proof = json.splice_root_object_source(proof, detached)
+		if not candidate or not owned_source_cells_safe(record.keys, candidate_document, candidate_proof) then return false end
 		record.used, record.files, record.updates = true, owned_file_adapter(files), detached
 		record.file_owner, record.file_methods = files, { write_if_unchanged = files.write_if_unchanged, delete = files.delete }
 		record.before, record.candidate = source, candidate
@@ -772,8 +796,8 @@ function M.publish_owned(owner, receipt, updates, backup_path, files)
 		if backed ~= true then record.pending, gate.debt = false, nil; return false end
 		local backup_bytes, backup_status = owned_writer().read_classified(backup_path, record.files)
 		if backup_status ~= "ok" or backup_bytes ~= backup then record.pending, gate.debt = false, nil; return false end
-		local latest, latest_document = owned_store_source()
-		if not latest or not owned_store_current(record, latest_document) or latest.status ~= source.status
+		local latest, latest_document, latest_proof = owned_store_source()
+		if not latest or not owned_store_current(record, latest_document, latest_proof) or latest.status ~= source.status
 			or latest.content ~= source.content then record.pending, gate.debt = false, nil; return false end
 		-- Retain compensation authority before invoking the actual publisher: a
 		-- false acknowledgement may still need native cleanup/readback resolution.
@@ -783,7 +807,7 @@ function M.publish_owned(owner, receipt, updates, backup_path, files)
 		if record.forward.publication_cleanup then _owned_file_debt = record end
 		record.forward.publication_effect = written == true
 		if not owned_storage_settle(record) then return false end
-		local observed, observed_document = owned_store_readback()
+		local observed, observed_document, observed_proof = owned_store_readback()
 		if not observed then return false end
 		if observed.status == "ok" and observed.content == candidate then
 			record.effect = true
@@ -794,7 +818,7 @@ function M.publish_owned(owner, receipt, updates, backup_path, files)
 			record.pending, gate.debt = false, nil
 			return false
 		else return false end
-		if written ~= true or not owned_store_current(record, observed_document) then return false end
+		if written ~= true or not owned_store_current(record, observed_document, observed_proof) then return false end
 		for key in pairs(detached) do
 			_owned_generations[key] = (_owned_generations[key] or 0) + 1
 			record.generations[key] = _owned_generations[key]
@@ -818,7 +842,7 @@ function M.restore_owned(owner, receipt)
 		if record.forward and record.effect ~= false then record.pending, gate.debt = true, record end
 		if not owned_storage_settle(record) then return false end
 		if not record.forward then record.restored, record.pending, gate.debt = true, false, nil; return true end
-		local current, document = owned_store_source()
+		local current, document, proof = owned_store_source()
 		if not current or not owned_live(record) then return false end
 		if record.effect == nil then
 			if current.status == record.before.status and current.content == record.before.content then
@@ -830,16 +854,15 @@ function M.restore_owned(owner, receipt)
 		end
 		if record.effect == false then record.restored, record.pending, gate.debt = true, false, nil; return true end
 		if record.inverse == nil then
-			if not owned_store_current(record, document) then return false end
-			local restored_document = owned_copy(document)
-			for key in pairs(record.updates) do
-				local before = record.snapshot[key]
-				if before.present then restored_document[key] = before.value else restored_document[key] = nil end
-			end
+			if not owned_store_current(record, document, proof) then return false end
+			local inverse_cells = {}
+			for key in pairs(record.updates) do inverse_cells[key] = record.snapshot[key] end
+			local restored_source, restored_document = json.splice_root_object_source(proof, inverse_cells)
+			if not restored_source then return false end
 			local target
 			if current.content == record.candidate then target = record.before
 			elseif record.original.status == "absent" and next(restored_document) == nil then target = { status = "absent" }
-			else target = { status = "ok", content = assert(json.encode(restored_document)) } end
+			else target = { status = "ok", content = restored_source } end
 			record.inverse = { path = _STORE_PATH, source = target, candidate = current.content, verify_absence = true }
 		end
 		record.pending, gate.debt = true, record
@@ -863,32 +886,218 @@ function M.restore_owned(owner, receipt)
 	end)
 end
 
---- Publishes a foreign ordinary mutation from actual source while gates are held.
---- This avoids replacing already-published owned cells with a stale legacy cache.
---- @param mutate function
---- @return boolean committed
-local function owned_foreign_commit(mutate)
-	if _owned_io_busy or _owned_file_debt ~= nil or _load_blocked then return false end
+--- Verifies the same ordinary publisher and touched-alias ownership/generation.
+--- @param record table Private pending intent.
+--- @return boolean current
+local function ordinary_live(record)
+	if not owned_live(record) or not rawequal(package.loaded["adapters.file_system"], record.file_owner)
+		or not rawequal(package.loaded["toml_codec.writer"], record.writer_owner) then return false end
+	for name, callback in pairs(record.writer_methods) do
+		if not rawequal(record.writer_owner[name], callback) then return false end
+	end
+	for key, generation in pairs(record.generations) do
+		if (_owned_generations[key] or 0) ~= generation
+			or not rawequal(_owned_aliases[key], record.alias_owners[key].value) then return false end
+	end
+	return true
+end
+
+--- Publishes an acknowledged sample exactly once, without replaying native IO.
+--- @param record table
+--- @param source table Classified actual current bytes.
+--- @param outcome string ack, no_effect, or superseded.
+local function ordinary_retire(record, source, outcome)
+	owned_cache_source(source)
+	if outcome ~= "no_effect" then
+		for key in pairs(record.updates) do _owned_generations[key] = (_owned_generations[key] or 0) + 1 end
+	end
+	record.outcome = outcome
+	_ordinary_debt = nil
+end
+
+--- Settles only the retained native terminal, then classifies current source.
+--- Foreign successors remain intact: a proven terminal retires the old intent
+--- with false ACK, rather than republishing or automatically compensating it.
+--- @param record table Exact current private ordinary intent.
+--- @return boolean terminal
+local function settle_ordinary_record(record)
+	if not rawequal(_ordinary_debt, record) or not ordinary_live(record) then return false end
+	if record.publication_cleanup ~= nil then
+		local settled = record.writer_methods.retry_publication_cleanup(record)
+		if settled ~= true or not ordinary_live(record) or not rawequal(_ordinary_debt, record) then return false end
+	end
+	local source = owned_store_readback()
+	if not source or not ordinary_live(record) or not rawequal(_ordinary_debt, record) then return false end
+	if source.status == "ok" and source.content == record.candidate then
+		if record.publication_effect ~= true then return false end
+		ordinary_retire(record, source, "ack")
+	elseif source.status == record.before.status and source.content == record.before.content then
+		if record.publication_effect == true then
+			ordinary_retire(record, source, "superseded")
+		else ordinary_retire(record, source, "no_effect") end
+	else
+		-- Exact native effect/cleanup receipt is required to retire an intent
+		-- whose source was externally replaced. A missing ACK cannot infer it.
+		if type(record.publication_effect) ~= "boolean" then return false end
+		ordinary_retire(record, source, "superseded")
+	end
+	return true
+end
+
+--- Attempts a pending terminal under the same actual-effect reentry fence.
+--- @return boolean terminal No new publication occurs here.
+settle_ordinary_debt = function()
+	if _ordinary_commit_busy or _owned_io_busy or _owned_file_debt ~= nil then return false end
+	if _ordinary_debt == nil then return true end
+	_ordinary_commit_busy = true
+	local okay, terminal = pcall(settle_ordinary_record, _ordinary_debt)
+	_ordinary_commit_busy = false
+	return okay and terminal == true
+end
+
+--- Compares an explicit retry with the detached originally requested cells.
+--- @param record table
+--- @param updates table
+--- @return boolean same
+local function ordinary_same_request(record, updates)
+	if not ordinary_live(record) then return false end
+	local source, model = json.splice_root_object_source(record.proof, updates)
+	if not source then return false end
+	for key, cell in pairs(record.updates) do
+		local wanted = updates[key]
+		if type(wanted) ~= "table" or wanted.present ~= cell.present
+			or (cell.present and not owned_equal(model[key], cell.value)) then return false end
+	end
+	for key in pairs(updates) do if record.updates[key] == nil then return false end end
+	return true
+end
+
+--- Publishes explicit foreign cells and retains every native pending terminal.
+--- Held aliases remain untouched; a settled retry never repeats accepted IO.
+--- @param updates table Explicit root-member cells.
+--- @return boolean committed Strict ACK for this caller's explicit intent.
+local function owned_foreign_commit(updates)
+	if _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil or _load_blocked then return false end
+	if _ordinary_debt ~= nil then
+		local previous = _ordinary_debt
+		_ordinary_commit_busy = true
+		local called, same = pcall(ordinary_same_request, previous, updates)
+		local settled, terminal = pcall(settle_ordinary_record, previous)
+		_ordinary_commit_busy = false
+		if not settled or terminal ~= true then return false end
+		if previous.outcome == "ack" then return called and same == true end
+		if previous.outcome ~= "no_effect" then return false end
+		-- Proven refusal before publication permits this new explicit attempt.
+	end
+	_ordinary_commit_busy = true
 	local okay, result = pcall(function()
-		local source, document = owned_store_source()
-		if not source then return false end
-		local staged = owned_copy(document)
-		mutate(staged)
-		staged = owned_copy(staged)
-		local payload = assert(json.encode(staged))
-		if not owned_numeric_source_safe(payload) then return false end
-		local files = owned_file_adapter(require("adapters.file_system"))
-		if owned_writer().publish_if_unchanged(_STORE_PATH, payload, files, source) ~= true then return false end
-		local current, status = owned_writer().read_classified(_STORE_PATH, files)
-		if status ~= "ok" or current ~= payload or not rawequal(package.loaded["adapters.storage"], M) then return false end
-		owned_cache_source({ status = "ok", content = payload })
-		return true
+		local identity = { methods = owned_methods() }
+		local source, _, proof = owned_store_source()
+		if not source or not owned_live(identity) then return false end
+		local payload, model = json.splice_root_object_source(proof, updates)
+		if not payload then return false end
+		local native, writer = require("adapters.file_system"), owned_writer()
+		local record = { methods = identity.methods, file_owner = native, writer_owner = writer,
+			writer_methods = { publish_if_unchanged = writer.publish_if_unchanged, retry_publication_cleanup = writer.retry_publication_cleanup },
+			file_methods = { write_if_unchanged = native.write_if_unchanged, delete = native.delete },
+			before = source, proof = proof, candidate = payload, updates = {}, generations = {}, alias_owners = {} }
+		for key, cell in pairs(updates) do
+			if _owned_aliases[key] ~= nil then return false end
+			record.updates[key] = { present = cell.present }
+			if cell.present then record.updates[key].value = owned_copy(model[key]) end
+			record.generations[key] = _owned_generations[key] or 0
+			record.alias_owners[key] = { value = _owned_aliases[key] }
+		end
+		local files = owned_file_adapter(native)
+		local publish = files.write_if_unchanged
+		files.write_if_unchanged = function(...)
+			if not ordinary_live(record) then return false, "ordinary publication owner changed" end
+			return publish(...)
+		end
+		if not ordinary_live(record) then return false end
+		_ordinary_debt = record -- Retain authority before an actual native effect.
+		local written, _, cleanup = record.writer_methods.publish_if_unchanged(_STORE_PATH, payload, files, source)
+		record.publication_cleanup = type(cleanup) == "function" and cleanup or nil
+		record.publication_effect = written == true and true or nil
+		if not settle_ordinary_record(record) then return false end
+		return record.outcome == "ack"
 	end)
+	_ordinary_commit_busy = false
 	return okay and result == true
 end
 
 
 -- =========================================
+--- Publishes explicit released aliases from the latest strict source spans.
+--- Native temporary-inode write/close/rename and their exact receipts remain the
+--- ordinary publisher. Source checks are advisory preconditions, not OS CAS.
+--- @param updates table|nil Explicit root cells; nil only for clear_all.
+--- @param clear_all boolean|nil Explicit whole-store deletion.
+--- @return boolean committed
+local function released_source_commit(updates, clear_all)
+	if _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil or next(_owned_aliases) ~= nil then return false end
+	if _ordinary_debt ~= nil then
+		local previous = _ordinary_debt
+		_ordinary_commit_busy = true
+		local retry_updates = updates or {}
+		if clear_all == true and previous.clear_all == true then retry_updates = previous.updates end
+		local called, same = pcall(ordinary_same_request, previous, retry_updates)
+		local settled, terminal = pcall(settle_ordinary_record, previous)
+		_ordinary_commit_busy = false
+		if not settled or terminal ~= true then return false end
+		if previous.outcome == "ack" then return called and same == true and (clear_all == true) == (previous.clear_all == true) end
+		if previous.outcome ~= "no_effect" then return false end
+	end
+	_ordinary_commit_busy = true
+	local okay, result = pcall(function()
+		if _ensure_loaded(true) ~= true then return false end -- Private unclaimed bootstrap; no held debt.
+		if _load_blocked then return false end
+		local identity = { methods = owned_methods() }
+		local source, document, proof = owned_store_source()
+		if not source or not owned_live(identity) then return false end
+		if clear_all then
+			updates = {}
+			for key in pairs(document) do updates[key] = { present = false } end
+		end
+		local payload, model = json.splice_root_object_source(proof, updates)
+		if not payload then return false end
+		local native, writer = require("adapters.file_system"), owned_writer()
+		local record = { methods = identity.methods, file_owner = native, writer_owner = writer,
+			writer_methods = { publish_if_unchanged = writer.publish_if_unchanged, retry_publication_cleanup = writer.retry_publication_cleanup },
+			file_methods = { write_if_unchanged = native.write_if_unchanged, delete = native.delete },
+			before = source, proof = proof, candidate = payload, updates = {}, generations = {}, alias_owners = {}, clear_all = clear_all == true }
+		for key, cell in pairs(updates) do
+			record.updates[key] = { present = cell.present }
+			if cell.present then record.updates[key].value = owned_copy(model[key]) end
+			record.generations[key], record.alias_owners[key] = _owned_generations[key] or 0, { value = _owned_aliases[key] }
+		end
+		if not ordinary_live(record) or next(_owned_aliases) ~= nil then return false end
+		-- A deletion which is already absent retains its established no-write
+		-- success, while refreshing the actual current cache and generations.
+		local only_absent = true
+		for key, cell in pairs(updates) do if cell.present or document[key] ~= nil then only_absent = false end end
+		if only_absent then ordinary_retire(record, source, "ack"); return true end
+		_ordinary_debt = record
+		local function admit()
+			if not ordinary_live(record) or next(_owned_aliases) ~= nil then return false end
+			local current = owned_store_readback()
+			return current ~= nil and ordinary_live(record) and next(_owned_aliases) == nil
+				and current.status == source.status and current.content == source.content
+		end
+		local prepared = { payload = payload, admit = admit, effect = false }
+		local written = _flush(model, prepared)
+		record.publication_effect = prepared.effect
+		if not settle_ordinary_record(record) then return false end
+		if record.outcome == "ack" and clear_all then
+			local count = 0; for _ in pairs(document) do count = count + 1 end
+			Logger.debug(LOG, "clear(): removed %d key(s).", count)
+		end
+		return written == true and record.outcome == "ack"
+	end)
+	_ordinary_commit_busy = false
+	return okay and result == true
+end
+
 -- =========================================
 -- ======= 4/ Adapter Methods ==============
 -- =========================================
@@ -900,11 +1109,11 @@ end
 --- @return boolean True on success, false on error.
 function M.set(key, value)
 	local alias = tostring(key)
-	if _owned_aliases[alias] ~= nil or _owned_io_busy or _owned_file_debt ~= nil then return false end
+	if _owned_aliases[alias] ~= nil or _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil then return false end
 	local committed
-	if next(_owned_aliases) ~= nil then committed = owned_foreign_commit(function(staged) staged[alias] = value end)
-	else committed = _commit(function(staged) staged[alias] = value end) end
-	if committed == true then _owned_generations[alias] = (_owned_generations[alias] or 0) + 1 end
+	local held = next(_owned_aliases) ~= nil
+	if held then committed = owned_foreign_commit({ [alias] = value == nil and { present = false } or { present = true, value = value } })
+	else committed = released_source_commit({ [alias] = value == nil and { present = false } or { present = true, value = value } }) end
 	return committed == true
 end
 
@@ -912,15 +1121,14 @@ end
 --- @param values table Map of storage keys to values.
 --- @return boolean
 function M.set_many(values)
-	if type(values) ~= "table" or _owned_io_busy or _owned_file_debt ~= nil then return false end
+	if type(values) ~= "table" or _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil then return false end
 	for key in pairs(values) do if _owned_aliases[tostring(key)] ~= nil then return false end end
-	local function mutate(staged) for key, value in pairs(values) do staged[tostring(key)] = value end end
 	local committed
-	if next(_owned_aliases) ~= nil then committed = owned_foreign_commit(mutate)
-	else committed = _commit(mutate) end
-	if committed == true then
-		for key in pairs(values) do local alias = tostring(key); _owned_generations[alias] = (_owned_generations[alias] or 0) + 1 end
-	end
+	local held = next(_owned_aliases) ~= nil
+	local updates = {}
+	for key, value in pairs(values) do updates[tostring(key)] = { present = true, value = value } end
+	if held then committed = owned_foreign_commit(updates)
+	else committed = released_source_commit(updates) end
 	return committed == true
 end
 
@@ -929,7 +1137,7 @@ end
 --- @param default_value any Returned when no value is stored.
 --- @return any
 function M.get(key, default_value)
-	_ensure_loaded()
+	if _ensure_loaded() ~= true then return default_value end
 	local ok, result = pcall(function()
 		local value = _cache[tostring(key)]
 		-- Native settings backends return values, not mutable cache ownership.
@@ -949,28 +1157,19 @@ end
 --- @return boolean True on success, including an already-absent key.
 function M.delete(key)
 	local storage_key = tostring(key)
-	if _owned_aliases[storage_key] ~= nil or _owned_io_busy or _owned_file_debt ~= nil then return false end
+	if _owned_aliases[storage_key] ~= nil or _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil then return false end
 	if next(_owned_aliases) ~= nil then
-		local committed = owned_foreign_commit(function(staged) staged[storage_key] = nil end)
-		if committed then _owned_generations[storage_key] = (_owned_generations[storage_key] or 0) + 1 end
+		local committed = owned_foreign_commit({ [storage_key] = { present = false } })
 		return committed == true
 	end
-	_ensure_loaded()
-	if _load_blocked then return false end
-	if _cache[storage_key] == nil then
-		_owned_generations[storage_key] = (_owned_generations[storage_key] or 0) + 1
-		return true
-	end
-	local committed = _commit(function(staged) staged[storage_key] = nil end)
-	if committed then _owned_generations[storage_key] = (_owned_generations[storage_key] or 0) + 1 end
-	return committed == true
+	return released_source_commit({ [storage_key] = { present = false } })
 end
 
 --- Reports whether a value is currently stored under the given key.
 --- @param key string
 --- @return boolean
 function M.has(key)
-	_ensure_loaded()
+	if _ensure_loaded() ~= true then return false end
 	local ok, result = pcall(function()
 		return _cache[tostring(key)] ~= nil
 	end)
@@ -991,7 +1190,7 @@ end
 --- Returns all keys currently present in the persistent store.
 --- @return table Array of key strings.
 function M.keys()
-	_ensure_loaded()
+	if _ensure_loaded() ~= true then return {} end
 	local ok, result = pcall(function()
 		local arr = {}
 		for k in pairs(_cache) do arr[#arr + 1] = k end
@@ -1007,19 +1206,8 @@ end
 --- Deletes every key currently present in the persistent store.
 --- @return boolean True when all entries have been removed without error.
 function M.clear()
-	if next(_owned_aliases) ~= nil or _owned_io_busy or _owned_file_debt ~= nil then return false end
-	_ensure_loaded()
-	if _load_blocked then return false end
-	local count = 0
-	for _ in pairs(_cache) do count = count + 1 end
-	if count == 0 then return true end
-	if not _commit(function(staged)
-		for key in pairs(staged) do staged[key] = nil end
-	end) then
-		return false
-	end
-	Logger.debug(LOG, "clear(): removed %d key(s).", count)
-	return true
+	if next(_owned_aliases) ~= nil or _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil then return false end
+	return released_source_commit(nil, true)
 end
 
 --- Returns recovery metadata after a corrupt or incomplete store read.

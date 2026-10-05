@@ -1,0 +1,1079 @@
+{
+	"refs": [
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\tests\\test_framework.ahk",
+			"sha256": "c735f0ad61a2c2a561b597a2d21e32ad229c3e0b979dc3d12d0a526bbac87607"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\app_state.ahk",
+			"sha256": "49f3d1b7f73c19fb7cee513bb86d9f2eed047a49a74eaeeedf2c01a454cefd30"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\tests\\test_stubs.ahk",
+			"sha256": "9cddbc1cdca4f9b4c66b7c58b72e00b38a443eee345e298ded2c35710e33bb2d"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_health.ahk",
+			"sha256": "ae37992b9e14f64c1c61fa3b0b187cff4c3dd49fbb3ce6e7e141dd1bc3dbf522"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\tick_count.ahk",
+			"sha256": "d82440cd7048e3e329b99168e549063cf00db7d15570a07dc3d4d640cc7286ec"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\vendor\\Promise.ahk",
+			"sha256": "7d81b21eb7de3c31eae7abf8d93f61f6f0fde16ed0c3d3e961870fee9216c45f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\webview_utils.ahk",
+			"sha256": "cfd2dd132bdacdc49a10dde39fc67cadd042ff3ead837b325240fdaf850bce23"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\console_window.ahk",
+			"sha256": "ee1e9feb2a23ca3634ce1c460591261d53956a316a242046c461043172d79858"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\wall_clock.ahk",
+			"sha256": "c767c8fc56e5f3301d81974b61ea5e699ea2ae81684d2909db4410a6ba6da928"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\bundle.ahk",
+			"sha256": "dac4537b29ba5a15dff710c7b1b1bcdc885378fa5b9554f770dfa94464005fe5"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\tray_bootstrap.ahk",
+			"sha256": "646af344664856b8b453f67577f5947f7784705f8742054b2c8e29df36b7b9c1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\tray_startup_click.ahk",
+			"sha256": "db4dd29738ce576daac4f45888436174d5acfa3dd34f72fc5c4b2b00890eae7a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\tray_startup_commands.ahk",
+			"sha256": "06aeb61c9557cecb1f33e6e5a7a1567e265d0b745dffac7a8dc723fba403e8a4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\single_instance_gate.ahk",
+			"sha256": "341441c9da6632196a5977d4440cbe8badecc6d51031558407e2fcfacfac7665"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\menu_build_coordinator.ahk",
+			"sha256": "2c570c62f5995fe3cbc09f68f5e40a9e4b7ab348fa699aa9e97a5256e03e1e1e"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\window_titles.ahk",
+			"sha256": "60ccdc3b8eca32f453a7ace215f36d1bc571814700fc85bb64175d1d1c180fe6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\native_dialogs.ahk",
+			"sha256": "4160fcfd0768c6201955032213ec42ca2c9b364fdd7ee06eb7dda4d8f2447cd3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\ui_style.ahk",
+			"sha256": "7bf03ee75f629852f04dfa8f50a332be496940e6cba04a08290960fa54212c79"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\logger_sub_files.ahk",
+			"sha256": "bedc5229ca397e4c0f06a8990a00a4158157b52f5579acf3574a1eb9c1c9fa87"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\app_dirs.ahk",
+			"sha256": "889a82db93fd94cf4754a288cda161cd2e0eeee6de92453a63e948e9007f5b02"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\logger.ahk",
+			"sha256": "5ea3eebffad5e0f741a141578d297fb926e830c0d795a2737b362de99ae8d63c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\boot_profiler.ahk",
+			"sha256": "69cc6e8226c0d618db0d0eca961e9839b86696c375f41629906d21502f07eb8a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\startup_smoke.ahk",
+			"sha256": "f2f0ab3952ed07c6db36550b5064396a167daae1984b9dfeff750deee560fdf1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\diagnostic_snapshot.ahk",
+			"sha256": "709be694e6b1a9762c15f2062548f560f730ee843ff9e0fd34486bf4775d688a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\issue_link.ahk",
+			"sha256": "51a67af438c6b13c2eb2a170a6eb749b2ecc6e878c3d500e52077c3ab245fb12"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\redact.ahk",
+			"sha256": "c7b6b251f8f284e1f0129e83edb1baa130622a7213d6d08ba18efc57a86ee540"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\issue_report.ahk",
+			"sha256": "8fb3e8d0631b75f830f4618b27aae29fcea531aa8e032f7b42e555c2037c0793"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\error_policy.ahk",
+			"sha256": "596549f8da205edf6aed68b41cfa68968396c0625df2aa1d66ea0fbe06ad39a9"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\error_report.ahk",
+			"sha256": "5ccad1da32370adba96c1e1a37fa6b1d6df8734e7b43929ebe8b94e2eaf6aec6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\toml\\toml_helpers.ahk",
+			"sha256": "0f4e3fc8f9e07b6c5d93ac14de0ee74014a74eeb16401ec8bd8b175bb9a855ec"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\timings\\timings_config.ahk",
+			"sha256": "8ce144c15830ee60c04696eccd56842aa3ac769f855724d897db7760a5f56d22"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\window_utils.ahk",
+			"sha256": "082cd7cf7fbd2b8f2ffd96d07936977a8d63a76b5171761266361431ad661343"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\external_url_policy.ahk",
+			"sha256": "1e29a3b42f30ce872f4422c9e7ee7974e37db6adc6990467b1ea4275284d0447"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\tooltip\\position_receipt.ahk",
+			"sha256": "b6ba91f708d99e6a48dd23f0bab98838251f046771a13d3e46c5503d6efeeece"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\text_utils.ahk",
+			"sha256": "b28d8faaf2395da17f0f80602a79b1cdf5ffa53da5e9396d10c6d5ee1073d6a7"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\text_case.ahk",
+			"sha256": "08755ca8c7d2152b06e551cb4c2163f0f3c838468a5af773ca0ab3921b030691"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\wrap_pair.ahk",
+			"sha256": "162a3e5dd04411b05fb122b655ae7f644aea2f40e50b5203705008d1e460cc26"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\send_input_parameter.ahk",
+			"sha256": "a223d0c65555b9cbac0b671b844bc2e6337f821bdcd24db045f5859fdc930da3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\tap_keys.ahk",
+			"sha256": "17b2985dbc4e0668510817f091b956b104553ada11bc8cfd2f726b1da0ae5a7f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\key_combinations.ahk",
+			"sha256": "e7946dff694b23f5c85e76d5084a5db54f1440a5a5e5f117a52f2e800c35f7ea"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\nav_layer_helpers.ahk",
+			"sha256": "25b0e8881c952c7ae6d46e4efc17bc02ec7977ef126b59a07c5b8eedddbb4ec3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstring_engine.ahk",
+			"sha256": "9da05a6e39e03c5208cb93fac59e4bf9e00c41f9fce620a9a1b962e69c578704"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\altgr_family.ahk",
+			"sha256": "404c43822df161a02b8ec5c646fa44f7668b9a3f62a84e8058b5b23309223ec2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstring_engine_main.ahk",
+			"sha256": "44681d98b60265105297b7b551e4ced3f4f6fbfa35423630bf85aef15583e0c4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstring_buffer_effects.ahk",
+			"sha256": "1ac5c087973a2cbaa90fb4cab1b60ffe80fa1a22ff7330c9b18942b5d7a17588"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstring_live_toggle.ahk",
+			"sha256": "cabc4c60048f549796e4a9585d5854a4af6733bee32100c3091b381f77d96b3c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstring_count_policy.ahk",
+			"sha256": "0210aa4de2960c0ec94eb29d81bdbfe763b4dcac1535c60ccb7fe351cf20029d"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstring_prefix_watcher.ahk",
+			"sha256": "e40296df62891f1bbe5656a208b93eca2d06149873e4701c9c6f85d52a56467c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\master_gates.ahk",
+			"sha256": "725dbdea41bdbb37079aa5b9ce8c6b29d43c5fbbe4b84bbe495aa8703a7bbfd9"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\terminators.ahk",
+			"sha256": "a961f9f79f8808c2a0c1e504458ad8a1691c5a1b56869d2764ebff114d63a032"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\toml\\toml_loader.ahk",
+			"sha256": "62265117a6954d36b80a04014e5758af9a04d71937a26d1cadb32d4d1c578e3c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\extension_packs.ahk",
+			"sha256": "a0903d7668cf6b1526d8a81075a193aa6adb9f69f4adc72fd922bf456958f6c5"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstrings_cache.ahk",
+			"sha256": "6b17fccecfb947adfb9802c783f7e0f5fc120b4905340e0d666a4b0eaab89684"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\toml\\toml_config_loader.ahk",
+			"sha256": "3f0097c45fce8661d80cd2199f87aa1d8b18a2e8a6886c41ae9778f3e1acd836"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\config_migrate.ahk",
+			"sha256": "1d536677e3e1eb2bddbed79540dedd0fe24f0023be29d039c8d1473f60cd59f1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\config\\outdated.ahk",
+			"sha256": "df97ae3d402a50653f01a9403f7e702d7a286f0a9beb9965ed13daad61bd6011"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\platform\\remap\\tap_hold_loader.ahk",
+			"sha256": "38d66b4bac2f5c0e4ffc72f5e593628ea0aab44780b45293294137fee879a686"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\platform\\remap\\tap_hold_writer.ahk",
+			"sha256": "5a1858671c9dbf29139374dd8c80a1b2badc179bc25702a08a32d2938fb8e9d2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\platform\\remap\\layers_loader.ahk",
+			"sha256": "554ca3d4b6ecddd9db27ddfe2c46732cd9002e8d1c529f7d069bdec89e0e2b7b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\platform\\remap\\nav_layer_table.ahk",
+			"sha256": "634ae69304f1674fe5fb28f0a49b9289d6aaa986267eb043f327269fd53bd2e7"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\layer_editor\\init.ahk",
+			"sha256": "085fe7093aaa8de783c5e74fc3343a02afb923557d6ea1e06acc37747fad7865"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_taphold.ahk",
+			"sha256": "47a3212ae6d14d0844d97c7a575afbedcc082eed4e32086a23cf06fa717a6ba5"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_hotstring_switches.ahk",
+			"sha256": "a9a45bd9ebc7732b2ed9e1136278f5e90dcb73d9960c8dbc42bd67b4a950a9c4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_submenus.ahk",
+			"sha256": "14bcf6826e2a81d1923045a16432a4d7766a11e3e805605622ea25ae1b0da084"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\features_manifest.ahk",
+			"sha256": "df394cdf600364256d225f82e73e2af6ed01e1e94c9ff568a495c10b3b82b995"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\manifest_reader.ahk",
+			"sha256": "5568dbb269ded8a0a1f8b22cfb2a857313c67389d51d79f8747f64d0262a251b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\manifest_descriptions.ahk",
+			"sha256": "122e75f5bd5d1e017b17240947812f75313cd105fc3bdc292dc9e3d7bfe15b04"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\dynamic_hotstrings\\dynamic_hotstrings.ahk",
+			"sha256": "e39e4083357b36f3d85d90cfa2949c1fde52a724d537dc213b9517a50c248e98"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\feature_io.ahk",
+			"sha256": "4d8bd248bd1d376b16dbf89313aeca3623cf9484f94eb81dd6d8a54bece5d2be"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\personal_features.ahk",
+			"sha256": "76bd4bba729877ff7128e78e5a5dcb3b9876e8fd76a25296dc8fb9556dff9fd8"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\hotstrings\\terminator_scope.ahk",
+			"sha256": "0f9c62a2ed1515b1b4c6c5dc3a386532896ab7347775da30c149bf2a5f4c41df"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstrings_config.ahk",
+			"sha256": "dc65f6a1710b3d87ae954c26ec3c0a99a21ec17ceeed6d1b54ee5b9340baa4fe"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\suspend_handoff.ahk",
+			"sha256": "f9f6fc3e70e06832f7aac74c56f89c81abc864ecc65aaf6436960e63f6b89180"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\reload_terminal_handoff.ahk",
+			"sha256": "fbbbc3730426ca6e75e59babc600039041c6d4daa60709a9748942314d8550ae"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\reload_successor.ahk",
+			"sha256": "f9a9dc2f630ef6cd4b9b575a4f9b886894d1d7511eaf99ea997c17503cf22971"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\reload_deferral.ahk",
+			"sha256": "0eb38c37002863c7c35b712ba3912867d187481432305b2deb830925909b884c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\suppressive_inputhook_ownership.ahk",
+			"sha256": "fa82b9f1c67934706dc3c7a9a1f02f74ab6bb38cbbdbf8b52f4b48ec6156880d"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\lifecycle_transition.ahk",
+			"sha256": "a88ce45ef868754550cbb90d5f2a6a7a7cabc3a00eef4c8726462844a3fa1b19"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\config_transition.ahk",
+			"sha256": "9be084e6141f29b5dda0453c7334cbf31777621a6199ee263e0ad665357ae343"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\config_transition_runtime.ahk",
+			"sha256": "f76164c6e8cf51164d401eb16e9d5e3e50e5403c3285cf48af38a9f2dc0f14ed"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\config_io.ahk",
+			"sha256": "04ea42b7db58489627a85b5d4b391fef2bb55ad3cb76ba383cdb43c74ae41720"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\config_scope.ahk",
+			"sha256": "148ca95a7787308f54ece2631dc095e733c25b1b5be2a79e03c396dfe0ea9572"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\hotstrings\\scope_overrides.ahk",
+			"sha256": "cc86d2e3129ed0c4681b4c9cea7209f65f1d30c7c11715a7259d8f4244b44627"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotstrings\\hotstrings_scope.ahk",
+			"sha256": "7603f5f651ea205ba998731a5a6b748659a580e112760b2727c61d97afde9652"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\config_global_scope.ahk",
+			"sha256": "6528cf2428bf6b84440fc9e829ea25c5e5a4ca82ee642787a6a6139766801a8d"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\personal_toml_editor.ahk",
+			"sha256": "2e8fbc15c4ac8c0789f301b5f876a4dc856b32807ea2597b89e8fa65d75fd81f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\personal_toml_editor_webview.ahk",
+			"sha256": "d6695ffc287c1c139a3b0f35e0a2decee63e266aa531f151f38fd1d5ae7133ce"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\menu_helpers.ahk",
+			"sha256": "36a97f38f30b668b3373656231fe25b805e8fc76786a2c88229b8017428320fd"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_rebuild.ahk",
+			"sha256": "a14e66db577959195381e87952806c6fb3ffcc6a2a2bb6392708d35fa3d6ff30"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\wrap_symbols_config.ahk",
+			"sha256": "b57929b7b4f6b2ece90703ed63fbf4aded81e9388f7f9fdef5bc885237a0cf8f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\layout\\layout_altgr.ahk",
+			"sha256": "7d6f9bf5132e1220668a743434b48849ec3a3e80828776b25473771ce7a3f884"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\layout\\layout_ergopti.ahk",
+			"sha256": "4db85eae3990580cbf5fddcc6d5ee3f6b8f5773dca7122087c8efabeec558978"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\layout\\accented_shortcuts.ahk",
+			"sha256": "5a6e134918ab38d6e0f4a1508aef2725d85b2758be21b524ada6615b8ef8d2ff"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\features\\number_row_policy.ahk",
+			"sha256": "a7db4ff9d9cda10e1490b4bebdef88bf53335e98f29137798a623b83e468f092"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\layout\\layout_shift_caps.ahk",
+			"sha256": "f77610e293ce62677f40d5ee71e753ec816335efbcbed4ae3bf0bc169eaa6c6e"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\keylayout\\keylayout_parser.ahk",
+			"sha256": "29dc7b71244afa0a915fa81207d791752fa8b22f007732e53ae50533b808897c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\keylayout\\keylayout_tables.ahk",
+			"sha256": "038805b28fe5eaccc752e869bdb492917974f0c4e195dd94f9cbd3493b2413c8"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\keylayout\\keylayout_emulation.ahk",
+			"sha256": "066458b51e3c98a5321fe900b21ccfc5a459dbc963f3856916169e7e02a2cfc1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\keylayout\\layout_registry.ahk",
+			"sha256": "e95d483bd3702cf75c64990dbc488a4b9ebfe7612da1e6bb5749125b3987d116"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\keylayout\\layout_catalogue.ahk",
+			"sha256": "506323ff18baa92541f9394677ee121c6cfde31b18571b560763d2575492a990"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\keylayout\\layout_extension.ahk",
+			"sha256": "d3cfa09da7f4d56cf5a2b20f343a468fd3f311abdd18e633ed0b8a2b79670748"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\layout_poll_helper.ahk",
+			"sha256": "bb94cf81f8fe87060b0939e0f96298d826e7c9496bbee73b79a44e6a221d88fc"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\tooltip\\init.ahk",
+			"sha256": "9a36c5c4b4c5884bb56c58a0ab0751ccbaf0b141620d7696c116479452670b33"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\tooltip_renderer.ahk",
+			"sha256": "2c0f57914c1caadbf090fedda85c7cbb6b8b3cd4699bf1225599d1fdccc76363"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\updater.ahk",
+			"sha256": "ad15ad8814701a032a6de9bf6e1c72efac36eb7040c3c03c399ec7acc6603957"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\uninstall.ahk",
+			"sha256": "ae2e1a6efbb81fd1caea60fa192fa14265dd80a34ba81b96830136f144e1a12a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\start_at_login.ahk",
+			"sha256": "a3074f409514c9cbfeb31cc77bd3b5d869928afe5cdb8a953f0bf3545d1cb7e6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\registry.ahk",
+			"sha256": "e635ad8488aa989a3a66f2079a894493ece595902b85b3252f7d98d23bca980a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\json.ahk",
+			"sha256": "54619ad803b65a0005556fa28bf94872cd14f7c597ff8e3a027c086c20718bd6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\network\\failure.ahk",
+			"sha256": "4306854cefa0bb51c74917929c15beef4f8539a47655918943d085b522993969"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\locale.ahk",
+			"sha256": "051dec30c589e4aaf7f4692e5ffbc3c8afcc9302d3a332f74648a31024871b24"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\gesture_emit_actions.ahk",
+			"sha256": "66da7ba9ce2e78486ae64826bd8d562e67f931dd9cbd594db9db33ed7ba19de1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\action_catalogue.ahk",
+			"sha256": "ffbfcc6f45f9941f78db4bef9d364686266fcf950019dcb7a5dcd4ee34feaffe"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\locale_table.ahk",
+			"sha256": "54f5726f40350ebabd31e64a18a6241d3ad368270c9776526d2af28d199936aa"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\i18n.ahk",
+			"sha256": "431eb54088fb39d016f5c08361345ea7d8ebe3a8045f3ac998b29f0f6d90b205"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\notifier.ahk",
+			"sha256": "f3275141b7de217cbe502654eb93957940e7106229aa5bfe89d939c0fb482220"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\timer_scheduler.ahk",
+			"sha256": "5f3779a31361891956d4f245a6d3d7fa14610ad062340f987ae4c2ae78ab15b3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\file_system.ahk",
+			"sha256": "aca40ccab79b7526395610d6381e57b249a6db18fa7bcda6c23834b04c157282"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\window_info.ahk",
+			"sha256": "2a0c59f3fd8af4bafb2c396f91e2ef8d549d1871ab64ca342996e6db02e001c2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\uia_worker.ahk",
+			"sha256": "e4bb55e3489f831c6e7d1e5ac45089f3b72733c86c134e79541269c4878ebe33"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\tray_menu.ahk",
+			"sha256": "67ea0230bc04a520f7bc23d3f5df3ed93a679592fcc7361a6a5db9c3bd569e83"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\text_sender.ahk",
+			"sha256": "41885bf94c201e380b9afc6f27327ce2996f03aead2dbc1b5dd5ff49840863d1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\http_client.ahk",
+			"sha256": "ff5f3584461e46b3bfd114372ea7751cadb2946995d22b88fb37d745a217b62b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\secure_field_detector.ahk",
+			"sha256": "7d84bc84683c0bd79919d3172c3c2a0430fb9da6451155e92e15ab89e8b2e338"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\clipboard.ahk",
+			"sha256": "1609feb326de463a272305da74e70fd87cb846fb764025e661f245fd544a707b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\storage.ahk",
+			"sha256": "606dee9abd6a17a37825676034947bbb2a2f7a41d1427f3a67cc7d755e6ced91"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\process_lifecycle.ahk",
+			"sha256": "d1433dcd06474b334b9f269b3bae76b74c50280ee6e416f05762be914efb0f62"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\key_state.ahk",
+			"sha256": "969f960c2aebdc29a1078b655f017122ce1e46d00245cd488c485575be312dd3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\app_launcher.ahk",
+			"sha256": "6b009d2ab93cc34975a14350e1960be2ebf7e48a7daabad48b0a0a3f64ae47f1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\crypto.ahk",
+			"sha256": "eee95d0a117f671dda62b50d2238c0a5a9d5c7636d418ec2c11455932065d7fe"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\network_info.ahk",
+			"sha256": "79426ada8fdb22cdd25b6342657ea35a9fdd545fbb482d0a1da0206cc0e64cad"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\window_manager.ahk",
+			"sha256": "5f86fb3834dffdb98db4ae1631914207109f3c8ab2b8d848830431ba1322773a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\system_control.ahk",
+			"sha256": "e4582b02beeb5e9dbdde7aa410c921df6c0d90ed769597b0e760363621fc17f8"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\mouse_control.ahk",
+			"sha256": "bc7da3d14331f43b7bb82b2fe7dfed2bd61a91766aae117526af4a8007f8d566"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\graphics_renderer.ahk",
+			"sha256": "066f3f4757b650a137796474cb2a79709bf87e3dab13202091c13cfd6bc4751b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\spotlight\\ownership.ahk",
+			"sha256": "19346136f5bd17d298576698f11dce5bd2eccb1dd0e18a8441880140be372a14"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\shell_runner.ahk",
+			"sha256": "deba93c562b3d9844cd646b5d20f0de627c4923d0941eb6ab0c742f53a048256"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\actions\\brightness.ahk",
+			"sha256": "979b3843bbd36457bbfa9ee8228413d61ce31c522343e90f6ae8eb83f621de49"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\screen_brightness.ahk",
+			"sha256": "b99a96d9b2a4845296bf10643c21dae7daf9a330c70f77aacbae39ccf797a412"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\crash_report_worker.ahk",
+			"sha256": "6a49a5cf8be4d3e095fdc00145eb6b5fa8d9ffe897a12d6e2368199f45ede54e"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\diagnostics\\crash_reporter.ahk",
+			"sha256": "dd33e8738fd3738b95544011220f6f97abe79db3a15f032fc11f12775be99aab"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\error_net.ahk",
+			"sha256": "6a4e6107fe1f849cc18c6bf2556d536cea5c53d4327cd4b036df2840a396149a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\uia_selection_worker.ahk",
+			"sha256": "607793ca5890f4c77efcad4103e8c8c15a4c6171c1c49daa74b0b433265d8a90"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hook_dispatcher.ahk",
+			"sha256": "bb4d99ed0af5c9f3b80fb3415436b18bfa1939ca6b1910b0b8755c0bc6cbc7ef"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\keyboard_hook.ahk",
+			"sha256": "5619d59f6de9cc864b4a05696366302f2bde10bb4f4bd1dba6cc06ea5c756b12"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\editors.ahk",
+			"sha256": "2c3c4ffbf73ca111ae385ac97692554d0acc92a3a07c8619f8b2200a9c788f92"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\log_openers.ahk",
+			"sha256": "4fe3b69cc14f2292018c5742bdf20c07c4dcebe8c66da0d28267d42c0c945a0c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\paths_editor\\init.ahk",
+			"sha256": "87fdf2a13b92791f72878397fa56dec998261a0340a6354b752eb66af43cf1f5"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\wpm\\wpm_gdiplus_ownership.ahk",
+			"sha256": "fefad49304a0b997cf748fd81878ab274d66e7e31faf2b3ed22161ec980e4561"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\wpm\\wpm_widget.ahk",
+			"sha256": "c590db12aa51c026d1cdd13111d2360ac6f668ed8cc9e2a46293e6d82e7281b3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_actions.ahk",
+			"sha256": "25103f5a4b7b82218520ced14171918814f86db2138ab506ee29564505df0bb4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\app_picker.ahk",
+			"sha256": "3f319eb720236e2fd6c44e16cf43cefab53eb42e5a28f885fc7784876241eb5f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\config_shortcuts.ahk",
+			"sha256": "1d9b13927ccb2bacd0bd91514d095ba30101a834d3d372a63bfeb5a0a384733c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\metrics\\metrics_filters.ahk",
+			"sha256": "30b4be6cd609b8cb6cc77fec347ab93318d4a856476ac890526bcccb02aa7907"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\metrics\\metrics_shortcuts.ahk",
+			"sha256": "4975ce1aeba6e8b80dc63d149b516429e83d0a1a3e5b7165a05152a5342d9693"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_metrics.ahk",
+			"sha256": "ef1b61fdd25cdea173e254213435c73d2e92ef142508011a84ff94acdb9374b6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_metrics_actions.ahk",
+			"sha256": "1e8819a41dbfc875582939c51717d31b5858cd7d3aaf41875c9b4bfcf9bb5bcc"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\models.ahk",
+			"sha256": "a3d73ea339afb17c905c03acff83b3f8553126777eff34ff1d035a006fe17dab"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\llm_defaults.ahk",
+			"sha256": "cc755469701da488fcd6ce8ccd9aa2a4a5d551042954eea2c8af71f516f06f11"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\llm_profiles_data.ahk",
+			"sha256": "ba95ae3bb8f2e29dacb65debfbe2f816a6f312cf07eb40c4f593d199846c42fe"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\profiles.ahk",
+			"sha256": "522c1c7aacb60bf29ba824d5587831bbab416be91ce4ea381abdaee4468f8c1a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\api_common.ahk",
+			"sha256": "d4dd0483324f3ddef8c13bbbb2de8d0253eab3ab944c37e01091120d34a3a1f7"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\api_token_crypto.ahk",
+			"sha256": "83f149f0e4efa5141b70186e712ff683e9d0b2f9031d87958e114537305e7efb"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\api_ollama.ahk",
+			"sha256": "214d95474e40f89b1431c6c8d8665007e6988a39d13021b88858abfdf6d130f6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\remote_formats.ahk",
+			"sha256": "b7761a426930613091070f7f056f12235ea4b2425bc13ac7e30a42110a171a8f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\llm\\local_server_auth.ahk",
+			"sha256": "d256eff2043244ce1dab39cd247ab1e24e4f89cfc2d6eccbdbd44be0c3d34e0f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\llm\\local_server_discovery.ahk",
+			"sha256": "f3004b8adb3f8ef068cd16bf0bc2653c20df4243fe306084faa94552df354395"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\api_remote.ahk",
+			"sha256": "72761bb37f4f8dc624129ef09b8fa02e0a6fbb01c00b3d2770768224834b1483"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\local_server_models.ahk",
+			"sha256": "1418ef23dd44fe5f0419a27eb571d2750c62d92e34a35362a1ced374a4adf072"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\option_validation.ahk",
+			"sha256": "6de61e34349c9ab3681816a4fc1fb5819f014cc2e65ec40fe57a008bfad47fd7"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\rewrite.ahk",
+			"sha256": "3140adb78224339868d24052ca4bc5336558a42b040378f7e24c277cdf213975"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\prompt_action.ahk",
+			"sha256": "91168dd228e30197e0b54b115eead8a82cbc14850738d491343c70412b181542"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\tone.ahk",
+			"sha256": "0a1aa05ea30d7a1e5b752ad28a5848fa48427db98faf6c21939c06bb8552d4e1"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\tone_action.ahk",
+			"sha256": "638731e1a7425163c905a99be01794af2326b4f97761345fd9e4cc09983e9df6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\vision.ahk",
+			"sha256": "dd3c5c57ba98aa99e00513c0abc5e05e6634bcf7d255d4337453a058b89ad927"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\vision_action.ahk",
+			"sha256": "7885953ed1646cc087007b560af1462fe967341477a020001ef421997260d56d"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\translate.ahk",
+			"sha256": "7bc7309e1a0325073122a29d0c01b6743ecb34d5ccd81a7b667b5a2f421d7b25"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\translate_action.ahk",
+			"sha256": "4b9006c6746c19ec949aee70f308ac7391d5eb6718f3e99d3b205d0cebd8363e"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\agent.ahk",
+			"sha256": "70b95570049f1389e772c0154504ef6f0f0590a4d3411d2b89826e5682d070ee"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\agent_connectors.ahk",
+			"sha256": "cd655cd8e209c2763663964a58ba588b898d049d46a7452f9c7d1276207f980a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\agent_action.ahk",
+			"sha256": "df04861b6050447012f394cecf78bb3118b819e1b5e2b93ff78b0d323a447315"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\prediction_engine.ahk",
+			"sha256": "d55142c86d2ffab04aad304c7b25232781218624b4adec675908fca651217b81"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keymap\\llm_bridge.ahk",
+			"sha256": "c5018e5647c0d26897cfc99873183c524285b63f52268281dc0553419c90d4d7"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\layout_manager\\init.ahk",
+			"sha256": "cb623bcc04533f5d29b510401ae059774efe3ecf33e10011b41014312b77f7e0"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_layout.ahk",
+			"sha256": "10a72de230b0a7650571dc0ba2590b9448be7fb5a7df8b2b68ab56e23573208c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\llm\\parser.ahk",
+			"sha256": "1d6448ddcd513624fcb985b0d70dde09a67ee069a3c40fb8cb2b45c4553e3d76"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\hotkey_identity.ahk",
+			"sha256": "572afa989562f4df141754f9ae4d40d7525eca94b5f0d8ead039abf4dd708628"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\llm_nav_event_owner.ahk",
+			"sha256": "357b20e978f7396fa90dfc83a8e85d7d2fc20e27290254cd3736e7be3a661767"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\tab_accept.ahk",
+			"sha256": "9db8e51a6aa5a0132d91b7ee34b92d316f83a431589356564b0a5a8bbf4500f8"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\init.ahk",
+			"sha256": "c65119c4d1b52618d6a0309794031791e3a7974a2173f7b3c737f91891c269b7"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\menu_models.ahk",
+			"sha256": "74a676c6eb8c4fefe301c08afe7d2445e8d9b6ca26b7bd5831050024e1fcdc2a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\menu_profiles.ahk",
+			"sha256": "56881a6814387fe089e24673c3e2b1d5bb989ba435e9147da53ae117c27ac0b2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\persist.ahk",
+			"sha256": "5553ffab45b25b72bda7a36f1e25c4205c44eb108d22fb17841d5dc7f5bf0f67"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\transactions.ahk",
+			"sha256": "1190f02ea005aff1bc30b57c89a15a2b9bbffcc7ab5ddbc7644cd5553b50d0c6"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\backend_lifecycle.ahk",
+			"sha256": "ce20244c82214b28944e97f9f510edad4368642d389335ec352114a0ccd73729"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\aux_ownership.ahk",
+			"sha256": "a6485fd65208601065fc9fb778390eeb23ccd3cf1b26859032a61568a379ed02"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\menu_api_entries.ahk",
+			"sha256": "ecbc1321fecf3f4e0f3c9f51642e43aaca7bb3e483359e5e85d43357ed2702bc"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\menu_main.ahk",
+			"sha256": "b20d6232959eba537cd18a1e506425f4fb64b146581f3f37dc378c90cf7e2dc2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\enable_admission.ahk",
+			"sha256": "9140389776298a9256fd273322b1cebc1b6d074893f006114172d64e9711a248"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\actions.ahk",
+			"sha256": "f133639fe45cba0aa167c1ce2c9cf3de7176895c77e22edb439eebab69434d4c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_gestures.ahk",
+			"sha256": "9af12565517f6bce9d82cc54510b33dfe1071891abed0210b0e1d2a4935ccdfa"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\menu_dispatcher.ahk",
+			"sha256": "cbb928a054e7e0a3a05ec72781ef78cd73d85589cfc4a81ccbe8f9bb06460f73"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\menu_settings.ahk",
+			"sha256": "7833a03e6d5818d0c3b49a776e84dd90ad26952f5d315110dfb23437eb1c6bbb"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_llm\\menu_agent.ahk",
+			"sha256": "7462ac155ce4f5e8db39f6aea83204822e30d6afc595273ab28ba9b0f4cf0412"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\prompt_editor\\init.ahk",
+			"sha256": "1a50d6cedaf8ac4223c06e6fa0ed98de35af2e9a253bef9ee8ef2fa17f0e0efa"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\changelog\\init.ahk",
+			"sha256": "479b9cf49d24dfa4a59cfeebb392324d79dcd887c5935d301608199c5e81c09c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\take_note.ahk",
+			"sha256": "9703e022deb739cf3830a67b096631f59363850bba60124427f66aac4397a0a7"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\touchpad_registry.ahk",
+			"sha256": "bf0f69a0f9fc699c18af9ec3f9ba334571ebbe4b3159b952e1fd7f5bd61b8b2d"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\gestures\\touchpad_registry.ahk",
+			"sha256": "15f3fdaa5b1c3ab93033e4f032738f99e365fc783e77897f05a58e44567b0960"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\gestures\\init.ahk",
+			"sha256": "0cea59d561ecd33beb3529285d9e4e713e282daaa79e4b603b64f091d806949b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\gestures\\click.ahk",
+			"sha256": "abac6a74d2a1844b0c294d1bcd53e272757b5aba79cc912fe424001cab0c68b4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\gestures\\screenshots.ahk",
+			"sha256": "082de4a69495d37e66b41aec5cea6dc1b7f5290eccde359008928c57eff9254c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\gestures\\window_cycle.ahk",
+			"sha256": "f8548b926b5ef06a1b4b6bd2046a8fc738f366d4c1030d0e5210476be00f689e"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\gestures\\virtual_desktops.ahk",
+			"sha256": "97619c43db02587faa3b8a8fc8033cc64c366a3a85ca7bc07e07a979126413db"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\gestures\\config.ahk",
+			"sha256": "53d01dc924eaf35bf1d373dae427b730dfd2e8eac894af1420e834191333bd7a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\onboarding\\gesture_registration.ahk",
+			"sha256": "b55f45456524eac788fbf3bf060d0966792ebd0db80151c1c70166ff890f49b4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\onboarding\\answers.ahk",
+			"sha256": "9ff4be7d6b9133f8438deb2b7a60adfd9748f7a86ff398633f0da1ffd8f5b597"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\onboarding\\finish.ahk",
+			"sha256": "c0c5179fa84587f683520afcad0c49c4f03e028b31bbb6dbfe1fc8ea9bf84cc3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\onboarding\\webview.ahk",
+			"sha256": "f39eb375656a4dddbb43f30124ac966a3e6982609b12832e2ccc94d5976397d5"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\sqlite3.ahk",
+			"sha256": "f8b86e5c41424cf42e789ca4d93cca3f3e8918ea364231b1d563c5968aead7fb"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_walker.ahk",
+			"sha256": "f88635bcf1cb549ab1fefd2d8c12d1e102be6e1b1447f460b8064d42f4af4cf2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_app_categories.ahk",
+			"sha256": "d2e0e99fd8e3ee1e5343c499bac08817f3e88d0ab21fcd310713ed98952b56b8"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_reader.ahk",
+			"sha256": "8ec5614bb503b2057ed5c4032a3cc974ed3e6db5049b0128c9367792ed5b12f5"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_roi_prune.ahk",
+			"sha256": "4d0f7de841a1b255653b8f7ad3e19998081b6ca92959ec3f48b69c03f633abac"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_password.ahk",
+			"sha256": "5526dce4e482209d4c6399d3721159c48efaaf2627ae2fa19c70842ba22c28b2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_llm_journal.ahk",
+			"sha256": "c7d28c45a4ee2306fd69d8a53b9b873de6002ccdd9a6aa3952af8a45a6177698"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_prefetch.ahk",
+			"sha256": "78b5bd2fcf63eadf9e2c9234d3775bf1a30e3ad2076a2a30adc019eb1755e52c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_network.ahk",
+			"sha256": "6e4148d5aeafe7126a1a12fe13d5e07f3772cb7a353b5c2f4b86c971d9a52913"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_av_state.ahk",
+			"sha256": "9d53e6b56e59158e1d60f531743cc466d8358b50d7f633dad572e5d9917ed197"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_webview.ahk",
+			"sha256": "67d937e68966b9c8341354c7233ce83fed3323638e42a9349a37261c1c4037d3"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_clipboard.ahk",
+			"sha256": "00bfd76bcec16ca308d9bfe0d34a97c388576ef9eb413d2b321da84c63ba261c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_json.ahk",
+			"sha256": "e2471902a683fc8e9b4983ed50d4f5f2ee9b7c36a1b199db2b92b5eeb302cc10"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_journal.ahk",
+			"sha256": "1a0ceb083e88848824c525a55c6aa229d5f506f46d8ecf1bcb5db9bf35d46a37"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_shutdown.ahk",
+			"sha256": "aa0b387b2e8f31f06b708dfec9cdf536fa7ee91b6a3e900e0511e310729bf9bb"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_event_id.ahk",
+			"sha256": "264b94c4d3b477df860902fce149183146cecaa1a597ac731a46ac0363d4c00f"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_text_cipher.ahk",
+			"sha256": "fd5373fb3ee1f6565ab1ffb908cdebe96753d7d183bda8ab4f983e3d5e1ff80c"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_text_migration.ahk",
+			"sha256": "cd56c881d7392772e93c681cb3cbfbd32be9e6afe0b2ede5e38a05fb4ca545b9"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_sql.ahk",
+			"sha256": "77f672a85ee0576bec863fb5525b92b3e682c73dfed91d9af7f92bb90e090a98"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_hotstring_log.ahk",
+			"sha256": "f7da3ca50dd6da57374865056539adab73139d67df390a863a426a9d44a34782"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_watchers.ahk",
+			"sha256": "3356cd54ceae8d2e88f6f8a544f23af466d34bb55f13ca82de8f3e7204159c04"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_hook.ahk",
+			"sha256": "85f00e6cb04d9c5d1ba27404a954aeccd17beb38d009675c3a034fbc2b1b3b31"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_mouse.ahk",
+			"sha256": "a67518f7c6ce687096e1d1323415acfb12a9c8c35dbbbf2f9dffc531379f3b09"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\modules\\keylogger\\keylogger_window_topology.ahk",
+			"sha256": "f7786c7aaae0a1f0900c6c46be3fccb21e56d24612794c51dc150955935fe9a0"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\menu_command_origin.ahk",
+			"sha256": "f3f26d242ba098d158dc58555c2bb5a3308fd8fc1a7926a3cc42afc8d2280b18"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\platform\\remap\\constants.ahk",
+			"sha256": "3df52a2c590197467e35b63738220f2722e9189001b527eed32c708487799b29"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\platform\\remap\\tap_hold_roll.ahk",
+			"sha256": "d0a763ce4446c7ad92fef4cbac073f9d50f6fb9b22d1bda547ddaf4437714af4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\platform\\remap\\altgr_criteria.ahk",
+			"sha256": "67accd7f3898db6cb9c965b6f3eb0375252ccae1d67c1bbce9a54308d3da5603"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\menu_manifest.ahk",
+			"sha256": "0236a1b7a9ea3f184619143fbe3e7c1d525f44bcd9303060de4c95b19aa407f4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\manifest_menu.ahk",
+			"sha256": "53b465d6bad2a616bebae8bf5486a2a4caad1289b9b6fe94dc121d20db386353"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\menu\\menu_init.ahk",
+			"sha256": "6689d170086fcc7adde6d246ae253371e3b3a9eda691a2c0e1f8414a0ddf5b9b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\_generated\\prompt_builder.ahk",
+			"sha256": "d19f523a770cc5eed50feddd027423d3e23468173c63a518f6e6c6f3f0055538"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\chord.ahk",
+			"sha256": "ea8382f9d29f280d2a3db87f38c004d7dc9b0b7352ba6b6cfc45bf1376f764fe"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\adapters\\hotkey_registrar.ahk",
+			"sha256": "66920a92fb43336a629b9add0dd7b1cf78c429b7a0b4cf32e74e45d4773d3acb"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\_shared\\modules\\shortcuts\\magic_editor.ahk",
+			"sha256": "f23548418b7f30056a626e733a89c172bf009552f4db0edffeaeb40c47236af2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\magic_editor.ahk",
+			"sha256": "685d3ce482395280a9976a81a3e4554e0fa6985e9900131e3667f7f7cb0b24ab"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\healthcheck\\core.ahk",
+			"sha256": "fd0811cf95659ababf283b3778c688521f51c0c511f13b184b325ff7249a5757"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\healthcheck\\helpers.ahk",
+			"sha256": "324f19eb61e1439d5b48accfc95d1c5d2c4c56c71de460c8880e3a762e3b7bca"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\healthcheck\\probes.ahk",
+			"sha256": "cd90c2545fc505647dc788dcb2eb294330a531511443bf2d17843831c0376e3b"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\healthcheck\\report.ahk",
+			"sha256": "f84f4662a066ab9cb2f5671eefa4ef037fd58a8d33aa3ff1d4d3ddd5c9d10927"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\healthcheck\\actions.ahk",
+			"sha256": "e63134a522fd571ee5c33fd4af65c125446a2c45e80c4b7d4a3f6d249c94e2e2"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\error_dialog\\init.ahk",
+			"sha256": "979c2597905639fa769e29926c0f8406e44c7ddb85e126bace8886e580d67f24"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\ui\\update_check\\init.ahk",
+			"sha256": "c70b8249c2f116553b02f0d25f3d45662772e177bfff56b7febd0ff9e928b4e8"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\infra\\hotpath_profiler.ahk",
+			"sha256": "65f1116151e44b00b9b823d0efa6467f8fe255ab26e4581c1c04ec2ba534cd45"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\llm-tests-proposal-v2\\test_llm_accept_injects_exact_text.ahk",
+			"sha256": "15b3dff7d8e05c59153b38c8dc32e88af9e1a364383cd6ad3151f2b51b019b45"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\tests\\unit\\test_hse_send_failure_transaction.ahk",
+			"sha256": "b9ca82d75528b6aa21db62e5f30599e8e073b58c294de4472f48b348b82f2e5d"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\probe.ahk",
+			"sha256": "d8b858080fad6b4c9e858b0aa5d5855d0bad68862f8b537e150431c60d447a27"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\observe.ps1",
+			"sha256": "0f650e8dc60113897dd61355b5d2703cda056c69e56bba3c420ed503613ab34a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\static\\ergopti_plus\\windows\\vendor\\ergopti_nav_owner.dll",
+			"sha256": "fd5cc433e6344155c6015e660fb2f10d4eb7139aa3cfe00a56de1f6f5d387676"
+		}
+	],
+	"direct_include_count": 265,
+	"predecessor_probe_sha256": "d8b858080fad6b4c9e858b0aa5d5855d0bad68862f8b537e150431c60d447a27",
+	"scope": "Exact V7 six cases/probe and supervisor; current actual includes and latest DLL pinned before execution."
+}
