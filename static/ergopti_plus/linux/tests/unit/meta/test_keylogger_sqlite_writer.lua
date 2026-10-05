@@ -897,3 +897,43 @@ helpers.describe("linux-sqlite-ngram-source-map", function()
 		end
 	end)
 end)
+
+helpers.describe("linux-sqlite-ngram-source-encoding", function()
+	local cases = {
+		{ "ordinary", "addon" },
+		{ "quoted UTF-8", "addon.é'\"" },
+		{ "literal backslash escape", "addon\\t" },
+		{ "unknown backslash escape", "addon\\q" },
+		{ "newline", "addon\nline" },
+		{ "tab", "addon\tfield" },
+		{ "carriage return", "addon\rfield" },
+	}
+	for _, case in ipairs(cases) do
+		it("linux-sqlite-ngram-source-encoding: " .. case[1] .. " remains one exact JSON key", function()
+			with_ngram_sql(function(writer, statements)
+				helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+					x = { c = 2, td = 7, cd = 2, e = 1, sources = { [case[2]] = 2 } },
+				}))
+				helpers.assert_eq(#statements, 1)
+				local source_json = statements[1]:match(",2,7,2,1,'(.-)'%)")
+				helpers.assert_type(source_json, "string", "actual admitted SQL must carry the source map")
+				-- SQL quotes are doubled after JSON encoding; restore only that outer layer.
+				source_json = source_json:gsub("''", "'")
+				local expected = { [case[2]] = 2 }
+				helpers.assert_eq(require("json").decode(source_json), expected)
+				helpers.assert_eq(source_json, require("json").encode(expected))
+			end)
+		end)
+	end
+	it("linux-sqlite-ngram-source-encoding: original numeric admission and floors are unchanged", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 2, sources = { ["addon\n"] = 2.9, [""] = 0.5,
+					string_count = "3", zero = 0, negative = -1, [1] = 4 } },
+			}))
+			local source_json = statements[1]:match(",2,0,0,0,'(.-)'%)")
+			helpers.assert_type(source_json, "string")
+			helpers.assert_eq(require("json").decode(source_json), { ["addon\n"] = 2, [""] = 0 })
+		end)
+	end)
+end)

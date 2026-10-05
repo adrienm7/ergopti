@@ -1036,8 +1036,8 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 			local source_parts = {}
 			for source, source_count in pairs(sources or {}) do
 				if type(source) == "string" and type(source_count) == "number" and source_count > 0 then
-					source_parts[#source_parts + 1] = string.format('"%s":%d',
-						source:gsub('"', '\\"'), math.floor(source_count))
+					source_parts[#source_parts + 1] = string.format('%s:%d',
+					Json.encode(source), math.floor(source_count))
 				end
 			end
 			local source_json = "{" .. table.concat(source_parts, ",") .. "}"
