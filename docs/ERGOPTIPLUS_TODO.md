@@ -5061,6 +5061,20 @@ private discarded output, cancellation, absent original process group and exact
 callback/handle retirement. These controls qualify the Linux runner boundary,
 not automation discovery, native Windows behavior or installed application input.
 
+Native macOS run 37304571728 tests CI commit 9d89453278dd9455fd4cc3ddebbc732b988a029e
+and the exact feature tree at 7ae2f6e251d7cdadbdfc8ca1575c54e2a8f6395f.
+Owned-program Swift cases pass 14/0; signed Hammerspoon inventory passes 15/16,
+including actual_native_runtime. real_interpreter_symlink remains failed and
+the five shim cases remain unexecuted. A strict primary-receipt validator now
+prints only a closed six-field diagnostic summary before preserving each
+original verdict. Its Python controls pass 20/0; dependent notification and
+global-switcher controller controls pass 13/0 and 27/0. No source identity,
+private stream, fixture pathname or signed download URL is logged. The native
+interpreter cause is still unobserved until the next source-identical CI run.
+The complete Swift suite retains the two Brew/Sparkle failures; packaging and
+installation are unqualified. Apple Shortcuts still times out in catalogue
+retrieval and has no qualified invocation; item106 remains partial.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
@@ -5468,6 +5482,13 @@ controls and both Lua ABI safety profiles pass, including independent rejected
 delivery-guard omissions. All nine genuine native cases still require hosted
 execution on the final committed SHA. Constructor qualification does not prove
 user delivery/clicks or complete the remaining native panel-title boundaries.
+
+Native macOS run 37304571728 passes all nine actual notification-constructor
+caption controls and retires the exact owned native process. Native delivery
+and click callbacks remain unqualified. The source-pinned inventory now emits
+only validated closed diagnostic facts; its dependent controller still passes
+13 portable controls. This does not qualify the deferred Windows console
+caption or the remaining application panels.
 
 Windows continuation for item109 (explicitly deferred to the maintainer's PC):
 

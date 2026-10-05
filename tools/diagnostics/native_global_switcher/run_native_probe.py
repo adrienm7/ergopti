@@ -19,7 +19,7 @@ from probe_receipts import qualify
 
 DEPENDENCIES = {
     "ownership": "d3bc862c737e444f22d84fc32368bb8669360bc33ba6008c208f7bf62001314b",
-    "inventory": "e5a90e628149d29ae93e5dba5675d45ad4e7a51cdea1c2221b11677e439c7c0f",
+    "inventory": "21b51cdc242e6c2b1d2b5270d6ef0ddafd65b7e4658d955addd9a9c36697696d",
 }
 
 

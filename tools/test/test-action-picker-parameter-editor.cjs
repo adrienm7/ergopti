@@ -869,8 +869,8 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'provider receipt parser controls complete'
 	);
 	check(
-		/Ran 17 tests in /.test(controls.stderr) && /\nOK\s*$/.test(controls.stderr),
-		'all seventeen receipt and diagnostic controls execute without skip'
+		/Ran 20 tests in /.test(controls.stderr) && /\nOK\s*$/.test(controls.stderr),
+		'all twenty receipt and diagnostic controls execute without skip'
 	);
 }
 
