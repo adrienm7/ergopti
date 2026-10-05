@@ -348,6 +348,14 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_timer_finite_admission.lua"
         timeout-minutes: 1
 
+      - name: Refuse non-finite native event-loop periods before allocation
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
+        timeout-minutes: 1
+
       - name: Admit file watches only after native activation succeeds
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

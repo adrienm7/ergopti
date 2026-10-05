@@ -1555,6 +1555,24 @@ These are software implementations; final hardware verification remains below.
   runtime gates remain deferred. Depends on L107's parser-contract stack; no
   visible channel/badge correction, draft policy, transport or reserved change.
 
+- [~] **L109.** Linux native periodic-duration admission: apply L105's shared
+  finite-number policy to resolved seconds and converted milliseconds before
+  clamping or allocating `EventLoop.run` resources. NaN/infinities and conversion
+  overflow could create a dormant huge timer or unintended 1 ms repetition;
+  refuse them through existing run cleanup. Preserve numeric strings, default and
+  nonnumeric-default periods, finite negative/zero/fraction clamps, large finite
+  durations and idle-only calls with unused invalid periods. Sixteen actual
+  libuv cases have five original failures on current LuaJIT and signed Ubuntu
+  22.04 dependencies, three on stock Lua 5.4, and pass after. Real finite foreign
+  watchdogs bound observations; exact foreign ownership and healthy same-instance
+  restart survive every refusal. Seventeen registered cases have six original
+  failures and pass under LuaJIT and Lua 5.4; allocation/conversion seams are
+  explicitly simulated, with a separate real native child. Retain all earlier
+  assertions and reentry/stop ownership. Register future Linux CI without
+  launching it. Windows/macOS have different timer-owner APIs by source; no
+  foreign runtime validation is claimed. No maximum/native-width policy, callback
+  type, pump/clock, sleep-completion or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

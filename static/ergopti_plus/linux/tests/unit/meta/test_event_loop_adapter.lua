@@ -348,6 +348,72 @@ helpers.describe("event_loop adapter", function()
 
 end)
 
+helpers.describe("linux-periodic-finite-admission", function()
+	for _, case in ipairs({ { name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge },
+		{ name = "positive converted overflow", value = 1e308 },
+		{ name = "negative converted overflow", value = -1e308 } }) do
+		helpers.it("linux-periodic-finite-admission: refuses " .. case.name .. " before allocation", function()
+			-- This explicit backend seam counts admission; the separate native
+			-- fixture proves actual libuv callbacks and foreign handle ownership.
+			local loop, state = stop_fixture("periodic")
+			local refused_calls, healthy_calls = 0, 0
+			local ok = pcall(loop.run, { periodSec = case.value,
+				onPeriodic = function() refused_calls = refused_calls + 1; loop.stop() end })
+			local allocated = #state.handles
+			helpers.assert_true(not loop.isRunning())
+			loop.run({ periodSec = 0.001,
+				onPeriodic = function() healthy_calls = healthy_calls + 1; loop.stop() end })
+			helpers.assert_eq(healthy_calls, 1, "duration refusal must release run ownership for retry")
+			helpers.assert_true(not ok)
+			helpers.assert_eq(refused_calls, 0)
+			helpers.assert_eq(allocated, 0, "invalid duration must not acquire idle or timer resources")
+		end)
+	end
+	for _, case in ipairs({ { name = "zero", value = 0, milliseconds = 1 },
+		{ name = "finite negative", value = -0.005, milliseconds = 1 },
+		{ name = "submillisecond fraction", value = 0.0005, milliseconds = 1 },
+		{ name = "fraction", value = 0.0055, milliseconds = 5 },
+		{ name = "numeric string", value = "0.002", milliseconds = 2 },
+		{ name = "default", milliseconds = 250 },
+		{ name = "nonnumeric default", value = "not a number", milliseconds = 250 },
+		{ name = "large finite", value = 1e12, milliseconds = 1e15 } }) do
+		helpers.it("linux-periodic-finite-admission: preserves " .. case.name .. " native conversion", function()
+			local loop, state, backend = stop_fixture("periodic")
+			local native_start, first, repeat_ms = backend.timer_start
+			backend.timer_start = function(handle, delay, interval, callback)
+				first, repeat_ms = delay, interval
+				return native_start(handle, delay, interval, callback)
+			end
+			local calls = 0
+			loop.run({ periodSec = case.value, onPeriodic = function() calls = calls + 1; loop.stop() end })
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(first, case.milliseconds)
+			helpers.assert_eq(repeat_ms, case.milliseconds)
+			helpers.assert_eq(#state.handles, 2)
+			for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+		end)
+	end
+	for _, value in ipairs({ 0 / 0, math.huge, 1e308 }) do
+		helpers.it("linux-periodic-finite-admission: idle-only ignores unused duration " .. tostring(value), function()
+			local loop, state = stop_fixture("idle")
+			loop.run({ periodSec = value, onIdle = function() loop.stop() end })
+			helpers.assert_eq(#state.handles, 1)
+			helpers.assert_true(state.handles[1].closed)
+		end)
+	end
+	if native_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-periodic-finite-admission: real libuv owns refusal and retry resources", function()
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_periodic_admission.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native periodic admission fixture must succeed")
+		end)
+	end
+end)
+
 helpers.describe("event loop backend isolation", function()
   helpers.it("dependency fixtures restore cached and preload values after success", function()
     local loaded, preload = package.loaded.luv, package.preload.luv
