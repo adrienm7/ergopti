@@ -526,3 +526,43 @@ helpers.describe("xkb_keymap: quoted block metadata", function()
 		end)
 	end
 end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 6/ Quoted key definition metadata =======================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("xkb_keymap: quoted key definition metadata", function()
+	local alphabetic = { AC01 = { "a", "A" } }
+	local cases = {
+		{ name = "balances a closing brace in a quoted type", body = [[key <AC01> { type="Readback } type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "balances an opening brace in a quoted type", body = [[key <AC01> { type="Readback { type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains balanced quoted braces", body = [[key <AC01> { type="Readback {balanced} type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains inverted quoted braces", body = [[key <AC01> { type="Readback }{ type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains an escaped quote before a quoted brace", body = [[key <AC01> { type="Readback \" } type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "closes a quoted type after even backslashes", body = [[key <AC01> { type="Readback \\" , symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains a quoted type after odd backslashes", body = [[key <AC01> { type="Readback \\\" } type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a quoted declaration before a real key", body = [[name="key <AC01> { [ z, Z ] }"; key <AC01> { [ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a quoted declaration after a real key", body = [[key <AC01> { [ a, A ] }; name="key <AC01> { [ z, Z ] }";]], expected = alphabetic },
+		{ name = "ignores a quoted phantom key declaration", body = [[name="key <DECOY> { [ z, Z ] }"; key <AC01> { [ a, A ] };]], expected = alphabetic },
+		{ name = "refuses a declaration inside another identifier", body = [[monkey <AC01> { [ z, Z ] };]], expected = {} },
+		{ name = "keeps adjacent real declarations distinct", body = [[key <AC01> {[ a, A ]};key <AC02> {[ s, S ]};]], expected = { AC01 = { "a", "A" }, AC02 = { "s", "S" } } },
+		{ name = "preserves the existing key-name grammar", body = [[key <A_B+1-2> {[ a, A ]};]], expected = { ["A_B+1-2"] = { "a", "A" } } },
+		{ name = "preserves long and short symbols forms", body = [[key <AC01> { type="Readback [ z, Z ] type", symbols[Group1]=[ a, A ] };key <AC02> {[ s, S ]};]], expected = { AC01 = { "a", "A" }, AC02 = { "s", "S" } } },
+		{ name = "refuses a declaration without its structural opener", body = [[key <AC01> [ a, A ];]], expected = {} },
+		{ name = "retains the empty symbols contract", body = "", expected = {} },
+	}
+	for _, spec in ipairs(cases) do
+		helpers.it("(xkb-key-definition-strings) " .. spec.name, function()
+			local parser = helpers.load_module("infra.xkb_keymap")
+			local text = 'xkb_symbols "healthy" {' .. spec.body .. '};'
+			helpers.assert_eq(parser.parse_symbols(text), spec.expected,
+				"real key declarations own complete definitions outside quoted metadata")
+		end)
+	end
+end)
