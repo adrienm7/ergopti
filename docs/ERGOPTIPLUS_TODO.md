@@ -2003,11 +2003,18 @@ physical-module control reproduces exactly 166/188 with neither provider and
 passes 188/188 with actual LuaFileSystem alone; native libuv alone is also a
 sufficient alternative. All 22 failure labels and expected/actual receipts
 match hosted CI. Source bytes, admission policy and every assertion are unchanged.
-The corrected hosted E2E job still requires qualification. This scripted replay
-does not establish physical input, packaging, installation or deferred Windows
-acceptance. Native updater validator, audio-locale and notification failures,
+The corrected hosted E2E job passes all 188 assertions in manual run
+37266856722 at b85d3f6ad (tree-identical to feature 0649967ea). Core JS 358/0
+and Linux units 6,892/0 also pass. This scripted replay does not establish
+physical input, packaging, installation or deferred Windows acceptance. Native updater validator, audio-locale and notification failures,
 and the macOS Homebrew/Sparkle archive acceptance failures, remain separately
 owned blockers; their assertions and package/install requirements are retained.
+
+The [Group 2 integration checkpoint](handovers/2026-10-04-parallel-containers/GROUP2-INTEGRATION-STATUS.md)
+records exact candidate/CI SHAs, passed/failed/skipped results and the remaining
+native and Windows continuation. No final integration lock, shared validation
+movement or dev merge has occurred; the published feature branch is retained
+until mandatory native packaging/installation qualification succeeds.
 
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings
