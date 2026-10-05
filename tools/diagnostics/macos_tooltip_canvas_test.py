@@ -617,5 +617,250 @@ class BoldContrastRasterControls(unittest.TestCase):
             observer.validate_pixels(self.capture("less"), self.root)
 
 
+class NativeScriptOverlayControls(unittest.TestCase):
+    """Model supervision ports; no test here executes Cocoa or the native SDK."""
+
+    def setUp(self):
+        self.temporary = TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.output = self.root / "output"
+        self.output.mkdir()
+        self.source = self.root / "source"
+        for relative in ("macos/init.lua", "_shared/lua/sentinel.lua"):
+            target = self.source / "static/ergopti_plus" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("-- actual source capture model\n")
+        self.app = self.root / "Hammerspoon.app"
+        exe = self.app / "Contents/MacOS/Hammerspoon"
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(b"native boundary fixture, not an executable")
+        exe.chmod(0o700)
+        with (self.app / "Contents/Info.plist").open("wb") as stream:
+            plistlib.dump(
+                {
+                    "CFBundleShortVersionString": "1.1.1",
+                    "CFBundleIdentifier": "org.hammerspoon.Hammerspoon",
+                },
+                stream,
+            )
+        self.canvas = {
+            "status": "ok",
+            "cleanup_errors": [],
+            "native_owner": {
+                "closed": True,
+                "reservation_lost": False,
+                "live_group_members": [],
+                "worker_pid": 711,
+                "group_id": 711,
+            },
+        }
+        self.unchanged = Mock()
+
+    def native_run(self, arguments, **options):
+        if arguments[0] == "/usr/bin/ditto":
+            import shutil
+
+            shutil.copytree(arguments[1], arguments[2])
+        return subprocess.CompletedProcess(arguments, 0, b"signature boundary fixture", b"")
+
+    def summary(self):
+        import hs_native_bootstrap_probe as bootstrap
+
+        executable = (
+            self.root
+            / "script-native-overlay.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon"
+        )
+        identity = {
+            "schema_version": 1,
+            "contract": bootstrap.CONTRACT,
+            "phase": "ready",
+            "nonce": "d" * 32,
+            "pid": 812,
+            "executable": str(executable),
+            "bundle_id": "org.hammerspoon.Hammerspoon",
+            "version": "1.1.1",
+        }
+        return {
+            "schema_version": 1,
+            "contract": bootstrap.CONTRACT,
+            "feature": "script_scope",
+            "qualification": bootstrap.QUALIFICATION,
+            "admission": "owned startup file",
+            "identity": identity,
+            "cleanup_acknowledged": True,
+            "process_retired": True,
+            "preference_restored": True,
+            "measurement": {
+                "contract": "script.scope-native",
+                "runtime": "native Hammerspoon",
+                "publication_scope": "private-file-and-nonce-settings-only",
+                "alias_count": 3,
+                "sdk_void_set": True,
+                "sdk_clear": True,
+                "participant_inverse": True,
+                "nonce": "d" * 32,
+                "pid": 812,
+                "executable": str(executable),
+            },
+        }
+
+    def qualify(self, change=None, observed=None):
+        import hs_native_bootstrap_probe as bootstrap
+        import macos_launch_gate as launch
+
+        summary = self.summary()
+        if change:
+            change(summary)
+        with (
+            patch.object(probe.subprocess, "run", side_effect=self.native_run),
+            patch.object(bootstrap, "SupplementaryNativeBootstrap") as constructor,
+            patch.object(launch, "processes", return_value=observed or []) as census,
+        ):
+            constructor.return_value.observe.return_value = summary
+            result = probe.qualify_script_scope(
+                self.app, self.source, self.root, self.output, "1.1.1", self.canvas, self.unchanged
+            )
+            constructor.assert_called_once_with(
+                self.root / "script-native-overlay.app",
+                self.output / "script-scope",
+                "org.hammerspoon.Hammerspoon",
+                census,
+            )
+            constructor.return_value.observe.assert_called_once_with("script_scope")
+            return result
+
+    def test_actual_overlay_is_detached_and_uses_exact_source_and_existing_owner(self):
+        result = self.qualify()
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["installed_package"], "unmeasured")
+        self.assertEqual(result["source_layout"], "private diagnostic overlay")
+        self.assertEqual(self.unchanged.call_count, 3)
+        self.assertFalse((self.root / "script-native-overlay.app").is_symlink())
+        self.assertEqual(
+            (
+                self.root
+                / "script-native-overlay.app/Contents/Resources/static/ergopti_plus/macos/init.lua"
+            ).read_bytes(),
+            (self.source / "static/ergopti_plus/macos/init.lua").read_bytes(),
+        )
+
+    def test_canvas_failure_or_inherited_group_debt_refuses_before_copy_or_script_owner(self):
+        import hs_native_bootstrap_probe as bootstrap
+
+        for altered in (
+            {"status": "error"},
+            {"cleanup_errors": ["retirement refused"]},
+            {"native_owner": {"closed": False}},
+            {
+                "native_owner": {
+                    "closed": True,
+                    "reservation_lost": True,
+                    "live_group_members": [],
+                    "worker_pid": 711,
+                    "group_id": 711,
+                }
+            },
+        ):
+            with self.subTest(altered=altered):
+                canvas = dict(self.canvas)
+                canvas.update(altered)
+                with (
+                    patch.object(probe.subprocess, "run") as native,
+                    patch.object(bootstrap, "SupplementaryNativeBootstrap") as begin,
+                    self.assertRaisesRegex(ValueError, "Canvas"),
+                ):
+                    probe.qualify_script_scope(
+                        self.app,
+                        self.source,
+                        self.root,
+                        self.output,
+                        "1.1.1",
+                        canvas,
+                        self.unchanged,
+                    )
+                native.assert_not_called()
+                begin.assert_not_called()
+        self.assertFalse((self.root / "script-native-overlay.app").exists())
+
+    def test_incomplete_or_unknown_sdk_receipt_cannot_qualify(self):
+        # Each invocation gets a new private fixture because overlay acquisition
+        # intentionally refuses an already-existing destination.
+        for change in (
+            lambda r: r["measurement"].update(sdk_void_set=False),
+            lambda r: r.update(process_retired=False),
+            lambda r: r.update(preference_restored=1),
+            lambda r: r["measurement"].update(foreign=True),
+        ):
+            with self.subTest(change=change), TemporaryDirectory() as directory:
+                previous, previous_output = self.root, self.output
+                self.root = Path(directory)
+                self.output = self.root / "output"
+                self.output.mkdir()
+                try:
+                    with self.assertRaises(ValueError):
+                        self.qualify(change)
+                finally:
+                    self.root, self.output = previous, previous_output
+
+    def test_live_successor_after_summary_refuses_native_qualification(self):
+        with self.assertRaisesRegex(ValueError, "remains live"):
+            self.qualify(observed=[913])
+
+    def test_source_drift_before_or_after_native_invocation_is_not_a_pass(self):
+        self.unchanged.side_effect = ValueError("source changed")
+        with self.assertRaisesRegex(ValueError, "source changed"):
+            self.qualify()
+        self.assertFalse((self.root / "script-native-overlay.app").exists())
+
+    def test_declared_native_probe_failure_turns_successful_canvas_run_red(self):
+        import PIL
+
+        names = (
+            "macos_tooltip_canvas.lua",
+            "macos_tooltip_canvas.py",
+            "macos_tooltip_canvas_observer.py",
+            "hs_native_bootstrap_probe.py",
+            "hs_native_bootstrap.lua",
+            "hs_script_scope_native.lua",
+            "hs_script_scope_probe.py",
+            "hs_delayed_timer_probe.py",
+            "hs_karabiner_config_probe.py",
+            "macos_launch_gate.py",
+            "hs_delayed_timer_contract.json",
+            "hs_karabiner_config_contract.json",
+        )
+        repo = Path(probe.owner.__file__).parents[2]
+        for name in names:
+            # Real diagnostics are hashed; this boundary does not replace sources.
+            self.assertTrue((repo / "tools/diagnostics" / name).is_file())
+
+        def admit(app, version, output, label):
+            return {"executable_sha256": probe.digest(self.app / "Contents/MacOS/Hammerspoon")}
+
+        with (
+            patch.object(probe.sys, "platform", "darwin"),
+            patch.object(probe.sys, "version_info", (3, 13)),
+            patch.object(PIL, "__version__", "11.3.0"),
+            patch.object(probe, "identities", return_value={}),
+            patch.object(probe, "selected_version", return_value="1.1.1"),
+            patch.object(probe, "admit_runtime", side_effect=admit),
+            patch.object(probe.subprocess, "run", side_effect=self.native_run),
+            patch.object(probe.owner, "NativeProcessGroups"),
+            patch.object(probe, "owned_observation", return_value=self.canvas),
+            patch.object(
+                probe,
+                "qualify_script_scope",
+                side_effect=ValueError("required SDK inverse refused"),
+                create=True,
+            ) as script,
+        ):
+            result = probe.run(repo, self.app, self.root / "run-result")
+        script.assert_called_once()
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"], "required SDK inverse refused")
+        self.assertEqual(result["installed_package"], "unmeasured")
+
+
 if __name__ == "__main__":
     unittest.main()
