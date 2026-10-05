@@ -4154,16 +4154,7 @@ local function _about_update_rows(ctx)
 				action = function()
 					-- Consent names the release this row shows: the manager refuses
 					-- it if a background check replaced the cached release since.
-					up.download_update(rel.download_url, function(archive, err)
-						local installed = archive ~= nil and up.install_update(archive)
-						if not archive then
-							Logger.error(LOG, "Update download failed: %s.", tostring(err))
-						end
-						-- The daemon restarts on the new version, or tells why not.
-						if type(ctx.on_update_finished) == "function" then
-							ctx.on_update_finished(installed, rel.tag, archive and "install" or "download")
-						end
-					end)
+					require("ui.update_check.bridge").download_offered(up, rel, ctx)
 				end,
 			}
 		end

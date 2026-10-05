@@ -1,0 +1,1071 @@
+--- a/static/ergopti_plus/_shared/lua/updater/release_install.lua
++++ b/static/ergopti_plus/_shared/lua/updater/release_install.lua
+@@ -25,6 +25,9 @@
+ 
+ local M = {}
+ 
++-- Remains monotonic when a native window creates a new install session.
++local operation_serial, failure_serial = 0, 0
++
+ -- The page's reason keys, one per way the install can stop.
+ M.REASON = {
+ 	busy = "changelog_window.install_error_busy",
+@@ -47,10 +50,15 @@
+ ---   find_release(tag, channel) -> release|nil, reason_key,
+ ---   backup(release) -> record|nil, error (record.path is shown to the user),
+ ---   resolve_asset(release) -> asset|nil,
+----   download(asset, release, done(path|nil, reason_key, detail)) -> dispatched,
++---   download(asset, release, done(path|nil, reason_key, detail, failure_receipt?)) -> dispatched,
+ ---   install(path, release, asset) -> true | false, reason_key, detail,
+ ---   restart(release) -> true | false,
+ ---   report(message) -- { tag, phase, reason_key?, backup_path? },
++---   failure_contract?() -> canonical network.failure interpreter,
++---   failure_owner?(release) -> private native snapshot,
++---   failure_current?(owner) -> true only for that exact live native owner,
++---   failure_capabilities?(owner) -> actual available native actions,
++---   failure_action?(id, owner) -> true only after real native dispatch,
+ ---   logger, log }
+ --- @return table session { install(tag, channel), busy() }
+ function M.new(ports)
+@@ -62,8 +70,30 @@
+ 	local Logger, LOG = ports.logger, ports.log or "release_install"
+ 	assert(type(Logger) == "table", "release_install needs a logger")
+ 
+-	local running = nil
++	local running, terminal = nil, nil
++	local retired = false
+ 	local session = {}
++
++	local function owner_current(current)
++		if retired or terminal ~= current or running ~= nil
++			or type(ports.failure_current) ~= "function" then return false end
++		local native = ports.failure_current(current.native_owner) == true
++		-- A native capability probe can reenter and retire this operation.
++		return native and not retired and terminal == current and running == nil
++	end
++
++	local function capabilities(current)
++		local alive = owner_current(current) and not ports.blocked()
++		local native = type(ports.failure_capabilities) == "function"
++			and ports.failure_capabilities(current.native_owner) or {}
++		local out = {}
++		if type(native) == "table" then
++			for key, value in pairs(native) do out[key] = value == true end
++		end
++		alive = alive and owner_current(current)
++		out.owner_alive, out.retry_available = alive == true, alive == true
++		return out
++	end
+ 
+ 	--- Sends one phase to the page, never letting a page failure unwind here.
+ 	--- @param message table
+@@ -76,10 +106,35 @@
+ 	--- @param tag string
+ 	--- @param reason string Locale key.
+ 	--- @param backup table|nil The backup made before the failure.
+-	local function fail(tag, reason, backup)
++	local function fail(tag, reason, backup, receipt, current)
+ 		if not KNOWN_REASON[reason] then reason = M.REASON.unexpected end
+ 		running = nil
+-		report({ tag = tag, phase = "failed", reason_key = reason, backup_path = backup and backup.path or nil })
++		local message = { tag = tag, phase = "failed", reason_key = reason, backup_path = backup and backup.path or nil }
++		if reason == M.REASON.download and current and type(ports.failure_contract) == "function" then
++			message.managed_failure = true
++			local ok, contract = pcall(ports.failure_contract)
++			if ok and type(contract) == "table" then
++				failure_serial = failure_serial + 1
++				current.epoch, current.contract = failure_serial, contract
++				-- Never publish the native receipt, release, owner or detail to the page.
++				current.receipt = type(receipt) == "table" and receipt or {}
++				terminal = current
++				local classified, safe = pcall(function()
++					return contract.classify(current.receipt, capabilities(current))
++				end)
++				if classified then
++					current.failure_report = safe
++					message.operation, message.failure_epoch = current.id, current.epoch
++					message.failure_report = safe
++				else
++					terminal = nil
++					Logger.error(LOG, "Managed-network native capability inspection failed; no failure actions admitted.")
++				end
++			else
++				Logger.error(LOG, "The canonical managed-network policy is unavailable; no failure actions admitted.")
++			end
++		end
++		report(message)
+ 	end
+ 
+ 	--- Whether an install is running.
+@@ -114,7 +169,10 @@
+ 			return false
+ 		end
+ 
+-		running = { tag = tag }
++		terminal, retired = nil, false
++		operation_serial = operation_serial + 1
++		running = { tag = tag, channel = channel, id = operation_serial,
++			native_owner = type(ports.failure_owner) == "function" and ports.failure_owner(release) or nil }
+ 		local current = running
+ 		Logger.start(LOG, "Installing %s from the Versions window (channel %s)…", tag, tostring(channel))
+ 		report({ tag = tag, phase = "backing_up" })
+@@ -134,12 +192,12 @@
+ 
+ 		report({ tag = tag, phase = "downloading", backup_path = backup.path })
+ 		local settled = false
+-		local function done(path, reason, detail)
++		local function done(path, reason, detail, failure_receipt)
+ 			if settled or running ~= current then return end
+ 			settled = true
+ 			if not path then
+ 				Logger.error(LOG, "Install of %s stopped before installing: %s.", tag, tostring(detail or reason))
+-				fail(tag, reason == M.REASON.verify and M.REASON.verify or M.REASON.download, backup)
++				fail(tag, reason == M.REASON.verify and M.REASON.verify or M.REASON.download, backup, failure_receipt, current)
+ 				return
+ 			end
+ 			report({ tag = tag, phase = "installing", backup_path = backup.path })
+@@ -165,12 +223,33 @@
+ 				Logger.error(LOG, "Install of %s stopped: the download could not start (%s).", tag,
+ 					tostring(ok_dispatch and "refused" or dispatched))
+ 				settled = true
+-				fail(tag, M.REASON.download, backup)
++				fail(tag, M.REASON.download, backup, nil, current)
+ 			end
+ 			return false
+ 		end
+ 		return true
+ 	end
++
++	--- Dispatches only an action of the exact native terminal operation.
++	function session.failure_action(operation, epoch, id)
++		local current = terminal
++		if not current or operation ~= current.id or epoch ~= current.epoch
++			or type(id) ~= "string" or not owner_current(current) then return false end
++		local admitted = false
++		for _, action in ipairs(current.contract.actions(current.failure_report.cause, capabilities(current))) do
++			if action.id == id then admitted = true end
++		end
++		if not admitted or not owner_current(current) or current.epoch ~= epoch then return false end
++		if id == "retry" then
++			-- Retire this terminal before synchronous dispatch can publish a newer failure.
++			terminal = nil
++			return session.install(current.tag, current.channel)
++		end
++		return type(ports.failure_action) == "function" and ports.failure_action(id, current.native_owner) == true
++	end
++
++	--- Retires page action authority; an already running native install is unchanged.
++	function session.retire() retired, terminal = true, nil end
+ 
+ 	return session
+ end
+--- a/static/ergopti_plus/_shared/ui/changelog/script.js
++++ b/static/ergopti_plus/_shared/ui/changelog/script.js
+@@ -949,7 +949,7 @@
+ 	if (_install.phase === 'restarting')
+ 		return _fillInstall('changelog_window.install_restarting', tag, path);
+ 	var reason = _fillInstall(
+-		_install.reasonKey || 'changelog_window.install_error_unexpected',
++		(_install.failureReport && _install.failureReport.message_key) || _install.reasonKey || 'changelog_window.install_error_unexpected',
+ 		tag,
+ 		path
+ 	);
+@@ -994,8 +994,9 @@
+ 	if (text) text.textContent = _install ? _installStatusText() : '';
+ 	if (retryButton) {
+ 		retryButton.textContent = _t('changelog_window.retry') || '';
+-		retryButton.style.display = _install && _install.phase === 'failed' ? '' : 'none';
+-	}
++		retryButton.style.display = _install && _install.phase === 'failed' && !_install.managedFailure ? '' : 'none';
++	}
++	_renderInstallFailureActions();
+ }
+ 
+ /**
+@@ -1011,7 +1012,7 @@
+ 
+ /** Asks the host again for the install that failed. */
+ function retryInstall() {
+-	if (!_install || _install.phase !== 'failed') return;
++	if (!_install || _install.phase !== 'failed' || _install.managedFailure) return;
+ 	if (_installBlockedKey !== '') return;
+ 	_postInstall(_install.tag, _install.channel);
+ }
+@@ -1043,9 +1044,53 @@
+ 		channel: _install && _install.tag === tag ? _install.channel : _currentChannel,
+ 		phase: message.phase,
+ 		reasonKey: _hostKey(message.reason_key, INSTALL_REASON_KEY),
+-		backupPath: _hostString(message.backup_path) || ''
++		backupPath: _hostString(message.backup_path) || '',
++		operation: Number.isSafeInteger(message.operation) && message.operation > 0 ? message.operation : 0,
++		failureEpoch: Number.isSafeInteger(message.failure_epoch) && message.failure_epoch > 0 ? message.failure_epoch : 0,
++		managedFailure: message.phase === 'failed' && (message.managed_failure === true || !!message.failure_report),
++		failureReport: message.phase === 'failed' ? _installFailureReport(message) : null
+ 	};
+ 	_renderInstallControls();
++}
++
++/** Accepts only the translated public report, never native failure metadata. */
++function _installFailureReport(message) {
++	var report = message.failure_report;
++	if (!report || typeof report !== 'object' || !Array.isArray(report.actions) ||
++		!Number.isSafeInteger(message.operation) || message.operation < 1 ||
++		!Number.isSafeInteger(message.failure_epoch) || message.failure_epoch < 1 ||
++		typeof report.cause !== 'string' || !/^[a-z_]+$/.test(report.cause) ||
++		typeof report.message_key !== 'string' || !/^network\.failure\.[a-z_]+$/.test(report.message_key)) return null;
++	var actions = [];
++	var seen = Object.create(null);
++	report.actions.forEach(function (action) {
++		if (!action || typeof action.id !== 'string' || !/^[a-z_]+$/.test(action.id) || seen[action.id] ||
++			typeof action.label_key !== 'string' || !/^(network\.action\.[a-z_]+|error_dialog\.open_log|mlx\.use_ollama)$/.test(action.label_key)) return;
++		seen[action.id] = true;
++		actions.push({ id: action.id, label_key: action.label_key });
++	});
++	return { cause: report.cause, message_key: report.message_key, actions: actions };
++}
++
++/** Captures the exact terminal operation; the native host recomputes admission. */
++function _renderInstallFailureActions() {
++	var box = document.getElementById('install-failure-actions');
++	if (!box) return;
++	box.replaceChildren();
++	var current = _install;
++	box.style.display = current && current.failureReport ? 'flex' : 'none';
++	if (!current || current.phase !== 'failed' || !current.failureReport) return;
++	current.failureReport.actions.forEach(function (action) {
++		var button = document.createElement('button');
++		button.type = 'button';
++		button.textContent = _t(action.label_key) || '';
++		button.addEventListener('click', function () {
++			if (_install !== current || current.phase !== 'failed' || _installBlockedKey !== '') return;
++			_postChangelogMessage({ action: 'install_failure_action', id: action.id,
++				operation: current.operation, epoch: current.failureEpoch });
++		});
++		box.appendChild(button);
++	});
+ }
+ 
+ /**
+--- a/static/ergopti_plus/_shared/ui/changelog/index.html
++++ b/static/ergopti_plus/_shared/ui/changelog/index.html
+@@ -51,6 +51,7 @@
+ 			<div id="install-panel" style="display: none">
+ 				<span id="install-text"></span>
+ 				<button id="btn-install-retry" type="button"></button>
++				<div id="install-failure-actions" style="display: none"></div>
+ 			</div>
+ 			<div id="release-body"></div>
+ 		</div>
+--- a/static/ergopti_plus/linux/ui/changelog/bridge.lua
++++ b/static/ergopti_plus/linux/ui/changelog/bridge.lua
+@@ -42,6 +42,9 @@
+ local Parser = require("updater.release_parser")
+ local ReleaseInstall = require("updater.release_install")
+ local VersionOrder = require("updater.version")
++local NetworkFailure = require("network.failure")
++local Paths = require("infra.paths")
++local FileSystem = require("adapters.file_system")
+ 
+ -- The owner and the repository come from the shared updater defaults, their
+ -- single source (tools/test/test-repo-url-single-source.cjs). The loader is
+@@ -59,7 +62,9 @@
+ local _last_list = nil
+ -- The one install session of this window (created on the first request).
+ local _install_session = nil
++local _failure_contract = nil
+ local _daemon_state = nil
++local _page_epoch = nil
+ 
+ --- The repository's web root, from the shared updater defaults.
+ --- @return string|nil url
+@@ -389,11 +394,36 @@
+ 
+ --- The install session of this window, over the updater manager's update path.
+ --- @return table session
++local function trusted_page_epoch(context)
++	if type(context) ~= "table" or context.app_name ~= APP_NAME or type(context.epoch) ~= "number" then return nil end
++	local ok, host = pcall(require, "ui.webview_manager")
++	if not ok or type(host.current_epoch) ~= "function" or type(host.is_visible) ~= "function" then return nil end
++	return host.current_epoch(APP_NAME) == context.epoch and host.is_visible(APP_NAME) == true and context.epoch or nil
++end
++
++local function failure_contract()
++	if _failure_contract then return _failure_contract end
++	local path = Paths.shared("modules/network/managed_network.json")
++	local raw = type(path) == "string" and FileSystem.read(path) or nil
++	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
++	_failure_contract = NetworkFailure.new(Json.decode(raw))
++	return _failure_contract
++end
++
+ local function install_session()
+ 	if _install_session then return _install_session end
+ 	_install_session = ReleaseInstall.new({
+ 		logger = Logger,
+ 		log = LOG,
++		failure_contract = failure_contract,
++		failure_owner = function()
++			return { list = _last_list, generation = _fetch_generation, state = _daemon_state, epoch = _page_epoch }
++		end,
++		failure_current = function(owner)
++			return type(owner) == "table" and owner.list ~= nil and owner.list == _last_list
++				and owner.generation == _fetch_generation and owner.state == _daemon_state
++				and owner.epoch ~= nil and trusted_page_epoch({ app_name = APP_NAME, epoch = owner.epoch }) == owner.epoch
++		end,
+ 		blocked = function() return install_blocked(updater()) end,
+ 		find_release = function(tag) return find_release(tag) end,
+ 		backup = function(chunk)
+@@ -466,6 +496,7 @@
+ 	_last_list = nil
+ 	_install_session = nil
+ 	_daemon_state = nil
++	_page_epoch = nil
+ 	M._config_backup = nil
+ 	M._http_get = default_http_get
+ 	M._push = default_push
+@@ -485,7 +516,9 @@
+ --- @param payload any  String or table from host_bridge.js.
+ --- @param state  table Daemon state.
+ --- @return any|nil  Response to send back to JS.
+-function M.on_message(payload, state)
++function M.on_message(payload, state, context)
++	local page_epoch = trusted_page_epoch(context)
++	if page_epoch ~= nil then _page_epoch = page_epoch end
+ 	if type(state) == "table" then _daemon_state = state end
+ 	if type(payload) == "string" then
+ 		if payload == "ready" or payload == "refresh" then
+@@ -502,6 +535,7 @@
+ 			return _build_initial_payload(state, channel)
+ 		end
+ 		if payload == "close" then
++			if _install_session then _install_session.retire() end
+ 			Logger.info(LOG, "Changelog close requested.")
+ 			return nil
+ 		end
+@@ -528,6 +562,13 @@
+ 	-- Only this click installs a chosen release: nothing else calls the session.
+ 	if action == "install_release" then
+ 		install_session().install(payload.tag, payload.channel)
++		return nil
++	end
++
++	if action == "install_failure_action" then
++		if page_epoch ~= nil and _install_session then
++			_install_session.failure_action(payload.operation, payload.epoch, payload.id)
++		end
+ 		return nil
+ 	end
+ 
+--- a/static/ergopti_plus/macos/ui/changelog/init.lua
++++ b/static/ergopti_plus/macos/ui/changelog/init.lua
+@@ -56,6 +56,7 @@
+ local DocumentCsp = require("webview.document_csp")
+ local ReleaseInstall = require("updater.release_install")
+ local VersionOrder = require("updater.version")
++local NetworkFailure = require("network.failure")
+ 
+ local LOG = "changelog_window"
+ 
+@@ -166,6 +167,7 @@
+ local _last_list = nil
+ -- The install session (created on the first request).
+ local _install_session = nil
++local _failure_contract = nil
+ 
+ -- Test seam: { updater, backup, installer, coordinator }.
+ M._deps = nil
+@@ -450,11 +452,30 @@
+ --- The install session, over the configuration backup, the release installer
+ --- and the controlled quit.
+ --- @return table session
++local function failure_contract()
++	if _failure_contract then return _failure_contract end
++	local path = Paths.shared("modules/network/managed_network.json")
++	local raw = type(path) == "string" and FileSystem.read(path) or nil
++	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
++	_failure_contract = NetworkFailure.new(Json.decode(raw))
++	return _failure_contract
++end
++
+ local function install_session()
+ 	if _install_session then return _install_session end
+ 	_install_session = ReleaseInstall.new({
+ 		logger = Logger,
+ 		log = LOG,
++		failure_contract = failure_contract,
++		failure_owner = function()
++			return { list = _last_list, generation = _fetch_generation,
++				owner = _focus_owner, view = _wv, controller = _ucc }
++		end,
++		failure_current = function(owner)
++			return type(owner) == "table" and owner.list ~= nil and owner.list == _last_list
++				and owner.generation == _fetch_generation
++				and session_is_current(owner.owner, owner.view, owner.controller)
++		end,
+ 		blocked = install_blocked,
+ 		find_release = function(tag) return find_release(tag) end,
+ 		backup = function(release)
+@@ -465,9 +486,9 @@
+ 		end,
+ 		resolve_asset = function(release) return deps().installer.find_asset(release) end,
+ 		download = function(asset, _, done)
+-			return deps().installer.stage(asset, function(staged, stage, detail)
++			return deps().installer.stage(asset, function(staged, stage, detail, failure_receipt)
+ 				done(staged, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download,
+-					detail)
++					detail, failure_receipt)
+ 			end) == true
+ 		end,
+ 		install = function(staged)
+@@ -611,6 +632,10 @@
+ 		elseif body.action == "install_release" then
+ 			-- Only this click installs a chosen release: nothing else calls the session.
+ 			install_session().install(body.tag, body.channel)
++		elseif body.action == "install_failure_action" then
++			if _install_session then
++				_install_session.failure_action(body.operation, body.epoch, body.id)
++			end
+ 		elseif body.action == "restore_backup" then
+ 			restore_from_page(body.id)
+ 		elseif body.action == "open_url" and type(body.url) == "string" then
+@@ -841,6 +866,7 @@
+ --- Closes the changelog window if open.
+ --- @return boolean committed
+ function M.close()
++	if _install_session then _install_session.retire() end
+ 	if _closing then return false end
+ 	if _opening then
+ 		_focus_owner = nil
+--- a/static/ergopti_plus/windows/modules/updater/release_install.ahk
++++ b/static/ergopti_plus/windows/modules/updater/release_install.ahk
+@@ -38,6 +38,10 @@
+ 
+ ; The tag of the release being installed from the Versions window, or "".
+ global _ReleaseInstallTag := ""
++global _ReleaseInstallCurrent := 0
++global _ReleaseInstallTerminal := 0
++global _ReleaseInstallOperation := 0
++global _ReleaseInstallFailureEpoch := 0
+ 
+ 
+ 
+@@ -63,6 +67,7 @@
+ ; @returns {Boolean} True when the backup is made and the update path started.
+ ReleaseInstall_Start(Tag, Channel, Deps) {
+ 	global _ReleaseInstallTag, RELEASE_INSTALL_REASONS
++	global _ReleaseInstallCurrent, _ReleaseInstallTerminal, _ReleaseInstallOperation
+ 	if !(Tag is String) || Tag == "" {
+ 		try LoggerError("ReleaseInstall", "Refused an install request without a release tag.")
+ 		return false
+@@ -87,6 +92,12 @@
+ 		return false
+ 	}
+ 	Release := Found["release"]
++	_ReleaseInstallTerminal := 0
++	_ReleaseInstallOperation += 1
++	Current := Map("id", _ReleaseInstallOperation, "tag", Tag, "channel", Channel, "deps", Deps,
++		"native_owner", Deps.Has("failure_owner") ? Deps["failure_owner"].Call() : 0,
++		"release", {RawJson: Release.RawJson, Tag: Release.Tag})
++	_ReleaseInstallCurrent := Current
+ 	_ReleaseInstallTag := Tag
+ 	try LoggerStart("ReleaseInstall", "Installing {1} from the Versions window (channel {2})…", Tag, Channel)
+ 	_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", "backing_up"))
+@@ -96,13 +107,15 @@
+ 		return _ReleaseInstall_Fail(Deps, Tag, "backup", "")
+ 	}
+ 	BackupPath := (Backup is Map && Backup.Has("path")) ? Backup["path"] : ""
++	Current["backup_path"] := BackupPath
+ 	Asset := Deps["asset"].Call(Release)
+ 	if !IsObject(Asset) {
+ 		try LoggerError("ReleaseInstall", "Install of {1} refused: the release has no asset for Windows.", Tag)
+ 		return _ReleaseInstall_Fail(Deps, Tag, "no_asset", BackupPath)
+ 	}
+ 	_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", "downloading", "backup_path", BackupPath))
+-	Observer := _ReleaseInstall_OnPhase.Bind(Deps, Tag, BackupPath)
++	Observer := (Phase, ReasonKey := "", FailureReceipt := 0) =>
++		_ReleaseInstall_OnPhase(Deps, Tag, BackupPath, Phase, ReasonKey, FailureReceipt, Current)
+ 	Started := false
+ 	try Started := Deps["install"].Call(Release, Observer) == true
+ 	catch as Err
+@@ -110,7 +123,7 @@
+ 	if Started
+ 		return true
+ 	; The update path may already have reported why through the observer.
+-	if (_ReleaseInstallTag == Tag)
++	if (_ReleaseInstallTag == Tag && ObjPtr(_ReleaseInstallCurrent) == ObjPtr(Current))
+ 		_ReleaseInstall_Fail(Deps, Tag, "download", BackupPath)
+ 	return false
+ }
+@@ -123,11 +136,17 @@
+ }
+ 
+ ; The update path's phases of the install this window asked for.
+-_ReleaseInstall_OnPhase(Deps, Tag, BackupPath, Phase, ReasonKey := "") {
++_ReleaseInstall_OnPhase(Deps, Tag, BackupPath, Phase, ReasonKey := "", FailureReceipt := 0, Expected := 0) {
+ 	global _ReleaseInstallTag, RELEASE_INSTALL_REASONS
+-	if (_ReleaseInstallTag != Tag)
+-		return
++	global _ReleaseInstallCurrent
++	if (_ReleaseInstallTag != Tag) || !IsObject(_ReleaseInstallCurrent)
++		return
++	if IsObject(Expected) && ObjPtr(Expected) != ObjPtr(_ReleaseInstallCurrent)
++		return
++	Current := _ReleaseInstallCurrent
+ 	if (Phase == "failed") {
++		; Capture the producer's exact Request/release owner before logging or any COM probe.
++		StageOwner := Deps.Has("failure_stage_owner") ? Deps["failure_stage_owner"].Call(Current["release"]) : 0
+ 		Known := false
+ 		for _, Key in RELEASE_INSTALL_REASONS {
+ 			if (Key == ReasonKey)
+@@ -136,8 +155,10 @@
+ 		_ReleaseInstallTag := ""
+ 		try LoggerError("ReleaseInstall", "Install of {1} stopped: {2}.", Tag,
+ 			Known ? ReasonKey : RELEASE_INSTALL_REASONS["unexpected"])
+-		_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", "failed", "backup_path", BackupPath,
+-			"reason_key", Known ? ReasonKey : RELEASE_INSTALL_REASONS["unexpected"]))
++		Message := Map("tag", Tag, "phase", "failed", "backup_path", BackupPath,
++			"reason_key", Known ? ReasonKey : RELEASE_INSTALL_REASONS["unexpected"])
++		_ReleaseInstall_ManagedFailure(Current, Message, FailureReceipt, StageOwner)
++		_ReleaseInstall_Report(Deps, Message)
+ 		return
+ 	}
+ 	; The swap worker has been acknowledged, not completed: the resident process
+@@ -155,8 +176,88 @@
+ 	Message := Map("tag", Tag, "phase", "failed", "reason_key", RELEASE_INSTALL_REASONS[Reason])
+ 	if (BackupPath != "")
+ 		Message["backup_path"] := BackupPath
++	global _ReleaseInstallCurrent
++	if IsObject(_ReleaseInstallCurrent)
++		_ReleaseInstall_ManagedFailure(_ReleaseInstallCurrent, Message, 0)
+ 	_ReleaseInstall_Report(Deps, Message)
+ 	return false
++}
++
++; Retains only the exact terminal native failure owner, never a page object.
++_ReleaseInstall_ManagedFailure(Current, Message, Receipt, StageOwner := 0) {
++	global _ReleaseInstallTerminal, _ReleaseInstallFailureEpoch, RELEASE_INSTALL_REASONS
++	Deps := Current["deps"]
++	if Message["reason_key"] != RELEASE_INSTALL_REASONS["download"] || !Deps.Has("failure_classify")
++		return
++	Message["managed_failure"] := true
++	_ReleaseInstallFailureEpoch += 1
++	Current["epoch"] := _ReleaseInstallFailureEpoch
++	Current["receipt"] := Receipt is Map ? Receipt : Map()
++	Current["stage_owner"] := StageOwner
++	_ReleaseInstallTerminal := Current
++	try Report := Deps["failure_classify"].Call(Current["receipt"],
++		() => _ReleaseInstall_FailureCurrent(Current), () => _ReleaseInstall_Retry(Current))
++	catch {
++		_ReleaseInstallTerminal := 0
++		try LoggerError("ReleaseInstall", "Managed-network capability inspection failed; no failure actions admitted.")
++		return
++	}
++	Current["failure_report"] := Report
++	Message["operation"] := Current["id"]
++	Message["failure_epoch"] := Current["epoch"]
++	Message["failure_report"] := Report
++}
++
++_ReleaseInstall_FailureCurrent(Current) {
++	global _ReleaseInstallTerminal, _ReleaseInstallTag
++	if !IsObject(_ReleaseInstallTerminal) || ObjPtr(_ReleaseInstallTerminal) != ObjPtr(Current)
++		|| _ReleaseInstallTag != ""
++		return false
++	Deps := Current["deps"]
++	Admitted := Deps.Has("failure_current") && Deps["failure_current"].Call(Current) == true
++		&& Deps["blocked"].Call() == "" && !Deps["busy"].Call()
++	return Admitted && IsObject(_ReleaseInstallTerminal) && ObjPtr(_ReleaseInstallTerminal) == ObjPtr(Current)
++		&& _ReleaseInstallTag == ""
++}
++
++; Exact terminal IDs are necessary but do not replace fresh native admission.
++ReleaseInstall_FailureAction(Operation, Epoch, Id) {
++	global _ReleaseInstallTerminal
++	Current := _ReleaseInstallTerminal
++	if !(Operation is Integer) || !(Epoch is Integer) || !(Id is String)
++		|| !IsObject(Current) || Operation != Current["id"] || Epoch != Current["epoch"]
++		|| !_ReleaseInstall_FailureCurrent(Current)
++		return false
++	Deps := Current["deps"]
++	return Deps["failure_action"].Call(Current["failure_report"]["cause"], Id,
++		() => _ReleaseInstall_FailureCurrent(Current), () => _ReleaseInstall_Retry(Current)) == true
++}
++
++; Retry preserves the initial backup and the native staging owner's consent,
++; authenticated asset/digest, pause provenance and channel policy.
++_ReleaseInstall_Retry(Previous) {
++	global _ReleaseInstallTerminal, _ReleaseInstallCurrent, _ReleaseInstallTag, _ReleaseInstallOperation
++	if !_ReleaseInstall_FailureCurrent(Previous)
++		return false
++	Deps := Previous["deps"]
++	_ReleaseInstallTerminal := 0
++	_ReleaseInstallOperation += 1
++	Current := Map("id", _ReleaseInstallOperation, "tag", Previous["tag"], "channel", Previous["channel"],
++		"backup_path", Previous["backup_path"], "deps", Deps, "native_owner", Previous["native_owner"], "release", Previous["release"])
++	_ReleaseInstallCurrent := Current
++	Tag := Current["tag"], BackupPath := Current["backup_path"]
++	_ReleaseInstallTag := Tag
++	_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", "downloading", "backup_path", BackupPath))
++	Observer := (Phase, ReasonKey := "", FailureReceipt := 0) =>
++		_ReleaseInstall_OnPhase(Deps, Tag, BackupPath, Phase, ReasonKey, FailureReceipt, Current)
++	Started := false
++	try Started := Deps["failure_retry"].Call(Previous["stage_owner"], Observer) == true
++	catch {
++		try LoggerError("ReleaseInstall", "The retained native retry refused before dispatch.")
++	}
++	if !Started && _ReleaseInstallTag == Tag && ObjPtr(_ReleaseInstallCurrent) == ObjPtr(Current)
++		_ReleaseInstall_Fail(Deps, Tag, "download", BackupPath)
++	return Started
+ }
+ 
+ ; Sends one phase to the page; a page failure never unwinds the install.
+@@ -177,14 +278,30 @@
+ ; ===================================
+ 
+ ; Encodes one install or restore phase as the JSON object the page reads.
+-; @param Message {Map} String values only.
++; @param Message {Map} Public phase strings, integer epochs and canonical safe report.
+ ; @returns {String}
+ ReleaseInstall_MessageJson(Message) {
+-	Text := "{"
+-	Index := 0
+-	for Key, Value in Message {
+-		Index += 1
+-		Text .= (Index > 1 ? "," : "") . JsonStringLiteral(Key) . ":" . JsonStringLiteral(Value . "")
++	Text := "{", Index := 0
++	for Key in ["tag", "phase", "reason_key", "backup_path"] {
++		if !Message.Has(Key) || !(Message[Key] is String)
++			continue
++		Text .= (Index++ ? "," : "") . JsonStringLiteral(Key) . ":" . JsonStringLiteral(Message[Key])
++	}
++	for Key in ["operation", "failure_epoch"] {
++		if !Message.Has(Key) || !(Message[Key] is Integer) || Message[Key] < 1
++			continue
++		Text .= (Index++ ? "," : "") . JsonStringLiteral(Key) . ":" . Message[Key]
++	}
++	if Message.Has("managed_failure") && Message["managed_failure"] == true
++		Text .= (Index++ ? "," : "") . '"managed_failure":true'
++	if Message.Has("failure_report") && Message["failure_report"] is Map {
++		Report := Message["failure_report"]
++		Public := '{"cause":' . JsonStringLiteral(Report["cause"])
++			. ',"message_key":' . JsonStringLiteral(Report["message_key"]) . ',"actions":['
++		for I, Action in Report["actions"]
++			Public .= (I > 1 ? "," : "") . '{"id":' . JsonStringLiteral(Action["id"])
++				. ',"label_key":' . JsonStringLiteral(Action["label_key"]) . '}'
++		Text .= (Index++ ? "," : "") . '"failure_report":' . Public . "]}"
+ 	}
+ 	return Text . "}"
+ }
+--- a/static/ergopti_plus/windows/ui/changelog/init.ahk
++++ b/static/ergopti_plus/windows/ui/changelog/init.ahk
+@@ -555,6 +555,8 @@
+ 		Tag := (Payload.Has("tag") && Payload["tag"] is String) ? Payload["tag"] : ""
+ 		Channel := (Payload.Has("channel") && Payload["channel"] is String) ? Payload["channel"] : ""
+ 		ReleaseInstall_Start(Tag, Channel, _CLW_InstallDeps(Request))
++	} else if (Action == "install_failure_action") {
++		ReleaseInstall_FailureAction(Payload.Get("operation", 0), Payload.Get("epoch", 0), Payload.Get("id", ""))
+ 	} else if (Action == "restore_backup") {
+ 		_CLW_RestoreBackup((Payload.Has("id") && Payload["id"] is String) ? Payload["id"] : "")
+ 	}
+@@ -870,6 +872,9 @@
+  * @returns {Map}
+  */
+ _CLW_InstallDeps(Request) {
++	global _CLW_LastList, _CLW_WindowEpoch, _CLW_BridgeSessionToken
++	Owner := Map("list", _CLW_LastList, "window_epoch", _CLW_WindowEpoch,
++		"session", _CLW_BridgeSessionToken, "request", Request)
+ 	return Map(
+ 		"busy", () => _UpdaterDownloadInProgress || _UpdaterRecoveryPublishTarget != "",
+ 		"blocked", _CLW_InstallBlocked,
+@@ -877,7 +882,37 @@
+ 		"backup", (Release) => ConfigBackup_Create(_ConfigDir, "pre_install", Release.Tag, Updater_CurrentVersion()),
+ 		"asset", (Release) => _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag),
+ 		"install", (Release, Observer) => _CLW_StartUpdatePath(Release, Observer, Request),
+-		"report", _CLW_ReportInstall)
++		"report", _CLW_ReportInstall,
++		"failure_owner", () => Owner,
++		"failure_stage_owner", (Release) => _Updater_GetManagedFailureOwnerFor(Request, Release),
++		"failure_current", _CLW_ManagedFailureCurrent,
++		"failure_classify", ManagedNetworkFailureWindows_Classify,
++		"failure_action", ManagedNetworkFailureWindows_PerformAction,
++		"failure_retry", _CLW_RetryUpdatePath)
++}
++
++; This native owner is never serialized. A refreshed list or replaced window
++; cannot lend an older staging intent its action authority.
++_CLW_ManagedFailureCurrent(Current) {
++	global _CLW_LastList
++	Owner := Current["native_owner"]
++	return Owner is Map && IsObject(Owner["list"]) && IsObject(_CLW_LastList)
++		&& ObjPtr(Owner["list"]) == ObjPtr(_CLW_LastList)
++		&& _CLW_BridgeSessionIsCurrent(Owner["window_epoch"], Owner["session"])
++		&& _Updater_ManagedFailureOwnerIsCurrent(Current["stage_owner"])
++}
++
++_CLW_RetryUpdatePath(Owner, Observer) {
++	global _UpdaterInstallObserver
++	_UpdaterInstallObserver := Observer
++	Started := false
++	try {
++		Started := _Updater_RetryManagedFailure(Owner) == true
++	} finally {
++		if !Started && IsObject(_UpdaterInstallObserver) && ObjPtr(_UpdaterInstallObserver) == ObjPtr(Observer)
++			_UpdaterInstallObserver := 0
++	}
++	return Started
+ }
+ 
+ /**
+--- a/static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua
++++ b/static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua
+@@ -17,3 +17,8 @@
+ 
+ require("test.config_backup_contract").register(helpers, { defaults = defaults })
+ require("test.release_install_contract").register(helpers)
++
++local policy_handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/network/managed_network.json", "rb"))
++local policy = assert(Json.decode(policy_handle:read("*a")), "managed network policy must decode")
++policy_handle:close()
++require("test.release_install_network_contract").register(helpers, policy)
+--- a/static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua
+@@ -17,3 +17,8 @@
+ 
+ require("test.config_backup_contract").register(helpers, { defaults = defaults })
+ require("test.release_install_contract").register(helpers)
++
++local policy_handle = assert(io.open(helpers.shared("modules/network/managed_network.json"), "rb"))
++local policy = assert(Json.decode(policy_handle:read("*a")), "managed network policy must decode")
++policy_handle:close()
++require("test.release_install_network_contract").register(helpers, policy)
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/test/release_install_network_contract.lua
+@@ -0,0 +1,142 @@
++--- Shared Versions failure-receipt and action lifecycle regression controls.
++--- Native I/O is controlled; classification uses the actual canonical policy.
++local M = {}
++
++function M.register(helpers, policy)
++	local Install = require("updater.release_install")
++	local contract = require("network.failure").new(policy)
++	local function fixture()
++		local state = { live = true, blocked = nil, calls = {}, reports = {}, callbacks = {}, diagnostics = false }
++		local native = {}
++		local function call(name) state.calls[#state.calls + 1] = name end
++		local logger = {}
++		for _, name in ipairs({ "error", "warn", "start", "success" }) do logger[name] = function() end end
++		local session = Install.new({ logger = logger,
++			blocked = function() return state.blocked end,
++			find_release = function(tag) call("find"); return { tag = tag } end,
++			backup = function() call("backup"); return { path = "/private/backup" } end,
++			resolve_asset = function() call("asset"); return { digest = "independently-pinned" } end,
++			download = function(_, _, done) call("download"); state.callbacks[#state.callbacks + 1] = done; return true end,
++			install = function() call("install"); return true end,
++			restart = function() call("restart"); return true end,
++			report = function(message) state.reports[#state.reports + 1] = message end,
++			failure_contract = function() return contract end,
++			failure_owner = function() return native end,
++			failure_current = function(owner)
++				if state.on_current then state.on_current() end
++				return owner == native and state.live
++			end,
++			failure_capabilities = function()
++				if state.probe_fault then error("private native probe failure") end
++				return { diagnostics_available = state.diagnostics }
++			end,
++			failure_action = function(id) call(id); return true end,
++		})
++		state.session = session
++		function state.fail(receipt, reason)
++			state.callbacks[#state.callbacks](nil, reason or Install.REASON.download, "private proxy credential", receipt)
++			return state.reports[#state.reports]
++		end
++		return state
++	end
++	local function proxy() return { stage = "proxy_connect", failure_provenance = "verified", proxy_connect_status = 407 } end
++	local function fail(state, receipt)
++		helpers.assert_eq(state.session.install("v1.2.3", "dev"), true)
++		return state.fail(receipt)
++	end
++	local function action(state, message, id)
++		return state.session.failure_action(message.operation, message.failure_epoch, id)
++	end
++	helpers.describe("Versions managed network receipt ownership", function()
++		helpers.it("classifies typed proxy evidence without exposing native secrets", function()
++			local state = fixture()
++			local receipt = proxy(); receipt.url, receipt.stderr, receipt.path = "https://token@host", "secret", "/private/file"
++			local message = fail(state, receipt)
++			helpers.assert_eq(message.failure_report.cause, "proxy")
++			helpers.assert_eq(message.failure_report.message_key, "network.failure.proxy")
++			helpers.assert_eq(message.failure_report.receipt, nil)
++			helpers.assert_eq(message.failure_report.url, nil)
++			helpers.assert_eq(message.failure_report.stderr, nil)
++			helpers.assert_eq(message.failure_report.path, nil)
++			helpers.assert_eq(message.detail, nil)
++			helpers.assert_eq(message.failure_receipt, nil)
++			helpers.assert_eq(message.backup_path, "/private/backup")
++			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download")
++		end)
++		helpers.it("keeps untyped adapter errors unknown despite hostile detail", function()
++			local state = fixture(); local message = fail(state, nil)
++			helpers.assert_eq(message.failure_report.cause, "unknown")
++			helpers.assert_eq(message.failure_report.evidence, "insufficient_evidence")
++		end)
++		helpers.it("never treats an unproved origin 407 as proxy evidence", function()
++			local state = fixture()
++			local message = fail(state, { stage = "http", failure_provenance = "verified", http_status = 407 })
++			helpers.assert_eq(message.failure_report.cause, "unknown")
++		end)
++		helpers.it("keeps failed verification separate and never installs", function()
++			local state = fixture(); state.session.install("v1.2.3", "dev")
++			local message = state.fail(proxy(), Install.REASON.verify)
++			helpers.assert_eq(message.reason_key, Install.REASON.verify)
++			helpers.assert_eq(message.failure_report, nil)
++			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download")
++		end)
++		helpers.it("requires exact operation and failure epoch before retry", function()
++			local state = fixture(); local message = fail(state, proxy())
++			helpers.assert_eq(state.session.failure_action(message.operation + 1, message.failure_epoch, "retry"), false)
++			helpers.assert_eq(state.session.failure_action(message.operation, message.failure_epoch + 1, "retry"), false)
++			helpers.assert_eq(#state.callbacks, 1)
++		end)
++		helpers.it("retry reruns backup-first and duplicate old callbacks cannot install", function()
++			local state = fixture(); local message = fail(state, proxy()); local old = state.callbacks[1]
++			helpers.assert_eq(action(state, message, "retry"), true)
++			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download,find,backup,asset,download")
++			old("/old/verified")
++			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download,find,backup,asset,download")
++			helpers.assert_eq(action(state, message, "retry"), false)
++			state.callbacks[2]("/new/verified")
++			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download,find,backup,asset,download,install,restart")
++		end)
++		helpers.it("new same-tag failure rejects the previous terminal owner", function()
++			local state = fixture(); local first = fail(state, proxy())
++			helpers.assert_eq(action(state, first, "retry"), true)
++			local second = state.fail(proxy())
++			helpers.assert_eq(second.operation > first.operation, true)
++			helpers.assert_eq(second.failure_epoch > first.failure_epoch, true)
++			helpers.assert_eq(action(state, first, "retry"), false)
++			helpers.assert_eq(action(state, second, "retry"), true)
++		end)
++		helpers.it("rechecks actual owner and build policy after failure", function()
++			local state = fixture(); local message = fail(state, proxy())
++			state.live = false; helpers.assert_eq(action(state, message, "retry"), false)
++			state.live = true; state.blocked = "source"; helpers.assert_eq(action(state, message, "retry"), false)
++			helpers.assert_eq(#state.callbacks, 1)
++		end)
++		helpers.it("recomputes real external capability and never takes a page path", function()
++			local state = fixture(); state.diagnostics = true; local message = fail(state, proxy())
++			state.diagnostics = false; helpers.assert_eq(action(state, message, "diagnostics"), false)
++			state.diagnostics = true; helpers.assert_eq(action(state, message, "diagnostics"), true)
++			helpers.assert_eq(state.calls[#state.calls], "diagnostics")
++		end)
++		helpers.it("reentrant native capability probe cannot lend a retired owner", function()
++			local state = fixture(); local message = fail(state, proxy())
++			state.on_current = function() state.session.retire() end
++			helpers.assert_eq(action(state, message, "retry"), false)
++			helpers.assert_eq(#state.callbacks, 1)
++		end)
++		helpers.it("native probe failure preserves the failed phase without unbound actions", function()
++			local state = fixture(); state.probe_fault = true; local message = fail(state, proxy())
++			helpers.assert_eq(message.phase, "failed")
++			helpers.assert_eq(message.managed_failure, true)
++			helpers.assert_eq(message.failure_report, nil)
++			helpers.assert_eq(state.session.failure_action(1, 1, "retry"), false)
++			helpers.assert_eq(message.backup_path, "/private/backup")
++		end)
++		helpers.it("retires action authority on close without cancelling native work", function()
++			local state = fixture(); local message = fail(state, proxy())
++			state.session.retire(); helpers.assert_eq(action(state, message, "retry"), false)
++			helpers.assert_eq(#state.callbacks, 1)
++		end)
++	end)
++end
++
++return M
+--- /dev/null
++++ b/tools/test/test-changelog-managed-failure.cjs
+@@ -0,0 +1,74 @@
++// Versions managed-network reports remain safe and bind actions to native epochs.
++'use strict';
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const { runPage } = require('./support/changelog-page-dom.cjs');
++const strings = JSON.parse(fs.readFileSync(path.join(__dirname, '../../static/ergopti_plus/_shared/data/locales/en.json'), 'utf8'));
++let controls = 0;
++function test(name, body) { body(); controls += 1; process.stdout.write(`PASS ${name}\n`); }
++function fixture() {
++	const page = runPage({ _i18n_strings: strings, __ergopti_host: 'linux', __installed_version: '1.0.0', __subscribed_channel: 'dev' });
++	page.sandbox.injectReleases([{ tag_name: 'v1.2.3', body: 'Notes', published_at: '2026-10-04T00:00:00Z', html_url: 'https://github.com/adrienm7/ergopti/releases/tag/v1.2.3' }], 'dev');
++	page.el = id => page.document.getElementById(id);
++	page.actions = () => page.posted.map(message => message.payload).filter(message => message && message.action === 'install_failure_action');
++	return page;
++}
++function message(operation = 31, epoch = 44, actions = [{ id: 'retry', label_key: 'network.action.retry' }]) {
++	return { tag: 'v1.2.3', phase: 'failed', reason_key: 'changelog_window.install_error_download', backup_path: '/cfg/backup', operation, failure_epoch: epoch,
++		failure_report: { cause: 'proxy', message_key: 'network.failure.proxy', actions,
++			receipt: { url: 'https://secret@host', stderr: 'credential', path: '/secret' } } };
++}
++test('translated managed failure preserves backup text and omits generic retry', () => {
++	const page = fixture(); page.sandbox.setInstallProgress(message());
++	assert.ok(page.el('install-text').textContent.includes(strings['network.failure.proxy']));
++	assert.ok(page.el('install-text').textContent.includes('/cfg/backup'));
++	assert.equal(page.el('btn-install-retry').style.display, 'none');
++	assert.equal(page.el('install-failure-actions').children.length, 1);
++	assert.equal(page.el('install-failure-actions').children[0].textContent, strings['network.action.retry']);
++	assert.equal(JSON.stringify(page.sandbox._install).includes('credential'), false);
++	assert.equal(JSON.stringify(page.sandbox._install).includes('https://secret'), false);
++});
++test('action posts only exact native operation and failure epoch', () => {
++	const page = fixture(); page.sandbox.setInstallProgress(message());
++	page.el('install-failure-actions').children[0].dispatch('click');
++	assert.deepEqual(JSON.parse(JSON.stringify(page.actions())), [{ action: 'install_failure_action', id: 'retry', operation: 31, epoch: 44 }]);
++	page.sandbox.retryInstall(); assert.equal(page.actions().length, 1);
++});
++test('retained button cannot borrow a new same-tag failure', () => {
++	const page = fixture(); page.sandbox.setInstallProgress(message());
++	const old = page.el('install-failure-actions').children[0];
++	page.sandbox.setInstallProgress(message(32, 45)); old.dispatch('click');
++	assert.equal(page.actions().length, 0);
++	page.el('install-failure-actions').children[0].dispatch('click');
++	assert.equal(page.actions()[0].operation, 32); assert.equal(page.actions()[0].epoch, 45);
++});
++test('successful phase retires managed actions and old retained callbacks', () => {
++	const page = fixture(); page.sandbox.setInstallProgress(message());
++	const old = page.el('install-failure-actions').children[0];
++	page.sandbox.setInstallProgress({ tag: 'v1.2.3', phase: 'installing' });
++	assert.equal(page.el('install-failure-actions').children.length, 0); old.dispatch('click');
++	assert.equal(page.actions().length, 0);
++});
++test('unavailable actions are absent and unsafe action labels cannot render', () => {
++	const page = fixture(); page.sandbox.setInstallProgress(message(31, 44, []));
++	assert.equal(page.el('install-failure-actions').children.length, 0);
++	page.sandbox.setInstallProgress(message(31, 44, [{ id: 'diagnostics', label_key: 'https://secret' }]));
++	assert.equal(page.el('install-failure-actions').children.length, 0);
++});
++test('unavailable or malformed managed report never revives an unbound generic retry', () => {
++	const page = fixture();
++	page.sandbox.setInstallProgress({ tag: 'v1.2.3', phase: 'failed', reason_key: 'changelog_window.install_error_download', managed_failure: true });
++	assert.equal(page.el('btn-install-retry').style.display, 'none');
++	assert.equal(page.el('install-failure-actions').children.length, 0);
++	page.sandbox.setInstallProgress({ ...message(), operation: 'untrusted' });
++	assert.equal(page.el('btn-install-retry').style.display, 'none');
++	assert.equal(page.el('install-failure-actions').children.length, 0);
++});
++test('generic integrity failure retains original translated reason and retry', () => {
++	const page = fixture(); page.sandbox.setInstallProgress({ tag: 'v1.2.3', phase: 'failed', reason_key: 'changelog_window.install_error_verify', backup_path: '/cfg/backup' });
++	assert.ok(page.el('install-text').textContent.includes(strings['changelog_window.install_error_verify'].split('{tag}').join('v1.2.3').split('{path}').join('/cfg/backup')));
++	assert.notEqual(page.el('btn-install-retry').style.display, 'none');
++	assert.equal(page.el('install-failure-actions').children.length, 0);
++});
++process.stdout.write(`${controls} managed Versions page controls passed\n`);
+--- a/static/ergopti_plus/windows/tests/unit/test_release_install.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_release_install.ahk
+@@ -326,3 +326,46 @@
+ }
+ Test("Updater: the background check announces a release and never installs it (update-notify-only)",
+ 	_RIT_BackgroundCheckNeverInstalls)
++
++
++; A same-tag retry must not let the previous transaction's observer publish.
++_RIT_SameTagObserverHasExactOperation() {
++	global _RIT_Reports
++	_RIT_Reset()
++	Observers := []
++	Deps := _RIT_Deps()
++	Deps["install"] := (Release, Observer) => (Observers.Push(Observer), true)
++	AssertTrue(ReleaseInstall_Start("v-owner", "dev", Deps))
++	Observers[1].Call("failed", "changelog_window.install_error_download")
++	AssertTrue(ReleaseInstall_Start("v-owner", "dev", Deps))
++	Count := _RIT_Reports.Length
++	Observers[1].Call("installing")
++	Observers[1].Call("failed", "changelog_window.install_error_verify")
++	AssertEqual(Count, _RIT_Reports.Length, "retired same-tag observer cannot publish or retire the new transaction")
++	AssertTrue(ReleaseInstall_Busy(), "the newer exact transaction still owns the install")
++	Observers[2].Call("installing")
++	AssertEqual(Count + 1, _RIT_Reports.Length, "the exact current observer can publish")
++	_RIT_Reset()
++}
++Test("Release install: same-tag retry fences the previous exact observer", _RIT_SameTagObserverHasExactOperation)
++
++_RIT_PublicFailureJsonNeverSerializesNativeReceipt() {
++	Receipt := Map("url", "https://credential@private", "stderr", "secret", "path", "C:\secret")
++	Report := Map("cause", "proxy", "message_key", "network.failure.proxy", "evidence", "proxy_connect_authentication",
++		"actions", [Map("id", "retry", "label_key", "network.action.retry")], "receipt", Receipt)
++	Message := Map("tag", "v1.2.3", "phase", "failed", "backup_path", "C:\cfg\backup", "operation", 31,
++		"failure_epoch", 44, "failure_report", Report, "receipt", Receipt, "owner", Map("secret", "credential"))
++	Encoded := ReleaseInstall_MessageJson(Message)
++	Decoded := JsonParse(Encoded)
++	AssertEqual(31, Decoded["operation"])
++	AssertEqual(44, Decoded["failure_epoch"])
++	AssertEqual("proxy", Decoded["failure_report"]["cause"])
++	AssertEqual("retry", Decoded["failure_report"]["actions"][1]["id"])
++	AssertFalse(Decoded.Has("receipt"))
++	AssertFalse(Decoded.Has("owner"))
++	AssertFalse(Decoded["failure_report"].Has("receipt"))
++	AssertEqual(0, InStr(Encoded, "credential"))
++	AssertEqual(0, InStr(Encoded, "secret"))
++	AssertEqual("C:\cfg\backup", Decoded["backup_path"], "the original user-visible backup is preserved")
++}
++Test("Release install: page JSON contains only canonical safe failure fields", _RIT_PublicFailureJsonNeverSerializesNativeReceipt)
+--- a/tools/test/browser/changelog-release-install.playwright.cjs
++++ b/tools/test/browser/changelog-release-install.playwright.cjs
+@@ -148,6 +148,29 @@
+ 			(payload) => payload && payload.action === 'install_release'
+ 		);
+ 		expect(retried.length === 2, 'Retry posts the request again');
++		await page.evaluate(() => {
++			window.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'failed',
++				reason_key: 'changelog_window.install_error_download', backup_path: '/tmp/backups/pre-install',
++				managed_failure: true, operation: 31, failure_epoch: 44,
++				failure_report: { cause: 'proxy', message_key: 'network.failure.proxy',
++					actions: [{ id: 'retry', label_key: 'network.action.retry' }] } });
++			window.__retainedFailureButton = document.querySelector('#install-failure-actions button');
++		});
++		expect(!(await page.locator('#btn-install-retry').isVisible()), 'managed failure hides the unbound generic Retry');
++		const managedRetry = page.locator('#install-failure-actions button');
++		expect(await managedRetry.isVisible(), 'the real managed retry button renders');
++		expect((await managedRetry.textContent()) === EN['network.action.retry'], 'the managed retry uses its actual translated label');
++		expect((await page.locator('#install-text').textContent()).includes(EN['network.failure.proxy']), 'the real page shows the translated proxy cause');
++		await managedRetry.click();
++		const actions = await page.evaluate(() => window.__posted.filter(p => p && p.action === 'install_failure_action'));
++		expect(actions.length === 1 && actions[0].operation === 31 && actions[0].epoch === 44 && actions[0].id === 'retry',
++			'the real button posts only the exact native terminal operation and failure epoch');
++		await page.evaluate(() => {
++			window.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'installing' });
++			window.__retainedFailureButton.click();
++		});
++		const retired = await page.evaluate(() => window.__posted.filter(p => p && p.action === 'install_failure_action'));
++		expect(retired.length === 1, 'the detached real DOM button cannot borrow a later phase');
+ 		expect(
+ 			pageErrors.length === 0,
+ 			`the page raised or reached the network: ${pageErrors.join('; ')}`
+--- a/static/ergopti_plus/_shared/ui/changelog/style.css
++++ b/static/ergopti_plus/_shared/ui/changelog/style.css
+@@ -332,6 +332,7 @@
+ 	white-space: pre-line;
+ }
+ 
++#install-failure-actions button,
+ #btn-install-retry,
+ #btn-restore {
+ 	background: rgba(10, 132, 255, 0.18);
+@@ -345,6 +346,7 @@
+ 	white-space: nowrap;
+ }
+ 
++#install-failure-actions button:hover,
+ #btn-install-retry:hover,
+ #btn-restore:hover {
+ 	background: rgba(10, 132, 255, 0.28);
+@@ -654,3 +656,9 @@
+ #btn-releases-page:hover {
+ 	background: rgba(10, 132, 255, 0.22);
+ }
++
++#install-failure-actions {
++	align-items: center;
++	flex-wrap: wrap;
++	gap: 8px;
++}

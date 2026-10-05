@@ -1,0 +1,38 @@
+--- a/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk
+@@ -126,6 +126,25 @@
+ 		if !this.DenyFile
+ 			AssertTrue(!FileExist(this.NewExe), "actual refused staged executable must be removed after native retirement")
+ 		return Failure
++	}
++
++	AssertCancelled() {
++		; terminate() deliberately suppresses OnDone. Qualification comes from
++		; the exact actual native terminal owner, never an invented callback.
++		AssertTrue(this.NativeState is Map && this.NativeState.Get("TreeQuiesced", false),
++			"actual cancellation acknowledges Job-empty and native process/handle retirement")
++		Claim := this.NativeState.Get("TerminalClaim", 0)
++		AssertTrue(Claim is Map && Claim.Get("TreeQuiesced", false), "exact native terminal claim remains inspectable")
++		AssertTrue(Claim.Get("NativeExitObserved", false), "exact native process exit was observed before handle closure")
++		for Name in ["ProcessHandle", "ThreadHandle", "JobHandle"]
++			AssertEqual(0, Claim.Get(Name, -1), "actual owned native handle closes: " . Name)
++		AssertEqual(0, Claim.Get("NativeErrors", []).Length, "native retirement errors cannot borrow quiescence success")
++		AssertTrue(Claim.Get("ExitCode", 0) != 0, "actual cancellation/deadline terminal cannot report successful staging")
++		AssertTrue(this.Results.Length <= 1, "suppressed completion cannot dispatch twice")
++		for Result in this.Results
++			AssertTrue(Result["exit"] != 0 && Result["stdout"] != "READY", "a naturally completed refusal cannot become successful READY")
++		AssertTrue(this.Handle.terminate(), "actual native retirement retry is idempotent")
++		AssertEqual(this.OldBytes, FileRead(this.CurrentExe, "UTF-8"), "actual cancellation preserves exact existing app bytes")
+ 	}
+ 
+ 	Retire() {
+@@ -291,8 +310,7 @@
+ 					"actual monotonic parent budget must consume the exact transaction")
+ 				AssertEqual(1, State.Notices, "actual deadline has one visible primary terminal")
+ 			}
+-			Result := Run.Wait(10000)
+-			AssertTrue(Result["exit"] != 0 && Result["stdout"] != "READY", "actual cancellation/deadline cannot reach READY")
++			Run.AssertCancelled()
+ 			AssertTrue(Run.NativeState.Get("TreeQuiesced", false), "native Job/process/handle closure cannot be supplied by a stub")
+ 			AssertTrue(!FileExist(Run.NewExe) && !FileExist(Run.SwapPath),
+ 				"actual parent cancellation must remove its partial owned staging inputs")

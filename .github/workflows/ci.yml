@@ -629,6 +629,11 @@ jobs:
                   exit 1
               fi
           fi
+          # Only a fresh publication requires the new producer's complete signed
+          # set. Historical published releases retain their attached feed.
+          if [ "$create_release" = true ]; then
+              node tools/build/macos-release-publication.cjs validate release-assets
+          fi
           echo "create_tag=$create_tag" >> "$GITHUB_OUTPUT"
           echo "create_release=$create_release" >> "$GITHUB_OUTPUT"
           echo "skip_feed=$skip_feed" >> "$GITHUB_OUTPUT"
@@ -708,8 +713,8 @@ jobs:
           branch="sparkle-appcasts"
           worktree="$RUNNER_TEMP/sparkle-appcasts"
           # The appcast carries the size and the EdDSA signature of one exact
-          # zip. When an earlier attempt already published the release, that
-          # zip is the release's, so its own appcast is published, never this
+          # archive. When an earlier attempt already published the release, that
+          # archive is the release's, so its own appcast is published, never this
           # attempt's artifact, which a rebuilt package would no longer match.
           if [ "$RESUMED" = true ]; then
               gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
@@ -777,13 +782,14 @@ jobs:
               exit 0
           fi
           download="$RUNNER_TEMP/homebrew-asset"
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --pattern ErgoptiPlus.app.zip --dir "$download" --clobber
-          sha=$(sha256sum "$download/ErgoptiPlus.app.zip" | cut -d ' ' -f 1)
+          selected=$(node tools/build/macos-release-publication.cjs download \
+              "$GITHUB_REPOSITORY" "$TAG" "$download")
+          archive=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.name)' "$selected")
+          sha=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.sha256)' "$selected")
 
           tap="$RUNNER_TEMP/homebrew-tap"
           git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPOSITORY}.git" "$tap"
-          cask=$(node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap")
+          cask=$(node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap" "$archive")
           git -C "$tap" config user.name "github-actions[bot]"
           git -C "$tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$tap" add -- "$cask"

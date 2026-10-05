@@ -1,0 +1,27 @@
+{
+	"status": "scratch only; uncompiled and unexecuted",
+	"tests_executed": false,
+	"existing_remote_cases_assertions_changed": false,
+	"scope": "Correct newly authored cancellation oracle to actual terminate() contract; no production runtime or feature change",
+	"api_source": "static/ergopti_plus/windows/adapters/shell_runner.ahk:1217",
+	"api": "terminate suppresses OnDone; true acknowledges native Job-empty retirement; requestTerminate retains callback",
+	"files": [
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk",
+			"preimage_sha256": "d72c706c357b53d5a9699139af342e60902d1310e9f17ff5776239778fde9f27",
+			"candidate_sha256": "d6ffa285db7a0410002e4fc1c4a86708fa12b003fdae63de2d9b75ad5513cb18"
+		}
+	],
+	"patch_sha256": "88ee9e17264f72b5526f6013648f01e2ba8174be260079c97572ccf32487c773",
+	"compose_after_manifest_sha256": "15ff8901aa4d85d3bec5bda25cf0f741c4307a8208d055ac1af760fc7d0f2055",
+	"direct_terminal_obligations": [
+		"TreeQuiesced on exact native state and terminal claim",
+		"NativeExitObserved true",
+		"ProcessHandle/ThreadHandle/JobHandle zero",
+		"NativeErrors empty",
+		"native terminal ExitCode nonzero",
+		"zero or one actual callback; no successful READY",
+		"idempotent native termination",
+		"exact old executable sentinel bytes preserved"
+	]
+}

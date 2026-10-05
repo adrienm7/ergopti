@@ -1,0 +1,29 @@
+{
+	"status": "scratch-only; real Windows native execution unrun",
+	"tests_executed": false,
+	"changed_existing_assertions": [],
+	"base_prepared_packet": "packets/managed-ca/proposed",
+	"production_dependency_manifest_sha256": "8402ac0a281f0a8a79ae27bc38eb101039336362ff04b1a1b3ff169ea8958bdc",
+	"canonical_routes_dependency_manifest_sha256": "62dca7d5bf09024df5d9e4edd9a7e33f22f58fce3b9c0d9e8721fbd585af1ff5",
+	"existing_remote_cases_preserved": 8,
+	"new_native_tests_authored": 2,
+	"actual_generated_download_cases_authored": 10,
+	"actual_native_parent_retirement_cases_authored": 2,
+	"independent_payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+	"independent_payload_bytes": 524288,
+	"sources": {
+		"static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1": {
+			"preimage_sha256": "3e3201f10b67b549a7fc57342cfb13315085045fbcd0bb1b492191e7d5f1948e",
+			"candidate_sha256": "44a762ae678fba8c8f9f91eb7e69759a301f25bb40f0659d9c8984ec64106f7a"
+		},
+		"static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk": {
+			"preimage_sha256": "6d474ec459b012a0abc450b05f286a3b9c50eb8f6e2d7f0dae7b3f024aed5508",
+			"candidate_sha256": "ad182698718381cae37cb3fe5075e400fc86f9aba871e91d6ff09ad6ebdc3392"
+		},
+		"static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk": {
+			"preimage_sha256": null,
+			"candidate_sha256": "d72c706c357b53d5a9699139af342e60902d1310e9f17ff5776239778fde9f27"
+		}
+	},
+	"patch_sha256": "9c7834a8d76a141f21b3d0b23d2fc0680d4e42a9c5b16fcd8c8a163e472a41ba"
+}
