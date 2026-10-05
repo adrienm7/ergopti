@@ -418,6 +418,18 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py lua5.4
         timeout-minutes: 1
 
+      - name: Accumulate arbitrary ngram source keys across native SQLite conflicts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          for ERGOPTI_SOURCE_RUNTIME in luajit lua5.4; do
+            ERGOPTI_SOURCE_PROOF=$(mktemp -d)
+            "$ERGOPTI_SOURCE_RUNTIME" tests/hardware/run_sqlite_ngram_source_maps.lua "$ERGOPTI_SOURCE_PROOF"
+            python3 tests/hardware/run_sqlite_ngram_source_maps.py "$ERGOPTI_SOURCE_PROOF"
+          done
+        timeout-minutes: 1
+
       - name: Preserve canonical Unicode character classes through native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
