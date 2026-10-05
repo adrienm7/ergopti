@@ -28,9 +28,9 @@ end
 --- @param record table Private import identity.
 --- @return boolean, string|nil, boolean Whether an owned file was removed.
 local function remove(record)
-	if record.status ~= require("keymap.layer_preset").IMPORTED then return true, nil, false end
 	local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
 	if settled ~= true then return false, settle_err, false end
+	if record.status ~= require("keymap.layer_preset").IMPORTED then return true, nil, false end
 	local content, status, detail = read(record)
 	if status == "absent" then return true, nil, false end
 	if status ~= "ok" then return false, "navigation-layer-source-unreadable: " .. tostring(detail or status) end
@@ -55,13 +55,28 @@ end
 local function replace(record)
 	local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
 	if settled ~= true then return false, settle_err end
+	if record.restoration_receipt ~= nil then
+		local ready, _, published = require("toml_codec.writer").retry_publication_cleanup(record.restoration_receipt)
+		if ready ~= true then return false, "navigation-layer-restoration-cleanup-pending" end
+		if published == true then
+			local current, status = read(record)
+			if status == "ok" and current == record.content then
+				record.restoration_receipt = nil
+				return true
+			end
+			return false, "navigation-layer-restoration-target-unverified"
+		end
+		record.restoration_receipt = nil
+	end
 	local content, status, detail = read(record)
 	if status == "ok" and content == record.content then return true end
 	if status ~= "absent" then
 		return false, "navigation-layer-restore-conflict: " .. tostring(detail or status)
 	end
-	return require("toml_codec.writer").publish_if_unchanged(record.path, record.content,
+	local written, write_err, retry_cleanup = require("toml_codec.writer").publish_if_unchanged(record.path, record.content,
 		require("adapters.file_system"), { status = "absent" })
+	if type(retry_cleanup) == "function" then record.restoration_receipt = { publication_cleanup = retry_cleanup } end
+	return written, write_err
 end
 
 --- Makes a recommended import whose inverse belongs to the local bulk owner.
@@ -70,8 +85,12 @@ function M.import()
 	local record, token = nil, nil
 	local sibling = {}
 	function sibling.prepare()
-		local imported, detail = require("platform.remap.nav_layer").import_recommended()
-		if not imported then return false, "nav-layer-import-failed" end
+		if record ~= nil then return false, "navigation-layer-import-already-prepared" end
+		local imported, detail, failed = require("platform.remap.nav_layer").import_recommended()
+		if not imported then
+			record = failed
+			return false, "nav-layer-import-failed"
+		end
 		record = { status = imported.status, path = imported.path, content = imported.content }
 		token = { status = record.status, path = record.path, content = record.content }
 		receipts[token] = record
