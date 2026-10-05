@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_trigger_shortcut_off_removed_on_macos/case.toml
 
 [case]
-description = "The shipped v3 to v4 step deletes an unset llm.trigger.shortcut (saved as false) from a macOS file."
+description = "Shipped migrations preserve an unset retired llm.trigger.shortcut (saved as false) until explicit cleanup on macOS."
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 3

@@ -583,3 +583,56 @@ local source_vectors_file = assert(io.open(helpers.shared("tests/corpus/config_s
 local source_vectors = assert(require("json").decode(source_vectors_file:read("*a")))
 source_vectors_file:close()
 require("test.toml_source_preservation_contract")(helpers, source_vectors)
+
+helpers.describe("toml_writer: native conditional removal capability", function()
+	helpers.it("delegates the exact preimage without a separate unlocked source read", function()
+		local expected = { status = "ok", content = "owned bytes" }
+		local calls = 0
+		local removed = writer.remove_if_unchanged("/controlled/native-removal.toml", {
+			read_with_status = function() error("the conditional capability owns every source observation") end,
+			remove_exact = function() error("unlocked unlink must not be used") end,
+			remove_if_unchanged = function(path, source)
+				calls = calls + 1
+				helpers.assert_eq(path, "/controlled/native-removal.toml")
+				helpers.assert_eq(source, expected)
+				return true
+			end,
+		}, expected)
+		helpers.assert_eq(removed, true); helpers.assert_eq(calls, 1)
+	end)
+
+	helpers.it("retains the exact cleanup capability from a refused native removal", function()
+		local cleanup = function() return false end
+		local removed, detail, retained = writer.remove_if_unchanged("/controlled/native-removal-debt.toml", {
+			remove_if_unchanged = function() return false, "retained release", cleanup end,
+		}, { status = "ok", content = "owned bytes" })
+		helpers.assert_eq(removed, false); helpers.assert_eq(detail, "retained release")
+		helpers.assert_eq(retained, cleanup)
+	end)
+
+	helpers.it("refuses truthy and throwing conditional native receipts without another unlink", function()
+		for _, behavior in ipairs({ "truthy", "throw" }) do
+			local calls = 0
+			local removed, detail = writer.remove_if_unchanged("/controlled/native-removal-strict.toml", {
+				remove_exact = function() error("a refusal must not fall back to unlocked unlink") end,
+				remove_if_unchanged = function()
+					calls = calls + 1
+					if behavior == "throw" then error("conditional native refusal") end
+					return "true"
+				end,
+			}, { status = "ok", content = "owned bytes" })
+			helpers.assert_eq(removed, false)
+			helpers.assert_true(type(detail) == "string" and detail ~= "")
+			helpers.assert_eq(calls, 1, "refusal must reach the actual conditional capability")
+		end
+	end)
+
+	helpers.it("keeps the session write fence ahead of the optional removal capability", function()
+		local path, calls = "/controlled/native-removal-session-fence.toml", 0
+		writer.refuse_writes(path, "invalid schema stamp")
+		local removed = writer.remove_if_unchanged(path, {
+			remove_if_unchanged = function() calls = calls + 1; return true end,
+		}, { status = "ok", content = "owned bytes" })
+		helpers.assert_eq(removed, false); helpers.assert_eq(calls, 0)
+	end)
+end)

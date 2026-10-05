@@ -1,0 +1,589 @@
+--- a/static/ergopti_plus/_shared/lua/layouts/catalogue.lua
++++ b/static/ergopti_plus/_shared/lua/layouts/catalogue.lua
+@@ -27,8 +27,13 @@
+ 
+ local Registry = require("layouts.registry")
+ local Extension = require("layouts.extension")
++local Json = require("json")
+ 
+ local M = {}
++
++-- Source-only fields and obsolete rows must not share the public runtime
++-- classification table, whose name may itself occur in a future source.
++local _installed_sources = setmetatable({}, { __mode = "k" })
+ 
+ --- Version of the installed-layouts record this module reads and writes.
+ M.INSTALLED_SCHEMA_VERSION = 1
+@@ -242,13 +247,25 @@
+ 	return { schema_version = M.INSTALLED_SCHEMA_VERSION, layouts = {} }
+ end
+ 
++--- Detaches a JSON model while retaining explicit null and array identities.
++--- @param value any
++--- @return any copy
++local function copy_json_value(value)
++	if type(value) ~= "table" or Json.is_null(value) then return value end
++	local copy = {}
++	for key, child in pairs(value) do copy[key] = copy_json_value(child) end
++	return Json.is_array(value) and Json.array(copy) or copy
++end
++
+ --- Why one entry of the installed-layouts record cannot be used, if it cannot.
+ --- @param id any The entry's key.
+ --- @param entry any The entry.
+ --- @return string|nil problem
+ local function installed_entry_problem(id, entry)
+ 	if not Registry.is_valid_id(id) then return "'" .. tostring(id) .. "' is not a layout id" end
+-	if type(entry) ~= "table" then return "the entry is not an object" end
++	if type(entry) ~= "table" or Json.is_array(entry) or Json.is_null(entry) then
++		return "the entry is not an object"
++	end
+ 	if entry.id ~= id then return "its id field does not name this entry" end
+ 	if type(entry.sha256) ~= "string" or type(entry.version) ~= "string" then
+ 		return "it has no verified sha256 and version"
+@@ -270,11 +287,19 @@
+ function M.decode_installed(text, decode_json)
+ 	if text == nil then return M.empty_installed(), nil end
+ 	local ok, record = pcall(decode_json, text)
+-	if not ok or type(record) ~= "table" then return nil, "the installed-layouts record is not valid JSON" end
++	if not ok or type(record) ~= "table" or Json.is_array(record) or Json.is_null(record) then
++		return nil, "the installed-layouts record is not valid JSON"
++	end
+ 	if record.schema_version ~= M.INSTALLED_SCHEMA_VERSION then
+ 		return nil, "the installed-layouts record has schema version " .. tostring(record.schema_version)
+ 	end
+-	if type(record.layouts) ~= "table" then return nil, "the installed-layouts record has no layouts table" end
++	if type(record.layouts) ~= "table" or Json.is_array(record.layouts) or Json.is_null(record.layouts) then
++		return nil, "the installed-layouts record has no layouts table"
++	end
++	local root_members = {}
++	for key, value in pairs(record) do
++		if key ~= "schema_version" and key ~= "layouts" then root_members[key] = copy_json_value(value) end
++	end
+ 	local layouts, outdated = {}, {}
+ 	for id, entry in pairs(record.layouts) do
+ 		local problem = installed_entry_problem(id, entry)
+@@ -282,6 +307,7 @@
+ 		else layouts[id] = entry end
+ 	end
+ 	record.layouts, record.outdated = layouts, outdated
++	_installed_sources[record] = { root_members = root_members, outdated = copy_json_value(outdated) }
+ 	return record, nil
+ end
+ 
+@@ -290,8 +316,23 @@
+ --- @param record table A decoded record.
+ --- @return table copy
+ local function writable_copy(record)
++	local source = _installed_sources[record]
++	if not source then
++		-- Existing programmatic records may carry the public obsolete registry.
++		-- Their remaining root members are ordinary source model values.
++		local root_members = {}
++		for key, value in pairs(record) do
++			if key ~= "schema_version" and key ~= "layouts" and key ~= "outdated" then
++				root_members[key] = copy_json_value(value)
++			end
++		end
++		source = { root_members = root_members, outdated = copy_json_value(record.outdated or {}) }
++	end
+ 	local copy = M.empty_installed()
+-	for id, item in pairs(record.outdated or {}) do copy.layouts[id] = item.entry end
++	local retained = copy_json_value(source)
++	for key, value in pairs(retained.root_members) do copy[key] = copy_json_value(value) end
++	for id, item in pairs(retained.outdated) do copy.layouts[id] = copy_json_value(item.entry) end
++	_installed_sources[copy] = retained
+ 	return copy
+ end
+ 
+@@ -301,8 +342,13 @@
+ --- @return table
+ function M.with_installed(record, entry)
+ 	local copy = writable_copy(record)
+-	for id, installed in pairs(record.layouts) do copy.layouts[id] = installed end
+-	copy.layouts[entry.id] = entry
++	for id, installed in pairs(record.layouts) do
++		if not _installed_sources[copy].outdated[id] then copy.layouts[id] = copy_json_value(installed) end
++	end
++	copy.layouts[entry.id] = copy_json_value(entry)
++	-- A verified same-id install explicitly replaces an obsolete row. A later
++	-- builder must not resurrect that original row after this acknowledged edit.
++	_installed_sources[copy].outdated[entry.id] = nil
+ 	return copy
+ end
+ 
+@@ -313,7 +359,9 @@
+ function M.without_installed(record, id)
+ 	local copy = writable_copy(record)
+ 	for installed_id, installed in pairs(record.layouts) do
+-		if installed_id ~= id then copy.layouts[installed_id] = installed end
++		if installed_id ~= id and not _installed_sources[copy].outdated[installed_id] then
++			copy.layouts[installed_id] = copy_json_value(installed)
++		end
+ 	end
+ 	return copy
+ end
+--- a/static/ergopti_plus/linux/modules/keymap/layout_registry.lua
++++ b/static/ergopti_plus/linux/modules/keymap/layout_registry.lua
+@@ -339,10 +339,10 @@
+ --- @return string|nil error
+ local function read_installed(deps)
+ 	local path = deps.local_dir .. deps.settings.installed_file
+-	if not deps.exists(path) then return Catalogue.decode_installed(nil, deps.decode_json) end
++	if not deps.exists(path) then return Catalogue.decode_installed(nil, deps.decode_installed_json or Json.decode_lossless) end
+ 	local text = deps.read(path)
+ 	if type(text) ~= "string" then return nil, "cannot read " .. path end
+-	local record, err = Catalogue.decode_installed(text, deps.decode_json)
++	local record, err = Catalogue.decode_installed(text, deps.decode_installed_json or Json.decode_lossless)
+ 	for id, item in pairs(record and record.outdated or {}) do
+ 		Outdated.report_in_file(path, { "layouts", id }, item.detail)
+ 	end
+--- a/static/ergopti_plus/macos/modules/keymap/layout_registry.lua
++++ b/static/ergopti_plus/macos/modules/keymap/layout_registry.lua
+@@ -227,7 +227,7 @@
+ 	local path = deps.local_dir .. deps.settings.installed_file
+ 	local text = deps.exists(path) and deps.read(path) or nil
+ 	if deps.exists(path) and type(text) ~= "string" then return nil, "cannot read " .. path end
+-	local record, err = Catalogue.decode_installed(text, deps.decode_json)
++	local record, err = Catalogue.decode_installed(text, deps.decode_installed_json or Json.decode_lossless)
+ 	for id, item in pairs(record and record.outdated or {}) do
+ 		Outdated.report_in_file(path, { "layouts", id }, item.detail)
+ 	end
+--- a/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_catalogue.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_catalogue.lua
+@@ -80,3 +80,5 @@
+ 		end
+ 	end)
+ end)
++
++require("test.layout_installed_record_contract")(helpers, Catalogue, Json)
+--- a/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_catalogue.lua
+@@ -303,3 +303,5 @@
+ 		helpers.assert_eq(#requests, 0)
+ 	end)
+ end)
++
++require("test.layout_installed_record_contract")(helpers, Catalogue, Json)
+--- a/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_registry.lua
+@@ -493,3 +493,13 @@
+ 		helpers.assert_nil(LayoutRegistry.installer_path("/nowhere", function() return false end))
+ 	end)
+ end)
++
++require("test.layout_installed_manager_contract")(helpers, Json, {
++	manager = manager,
++	run = run,
++	entry = entry_of("ergol"),
++	files = shipped_files,
++	local_dir = LOCAL_DIR,
++	probe_receipt = OK_RUN,
++	install_receipt = INSTALLED_RUN,
++})
+--- a/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/keymap/test_layout_registry.lua
+@@ -405,3 +405,16 @@
+ 		helpers.assert_nil(LayoutRegistry.snapshot(deps).installed.ergol)
+ 	end)
+ end)
++
++require("test.layout_installed_manager_contract")(helpers, Json, {
++	manager = manager,
++	run = run,
++	entry = entry_of("ergol"),
++	files = shipped_files,
++	local_dir = LOCAL_DIR,
++	-- Explicitly repair only the earlier controlled native-port copy. The
++	-- production foreign-file policy and the actual private record stay strict.
++	repair_partial_copy = function(state)
++		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
++	end,
++})
+--- a/docs/ERGOPTIPLUS_TODO.md
++++ b/docs/ERGOPTIPLUS_TODO.md
+@@ -1647,6 +1647,22 @@
+ verification, native Windows and native three-OS qualification remain required;
+ TODO33 stays partial.
+ 
++Linux and macOS installed-layout record saves now retain unknown root model
++members and obsolete null, empty-array and false values through the existing
++lossless JSON owner. Private detached source identity keeps a user-written
++outdated root member separate from runtime classification and carries that
++identity through chained builders; verified same-id replacement does not
++resurrect an obsolete row. Index/default/generic JSON decoding, syntax/header/
++schema refusals and native installer ownership stay strict. All original
++registered assertions remain; the identical source regression modules give
++56 passed / 24 failed against the original owners and 80 / 0 after the fix
++on LuaJIT and Lua 5.4. Actual manager install/remove publication uses private
++real files with controlled native ports; the existing macOS copy-before-record
++refusal still needs explicit copy repair before retry. Source models, not
++JSON whitespace or token spelling, are preserved. The Windows v3 counterpart,
++full selected gates, native installation and hosted qualification remain
++separate requirements; TODO33 remains partial.
++
+ - [~] **34.** Match the Windows recommended hotstring delays to the shared
+   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
+   The shared AHK override policy now writes an explicit recommended delay only
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/test/layout_installed_record_contract.lua
+@@ -0,0 +1,86 @@
++--- _shared/lua/test/layout_installed_record_contract.lua
++
++--- Replays independently written complete installed-record preservation models.
++return function(helpers, Catalogue, Json)
++	local path = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/installed_record_preservation.json"
++	local file = assert(io.open(path, "rb"))
++	local source = assert(file:read("*a"))
++	assert(file:close())
++	local vectors = assert(Json.decode_lossless(source))
++
++	local function assert_model(actual, expected, label)
++		helpers.assert_eq(type(actual), type(expected), label .. ": scalar type")
++		helpers.assert_eq(Json.is_null(actual), Json.is_null(expected), label .. ": null identity")
++		helpers.assert_eq(Json.is_array(actual), Json.is_array(expected), label .. ": array identity")
++		if type(expected) ~= "table" or Json.is_null(expected) then
++			if not Json.is_null(expected) then helpers.assert_eq(actual, expected, label) end
++			return
++		end
++		for key, value in pairs(expected) do assert_model(actual[key], value, label .. "." .. tostring(key)) end
++		for key in pairs(actual) do helpers.assert_true(expected[key] ~= nil, label .. ": extra " .. tostring(key)) end
++	end
++
++	helpers.describe("installed record source preservation", function()
++		for _, vector in ipairs(vectors.cases) do
++			helpers.it(vector.id .. " (config-outdated-installed-preservation)", function()
++				local record = assert(Catalogue.decode_installed(vector.source, Json.decode_lossless))
++				local original = assert(Json.decode_lossless(vector.source))
++				if vector.mutate_runtime then
++					record.outdated.retired.entry = "runtime mutation"
++					record.outdated.extra = { entry = "runtime-only", detail = "runtime classification" }
++					record.future.nested.value = 99
++				end
++				for position, operation in ipairs(vector.operations) do
++					local previous = record
++					if operation.kind == "install" then record = Catalogue.with_installed(record, operation.entry)
++					else record = Catalogue.without_installed(record, operation.id) end
++					helpers.assert_true(record ~= previous, vector.id .. ": detached builder record")
++					if vector.mutate_builder and position == 1 then
++						record.future_root.nested.value = 99
++						record.layouts.gone.fields[1] = false
++						record.layouts.sample.version = "2"
++						helpers.assert_eq(previous.future_root.nested.value, 12)
++						helpers.assert_true(Json.is_null(previous.outdated.gone.entry.fields[1]))
++						helpers.assert_eq(previous.layouts.sample.version, "1")
++					end
++				end
++				local payload = assert(Json.encode(record))
++				assert_model(assert(Json.decode_lossless(payload)), assert(Json.decode_lossless(vector.expected)), vector.id)
++				assert_model(assert(Json.decode_lossless(vector.source)), original, vector.id .. ": original source")
++			end)
++		end
++		helpers.it("keeps fresh constructor members and public obsolete registry (config-outdated-installed-preservation)", function()
++			local fresh = Catalogue.empty_installed()
++			fresh.future = assert(Json.decode_lossless('{"empty":[],"nothing":null,"flag":false}'))
++			fresh.outdated = { legacy = { entry = false, detail = "old shape" } }
++			local entry = { id = "new", sha256 = "verified", version = "2" }
++			local built = Catalogue.with_installed(fresh, entry)
++			local expected = assert(Json.decode_lossless(
++				'{"schema_version":1,"layouts":{"legacy":false,"new":{"id":"new","sha256":"verified","version":"2"}},'
++				.. '"future":{"empty":[],"nothing":null,"flag":false}}'))
++			assert_model(assert(Json.decode_lossless(Json.encode(built))), expected, "fresh constructor")
++			built.future.empty[1] = "candidate edit"
++			built.layouts.new.version = "3"
++			helpers.assert_eq(#fresh.future.empty, 0)
++			helpers.assert_eq(entry.version, "2")
++			local removed = Catalogue.without_installed(built, "new")
++			expected.layouts.new = nil
++			assert_model(assert(Json.decode_lossless(Json.encode(removed))), expected, "fresh source identity")
++		end)
++		helpers.it("keeps genuine syntax, header and schema refusals (config-outdated-installed-preservation)", function()
++			for _, text in ipairs(vectors.refusals) do
++				local record, err = Catalogue.decode_installed(text, Json.decode_lossless)
++				helpers.assert_nil(record, "accepted: " .. text)
++				helpers.assert_type(err, "string")
++			end
++		end)
++		helpers.it("keeps the generic decoder contract unchanged (config-outdated-installed-preservation)", function()
++			local legacy = assert(Json.decode('{"empty":[],"nothing":null}'))
++			helpers.assert_eq(Json.is_array(legacy.empty), false)
++			helpers.assert_eq(Json.is_null(legacy.nothing), false)
++			local lossless = assert(Json.decode_lossless('{"empty":[],"nothing":null}'))
++			helpers.assert_true(Json.is_array(lossless.empty))
++			helpers.assert_true(Json.is_null(lossless.nothing))
++		end)
++	end)
++end
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/test/layout_installed_manager_contract.lua
+@@ -0,0 +1,142 @@
++--- _shared/lua/test/layout_installed_manager_contract.lua
++
++--- Exercises actual driver managers with private real installed-record files.
++--- Native installation, transport and input-source ports remain controlled.
++return function(helpers, Json, ports)
++	local path = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/installed_record_preservation.json"
++	local vector_file = assert(io.open(path, "rb"))
++	local vectors = assert(Json.decode_lossless(assert(vector_file:read("*a"))))
++	assert(vector_file:close())
++
++	local function with_manager(source, body)
++		local private_path = os.tmpname()
++		local initial = assert(io.open(private_path, "wb"))
++		assert(initial:write(source))
++		assert(initial:close())
++		local files = ports.files()
++		files[ports.local_dir .. "installed.json"] = source
++		local receipts = {}
++		for index = 1, 12 do
++			receipts[index] = index % 2 == 1 and ports.probe_receipt or ports.install_receipt
++		end
++		local registry, deps, state = ports.manager({ files = files, runs = receipts })
++		deps.local_source = true
++		local record_path = ports.local_dir .. "installed.json"
++		local original_read, original_exists, original_write = deps.read, deps.exists, deps.write
++		local writes, refuse = 0, false
++		local function read_source()
++			local file = assert(io.open(private_path, "rb"))
++			local text = assert(file:read("*a"))
++			assert(file:close())
++			return text
++		end
++		deps.read = function(file_path)
++			if file_path == record_path then return read_source() end
++			return original_read(file_path)
++		end
++		deps.exists = function(file_path)
++			if file_path == record_path then return true end
++			return original_exists(file_path)
++		end
++		deps.write = function(file_path, content)
++			if file_path ~= record_path then return original_write(file_path, content) end
++			writes = writes + 1
++			if refuse then return false, "record publication refused" end
++			local file = assert(io.open(private_path, "wb"))
++			assert(file:write(content))
++			assert(file:close())
++			state.files[file_path] = content
++			return true
++		end
++		local ok, err = pcall(body, registry, deps, state, read_source,
++			function(value) refuse = value end, function() return writes end)
++		assert(os.remove(private_path))
++		if not ok then error(err, 0) end
++	end
++
++	local function assert_model(text, expected, label)
++		local actual = assert(Json.decode_lossless(text))
++		helpers.assert_eq(Json.encode(actual), Json.encode(expected), label .. ": complete model")
++		helpers.assert_true(Json.is_array(actual.future_root.empty), label .. ": empty array")
++		helpers.assert_true(Json.is_null(actual.future_root.nothing), label .. ": null")
++		helpers.assert_eq(actual.future_flag, false, label .. ": Boolean false")
++	end
++
++	helpers.describe("driver installed-record publication preservation", function()
++		helpers.it("keeps future roots and obsolete values through real-file install/remove (config-outdated-installed-manager)", function()
++			with_manager(vectors.manager_source, function(registry, deps, _state, read_source, _refuse, write_count)
++				local generic_decode = deps.decode_json
++				deps.decode_json = function(text)
++					helpers.assert_true(text ~= vectors.manager_source,
++						"the generic/index decoder must not consume the installed record")
++					return generic_decode(text)
++				end
++				local expected = assert(Json.decode_lossless(vectors.manager_source))
++				local installed = ports.run(function(done) registry.install("ergol", done, deps) end)
++				helpers.assert_eq(installed.ok, true, tostring(installed.extra))
++				expected.layouts.ergol = ports.entry
++				assert_model(read_source(), expected, "install")
++				local removed = ports.run(function(done) registry.uninstall("ergol", done, deps) end)
++				helpers.assert_eq(removed.ok, true, tostring(removed.extra))
++				expected.layouts.ergol = nil
++				assert_model(read_source(), expected, "remove")
++				helpers.assert_eq(write_count(), 2)
++			end)
++		end)
++
++		helpers.it("keeps obsolete source and future roots on refused publication, then retries (config-outdated-installed-manager)", function()
++			with_manager(vectors.manager_source, function(registry, deps, state, read_source, refuse, write_count)
++				refuse(true)
++				local refused = ports.run(function(done) registry.install("ergol", done, deps) end)
++				helpers.assert_eq(refused.ok, false)
++				helpers.assert_eq(read_source(), vectors.manager_source, "refusal keeps exact source bytes")
++				refuse(false)
++				if ports.repair_partial_copy then
++					-- The existing macOS installer copies before record publication;
++					-- its retry must keep refusing that unrecorded native copy.
++					local blocked = ports.run(function(done) registry.install("ergol", done, deps) end)
++					helpers.assert_eq(blocked.ok, false)
++					helpers.assert_eq(blocked.detail, registry.FAILURE_FOREIGN_FILE)
++					helpers.assert_eq(read_source(), vectors.manager_source)
++					helpers.assert_eq(write_count(), 1)
++					ports.repair_partial_copy(state)
++				end
++				local installed = ports.run(function(done) registry.install("ergol", done, deps) end)
++				helpers.assert_eq(installed.ok, true, tostring(installed.extra))
++				local expected = assert(Json.decode_lossless(vectors.manager_source))
++				expected.layouts.ergol = ports.entry
++				assert_model(read_source(), expected, "retry")
++				helpers.assert_eq(write_count(), 2)
++			end)
++		end)
++
++		helpers.it("replaces an obsolete same-id row only after a verified installation (config-outdated-installed-manager)", function()
++			local input = assert(Json.decode_lossless(vectors.manager_source))
++			input.layouts.ergol = false
++			with_manager(Json.encode(input), function(registry, deps, _state, read_source)
++				local installed = ports.run(function(done) registry.install("ergol", done, deps) end)
++				helpers.assert_eq(installed.ok, true, tostring(installed.extra))
++				local expected = assert(Json.decode_lossless(vectors.manager_source))
++				expected.layouts.ergol = ports.entry
++				assert_model(read_source(), expected, "verified replacement")
++				local removed = ports.run(function(done) registry.uninstall("ergol", done, deps) end)
++				helpers.assert_eq(removed.ok, true, tostring(removed.extra))
++				expected.layouts.ergol = nil
++				assert_model(read_source(), expected, "no obsolete resurrection")
++			end)
++		end)
++
++		helpers.it("refuses array/null owned layouts before uninstalling or publishing (config-outdated-installed-manager)", function()
++			for _, text in ipairs({ '{"schema_version":1,"layouts":[]}', '{"schema_version":1,"layouts":null}' }) do
++				with_manager(text, function(registry, deps, state, read_source, _refuse, write_count)
++					local result = ports.run(function(done) registry.uninstall("ergol", done, deps) end)
++					helpers.assert_eq(result.ok, false)
++					helpers.assert_eq(result.detail, registry.FAILURE_RECORD)
++					helpers.assert_eq(read_source(), text)
++					helpers.assert_eq(write_count(), 0)
++					helpers.assert_eq(#state.deleted, 0)
++				end)
++			end
++		end)
++	end)
++end
+--- /dev/null
++++ b/static/ergopti_plus/_shared/tests/corpus/layouts/installed_record_preservation.json
+@@ -0,0 +1,125 @@
++{
++	"cases": [
++		{
++			"id": "install-preserves-complete-unowned-model",
++			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
++			"operations": [
++				{
++					"kind": "install",
++					"entry": {
++						"id": "new",
++						"sha256": "verified",
++						"version": "2"
++					}
++				}
++			],
++			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]},\"new\":{\"id\":\"new\",\"sha256\":\"verified\",\"version\":\"2\"}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
++		},
++		{
++			"id": "remove-preserves-complete-unowned-model",
++			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
++			"operations": [
++				{
++					"kind": "remove",
++					"id": "sample"
++				}
++			],
++			"expected": "{\"schema_version\":1,\"layouts\":{\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
++		},
++		{
++			"id": "chained-builders-retain-source-only-values",
++			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
++			"operations": [
++				{
++					"kind": "install",
++					"entry": {
++						"id": "new",
++						"sha256": "verified",
++						"version": "2"
++					}
++				},
++				{
++					"kind": "remove",
++					"id": "new"
++				}
++			],
++			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
++		},
++		{
++			"id": "verified-replacement-does-not-resurrect-obsolete-row",
++			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
++			"operations": [
++				{
++					"kind": "install",
++					"entry": {
++						"id": "retired",
++						"sha256": "verified",
++						"version": "3"
++					}
++				},
++				{
++					"kind": "remove",
++					"id": "retired"
++				}
++			],
++			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
++		},
++		{
++			"id": "source-outdated-member-is-not-runtime-classification",
++			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\"},\"retired\":false},\"outdated\":{\"source\":[null,[],false],\"note\":\"retain\"},\"future\":{\"nested\":{\"value\":7}}}",
++			"mutate_runtime": true,
++			"operations": [
++				{
++					"kind": "remove",
++					"id": "sample"
++				}
++			],
++			"expected": "{\"schema_version\":1,\"layouts\":{\"retired\":false},\"outdated\":{\"source\":[null,[],false],\"note\":\"retain\"},\"future\":{\"nested\":{\"value\":7}}}"
++		},
++		{
++			"id": "without-internal-classification-leak",
++			"source": "{\"schema_version\":1,\"layouts\":{\"retired\":null,\"empty_row\":[],\"legacy\":{\"id\":\"legacy\",\"version\":1}}}",
++			"operations": [
++				{
++					"kind": "install",
++					"entry": {
++						"id": "new",
++						"sha256": "verified",
++						"version": "2"
++					}
++				}
++			],
++			"expected": "{\"schema_version\":1,\"layouts\":{\"retired\":null,\"empty_row\":[],\"legacy\":{\"id\":\"legacy\",\"version\":1},\"new\":{\"id\":\"new\",\"sha256\":\"verified\",\"version\":\"2\"}}}"
++		},
++		{
++			"id": "builder-edits-do-not-rewrite-source-only-provenance",
++			"source": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"1\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}",
++			"mutate_builder": true,
++			"operations": [
++				{
++					"kind": "install",
++					"entry": {
++						"id": "new",
++						"sha256": "verified",
++						"version": "2"
++					}
++				},
++				{
++					"kind": "remove",
++					"id": "new"
++				}
++			],
++			"expected": "{\"schema_version\":1,\"layouts\":{\"sample\":{\"id\":\"sample\",\"sha256\":\"original\",\"version\":\"2\",\"future\":{\"nothing\":null,\"empty\":[]}},\"retired\":false,\"gone\":{\"version\":2,\"fields\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"Schema_version\":14}"
++		}
++	],
++	"refusals": [
++		"{ damaged",
++		"{\"schema_version\":2,\"layouts\":{}}",
++		"{\"schema_version\":1}",
++		"{\"schema_version\":1,\"layouts\":[]}",
++		"{\"schema_version\":1,\"layouts\":null}",
++		"[]",
++		"null"
++	],
++	"manager_source": "{\"schema_version\":1,\"layouts\":{\"retired\":false,\"null_row\":null,\"array_row\":[],\"legacy\":{\"version\":2,\"future\":[null,[],false]}},\"future_text\":\"retain\",\"future_flag\":false,\"future_root\":{\"empty\":[],\"nothing\":null,\"nested\":{\"value\":12}},\"outdated\":{\"source\":[null,[],false],\"note\":\"retain\"}}"
++}
