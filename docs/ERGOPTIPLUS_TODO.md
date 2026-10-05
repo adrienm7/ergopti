@@ -3239,6 +3239,19 @@ delivery. The full HTTP adapter fixture passes 295 cases per ABI. Detached
 descendant absence, runtime acquisition and complete native qualification remain
 separate requirements; this checkpoint does not complete item 47.
 
+The strong Linux owned HTTP operation now retains the acquired detached group
+and its original referenced timer until native ESRCH, process exit and every
+captured close acknowledgement. Leader exit, EOF and accepted signals cannot
+admit a successor while descendants or a refused close remain. Fourteen added
+independent controls preserve all 585 existing assertion lines; the extended
+adapter fixture passes 400 cases on LuaJIT and 397 on Lua 5.4. Real detached
+Linux descendants reproduce the old defect on both ABIs and qualify the repair.
+Actual curl streaming passes 262 checks per ABI; authenticated discovery passes
+48 on the production LuaJIT ABI. The Lua 5.4 authentication fixture still fails
+17 checks on both baseline and candidate because its private-file owner requires
+FFI. Hosted qualification and runtime installation/start remain separate; item
+47 stays partial.
+
 Actual root integration command for the extended mandatory native fixture, after activation and in the Linux driver directory:
 
 ```sh
