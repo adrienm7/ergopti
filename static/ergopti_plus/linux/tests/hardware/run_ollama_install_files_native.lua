@@ -26,14 +26,26 @@ local function test(name, body)
 	if not ok then io.stderr:write("FAIL ", name, ": ", tostring(reason), "\n") error(reason) end
 	passed = passed + 1 io.write("PASS ", name, "\n")
 end
-local function process(program, args)
-	local result
+local function process_capture(program, args)
+	local result, callbacks = nil, 0
 	process_serial = process_serial + 1
-	local op = Process.start(program, args, { owner = "archive-fixture-" .. process_serial, timeout_ms = 10000, max_output_bytes = 65536 }, function(value) result = value end)
+	local op = Process.start(program, args, { owner = "archive-fixture-" .. process_serial, timeout_ms = 10000, max_output_bytes = 65536 }, function(value) result = value callbacks = callbacks + 1 end)
 	while not op:is_settled() do uv.run("once") end
 	expect(not uv.loop_alive(), "every native handle physically closed")
+	expect(op.started == true and callbacks == 1 and type(result) == "table", "one actual admitted helper receipt after physical retirement")
+	return result, op
+end
+local function process(program, args)
+	local result, op = process_capture(program, args)
 	expect(op.started and result and result.ok and result.exit_code == 0, "actual successful owned helper receipt")
 	return result
+end
+local no_clobber_skip_exit
+local function read_bytes(path)
+	local input = assert(io.open(path, "rb")) local value = assert(input:read("*a")) assert(input:close()) return value
+end
+local function unchanged(before, after)
+	return before.ino == after.ino and before.dev == after.dev and before.mode == after.mode and before.size == after.size
 end
 local function copy_archive(path)
 	local input = assert(io.open(fixture_archive, "rb")) local bytes = assert(input:read("*a")) assert(input:close())
@@ -76,6 +88,13 @@ test("real native prerequisite receipts", function()
 		local result = process(definition[1], definition[2])
 		for _, expected in ipairs(definition[3]) do expect(result.stdout:find(expected, 1, true), "actual required native semantics") end
 	end
+	local version = process("mv", { "--version" }).stdout
+	local major, minor = version:match("^mv %(GNU coreutils%) (%d+)%.(%d+)")
+	expect(major ~= nil and minor ~= nil, "actual unambiguous GNU move version")
+	major, minor = tonumber(major), tonumber(minor)
+	-- GNU 9.5 NEWS pins the 9.2--9.4 nonzero skip interval; earlier/later releases
+	-- silently skip. A negative move must match its independently observed version.
+	no_clobber_skip_exit = major == 9 and minor >= 2 and minor <= 4 and 1 or 0
 end)
 
 test("tiny independently hashed archive extracts and publishes full tree", function()
@@ -121,7 +140,22 @@ test("actual raced empty foreign destination survives mv no-clobber", function()
 	local f = fixture() verify(f) extract(f)
 	assert(uv.fs_mkdir(f.owner.directory, 448))
 	local before = assert(uv.fs_lstat(f.owner.directory))
-	local ok, reason = f.owner.admit_publication(publish(f))
+	local stage = assert(uv.fs_lstat(f.paths.stage))
+	local binary_path, library_path = f.paths.stage .. "/bin/ollama", f.paths.stage .. "/lib/ollama/native-fixture.txt"
+	local binary, library = assert(uv.fs_lstat(binary_path)), assert(uv.fs_lstat(library_path))
+	local binary_bytes, library_bytes = read_bytes(binary_path), read_bytes(library_path)
+	local program, args = f.owner.publish_command()
+	local actual = process_capture(program, args)
+	expect(actual.exit_code == no_clobber_skip_exit and actual.ok == (no_clobber_skip_exit == 0), "actual no-clobber receipt matches independently observed GNU version")
+	expect(unchanged(before, assert(uv.fs_lstat(f.owner.directory))) and unchanged(stage, assert(uv.fs_lstat(f.paths.stage))), "no-clobber preserves foreign and owned stage inode/mode/size")
+	expect(unchanged(binary, assert(uv.fs_lstat(binary_path))) and unchanged(library, assert(uv.fs_lstat(library_path))), "complete staged executable/library identities unchanged")
+	expect(read_bytes(binary_path) == binary_bytes and read_bytes(library_path) == library_bytes, "complete staged executable/library bytes unchanged")
+	local admitted, failure = f.owner.admit_publication(actual)
+	local expected_reason = no_clobber_skip_exit == 0 and "install_publication_not_owned" or "install_publication_refused"
+	expect(not admitted and failure == expected_reason, "actual negative publication cannot claim installation")
+	-- This distinct actual no-op child supplies a zero-exit control, not a real mv receipt.
+	local zero_exit_control = process("true", {})
+	local ok, reason = f.owner.admit_publication(zero_exit_control)
 	expect(not ok and reason == "install_publication_not_owned", "GNU zero skip not borrowed as success")
 	expect(f.owner.cleanup(), "private stage/archive removed")
 	local after = assert(uv.fs_lstat(f.owner.directory))
