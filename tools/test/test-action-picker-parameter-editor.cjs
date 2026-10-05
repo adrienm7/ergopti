@@ -26,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -170,7 +171,12 @@ const IDS = [
 	'param-program-executable-label',
 	'param-program-arguments',
 	'param-program-arguments-label',
-	'param-program-add'
+	'param-program-add',
+	'param-program-provider',
+	'param-program-provider-label',
+	'param-program-provider-select',
+	'param-program-provider-hint',
+	'param-program-provider-status'
 ];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
@@ -750,6 +756,120 @@ for (const platform of ['ahk', 'hs', 'linux']) {
 			count += 1;
 		}
 	check(count >= 63, 'all independent program vectors execute');
+}
+
+// 13. Discovered scripts lower only in the native owner; the page cannot forge
+// executable paths and a refusal keeps literal arguments available for retry.
+for (const platform of ['hs', 'linux', 'ahk']) {
+	const page = loadPage(platform);
+	vm.runInContext(
+		`programProviders = {
+		choices: [{key:'1:1', label:'été 日本.py'}], truncated:false
+	}; programProviderStrings = { label:'Script', manual:'Manual', hint:'Owned folder',
+		unavailable:'Unavailable', changed:'Changed', empty:'Empty', truncated:'Truncated' };
+	doConfirm('run_program')`,
+		page.context
+	);
+	check(page.byId['param-program-provider'].hidden === false, 'provider selector is visible');
+	check(
+		page.byId['param-program-provider-select'].children[1].textContent === 'été 日本.py',
+		'script labels remain opaque Unicode text'
+	);
+	page.byId['param-program-provider-select'].value = '1:1';
+	page.byId['param-program-provider-select'].dispatch('change');
+	check(page.byId['param-program-executable'].hidden === true, 'preset owns its executable');
+	page.context.__argument = 'a "quoted" 日本\nline';
+	vm.runInContext("appendProgramArgument(''); appendProgramArgument(__argument)", page.context);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 &&
+			page.posted[0].providerKey === '1:1' &&
+			!Object.hasOwn(page.posted[0], 'parameter'),
+		'only opaque key reaches native resolver'
+	);
+	check(
+		JSON.stringify(page.posted[0].programArguments) ===
+			JSON.stringify(['', 'a "quoted" 日本\nline']),
+		'preset arguments preserve empty, quote, Unicode and newline values'
+	);
+	vm.runInContext('programProviderRefused()', page.context);
+	check(
+		page.byId['param-error'].hidden === false && page.byId['param-error'].textContent === 'Changed',
+		'identity refusal remains visible in the same open editor'
+	);
+	check(
+		page.byId['param-program-arguments'].querySelectorAll('textarea').length === 2,
+		'refusal does not erase editable arguments'
+	);
+	page.byId['param-program-provider-select'].value = '';
+	page.byId['param-program-provider-select'].dispatch('change');
+	check(
+		page.byId['param-program-executable'].hidden === false,
+		'manual executable remains available'
+	);
+	vm.runInContext(
+		'closeParamEditor(); programProviders={unavailable:true}; doConfirm("run_program")',
+		page.context
+	);
+	check(
+		page.byId['param-program-provider-status'].textContent === 'Unavailable',
+		'unsupported discovery has its translated reason'
+	);
+	vm.runInContext(
+		'closeParamEditor(); programProviders={choices:[],truncated:false}; doConfirm("run_program")',
+		page.context
+	);
+	check(
+		page.byId['param-program-provider-status'].textContent === 'Empty',
+		'missing folder is neutral'
+	);
+	vm.runInContext(
+		'closeParamEditor(); programProviders={choices:[],truncated:true}; doConfirm("run_program")',
+		page.context
+	);
+	check(
+		page.byId['param-program-provider-status'].textContent === 'Truncated',
+		'bounded inventory is honest'
+	);
+	vm.runInContext(
+		'closeParamEditor(); programProviders=null; doConfirm("run_program")',
+		page.context
+	);
+	check(
+		page.byId['param-program-provider'].hidden === true &&
+			page.byId['param-program-executable'].hidden === false,
+		'legacy/manual editor never stays hidden'
+	);
+}
+
+// Parser controls qualify receipt admission only; native Hammerspoon runs in CI.
+{
+	const controls = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		[
+			'-m',
+			'unittest',
+			'discover',
+			'-s',
+			'tools/diagnostics/native_hs_program_providers',
+			'-p',
+			'test_receipt.py'
+		],
+		{
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+		}
+	);
+	check(
+		!controls.error && controls.signal === null && controls.status === 0,
+		'provider receipt parser controls complete'
+	);
+	check(
+		/Ran 11 tests in /.test(controls.stderr) && /\nOK\s*$/.test(controls.stderr),
+		'all eleven parser controls execute without skip'
+	);
 }
 
 if (errors.length > 0) {

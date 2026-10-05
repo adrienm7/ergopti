@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "קובץ הפעלה",
 	"dialog.action_picker.program_arguments": "ארגומנטים (אחד בכל שדה)",
 	"dialog.action_picker.program_add_argument": "הוספת ארגומנט",
+	"dialog.action_picker.program_provider_changed": "הסקריפט או המפרש השתנו. יש לפתוח מחדש את בורר הפעולות.",
+	"dialog.action_picker.program_provider_empty": "לא נמצאו סקריפטים שניתן להריץ.",
+	"dialog.action_picker.program_provider_hint": "יש למקם סקריפטים של shell או Python בתיקיית המשנה scripts שבתיקיית ההגדרות.",
+	"dialog.action_picker.program_provider_label": "סקריפט",
+	"dialog.action_picker.program_provider_manual": "הזנת קובץ הרצה",
+	"dialog.action_picker.program_provider_truncated": "חלק מהסקריפטים אינם מוצגים. יש לצמצם את תוכן התיקייה ולפתוח מחדש את הבורר.",
+	"dialog.action_picker.program_provider_unavailable": "גילוי סקריפטים אינו זמין. יש להזין קובץ הרצה במקום זאת.",
 	"dialog.action_picker.program_remove_argument": "הסרת ארגומנט",
 	"platform_reason.program_runner_unavailable": "לא זמין: מפעיל התוכניות המובנה או שיוך זה אינם זמינים."
 }

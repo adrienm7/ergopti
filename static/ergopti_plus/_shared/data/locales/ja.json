@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "実行ファイル",
 	"dialog.action_picker.program_arguments": "引数（各欄に1つ）",
 	"dialog.action_picker.program_add_argument": "引数を追加",
+	"dialog.action_picker.program_provider_changed": "スクリプトまたはインタープリターが変更されました。アクション選択画面を開き直してください。",
+	"dialog.action_picker.program_provider_empty": "実行可能なスクリプトが見つかりませんでした。",
+	"dialog.action_picker.program_provider_hint": "シェルまたはPythonのスクリプトを設定フォルダ内のscriptsサブフォルダに配置してください。",
+	"dialog.action_picker.program_provider_label": "スクリプト",
+	"dialog.action_picker.program_provider_manual": "実行ファイルを入力",
+	"dialog.action_picker.program_provider_truncated": "一部のスクリプトは表示されません。フォルダの内容を減らして選択画面を開き直してください。",
+	"dialog.action_picker.program_provider_unavailable": "スクリプトの検出を利用できません。実行ファイルを入力してください。",
 	"dialog.action_picker.program_remove_argument": "引数を削除",
 	"platform_reason.program_runner_unavailable": "利用不可: ネイティブのプログラム実行機能またはこの割り当ては利用できません。"
 }

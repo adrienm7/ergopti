@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Exécutable",
 	"dialog.action_picker.program_arguments": "Arguments (un par champ)",
 	"dialog.action_picker.program_add_argument": "Ajouter un argument",
+	"dialog.action_picker.program_provider_changed": "Le script ou son interpréteur a changé. Rouvrez le sélecteur d’actions.",
+	"dialog.action_picker.program_provider_empty": "Aucun script exécutable trouvé.",
+	"dialog.action_picker.program_provider_hint": "Placez vos scripts shell ou Python dans le sous-dossier scripts de votre dossier de configuration.",
+	"dialog.action_picker.program_provider_label": "Script",
+	"dialog.action_picker.program_provider_manual": "Saisir un exécutable",
+	"dialog.action_picker.program_provider_truncated": "Certains scripts ne sont pas affichés. Réduisez le contenu du dossier et rouvrez le sélecteur.",
+	"dialog.action_picker.program_provider_unavailable": "La découverte de scripts est indisponible. Saisissez un exécutable.",
 	"dialog.action_picker.program_remove_argument": "Supprimer un argument",
 	"platform_reason.program_runner_unavailable": "Indisponible : le lanceur natif ou cette association est indisponible."
 }

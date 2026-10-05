@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Spustitelný soubor",
 	"dialog.action_picker.program_arguments": "Argumenty (jeden v každém poli)",
 	"dialog.action_picker.program_add_argument": "Přidat argument",
+	"dialog.action_picker.program_provider_changed": "Skript nebo jeho interpret se změnil. Znovu otevřete výběr akcí.",
+	"dialog.action_picker.program_provider_empty": "Nebyly nalezeny žádné spustitelné skripty.",
+	"dialog.action_picker.program_provider_hint": "Umístěte shellové nebo Python skripty do podsložky scripts ve složce konfigurace.",
+	"dialog.action_picker.program_provider_label": "Skript",
+	"dialog.action_picker.program_provider_manual": "Zadat spustitelný soubor",
+	"dialog.action_picker.program_provider_truncated": "Některé skripty nejsou uvedeny. Omezte obsah složky a znovu otevřete výběr.",
+	"dialog.action_picker.program_provider_unavailable": "Vyhledávání skriptů není dostupné. Zadejte spustitelný soubor.",
 	"dialog.action_picker.program_remove_argument": "Odebrat argument",
 	"platform_reason.program_runner_unavailable": "Nedostupné: Nativní spouštěč nebo tato vazba není dostupná."
 }

@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Ausführbare Datei",
 	"dialog.action_picker.program_arguments": "Argumente (eines pro Feld)",
 	"dialog.action_picker.program_add_argument": "Argument hinzufügen",
+	"dialog.action_picker.program_provider_changed": "Das Skript oder der Interpreter wurde geändert. Öffnen Sie die Aktionsauswahl erneut.",
+	"dialog.action_picker.program_provider_empty": "Keine ausführbaren Skripte gefunden.",
+	"dialog.action_picker.program_provider_hint": "Legen Sie Shell- oder Python-Skripte im Unterordner scripts Ihres Konfigurationsordners ab.",
+	"dialog.action_picker.program_provider_label": "Skript",
+	"dialog.action_picker.program_provider_manual": "Programmdatei eingeben",
+	"dialog.action_picker.program_provider_truncated": "Einige Skripte werden nicht angezeigt. Verringern Sie den Ordnerinhalt und öffnen Sie die Auswahl erneut.",
+	"dialog.action_picker.program_provider_unavailable": "Die Skriptsuche ist nicht verfügbar. Geben Sie stattdessen eine Programmdatei ein.",
 	"dialog.action_picker.program_remove_argument": "Argument entfernen",
 	"platform_reason.program_runner_unavailable": "Nicht verfügbar: Der native Programmstarter oder diese Zuordnung ist nicht verfügbar."
 }

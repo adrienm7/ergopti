@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Executable",
 	"dialog.action_picker.program_arguments": "Arguments (one per field)",
 	"dialog.action_picker.program_add_argument": "Add argument",
+	"dialog.action_picker.program_provider_changed": "The script or interpreter changed. Reopen the action picker.",
+	"dialog.action_picker.program_provider_empty": "No runnable scripts were found.",
+	"dialog.action_picker.program_provider_hint": "Place shell or Python scripts in the scripts subfolder of your configuration folder.",
+	"dialog.action_picker.program_provider_label": "Script",
+	"dialog.action_picker.program_provider_manual": "Enter an executable",
+	"dialog.action_picker.program_provider_truncated": "Some scripts were not listed. Reduce the folder contents and reopen.",
+	"dialog.action_picker.program_provider_unavailable": "Script discovery is unavailable. Enter an executable instead.",
 	"dialog.action_picker.program_remove_argument": "Remove argument",
 	"platform_reason.program_runner_unavailable": "Unavailable: The native program runner or this binding is unavailable."
 }

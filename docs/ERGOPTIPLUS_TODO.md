@@ -3731,6 +3731,21 @@ Homebrew and Sparkle archive acceptance cases, so package completion and
 installation remain unexecuted. Native Hammerspoon publication, provider
 discovery and physical acceptance are still separate unfinished scope.
 
+The shared picker now inventories explicit `config_dir/scripts` on Linux and
+macOS through bounded native adapters, with opaque session choices and the
+existing literal executable/argv persistence. Selection rechecks script,
+interpreter, configured route and captured identity before assignment; manual
+entry remains available. Windows honestly reports discovery unavailable.
+Seven new labels are translated in all21 locales. Real Linux child fixtures
+cover discovered shell, Python and executable scripts, literal Unicode/empty
+arguments, refused starts, exit37 and cancellation with closed process groups.
+The registered macOS controlled fixtures cover exact native64-bit integers,
+stale identities, source privacy and retained cleanup debt. A signed official
+Hammerspoon native inventory fixture is registered in macOS CI; its portable
+parser controls are not native qualification. Hosted execution of that fixture,
+Apple Shortcuts, installed automation/application providers, Windows discovery,
+consumer parity and full packaging/installation remain unfinished.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate

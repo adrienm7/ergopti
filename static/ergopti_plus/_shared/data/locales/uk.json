@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Виконуваний файл",
 	"dialog.action_picker.program_arguments": "Аргументи (по одному в полі)",
 	"dialog.action_picker.program_add_argument": "Додати аргумент",
+	"dialog.action_picker.program_provider_changed": "Скрипт або інтерпретатор змінився. Відкрийте вибір дій знову.",
+	"dialog.action_picker.program_provider_empty": "Скриптів, доступних для запуску, не знайдено.",
+	"dialog.action_picker.program_provider_hint": "Розмістіть скрипти оболонки або Python у підпапці scripts теки конфігурації.",
+	"dialog.action_picker.program_provider_label": "Скрипт",
+	"dialog.action_picker.program_provider_manual": "Указати виконуваний файл",
+	"dialog.action_picker.program_provider_truncated": "Деякі скрипти не показано. Зменште вміст теки та відкрийте вибір знову.",
+	"dialog.action_picker.program_provider_unavailable": "Пошук скриптів недоступний. Укажіть виконуваний файл.",
 	"dialog.action_picker.program_remove_argument": "Видалити аргумент",
 	"platform_reason.program_runner_unavailable": "Недоступно: Нативний запуск програм або ця прив’язка недоступні."
 }

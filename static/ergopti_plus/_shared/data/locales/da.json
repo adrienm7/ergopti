@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Programfil",
 	"dialog.action_picker.program_arguments": "Argumenter (ét pr. felt)",
 	"dialog.action_picker.program_add_argument": "Tilføj argument",
+	"dialog.action_picker.program_provider_changed": "Scriptet eller fortolkeren er ændret. Åbn handlingsvælgeren igen.",
+	"dialog.action_picker.program_provider_empty": "Ingen scripts, der kan køres, blev fundet.",
+	"dialog.action_picker.program_provider_hint": "Læg shell- eller Python-scripts i undermappen scripts i din konfigurationsmappe.",
+	"dialog.action_picker.program_provider_label": "Script",
+	"dialog.action_picker.program_provider_manual": "Indtast en programfil",
+	"dialog.action_picker.program_provider_truncated": "Nogle scripts vises ikke. Reducer mappens indhold, og åbn vælgeren igen.",
+	"dialog.action_picker.program_provider_unavailable": "Scriptsøgning er ikke tilgængelig. Indtast en programfil i stedet.",
 	"dialog.action_picker.program_remove_argument": "Fjern argument",
 	"platform_reason.program_runner_unavailable": "Utilgængelig: Den native programstarter eller denne binding er utilgængelig."
 }

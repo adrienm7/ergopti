@@ -205,6 +205,13 @@ const STEP_CONDITIONS = [
 		'Upload Swift launcher failure transcript',
 		"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
 	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Run signed Hammerspoon program provider inventory',
+		'${{ always() }}'
+	],
+	[MACOS_BOX, 'package-macos', 'Retain native Hammerspoon provider inventory', '${{ always() }}'],
 	[MACOS_BOX, 'package-macos', 'Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
@@ -1228,6 +1235,28 @@ function stepProblems(files) {
 }
 
 errors.push(...stepProblems(pipeline.files()));
+for (const name of [
+	'Run signed Hammerspoon program provider inventory',
+	'Retain native Hammerspoon provider inventory'
+]) {
+	const head = `      - name: ${name}\n`;
+	for (const condition of ['', 'false', 'success()']) {
+		mustCatch(
+			`native provider ${name} condition ${condition}`,
+			MACOS_BOX,
+			head + '        if: ${{ always() }}\n',
+			head + (condition ? `        if: ${condition}\n` : ''),
+			stepProblems
+		);
+	}
+	mustCatch(
+		`missing mandatory ${name}`,
+		MACOS_BOX,
+		head,
+		'      - name: Omitted native provider step\n',
+		stepProblems
+	);
+}
 for (const condition of ['', 'false', 'success()']) {
 	const head = '      - name: Retain archive diagnostic session\n';
 	const from =

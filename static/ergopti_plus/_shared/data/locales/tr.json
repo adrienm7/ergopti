@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Çalıştırılabilir dosya",
 	"dialog.action_picker.program_arguments": "Bağımsız değişkenler (alan başına bir)",
 	"dialog.action_picker.program_add_argument": "Bağımsız değişken ekle",
+	"dialog.action_picker.program_provider_changed": "Betik veya yorumlayıcı değişti. Eylem seçiciyi yeniden açın.",
+	"dialog.action_picker.program_provider_empty": "Çalıştırılabilir betik bulunamadı.",
+	"dialog.action_picker.program_provider_hint": "Kabuk veya Python betiklerini yapılandırma klasörünüzün scripts alt klasörüne koyun.",
+	"dialog.action_picker.program_provider_label": "Betik",
+	"dialog.action_picker.program_provider_manual": "Çalıştırılabilir dosya girin",
+	"dialog.action_picker.program_provider_truncated": "Bazı betikler listelenmedi. Klasör içeriğini azaltıp seçiciyi yeniden açın.",
+	"dialog.action_picker.program_provider_unavailable": "Betik keşfi kullanılamıyor. Bunun yerine çalıştırılabilir dosya girin.",
 	"dialog.action_picker.program_remove_argument": "Bağımsız değişkeni kaldır",
 	"platform_reason.program_runner_unavailable": "Kullanılamıyor: Yerel program çalıştırıcısı veya bu atama kullanılamıyor."
 }

@@ -123,7 +123,12 @@ for (const id of [
 	'param-program-executable',
 	'param-program-arguments-label',
 	'param-program-arguments',
-	'param-program-add'
+	'param-program-add',
+	'param-program-provider',
+	'param-program-provider-label',
+	'param-program-provider-select',
+	'param-program-provider-hint',
+	'param-program-provider-status'
 ]) {
 	byId[id] = new FakeElement('div', id);
 }

@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Ejecutable",
 	"dialog.action_picker.program_arguments": "Argumentos (uno por campo)",
 	"dialog.action_picker.program_add_argument": "Añadir argumento",
+	"dialog.action_picker.program_provider_changed": "El script o su intérprete ha cambiado. Vuelva a abrir el selector de acciones.",
+	"dialog.action_picker.program_provider_empty": "No se encontraron scripts ejecutables.",
+	"dialog.action_picker.program_provider_hint": "Coloque scripts de shell o Python en la subcarpeta scripts de su carpeta de configuración.",
+	"dialog.action_picker.program_provider_label": "Script",
+	"dialog.action_picker.program_provider_manual": "Introducir un ejecutable",
+	"dialog.action_picker.program_provider_truncated": "Algunos scripts no se muestran. Reduzca el contenido de la carpeta y vuelva a abrir el selector.",
+	"dialog.action_picker.program_provider_unavailable": "La búsqueda de scripts no está disponible. Introduzca un ejecutable.",
 	"dialog.action_picker.program_remove_argument": "Eliminar argumento",
 	"platform_reason.program_runner_unavailable": "No disponible: El ejecutor nativo o esta asignación no está disponible."
 }
