@@ -16,7 +16,7 @@ class PersonalFileControls {
 
 	/** Read physical identity from an open handle, including hard-link aliases. */
 	static Physical(Path) {
-		File := FileOpen(Path, "r", "UTF-8")
+		File := FSOpenReadStrict(Path)
 		if !IsObject(File)
 			throw Error("The personal hotstring file is unreadable.")
 		try {
@@ -59,14 +59,8 @@ class PersonalFileControls {
 		global ScriptInformation
 		Primary := ScriptInformation.Get("PersonalTomlPath", "")
 		PrimaryPresent := false
-		if Primary != "" {
-			Attributes := DllCall("GetFileAttributesW", "wstr", Primary, "uint")
-			if Attributes == 0xffffffff {
-				if A_LastError != 2 && A_LastError != 3
-					throw Error("The primary personal source presence is unavailable.")
-			} else
-				PrimaryPresent := true
-		}
+		if Primary != ""
+			PrimaryPresent := FSStrictExists(Primary)
 		if PrimaryPresent {
 			; Refuse discovery if the already owned primary identity cannot be
 			; reserved: skipping this evidence could authorize a hard-link alias.

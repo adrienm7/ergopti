@@ -711,6 +711,11 @@ FSMove(Source, Destination, Overwrite := false) {
         }
 }
 
+/** Open a BOM-aware UTF-8 reader; native refusal reaches the identity owner. */
+FSOpenReadStrict(Path) {
+	return FileOpen(Path, "r", "UTF-8")
+}
+
 ; Opens a file for STREAMED reading and hands the handle back.
 ; FSRead loads a whole file; the at-rest migration walks data.sql, which can be
 ; hundreds of megabytes, and would have to hold all of it in memory to rewrite

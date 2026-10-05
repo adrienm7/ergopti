@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Include ../../../_shared/modules/hotstrings/user_code.ahk
+#Include ../../adapters/user_hotstrings_native.ahk
 
 ; Native programmable hotstrings run outside the keyboard hook, in an owned Job.
 ; Only the host may publish returned text. Callback actions remain user-owned.
@@ -79,7 +80,7 @@ UserHotstringsOpenSource(*) {
 	if !FSStrictExists(Path)
 		return false
 	try {
-		Run('notepad.exe "' . Path . '"')
+		UHN_OpenSource(Path)
 		return true
 	} catch {
 		LoggerError("UserHotstrings", "The personal code editor could not be opened.")
@@ -296,7 +297,7 @@ _UserHotstringsParseResult(Text) {
 
 _UserHotstringsWindowProcess(Hwnd) {
 	ProcessId := 0
-	if !Hwnd || !DllCall("GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &ProcessId)
+	if !Hwnd || !UHN_WindowProcessId(Hwnd, &ProcessId)
 		return 0
 	return ProcessId
 }
@@ -325,7 +326,7 @@ UserHotstringsOnChar(BufferValue) {
 		TimeActivationSeconds: Delay, PrevCharKey: _TextPenultimateCodepoint(Trigger), OnlyText: true}
 	if !_HSE_PrepareDispatchDecision(Spec, BufferValue, "")
 		return false
-	Hwnd := WinExist("A")
+	Hwnd := UHN_ForegroundHwnd()
 	_UserHotstringsCapture := Map("input", _UserHotstringsInputSerial, "hwnd", Hwnd,
 		"process", _UserHotstringsWindowProcess(Hwnd),
 		"control", WIGetFocusedControlToken(), "field", SFD_FocusSnapshot(), "buffer", BufferValue, "trigger", Trigger,
@@ -341,7 +342,7 @@ _UserHotstringsCurrent(Capture, Source) {
 	if A_IsSuspended || !IsCategoryGated("Hotstrings") || Capture["input"] != _UserHotstringsInputSerial
 		|| Capture["context"] != _PrefixInputContextGeneration || Capture["deferred"] != _PrefixDeferredGeneration
 		|| Capture["registry"] != HSE_RegistryGeneration || Capture["decision"] != HSE_RuntimeDecisionGeneration
-		|| !(Capture["buffer"] == HSE_Buffer) || Capture["hwnd"] != WinExist("A")
+		|| !(Capture["buffer"] == HSE_Buffer) || Capture["hwnd"] != UHN_ForegroundHwnd()
 		|| !Capture["process"] || Capture["process"] != _UserHotstringsWindowProcess(Capture["hwnd"])
 		|| !(Capture["control"] == WIGetFocusedControlToken()) || SFD_IsSecureField()
 		return false
@@ -439,7 +440,7 @@ class UserHotstringWorker {
 		if !Ready
 			return false
 		if this.event
-			DllCall("CloseHandle", "Ptr", this.event)
+			UHN_CloseEvent(this.event)
 		this.event := 0
 		if _UserHotstringsJobs.Has(this)
 			_UserHotstringsJobs.Delete(this)
@@ -452,7 +453,7 @@ class UserHotstringWorker {
 		this.cancelled := true
 		SetTimer(this.timer, 0)
 		if this.event
-			DllCall("SetEvent", "Ptr", this.event)
+			UHN_SignalEvent(this.event)
 		if IsObject(this.task) && !UserCodeAcknowledged(this.task.terminate())
 			return false
 		return this.Cleanup()
@@ -467,13 +468,13 @@ class UserHotstringWorker {
 				return this.Finish(0, "ERGOPTI_USER_HOTSTRINGS_V1`nCANCEL`nEND`n", "")
 			if !_UserHotstringsSourceCurrent(this.source)
 				throw Error("The source changed before execution.")
-			Nonce := Format("{:x}-{:x}-{:x}", DllCall("GetCurrentProcessId"), A_TickCount, Random(0, 0x7fffffff))
+			Nonce := Format("{:x}-{:x}-{:x}", UHN_CurrentProcessId(), A_TickCount, Random(0, 0x7fffffff))
 			Name := "Local\ErgoptiPlus.UserHotstrings." . Nonce
-			this.event := DllCall("CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", Name, "Ptr")
-			if !this.event || A_LastError == 183
+			this.event := UHN_CreateCancellationEvent(Name, &EventError)
+			if !this.event || EventError == 183
 				throw Error("The cancellation event is not exclusively owned.")
 			Stage := A_Temp . "\ergopti_user_hotstrings_" . Nonce
-			if !DllCall("CreateDirectoryW", "Str", Stage, "Ptr", 0)
+			if !FSCreateDirectoryExclusiveStrict(Stage)
 				throw Error("The source stage is not exclusively owned.")
 			this.stage := Stage
 			SourcePath := this.stage . "\source.ahk", Wrapper := this.stage . "\worker.ahk"
