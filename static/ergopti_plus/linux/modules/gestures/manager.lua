@@ -940,6 +940,7 @@ local _reader_stop_error = nil -- an unacknowledged close must fence reacquisiti
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
 local _parameter_configuration_owner = nil
+local _parameter_delivery_epoch = 0
 local _scope_owner   = nil   -- retains refused runtime compensation
 local _scope_native = false -- admits only the scope's synchronous native inverse
 local _scope_sequence = 0
@@ -1445,12 +1446,14 @@ end
 ---   the options the picker bridge's open() reads.
 function M.get_picker_parameter_fields(items, binding)
 	local prompts, errors = {}, {}
+	local combination = type(binding) == "string" and binding:match("^combination__") ~= nil
+		and require("modules.shortcuts.key_combinations").configuration_domain(binding) == "combination"
 	for _, item in ipairs(items) do
 		local kind = item.type == "action" and M.get_action_parameter_spec(item.id) or nil
 		if kind then
 			if kind == "program" and (type(binding) ~= "string"
 				or (M.DEFAULT_GESTURES[binding] == nil and not binding:match("^keyboard__.+$")
-					and not binding:match("^script__.+$") and not binding:match("^tap_key__.+$"))) then
+					and not binding:match("^script__.+$") and not binding:match("^tap_key__.+$") and not combination)) then
 				item.disabled = true
 				item.hint = i18n.get("platform_reason.program_runner_unavailable")
 			end
@@ -1494,6 +1497,20 @@ function M.get_picker_parameter_fields(items, binding)
 	}
 end
 
+--- Builds a validated detached row for the canonical parameter publisher.
+--- No source, native owner or runtime state is modified by this constructor.
+--- @param binding string Exact binding identifier.
+--- @param action_name string Declared parameter-bearing action.
+--- @param value string Validated parameter scalar.
+--- @return table|nil update Canonical section/key/value row, or refusal.
+function M.action_parameter_update(binding, action_name, value)
+	if type(binding) ~= "string" or binding == "" or not binding:match("^[a-z0-9_]+$")
+		or type(action_name) ~= "string" or type(value) ~= "string"
+		or M.get_action_parameter_spec(action_name) == nil
+		or M.validate_action_parameter(action_name, value) ~= true then return nil end
+	return { section = CONFIG_SECTION_PARAMS, key = parameter_key(binding, action_name), value = value }
+end
+
 function M.set_action_parameter(binding, action_name, value)
 	if not admit_mutation() then return false end
 	if not M.validate_action_parameter(action_name, value) then return false end
@@ -1507,6 +1524,15 @@ function M.set_action_parameter(binding, action_name, value)
 	_action_params = staged
 	_program_revision = _program_revision + 1
 	return true
+end
+
+--- Captures private revision/lease currency across physical input callbacks.
+function M.capture_parameter_delivery_guard()
+	local revision, epoch, parameters = _program_revision, _parameter_delivery_epoch, _action_params
+	return function()
+		return _parameter_configuration_owner == nil and _program_revision == revision
+			and _parameter_delivery_epoch == epoch and _action_params == parameters
+	end
 end
 
 function M.get_all_action_parameters()
@@ -2118,6 +2144,7 @@ end
 function M.acquire_parameter_configuration(owner)
 	if type(owner) ~= "table" or not admit_mutation(owner) or not retire_window_operation() or not admit_mutation(owner) then return false end
 	_parameter_configuration_owner = owner
+	_parameter_delivery_epoch = _parameter_delivery_epoch + 1
 	return true
 end
 
@@ -2127,6 +2154,7 @@ end
 function M.release_parameter_configuration(owner)
 	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner then return false end
 	_parameter_configuration_owner = nil
+	_parameter_delivery_epoch = _parameter_delivery_epoch + 1
 	return true
 end
 
@@ -2181,6 +2209,37 @@ function M.apply_parameter_configuration(owner, parameters)
 	_action_params = copy
 	_program_revision = _program_revision + 1
 	return true
+end
+
+--- Compares the actual loader's canonical/legacy frame with private runtime intent.
+--- The exact lease (or neutral nil for a detached editor capture) must survive
+--- every external validator/domain callback. Unowned parameters stay untouched.
+function M.parameter_configuration_matches(owner, document, recognizes)
+	if _parameter_configuration_owner ~= owner or type(document) ~= "table" or type(recognizes) ~= "function" then return false end
+	local revision, epoch, runtime = _program_revision, _parameter_delivery_epoch, _action_params
+	local expected = {}
+	walk_user_config(document, { param = function(_, key, value)
+		local binding = M.split_action_parameter_key(key)
+		if recognizes(binding) then expected[key] = value end
+	end })
+	for key, value in pairs(runtime) do
+		local binding = M.split_action_parameter_key(key)
+		if binding and recognizes(binding) and expected[key] ~= value then return false end
+	end
+	for key, value in pairs(expected) do if runtime[key] ~= value then return false end end
+	return _parameter_configuration_owner == owner and _action_params == runtime
+		and _program_revision == revision and _parameter_delivery_epoch == epoch
+end
+
+--- Captures source agreement without acquiring or retiring native work.
+function M.capture_parameter_source_guard(document, recognizes)
+	local revision, epoch, runtime = _program_revision, _parameter_delivery_epoch, _action_params
+	local function current()
+		return _parameter_configuration_owner == nil and _action_params == runtime
+			and _program_revision == revision and _parameter_delivery_epoch == epoch
+	end
+	if not current() or M.parameter_configuration_matches(nil, document, recognizes) ~= true or not current() then return nil end
+	return current
 end
 
 --- Enumerates only recognized parameter bindings consumed by this loader.

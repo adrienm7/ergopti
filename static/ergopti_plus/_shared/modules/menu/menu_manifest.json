@@ -1163,7 +1163,8 @@
 			],
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1226,7 +1227,8 @@
 			"category": "KeyCombinations",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1294,7 +1296,8 @@
 			"id": "key_combination_rows_left",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1310,7 +1313,8 @@
 			"id": "key_combination_rows_right",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}
@@ -1348,7 +1352,8 @@
 			],
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1364,7 +1369,8 @@
 			"id": "key_combination_slots",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}

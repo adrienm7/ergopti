@@ -28,7 +28,7 @@ failure even if later retries physically settle the same capability.
 
 The official public wrapper source and C backend were downloaded from the exact
 1.1.1 tag and are pinned in `official/sources.json`. The native runner composes
-reviewed provider helper `e5a90e628149d29ae93e5dba5675d45ad4e7a51cdea1c2221b11677e439c7c0f`
+reviewed provider helper `21b51cdc242e6c2b1d2b5270d6ef0ddafd65b7e4658d955addd9a9c36697696d`
 and unchanged owned-process helper
 `d3bc862c737e444f22d84fc32368bb8669360bc33ba6008c208f7bf62001314b`.
 It preserves the existing release-asset digest/size, archive census, bundle,

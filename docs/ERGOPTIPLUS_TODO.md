@@ -4227,8 +4227,9 @@ This deferral does not complete this item or the cross-cutting items16/38.
       physical keys through the same catalogue and invalidates its picker
       cache when the locale changes. The complete 182-entry native matrix,
       action IDs, press order and setter refusal boundaries stay unchanged;
-      the three script-management pairs remain hidden. Linux still has no
-      combination engine and retains the shared availability reason. The
+      the three script-management pairs remain hidden. Linux now provides
+      shared labelled ordered tap/hold pairs; simultaneous chords remain
+      unavailable under the existing translated platform reason. The
       real macOS provider regression covers all 21 locales; shared contracts
       also replay each driver's physical catalogue. Native CI qualification
       remains pending. Find which action left the French magic-key category
@@ -4416,8 +4417,25 @@ This deferral does not complete this item or the cross-cutting items16/38.
   owner and pass after final private currency checks. This first tranche supports ordered tap and hold pairs on one exact
   keyboard, with modifier restoration and source/retirement fences.
   Simultaneous chords, cross-device pairs, native-only caps_word and
-  one_shot_shift actions remain unavailable. Source publication, menu and
-  manifest admission are separate pending tranches. Native hosted input,
+  one_shot_shift actions remain unavailable. The ordered-pair menu and
+  generated manifest now admit the reviewed Linux configuration scope.
+  Its staged delivery fence prevents native output while any participant
+  can still refuse publication or retain inverse debt. Final route currency
+  is checked after pause observations. Reviewed controlled scope/owner
+  fixtures pass 50 scope and 49 pair-owner cases per Lua ABI; six actual
+  menu controls preserve the full 182-pair matrix through a bounded native
+  hold picker. The unchanged whole-tray ceiling is respected: 2,291 rows
+  instead of 8,297. Linux onboarding No explicitly disables its independent
+  pair owner even on a first run or while ordinary shortcuts are off;
+  existing tray choices survive Yes without a new import. Formatting and
+  all 360 JavaScript checks pass, portable macOS units pass 14,895/0 and
+  Linux E2E passes 189/0. The normal-JIT, uninstrumented composed Linux
+  suite passes 8,156/0 across 393 registered modules. Fixture-owned native
+  library caches survive suite restoration, and actual window-action tests
+  use scoped SDK admission rather than accidentally opening GTK headlessly.
+  Portable macOS E2E passes 101 cases with one native-host skip.
+  Global bulk clear/recommended composition
+  awaits the physical shortcut scope tranche. Native hosted input,
   packaging, installation and physical acceptance remain unqualified.
 
 Windows continuation for item93 (explicitly deferred to the maintainer's PC):
@@ -5034,6 +5052,29 @@ qualified. The Windows handoff now records nine actual program-action failures,
 two missing lifecycle/timer inventories and two unchanged OS-purity ratchets.
 These are explicit repair steps for the maintainer's PC, not completed scope.
 
+The Linux runner now admits each native close callback only after the same
+protected close attempt acknowledges submission. A rejected or raised attempt
+cannot borrow a callback from itself or a replacement attempt to retire the
+handle. All 36 prior lifecycle cases remain; 14 causal close-attempt controls
+pass on both Lua ABIs. Two actual POSIX/luv cases per ABI retain exit status 37,
+private discarded output, cancellation, absent original process group and exact
+callback/handle retirement. These controls qualify the Linux runner boundary,
+not automation discovery, native Windows behavior or installed application input.
+
+Native macOS run 37304571728 tests CI commit 9d89453278dd9455fd4cc3ddebbc732b988a029e
+and the exact feature tree at 7ae2f6e251d7cdadbdfc8ca1575c54e2a8f6395f.
+Owned-program Swift cases pass 14/0; signed Hammerspoon inventory passes 15/16,
+including actual_native_runtime. real_interpreter_symlink remains failed and
+the five shim cases remain unexecuted. A strict primary-receipt validator now
+prints only a closed six-field diagnostic summary before preserving each
+original verdict. Its Python controls pass 20/0; dependent notification and
+global-switcher controller controls pass 13/0 and 27/0. No source identity,
+private stream, fixture pathname or signed download URL is logged. The native
+interpreter cause is still unobserved until the next source-identical CI run.
+The complete Swift suite retains the two Brew/Sparkle failures; packaging and
+installation are unqualified. Apple Shortcuts still times out in catalogue
+retrieval and has no qualified invocation; item106 remains partial.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
@@ -5442,6 +5483,13 @@ delivery-guard omissions. All nine genuine native cases still require hosted
 execution on the final committed SHA. Constructor qualification does not prove
 user delivery/clicks or complete the remaining native panel-title boundaries.
 
+Native macOS run 37304571728 passes all nine actual notification-constructor
+caption controls and retires the exact owned native process. Native delivery
+and click callbacks remain unqualified. The source-pinned inventory now emits
+only validated closed diagnostic facts; its dependent controller still passes
+13 portable controls. This does not qualify the deferred Windows console
+caption or the remaining application panels.
+
 Windows continuation for item109 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
@@ -5531,6 +5579,14 @@ committed-candidate sources. CI owns a fresh temporary-fixture control runner;
 genuine native execution and product SyntheticInput broker integration remain
 unfinished. This probe does not implement the product global action or complete
 physical dual-display acceptance.
+
+Native macOS CI 37304571728 did not execute this probe: two portable wrapper
+controls expected lexical library paths, whereas the controller correctly uses
+the canonical source root (`/var` resolves to `/private/var` on the runner).
+The fixture now checks canonical library identities while retaining the exact
+literal owned output argument; an independent source-alias case covers the
+same boundary on Linux. No native permission or switch result is inferred from
+this preparatory failure. Native execution and product integration remain open.
 
 Windows continuation for item111 (explicitly deferred to the maintainer's PC):
 
