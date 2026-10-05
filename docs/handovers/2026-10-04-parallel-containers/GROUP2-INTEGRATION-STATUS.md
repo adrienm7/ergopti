@@ -1,19 +1,21 @@
 <!-- docs/handovers/2026-10-04-parallel-containers/GROUP2-INTEGRATION-STATUS.md -->
 
-# Group 2 integration checkpoint
+# Group 2 delivery and device continuation
 
-The hotstring source candidate is `0649967eae35cf9c3f368051ad8cbbc44dc15539`
+The hotstring source candidate is `d561cbf57b0084d3e82cb7a2ea6efc2c098c0096`
 on `feat/hotstrings`. It contains the shared/macOS/Linux implementation and
 prepared Windows sources for TODO 34/37/102/104/105. All five parent items remain
-partial; no item was removed. Items 16/38 remain byte-identical to the current
-`origin/dev` baseline `02ad69e06ecea424de11facf3dced404a6fdd602`.
+partial; no item was removed. Items 16/38 remain byte-identical to the latest adopted
+`origin/dev` baseline `3b4afeba128bdcf9fb1155754742792c95f250fc`.
 
 Windows-dependent implementation and qualification were explicitly deferred to
 the maintainer PC. Follow [the Windows continuation](GROUP2-WINDOWS-TODO.md);
 in particular, TODO 34 still needs the actual Windows custom terminator-record
-consumer/editor. Existing delimiter strings are not that implementation. Before integration,
-continue on the published feature source SHA above; the old dev baseline does
-not contain these features. After integration, qualify the actual integrated SHA.
+consumer/editor. Existing delimiter strings are not that implementation. The maintainer now explicitly requests advancing dev with all feasible container
+and CI work, documenting genuine remaining device/foreign-owner work and deleting
+the feature after integration. This permits delivery with reported native failures;
+it does not convert those failures into acceptance. After integration, qualify
+the actual dev source SHA. See [device and native continuation](GROUP2-DEVICE-TODO.md).
 
 ## Published corrections
 
@@ -26,6 +28,10 @@ not contain these features. After integration, qualify the actual integrated SHA
   strengthen the existing compiled-function budget guard on LuaJIT.
 - `0649967ea`: provision native LuaFileSystem before the Linux scripted daemon
   E2E harness, retaining every source/admission and assertion boundary.
+
+- `1cb339207`: merge the current dev, retaining all published Linux corrections.
+- `d561cbf57`: install actual audio translation catalogs and require observed native
+  notification urgency-rule receipts, with an independent wrong-rule rejection.
 
 ## Exact validation
 
@@ -67,28 +73,58 @@ Native package completion and installation were not qualified. Its Linux
 6,886/4 entry/CLI regression was causally fixed by c04072754 and the corrected
 hosted Linux unit suite passes 6,892/0.
 
+## Subsequent native prerequisite qualification
+
+The selected d561cbf57 gate passes formatting, all 359 JS checks, Linux units
+7,607/0, actual X11 source controls and actual libuv/curl streaming/retirement.
+The JS count includes the subsequently integrated Linux owner's additional gate.
+The unchanged native audio fixture passes six/zero on both LuaJIT and Lua 5.4
+with actual French/German PulseAudio catalogs, versus six/four without them.
+The Ubuntu runner now installs its two language packs. Original native GTK
+application operands pass four/four locally; no GTK assertion, deadline or source
+was changed. This does not explain the earlier intermittent hosted failure.
+
+The original notifications pass twelve/zero on actual Dunst 1.12.2. The corrected
+fixture preserves every vector and exact literal-text/application/timeout check;
+actual urgency rules classify native receipt categories independently of expected
+inputs, and history urgency is additionally checked when exported. Its actual
+wrong-rule negative control is rejected; all thirteen checks pass locally.
+Debian Dunst 1.9.0 lacks the required ClearHistory method, so its failed local
+probe does not qualify Ubuntu Dunst 1.9.2. Exact-source hosted confirmation is
+pending and must be recorded separately in the final delivery receipt.
+
 ## Required continuation
 
-- Keep native GTK, updater-validator, audio-locale and notification corrections
-  under their current owners. Obtain bounded reviewed fixes and native receipts;
-  preserve every existing assertion and refusal/retirement requirement.
-- Group 6 retains Homebrew/Sparkle archive acceptance. Its latest inspected run
-  [37263453529](https://github.com/adrienm7/ergopti/actions/runs/37263453529) at
-  `9a95d5ce4bb20179a1e01860c07eed1231eaf8b2` still fails those two methods:
-  309 Swift cases executed, six failure assertions/two unexpected. Those
-  unqualified archive patches have not been imported into this feature.
-- Fetch actual `origin/dev`, merge subsequent changes without losing owners,
-  and requalify affected final sources. Only final integration owns
-  `codex/ci-lock` plus `codex/ci-validation`; preparatory CI uses its own branch.
-- Reserve the final lock through an empty commit from the latest origin/dev
-  naming group, branch and candidate SHA, pushed without force. An existing
-  lock blocks reservation. Merge without squash/no-ff, immediately push dev,
-  cancel exact-SHA automatic workflows and let manual integrated CI finish.
-- Confirm all feature commits are in origin/dev and that required integrated
-  qualification passed before deleting only feat/hotstrings. Its owner alone
-  deletes the lock after terminal CI. No release is authorized by these tests.
+- Follow [the Windows continuation](GROUP2-WINDOWS-TODO.md) and
+  [the device/native continuation](GROUP2-DEVICE-TODO.md). Keep all five parent
+  items partial until their real remaining scope and acceptance passes.
+- The Linux native HTTP owner must preserve canonical E1 after an HTTP 503
+  carrying E2 on Curl 8.5, without overwriting a foreign winner or discarding
+  cleanup debt. The original six adversarial inputs/expectations remain intact.
+  Curl 8.14 passes six/zero locally; this does not fix older supported Curl.
+- Group 6 retains Homebrew/Sparkle archive acceptance. Latest inspected manual
+  run [37267530410](https://github.com/adrienm7/ergopti/actions/runs/37267530410)
+  at `4d026ba9abbc8449d68f8be932f21a7e9cac6c0b` still fails: 309 Swift cases,
+  sixteen failure assertions. The Homebrew confined positive receiver reports
+  target error -10004 with no nonce reply; this is not proven to be TCC or a
+  hotstring defect. Sparkle still fails native server retirement/deadline controls.
+  These unqualified foreign archive patches have not been imported here.
+- Fetch actual origin/dev and preserve subsequent owner corrections. Final
+  integration alone owns codex/ci-lock plus codex/ci-validation. Reserve the lock
+  with an empty commit from the newest dev naming group, branch and candidate.
+  Existing foreign ownership blocks reservation. Merge without squash/no-ff,
+  immediately push dev and cancel exact-SHA automatic workflows.
+- Let the manual integrated CI reach its terminal result, verify its actual
+  tested SHA and that Release/Publish is skipped, and record passes, failures,
+  skips and unexecuted work in the delivery receipt linked from
+  [coordination issue 86](https://github.com/adrienm7/ergopti/issues/86).
+  The latest maintainer instruction authorizes integration/deletion with genuine
+  native or device remainder documented; mandatory assertions remain unchanged.
+- Confirm every feature commit is in origin/dev before deleting only
+  feat/hotstrings. Its owner alone releases the lock after terminal CI.
 
-No final lock was acquired, no shared validation branch was moved, no dev
-merge/push occurred and the feature branch remains published. The original main index with 307 staged paths and unrelated working files were
-preserved. All prepared product corrections are committed; retained local evidence is supplementary
-and never substitutes for the missing native/Windows qualification.
+This document records the source/prerequisite checkpoint before final integration;
+the exact final dev merge and CI result are recorded in the linked coordination
+receipt and delivery report. The original main index with 307 staged paths and
+unrelated working files remains preserved. No parent TODO item is removed and
+no release is authorized by manual validation.
