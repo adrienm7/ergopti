@@ -53,7 +53,7 @@ local function remap_double(trace, enabled)
 	function remap.settings_pending() return false end
 	function remap.retry_settings_recovery() return true end
 	--- Settles the latest remap request.
-	function remap.settle(ok) return remap.terminals[#remap.terminals](ok, ok and "ready" or "refused") end
+	function remap.settle(ok) return remap.terminals[#remap.terminals](ok, ok and "ready" or "refused", 0, { status = "kept" }) end
 	return remap
 end
 
