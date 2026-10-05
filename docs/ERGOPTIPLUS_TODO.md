@@ -4313,9 +4313,18 @@ transport receipts remain native. Ninety-one focused shared/JS/Linux document
 controls pass; causal predecessors remain retained. The complete Linux suite
 passes 6,781 tests in 365 modules, and its E2E suite passes. Existing fixture
 assertions retain genuine managed initialization and protected module cleanup.
-The Versions browser scenario now runs mandatorily in shared CI on Chromium
-and WebKit; execution of that new browser step and physical GTK/WebKit,
-packaging and installation qualification remain pending. Item 62 stays partial.
+The mandatory Versions browser scenario passes on Chromium and WebKit in
+manual run 37309897244 at 055afc3f94377f119c8c1b589ef590b6d0295e11.
+That run exposes a native WebKit admission defect: LGI supplies is_loading as
+a Boolean property, while the new port called it as a method. The corrected
+port and property-shaped fixture pass eighteen independent admission controls;
+the old port fails twelve of those controls. Both native window fixtures now
+use the actual pause controller; model retries traverse the actual admitted
+page bridge and decode native responses. Original assertions and deadlines
+remain intact. Selected verification passes formatting, 361 JavaScript checks,
+Linux E2E and 7,934 Linux tests in 384 modules. These corrections still require
+actual GTK/WebKit CI execution; packaging and installation remain unqualified.
+Item 62 stays partial.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard

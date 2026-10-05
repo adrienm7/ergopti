@@ -36,7 +36,13 @@ function M.new(app_name, handler, state)
 	function WebKit.WebView(options)
 		local v={ucm=options.user_content_manager,uri="file:///",loading=false,results={},epoch=Manager.current_epoch(app_name)}
 		function v:get_uri() if c.on_uri then c.on_uri() end;return self.uri end
-		function v:is_loading() return self.loading end
+		-- Match LGI's property shape so a method call cannot pass this boundary.
+		setmetatable(v, { __index = function(self, key)
+			if key == "is_loading" then
+				if c.on_loading then c.on_loading() end
+				return self.loading
+			end
+		end })
 		function v:load_html(_,uri) self.uri=uri end
 		function v:run_javascript(code,_,done)
 			c.scripts[#c.scripts+1]={view=self,code=code}

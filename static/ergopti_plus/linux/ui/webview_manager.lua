@@ -882,7 +882,8 @@ function M._create_gtk_window(app_name, html, handler)
 							and document_entry.owner.refusal_current(record) == true
 					end)
 				end,
-				read_document = function() return webview:get_uri(), webview:is_loading() end,
+				-- LGI exposes WebKit's is-loading property as a boolean, not a callable.
+				read_document = function() return webview:get_uri(), webview.is_loading end,
 				nonce = webkit_host.native_nonce, deadline = Deadline.start,
 				read_nonce = function(done)
 					if not native_current() then return false end
