@@ -170,6 +170,17 @@ helpers.describe("updater release parser corpus — vector replay", function()
 	end
 
 	-- parse_asset_url vectors
+	helpers.it("parse_asset_url: refuses nonstring body and filename arguments", function()
+		local body = '{"assets":[{"name":"bundle.zip","browser_download_url":"https://example.invalid/bundle.zip"}]}'
+		for _, value in ipairs({ false, true, 1, {}, function() end }) do
+			helpers.assert_eq(P.parse_asset_url(value, "bundle.zip"), "", "body must be a JSON string")
+			helpers.assert_eq(P.parse_asset_url(body, value), "", "filename must be a string")
+		end
+		helpers.assert_eq(P.parse_asset_url(nil, "bundle.zip"), "")
+		helpers.assert_eq(P.parse_asset_url(body, nil), "")
+		helpers.assert_eq(P.parse_asset_url(body, ""), "")
+	end)
+
 	for _, vec in ipairs(by_cat["parse_asset_url"] or {}) do
 		helpers.it("parse_asset_url: " .. vec.id, function()
 			helpers.assert_eq(dispatch(P, vec), vec.expected,

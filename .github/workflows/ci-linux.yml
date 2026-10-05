@@ -375,6 +375,14 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_http_empty_headers.py
         timeout-minutes: 1
 
+      - name: Preserve asset identity in native release metadata
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_asset_metadata.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_asset_metadata.py
+        timeout-minutes: 1
+
       - name: Reject interrupted conditional release responses before cache reuse
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
