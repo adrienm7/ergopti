@@ -2280,6 +2280,29 @@ These are software implementations; final hardware verification remains below.
   collector, Reader, shared helper, raw event, timing, schema, configuration,
   menu, reserved implementation or foreign driver change.
 
+- [~] **L141.** Linux live ngram source projection: use the delivered shared
+  source-membership predicate and subtract each source's own flushed snapshot
+  before summing its positive pending contribution into the other bucket.
+  Preserve logical, hotstring and LLM deltas, raw events, flush receipts, timing,
+  producer admission and persistence. Public software output, real private
+  SQLite and range/dashboard requests reproduce seven failures among fifteen
+  before, then all pass after on LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. Known-source/manual controls remain healthy; repeated reads
+  retain exact pending counts without flushing the durable database. Twelve
+  additive registered units reproduce seven failures before and pass after;
+  preserve the complete old31208-byte owner and all45 old subjects. The root
+  complete owner explicitly requires57 subjects and passes on all three
+  profiles. Caller-supplied API timestamps are software inputs; no mocked clock
+  or physical clipboard/input validation is claimed. The shared predicate owns
+  label membership; native source maps/deltas remain the Linux implementation.
+  Foreign source inspection establishes supported string taxonomy only, without
+  native Windows/macOS validation. The separate delivered Writer conflict fix
+  retains persisted labels; this slice covers pending projection. Register the
+  future CI commands without launching workflows. Preserve both language packs
+  and principal notification/HTTP assertions. No Writer, Reader, input hook,
+  schema, source-count admission, session cursor, configuration, menu, foreign
+  driver or reserved implementation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

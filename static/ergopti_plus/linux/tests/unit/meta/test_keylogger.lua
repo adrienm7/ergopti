@@ -629,3 +629,65 @@ helpers.describe("manual-marker-chars", function()
     helpers.assert_eq(keylogger.get_app_stats()["owned-direct"].typing_time_ms, 200)
   end)
 end)
+
+helpers.describe("live-source-projection", function()
+	local function fresh_live()
+		keylogger.init({ sqlite_path = fresh_db() })
+		require("tests.support.metrics_consent_fixture").enable(keylogger)
+		keylogger.reset_session()
+	end
+	local function assert_tuple(payload, app, count, hs, llm, other)
+		local item = payload.today[app].c.a
+		helpers.assert_eq(item.c, count, "literal logical character count")
+		helpers.assert_eq(item.hs, hs, "dedicated hotstring source count")
+		helpers.assert_eq(item.llm, llm, "dedicated LLM source count")
+		helpers.assert_eq(item.o, other, "additional synthetic source count")
+	end
+	local vectors = {
+		{ name = "clipboard", label = "clipboard", hs = 0, llm = 0, other = 2 },
+		{ name = "action", label = "action", hs = 0, llm = 0, other = 2 },
+		{ name = "empty string", label = "", hs = 0, llm = 0, other = 2 },
+		{ name = "case-sensitive label", label = "None", hs = 0, llm = 0, other = 2 },
+		{ name = "hotstring", label = "hotstring", hs = 2, llm = 0, other = 0 },
+		{ name = "llm", label = "llm", hs = 0, llm = 2, other = 0 },
+		{ name = "other", label = "other", hs = 0, llm = 0, other = 2 },
+		{ name = "manual marker", label = "none", hs = 0, llm = 0, other = 0 },
+	}
+	for _, vector in ipairs(vectors) do
+		it("live-source-projection: public pending " .. vector.name, function()
+			fresh_live()
+			keylogger.record_synthetic_output("owned-live", "aa", vector.label, 1000)
+			assert_tuple(keylogger.get_range_payload(), "owned-live", 2, vector.hs, vector.llm, vector.other)
+		end)
+	end
+	it("live-source-projection: software manual input keeps all generated buckets zero", function()
+		fresh_live()
+		keylogger.on_keydown("a", 1000, "owned-live")
+		keylogger.on_keydown("a", 1100, "owned-live")
+		assert_tuple(keylogger.get_range_payload(), "owned-live", 2, 0, 0, 0)
+	end)
+	it("live-source-projection: repeated projections do not consume or duplicate pending labels", function()
+		fresh_live()
+		keylogger.record_synthetic_output("owned-live", "aa", "clipboard", 1000)
+		keylogger.record_synthetic_output("owned-live", "aaa", "action", 1100)
+		keylogger.record_synthetic_output("owned-live", "a", "hotstring", 1200)
+		keylogger.record_synthetic_output("owned-live", "a", "llm", 1300)
+		for _ = 1, 3 do assert_tuple(keylogger.get_range_payload(), "owned-live", 7, 1, 1, 5) end
+	end)
+	it("live-source-projection: dashboard prefetch uses the same additional label policy", function()
+		fresh_live()
+		keylogger.record_synthetic_output("owned-live", "aa", "clipboard", 1000)
+		local dashboard = keylogger.get_dashboard_payload()
+		helpers.assert_eq(dashboard.driver_meta.os, "linux")
+		assert_tuple(dashboard._prefetch_data, "owned-live", 2, 0, 0, 2)
+	end)
+	it("live-source-projection: flushed other snapshot is not included in the pending source delta", function()
+		fresh_live()
+		keylogger.record_synthetic_output("owned-live", "aa", "other", 1000)
+		keylogger.flush()
+		assert_tuple(keylogger.get_range_payload(), "owned-live", 2, 0, 0, 2)
+		keylogger.record_synthetic_output("owned-live", "aa", "other", 1100)
+		keylogger.record_synthetic_output("owned-live", "aaa", "action", 1200)
+		for _ = 1, 3 do assert_tuple(keylogger.get_range_payload(), "owned-live", 7, 0, 0, 7) end
+	end)
+end)
