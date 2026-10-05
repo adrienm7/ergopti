@@ -3461,6 +3461,20 @@ is retained, and its exact correction is independently reviewed. Actual hosted
 transport cause remains unknown; native Swift and full producer compilation
 must be rerun. This diagnostic does not activate capture or complete TODO31.
 
+Native observation qualification now has additive hosted XCTest fixtures for
+the actual pinned Hammerspoon C getter and conservative native posture samples.
+The clock controller reuses the existing exact process owner and unchanged
+SDK30/35/10 budgets, verifies signed official runtime acquisition, and brackets
+its real samples with independent parent Mach reads. Portable46 controls pass
+in normal/optimized discovery; six independent controls and19 exact rejected
+mutations are retained. The five posture tests preserve39 frozen assertions and
+use typed session/registry facts and public display accessors. Private console
+keys remain version-qualified diagnostics; missing or contradictory facts stay
+unknown, including initial system_awake. Neither fixture grants historical
+clock, wall, privacy or capture authority. Actual Swift compilation, runtime
+acquisition, C getter, native posture and posture fault controls remain
+unexecuted until targeted macOS CI; TODO31 is still partial.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
