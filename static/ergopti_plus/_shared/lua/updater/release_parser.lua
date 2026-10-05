@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: GitHub Release JSON Parser (Shared)
 --- DESCRIPTION:
---- Pure functions for parsing GitHub Releases API JSON payloads. Assets and
---- notes use the shared JSON decoder to preserve metadata boundaries. Extracted
+--- Pure functions for parsing GitHub Releases API JSON payloads. Tags, assets
+--- and notes use the shared JSON decoder to preserve metadata boundaries. Extracted
 --- from macos/infra/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
 --- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
@@ -31,12 +31,16 @@ local M = {}
 -- ==========================================
 -- ==========================================
 
---- Extracts the "tag_name" field from a GitHub release JSON string.
---- @param body string Raw JSON (single object or array wrapper)
+--- Extracts the selected release's own "tag_name" without reading nested fields.
+--- An array wrapper selects its first release, preserving publication order.
+--- @param body string Raw JSON (single object or array wrapper).
 --- @return string tag or ""
 function M.parse_tag(body)
-	if not body or body == "" then return "" end
-	return body:match('"tag_name"%s*:%s*"([^"]+)"') or ""
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" then return "" end
+	if type(release[1]) == "table" then release = release[1] end
+	return type(release.tag_name) == "string" and release.tag_name or ""
 end
 
 

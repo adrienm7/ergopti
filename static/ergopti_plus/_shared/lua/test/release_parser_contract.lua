@@ -1,11 +1,12 @@
 --- _shared/lua/test/release_parser_contract.lua
 
 --- ==============================================================================
---- MODULE: Shared Lua Release Notes Contract
+--- MODULE: Shared Lua Release Metadata Contract
 --- DESCRIPTION:
---- Pins selected-object field lookup and the Lua parser's established CR removal.
---- Windows retains separate historical wrapper/CR behavior; universal JSON
---- string escapes remain in the cross-driver release-parser corpus.
+--- Pins selected-object metadata, tag-wrapper order and established CR removal.
+--- Windows still scans raw tag fields and has historical notes wrapper/CR
+--- differences. Universal notes escapes remain in the cross-driver corpus;
+--- this owner pins the Lua metadata contract without hiding those differences.
 --- ==============================================================================
 
 local M = {}
@@ -62,6 +63,69 @@ local NOTES = {
 	},
 }
 
+local TAGS = {
+	{ id = "escaped_digit",
+		body = "{\"tag_name\":\"v\\u0031.2.0\"}",
+		expected = "v1.2.0" },
+	{ id = "escaped_prefix",
+		body = "{\"tag_name\":\"\\u0076\\u0031.2.0\"}",
+		expected = "v1.2.0" },
+	{ id = "escaped_key",
+		body = "{\"tag_\\u006eame\":\"v1.2.0\"}",
+		expected = "v1.2.0" },
+	{ id = "nested_tag_not_release",
+		body = "{\"author\":{\"tag_name\":\"v9.9.9\"},\"tag_name\":\"v1.2.0\"}",
+		expected = "v1.2.0" },
+	{ id = "nested_only",
+		body = "{\"author\":{\"tag_name\":\"v9.9.9\"}}",
+		expected = "" },
+	{ id = "single_wrapper",
+		body = "[{\"tag_name\":\"v1.2.0\"}]",
+		expected = "v1.2.0" },
+	{ id = "multi_wrapper_first_entry",
+		body = "[{\"tag_name\":\"v1.2.0\"},{\"tag_name\":\"v9.9.9\"}]",
+		expected = "v1.2.0" },
+	{ id = "wrapper_missing_first_tag",
+		body = "[{},{\"tag_name\":\"v9.9.9\"}]",
+		expected = "" },
+	{ id = "wrapper_nonstring_first_tag",
+		body = "[{\"tag_name\":123},{\"tag_name\":\"v9.9.9\"}]",
+		expected = "" },
+	{ id = "wrapper_nonobject_first",
+		body = "[false,{\"tag_name\":\"v9.9.9\"}]",
+		expected = "" },
+	{ id = "wrapper_null_first",
+		body = "[null,{\"tag_name\":\"v9.9.9\"}]",
+		expected = "" },
+	{ id = "wrapper_nested_first",
+		body = "[{\"author\":{\"tag_name\":\"v9.9.9\"}},{\"tag_name\":\"v2.0.0\"}]",
+		expected = "" },
+	{ id = "malformed_trailing",
+		body = "{\"tag_name\":\"v1.2.0\"} trailing",
+		expected = "" },
+	{ id = "number_field",
+		body = "{\"tag_name\":123}",
+		expected = "" },
+	{ id = "boolean_field",
+		body = "{\"tag_name\":true}",
+		expected = "" },
+	{ id = "object_field",
+		body = "{\"tag_name\":{\"tag_name\":\"v9.9.9\"}}",
+		expected = "" },
+	{ id = "empty_wrapper",
+		body = "[]",
+		expected = "" },
+	{ id = "null_release",
+		body = "null",
+		expected = "" },
+	{ id = "literal_whitespace_retained",
+		body = "{\"tag_name\":\" v1.2.0 \"}",
+		expected = " v1.2.0 " },
+	{ id = "unicode_identity",
+		body = "{\"tag_name\":\"\\u03b1\"}",
+		expected = "α" },
+}
+
 --- Registers the shared Lua object and normalization contract in a driver suite.
 --- @param helpers table Case registration and assertions.
 --- @param Parser table Actual shared release parser under test.
@@ -79,6 +143,22 @@ function M.run(helpers, Parser)
 		for _, row in ipairs(NOTES) do
 			helpers.it("parse_notes: " .. row.id, function()
 				helpers.assert_eq(Parser.parse_notes(row.body), row.expected, row.id)
+			end)
+		end
+	end)
+	helpers.describe("shared Lua release tag contract", function()
+		helpers.it("parse_tag: refuses nonstring input without changing version validation", function()
+			helpers.assert_eq(#TAGS, 20, "every selected-tag and wrapper vector is retained")
+			for _, value in ipairs({ false, true, 1, {}, function() end }) do
+				helpers.assert_eq(Parser.parse_tag(value), "", "release JSON must be a string")
+			end
+			helpers.assert_eq(Parser.parse_tag(nil), "")
+			helpers.assert_eq(Parser.parse_tag(""), "")
+			helpers.assert_eq(select("#", Parser.parse_tag('{"tag_name":"v1.2.0"}')), 1)
+		end)
+		for _, row in ipairs(TAGS) do
+			helpers.it("parse_tag: " .. row.id, function()
+				helpers.assert_eq(Parser.parse_tag(row.body), row.expected, row.id)
 			end)
 		end
 	end)
