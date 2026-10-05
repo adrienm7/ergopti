@@ -2028,6 +2028,11 @@ publication/rollback owners in code before device acceptance. On Windows,
 replay fresh/existing/moved folder recommendation and clear with exact backups,
 strict external-write refusal, restart and actual input; retain items 16/38.
 
+The reviewed compensation tranche retains native Linux scope claims and
+acknowledged participant receipts through rollback and finalization retries.
+Portable native and shared contracts pass. Direct Script participation and
+physical-device acceptance remain open; this does not complete global reset.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the

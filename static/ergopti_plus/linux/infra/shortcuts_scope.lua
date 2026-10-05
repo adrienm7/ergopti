@@ -4,6 +4,7 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Transaction = require("config_scope_transaction")
+local FencedTransaction = require("config_scope_fenced_transaction")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
@@ -38,7 +39,7 @@ function M.new(options)
 	local parameters = options.parameters or require("modules.gestures.manager")
 	local url = options.url or require("modules.shortcuts.chatgpt")
 	local files = options.files or require("adapters.file_system")
-	local owner, held, source, document, legacy = {}, {}, nil, nil, nil
+	local owner, source, document, legacy = {}, nil, nil, nil
 	local ports = {
 		{ acquire = manager.acquire_configuration, release = manager.release_configuration },
 		{ acquire = parameters.acquire_parameter_configuration, release = parameters.release_parameter_configuration },
@@ -47,12 +48,6 @@ function M.new(options)
 		{ acquire = taps.acquire_configuration, release = taps.release_configuration },
 		{ acquire = chords.acquire_configuration, release = chords.release_configuration },
 	}
-	local function release()
-		for index = #held, 1, -1 do
-			assert(held[index].release(owner) == true, "shortcut configuration release refused")
-			held[index] = nil
-		end
-	end
 	local function domain(binding)
 		return keyboard.configuration_domain(binding) or taps.configuration_domain(binding)
 			or chords.configuration_domain(binding)
@@ -151,39 +146,10 @@ function M.new(options)
 			return apply_state(candidate)
 		end,
 	})
-	function owner.pending() return transaction.pending() end
-	function owner.apply(mode)
-		if #held > 0 or (mode ~= "clear" and mode ~= "recommended") or options.is_paused() then return false end
-		for _, port in ipairs(ports) do
-			local called, acquired = pcall(port.acquire, owner)
-			if not called or acquired ~= true then release(); return false, "shortcut configuration is already owned" end
-			held[#held + 1] = port
-		end
-		-- Dispatch acquisition cancels queued work irreversibly. Compensation
-		-- restores preferences after that point and never replays user actions.
-		local committed, detail = transaction.apply("shortcuts", mode)
-		if not transaction.pending() then release() end
-		return committed, detail
-	end
-	function owner.retry_restore()
-		if transaction.retry_restore() ~= true then return false end
-		if #held > 0 then release() end
-		return true
-	end
-	--- Undoes the last commit under the same dispatch ownership as apply().
-	function owner.revert()
-		if #held > 0 or options.is_paused() then return false, "shortcut configuration is already owned" end
-		for _, port in ipairs(ports) do
-			local called, acquired = pcall(port.acquire, owner)
-			if not called or acquired ~= true then release(); return false, "shortcut configuration is already owned" end
-			held[#held + 1] = port
-		end
-		local reverted, detail = transaction.revert()
-		if not transaction.pending() then release() end
-		return reverted, detail
-	end
-	function owner.release() transaction.release() end
-	return owner
+	-- Acquisition cancels queued dispatch irreversibly. The shared journal
+	-- restores only preferences and retains refused native release claims.
+	return FencedTransaction.new({ owner = owner, transaction = transaction, scope = "shortcuts", fences = ports,
+		available = function() return not options.is_paused() end })
 end
 
 --- Applies a menu request while retaining any refused runtime compensation.
