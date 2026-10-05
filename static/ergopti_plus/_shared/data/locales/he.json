@@ -1780,6 +1780,8 @@
 	"mlx.use_ollama": "השתמש ב-Ollama",
 	"mlx.machine_intel": "מעבד Intel",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "לא ניתן היה להכין את Ollama המקומי. בדקו את היומן ונסו שוב.",
+	"ollama.runtime_start": "הפעלת Ollama",
 	"python.not_native_title": "אין Python עבור מק זה",
 	"python.not_native_body": "פעולה זו דורשת Python 3 שנבנה עבור {1}. גרסאות ה-Python המותקנות במק זה נבנו רק עבור מעבד אחר, ו-macOS היה מריץ אותן דרך Rosetta, שהתמיכה בו מסתיימת:\n{2}",
 	"python.missing_title": "Python 3 חסר",

@@ -15,12 +15,15 @@ local HttpClient = require("adapters.http_client")
 local Json = require("json")
 local Logger = require("logger.shim")
 local DownloadWindow = require("ui.download_window.bridge")
+local WindowSessionId, RetireWindow, CompleteWindow = DownloadWindow.session_id, DownloadWindow.retire, DownloadWindow.complete
 
 local LOG = "modules.llm.model_download"
 local OWNER = "ollama_model_pull"
 local MODEL_PULL_TIMEOUT_MS = 24 * 60 * 60 * 1000
 
 local _active = nil
+-- Retain the exact creator/transport after logical progress has completed.
+local _retained = nil
 local _retry_request = nil
 local _attempt_serial = 0
 
@@ -34,13 +37,45 @@ local function valid_tag(tag)
 		and tag:match("^[%w%._%-%/:]+$") ~= nil
 end
 
+--- Observes actual physical retirement, never a legacy cancellation signal.
+--- @param request table
+--- @return boolean
+local function settled(request)
+	if request.creating or request.acquiring or request.unknown then return false end
+	if not request.operation then return true end
+	local ok, value = pcall(request.settled, request.operation)
+	return ok and value == true
+end
+
+--- Ends every source callback with exact private request/attempt guards.
+--- @param request table
+--- @param attempt integer|nil
+--- @return boolean
+local function current(request, attempt)
+	local allowed = true
+	if request.admission ~= nil then
+		if type(request.admission) ~= "function" then return false end
+		local ok, value = pcall(request.admission)
+		allowed = ok and value == true
+	end
+	return allowed and _retained == request and not request.cancelled
+		and (attempt == nil or request.attempt == attempt)
+end
+
 local function finish(request, attempt, succeeded, message, failure_receipt)
-	if _active ~= request or request.terminal or request.attempt ~= attempt then return end
+	if not current(request, attempt) then
+		if _active == request and _retained == request and request.attempt == attempt and not request.terminal then
+			request.cancelled, request.shutting_down = true, true
+			M.cancel(request)
+		end
+		return
+	end
+	if _active ~= request or request.terminal then return end
 	request.terminal = true
 	_active = nil
 	_retry_request = not succeeded and request or nil
 	DownloadWindow.complete(request.session_id, succeeded, message, failure_receipt)
-	if type(request.on_done) == "function" then
+	if current(request, attempt) and type(request.on_done) == "function" then
 		local ok, err = pcall(request.on_done, succeeded, request.tag)
 		if not ok then Logger.error(LOG, "Model-download completion callback raised: %s", tostring(err)) end
 	end
@@ -62,6 +97,7 @@ local function consume_line(request, line)
 	local total = tonumber(message.total)
 	local percentage = nil
 	if completed and total and total > 0 then percentage = completed * 100 / total end
+	if not current(request, request.attempt) or _active ~= request then return end
 	DownloadWindow.update(request.session_id, percentage,
 		translated("ollama.downloading"), type(message.status) == "string" and message.status or nil)
 end
@@ -69,6 +105,7 @@ end
 local function consume_chunk(request, chunk, flush)
 	request.pending = request.pending .. (type(chunk) == "string" and chunk or "")
 	while true do
+		if request.cancelled or _active ~= request then return end
 		local line, rest = request.pending:match("^([^\r\n]*)\r?\n(.*)$")
 		if not line then break end
 		request.pending = rest
@@ -81,46 +118,71 @@ local function consume_chunk(request, chunk, flush)
 end
 
 local function dispatch(request)
+	if not settled(request) or request.cancelled or _retained ~= request then return false end
+	request.acquiring = true
+	request.operation, request.retire, request.settled = nil, nil, nil
 	_attempt_serial = _attempt_serial + 1
 	local attempt = _attempt_serial
 	request.attempt = attempt
-	_active = request
+	_active, _retained = request, request
 	local url = HttpBridge.ollama_endpoint(request.base_url, "pull")
 	local ok_body, body = pcall(Json.encode, { name = request.tag, stream = true })
 	if not url or not ok_body or type(body) ~= "string" then
+		request.acquiring = false
 		finish(request, attempt, false, translated("menu.llm.download_failed"))
 		return false
 	end
-	if type(request.admission) == "function" then
-		local ok, allowed = pcall(request.admission)
-		if not ok or allowed ~= true then
-			finish(request, attempt, false, translated("menu.llm.download_failed"))
-			return false
-		end
+	if not current(request, attempt) or _active ~= request or request.terminal then
+		request.acquiring = false
+		request.cancelled, request.shutting_down = true, true
+		M.cancel(request)
+		return false
 	end
-	-- Consent checks may synchronously retire or replace this native owner.
-	if _active ~= request or request.terminal or request.cancelled or request.attempt ~= attempt then return false end
-	local dispatched = HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, body, {
-		owner = OWNER,
-		timeout_ms = MODEL_PULL_TIMEOUT_MS,
-	}, function(chunk)
-		if _active ~= request or request.terminal or request.attempt ~= attempt then return end
-		consume_chunk(request, chunk, false)
-	end, function(result)
-		if _active ~= request or request.terminal or request.attempt ~= attempt then return end
-		consume_chunk(request, "", true)
-		local succeeded = type(result) == "table" and result.ok == true
-			and request.saw_success == true and request.remote_error == nil
-		finish(request, attempt, succeeded, succeeded and translated("download_window.done_success")
-			or translated("menu.llm.download_failed"),
-			type(result) == "table" and result.ok ~= true and result.failure_receipt or nil)
+	local called, operation = pcall(HttpClient.post_stream_owned,
+		url, { ["Content-Type"] = "application/json" }, body, {
+			owner = OWNER, timeout_ms = MODEL_PULL_TIMEOUT_MS,
+			authorized = function()
+				return current(request, attempt) and _active == request and not request.terminal
+			end,
+		}, function(chunk)
+			if not current(request, attempt) or _active ~= request or request.terminal then return end
+			consume_chunk(request, chunk, false)
+		end, function(result)
+			if not current(request, attempt) or _active ~= request or request.terminal then return end
+			consume_chunk(request, "", true)
+			local succeeded = type(result) == "table" and result.ok == true
+				and request.saw_success == true and request.remote_error == nil
+			finish(request, attempt, succeeded, succeeded and translated("download_window.done_success")
+				or translated("menu.llm.download_failed"),
+				type(result) == "table" and result.ok ~= true and result.failure_receipt or nil)
+		end)
+	request.acquiring = false
+	if not called or type(operation) ~= "table" or type(operation.cancel) ~= "function"
+		or type(operation.is_settled) ~= "function" or type(operation.on_settled) ~= "function"
+		or type(operation.started) ~= "boolean" then
+		request.cancelled, request.unknown = true, true
+		return false
+	end
+	request.operation, request.retire, request.settled = operation, operation.cancel, operation.is_settled
+	local notify = operation.on_settled
+	notify(operation, function()
+		if _retained ~= request or request.attempt ~= attempt or request.cancelling then return end
+		local allowed = current(request, attempt)
+		if _retained ~= request or request.attempt ~= attempt then return end
+		if not allowed or request.cancelled then
+			request.cancelled, request.shutting_down = true, true
+			M.cancel(request)
+		end
 	end)
-	if dispatched ~= true and _active == request and request.attempt == attempt then
-		finish(request, attempt, false, translated("menu.llm.download_failed"))
+	if request.cancelled then M.cancel(request); return false end
+	if operation.started ~= true then
+		if current(request, attempt) then
+			finish(request, attempt, false, translated("menu.llm.download_failed"))
+		end
 		return false
 	end
 	Logger.info(LOG, "Ollama model pull started for '%s'.", request.tag)
-	return dispatched == true
+	return true
 end
 
 --- Starts one model pull and its progress window.
@@ -132,9 +194,11 @@ end
 --- @return boolean
 function M.start(base_url, tag, label, on_done, admission)
 	if _active then
+		if _active.creating or _active.acquiring or _active.cancelled then return false end
 		if _active.tag == tag then return DownloadWindow.focus(_active.session_id) end
 		return false
 	end
+	if _retained and not settled(_retained) then return false end
 	if type(base_url) ~= "string" or base_url == "" or not valid_tag(tag)
 			or type(label) ~= "string" or label == "" then
 		return false
@@ -148,52 +212,102 @@ function M.start(base_url, tag, label, on_done, admission)
 		pending = "",
 		remote_error = nil,
 		saw_success = false,
-		terminal = false,
+		terminal = false, creating = true,
 	}
-	_retry_request = nil
-	request.session_id = DownloadWindow.show({
+	_active, _retained, _retry_request = request, request, nil
+	local shown, session = pcall(DownloadWindow.show, {
 		kind = "ollama_model",
 		label = label,
 		on_cancel = function() return M.cancel(request) end,
 		on_retry = function() return M.retry(request) end,
 		is_current = function()
-			return not request.cancelled and (_active == request or _retry_request == request)
-				and request.session_id == DownloadWindow.session_id()
+			local session_id = DownloadWindow.session_id()
+			return current(request) and (_active == request or _retry_request == request)
+				and request.session_id == session_id
 		end,
+		classify_failure = function() return not request.cancelled and current(request) end,
 		can_retry = function()
 			if _active or _retry_request ~= request or request.cancelled
 				or request.session_id ~= DownloadWindow.session_id() then return false end
-			if type(request.admission) ~= "function" then return true end
-			local ok, allowed = pcall(request.admission)
-			return ok and allowed == true
+			return current(request) and _active == nil and _retry_request == request
 		end,
 	})
-	if not request.session_id then return false end
-	_active = request
+	request.creating = false
+	if not shown then request.cancelled, request.unknown = true, true; return false end
+	request.session_id = session
+	if request.cancelled then M.shutdown(); return false end
+	if not session then
+		if _active == request then _active = nil end
+		if _retained == request then _retained = nil end
+		return false
+	end
 	return dispatch(request)
 end
 
 --- Cancels the exact owned curl process group.
 --- @return boolean
 function M.cancel(expected)
-	local request = _active
+	local request = _active or _retained or _retry_request
 	if expected ~= nil and request ~= expected then return false end
 	if not request then return true end
-	if HttpClient.cancel(OWNER) ~= true then return false end
-	_attempt_serial = _attempt_serial + 1
-	request.attempt = _attempt_serial
-	request.terminal = true
 	request.cancelled = true
-	_active = nil
-	_retry_request = nil
+	if request.creating or request.acquiring or request.unknown or request.ui_completing or request.cancelling then return false end
+	if request.operation then
+		-- A synchronous settlement belongs to this executing cancel claim; the
+		-- caller still owns immediate cancellation presentation until it returns.
+		request.cancelling = true
+		local called = pcall(request.retire, request.operation)
+		request.cancelling = false
+		if not called or not settled(request) then return false end
+	end
+	if request.shutting_down and request.session_id and not request.ui_retired then
+		local observed, session_id = pcall(WindowSessionId)
+		if not observed or (session_id ~= nil and (type(session_id) ~= "number"
+			or session_id <= 0 or session_id % 1 ~= 0)) then return false end
+		if _retained ~= request and _active ~= request and _retry_request ~= request then return false end
+		if session_id == request.session_id and not request.terminal and not request.ui_cancelled then
+			-- Cancellation presentation is cleanup of this known namespace, never
+			-- a stale server result, retry receipt or model-selection callback.
+			request.ui_completing = true
+			local named, message = pcall(translated, "ollama.download_cancelled")
+			local same, live = pcall(WindowSessionId)
+			if not named or not same or (_retained ~= request and _active ~= request and _retry_request ~= request)
+				or live ~= request.session_id then request.ui_completing = false; return false end
+			local called, completed = pcall(CompleteWindow, request.session_id, false, message)
+			local read, now = pcall(WindowSessionId)
+			request.ui_completing = false
+			if not read or (now ~= nil and (type(now) ~= "number" or now <= 0 or now % 1 ~= 0))
+				or (_retained ~= request and _active ~= request and _retry_request ~= request) then return false end
+			if now == request.session_id and (not called or completed ~= true) then return false end
+			request.ui_cancelled = true
+			session_id = now
+		end
+		if session_id == request.session_id then
+			request.ui_completing = true
+			local ok, retired = pcall(RetireWindow, request.session_id)
+			local read, now = pcall(WindowSessionId)
+			request.ui_completing = false
+			if not read or (now ~= nil and (type(now) ~= "number" or now <= 0 or now % 1 ~= 0))
+				or (_retained ~= request and _active ~= request and _retry_request ~= request) then return false end
+			if now == request.session_id and (not ok or retired ~= true) then return false end
+		end
+		-- A successfully observed absent/new serial proves this old namespace gone.
+		-- Never send retirement to a different session or treat read failure as absence.
+		request.ui_retired = true
+	end
+	if not settled(request) then return false end
+	request.terminal = true
+	if _active == request then _active = nil end
+	if _retry_request == request then _retry_request = nil end
+	if _retained == request then _retained = nil end
 	Logger.info(LOG, "Ollama model pull cancelled for '%s'.", request.tag)
-	return true
+	return _active == nil and _retained == nil and _retry_request == nil
 end
 
 --- Re-dispatches the last failed request in the same progress session.
 --- @return boolean
 function M.retry(expected)
-	if _active then return false end
+	if _active or (_retained and not settled(_retained)) then return false end
 	local session_id = DownloadWindow.session_id()
 	if not session_id then return false end
 	-- The retry callback is retained by DownloadWindow inside the old request's
@@ -222,14 +336,10 @@ end
 
 --- Stops transport before daemon shutdown.
 function M.shutdown()
-	local request = _active or _retry_request
+	local request = _active or _retained or _retry_request
+	if request then request.shutting_down = true end
 	if M.cancel() ~= true then return false end
-	_retry_request = nil
-	if request then
-		request.cancelled = true
-		if type(DownloadWindow.retire) == "function" then DownloadWindow.retire(request.session_id) end
-	end
-	return true
+	return _active == nil and _retained == nil and _retry_request == nil
 end
 
 return M

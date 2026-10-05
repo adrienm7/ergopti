@@ -122,6 +122,62 @@ jobs:
         run: lua5.4 tests/e2e/run_e2e.lua
         timeout-minutes: 5
 
+  tooltip-canvas:
+    name: 'Native tooltip canvas · 12 captures'
+    needs: e2e-hs
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prepare independent pixel observer
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tooltip-provisioning"
+          python3 -m pip install Pillow==11.3.0
+          node tools/test/run-macos-tooltip-canvas-tests.cjs
+      - name: Acquire the pinned official Hammerspoon runtime
+        run: |
+          set -euo pipefail
+          version=$(sed -nE 's/^HAMMERSPOON_VERSION="\$\{HAMMERSPOON_VERSION:-([^}]+)\}"$/\1/p' tools/build/build_macos_app.sh)
+          test "$version" = 1.1.1
+          url="https://github.com/Hammerspoon/hammerspoon/releases/download/$version/Hammerspoon-$version.zip"
+          archive="$RUNNER_TEMP/tooltip-provisioning/Hammerspoon-$version.zip"
+          printf '%s\n' "$url" > "$RUNNER_TEMP/tooltip-provisioning/origin-url.txt"
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 2 --max-time 120 -o "$archive" "$url"
+          # Existing qualified pin from hs274-native.yml/macos-release-launch.yml.
+          printf '%s  %s\n' 11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa "$archive" | shasum -a 256 --check
+          shasum -a 256 "$archive" > "$RUNNER_TEMP/tooltip-provisioning/archive.sha256"
+          ditto -x -k "$archive" "$RUNNER_TEMP/tooltip-hammerspoon"
+          app="$RUNNER_TEMP/tooltip-hammerspoon/Hammerspoon.app"
+          codesign --verify --strict --deep "$app" > "$RUNNER_TEMP/tooltip-provisioning/codesign-verify.stdout" 2> "$RUNNER_TEMP/tooltip-provisioning/codesign-verify.stderr"
+          codesign --display --verbose=4 "$app" > "$RUNNER_TEMP/tooltip-provisioning/codesign-signer.stdout" 2> "$RUNNER_TEMP/tooltip-provisioning/codesign-signer.stderr"
+          # Actual Gatekeeper policy refusal fails. This records its assessment,
+          # while the independently pinned official archive binds selected bytes.
+          spctl --assess --type execute --verbose=4 "$app" > "$RUNNER_TEMP/tooltip-provisioning/gatekeeper.stdout" 2> "$RUNNER_TEMP/tooltip-provisioning/gatekeeper.stderr"
+      - name: Observe actual production canvas pixels and retire its native owner
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > "$RUNNER_TEMP/tooltip-provisioning/tested-sha.txt"
+          python3 tools/diagnostics/macos_tooltip_canvas.py \
+            --repo "$PWD" \
+            --app "$RUNNER_TEMP/tooltip-hammerspoon/Hammerspoon.app" \
+            --output "$RUNNER_TEMP/tooltip-canvas-evidence"
+      - name: Retain native captures, source, provisioning and retirement receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-tooltip-canvas-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/tooltip-provisioning
+            ${{ runner.temp }}/tooltip-canvas-evidence
+
   # ─────────────────────────────────────────────────
   # 3) Swift launcher tests, then the app built once
   # ─────────────────────────────────────────────────
@@ -564,7 +620,7 @@ jobs:
 
   macos-ok:
     name: 'Verdict'
-    needs: [test-hs, e2e-hs, package-macos, launch]
+    needs: [test-hs, e2e-hs, package-macos, launch, tooltip-canvas]
     if: always()
     runs-on: ubuntu-latest
     steps:

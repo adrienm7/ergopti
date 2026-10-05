@@ -605,11 +605,11 @@ function M.new(deps)
 	--- @param getters table Native state and caption readers.
 	--- @param children table Native child data indexed by declared group identity.
 	--- @return table|nil rows
-	function R.template_rows(manifest_key, commands, getters, children)
+	local function template_rows(manifest_key, commands, getters, children, status_definition)
 		commands, getters, children = commands or {}, getters or {}, children or {}
 		local visiting = {}
 		local function collect(key)
-			local declaration = get_menu_def(key)
+			local declaration = status_definition or get_menu_def(key)
 			if visiting[key] or #declaration == 0 then
 				Logger.error(LOG, "Missing or cyclic child template '%s' — provider rows refused.", key)
 				return nil
@@ -625,6 +625,8 @@ function M.new(deps)
 						for _, child in ipairs(included) do rows[#rows + 1] = child end
 					elseif item.type == "---" then
 						row = { separator = true }
+					elseif status_definition and item.type == "label" then
+						row = { label = i18n.get(item.i18n), disabled = true }
 					elseif item.type == "label" then
 						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
 						local valid = type(item.id) == "string" and item.id ~= ""
@@ -690,6 +692,38 @@ function M.new(deps)
 			return rows
 		end
 		return collect(manifest_key)
+	end
+
+	function R.template_rows(manifest_key, commands, getters, children)
+		return template_rows(manifest_key, commands, getters, children)
+	end
+
+	--- Supplies inert status declared on an existing live provider row.
+	--- No callbacks, getters or children can be declared in status data.
+	--- @param manifest_key string Owning menu declaration.
+	--- @param row_id string Existing provider identity.
+	--- @param status string Named native status to project.
+	--- @return table|nil rows
+	function R.status_rows(manifest_key, row_id, status)
+		local owner
+		for _, item in ipairs(get_menu_def(manifest_key)) do
+			if item.id == row_id then owner = item; break end
+		end
+		local statuses = owner and owner.status_rows
+		local declaration = type(statuses) == "table" and statuses[status]
+		if type(declaration) ~= "table" or #declaration == 0 then
+			Logger.error(LOG, "Missing provider status '%s.%s.%s' — rows refused.", manifest_key, row_id, status)
+			return nil
+		end
+		for _, item in ipairs(declaration) do
+			if type(item) ~= "table" then return nil end
+			local label = item.type == "label" and type(item.i18n) == "string" and item.i18n ~= ""
+			if item.type ~= "---" and not label then return nil end
+			for field in pairs(item) do
+				if field ~= "type" and not (label and field == "i18n") then return nil end
+			end
+		end
+		return template_rows(manifest_key, {}, {}, {}, declaration)
 	end
 
 	--- Supplies a declared checkbox as provider data through the shared policy.

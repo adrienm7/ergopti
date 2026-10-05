@@ -595,6 +595,7 @@ end
 function M.sqlite_writer(opts)
 	opts = opts or {}
 	local available = opts.available ~= false
+	local system_day_paths = {}
 	local fake = {
 		typing = {}, hotstrings = {}, shortcuts = {}, app_switches = {},
 		app_days = {}, ngrams = {}, scancodes = {},
@@ -672,7 +673,33 @@ function M.sqlite_writer(opts)
 	fake.upsert_title = collect_row(fake.titles)
 	fake.upsert_layout = collect_row(fake.layouts)
 	fake.upsert_kc_hold = collect_row(fake.kc_hold)
-	fake.upsert_system_day = collect_row(fake.system_days)
+	local record_system_day = collect_row(fake.system_days)
+	function fake.upsert_system_day(device_id, row)
+		local accepted = record_system_day(device_id, row)
+		system_day_paths[#fake.system_days] = fake.path
+		return accepted
+	end
+
+	function fake.read_system_day(device_id, date)
+		if not available or not fake.path or type(device_id) ~= "string" or device_id == ""
+			or type(date) ~= "string" or date == "" then return nil, false end
+		for index = #fake.system_days, 1, -1 do
+			local entry = fake.system_days[index]
+			if system_day_paths[index] == fake.path and entry.device_id == device_id and entry.row.date == date then
+				local row = { date = date }
+				for _, field in ipairs({ "wifi_changes", "space_switches", "battery_sum", "battery_count",
+					"audio_muted_ms", "locked_ms", "sleep_ms", "awake_ms", "passive_count", "night_wake_count" }) do
+					row[field] = math.floor(tonumber(entry.row[field]) or 0)
+				end
+				for _, field in ipairs({ "battery_min", "battery_max" }) do
+					local value = tonumber(entry.row[field])
+					row[field] = value and math.floor(value) or nil
+				end
+				return row, true
+			end
+		end
+		return nil, true
+	end
 
 	function fake.set_app_category(device_id, app_name, category, score)
 		fake.categories[#fake.categories + 1] = {
