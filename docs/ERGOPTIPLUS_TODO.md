@@ -3936,6 +3936,8 @@ Both Lua drivers can now replace or explicitly remove an existing root dotted sc
 
 The actual Lua preference writer now preserves requested finite numeric header leaves with the existing optional precise-literal owner and rejects inexact owned readback before native publication. Authentic source literals retain precedence; nonnumeric/container handling, the default codec, backups and source/CAS permissions are unchanged. Native-file setter, full-image and fresh-reload controls cover 17-digit values and signed zero on both Lua drivers. Root inline-table and section-relative dotted write support remain implementation work; packaging and installed-device acceptance remain separate qualifications.
 
+Two Windows cleanup controls now compare their complete handwritten case-sensitive identity sets independently of unspecified native Map enumeration order. Exact cardinality, duplicate refusal and unique semantic section markers strengthen the checks; all original key identities, backup, unknown-data and case-twin assertions remain. Production discovery and cleanup policies are unchanged. Actual Windows execution remains pending CI.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical

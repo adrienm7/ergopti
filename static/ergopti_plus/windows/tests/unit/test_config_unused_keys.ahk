@@ -65,13 +65,40 @@ _CUK_Ids(Keys) {
 }
 
 _CUK_SortedIds(Keys) {
+	return _CUK_CanonicalIds(_CUK_Ids(Keys))
+}
+
+; Cleanup promises identities, not the native parser Map's enumeration order.
+; Compare hand-written identities case-exactly without discarding duplicates.
+_CUK_CanonicalIds(Items) {
 	Sorted := Map()
-	for Id in _CUK_Ids(Keys)
+	Sorted.CaseSense := "On"
+	for Id in Items {
+		AssertFalse(Sorted.Has(Id), "cleanup preview identities must not repeat")
 		Sorted[Id] := true
+	}
 	Ids := []
 	for Id in Sorted
 		Ids.Push(Id)
 	return Ids
+}
+
+_CUK_AssertIds(Expected, Keys) {
+	ExpectedIds := StrSplit(Expected, "|")
+	ActualIds := _CUK_Ids(Keys)
+	AssertEqual(ExpectedIds.Length, ActualIds.Length, "every hand-written cleanup identity occurs exactly once")
+	AssertEqual(_CUK_Join(_CUK_CanonicalIds(ExpectedIds)), _CUK_Join(_CUK_CanonicalIds(ActualIds)),
+		"the complete cleanup identities match case-exactly")
+}
+
+_CUK_RequireId(Keys, Id) {
+	Matches := []
+	for Entry in Keys {
+		if (Entry["section"] . "." . Entry["key"] . "=" . Entry["kind"]) == Id
+			Matches.Push(Entry)
+	}
+	AssertEqual(1, Matches.Length, "the independently named cleanup identity occurs exactly once")
+	return Matches[1]
 }
 
 _CUK_Join(Items) {
@@ -315,8 +342,8 @@ _CUK_CaseVariantSectionKeepsKnownTwin() {
 		Path := _CUK_WriteFixture(Dir)
 		AssertTrue(TOML_BatchWrite(Path, [{ Section: "Layout", Key: "stale", Value: 1 }]))
 		Keys := ConfigUnusedKeysFind(Path)["keys"]
-		AssertEqual("ahk.layout.ergopti_base=section|Layout.stale=section|metrics.metrics_encrypt=leaf|stale.section.label=section",
-			_CUK_Join(_CUK_Ids(Keys)))
+		_CUK_AssertIds("ahk.layout.ergopti_base=section|Layout.stale=section|metrics.metrics_encrypt=leaf|stale.section.label=section",
+			Keys)
 		AssertEqual("removed", ConfigUnusedKeysRemove(Path, Keys, "20990101-000004")["status"])
 		After := TOML_ParseFreshFile(Path)
 		AssertEqual(false, After["layout"]["ergopti_base"],
@@ -677,12 +704,14 @@ _CUK_RetiredPrefixActualCleanup() {
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
 		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
-		AssertEqual("ahk.=section|ahk.layout.flag=section|ahk.layout.deep.label=section|ahk.empty.=section",
-			_CUK_Join(_CUK_Ids(Rows)))
-		AssertTrue(Rows[1]["section_only"] is Integer)
-		AssertEqual(1, Rows[1]["section_only"])
-		AssertTrue(Rows[4]["section_only"] is Integer)
-		AssertEqual(1, Rows[4]["section_only"])
+		_CUK_AssertIds("ahk.=section|ahk.layout.flag=section|ahk.layout.deep.label=section|ahk.empty.=section",
+			Rows)
+		RootRow := _CUK_RequireId(Rows, "ahk.=section")
+		EmptyRow := _CUK_RequireId(Rows, "ahk.empty.=section")
+		AssertTrue(RootRow["section_only"] is Integer)
+		AssertEqual(1, RootRow["section_only"])
+		AssertTrue(EmptyRow["section_only"] is Integer)
+		AssertEqual(1, EmptyRow["section_only"])
 		AssertEqual(Source, FSReadUtf8Exact(Path), "scanning never accepts cleanup")
 		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000201", 0, 0, Source)
 		AssertEqual("removed", Result["status"])
@@ -1357,3 +1386,29 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 }
 Test("config: retired gesture source survives native reload, ordinary edit and full save until explicit cleanup (gesture-binding-identity-preservation)",
 	_CUK_RetiredGestureBindingsPreserveWholeSource)
+
+; Case twins survive canonicalization; count and uniqueness remain assertions.
+_CUK_CanonicalIdentityControls() {
+	Upper := Map("section", "Layout", "key", "stale", "kind", "section")
+	Lower := Map("section", "layout", "key", "stale", "kind", "section")
+	_CUK_AssertIds("layout.stale=section|Layout.stale=section", [Upper, Lower])
+	_CUK_AssertIds("layout.stale=section|Layout.stale=section", [Lower, Upper])
+	AssertEqual(2, _CUK_CanonicalIds(["Layout.stale=section", "layout.stale=section"]).Length,
+		"a case twin is a distinct source identity")
+	AssertThrows(_CUK_CanonicalIds.Bind(["layout.stale=section", "layout.stale=section"]),
+		"canonicalization must refuse duplicates instead of hiding them")
+	AssertThrows(_CUK_AssertIds.Bind("layout.stale=section", []),
+		"an empty actual preview cannot satisfy a nonempty independent expectation")
+	AssertThrows(_CUK_AssertIds.Bind("layout.stale=section", [Upper]),
+		"a case near-miss cannot satisfy the expectation")
+	AssertThrows(_CUK_AssertIds.Bind("layout.stale=section|Layout.stale=section", [Lower, Lower]),
+		"the right row count cannot conceal a duplicate and missing case twin")
+	AssertEqual(ObjPtr(Upper), ObjPtr(_CUK_RequireId([Lower, Upper], "Layout.stale=section")),
+		"marker checks select the unique semantic source identity")
+	AssertThrows(_CUK_RequireId.Bind([], "Layout.stale=section"),
+		"a marker lookup must refuse an absent identity")
+	AssertThrows(_CUK_RequireId.Bind([Upper, Upper], "Layout.stale=section"),
+		"a marker lookup must refuse ambiguous duplicates")
+}
+Test("config cleanup fixture: canonical identities keep case twins and reject missing or duplicate rows "
+	. "(config-unused-keys-identity-controls)", _CUK_CanonicalIdentityControls)
