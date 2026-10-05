@@ -303,3 +303,5 @@ helpers.describe("layout catalogue: where a layout's bytes come from", function(
 		helpers.assert_eq(#requests, 0)
 	end)
 end)
+
+require("test.layout_installed_record_contract")(helpers, Catalogue, Json)

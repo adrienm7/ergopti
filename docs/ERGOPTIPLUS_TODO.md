@@ -1755,6 +1755,22 @@ host-specific skip) pass. Hosted native qualification remains required. This is
 a bounded TODO33 correction, not completion of its remaining domains or physical
 checks.
 
+The frozen shared Lua installed-record packet is now applied after exact source
+and test preimage checks. Installed-only lossless decoding preserves unknown root
+members and obsolete rows, including JSON null, empty arrays, false and a source
+member named outdated. Detached private source identity survives chained builders;
+verified same-id replacement does not resurrect an ignored row on later removal.
+Generic JSON decoding, Windows owners, syntax/header/schema refusals and native
+artifact publication policies are unchanged. Current focused Mac catalogue and
+manager cases and the Linux installed-record controls pass. Selected formatting,
+356 JS checks, 14,044 portable macOS unit cases, 6,627 Linux unit cases and both
+portable E2E suites pass. The corpus guard includes their actual shared replay
+helpers; its assertions and every corpus expectation remain intact. The AHK
+unit gate was not executed on this Linux host; hosted native qualification is
+still required. Preserved future members on updates of already usable entries
+and invalid extension classification are separate follow-ups. TODO33 remains
+partial.
+
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] Run the native installed-record/member-span cases in test_layout_catalogue.ahk and test_json_object_key_nul.ahk: usable neighbors, warning-once, exact obsolete/future preservation, case identity, native NUL-path refusal, stale-source refusal and install/uninstall.
