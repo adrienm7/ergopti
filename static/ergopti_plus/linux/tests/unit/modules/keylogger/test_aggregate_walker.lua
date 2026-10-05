@@ -895,3 +895,72 @@ helpers.describe("linux-hourly-manual-errors", function()
 		helpers.assert_eq(#rows.hourly_min5, 0)
 	end)
 end)
+
+-- ============================================================================
+-- Canonical backspace unigrams without extending correction sequences
+-- ============================================================================
+
+helpers.describe("aggregate walker: backspace unigram retention", function()
+	it("linux-backspace-unigrams: manual correction keeps its count and native delay", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 110), key("b", 120) },
+			"2026-08-06", "app")
+		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
+		helpers.assert_true(item ~= nil, "the supported Backspace row survives persistence")
+		helpers.assert_eq(item.c, 1)
+		helpers.assert_eq(item.td, 110)
+		helpers.assert_eq(item.cd, 1)
+		helpers.assert_eq(item.e, 0)
+		helpers.assert_nil(next(item.esrc))
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 1)
+		helpers.assert_eq(batch.chars_class["2026-08-06\1app"].letter, 2)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_words", "a"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_words", "b"), 1)
+	end)
+	it("linux-backspace-unigrams: synthetic deletions keep HS and LLM source counts", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 0, "hotstring"),
+			key("[BS]", 0, "hotstring"), key("[BS]", 0, "llm"), key("b", 100) },
+			"2026-08-06", "app")
+		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
+		helpers.assert_true(item ~= nil)
+		helpers.assert_eq(item.c, 3)
+		helpers.assert_eq(item.td, 0)
+		helpers.assert_eq(item.cd, 0)
+		helpers.assert_eq(item.e, 0)
+		helpers.assert_eq(item.esrc.hotstring, 2)
+		helpers.assert_eq(item.esrc.llm, 1)
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].cascade_count, 0)
+		helpers.assert_eq(batch.chars_class["2026-08-06\1app"].letter, 2)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 0)
+	end)
+	it("linux-backspace-unigrams: cascade and recovery contexts stay independent", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("[BS]", 100),
+			key("[BS]", 100), key("b", 140) }, "2026-08-06", "app")
+		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
+		helpers.assert_true(item ~= nil)
+		helpers.assert_eq(item.c, 3)
+		helpers.assert_eq(item.td, 300)
+		helpers.assert_eq(item.cd, 3)
+		local errors = batch.errors["2026-08-06\1app"]
+		helpers.assert_eq(errors.bs_total, 3)
+		helpers.assert_eq(errors.cascade_count, 1)
+		helpers.assert_eq(errors.cascade_max_len, 3)
+		helpers.assert_eq(errors.recovery_sum_ms, 140)
+		helpers.assert_eq(errors.recovery_count, 1)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "a[BS]"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "a[BS]b"), 0)
+	end)
+	it("linux-backspace-unigrams: literal software spelling stays four codepoints", function()
+		local batch = Walker.walk({ key("[", 0, "other"), key("B", 0, "other"),
+			key("S", 0, "other"), key("]", 0, "other") }, "2026-08-06", "app")
+		helpers.assert_eq(count_of(batch, "ngram_chars", "[BS]"), 0)
+		for _, char in ipairs({ "[", "B", "S", "]" }) do
+			local item = batch.ngram.ngram_chars["2026-08-06\1app\1" .. char]
+			helpers.assert_eq(item.c, 1)
+			helpers.assert_eq(item.esrc.other, 1)
+		end
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
+	end)
+end)

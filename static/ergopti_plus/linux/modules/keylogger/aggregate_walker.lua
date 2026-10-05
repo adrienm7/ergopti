@@ -392,6 +392,7 @@ function M.walk(events, date_str, app, batch, clock)
 		local is_synthetic, source = synthetic_of(event)
 
 		if char == BACKSPACE_MARKER then
+			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, delay, false, source)
 			-- A correction. The run is broken because what follows continues from
 			-- a different character than it appears to, and the partial word is
 			-- abandoned rather than recorded — the user was not writing it.
