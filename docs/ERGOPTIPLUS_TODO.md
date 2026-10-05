@@ -1862,6 +1862,26 @@ These are software implementations; final hardware verification remains below.
   No alias policy, SQL/schema/cache/flush, physical hook/remap, magic/shortcut,
   persistence, brightness or title change.
 
+- [~] **L124.** Linux supplied burst histogram keys: encode complete JSON keys
+  with the existing shared codec instead of escaping only quotes. Backslash-b
+  changed the stored key bytes; backslash-l and literal controls produced invalid
+  JSON and refused the next merge. Normal collection uses numeric and `500+`
+  labels and stays unchanged. Eighteen real public Writer/SQLite checks reproduce
+  five failures and pass under current LuaJIT, signed Ubuntu 22.04 luv/libuv
+  dependencies and Lua 5.4; SQLite/kernel/libc remain current in the mixed profile.
+  Independent native `json_valid` and `json_each`/`hex(key)` assertions cover
+  supplied key bytes, repeated writes, filtering, floors, empty defaults and a
+  genuine SQLite statement refusal/retry. Eight registered scripted unit cases
+  reproduce three failures and pass on both Lua runtimes; every prior owner
+  assertion stays intact. Existing category and metadata native regressions
+  remain green under all three configurations. Reuse the already imported shared
+  JSON encoder, retaining caller data, counts, SQL/schema and all other Writer
+  paths. Register future Linux CI without launching it. Check Windows and macOS
+  histogram serialization by source inspection; leave their native gates to the
+  principal agent. NUL-key projection is a separate diagnosis outside this fix.
+  No collection policy, cache/flush, persistence, reserved surface or physical
+  keyboard validation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
