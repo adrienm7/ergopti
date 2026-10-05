@@ -399,6 +399,13 @@ function M.init(opts)
 	-- Open the SQLite database (bootstraps schema on first run).
 	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
 		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+		if SystemMetrics then
+			local database, device = _sqlite_path, _device_id
+			SystemMetrics.bind(database, device, function(date)
+				if SqliteWriter.get_db_path() ~= database then return nil, false end
+				return SqliteWriter.read_system_day(device, date)
+			end)
+		end
 		Logger.info(LOG, "SQLite persistence active: %s", _sqlite_path)
 	else
 		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")

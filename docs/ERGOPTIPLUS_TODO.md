@@ -2348,6 +2348,31 @@ These are software implementations; final hardware verification remains below.
   schema, source-count policy, configuration, menu or reserved implementation
   change.
 
+- [~] **L144.** Linux system-day restart retention: hydrate the sampler's
+  cumulative row for its exact database, device and calendar day before the
+  first sample. Preserve replacement/idempotence semantics and reset previous
+  process clocks and sensor transitions. A checked Writer read distinguishes
+  accepted absence from refusal; failed reads publish no writable zero day and
+  remain retryable. Rebinding the same database preserves the live day, while
+  changed database/device/day identities load their own row. Actual public
+  collector and SQLite in two separate native processes reproduce three
+  history-loss failures; a genuine thirty-second monotonic interval is retained
+  after restart on LuaJIT, Lua 5.4 and the signed Jammy mixed profile. Each profile
+  preserves two first-process controls and changes twelve restart checks from
+  ten failures to zero; seven baseline failures cover the newly introduced
+  checked-loader API, not seven further old data-loss bugs. Complete sampler25
+  and Writer122 owners change ten failures each to zero, retaining all old
+  assertions. The truthful in-memory Writer model and its23-case protocol owner
+  remain explicit software tests, with detached rows and owned identity checks.
+  Supplied sensor history, reset seams and the next-date adapter are modeled;
+  clocks, native processes, library calls and SQLite refusal/recovery are real.
+  No physical sensor, keyboard, systemd or foreign runtime claim. Foreign source
+  inspection finds additive system deltas on macOS and additive/SQL-rebuilt
+  system fields on Windows, rather than this Linux cumulative zero overwrite.
+  Register future native Linux CI commands without launching workflows. Preserve
+  both language packs and principal notification/HTTP assertions. No schema,
+  raw-event, menu, title, configuration or reserved implementation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -446,6 +446,23 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
         timeout-minutes: 1
 
+      - name: Preserve cumulative system-day metrics across native restarts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+          for ERGOPTI_SYSTEM_RUNTIME in luajit lua5.4; do
+            ERGOPTI_SYSTEM_PROFILE=$(mktemp -d)
+            export XDG_CONFIG_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/config"
+            export XDG_DATA_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/data"
+            export XDG_CACHE_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/cache"
+            export XDG_STATE_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/state"
+            mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
+            "$ERGOPTI_SYSTEM_RUNTIME" "$PWD/tests/hardware/run_system_day_restart.lua" first "$ERGOPTI_SYSTEM_PROFILE/native.sqlite" "$ERGOPTI_SYSTEM_PROFILE/first.json"
+            "$ERGOPTI_SYSTEM_RUNTIME" "$PWD/tests/hardware/run_system_day_restart.lua" restart "$ERGOPTI_SYSTEM_PROFILE/native.sqlite" "$ERGOPTI_SYSTEM_PROFILE/first.json"
+          done
+        timeout-minutes: 3
+
       - name: Retain canonical backspace unigrams through native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
