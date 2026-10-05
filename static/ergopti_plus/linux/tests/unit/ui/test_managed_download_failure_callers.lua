@@ -57,13 +57,18 @@ end
 
 local function model_fixture(replace)
 	local world = { starts = {}, updates = {}, completions = {}, consent = true }
-	replace("adapters.http_client", {
+	local http = {
 		postStream = function(_, _, _, _, chunk, done)
 			world.starts[#world.starts + 1] = { chunk = chunk, done = done }
 			return true
 		end,
-		cancel = function() return true end,
-	})
+		cancel = function()
+			if world.cancel_throws then error("controlled retirement exception") end
+			return world.cancel_ok ~= false
+		end,
+	}
+	world.owned_http = {}
+	replace("adapters.http_client", require("tests.support.owned_http_fixture").attach(http, world.owned_http))
 	replace("ui.download_window.bridge", {
 		show = function(opts) world.options = opts; return 47 end,
 		session_id = function() return 47 end,
@@ -351,6 +356,105 @@ helpers.describe("managed download caller ownership", function()
 			world.starts[1].done(nil, "Independent failure", "download", certificate())
 			helpers.assert_eq(#world.completions, 1, "the original owner still publishes its actual terminal")
 			helpers.assert_true(world.options.can_retry())
+		end)
+	end)
+end)
+
+
+helpers.describe("actual model cancellation preserves caller UI ownership", function()
+	local function actual_bridge_fixture(replace)
+		local _, world = model_fixture(replace)
+		world.evaluated, world.page_epoch = {}, 101
+		replace("ui.webview_manager", {
+			show = function() return true end,
+			hide = function() return true end,
+			current_epoch = function() return world.page_epoch end,
+			eval_js = function(_, code)
+				world.evaluated[#world.evaluated + 1] = code
+				return true
+			end,
+		})
+		replace("ui.download_window.bridge", nil)
+		local bridge = require("ui.download_window.bridge")
+		replace("modules.llm.model_download", nil)
+		return require("modules.llm.model_download"), world, bridge
+	end
+
+	helpers.it("model-cancel-settlement: synchronous ACK leaves actual UI caller its cancellation presentation", function()
+		isolated(function(replace)
+			local model, world, bridge = actual_bridge_fixture(replace)
+			local completions = 0
+			helpers.assert_true(model.start("http://127.0.0.1:11434", "qwen:2b", "Independent model",
+				function() completions = completions + 1 end, function() return world.consent end))
+			local id = bridge.session_id()
+			helpers.assert_true(bridge.on_message("ready").pushed)
+			helpers.assert_true(bridge.on_message({ action = "cancel", session = id }).cancelled)
+			helpers.assert_eq(model.is_active(), false)
+			local ready = bridge.on_message("ready")
+			helpers.assert_true(type(ready) == "table", "immediate caller cancellation must not retire its own UI")
+			helpers.assert_true(ready.pushed)
+			helpers.assert_true(world.evaluated[#world.evaluated]:find("ollama.download_cancelled", 1, true) ~= nil)
+			helpers.assert_true(world.evaluated[#world.evaluated]:find("showNetworkFailure(", 1, true) == nil)
+			world.starts[1].done({ ok = true })
+			helpers.assert_eq(completions, 0, "cancellation cannot publish model completion")
+		end)
+	end)
+
+	helpers.it("model-cancel-settlement: accepted cancellation keeps actual UI busy until independent asynchronous ACK", function()
+		isolated(function(replace)
+			local model, world, bridge = actual_bridge_fixture(replace)
+			world.owned_http.settled = false
+			helpers.assert_true(model.start("http://127.0.0.1:11434", "qwen:2b", "Independent model", nil,
+				function() return world.consent end))
+			local id = bridge.session_id()
+			bridge.on_message("ready")
+			helpers.assert_eq(bridge.on_message({ action = "cancel", session = id }).cancelled, false)
+			helpers.assert_true(model.is_active())
+			helpers.assert_true(type(bridge.on_message("ready")) == "table")
+			world.consent = false
+			world.owned_http.operations[1]:acknowledge()
+			helpers.assert_eq(model.is_active(), false)
+			helpers.assert_eq(bridge.on_message("ready"), nil, "late native settlement retires only its old namespace")
+			local cancelled_terminal = false
+			for _, code in ipairs(world.evaluated) do
+				if code:find("done(false,", 1, true) and code:find("ollama.download_cancelled", 1, true) then
+					cancelled_terminal = true
+				end
+			end
+			helpers.assert_true(cancelled_terminal, "acknowledged cancellation precedes Retire's failure-control cleanup")
+			helpers.assert_true(model.shutdown())
+		end)
+	end)
+
+	helpers.it("model-cancel-settlement: refused termination retains owner then cleans after actual ACK", function()
+		isolated(function(replace)
+			local model, world, bridge = actual_bridge_fixture(replace)
+			world.cancel_ok = false
+			helpers.assert_true(model.start("http://127.0.0.1:11434", "qwen:2b", "Independent model"))
+			local id = bridge.session_id()
+			bridge.on_message("ready")
+			helpers.assert_eq(bridge.on_message({ action = "cancel", session = id }).cancelled, false)
+			helpers.assert_true(model.is_active())
+			world.owned_http.operations[1]:acknowledge()
+			helpers.assert_eq(model.is_active(), false)
+			helpers.assert_eq(bridge.on_message("ready"), nil)
+			helpers.assert_true(model.shutdown())
+		end)
+	end)
+
+	helpers.it("model-cancel-settlement: throwing retirement unwinds claim without erasing physical debt", function()
+		isolated(function(replace)
+			local model, world, bridge = actual_bridge_fixture(replace)
+			world.cancel_throws = true
+			helpers.assert_true(model.start("http://127.0.0.1:11434", "qwen:2b", "Independent model"))
+			local id = bridge.session_id()
+			bridge.on_message("ready")
+			helpers.assert_eq(bridge.on_message({ action = "cancel", session = id }).cancelled, false)
+			helpers.assert_true(model.is_active())
+			world.owned_http.operations[1]:acknowledge()
+			helpers.assert_eq(model.is_active(), false, "asynchronous listener must not inherit an abandoned cancel frame")
+			helpers.assert_eq(bridge.on_message("ready"), nil)
+			helpers.assert_true(model.shutdown())
 		end)
 	end)
 end)

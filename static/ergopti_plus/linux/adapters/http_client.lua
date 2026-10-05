@@ -809,6 +809,11 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 			-- invalidate the complete response. Never publish it as evidence.
 			if #chunk > remaining then request.error_body_truncated = true end
 			if remaining > 0 then request.error_body_text = request.error_body_text .. chunk:sub(1, remaining) end
+			if request.operation and not request.operation._body_cleanup
+				and not owned_authorized(request) then
+				finish(request, { ok = false, status = 0, body = "", error = "request authorization withdrawn" }, true)
+				return
+			end
 			if type(request.on_chunk) == "function" then
 				local ok, callback_err = pcall(request.on_chunk, chunk)
 				if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", tostring(callback_err)) end
@@ -853,6 +858,15 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		end
 	end
 
+	-- Native seams can complete or cancel synchronously during stream/body
+	-- activation. Never republish that retired strong owner as logical activity.
+	if operation and not operation._body_cleanup and (request.terminal
+		or operation._cancelled or operation._settled or _owned[owner] ~= operation) then
+		if not request.terminal then
+			finish(request, { ok = false, status = 0, body = "", error = "cancelled" }, true)
+		end
+		return false
+	end
 	_active[owner] = request
 	Logger.debug(LOG, "HTTP request dispatched asynchronously (owner=%s, pid=%d).", owner, pid)
 	return true
@@ -909,7 +923,7 @@ end
 --- @param options table|nil { authorized?: function }
 --- @param callback function
 --- @return table Operation { started, cancel, is_settled, on_settled }.
-function M.get_owned(url, headers, options, callback)
+local function owned_request(url, headers, body, options, on_chunk, on_done, method, buffered)
 	local operation = { started = false, _settled = false, _cancelled = false, _listeners = {} }
 	function operation:is_settled() return self._settled end
 	function operation:on_settled(listener)
@@ -935,20 +949,26 @@ function M.get_owned(url, headers, options, callback)
 		end
 		return self._settled
 	end
+	-- Capture scalar source admission before option/header metatable callbacks.
+	-- Native construction still belongs to start_request's exact reservation.
+	local authorized
+	if type(options) == "table" then authorized = rawget(options, "authorized") end
 	local request_options = {}
 	if type(options) == "table" then
-		for key, value in pairs(options) do request_options[key] = value end
+		for key, value in next, options do request_options[key] = value end
 	end
-	local authorized = request_options.authorized
 	if authorized ~= nil and type(authorized) ~= "function" then
 		operation._settled = true
 		return operation
 	end
-	request_options.buffered = true
-	request_options.method = "GET"
+	request_options.buffered = buffered
+	request_options.method = method
+	-- A streaming owner without an optional source still reserves before caller
+	-- metadata and brackets chunk delivery with its exact retained operation.
+	if method == "POST" and authorized == nil then authorized = function() return true end end
 	if authorized then
-		local ok, started = pcall(start_request, url, type(headers) == "table" and headers or {}, nil,
-			request_options, nil, callback, operation, authorized)
+		local ok, started = pcall(start_request, url, type(headers) == "table" and headers or {}, body,
+			request_options, on_chunk, on_done, operation, authorized)
 		if not ok then
 			if operation._request then
 				finish(operation._request, { ok = false, status = 0, body = "", error = "owned request admission failed" })
@@ -959,10 +979,35 @@ function M.get_owned(url, headers, options, callback)
 			operation.started = started
 		end
 	else
-		operation.started = start_request(url, type(headers) == "table" and headers or {}, nil,
-			request_options, nil, callback, operation)
+		operation.started = start_request(url, type(headers) == "table" and headers or {}, body,
+			request_options, on_chunk, on_done, operation)
 	end
 	return operation
+end
+
+--- Starts a buffered GET with the existing exact physical cleanup contract.
+--- @param url string
+--- @param headers table
+--- @param options table|nil Optional captured source admission.
+--- @param callback function
+--- @return table Retained operation { started, cancel, is_settled, on_settled }.
+function M.get_owned(url, headers, options, callback)
+	return owned_request(url, headers, nil, options, nil, callback, "GET", true)
+end
+
+--- Streams a POST while retaining exact body FD/process/group/close ownership.
+--- Chunks require literal current source admission; terminal delivery additionally
+--- requires actual group absence and every acquired descriptor/handle close ACK.
+--- @param url string
+--- @param headers table
+--- @param body string
+--- @param options table|nil Optional captured authorized function.
+--- @param on_chunk function
+--- @param on_done function
+--- @return table Retained operation { started, cancel, is_settled, on_settled }.
+function M.post_stream_owned(url, headers, body, options, on_chunk, on_done)
+	return owned_request(url, headers, type(body) == "string" and body or "", options,
+		on_chunk, on_done, "POST", false)
 end
 
 --- Downloads one response body directly to a caller-owned temporary file.
