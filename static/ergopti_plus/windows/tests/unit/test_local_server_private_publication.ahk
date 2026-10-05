@@ -22,6 +22,9 @@ class _LSP_World {
 		this.HadShutdown := IsSet(_LifecycleShutdownReason)
 		this.Shutdown := this.HadShutdown ? _LifecycleShutdownReason : ""
 		this.PriorRetained := _ConfigTransitionRetainedBarrier
+		global LLM_Defaults
+		this.HadDefaults := IsSet(LLM_Defaults)
+		this.PreviousDefaults := this.HadDefaults ? LLM_Defaults : false
 		_LLM_Menu_Loaded := true
 		_LifecycleLatestTransition := 0
 		_LifecycleShutdownReason := ""
@@ -48,6 +51,8 @@ class _LSP_World {
 		this.CleanupRefused := false
 		this.WrongCandidate := true
 		try {
+			; This source fixture owns the canonical boot dependency even when filtered.
+			LLM_Defaults_Load()
 			AssertTrue(LLM_API_PROVIDERS.Has("lmstudio"), "the actual native local-provider catalogue must be present")
 			AssertTrue(LLM_LOCAL_API_SERVERS.Has("lmstudio"))
 			this.ConfigImage := '[llm]`napi_entry_id = "native-active"`n[llm.models]`nselected = "ollama"`n'
@@ -85,41 +90,49 @@ class _LSP_World {
 	}
 
 	Restore() {
-		global _LLM_Menu_Loaded, _LifecycleLatestTransition, _LifecycleShutdownReason
-		global _ConfigTransitionRetainedBarrier, _PathsFile
-		; Only this fixture's exclusively created files and exact bundle may be repaired
-		; after the assertions. Real production code never gains this cleanup authority.
-		if (this.OwnedBundle is Object) && _ConfigWriteLeaseState().terminal == this.OwnedBundle {
-			try {
-				if this.HasOwnProp("ConfigCandidate") {
-					FSWriteDurable(this.ConfigPath, this.ConfigCandidate)
-					FSWriteDurable(this.ApiPath, this.ApiCandidate)
+		global LLM_Defaults
+		try {
+			global _LLM_Menu_Loaded, _LifecycleLatestTransition, _LifecycleShutdownReason
+			global _ConfigTransitionRetainedBarrier, _PathsFile
+			; Only this fixture's exclusively created files and exact bundle may be repaired
+			; after the assertions. Real production code never gains this cleanup authority.
+			if (this.OwnedBundle is Object) && _ConfigWriteLeaseState().terminal == this.OwnedBundle {
+				try {
+					if this.HasOwnProp("ConfigCandidate") {
+						FSWriteDurable(this.ConfigPath, this.ConfigCandidate)
+						FSWriteDurable(this.ApiPath, this.ApiCandidate)
+					}
+					ConfigTransitionRollbackOwned(_PathsFile, this.OwnedBundle, ConfigTransitionProductionPort())
+				} finally {
+					_ConfigWriteTerminalRelease(this.OwnedBundle)
+					if _ConfigTransitionRetainedBarrier == this.OwnedBundle
+						_ConfigTransitionRetainedBarrier := this.PriorRetained
 				}
-				ConfigTransitionRollbackOwned(_PathsFile, this.OwnedBundle, ConfigTransitionProductionPort())
-			} finally {
-				_ConfigWriteTerminalRelease(this.OwnedBundle)
-				if _ConfigTransitionRetainedBarrier == this.OwnedBundle
-					_ConfigTransitionRetainedBarrier := this.PriorRetained
 			}
+			_LLM_Menu_Loaded := this.Loaded
+			_LifecycleLatestTransition := this.Transition
+			if this.HadShutdown
+				_LifecycleShutdownReason := this.Shutdown
+			else
+				_LifecycleShutdownReason := unset
+			_LMT_RestoreApiFixture(this.Previous)
+			if this.HasOwnProp("Receipt")
+				this.Receipt := 0
+			if this.HasOwnProp("OtherReceipt")
+				this.OtherReceipt := 0
+			if this.HasOwnProp("Owner") {
+				this.Owner.Options := Map()
+				this.Owner.Port := ConfigTransitionProductionPort()
+				this.Owner := 0
+			}
+			if this.HasOwnProp("Port")
+				this.Port := Map()
+		} finally {
+			if this.HadDefaults
+				LLM_Defaults := this.PreviousDefaults
+			else
+				LLM_Defaults := unset
 		}
-		_LLM_Menu_Loaded := this.Loaded
-		_LifecycleLatestTransition := this.Transition
-		if this.HadShutdown
-			_LifecycleShutdownReason := this.Shutdown
-		else
-			_LifecycleShutdownReason := unset
-		_LMT_RestoreApiFixture(this.Previous)
-		if this.HasOwnProp("Receipt")
-			this.Receipt := 0
-		if this.HasOwnProp("OtherReceipt")
-			this.OtherReceipt := 0
-		if this.HasOwnProp("Owner") {
-			this.Owner.Options := Map()
-			this.Owner.Port := ConfigTransitionProductionPort()
-			this.Owner := 0
-		}
-		if this.HasOwnProp("Port")
-			this.Port := Map()
 	}
 
 	Read(Path) {
@@ -947,3 +960,55 @@ _LSP_CommittedCallbackNoIO(World) {
 }
 Test("Local server publication: committed model callback performs no private source I/O (local-server-private-source)",
 	(*) => _LSP_WithWorld(_LSP_CommittedCallbackNoIO))
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= 1/ Filtered Private Source Defaults Owner =======
+; =========================================================
+; =========================================================
+
+_LSP_DefaultsFixtureOwnsColdAdmission(InitiallySet) {
+	global LLM_Defaults
+	HadOuterDefaults := IsSet(LLM_Defaults)
+	OuterDefaults := HadOuterDefaults ? LLM_Defaults : false
+	ForeignDefaults := Map("unrelated_fixture_sentinel", Map("retained", true))
+	World := 0
+	try {
+		if InitiallySet
+			LLM_Defaults := ForeignDefaults
+		else
+			LLM_Defaults := unset
+		World := _LSP_World()
+		Receipt := World.Owner.Capture()
+		AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt,
+			"the actual private source must acquire authority without an earlier defaults test")
+		AssertTrue(IsSet(LLM_Defaults) && LLM_Defaults is Map)
+		AssertEqual("ollama", LLM_Defaults["llm_backend"])
+		World.Restore()
+		World := 0
+		if InitiallySet {
+			AssertTrue(IsSet(LLM_Defaults) && LLM_Defaults == ForeignDefaults,
+				"fixture retirement must restore the exact inherited defaults object")
+			AssertTrue(LLM_Defaults["unrelated_fixture_sentinel"]["retained"])
+		} else
+			AssertFalse(IsSet(LLM_Defaults), "fixture retirement must restore an unset boot dependency")
+	} finally {
+		try {
+			if World is _LSP_World
+				World.Restore()
+		} finally {
+			if HadOuterDefaults
+				LLM_Defaults := OuterDefaults
+			else
+				LLM_Defaults := unset
+		}
+	}
+}
+Test("Local source defaults fixture: cold admission owns and restores unset defaults (local-source-defaults-fixture)",
+	_LSP_DefaultsFixtureOwnsColdAdmission.Bind(false))
+Test("Local source defaults fixture: cold admission restores the exact inherited object (local-source-defaults-fixture)",
+	_LSP_DefaultsFixtureOwnsColdAdmission.Bind(true))
