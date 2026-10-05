@@ -1974,6 +1974,12 @@ const CHECKS = [
 		repro: 'npm run test:download-window-session'
 	},
 	{
+		name: 'managed download failures render safe translated actions with captured owners',
+		cmd: 'node',
+		args: ['tools/test/test-managed-network-failure-ui.cjs'],
+		repro: 'npm run test:managed-network-failure-ui'
+	},
+	{
 		name: 'model browser actions retain their operation session across native reuse',
 		cmd: 'node',
 		args: ['tools/test/test-model-browser-session.cjs'],
@@ -2234,6 +2240,12 @@ if (failed.length === 0) {
 
 console.log(`❌  ${failed.length}/${results.length} JS check(s) FAILED:\n`);
 for (const f of failed) {
+	if (process.env?.GITHUB_ACTIONS === 'true') {
+		// Check names remain available through the API when archived log access
+		// fails. Never copy command output, URLs or native receipts here.
+		const name = f.name.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+		console.log(`::error title=Shared validation check failed::${name}`);
+	}
 	console.log(`  ✗ ${f.name}`);
 	console.log(`    reproduce: ${f.repro}`);
 	console.log(

@@ -1,0 +1,75 @@
+<!-- _shared/ui/changelog/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+		/>
+		<title data-i18n="changelog_window.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+		<script src="../markdown.js"></script>
+		<script src="../repository_links.js"></script>
+		<script src="atom_feed.js"></script>
+		<script src="release_body.js"></script>
+		<script src="../_generated/update_channel_registry.js"></script>
+		<script src="../update_channels.js"></script>
+		<script src="../version_order.js"></script>
+	</head>
+	<body>
+		<div id="sidebar">
+			<div id="sidebar-header">
+				<div id="channel-toggle"></div>
+			</div>
+			<div id="release-list"></div>
+		</div>
+
+		<div id="content">
+			<div id="restore-banner" style="display: none">
+				<span id="restore-text"></span>
+				<button id="btn-restore" type="button"></button>
+			</div>
+			<div id="subscribe-banner" style="display: none">
+				<span id="subscribe-text"></span>
+				<button id="btn-subscribe"></button>
+				<div id="subscribe-confirm" style="display: none">
+					<span id="subscribe-confirm-text"></span>
+					<button id="btn-subscribe-confirm"></button>
+					<button id="btn-subscribe-cancel"></button>
+				</div>
+			</div>
+			<div id="content-header">
+				<div id="release-tag"></div>
+				<div id="release-meta"></div>
+				<button id="btn-install" type="button"></button>
+				<button id="btn-github"></button>
+			</div>
+			<div id="install-note" style="display: none"></div>
+			<div id="install-panel" style="display: none">
+				<span id="install-text"></span>
+				<button id="btn-install-retry" type="button"></button>
+				<div id="install-failure-actions" style="display: none"></div>
+			</div>
+			<div id="release-body"></div>
+		</div>
+
+		<div id="loading-overlay">
+			<div id="loading-spinner"></div>
+			<div id="loading-text" data-i18n="changelog_window.loading"></div>
+		</div>
+
+		<div id="error-overlay" style="display: none">
+			<div id="error-icon">⚠️</div>
+			<div id="error-text"></div>
+			<div id="error-actions">
+				<button id="btn-retry"></button>
+				<button id="btn-releases-page"></button>
+			</div>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>

@@ -184,7 +184,8 @@ end
 --- and a Mac that cannot run MLX, open the repair offer: the next selection,
 --- or its button, always tries again.
 --- @param on_complete function|nil Receives the terminal result.
---- @param opts table|nil { repair = true } for the repair button.
+--- @param opts table|nil { repair = true } for the repair button;
+---   { failure_revision = integer } retains the failed intent through the selection router.
 --- @return boolean accepted
 function M.select_mlx(on_complete, opts)
 	if not mlx_supported_here() then
@@ -198,7 +199,14 @@ function M.select_mlx(on_complete, opts)
 		if type(on_complete) == "function" then return on_complete(ok) end
 		return ok
 	end
-	local install_opts = type(opts) == "table" and opts.repair == true and { repair = true } or nil
+	local install_opts = nil
+	if type(opts) == "table" then
+		if opts.repair == true then install_opts = { repair = true } end
+		if opts.failure_revision ~= nil then
+			install_opts = install_opts or {}
+			install_opts.failure_revision = opts.failure_revision
+		end
+	end
 	return mlx_deps().install_for_selection(settle, install_opts) == true
 end
 

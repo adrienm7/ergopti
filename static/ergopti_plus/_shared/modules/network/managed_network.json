@@ -1,0 +1,310 @@
+{
+	"schema_version": 1,
+	"fields": {
+		"stage": {
+			"type": "string",
+			"values": [
+				"proxy_resolve",
+				"proxy_connect",
+				"connect",
+				"tls",
+				"http",
+				"file_read",
+				"file_write",
+				"file_create",
+				"file_rename",
+				"file_remove"
+			]
+		},
+		"backend": {
+			"type": "string",
+			"values": [
+				"curl",
+				"winhttp",
+				"wininet",
+				"dotnet",
+				"urlsession",
+				"gio",
+				"native_fs",
+				"native_socket"
+			]
+		},
+		"failure_provenance": {
+			"type": "string",
+			"values": ["verified", "unavailable", "unknown"]
+		},
+		"native_errno_domain": {
+			"type": "string",
+			"values": ["posix", "win32", "winsock"]
+		},
+		"native_errno": {
+			"type": "string"
+		},
+		"curl_exit": {
+			"type": "integer"
+		},
+		"http_status": {
+			"type": "integer"
+		},
+		"http_response_source": {
+			"type": "string",
+			"values": ["proxy", "origin", "unavailable"]
+		},
+		"proxy_connect_status": {
+			"type": "integer"
+		},
+		"proxy_mode": {
+			"type": "string",
+			"values": ["selected", "direct", "environment", "unavailable"]
+		},
+		"proxy_resolution_status": {
+			"type": "string",
+			"values": [
+				"selected",
+				"direct",
+				"pac_failed",
+				"wpad_failed",
+				"invalid_configuration",
+				"unavailable"
+			]
+		},
+		"tls_verification": {
+			"type": "string",
+			"values": ["enforced", "disabled", "unavailable"]
+		},
+		"tls_status": {
+			"type": "string",
+			"values": [
+				"untrusted_certificate",
+				"expired_certificate",
+				"hostname_mismatch",
+				"revoked_certificate",
+				"unavailable"
+			]
+		},
+		"network_status": {
+			"type": "string",
+			"values": ["disconnected", "unavailable"]
+		}
+	},
+	"causes": {
+		"certificate": {
+			"message_key": "network.failure.certificate",
+			"actions": ["retry", "alternative_backend", "diagnostics"]
+		},
+		"proxy": {
+			"message_key": "network.failure.proxy",
+			"actions": ["retry", "proxy_settings", "diagnostics"]
+		},
+		"host_blocked": {
+			"message_key": "network.failure.host_blocked",
+			"actions": ["retry", "alternative_backend", "proxy_settings", "diagnostics"]
+		},
+		"offline": {
+			"message_key": "network.failure.offline",
+			"actions": ["retry", "proxy_settings", "diagnostics"]
+		},
+		"disk": {
+			"message_key": "network.failure.disk",
+			"actions": ["retry", "download_folder", "diagnostics"]
+		},
+		"permission": {
+			"message_key": "network.failure.permission",
+			"actions": ["retry", "download_folder", "diagnostics"]
+		},
+		"unknown": {
+			"message_key": "network.failure.unknown",
+			"actions": ["retry", "diagnostics"]
+		}
+	},
+	"capabilities": [
+		"owner_alive",
+		"retry_available",
+		"proxy_settings_available",
+		"download_folder_available",
+		"download_folder_owned",
+		"diagnostics_available",
+		"alternative_backend_available"
+	],
+	"actions": {
+		"retry": {
+			"label_key": "network.action.retry",
+			"requires": ["owner_alive", "retry_available"]
+		},
+		"proxy_settings": {
+			"label_key": "network.action.open_proxy_settings",
+			"requires": ["proxy_settings_available"]
+		},
+		"download_folder": {
+			"label_key": "network.action.open_download_folder",
+			"requires": ["download_folder_available", "download_folder_owned"]
+		},
+		"diagnostics": {
+			"label_key": "error_dialog.open_log",
+			"requires": ["diagnostics_available"]
+		},
+		"alternative_backend": {
+			"label_key": "mlx.use_ollama",
+			"requires": ["owner_alive", "alternative_backend_available"]
+		}
+	},
+	"rules": [
+		{
+			"id": "file_space_posix",
+			"cause": "disk",
+			"when": {
+				"stage": ["file_read", "file_write", "file_create", "file_rename", "file_remove"],
+				"failure_provenance": ["verified"],
+				"native_errno_domain": ["posix"],
+				"native_errno": ["ENOSPC", "EDQUOT"]
+			}
+		},
+		{
+			"id": "file_space_win32",
+			"cause": "disk",
+			"when": {
+				"stage": ["file_read", "file_write", "file_create", "file_rename", "file_remove"],
+				"failure_provenance": ["verified"],
+				"native_errno_domain": ["win32"],
+				"native_errno": ["39", "112"]
+			}
+		},
+		{
+			"id": "file_permission_posix",
+			"cause": "permission",
+			"when": {
+				"stage": ["file_read", "file_write", "file_create", "file_rename", "file_remove"],
+				"failure_provenance": ["verified"],
+				"native_errno_domain": ["posix"],
+				"native_errno": ["EACCES", "EPERM", "EROFS"]
+			}
+		},
+		{
+			"id": "file_permission_win32",
+			"cause": "permission",
+			"when": {
+				"stage": ["file_read", "file_write", "file_create", "file_rename", "file_remove"],
+				"failure_provenance": ["verified"],
+				"native_errno_domain": ["win32"],
+				"native_errno": ["5", "19"]
+			}
+		},
+		{
+			"id": "verified_native_certificate",
+			"cause": "certificate",
+			"when": {
+				"stage": ["tls"],
+				"failure_provenance": ["verified"],
+				"tls_verification": ["enforced"],
+				"tls_status": [
+					"untrusted_certificate",
+					"expired_certificate",
+					"hostname_mismatch",
+					"revoked_certificate"
+				]
+			}
+		},
+		{
+			"id": "curl_certificate_verification",
+			"cause": "certificate",
+			"when": {
+				"backend": ["curl"],
+				"stage": ["tls"],
+				"failure_provenance": ["verified"],
+				"tls_verification": ["enforced"],
+				"curl_exit": [60]
+			}
+		},
+		{
+			"id": "proxy_connect_authentication",
+			"cause": "proxy",
+			"when": {
+				"stage": ["proxy_connect"],
+				"failure_provenance": ["verified"],
+				"proxy_connect_status": [407]
+			}
+		},
+		{
+			"id": "selected_proxy_authentication",
+			"cause": "proxy",
+			"when": {
+				"stage": ["http"],
+				"failure_provenance": ["verified"],
+				"proxy_mode": ["selected"],
+				"http_response_source": ["proxy"],
+				"http_status": [407]
+			}
+		},
+		{
+			"id": "verified_proxy_resolution_failure",
+			"cause": "proxy",
+			"when": {
+				"stage": ["proxy_resolve"],
+				"failure_provenance": ["verified"],
+				"proxy_resolution_status": ["pac_failed", "wpad_failed", "invalid_configuration"]
+			}
+		},
+		{
+			"id": "curl_proxy_name_resolution",
+			"cause": "proxy",
+			"when": {
+				"backend": ["curl"],
+				"stage": ["proxy_resolve"],
+				"failure_provenance": ["verified"],
+				"curl_exit": [5]
+			}
+		},
+		{
+			"id": "proxy_connect_policy_denial",
+			"cause": "host_blocked",
+			"when": {
+				"stage": ["proxy_connect"],
+				"failure_provenance": ["verified"],
+				"proxy_connect_status": [403, 451]
+			}
+		},
+		{
+			"id": "native_socket_policy_denial",
+			"cause": "host_blocked",
+			"when": {
+				"backend": ["native_socket"],
+				"stage": ["connect"],
+				"failure_provenance": ["verified"],
+				"native_errno_domain": ["posix"],
+				"native_errno": ["EACCES", "EPERM"]
+			}
+		},
+		{
+			"id": "native_socket_unreachable_posix",
+			"cause": "offline",
+			"when": {
+				"backend": ["native_socket"],
+				"stage": ["connect"],
+				"failure_provenance": ["verified"],
+				"native_errno_domain": ["posix"],
+				"native_errno": ["ENETDOWN", "ENETUNREACH", "EHOSTUNREACH"]
+			}
+		},
+		{
+			"id": "native_socket_unreachable_winsock",
+			"cause": "offline",
+			"when": {
+				"backend": ["native_socket"],
+				"stage": ["connect"],
+				"failure_provenance": ["verified"],
+				"native_errno_domain": ["winsock"],
+				"native_errno": ["10050", "10051", "10065"]
+			}
+		},
+		{
+			"id": "verified_disconnected_network",
+			"cause": "offline",
+			"when": {
+				"stage": ["connect"],
+				"failure_provenance": ["verified"],
+				"network_status": ["disconnected"]
+			}
+		}
+	],
+	"default_cause": "unknown"
+}
