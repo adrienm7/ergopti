@@ -376,6 +376,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Roll back native category and score edits after SQLite refusal
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_category_edit_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_category_edit_receipts.lua
+        timeout-minutes: 1
+
       - name: Read actual canonical XKB symbol lists outside quoted metadata
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

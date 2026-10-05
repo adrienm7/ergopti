@@ -749,12 +749,17 @@ function M.set_app_category(device_id, app_name, category, score)
 	if not M.is_available() then return false end
 	if type(app_name) ~= "string" or app_name == "" then return false end
 	if type(category) ~= "string" or category == "" then return false end
-	local sql = string.format(
-		"UPDATE agg_app_day SET category = '%s' WHERE device_id = '%s' AND app = '%s';",
-		_sql_escape(category), _sql_escape(device_id), _sql_escape(app_name))
-	local ok = _exec(sql)
-	if ok then M.set_meta("app_score." .. app_name, tostring(math.floor(tonumber(score) or 0))) end
-	return ok
+	-- Category and score are one edit. Native -bail closes an unfinished
+	-- transaction after a statement error, undoing even an AFTER trigger FAIL.
+	local sql = string.format([[
+BEGIN;
+UPDATE agg_app_day SET category = '%s' WHERE device_id = '%s' AND app = '%s';
+INSERT OR REPLACE INTO meta (key, value) VALUES ('%s', '%s');
+COMMIT;
+]],
+		_sql_escape(category), _sql_escape(device_id), _sql_escape(app_name),
+		_sql_escape("app_score." .. app_name), _sql_escape(tostring(math.floor(tonumber(score) or 0))))
+	return _exec(sql)
 end
 
 -- How many window titles one application-day keeps. From the shared accumulator

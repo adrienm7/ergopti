@@ -1795,6 +1795,28 @@ These are software implementations; final hardware verification remains below.
   wider raw-input grammar remain separate. No physical magic, reserved shortcut,
   display/device, normalization, comment grammar or group policy change.
 
+- [~] **L121.** Linux native application category/score edit: publish the
+  existing category UPDATE and score INSERT in one checked SQLite transaction.
+  Previously a score-write refusal could leave the category changed and report
+  success. Native statement errors now stop before COMMIT; closing the native
+  connection rolls back the unfinished edit, including AFTER trigger FAIL
+  effects. Fifteen genuine Bridge/Keylogger/Writer/SQLite checks reproduce
+  three failures and pass under current LuaJIT, signed Ubuntu 22.04 luv/libuv
+  dependencies and Lua 5.4; SQLite/kernel/libc stay current in the mixed profile.
+  Retain unchanged category/score/cache on ABORT and FAIL, truthful saved replies,
+  healthy retries, existing defaults/floors/filtering/escaping and CRLF/Unicode
+  controls. Writer-only NUL hex/value fidelity is checked separately; the older
+  fourteen-case diagnostic retains its unresolved Reader NUL projection and
+  is not claimed green. Six additive command-adapter unit cases reproduce two
+  failures and pass on both Lua runtimes, with every previous assertion intact;
+  prior native metadata20 remains green on all three profiles. Register future
+  Linux CI without launching it. This proves statement-error rollback; a lost
+  receipt after successful COMMIT remains outside this guarantee. macOS uses
+  one categories-object publication; Windows has a different category-only
+  sidecar and no equivalent two-statement SQL action by source inspection.
+  Foreign native behavior is untested. No Reader/schema/cache/flush/TOML,
+  physical input or reserved title/shortcut change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
