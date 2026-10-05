@@ -1886,9 +1886,11 @@ These are software implementations; final hardware verification remains below.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
   acknowledgement, external-write conflict detection and retryable rollback.
-  Recommended delay values must match effective runtime inheritance: deleting
-  `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
-  0.5 s. Do not assume deletion implements the recommendation. Hotstrings: Linux
+  Recommended delay values must match effective runtime inheritance for the
+  currently published feature catalogue. The retired `autocorrection.caps`
+  namespace is obsolete source data, preserved until explicit cleanup; it is
+  not a current recommendation target. Do not assume deletion implements the
+  recommendation. Hotstrings: Linux
   categories, sections and scalar settings are canonical config.toml leaves,
   with a one-shot import of legacy storage.json choices; both Lua drivers have a
   two-file recommended/clear owner whose planner writes explicit delays where
@@ -2028,22 +2030,24 @@ publication/rollback owners in code before device acceptance. On Windows,
 replay fresh/existing/moved folder recommendation and clear with exact backups,
 strict external-write refusal, restart and actual input; retain items 16/38.
 
-The reviewed compensation tranche retains native Linux scope claims and
-acknowledged participant receipts through rollback and finalization retries.
-Portable native and shared contracts pass. Direct Script participation and
-physical-device acceptance remain open; this does not complete global reset.
+Current global composition now retains its exact admitted participant cohort,
+including refused finalization. Linux Shortcuts, Hotstrings, Metrics and AI
+scope owners keep the actual file/runtime claims through compensation; an
+acknowledged sibling release is reacquired before a retained rollback may run.
+Retry settles only the outstanding phase and does not repeat accepted inverses
+or overwrite successor runtime owners. Independent focused contracts pass;
+current full selected and hosted qualification are recorded separately. Direct
+Script participation is now implemented on Linux/macOS through the shared
+planner, live logger/locale/error owners and acknowledged native settings
+receipts. Initial same-threshold successor defects refuse through raw parent
+identity fences. Final composed, installed and device acceptance remain open.
 
-Direct scope planning now preserves the selected declaration while
-leaving included scopes to their native owners. Existing recursive APIs
-retain exclusions and dynamic policies. Script runtime participation and
-physical acceptance remain separate prerequisites.
-
-Linux and macOS global composition now includes direct Script settings,
-using actual logger, locale, error and native settings owners with verified
-backups, exact inverse receipts and raw successor fences. Hammerspoon void
-setter completion requires matching whole-cohort readback; clear retains
-its native Boolean contract. Portable validation and native qualification
-are recorded separately; installed and device acceptance remain open.
+The native Script settings cohort refuses valid JSON source whose current
+codec cannot preserve exact decimal semantics, including large integers and
+some fractional spellings. It preserves the original source on refusal. This
+conservative boundary remains source work for complete future-data support;
+portable settings models do not prove actual Hammerspoon storage or atomic
+cross-process publication.
 
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
@@ -2110,9 +2114,12 @@ qualified separately. Installed Windows and macOS wizard reruns, restart and
 physical input remain device acceptance; work-machine logs/screenshots need
 not be exported. Follow PARTIAL-DELIVERY.md and record the exact artifact.
 
-The Lua wizard character planner rejects malformed UTF-8 before native
-writes through the shared decoder. Both portable runtimes pass; genuine
-WebView transport, installed wizard and device acceptance remain open.
+The shared Lua wizard planner now uses the canonical strict UTF-8 owner for
+single-character answers. Overlong encodings, surrogate values and values above
+U+10FFFF refuse before writes on macOS, while valid BMP/non-BMP symbols and the
+existing Linux rare-symbol policy retain their previous behavior. Independent
+actual-catalogue controls pass on both Lua runtimes; this source qualification
+does not establish native WebView transport or installed-device acceptance.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
@@ -2861,28 +2868,16 @@ obsolete-value preservation; do not remove assertions. Full failure annotations
 are truncated; the exact known subjects and limits are in the current partial
 delivery evidence. E2E/package/install remain skipped, not passed.
 
-Published declaration metadata is available without resolving hardware
-defaults, supporting strict expert-value admission through the actual
-catalogue. This additive API does not complete expert-field coverage.
+Additional native macOS source-policy controls preserve carried nonstring
+combination leaves on unrelated saves and refuse requested replacement until
+explicit repair. Known expert script logger thresholds and manifest-declared
+feature values are admitted through their actual published catalogues; invalid
+values remain unread, warned and byte-preserved. Metadata inspection is pure and
+does not resolve a hardware backend. Deliberate arbitrary expert scalar fields
+retain their existing API. These bounded slices do not complete the catalogue,
+whole-file refusal, persisted-legacy-settings or native acceptance requirements.
 
-Native macOS logger and known feature admission uses the published
-catalogues. Malformed carried combination leaves stay byte-preserved on
-unrelated saves and refuse requested replacement. Both portable native
-suites pass; wider expert catalogue and installed acceptance remain open.
-
-Windows known-feature fixtures use the current names declaration and
-retain strict publication generations, native restart timing and obsolete
-source preservation. Composed native Windows qualification remains open.
-
-Typed macOS section-order projection warns and preserves malformed rows
-and source-proven empty arrays, refusing requested replacement until
-explicit repair. Its optional native data namespace is declared in the
-shared manifest and schema without adding an enable flag or defaults.
-
-Linux settings source whose current JSON codec cannot preserve exact
-number semantics refuses before publication and keeps the original bytes.
-Some valid fractions and large integers remain unsupported source; this
-conservative boundary does not complete future-data compatibility.
+The 2026-10-05 continuation preserves malformed shortcut-order source rows and source-proven empty arrays instead of treating them as valid maps. Requested replacement refuses until explicit repair; valid reorders and resets retain unrelated source kinds. The Windows known-feature fixtures now target the currently published `names` owner, keeping the removed `caps` namespace as a source-preservation/explicit-cleanup control. The changed-publication/restart timing remains an explicit nondefault Float (0.75), with the separate 0.5 default test retained. Focused portable checks and independent source review pass; final composed and hosted Windows qualification remain pending.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -3355,25 +3350,17 @@ document/config dotted assignments with independent expected models. Preserve
 retired scalar collisions until explicit cleanup; ordinary saves must refuse
 them. Installed-driver restart and actual menu persistence remain acceptance.
 
-The shared TOML leaf writer preserves authenticated same-source array,
-object and scalar kinds. Stale and forged kind hints refuse. Portable
-real-file fixtures pass; complete unused-key projections remain open.
+Ordinary Windows full-save, onboarding and AI configuration candidates now use
+the same semantic-document writer as targeted configuration updates, preserving
+root-dotted, quoted and inline source identities through the existing leases,
+staging and durable receipt owners. Shared Lua leaf publication and explicit
+unused-key cleanup retain authenticated source array/object kinds and opaque
+scalar lexemes; stale or forged shape hints refuse. Native macOS custom wrap
+choices publish through their canonical typed namespace and conditional writer,
+including future pair metadata. All native Windows causal fixtures and final
+packaging/install acceptance remain separately required.
 
-New Windows sections publish native-readable headers only after semantic
-admission against surviving physical source. First publication and
-explicit replacement pass in targeted Windows CI; the composed native
-suite, E2E, packaging and installation remain separately required.
-
-Ordinary Windows full saves preserve obsolete settings and route their
-collected leaves through the semantic writer. Explicit retired physical
-section cleanup owns and verifies its exact backup source inside the
-existing transaction. Unsupported dotted, inline and table-array cleanup
-projections remain source work; final native acceptance is still required.
-
-Typed Wrap preferences and explicit cleanup share authenticated source
-kinds through native projection and conditional publication, including
-future custom-pair metadata. Native and installed acceptance remain
-separate requirements.
+The 2026-10-05 continuation adds source-bound explicit Windows cleanup of retired physical sections, including empty section headers, exact case identities and verified backup bytes. Ordinary full saves preserve retired entries. New Windows namespace publication now uses an explicit native-readable header only when the semantic parser admits that declaration after explicitly owned drops; closed dotted/inline owners keep their existing legal insertion route. Complete independently written images and actual flat-reader assertions cover first publication and explicit replacement. Native qualification is still in progress; unsupported retired dotted/inline/table-array cleanup projections remain implementation work.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -4135,10 +4122,19 @@ blocked by those predecessors; Gesture mode has no complete test/generation
 qualification. Continue remaining families to the actual zero-site ratchet.
 These are implementation tasks; separate installed tray/input acceptance.
 
-The reviewed Wrap, Gesture and Tap-Hold fixed controls consume canonical
-shared templates, including translated captions and per-key duration
-prompts in all 21 locales. Dynamic native sensitivity choices and remaining
-fixed provider families remain implementation work.
+Further fixed Wrap, Gesture mode/sensitivity/action and Tap-Hold duration and
+Karabiner guidance controls now consume shared declarations through actual
+native templates. Inert labels, named composed headers and checked templates
+retain strict field and getter contracts; clicked submenus still require a
+usable child. Each native composition edge carries executable source evidence,
+and transparent includes retain cycle, missing-target and duplicate-identity
+refusal. The Windows per-key duration path preserves physical TOML source and
+requires the precise native publication witness before reload. Its current-value
+prompt is genuinely translated in all 21 locales. Independent historical
+corpora remain immutable. Full selected and all-OS native qualification remain
+required; the remaining fixed native families and physical acceptance are open.
+
+The 2026-10-05 Swipe continuation declares its fixed action separator, mode group and sensitivity group once in the shared manifest. Native selection, eighteen numeric sensitivity choices and acknowledged compensation remain their existing owners. Two captions use genuine translated prefixes in all 21 locales. Source/graph/callback controls and the old-producer inverse pass; final composed native and physical UI qualification remain pending. This does not complete the remaining fixed provider controls.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
@@ -4389,11 +4385,7 @@ Complete the source steps under item 54, then native E2E/package/install and
 real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
 fix as explicit code work rather than unsupported-platform exceptions.
 
-The owner-generated native-row ceiling is Windows83/macOS126/Linux93
-with 76 canonical menu sections. Each removed fixed site has actual native
-consumer and independent graph/order evidence. The eighteen numeric Swipe
-choices and remaining native providers are not claimed migrated; items
-54/81 and transverse16/38 remain open.
+The composed 2026-10-05 source census is Windows 83, macOS 126 and Linux 93 after the additional three macOS Swipe sites are migrated. The canonical generator owns the 76 menu sections and the baseline generator owns this lower ceiling. Clicked mode children and the composed sensitivity heading are distinct proof edges; the latter does not claim the eighteen numeric native choices. Other fixed/native provider controls remain source work, so this item stays partial.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
