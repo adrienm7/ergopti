@@ -2573,6 +2573,8 @@ The existing before-package native Canvas gate now requires the same actual Hamm
 
 Actual Windows CI exposed two fixture premises in the new semantic snapshot controls: a stale caps raw-row lookup despite a names source, and an applied-record count omitting the independently supplied trigger. The successor retains all other assertions, checks the real trigger positively and expects both valid records. Native Windows execution remains required; no production loader or retirement policy changes.
 
+The canonical JSON codec now offers private strict root-object source receipts and explicit root-member splicing. It retains unowned numeric/container tokens, escaped identities and source trivia without whole-document encoding, and reparses the complete candidate. All122 prior corpus behaviors and registered test prefixes remain unchanged; independent Linux33/0 and macOS25/0 pass on both runtimes, while actual whole-encode controls fail12 cases. This is a pure source primitive: it grants no file liveness or publication authority, and native owned/ordinary Storage adoption remains necessary before the conservative numeric boundary can be lifted.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
