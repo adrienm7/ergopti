@@ -241,6 +241,21 @@ helpers.describe("linux-sqlite-writer-receipts", function()
 	end
 end)
 
+--- Captures actual Writer SQL while simulating only the CLI exit receipt.
+local function with_ngram_sql(test)
+	local command = require("modules.keylogger.sqlite_command")
+	local previous_build, statements = command.build, {}
+	command.build = function(path, sql, options)
+		if sql:find("INSERT INTO ngram_", 1, true) then statements[#statements + 1] = sql end
+		return previous_build(path, sql, options)
+	end
+	local ok, reason = xpcall(function()
+		with_category_commands(nil, function(writer) test(writer, statements) end)
+	end, debug.traceback)
+	command.build = previous_build
+	if not ok then error(reason, 0) end
+end
+
 helpers.describe("sqlite_writer", function()
 
   -- ==========================================================================
@@ -275,10 +290,31 @@ helpers.describe("sqlite_writer", function()
 		local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
 		local fh = assert(io.open(path, "r"))
 		local src = fh:read("*a"); fh:close()
-		helpers.assert_true(src:find("esrc_json = json_object", 1, true) ~= nil,
-			"source histogram must be merged across flushes instead of overwritten")
-		helpers.assert_true(src:find("'hotstring'", 1, true) ~= nil)
-		helpers.assert_true(src:find("'llm'", 1, true) ~= nil)
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 14, td = 7, cd = 2, e = 1,
+					sources = { hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5 } },
+			}))
+			helpers.assert_eq(#statements, 1, "the actual Writer must compose one n-gram SQL subject")
+			local sql = statements[1]
+			helpers.assert_type(sql, "string")
+			helpers.assert_true(sql ~= "", "source-preservation checks need an actual SQL subject")
+			helpers.assert_contains(sql, "(device_id, date, app, token, c, td, cd, e, esrc_json)")
+			local admitted = sql:match(",14,7,2,1,'([^']*)'")
+			helpers.assert_type(admitted, "string", "known and arbitrary source counts must accompany the scalar fields")
+			helpers.assert_eq(require("json").decode(admitted), {
+				hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5,
+			})
+			helpers.assert_contains(sql, "ON CONFLICT(device_id, date, app, token) DO UPDATE SET")
+			helpers.assert_contains(sql, "esrc_json = (SELECT json_group_object(k, v)")
+			helpers.assert_contains(sql, "SELECT key AS k, SUM(value) AS v")
+			helpers.assert_contains(sql, "SELECT key, value FROM json_each(esrc_json)")
+			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(excluded.esrc_json)")
+			helpers.assert_contains(sql, "GROUP BY key")
+			for _, scalar in ipairs({ "c", "td", "cd", "e" }) do
+				helpers.assert_contains(sql, scalar .. " = " .. scalar .. " + excluded." .. scalar .. ", ")
+			end
+		end)
 		helpers.assert_true(src:find("INSERT INTO ngram_scancodes", 1, true) ~= nil,
 			"evdev hardware counts must be persisted in the canonical scancode table")
 	end)
@@ -796,4 +832,68 @@ helpers.describe("linux-sqlite-raw-batch-transactions", function()
 			end)
 		end
 	end
+end)
+
+helpers.describe("linux-sqlite-ngram-source-map", function()
+	it("linux-sqlite-ngram-source-map: each admitted source is merged as a literal key", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 4, td = 7, cd = 2, e = 1, sources = { extension = 2, hotstring = 1, llm = 1, other = 1 } },
+			}))
+			helpers.assert_eq(#statements, 1)
+			local sql = statements[1]
+			helpers.assert_contains(sql, "json_each(esrc_json)")
+			helpers.assert_contains(sql, "json_each(excluded.esrc_json)")
+			helpers.assert_contains(sql, "SUM(value)")
+			helpers.assert_contains(sql, "GROUP BY key")
+			for _, key in ipairs({ "extension", "hotstring", "llm", "other" }) do
+				helpers.assert_contains(sql, '"' .. key .. '":')
+			end
+			for _, scalar in ipairs({ "c", "td", "cd", "e" }) do
+				helpers.assert_contains(sql, scalar .. " = " .. scalar .. " + excluded." .. scalar .. ", ")
+			end
+		end)
+	end)
+
+	it("linux-sqlite-ngram-source-map: all nine native table families share literal-key merging", function()
+		with_ngram_sql(function(writer, statements)
+			local families = 0
+			for target in pairs(writer.NGRAM_TABLES) do
+				families = families + 1
+				helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+					x = { c = 1, sources = { ["extension.v2"] = 1 } },
+				}, target))
+				local sql = statements[families]
+				helpers.assert_contains(sql, "INSERT INTO " .. target .. " ")
+				helpers.assert_contains(sql, "json_each(esrc_json)")
+				helpers.assert_contains(sql, "json_each(excluded.esrc_json)")
+			end
+			helpers.assert_eq(families, 9)
+			helpers.assert_eq(#statements, 9)
+		end)
+	end)
+
+	it("linux-sqlite-ngram-source-map: original numeric admission and floors retain every string label", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 1, sources = { extension = 2.9, [""] = 1.9, string_count = "3", zero = 0, negative = -1 } },
+			}))
+			local sql = statements[1]
+			helpers.assert_contains(sql, '"extension":2')
+			helpers.assert_contains(sql, '"":1')
+			helpers.assert_true(not sql:find("string_count", 1, true))
+			helpers.assert_true(not sql:find('"zero"', 1, true))
+			helpers.assert_true(not sql:find('"negative"', 1, true))
+		end)
+	end)
+
+	it("linux-sqlite-ngram-source-map: refused native receipt never acknowledges a source delta", function()
+		for _, status in ipairs({ 7, 127, "missing" }) do
+			with_writer_read_receipts("", status, function(writer)
+				helpers.assert_eq(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+					x = { c = 1, sources = { extension = 1 } },
+				}), false)
+			end)
+		end
+	end)
 end)

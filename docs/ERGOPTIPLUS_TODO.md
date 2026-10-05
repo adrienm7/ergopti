@@ -2255,6 +2255,31 @@ These are software implementations; final hardware verification remains below.
   principal notification/HTTP assertions. No bridge, backend, input hook, menu,
   configuration, source-admission, translation or reserved implementation change.
 
+- [~] **L140.** Linux ngram source conflicts: reuse the existing numeric-map
+  SQL accumulator so successive flushes retain every admitted literal source key.
+  Preserve existing string/positive-number admission, floors, scalar counters,
+  schema and generic helper. Actual public software output and native SQLite
+  reproduce four failures among twelve before, then pass after, on current
+  LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. An independent
+  read-only Python connection verifies the same twelve outcomes from native
+  snapshots. Eight healthy controls retain known-source addition, manual absence,
+  raw tagged events, exact c/td/cd/e, device/date isolation and numeric admission.
+  Quoted Unicode/dotted keys and persisted numeric-string counts accumulate.
+  Four additive registered units pass; all104 Writer controls remain green.
+  Strengthen only three old source-shape assertions into captured public Writer
+  SQL, decoded known/extra input maps, cumulative literal-key inputs and scalar
+  bindings; preserve every other old byte and assertion. All six focused faulty
+  mutations are caught by the original strengthened subject and native fixture.
+  Register future native/Python CI pairs without launching workflows. Windows
+  already enumerates literal source keys; macOS uses generic JSON-path merging,
+  supporting conventional labels by source inspection, without establishing
+  dotted/quoted/empty literal-key parity. Foreign native runtimes and physical
+  input are unexecuted. This conflict slice does not fix control-character key
+  encoding, pending live-source projection or cross-flush session accounting.
+  Preserve both language packs and principal notification/HTTP assertions. No
+  collector, Reader, shared helper, raw event, timing, schema, configuration,
+  menu, reserved implementation or foreign driver change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -1068,10 +1068,7 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 		.. "td = td + excluded.td, "
 		.. "cd = cd + excluded.cd, "
 		.. "e = e + excluded.e, "
-		.. "esrc_json = json_object("
-		.. "'hotstring', COALESCE(json_extract(esrc_json, '$.hotstring'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.hotstring'), 0), "
-		.. "'llm', COALESCE(json_extract(esrc_json, '$.llm'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.llm'), 0), "
-		.. "'other', COALESCE(json_extract(esrc_json, '$.other'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.other'), 0));",
+		.. number_map_merge_sql("esrc_json") .. ";",
 		table.concat(parts, ",")
 	)
 	return _exec(sql)
