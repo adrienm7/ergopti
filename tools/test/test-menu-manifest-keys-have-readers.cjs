@@ -195,6 +195,80 @@ const groupIds = new Set();
 	}
 })(manifest);
 
+/** Reaches includes only from sections that already have a real reader. */
+function includedSections(menu, roots, consumerAvailable) {
+	const reachable = new Set(roots);
+	if (!consumerAvailable) return reachable;
+	const visiting = new Set();
+	const visited = new Set();
+	function visit(section) {
+		if (visiting.has(section))
+			throw new Error(`manifest section "${section}" has a cyclic include`);
+		if (visited.has(section)) return;
+		visiting.add(section);
+		const rows = Array.isArray(menu[section]) ? menu[section] : [];
+		for (const row of rows) {
+			if (row.type !== 'include') continue;
+			if (!Array.isArray(menu[row.section]))
+				throw new Error(`manifest section "${section}" includes missing section "${row.section}"`);
+			reachable.add(row.section);
+			visit(row.section);
+		}
+		visiting.delete(section);
+		visited.add(section);
+	}
+	for (const root of roots) visit(root);
+	return reachable;
+}
+
+// Dynamic includes need an actual native recursive reader, not merely a
+// declaration naming another declaration. Shared code alone is not a driver.
+const includeConsumerAvailable = sources.some(({ src }) => {
+	const executable = src
+		.split('\n')
+		.filter((line) => {
+			const t = line.trimStart();
+			return !t.startsWith('--') && !t.startsWith(';') && !t.startsWith('//');
+		})
+		.join('\n');
+	return (
+		/ItemType == "include"/.test(executable) &&
+		/_MR_TemplateRows\(_MR_Get\(Item, "section"\),/.test(executable)
+	);
+});
+// New include edges start only at literal driver readers. The historical
+// suffix convention remains below, but an orphan group cannot seed new edges.
+const directlyReadSections = sections.filter((section) => readersOf(section).length > 0);
+let reachableIncludes = new Set(directlyReadSections);
+try {
+	reachableIncludes = includedSections(manifest, directlyReadSections, includeConsumerAvailable);
+} catch (error) {
+	errors.push(error.message);
+}
+
+// These independent graph controls retain rejection of orphan declarations,
+// including mutually referring orphans and declarations without a live reader.
+const assert = require('node:assert/strict');
+const probeMenu = {
+	root: [{ type: 'include', section: 'child' }],
+	child: [{ type: 'include', section: 'leaf' }],
+	leaf: [],
+	orphan: [{ type: 'include', section: 'orphan_cycle' }],
+	orphan_cycle: [{ type: 'include', section: 'orphan' }]
+};
+assert.deepEqual([...includedSections(probeMenu, ['root'], true)], ['root', 'child', 'leaf']);
+assert.deepEqual([...includedSections(probeMenu, ['root'], false)], ['root']);
+assert.deepEqual([...includedSections(probeMenu, [], true)], []);
+assert.throws(
+	() => includedSections({ root: [{ type: 'include', section: 'missing' }] }, ['root'], true),
+	/missing section/
+);
+assert.throws(
+	() => includedSections({ root: [{ type: 'include', section: 'root' }] }, ['root'], true),
+	/cyclic include/
+);
+assert.deepEqual([...includedSections({ root: { unused: true } }, ['root'], true)], ['root']);
+
 // ======================================
 // ======================================
 // ======= 3/ Fields and sections =======
@@ -211,7 +285,7 @@ for (const field of [...fields].sort()) {
 }
 
 for (const section of [...sections].sort()) {
-	if (readersOf(section).length > 0) continue;
+	if (readersOf(section).length > 0 || reachableIncludes.has(section)) continue;
 
 	// The `<id>_group` convention: reachable when a group entry declares the id
 	// AND something actually composes the suffix.

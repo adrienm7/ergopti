@@ -2618,7 +2618,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 96, macOS 153, Linux 97, each
+  drivers still build (current baseline: Windows 95, macOS 152, Linux 96, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -2634,6 +2634,17 @@ fixed caption source per driver: Windows/macOS/Linux 97/154/98 to 96/153/97.
 Independent caption/state/platform corpus and actual menu callback regressions
 cover the bounded slice; hosted Windows execution, physical native validation
 and the final complete three-OS gate remain required. This item stays partial.
+
+The per-key Tap-Hold head now uses one shared ordered child template on all
+three drivers, including the original platform captions and declared separator.
+Native picker, acknowledged writer and refusal owners remain authoritative.
+Independent handwritten order/caption tests and original-provider inversions
+cover this slice. The reader guard follows includes only from actual native
+read roots and rejects missing, cyclic and disconnected consumers. Both owner
+generators reproduce the artifacts; the census falls from 96/153/97 to 95/152/96.
+Items 54/81 remain partial for delay, picker children and other menu families.
+Full selected verification and three-OS native CI are tracked separately;
+physical tray and input acceptance remain required on installed devices.
 
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
@@ -3160,7 +3171,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 96, macOS 153 and Linux 97 rows are still built by the
+  Windows 95, macOS 152 and Linux 96 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
