@@ -51,6 +51,8 @@
 --- ==============================================================================
 
 local M = {}
+local _scope_busy = false
+local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
 
 -- socket.gettime() gives sub-second precision for the millisecond component.
 -- Loaded via pcall so headless unit tests that lack the hs sandbox still work.
@@ -808,6 +810,8 @@ end
 --- Sets the active log level. Messages below this threshold are silently dropped.
 --- @param level number|string Numeric constant (M.LEVELS.DEBUG) or name ("DEBUG", …).
 function M.set_level(level)
+	if _scope_owner ~= nil then return false end
+	_scope_generation = _scope_generation + 1
 	if type(level) == "number" then
 		M.current_level = level
 	elseif type(level) == "string" then
@@ -1758,6 +1762,129 @@ function M.install_runtime_error_capture()
 	end
 
 	_log("INFO", "logger", "Runtime error capture installed (hs.timer guards + console tee).")
+end
+
+--- Reads only the logger state this module owns; no persistence occurs here.
+local function scope_state()
+	return { module = package.loaded["infra.logger"], level = M.current_level }
+end
+
+local function scope_equal(left, right)
+	return rawequal(left.module, right.module) and left.level == right.level
+end
+
+--- Acquires the declared runtime field for one primary transaction token.
+--- @param owner table Exact token; pending() describes primary compensation only.
+--- @return boolean acquired
+function M.scope_acquire(owner)
+	if type(owner) ~= "table" or type(owner.pending) ~= "function" or _scope_owner ~= nil or _scope_busy
+		or not rawequal(package.loaded["infra.logger"], M) then return false end
+	_scope_owner = owner
+	return true
+end
+
+--- Releases the admission gate while retaining opaque inverse receipts.
+--- @param owner table Exact token.
+--- @return boolean released
+function M.scope_release(owner)
+	if _scope_busy or not rawequal(_scope_owner, owner) or owner.pending() ~= false then return false end
+	_scope_owner = nil
+	return true
+end
+
+--- Captures an opaque, source-bound runtime inverse under the native claim.
+--- @param owner table Exact token.
+--- @return table|nil receipt
+local function scope_capture_impl(owner)
+	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.logger"], M) then return nil end
+	local generation = _scope_generation
+	local receipt, before = {}, scope_state()
+	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.logger"], M) or _scope_generation ~= generation then return nil end
+	_scope_receipts[receipt] = { owner = owner, before = before, expected = before, generation = _scope_generation }
+	return receipt
+end
+
+function M.scope_capture(owner)
+	if _scope_busy then return nil end
+	_scope_busy = true
+	local called, result = pcall(scope_capture_impl, owner)
+	_scope_busy = false
+	if not called then return nil end
+	return result
+end
+
+--- Applies one canonical value after proving the captured runtime still owns it.
+--- @param owner table Exact token.
+--- @param receipt table Native opaque receipt.
+--- @param value string Canonical declared log token.
+--- @return boolean applied
+local function scope_apply_impl(owner, receipt, value)
+	local data = _scope_receipts[receipt]
+	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.attempted
+		or data.generation ~= _scope_generation or not scope_equal(scope_state(), data.expected)
+		or not rawequal(package.loaded["infra.logger"], M) then return false end
+	if type(value) ~= "string" or type(M.LEVELS[value]) ~= "number" then return false end
+	local next_value = { module = M, level = M.LEVELS[value] }
+	_scope_generation = _scope_generation + 1
+	data.generation, data.expected, data.attempted = _scope_generation, next_value, true
+	local called = pcall(function()
+		M.current_level = next_value.level
+	end)
+	local observed = scope_state()
+	return called and scope_equal(observed, next_value) and rawequal(_scope_owner, owner)
+		and rawequal(package.loaded["infra.logger"], M) and data.generation == _scope_generation
+end
+
+function M.scope_apply(owner, receipt, value)
+	if _scope_busy then return false end
+	_scope_busy = true
+	local called, result = pcall(scope_apply_impl, owner, receipt, value)
+	_scope_busy = false
+	if not called then return false end
+	return result
+end
+
+--- Restores only this receipt's acknowledged or interrupted scalar publication.
+--- @param owner table Exact token.
+--- @param receipt table Native opaque receipt.
+--- @return boolean restored
+local function scope_restore_impl(owner, receipt)
+	local data = _scope_receipts[receipt]
+	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.generation ~= _scope_generation then return false end
+	local current = scope_state()
+	if not rawequal(current.module, M) or not rawequal(package.loaded["infra.logger"], M) or not (current.level == data.before.level or current.level == data.expected.level) then return false end
+	if not data.attempted or data.restored then return scope_equal(current, data.before) end
+	local called = pcall(function()
+		M.current_level = data.before.level
+	end)
+	local observed = scope_state()
+	if not called or not scope_equal(observed, data.before) or not rawequal(_scope_owner, owner)
+		or not rawequal(package.loaded["infra.logger"], M) or data.generation ~= _scope_generation then return false end
+	_scope_generation = _scope_generation + 1
+	data.generation, data.expected, data.restored = _scope_generation, data.before, true
+	return true
+end
+
+function M.scope_restore(owner, receipt)
+	if _scope_busy then return false end
+	_scope_busy = true
+	local called, result = pcall(scope_restore_impl, owner, receipt)
+	_scope_busy = false
+	if not called then return false end
+	return result
+end
+
+--- Forgets only a finalized inverse, without changing live native state.
+--- @param owner table Exact primary token.
+--- @param receipt table Native opaque receipt.
+--- @return boolean forgotten
+function M.scope_forget(owner, receipt)
+	local data = _scope_receipts[receipt]
+	if _scope_busy or rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or owner.pending() ~= false then return false end
+	if data.forgotten then return true end
+	data.before, data.expected, data.generation = nil, nil, nil
+	data.forgotten = true
+	return true
 end
 
 return M
