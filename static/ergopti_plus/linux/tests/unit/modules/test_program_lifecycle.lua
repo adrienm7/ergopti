@@ -622,3 +622,139 @@ helpers.describe("private native program execution refusal", function()
 		helpers.assert_eq(handle.terminate(), true)
 	end)
 end)
+
+helpers.describe("exact private process close attempts (program106-close-attempt)", function()
+	local function close_fixture(close)
+		local port, state = group_fixture()
+		local counts = { completed = 0, settled = 0 }
+		local handle
+		port.spawn = function(_, _, callback)
+			state.terminal = callback
+			return { close = function(_, receipt) return close(receipt, handle, counts) end }, 4321
+		end
+		handle = Runner.spawn("/bin/sh", {}, function(status)
+			helpers.assert_eq(status, 37)
+			counts.completed = counts.completed + 1
+		end, function() return true end, port)
+		helpers.assert_eq(handle.start(), true)
+		handle.onSettled(function() counts.settled = counts.settled + 1 end)
+		state.absent = true
+		return handle, state, counts
+	end
+
+	for _, admission in ipairs({ "nil", "zero", "true" }) do
+		helpers.it("latches synchronous " .. admission .. " until close returns (program106-close-attempt)", function()
+			local calls, reentry, snapshot = 0, nil, nil
+			local handle, state, counts = close_fixture(function(receipt, pending, observed)
+				calls = calls + 1
+				receipt()
+				reentry = pending.isSettled()
+				snapshot = { completed = observed.completed, settled = observed.settled }
+				if admission == "zero" then return 0 end
+				if admission == "true" then return true end
+			end)
+			state.terminal(37, 0)
+			helpers.assert_eq(reentry, false, "callback before close ACK cannot retire the owner")
+			helpers.assert_eq(snapshot, { completed = 0, settled = 0 })
+			helpers.assert_eq(handle.isSettled(), true)
+			helpers.assert_eq(counts, { completed = 1, settled = 1 })
+			helpers.assert_eq(calls, 1)
+		end)
+	end
+
+	for _, refusal in ipairs({ "false", "throw", "text", "nil_error" }) do
+		helpers.it("rejects synchronous " .. refusal .. " callbacks (program106-close-attempt)", function()
+			local phase, current, rejected, calls = "refused", nil, nil, 0
+			local reentry, snapshot
+			local handle, state, counts = close_fixture(function(receipt, pending, observed)
+				calls = calls + 1
+				if phase == "pending" then current = receipt; return 0 end
+				rejected = receipt
+				receipt()
+				reentry = pending.isSettled()
+				snapshot = { completed = observed.completed, settled = observed.settled }
+				if refusal == "throw" then error("private rejected close receipt") end
+				if refusal == "text" then return "private malformed close receipt" end
+				if refusal == "nil_error" then return nil, "private native close error" end
+				return false
+			end)
+			state.terminal(37, 0)
+			helpers.assert_eq(reentry, false, "synchronous reentry must retain unadmitted debt")
+			helpers.assert_eq(snapshot, { completed = 0, settled = 0 })
+			helpers.assert_eq(counts, { completed = 0, settled = 0 })
+			phase = "pending"
+			helpers.assert_eq(handle.isSettled(), false)
+			helpers.assert_eq(calls, 2, "rejected attempt must yield to one freshly admitted retry")
+			rejected()
+			helpers.assert_eq(handle.isSettled(), false, "rejected callback cannot retire a newer close attempt")
+			helpers.assert_eq(counts, { completed = 0, settled = 0 })
+			current()
+			helpers.assert_eq(handle.isSettled(), true)
+			helpers.assert_eq(counts, { completed = 1, settled = 1 })
+		end)
+	end
+
+	for _, refusal in ipairs({ "false", "throw", "nil_error" }) do
+		for _, timing in ipairs({ "before", "during" }) do
+			helpers.it("fences late " .. refusal .. " " .. timing .. " retry (program106-close-attempt)", function()
+				local phase, old, current, calls = "refused", nil, nil, 0
+				local reentry, snapshot
+				local handle, state, counts = close_fixture(function(receipt, pending, observed)
+					calls = calls + 1
+					if phase == "refused" then
+						old = receipt
+						if refusal == "throw" then error("private refused close") end
+						if refusal == "nil_error" then return nil, "private close error" end
+						return false
+					end
+					current = receipt
+					if timing == "during" then
+						old()
+						reentry = pending.isSettled()
+						snapshot = { completed = observed.completed, settled = observed.settled }
+					end
+					return true
+				end)
+				state.terminal(37, 0)
+				phase = "pending"
+				if timing == "before" then old() end
+				helpers.assert_eq(handle.isSettled(), false, "late rejected callback is never physical retirement")
+				if timing == "during" then
+					helpers.assert_eq(reentry, false, "old callback during close must retain this attempt")
+					helpers.assert_eq(snapshot, { completed = 0, settled = 0 })
+				end
+				helpers.assert_eq(calls, 2)
+				helpers.assert_eq(counts, { completed = 0, settled = 0 })
+				old()
+				helpers.assert_eq(handle.isSettled(), false)
+				current()
+				helpers.assert_eq(handle.isSettled(), true)
+				helpers.assert_eq(counts, { completed = 1, settled = 1 })
+				old(); current()
+				helpers.assert_eq(counts, { completed = 1, settled = 1 })
+			end)
+		end
+	end
+
+	helpers.it("retains debt through cancellation reentry before admitted close (program106-close-attempt)", function()
+		local receipt, calls, cancellation, reentry, snapshot = nil, 0, nil, nil, nil
+		local handle, state, counts = close_fixture(function(callback, pending, observed)
+			calls = calls + 1
+			receipt = callback
+			callback()
+			cancellation = pending.terminate()
+			reentry = pending.isSettled()
+			snapshot = { completed = observed.completed, settled = observed.settled }
+			return 0
+		end)
+		state.terminal(37, 0)
+		helpers.assert_eq(cancellation, false, "cancellation cannot convert early callback into retirement")
+		helpers.assert_eq(reentry, false)
+		helpers.assert_eq(snapshot, { completed = 0, settled = 0 })
+		helpers.assert_eq(handle.isSettled(), true)
+		helpers.assert_eq(counts, { completed = 0, settled = 1 })
+		helpers.assert_eq(calls, 1)
+		receipt()
+		helpers.assert_eq(counts, { completed = 0, settled = 1 })
+	end)
+end)

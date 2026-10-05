@@ -415,5 +415,158 @@ class DiagnosticFactControls(unittest.TestCase):
                     subject.source_hashes(root, SHA, DIAGNOSTIC_FILES)
 
 
+class ClosedDiagnosticLogControls(unittest.TestCase):
+    def test_invalid_diagnostic_facts_produce_no_log(self):
+        for mutate in (
+            lambda value: value.update(raw_error="private path scalar argv"),
+            lambda value: value.update(pid=124),
+            lambda value: value["runtime"].update(file_open="private path scalar argv"),
+        ):
+            value = facts()
+            mutate(value)
+            with mock.patch("builtins.print") as printed:
+                with self.assertRaises(ValueError):
+                    subject.report_diagnostic_facts(
+                        value, packet(), "full", SHA, NONCE, 123, DIAGNOSTIC_HASHES
+                    )
+                printed.assert_not_called()
+
+    def test_valid_failed_facts_log_only_closed_fields_and_never_promote_primary(self):
+        import contextlib
+        import io
+
+        for scenario, census in (("full", EXPECTED_FULL), ("shim", EXPECTED_SHIM)):
+            with self.subTest(scenario=scenario):
+                primary, value = packet(), facts()
+                primary.update(
+                    scenario=scenario,
+                    cases=[{"id": name, "status": "passed"} for name in census],
+                    counts={"passed": len(census) - 1, "failed": 1, "skipped": 0},
+                )
+                primary["cases"][0]["status"] = "failed"
+                value.update(
+                    scenario=scenario,
+                    case_facts=[{"case": name, "kind": "none", "ordinal": 0} for name in census],
+                )
+                value["case_facts"][0].update(kind="check", ordinal=4)
+                logged = io.StringIO()
+                with contextlib.redirect_stdout(logged):
+                    result = subject.report_diagnostic_facts(
+                        value, primary, scenario, SHA, NONCE, 123, DIAGNOSTIC_HASHES
+                    )
+                self.assertIsNone(result)
+                observed = json.loads(logged.getvalue())
+                self.assertEqual(
+                    set(observed),
+                    {
+                        "contract",
+                        "scenario",
+                        "case_facts",
+                        "runtime",
+                        "interpreter",
+                        "expected_path_equal",
+                    },
+                )
+                self.assertEqual(
+                    observed["case_facts"][0],
+                    {"case": census[0], "kind": "check", "ordinal": 4},
+                )
+                for private in (
+                    SHA,
+                    NONCE,
+                    *DIAGNOSTIC_FILES,
+                    '"pid"',
+                    '"source_hashes"',
+                    '"counts"',
+                    '"native_pass"',
+                ):
+                    self.assertNotIn(private, logged.getvalue())
+                with self.assertRaisesRegex(ValueError, "native_case_failed"):
+                    subject.validate_receipt(primary, scenario, SHA, NONCE, 123, HASHES)
+
+    def test_both_native_scenarios_log_closed_failure_then_retire_without_success(self):
+        import contextlib
+        import io
+
+        for scenario, census in (("full", EXPECTED_FULL), ("shim", EXPECTED_SHIM)):
+            with (
+                self.subTest(scenario=scenario),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                output = Path(temporary)
+                primary, value = packet(), facts()
+                primary.update(
+                    scenario=scenario,
+                    cases=[{"id": name, "status": "passed"} for name in census],
+                    counts={"passed": len(census) - 1, "failed": 1, "skipped": 0},
+                )
+                primary["cases"][0]["status"] = "failed"
+                value.update(
+                    scenario=scenario,
+                    case_facts=[{"case": name, "kind": "none", "ordinal": 0} for name in census],
+                )
+                value["case_facts"][0].update(kind="raised", ordinal=0)
+                retained = type(
+                    "ClosedMockOwner",
+                    (),
+                    {
+                        "process": type("ControlledProcess", (), {"pid": 123, "returncode": 0})(),
+                        "settle": mock.Mock(return_value=True),
+                        "receipt": lambda self: {"controlled_parser_fixture_only": True},
+                        "wait_for_exit": mock.Mock(),
+                    },
+                )()
+
+                def acquire(arguments, native, register, **options):
+                    register(retained)
+                    return retained
+
+                owner = type("OwnershipPort", (), {"acquire_owned": staticmethod(acquire)})()
+
+                def prepare_owned_link(base, *arguments):
+                    (base / "bin").mkdir()
+                    (base / "bin/python3").symlink_to(Path(sys.executable).resolve())
+                    path = base / "primary.json"
+                    path.write_text(json.dumps(primary))
+                    (base / "diagnostic-facts.json").write_text(json.dumps(value))
+                    return {"receipt": str(path)}
+
+                logged = io.StringIO()
+                with (
+                    mock.patch.object(subject, "prepare", side_effect=prepare_owned_link),
+                    mock.patch.object(subject, "runtime_origin", return_value={}),
+                    mock.patch.object(subject.secrets, "token_hex", return_value=NONCE),
+                    contextlib.redirect_stdout(logged),
+                ):
+                    with self.assertRaisesRegex(ValueError, "native_case_failed"):
+                        subject.run_case(
+                            scenario,
+                            Path("application"),
+                            Path("source"),
+                            SHA,
+                            output,
+                            HASHES,
+                            object(),
+                            owner,
+                            DIAGNOSTIC_HASHES,
+                        )
+                records = [json.loads(line) for line in logged.getvalue().splitlines()]
+                diagnostic = [
+                    record
+                    for record in records
+                    if record["contract"] == "macos-native-hs-program-provider-diagnostic-facts"
+                ]
+                self.assertEqual(len(diagnostic), 1)
+                self.assertEqual(
+                    diagnostic[0]["case_facts"][0],
+                    {"case": census[0], "kind": "raised", "ordinal": 0},
+                )
+                self.assertNotIn(NONCE, logged.getvalue())
+                self.assertNotIn(SHA, logged.getvalue())
+                self.assertNotIn('"pid"', logged.getvalue())
+                retained.settle.assert_called_once()
+                retained.wait_for_exit.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
