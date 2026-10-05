@@ -359,6 +359,13 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_crypto_cli_receipts.lua
         timeout-minutes: 1
 
+      - name: Split native SQLite history at calendar-day boundaries
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_calendar_split.lua
+        timeout-minutes: 1
+
       - name: Preserve empty native HTTP fields and existing metadata validation
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

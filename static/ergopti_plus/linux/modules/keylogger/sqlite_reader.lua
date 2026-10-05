@@ -449,7 +449,13 @@ end
 --- Returns historical n-grams before today plus per-app n-grams for today.
 function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
 	local today = os.date("%Y-%m-%d")
-	local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
+	-- Calendar days can contain 23 or 25 hours. Derive the preceding day from
+	-- the captured date at noon, so DST and a clock crossing midnight cannot
+	-- duplicate today's rows or omit yesterday from the historical projection.
+	local year, month, day = today:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+	local yesterday = os.date("%Y-%m-%d", os.time({
+		year = tonumber(year), month = tonumber(month), day = tonumber(day) - 1, hour = 12,
+	}))
 	local historical_end = valid_date(end_date) and end_date < today and end_date or yesterday
 	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}

@@ -1371,6 +1371,25 @@ These are software implementations; final hardware verification remains below.
   foreign runtime qualification remains deferred. No common header policy,
   duplicate-field rule, reserved surface or shared port changed.
 
+- [~] **L99.** Linux historical metrics calendar boundary: derive yesterday
+  from the already captured local date using native calendar normalization at
+  noon, instead of subtracting 86,400 elapsed seconds. A late 25-hour day had
+  duplicated today's rows into history; midnight after a 23-hour day had omitted
+  the preceding day's rows. Eight actual SQLite/public collector controls have
+  two original failures and pass after, conserving selected row bytes and
+  revision. The deterministic fixture explicitly supplies wall-clock input
+  while libc DST/date normalization, native CLI processes, database writes and
+  public range readers remain real. A separate actual-clock reproduction is
+  preserved. Six registered units cover ordinary/midnight/leap/month/year dates
+  and a clock crossing midnight after capturing today, with one original
+  failure; their CLI and clock inputs are explicitly simulated. Register the
+  native matrix for future Linux CI without launching hosted workflows.
+  macOS already derives the previous calendar day at noon; Windows uses native
+  DateAdd by source. No suitable shared exported calendar owner exists, so the
+  bounded Linux native calendar adapter follows that existing policy without
+  adding a framework. Foreign runtime gates remain deferred. Range selection,
+  date validation, persistence and reserved surfaces are unchanged.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
