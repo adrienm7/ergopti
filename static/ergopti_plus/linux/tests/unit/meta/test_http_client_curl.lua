@@ -2567,3 +2567,106 @@ helpers.describe("http_client: captured owned source capability", function()
 		helpers.assert_eq(responses, 1)
 	end)
 end)
+
+--- Independent additive owned streaming POST admission/retirement controls.
+helpers.describe("http_client: owned streaming POST", function()
+	for _, invalid in ipairs({false,true,"callable",{}}) do
+		helpers.it("owned-post: malformed capability " .. type(invalid) .. " owns no resources",function()
+			local client,state=fresh_client();local chunks,results=0,0
+			local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{authorized=invalid},function()chunks=chunks+1 end,function()results=results+1 end)
+			helpers.assert_eq(op.started,false);helpers.assert_true(op:is_settled());helpers.assert_eq(#state.handles,0);helpers.assert_eq(#state.requests,0);helpers.assert_eq(chunks,0);helpers.assert_eq(results,0)
+		end)
+	end
+	for _,mode in ipairs({"false","nil","number","string","throw"}) do
+		helpers.it("owned-post: initial " .. mode .. " admission precedes body/header allocation",function()
+			local client,state=fresh_client();local constructions,results=0,0
+			local header=setmetatable({},{__tostring=function()constructions=constructions+1;return "credential" end})
+			local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{Authorization=header},"{}",{authorized=function()
+				if mode=="throw" then error("independent refusal") end
+				if mode=="false" then return false elseif mode=="number" then return 1 elseif mode=="string" then return "true" end
+			end},function()end,function()results=results+1 end)
+			helpers.assert_eq(op.started,false);helpers.assert_true(op:is_settled());helpers.assert_eq(#state.handles,0);helpers.assert_eq(#state.descriptors,0);helpers.assert_eq(constructions,0);helpers.assert_eq(results,0)
+		end)
+	end
+	helpers.it("owned-post: reservation prevents same-owner authorizer reentry and sends exact private body",function()
+		local client,state=fresh_client();local entered,nested,nested_calls=false,nil,0
+		local body='@literal\n{"escaped":"\\u0000"}'
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},body,{owner="post",buffered=true,authorized=function()
+			if not entered then entered=true;nested=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"nested",{owner="post",authorized=function()nested_calls=nested_calls+1;return true end},function()end,function()end) end;return true
+		end},function()end,function()end)
+		helpers.assert_true(op.started);helpers.assert_eq(nested.started,false);helpers.assert_true(nested:is_settled());helpers.assert_eq(nested_calls,0);helpers.assert_eq(#state.requests,1);helpers.assert_eq(state.body,body)
+		helpers.assert_true(state.config:find('data-binary = "@/dev/fd/3"',1,true)~=nil);helpers.assert_eq(state.config:find(body,1,true),nil)
+		helpers.assert_true(table.concat(state.options.args," "):find("%{stderr}",1,true)~=nil,"caller buffered option cannot alter owned streaming protocol")
+		state.stderr("\nERGOPTI_HTTP_STATUS:200\n");state.complete();helpers.assert_true(op:is_settled())
+	end)
+	helpers.it("owned-post: original source capability remains captured through option replacement and chunks",function()
+		local client,state=fresh_client();local calls,replacement_calls,chunk,result=0,0,nil,nil;local options={owner="post"}
+		options.authorized=function()calls=calls+1;options.authorized=function()replacement_calls=replacement_calls+1;return false end;return true end
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",options,function(value)chunk=value end,function(value)result=value end)
+		state.stdout("{\"status\":\"success\"}\n");state.stderr("\nERGOPTI_HTTP_STATUS:200\n");state.complete()
+		helpers.assert_true(op:is_settled());helpers.assert_eq(calls,4);helpers.assert_eq(replacement_calls,0);helpers.assert_eq(chunk,'{"status":"success"}\n');helpers.assert_true(result and result.ok);helpers.assert_eq(result.status,200)
+	end)
+	helpers.it("owned-post: final credential revocation retains every acquired body handle ACK",function()
+		local client,state=fresh_client({defer_close=true});local current,results=true,0
+		local header=setmetatable({},{__tostring=function()current=false;return "credential" end})
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{Authorization=header},"{}",{owner="post",authorized=function()return current end},function()end,function()results=results+1 end)
+		helpers.assert_eq(op.started,false);helpers.assert_eq(#state.requests,0);helpers.assert_eq(#state.handles,6);helpers.assert_eq(#state.descriptors,2);helpers.assert_eq(op:is_settled(),false)
+		local successor=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post"},function()end,function()end);helpers.assert_eq(successor.started,false)
+		state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(results,0)
+	end)
+	helpers.it("owned-post: revoked chunks never dispatch and leader exit cannot retire descendants or monitor",function()
+		local client,state=fresh_client({defer_close=true,descendants_alive=true});local current,chunks,results,settled=true,0,0,0
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post",authorized=function()return current end},function()chunks=chunks+1 end,function()results=results+1 end);op:on_settled(function()settled=settled+1 end)
+		current=false;state.stdout("stale");helpers.assert_eq(chunks,0);helpers.assert_eq(op:is_settled(),false)
+		state.exit();state.ack_closes();helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(settled,0)
+		local successor=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post"},function()end,function()end);helpers.assert_eq(successor.started,false)
+		state.groups[4321]=false;state.timer.callback();helpers.assert_eq(op:is_settled(),false);state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(settled,1);helpers.assert_eq(results,0)
+	end)
+	helpers.it("owned-post: raw body FD close refusal cannot masquerade as complete admission failure",function()
+		local client,state=fresh_client({defer_close=true,body_attach_failure=true,raw_close_receipt="false"});local result
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="post"},function()end,function(value)result=value end)
+		helpers.assert_eq(op.started,false);helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(#state.descriptors,2);helpers.assert_eq(#state.requests,0);helpers.assert_eq(result,nil)
+		state.ack_closes();helpers.assert_eq(op:is_settled(),false);state.allow_closes=true;op:cancel();state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(result,nil)
+	end)
+	helpers.it("owned-post: response source fence happens after every physical close ACK",function()
+		local client,state=fresh_client({defer_close=true});local current,result,settled=true,nil,0
+		local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{authorized=function()return current end},function()end,function(value)result=value end);op:on_settled(function()settled=settled+1 end)
+		state.stderr("\nERGOPTI_HTTP_STATUS:200\n");state.complete();helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(result,nil);current=false;state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(result,nil);helpers.assert_eq(settled,1)
+	end)
+end)
+
+helpers.describe("http_client: synchronous owned publication",function()
+ helpers.it("owned-post: eager revoked chunk cannot republish its terminal logical owner",function()
+  local calls,chunks,result=0,0,nil
+  local client,state=authorizer_client({defer_close=true},function(fake,state)
+   local native_close=fake.close
+   fake.close=function(handle,callback)
+    if not state.allow_closes and state.options and (handle==state.options.stdio[2] or handle==state.options.stdio[3] or handle==state.body_pipe) then return nil,"independent post-read terminal close refusal" end
+    return native_close(handle,callback)
+   end
+   local read_start=fake.read_start
+   fake.read_start=function(pipe,callback)
+    local admitted=read_start(pipe,callback)
+    if state.options and pipe==state.options.stdio[2] then callback(nil,"eager") end
+    return admitted
+   end
+  end)
+  local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="eager",authorized=function()calls=calls+1;return calls<3 end},function()chunks=chunks+1 end,function(value)result=value end)
+  helpers.assert_eq(op.started,false);helpers.assert_eq(client.isActive("eager"),false);helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(chunks,0);helpers.assert_eq(result,nil)
+  state.allow_closes=true;state.exit();state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(client.isActive("eager"),false)
+ end)
+ helpers.it("owned-post: synchronous last body-write failure cannot resurrect terminal activity",function()
+  local result
+  local client,state=authorizer_client({defer_close=true},function(fake,state)
+   local write=fake.write
+   fake.write=function(pipe,data,callback)
+    if pipe==state.body_pipe then callback("independent final body write refusal");return true end
+    return write(pipe,data,callback)
+   end
+  end)
+  local op=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="last-write"},function()end,function(value)result=value end)
+  helpers.assert_eq(op.started,false);helpers.assert_eq(client.isActive("last-write"),false);helpers.assert_eq(op:is_settled(),false);helpers.assert_eq(result,nil)
+  local successor=client.post_stream_owned("http://127.0.0.1:9000/pull",{},"{}",{owner="last-write"},function()end,function()end);helpers.assert_eq(successor.started,false)
+  state.exit();state.ack_closes();helpers.assert_true(op:is_settled());helpers.assert_eq(client.isActive("last-write"),false);helpers.assert_true(result and not result.ok);helpers.assert_eq(result.error,"curl body write failed")
+ end)
+end)
