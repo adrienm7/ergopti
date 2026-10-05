@@ -28,6 +28,7 @@ class _LSP_World {
 		this.ConfigPath := ConfigurationFile
 		this.ApiPath := _LLM_Menu_ApiEntriesPath()
 		this.ApplyCalls := 0
+		this.ReadCalls := 0
 		this.AdmissionCalls := 0
 		this.Mutation := ""
 		this.Mutated := false
@@ -121,6 +122,7 @@ class _LSP_World {
 	}
 
 	Read(Path) {
+		this.ReadCalls += 1
 		Content := FSReadUtf8Exact(Path)
 		if this.Mutation == "claim_model" && this.CommittedCalls >= 2 && !this.Mutated {
 			this.Mutated := true
@@ -187,6 +189,8 @@ class _LSP_World {
 		this.OwnedBundle := _ConfigWriteLeaseState().terminal
 		this.ConfigCandidate := FSReadUtf8Exact(this.ConfigPath)
 		this.ApiCandidate := FSReadUtf8Exact(this.ApiPath)
+		; The writer owns this durable boundary; the committed model callback is pure.
+		this.OldSourceAdmittedAfterDurability := this.Owner.Current(this.Receipt)
 		if this.Mutation == "committed_model"
 			this.ModelCurrent := false
 		if this.Mutation == "missing_wal" {
@@ -240,8 +244,7 @@ class _LSP_World {
 		if Phase == "committed" {
 			this.CommittedCalls += 1
 			this.CandidateSeen := true
-			this.OldSourceAdmittedAfterDurability := this.Owner.Current(this.Receipt)
-			return this.ModelCurrent && this.Owner.CandidateCurrent(Capability)
+			return this.ModelCurrent
 		}
 		return this.ModelCurrent && this.Owner.Current(this.Receipt)
 	}
@@ -916,9 +919,27 @@ _LSP_NativeFacts(World, Point) {
 			. " retained_owned=" . (Retained == Owned)
 			. " retained_terminal=" . (Retained == Terminal)
 			. " owned_terminal=" . (Owned == Terminal)
+			. " kind_exact=" . (Owned is Object && Owned.HasOwnProp("kind") && Owned.kind == "terminal_bundle")
 			. " tokens=" . Tokens.Length . " tokens_owned=" . AllOwn
 			. " committed=" . World.CommittedCalls . " claims=" . World.ClaimCalls
 			. " model_current=" . World.ModelCurrent
 			. " apply_calls=" . World.ApplyCalls)
 	} finally Critical(PreviousCritical)
 }
+
+
+_LSP_CommittedCallbackNoIO(World) {
+	World.Capture()
+	Reads := World.ReadCalls
+	Capability := LLM_Menu_ApiPrivateCandidateReceipt()
+	Admitted := World.Admission("committed", Capability)
+	AssertEqual(Reads, World.ReadCalls, "the retained model callback cannot acquire or reread private source files")
+	AssertTrue((Admitted is Integer) && Admitted == 1)
+	World.ModelCurrent := false
+	Admitted := World.Admission("committed", Capability)
+	AssertEqual(Reads, World.ReadCalls, "a refused retained model callback also remains source-port free")
+	AssertTrue((Admitted is Integer) && Admitted == 0)
+	World.AssertUnchanged()
+}
+Test("Local server publication: committed model callback performs no private source I/O (local-server-private-source)",
+	(*) => _LSP_WithWorld(_LSP_CommittedCallbackNoIO))

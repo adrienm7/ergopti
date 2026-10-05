@@ -306,6 +306,8 @@ Test("config-scope: the gesture menu's restore owns the master, its clear keeps 
 	_ScopeGestureMenuOwnsParameters)
 
 _ScopeOwnerRetainsRollbackDebt() {
+	global _ConfigTransitionRetainedBarrier
+	PriorRetained := _ConfigTransitionRetainedBarrier
 	Fixture := _ScopeOwnerFixture()
 	Bundle := 0, RefuseMove := false
 	Port := ConfigTransitionProductionPort()
@@ -331,8 +333,12 @@ _ScopeOwnerRetainsRollbackDebt() {
 		Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
 		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
 	} finally {
-		if Bundle is Object
+		if (Bundle is Object) && _ConfigWriteLeaseState().terminal == Bundle {
 			_ConfigWriteTerminalRelease(Bundle)
+			; Retire only this experiment's marker; preserve an outer owner.
+			if _ConfigTransitionRetainedBarrier == Bundle
+				_ConfigTransitionRetainedBarrier := PriorRetained
+		}
 		_ScopeOwnerCleanup(Fixture)
 	}
 }

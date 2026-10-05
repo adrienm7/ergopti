@@ -16,6 +16,7 @@ local helpers = require("tests.helpers")
 
 -- Stub the TOML codec so we can control decode behaviour.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
+_toml_stub.decode_with_shapes = function(raw) return _toml_stub.decode(raw) end
 package.loaded["toml_codec"]     = _toml_stub
 package.loaded["infra.toml.codec"] = _toml_stub
 

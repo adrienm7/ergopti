@@ -82,11 +82,18 @@ _LCOC_RunCurl(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	ProcessOwner := Map("pid", Pid, "handle", 9262, "released", false)
 }
 
+_LCOC_ResolveDirect(Url, Callback) {
+	; Admit only this synchronous fixture prerequisite; no system proxy is queried.
+	Callback.Call(Map("ok", true, "inherit", false, "proxy", ""))
+	return true
+}
+
 _LCOC_RemoteTransportSchedulesTheCommonReaper() {
 	global _LLM_Remote_Async
 	ReqId := "ahk2_03_remote_sweep"
 	State := Map("sweeps", 0)
 	Port := Map(
+		"resolve_proxy", _LCOC_ResolveDirect,
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,

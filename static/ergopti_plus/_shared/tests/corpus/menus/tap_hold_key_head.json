@@ -1,0 +1,72 @@
+{
+	"_comment": "Handwritten expected child-template composition. Shared declarations own platform caption variants and order; native owners retain callbacks, action-label data and child picker payloads.",
+	"section": "tap_hold_key_head",
+	"include": "tap_hold_key_native_commands",
+	"rows": [
+		{
+			"type": "include",
+			"section": "tap_hold_key_native_commands"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "tap_hold_key_tap",
+			"i18n": "tap_hold.picker.tap",
+			"caption_getter": "tap_hold_key_tap_caption",
+			"platforms": ["ahk", "linux"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "tap_hold_key_tap_picker",
+			"i18n": "menu.tapholds.tap_arrow",
+			"caption_getter": "tap_hold_key_tap_caption",
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "tap_hold_key_hold",
+			"i18n": "tap_hold.picker.hold",
+			"caption_getter": "tap_hold_key_hold_caption",
+			"platforms": ["ahk", "linux"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "tap_hold_key_hold_picker",
+			"i18n": "menu.tapholds.hold_arrow",
+			"caption_getter": "tap_hold_key_hold_caption",
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		}
+	],
+	"platforms": {
+		"ahk": {
+			"native": "tap_hold_key_native",
+			"tap": "tap_hold_key_tap",
+			"hold": "tap_hold_key_hold",
+			"tap_label": "tap_hold.picker.tap",
+			"hold_label": "tap_hold.picker.hold",
+			"tap_kind": "action"
+		},
+		"linux": {
+			"native": "tap_hold_key_native",
+			"tap": "tap_hold_key_tap",
+			"hold": "tap_hold_key_hold",
+			"tap_label": "tap_hold.picker.tap",
+			"hold_label": "tap_hold.picker.hold",
+			"tap_kind": "action"
+		},
+		"hs": {
+			"native": "tap_hold_key_no_action",
+			"tap": "tap_hold_key_tap_picker",
+			"hold": "tap_hold_key_hold_picker",
+			"tap_label": "menu.tapholds.tap_arrow",
+			"hold_label": "menu.tapholds.hold_arrow",
+			"tap_kind": "items"
+		}
+	}
+}

@@ -194,6 +194,12 @@ Test("filesystem: appends reject short writes (AHK-165)", _LTATO_AppendRejectsSh
 ; ====================================================
 ; ====================================================
 
+_LTATO_RemoteResolveDirect(Url, Callback) {
+	; Admit only this synchronous fixture prerequisite; no system proxy is queried.
+	Callback.Call(Map("ok", true, "inherit", false, "proxy", ""))
+	return true
+}
+
 _LTATO_RemoteLaunchFailureDeletesEveryArtifact() {
 	global _LLM_Remote_Async
 	Dir := _LTATO_UniqueDir("remote")
@@ -203,6 +209,7 @@ _LTATO_RemoteLaunchFailureDeletesEveryArtifact() {
 	Paths := [Base . ".json", Base . ".out", Base . ".conf", Base . ".out.status", Base . ".out.exit"]
 	State := Map("fail_calls", 0, "run_calls", 0, "launch_paths", [Paths[2], Paths[4], Paths[5]])
 	Port := Map(
+		"resolve_proxy", _LTATO_RemoteResolveDirect,
 		"file_exists", (*) => true,
 		"temp_dir", (*) => Dir,
 		"write", FSWrite,

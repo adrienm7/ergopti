@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, handles = {}, requests = {}, closes = {}, refused_closes = {},
+	local state = { groups = {}, probes = {}, timer_starts = {}, kills = {}, handles = {}, requests = {}, closes = {}, refused_closes = {},
 		descriptors = {}, descriptor_closes = {}, identities = {} }
 	local fake = {}
 	local function refused(receipt)
@@ -71,7 +71,9 @@ local function fake_luv(config)
 		return state.timer
 	end
 	function fake.timer_start(timer, timeout_ms, repeat_ms, callback)
-		if options.timer_failure then return nil, "timer refused" end
+		state.timer_starts[#state.timer_starts + 1] = { timer = timer, timeout = timeout_ms, repeat_ms = repeat_ms, callback = callback }
+		if options.timer_failure or (repeat_ms > 0 and state.monitor_refused) then return nil, "timer refused" end
+		timer.stopped = false
 		timer.timeout_ms = timeout_ms
 		timer.repeat_ms = repeat_ms
 		timer.callback = callback
@@ -101,6 +103,7 @@ local function fake_luv(config)
 			return refused(options.body_handle_close_receipt)
 		end
 		if options.close_failure and not state.allow_closes then return nil, "close refused" end
+		if value.kind == "timer" and state.monitor_close_refused then return nil, "monitor close refused" end
 		value.closing = true
 		if value.descriptor then
 			state.descriptor_closes[#state.descriptor_closes + 1] = value.descriptor
@@ -122,6 +125,16 @@ local function fake_luv(config)
 	end
 	function fake.kill(pid, signal)
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
+		if signal == 0 then
+			state.probes[#state.probes + 1] = { pid = pid, signal = signal }
+			if state.probe_mode == "throw" then error("probe refused") end
+			if state.probe_mode == "false" then return false end
+			if state.probe_mode == "nil" then return nil end
+			if state.probe_mode == "text-only" then return nil, "ESRCH: no such process" end
+			if state.probe_mode == "unknown-code" then return nil, "probe refused", "EPERM" end
+			if state.groups[-pid] == false then return nil, "ESRCH: no such process", "ESRCH" end
+			return true
+		end
 		if options.kill_missing then return nil, "ESRCH: no such process", "ESRCH" end
 		if options.kill_failure and not state.allow_kills then return nil, "EPERM: operation not permitted", "EPERM" end
 		return true
@@ -129,6 +142,7 @@ local function fake_luv(config)
 	function fake.spawn(command, options, callback)
 		if config and config.spawn_failure then return nil, "EACCES", "permission denied" end
 		local pid = 4320 + #state.requests + 1
+		state.groups[pid] = true
 		state.command = command
 		state.options = options
 		state.exit_callback = callback
@@ -144,7 +158,10 @@ local function fake_luv(config)
 
 	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
 	function state.stderr(chunk) state.options.stdio[3].read_callback(nil, chunk) end
-	function state.exit(code, signal) state.exit_callback(code or 0, signal or 0) end
+	function state.exit(code, signal)
+		if not options.descendants_alive then state.groups[state.requests[#state.requests].pid] = false end
+		state.exit_callback(code or 0, signal or 0)
+	end
 	function state.complete(code)
 		state.stdout(nil)
 		state.stderr(nil)
@@ -155,6 +172,7 @@ local function fake_luv(config)
 		if stdout_text ~= nil then request.options.stdio[2].read_callback(nil, stdout_text) end
 		request.options.stdio[2].read_callback(nil, nil)
 		request.options.stdio[3].read_callback(nil, nil)
+		if not options.descendants_alive then state.groups[request.pid] = false end
 		request.exit_callback(code or 0, 0)
 	end
 	return fake, state
@@ -2044,5 +2062,210 @@ helpers.describe("http_client: unknown raw body identity", function()
 		for _, fd in ipairs(state.descriptors) do state.identities[fd] = nil end
 		helpers.assert_true(client.cancel("unknown-body"), "EBADF still proves retirement without inventing descriptor ownership")
 		helpers.assert_eq(callbacks, 0)
+	end)
+end)
+
+--- Independent owned-group regressions: expected group absence is authored here,
+--- never regenerated from the implementation. These are native-port doubles.
+
+local function retired_leader_with_live_descendant(config)
+	config = config or {}
+	config.descendants_alive = true
+	config.defer_close = true
+	local client, state = fresh_client(config)
+	local calls = 0
+	local operation = client.get_owned("http://127.0.0.1:9000/models", {},
+		{ owner = "group-receipt", timeout_ms = 1500 }, function() calls = calls + 1 end)
+	return client, state, operation, function() return calls end
+end
+
+local function complete_owned_leader(state)
+	state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+	state.ack_closes()
+end
+
+local function nonzero_signals(state)
+	local count = 0
+	for _, receipt in ipairs(state.kills) do if receipt.signal ~= 0 then count = count + 1 end end
+	return count
+end
+
+local function assert_successor_blocked(client, state)
+	local successor = client.get_owned("http://127.0.0.1:9000/models", {},
+		{ owner = "group-receipt" }, function() end)
+	helpers.assert_eq(successor.started, false)
+	helpers.assert_true(successor:is_settled(), "refusal acquires no physical work")
+	helpers.assert_eq(client.get("http://127.0.0.1:9000/models", {},
+		{ owner = "group-receipt" }, function() end), false)
+	helpers.assert_eq(#state.requests, 1, "both APIs must preserve the pending group owner")
+end
+
+helpers.describe("http_client: independent owned detached-group absence", function()
+	helpers.it("owned-group: leader exit, both EOFs and stream/process ACKs leave a live descendant pending", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		helpers.assert_eq(operation:is_settled(), false, "leader exit is not detached-group absence")
+		helpers.assert_eq(calls(), 0)
+		for _, handle in ipairs(state.handles) do
+			if handle.kind ~= "timer" then helpers.assert_true(handle.closing, "every other native close is admitted") end
+		end
+		assert_successor_blocked(client, state)
+		helpers.assert_eq(state.timer.closing, false)
+		helpers.assert_eq(state.timer.timeout_ms, 50)
+		helpers.assert_eq(state.timer.repeat_ms, 50)
+		helpers.assert_eq(#state.handles, 5, "cleanup reuses the acquired request timer")
+		helpers.assert_true(nonzero_signals(state) >= 2)
+	end)
+
+	helpers.it("owned-group: accepted TERM and KILL retain debt until native ESRCH and monitor close ACK", function()
+		local _, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false, "signal acceptance cannot settle live descendants")
+		helpers.assert_eq(calls(), 0)
+		state.groups[4321] = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false, "the cleanup monitor still owns its close callback")
+		helpers.assert_true(state.timer.closing)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 1)
+	end)
+
+	for _, mode in ipairs({ "throw", "false", "nil", "text-only", "unknown-code" }) do
+		helpers.it("owned-group: " .. mode .. " probe refusal is not a native absence receipt", function()
+			local client, state, operation, calls = retired_leader_with_live_descendant()
+			state.probe_mode = mode
+			complete_owned_leader(state)
+			helpers.assert_eq(operation:is_settled(), false)
+			helpers.assert_eq(calls(), 0)
+			helpers.assert_eq(nonzero_signals(state), 0, "an unadmitted group probe cannot authorize cleanup signals")
+			assert_successor_blocked(client, state)
+			state.probe_mode = nil
+			state.groups[4321] = false
+			state.timer.callback()
+			state.ack_closes()
+			helpers.assert_true(operation:is_settled())
+		end)
+	end
+
+	helpers.it("owned-group: termination refusal and later signal acceptance both preserve descendant debt", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant({ kill_failure = true })
+		complete_owned_leader(state)
+		helpers.assert_eq(operation:is_settled(), false)
+		state.timer.callback()
+		assert_successor_blocked(client, state)
+		state.allow_kills = true
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(calls(), 0)
+		state.groups[4321] = false
+		state.timer.callback()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+	end)
+
+	helpers.it("owned-group: a refused cleanup monitor stays owned and manual retry arms the same handle", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		state.monitor_refused = true
+		complete_owned_leader(state)
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(calls(), 0)
+		assert_successor_blocked(client, state)
+		state.monitor_refused = false
+		helpers.assert_eq(operation:cancel(), false)
+		helpers.assert_eq(#state.handles, 5)
+		helpers.assert_eq(state.timer.repeat_ms, 50)
+		state.groups[4321] = false
+		state.timer.callback()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 0, "cancel intent suppresses the pending response")
+	end)
+
+	helpers.it("owned-group: refused monitor close rearms its referenced handle and waits for its own ACK", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		state.monitor_close_refused = true
+		state.groups[4321] = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		helpers.assert_eq(calls(), 0)
+		helpers.assert_eq(state.timer.stopped, false, "refused close must retain progress on the same timer")
+		assert_successor_blocked(client, state)
+		state.monitor_close_refused = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 1)
+	end)
+
+	helpers.it("owned-group: native group absence still waits for the exact leader exit receipt", function()
+		local _, state, operation, calls = retired_leader_with_live_descendant()
+		helpers.assert_eq(operation:cancel(), false)
+		state.ack_closes()
+		state.groups[4321] = false
+		state.timer.callback()
+		helpers.assert_eq(operation:is_settled(), false)
+		local signals = #state.kills
+		state.timer.callback()
+		helpers.assert_eq(#state.kills, signals, "acknowledged absence forbids later signals on a reused PGID")
+		state.exit()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(calls(), 0)
+	end)
+
+	helpers.it("owned-group: stale old monitor and close callbacks cannot signal or settle a new owner", function()
+		local client, state, operation, calls = retired_leader_with_live_descendant()
+		complete_owned_leader(state)
+		local old_monitor = state.timer.callback
+		state.groups[4321] = false
+		old_monitor()
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		local old_closes = {}
+		for _, receipt in ipairs(state.closes) do old_closes[#old_closes + 1] = receipt.callback end
+		local successor = client.get_owned("http://127.0.0.1:9000/models", {},
+			{ owner = "group-receipt" }, function() end)
+		helpers.assert_true(successor.started)
+		local signals = #state.kills
+		old_monitor()
+		for _, callback in ipairs(old_closes) do callback() end
+		helpers.assert_eq(#state.kills, signals)
+		helpers.assert_eq(successor:is_settled(), false)
+		helpers.assert_true(client.isActive("group-receipt"))
+		helpers.assert_eq(calls(), 1)
+		state.groups[4322] = false
+		state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		state.ack_closes()
+		helpers.assert_true(successor:is_settled())
+	end)
+
+	helpers.it("owned-group: already absent completed groups need no retirement signals", function()
+		local client, state = fresh_client({ defer_close = true })
+		local operation = client.get_owned("http://127.0.0.1:9000/models", {}, {}, function() end)
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		state.ack_closes()
+		helpers.assert_true(operation:is_settled())
+		helpers.assert_eq(nonzero_signals(state), 0)
+		helpers.assert_true(#state.probes > 0)
+	end)
+
+	helpers.it("owned-group: exceptional legacy body cleanup retains its existing boolean ABI and no group monitor", function()
+		local config = { descendants_alive = true, defer_close = true }
+		local client, state = fresh_client(config)
+		local result
+		helpers.assert_true(client.post("http://127.0.0.1:9000/models", {}, "{}", function(value) result = value end))
+		config.close_failure = true -- Refuse terminal cleanup only after successful admission.
+		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+		helpers.assert_eq(result, nil)
+		state.allow_closes = true
+		helpers.assert_eq(client.cancel(), false)
+		state.ack_closes()
+		helpers.assert_true(client.cancel())
+		helpers.assert_eq(#state.probes, 0, "_body_cleanup is the retained historical internal operation")
+		for _, receipt in ipairs(state.timer_starts) do helpers.assert_eq(receipt.repeat_ms, 0) end
 	end)
 end)
