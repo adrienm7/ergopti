@@ -176,16 +176,39 @@ local function close_process(request)
 	if close_handle(request.process, request) or not request.operation then request.process = nil end
 end
 
+--- Checks only the captured optional source capability while retaining its exact owner.
+--- @param request table
+--- @return boolean
+local function owned_authorized(request)
+	local operation = request.operation
+	if not request.authorized then return true end
+	if request.authorization_revoked or request.authorizing or operation._cancelled
+		or operation._settled or _owned[request.owner] ~= operation then return false end
+	request.authorizing = true
+	local ok, accepted = pcall(request.authorized)
+	request.authorizing = false
+	local current = ok and accepted == true and not operation._cancelled
+		and not operation._settled and _owned[request.owner] == operation
+	if not current then request.authorization_revoked = true end
+	return current
+end
+
 --- Releases only exact physical ownership after group absence and every close ACK.
 --- @param request table
 local function finalize_owned(request)
 	local operation = request.operation
-	if not operation or operation._settled or not request.terminal then return end
+	if not operation or operation._settled or not request.terminal or request.authorizing then return end
 	if request.spawned and not request.exited then return end
 	if not operation._body_cleanup and request.spawned and not request.group_absent then return end
 	if request.body_readfd ~= nil or request.body_writefd ~= nil then return end
 	for _, receipt in pairs(request.handles) do
 		if receipt.state ~= "closed" then return end
+	end
+	-- A foreign capability may reenter cancellation. Keep the reservation and
+	-- fence recursive finalization until it returns after every physical ACK.
+	if not operation._cancelled and not request.suppress_callback
+		and type(request.on_done) == "function" and not owned_authorized(request) then
+		request.suppress_callback = true
 	end
 	operation._settled = true
 	if _owned[request.owner] == operation then _owned[request.owner] = nil end
@@ -519,15 +542,53 @@ end
 --- @param on_chunk function|nil
 --- @param on_done function
 --- @return boolean
-local function start_request(url, headers, body, options, on_chunk, on_done, operation)
+local function start_request(url, headers, body, options, on_chunk, on_done, operation, authorized)
+	local request
 	local function reject(message)
-		if operation then operation._settled = true end
 		local result = { ok = false, status = 0, body = "", error = message }
+		if request then finish(request, result); return false end
+		if operation then operation._settled = true end
 		if type(on_done) == "function" then
 			local ok, err = pcall(on_done, result)
 			if not ok then Logger.error(LOG, "HTTP rejection callback raised: %s.", tostring(err)) end
 		end
 		return false
+	end
+	local function new_request(owner)
+		return {
+			owner = owner,
+			operation = operation,
+			authorized = authorized,
+			body_owner = body ~= nil,
+			handles = {},
+			spawned = false,
+			buffered = options.buffered == true,
+			max_body_bytes = tonumber(options.max_body_bytes),
+			on_chunk = on_chunk,
+			on_done = on_done,
+			stdout_text = "",
+			stderr_text = "",
+			stderr_tail = "",
+			error_body_text = "",
+			error_body_truncated = false,
+			stdout_eof = false,
+			stderr_eof = false,
+			exited = false,
+			terminal = false,
+		}
+	end
+	if authorized then
+		local owner = request_owner(options.owner)
+		-- Reserve before the first caller capability or metadata callback. A
+		-- refused successor never invokes another operation's source capability.
+		if _owned[owner] then operation._settled = true; return false end
+		request = new_request(owner)
+		operation._request = request
+		_owned[owner] = operation
+		if not owned_authorized(request) then
+			finish(request, { ok = false, status = 0, body = "", error = "request authorization withdrawn" }, true)
+			return false
+		end
 	end
 	if type(url) ~= "string" or url == "" then return reject("curl URL must be a non-empty string") end
 	-- Curl reads the URL from a C-string config value. NUL silently selects a
@@ -579,34 +640,16 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
 		if argv_refusal ~= "" then return reject("curl argument vector refused: " .. argv_refusal) end
 	end
-	if _owned[owner] then return reject("previous request cleanup pending") end
+	if _owned[owner] and _owned[owner] ~= operation then return reject("previous request cleanup pending") end
 	if _active[owner] and not M.cancel(owner) then
 		return reject("previous request cancellation failed")
 	end
+	if authorized and _owned[owner] ~= operation then return reject("previous request cleanup pending") end
 	if not luv or type(luv.spawn) ~= "function" then
 		return reject("asynchronous HTTP unavailable")
 	end
 
-	local request = {
-		owner = owner,
-		operation = operation,
-		body_owner = body ~= nil,
-		handles = {},
-		spawned = false,
-		buffered = options.buffered == true,
-		max_body_bytes = tonumber(options.max_body_bytes),
-		on_chunk = on_chunk,
-		on_done = on_done,
-		stdout_text = "",
-		stderr_text = "",
-		stderr_tail = "",
-		error_body_text = "",
-		error_body_truncated = false,
-		stdout_eof = false,
-		stderr_eof = false,
-		exited = false,
-		terminal = false,
-	}
+	request = request or new_request(owner)
 	local handles_ok
 	if operation or request.body_owner then
 		if operation then operation._request = request; _owned[owner] = operation end
@@ -688,6 +731,12 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 			return false
 		end
 	end
+	-- This is the last admission after credential/config/native setup callbacks;
+	-- the following call is the only physical dispatch point.
+	if operation and not owned_authorized(request) then
+		finish(request, { ok = false, status = 0, body = "", error = "request authorization withdrawn" }, true)
+		return false
+	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
 		args = argv,
 		stdio = { request.stdin, request.stdout, request.stderr, request.body_reader },
@@ -760,6 +809,11 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 			-- invalidate the complete response. Never publish it as evidence.
 			if #chunk > remaining then request.error_body_truncated = true end
 			if remaining > 0 then request.error_body_text = request.error_body_text .. chunk:sub(1, remaining) end
+			if request.operation and not request.operation._body_cleanup
+				and not owned_authorized(request) then
+				finish(request, { ok = false, status = 0, body = "", error = "request authorization withdrawn" }, true)
+				return
+			end
 			if type(request.on_chunk) == "function" then
 				local ok, callback_err = pcall(request.on_chunk, chunk)
 				if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", tostring(callback_err)) end
@@ -804,6 +858,15 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		end
 	end
 
+	-- Native seams can complete or cancel synchronously during stream/body
+	-- activation. Never republish that retired strong owner as logical activity.
+	if operation and not operation._body_cleanup and (request.terminal
+		or operation._cancelled or operation._settled or _owned[owner] ~= operation) then
+		if not request.terminal then
+			finish(request, { ok = false, status = 0, body = "", error = "cancelled" }, true)
+		end
+		return false
+	end
 	_active[owner] = request
 	Logger.debug(LOG, "HTTP request dispatched asynchronously (owner=%s, pid=%d).", owner, pid)
 	return true
@@ -857,10 +920,10 @@ end
 --- process exit and all owned native handle close callbacks.
 --- @param url string
 --- @param headers table
---- @param options table|nil
+--- @param options table|nil { authorized?: function }
 --- @param callback function
 --- @return table Operation { started, cancel, is_settled, on_settled }.
-function M.get_owned(url, headers, options, callback)
+local function owned_request(url, headers, body, options, on_chunk, on_done, method, buffered)
 	local operation = { started = false, _settled = false, _cancelled = false, _listeners = {} }
 	function operation:is_settled() return self._settled end
 	function operation:on_settled(listener)
@@ -886,15 +949,65 @@ function M.get_owned(url, headers, options, callback)
 		end
 		return self._settled
 	end
+	-- Capture scalar source admission before option/header metatable callbacks.
+	-- Native construction still belongs to start_request's exact reservation.
+	local authorized
+	if type(options) == "table" then authorized = rawget(options, "authorized") end
 	local request_options = {}
 	if type(options) == "table" then
-		for key, value in pairs(options) do request_options[key] = value end
+		for key, value in next, options do request_options[key] = value end
 	end
-	request_options.buffered = true
-	request_options.method = "GET"
-	operation.started = start_request(url, type(headers) == "table" and headers or {}, nil,
-		request_options, nil, callback, operation)
+	if authorized ~= nil and type(authorized) ~= "function" then
+		operation._settled = true
+		return operation
+	end
+	request_options.buffered = buffered
+	request_options.method = method
+	-- A streaming owner without an optional source still reserves before caller
+	-- metadata and brackets chunk delivery with its exact retained operation.
+	if method == "POST" and authorized == nil then authorized = function() return true end end
+	if authorized then
+		local ok, started = pcall(start_request, url, type(headers) == "table" and headers or {}, body,
+			request_options, on_chunk, on_done, operation, authorized)
+		if not ok then
+			if operation._request then
+				finish(operation._request, { ok = false, status = 0, body = "", error = "owned request admission failed" })
+			else
+				operation._settled = true
+			end
+		else
+			operation.started = started
+		end
+	else
+		operation.started = start_request(url, type(headers) == "table" and headers or {}, body,
+			request_options, on_chunk, on_done, operation)
+	end
 	return operation
+end
+
+--- Starts a buffered GET with the existing exact physical cleanup contract.
+--- @param url string
+--- @param headers table
+--- @param options table|nil Optional captured source admission.
+--- @param callback function
+--- @return table Retained operation { started, cancel, is_settled, on_settled }.
+function M.get_owned(url, headers, options, callback)
+	return owned_request(url, headers, nil, options, nil, callback, "GET", true)
+end
+
+--- Streams a POST while retaining exact body FD/process/group/close ownership.
+--- Chunks require literal current source admission; terminal delivery additionally
+--- requires actual group absence and every acquired descriptor/handle close ACK.
+--- @param url string
+--- @param headers table
+--- @param body string
+--- @param options table|nil Optional captured authorized function.
+--- @param on_chunk function
+--- @param on_done function
+--- @return table Retained operation { started, cancel, is_settled, on_settled }.
+function M.post_stream_owned(url, headers, body, options, on_chunk, on_done)
+	return owned_request(url, headers, type(body) == "string" and body or "", options,
+		on_chunk, on_done, "POST", false)
 end
 
 --- Downloads one response body directly to a caller-owned temporary file.

@@ -61,6 +61,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Actual libuv/curl loopback receipts run under verify-change and Linux CI,
 	// independently of the Node-only static registration contract.
 	'tools/test/run-linux-http-stream-receipts.cjs',
+	// Real process/file probes run under verify-change and mandatory Linux CI.
+	'tools/test/run-linux-runtime-native.cjs',
+	// Complete pure Python canvas controls have their own planner and Mac CI gate.
+	'tools/test/run-macos-tooltip-canvas-tests.cjs',
 	// Real-browser render runs separately from the Node-only suite;
 	// test-changelog-release-install.cjs runs the same page scripts against
 	// a recording DOM inside the suite.

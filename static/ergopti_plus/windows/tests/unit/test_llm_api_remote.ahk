@@ -918,15 +918,8 @@ _RemoteCancelPublication_Poll(State, ReqId) {
 	State["polls"] += 1
 }
 
-_RemoteCancelPublication_ResolveDirect(Url, Callback) {
-	; Admit only this synchronous fixture prerequisite; no system proxy is queried.
-	Callback.Call(Map("ok", true, "inherit", false, "proxy", ""))
-	return true
-}
-
 _RemoteCancelPublication_CurlPort(State, RunFn) {
 	return Map(
-		"resolve_proxy", _RemoteCancelPublication_ResolveDirect,
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,

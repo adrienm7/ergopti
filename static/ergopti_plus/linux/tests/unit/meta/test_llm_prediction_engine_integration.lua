@@ -31,6 +31,7 @@ local function with_refused_storage(body)
       end,
       cancel = function() pending = nil; return true end,
     }
+    require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
     package.loaded["modules.llm.enable_admission"] = nil
     package.loaded["modules.llm.profiles"] = nil
     package.loaded["modules.llm.prediction_engine"] = nil
@@ -105,7 +106,8 @@ helpers.describe("prediction_engine integration", function()
         get = function(_, _, _, callback) pending = callback; return true end,
         cancel = function() pending = nil; return true end,
       }
-      package.loaded["modules.llm.enable_admission"] = nil
+      require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
+    package.loaded["modules.llm.enable_admission"] = nil
       package.loaded["modules.llm.profiles"] = nil
       package.loaded["modules.llm.prediction_engine"] = nil
       local ok, err = pcall(function()
@@ -294,9 +296,9 @@ helpers.describe("prediction_engine integration", function()
           "a failed enable write must not turn only the profile state on")
 
         local writes, set_many = 0, storage.set_many
-        storage.set_many = function(values, expected_source)
+        storage.set_many = function(values, expected_source, admission)
           writes = writes + 1
-          return set_many(values, expected_source)
+          return set_many(values, expected_source, admission)
         end
         helpers.assert_true(prediction.enable(), "true acknowledges version dispatch only")
         helpers.assert_eq(prediction.is_enabled(), false)

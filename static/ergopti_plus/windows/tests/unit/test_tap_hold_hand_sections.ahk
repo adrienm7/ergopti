@@ -140,7 +140,7 @@ _THHS_NativeCommandStates(TargetPath) {
 		"inherit_defaults", false)
 	Active := _THHS_NativeCommandRow("caps_lock")
 	AssertEqual(t("tap_hold.action.disable"), Active["label"], "established Windows caption")
-	Assert(!Active["disabled"], "configured key can be made native")
+	Assert(!_MR_Get(Active, "disabled", false), "configured key can be made native")
 	TapHold := Map("keys", Map(), "inherit_defaults", false)
 	Native := _THHS_NativeCommandRow("caps_lock")
 	Assert(Native["disabled"], "native key remains disabled")
@@ -157,7 +157,7 @@ _THHS_NativeCommandCaption(TargetPath) {
 		Definition["i18n"] := "menu.shortcuts.title"
 		Row := _THHS_NativeCommandRow("caps_lock")
 		AssertEqual(t("menu.shortcuts.title"), Row["label"], "actual provider consumes shared caption")
-		Assert(!Row["disabled"], "caption mutation retains configured availability")
+		Assert(!_MR_Get(Row, "disabled", false), "caption mutation retains configured availability")
 	} finally Definition["i18n"] := Previous
 }
 Test("tap-holds: the actual native command consumes its shared caption (tap-hold-key-native)",
@@ -202,7 +202,10 @@ _THHS_KeyHeadOrder(TargetPath) {
 	Assert(Rows[4]["items"] is Array && !Rows[4].Has("action"), "hold remains native child data")
 	Rendered := Menu()
 	try {
-		AssertEqual(4, _MR_RenderRows(Rendered, Rows, "tap_hold_key_head_test", 1), "real native renderer draws the declared head")
+		; The renderer receipt counts labelled rows; separators still occupy native positions.
+		AssertEqual(3, _MR_RenderRows(Rendered, Rows, "tap_hold_key_head_test", 1), "renderer reports all three labelled head rows")
+		AssertEqual(4, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"real native renderer draws the complete four-row declared head")
 		AssertEqual(Rows[1]["label"], _THHS_LabelAt(Rendered, 0), "native first caption")
 		Assert(TrayMenuIsSeparatorAt(Rendered, 1), "real native separator follows the included command")
 		AssertEqual(Rows[3]["label"], _THHS_LabelAt(Rendered, 2), "native tap caption")

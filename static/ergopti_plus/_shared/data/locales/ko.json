@@ -1779,6 +1779,8 @@
 	"mlx.use_ollama": "Ollama 사용",
 	"mlx.machine_intel": "Intel 프로세서",
 	"mlx.machine_apple_silicon": "Apple 실리콘",
+	"ollama.runtime_repair_failed": "로컬 Ollama를 준비하지 못했습니다. 로그를 확인하고 다시 시도하세요.",
+	"ollama.runtime_start": "Ollama 시작",
 	"python.not_native_title": "이 Mac용 Python 없음",
 	"python.not_native_body": "이 작업에는 {1}용으로 빌드된 Python 3이 필요합니다. 이 Mac에 설치된 Python은 다른 프로세서용으로만 빌드되어 있어 macOS가 지원이 종료될 Rosetta로 실행하게 됩니다:\n{2}",
 	"python.missing_title": "Python 3이 없습니다",
