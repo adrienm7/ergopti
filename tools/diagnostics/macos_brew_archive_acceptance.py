@@ -832,15 +832,28 @@ def _admit_appleevent_boundary(children, repository):
     receiver = children.start([str(executables["receiver"]), str(ready), str(marker), nonce])
     group = children.groups[receiver]
 
-    def same_live_receiver():
-        require(
-            group.observe_exit() is None, "The exact owned AppleEvent receiver is no longer live"
-        )
+    def same_live_receiver(checkpoint):
+        observation = group.observe_exit()
+        if observation is not None:
+            # This is the existing exact-PID WNOWAIT observation. Do not poll,
+            # reap or read child streams while its reservation is still owned.
+            kind = {
+                os.CLD_EXITED: "CLD_EXITED",
+                os.CLD_KILLED: "CLD_KILLED",
+                os.CLD_DUMPED: "CLD_DUMPED",
+            }[observation.si_code]
+            require(
+                False,
+                "The exact owned AppleEvent receiver is no longer live: "
+                f"checkpoint={checkpoint}, receiver_pid={receiver.pid}, "
+                f"waitid_kind={kind}, waitid_code={observation.si_code}, "
+                f"waitid_status={observation.si_status}",
+            )
 
     deadline = time.monotonic() + 10
     expected_ready = f"{receiver.pid}\n{nonce}\n".encode()
     while True:
-        same_live_receiver()
+        same_live_receiver("readiness")
         if ready.exists() or ready.is_symlink():
             require(
                 ready.is_file() and not ready.is_symlink(),
@@ -857,7 +870,7 @@ def _admit_appleevent_boundary(children, repository):
             time.monotonic() < deadline, "Owned AppleEvent receiver did not acknowledge readiness"
         )
         time.sleep(0.02)
-    same_live_receiver()
+    same_live_receiver("before-unconfined-positive")
     sender = [str(executables["sender"]), str(receiver.pid), nonce]
     positive = children.run([*sender, "success"])
     require(
@@ -879,7 +892,7 @@ def _admit_appleevent_boundary(children, repository):
     require(
         not Path(str(marker) + ".2").exists(), "Unexpected delivery preceded deny-removal control"
     )
-    same_live_receiver()
+    same_live_receiver("before-deny-removal-positive")
     policy = (root / "sandbox.sb").read_text(encoding="utf-8")
     deny = "(deny appleevent-send)\n"
     require(
@@ -894,14 +907,14 @@ def _admit_appleevent_boundary(children, repository):
     )
     second = marker_bytes(2)
     require(marker_bytes(1) == first, "Deny-removal delivery altered the first positive marker")
-    same_live_receiver()
+    same_live_receiver("before-full-policy-denial")
     refused = children.run([*sender, "denied"], confined=True)
     require(
         refused.stdout in ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
         and not refused.stderr,
         "Full native policy did not report a documented AppleEvent refusal",
     )
-    same_live_receiver()
+    same_live_receiver("after-full-policy-denial")
     require(
         marker_bytes(1) == first
         and marker_bytes(2) == second
