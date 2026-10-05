@@ -85,7 +85,7 @@ check("native nested JSON text keeps escaped NUL and UTF-8 identities", function
 end)
 
 check("native empty row lists and selected app filters keep their meaning", function()
-	assert(next(Reader.read_manifest(database, date, date, { "absent app" })) == nil)
+	assert(next((Reader.read_manifest(database, date, date, { "absent app" }))) == nil)
 	assert(next(Reader.read_system_days(database, "2026-10-04", "2026-10-04")) == nil)
 	assert(Reader.read_manifest(database, date, date, {})[date][app].char_letter == 5)
 end)

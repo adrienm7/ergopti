@@ -888,8 +888,10 @@ local function persisted_manifest()
 	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
 		return _manifest_cache.manifest
 	end
-	local fresh = SqliteReader.read_manifest(_sqlite_path)
-	_manifest_cache = { revision = revision, manifest = fresh }
+	local fresh, complete = SqliteReader.read_manifest(_sqlite_path)
+	if complete then
+		_manifest_cache = { revision = revision, manifest = fresh }
+	end
 	return fresh
 end
 
