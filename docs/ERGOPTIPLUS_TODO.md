@@ -3712,6 +3712,15 @@ private logical compensation. Stale cleanup closures cannot retire a successor.
 Independent source review and 296 targeted Lua5.4 cases cover both participants;
 this is portable qualification, without native Hammerspoon or packaged approval.
 
+The macOS stubbed E2E lane now installs LuaFileSystem for real directory and
+payload identity observations. Removing that prerequisite reproduces the exact
+34 hosted failures; restoring it passes101 cases with one existing skip.
+Manual run37259060275 at78c33cd851be187221dcd6ab5f2b2668928b0dc8 confirms
+stubbed units and E2E pass. Native Swift compilation then fails because the
+owned-program C header is absent from the umbrella export. The native14 cases,
+package completion and installation remain unexecuted; this prerequisite fix
+does not qualify those surfaces or finish the item.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
