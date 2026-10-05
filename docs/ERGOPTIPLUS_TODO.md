@@ -3884,6 +3884,8 @@ The 2026-10-05 continuation adds source-bound explicit Windows cleanup of retire
 
 Ordinary macOS snapshot and scope preparation now preserve an obsolete scalar at the optional user-model list. Neutral operations cannot silently delete it; nonneutral replacement refuses before source cleanup. Existing exact-source and typed-neighbor fences stay active.
 
+Windows explicit cleanup now offers the complete retired ahk root in dotted assignments, inline roots and table-array generations. Its private native receipt binds exact record identity, fields and complete source; cloned, forged, mutated, stale, partial and consumed records refuse before publication. Existing backup, lease, typed document writer and host action-only authority remain intact. Twenty-one native regression cases are added; native Windows qualification is pending. Lua collectors still cannot offer these root forms, and retirement policy is not yet centralized, so this slice does not complete the cross-driver item.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
