@@ -208,10 +208,10 @@ FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.kc_hold = entry.kc_hold or {}
 		entry.kc_hold[tostring(row.keycode)] = {
-			sum_ms = row.sum_ms or 0, count = row.count or 0,
+			s = row.sum_ms or 0, n = row.count or 0,
 			-- MAX, not SUM: the longest hold of the day is a record across devices.
-			max_ms = row.max_ms or 0,
-			tap_count = row.tap_count or 0, hold_count = row.hold_count or 0,
+			m = row.max_ms or 0,
+			tap = row.tap_count or 0, hold = row.hold_count or 0,
 		}
 	end
 

@@ -1839,6 +1839,29 @@ These are software implementations; final hardware verification remains below.
   and leave their native gates to the principal agent. No release publication,
   website, transport, persistence, physical input or reserved policy change.
 
+- [~] **L123.** Linux modifier-hold statistics projection: publish the existing
+  shared `s/n/m/tap/hold` record names instead of leaking native SQL column names.
+  SQLite stored correct sums/counts/maxima, but Apps displayed zero duration and
+  event counts and Typing displayed an em dash. Change exactly five keys in three
+  Reader lines; keep SQL SUM/MAX, defaults, numeric values/rounding, filters,
+  Writer/schema, shared contract and consumers identical. Twelve real public
+  Writer/SQLite/Reader checks reproduce eight failures and pass under current
+  LuaJIT, signed Ubuntu 22.04 luv/libuv dependencies and Lua 5.4; SQLite/kernel/
+  libc remain current in the mixed profile. Independent SQL establishes totals,
+  maximum across devices, legitimate zero and existing fraction-floor controls.
+  Separately run five actual Apps/Typing consumer checks on each native manifest:
+  four fail before and all pass after, restoring 1570 ms/seven samples and the
+  300 ms/600 ms Typing figures. Node VM supplies explicitly simulated DOM/state;
+  this is software integration, without a browser session or physical tap-hold
+  validation. Eight new registered unit cases fail before and pass on both Lua
+  runtimes, preserving every previous owner assertion. The final CJS refuses a
+  failed native child before consumer checks; its after run validates both layers.
+  Register future Linux CI without launching it. Windows already emits canonical
+  fields; macOS emits sum/count/max/tap/hold by source inspection, retaining a
+  separate duration/count/maximum diagnosis without a native run or foreign edit.
+  No alias policy, SQL/schema/cache/flush, physical hook/remap, magic/shortcut,
+  persistence, brightness or title change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
