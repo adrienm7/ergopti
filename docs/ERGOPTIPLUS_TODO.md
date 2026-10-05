@@ -2864,6 +2864,15 @@ physical input, packaging, installation or deferred Windows acceptance. Native u
 and the macOS Homebrew/Sparkle archive acceptance failures, remain separately
 owned blockers; their assertions and package/install requirements are retained.
 
+Native Linux prerequisite follow-up: the unchanged audio fixture reproduces
+six checks/four failures without actual PulseAudio gettext catalogs and six/zero
+with the signed package's French/German catalogs. The Ubuntu runner now installs
+both language packs. Dunst 1.9 history lacks urgency; fixture-owned native urgency
+rules must provide a classified category receipt for every original notification
+case, and a deliberately wrong native rule must be rejected. Neither product
+adapters nor the existing literal-text/options assertions are weakened. Hosted
+confirmation remains pending until the next exact-source manual run.
+
 The [Group 2 integration checkpoint](handovers/2026-10-04-parallel-containers/GROUP2-INTEGRATION-STATUS.md)
 records exact candidate/CI SHAs, passed/failed/skipped results and the remaining
 native and Windows continuation. No final integration lock, shared validation
