@@ -2089,6 +2089,29 @@ These are software implementations; final hardware verification remains below.
   No Writer, Keylogger, SQL, schema, UI labels, menu, configuration, physical-input,
   foreign driver or reserved change.
 
+- [~] **L133.** Linux directed application transitions: project persisted
+  agg_app_day_switches_to rows into the canonical switches_to map. Sum device
+  contributions by date, source and destination; reuse inclusive date and source
+  application filters while retaining destinations outside that selection.
+  Preserve optional absence, typed zero, quoted UTF-8 names, aggregate/raw bytes
+  and native completion-cache refusal/recovery. Thirteen real public software
+  collector/SQLite/Reader/dashboard controls reproduce nine failures and pass
+  after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile.
+  Five independent native SQL controls reproduce three failures and pass after
+  on each profile, including literal directed 6|2, reverse 1|1 and zero integer
+  0|1|integer oracles. Both fixtures enforce their exact thirteen/five floors.
+  Four registered CLI-response unit cases reproduce three failures and pass
+  after; all sixty-three existing Reader owner cases and every old assertion
+  remain. Replay native NULL8, completion10, public-cache3 and layouts10 on all
+  three profiles. Shared consumers already use switches_to; no shared policy
+  change is needed. macOS/Windows source also produces transitions but their
+  Reader manifests omit this field; this is a source diagnosis, with native
+  foreign validation and corresponding fixes left to the principal agent.
+  Register future Linux CI without launching it. Explicit software focus calls
+  exercise native databases, not physical input or foreground-window discovery.
+  Preserve both language packs and principal notification/HTTP assertions.
+  No Writer, Keylogger, schema, UI, configuration or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

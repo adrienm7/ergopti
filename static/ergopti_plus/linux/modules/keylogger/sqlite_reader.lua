@@ -351,6 +351,20 @@ FROM agg_app_day_session%s;
 		end
 	end
 
+	-- Application filters select the source app; its destinations remain the
+	-- workflow the shared metrics pages display. Alias the source at the SQL
+	-- boundary so the same date/app filter policy covers this differently keyed
+	-- aggregate, including synchronized contributions from several devices.
+	for _, row in ipairs(query(string.format([[
+SELECT date, app, app_to, SUM(count) AS count
+FROM (SELECT date, app_from AS app, app_to, count FROM agg_app_day_switches_to)%s
+GROUP BY date, app, app_to;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.switches_to = entry.switches_to or {}
+		entry.switches_to[row.app_to] = row.count or 0
+	end
+
 	return manifest, complete
 end
 
