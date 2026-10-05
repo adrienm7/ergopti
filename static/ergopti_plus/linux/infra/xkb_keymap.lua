@@ -222,6 +222,27 @@ local function key_definitions(body)
 	end
 end
 
+--- Matches existing list syntax only when its start is outside a string.
+--- @param text string Exact key definition.
+--- @param pattern string Existing single-capture list pattern.
+--- @return string|nil Original captured bytes, including an empty capture.
+local function match_unquoted(text, pattern)
+	local i = 1
+	local anchored = "^" .. pattern
+	while i <= #text do
+		local c = text:sub(i, i)
+		if c == '"' then
+			i = skip_quoted_string(text, i)
+			if not i then return nil end
+		else
+			local captured = text:match(anchored, i)
+			if captured ~= nil then return captured end
+			i = i + 1
+		end
+	end
+	return nil
+end
+
 --- Reads the group-1 keysym list for every key in the symbols block.
 ---
 --- Two spellings occur in the same dump. The short form is
@@ -244,8 +265,8 @@ function M.parse_symbols(text)
 		-- Injecting into a group that is not active types the wrong characters,
 		-- so only the first group is kept and the active-group question is the
 		-- caller's.
-		local explicit = definition:match("symbols%s*%[%s*Group1%s*%]%s*=%s*%[([^%]]*)%]")
-		local list = explicit or definition:match("%[([^%]]*)%]")
+		local explicit = match_unquoted(definition, "symbols%s*%[%s*Group1%s*%]%s*=%s*%[([^%]]*)%]")
+		local list = explicit or match_unquoted(definition, "%[([^%]]*)%]")
 		if list then keys[name] = split_levels(list) end
 	end
 	return keys
