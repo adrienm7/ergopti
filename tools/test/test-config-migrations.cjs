@@ -596,14 +596,16 @@ for (let mask = 1; mask < 2 ** modifiers.length; mask += 1) {
 }
 const migrationContext = { modifier_chords: modifierChords, assignable_actions: assignableActions };
 
-// Inline tables remain opaque only at the exact source of the closed opcode.
-// Every unrelated inline-table corpus record keeps the existing parser guard.
-function opaqueChordPaths(source, registry, where) {
+// Inline tables remain opaque at a closed opcode source or this exact frozen
+// destination-owner fixture. Every unrelated inline record keeps the guard.
+function opaqueChordPaths(source, registry, where, report = fail) {
 	const allowed = new Set(
 		registry.steps.flatMap((step) =>
 			step.ops.filter((op) => op.op === 'move_chord_action').map((op) => op.section + '.' + op.key)
 		)
 	);
+	if (/^shipped_common_autocorrection_occupied\/(input|expected)\.toml$/.test(where))
+		allowed.add('hotstrings.autocorrection.names');
 	const paths = new Set();
 	let section = '';
 	for (const line of source.split('\n')) {
@@ -613,12 +615,36 @@ function opaqueChordPaths(source, registry, where) {
 		if (inline) {
 			const path = section + '.' + inline[1];
 			if (!allowed.has(path))
-				fail(where, 'uses an unrelated inline table, which the three parsers address differently');
+				report(
+					where,
+					'uses an unrelated inline table, which the three parsers address differently'
+				);
 			else paths.add(path);
 		} else if (/=\s*\{/.test(line))
-			fail(where, 'uses an unrelated inline table, which the three parsers address differently');
+			report(where, 'uses an unrelated inline table, which the three parsers address differently');
 	}
 	return paths;
+}
+
+// Both the namespace and fixture identity fence this exception. These negative
+// controls call the same guard without adding expected failures to the run.
+{
+	const controls = [
+		[
+			'shipped_common_autocorrection_occupied/input.toml',
+			'[hotstrings.autocorrection]\nforeign = { enabled = false }\n'
+		],
+		['unrelated/input.toml', '[hotstrings.autocorrection]\nnames = { enabled = false }\n']
+	];
+	for (const [where, source] of controls) {
+		const refusals = [];
+		const paths = opaqueChordPaths(source, { steps: [] }, where, (...args) => refusals.push(args));
+		if (refusals.length !== 1 || paths.size !== 0)
+			fail(
+				'opaque namespace negative control',
+				`${where}: unrelated inline ownership must remain refused`
+			);
+	}
 }
 
 const shipped = validateRegistry(readToml(REGISTRY_PATH) || {}, 'migrations.toml');

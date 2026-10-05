@@ -375,6 +375,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
+#Include ../_shared/modules/network/failure.ahk
 #Include adapters/http_client.ahk
 #Include adapters/secure_field_detector.ahk
 #Include adapters/storage.ahk
@@ -1373,9 +1374,16 @@ _ReleasePhantomModifiers()
 ; Deferring these ~3000 registrations after ready made a first emoji/symbol trigger
 ; literal for seconds and allowed the timer to stall the first typing burst.
 BootProfile_StageBegin("hotstrings")
-RegisterAllHotstrings(false)
+_BootHotstringsReceipt := RegisterAllHotstrings(false, true)
+if !(_BootHotstringsReceipt is Map) || !_BootHotstringsReceipt.Get("committed", false)
+	throw Error("Cold hotstring registration did not return a committed receipt.")
 BootProfile_StageEnd("hotstrings")
-BootProfile_Mark("Hotstrings registered (HSE complete)")
+if _BootHotstringsReceipt["complete"]
+	BootProfile_Mark("Hotstrings registered (HSE complete)")
+else {
+	LoggerWarn("Hotstrings", "Common autocorrection is unavailable after override admission refusal; unrelated hotstrings were registered.")
+	BootProfile_Mark("Hotstrings registered (common autocorrection unavailable)")
+}
 BootProfile_StageBegin("prefix watcher")
 HotstringPrefixWatcherInit()
 ; Install the shared low-level keyboard arbiter after the prefix InputHook. Its

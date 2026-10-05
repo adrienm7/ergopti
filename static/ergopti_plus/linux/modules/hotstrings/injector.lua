@@ -182,6 +182,8 @@ end
 --- and the replacement arriving.
 --- @param tx table Output transaction.
 --- @param count integer Number of Backspace strokes to send.
+local require_publication
+
 local function send_backspaces(tx, count)
 	if count < 1 then return end
 	for _ = 1, count do
@@ -225,6 +227,7 @@ local function send_text_native(tx, text)
 		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock release up")
 	end
 	local ok_typed, typed_err = pcall(function()
+		require_publication(tx.publication, false)
 		for _, step in ipairs(plan) do
 			for _, mod in ipairs(step.mods) do
 				must_emit(tx, MODIFIER_CODES[mod], EVDEV_VALUE_DOWN, "layout modifier down")
@@ -266,7 +269,16 @@ end
 local function send_text(tx, text, is_private)
 	if send_text_native(tx, text) then return true end
 
-	if Clipboard.paste_text(text, tx.channel(), sleep_ms) then
+	local pause = sleep_ms
+	if tx.publication then
+		pause = function(ms)
+			require_publication(tx.publication, false)
+			sleep_ms(ms)
+			require_publication(tx.publication, false)
+		end
+	end
+	require_publication(tx.publication, false)
+	if Clipboard.paste_text(text, tx.channel(), pause) then
 		Logger.debug(LOG, "Replacement delivered by clipboard (untypable on this layout).")
 		return true
 	end
@@ -320,13 +332,42 @@ local function stop_after_failure(result, label)
 	end
 end
 
+--- Requires retained programmable admission at an actual native output boundary.
+--- @param publication table|nil Optional programmable publication owner.
+--- @param cached boolean True for the RAM-only per-key fence.
+require_publication = function(publication, cached)
+	if publication == nil then return end
+	local check = cached and publication.cached or publication.current
+	local ok, current = pcall(check)
+	if not ok or current ~= true then error("programmable publication is no longer current", 0) end
+end
+
 --- Runs one complete output transaction with unconditional cleanup.
 --- @param label string Diagnostic operation name.
 --- @param body function Called as body(transaction).
 --- @return table Commit result.
-local function run_transaction(label, body)
-	local tx = OutputTransaction.new(_uinput)
+local function run_transaction(label, body, publication)
+	local native_tx = OutputTransaction.new(_uinput)
+	local tx = native_tx
+	if publication ~= nil then
+		-- Cleanup remains on the original transaction wire, so a refused late
+		-- publication never prevents owned key-ups or physical modifier restore.
+		tx = setmetatable({ publication = publication,
+			emit = function(code, value, phase)
+				if value == EVDEV_VALUE_DOWN and phase ~= "capslock restore down" then
+					require_publication(publication, true)
+				end
+				return native_tx.emit(code, value, phase)
+			end,
+		}, { __index = native_tx })
+		tx.channel = function()
+			local channel = native_tx.channel()
+			return { is_open = channel.is_open,
+				emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end }
+		end
+	end
 	local ok, err = pcall(function()
+		require_publication(publication, false)
 		if not tx.neutralize(held_text_modifier_codes()) then error(tx.error(), 0) end
 		-- Ctrl, Alt and Super are released for good: the chord that asked for
 		-- this text (Alt+1 on a prediction) is spent, and text typed under them
@@ -350,7 +391,8 @@ local function run_transaction(label, body)
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
-	if not result.ok then stop_after_failure(result, label) end
+	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
+		and result.error == "programmable publication is no longer current") then stop_after_failure(result, label) end
 	return result
 end
 
@@ -490,7 +532,8 @@ end
 ---   changes nothing about what is TYPED — only about what is written to the
 ---   log, which the driver keeps for 14 days at a level that prints TRACE.
 --- @param replay_terminator string|nil Exact non-consumed carrier to type last.
-function M.inject(backspace_count, replacement_text, is_private, replay_terminator)
+--- @param publication table|nil Retained full-phase and cached-key admission guards.
+function M.inject(backspace_count, replacement_text, is_private, replay_terminator, publication)
 	if type(backspace_count) ~= "number" or type(replacement_text) ~= "string"
 			or (replay_terminator ~= nil and type(replay_terminator) ~= "string") then
 		-- The TYPES, not the values. This branch is reached BECAUSE the arguments
@@ -521,12 +564,14 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			sleep_ms(INTER_PHASE_DELAY_MS)
 		end
 
+		require_publication(publication, false)
 		-- Phase 2: type the replacement.
 		if not send_text(tx, replacement_text, is_private) then error(tx.error(), 0) end
 		if replay_terminator and replay_terminator ~= "" then
+			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end)
+	end, publication)
 
 	if result.ok then Logger.done(LOG, "inject(): done (bc=%d).", backspace_count) end
 	return result

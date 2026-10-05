@@ -164,7 +164,8 @@ check(
 	'the release workflow runs the generator on the published asset and the docs name its tap',
 	() => {
 		assert.ok(WORKFLOW.includes('node tools/build/homebrew-cask.cjs "$TAG" "$sha" "$tap"'));
-		assert.ok(WORKFLOW.includes(`--pattern ${Cask.ASSET_NAME}`));
+		assert.ok(WORKFLOW.includes('node tools/build/macos-release-publication.cjs download'));
+		assert.ok(WORKFLOW.includes('"$tap" "$archive"'));
 		const tap = WORKFLOW.match(
 			/TAP_REPOSITORY: \$\{\{ github\.repository_owner \}\}\/(homebrew-[a-z-]+)/
 		);
@@ -230,6 +231,251 @@ check('Ruby parses both casks', () => {
 		const run = spawnSync('ruby', ['-c'], { input: cask.text, encoding: 'utf8' });
 		assert.strictEqual(run.status, 0, `${cask.token}: ${run.stderr}`);
 	}
+});
+
+check('an admitted preferred name remains coupled to its independent hash', () => {
+	const publication = require('../build/macos-release-publication.cjs');
+	const preferred = publication.bindings()[0];
+	const crypto = require('node:crypto');
+	const tap = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-preferred-cask-'));
+	try {
+		const payload = path.join(tap, preferred.name);
+		fs.writeFileSync(payload, Buffer.from('independent selected public archive bytes'));
+		const actualHash = crypto.createHash('sha256').update(fs.readFileSync(payload)).digest('hex');
+		const selected = Cask.renderCask('v0.0.0-dev.142', actualHash, preferred.name);
+		assert.ok(selected.text.includes(`/v#{version}/${preferred.name}"`));
+		assert.ok(selected.text.includes(`sha256 "${actualHash}"`));
+		const result = spawnSync(
+			process.execPath,
+			[
+				path.join(ROOT, 'tools/build/homebrew-cask.cjs'),
+				'v0.0.0-dev.142',
+				actualHash,
+				tap,
+				preferred.name
+			],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(fs.readFileSync(path.join(tap, selected.file), 'utf8'), selected.text);
+		assert.throws(() => Cask.renderCask('v1.2.3', actualHash, 'unknown.tar.xz'), /undeclared/);
+	} finally {
+		fs.rmSync(tap, { recursive: true });
+	}
+});
+
+check('portable Brew ownership controls remain registered and mandatory', () => {
+	const controls = path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance_test.py');
+	const result = spawnSync(process.platform === 'win32' ? 'python' : 'python3', [controls], {
+		cwd: ROOT,
+		encoding: 'utf8',
+		timeout: 30000,
+		env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+	});
+	assert.ifError(result.error);
+	assert.strictEqual(result.signal, null, result.stderr);
+	assert.strictEqual(result.status, 0, result.stderr);
+	assert.match(result.stderr, /Ran 30 tests in /);
+	assert.match(result.stderr, /\nOK\s*$/);
+	assert.doesNotMatch(result.stderr, /skipped=/);
+});
+
+check(
+	'owned AppleEvent compile boundary uses declared 64-bit dispatch and actual selected tools',
+	() => {
+		const receiver = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+			'utf8'
+		);
+		const helper = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+			'utf8'
+		);
+		assert.match(
+			receiver,
+			/ReceiveNextEvent\(1, &apple_event, kEventDurationForever, true, &event\)/
+		);
+		assert.match(receiver, /AEProcessEvent\(event\)/);
+		assert.match(receiver, /ReleaseEvent\(event\)/);
+		assert.doesNotMatch(receiver, /RunApplicationEventLoop\s*\(/);
+		assert.match(helper, /xcode-select", "--print-path"\], confined=True/);
+		assert.match(helper, /-isysroot/);
+		assert.match(helper, /-fmodules-cache-path=/);
+		assert.match(helper, /cache\.mkdir\(mode=0o700\)/);
+		const boundary = helper.slice(
+			helper.indexOf('def _admit_appleevent_boundary'),
+			helper.indexOf('def ', helper.indexOf('def _admit_appleevent_boundary') + 5)
+		);
+		assert.doesNotMatch(boundary, /xcrun/);
+	}
+);
+
+check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
+	const fixture = fs.readFileSync(
+		path.join(
+			ROOT,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	assert.match(
+		fixture,
+		/func testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState\(\) throws/
+	);
+	assert.match(fixture, /tools\/diagnostics\/macos_brew_archive_acceptance\.py/);
+	assert.match(fixture, /process\.run\(\)/);
+	assert.match(fixture, /process\.terminationStatus == 0/);
+	assert.match(fixture, /attributes: \[\.posixPermissions: 0o700\]/);
+	assert.match(fixture, /Set\(ownership\.keys\) == Set\(\["schema", "helper_pid", "closed"\]\)/);
+	assert.match(fixture, /ownership\["closed"\] as\? Bool == true/);
+	assert.match(fixture, /ownership\["helper_pid"\]/);
+	assert.match(fixture, /func retireInvoker\(\) -> Bool/);
+	assert.doesNotMatch(fixture, /SIGKILL/);
+
+	assert.match(fixture, /receipt\["complete"\] as\? Bool, true/);
+	assert.match(fixture, /receipt\["host_unchanged"\] as\? Bool, true/);
+	assert.match(fixture, /receipt\["fixture_retained"\] as\? Bool, false/);
+	assert.match(fixture, /receipt\["cleanup_errors"\] as\? \[String\], \[\]/);
+	for (const name of [
+		'zip_install',
+		'xz_upgrade',
+		'checksum_refusal_preserved',
+		'checksum_retry',
+		'artifact_refusal_preserved',
+		'artifact_retry'
+	]) {
+		assert.ok(fixture.includes(`"${name}": true`), `Native receipt must acknowledge ${name}`);
+	}
+	assert.doesNotMatch(fixture, /XCTSkip|mock|stub/i);
+});
+
+check('native macOS CI admits the pinned Python nonreaping prerequisites', () => {
+	const pipeline = require('./ci-pipeline.cjs');
+	const job = pipeline.job('package-macos');
+	const setupName = 'Prepare Python for native nonreaping waits';
+	const admissionName = 'Admit native nonreaping Python prerequisites';
+	const setup = pipeline.step(job, setupName);
+	const admission = pipeline.step(job, admissionName);
+	assert.equal(pipeline.stepField(setup, 'uses'), 'actions/setup-python@v5');
+	assert.match(setup, /python-version: '3\.13'/);
+	for (const step of [setup, admission]) {
+		assert.equal(pipeline.stepField(step, 'if'), null);
+		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+	}
+	const order = pipeline.steps(job).map((step) => step.name);
+	assert.ok(order.indexOf(setupName) < order.indexOf(admissionName));
+	assert.ok(order.indexOf(admissionName) < order.indexOf('Run Swift launcher tests'));
+	const lines = pipeline.runOf(admission);
+	assert.equal(lines[0], "python3 - <<'PY'");
+	assert.equal(lines.at(-1), 'PY');
+	const script = lines.slice(1, -1).join('\n');
+	for (const [version, missing, expected] of [
+		[[3, 12, 12], null, 1],
+		[[3, 13, 7], 'waitid', 1],
+		[[3, 13, 7], 'WNOWAIT', 1],
+		[[3, 13, 7], null, 0]
+	]) {
+		// These portable models exercise the actual admission script; native
+		// WNOWAIT behavior remains owned by repeated macOS observations.
+		const preparation =
+			`import os, sys\nsys.platform = "darwin"\nsys.version_info = tuple(${JSON.stringify(version)})\nfor name in ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT", "CLD_EXITED", "CLD_KILLED", "CLD_DUMPED"):\n if not hasattr(os, name): setattr(os, name, None)\n` +
+			(missing
+				? `if hasattr(os, ${JSON.stringify(missing)}): delattr(os, ${JSON.stringify(missing)})\n`
+				: '') +
+			`exec(${JSON.stringify(script)})\n`;
+		const result = spawnSync(
+			process.platform === 'win32' ? 'python' : 'python3',
+			['-c', preparation],
+			{ encoding: 'utf8', timeout: 30000 }
+		);
+		assert.ifError(result.error);
+		assert.equal(result.signal, null, result.stderr);
+		assert.equal(result.status === 0 ? 0 : 1, expected, result.stderr);
+		if (expected === 0) {
+			assert.deepEqual(JSON.parse(result.stdout).version, version);
+			assert.ok(JSON.parse(result.stdout).nonreaping_apis.includes('WNOWAIT'));
+		} else {
+			assert.match(result.stderr, missing ? /Missing native nonreaping APIs/ : /CPython >= 3.13/);
+		}
+	}
+});
+
+check('archive artifacts bind only this step session independently of TIS', () => {
+	const pipeline = require('./ci-pipeline.cjs');
+	const job = pipeline.job('package-macos');
+	const step = pipeline.step(job, 'Run Swift launcher tests');
+	const lines = pipeline.runOf(step).join('\n');
+	assert.match(
+		lines,
+		/ERGOPTI_ARCHIVE_EVIDENCE_DIR="\$\(mktemp -d "\$RUNNER_TEMP\/swift-launcher-evidence\/archive-session\.XXXXXX"\)"/
+	);
+	assert.ok(
+		lines.indexOf('archive_session_dir=') < lines.indexOf('export ERGOPTI_TIS_EVIDENCE_DIR=')
+	);
+	assert.ok(
+		lines.indexOf('"scope": "swift-not-started"') <
+			lines.indexOf('export ERGOPTI_TIS_EVIDENCE_DIR=')
+	);
+	assert.match(step, /timeout-minutes: 10/);
+	const upload = pipeline.step(job, 'Retain archive diagnostic session');
+	assert.equal(
+		pipeline.stepField(upload, 'if'),
+		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
+	);
+	assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
+	const pathBlock = /^ {10}path: \|\n((?: {12}.+\n?)+)/m.exec(upload)?.[1];
+	assert.ok(pathBlock);
+	const paths = pathBlock
+		.trim()
+		.split('\n')
+		.map((line) => line.trim());
+	assert.deepEqual(paths, [
+		'${{ steps.swift-launcher-tests.outputs.archive_session_dir }}/*/*.json',
+		'${{ steps.swift-launcher-tests.outputs.archive_session_dir }}/*/helper/*.json'
+	]);
+	assert.doesNotMatch(upload, /tis_session_dir|\*\*|cache|fixture|key|\.app/i);
+});
+
+check('archive owners publish bounded typed phase evidence before native work', () => {
+	const testRoot = 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/';
+	for (const [file, owner] of [
+		['HomebrewArchiveAcceptanceTests.swift', 'brew'],
+		['SparkleArchiveUpdateAcceptanceTests.swift', 'sparkle']
+	]) {
+		const source = fs.readFileSync(path.join(ROOT, testRoot, file), 'utf8');
+		assert.ok(source.includes(`ArchiveAcceptanceEvidence(owner: .${owner})`));
+		assert.ok(source.includes('checkpoint("candidate.begin")'));
+		assert.match(source, /checkpoint\("cleanup\.debt(?:-" \+ label|"), status: "cleanup-debt"/);
+		if (owner === 'brew') assert.ok(source.includes('if evidenceRefused { canRetire = false }'));
+	}
+	const writer = fs.readFileSync(
+		path.join(ROOT, testRoot, 'ArchiveAcceptanceEvidence.swift'),
+		'utf8'
+	);
+	assert.match(writer, /swift-launcher-evidence/);
+	assert.match(writer, /O_NOFOLLOW/);
+	assert.match(writer, /bytes\.count <= 4096/);
+	assert.match(writer, /sequence < 256/);
+	assert.match(writer, /testRefusedPublicationNeverReplacesAnUnclosedCheckpoint/);
+});
+
+check('shared native process ownership controls remain registered and mandatory', () => {
+	const result = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		[path.join(ROOT, 'tools/diagnostics/macos_owned_process_test.py')],
+		{
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+		}
+	);
+	assert.ifError(result.error);
+	assert.strictEqual(result.signal, null, result.stderr);
+	assert.strictEqual(result.status, 0, result.stderr);
+	assert.match(result.stderr, /Ran 15 tests in /);
+	assert.match(result.stderr, /\nOK\s*$/);
+	assert.doesNotMatch(result.stderr, /skipped=/);
 });
 
 if (failures > 0) {

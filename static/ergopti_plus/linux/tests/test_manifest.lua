@@ -9,7 +9,13 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.test_user_hotstring_destination",
+	"tests.unit.infra.test_user_hotstring_runtime",
 	"tests.unit.ui.test_ergopti_extension_selection",
+	"tests.unit.ui.test_user_hotstring_menu",
+	"tests.unit.infra.test_personal_file_adoption",
+	"tests.unit.infra.test_personal_file_adoption_native",
+	"tests.unit.meta.test_user_code_contract",
 	"tests.unit.modules.llm.test_local_server_discovery",
 	"tests.unit.meta.test_combination_labels",
 	"tests.unit.adapters.test_atspi_focus",
@@ -109,6 +115,7 @@ return {
 	"tests.unit.meta.test_helper_assertions",
 	"tests.unit.meta.test_hotstrings_config",
 	"tests.unit.meta.test_http_client_curl",
+	"tests.unit.meta.test_managed_network_failure",
 	"tests.unit.meta.test_i18n_is_ready_before_the_tray",
 	"tests.unit.meta.test_i18n_persistence",
 	"tests.unit.meta.test_injector_commands",
@@ -366,6 +373,7 @@ return {
 	"tests.unit.ui.test_paths_editor_logs_dir",
 	"tests.unit.ui.test_unused_keys_cleanup",
 	"tests.unit.ui.test_update_check_bridge",
+	"tests.unit.ui.test_managed_download_failure_callers",
 	"tests.unit.ui.test_config_cleanup_bridge",
 	"tests.unit.ui.test_config_cleanup_session",
 	"tests.unit.ui.test_wpm_readouts",

@@ -1,0 +1,11 @@
+--- a/static/ergopti_plus/_shared/modules/network/managed_network.json
++++ b/static/ergopti_plus/_shared/modules/network/managed_network.json
+@@ -306,5 +306,8 @@
+ 			}
+ 		}
+ 	],
++	"presentation": {
++		"render_ack_timeout_ms": 5000
++	},
+ 	"default_cause": "unknown"
+ }

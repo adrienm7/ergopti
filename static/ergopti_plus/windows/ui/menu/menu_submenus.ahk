@@ -205,6 +205,11 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 			continue
 		}
 		V2Id := _LegacyDynamicHotstringsKeyMap[V1Id]
+		if V2Id == "user_code" {
+			for UserRow in _HS_ProgrammableHotstringRows()
+				Rows.Push(UserRow)
+			continue
+		}
 		Entry := ManifestFindEntryByPath("hotstrings.dynamic." . V2Id)
 		if (Entry == false) {
 			try LoggerWarn("Menu",
@@ -288,4 +293,3 @@ _CollectAllHotstringsV2Paths(FeaturesTarget, SeedPersonal := true) {
 
 	return Paths
 }
-

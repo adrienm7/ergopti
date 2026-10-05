@@ -190,11 +190,22 @@ const STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'package-macos',
+		'Retain archive diagnostic session',
+		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Retain closed TIS diagnostic session',
+		"${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}"
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
 		'Upload Swift launcher failure transcript',
 		"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
 	],
-	[MACOS_BOX, 'package-macos', 'Install Sparkle signing tool', 'inputs.release'],
-	[MACOS_BOX, 'package-macos', 'Sign zip with Sparkle EdDSA key', 'inputs.release'],
+	[MACOS_BOX, 'package-macos', 'Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
 	[MACOS_BOX, 'launch', 'Retain launch evidence', 'always()'],
@@ -208,6 +219,18 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[
+		WINDOWS_BOX,
+		'launch-windows',
+		'Qualify programmable hotstrings in the actual compiled package',
+		NOT_CANCELLED
+	],
+	[
+		WINDOWS_BOX,
+		'launch-windows',
+		'Upload mandatory compiled programmable package evidence',
+		'always()'
+	],
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
 	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],
@@ -1217,6 +1240,47 @@ function stepProblems(files) {
 }
 
 errors.push(...stepProblems(pipeline.files()));
+for (const condition of ['', 'false', 'success()']) {
+	const head = '      - name: Retain archive diagnostic session\n';
+	const from =
+		head +
+		"        if: ${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}\n";
+	mustCatch(
+		'archive retained evidence condition ' + condition,
+		MACOS_BOX,
+		from,
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing mandatory archive evidence upload',
+	MACOS_BOX,
+	'      - name: Retain archive diagnostic session\n',
+	'      - name: Omitted archive evidence upload\n',
+	stepProblems
+);
+
+for (const condition of ['', 'false', 'success()']) {
+	const head = '      - name: Retain closed TIS diagnostic session\n';
+	const from =
+		head +
+		"        if: ${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}\n";
+	mustCatch(
+		'TIS retained evidence condition ' + condition,
+		MACOS_BOX,
+		from,
+		head + (condition ? '        if: ' + condition + '\n' : ''),
+		stepProblems
+	);
+}
+mustCatch(
+	'missing mandatory TIS evidence upload',
+	MACOS_BOX,
+	'      - name: Retain closed TIS diagnostic session\n',
+	'      - name: Omitted TIS evidence upload\n',
+	stepProblems
+);
 for (const condition of ['false', "matrix.kind == 'deb'"]) {
 	mustCatch(
 		`an AppImage launch routed through ${condition}`,
@@ -1896,6 +1960,80 @@ for (const input of ['{', 'null', '[]', '{}']) {
 	assert.equal(result.status, 1);
 	assert.equal(result.stdout, '');
 }
+
+/** Requires native signing tools before XCTest without release-key access. */
+function sparkleToolProblems(files) {
+	const problems = [];
+	const mac = files.find((entry) => entry.rel === MACOS_BOX);
+	const job =
+		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'package-macos');
+	const steps = job ? pipeline.steps(job.body) : [];
+	const tools = steps.filter((step) => step.name === 'Install Sparkle signing tool');
+	const toolAt = steps.findIndex((step) => step.name === 'Install Sparkle signing tool');
+	const nativeAt = steps.findIndex((step) => step.name === 'Run Swift launcher tests');
+	if (tools.length !== 1 || toolAt < 0 || nativeAt <= toolAt) {
+		problems.push('the actual pinned Sparkle tool installer must precede native XCTest');
+	} else if (
+		pipeline.stepField(tools[0].body, 'if') !== null ||
+		pipeline.stepField(tools[0].body, 'continue-on-error') !== null ||
+		/\bsecrets\.|SPARKLE_ED_PRIVATE_KEY/.test(codeOf(tools[0].body))
+	) {
+		problems.push(
+			'native fixture tool installation must be unconditional and cannot receive release secrets'
+		);
+	}
+	return problems;
+}
+errors.push(...sparkleToolProblems(pipeline.files()));
+const sparkleToolBody = pipeline.step(
+	pipeline.job('package-macos'),
+	'Install Sparkle signing tool'
+);
+const sparkleNativeBody = pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests');
+for (const [what, from, to] of [
+	['missing native Sparkle tools', sparkleToolBody, ''],
+	[
+		'release-only native Sparkle tools',
+		sparkleToolBody,
+		sparkleToolBody.replace(
+			'        shell: bash',
+			'        if: inputs.release\n        shell: bash'
+		)
+	],
+	[
+		'forgiven native Sparkle tools',
+		sparkleToolBody,
+		sparkleToolBody.replace(
+			'        shell: bash',
+			'        continue-on-error: true\n        shell: bash'
+		)
+	],
+	[
+		'release secret handed to native Sparkle tools',
+		sparkleToolBody,
+		sparkleToolBody.replace(
+			"          SPARKLE_VERSION: '2.9.2'",
+			"          SPARKLE_VERSION: '2.9.2'\n          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}"
+		)
+	]
+]) {
+	mustCatch(what, MACOS_BOX, from, to, sparkleToolProblems);
+}
+const swappedSparkleSteps = pipeline.files().map((entry) =>
+	entry.rel === MACOS_BOX
+		? {
+				...entry,
+				text: entry.text
+					.replace(sparkleToolBody, '__OWNED_SPARKLE_TOOL_STEP__')
+					.replace(sparkleNativeBody, sparkleToolBody)
+					.replace('__OWNED_SPARKLE_TOOL_STEP__', sparkleNativeBody)
+			}
+		: entry
+);
+assert.ok(
+	sparkleToolProblems(swappedSparkleSteps).length > 0,
+	'native XCTest before Sparkle tool installation must refuse'
+);
 
 if (errors.length > 0) {
 	console.error(

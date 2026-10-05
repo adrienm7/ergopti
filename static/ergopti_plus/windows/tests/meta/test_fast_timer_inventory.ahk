@@ -68,6 +68,7 @@ _FTI_Inventory() {
 	return Map(
 		'Job["timer"]',                 "15",    ; selection capture, torn down on completion
 		"_SuspendPendingPoll",          "25",    ; short-lived, awaits a pending suspend
+		"_UserHotstringsPoll",          "25",    ; only while exact worker/Job/stage debt is owned; stale source/focus/input cancellation
 		"ScreenBrightnessPoll",          "50",    ; only while a native backlight worker or exact retirement debt is owned
 		"FocusTimerFn",                 "50",    ; generation-bound focus snapshot, title deadline <= 5 ms
 		"_LLM_PointerWatch_MoveFn",     "50",    ; only armed while a prediction is on screen

@@ -15,6 +15,7 @@
 
 let globalLogLines = [];
 let globalDoneState = false;
+let globalDoneSucceeded = null;
 // Set by done() from the Lua-side error_kind (e.g. "gated" for a private/gated
 // HuggingFace repo). Read by doRetry() so the same button can either relaunch
 // the download as-is or trigger the "log in and retry" flow — the Lua side
@@ -74,6 +75,9 @@ function setKind(kind, title, subtitle, session) {
 		throw new TypeError('Download bridge session must be a positive safe integer');
 	}
 	if (!kind || !KIND_MODES[kind]) return;
+	if (window.clearNetworkFailure) window.clearNetworkFailure();
+	globalDoneState = false;
+	globalDoneSucceeded = null;
 	bridgeSession = session;
 	const mode = KIND_MODES[kind];
 	// Clear previous kind/mode classes before applying the fresh ones
@@ -192,8 +196,10 @@ function doRetry() {
  * Resets the UI to its initial state for a retry, preventing zombie placeholders.
  */
 function resetUI() {
+	if (window.clearNetworkFailure) window.clearNetworkFailure();
 	globalLogLines = [];
 	globalDoneState = false;
+	globalDoneSucceeded = null;
 	globalErrorKind = null;
 
 	const barFill = document.getElementById('bar-fill');
@@ -340,8 +346,10 @@ function addLog(line) {
  *   of a plain retry when the failure was a gated/private HuggingFace repo.
  */
 function done(isSuccess, message, errorKind) {
-	globalDoneState = true;
 	globalErrorKind = errorKind || null;
+	if (window.clearNetworkFailure) window.clearNetworkFailure();
+	globalDoneState = true;
+	globalDoneSucceeded = isSuccess === true;
 
 	const cancelButton = document.getElementById('btn-cancel');
 	if (cancelButton) cancelButton.style.display = 'none';

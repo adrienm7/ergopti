@@ -199,6 +199,7 @@ global _DefaultLogsDir := _LogsDir
 ; date formatters). Definitions only — _DynHS_RegisterAll() is not called here,
 ; so no registration happens at harness load.
 #Include ../modules/dynamic_hotstrings/dynamic_hotstrings.ahk
+#Include ../modules/dynamic_hotstrings/user_code.ahk
 #Include ../infra/feature_io.ahk
 ; EnsurePersonalHotstringFeature is exercised directly by the F4 regression
 ; test (test_feature_io_locator.ahk) — RegisterPersonalFeature in the same file
@@ -262,6 +263,7 @@ global _DefaultLogsDir := _LogsDir
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
+#Include ../../_shared/modules/network/failure.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
@@ -426,6 +428,7 @@ InstallSendNoOps()
 #Include unit/test_hotstring_language_packs.ahk
 #Include unit/test_menu_languages_and_global_separator.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
+#Include unit/test_user_hotstrings.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk
 #Include unit/test_hotstring_override_global_transaction_20260813.ahk
@@ -458,6 +461,7 @@ InstallSendNoOps()
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_personal_file_controls.ahk
 #Include unit/test_hotstring_delimiter_scope_preservation.ahk
 #Include unit/test_hotstring_category_scope.ahk
 #Include unit/test_global_config_scope.ahk
@@ -1050,6 +1054,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_remote_generate_curl_dispatch.ahk
 #Include unit/test_network_dispatch_nonblocking.ahk
+#Include unit/test_managed_network_failure.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk

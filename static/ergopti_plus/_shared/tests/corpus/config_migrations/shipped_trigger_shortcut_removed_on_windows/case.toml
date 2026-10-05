@@ -5,4 +5,4 @@ description = "Shipped migrations preserve the retired Windows llm.trigger_short
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 3
-to_version = 10
+to_version = 11

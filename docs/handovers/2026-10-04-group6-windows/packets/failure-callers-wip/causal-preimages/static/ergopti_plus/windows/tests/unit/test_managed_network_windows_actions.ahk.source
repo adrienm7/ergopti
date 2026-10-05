@@ -1,0 +1,446 @@
+﻿; tests/unit/test_managed_network_windows_actions.ahk
+
+; ==============================================================================
+; MODULE: Managed Windows Failure Caller Controls
+; DESCRIPTION:
+; Independently authored requests and interleavings drive the actual shared
+; interpreter, Windows native adapter, private session and window callbacks.
+; Native probes, timers and WebView promises are controlled ports, not proof of
+; Windows networking, actual settings activation or a rendered native document.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_MNW_TestState() {
+	Owner := Map("request", "first", "private_url", "https://user:secret@example.test/private")
+	return Map("owner", Owner, "paused", false, "proxy_available", true,
+		"log_path", "C:\private\ergopti.log", "log_exists", true,
+		"log_opener", true, "folder_opener", false, "opens", [],
+		"retries", 0, "retired_before_retry", false, "timers", [], "scripts", [],
+		"log_hook", 0, "current_hook", 0, "retry_hook", 0)
+}
+
+_MNW_Current(State, Owner) {
+	Hook := State["current_hook"]
+	State["current_hook"] := 0
+	if HasMethod(Hook, "Call")
+		Hook.Call()
+	return State["owner"] == Owner
+}
+
+_MNW_LogPath(State) {
+	Hook := State["log_hook"]
+	State["log_hook"] := 0
+	if HasMethod(Hook, "Call")
+		Hook.Call()
+	return State["log_path"]
+}
+
+_MNW_Open(State, Id, Path := "") {
+	State["opens"].Push(Map("id", Id, "path", Path))
+	return true
+}
+
+_MNW_Retry(State, Owner) {
+	if State["owner"] != Owner
+		return false
+	State["retries"] += 1
+	State["retired_before_retry"] := State["session"].Owner == 0
+	Hook := State["retry_hook"]
+	State["retry_hook"] := 0
+	if HasMethod(Hook, "Call")
+		Hook.Call()
+	return true
+}
+
+_MNW_Ports(State) {
+	return Map("pause_admitted", () => !State["paused"],
+		"proxy_available", () => State["proxy_available"], "log_path", _MNW_LogPath.Bind(State),
+		"file_regular", (Path) => State["log_exists"] && Path == State["log_path"],
+		"folder_regular", (Path) => false,
+		"log_opener_available", () => State["log_opener"],
+		"folder_opener_available", () => State["folder_opener"],
+		"open_proxy", _MNW_Open.Bind(State, "proxy_settings"),
+		"open_log", _MNW_Open.Bind(State, "diagnostics"),
+		"open_folder", _MNW_Open.Bind(State, "download_folder"))
+}
+
+_MNW_Scope(Body) {
+	global _ManagedNetworkWindowsContract, _ManagedNetworkWindowsPorts, _ManagedNetworkWindowsInitializing, _SharedDir
+	SavedContract := _ManagedNetworkWindowsContract
+	SavedPorts := _ManagedNetworkWindowsPorts
+	SavedInitializing := _ManagedNetworkWindowsInitializing
+	SavedCounter := ManagedDownloadFailureSession.Counter
+	SavedWindow := ManagedDownloadFailureWindow.Current
+	HadRegistryOwner := WebViewHost._Instances.Has("download_window")
+	SavedRegistryOwner := HadRegistryOwner ? WebViewHost._Instances["download_window"] : 0
+	if HadRegistryOwner
+		WebViewHost._Instances.Delete("download_window")
+	State := _MNW_TestState()
+	_ManagedNetworkWindowsContract := 0
+	_ManagedNetworkWindowsPorts := 0
+	_ManagedNetworkWindowsInitializing := false
+	ManagedDownloadFailureSession.Counter := 0
+	ManagedDownloadFailureWindow.Current := 0
+	try {
+		Policy := JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))
+		ManagedNetworkFailureWindows_Init(Policy, _MNW_Ports(State))
+		Body.Call(State)
+	} finally {
+		Window := ManagedDownloadFailureWindow.Current
+		if IsObject(Window)
+			Window.Close()
+		_ManagedNetworkWindowsContract := SavedContract
+		_ManagedNetworkWindowsPorts := SavedPorts
+		_ManagedNetworkWindowsInitializing := SavedInitializing
+		ManagedDownloadFailureSession.Counter := SavedCounter
+		ManagedDownloadFailureWindow.Current := SavedWindow
+		if WebViewHost._Instances.Has("download_window")
+			WebViewHost._Instances.Delete("download_window")
+		if HadRegistryOwner
+			WebViewHost._Instances["download_window"] := SavedRegistryOwner
+	}
+}
+
+_MNW_UnknownReceipt() {
+	return Map("backend", "curl", "stage", "tls", "failure_provenance", "verified",
+		"tls_verification", "enforced", "curl_exit", 35)
+}
+
+_MNW_ProxyReceipt() {
+	return Map("backend", "curl", "stage", "proxy_connect", "failure_provenance", "verified", "proxy_connect_status", 407)
+}
+
+_MNW_NewSession(State, Receipt := unset) {
+	Session := ManagedDownloadFailureSession()
+	State["session"] := Session
+	Owner := State["owner"]
+	if !IsSet(Receipt)
+		Receipt := _MNW_UnknownReceipt()
+	AssertTrue(Session.Publish(Receipt, Owner, _MNW_Current.Bind(State, Owner), _MNW_Retry.Bind(State, Owner)))
+	return Session
+}
+
+_MNW_Action(Session, Id, Epoch := unset) {
+	return Map("action", "failure_action", "id", Id, "session", Session.Id,
+		"epoch", IsSet(Epoch) ? Epoch : Session.Epoch)
+}
+
+_MNW_Timer(State, Callback, Period) {
+	State["timers"].Push(Callback)
+}
+
+class _MNW_Promise {
+	onSettled(Success, Failure) {
+		Success.Call("null")
+	}
+}
+
+class _MNW_WebView {
+	Ptr := 71
+	Source := "https://ergopti.download.session1/ui/download_window/index.html?cb=1"
+	__New(State) {
+		this.State := State
+	}
+	ExecuteScriptAsync(Js) {
+		this.State["scripts"].Push(Js)
+		return _MNW_Promise()
+	}
+}
+
+class _MNW_MessageArgs {
+	__New(Source, Text, ReadHook := 0, SourceHook := 0) {
+		this.SourceText := Source
+		this.Text := Text
+		this.ReadHook := ReadHook
+		this.SourceHook := SourceHook
+	}
+	Source {
+		get {
+			Hook := this.SourceHook
+			this.SourceHook := 0
+			if HasMethod(Hook, "Call")
+				Hook.Call()
+			return this.SourceText
+		}
+	}
+	TryGetWebMessageAsString() {
+		Hook := this.ReadHook
+		this.ReadHook := 0
+		if HasMethod(Hook, "Call")
+			Hook.Call()
+		return this.Text
+	}
+}
+
+class _MNW_Window extends ManagedDownloadFailureWindow {
+	__New(State, Receipt := unset) {
+		this.AppId := "download_window"
+		this.Failure := IsSet(Receipt) ? _MNW_NewSession(State, Receipt) : _MNW_NewSession(State)
+		this.WebView := _MNW_WebView(State)
+		this.DocumentUrl := "https://ergopti.download.session1/ui/download_window/index.html?cb=1"
+		this.TimerFn := _MNW_Timer.Bind(State)
+		this.Epoch := 1
+		this.Ready := true
+		this.Opts := Map()
+		ManagedDownloadFailureWindow.Current := this
+	}
+	_LocaleScript() {
+		; Only the native file read is doubled; policy, serialization and callback owners stay real.
+		return "window._i18n_strings={};"
+	}
+}
+
+_MNW_InitOwner(State) {
+	AssertThrows(() => ManagedNetworkFailureWindows_Init(ManagedNetworkFailureWindows_Contract().Policy, _MNW_Ports(State)),
+		"a second initialization owner is refused")
+}
+Test("managed Windows failures: one initialization owner", (*) => _MNW_Scope(_MNW_InitOwner))
+
+_MNW_TypedAndUnknown(State) {
+	Owner := State["owner"]
+	Current := _MNW_Current.Bind(State, Owner)
+	Receipt := Map("backend", "curl", "stage", "tls", "failure_provenance", "verified", "tls_verification", "enforced", "curl_exit", 60)
+	AssertEqual("certificate", ManagedNetworkFailureWindows_Classify(Receipt, Current)["cause"])
+	AssertEqual("unknown", ManagedNetworkFailureWindows_Classify(_MNW_UnknownReceipt(), Current)["cause"])
+	Receipt := Map("backend", "curl", "stage", "http", "failure_provenance", "verified", "proxy_mode", "selected", "http_status", 407)
+	AssertEqual("unknown", ManagedNetworkFailureWindows_Classify(Receipt, Current)["cause"], "selected relay cannot prove the non-CONNECT challenge source")
+	Receipt := Map("stderr", "certificate failed; proxy denied", "url", "https://user:secret@example.test/private")
+	Report := ManagedNetworkFailureWindows_Classify(Receipt, Current)
+	AssertEqual("unknown", Report["cause"])
+	Encoded := ManagedNetworkFailureWindows_ReportJson(Report)
+	AssertEqual(0, InStr(Encoded, "secret"), "raw receipt and URL never reach the page")
+}
+Test("managed Windows failures: typed TLS proof and ambiguous origin receipts", (*) => _MNW_Scope(_MNW_TypedAndUnknown))
+
+_MNW_UnavailableActions(State) {
+	State["proxy_available"] := false
+	State["log_exists"] := false
+	Owner := State["owner"]
+	Report := ManagedNetworkFailureWindows_Classify(_MNW_ProxyReceipt(), _MNW_Current.Bind(State, Owner))
+	AssertEqual("proxy", Report["cause"])
+	AssertEqual(0, Report["actions"].Length, "nonexistent retry/settings/log owners produce no useless actions")
+	AssertTrue(!ManagedNetworkFailureWindows_PerformAction("proxy", "proxy_settings", _MNW_Current.Bind(State, Owner)))
+	AssertEqual(0, State["opens"].Length)
+}
+Test("managed Windows failures: actual unavailable capabilities omit actions", (*) => _MNW_Scope(_MNW_UnavailableActions))
+
+_MNW_RetiredOwner(State) {
+	Session := _MNW_NewSession(State)
+	State["owner"] := Map("request", "replacement")
+	AssertTrue(!Session.Handle(_MNW_Action(Session, "retry")))
+	AssertTrue(!Session.Handle(_MNW_Action(Session, "diagnostics")))
+	AssertEqual(0, State["retries"])
+	AssertEqual(0, State["opens"].Length)
+}
+Test("managed Windows failures: a replacement native owner retires every old action", (*) => _MNW_Scope(_MNW_RetiredOwner))
+
+_MNW_SameSessionNewFailure(State) {
+	Session := _MNW_NewSession(State)
+	Old := _MNW_Action(Session, "retry")
+	Owner := State["owner"]
+	AssertTrue(Session.Publish(_MNW_ProxyReceipt(), Owner, _MNW_Current.Bind(State, Owner), _MNW_Retry.Bind(State, Owner)))
+	AssertEqual(1, Session.Id, "failure replacement keeps the operation session")
+	AssertEqual(2, Session.Epoch, "failure replacement changes its epoch")
+	AssertTrue(!Session.Handle(Old))
+	AssertEqual(0, State["retries"])
+}
+Test("managed Windows failures: same-session stale Retry cannot borrow the later failure", (*) => _MNW_Scope(_MNW_SameSessionNewFailure))
+
+_MNW_RetryConsumesIntent(State) {
+	Session := _MNW_NewSession(State)
+	Old := _MNW_Action(Session, "retry")
+	AssertTrue(Session.Handle(Old))
+	AssertTrue(State["retired_before_retry"], "native retry sees the old page authorization already retired")
+	AssertEqual(1, State["retries"])
+	AssertTrue(!Session.Handle(Old))
+	AssertEqual(1, State["retries"])
+}
+Test("managed Windows failures: Retry consumes the exact page intent once", (*) => _MNW_Scope(_MNW_RetryConsumesIntent))
+
+_MNW_PrivateLogTarget(State) {
+	Session := _MNW_NewSession(State)
+	Payload := _MNW_Action(Session, "diagnostics")
+	Payload["path"] := "C:\unowned\run-me.exe"
+	Payload["url"] := "https://unowned.example.test/"
+	AssertTrue(Session.Handle(Payload))
+	AssertEqual(1, State["opens"].Length)
+	AssertEqual("diagnostics", State["opens"][1]["id"])
+	AssertEqual("C:\private\ergopti.log", State["opens"][1]["path"], "only the freshly resolved private native log is opened")
+}
+Test("managed Windows failures: page paths never become opener targets", (*) => _MNW_Scope(_MNW_PrivateLogTarget))
+
+_MNW_LogDisappears(State) {
+	Session := _MNW_NewSession(State)
+	Old := _MNW_Action(Session, "diagnostics")
+	State["log_exists"] := false
+	AssertTrue(!Session.Handle(Old))
+	AssertEqual(0, State["opens"].Length, "the displayed diagnostics row grants no permanent capability")
+}
+Test("managed Windows failures: diagnostics rechecks actual current file", (*) => _MNW_Scope(_MNW_LogDisappears))
+
+_MNW_ReplaceOnProbe(State, Session) {
+	Owner := Map("request", "new during native capability probe")
+	State["owner"] := Owner
+	AssertTrue(Session.Publish(_MNW_ProxyReceipt(), Owner, _MNW_Current.Bind(State, Owner), _MNW_Retry.Bind(State, Owner)))
+}
+
+_MNW_ProbeReentrancy(State) {
+	Session := _MNW_NewSession(State)
+	State["log_hook"] := _MNW_ReplaceOnProbe.Bind(State, Session)
+	AssertTrue(!Session.Handle(_MNW_Action(Session, "diagnostics")))
+	AssertEqual("proxy", Session.Report["cause"], "the successor failure remains published")
+	AssertEqual(0, State["opens"].Length)
+}
+Test("managed Windows failures: native capability reentrancy cannot borrow a replacement owner", (*) => _MNW_Scope(_MNW_ProbeReentrancy))
+
+_MNW_PublicationReentrancy(State) {
+	Session := _MNW_NewSession(State)
+	Owner := State["owner"]
+	State["current_hook"] := _MNW_ReplaceOnProbe.Bind(State, Session)
+	AssertTrue(!Session.Publish(_MNW_UnknownReceipt(), Owner, _MNW_Current.Bind(State, Owner), _MNW_Retry.Bind(State, Owner)))
+	AssertEqual("proxy", Session.Report["cause"], "an older publication cannot overwrite the successor returned by its admission port")
+	AssertEqual(2, Session.Epoch)
+}
+Test("managed Windows failures: reentrant publication preserves the successor failure", (*) => _MNW_Scope(_MNW_PublicationReentrancy))
+
+_MNW_PauseAdmission(State) {
+	Session := _MNW_NewSession(State, _MNW_ProxyReceipt())
+	State["paused"] := true
+	AssertTrue(!Session.Handle(_MNW_Action(Session, "retry")))
+	AssertTrue(!Session.Handle(_MNW_Action(Session, "proxy_settings")))
+	AssertEqual(0, State["retries"])
+	AssertEqual(0, State["opens"].Length)
+}
+Test("managed Windows failures: pause admission gates retry and settings", (*) => _MNW_Scope(_MNW_PauseAdmission))
+
+_MNW_ProtocolRefusals(State) {
+	Session := _MNW_NewSession(State)
+	AssertTrue(!Session.Handle("retry"), "legacy unowned string Retry is refused")
+	Payload := _MNW_Action(Session, "retry")
+	Payload["session"] := "1"
+	AssertTrue(!Session.Handle(Payload), "numeric-looking session strings are not native session tokens")
+	Payload := _MNW_Action(Session, "Retry")
+	AssertTrue(!Session.Handle(Payload), "action identifiers remain exact")
+	AssertEqual(0, State["retries"])
+}
+Test("managed Windows failures: strict owned message protocol", (*) => _MNW_Scope(_MNW_ProtocolRefusals))
+
+_MNW_WindowProvenance(State) {
+	Host := _MNW_Window(State)
+	Raw := '{"action":"failure_action","id":"retry","session":1,"epoch":1}'
+	Host._OnWebMessage({Ptr: 72}, _MNW_MessageArgs(Host.DocumentUrl, Raw))
+	Host._OnWebMessage({Ptr: 71}, _MNW_MessageArgs("https://unowned.example.test/", Raw))
+	AssertEqual(0, State["timers"].Length, "wrong native controller and wrong exact source never schedule dispatch")
+	AssertEqual(0, State["retries"])
+}
+Test("managed Windows failures: native controller and exact document provenance", (*) => _MNW_Scope(_MNW_WindowProvenance))
+
+_MNW_WindowReadReentrancy(State) {
+	Host := _MNW_Window(State)
+	Raw := '{"action":"failure_action","id":"retry","session":1,"epoch":1}'
+	Args := _MNW_MessageArgs(Host.DocumentUrl, Raw, _MNW_ReplaceOnProbe.Bind(State, Host.Failure))
+	Host._OnWebMessage({Ptr: 71}, Args)
+	AssertEqual(1, State["timers"].Length, "a decoded message is deferred outside its COM callback")
+	State["timers"][1].Call()
+	AssertEqual(0, State["retries"])
+	AssertEqual("proxy", Host.Failure.Report["cause"])
+}
+Test("managed Windows failures: COM read reentrancy retains the original failure epoch", (*) => _MNW_Scope(_MNW_WindowReadReentrancy))
+
+_MNW_QueuedScripts(State) {
+	Host := _MNW_Window(State)
+	AssertTrue(Host.Publish())
+	_MNW_ReplaceOnProbe(State, Host.Failure)
+	AssertTrue(Host.Publish())
+	AssertEqual(2, State["timers"].Length)
+	State["timers"][1].Call()
+	AssertEqual(0, State["scripts"].Length, "retained script timer cannot paint an older same-session failure")
+	State["timers"][2].Call()
+	AssertEqual(1, State["scripts"].Length)
+	AssertTrue(InStr(State["scripts"][1], "network.failure.proxy") > 0)
+	AssertEqual(0, InStr(State["scripts"][1], "secret"), "native receipt and request URL stay out of script source")
+}
+Test("managed Windows failures: queued failure scripts retain session and epoch", (*) => _MNW_Scope(_MNW_QueuedScripts))
+
+_MNW_SuccessorOnRetry(State, Host) {
+	_MNW_ReplaceOnProbe(State, Host.Failure)
+}
+
+_MNW_SynchronousRetryFailure(State) {
+	Host := _MNW_Window(State)
+	State["retry_hook"] := _MNW_SuccessorOnRetry.Bind(State, Host)
+	AssertTrue(Host.Deliver(Host.Epoch, _MNW_Action(Host.Failure, "retry")))
+	AssertTrue(!Host.Cancelled, "the old retry completion cannot close its synchronous successor failure")
+	AssertEqual("proxy", Host.Failure.Report["cause"])
+	AssertEqual(3, Host.Failure.Epoch)
+	AssertEqual(1, State["retries"])
+}
+Test("managed Windows failures: synchronous retry failure retains its own host", (*) => _MNW_Scope(_MNW_SynchronousRetryFailure))
+
+_MNW_WindowClose(State) {
+	Host := _MNW_Window(State)
+	Payload := _MNW_Action(Host.Failure, "retry")
+	Epoch := Host.Epoch
+	Host.Close()
+	AssertTrue(!Host.Deliver(Epoch, Payload))
+	AssertEqual(0, State["retries"])
+	Next := _MNW_Window(State)
+	AssertEqual(2, Next.Failure.Id, "reopened native windows never reuse the retired operation session")
+	AssertTrue(!Next.Failure.Handle(Payload))
+	AssertEqual(0, State["retries"])
+}
+Test("managed Windows failures: close and reopen never reuse the old request token", (*) => _MNW_Scope(_MNW_WindowClose))
+
+_MNW_StaleNativeCompletion(State) {
+	Old := _MNW_Window(State)
+	WindowEpoch := Old.Epoch
+	Owner := Old.Failure.Owner
+	FailureEpoch := Old.Failure.Epoch
+	Old.Close()
+	Next := _MNW_Window(State)
+	Old._ScriptSettled(WindowEpoch, Owner, FailureEpoch, false)
+	AssertTrue(!Next.Cancelled, "old native script failure cannot fallback over the replacement window")
+	AssertEqual(Next, ManagedDownloadFailureWindow.Current)
+}
+Test("managed Windows failures: late native outcome cannot fallback over a successor", (*) => _MNW_Scope(_MNW_StaleNativeCompletion))
+
+_MNW_SafeProjection(State) {
+	Session := _MNW_NewSession(State)
+	Session.Report["native_receipt"] := Map("token", "secret")
+	Session.Report["url"] := "https://user:secret@example.test/"
+	Session.Report["actions"][1]["private_path"] := "C:\private\secret"
+	Encoded := Session.Json()
+	Parsed := JsonParse(Encoded)
+	AssertEqual(4, Parsed.Count)
+	AssertEqual(2, Parsed["actions"][1].Count)
+	AssertEqual(0, InStr(Encoded, "secret"), "report serialization whitelists canonical fields even after upstream contamination")
+}
+Test("managed Windows failures: safe report projection cannot serialize upstream extras", (*) => _MNW_Scope(_MNW_SafeProjection))
+
+_MNW_ForeignRegistryOwner(State) {
+	Window := _MNW_Window(State)
+	Foreign := Map("native_owner", "another window")
+	WebViewHost._Instances["download_window"] := Foreign
+	Window.Close()
+	AssertTrue(WebViewHost._Instances.Has("download_window"), "teardown preserves the foreign registry owner")
+	AssertTrue(WebViewHost._Instances["download_window"] == Foreign, "the exact replacement survives old native teardown")
+	AssertTrue(Window.ResetDone)
+	AssertEqual(0, ManagedDownloadFailureWindow.Current)
+}
+Test("managed Windows failures: old teardown preserves a foreign window registry owner", (*) => _MNW_Scope(_MNW_ForeignRegistryOwner))
+
+_MNW_SingletonReservation(State) {
+	Old := _MNW_Window(State)
+	Current := _MNW_Window(State)
+	AssertTrue(!Old._ReserveCurrent(0), "an admission probe cannot overwrite a reentrant successor")
+	AssertTrue(ManagedDownloadFailureWindow.Current == Current)
+	AssertTrue(!Old.ResetDone)
+	Old.Close()
+	AssertTrue(ManagedDownloadFailureWindow.Current == Current, "old teardown preserves the new singleton")
+	Foreign := Map("native_owner", "another window")
+	WebViewHost._Instances["download_window"] := Foreign
+	AssertTrue(!Current._ReserveCurrent(Current), "the factory registry also owns admission")
+	AssertTrue(WebViewHost._Instances["download_window"] == Foreign)
+}
+Test("managed Windows failures: singleton reservation rejects reentrant or foreign owners", (*) => _MNW_Scope(_MNW_SingletonReservation))
