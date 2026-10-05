@@ -55,7 +55,7 @@ LLM_Menu_LocalServersInit(RequestBuild := true) {
 			try _LLM_LocalServerPanelInitBusy := false
 			finally Critical(ClaimCritical)
 		}
-		LoggerDone("LLM.local_servers", "Local server menu owner initialized.")
+		LoggerSuccess("LLM.local_servers", "Local server menu owner initialized.")
 		if RequestBuild
 			LLM_Menu_RequestBuild("local_servers_initialized")
 		return true

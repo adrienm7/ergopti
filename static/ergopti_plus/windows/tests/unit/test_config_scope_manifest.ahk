@@ -306,6 +306,8 @@ Test("config-scope: the gesture menu's restore owns the master, its clear keeps 
 	_ScopeGestureMenuOwnsParameters)
 
 _ScopeOwnerRetainsRollbackDebt() {
+	global _ConfigTransitionRetainedBarrier
+	PriorRetained := _ConfigTransitionRetainedBarrier
 	Fixture := _ScopeOwnerFixture()
 	Bundle := 0, RefuseMove := false
 	Port := ConfigTransitionProductionPort()
@@ -331,9 +333,21 @@ _ScopeOwnerRetainsRollbackDebt() {
 		Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
 		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
 	} finally {
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
-		_ScopeOwnerCleanup(Fixture)
+		try {
+			if Bundle is Object
+				_ConfigWriteTerminalRelease(Bundle)
+		} finally {
+			; Recovered fixture debt retires its exact registry marker even when
+			; its terminal release has already completed. Foreign markers survive.
+			PreviousCritical := Critical("On")
+			try {
+				if (Bundle is Object) && _ConfigTransitionRetainedBarrier == Bundle
+					_ConfigTransitionRetainedBarrier := PriorRetained
+			} finally {
+				Critical(PreviousCritical)
+				_ScopeOwnerCleanup(Fixture)
+			}
+		}
 	}
 }
 Test("config-scope: failed rollback retains the exact terminal barrier until recovery", _ScopeOwnerRetainsRollbackDebt)

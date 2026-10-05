@@ -325,7 +325,8 @@ _LSPN_ActualExitRefusalKeepsItsResult() {
 		Probe .= "LLM_Menu_ApiPrivateRefuseShutdown(Attempt) {`nglobal PrivateRefusals`nPrivateRefusals += 1`nreturn true`n}`n"
 		Probe .= 'LLM_Menu_LocalServersShutdownRefused(Attempt) {' . "`nglobal RepairCalls`nRepairCalls += 1`n" . 'throw Error("independent repair timer failure")' . "`n}`n"
 		Probe .= "LoggerError(*) {`nglobal Logged`nLogged += 1`n}`n"
-		Probe .= "_LifecycleRefuseShutdown(Gate) {`n" . Body . "`n}`n"
+		; The source helper supplies the full declaration, including its signature.
+		Probe .= Body . "`n"
 		Probe .= 'Result := _LifecycleRefuseShutdown("independent local discovery debt")' . "`n"
 		Probe .= 'FileAppend(Result . ":" . PrivateRefusals . ":" . RepairCalls . ":" . Logged, ' . _LSPN_SourceString(ReceiptPath) . ', "UTF-8-RAW")' . "`nExitApp(0)`n"
 		AssertTrue(FSWriteDurable(ChildPath, Chr(0xFEFF) . Probe))
