@@ -597,6 +597,62 @@ function M.new(deps)
 		return nil
 	end
 
+	--- Supplies an ordered declared child template as provider data.
+	--- Includes reuse the original command declaration and retained readiness gate.
+	--- Native owners provide only callbacks, current caption values and child data.
+	--- @param manifest_key string Owning shared child declaration.
+	--- @param commands table Native command owners.
+	--- @param getters table Native state and caption readers.
+	--- @param children table Native child data indexed by declared group identity.
+	--- @return table|nil rows
+	function R.template_rows(manifest_key, commands, getters, children)
+		commands, getters, children = commands or {}, getters or {}, children or {}
+		local visiting = {}
+		local function collect(key)
+			local declaration = get_menu_def(key)
+			if visiting[key] or #declaration == 0 then
+				Logger.error(LOG, "Missing or cyclic child template '%s' — provider rows refused.", key)
+				return nil
+			end
+			visiting[key] = true
+			local rows = {}
+			for _, item in ipairs(declaration) do
+				if is_for_platform(item) then
+					local row
+					if item.type == "include" then
+						local included = type(item.section) == "string" and collect(item.section) or nil
+						if not included then return nil end
+						for _, child in ipairs(included) do rows[#rows + 1] = child end
+					elseif item.type == "---" then
+						row = { separator = true }
+					elseif item.type == "command" then
+						row = R.command_row(key, item.id, commands, getters)
+						if not row then return nil end
+					elseif item.type == "group" and type(children[item.id]) == "table" then
+						row = { label = i18n.get(item.i18n), items = children[item.id] }
+					else
+						Logger.error(LOG, "Missing child data or unsupported row in template '%s' — provider rows refused.", key)
+						return nil
+					end
+					if row and item.caption_getter ~= nil then
+						local getter = getters[item.caption_getter]
+						local value = type(getter) == "function" and getter() or nil
+						local title = i18n.get(item.i18n)
+						if type(value) ~= "string" then
+							Logger.error(LOG, "Invalid caption getter in template '%s' — provider rows refused.", key)
+							return nil
+						end
+						row.label = title:gsub("%%s", function() return value end)
+					end
+					if row then rows[#rows + 1] = row end
+				end
+			end
+			visiting[key] = nil
+			return rows
+		end
+		return collect(manifest_key)
+	end
+
 	--- Supplies a declared checkbox as provider data through the shared policy.
 	--- A retained callback rechecks its declared readiness before delivery.
 	--- @param manifest_key string Owning menu declaration.

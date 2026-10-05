@@ -293,15 +293,16 @@ end
 --- Puts a candidate user document in force before its file is published, so a
 --- scope transaction acknowledges exactly what it is about to write.
 --- @param document table Decoded candidate tap_hold.toml.
+--- @param shapes table|nil Canonical receipt bound to this exact candidate.
 --- @return boolean True once the candidate engine is installed.
-function M.apply_configuration(document)
+function M.apply_configuration(document, shapes)
 	_require_init()
 	if type(document) ~= "table" then
 		Logger.error(LOG, "Tap-hold scope candidate must be a decoded document — nothing changed.")
 		return false
 	end
 	local ok, loaded, one_shot, engine = pcall(function()
-		return _build(Config.load_document(_defaults_path, document, nil, _user_path))
+		return _build(Config.load_document(_defaults_path, document, nil, _user_path, shapes))
 	end)
 	if not ok then
 		Logger.error(LOG, "Tap-hold scope candidate refused, the previous configuration stays: %s.", tostring(loaded))

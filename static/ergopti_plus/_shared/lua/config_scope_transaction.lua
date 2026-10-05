@@ -11,30 +11,7 @@ local function belongs(path, prefix)
 	return path == prefix or path:sub(1, #prefix + 1) == prefix .. "."
 end
 
---- Puts one published file back while it still holds the candidate we wrote.
---- @param file table Published path, exact source and candidate bytes.
---- @param files table Classified file adapter.
---- @return boolean restored
-local function restore_file(file, files)
-	if file.removal_cleanup ~= nil then
-		local call_ok, settled, _, removed = pcall(file.removal_cleanup)
-		if not call_ok or settled ~= true then return false end
-		file.removal_cleanup = nil
-		if removed == true then return true end
-		-- A refused native unlink can still have removed the file. Only a
-		-- later classified absence after its retained lease settles proves the
-		-- inverse target; a changed present source remains refused.
-		local _, status = Writer.read_classified(file.path, files)
-		if status == "absent" then return true end
-	end
-	local expected = { status = "ok", content = file.candidate }
-	if file.source.status == "absent" then
-		local removed, _, retry_cleanup = Writer.remove_if_unchanged(file.path, files, expected)
-		if type(retry_cleanup) == "function" then file.removal_cleanup = retry_cleanup end
-		return removed == true
-	end
-	return Writer.publish_if_unchanged(file.path, file.source.content, files, expected) == true
-end
+local FileInverse = require("config_file_inverse")
 
 --- Validates one preset owner port.
 --- @param id string Preset identifier from the manifest.
@@ -56,7 +33,8 @@ end
 --- to its host; it must return true, detail, candidate bytes and exact source.
 --- Optional presets[id] = { path, backup_path, prefixes, render } owns the file
 --- of a manifest preset: rows under `prefixes` are routed to it, and
---- render(mode, source_document, rows) returns its complete candidate bytes.
+--- render(mode, source_document, rows, shapes) returns its complete candidate
+--- bytes; the optional canonical receipt keeps empty arrays distinct from maps.
 --- Optional select(path) narrows a scope to the rows it returns true for: a
 --- submenu that restores or clears one part of its scope (the script chords of
 --- the Shortcuts scope) keeps the scope's owner, backup and compensation.
@@ -82,6 +60,12 @@ function M.new(options)
 	-- reverse. Each settled step is recorded so a retry never repeats it.
 	local function compensate()
 		if debt == nil then return true end
+		for _, receipt in ipairs(debt.cleanup or {}) do
+			if Writer.retry_publication_cleanup(receipt) ~= true then return false end
+		end
+		for _, file in ipairs(debt.files) do
+			if FileInverse.settle_publication(file) ~= true then return false end
+		end
 		if debt.runtime then
 			local ok, restored = pcall(options.restore, debt.snapshot)
 			if not ok or restored ~= true then return false end
@@ -90,7 +74,7 @@ function M.new(options)
 		for index = #debt.files, 1, -1 do
 			local file = debt.files[index]
 			if not file.restored then
-				if not restore_file(file, options.files) then return false end
+				if not FileInverse.restore(file, options.files) then return false end
 				file.restored = true
 			end
 		end
@@ -103,22 +87,26 @@ function M.new(options)
 		if status ~= "ok" and status ~= "absent" then
 			return nil, "preset " .. id .. " source is unreadable: " .. tostring(detail)
 		end
-		local document = Codec.decode(content or "")
+		local document, shapes = Codec.decode_with_shapes(content or "")
 		if type(document) ~= "table" then return nil, "preset " .. id .. " source is not valid TOML" end
-		local candidate = port.render(mode, document, rows)
+		local candidate = port.render(mode, document, rows, shapes)
 		if type(candidate) ~= "string" then return nil, "preset " .. id .. " rendered no candidate" end
-		local decoded = Codec.decode(candidate)
+		local decoded, candidate_shapes = Codec.decode_with_shapes(candidate)
 		if type(decoded) ~= "table" then return nil, "preset " .. id .. " candidate is not valid TOML" end
 		return {
-			id = id, path = port.path, backup_path = port.backup_path, decoded = decoded, candidate = candidate,
+			id = id, path = port.path, backup_path = port.backup_path,
+			decoded = decoded, shapes = candidate_shapes, candidate = candidate,
 			source = { status = status, content = status == "ok" and content or nil },
 		}
 	end
 	--- Writes and verifies one exact backup before any destination is touched.
 	local function back_up(file)
 		if file.source.status ~= "ok" then return true end
-		local backed, backup_error = Writer.publish_if_unchanged(file.backup_path,
+		local backed, backup_error, retry_cleanup = Writer.publish_if_unchanged(file.backup_path,
 			file.source.content, options.files, { status = "absent" })
+		if type(retry_cleanup) == "function" then
+			debt.cleanup[#debt.cleanup + 1] = { publication_cleanup = retry_cleanup }
+		end
 		if backed ~= true then return false, "backup refused: " .. tostring(backup_error) end
 		local observed, status = Writer.read_classified(file.backup_path, options.files)
 		if status ~= "ok" or observed ~= file.source.content then return false, "backup verification failed" end
@@ -197,27 +185,31 @@ function M.new(options)
 			for _, preset in ipairs(presets) do
 				local file, why = prepare_preset(preset.id, preset.port, mode, preset.rows)
 				if not file then return false, why end
-				rendered[preset.id] = { decoded = file.decoded, candidate = file.candidate, source = file.source }
+				rendered[preset.id] = { decoded = file.decoded, shapes = file.shapes, candidate = file.candidate, source = file.source }
 				files[#files + 1] = file
 			end
 			if config then files[#files + 1] = config end
 			local snapshot = options.capture(source, candidate, updates, rendered)
 			if type(snapshot) ~= "table" then return false, "runtime snapshot was not acknowledged" end
+			debt = { snapshot = snapshot, runtime = false, files = published, cleanup = {} }
 			for _, file in ipairs(files) do
 				local backed, why = back_up(file)
 				if not backed then return false, why end
 			end
 			-- Capture before invocation because a native callback can mutate and throw.
-			debt = { snapshot = snapshot, runtime = true, files = published }
+			debt.runtime = true
 			if options.apply(decoded, updates, source, candidate, rendered) ~= true then
 				return false, "runtime application refused"
 			end
 			for _, file in ipairs(files) do
 				local expected = file.source.status == "ok" and { status = "ok", content = file.source.content }
 					or { status = "absent" }
-				local done, publish_error = Writer.publish_if_unchanged(file.path, file.candidate, options.files, expected)
+				local done, publish_error, retry_cleanup = Writer.publish_if_unchanged(file.path, file.candidate, options.files, expected)
+				if done == true or type(retry_cleanup) == "function" then
+					published[#published + 1] = { path = file.path, source = file.source, candidate = file.candidate,
+						publication_cleanup = type(retry_cleanup) == "function" and retry_cleanup or nil }
+				end
 				if done ~= true then return false, publish_error end
-				published[#published + 1] = { path = file.path, source = file.source, candidate = file.candidate }
 			end
 			debt = nil
 			committed = { snapshot = snapshot, files = published }

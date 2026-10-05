@@ -12,6 +12,8 @@ local RecordScanner = require("toml_codec.record_scanner")
 local KeyPath = require("toml_codec.key_path")
 local Bom = require("toml_codec.bom")
 local BasicString = require("toml_codec.basic_string")
+-- Integer subtype is an optional capability; LuaJIT leaves it absent.
+local math_type = math.type
 --- MODULE: TOML Codec (shared)
 --- DESCRIPTION:
 --- Generic TOML encoder + decoder for arbitrarily nested Lua tables.
@@ -41,8 +43,10 @@ local BasicString = require("toml_codec.basic_string")
 --- LIMITATIONS:
 --- - Ordinary sub-tables become their own [section]. Dictionary members
 ---   inside arrays use inline tables so their fields are not discarded.
---- - TOML datetime types are not supported; HS state has none.
---- - Float precision uses Lua's default tostring (16-digit max).
+--- - Default datetime decoding uses strings; optional source receipts retain
+---   unchanged bare temporal tokens without adding date validation.
+--- - Default float encoding uses Lua tostring; optional source receipts retain
+---   unchanged numeric tokens and use a round-trip fallback for changed numbers.
 --- ==============================================================================
 
 local M = {}
@@ -102,25 +106,61 @@ local function ensure_blank_lines(out, count)
 	end
 end
 
-encode_value = function(v)
+encode_value = function(v, shapes, owner, key)
 	local t = type(v)
-	if t == "string"  then return encode_string(v) end
+	if t == "string" then
+		local saved = shapes and shapes.strings and shapes.strings[owner]
+		saved = saved and saved[key]
+		if saved and saved.value == v then return saved.token end
+		return encode_string(v)
+	end
 	if t == "boolean" then return tostring(v)      end
 	if t == "number"  then
+		local saved = shapes and shapes.numbers and shapes.numbers[owner]
+		saved = saved and saved[key]
+		if saved and ((saved.value == v and (v ~= 0 or 1 / saved.value == 1 / v))
+			or (saved.value ~= saved.value and v ~= v))
+			and (not math_type or math_type(saved.value) == math_type(v)) then
+			return saved.token
+		end
 		if v ~= v then return "nan" end -- NaN
 		if v ==  math.huge then return "+inf" end
 		if v == -math.huge then return "-inf" end
+		-- Zero equality hides its sign. Optional writes preserve floating zero
+		-- before integer formatting; LuaJIT only has a decoded token or sign.
+		if shapes and v == 0 and (1 / v == -math.huge
+			or (math_type and math_type(v) == "float")
+			or (not math_type and saved and saved.value == 0 and saved.token:find("[%.eE]"))) then
+			return 1 / v == -math.huge and "-0.0" or "0.0"
+		end
 		-- Preserve integer-ness when possible; Lua 5.3+ has integer subtype
 		if v == math.floor(v) and math.abs(v) < 1e15 then
 			return string.format("%d", v)
 		end
+		if shapes then
+			-- Optional source-shape writes must retain the decoded numeric value.
+			-- LuaJIT tostring() can round a double; Lua 5.3+ integers stay exact.
+			if math_type and math_type(v) == "integer" then return tostring(v) end
+			local text = tostring(v)
+			if tonumber(text) == v then return text end
+			return string.format("%.17g", v)
+		end
 		return tostring(v)
 	end
 	if t == "table" then
-		if is_array_like(v) then
+		if (shapes and shapes.arrays[v]) or is_array_like(v) then
+			if shapes and shapes.arrays[v] then
+				local count = 0
+				for key in pairs(v) do
+					assert(type(key) == "number" and key >= 1 and key % 1 == 0,
+						"TOML array receipt cannot discard named or invalid slots")
+					count = count + 1
+				end
+				for index = 1, count do assert(v[index] ~= nil, "TOML array receipt requires dense slots") end
+			end
 			local parts = {}
-			for _, item in ipairs(v) do
-				parts[#parts + 1] = encode_value(item)
+			for index, item in ipairs(v) do
+				parts[#parts + 1] = encode_value(item, shapes, v, index)
 			end
 			return "[" .. table.concat(parts, ", ") .. "]"
 		end
@@ -130,7 +170,7 @@ encode_value = function(v)
 		for key in pairs(v) do keys[#keys + 1] = key end
 		table.sort(keys, function(left, right) return tostring(left) < tostring(right) end)
 		for _, key in ipairs(keys) do
-			parts[#parts + 1] = encode_key(key) .. " = " .. encode_value(v[key])
+			parts[#parts + 1] = encode_key(key) .. " = " .. encode_value(v[key], shapes, v, key)
 		end
 		return "{ " .. table.concat(parts, ", ") .. " }"
 	end
@@ -142,11 +182,11 @@ end
 --- @param path  string The dotted-section path; "" for the root.
 --- @param out   table  Mutable list of lines being built.
 --- @param depth number Current nesting depth (0 = root).
-encode_table = function(tbl, path, out, depth)
+encode_table = function(tbl, path, out, depth, shapes)
 	-- Partition keys into scalars (and array values) vs sub-maps
 	local scalars, submaps = {}, {}
 	for k, v in pairs(tbl) do
-		if type(v) == "table" and not is_array_like(v) then
+		if type(v) == "table" and not (shapes and shapes.arrays[v]) and not is_array_like(v) then
 			submaps[#submaps + 1] = k
 		else
 			scalars[#scalars + 1] = k
@@ -166,29 +206,48 @@ encode_table = function(tbl, path, out, depth)
 		out[#out + 1] = "[" .. path .. "]"
 	end
 	for _, k in ipairs(scalars) do
-		out[#out + 1] = encode_key(k) .. " = " .. encode_value(tbl[k])
+		out[#out + 1] = encode_key(k) .. " = " .. encode_value(tbl[k], shapes, tbl, k)
 	end
 	if #scalars > 0 then
 		ensure_blank_lines(out, 1)
 	end
 	for _, k in ipairs(submaps) do
 		local subpath = (path == "") and encode_key(k) or (path .. "." .. encode_key(k))
-		encode_table(tbl[k], subpath, out, depth + 1)
+		encode_table(tbl[k], subpath, out, depth + 1, shapes)
 	end
 end
 
 --- Encode a Lua table as a TOML string.
 --- @param tbl table The root table.
 --- @return string The serialised TOML body.
-function M.encode(tbl)
+local function encode_document(tbl, shapes)
 	if type(tbl) ~= "table" then return "" end
 	local out = {
 		"# Hammerspoon configuration — auto-generated. Hand-edits are",
 		"# preserved across saves provided the file remains valid TOML.",
 		"",
 	}
-	encode_table(tbl, "", out, 0)
+	encode_table(tbl, "", out, 0, shapes)
 	return table.concat(out, "\n")
+end
+
+--- Encodes with the unchanged default model and rendering rules.
+--- @param tbl table Root table.
+--- @return string document Default TOML body.
+function M.encode(tbl)
+	return encode_document(tbl)
+end
+
+--- Retains exact parsed array identities and unchanged scalar source tokens.
+--- The root identity prevents a receipt from another source read from granting
+--- publication authority. New and changed fields use the ordinary value model.
+--- @param tbl table Exact root returned by decode_with_shapes().
+--- @param shapes table Receipt belonging to that same document.
+--- @return string document TOML body retaining source-owned value kinds.
+function M.encode_with_shapes(tbl, shapes)
+	assert(type(shapes) == "table" and type(shapes.arrays) == "table", "TOML encoding needs its shape receipt")
+	assert(shapes.document == tbl, "TOML shape receipt belongs to another document")
+	return encode_document(tbl, shapes)
 end
 
 --- Encode one value as the TOML literal a ``key = value`` line carries, with
@@ -197,6 +256,19 @@ end
 --- @return string The TOML literal.
 function M.encode_value(value)
 	return encode_value(value)
+end
+
+--- Encodes a value retaining canonical array identities and unchanged scalar tokens.
+--- Empty arrays have the same Lua model as empty maps; this explicit receipt
+--- keeps them distinct without changing default encoding for existing callers.
+--- @param value any Value from the document decoded with this receipt.
+--- @param shapes table Canonical decode_with_shapes() receipt.
+--- @param owner table|nil Exact parsed parent, for unchanged numeric source tokens.
+--- @param key any|nil Field/index within owner.
+--- @return string literal
+function M.encode_value_with_shapes(value, shapes, owner, key)
+	assert(type(shapes) == "table" and type(shapes.arrays) == "table", "TOML encoding needs its shape receipt")
+	return encode_value(value, shapes, owner, key)
 end
 
 
@@ -311,6 +383,16 @@ local function strip_comments(source)
 		end
 	end
 	return table.concat(out)
+end
+
+--- Removes the comment of one physical line without treating quoted hashes as comments.
+--- Continuation ownership stays with the caller's existing record scanner.
+--- @param source string One physical TOML line.
+--- @return string line The original non-comment bytes.
+function M.strip_inline_comment(source)
+	assert(type(source) == "string" and not source:find("\n", 1, true),
+		"strip_inline_comment needs one physical TOML line")
+	return strip_comments(source)
 end
 
 --- Splits a TOML array or inline-table body on top-level commas.
@@ -525,7 +607,7 @@ end
 
 --- Coerce a raw RHS into a Lua value (string / boolean / number / array / inline-table).
 --- Returns PARSE_ERROR on malformed input so M.decode can return nil.
-local function coerce_value(raw)
+local function coerce_value(raw, shapes, owner, key)
 	raw = trim(strip_comments(raw))
 	if raw == "" then return PARSE_ERROR end  -- Missing value (e.g., "key =")
 	-- Booleans
@@ -592,7 +674,7 @@ local function coerce_value(raw)
 			if segments == nil then return PARSE_ERROR end
 			local owner, key = assignment_owner(tbl, segments, dotted, sealed)
 			if not owner or owner[key] ~= nil then return PARSE_ERROR end
-			local v = coerce_value(v_raw or "")
+			local v = coerce_value(v_raw or "", shapes, owner, key)
 			if v == PARSE_ERROR then return PARSE_ERROR end
 			owner[key] = v
 			if type(v) == "table" then sealed[v] = true end
@@ -604,13 +686,14 @@ local function coerce_value(raw)
 		if raw:sub(-1) ~= "]" then return PARSE_ERROR end
 		local body = trim(raw:sub(2, -2))
 		local out = {}
+		if shapes then shapes.arrays[out] = true end
 		if body == "" then return out end
 		local elements = split_top_level_commas(body)
 		if not elements then return PARSE_ERROR end
 		for _, element in ipairs(elements) do
 			local final = trim(element)
 			if final == "" then return PARSE_ERROR end
-			out[#out + 1] = coerce_value(final)
+			out[#out + 1] = coerce_value(final, shapes, out, #out + 1)
 		end
 		-- Propagate any element-level parse errors
 		for _, v in ipairs(out) do
@@ -620,7 +703,22 @@ local function coerce_value(raw)
 	end
 	-- Numbers — including TOML 1.0 special float literals
 	local number, is_number = parse_number(raw)
-	if is_number then return number end
+	if is_number then
+		if shapes and number ~= PARSE_ERROR and owner then
+			local fields = shapes.numbers[owner] or {}
+			shapes.numbers[owner] = fields
+			fields[key] = { value = number, token = raw }
+		end
+		return number
+	end
+	-- The existing bare fallback also carries TOML temporal literals as strings.
+	-- Optional source evidence preserves their unchanged spelling without adding
+	-- a second parser or changing this decoder's existing admission semantics.
+	if shapes and owner then
+		local fields = shapes.strings[owner] or {}
+		shapes.strings[owner] = fields
+		fields[key] = { value = raw, token = raw }
+	end
 	-- Bare key fallback — treat as string
 	return raw
 end
@@ -669,7 +767,7 @@ end
 --- Returns nil on any spec violation (duplicate keys, invalid syntax, etc.).
 --- @param content string The TOML source.
 --- @return table|nil The decoded root table, or nil on error.
-function M.decode(content)
+local function decode_document(content, shapes)
 	local root = {}
 	local current = root
 	-- Track which keys have been set in each table to detect duplicates
@@ -748,7 +846,7 @@ function M.decode(content)
 			pending.depth, pending.multiline_quote =
 				scan_bracket_depth(line, pending.depth, pending.multiline_quote)
 			if pending.depth == 0 and pending.multiline_quote == nil then
-				local v = coerce_value(table.concat(pending.parts, "\n"))
+				local v = coerce_value(table.concat(pending.parts, "\n"), shapes, pending.target, pending.key)
 				if v == PARSE_ERROR then return nil end
 				if not claim_value(pending.target, pending.key, v) then return nil end
 				pending = nil
@@ -782,6 +880,7 @@ function M.decode(content)
 					arr = {}
 					parent[last] = arr
 					aot_arrays[arr] = true
+					if shapes then shapes.arrays[arr] = true end
 				elseif type(arr) ~= "table" or not aot_arrays[arr] then
 					return nil
 				end
@@ -842,7 +941,7 @@ function M.decode(content)
 				}
 				goto continue_decode
 			end
-			local v = coerce_value(raw_trimmed)
+			local v = coerce_value(raw_trimmed, shapes, target, parsed_key)
 			-- Propagate parse errors from coerce_value
 			if v == PARSE_ERROR then return nil end
 			if not claim_value(target, parsed_key, v) then return nil end
@@ -854,5 +953,27 @@ function M.decode(content)
 	return root
 end
 
+
+--- Decodes a document with the established untagged Lua value model.
+--- @param content string TOML source.
+--- @return table|nil document
+function M.decode(content)
+	return decode_document(content)
+end
+
+--- Decodes exact source and retains parsed array identities and numeric tokens.
+--- The receipt refers to this returned document only, including empty/nested
+--- arrays and arrays of tables. Failed decoding exposes neither document nor
+--- partial evidence; no metatable or model mutation reaches existing callers.
+--- @param content string TOML source.
+--- @return table|nil document
+--- @return table|nil shapes Source-bound arrays and unchanged scalar tokens.
+function M.decode_with_shapes(content)
+	local shapes = { arrays = {}, numbers = {}, strings = {} }
+	local document = decode_document(content, shapes)
+	if not document then return nil, nil end
+	shapes.document = document
+	return document, shapes
+end
 
 return M

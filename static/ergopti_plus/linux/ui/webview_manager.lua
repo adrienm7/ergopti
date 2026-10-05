@@ -593,7 +593,9 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 	local current_epoch = M.current_epoch(app_name)
-	if source_epoch ~= nil and current_epoch ~= nil and source_epoch ~= current_epoch then
+	-- Native callbacks keep their captured epoch after public hide. No live
+	-- epoch means their page has retired, rather than permission to reload it.
+	if source_epoch ~= nil and source_epoch ~= current_epoch then
 		Logger.debug(LOG, "Ignoring stale message for '%s' from epoch %s (current %s).",
 			app_name, tostring(source_epoch), tostring(current_epoch))
 		return nil

@@ -21,6 +21,7 @@ local function with_fixture(callback)
 			local HOST_SYMLINK_ATTRIBUTES = host.fs.symlinkAttributes
 			local HOST_MKDIR = host.fs.mkdir
 			local HOST_RMDIR = host.fs.rmdir
+			local HOST_OS_EXECUTE = os.execute
 
 			local function make_directory_iterator(entries)
 				local index = 0
@@ -83,6 +84,17 @@ local function with_fixture(callback)
 						if command:find("/bin/cp -p ", 1, true) then
 							local source_path = arguments[1]
 							local destination_path = arguments[2]
+							-- Preserve the actual staging inode and native mode independently
+							-- of the process umask. Metadata records below model only SDK fields.
+							local executed, exit_type, rc = HOST_OS_EXECUTE(command)
+							-- Lua 5.4 acknowledges exit zero with true,"exit",0; 5.1
+							-- and LuaJIT expose the native system status as integer zero.
+							local success = executed == true and exit_type == "exit" and rc == 0
+							if type(executed) == "number" then
+								success, exit_type, rc = executed == 0, "exit", executed
+							end
+							local output = ""
+							if success ~= true then return output, false, exit_type, rc end
 							if type(metadata_fixture) == "table" then
 								metadata_fixture.copy_calls = (metadata_fixture.copy_calls or 0) + 1
 								metadata_fixture.records[destination_path] = copy_table(
@@ -92,7 +104,7 @@ local function with_fixture(callback)
 									metadata_fixture.after_copy(metadata_fixture.records[destination_path])
 								end
 							end
-							return "", true, "exit", 0
+							return output, success, exit_type, rc
 						end
 						if command:find("/bin/ls -led ", 1, true) then
 							local record = type(metadata_fixture) == "table"
@@ -122,7 +134,7 @@ local function with_fixture(callback)
 							return make_directory_iterator(entries)
 						end,
 						attributes = function(path)
-							if staging_locks[path] then return { mode = "directory" } end
+							if staging_locks[path] then return HOST_ATTRIBUTES(path) end
 							return with_fixture_metadata(path, HOST_ATTRIBUTES(path))
 						end,
 						symlinkAttributes = function(path)
@@ -132,7 +144,7 @@ local function with_fixture(callback)
 							if type(confirmed_absences) == "table" and confirmed_absences[path] then
 								return nil, "injected missing path"
 							end
-							if staging_locks[path] then return { mode = "directory" } end
+							if staging_locks[path] then return HOST_SYMLINK_ATTRIBUTES(path) end
 							local target = type(symlink_targets) == "table" and symlink_targets[path]
 							if type(target) == "function" then target = target(path) end
 							if type(target) == "string" then return { mode = "link", target = target } end

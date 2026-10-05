@@ -72,12 +72,15 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 	helpers.it("routes every menu-side keymap start through the shared gate", function()
 		local units = {
 			-- Explicit category scope commands select desired choices without starting
-			-- input capture. The four remaining runtime-enabling routes keep the gate.
-			{ marker = "function M.all_sections_switch", expected = 4, label = "common hotstrings" },
+			-- input capture. The four category routes and the extension selection
+			-- publisher's runtime enable keep the gate.
+			{ marker = "function M.all_sections_switch", expected = 5, label = "common hotstrings" },
 			-- Personal scope selection preserves stopped capture; only a live section
 			-- enable still requires the strict start gate, covered by callback tests.
 			{ marker = "function M.build_custom", expected = 1, label = "custom hotstrings" },
-			{ marker = "function M.schedule_pause_layout_switch", expected = 1, label = "layout menu" },
+			-- Replacement now belongs to Ergopti's exact bound hotstring section;
+			-- Layout retains physical-key selection without enabling capture.
+			{ marker = "function M.schedule_pause_layout_switch", expected = 0, label = "layout menu" },
 			{ marker = "function M.sync_state_to_modules", expected = 1, label = "state synchronization" },
 			-- The menu root (ui/menu/init.lua): the global « Tout activer » was retired
 			-- on every driver; the Hotstrings scope owner it constructs starts the

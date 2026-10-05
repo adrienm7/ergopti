@@ -1,0 +1,11 @@
+{
+	"incoming_dev": "6e6111741b9c71d768cb8ced55911ffd73c0e225",
+	"personal_metadata_resolution": "Exact incoming stronger seed/count/readability/value assertions; all original151 assertion statements remain in order",
+	"json_resolution": "Exact incoming two standard escape branches; duplicate equivalent auto-merged cases removed after exact original-source recovery proof",
+	"fixture_owner_lists": {
+		"static/ergopti_plus/macos/tests/support/gesture_actions_fixture.lua": "Exact incoming list retained, including new transitive owners",
+		"static/ergopti_plus/macos/tests/support/metrics_typing_scope.lua": "Exact incoming list retained, including new transitive owners",
+		"static/ergopti_plus/macos/tests/support/tooltip_renderer_fixture.lua": "Exact incoming list retained, including new transitive owners"
+	},
+	"dynamic_cache_resolution": "Exact incoming file plus only the reviewed two-line raw-cache precondition; all incoming source retained"
+}

@@ -5,4 +5,4 @@ description = "Shipped migrations preserve an unset retired llm.trigger.shortcut
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 3
-to_version = 10
+to_version = 11

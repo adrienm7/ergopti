@@ -211,6 +211,12 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 		local root = ManifestMenu and ManifestMenu.get_root() or nil
 		helpers.assert_not_nil(root, "the manifest must load, or this test checks nothing")
 
+		-- The complete fixture has no configured key, so these independent captions
+		-- name the native tap and absent hold. Provider templates format their rows.
+		local fixture_captions = {
+			tap_hold_key_tap_caption = i18n.get("tap_hold.tap.none"),
+			tap_hold_key_hold_caption = i18n.get("tap_hold.hold.none"),
+		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
 			local rows = ManifestMenu.get_array(menu_key)
@@ -227,6 +233,11 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 						local label = (kind == "section_header")
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
+						if row.caption_getter ~= nil then
+							local caption = fixture_captions[row.caption_getter]
+							helpers.assert_type(caption, "string", "every declared caption needs independent fixture state")
+							label = string.format(label, caption)
+						end
 						if not titles[label] then
 							missing[#missing + 1] = menu_key .. "/" .. (row.id or row.i18n)
 						end

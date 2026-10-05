@@ -1,6 +1,7 @@
 # \_shared/modules/hotstrings/ — Cross-Driver Hotstring Data
 
-This directory is the **single source of truth** for all bundled hotstring data.
+This directory owns common and language-specific hotstring data. The shipped
+Ergopti extension owns its bound files under `static/layouts/registry/ergopti/`.
 The AHK driver consumes it at runtime via a self-healing `.tsv` cache (no
 generated code is committed), and the Hammerspoon driver consumes it directly.
 
@@ -9,11 +10,9 @@ generated code is committed), and the Hammerspoon driver consumes it directly.
 ```
 _shared/modules/hotstrings/
   _index.toml              Category order, and the [languages] packs
-  distancesreduction.toml  Language-neutral categories (one file each):
-  autocorrection.toml        layout distances, brand capitalisation, symbols
-  magickey.toml
+  autocorrection.toml      Common autocorrections
+  magickey.toml            Common symbols and native section-order markers
   french/                  French language pack (declared in _index.toml)
-    distancesreduction.toml  French suffixes
     autocorrection.toml      accents, names, elisions, hyphens, typos
     magickey.toml            French abbreviations and emoji names
   defaults.toml            Delay and colour fallbacks
@@ -23,16 +22,20 @@ _shared/modules/hotstrings/
 
 ## Ergopti layout hotstrings
 
-The hotstrings written for Ergopti's key positions — SFB reduction
-(`sfbsreduction`), rolls (`rolls`) and the magic key's repeat corrections
-(`magickey` section `repeat_corrections`) — live in the Ergopti layout
-extension, `static/layouts/registry/ergopti/hotstrings/`. Its manifest binds
+The hotstrings written for Ergopti's key positions — distance and SFB reduction,
+rolls, French suffixes (`french_distancesreduction` section `suffixes_a`) and the
+magic key's repeat corrections (`magickey` section `repeat_corrections`) — live
+in the Ergopti layout extension, `static/layouts/registry/ergopti/hotstrings/`.
+The same extension owns the translated metadata for the native `magickey.replace`
+choice; that metadata file contains no replacement hotstring. The common
+MagicKey source retains its section-order marker for the native gate.
+Its manifest binds
 each file to its historical category, feature section and common priority
 tier (`[extension.hotstring_bindings.<stem>]`), so every existing preference
-still addresses it. They are available wherever the Ergopti extension is
-installed; every driver counts the Ergopti it ships as installed, and the
-Hotstrings menu lists them in the extensions section, under « Hotstrings
-Ergopti ».
+still addresses it. Every driver discovers the pack it ships and always lists
+« Hotstrings Ergopti » in the extensions section, even when the Ergopti keyboard
+layout has not been installed. Replacement is controlled there; the physical
+key picker remains in the Layout menu.
 
 ## Language packs
 
@@ -45,7 +48,7 @@ order = ["french"]
 
 [languages.french]
 locale = "fr"                # key into _shared/data/locale_names.json
-categories_order = ["distancesreduction", "autocorrection", "magickey"]
+categories_order = ["autocorrection", "magickey"]
 ```
 
 Each `<language>/<stem>.toml` loads as its own group `"<language>_<stem>"`
@@ -85,3 +88,10 @@ If that cache is missing or older than any source `.toml`, the driver rebuilds i
 from the TOML on the spot (a one-time cost on first launch or after an edit) and
 rewrites it, so every subsequent boot is fast — the same self-healing pattern as
 the locale `.tsv` caches. Just edit the TOML files; the cache refreshes itself.
+
+A Linux explicit path to the actual shipped common file selects its logical
+category, including that category's bound extension sections. Native device and
+inode observations distinguish the shipped file from a physically distinct user
+copy, even when their bytes match. A custom single-file path remains exact and
+admits no additional extension categories. Shipped pack discovery reads the local
+registry defaults directly; it needs no updater transport or installed layout.

@@ -47,6 +47,7 @@ local XkbCapture = require("adapters.xkb_capture")
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
+local Utf8 = require("compat.utf8")
 
 local LOG = "adapters.keyboard_layout"
 
@@ -390,9 +391,11 @@ end
 --- unresolvable string through the clipboard instead.
 --- @param text string
 --- @return table|nil Array of { keycode, mods } in order, or nil.
---- @return string|nil The character that could not be typed.
+--- @return string|nil The untypable character; nil when the input is malformed.
 function M.plan(text)
 	if type(text) ~= "string" then return nil, nil end
+	-- A pattern walk can skip malformed bytes and falsely approve a partial plan.
+	if not Utf8.len(text) then return nil, nil end
 	if not _table then return nil, text:sub(1, 1) end
 
 	local plan = {}

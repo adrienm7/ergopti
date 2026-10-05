@@ -194,20 +194,36 @@ return function(helpers)
 
 		helpers.it("writes the autocorrection recommendation that deletion would inherit as 1.0 s", function()
 			local changes, recommendations = plan("recommended")
-			helpers.assert_eq(inherited("autocorrection", "caps"), 1.0, "corpus fixture")
+			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
+				helpers.assert_eq(inherited("autocorrection", section), 1.0, "the split preserves each family corpus delay")
+			end
 			local explicit = {}
 			for _, change in ipairs(changes) do
 				if change.value ~= nil then
 					explicit[change.override[1] .. "." .. tostring(change.section) .. "." .. change.field] = change.value
 				end
 			end
-			helpers.assert_eq(explicit["autocorrection.caps.delay"], 0.5)
+			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
+				helpers.assert_eq(explicit["autocorrection." .. section .. ".delay"], 0.5, section .. " explicit recommendation")
+			end
+			helpers.assert_nil(explicit["autocorrection.caps.delay"], "the retired family is not a shipped recommendation")
 			helpers.assert_eq(explicit["french_autocorrection.accents.delay"], 0.5)
 			helpers.assert_eq(explicit["rolls.hc.delay"], nil, "an equal inheritance stays sparse")
-			helpers.assert_eq(#recommendations, 10, "every differing bundled section is reported")
+			-- The historical ten differences were one common caps family and the
+			-- nine French families below. Three replacements add exactly two rows;
+			-- this independent membership list also refuses accidental additions.
+			helpers.assert_eq(#recommendations, 12, "ten historical rows minus caps plus three common families")
+			local reported = {}
 			for _, row in ipairs(recommendations) do
 				helpers.assert_true(row.inherited ~= row.seconds, row.group .. "." .. row.section)
+				reported[#reported + 1] = row.group .. "." .. row.section
 			end
+			table.sort(reported)
+			helpers.assert_eq(reported, { "autocorrection.abbreviations", "autocorrection.names", "autocorrection.technical_terms",
+				"french_autocorrection.accents", "french_autocorrection.errors", "french_autocorrection.minus",
+				"french_autocorrection.minus_apostrophe", "french_autocorrection.multiple_punctuation_marks",
+				"french_autocorrection.names", "french_autocorrection.ou", "french_autocorrection.suffixes_a_chaining",
+				"french_autocorrection.typographic_apostrophe" })
 		end)
 
 		helpers.it("returns every section to its corpus inheritance on clear", function()
@@ -276,9 +292,11 @@ return function(helpers)
 			refused({ groups = { { id = "rolls", override = { "rolls" }, sections = { "" }, bundled = true } } })
 			refused({ groups = { { id = "rolls", override = { "rolls" }, sections = {}, bundled = true },
 				{ id = "rolls", override = { "rolls" }, sections = {}, bundled = true } } })
-			helpers.assert_eq(pcall(Planner.plan, { mode = "recommended", features = Manifest.features(),
-				groups = { { id = "autocorrection", override = { "autocorrection" }, sections = { "caps" }, bundled = true } },
-				inherited = function() return nil end }), false, "an unknown inheritance cannot be compared")
+			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
+				helpers.assert_eq(pcall(Planner.plan, { mode = "recommended", features = Manifest.features(),
+					groups = { { id = "autocorrection", override = { "autocorrection" }, sections = { section }, bundled = true } },
+					inherited = function() return nil end }), false, "an unknown inheritance cannot be compared: " .. section)
+			end
 		end)
 	end)
 end

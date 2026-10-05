@@ -87,29 +87,56 @@ M.MAX_LEVEL = 4
 -- ==============================================
 -- ==============================================
 
+--- Finds the byte after a quoted string without interpreting its contents.
+--- @param text string
+--- @param start integer Opening quote position.
+--- @return integer|nil Position after the closing quote, or nil when unfinished.
+local function skip_quoted_string(text, start)
+	local i = start + 1
+	while i <= #text do
+		local c = text:sub(i, i)
+		if c == "\\" then
+			i = i + 2
+		elseif c == '"' then
+			return i + 1
+		else
+			i = i + 1
+		end
+	end
+	return nil
+end
+
 --- Extracts the body of a named top-level block, brace-balanced.
 ---
 --- A pattern match cannot do this: every block contains nested braces, so
 --- `xkb_symbols "…" {(.-)}` stops at the first inner closing brace and returns
---- the type definitions instead of the symbols.
+--- the type definitions instead of the symbols. Quoted names and metadata are
+--- not structural keywords or braces, including escaped quotes in a string.
 --- @param text string Whole keymap dump.
 --- @param name string Block name, e.g. "xkb_symbols".
 --- @return string|nil The block body without its outer braces.
 function M.block(text, name)
 	if type(text) ~= "string" then return nil end
-	local start = text:find(name, 1, true)
-	if not start then return nil end
-	local open = text:find("{", start, true)
-	if not open then return nil end
-
-	local depth = 0
-	for i = open, #text do
+	local start, open
+	local depth, i = 0, 1
+	while i <= #text do
 		local c = text:sub(i, i)
-		if c == "{" then
+		if c == '"' then
+			i = skip_quoted_string(text, i)
+			if not i then return nil end
+		elseif not start and text:sub(i, i + #name - 1) == name then
+			start = true
+			i = i + #name
+		elseif start and c == "{" then
+			open = open or i
 			depth = depth + 1
-		elseif c == "}" then
+			i = i + 1
+		elseif open and c == "}" then
 			depth = depth - 1
 			if depth == 0 then return text:sub(open + 1, i - 1) end
+			i = i + 1
+		else
+			i = i + 1
 		end
 	end
 	return nil
@@ -165,6 +192,57 @@ local function split_levels(list)
 	return levels
 end
 
+--- Iterates complete real key definitions without reading quoted declarations.
+--- @param body string Symbols block body.
+--- @return function Iterator yielding the key name and exact braced definition.
+local function key_definitions(body)
+	local i = 1
+	return function()
+		while i <= #body do
+			local c = body:sub(i, i)
+			if c == '"' then
+				i = skip_quoted_string(body, i)
+				if not i then return nil end
+			else
+				local name, open
+				if c == "k" and (i == 1 or not body:sub(i - 1, i - 1):match("[%w_]")) then
+					name, open = body:match("^key%s+<([%w_+%-]+)>%s*()", i)
+				end
+				if name and body:sub(open, open) == "{" then
+					local inner = M.block(body:sub(i), "key")
+					if not inner then return nil end
+					local close = open + #inner + 1
+					i = close + 1
+					return name, body:sub(open, close)
+				end
+				i = i + 1
+			end
+		end
+		return nil
+	end
+end
+
+--- Matches existing list syntax only when its start is outside a string.
+--- @param text string Exact key definition.
+--- @param pattern string Existing single-capture list pattern.
+--- @return string|nil Original captured bytes, including an empty capture.
+local function match_unquoted(text, pattern)
+	local i = 1
+	local anchored = "^" .. pattern
+	while i <= #text do
+		local c = text:sub(i, i)
+		if c == '"' then
+			i = skip_quoted_string(text, i)
+			if not i then return nil end
+		else
+			local captured = text:match(anchored, i)
+			if captured ~= nil then return captured end
+			i = i + 1
+		end
+	end
+	return nil
+end
+
 --- Reads the group-1 keysym list for every key in the symbols block.
 ---
 --- Two spellings occur in the same dump. The short form is
@@ -182,13 +260,13 @@ function M.parse_symbols(text)
 		return keys
 	end
 
-	for name, definition in body:gmatch("key%s+<([%w_+%-]+)>%s*(%b{})") do
+	for name, definition in key_definitions(body) do
 		-- Group 2 and beyond are a user who switches layouts with a hotkey.
 		-- Injecting into a group that is not active types the wrong characters,
 		-- so only the first group is kept and the active-group question is the
 		-- caller's.
-		local explicit = definition:match("symbols%s*%[%s*Group1%s*%]%s*=%s*%[([^%]]*)%]")
-		local list = explicit or definition:match("%[([^%]]*)%]")
+		local explicit = match_unquoted(definition, "symbols%s*%[%s*Group1%s*%]%s*=%s*%[([^%]]*)%]")
+		local list = explicit or match_unquoted(definition, "%[([^%]]*)%]")
 		if list then keys[name] = split_levels(list) end
 	end
 	return keys

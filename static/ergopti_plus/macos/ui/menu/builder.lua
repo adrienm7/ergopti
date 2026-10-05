@@ -12,6 +12,7 @@
 --- ==============================================================================
 
 local M = {}
+local PersonalFiles = require("hotstrings.personal_files")
 local hs         = hs
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -290,6 +291,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		for _, f in ipairs(ctx.hotfiles) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
+			and not PersonalFiles.components(name)
 			and not LANGUAGE_GROUPS[name] and not Extensions.parse_category_key(name)
 			and not BOUND_GROUPS[name] then
 				common_filter[name] = true
@@ -346,8 +348,8 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		and menu_mods.hotstrings.bound_sections(ctx) or {}
 	for _, menu in ipairs(M.extension_menus(ctx, counts, BOUND_BY_EXTENSION, BOUND_SECTIONS)) do
 		local items = {}
-		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
-			and menu_mods.hotstrings.build_language_bulk_actions(ctx, menu.groups) or {}
+		local bulk = type(menu_mods.hotstrings.build_extension_bulk_actions) == "function"
+			and menu_mods.hotstrings.build_extension_bulk_actions(ctx, menu.groups, menu.sections) or {}
 		for _, row in ipairs(bulk) do items[#items + 1] = row end
 		items[#items + 1] = { separator = true }
 		-- One group at a time: a single pass over the loaded groups would draw them

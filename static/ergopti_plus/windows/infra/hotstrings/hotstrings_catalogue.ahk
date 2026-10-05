@@ -41,6 +41,8 @@
 ;   4. toml.file
 ;   5. GLOBAL_DEFAULT_DELAY (delay only); color stays empty.
 HotstringsResolve(CategoryName, SectionName := "") {
+		if IsSet(PersonalFileControls) && PersonalFileControls.owners.Has(CategoryName)
+				return PersonalFileControls.owners[CategoryName].Resolve(SectionName)
 		global _HSResolveCache, _HSResolveGen
 		Key := StrLower(CategoryName) . "|" . (SectionName != "" ? FoldAsciiLower(SectionName) : "")
 		if (_HSResolveCache.Has(Key)) {

@@ -523,9 +523,11 @@ check(
 			fs.readFileSync(path.join(shared, 'modules/hotstrings/_index.toml'), 'utf8')
 		);
 		assert.ok(!index.menu.categories_order.includes(reference.category));
-		assert.ok(index.languages.french.categories_order.includes(reference.category));
-		assert.ok(
-			fs.existsSync(path.join(shared, 'modules/hotstrings/french/distancesreduction.toml'))
+		assert.ok(!index.languages.french.categories_order.includes(reference.category));
+		assert.strictEqual(
+			fs.existsSync(path.join(shared, 'modules/hotstrings/french/distancesreduction.toml')),
+			false,
+			'Ergopti suffixes have one extension source'
 		);
 		const distanceFeatures = manifest.features.hotstrings.flatMap(
 			(entry) => entry.distances_reduction || []
@@ -545,6 +547,80 @@ check(
 		}
 	}
 );
+
+check('Ergopti owns suffixes and magic-key replacement with exact historical data', () => {
+	const { parse } = require('smol-toml');
+	const shared = path.join(ROOT, 'static/ergopti_plus/_shared');
+	const extension = parse(
+		fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti/manifest.toml'), 'utf8')
+	).extension;
+	assert.deepStrictEqual(extension.hotstring_bindings.suffixes_a, {
+		category: 'french_distancesreduction',
+		feature_section: 'hotstrings.french_distancesreduction',
+		source: 'common'
+	});
+	assert.deepStrictEqual(extension.hotstring_bindings.magickeyreplace, {
+		category: 'magickey',
+		feature_section: 'hotstrings.magic_key',
+		sections: ['replace'],
+		source: 'common'
+	});
+	// Captured from the original source before relocation; never generated from the moved file.
+	const suffixSource = fs.readFileSync(
+		path.join(REGISTRY_DIR, 'ergopti/hotstrings/suffixes_a.toml'),
+		'utf8'
+	);
+	assert.strictEqual(
+		crypto
+			.createHash('sha256')
+			.update(suffixSource.slice(suffixSource.indexOf('\n') + 1))
+			.digest('hex'),
+		'779cdcac3eb9446f998a915c22398aa6cb8b08e19b18d696249ddad7801e7ff2',
+		'all 24 historical rules, flags, order and 21-language metadata remain byte-exact'
+	);
+	const suffixes = parse(suffixSource);
+	assert.deepStrictEqual(suffixes._meta.sections_order, ['suffixes_a']);
+	assert.strictEqual(Object.keys(suffixes.suffixes_a[0]).length, 24);
+	const replacementSource = fs.readFileSync(
+		path.join(REGISTRY_DIR, 'ergopti/hotstrings/magickeyreplace.toml'),
+		'utf8'
+	);
+	const replacementDescription = replacementSource
+		.split('\n')
+		.find((line) => line.startsWith('replace = '));
+	assert.strictEqual(
+		crypto.createHash('sha256').update(replacementDescription).digest('hex'),
+		'445d95e02245d1d65425357db4374315c95e75206038e8b00e22963fa4547861',
+		'the complete independent 21-language replacement description is preserved'
+	);
+	const replacement = parse(replacementSource);
+	assert.deepStrictEqual(replacement._meta.sections_order, ['replace']);
+	assert.strictEqual(Object.keys(replacement._meta.sections.replace).length, 21);
+	assert.strictEqual(
+		replacement.replace,
+		undefined,
+		'replacement remains a native feature, with no fabricated hotstring'
+	);
+	const common = parse(
+		fs.readFileSync(path.join(shared, 'modules/hotstrings/magickey.toml'), 'utf8')
+	);
+	assert.strictEqual(
+		common._meta.sections.replace,
+		undefined,
+		'the common source no longer owns replacement'
+	);
+	assert.deepStrictEqual(
+		common._meta.sections_order,
+		[
+			'replace',
+			'repeat_corrections',
+			'-',
+			'text_expansion_symbols',
+			'text_expansion_symbols_typst'
+		],
+		'the category retains the canonical relative-order anchors for its bound sections'
+	);
+});
 
 console.log(`\n${passes} passed, ${failures} failed`);
 if (failures > 0) process.exit(1);

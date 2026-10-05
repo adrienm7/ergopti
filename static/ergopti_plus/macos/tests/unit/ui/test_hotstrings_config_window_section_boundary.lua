@@ -106,11 +106,13 @@ helpers.describe("Hotstrings configuration section boundary", function()
 						return true
 					end,
 				}
+				local root, category = Fixture.install_personal_binding("/personal/sample.toml", content)
+				helpers.assert_eq(category, "personal-file:73616d706c652e746f6d6c")
 				package.loaded["ui.hotstrings_config_window"] = nil
 				local window = require("ui.hotstrings_config_window")
-				window.setup({ personal_dir = "/personal" })
+				Fixture.prepare_personal_window(window, root)
 				local body = {
-					category = "personal:sample", group = "personal", section = "",
+					category = category, group = "personal", section = "",
 					ms = 420, hex = "#abcdef", show_tooltip = false, priority = 7,
 				}
 				for _, operation in ipairs({ "set", "clear" }) do

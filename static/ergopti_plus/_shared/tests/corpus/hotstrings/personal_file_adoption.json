@@ -1,0 +1,316 @@
+{
+	"version": 1,
+	"vectors": [
+		{
+			"name": "flattened names remain distinct",
+			"candidates": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"path": "/files/a__b.toml"
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"path": "/files/a/b.toml"
+				}
+			],
+			"expected": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "personal-file:615f5f622e746f6d6c",
+					"path": "/files/a__b.toml",
+					"admitted": true,
+					"exclusive": true
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"owner": "personal-file:61:622e746f6d6c",
+					"path": "/files/a/b.toml",
+					"admitted": true,
+					"exclusive": true
+				}
+			]
+		},
+		{
+			"name": "ambiguous stored legacy choice is not copied twice",
+			"candidates": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"path": "/files/a__b.toml",
+					"legacy_owner": "personal_ext_a__b"
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"path": "/files/a/b.toml",
+					"legacy_owner": "personal_ext_a__b"
+				}
+			],
+			"expected": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "personal-file:615f5f622e746f6d6c",
+					"path": "/files/a__b.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "ambiguous-legacy-owner"
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"owner": "personal-file:61:622e746f6d6c",
+					"path": "/files/a/b.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "ambiguous-legacy-owner"
+				}
+			]
+		},
+		{
+			"name": "physical aliases both refuse",
+			"candidates": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"path": "/files/a__b.toml",
+					"physical": "8:1234"
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"path": "/files/a/b.toml",
+					"physical": "8:1234"
+				}
+			],
+			"expected": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "personal-file:615f5f622e746f6d6c",
+					"path": "/files/a__b.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "physical-alias"
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"owner": "personal-file:61:622e746f6d6c",
+					"path": "/files/a/b.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "physical-alias"
+				}
+			]
+		},
+		{
+			"name": "normalized pathname aliases both refuse",
+			"candidates": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"path": "/files/same.toml"
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"path": "/files/same.toml"
+				}
+			],
+			"expected": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "personal-file:615f5f622e746f6d6c",
+					"path": "/files/same.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "path-alias"
+				},
+				{
+					"source": {
+						"id": "personal-file:61:622e746f6d6c",
+						"components": ["a", "b.toml"],
+						"label": "a / b"
+					},
+					"owner": "personal-file:61:622e746f6d6c",
+					"path": "/files/same.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "path-alias"
+				}
+			]
+		},
+		{
+			"name": "duplicate descriptor cannot select another path",
+			"candidates": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"path": "/files/one.toml"
+				},
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"path": "/files/two.toml"
+				}
+			],
+			"expected": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "personal-file:615f5f622e746f6d6c",
+					"path": "/files/one.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "duplicate-source"
+				},
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "personal-file:615f5f622e746f6d6c",
+					"path": "/files/two.toml",
+					"admitted": false,
+					"exclusive": false,
+					"reason": "duplicate-source"
+				}
+			]
+		},
+		{
+			"name": "unique stored legacy owner can be admitted",
+			"candidates": [
+				{
+					"source": {
+						"id": "personal-file:632e746f6d6c",
+						"components": ["c.toml"],
+						"label": "c"
+					},
+					"path": "/files/c.toml",
+					"legacy_owner": "personal_ext_c",
+					"physical": "8:99"
+				}
+			],
+			"expected": [
+				{
+					"source": {
+						"id": "personal-file:632e746f6d6c",
+						"components": ["c.toml"],
+						"label": "c"
+					},
+					"owner": "personal-file:632e746f6d6c",
+					"path": "/files/c.toml",
+					"admitted": true,
+					"exclusive": true
+				}
+			]
+		},
+		{
+			"name": "unavailable physical metadata does not manufacture alias",
+			"candidates": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"path": "/files/a__b.toml"
+				},
+				{
+					"source": {
+						"id": "personal-file:632e746f6d6c",
+						"components": ["c.toml"],
+						"label": "c"
+					},
+					"path": "/files/c.toml",
+					"physical": "8:99"
+				}
+			],
+			"expected": [
+				{
+					"source": {
+						"id": "personal-file:615f5f622e746f6d6c",
+						"components": ["a__b.toml"],
+						"label": "a__b"
+					},
+					"owner": "personal-file:615f5f622e746f6d6c",
+					"path": "/files/a__b.toml",
+					"admitted": true,
+					"exclusive": true
+				},
+				{
+					"source": {
+						"id": "personal-file:632e746f6d6c",
+						"components": ["c.toml"],
+						"label": "c"
+					},
+					"owner": "personal-file:632e746f6d6c",
+					"path": "/files/c.toml",
+					"admitted": true,
+					"exclusive": true
+				}
+			]
+		}
+	]
+}

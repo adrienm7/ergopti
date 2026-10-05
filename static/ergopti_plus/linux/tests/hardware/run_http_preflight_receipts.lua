@@ -108,32 +108,42 @@ local invalid = {
 	}) } },
 }
 
-for _, case in ipairs(invalid) do
-	check(case.name .. " retains the actual valid response owner", function()
-		write(path, "\"native-retained\"\n")
-		write(destination, "Retained download bytes")
-		local good, bad, callbacks, before_held, before_requests = nil, nil, 0, #held, requests
-		assert(HTTP.get(url .. "/held", {}, { owner = owner, timeout_ms = 1500 }, function(value) good = value end))
-		wait_for(function() return #held == before_held + 1 end)
-		assert(HTTP.isActive(owner), "fixture did not hold an actual curl request")
-		local options = { owner = owner, timeout_ms = 100 }
-		for key, value in pairs(case.options or {}) do options[key] = value end
-		local function complete(value) bad = value; callbacks = callbacks + 1 end
-		local protected, dispatched = pcall(function()
-			if case.download then return HTTP.download(url .. "/direct", {}, case.download, options, complete) end
-			return HTTP.get(case.url or (url .. "/direct"), case.headers or {}, options, complete)
+for _, owned in ipairs({ false, true }) do
+	for _, case in ipairs(invalid) do
+		check((owned and "owned " or "") .. case.name .. " retains the actual valid response owner", function()
+			write(path, "\"native-retained\"\n")
+			write(destination, "Retained download bytes")
+			local good, bad, callbacks, before_held, before_requests = nil, nil, 0, #held, requests
+			assert(HTTP.get(url .. "/held", {}, { owner = owner, timeout_ms = 1500 }, function(value) good = value end))
+			wait_for(function() return #held == before_held + 1 end)
+			assert(HTTP.isActive(owner), "fixture did not hold an actual curl request")
+			local options = { owner = owner, timeout_ms = 100 }
+			for key, value in pairs(case.options or {}) do options[key] = value end
+			local function complete(value) bad = value; callbacks = callbacks + 1 end
+			local operation
+			local protected, dispatched = pcall(function()
+				if owned then
+					if case.download then options.output_path = case.download end
+					operation = HTTP.get_owned(case.url or (url .. "/direct"), case.headers or {}, options, complete)
+					return operation.started
+				end
+				if case.download then return HTTP.download(url .. "/direct", {}, case.download, options, complete) end
+				return HTTP.get(case.url or (url .. "/direct"), case.headers or {}, options, complete)
+			end)
+			assert(protected and dispatched == false, "invalid curl metadata escaped as an exception or dispatch")
+			wait_for(function() return bad ~= nil end)
+			if owned then assert(operation:is_settled(), "invalid owned replacement retained native cleanup debt") end
+			assert(bad and bad.ok == false and bad.status == 0 and callbacks == 1)
+			assert(type(bad.error) == "string" and not bad.error:find("private-suffix", 1, true)
+				and not bad.error:find("Synthetic private header value", 1, true))
+			assert(HTTP.isActive(owner), "invalid replacement cancelled the actual in-flight curl owner")
+			respond(held[#held])
+			wait_for(function() return good ~= nil end)
+			assert(good.ok and good.status == 200 and good.body == "abc")
+			assert(requests == before_requests + 1, "invalid replacement contacted an extra native endpoint")
+			assert(read(path) == "\"native-retained\"\n" and read(destination) == "Retained download bytes")
 		end)
-		assert(protected and dispatched == false, "invalid curl metadata escaped as an exception or dispatch")
-		assert(bad and bad.ok == false and bad.status == 0 and callbacks == 1)
-		assert(type(bad.error) == "string" and not bad.error:find("private-suffix", 1, true)
-			and not bad.error:find("Synthetic private header value", 1, true))
-		assert(HTTP.isActive(owner), "invalid replacement cancelled the actual in-flight curl owner")
-		respond(held[#held])
-		wait_for(function() return good ~= nil end)
-		assert(good.ok and good.status == 200 and good.body == "abc")
-		assert(requests == before_requests + 1, "invalid replacement contacted an extra native endpoint")
-		assert(read(path) == "\"native-retained\"\n" and read(destination) == "Retained download bytes")
-	end)
+	end
 end
 
 check("valid replacement still retires its previous actual owner", function()
@@ -143,6 +153,59 @@ check("valid replacement still retires its previous actual owner", function()
 	assert(HTTP.get(url .. "/direct", {}, { owner = owner, timeout_ms = 1000 }, function(value) current = value end))
 	wait_for(function() return current ~= nil end)
 	assert(current.ok and current.body == "abc" and old == nil and not HTTP.isActive(owner))
+end)
+
+check("valid owned replacement composes once and retires its regular predecessor", function()
+	local old, current, before, conversions = nil, nil, #held, 0
+	assert(HTTP.get(url .. "/held", {}, { owner = owner, timeout_ms = 1500 }, function(value) old = value end))
+	wait_for(function() return #held == before + 1 end)
+	local header = setmetatable({}, { __tostring = function()
+		conversions = conversions + 1
+		return "Synthetic native header"
+	end })
+	local operation = HTTP.get_owned(url .. "/direct", { ["X-Native"] = header },
+		{ owner = owner, timeout_ms = 1000 }, function(value) current = value end)
+	assert(operation.started and conversions == 1)
+	wait_for(function() return current ~= nil end)
+	assert(operation:is_settled() and current.ok and current.body == "abc" and old == nil and not HTTP.isActive(owner))
+end)
+
+check("first owned construction failure retains late native close acknowledgments", function()
+	local good, bad, before, before_requests = nil, nil, #held, requests
+	assert(HTTP.get(url .. "/held", {}, { owner = owner, timeout_ms = 1500 }, function(value) good = value end))
+	wait_for(function() return #held == before + 1 end)
+	local header = setmetatable({}, { __tostring = function() error("Synthetic private header value") end })
+	local operation = HTTP.get_owned(url .. "/direct", { ["X-Native"] = header },
+		{ owner = "independent-owned-invalid", timeout_ms = 1000 }, function(value) bad = value end)
+	assert(operation.started == false and not operation:is_settled() and bad == nil,
+		"first owned construction must retain its late allocation cleanup contract")
+	local acknowledged = false
+	operation:on_settled(function() acknowledged = true end)
+	wait_for(function() return bad ~= nil end)
+	assert(acknowledged and operation:is_settled() and bad.ok == false and bad.error == "curl request construction failed")
+	assert(HTTP.isActive(owner) and requests == before_requests + 1)
+	respond(held[#held])
+	wait_for(function() return good ~= nil end)
+	assert(good.ok and good.body == "abc")
+end)
+
+check("owned cleanup ownership rejects metadata without evaluating it", function()
+	local good, bad, before, conversions = nil, nil, #held, 0
+	local predecessor = HTTP.get_owned(url .. "/held", {}, { owner = owner, timeout_ms = 1500 },
+		function(value) good = value end)
+	assert(predecessor.started)
+	wait_for(function() return #held == before + 1 end)
+	local header = setmetatable({}, { __tostring = function()
+		conversions = conversions + 1
+		error("Synthetic private header value")
+	end })
+	local refused = HTTP.get_owned(url .. "/direct", { ["X-Native"] = header }, { owner = owner },
+		function(value) bad = value end)
+	assert(refused.started == false and refused:is_settled() and bad.error == "previous request cleanup pending")
+	assert(conversions == 0 and HTTP.isActive(owner))
+	respond(held[#held])
+	wait_for(function() return good ~= nil end)
+	assert(predecessor:is_settled() and good.ok and good.body == "abc")
 end)
 
 check("literal native ETag files retain compare and save behavior", function()

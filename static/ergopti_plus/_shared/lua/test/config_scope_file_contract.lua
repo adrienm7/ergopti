@@ -87,4 +87,46 @@ return function(helpers)
 			helpers.assert_eq(participant.restore(), true)
 		end)
 	end)
+	helpers.describe("secondary conditional publication terminal", function()
+		for _, published in ipairs({ true, false }) do
+			helpers.it("retains cleanup after a refused publication effect=" .. tostring(published), function()
+				local source, blocked = "[rolls]\ndelay = 0.3\n", true
+				local disk = { overrides = source }
+				local first, calls = true, 0
+				local fs = { read_with_status = function(path) return disk[path], disk[path] and "ok" or "absent" end,
+					write = function() error("conditional writer required") end,
+					write_if_unchanged = function(path, candidate, expected)
+						if disk[path] ~= expected.content then return false end
+						if first then
+							first = false
+							if published then disk[path] = candidate end
+							return false, "release refused", function()
+								calls = calls + 1
+								return not blocked, "native owner pending", published
+							end
+						end
+						disk[path] = candidate; return true
+					end }
+				local file = ScopeFile.new({ path = "overrides", backup_path = "backup", files = fs,
+					remove = function() error("present source must not be removed") end })
+				helpers.assert_eq(file.prepare(DELETE), true)
+				helpers.assert_eq(file.publish(), false)
+				helpers.assert_eq(file.restore(), false)
+				helpers.assert_eq(file.pending(), true)
+				local candidate = disk.overrides
+				disk.overrides = "external successor"
+				blocked = false
+				helpers.assert_eq(file.restore(), not published)
+				helpers.assert_eq(disk.overrides, "external successor")
+				if published then
+					helpers.assert_eq(file.pending(), true, "the source inverse outlives native release")
+					disk.overrides = candidate
+					helpers.assert_eq(file.restore(), true)
+					helpers.assert_eq(disk.overrides, source)
+				end
+				helpers.assert_eq(file.pending(), false)
+				helpers.assert_eq(calls, 2, "completed native cleanup is not repeated")
+			end)
+		end
+	end)
 end

@@ -1,0 +1,18 @@
+# static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+sections_order = ["replace"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+replace = { fr = "Transformer une touche en touche ★", en = "Transform a key into the ★ key", de = "Eine Taste in die ★-Taste umwandeln", es = "Transformar una tecla en la tecla ★", zh = "将一个键转换为 ★ 键", ar = "تحويل مفتاح إلى مفتاح ★", cs = "Transformovat klávesu na klávesu ★", da = "Omdanne en tast til ★-tasten", he = "להפוך מקש למקש ★", hi = "किसी कुंजी को ★ में बदलें", it = "Trasformare un tasto nel tasto ★", ja = "キーを★キーに変換", ko = "키를 ★ 키로 변환", nl = "Een toets omzetten naar de ★-toets", no = "Gjøre en tast om til ★-tasten", pl = "Przekształć klawisz w klawisz ★", pt = "Transformar uma tecla na tecla ★", ru = "Превратить клавишу в клавишу ★", sv = "Omvandla en tangent till ★-tangenten", tr = "Bir tuşu ★ tuşuna dönüştür", uk = "Перетворити клавішу на клавішу ★" }
