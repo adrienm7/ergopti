@@ -240,6 +240,7 @@ return {
 	"tests.unit.modules.keylogger.test_aggregate_walker",
 	"tests.unit.modules.keylogger.test_app_switch_aggregate",
 	"tests.unit.modules.keylogger.test_configuration_scope",
+	"tests.unit.modules.keylogger.test_physical_configuration_observation_portability",
 	"tests.unit.modules.keylogger.test_hold_durations",
 	"tests.unit.modules.keylogger.test_keylogger_privacy_filters",
 	"tests.unit.modules.keylogger.test_metrics_collector_privacy",

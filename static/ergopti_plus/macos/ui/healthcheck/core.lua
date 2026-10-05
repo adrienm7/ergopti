@@ -226,6 +226,12 @@ end
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
 	{
+		id       = "adapters.physical_observation_clock",
+		contract = { "now" },
+		-- Reached by explicit configuration binding; loading never samples time.
+		wired    = true,
+	},
+	{
 		id       = "adapters.keyboard_source_probe",
 		contract = { "current_source_id", "request" },
 		wired    = true,

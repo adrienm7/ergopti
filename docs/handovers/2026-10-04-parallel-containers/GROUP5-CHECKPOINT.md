@@ -81,6 +81,25 @@ checks with one explicit skip. Actual native qualification is still pending;
 production activation/history/recovery/shutdown are not implemented by this
 prerequisite.
 
+The next dormant configuration prerequisite observes the actual filter setters
+and complete configuration transactions through one exact owner/token. Copied
+selectors, prevalidated bound transactions, raw identity comparisons and native
+integer clock samples protect aliases and callback reentry. It carries no
+permission/history/context/capture authority and currently has only a macOS
+Lua5.4 consumer. Thirty-nine controls and39 unchanged existing controls
+pass; independent review is clear after causal corrections for alias restoration,
+late validation and caller equality. The shared numeric policy executes five
+normal discovered controls on actual LuaJIT and Lua5.4; native clock and public
+budget validation remain strict macOS integers without coercion. Semantic refusal
+reasons and a healthy detached-copy control replace a weak negative status-only
+test without removing its assertions or changing a ratchet baseline. Original
+shared source fails all five final controls; two semantic/alias mutants fail.
+Root runtime gates pass14,209 macOS units in1,492 modules,101 stubbed E2E
+cases with one explicit skip,6,696 Linux units in363 modules and188 Linux E2E
+cases. Final format/JS verification is required before committing. Native Swift
+is explicitly deferred on Linux; actual Hammerspoon clock invocation remains
+pending. ContextTracker, watcher and pause observation boundaries remain unfinished.
+
 ## Pushed changes
 
 | Commit                                     | Scope                                                                                 |
@@ -246,14 +265,27 @@ it can prove. Hardware double results cannot close these acceptance requirements
 
 ## Native CI status
 
-Most recent exact-source manual run37252831698 at pushed7e5abf006 selects
-macOS only. Shared Core and portable macOS units/E2E pass; native release build
-and311 XCTest cases execute. Raw artifact11321921834 confirms309 passed and
-two failed cases (Brew/Sparkle prerequisites), with seven assertion failures/two
-unexpected. All logger and keyboard cases pass. Packaging and installation
-remain unqualified; Linux/Windows and Release are skipped. The exact-SHA census
-finds only this retained terminal manual run. No final integration lock/ref or
-dev push has occurred. These sources precede the matched-delivery slice above.
+Most recent exact-source manual run37255224392 at pushedb1c0864dc selects
+macOS only and finishes failure. Shared Core, portable macOS units/E2E and the
+native release launcher build pass. The recovered raw artifact11322647196 now
+confirms311 complete native cases,309 passed/two failed cases, seven assertion
+failures/two unexpected. All nine logger cases and keyboard cases pass; the
+historical lock-deadline refusal is not proved fixed. The Brew receiver is no
+longer live before its first AppleEvent; Sparkle reaches wait.server-start and
+then cleanup debt before any server-ready or update-entry witness. Terminal
+census failure does not explain that earlier readiness refusal. The artifact
+download succeeds at53,472 bytes with ZIP integrity verified after the earlier
+results-host denial. Network draft13 preserves installer/startup/presets; current
+access succeeds, which does not prove publication or fresh setup replay.
+Packaging and installation remain unexecuted; Linux/Windows and Release are
+skipped. No final integration lock/ref or dev push has occurred. These sources
+precede the configuration-observation prerequisite above.
+
+Previous manual run37252831698 at7e5abf006 executes311 XCTest cases;
+downloaded raw artifact11321921834 confirms309 passed/two failed cases, seven
+assertion failures/two unexpected. All logger and keyboard cases pass in that
+run; this does not fix the historical lock-deadline failure. Packaging/install
+remain unqualified and Linux/Windows/Release skipped.
 
 Manual run37238984667 tested CI SHA
 `e405575f60a078866468057b05952f3df9ee821b`, whose tree exactly equals feature

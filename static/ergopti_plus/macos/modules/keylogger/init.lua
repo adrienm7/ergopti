@@ -1054,6 +1054,82 @@ local function copy_configuration(value)
 	return result
 end
 
+-- The dormant configuration channel owns no native context, history or capture.
+-- A retired channel remains bound until its exact token is explicitly detached.
+local _physical_configuration_binding
+
+--- Copies the actual filter policy into one dormant configuration receipt.
+--- No app, enabled/pause decision or key contents are delivered by this port.
+local function publish_physical_configuration()
+	local binding = _physical_configuration_binding
+	if not binding then return true end
+	return binding.channel.publish({ disabled_apps = CoreState.disabled_apps,
+		private_filter_enabled = CoreState.private_filter_enabled,
+		secure_field_filter_enabled = CoreState.secure_field_filter_enabled,
+		system_auth_filter_enabled = CoreState.system_auth_filter_enabled })
+end
+
+--- Binds one explicit configuration subscriber without activating native capture.
+--- This prerequisite covers filter writers only; it does not establish retained
+--- app/privacy, pause, sleep or permission interval authority.
+---@param owner table Trusted caller identity.
+---@param capacity integer Receipt budget; exhaustion requires exact detach/rebind.
+---@param receive function Called with (copied record, exact token), acknowledging true.
+---@param on_refused function Called once after this subscription is revoked.
+---@return boolean bound False if acquisition or the initial receipt is refused.
+---@return table|string token Exact detach token on success, otherwise a refusal reason.
+function M.bind_physical_configuration_observer(owner, capacity, receive, on_refused)
+	assert(type(owner) == "table" and type(receive) == "function" and type(on_refused) == "function",
+		"Invalid physical configuration subscriber")
+	if _physical_configuration_binding then return false, "Physical configuration subscriber already bound" end
+	local Observation = require("keylogger.physical_configuration_observation")
+	-- Verify policy data before installing ownership or severing legacy aliases.
+	Observation.copy({ disabled_apps = CoreState.disabled_apps,
+		private_filter_enabled = CoreState.private_filter_enabled,
+		secure_field_filter_enabled = CoreState.secure_field_filter_enabled,
+		system_auth_filter_enabled = CoreState.system_auth_filter_enabled })
+	assert(math.type(capacity) == "integer" and capacity > 0, "Invalid physical observation budget")
+	local binding = { owner = owner, token = {} }
+	binding.channel = Observation.new(capacity, require("adapters.physical_observation_clock").now,
+		function(record) return receive(record, binding.token) end, function(reason)
+			Logger.callback(LOG, "Physical configuration refusal observer", on_refused, reason)
+		end)
+	local prior_apps = CoreState.disabled_apps
+	local owned_apps = Observation.own_apps(prior_apps)
+	CoreState.disabled_apps = owned_apps
+	_physical_configuration_binding = binding
+	local accepted, reason = publish_physical_configuration()
+	if accepted ~= true then
+		-- A callback may detach this candidate and bind a successor synchronously.
+		if rawequal(_physical_configuration_binding, binding) then
+			binding.channel.close()
+			_physical_configuration_binding = nil
+		end
+		-- A receiver may have detached this acquisition without installing a
+		-- successor. Restore only while no binding owns the unchanged candidate.
+		if _physical_configuration_binding == nil and rawequal(CoreState.disabled_apps, owned_apps) then
+			CoreState.disabled_apps = prior_apps
+		end
+		return false, reason
+	end
+	return true, binding.token
+end
+
+--- Detaches only the exact bound caller and token, including a retired channel.
+---@param owner table Exact trusted caller identity.
+---@param token table Exact token delivered to this binding.
+---@return boolean detached False for stale or competing callers.
+function M.unbind_physical_configuration_observer(owner, token)
+	local binding = _physical_configuration_binding
+	if not binding or not rawequal(binding.owner, owner) or not rawequal(binding.token, token) then return false end
+	-- Ownership checks execute no caller equality. Fence the exact selected
+	-- generation immediately before retirement; a stale detach cannot clear it.
+	if not rawequal(_physical_configuration_binding, binding) then return false end
+	_physical_configuration_binding = nil
+	binding.channel.close()
+	return true
+end
+
 --- Captures native configuration without exposing buffers or persisted metrics.
 --- @return table|nil snapshot Absent while a historical conversion owns encryption.
 function M.configuration_snapshot()
@@ -1074,6 +1150,13 @@ end
 --- @param config table Native configuration captured or explicitly planned by a scope.
 --- @return boolean committed Exact policy acknowledgement.
 function M.apply_configuration(config)
+	if _physical_configuration_binding then
+		local Observation = require("keylogger.physical_configuration_observation")
+		-- Own and validate the complete bound plan before encryption, migration
+		-- or posture callbacks can mutate caller aliases or observe partial policy.
+		config = Observation.own_data(config)
+		Observation.copy(config)
+	end
 	assert(type(config) == "table" and type(config.options) == "table"
 		and type(config.disabled_apps) == "table", "invalid metrics configuration")
 	for _, key in ipairs({ "private_filter_enabled", "secure_field_filter_enabled", "system_auth_filter_enabled" }) do
@@ -1089,17 +1172,23 @@ function M.apply_configuration(config)
 	cipher.set_enabled(enabled)
 	if cipher.is_enabled() ~= enabled then return false end
 	CoreState.options = copy_configuration(config.options)
-	CoreState.disabled_apps = copy_configuration(config.disabled_apps)
+	CoreState.disabled_apps = _physical_configuration_binding
+		and require("keylogger.physical_configuration_observation").own_apps(config.disabled_apps)
+		or copy_configuration(config.disabled_apps)
 	CoreState.private_filter_enabled = config.private_filter_enabled
 	CoreState.secure_field_filter_enabled = config.secure_field_filter_enabled
 	CoreState.system_auth_filter_enabled = config.system_auth_filter_enabled
+	publish_physical_configuration()
 	return true
 end
 
 --- Replaces the disabled-app list.
 --- @param apps table An array of {bundleID=…} or {appPath=…} entries.
 function M.set_disabled_apps(apps)
-	CoreState.disabled_apps = type(apps) == "table" and apps or {}
+	local assigned = type(apps) == "table" and apps or {}
+	CoreState.disabled_apps = _physical_configuration_binding
+		and require("keylogger.physical_configuration_observation").own_apps(assigned) or assigned
+	publish_physical_configuration()
 	Logger.debug(LOG, "Disabled apps updated (%d entry(ies)).", #CoreState.disabled_apps)
 end
 
@@ -1108,6 +1197,7 @@ end
 --- @param v boolean
 function M.set_private_filter_enabled(v)
 	CoreState.private_filter_enabled = (v ~= false)
+	publish_physical_configuration()
 	Logger.debug(LOG, "Private window filter: %s.", CoreState.private_filter_enabled and "on" or "off")
 end
 
@@ -1116,6 +1206,7 @@ end
 --- @param v boolean
 function M.set_secure_field_filter_enabled(v)
 	CoreState.secure_field_filter_enabled = (v ~= false)
+	publish_physical_configuration()
 	Logger.debug(LOG, "Secure field filter: %s.", CoreState.secure_field_filter_enabled and "on" or "off")
 end
 
@@ -1124,6 +1215,7 @@ end
 --- @param v boolean
 function M.set_system_auth_filter_enabled(v)
 	CoreState.system_auth_filter_enabled = (v ~= false)
+	publish_physical_configuration()
 	Logger.debug(LOG, "System auth filter: %s.", CoreState.system_auth_filter_enabled and "on" or "off")
 end
 

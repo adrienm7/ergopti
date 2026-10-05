@@ -1804,6 +1804,27 @@ explicit skip. Actual native acceptance remains pending. Production history,
 recovery and shutdown wiring remain open;
 this dormant prerequisite does not complete WP3 or enable the owned runtime.
 
+The dormant configuration channel now observes the real privacy-filter setters
+and complete configuration transactions under one exact owner/token. Bound app
+selectors and complete candidates are copied and validated before mutation or
+foreign posture callbacks; unbound legacy aliases and returns are preserved.
+Raw identity fences prevent caller equality from forging detach or overwriting
+a successor. Thirty-nine independently authored controls and39 unchanged existing
+controls pass; earlier private implementations fail the added alias, validation
+and equality controls. Shared finite-integral validation also executes five
+normal discovered Linux controls under actual LuaJIT and Lua5.4. The native macOS
+clock and public budget retain strict integer admission without coercion. A weak
+negative test was strengthened with semantic reasons and a healthy detached-copy
+control; the original shared source fails all five cases and two semantic/alias
+mutants fail. Independent review is clear. Source-selected runtime gates pass
+14,209 portable macOS units in1,492 modules,101 stubbed E2E cases with one skip,
+6,696 Linux units in363 modules and188 Linux E2E cases. Final format/JS checks
+must pass before publication; actual native clock invocation remains pending.
+This dormant subscription contains configuration only, with no
+permission/history/context/capture authority.
+ContextTracker, pause/sleep writers, recovery, termination and runtime activation
+remain unfinished; TODO31 stays open.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
