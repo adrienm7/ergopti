@@ -704,6 +704,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_local_server_private_publication.ahk
 #Include unit/test_local_server_write_admission.ahk
 #Include unit/test_local_server_join.ahk
+#Include unit/test_local_server_scope_cohort.ahk
 #Include unit/test_local_server_panel.ahk
 #Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk

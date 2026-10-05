@@ -338,8 +338,7 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 	global _LLM_Menu, _LLM_Menu_Handle
 	switch id {
 	case "llm_backend":
-		BackendMenu := LLM_Menu_BuildBackendMenu()
-		_LLM_Menu_AddRow(_LLM_Menu_BackendRowLabel(), BackendMenu, disabled)
+		_LLM_Menu_AddRow(_LLM_Menu_BackendRowLabel(), LLM_Menu_BuildBackendMenu(), disabled)
 	case "llm_model":
 		; Build the submenu, fire the async probes (backend health + installed-tags
 		; list), then prefix the label with the cached backend-health dot (🟢
