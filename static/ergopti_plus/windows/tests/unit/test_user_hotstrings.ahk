@@ -884,3 +884,45 @@ _UCHNativeNotepadRelease(State, Token) {
 
 Test("programmable hotstrings: Notepad invalidation retains native completion ownership (notepad-publication)",
 	_UCHNativeNotepadInvalidation)
+
+/** A duplicate native event remains separately owned and reports its collision. */
+_UCHNativeEventBoundary() {
+	First := 0, Duplicate := 0
+	Name := "Local\ErgoptiPlus.NativeBoundaryTest." . UHN_CurrentProcessId() . "." . A_TickCount . "." . Random(0, 0x7fffffff)
+	try {
+		First := UHN_CreateCancellationEvent(Name, &FirstError)
+		AssertTrue(First != 0, "the actual native adapter acquires an event handle")
+		AssertTrue(FirstError != 183, "a fresh name does not adopt an existing event")
+		AssertEqual(258, PLC_WaitHandle(First, 0), "the manual-reset event starts nonsignaled")
+		Duplicate := UHN_CreateCancellationEvent(Name, &DuplicateError)
+		AssertTrue(Duplicate != 0, "CreateEvent returns a separately closeable collision handle")
+		AssertEqual(183, DuplicateError, "the caller receives the immediate native collision error")
+		AssertTrue(UHN_SignalEvent(First), "the actual signal succeeds")
+		AssertEqual(0, PLC_WaitHandle(Duplicate, 0), "the collision handle observes the same signaled native event")
+	} finally {
+		try {
+			if Duplicate
+				AssertTrue(UHN_CloseEvent(Duplicate), "the owned duplicate is closed once")
+		} finally {
+			if First
+				AssertTrue(UHN_CloseEvent(First), "the owned initial handle is closed once")
+		}
+	}
+}
+Test("programmable hotstrings: native adapter preserves event ownership and immediate collision error", _UCHNativeEventBoundary)
+
+/** Read-only probes preserve the active process and reject the null window. */
+_UCHNativeWindowBoundary() {
+	global DriverPid
+	AssertEqual(DriverPid, UHN_CurrentProcessId(), "the nonce source is the actual interpreter process")
+	ProcessId := 0
+	AssertEqual(0, UHN_WindowProcessId(0, &ProcessId), "a null window acquires no process identity")
+	AssertEqual(0, ProcessId)
+	Hwnd := UHN_ForegroundHwnd()
+	AssertTrue(Hwnd is Integer, "the active-window probe returns a native HWND value")
+	if Hwnd {
+		AssertTrue(UHN_WindowProcessId(Hwnd, &ProcessId) != 0)
+		AssertTrue(ProcessId > 0, "an actual foreground window yields a native process identity")
+	}
+}
+Test("programmable hotstrings: native adapter preserves foreground and process identity", _UCHNativeWindowBoundary)

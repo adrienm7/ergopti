@@ -164,7 +164,7 @@ ConfigTomlReadSnapshot(Path) {
 		Snapshot.Present := false
 		return Snapshot
 	}
-	try Source := FileRead(Path, "UTF-8")
+	try Source := FSReadStrict(Path)
 	catch as Err {
 		_TomlReadFailures[Path] := true
 		if FileExist(Path)
