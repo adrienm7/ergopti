@@ -32,6 +32,7 @@
 
 local helpers = require("tests.helpers")
 local NativeCommand = require("modules.keylogger.sqlite_command")
+local Json = require("json")
 
 -- Every table the schema declares for character sequences, and the code the
 -- dashboard envelope uses for each.
@@ -170,6 +171,27 @@ helpers.describe("linux-sqlite-read-receipts", function()
 	end)
 end)
 
+helpers.describe("sqlite-ngram-text-receipts", function()
+	helpers.it("sqlite-ngram-text-receipts: escaped native token bytes remain distinct", function()
+		with_stubbed_sqlite(function(sql)
+			if not sql:find("FROM ngram_chars", 1, true) then return "[]" end
+			local rows = {}
+			for index, token in ipairs({ "a", "a\0b", "\0", "été" }) do
+				rows[index] = { token_json = Json.encode(token), c = index, td = index * 10,
+					e = index, esrc_json = '{}', source_rows = 1 }
+			end
+			return Json.encode(rows)
+		end, function(reader)
+			local chars = reader.read_ngrams("/owned/metrics.sqlite").c
+			for index, token in ipairs({ "a", "a\0b", "\0", "été" }) do
+				helpers.assert_not_nil(chars[token], "native JSON token must retain all original bytes")
+				helpers.assert_eq(chars[token].c, index, "distinct tokens cannot merge counters")
+				helpers.assert_eq(chars[token].t, index * 10)
+			end
+		end)
+	end)
+end)
+
 --- Whether any statement selects from the given table.
 --- @param statements table
 --- @param table_name string
@@ -267,7 +289,7 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_bigrams", 1, true) then
-				return '[{"token":"ab","c":7,"td":840,"e":1,"esrc_json":"{}"}]'
+				return '[{"token_json":"\\\"ab\\\"","c":7,"td":840,"e":1,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
@@ -285,7 +307,7 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_trigrams", 1, true) then
-				return '[{"token":"abc","c":4,"td":1200,"e":2,"esrc_json":"{}"}]'
+				return '[{"token_json":"\\\"abc\\\"","c":4,"td":1200,"e":2,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
@@ -303,8 +325,8 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_words", 1, true) then
-				return '[{"token":"bonjour","c":3,"td":900,"e":0,"esrc_json":"{}"},'
-					.. '{"token":"bonjour","c":5,"td":1500,"e":1,"esrc_json":"{}"}]'
+				return '[{"token_json":"\\\"bonjour\\\"","c":3,"td":900,"e":0,"esrc_json":"{}"},'
+					.. '{"token_json":"\\\"bonjour\\\"","c":5,"td":1500,"e":1,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
@@ -321,7 +343,7 @@ helpers.describe("sqlite reader: what the envelope carries", function()
 		local result
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM ngram_bigrams", 1, true) and sql:find("app,", 1, true) then
-				return '[{"app":"firefox","token":"ab","c":2,"td":200,"e":0,"esrc_json":"{}"}]'
+				return '[{"app":"firefox","token_json":"\\\"ab\\\"","c":2,"td":200,"e":0,"esrc_json":"{}"}]'
 			end
 			return ""
 		end, function(reader)
