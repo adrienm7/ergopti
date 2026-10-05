@@ -41,6 +41,7 @@ local OWNED = {
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
 	"adapters.python_interpreter", "ui.python_runtime_offer",
+	"adapters.file_system",
 }
 
 -- The closing lines ensure-mlx-deps.sh prints after any failed uv sync: they
@@ -180,6 +181,20 @@ local function load_world(world)
 		world.errors[#world.errors + 1] = ok and text or tostring(fmt)
 	end
 	package.loaded["infra.logger"] = logger
+	-- Only native boundaries are doubled: the policy bytes and parser remain real.
+	package.loaded["adapters.file_system"] = {
+		read = function(path)
+			helpers.assert_true(path:find("/_shared/", 1, true) ~= nil, "native fixture reads actual shared source data")
+			local file = assert(io.open(path, "rb"))
+			local text = file:read("*a")
+			file:close()
+			return text
+		end,
+		path_status = function(path)
+			local attributes = fake_fs(world).attributes(path)
+			return attributes and "present" or "absent", attributes
+		end,
+	}
 	package.loaded["ui.download_window"] = {
 		is_active = function() return world.window_sessions > 0 end,
 		session_id = function() return world.window_sessions end,
@@ -206,6 +221,21 @@ local function load_world(world)
 			return "", true
 		end,
 	})
+	-- Controlled native receipt boundary: unstructured stderr is never promoted
+	-- into proof. The real diagnosis and canonical interpreter consume these
+	-- manually authored typed receipts for the action cases that need them.
+	local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
+	local classify = Diagnosis.classify
+	Diagnosis.classify = function(lines, exit_code, context)
+		if world.native_network_receipt ~= nil then
+			context = context or {}
+			context.network_receipt = world.native_network_receipt
+			local raw = package.loaded["adapters.file_system"].read(
+				require("infra.paths").shared("modules/network/managed_network.json"))
+			context.network_contract = require("network.failure").new(require("json").decode(raw))
+		end
+		return classify(lines, exit_code, context)
+	end
 	package.loaded["infra.dialog_util"] = {
 		-- The network failures' offer: its actions, then « Plus tard ».
 		choose = function(title, body, choices, cancel_label)
@@ -562,7 +592,7 @@ helpers.describe("Selecting MLX again after a failure retries it (mlx-bootstrap-
 		stream_lines(world.tasks[1], { "curl: (6) Could not resolve host: astral.sh" })
 		world.tasks[1].finish(1, "", "")
 		helpers.assert_eq(results, { false })
-		helpers.assert_eq(checker.get_failure_cause().kind, "offline")
+		helpers.assert_eq(checker.get_failure_cause().kind, "network_unknown")
 		helpers.assert_eq(#world.deferred, 1, "every failed selection offers its repair")
 		world.answers = { "later" }
 		drain(world)
@@ -790,23 +820,24 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		helpers.assert_eq(#world.tasks, 1)
 		stream_lines(world.tasks[1], { "curl: (6) Could not resolve host: astral.sh" })
 		world.tasks[1].finish(1, "", "")
-		helpers.assert_eq(checker.get_failure_cause().kind, "offline")
+		helpers.assert_eq(checker.get_failure_cause().kind, "network_unknown")
 
 		-- The failure reopens the offer with its cause, in the words the three
-		-- drivers share (network.failure.offline), and the button that retries.
+		-- drivers share (network.failure.unknown), and the button that retries.
 		world.answers = { "primary" }
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 2)
 		local failed = world.dialogs[2]
 		helpers.assert_eq(failed.title, "L’installation de MLX a échoué")
-		helpers.assert_true(failed.body:find("Le serveur est injoignable", 1, true) ~= nil, failed.body)
+		helpers.assert_true(failed.body:find(package.loaded["infra.i18n"].get("network.failure.unknown"), 1, true) ~= nil, failed.body)
 		helpers.assert_true(failed.body:find("Could not resolve host: astral.sh", 1, true) ~= nil,
 			"the dialog quotes the line that proves the cause")
 		helpers.assert_eq(failed.primary, "Réessayer")
-		helpers.assert_eq(failed.secondary, "Ouvrir les réglages du proxy")
+		helpers.assert_eq(failed.secondary, package.loaded["infra.i18n"].get("error_dialog.open_log"))
 		helpers.assert_eq(#world.tasks, 2, "the repair button retries at once")
-		helpers.assert_true(world.tasks[2].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil,
-			"the retry removes what the failed install left, then installs again")
+		helpers.assert_true(world.tasks[2].command() ~= "", "retry owns a real native command")
+		helpers.assert_true(world.tasks[2].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) == nil,
+			"an unknown network failure retries without authorizing removal of a valid runtime")
 
 		-- A repair that fails in turn says why, with the same button.
 		stream_lines(world.tasks[2], { "curl: (6) Could not resolve host: astral.sh" })
@@ -815,7 +846,7 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 3)
 		helpers.assert_eq(world.dialogs[3].primary, "Réessayer")
-		helpers.assert_true(world.dialogs[3].body:find("Le serveur est injoignable", 1, true) ~= nil,
+		helpers.assert_true(world.dialogs[3].body:find(package.loaded["infra.i18n"].get("network.failure.unknown"), 1, true) ~= nil,
 			world.dialogs[3].body)
 		helpers.assert_eq(#world.tasks, 2, "« Plus tard » starts nothing")
 	end))
@@ -924,7 +955,7 @@ helpers.describe("A network failure names its class and its fixes (mlx-bootstrap
 		load_world(world)
 		local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 		local cases = {
-			{ "certificate", {
+			{ "network_unknown", {
 				"error: Request failed after 3 retries",
 				"  Caused by: Failed to download `https://github.com/astral-sh/python-build-standalone/x.tar.gz`",
 				"  Caused by: error sending request for url (https://github.com/astral-sh/x.tar.gz)",
@@ -933,19 +964,19 @@ helpers.describe("A network failure names its class and its fixes (mlx-bootstrap
 			} },
 			-- A company filter denying uv network access: "Operation not permitted",
 			-- once read as a file permission that offered to show a folder.
-			{ "host_blocked", {
+			{ "network_unknown", {
 				"  Caused by: error sending request for url (https://files.pythonhosted.org/packages/mlx.whl)",
 				"  Caused by: client error (Connect)",
 				"  Caused by: tcp connect error: Operation not permitted (os error 1)",
 			} },
-			{ "host_blocked", {
+			{ "network_unknown", {
 				"Permission error: operation not permitted",
 				"Request failed after 3 retries",
 				"Caused by: failed to download URL",
 				"Error sending request for URL",
 			} },
-			{ "proxy", { "curl: (56) CONNECT tunnel failed, response 407", "HTTP/1.1 407 Proxy Authentication Required" } },
-			{ "offline", { "curl: (6) Could not resolve host: files.pythonhosted.org" } },
+			{ "network_unknown", { "curl: (56) CONNECT tunnel failed, response 407", "HTTP/1.1 407 Proxy Authentication Required" } },
+			{ "network_unknown", { "curl: (6) Could not resolve host: files.pythonhosted.org" } },
 			{ "permission", { "error: failed to create directory `/Users/u/Library/Application Support/Ergopti/mlx-venv`: Operation not permitted (os error 1)" } },
 		}
 		for _, case in ipairs(cases) do
@@ -960,15 +991,17 @@ helpers.describe("A network failure names its class and its fixes (mlx-bootstrap
 		local checker, router = load_world(world)
 		speak("fr")
 		helpers.assert_true(router.select_mlx(function() end))
+		world.native_network_receipt = { backend = "curl", stage = "proxy_connect",
+			failure_provenance = "verified", proxy_connect_status = 407 }
 		stream_lines(world.tasks[1], { "HTTP/1.1 407 Proxy Authentication Required" })
 		world.tasks[1].finish(1, "", "")
 		helpers.assert_eq(checker.get_failure_cause().kind, "proxy")
-		world.answers = { "primary" }
+		world.answers = { "secondary" }
 		drain(world)
 		local dialog = world.dialogs[#world.dialogs]
-		helpers.assert_eq(dialog.choices[1], "Ouvrir les réglages du proxy")
-		helpers.assert_eq(dialog.choices[2], "Réessayer")
-		helpers.assert_true(dialog.body:find("407 Proxy Authentication Required", 1, true) ~= nil, dialog.body)
+		helpers.assert_eq(dialog.choices[1], "Réessayer")
+		helpers.assert_eq(dialog.choices[2], "Ouvrir les réglages du proxy")
+		helpers.assert_true(dialog.body:find(package.loaded["infra.i18n"].get("network.failure.proxy"), 1, true) ~= nil, dialog.body)
 		local spawn = world.spawns[#world.spawns]
 		helpers.assert_eq(spawn.executable, "/usr/bin/open")
 		helpers.assert_eq(spawn.args[1], "x-apple.systempreferences:com.apple.Network-Settings.extension")
@@ -981,6 +1014,8 @@ helpers.describe("A network failure names its class and its fixes (mlx-bootstrap
 		speak("fr")
 		offer.set_alternative(function() world.alternatives = world.alternatives + 1; return true end)
 		helpers.assert_true(router.select_mlx(function() end))
+		world.native_network_receipt = { backend = "native_socket", stage = "connect",
+			failure_provenance = "verified", native_errno_domain = "posix", native_errno = "EACCES" }
 		stream_lines(world.tasks[1], {
 			"  Caused by: error sending request for url (https://files.pythonhosted.org/packages/mlx.whl)",
 			"  Caused by: tcp connect error: Operation not permitted (os error 1)",
@@ -995,5 +1030,196 @@ helpers.describe("A network failure names its class and its fixes (mlx-bootstrap
 		helpers.assert_true(dialog.body:find("Le réseau bloque l'accès à ce serveur", 1, true) ~= nil, dialog.body)
 		helpers.assert_eq(world.alternatives, 1, "« Utiliser Ollama » selects Ollama")
 		offer.set_alternative(nil)
+	end))
+end)
+
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 10/ Network Failure Ownership =======
+-- =============================================
+-- =============================================
+
+helpers.describe("Managed network failure actions retain their native revision", function()
+	local function failed_world(installed, receipt, expected_kind)
+		local world = new_world({ installed = installed == true })
+		local checker, router, offer = load_world(world)
+		world.native_network_receipt = receipt
+		speak("en")
+		helpers.assert_true(checker.install_for_selection(nil, installed and { repair = true } or nil))
+		stream_lines(world.tasks[1], { "curl: (35) SSL connect error" })
+		world.tasks[1].finish(1, "", "")
+		local cause = checker.get_failure_cause()
+		helpers.assert_eq(cause.kind, expected_kind or "network_unknown", "only the controlled native receipt can establish a network cause")
+		helpers.assert_true(checker.failure_action_admitted(cause.failure_revision))
+		return world, checker, router, offer, cause
+	end
+
+	helpers.it("managed-network-revision: failure copies retain one monotonic action revision", scoped(function()
+		local world, checker, _, _, first = failed_world(false)
+		local copy = checker.get_failure_cause()
+		helpers.assert_true(first ~= copy, "the getter intentionally returns copies")
+		helpers.assert_eq(first.failure_revision, copy.failure_revision)
+		helpers.assert_true(checker.reset_bootstrap_state())
+		helpers.assert_eq(false, checker.failure_action_admitted(first.failure_revision), "clearing the failure retires its dialog")
+		helpers.assert_true(checker.install_for_selection())
+		stream_lines(world.tasks[2], { "HTTP 403 Forbidden" })
+		world.tasks[2].finish(1, "", "")
+		local second = checker.get_failure_cause()
+		helpers.assert_true(second.failure_revision > first.failure_revision)
+		helpers.assert_true(checker.failure_action_admitted(second.failure_revision))
+		helpers.assert_eq(false, checker.failure_action_admitted(first.failure_revision))
+	end))
+
+	helpers.it("managed-network-retry: unknown failure reuses a valid runtime without full repair", scoped(function()
+		local world, checker, _, offer, first = failed_world(true)
+		world.answers = { "primary" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		helpers.assert_eq(#world.dialogs, 1)
+		helpers.assert_eq(world.dialogs[1].primary, package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(#world.tasks, 1, "normal retry reuses valid Python and fingerprint, rather than launching repair")
+		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
+		helpers.assert_true(world.files[MLX_VENV .. "/.last_sync_hash"])
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_nil(checker.get_failure_cause())
+		helpers.assert_eq(false, checker.failure_action_admitted(first.failure_revision))
+	end))
+
+
+	helpers.it("managed-network-filesystem: typed permission retains canonical retry without rebuilding runtime", scoped(function()
+		local world, checker, _, offer, first = failed_world(true, {
+			backend = "native_fs", stage = "file_write", failure_provenance = "verified",
+			native_errno_domain = "posix", native_errno = "EACCES",
+		}, "permission")
+		world.answers = { "primary" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(#world.tasks, 1, "typed download file failure never forces a valid runtime rebuild")
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
+	end))
+
+	helpers.it("managed-network-filesystem: typed disk failure retains canonical retry without rebuilding runtime", scoped(function()
+		local world, checker, _, offer, first = failed_world(true, {
+			backend = "native_fs", stage = "file_write", failure_provenance = "verified",
+			native_errno_domain = "posix", native_errno = "ENOSPC",
+		}, "disk_full")
+		world.answers = { "primary" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(#world.tasks, 1, "typed download disk failure never forces a valid runtime rebuild")
+		helpers.assert_eq(checker.get_state(), "ready")
+		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
+	end))
+
+	helpers.it("managed-network-modal: a newer failure rejects the retained retry choice", scoped(function()
+		local world, checker, router, offer, first = failed_world(false)
+		local calls = 0
+		local original_select = router.select_mlx
+		router.select_mlx = function(...)
+			calls = calls + 1
+			return original_select(...)
+		end
+		local original_choose = package.loaded["infra.dialog_util"].choose
+		package.loaded["infra.dialog_util"].choose = function(...)
+			local selected = original_choose(...)
+			helpers.assert_true(checker.reset_bootstrap_state())
+			helpers.assert_true(checker.install_for_selection())
+			stream_lines(world.tasks[2], { "HTTP 451 unavailable" })
+			world.tasks[2].finish(1, "", "")
+			return selected
+		end
+		world.answers = { "primary" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		helpers.assert_eq(#world.dialogs, 1)
+		helpers.assert_eq(#world.tasks, 2, "a retained modal result cannot dispatch a third task")
+		helpers.assert_eq(calls, 0, "stale choice never reaches the real selection router")
+		helpers.assert_true(checker.get_failure_cause().failure_revision > first.failure_revision)
+		helpers.assert_eq(false, checker.failure_action_admitted(first.failure_revision))
+	end))
+
+	helpers.it("managed-network-modal: a live successor install rejects retained retry admission", scoped(function()
+		local world, checker, router, offer, first = failed_world(false)
+		local calls = 0
+		local original_select = router.select_mlx
+		router.select_mlx = function(...)
+			calls = calls + 1
+			return original_select(...)
+		end
+		local original_choose = package.loaded["infra.dialog_util"].choose
+		package.loaded["infra.dialog_util"].choose = function(...)
+			local selected = original_choose(...)
+			helpers.assert_true(checker.reset_bootstrap_state())
+			helpers.assert_true(checker.install_for_selection())
+			helpers.assert_true(checker.is_task_running())
+			return selected
+		end
+		world.answers = { "primary" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		helpers.assert_eq(#world.tasks, 2)
+		helpers.assert_eq(calls, 0, "retained failure cannot join or borrow the new native installation owner")
+		helpers.assert_eq(false, offer.retry_failure(first.failure_revision))
+		world.tasks[2].finish(0, "", "")
+	end))
+
+
+	local function host_policy_receipt()
+		return { backend = "native_socket", stage = "connect", failure_provenance = "verified",
+			native_errno_domain = "posix", native_errno = "EACCES" }
+	end
+
+	helpers.it("managed-network-alternative: a newer failure rejects the retained alternate choice", scoped(function()
+		local world, checker, _, offer, first = failed_world(false, host_policy_receipt(), "host_blocked")
+		offer.set_alternative(function() world.alternatives = world.alternatives + 1; return true end)
+		local original_choose = package.loaded["infra.dialog_util"].choose
+		package.loaded["infra.dialog_util"].choose = function(...)
+			local selected = original_choose(...)
+			helpers.assert_true(checker.reset_bootstrap_state())
+			helpers.assert_true(checker.install_for_selection())
+			stream_lines(world.tasks[2], { "HTTP 451 unavailable" })
+			world.tasks[2].finish(1, "", "")
+			return selected
+		end
+		world.answers = { "secondary" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		helpers.assert_eq(world.dialogs[1].choices[2], package.loaded["infra.i18n"].get("mlx.use_ollama"))
+		helpers.assert_eq(world.alternatives, 0, "a stale alternate choice cannot borrow the successor failure revision")
+		helpers.assert_eq(#world.tasks, 2)
+		helpers.assert_true(checker.get_failure_cause().failure_revision > first.failure_revision)
+		offer.set_alternative(nil)
+	end))
+
+	helpers.it("managed-network-alternative: missing actual selection never offers a backend action", scoped(function()
+		local world, _, _, offer, first = failed_world(false, host_policy_receipt(), "host_blocked")
+		offer.set_alternative(nil)
+		world.answers = { "later" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		local labels = package.loaded["infra.i18n"]
+		helpers.assert_eq(#world.dialogs[1].choices, 3)
+		helpers.assert_eq(world.dialogs[1].choices[1], labels.get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].choices[2], labels.get("network.action.open_proxy_settings"))
+		helpers.assert_eq(world.dialogs[1].choices[3], labels.get("error_dialog.open_log"))
+		helpers.assert_eq(world.alternatives, 0)
+	end))
+
+	helpers.it("managed-network-modal: unavailable diagnostics never creates an actionable row", scoped(function()
+		local world, _, _, offer, first = failed_world(false)
+		package.loaded["infra.logger"].today_log_path = function() return nil end
+		world.answers = { "later" }
+		helpers.assert_true(offer.offer(first))
+		drain(world)
+		helpers.assert_eq(#world.dialogs[1].choices, 1)
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(#world.spawns, 0)
 	end))
 end)

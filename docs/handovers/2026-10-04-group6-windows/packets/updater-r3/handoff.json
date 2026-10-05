@@ -1,0 +1,46 @@
+{
+	"base_commit": "b88d2c9689c5b7f05f8345e62ce642c782390e8d",
+	"status": "scratch-only; canonical Routes and Windows native qualification pending",
+	"tests_executed": false,
+	"changed_existing_assertions": [],
+	"sources": {
+		"static/ergopti_plus/windows/modules/updater/self_update.ahk": {
+			"preimage_sha256": "42a8207f381c63c7f0b01ccbb3bfae8442a364a3b5dfe51c08ec5bb9a0a2ac80",
+			"candidate_sha256": "fd9ff413b5a640ed234aba271660f77369bff143b942a151397da1783d873acb"
+		},
+		"static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1": {
+			"preimage_sha256": "a5690a076530c0940126ccfd6c2f8a75f9d87885fb23f5c8533327c39dc5e7d3",
+			"candidate_sha256": "add50110af2096cb69ec9df1fdadf0eda9a38fb966d48221f68ebeb037f07f8a"
+		},
+		"static/ergopti_plus/windows/tests/fixtures/updater_download_receipts.ps1": {
+			"preimage_sha256": null,
+			"candidate_sha256": "e87f6db3150259894d112540c4267fd01113be95b6c17ab03c2ae4fe47deb0cf"
+		},
+		"static/ergopti_plus/windows/tests/unit/test_updater_managed_failure.ahk": {
+			"preimage_sha256": null,
+			"candidate_sha256": "7875700e3a0a1537643ddd50b0fe183b7579ef1182b1ac5e054c740ecaed383d"
+		},
+		"static/ergopti_plus/windows/vendor/ergopti_native_proxy.ps1": {
+			"preimage_sha256": null,
+			"candidate_sha256": "3bb0f2bc868e05b4e45811e4bebe3657f216e28ef21ce1aa0ceebebab066391e"
+		},
+		"static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1": {
+			"preimage_sha256": "bd1619c56068fe64cdde9c9a4fb27843cbaff4585cd5f86971aea1e8cec169f4",
+			"candidate_sha256": "a6466bc36a3fd8c5cc5ea20ff06e99f4c5651754defe18086e01c34bacb1508a"
+		},
+		"static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1": {
+			"preimage_sha256": null,
+			"candidate_sha256": "4d29b809eeb660b8ed95b6c345b99bfed515ca082ef009a798882c18712e6b45"
+		}
+	},
+	"staging_script_source_chars": 2936,
+	"staging_script_utf16_base64_chars": 7832,
+	"staging_script_environment_limit": 8191,
+	"revision": 3,
+	"supersedes": "../handoff.json",
+	"followup": "Original parent/native deadline, exact retry compare-and-claim, installed shared policy paths, private native resolver cleanup flag.",
+	"patch_sha256": "35e3964f4b8ce4d7fd170a28efa53f93d81d1e4b9b22dbc6c94c52d31b99c7a7",
+	"native_fixture_controls_authored": 15,
+	"caller_tests_authored": 8,
+	"staging_script_sha256": "35c43c75e74f6718ba118a8622551828d79a3656608612cb9aee5bc241178845"
+}

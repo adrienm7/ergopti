@@ -1,0 +1,142 @@
+--- Shared Versions failure-receipt and action lifecycle regression controls.
+--- Native I/O is controlled; classification uses the actual canonical policy.
+local M = {}
+
+function M.register(helpers, policy)
+	local Install = require("updater.release_install")
+	local contract = require("network.failure").new(policy)
+	local function fixture()
+		local state = { live = true, blocked = nil, calls = {}, reports = {}, callbacks = {}, diagnostics = false }
+		local native = {}
+		local function call(name) state.calls[#state.calls + 1] = name end
+		local logger = {}
+		for _, name in ipairs({ "error", "warn", "start", "success" }) do logger[name] = function() end end
+		local session = Install.new({ logger = logger,
+			blocked = function() return state.blocked end,
+			find_release = function(tag) call("find"); return { tag = tag } end,
+			backup = function() call("backup"); return { path = "/private/backup" } end,
+			resolve_asset = function() call("asset"); return { digest = "independently-pinned" } end,
+			download = function(_, _, done) call("download"); state.callbacks[#state.callbacks + 1] = done; return true end,
+			install = function() call("install"); return true end,
+			restart = function() call("restart"); return true end,
+			report = function(message) state.reports[#state.reports + 1] = message end,
+			failure_contract = function() return contract end,
+			failure_owner = function() return native end,
+			failure_current = function(owner)
+				if state.on_current then state.on_current() end
+				return owner == native and state.live
+			end,
+			failure_capabilities = function()
+				if state.probe_fault then error("private native probe failure") end
+				return { diagnostics_available = state.diagnostics }
+			end,
+			failure_action = function(id) call(id); return true end,
+		})
+		state.session = session
+		function state.fail(receipt, reason)
+			state.callbacks[#state.callbacks](nil, reason or Install.REASON.download, "private proxy credential", receipt)
+			return state.reports[#state.reports]
+		end
+		return state
+	end
+	local function proxy() return { stage = "proxy_connect", failure_provenance = "verified", proxy_connect_status = 407 } end
+	local function fail(state, receipt)
+		helpers.assert_eq(state.session.install("v1.2.3", "dev"), true)
+		return state.fail(receipt)
+	end
+	local function action(state, message, id)
+		return state.session.failure_action(message.operation, message.failure_epoch, id)
+	end
+	helpers.describe("Versions managed network receipt ownership", function()
+		helpers.it("classifies typed proxy evidence without exposing native secrets", function()
+			local state = fixture()
+			local receipt = proxy(); receipt.url, receipt.stderr, receipt.path = "https://token@host", "secret", "/private/file"
+			local message = fail(state, receipt)
+			helpers.assert_eq(message.failure_report.cause, "proxy")
+			helpers.assert_eq(message.failure_report.message_key, "network.failure.proxy")
+			helpers.assert_eq(message.failure_report.receipt, nil)
+			helpers.assert_eq(message.failure_report.url, nil)
+			helpers.assert_eq(message.failure_report.stderr, nil)
+			helpers.assert_eq(message.failure_report.path, nil)
+			helpers.assert_eq(message.detail, nil)
+			helpers.assert_eq(message.failure_receipt, nil)
+			helpers.assert_eq(message.backup_path, "/private/backup")
+			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download")
+		end)
+		helpers.it("keeps untyped adapter errors unknown despite hostile detail", function()
+			local state = fixture(); local message = fail(state, nil)
+			helpers.assert_eq(message.failure_report.cause, "unknown")
+			helpers.assert_eq(message.failure_report.evidence, "insufficient_evidence")
+		end)
+		helpers.it("never treats an unproved origin 407 as proxy evidence", function()
+			local state = fixture()
+			local message = fail(state, { stage = "http", failure_provenance = "verified", http_status = 407 })
+			helpers.assert_eq(message.failure_report.cause, "unknown")
+		end)
+		helpers.it("keeps failed verification separate and never installs", function()
+			local state = fixture(); state.session.install("v1.2.3", "dev")
+			local message = state.fail(proxy(), Install.REASON.verify)
+			helpers.assert_eq(message.reason_key, Install.REASON.verify)
+			helpers.assert_eq(message.failure_report, nil)
+			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download")
+		end)
+		helpers.it("requires exact operation and failure epoch before retry", function()
+			local state = fixture(); local message = fail(state, proxy())
+			helpers.assert_eq(state.session.failure_action(message.operation + 1, message.failure_epoch, "retry"), false)
+			helpers.assert_eq(state.session.failure_action(message.operation, message.failure_epoch + 1, "retry"), false)
+			helpers.assert_eq(#state.callbacks, 1)
+		end)
+		helpers.it("retry reruns backup-first and duplicate old callbacks cannot install", function()
+			local state = fixture(); local message = fail(state, proxy()); local old = state.callbacks[1]
+			helpers.assert_eq(action(state, message, "retry"), true)
+			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download,find,backup,asset,download")
+			old("/old/verified")
+			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download,find,backup,asset,download")
+			helpers.assert_eq(action(state, message, "retry"), false)
+			state.callbacks[2]("/new/verified")
+			helpers.assert_eq(table.concat(state.calls, ","), "find,backup,asset,download,find,backup,asset,download,install,restart")
+		end)
+		helpers.it("new same-tag failure rejects the previous terminal owner", function()
+			local state = fixture(); local first = fail(state, proxy())
+			helpers.assert_eq(action(state, first, "retry"), true)
+			local second = state.fail(proxy())
+			helpers.assert_eq(second.operation > first.operation, true)
+			helpers.assert_eq(second.failure_epoch > first.failure_epoch, true)
+			helpers.assert_eq(action(state, first, "retry"), false)
+			helpers.assert_eq(action(state, second, "retry"), true)
+		end)
+		helpers.it("rechecks actual owner and build policy after failure", function()
+			local state = fixture(); local message = fail(state, proxy())
+			state.live = false; helpers.assert_eq(action(state, message, "retry"), false)
+			state.live = true; state.blocked = "source"; helpers.assert_eq(action(state, message, "retry"), false)
+			helpers.assert_eq(#state.callbacks, 1)
+		end)
+		helpers.it("recomputes real external capability and never takes a page path", function()
+			local state = fixture(); state.diagnostics = true; local message = fail(state, proxy())
+			state.diagnostics = false; helpers.assert_eq(action(state, message, "diagnostics"), false)
+			state.diagnostics = true; helpers.assert_eq(action(state, message, "diagnostics"), true)
+			helpers.assert_eq(state.calls[#state.calls], "diagnostics")
+		end)
+		helpers.it("reentrant native capability probe cannot lend a retired owner", function()
+			local state = fixture(); local message = fail(state, proxy())
+			state.on_current = function() state.session.retire() end
+			helpers.assert_eq(action(state, message, "retry"), false)
+			helpers.assert_eq(#state.callbacks, 1)
+		end)
+		helpers.it("native probe failure preserves the failed phase without unbound actions", function()
+			local state = fixture(); state.probe_fault = true; local message = fail(state, proxy())
+			helpers.assert_eq(message.phase, "failed")
+			helpers.assert_eq(message.managed_failure, true)
+			helpers.assert_eq(message.failure_report, nil)
+			helpers.assert_eq(state.session.failure_action(1, 1, "retry"), false)
+			helpers.assert_eq(message.backup_path, "/private/backup")
+		end)
+		helpers.it("retires action authority on close without cancelling native work", function()
+			local state = fixture(); local message = fail(state, proxy())
+			state.session.retire(); helpers.assert_eq(action(state, message, "retry"), false)
+			helpers.assert_eq(#state.callbacks, 1)
+		end)
+	end)
+end
+
+return M

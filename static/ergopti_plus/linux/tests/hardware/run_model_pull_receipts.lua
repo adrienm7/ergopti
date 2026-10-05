@@ -94,7 +94,10 @@ local ok, err = xpcall(function()
 	check(await(function() return #results == 1 end), "failed native model pull settles")
 	check(results[1] == false and requests == 1 and not Download.is_active(), "HTTP failure remains a failed pull")
 	status, body = 200, '{"status":"success"}\n'
-	local retry = Window.on_message("retry")
+	local failed_session = Window.session_id()
+	local failed_epoch = Window.on_message("ready").failure_epoch
+	local failed_retry = { action = "failure_action", id = "retry", session = failed_session, epoch = failed_epoch }
+	local retry = Window.on_message(failed_retry)
 	check(retry and retry.retried == true, "failed pull admits retry through the actual progress bridge")
 	check(await(function() return #results == 2 end), "retried native pull settles")
 	check(results[2] == true and requests == 2 and not Download.is_active(), "successful native pull releases transport")
@@ -112,7 +115,7 @@ local ok, err = xpcall(function()
 	check(Window.on_message("ready").pushed == true
 		and evaluate(view, "String(window.nativePullSucceeded)") == "true", "native page receives successful settlement")
 	check(Download.retry() == false, "successful native pull refuses direct stale retry")
-	retry = Window.on_message("retry")
+	retry = Window.on_message(failed_retry)
 	check(retry and retry.retried == false, "successful native pull refuses stale progress retry")
 	check(requests == 2 and not Download.is_active() and not Http.isActive("ollama_model_pull"),
 		"stale retries cannot reacquire native transport")
