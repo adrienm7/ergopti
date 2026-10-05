@@ -3533,6 +3533,11 @@ Windows-dependent acceptance is explicitly deferred to the maintainer PC. Comple
 
 The hotstring formatter now supports an explicit preamble directive for sources whose physical registration order is intentional. Marked files retain interleaved array boundaries and rule order while canonical rule layout and syntax admission remain mandatory; unmarked files keep the existing sorter. The independent 140-rule corpus remains unchanged. This is a tooling prerequisite for the prepared family split; runtime migration and native acceptance remain separate.
 
+Native-source fixture prerequisites explicitly provision LuaFileSystem for the
+macOS E2E interpreter and the Linux unit interpreter. Real link, directory and
+device/inode controls remain mandatory; this dependency does not replace native
+packaging, installation or physical acceptance.
+
 - [~] **105.** Let users define programmable dynamic hotstrings on Windows,
   macOS and Linux, separately from the ordinary hotstrings editor. Provide
   a documented user-code entry point under "Dynamic hotstrings", examples
