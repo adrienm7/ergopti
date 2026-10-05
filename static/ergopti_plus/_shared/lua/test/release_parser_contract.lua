@@ -4,7 +4,7 @@
 --- MODULE: Shared Lua Release Metadata Contract
 --- DESCRIPTION:
 --- Pins selected-object metadata, tag-wrapper order and established CR removal.
---- Windows still scans raw tag fields and has historical notes wrapper/CR
+--- Windows still scans raw tag and publication-time fields and has historical notes wrapper/CR
 --- differences. Universal notes escapes remain in the cross-driver corpus;
 --- this owner pins the Lua metadata contract without hiding those differences.
 --- ==============================================================================
@@ -126,6 +126,69 @@ local TAGS = {
 		expected = "α" },
 }
 
+local PUBLISHED = {
+	{ id = "escaped_digit",
+		body = "{\"published_at\":\"2026-10-0\\u0031T00:00:00Z\"}",
+		expected = "2026-10-01T00:00:00Z" },
+	{ id = "escaped_key",
+		body = "{\"published_\\u0061t\":\"2026-10-01T00:00:00Z\"}",
+		expected = "2026-10-01T00:00:00Z" },
+	{ id = "nested_time_not_release",
+		body = "{\"author\":{\"published_at\":\"2026-09-29T00:00:00Z\"},\"published_at\":\"2026-10-01T00:00:00Z\"}",
+		expected = "2026-10-01T00:00:00Z" },
+	{ id = "nested_only",
+		body = "{\"author\":{\"published_at\":\"2026-09-29T00:00:00Z\"}}",
+		expected = "" },
+	{ id = "number_field",
+		body = "{\"published_at\":123}",
+		expected = "" },
+	{ id = "boolean_field",
+		body = "{\"published_at\":true}",
+		expected = "" },
+	{ id = "null_field",
+		body = "{\"published_at\":null}",
+		expected = "" },
+	{ id = "object_field",
+		body = "{\"published_at\":{\"published_at\":\"2026-09-29T00:00:00Z\"}}",
+		expected = "" },
+	{ id = "array_field",
+		body = "{\"published_at\":[\"2026-09-29T00:00:00Z\"]}",
+		expected = "" },
+	{ id = "object_only_wrapper",
+		body = "[{\"published_at\":\"2026-09-29T00:00:00Z\"}]",
+		expected = "" },
+	{ id = "null_release",
+		body = "null",
+		expected = "" },
+	{ id = "number_release",
+		body = "123",
+		expected = "" },
+	{ id = "malformed_trailing",
+		body = "{\"published_at\":\"2026-10-01T00:00:00Z\"} trailing",
+		expected = "" },
+	{ id = "malformed_delimiter",
+		body = "{\"published_at\":\"2026-10-01T00:00:00Z\"",
+		expected = "" },
+	{ id = "literal_escape_retained",
+		body = "{\"published_at\":\"2026-10-0\\\\u0031T00:00:00Z\"}",
+		expected = "2026-10-0\\u0031T00:00:00Z" },
+	{ id = "date_policy_unchanged",
+		body = "{\"published_at\":\"not a timestamp\"}",
+		expected = "not a timestamp" },
+	{ id = "offset_identity",
+		body = "{\"published_at\":\"2026-10-01T00:00:00+01:00\"}",
+		expected = "2026-10-01T00:00:00+01:00" },
+	{ id = "whitespace_identity",
+		body = "{\"published_at\":\" 2026-10-01T00:00:00Z \"}",
+		expected = " 2026-10-01T00:00:00Z " },
+	{ id = "unicode_identity",
+		body = "{\"published_at\":\"\\u03b1\"}",
+		expected = "α" },
+	{ id = "empty_field",
+		body = "{\"published_at\":\"\"}",
+		expected = "" },
+}
+
 --- Registers the shared Lua object and normalization contract in a driver suite.
 --- @param helpers table Case registration and assertions.
 --- @param Parser table Actual shared release parser under test.
@@ -159,6 +222,22 @@ function M.run(helpers, Parser)
 		for _, row in ipairs(TAGS) do
 			helpers.it("parse_tag: " .. row.id, function()
 				helpers.assert_eq(Parser.parse_tag(row.body), row.expected, row.id)
+			end)
+		end
+	end)
+	helpers.describe("shared Lua release publication time contract", function()
+		helpers.it("parse_published_at: refuses nonstring input without changing date validation", function()
+			helpers.assert_eq(#PUBLISHED, 20, "every publication metadata vector is retained")
+			for _, value in ipairs({ false, true, 1, {}, function() end }) do
+				helpers.assert_eq(Parser.parse_published_at(value), "", "release JSON must be a string")
+			end
+			helpers.assert_eq(Parser.parse_published_at(nil), "")
+			helpers.assert_eq(Parser.parse_published_at(""), "")
+			helpers.assert_eq(select("#", Parser.parse_published_at('{"published_at":"not a timestamp"}')), 1)
+		end)
+		for _, row in ipairs(PUBLISHED) do
+			helpers.it("parse_published_at: " .. row.id, function()
+				helpers.assert_eq(Parser.parse_published_at(row.body), row.expected, row.id)
 			end)
 		end
 	end)

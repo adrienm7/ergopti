@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: GitHub Release JSON Parser (Shared)
 --- DESCRIPTION:
---- Pure functions for parsing GitHub Releases API JSON payloads. Tags, assets
---- and notes use the shared JSON decoder to preserve metadata boundaries. Extracted
+--- Pure functions for parsing GitHub Releases API JSON payloads. Tags, assets,
+--- notes and publication times decode JSON to preserve metadata boundaries. Extracted
 --- from macos/infra/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
 --- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
@@ -86,12 +86,15 @@ function M.parse_html_url(body)
 end
 
 
---- Extracts the "published_at" ISO-8601 timestamp from a release object.
---- @param body string Raw JSON
+--- Extracts the selected release object's own "published_at" string.
+--- JSON escapes decode once; timestamp validation remains with its consumers.
+--- @param body string Raw single-release JSON object.
 --- @return string timestamp or ""
 function M.parse_published_at(body)
-	if not body or body == "" then return "" end
-	return body:match('"published_at"%s*:%s*"([^"]+)"') or ""
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" then return "" end
+	return type(release.published_at) == "string" and release.published_at or ""
 end
 
 

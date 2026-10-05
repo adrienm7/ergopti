@@ -1516,6 +1516,26 @@ These are software implementations; final hardware verification remains below.
   runtime gates remain deferred. Physical selection and reserved surfaces stay
   unmodified.
 
+- [~] **L107.** Shared release publication-time decoding: read the selected
+  object's own string through the existing JSON decoder. Equivalent escaped
+  timestamps could falsely announce an older dev release, hide a newer release
+  or leave encoded bytes in offered/cache metadata; nested timestamps could
+  replace the release's own date. Preserve existing date/version/channel rules,
+  exact decoded identity and the selected-object contract; do not normalize dates
+  or add wrapper selection. Twelve real verified TLS/public Linux updater checks
+  have six original failures and pass after on current LuaJIT, stock Lua 5.4 and
+  signed Ubuntu 22.04 dependencies. Retain ordinary older/equal/newer notices,
+  same-channel up-to-date, typed refusal, exact complete response/callback/native
+  settlement and cache controls; no artifact is fetched or installed. Twenty
+  shared Lua vectors plus one typed/single-return case retain all earlier
+  assertions: 115 focused checks have eleven original failures and pass after.
+  All six other parser helpers remain byte-identical. Register both native
+  interpreters for future Linux CI without launching it. macOS production checks
+  use the corrected shared classification helper; Windows has the same raw-regex
+  issue by source, with a bounded proposal but no foreign implementation change.
+  Foreign runtime gates remain deferred. Depends on L104's shared tag decoding;
+  no timestamp policy, transport, frontend or reserved surface is changed.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
