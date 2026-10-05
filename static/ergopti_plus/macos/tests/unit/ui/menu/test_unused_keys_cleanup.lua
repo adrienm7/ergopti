@@ -721,3 +721,16 @@ helpers.with_stub_scope(MODULES, function()
 		end)
 	end)
 end)
+
+helpers.with_stub_scope(MODULES, function()
+	package.loaded["adapters.storage"] = {
+		get = function() end, set = function() return true end,
+		delete = function() return true end, keys = function() return {} end,
+	}
+	package.loaded["adapters.file_system"] = IoAdapter
+	local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
+	require("test.config_cleanup_roots_contract").register(helpers, {
+		driver = "macos", collect = cleanup.collect, file_adapter = IoAdapter,
+		find = function(path) return cleanup.find(path, IoAdapter) end,
+	})
+end)
