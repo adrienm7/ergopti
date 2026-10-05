@@ -1744,6 +1744,17 @@ on this Linux host; native CI and packaging/installation remain required. Shared
 record writes still need qualification of top-level future fields and
 default-decoder null/array identity; this prerequisite does not complete TODO33.
 
+The frozen macOS Boolean-leaf packet is now applied to the current feature
+source. Unusable tap_holds.enabled and mod_combos.symmetric values retain their
+complete scalar, array or inline-table models during unrelated saves, with one
+warning per file/path/reason. An implicit non-neutral replacement refuses before
+publication until explicit source repair. All 28 independent real-file controls
+pass; the exact source preimage matches the reviewed packet. Selected formatting,
+356 JS checks, 14,030 portable macOS unit cases and macOS E2E (101 passed, one
+host-specific skip) pass. Hosted native qualification remains required. This is
+a bounded TODO33 correction, not completion of its remaining domains or physical
+checks.
+
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] Run the native installed-record/member-span cases in test_layout_catalogue.ahk and test_json_object_key_nul.ahk: usable neighbors, warning-once, exact obsolete/future preservation, case identity, native NUL-path refusal, stale-source refusal and install/uninstall.

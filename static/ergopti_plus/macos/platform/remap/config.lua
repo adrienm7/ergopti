@@ -59,14 +59,38 @@ local function timing_leaf(section, key, default, path, section_name)
 	return default, true
 end
 
+--- Reads one Boolean leaf without treating obsolete data as a file failure.
+--- @return boolean|nil value Its owning default when the source is obsolete.
+--- @return boolean outdated
+local function boolean_leaf(section, key, default, path, section_name, detail)
+	if section[key] == nil then return default, false end
+	if type(section[key]) == "boolean" then return section[key], false end
+	Outdated.report_in_file(path, { section_name, key }, detail, Logger)
+	return default, true
+end
+
 --- Reads the combination switch; its absent state keeps combinations on.
 --- @return boolean|nil value
 --- @return boolean outdated
 local function combinations_enabled(section, path)
-	if section.enabled == nil or type(section.enabled) == "boolean" then return section.enabled, false end
-	Outdated.report_in_file(path, { "mod_combos", "enabled" },
-		"a combination switch is boolean; its absent state is used", Logger)
-	return nil, true
+	return boolean_leaf(section, "enabled", nil, path, "mod_combos",
+		"a combination switch is boolean; its absent state is used")
+end
+
+--- Reads the tap-hold switch with its manifest-owned neutral value.
+--- @return boolean value
+--- @return boolean outdated
+local function tap_holds_switch(section, path)
+	return boolean_leaf(section, "enabled", Manifest.default_for("tap_holds.enabled"), path, "tap_holds",
+		"a tap-hold switch is boolean; the neutral state is used")
+end
+
+--- Reads combination symmetry with its shared native default.
+--- @return boolean value
+--- @return boolean outdated
+local function combinations_symmetric(section, path)
+	return boolean_leaf(section, "symmetric", COMBO_SYMMETRIC_DEFAULT, path, "mod_combos",
+		"a combination symmetry switch is boolean; the canonical default is used")
 end
 
 --- « Ergopti uses Karabiner »: `[karabiner] integration_enabled` in
@@ -575,11 +599,10 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local simultaneous_ms = timing(combos, "simultaneous_threshold_ms", SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
 		"mod_combos.simultaneous_threshold_ms")
 
-	local combo_symmetric = COMBO_SYMMETRIC_DEFAULT
-	if combos.symmetric ~= nil then combo_symmetric = combos.symmetric == true end
+	local combo_symmetric = combinations_symmetric(combos, user_config_path)
 
 	-- Absence is neutral even when other explicit remap preferences are present.
-	local tap_holds_enabled = tap_holds.enabled == true
+	local tap_holds_enabled = tap_holds_switch(tap_holds, user_config_path)
 
 	-- The key-combinations switch stays absent until the user sets it: absent,
 	-- the combinations are on (Generator.key_combinations_enabled).
@@ -676,6 +699,17 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			end
 			assign(target, key, value, neutral)
 		end
+		local function assign_boolean(target, section, key, value, neutral, classify)
+			local _, outdated = classify(target, user_config_path)
+			if not overwrite_corrupt and outdated then
+				if value ~= neutral then
+					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
+					error(candidate_refusal, 0)
+				end
+				return
+			end
+			assign(target, key, value, neutral)
+		end
 		local function merge_bindings(target, updates, fields, section)
 			for id, values in pairs(updates or {}) do
 				assert(type(id) == "string" and type(values) == "table", "invalid remap binding candidate")
@@ -713,7 +747,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
 		local tap_holds = table_at(document, "tap_holds")
-		assign(tap_holds, "enabled", state.tap_holds_enabled, Manifest.default_for("tap_holds.enabled"))
+		assign_boolean(tap_holds, "tap_holds", "enabled", state.tap_holds_enabled,
+			Manifest.default_for("tap_holds.enabled"), tap_holds_switch)
 		assign_timing(tap_holds, "tap_holds", "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
 		assign_timing(tap_holds, "tap_holds", "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
 		merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, "tap_holds")
@@ -729,7 +764,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			mod_combos.enabled = state.mod_combos_enabled
 		end
 		assign_timing(mod_combos, "mod_combos", "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
-		assign(mod_combos, "symmetric", state.combo_symmetric, COMBO_SYMMETRIC_DEFAULT)
+		assign_boolean(mod_combos, "mod_combos", "symmetric", state.combo_symmetric,
+			COMBO_SYMMETRIC_DEFAULT, combinations_symmetric)
 		merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" }, "mod_combos")
 		if next(tap_holds.config) == nil then tap_holds.config = nil end
 		if next(mod_combos.config) == nil then mod_combos.config = nil end
