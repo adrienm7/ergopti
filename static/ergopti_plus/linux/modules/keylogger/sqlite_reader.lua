@@ -64,10 +64,19 @@ local function read_rows(sqlite_path, sql)
 		return {}
 	end
 	if body == "" then return {} end
-	local ok, rows = pcall(Json.decode, body)
+	local ok, rows = pcall(Json.decode_lossless, body)
 	if not ok or type(rows) ~= "table" then
 		Logger.warn(LOG, "SQLite read returned invalid JSON; dashboard projection skipped.")
 		return {}
+	end
+	-- SQLite emits scalar object fields, with null for absent SQL values. The
+	-- legacy decoder represents null as an ordinary empty table, which defeats
+	-- numeric defaults and publishes optional extrema as {}. Only the explicit
+	-- lossless token is absent here; inner JSON text and array identities survive.
+	for _, row in ipairs(rows) do
+		for column, value in pairs(row) do
+			if Json.is_null(value) then row[column] = nil end
+		end
 	end
 	return rows
 end
