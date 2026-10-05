@@ -81,30 +81,92 @@ _AHK04M_AllDispatchCallersConsumeTheVerdict() {
 		"partial native replay callbacks must remain ordered behind visible suffixes")
 }
 
+/** Checks the actual asynchronous completion owner separately from keyboard dispatch. */
+_AHK04M_NativeCommitPolicy(Commit := unset, Finish := unset, Complete := unset) {
+	_NHAB_AssertNativeRoute()
+	if !IsSet(Commit)
+		Commit := _DriverFuncBody("_HSE_CommitNotepadOwner")
+	if !IsSet(Finish)
+		Finish := _DriverFuncBody("_HSE_FinishNotepadCommit")
+	if !IsSet(Complete)
+		Complete := _DriverFuncBody("_HSE_CompleteNotepadOwner")
+	Assert(Commit != "" && Finish != "" && Complete != "", "native commit and completion owners must exist")
+	Code := _DriverMaskNonCode(&Commit)
+	CriticalGuard := InStr(Code, "if !A_IsCritical")
+	OwnerGuard := InStr(Code, "if _HSE_TerminalOwner != Owner")
+	ContextGuard := InStr(Code, "if A_IsSuspended || HSE_Buffer != Owner[")
+	Mutation := InStr(Code, "HSE_Buffer := SubStr(HSE_Buffer,")
+	Mirror := InStr(Code, "_HSE_MirrorCanonicalEffectToLlm(Effect)")
+	Assert(CriticalGuard > 0 && OwnerGuard > CriticalGuard && ContextGuard > OwnerGuard && Mutation > ContextGuard,
+		"native canonical mutation must retain Critical, exact owner and original context guards")
+	Assert(Mirror > Mutation, "native canonical mirroring follows the admitted engine edit")
+	Assert(RegExMatch(Code, "i)Owner\[\s*\]\s*:=\s*true", &ClaimCode),
+		"native commit must claim the verified canonical effect")
+	Claim := ClaimCode.Pos
+	Assert(RegExMatch(SubStr(Commit, Claim), 'i)^Owner\["Committed"\]\s*:=\s*true'),
+		"the canonical claim must belong to the actual Committed field")
+	Finalizer := InStr(Code, "return _HSE_FinishNotepadCommit.Bind(Owner)")
+	Assert(Claim > Mirror && Finalizer > Claim, "native commit claims its effect before returning presentation")
+	FinishCode := _DriverMaskNonCode(&Finish)
+	Fire := InStr(FinishCode, "_HSE_QueueFireLog(")
+	Assert(RegExMatch(FinishCode, "i)Owner\[\s*\]\s*:=\s*true", &FinishClaim),
+		"native fire finalizer must contain its actual once-only claim")
+	Assert(RegExMatch(SubStr(Finish, FinishClaim.Pos), 'i)^Owner\["FinalizerClaimed"\]\s*:=\s*true'),
+		"the finalizer claim belongs to the real FinalizerClaimed field")
+	Assert(Fire > 0 && FinishClaim.Pos > 0 && FinishClaim.Pos < Fire,
+		"native fire metrics must be claimed once by the post-commit finalizer")
+	CompleteCode := _DriverMaskNonCode(&Complete)
+	Assert(RegExMatch(CompleteCode, "i)Owner\[\s*\]\s*:=\s*\(Ok\s+is\s+Integer\)\s*&&\s*Ok\s*==\s*true\s*&&\s*Owner\[\s*\]", &Success),
+		"native completion requires a typed sender and canonical commit")
+	Assert(RegExMatch(SubStr(Complete, Success.Pos), 'i)^Owner\["FinalSucceeded"\]\s*:=\s*\(Ok\s+is\s+Integer\)\s*&&\s*Ok\s*==\s*true\s*&&\s*Owner\["Committed"\]'),
+		"the actual final success field must consume the canonical Committed receipt")
+	Assert(!RegExMatch(CompleteCode, "i)\b(?:HSE_ApplyExpansion|_HSE_QueueFireLog)\s*\("),
+		"native completion cannot apply an effect or publish a fire from pending admission")
+}
+
 _AHK04M_NormalDispatchCommitsAfterOutput() {
 	Body := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
 	Assert(Body != "", "HSE_DispatchMatch must exist in the driver source")
-	; Both branches run their sender inside _HSE_SendWithAltGrUp (the Kana AltGr
-	; owner) and publish Fired from the verdict it returns.
-	NotepadSend := InStr(Body, "Fired := _HSE_SendWithAltGrUp(")
-	NotepadSend := (NotepadSend > 0 and InStr(Body, "() => SendInstant(", , NotepadSend) > NotepadSend) ? NotepadSend : 0
+	_AHK04M_NativeCommitPolicy()
+	; The native branch returns its receipt; the atomic keyboard branch alone
+	; publishes Fired inline from its owned AltGr lift and sender verdict.
+	Branch := _NHAB_NativeBranch(Body)
+	BranchCode := _DriverMaskNonCode(&Branch)
+	Assert(!RegExMatch(BranchCode, "i)\b(?:HSE_ApplyExpansion|_HSE_QueueFireLog|_HSE_SendWithAltGrUp)\s*\("),
+		"native scheduling cannot publish a fire or lift a keyboard modifier")
 	HookVerdict := InStr(Body, 'return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))')
 	AtomicSend := InStr(Body, "SendInput(Burst)")
 	DirectVerdict := InStr(Body, "return true", , AtomicSend)
 	DirectCommit := InStr(Body, "Fired := _HSE_SendWithAltGrUp(SendAtomicBurst)", , DirectVerdict)
 	Apply := InStr(Body, "HSE_ApplyExpansion")
-	Assert(NotepadSend > 0 and HookVerdict > 0 and AtomicSend > HookVerdict
-		and DirectVerdict > AtomicSend and DirectCommit > DirectVerdict,
-		"both normal fire branches must publish success only after their atomic sender succeeds")
-	Assert(Apply > NotepadSend and Apply > AtomicSend,
-		"HSE_ApplyExpansion must run only after the selected output branch succeeds")
+	Assert(HookVerdict > 0 && AtomicSend > HookVerdict && DirectVerdict > AtomicSend && DirectCommit > DirectVerdict,
+		"both atomic sender implementations must publish success only after their sender succeeds")
+	Assert(Apply > AtomicSend && Apply > DirectCommit, "inline HSE expansion must follow the proven atomic sender verdict")
 	Assert(_AHK04M_Count(Body, "if !Fired") >= 2,
-		"both Notepad and atomic branches must abort on failed output")
+		"terminal and atomic keyboard dispatch must abort on failed output")
 	Assert(InStr(Body, "if (!TerminalOwnershipTransferred and Fired and IsSet(_ResetPrefixBuffer))") > 0,
-		"the preview reset must be gated on output success")
+		"the preview reset remains gated on inline success outside transferred ownership")
 	Assert(InStr(Body, "catch as Err", , AtomicSend) > AtomicSend,
-		"the direct atomic SendInput path must convert an OS exception into a failed transaction")
+		"the direct atomic SendInput path converts an OS exception into a failed transaction")
 }
+
+_AHK04M_NativePolicyRefusesMissingCommitGuard() {
+	Commit := _DriverFuncBody("_HSE_CommitNotepadOwner")
+	_AHK04M_NativeCommitPolicy(Commit)
+	Bad := StrReplace(Commit, "if _HSE_TerminalOwner != Owner", "if false", true, &Changed)
+	AssertEqual(1, Changed, "the inverse removes exactly the actual native owner admission guard")
+	Refused := false
+	try _AHK04M_NativeCommitPolicy(Bad)
+	catch as Err {
+		if Type(Err) != "Error" || InStr(Err.Message,
+			"native canonical mutation must retain Critical, exact owner and original context guards", true) != 1
+			throw Err
+		Refused := true
+	}
+	AssertTrue(Refused, "the actual policy must reject an ownerless canonical commit")
+}
+Test("meta hotstrings: native canonical admission guard cannot be removed (AHK-04-send-transaction)",
+	_AHK04M_NativePolicyRefusesMissingCommitGuard)
 
 _AHK04M_SendInstantPreparesCleanupBeforeInjection() {
 	Body := _StripFullLineComments(_DriverFuncBody("SendInstant"))

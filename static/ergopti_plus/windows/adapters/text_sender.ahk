@@ -18,9 +18,8 @@
 ; CLIPBOARD THRESHOLD:
 ; Payloads longer than TEXT_CLIPBOARD_THRESHOLD characters (1000, matching
 ; TextSender.spec.js) are injected via the clipboard to avoid the overhead
-; of simulating keystrokes for large expansions. In "auto" mode a payload of
-; any length is pasted into an application that garbles typed text (Windows
-; 11's Notepad, see _TextSenderHostTakesTextByPaste).
+; of simulating keystrokes for large expansions. In "auto" mode Windows
+; Notepad uses verified native editor messages at any payload length instead.
 ;
 ; CLIPBOARD DEPENDENCY:
 ; The clipboard path uses CB_SaveAll / CB_Write / CB_RestoreAll from the Clipboard
@@ -33,6 +32,8 @@
 ; Payload length threshold above which TextSend switches to clipboard injection.
 ; Mirrors TextSender.spec.js CLIPBOARD_THRESHOLD = 1000.
 global TEXT_CLIPBOARD_THRESHOLD := 1000
+
+#Include %A_LineFile%\..\..\adapters\editor_replace.ahk
 
 ; Metadata only: never retain document, prediction or clipboard text in a log.
 _TextSenderReadClipboardDiagnosticState() {
@@ -816,10 +817,10 @@ _TextSenderHostTakesTextByPaste() {
 ; path so the interaction is mockable and the driver has one canonical clipboard
 ; code path.
 ; @param Text     {String}   The Unicode text to insert.
-; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto",
-;                              erase_before?: Integer — Backspaces sent first, in
-;                              the same batch; atomic (admission-owned) output only }
-; @param Callback {Func|0}   Called with no arguments on completion.
+; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"native"|"auto",
+;                              erase_before?: Integer — admission-owned deletion;
+;                              deleted_text?: String — exact native deleted suffix }
+; @param Callback {Func|0}   Called with the completion Boolean and error message.
 TextSend(Text, Opts, Callback) {
 	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE
 	Mode := "auto"
@@ -839,11 +840,15 @@ TextSend(Text, Opts, Callback) {
 		return
 	}
 
-	; Resolve "auto" to a concrete strategy: a long payload is pasted, and so is
-	; any payload for an application that garbles typed text.
+	; Notepad uses its verified editor worker; other long payloads use the paste FIFO.
 	if Mode = "auto"
-		Mode := (StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD or _TextSenderHostTakesTextByPaste())
-			? "clipboard" : "direct"
+		Mode := _TextSenderHostTakesTextByPaste() ? "native"
+			: (StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct")
+
+	if Mode = "native" {
+		_TextSenderQueueNative(Text, Opts, Callback)
+		return
+	}
 
 	if Mode = "clipboard" {
 		; The clipboard round-trip (write + blocking ClipWait + paste) is deferred

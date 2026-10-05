@@ -78,7 +78,8 @@ _HS_RegisterAutocorrection() {
 		; expands "..." → "…" only after a letter (otherwise it breaks code like the JS
 		; spread « [...a, ...b] ») and returns a { Bs, Ins } effect for buffer resync.
 		CreateRawCallbackHotstring("*?", "...", _EllipsisRawCallback,
-			Map("Category", "french_autocorrection", "Section", "multiple_punctuation_marks"))
+			Map("Category", "french_autocorrection", "Section", "multiple_punctuation_marks",
+				"SupportsPreparation", true))
 	}
 
 	if Features["hotstrings"]["french_autocorrection"]["suffixes_a_chaining"]["enabled"] {

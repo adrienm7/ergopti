@@ -2694,6 +2694,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded() {
 	if !Module
 		throw Error("Navigation owner DLL could not be loaded")
 	Names := [
+		"ErgoptiEditor_Begin", "ErgoptiEditor_Poll",
+		"ErgoptiEditor_Decide", "ErgoptiEditor_Close",
 		"ErgoptiNav_Start", "ErgoptiNav_Stop",
 		"ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
 		"ErgoptiNav_SetSuspended", "ErgoptiNav_CanStop",

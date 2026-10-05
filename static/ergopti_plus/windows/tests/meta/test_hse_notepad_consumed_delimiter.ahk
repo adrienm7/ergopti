@@ -3,22 +3,9 @@
 ; ==============================================================================
 ; MODULE: HSE Notepad Branch Consumed Delimiter Guard
 ; DESCRIPTION:
-; Static source guard for the Notepad clipboard branch of HSE_DispatchMatch in
-; infra/hotstrings/hotstring_engine_main.ahk.
-;
-; ROOT CAUSE ENCODED:
-; The Notepad branch unconditionally sent `SendInstant(Replacement . EndChar)`,
-; ignoring HSE_CONSUMED_DELIMITERS. The atomic branch and HSE_ApplyExpansion
-; both guard with `!InStr(HSE_CONSUMED_DELIMITERS, EndChar)`. Without the same
-; guard, a space (or any other consumed delimiter) was re-injected after the
-; clipboard paste, producing a double-space or spurious character.
-;
-; The fix introduces EndCharEmitted in the Notepad branch with the same guard:
-;   EndCharEmitted := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar))
-;                     ? EndChar : ""
-; and uses `Replacement . EndCharEmitted` in the SendInstant call and SentBurst
-; trace. This test asserts that the guard is present and the bare unguarded form
-; does not appear in the Notepad branch.
+; Consumption is resolved once before dispatch branches. The native edit owner
+; must retain that filtered literal and must not re-emit a consumed delimiter.
+; This guards F30 after asynchronous receiving replaced the clipboard strategy.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -30,21 +17,8 @@
 ; ===========================================================
 ; ===========================================================
 
-; Extracts the Notepad branch body from HSE_DispatchMatch: the block that starts
-; with `if IsNotepadApp {` and ends at the matching closing brace before `} else {`.
-_THNCD_ExtractNotepadBranch(Src) {
-	; Locate the Notepad branch opener
-	Marker := "if IsNotepadApp {"
-	StartIdx := InStr(Src, Marker)
-	if !StartIdx
-		return ""
-	; The Notepad block ends at the `} else {` that immediately follows it.
-	ElseMarker := "} else {"
-	ElseIdx := InStr(Src, ElseMarker, , StartIdx)
-	if !ElseIdx
-		return SubStr(Src, StartIdx)
-	return SubStr(Src, StartIdx, ElseIdx - StartIdx + StrLen(ElseMarker))
-}
+; Native output receives the shared consumption decision before owner creation.
+
 
 
 ; =========================================================
@@ -54,25 +28,25 @@ _THNCD_ExtractNotepadBranch(Src) {
 ; =========================================================
 
 _THNCD_NotepadBranchHasConsumedDelimiterGuard() {
-	Src := _DriverDirConcat("infra/hotstrings")
-	Assert(Src != "", "infra/hotstrings/hotstring_engine_main.ahk must be readable")
-
-	Branch := _THNCD_ExtractNotepadBranch(Src)
-	Assert(Branch != "", "Notepad branch (if IsNotepadApp) must exist in HSE_DispatchMatch")
-
-	; The consumed-delimiter guard must be present in the Notepad branch so a
-	; consumed end-char (e.g. Space) is not re-injected after the clipboard paste.
-	Assert(InStr(Branch, "HSE_CONSUMED_DELIMITERS") > 0,
-		"Notepad branch must contain HSE_CONSUMED_DELIMITERS guard (F30: re-emit consumed end-char fix)")
-
-	; The guard variable computed from the consumed-delimiter check must be used
-	; in place of the bare EndChar in the SendInstant call.
-	Assert(InStr(Branch, "EndCharEmitted") > 0,
-		"Notepad branch must use EndCharEmitted (consumed-delimiter-aware) instead of bare EndChar")
-
-	; The bare unguarded form must NOT appear anywhere in the Notepad branch;
-	; its presence would mean the guard was added but the call site was not updated.
-	Assert(!InStr(Branch, "SendInstant(Replacement . EndChar)"),
-		"Notepad branch must NOT contain bare SendInstant(Replacement . EndChar) — use EndCharEmitted instead")
+	_NHAB_AssertNativeRoute()
+	Dispatch := _DriverFuncBody("HSE_DispatchMatch")
+	Constructor := _DriverFuncBody("_HSE_NewNotepadOwner")
+	Assert(Dispatch != "" && Constructor != "", "native delimiter owners must exist")
+	Code := _DriverMaskNonCode(&Dispatch)
+	Assert(RegExMatch(Code, "i)\bEndCharPart\s*:=([^\n]*(?:\n[^\n]*)?)", &Assignment),
+		"dispatch must derive the shared emitted delimiter")
+	Branch := _NHAB_NativeBranch(Dispatch)
+	BranchCode := _DriverMaskNonCode(&Branch)
+	Assert(RegExMatch(Assignment[1], "i)!ForceConsumeEndChar[\s\S]*!InStr\(HSE_CONSUMED_DELIMITERS,\s*EndChar\)"),
+		"the shared delimiter must honor both explicit consumption authorities")
+	Assert(Assignment.Pos < InStr(Code, "if IsNotepadApp {"),
+		"delimiter consumption must be resolved before the native branch")
+	Assert(RegExMatch(BranchCode, "i)_HSE_NewNotepadOwner\(\s*Spec,\s*Replacement,\s*EndCharPart,"),
+		"native output must receive the centrally filtered delimiter")
+	ConstructorCode := _DriverMaskNonCode(&Constructor)
+	Assert(RegExMatch(ConstructorCode, "i)Replacement\s*\.\s*EndCharPart"),
+		"the native owner must retain replacement plus the filtered delimiter")
+	AssertContains(Constructor, '"PlainInsertedText", Replacement . EndCharPart',
+		"the visible literal field must bind that filtered delimiter")
 }
 Test("hotstring_engine_main: Notepad branch guards EndChar against HSE_CONSUMED_DELIMITERS (F30)", _THNCD_NotepadBranchHasConsumedDelimiterGuard)

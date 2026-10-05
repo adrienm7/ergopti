@@ -38,37 +38,24 @@ Test("hotstrings: atomic-branch ring records the emitted end-char, not the raw E
 ; ===================================================================
 ; ===================================================================
 
-; Extracts the Notepad branch body from HSE_DispatchMatch: the block that
-; starts with `if IsNotepadApp {` and ends at the matching `} else {` that
-; opens the atomic branch. Mirrors _THNCD_ExtractNotepadBranch in
-; tests/meta/test_hse_notepad_consumed_delimiter.ahk.
-_HCER_ExtractNotepadBranch(Src) {
-	Marker := "if IsNotepadApp {"
-	StartIdx := InStr(Src, Marker)
-	if !StartIdx
-		return ""
-	ElseMarker := "} else {"
-	ElseIdx := InStr(Src, ElseMarker, , StartIdx)
-	if !ElseIdx
-		return SubStr(Src, StartIdx)
-	return SubStr(Src, StartIdx, ElseIdx - StartIdx + StrLen(ElseMarker))
-}
+; Native completion records the actual committed scalar tail, never erase syntax.
+
 
 _HCER_AssertNotepadBranchDoesNotCorruptRing() {
-	Src := _DriverSourceConcat()
-	Branch := _HCER_ExtractNotepadBranch(Src)
-	Assert(Branch != "", "HSE_DispatchMatch's Notepad branch (if IsNotepadApp) must exist")
-
-    ; The erase is now part of SendInstant's one SendInput transaction. It must
-    ; never pass through SendNewResult, whose normal ring update would record the
-    ; control sequence's trailing "}" instead of a character visible in Notepad.
-    Assert(InStr(Branch, "SendNewResult(BackSpaceSeq") = 0,
-        "Notepad branch must not send BackSpaceSeq through SendNewResult; SendInstant owns the atomic erase+paste transaction (F8)")
-
-	; The REAL emitted text (the clipboard paste) must feed the ring explicitly,
-	; mirroring the atomic branch's UpdateLastSentCharacter(SubStr(EndCharPart ...))
-	; call right after its SendInput burst.
-	Assert(InStr(Branch, "UpdateLastSentCharacter(SubStr(EndCharEmitted") > 0,
-		"Notepad branch must call UpdateLastSentCharacter with the real emitted text (EndCharEmitted / Replacement) after the paste, mirroring the atomic branch (F8)")
+	_NHAB_AssertNativeRoute()
+	Commit := _DriverFuncBody("_HSE_CommitNotepadOwner")
+	Assert(Commit != "", "native Notepad canonical commit must exist")
+	Code := _DriverMaskNonCode(&Commit)
+	Assert(RegExMatch(Code, "im)^\s*InsertedText\s*:=\s*Owner\[", &Load),
+		"native ring commit must load its owned inserted text")
+	Assert(RegExMatch(SubStr(Commit, Load.Pos), 'i)^\s*InsertedText\s*:=\s*Owner\["PlainInsertedText"\]'),
+		"native ring commit must load the exact visible literal, not a control sequence")
+	Guard := InStr(Code, "if !A_IsCritical")
+	Mirror := InStr(Code, "_HSE_MirrorCanonicalEffectToLlm(Effect)")
+	Ring := InStr(Code, "UpdateLastSentCharacter(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)))")
+	Assert(Guard > 0 && Load.Pos > Guard && Mirror > Load.Pos && Ring > Mirror,
+		"native Notepad ring must commit the scalar tail after its canonical mirror under Critical")
+	Assert(!RegExMatch(Code, "i)\bSendNewResult\s*\("),
+		"native Notepad ring commit must not send an erase control sequence")
 }
 Test("hotstrings: Notepad branch does not corrupt the last-sent ring with the backspace sequence (F8)", _HCER_AssertNotepadBranchDoesNotCorruptRing)

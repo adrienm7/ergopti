@@ -1,0 +1,66 @@
+{
+	"historical_artifacts": [
+		{
+			"original_name": "receipt.json",
+			"retained_name": "receipt.json",
+			"original_sha256": "23637f79b6657338eb6fa4bb323b7687d0c18a3c5df86183442cdb81155c9fbd",
+			"retained_sha256": "69f4cb22e10dc8a59371369de3284becfcefa5dcaf3872f1ab22b8a3ecb92c95",
+			"normalization": "JSON whitespace only (repository Prettier); measured fields unchanged"
+		},
+		{
+			"original_name": "qualification.json",
+			"retained_name": "qualification.json",
+			"original_sha256": "a5694c797f313e3164ec4b3773ad9348963279f8d6c4e45190bbe176815a53db",
+			"retained_sha256": "41f850b46232dc29b3c82cff3b94ed43f9878faedda4a92272c4a5bc5b5ec0b9",
+			"normalization": "JSON whitespace only (repository Prettier); measured fields unchanged"
+		},
+		{
+			"original_name": "stdout.log",
+			"retained_name": "stdout.txt",
+			"original_sha256": "5f701d88605347526ff198692cfa8c2458804f9a3d16731d7532accc26a3f804",
+			"retained_sha256": "5f701d88605347526ff198692cfa8c2458804f9a3d16731d7532accc26a3f804",
+			"normalization": "CRLF to LF only"
+		},
+		{
+			"original_name": "stderr.log",
+			"retained_name": "stderr.txt",
+			"original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"normalization": "byte-exact"
+		},
+		{
+			"original_name": "source-before.json",
+			"retained_name": "source-before.json",
+			"original_sha256": "b098f4b8eb0f5afb8d956d911c40724a67d567a05f9f7e08ecaa134c4c2b3ba4",
+			"retained_sha256": "2859d25172ccde28e645011ddc6a3e501319fa0d29729e5c7b521c7d8ca18c3c",
+			"normalization": "JSON whitespace only (repository Prettier); measured fields unchanged"
+		}
+	],
+	"source_after_sha256": "16a961eb8e23dfe1e0da2fc86e31da0e41a60d254028e0bf2b72079f19d71b97",
+	"source_before_after_all_268_equal": true,
+	"original_full_probe_sha256": "d8b858080fad6b4c9e858b0aa5d5855d0bad68862f8b537e150431c60d447a27",
+	"current_diagnostic_function_provenance": "../../../../../tools/diagnostics/notepad-callers.ahk retains eighteen exercised functions byte-exact; ProbeCheckOwner and CallerMain additionally fence the exclusive document nonce and title. Unused standalone probes and hardcoded include list removed.",
+	"limits": "Historical V8 observation. Current tracked entry has separate six-case receiving qualification recorded in the adjacent report; physical InputHook and startup are not implied.",
+	"historical_function_sha256": {
+		"CallerFatal": "430ad556de6942290acef81eecf6678494751eefaaec7f63936ec1878606e51d",
+		"ProbeCheckOwner": "1de1c2f5273fbb09b8bbf96b0ef09d95650cbdf6f7d8469dfc63481194762302",
+		"ProbeSend": "008af880b33de28d9933554b85bfdb51e86bb56dbf3c1c5381d32847e893e7e0",
+		"ProbeSelection": "c7e22f4e319d1d2bc706336cefbb5859b314290adeb1011214a288bfd8dca275",
+		"ProbeSelect": "f76202890c8529fbbbe0a728b4ae84dbc3a22b482ee3a82bb479ae7fffb16f11",
+		"ProbeReplace": "866de3283acf2e3742203a65b23d657aad881257654c910d033fe7799afb98e7",
+		"ProbeRead": "86ab548356c8a7bec94a9739d80b2ff6e63625915fe8ab805dcddb204e565ebf",
+		"CoordinateSnapshot": "26cc2b673a3d94f603339e6f4f97f42a48a94948d345b0cb8436e886d5f33c0c",
+		"CoordinateReset": "b87736794368cf42bfe89bfc11018ac2c36c24ae2a5e2784c33e2ec19f2b5ebd",
+		"WorkerFocus": "1eab831a750cb8c2327d68081b66a668c51f527ee93cc4da249759d9858e0547",
+		"CallerNativeBegin": "4de86d0fe5e5cba029de6619530232d68dfd01877b1e0e32f4a76fde01cf8cf1",
+		"CallerNativePoll": "d596578fbb50de9082222182aa58f983c8f9f516a6d65407769b5d7a577b060c",
+		"CallerNativeClose": "9f1110ae977481de254dddc513364821c62db044f4e7bbdc86590821cdaccb1e",
+		"CallerWait": "c91b5e84d81c0915323679905139146c535fbe7e0f8ff6867ee27f3fa0c4cfcb",
+		"CallerConfigureHost": "1e17975f76c673b01f0ae3620a02718b596b4b3588d4be8373ea2d16d4821903",
+		"CallerSeed": "3816a0d4b2835fc8bf34168d17974e2391f4523714815d69d375b1ac24ccc19d",
+		"CallerAssertDocument": "6059c6585d56c685a502d38591f5d65bb14ada1310a7676de4cb9487ce6b73e9",
+		"CallerLlm": "4e910a93d1a782f868ce7c2aab1743676d0c276ba8b0d720710ddc7f863727b8",
+		"CallerHse": "1ddcac1c574264ea1bedca1e8b56bb0c4e4efa1ed0c7e15aa4b984d74a3e0739",
+		"CallerMain": "780c9346be2801bfd2bf2ea249663aca210b02816153e72c920fecd504d9df4b"
+	}
+}
