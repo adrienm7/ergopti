@@ -1,9 +1,11 @@
 # Configuration and menus: partial dev delivery
 
-The maintainer requested a rapid partial no-squash integration. Merge
-`a550193ebc31aa819c369f701a61ebed72d86216` is pushed to dev and contains the
+The maintainer requested a rapid partial no-squash integration. Merges
+`a550193ebc31aa819c369f701a61ebed72d86216` and
+`c8e4434a0a1f0e321897621621d8024f27558431` are pushed to dev. They contain the
 configuration continuation, complete shared Tap-Hold key head, native Linux
-fixture corrections and the two translated PulseAudio dependency packages.
+fixture corrections, the two translated PulseAudio dependency packages and
+the reviewed native fixture qualification successors.
 Items 5, 7, 33, 42, 54 and 81 remain partial. No item was removed. Items 16/38
 retain their complete validation requirements.
 
@@ -45,7 +47,44 @@ tree-identical to source `709dc545e902682e8d4e287b8a3ce56000a7d6ec`, with
   deliberately unselected Linux lane, and Release / Publish.
 - Not executed: installed-device wizard/tray/input/restart acceptance.
 
-This source checkpoint does not replace qualification after final integration.
+This historical source checkpoint does not replace qualification after final
+integration. The final composition preserves the current hotstrings owner's
+stronger metadata seed assertions and new transitive fixture owners; it avoids
+duplicating equivalent JSON escape branches. The only native difference from
+dev `6e6111741` is the three reviewed Windows fixture paths. The final integrated
+manual dispatch therefore selects Windows only, with an exact-tree projection.
+
+## Final integrated qualification
+
+Manual [run37287365425](https://github.com/adrienm7/ergopti/actions/runs/37287365425)
+completed with failure. CI `8221ec5ff188705b61d5ecb1c7998c5f5b1c5520` has exactly
+the tree of integrated dev `c8e4434a0a1f0e321897621621d8024f27558431`.
+The final documentation commit changes no native source, test, build or
+workflow input and does not require another native dispatch.
+
+- Passed: shared JS/properties and 9,218 Windows unit cases.
+- Failed: 50 Windows unit cases. The actual preceding incoming-dev checkpoint
+  `6e6111741`, tested by [run37283538700](https://github.com/adrienm7/ergopti/actions/runs/37283538700),
+  has 9,213 passed and 55 failed, with the same 9,268-case census. Twenty of the
+  twenty-one complete visible failures match that native baseline exactly.
+  This comparison does not establish the cause or identity of all fifty cases.
+- Skipped: Windows engine E2E/package/install, deliberately unselected
+  macOS/Linux lanes, and Release / Publish. No release was published.
+- Not executed: installed-device wizard/tray/input/restart acceptance.
+
+The annotation is truncated during case22; full redirected Azure job logs
+remain unavailable in this environment. Preserve the [raw annotations and
+native baseline comparison](evidence/final-native-baseline-comparison.json).
+Visible failures include six configuration-snapshot cases, legacy Boolean
+admission, personal-file activation/metadata, preview pack enumeration and
+retained hotstring menu ownership. Coordinate those Windows fixes with the
+hotstrings owner. Capture the complete native result file on the workstation;
+do not treat the earlier 9,175/14 fixture checkpoint as the current result.
+
+This delivery is explicitly partial. All source and preparation commits are
+integrated without squash; the feature branch is no longer needed to preserve
+the unfinished work. The existing TODO steps and immutable preparation archives
+remain the continuation authority.
 
 ## Remaining implementation
 
