@@ -16,6 +16,7 @@ local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local BodyPipe = require("infra.http_body_pipe")
 local NativeTimer = require("infra.native_timer")
+local Timings = require("infra.timings")
 local ProcessGroup = require("infra.libuv_process_group")
 local RedirectPolicy = require("infra.http_redirect_policy")
 local HeaderPolicy = require("infra.http_header_policy")
@@ -34,6 +35,7 @@ if not ok_luv then luv = nil end
 
 local DEFAULT_TIMEOUT_MS = 30000
 local DEFAULT_OWNER = "default"
+local CLEANUP_POLL_MS = Timings.ms("llm", "poll_interval_ms")
 local MAX_DIAGNOSTIC_BYTES = 65536
 local STATUS_MARKER = "ERGOPTI_HTTP_STATUS:"
 
@@ -174,12 +176,13 @@ local function close_process(request)
 	if close_handle(request.process, request) or not request.operation then request.process = nil end
 end
 
---- Releases an owned operation only after physical exit and native close ACKs.
+--- Releases only exact physical ownership after group absence and every close ACK.
 --- @param request table
-settle_owned = function(request)
+local function finalize_owned(request)
 	local operation = request.operation
 	if not operation or operation._settled or not request.terminal then return end
 	if request.spawned and not request.exited then return end
+	if not operation._body_cleanup and request.spawned and not request.group_absent then return end
 	if request.body_readfd ~= nil or request.body_writefd ~= nil then return end
 	for _, receipt in pairs(request.handles) do
 		if receipt.state ~= "closed" then return end
@@ -199,19 +202,78 @@ settle_owned = function(request)
 	end
 end
 
---- Retries only this request's exact native handles after a close refusal.
+--- Retains the original timer as a referenced cleanup monitor until its own ACK.
+--- @param request table
+local function arm_owned_cleanup(request)
+	local timer = request.timer
+	local receipt = timer and request.handles[timer]
+	if not receipt or receipt.state ~= "open" or request.cleanup_monitor then return end
+	local ok, accepted, err = pcall(NativeTimer.start, luv, timer,
+		CLEANUP_POLL_MS, CLEANUP_POLL_MS, function()
+			local operation = request.operation
+			if operation._settled or _owned[request.owner] ~= operation then return end
+			retry_owned_cleanup(request)
+		end)
+	request.cleanup_monitor = ok and accepted ~= nil and accepted ~= false and err == nil
+end
+
+--- Retries only the acquired group and captured handles; signal acceptance is not absence.
 --- @param request table
 retry_owned_cleanup = function(request)
+	local operation = request.operation
+	local strong = operation and not operation._body_cleanup
+	if strong then
+		if operation._settled or _owned[request.owner] ~= operation
+			or not request.terminal or request.cleanup_running then return end
+		request.cleanup_running = true
+		if not request.spawned then
+			request.group_absent = true
+		elseif not request.group_absent then
+			local accepted, absent = ProcessGroup.signal(luv, request.pid, 0)
+			if accepted and not absent then
+				ProcessGroup.terminate(luv, request.pid)
+				accepted, absent = ProcessGroup.signal(luv, request.pid, 0)
+			end
+			request.group_absent = absent
+		end
+	end
 	close_body_descriptor(request, "body_readfd")
 	close_body_descriptor(request, "body_writefd")
-	close_timer(request)
+	if not strong then close_timer(request) end
 	close_stream(request, "stdin")
 	close_stream(request, "body_pipe")
 	close_stream(request, "body_reader")
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
 	close_process(request)
-	settle_owned(request)
+	if strong then
+		local ready = (not request.spawned or request.exited) and request.group_absent
+			and request.body_readfd == nil and request.body_writefd == nil
+		for handle, receipt in pairs(request.handles) do
+			if handle ~= request.timer and receipt.state ~= "closed" then ready = false end
+		end
+		if ready then
+			request.cleanup_monitor = false
+			close_timer(request)
+		end
+		-- A refused monitor close has stopped the timer: rearm the same handle,
+		-- never discard its debt or allocate a second physical policy owner.
+		arm_owned_cleanup(request)
+		request.cleanup_running = false
+	end
+	finalize_owned(request)
+end
+
+--- Drives terminal native ACKs without recursively entering synchronous close ports.
+--- @param request table
+settle_owned = function(request)
+	local operation = request.operation
+	if not operation or operation._settled or not request.terminal then return end
+	if not operation._body_cleanup then
+		retry_owned_cleanup(request)
+	else
+		finalize_owned(request)
+	end
 end
 
 --- Publishes one terminal result and makes all stale callbacks inert.
@@ -224,15 +286,19 @@ local function finish(request, result, suppress_callback)
 	request.result = result
 	request.suppress_callback = suppress_callback == true
 	if _active[request.owner] == request then _active[request.owner] = nil end
-	close_body_descriptor(request, "body_readfd")
-	close_body_descriptor(request, "body_writefd")
-	close_timer(request)
-	close_stream(request, "stdin")
-	close_stream(request, "body_pipe")
-	close_stream(request, "body_reader")
-	close_stream(request, "stdout")
-	close_stream(request, "stderr")
-	close_process(request)
+	if request.operation and not request.operation._body_cleanup then
+		retry_owned_cleanup(request)
+	else
+		close_body_descriptor(request, "body_readfd")
+		close_body_descriptor(request, "body_writefd")
+		close_timer(request)
+		close_stream(request, "stdin")
+		close_stream(request, "body_pipe")
+		close_stream(request, "body_reader")
+		close_stream(request, "stdout")
+		close_stream(request, "stderr")
+		close_process(request)
+	end
 	if result.ok then
 		Logger.debug(LOG, "HTTP request completed (status=%d).", result.status or 0)
 	elseif result.error ~= "cancelled" then
@@ -252,6 +318,11 @@ end
 --- @param request table
 --- @return boolean
 local function terminate_group(request)
+	local operation = request.operation
+	if operation and not operation._body_cleanup then
+		if operation._settled or _owned[request.owner] ~= operation then return false end
+		if request.group_absent then return true end
+	end
 	return ProcessGroup.terminate(luv, request.pid)
 end
 
@@ -811,7 +882,6 @@ function M.get_owned(url, headers, options, callback)
 			if not terminate_group(request) then return false end
 			finish(request, { ok = false, status = 0, body = "", error = "cancelled" }, true)
 		else
-			if request.spawned and not request.exited and not terminate_group(request) then return false end
 			retry_owned_cleanup(request)
 		end
 		return self._settled
