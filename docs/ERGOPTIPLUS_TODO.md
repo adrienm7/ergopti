@@ -2137,6 +2137,31 @@ These are software implementations; final hardware verification remains below.
   principal notification/HTTP assertions. No input hook, Reader, Keylogger, schema,
   configuration, menu, foreign driver or reserved change.
 
+- [~] **L135.** Linux canonical manual-character count: exclude the exact
+  software correction marker [BS] from the per-app character accumulator.
+  Preserve its raw event/bytes, correction counters, elapsed-time admission,
+  global/live/raw-event WPM, ngrams and exact-marker distinction. The software
+  a/[BS]/b stream previously exposed live/durable chars3 while class/hour totals
+  correctly remained2; correction-only input incorrectly contributed a character.
+  Nine real public collector/SQLite/Reader/dashboard controls reproduce five
+  failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. Keep the existing exact nine-check floor. Literal SQL independently
+  requires daily2, classes2, hourly2, raw hex615B42535D62 with three input events,
+  and backspaces1. A second c/[BS] flush adds one character for cumulative3;
+  an empty flush preserves all raw ID/text/event bytes and the ASCII control2.
+  Four registered unit cases reproduce three failures and pass after, including
+  Unicode/whitespace, marker-only and [BS]x controls. All forty-five old/new owner
+  cases pass; preserve the entire 28658-byte old unit prefix and all ninety-eight
+  assertion lines. The frozen author README undercounts those lines as97; keep
+  that receipt unchanged and use the measured count here. Shared Apps/Typing,
+  macOS/Windows source already separate manual chars from corrections; no new
+  policy or foreign-native claim. Native foreign gates remain principal-owned.
+  Register future Linux CI without launching it. This software protocol does not
+  validate physical Backspace collection, which currently does not feed this
+  marker. Preserve both language packs and principal notification/HTTP assertions.
+  No physical hook, timing policy, Writer, Reader, Walker, schema, configuration,
+  window-title logic, menu, foreign driver or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
