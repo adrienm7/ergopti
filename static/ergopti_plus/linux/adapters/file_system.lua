@@ -54,6 +54,18 @@ function M.write_if_unchanged(path, content, expected)
 	return require("toml_codec.writer").publish_if_unchanged(path, content, nil, expected)
 end
 
+--- Publishes exact source bytes with a captured final logical admission.
+--- @param path string Destination path.
+--- @param content string Candidate bytes.
+--- @param expected table Exact classified source.
+--- @param admission function Final publication admission.
+--- @return boolean committed
+--- @return string|nil detail
+function M.write_if_unchanged_admitted(path, content, expected, on_error, admission)
+	if type(admission) ~= "function" then return false, "publication admission required" end
+	return require("toml_codec.writer").publish_if_unchanged(path, content, nil, expected, on_error, admission)
+end
+
 -- LuaFileSystem is optional — present on most LuaJIT installations.
 -- TODO(linux): declare lfs in vendor/ so it is always available.
 local ok_lfs, lfs = pcall(require, "lfs")

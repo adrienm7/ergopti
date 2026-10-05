@@ -202,6 +202,7 @@ end
 package.preload.luv = function() return uv end
 package.preload['logger.shim'] = function() return {
  debug = function() end,
+ info = function() end,
  error = function(_, format, detail)
   assert(not tostring(detail):find(os.getenv('GITHUB_TOKEN'), 1, true), 'native logger exposed CI authentication')
   if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end

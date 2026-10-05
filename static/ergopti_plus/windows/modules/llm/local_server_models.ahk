@@ -21,7 +21,7 @@
 ; ===========================================
 
 /** Owns provider-scoped models GET requests without replacing the HTTP adapter. */
-class LocalServerModelsOwner {
+class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 
 	/**
 	 * @param {Map} Options Catalogue servers, timeout_ms and poll_ms are required.
@@ -333,10 +333,7 @@ class LocalServerModelsOwner {
 		return CurlAsyncRequest()
 	}
 
-	_NativeTimer(Callback, Period) {
-		SetTimer(Callback, Period)
-		return true
-	}
+
 
 	_NativeClock() {
 		return A_TickCount

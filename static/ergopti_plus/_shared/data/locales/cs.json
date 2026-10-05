@@ -1779,6 +1779,8 @@
 	"mlx.use_ollama": "Použít Ollamu",
 	"mlx.machine_intel": "procesor Intel",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Místní Ollama se nepodařilo připravit. Zkontrolujte protokol a zkuste to znovu.",
+	"ollama.runtime_start": "Spustit Ollama",
 	"python.not_native_title": "Žádný Python pro tento Mac",
 	"python.not_native_body": "Tato akce potřebuje Python 3 sestavený pro {1}. Verze Pythonu nainstalované na tomto Macu jsou sestavené jen pro jiný procesor a macOS by je spouštěl přes Rosettu, která končí:\n{2}",
 	"python.missing_title": "Chybí Python 3",
