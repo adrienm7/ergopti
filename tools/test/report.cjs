@@ -154,109 +154,7 @@ function failureNotice(failures) {
 	return omitted ? text + footer(omitted) : text;
 }
 
-// CI-only source-image diagnostics. Keep the production parser and receipts
-// unchanged; the AHK framework terminates each multiline error with timing.
-function rawFailureDetail(output, failure) {
-	const lines = output.split(/\r?\n/);
-	const first = lines.findIndex((line) => {
-		const tap = line.match(/^not ok\s+\d+\s+-\s+(.+)$/);
-		return tap && tap[1].trim() === failure;
-	});
-	if (first < 0) return failure;
-	const details = [failure];
-	for (let index = first + 1; index < lines.length; index++) {
-		const line = lines[index];
-		if (
-			/^(?:# duration_ms \d+ |# \d+ passed,|#   replay:|RUNNING \d+\/|(?:not )?ok \d+ - |1\.\.\d+)/.test(
-				line
-			)
-		)
-			break;
-		details.push(line);
-	}
-	return details.join('\n');
-}
-
-function boundedDiagnostic(detail) {
-	const json = JSON.stringify(detail);
-	const escaped = ghEscape(json);
-	if (escaped.length <= 3400 && Buffer.byteLength(escaped, 'utf8') <= 3000) return escaped;
-	const suffix = ' [diagnostic truncated; complete raw cause remains in runner output]';
-	let prefix = '';
-	for (const scalar of detail) {
-		const candidate = ghEscape(JSON.stringify(prefix + scalar + suffix));
-		if (candidate.length > 3400 || Buffer.byteLength(candidate, 'utf8') > 3000) break;
-		prefix += scalar;
-	}
-	return ghEscape(JSON.stringify(prefix + suffix));
-}
-
-// Preserve two original notices inside GitHub's ten-notice per-step quota.
-// Multiline expected/actual images get first access; original ordinals remain.
-function diagnosticChunks(details) {
-	const limit = 8;
-	const omission = '[diagnostic omissions; complete raw causes remain in runner output]';
-	const suffix = ' [diagnostic truncated; complete raw cause remains in runner output]';
-	const encode = (entries, omitted) =>
-		ghEscape(
-			JSON.stringify({
-				total_failures: details.length,
-				failures: entries,
-				omitted_failures: omitted,
-				omission_marker: omitted ? omission : null
-			})
-		);
-	// Reserve the largest omission footer before packing any complete message.
-	const fits = (entries) => {
-		const encoded = encode(entries, details.length);
-		return encoded.length <= 3400 && Buffer.byteLength(encoded, 'utf8') <= 3000;
-	};
-	const image = (detail) =>
-		detail.includes('\n') && detail.includes('expected: <') && detail.includes('actual: <');
-	const queue = details
-		.map((message, index) => ({ failure_index: index + 1, message, truncated: false }))
-		.sort(
-			(left, right) =>
-				Number(image(right.message)) - Number(image(left.message)) ||
-				left.failure_index - right.failure_index
-		);
-	const chunks = [];
-	let current = [];
-	let omitted = 0;
-	for (const original of queue) {
-		if (chunks.length === limit) {
-			omitted++;
-			continue;
-		}
-		let entry = original;
-		if (!fits([entry])) {
-			const scalars = Array.from(entry.message);
-			let low = 0;
-			let high = scalars.length;
-			while (low < high) {
-				const middle = Math.ceil((low + high) / 2);
-				const candidate = {
-					...entry,
-					message: scalars.slice(0, middle).join('') + suffix,
-					truncated: true
-				};
-				if (fits([candidate])) low = middle;
-				else high = middle - 1;
-			}
-			entry = { ...entry, message: scalars.slice(0, low).join('') + suffix, truncated: true };
-		}
-		if (current.length && !fits([...current, entry])) {
-			chunks.push(current);
-			current = [];
-		}
-		if (chunks.length === limit) omitted++;
-		else current.push(entry);
-	}
-	if (current.length) chunks.push(current);
-	return chunks.map((entries) => encode(entries, omitted));
-}
-
-function emit(opts, res, code, output = '') {
+function emit(opts, res, code) {
 	const onGitHub = !!process.env.GITHUB_ACTIONS;
 	if (onGitHub) {
 		for (const f of res.failures) {
@@ -266,15 +164,6 @@ function emit(opts, res, code, output = '') {
 			process.stdout.write(
 				`::notice title=${ghEscape(opts.name)} all failures::${ghEscape(failureNotice(res.failures))}\n`
 			);
-		// Only supplemental diagnostics are packed; every original receipt stays.
-		const diagnostics = diagnosticChunks(
-			res.failures.map((failure) => rawFailureDetail(output, failure))
-		);
-		for (const [index, detail] of diagnostics.entries()) {
-			process.stdout.write(
-				`::notice title=${ghEscape(opts.name)} diagnostic causes ${index + 1}::${detail}\n`
-			);
-		}
 		const summary = `${opts.name}: ${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`;
 		process.stdout.write(`::notice title=${ghEscape(opts.name)}::${ghEscape(summary)}\n`);
 		if (process.env.GITHUB_STEP_SUMMARY) {
@@ -332,7 +221,7 @@ function main() {
 	if (opts.cmd[0] === 'PARSE_FILE') {
 		const out = fs.readFileSync(opts.cmd[1], 'utf8');
 		const res = parseResults(out);
-		emit(opts, res, res.failed > 0 ? 1 : 0, out);
+		emit(opts, res, res.failed > 0 ? 1 : 0);
 		process.exitCode = res.failed > 0 ? 1 : 0;
 		return;
 	}
@@ -351,7 +240,7 @@ function main() {
 	child.on('close', (code) => {
 		if (spawnFailed) return;
 		const res = parseResults(buf);
-		emit(opts, res, code ?? 0, buf);
+		emit(opts, res, code ?? 0);
 		// Natural shutdown drains both forwarded streams and final annotations.
 		// An immediate exit discards pending pipe writes despite a valid JSON file.
 		process.exitCode = code ?? 0;

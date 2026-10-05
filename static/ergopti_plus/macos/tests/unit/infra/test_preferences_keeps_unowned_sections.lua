@@ -709,3 +709,152 @@ helpers.describe("Published gesture parameter identity source preservation", fun
 		end)
 	end)
 end)
+
+helpers.describe("macOS real preference root dotted scalar publication", function()
+	local vectors = {
+		{ name = "header", source = '[llm]\nagent_mode="auto"\nfuture=9007199254740993\n', owned = '[llm]\nagent_mode = "action"\nfuture=9007199254740993\n', accepted = true },
+		{ name = "root dotted", source = 'llm.agent_mode="auto"\nfuture.keep=9007199254740993\n', owned = 'llm.agent_mode = "action"\nfuture.keep=9007199254740993\n', accepted = true },
+		{ name = "root inline", source = 'llm={agent_mode="auto",future=9007199254740993}\n', accepted = false },
+		{ name = "obsolete scalar", source = 'llm="obsolete"\nfuture.keep=9007199254740993\n', accepted = false },
+	}
+	for _, vector in ipairs(vectors) do
+		helpers.it("uses the actual conditional preference publisher for " .. vector.name, function()
+			helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+				local logger = helpers.make_logger_stub()
+				package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+				package.loaded["adapters.file_system"] = nil
+				local preferences = helpers.load_with_stubs("infra.preferences")
+				local path = os.tmpname()
+				local file = assert(io.open(path, "wb")); assert(file:write(vector.source)); assert(file:close())
+				local okay, detail = xpcall(function()
+					local state, status = preferences.load(path)
+					helpers.assert_eq(status, "ok")
+					helpers.assert_eq(preferences.save(path, { llm_agent_mode = "action" }, {}, {}), vector.accepted)
+					local current = assert(io.open(path, "rb")); local bytes = assert(current:read("*a")); assert(current:close())
+					local expected = vector.owned and vector.owned .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n' or vector.source
+					helpers.assert_eq(bytes, expected, "complete independently handwritten native source image")
+					package.loaded["infra.preferences"] = nil
+					local restarted, restart_status = helpers.load_with_stubs("infra.preferences").load(path)
+					helpers.assert_eq(restart_status, "ok")
+					if vector.accepted then helpers.assert_eq(restarted.llm_agent_mode, "action")
+					elseif vector.name == "root inline" then helpers.assert_eq(restarted.llm_agent_mode, "auto")
+					else helpers.assert_nil(restarted.llm_agent_mode) end
+				end, debug.traceback)
+				os.remove(path)
+				if not okay then error(detail, 0) end
+			end)
+		end)
+	end
+end)
+
+helpers.describe("macOS real root dotted numeric admission", function()
+	helpers.it("acknowledges the exact requested finite temperature through the conditional publisher", function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+			local logger = helpers.make_logger_stub()
+			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["adapters.file_system"] = nil
+			local preferences = helpers.load_with_stubs("infra.preferences")
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); assert(file:write('llm.generation.temperature=0.25\nfuture.keep=9007199254740993\n')); assert(file:close())
+			local okay, detail = xpcall(function()
+				local requested = 0.12345678901234567
+				local _, status = preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				helpers.assert_true(preferences.save(path, { llm_temperature = requested }, {}, {}))
+				local current = assert(io.open(path, "rb")); local bytes = assert(current:read("*a")); assert(current:close())
+				helpers.assert_eq(bytes, 'llm.generation.temperature = 0.12345678901234566\nfuture.keep=9007199254740993\n\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				package.loaded["infra.preferences"] = nil
+				local restarted, restart_status = helpers.load_with_stubs("infra.preferences").load(path)
+				helpers.assert_eq(restart_status, "ok")
+				helpers.assert_eq(restarted.llm_temperature, requested)
+			end, debug.traceback)
+			os.remove(path)
+			if not okay then error(detail, 0) end
+		end)
+	end)
+end)
+
+helpers.describe("macOS real finite header numeric admission", function()
+	helpers.it("reloads an acknowledged exact temperature from its actual conditional source publisher", function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+			local logger = helpers.make_logger_stub()
+			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["adapters.file_system"] = nil
+			local preferences = helpers.load_with_stubs("infra.preferences")
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); assert(file:write('[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n')); assert(file:close())
+			local okay, detail = xpcall(function()
+				local requested = 0.12345678901234567
+				local _, status = preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				helpers.assert_true(preferences.save(path, { llm_temperature = requested }, {}, {}))
+				local current = assert(io.open(path, "rb")); local bytes = assert(current:read("*a")); assert(current:close())
+				helpers.assert_eq(bytes, '[llm.generation]\ntemperature = 0.12345678901234566\nfuture=9007199254740993\n\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				package.loaded["infra.preferences"] = nil
+				local restarted, restart_status = helpers.load_with_stubs("infra.preferences").load(path)
+				helpers.assert_eq(restart_status, "ok")
+				helpers.assert_eq(restarted.llm_temperature, requested)
+			end, debug.traceback)
+			os.remove(path)
+			if not okay then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("retains acknowledged negative zero through actual conditional preference restart", function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+			local logger = helpers.make_logger_stub()
+			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["adapters.file_system"] = nil
+			local preferences = helpers.load_with_stubs("infra.preferences")
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); assert(file:write('[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n')); assert(file:close())
+			local okay, detail = xpcall(function()
+				local _, status = preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				helpers.assert_true(preferences.save(path, { llm_temperature = -0.0 }, {}, {}))
+				local current = assert(io.open(path, "rb")); local bytes = assert(current:read("*a")); assert(current:close())
+				helpers.assert_eq(bytes, '[llm.generation]\ntemperature = -0.0\nfuture=9007199254740993\n\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				package.loaded["infra.preferences"] = nil
+				local restarted, restart_status = helpers.load_with_stubs("infra.preferences").load(path)
+				helpers.assert_eq(restart_status, "ok")
+				helpers.assert_eq(1 / restarted.llm_temperature, -math.huge)
+			end, debug.traceback)
+			os.remove(path)
+			if not okay then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("retains the actual source on wrong numeric admission and permits an explicit repaired retry", function()
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+			local logger = helpers.make_logger_stub()
+			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["adapters.file_system"] = nil
+			local preferences = helpers.load_with_stubs("infra.preferences")
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			local source = '[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n'
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())
+			local okay, detail = xpcall(function()
+				local _, status = preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				LeafRows.value_literal = function(value)
+					if type(value) == "number" then return "0.12345678901235" end
+					return original(value)
+				end
+				local called, accepted = pcall(preferences.save, path, { llm_temperature = 0.12345678901234567 }, {}, {})
+				LeafRows.value_literal = original
+				helpers.assert_eq(called, true)
+				helpers.assert_eq(accepted, false)
+				local current = assert(io.open(path, "rb")); local bytes = assert(current:read("*a")); assert(current:close())
+				helpers.assert_eq(bytes, source)
+				helpers.assert_true(preferences.save(path, { llm_temperature = 0.12345678901234567 }, {}, {}))
+				current = assert(io.open(path, "rb")); bytes = assert(current:read("*a")); assert(current:close())
+				helpers.assert_eq(bytes, '[llm.generation]\ntemperature = 0.12345678901234566\nfuture=9007199254740993\n\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+			end, debug.traceback)
+			LeafRows.value_literal = original
+			os.remove(path)
+			if not okay then error(detail, 0) end
+		end)
+	end)
+end)

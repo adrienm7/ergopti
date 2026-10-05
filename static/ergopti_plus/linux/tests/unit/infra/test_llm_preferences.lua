@@ -149,3 +149,82 @@ helpers.describe("AI enable source generation (ai-enable-admission)", function()
 		end)
 	end)
 end)
+
+helpers.describe("Linux real AI root dotted scalar publication", function()
+	local vectors = {
+		{ name = "header", source = '[llm]\nagent_mode="auto"\nfuture=9007199254740993\n', expected = '[llm]\nagent_mode = "action"\nfuture=9007199254740993\n', accepted = true },
+		{ name = "root dotted", source = 'llm.agent_mode="auto"\nfuture.keep=9007199254740993\n', expected = 'llm.agent_mode = "action"\nfuture.keep=9007199254740993\n', accepted = true },
+		{ name = "root inline", source = 'llm={agent_mode="auto",future=9007199254740993}\n', accepted = false },
+		{ name = "obsolete scalar", source = 'llm="obsolete"\nfuture.keep=9007199254740993\n', accepted = false },
+	}
+	for _, vector in ipairs(vectors) do
+		helpers.it("uses the actual native source owner for " .. vector.name, function()
+			with_config(vector.source, function(path)
+				local preferences = require("infra.llm_preferences")
+				helpers.assert_eq(Sandbox.read_bytes(path), vector.source)
+				helpers.assert_eq(preferences.set("llm.agent_mode", "action"), vector.accepted)
+				helpers.assert_eq(Sandbox.read_bytes(path), vector.expected or vector.source, "complete independently handwritten physical image")
+				package.loaded["infra.llm_preferences"] = nil
+				local restarted = require("infra.llm_preferences").get("llm.agent_mode")
+				if vector.accepted then helpers.assert_eq(restarted, "action")
+				elseif vector.name == "root inline" then helpers.assert_eq(restarted, "auto")
+				else helpers.assert_nil(restarted) end
+			end)
+		end)
+	end
+end)
+
+helpers.describe("Linux real root dotted numeric admission", function()
+	helpers.it("acknowledges the exact requested finite temperature and reloads it without rounding", function()
+		with_config('llm.generation.temperature=0.25\nfuture.keep=9007199254740993\n', function(path)
+			local requested = 0.12345678901234567
+			local preferences = require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", requested))
+			helpers.assert_eq(Sandbox.read_bytes(path), 'llm.generation.temperature = 0.12345678901234566\nfuture.keep=9007199254740993\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), requested)
+		end)
+	end)
+end)
+
+helpers.describe("Linux real finite header numeric admission", function()
+	helpers.it("reloads an acknowledged exact temperature while keeping foreign source tokens", function()
+		with_config('[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n', function(path)
+			local requested = 0.12345678901234567
+			local preferences = require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", requested))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm.generation]\ntemperature = 0.12345678901234566\nfuture=9007199254740993\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(require("infra.llm_preferences").get("llm.generation.temperature"), requested)
+		end)
+	end)
+
+	helpers.it("refuses a wrong optional literal with no write or generation ACK and permits a repaired retry", function()
+		local source = '[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n'
+		with_config(source, function(path)
+			local preferences = require("infra.llm_preferences")
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			local generation = preferences.generation()
+			LeafRows.value_literal = function() return "0.12345678901235" end
+			local called, accepted = pcall(preferences.set, "llm.generation.temperature", 0.12345678901234567)
+			LeafRows.value_literal = original
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(preferences.generation(), generation)
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			helpers.assert_true(preferences.set("llm.generation.temperature", 0.12345678901234567))
+			helpers.assert_true(preferences.generation() > generation, "only an acknowledged write or observed changed source advances the revision")
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm.generation]\ntemperature = 0.12345678901234566\nfuture=9007199254740993\n')
+		end)
+	end)
+	helpers.it("retains acknowledged negative zero through actual native preference restart", function()
+		with_config('[llm.generation]\ntemperature=0.25\nfuture=9007199254740993\n', function(path)
+			local preferences = require("infra.llm_preferences")
+			helpers.assert_true(preferences.set("llm.generation.temperature", -0.0))
+			helpers.assert_eq(Sandbox.read_bytes(path), '[llm.generation]\ntemperature = -0.0\nfuture=9007199254740993\n')
+			package.loaded["infra.llm_preferences"] = nil
+			helpers.assert_eq(1 / require("infra.llm_preferences").get("llm.generation.temperature"), -math.huge)
+		end)
+	end)
+end)
