@@ -3379,7 +3379,10 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   local Linux suite passes8338/0 across406 modules after current dev integration. Six Windows
   retained writer/JOIN failures are traced to the scope fixture retaining its
   recovered barrier. Exact-owner fixture restoration and six original native
-  refusal sequences are adopted; their native replay remains pending. Complete native three-OS
+  refusal sequences are adopted. Native37313187012 passes panel20/20, timers4/4
+  and logical controller39/39, but still exposes two subsequent recovered G2
+  fixture markers. Their coordinated exact-owner finally restoration preserves
+  all139 original assertions; fresh full Windows replay remains pending. Complete native three-OS
   qualification remains; items16/38 stay.
 
 - [~] **48.** **Partial: owned local-runtime repair and enable admission.** All
