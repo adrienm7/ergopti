@@ -204,7 +204,7 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 		end
 	end)
 
-	helpers.it("drops the legacy enabled key and keeps the rest of the file on save", function()
+	helpers.it("preserves the retired enabled key and the rest of the file until explicit cleanup", function()
 		local file_system = package.loaded["adapters.file_system"]
 		local codec = package.loaded["infra.toml.codec"]
 		local original_read, original_decode = file_system.read_with_status, codec.decode
@@ -218,8 +218,11 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 				state.enabled = switch
 				local encoded = encoded_document(state, true)
 				helpers.assert_true(type(encoded) == "table")
-				helpers.assert_true(encoded.karabiner == nil or encoded.karabiner.enabled == nil,
-					"a save must retire the key older builds wrote")
+				helpers.assert_eq(encoded.karabiner.enabled, false,
+					"a retired key remains until explicit cleanup")
+				helpers.assert_eq(encoded, {
+					karabiner = { enabled = false, integration_enabled = switch }, personal = { kept = true },
+				}, "the complete independently specified source model survives the ordinary save")
 				helpers.assert_eq(encoded.personal and encoded.personal.kept, true)
 			end
 		end)
