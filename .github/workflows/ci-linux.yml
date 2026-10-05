@@ -376,6 +376,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Preserve UTF-8 boundaries in native provider error diagnostics
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_server_message_utf8.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_server_message_utf8.py
+        timeout-minutes: 1
+
       - name: Refuse malformed structured provider completions through strict JSON
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

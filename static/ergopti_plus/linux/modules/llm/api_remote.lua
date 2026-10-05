@@ -34,6 +34,7 @@ local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
 local PromptBuilder = require("llm.prompt_builder")
+local TextUtils = require("text_utils")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
@@ -462,7 +463,7 @@ function M.server_message(body)
 	local message = type(root.error) == "table" and root.error.message or root.message
 	if type(message) ~= "string" and type(root.error) == "string" then message = root.error end
 	if type(message) ~= "string" or message == "" then return nil end
-	return message:sub(1, MAX_SERVER_MESSAGE)
+	return TextUtils.utf8_byte_prefix(message, MAX_SERVER_MESSAGE)
 end
 
 
