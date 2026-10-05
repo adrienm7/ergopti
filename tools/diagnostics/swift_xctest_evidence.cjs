@@ -136,6 +136,75 @@ function phaseAnnotation(evidence) {
 	return '::notice title=Native keyboard phase witness::' + escapeData(message);
 }
 
+// These are the existing native LauncherLog callback stages. The stderr frame
+// is validated in full, but filesystem metadata is never retained or displayed.
+const loggerStages = new Set([
+	'validate-test-directory',
+	'validate-directory',
+	'open-directory',
+	'chmod-directory',
+	'open-file',
+	'stat-file',
+	'validate-file',
+	'chmod-file',
+	'lock-file',
+	'write-file',
+	'rotate-file'
+]);
+const loggerFrame =
+	/^Logger test writer=writer-([0-9]) entry=(0|[1-9]\d{0,2}) stage=([a-z-]+) errno=(0|-?[1-9]\d{0,9}) directoryStatus=(0|-1) directoryInode=(0|[1-9]\d{0,19}) directoryLinks=(0|[1-9]\d{0,4}) fileStatus=(0|-1) fileInode=(0|[1-9]\d{0,19})\.$/;
+
+/** Retains only three finite callback receipts from the exact native frame. */
+function loggerReceipts(lines) {
+	const result = { accepted: 0, refused: 0, count_saturated: false, last: [] };
+	const count = (key) => {
+		if (result[key] < 1_000_000) result[key]++;
+		else result.count_saturated = true;
+	};
+	for (const line of lines) {
+		if (!line.startsWith('Logger test ')) continue;
+		const fields = Buffer.byteLength(line, 'utf8') <= 320 ? loggerFrame.exec(line) : null;
+		if (
+			!fields ||
+			!loggerStages.has(fields[3]) ||
+			Number(fields[2]) > 511 ||
+			Number(fields[4]) < -2_147_483_648 ||
+			Number(fields[4]) > 2_147_483_647 ||
+			BigInt(fields[6]) > 18_446_744_073_709_551_615n ||
+			Number(fields[7]) > 65_535 ||
+			BigInt(fields[9]) > 18_446_744_073_709_551_615n
+		) {
+			count('refused');
+			continue;
+		}
+		count('accepted');
+		result.last.push({
+			writer: Number(fields[1]),
+			entry: Number(fields[2]),
+			stage: fields[3],
+			errno: Number(fields[4])
+		});
+		if (result.last.length > 3) result.last.shift();
+	}
+	return result;
+}
+
+/** One failure-only notice, containing no raw frame or native inode metadata. */
+function loggerAnnotation(evidence) {
+	const message =
+		'Native logger callback receipts observed; cause remains unqualified. ' +
+		`accepted=${evidence.accepted}; refused=${evidence.refused}; countSaturated=${evidence.count_saturated}; last=` +
+		(evidence.last.length
+			? evidence.last
+					.map(
+						(record) =>
+							`writer=${record.writer} entry=${record.entry} stage=${record.stage} errno=${record.errno}`
+					)
+					.join('; ')
+			: 'unobserved');
+	return '::notice title=Native logger callback receipt::' + escapeData(message);
+}
+
 /** Judges the serial, unfiltered XCTest transcript independently of process zero. */
 function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dirname, '../..')) {
 	const script = exitStatus(scriptStatus);
@@ -224,6 +293,7 @@ function evaluate(text, scriptStatus, teeStatus, repository = path.resolve(__dir
 		completed_tests: completed,
 		failures,
 		keyboard_phase_witnesses: keyboardPhases(lines),
+		logger_callback_receipts: loggerReceipts(lines),
 		exit_status: script || tee || (failures.length ? 1 : 0)
 	};
 }
@@ -241,6 +311,11 @@ function main(args = process.argv.slice(2), log = console.log) {
 		fs.writeFileSync(args[3], JSON.stringify(result, null, '\t') + '\n');
 		for (const failure of result.failures) log(annotation(failure));
 		if (result.exit_status !== 0) log(phaseAnnotation(result.keyboard_phase_witnesses));
+		if (
+			result.exit_status !== 0 &&
+			(result.logger_callback_receipts.accepted || result.logger_callback_receipts.refused)
+		)
+			log(loggerAnnotation(result.logger_callback_receipts));
 		log(
 			`[Swift XCTest] ${result.completed_tests.length} completed test(s); script=${script}; capture=${tee}; verdict=${result.exit_status}.`
 		);
@@ -251,5 +326,14 @@ function main(args = process.argv.slice(2), log = console.log) {
 	}
 }
 
-module.exports = { annotation, cleanTranscript, evaluate, keyboardPhases, phaseAnnotation, main };
+module.exports = {
+	annotation,
+	cleanTranscript,
+	evaluate,
+	keyboardPhases,
+	phaseAnnotation,
+	loggerReceipts,
+	loggerAnnotation,
+	main
+};
 if (require.main === module) process.exitCode = main();

@@ -15,7 +15,8 @@ const {
 	annotation,
 	cleanTranscript,
 	evaluate,
-	keyboardPhases
+	keyboardPhases,
+	loggerReceipts
 } = require('../diagnostics/swift_xctest_evidence.cjs');
 const pipeline = require('./ci-pipeline.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
@@ -224,6 +225,107 @@ for (const [text, script, tee] of [
 	assert.deepEqual(observed.summary, original.summary);
 }
 
+// This hand-authored frame follows the existing native stderr protocol; its
+// example lock stage is not a claim about the unavailable actual CI transcript.
+const loggerFrame =
+	'Logger test writer=writer-3 entry=75 stage=lock-file errno=35 ' +
+	'directoryStatus=0 directoryInode=13883934701001 directoryLinks=2 fileStatus=0 fileInode=13883934701002.';
+const loggerStages = [
+	'validate-test-directory',
+	'validate-directory',
+	'open-directory',
+	'chmod-directory',
+	'open-file',
+	'stat-file',
+	'validate-file',
+	'chmod-file',
+	'lock-file',
+	'write-file',
+	'rotate-file'
+];
+assert.deepEqual(loggerReceipts([loggerFrame]), {
+	accepted: 1,
+	refused: 0,
+	count_saturated: false,
+	last: [{ writer: 3, entry: 75, stage: 'lock-file', errno: 35 }]
+});
+const allLoggerStages = loggerStages.map((stage) =>
+	loggerFrame.replace('stage=lock-file', 'stage=' + stage)
+);
+assert.deepEqual(loggerReceipts(allLoggerStages), {
+	accepted: 11,
+	refused: 0,
+	count_saturated: false,
+	last: [
+		{ writer: 3, entry: 75, stage: 'lock-file', errno: 35 },
+		{ writer: 3, entry: 75, stage: 'write-file', errno: 35 },
+		{ writer: 3, entry: 75, stage: 'rotate-file', errno: 35 }
+	]
+});
+const invalidLoggerFrames = [
+	loggerFrame + ' secret=' + foreign,
+	loggerFrame.replace('writer-3', 'private-writer'),
+	loggerFrame.replace('writer-3', 'writer-10'),
+	loggerFrame.replace('entry=75', 'entry=512'),
+	loggerFrame.replace('entry=75', 'entry=-1'),
+	loggerFrame.replace('entry=75', 'entry=075'),
+	loggerFrame.replace('stage=lock-file', 'stage=/Users/foreign/TOKEN%::error::inert'),
+	loggerFrame.replace('stage=lock-file', 'stage=unknown-file'),
+	loggerFrame.replace('errno=35', 'errno=2147483648'),
+	loggerFrame.replace('errno=35', 'errno=-2147483649'),
+	loggerFrame.replace('errno=35', 'errno=NaN'),
+	loggerFrame.replace('errno=35', 'errno=35 errno=22'),
+	loggerFrame.replace('directoryStatus=0', 'directoryStatus=1'),
+	loggerFrame.replace('fileStatus=0', 'fileStatus=-2'),
+	loggerFrame.replace('directoryInode=13883934701001', 'directoryInode=18446744073709551616'),
+	loggerFrame.replace('fileInode=13883934701002', 'fileInode=-1'),
+	loggerFrame.replace('directoryLinks=2', 'directoryLinks=65536'),
+	loggerFrame.replace('directoryLinks=2', 'directoryLinks=2.5'),
+	loggerFrame.replace(' fileStatus=0', ''),
+	loggerFrame.slice(0, -1),
+	'Logger test ' + 'x'.repeat(321),
+	loggerFrame.replace('stage=lock-file', 'stage=lock-file\r::error::inert')
+];
+assert.deepEqual(loggerReceipts(invalidLoggerFrames), {
+	accepted: 0,
+	refused: 22,
+	count_saturated: false,
+	last: []
+});
+const edgeLoggerFrame = loggerFrame
+	.replace('writer-3', 'writer-9')
+	.replace('entry=75', 'entry=511')
+	.replace('errno=35', 'errno=-2147483648')
+	.replace('directoryStatus=0', 'directoryStatus=-1')
+	.replace('directoryInode=13883934701001', 'directoryInode=18446744073709551615')
+	.replace('directoryLinks=2', 'directoryLinks=65535')
+	.replace('fileStatus=0', 'fileStatus=-1')
+	.replace('fileInode=13883934701002', 'fileInode=0');
+assert.deepEqual(loggerReceipts([edgeLoggerFrame]).last, [
+	{ writer: 9, entry: 511, stage: 'lock-file', errno: -2147483648 }
+]);
+assert.equal(loggerReceipts(Array(200).fill(loggerFrame)).accepted, 200);
+assert.equal(loggerReceipts(Array(200).fill(loggerFrame)).last.length, 3);
+for (const [text, script, tee] of [
+	[failed, 0, 0],
+	[passed, 42, 0],
+	[passed, 0, 17],
+	[passed, 0, 0]
+]) {
+	const original = evaluate(text, script, tee);
+	const observed = evaluate(
+		text + '\n' + allLoggerStages.join('\n') + '\n' + invalidLoggerFrames.join('\n'),
+		script,
+		tee
+	);
+	assert.equal(observed.exit_status, original.exit_status);
+	assert.equal(observed.complete, original.complete);
+	assert.deepEqual(observed.failures, original.failures);
+	assert.deepEqual(observed.completed_tests, original.completed_tests);
+	assert.deepEqual(observed.summary, original.summary);
+	assert.deepEqual(observed.keyboard_phase_witnesses, original.keyboard_phase_witnesses);
+}
+
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-swift-evidence-'));
 try {
 	const log = path.join(root, 'native.log');
@@ -274,6 +376,66 @@ try {
 	assert.equal(result.status, 42);
 	assert.match(result.stdout, /accepted=0; refused=0; countSaturated=false; last=unobserved/);
 	fs.writeFileSync(log, passed + '\n' + phaseTranscript + '\n' + refusedPhases);
+	result = spawnSync(process.execPath, [owner, log, '0', '0', json], { encoding: 'utf8' });
+	assert.equal(result.status, 0);
+	assert.doesNotMatch(result.stdout, /::notice|::error|PRIVATE_PATH|TOKEN/);
+
+	const loggerFile = path.join(
+		repository,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherLogTests.swift'
+	);
+	const loggerFailure = [
+		"Test Suite 'All tests' started at 2026-10-05 01:00:00.000.",
+		"Test Case '-[ErgoptiPlusTests.LauncherLogTests testIndependentProcessesAppendEveryWholeRecordExactlyOnce]' started.",
+		loggerFrame,
+		`${loggerFile}:606: error: expected child exit 0, observed 73`,
+		`${loggerFile}:635: error: observed 1227 records, expected 1280`,
+		`${loggerFile}:641: error: complete records: missing=53, unexpected=0`,
+		"Test Case '-[ErgoptiPlusTests.LauncherLogTests testIndependentProcessesAppendEveryWholeRecordExactlyOnce]' failed (0.500 seconds).",
+		"Test Suite 'All tests' failed at 2026-10-05 01:00:01.000.",
+		'Executed 1 test, with 3 failures (0 unexpected) in 0.500 (0.500) seconds'
+	].join('\n');
+	fs.writeFileSync(log, loggerFailure + '\n' + invalidLoggerFrames.join('\n'));
+	result = spawnSync(process.execPath, [owner, log, '1', '0', json], { encoding: 'utf8' });
+	assert.equal(result.status, 1);
+	assert.match(result.stdout, /expected child exit 0, observed 73/);
+	assert.match(result.stdout, /complete records: missing=53, unexpected=0/);
+	const loggerNotices = result.stdout
+		.split('\n')
+		.filter((line) => line.startsWith('::notice title=Native logger callback receipt::'));
+	assert.equal(
+		loggerNotices.length,
+		1,
+		'one bounded logger annotation exposes the existing native callback'
+	);
+	assert.ok(loggerNotices[0].length < 512);
+	assert.match(loggerNotices[0], /accepted=1; refused=22/);
+	assert.match(loggerNotices[0], /last=writer=3 entry=75 stage=lock-file errno=35$/);
+	assert.doesNotMatch(
+		loggerNotices[0],
+		/PRIVATE_PATH|TOKEN|Users|directory|Inode|1388393470100|::error|%0A|%0D/
+	);
+	const loggerVerdict = JSON.parse(fs.readFileSync(json, 'utf8'));
+	assert.equal(loggerVerdict.complete, false);
+	assert.deepEqual(loggerVerdict.logger_callback_receipts.last, [
+		{ writer: 3, entry: 75, stage: 'lock-file', errno: 35 }
+	]);
+	assert.doesNotMatch(
+		JSON.stringify(loggerVerdict.logger_callback_receipts),
+		/Inode|1388393470100|TOKEN/
+	);
+	fs.writeFileSync(log, loggerFailure.replace(loggerFrame, invalidLoggerFrames[0]));
+	result = spawnSync(process.execPath, [owner, log, '73', '17', json], { encoding: 'utf8' });
+	assert.equal(
+		result.status,
+		73,
+		'callback visibility cannot override the original native pipeline status'
+	);
+	assert.match(
+		result.stdout,
+		/Native logger callback receipt::.*accepted=0; refused=1; countSaturated=false; last=unobserved/
+	);
+	fs.writeFileSync(log, passed + '\n' + loggerFrame + '\n' + invalidLoggerFrames.join('\n'));
 	result = spawnSync(process.execPath, [owner, log, '0', '0', json], { encoding: 'utf8' });
 	assert.equal(result.status, 0);
 	assert.doesNotMatch(result.stdout, /::notice|::error|PRIVATE_PATH|TOKEN/);

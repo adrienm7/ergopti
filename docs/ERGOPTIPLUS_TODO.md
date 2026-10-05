@@ -1853,6 +1853,18 @@ Package stops at an incomplete native keyboard XCTest. Remaining package,
 installation and Karabiner launch qualification uses the group-owned test CI
 branch, with final integrated qualification reserved exclusively.
 
+Native run37244850361 at d1ef1f121 compiles the corrected keyboard diagnostics
+and executes XCTest. Its complete suite reports a distinct launcher-log failure:
+one cooperating writer exits73; 1,227 of 1,280 whole records are present, with
+53 missing and none unexpected. No keyboard case is reported incomplete; the
+last observed outer restoration and its diagnostic read return successfully.
+The existing helper emits the refused append stage and errno on stderr, but
+its raw artifact download is denied by the running cloud network. A bounded
+failure-only reader for that existing receipt is being prepared without changing
+record/inode/ownership assertions, the 250ms lock deadline or the original
+verdict. Exact failed-stage diagnosis and native package/install/Karabiner
+qualification remain pending; TODO40 remains partial.
+
 The existing owned-sample reader now preserves observed file-read and native
 task-termination frames with their bounded thread ancestry. The pinned
 Hammerspoon1.1.1 task implementation performs synchronous pipe reads on the main

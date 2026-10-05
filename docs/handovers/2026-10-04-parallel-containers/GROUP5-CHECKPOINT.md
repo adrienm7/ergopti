@@ -201,6 +201,34 @@ network policy (proxy tunnel403). The domain is saved in the environment draft;
 saving does not apply it to this running instance. Native failure diagnosis and
 an exact final-candidate rerun remain necessary before integration qualification.
 
+Manual run37243489582 tested feature b4ab3d530 with macOS+Linux. Validate,
+Core and portable macOS units/E2E passed. Linux failed its native metrics
+aggregation equivalence fixture before driver units; Group2 now owns the
+receipt-aware fixture correction, with an independently reproduced old-source
+failure and adapted real-SQLite result (648 grouped/2,808 raw rows). No tracked
+Linux fixture was changed by Group5. Its unchanged histogram sibling passes
+60 checks. Native Mac test compilation refused the diagnostic phase-set
+expression's inference complexity; no XCTest executed in that run.
+
+The reviewed typed-loop correction d1ef1f121 preserves all 74 closed phases,
+privacy, bounds and ordering. Local formatting,356 JS checks and13,954 portable
+macOS units pass. Manual run37244850361 tests that exact SHA with macOS only:
+Core and portable macOS units/E2E pass, native release and test compilation
+succeed, then the complete XCTest suite reports launcher-log append failure.
+One helper exits73,1,227/1,280 records are present,53 are missing and0 are
+unexpected. No keyboard case is reported incomplete;316 accepted phase frames
+end after the outer restore call and its diagnostic observation have returned.
+That observation does not explain the earlier native termination.
+
+Native package construction, installation and launch are skipped. Release/Publish
+is skipped. Artifact11318359681 is retained by GitHub but redirects to
+productionresultssa6.blob.core.windows.net; the actual download fails at the
+proxy tunnel with403. That exact hostname is saved additively in the existing
+environment draft; runtime propagation and publication are unproved. The helper
+already emits its failed append stage/errno on stderr. Group5 is preparing a
+bounded failure-only annotation without changing native logger assertions,
+ownership, source checks or the250ms deadline. No dev integration has occurred.
+
 The maintainer now allows feature test CI in parallel: group5 exclusively uses
 `codex/ci-macos-input`, without a lock. Only final integration reserves
 `codex/ci-lock` and `codex/ci-validation`. Group5 deleted its own earlier empty
