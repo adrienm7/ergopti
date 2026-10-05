@@ -737,3 +737,73 @@ helpers.describe("linux-sqlite-layouts-seen", function()
 		end)
 	end)
 end)
+
+helpers.describe("linux-sqlite-switch-projection", function()
+	helpers.it("linux-sqlite-switch-projection: grouped destinations reach the shared map without inventing other totals", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then
+				helpers.assert_contains(sql, "SUM(count) AS count")
+				helpers.assert_contains(sql, "GROUP BY date, app, app_to")
+				return Json.encode({
+					{ date = "2026-10-05", app = "owned-source", app_to = "owned-destination", count = 7 },
+					{ date = "2026-10-05", app = "owned-source", app_to = "café'owned", count = 2 },
+				})
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			local source = manifest["2026-10-05"]["owned-source"]
+			helpers.assert_eq(source.switches_to["owned-destination"], 7)
+			helpers.assert_eq(source.switches_to["café'owned"], 2)
+			helpers.assert_eq(source.chars, 0)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-destination"])
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-switch-projection: existing date and source app filters cover the alternate schema keys", function()
+		local apps = { "owned' source", "café" }
+		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+			reader.read_manifest("/db/metrics.sqlite", "2026-10-01", "2026-10-05", apps)
+		end)
+		local matches = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then
+				matches = matches + 1
+				helpers.assert_contains(sql, "app_from AS app")
+				helpers.assert_contains(sql, "date >= '2026-10-01'")
+				helpers.assert_contains(sql, "date <= '2026-10-05'")
+				helpers.assert_contains(sql, "app IN ('owned'' source','café')")
+			end
+		end
+		helpers.assert_eq(matches, 1)
+		helpers.assert_eq(#apps, 2)
+		helpers.assert_eq(apps[1], "owned' source")
+	end)
+	helpers.it("linux-sqlite-switch-projection: absent transitions retain optional maps and healthy completion", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return '[{"date":"2026-10-05","app":"owned-control","chars":3}]'
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2026-10-05"]["owned-control"].chars, 3)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-control"].switches_to)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-switch-projection: failed destination read refuses complete cache admission", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then return { body = "[]", status = 1 } end
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return '[{"date":"2026-10-05","app":"owned-control","chars":3}]'
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2026-10-05"]["owned-control"].chars, 3)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-control"].switches_to)
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)
