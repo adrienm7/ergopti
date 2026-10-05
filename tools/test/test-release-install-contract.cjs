@@ -176,7 +176,7 @@ function checkLinuxInstallCallers() {
 	// The manager defines them; its own bodies are checked below.
 	const installs = luaCallers(
 		'linux',
-		/\.(download_update|download_release|install_update|install_release_archive)\(/
+		/\.(download_update|download_release|download_offered|install_update|install_release_archive)\(/
 	).filter((file) => file !== 'modules/updater/manager.lua');
 	expect(
 		same(
@@ -189,7 +189,7 @@ function checkLinuxInstallCallers() {
 		const body = luaBody('linux', 'modules/updater/manager.lua', name);
 		expect(body !== '', `Linux: ${name} not found`);
 		expect(
-			!/download_update|download_release|install_update|install_release_archive|start_download/.test(
+			!/download_update|download_release|download_offered|install_update|install_release_archive|start_download/.test(
 				body
 			),
 			`Linux: ${name} must only announce a release`

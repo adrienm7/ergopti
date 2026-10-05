@@ -1,0 +1,54 @@
+{
+	"slot": "parent authorized focused Lua/JS sequential scratch replay; explicitly closed",
+	"candidate_lua": {
+		"command": "tools/rtk/rtk.sh lua packets/versions14/replay.lua",
+		"exit": 0,
+		"passed": 22,
+		"failed": 0,
+		"skipped": 0,
+		"new": 12,
+		"original": 10
+	},
+	"preimage_lua": {
+		"command": "tools/rtk/rtk.sh lua packets/versions14/replay.lua before",
+		"exit": 0,
+		"passed": 1,
+		"expected_failed": 11,
+		"skipped": 0,
+		"note": "Harness requires at least one expected red; most reds are absent receipt/action APIs, verification preservation passes."
+	},
+	"candidate_page": {
+		"command": "tools/rtk/rtk.sh node packets/versions14/replay/tools/test/test-changelog-managed-failure.cjs",
+		"exit": 0,
+		"passed": 7,
+		"failed": 0,
+		"skipped": 0
+	},
+	"original_page": {
+		"command": "tools/rtk/rtk.sh node packets/versions14/replay/tools/test/test-changelog-release-install.cjs",
+		"exit": 0,
+		"checks": 55,
+		"failed": 0
+	},
+	"preimage_page": {
+		"command": "tools/rtk/rtk.sh node packets/versions14/before-replay/tools/test/test-changelog-managed-failure.cjs",
+		"exit": 1,
+		"expected_first_failure": "Actual old page does not show translated proxy cause from native canonical report.",
+		"remaining_controls": "Not executed after first assertion."
+	},
+	"first_authored_page_replay": {
+		"exit": 1,
+		"passed_before_error": 6,
+		"cause": "New expected verification template forgot existing {tag}/{path} expansion.",
+		"repair": "Expected translation explicitly expands independent fixture tag/path; production unchanged; all assertions retained."
+	},
+	"not_executed": [
+		"Full JavaScript suite",
+		"verify-change",
+		"Real Chromium Versions scenario",
+		"Windows AHK controls",
+		"macOS native Versions tests",
+		"Linux native GUI/transport integration",
+		"Native packaging/installation"
+	]
+}

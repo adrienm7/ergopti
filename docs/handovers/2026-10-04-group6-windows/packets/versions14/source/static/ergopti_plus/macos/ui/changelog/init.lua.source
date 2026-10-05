@@ -1,0 +1,916 @@
+--- ui/changelog/init.lua
+
+--- ==============================================================================
+--- MODULE: Changelog Window
+--- DESCRIPTION:
+--- Floating webview that fetches GitHub release notes and renders them as a
+--- two-column UI: a sidebar listing available releases and a markdown content
+--- pane. Uses the _shared/ui/changelog/ HTML/CSS/JS assets so Windows (AHK +
+--- WebView2) and a future Linux driver can reuse the same frontend without
+--- duplication.
+---
+--- FEATURES & RATIONALE:
+--- 1. Native fetch proxy: hs.http.asyncGet (NSURLSession, which applies the
+---    system proxy and PAC settings) is used instead of the WebKit fetch() API.
+---    The Lua backend injects the result via evaluateJavaScript("injectReleases(…)")
+---    so the JS never touches the network directly.
+--- 1b. Bounded sources: every request carries a deadline, and a failed GitHub
+---    API request falls back to the public releases Atom feed through the
+---    shared order in _shared/lua/updater/release_sources.lua. The outcome, or
+---    a translated error, always reaches the page.
+--- 2. Singleton window: a second call to M.open() while the window is already
+---    visible brings it to the front instead of opening a duplicate.
+--- 3. Channel routing: the ids come from the shared update-channel registry.
+---    The window opens on the channel the caller names (the subscribed one); a
+---    tab only changes the view. The page's subscription banner goes through
+---    the caller's channel owner (modules/updater/channel.lua), and the owner's
+---    changes, from the menu or the page, are pushed back to the open page.
+--- 4. One document policy: the page's browser-host CSP only allows external
+---    same-origin scripts, which blocks every script once inlined, so the page
+---    never left its loading state. The generated document instead carries the
+---    shared driver policy (_shared/lua/webview/document_csp.lua) with a
+---    per-document nonce on every script.
+--- 5. One-click release install: « Install this version » posts install_release.
+---    The shared sequence (_shared/lua/updater/release_install.lua) backs the
+---    configuration up (modules/updater/config_backup.lua), finds the release
+---    in the list this window last fetched from the GitHub API, then downloads
+---    and verifies it and arms the app replacement
+---    (modules/updater/release_installer.lua) before the controlled quit. Each
+---    phase reaches the page through setInstallProgress(). The restore banner
+---    posts restore_backup; the driver reloads on the restored configuration.
+--- ==============================================================================
+
+local M = {}
+local WebviewResult = require("adapters.webview_result")
+
+local Logger     = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
+local Paths      = require("infra.paths")
+local ui_builder = require("ui.ui_builder")
+local i18n       = require("infra.i18n")
+local FileSystem = require("adapters.file_system")
+local Json       = require("json")
+local JsonCodec  = require("adapters.json_codec")
+local ReleaseSources = require("updater.release_sources")
+local UpdateChannels = require("updater.channels")
+local DocumentCsp = require("webview.document_csp")
+local ReleaseInstall = require("updater.release_install")
+local VersionOrder = require("updater.version")
+local NetworkFailure = require("network.failure")
+
+local LOG = "changelog_window"
+
+local _sources = nil
+local _channels = nil
+
+--- Loads the release sources once from the shared updater defaults.
+--- @return table|nil sources
+--- @return string|nil error
+local function load_sources()
+	if _sources then return _sources, nil end
+	local path = Paths.shared("modules/updater/defaults.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then return nil, "shared updater defaults are unreadable" end
+	local ok, decoded = pcall(Json.decode, raw)
+	if not ok then return nil, "shared updater defaults are not valid JSON" end
+	local sources, err = ReleaseSources.resolve(decoded)
+	if not sources then return nil, err end
+	_sources = sources
+	return sources, nil
+end
+
+--- Loads the shared update-channel registry once. Without it no channel id is
+--- accepted: a guessed list could show or subscribe to a channel that is gone.
+--- @return table|nil registry updater.channels interpreter
+--- @return string|nil error
+local function load_channels()
+	if _channels then return _channels, nil end
+	local path = Paths.shared("modules/updater/channels.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then return nil, "the shared update channel registry is unreadable" end
+	local ok, decoded = pcall(Json.decode, raw)
+	if not ok then return nil, "the shared update channel registry is not valid JSON" end
+	local registry, err = UpdateChannels.load(decoded)
+	if not registry then return nil, err end
+	_channels = registry
+	return registry, nil
+end
+
+--- Returns the registry id a caller or the page named, or nil with a log line.
+--- @param channel any Id to check (exact; aliases are not accepted here).
+--- @param purpose string What the id is for, for the log.
+--- @return string|nil id
+local function registry_channel(channel, purpose)
+	local registry, err = load_channels()
+	if not registry then
+		Logger.error(LOG, "Refused the %s: %s.", purpose, tostring(err))
+		return nil
+	end
+	if type(channel) == "string" and registry.channel(channel) ~= nil then return channel end
+	Logger.warn(LOG, "Refused the %s: '%s' is not a registry channel.", purpose, tostring(channel))
+	return nil
+end
+
+--- Bounded GET over hs.http. NSURLSession honours the system proxy; the
+--- deadline guarantees one terminal answer even when a proxy holds the socket.
+--- @param url string
+--- @param headers table
+--- @param timeout_ms number
+--- @param callback function Receives status, body, err exactly once.
+local function http_get(url, headers, timeout_ms, callback)
+	local settled = false
+	local function settle(status, body, err)
+		if settled then return end
+		settled = true
+		callback(status, body, err)
+	end
+	-- The deadline is armed before the request so a request that raises or never
+	-- answers still ends; an unarmed deadline is itself a terminal failure.
+	if not DeferredWork.after(timeout_ms / 1000, function() settle(0, "", "timeout") end,
+		"changelog.fetch_deadline")
+	then
+		settle(0, "", "deadline unavailable")
+		return
+	end
+	local ok = pcall(hs.http.asyncGet, url, headers, function(status, body, _)
+		status = tonumber(status) or 0
+		if status < 0 then
+			settle(0, "", "network error " .. tostring(status))
+		else
+			settle(status, body, nil)
+		end
+	end)
+	if not ok then settle(0, "", "request refused") end
+end
+
+M._http_get = http_get
+
+-- Window geometry is resolved at open time from the shared manifest
+-- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
+-- width/height constant: hardcoding here is what caused the cross-driver drift.
+
+local _wv       = nil
+local _wv_committed = false
+local _focus_owner = nil
+local _ucc      = nil
+local _ready    = false
+local _queued   = {}
+local _fetch_generation = 0
+local _opening = nil
+local _closing = false
+-- The caller's update-channel owner ({ get, set, subscribe }), or nil when the
+-- window was opened without one (no subscription banner then).
+local _channel_owner = nil
+-- The release list the last fetch published: { kind = "json", releases } or
+-- { kind = "feed" }. An install finds its release here, so the page and the
+-- host act on one list.
+local _last_list = nil
+-- The install session (created on the first request).
+local _install_session = nil
+local _failure_contract = nil
+
+-- Test seam: { updater, backup, installer, coordinator }.
+M._deps = nil
+
+--- The owners the install and the restore go through.
+--- @return table
+local function deps()
+	if M._deps then return M._deps end
+	return {
+		updater = require("modules.updater"),
+		backup = require("modules.updater.config_backup"),
+		installer = require("modules.updater.release_installer"),
+		coordinator = require("infra.termination_coordinator"),
+	}
+end
+
+--- Checks publication authority independently of retained native cleanup handles.
+--- @param owner table? Captured session identity.
+--- @param view userdata? Captured native recipient.
+--- @param controller userdata? Captured bridge controller.
+--- @return boolean current
+local function session_is_current(owner, view, controller)
+	return owner ~= nil and _focus_owner == owner and view ~= nil and _wv == view and _ucc == controller
+end
+
+-- The shared UI assets live in …/ergopti_plus/_shared/ui/changelog/. Resolved
+-- through the single shared-tree resolver (Paths.shared); the trailing slash is
+-- preserved because the consumer concatenates "index.html" onto this directory.
+local ASSETS_DIR = (Paths.shared("ui/changelog") or "") .. "/"
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 1/ Javascript Bridge =======
+-- ====================================
+-- ====================================
+
+--- Observes admission and execution for one exact queued publication.
+--- @param publication table Script, request generation, and optional release count.
+--- @param owner table Native session identity.
+--- @param view userdata Exact native recipient.
+--- @param controller userdata Exact message bridge.
+--- @return boolean submitted
+local function submit_publication(publication, owner, view, controller)
+	local function current()
+		return session_is_current(owner, view, controller)
+			and (publication.generation == nil or publication.generation == _fetch_generation)
+	end
+	if not current() then return false end
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if not current() or owner.javascript_failures[category] then return end
+		owner.javascript_failures[category] = true
+		Logger.error(LOG, "Changelog JavaScript %s (generation=%s; content withheld; repeats suppressed).",
+			category, tostring(publication.generation))
+	end
+	local admitted, settled, failed, early_completion = false, false, false, nil
+	local function complete(_, script_error)
+		if settled then return end
+		if not admitted then early_completion = early_completion or { error = script_error }; return end
+		settled = true
+		if not current() then return end
+		if WebviewResult.is_error(script_error) then failed = true; report("execution failed"); return end
+		if publication.release_count ~= nil then
+			Logger.done(LOG, "Injected %d release(s) into changelog UI.", publication.release_count)
+		end
+	end
+	local ok, result = pcall(function() return view:evaluateJavaScript(publication.code, complete) end)
+	if not ok or result ~= view then
+		settled = true
+		report(ok and "submission refused" or "submission raised")
+		return false
+	end
+	admitted = true
+	if early_completion then complete(nil, early_completion.error) end
+	return not failed and current()
+end
+
+--- Runs JavaScript or queues it without claiming execution before completion.
+--- @param code string Raw JavaScript to evaluate.
+--- @param generation number|nil Fetch generation that owns this publication.
+--- @param release_count number|nil Number of releases acknowledged after execution.
+local function eval(code, generation, release_count)
+	if generation ~= nil and generation ~= _fetch_generation then return end
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
+	local publication = { code = code, generation = generation, release_count = release_count }
+	if _ready then
+		return submit_publication(publication, owner, view, controller)
+	else
+		table.insert(_queued, publication)
+		if #_queued > 300 then table.remove(_queued, 1) end
+	end
+end
+
+--- Advances the fetch generation and invalidates every earlier publication.
+--- @return number generation Newly active generation.
+local function next_fetch_generation()
+	_fetch_generation = _fetch_generation + 1
+	return _fetch_generation
+end
+
+--- Escapes a Lua string for safe injection into a JS string literal.
+--- @param s string
+--- @return string
+local function js_str(s)
+	if s == nil then return "null" end
+	return '"' .. tostring(s)
+		:gsub("\\", "\\\\")
+		:gsub('"',  '\\"')
+		:gsub("\n", "\\n")
+		:gsub("\r", "")
+		.. '"'
+end
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 2/ GitHub API Fetch Helpers =======
+-- ===========================================
+-- ===========================================
+
+--- Validates external release records before filtering or JavaScript publication.
+--- @param data any Native decoded response.
+--- @param body string Original JSON, retaining the outer array/object distinction.
+--- @return boolean valid
+local function valid_releases(data, body)
+	if type(data) ~= "table" then return false end
+	local source = body:gsub("^\239\187\191", "", 1)
+	if not source:match("^[ \t\r\n]*%[") then return false end
+	local count = 0
+	for index, release in pairs(data) do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(release) ~= "table" then
+			return false
+		end
+		count = count + 1
+		for key in pairs(release) do
+			if type(key) ~= "string" then return false end
+		end
+		for _, field in ipairs({ "tag_name", "body", "published_at", "html_url" }) do
+			if release[field] ~= nil and type(release[field]) ~= "string" then return false end
+		end
+		if release.prerelease ~= nil and type(release.prerelease) ~= "boolean" then return false end
+	end
+	for index = 1, count do
+		if data[index] == nil then return false end
+	end
+	return true
+end
+
+--- Fetches releases from the GitHub API and injects them into the webview. The
+--- page keeps what the channel's view lists (the shared registry's tag rule).
+--- @param channel string Registry channel id.
+local function fetch_and_inject(channel)
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
+	if not registry_channel(channel, "release fetch") then return end
+	local request_generation = next_fetch_generation()
+
+	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
+	if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
+
+	local sources, sources_err = load_sources()
+	if not sources then
+		Logger.error(LOG, "Release sources unavailable: %s.", tostring(sources_err))
+		eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_network"))),
+			request_generation)
+		return
+	end
+
+	ReleaseSources.fetch(sources, M._http_get, Logger, LOG, function(result)
+		if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
+
+		if result.error then
+			_last_list = nil
+			eval(string.format("injectError(%s)", js_str(i18n.get(result.error_key))), request_generation)
+			return
+		end
+		if result.kind == "feed" then
+			_last_list = { kind = "feed" }
+			-- The shared page converts the feed; the text travels as a JS string.
+			eval(string.format("injectReleasesFeed(%s,%s)", js_str(result.body), js_str(channel)),
+				request_generation)
+			return
+		end
+		local body = result.body
+
+		-- Decode native null semantics into an independently owned tree.
+		local data, decode_err = JsonCodec.decode(body)
+		if decode_err ~= nil or type(data) ~= "table" then
+			Logger.warn(LOG, "GitHub API JSON parse failed.")
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
+			return
+		end
+		if not valid_releases(data, body) then
+			Logger.warn(LOG, "GitHub release response schema is invalid; response content withheld.")
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
+			return
+		end
+
+		local releases = data
+		_last_list = { kind = "json", releases = data }
+		local ok_enc, json = pcall(hs.json.encode, releases)
+		if not ok_enc or not json then
+			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
+			return
+		end
+
+		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
+			request_generation, #releases)
+	end)
+end
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 3/ Release Install ================
+-- ===========================================
+-- ===========================================
+
+--- Encodes a host message for the page; "<" is escaped so no value can close
+--- the script it is evaluated in.
+--- @param value table
+--- @return string|nil
+local function js_value(value)
+	local ok, encoded = pcall(Json.encode, value)
+	if not ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "A Versions page message could not be encoded.")
+		return nil
+	end
+	return (encoded:gsub("<", "\\u003c"))
+end
+
+--- Why this build cannot install a release, or nil when it can.
+--- @return string|nil key Locale key the page shows.
+local function install_blocked()
+	if deps().updater.is_local_source() then return "changelog_window.install_blocked_source" end
+	return nil
+end
+
+--- The newest restorable pre-install backup as the page describes it, or nil.
+--- @return table|nil
+local function restorable_backup()
+	local owner = deps().backup.owner()
+	local latest = owner and owner.latest("pre_install") or nil
+	if not latest then return nil end
+	return { id = latest.id, created_at = latest.created_at, tag = latest.tag }
+end
+
+--- Finds a release in the list the page shows.
+--- @param tag string
+--- @return table|nil release Decoded release object.
+--- @return string|nil reason Locale key when it is not there.
+local function find_release(tag)
+	if not _last_list then return nil, ReleaseInstall.REASON.unknown_release end
+	-- The Atom feed carries no asset list and no digest.
+	if _last_list.kind ~= "json" then return nil, ReleaseInstall.REASON.no_details end
+	local registry = load_channels()
+	if not registry or not registry.channel_for_tag(tag) then return nil, ReleaseInstall.REASON.unknown_release end
+	local wanted = VersionOrder.normalize_tag(tag)
+	for _, release in ipairs(_last_list.releases) do
+		if type(release) == "table" and VersionOrder.normalize_tag(release.tag_name) == wanted then
+			return release, nil
+		end
+	end
+	return nil, ReleaseInstall.REASON.unknown_release
+end
+
+--- The install session, over the configuration backup, the release installer
+--- and the controlled quit.
+--- @return table session
+local function failure_contract()
+	if _failure_contract then return _failure_contract end
+	local path = Paths.shared("modules/network/managed_network.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
+	_failure_contract = NetworkFailure.new(Json.decode(raw))
+	return _failure_contract
+end
+
+local function install_session()
+	if _install_session then return _install_session end
+	_install_session = ReleaseInstall.new({
+		logger = Logger,
+		log = LOG,
+		failure_contract = failure_contract,
+		failure_owner = function()
+			return { list = _last_list, generation = _fetch_generation,
+				owner = _focus_owner, view = _wv, controller = _ucc }
+		end,
+		failure_current = function(owner)
+			return type(owner) == "table" and owner.list ~= nil and owner.list == _last_list
+				and owner.generation == _fetch_generation
+				and session_is_current(owner.owner, owner.view, owner.controller)
+		end,
+		blocked = install_blocked,
+		find_release = function(tag) return find_release(tag) end,
+		backup = function(release)
+			local owner, err = deps().backup.owner()
+			if not owner then return nil, err end
+			return owner.create("pre_install", { tag = release.tag_name,
+				from_version = deps().updater.current_version() })
+		end,
+		resolve_asset = function(release) return deps().installer.find_asset(release) end,
+		download = function(asset, _, done)
+			return deps().installer.stage(asset, function(staged, stage, detail, failure_receipt)
+				done(staged, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download,
+					detail, failure_receipt)
+			end) == true
+		end,
+		install = function(staged)
+			local armed, err = deps().installer.arm_swap(staged)
+			if armed == true then return true end
+			return false, ReleaseInstall.REASON.install, err
+		end,
+		restart = function()
+			return deps().coordinator.request_user_exit("release_install") == true
+		end,
+		report = function(message)
+			local encoded = js_value(message)
+			if encoded then eval(string.format("setInstallProgress(%s)", encoded)) end
+		end,
+	})
+	return _install_session
+end
+
+--- Restores a pre-install backup and reloads the driver on it.
+--- @param id any Backup id posted by the page.
+local function restore_from_page(id)
+	local function answer(message)
+		local encoded = js_value(message)
+		if encoded then eval(string.format("setRestoreProgress(%s)", encoded)) end
+	end
+	if install_session().busy() then
+		answer({ phase = "failed", reason_key = "changelog_window.restore_error_unexpected" })
+		return
+	end
+	answer({ phase = "restoring" })
+	local owner = deps().backup.owner()
+	if not owner then
+		answer({ phase = "failed", reason_key = "changelog_window.restore_error_backup" })
+		return
+	end
+	local restored, reason, pre = owner.restore(id)
+	if not restored then
+		answer({ phase = "failed", backup_path = pre and pre.path or nil,
+			reason_key = reason == "missing" and "changelog_window.restore_error_missing"
+				or reason == "backup" and "changelog_window.restore_error_backup"
+				or "changelog_window.restore_error_unexpected" })
+		return
+	end
+	answer({ phase = "restored", backup_path = pre and pre.path or nil })
+	local ok, accepted = pcall(deps().coordinator.request_reload, "config_restore")
+	if not ok or accepted ~= true then
+		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(accepted))
+	end
+end
+
+--- The page seeds of what this build can install and restore.
+--- @return string script
+local function install_seed()
+	local ok, seed = pcall(function()
+		local blocked = install_blocked()
+		local backup = restorable_backup()
+		return string.format("window.__installed_version=%s;window.__install_blocked_key=%s;"
+			.. "window.__restorable_backup=%s;", js_str(deps().updater.current_version()),
+			js_str(blocked or ""), backup and js_value(backup) or "null")
+	end)
+	if not ok then
+		Logger.error(LOG, "The Versions page gets no install buttons: %s.", tostring(seed))
+		return ""
+	end
+	return seed
+end
+
+M._install_seed = install_seed
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 4/ Window Lifecycle Helpers =======
+-- ===========================================
+-- ===========================================
+
+--- Flushes the queued JS calls now that the page is ready.
+local function flush_queue()
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
+	_ready = true
+	local q = _queued
+	_queued = {}
+	for _, pending in ipairs(q) do
+		submit_publication(pending, owner, view, controller)
+	end
+end
+
+--- Subscribes to the channel the page asked for through the caller's channel
+--- owner, then answers the page with the subscription that holds afterwards,
+--- so a refusal shows as a failure instead of a banner left pending.
+--- @param channel any Channel id posted by the page.
+--- @return boolean committed
+local function subscribe_from_page(channel)
+	local channel_owner = _channel_owner
+	local id = registry_channel(channel, "subscription")
+	local committed = false
+	if id and not channel_owner then
+		Logger.error(LOG, "Refused the subscription: the window was opened without an update channel owner.")
+	elseif id then
+		local ok, result = pcall(channel_owner.set, id)
+		if not ok then Logger.error(LOG, "The update channel owner raised: %s.", tostring(result)) end
+		committed = ok and result == true
+	end
+	local held = channel_owner and channel_owner.get() or nil
+	eval(string.format("setSubscribedChannel(%s,%s)", js_str(held), committed and "true" or "false"))
+	return committed
+end
+
+--- Creates a distinct native message controller for one window session.
+--- @param owner table Exact session identity.
+local function ensure_ucc(owner)
+	_ucc = hs.webview.usercontent.new("changelog_bridge")
+	local controller = _ucc
+	if _focus_owner ~= owner or not controller then return false end
+	local registered = controller:setCallback(function(msg)
+		if not session_is_current(owner, _wv, controller) then return end
+		if type(msg) ~= "table" then return end
+		local body = msg.body
+		if type(body) == "string" and body == "ready" then
+			flush_queue()
+			return
+		end
+
+		-- host_bridge.js's makeHostBridge() posts non-string payloads RAW (no
+		-- JSON.stringify) on WKWebView — WebKit itself converts the JS object into
+		-- a native Lua table, so `body` already IS that table here. Passing it
+		-- through hs.json.decode (which expects a JSON *string*) always throws,
+		-- and a bare pcall around it swallowed the error with zero logging —
+		-- matching the convention already used by action_picker / hotstring_editor
+		-- / hotstrings_config_window / metrics_apps, read the table directly.
+		if type(body) ~= "table" then return end
+
+		if body.action == "fetch" then
+			fetch_and_inject(body.channel)
+		elseif body.action == "set_channel" then
+			subscribe_from_page(body.channel)
+		elseif body.action == "install_release" then
+			-- Only this click installs a chosen release: nothing else calls the session.
+			install_session().install(body.tag, body.channel)
+		elseif body.action == "install_failure_action" then
+			if _install_session then
+				_install_session.failure_action(body.operation, body.epoch, body.id)
+			end
+		elseif body.action == "restore_backup" then
+			restore_from_page(body.id)
+		elseif body.action == "open_url" and type(body.url) == "string" then
+			if ui_builder.open_http_url(body.url) then
+				Logger.info(LOG, "Opened changelog release URL.")
+			end
+		end
+	end)
+	return registered == controller and _focus_owner == owner
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 5/ Public API =======
+-- =============================
+-- =============================
+
+--- Builds one candidate while its transaction excludes reentrant constructors.
+--- @param channel string Requested release channel.
+--- @param opening_generation number Initial fetch authority.
+--- @param focus_owner table Exact construction identity.
+--- @return boolean committed
+local function build_window(channel, opening_generation, focus_owner)
+	Logger.start(LOG, "Opening changelog window (channel=%s)…", channel)
+	if _focus_owner ~= focus_owner then return false end
+	if not ensure_ucc(focus_owner) then return false end
+	_ready  = false
+	_queued = {}
+
+	-- Inject repo config and default channel before i18n boot so script.js
+	-- reads the correct values during its init() IIFE.
+	-- Unusable defaults are reported by the first fetch; the page then keeps its
+	-- own repository identity for links.
+	local sources = load_sources()
+	local repository = sources and string.format(
+		"window.__changelog_gh_owner=%s;window.__changelog_gh_repo=%s;",
+		js_str(sources.owner), js_str(sources.repo)) or ""
+	-- The subscription banner needs the owner's channel; Sparkle reads the new
+	-- feed at its next check, so a change never restarts the app here.
+	local subscription = _channel_owner and string.format(
+		"window.__subscribed_channel=%s;window.__channel_switch_restarts=false;",
+		js_str(_channel_owner.get())) or ""
+	local config_script = string.format(
+		"<script>%s%s%swindow.__changelog_channel=%s;</script>", repository, subscription, install_seed(),
+		js_str(channel))
+
+	-- Build HTML with repo config injected before script.js IIFE runs.
+	-- ui_builder.build_injected_html inlines CSS/JS; we then patch the result
+	-- to prepend the config block right after <head> so window.__changelog_*
+	-- are set before script.js's init() fires.
+	local raw_html = ui_builder.build_injected_html(ASSETS_DIR)
+	if _focus_owner ~= focus_owner or type(raw_html) ~= "string" then return false end
+	local configured_html = raw_html:gsub("(<head[^>]*>)", function(tag)
+		return tag .. config_script
+	end, 1)
+	local ok_uuid, uuid = pcall(hs.host.uuid)
+	local nonce = ok_uuid and type(uuid) == "string" and uuid:gsub("[^%w]", "") or ""
+	if nonce == "" then
+		Logger.error(LOG, "Cannot build changelog: CSP nonce generation failed.")
+		return false
+	end
+	local final_html, csp_err = DocumentCsp.apply(configured_html, nonce)
+	if not final_html then
+		Logger.error(LOG, "Cannot build changelog: %s.", tostring(csp_err))
+		return false
+	end
+
+	local geo = ui_builder.get_app_geometry("changelog")
+	if not geo or _focus_owner ~= focus_owner then return false end
+	local frame = ui_builder.get_centered_frame(geo.width, geo.height)
+	local title = i18n.get("changelog_window.window_title")
+	if _focus_owner ~= focus_owner then return false end
+	local candidate = nil
+	local closed = false
+	local function candidate_is_owned()
+		return closed ~= true and candidate ~= nil and _wv == candidate and _focus_owner == focus_owner
+	end
+	local webview = ui_builder.show_webview({
+		frame             = frame,
+		title             = title,
+		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
+		allow_new_windows = false,
+		usercontent       = _ucc,
+		-- Pass pre-built HTML directly; skip assets_dir so show_webview does
+		-- not call build_injected_html a second time.
+		html_string       = final_html,
+		on_navigation     = function(action)
+			if not candidate_is_owned() then return false end
+			if action == "didFinishNavigation" then
+				-- Safety flush after navigation — belt-and-suspenders alongside
+				-- the "ready" message from script.js.
+				DeferredWork.after(0.15, function()
+					if not candidate_is_owned() then return end
+					if not _ready then flush_queue() end
+					-- Kick off the first fetch from the Lua side so the JS
+					-- fallback timeout is beaten and we get the native proxy path.
+					if candidate_is_owned() and _fetch_generation == opening_generation then
+						fetch_and_inject(channel)
+					end
+				end, "changelog.navigation")
+			end
+			return true
+		end,
+		on_close          = function()
+			closed = true
+			if _wv ~= candidate then return end
+			next_fetch_generation()
+			_wv = nil
+			_focus_owner = nil
+			_wv_committed = false
+			_ready = false
+			_queued = {}
+			if not _opening and not _closing then M.close() end
+		end,
+		on_webview_created = function(owned)
+			if _wv ~= nil or _focus_owner ~= focus_owner then return false end
+			candidate = owned
+			_wv = owned
+			_wv_committed = false
+			return true
+		end,
+		is_current = function()
+			return candidate_is_owned()
+		end,
+	})
+	if webview == nil or webview ~= candidate or closed or not candidate_is_owned() then return false end
+	_wv_committed = true
+
+	-- Safety: if didFinishNavigation fires very fast and queues pile up,
+	-- flush after 1.5 s regardless.
+	local scheduled = DeferredWork.after(1.5, function()
+		if candidate_is_owned() and not _ready then flush_queue() end
+	end, "changelog.ready_fallback")
+
+	return scheduled == true and candidate_is_owned()
+end
+
+--- Tells the open page which channel the user now receives updates from. The
+--- channel owner calls it after every durable change, from the menu or the page.
+--- @param channel string Registry channel id.
+--- @return boolean pushed Whether an open page was told.
+function M.push_subscribed_channel(channel)
+	local id = registry_channel(channel, "subscription update")
+	if not id or not session_is_current(_focus_owner, _wv, _ucc) then return false end
+	eval(string.format("setSubscribedChannel(%s,true)", js_str(id)))
+	return true
+end
+
+--- Opens or focuses the changelog after settling every prior cleanup obligation.
+--- @param opts table|nil { channel = registry id shown first, channel_owner =
+---   update-channel owner (modules/updater/channel.lua) behind the banner }.
+--- @return boolean committed
+function M.open(opts)
+	if _opening or _closing then return false end
+	opts = type(opts) == "table" and opts or {}
+	local channel_owner = opts.channel_owner
+	if channel_owner ~= nil and (type(channel_owner) ~= "table" or type(channel_owner.get) ~= "function"
+		or type(channel_owner.set) ~= "function" or type(channel_owner.subscribe) ~= "function")
+	then
+		Logger.error(LOG, "Refused to open the changelog: the channel owner is not an update-channel owner.")
+		return false
+	end
+	local registry, registry_err = load_channels()
+	if not registry then
+		Logger.error(LOG, "Refused to open the changelog: %s.", tostring(registry_err))
+		return false
+	end
+	local channel
+	if opts.channel ~= nil then
+		channel = registry_channel(opts.channel, "channel to open on")
+		if not channel then return false end
+	else
+		channel = channel_owner and channel_owner.get() or registry.ids()[1]
+	end
+	-- Adopted once the previous session is settled: closing it releases its owner.
+	local function adopt_channel_owner()
+		if not channel_owner then return end
+		_channel_owner = channel_owner
+		channel_owner.subscribe("changelog", M.push_subscribed_channel)
+	end
+
+	if not _wv and _ucc and M.close() ~= true then return false end
+
+	-- Singleton: reuse existing window.
+	if _wv then
+		if _wv_committed ~= true or _focus_owner == nil then
+			if M.close() ~= true then return false end
+		else
+			local view, controller, focus_owner = _wv, _ucc, _focus_owner
+			Logger.info(LOG, "Changelog window already open — bringing to front.")
+			if not session_is_current(focus_owner, view, controller) then return false end
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner
+					and _wv == view and _ucc == controller and _wv_committed == true
+			end })
+			if not session_is_current(focus_owner, view, controller) then return false end
+			if channel_owner then
+				adopt_channel_owner()
+				M.push_subscribed_channel(channel_owner.get())
+			end
+			-- Reload releases for the requested channel.
+			fetch_and_inject(channel)
+			return true
+		end
+	end
+
+	adopt_channel_owner()
+	local opening_generation = next_fetch_generation()
+	local owner = {}
+	_opening, _focus_owner = owner, owner
+	local ok, built = pcall(build_window, channel, opening_generation, owner)
+	_opening = nil
+	if not ok or built ~= true or _focus_owner ~= owner then
+		_focus_owner = nil
+		local cleaned = M.close()
+		Logger.error(LOG, "Changelog construction did not commit (outcome=%s; cleanup=%s; error content withheld).",
+			ok and "refused" or "raised", cleaned == true and "complete" or "pending")
+		return false
+	end
+	Logger.success(LOG, "Changelog window created.")
+	return _focus_owner == owner and _wv_committed == true
+end
+
+--- Closes the changelog window if open.
+--- @return boolean committed
+function M.close()
+	if _install_session then _install_session.retire() end
+	if _closing then return false end
+	if _opening then
+		_focus_owner = nil
+		return false
+	end
+	if not _wv and not _ucc then return true end
+	_closing = true
+	_focus_owner = nil
+	local owned = _wv
+	next_fetch_generation()
+	_ready = false
+	_queued = {}
+	_wv_committed = false
+	local ok = not owned or pcall(function() owned:delete() end)
+	if not ok then
+		-- A synchronous on_close may already have cleared the logical owner before
+		-- the native deletion raised. Retain only the exact cleanup handle so open()
+		-- cannot create a second changelog beside an ambiguously live first one.
+		_wv = owned
+		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained (error content withheld).")
+		_closing = false
+		return false
+	end
+	if _wv == owned then
+		next_fetch_generation()
+		_wv = nil
+		_wv_committed = false
+		_ready = false
+		_queued = {}
+	end
+	local controller = _ucc
+	if controller then
+		local released, result = pcall(function() return controller:setCallback(nil) end)
+		if not released or result ~= controller then
+			Logger.error(LOG, "Changelog bridge release did not commit; exact controller retained (error content withheld).")
+			_closing = false
+			return false
+		end
+		if _ucc == controller then _ucc = nil end
+	end
+	_channel_owner = nil
+	_closing = false
+	Logger.info(LOG, "Changelog window closed.")
+	return true
+end
+
+return M

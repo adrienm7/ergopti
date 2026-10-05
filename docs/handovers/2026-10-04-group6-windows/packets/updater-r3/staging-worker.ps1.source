@@ -1,0 +1,35 @@
+param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null)
+$ErrorActionPreference = "Stop"
+$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()}
+function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}
+try {
+  . $DownloadModulePath
+  . (Join-Path (Split-Path -Parent $DownloadModulePath) "ergopti_network_routes.ps1")
+  $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}
+  $Request=[System.Net.HttpWebRequest]::Create($Url)
+  $Request.ReadWriteTimeout = $TimeoutMs
+  $ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick
+  $State.Stage="file_read"
+  $ActualSize=(Get-Item -LiteralPath $NewExe).Length
+  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }
+  if ($ActualSize -lt $MinimumSize) { $State.Reason="verify";throw "Downloaded file is too small" }
+  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { $State.Reason="verify";throw "Missing or invalid trusted SHA-256 digest" }
+  $ActualDigest=(Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()
+  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }
+  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))
+  $State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)
+  $State.Stage="file_write"
+  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+  [IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))
+  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+  Write-Output "READY"
+  exit 0
+} catch {
+  $Receipt=@{}
+  if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }
+  CleanWorker $NewExe "staged_executable"
+  CleanWorker $SwapScriptPath "swap_worker"
+  @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress
+  exit 1
+}
