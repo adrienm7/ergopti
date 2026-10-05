@@ -1953,6 +1953,15 @@ the original 27 controls and 30 candidate controls pass without skips. Actual
 compiler/linker confinement, both positive AppleEvent sends, the denied send
 and Brew install/upgrade/refusal/recovery still require macOS qualification.
 
+Integrated manual run 37248612190 builds the release launcher and passes
+macOS stubbed units/E2E, but refuses the actual Sparkle census and native
+AppleEvent receiver liveness. The prior compiler boundary is passed; this
+is not proof of successful AppleEvent containment or archive lifecycle.
+No bounded census detail reaches the failure annotations in this run.
+Swift failure evidence is retained; archive packaging and installation are
+skipped, and publication is skipped. Keep item 36 open and preserve all
+physical ownership and independent positive/negative assertions.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
@@ -2912,6 +2921,16 @@ SQLite profile and AT-SPI interpreter-option scenarios now pass after upstream
 fixture provisioning, which this branch preserves. The reference's older model
 protocol also passes; do not claim a baseline failure-to-success for that case.
 Final candidate and integrated native qualification remain required.
+
+The bounded group-6 slices are integrated without squash in dev
+02ad69e06ecea424de11facf3dced404a6fdd602. Manual run 37248612190 tests
+d993de4fc26d8febceac685a334246bb9bdce998, whose complete source tree
+is identical to that integrated commit. Shared checks and Linux units pass;
+the four executed reference E2E scenarios above still fail, leaving Linux
+packaging and installation skipped. The managed model retry scenario passes.
+The macOS native archive cohort also refuses; release publication is skipped.
+Windows remains the twelve-step PC continuation. Items 36 and 62 are partial;
+no completion or native enterprise-network qualification is inferred.
 
 The unintegrated Linux HTTP producer is preserved in the
 [Linux continuation](handovers/2026-10-04-group6-linux/README.md), with exact
