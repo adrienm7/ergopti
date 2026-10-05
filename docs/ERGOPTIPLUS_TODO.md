@@ -3475,6 +3475,16 @@ clock, wall, privacy or capture authority. Actual Swift compilation, runtime
 acquisition, C getter, native posture and posture fault controls remain
 unexecuted until targeted macOS CI; TODO31 is still partial.
 
+The Linux qualification prerequisite's raw-row SQL oracle now preserves the
+reader's existing json_quote(token) AS token_json transport column. Only that
+projection changes; the unchanged real SQLite data, raw multiplicity, date/app
+filters, receipt refusals and equivalence/fewer-row assertions remain intact.
+The exact dev851 preimage fails while the corrected oracle passes all five
+workloads with648 grouped/2808 raw rows;1109 private dependency files stay
+byte-exact. This repairs the independently reproduced baseline qualification
+blocker without changing production metrics or another group's TODO. Final
+selected gates and hosted Linux qualification remain required; TODO31 is partial.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
