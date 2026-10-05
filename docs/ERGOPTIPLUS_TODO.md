@@ -3017,6 +3017,17 @@ packet. Per-hop PAC, retry leases, installer/pull and enterprise CA/auth/WPAD
 remain pending. Refresh ownership and qualify the final composition before
 delivery; item 62 and transversal requirements 16/38 stay open.
 
+Linux remote API callbacks now preserve an actual failed transport's private
+receipt through chat, decisions, both Backboard hops, model discovery and Test.
+Existing positional results, formats, authentication, cancellation and identity
+fences remain intact. Successful/malformed application replies and error strings
+cannot create transport evidence. Fifteen independently authored caller controls
+pass; the untouched producer fails eight of those same controls, and 129 original
+remote/provider/auth assertions pass in isolation. The registered control module
+keeps those expectations unchanged. This receipt is not a page-safe report and
+does not itself implement failure actions. Final managed transport composition,
+native network/UI behavior, full Linux and packaging/install remain pending.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

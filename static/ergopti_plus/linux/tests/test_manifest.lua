@@ -258,6 +258,7 @@ return {
 	"tests.unit.modules.llm.test_prediction_messages",
 	"tests.unit.modules.llm.test_parser_spacing",
 	"tests.unit.modules.llm.test_api_remote",
+	"tests.unit.modules.llm.test_api_remote_failure_receipts",
 	"tests.unit.modules.llm.test_api_entries",
 	"tests.unit.modules.llm.test_local_server_auth_policy",
 	"tests.unit.modules.llm.test_prediction_backend",
