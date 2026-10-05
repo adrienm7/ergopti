@@ -258,10 +258,19 @@ _HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
 				AssertEqual("pending", Receipt["status"])
 				AssertEqual(1, Launches)
 				Parsed := TOML_ParseFreshFile(Fixture.path)
-				AssertEqual(Enabled, Parsed["hotstrings.groups"]["ext:sample:words"])
-				for Name in ["wanted", "hidden"]
-					AssertEqual(Enabled, Parsed['hotstrings.modules."ext:sample:words"'][Name],
+				GroupPath := "hotstrings.groups.ext:sample:words"
+				GroupRows := Parsed.Get("hotstrings.groups", Map())
+				AssertEqual(Enabled != ManifestDefaultFor(GroupPath), GroupRows.Has("ext:sample:words"),
+					"the group persists only a difference from its declared neutral choice")
+				AssertEqual(Enabled, GroupRows.Get("ext:sample:words", ManifestDefaultFor(GroupPath)))
+				ModuleRows := Parsed.Get('hotstrings.modules."ext:sample:words"', Map())
+				for Name in ["wanted", "hidden"] {
+					ModulePath := "hotstrings.modules.ext:sample:words." . Name
+					AssertEqual(Enabled != ManifestDefaultFor(ModulePath), ModuleRows.Has(Name),
+						"each module persists only a difference from its declared neutral choice")
+					AssertEqual(Enabled, ModuleRows.Get(Name, ManifestDefaultFor(ModulePath)),
 						"all pack-owned sections share the group transaction")
+				}
 				AssertTrue(Parsed["hotstrings.groups"]["ext:foreign:words"])
 				AssertTrue(Parsed["hotstrings.magic_key.replace"]["enabled"], "a different extension cannot alter replacement")
 				Refusal.Call("native pack-owned selection refused")
@@ -573,16 +582,18 @@ _HSCS_TrayMapLiteral(Source, Name) {
 _HSCS_WithDynamicBootState(Body) {
 	Assert(IsSet(MenuLabelFromManifestEntry), "the headless menu must load its real manifest label owner")
 	global Features, _LegacyTopCategoryMap, _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
-	global PersonalInformation, _TomlCountCache
+	global PersonalInformation, _TomlCountCache, _V1CatToV2CatMap
 	HadInformation := IsSet(PersonalInformation), OldInformation := HadInformation ? PersonalInformation : 0
 	HadCounts := IsSet(_TomlCountCache), OldCounts := HadCounts ? _TomlCountCache : 0
 	HadFeatures := IsSet(Features), OldFeatures := HadFeatures ? Features : 0
 	HadTop := IsSet(_LegacyTopCategoryMap), OldTop := HadTop ? _LegacyTopCategoryMap : 0
+	HadCategoryMap := IsSet(_V1CatToV2CatMap), OldCategoryMap := HadCategoryMap ? _V1CatToV2CatMap : 0
 	HadKeys := IsSet(_LegacyDynamicHotstringsKeyMap), OldKeys := HadKeys ? _LegacyDynamicHotstringsKeyMap : 0
 	HadOrder := IsSet(_DYNAMIC_HOTSTRINGS_ORDER), OldOrder := HadOrder ? _DYNAMIC_HOTSTRINGS_ORDER : 0
 	try {
 		Source := _StripFullLineComments(FileRead(_DriverDir . "\ui\tray_menu.ahk", "UTF-8"))
 		_LegacyTopCategoryMap := _HSCS_TrayMapLiteral(Source, "_LegacyTopCategoryMap")
+		_V1CatToV2CatMap := _HSCS_TrayMapLiteral(Source, "_V1CatToV2CatMap")
 		Assert(InStr(Source, "global _LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()"),
 			"the real tray must consume the shared family alias owner")
 		Assert(InStr(Source, "global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()"),
@@ -607,18 +618,19 @@ _HSCS_WithDynamicBootState(Body) {
 		_TomlCountCache := HadCounts ? OldCounts : unset
 		Features := HadFeatures ? OldFeatures : unset
 		_LegacyTopCategoryMap := HadTop ? OldTop : unset
+		_V1CatToV2CatMap := HadCategoryMap ? OldCategoryMap : unset
 		_LegacyDynamicHotstringsKeyMap := HadKeys ? OldKeys : unset
 		_DYNAMIC_HOTSTRINGS_ORDER := HadOrder ? OldOrder : unset
 	}
 }
 
-; Dynamic scopes have seven canonical families and no separate category gate.
+; Dynamic scopes have eight canonical features and no separate category gate.
 ; The native submenu reaches the same journal while the master or pause is off.
 _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 	global Features, CategoryEnabled, _LegacyTopCategoryMap, _MenuDispatchCallbacks, _TomlFileCache
 	Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Accepted := 0, Launches := 0
 	Names := ["date", "date_fr", "date_long_fr", "phone_prefixes", "ssn_prefixes",
-		"iban_prefixes", "text_expansion_personal_information"]
+		"iban_prefixes", "user_code", "text_expansion_personal_information"]
 	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.dynamic]`nenabled = false`n'
 	for Index, Name in Names {
 		Source .= '[hotstrings.dynamic.' . Name . ']`nenabled = ' . (Mod(Index, 2) ? "true" : "false") . '`n'
@@ -650,7 +662,7 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 		AssertEqual(Source, ReadTomlFile(Fixture.path), "fixture primes the live text cache before publication")
 		Cached := ParseTomlFile(Fixture.path)
 		Built := _BuildDynamicHotstringsSubmenu(Fixture.options)
-		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven families and their editor")
+		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven displayed families and their editor")
 		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0))
 		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1))
 		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the old checkbox is retired")
