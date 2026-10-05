@@ -1776,6 +1776,25 @@ These are software implementations; final hardware verification remains below.
   physical device, magic selection/repeat/recovery, reserved shortcut, comment
   grammar, normalization or group policy change.
 
+- [~] **L120.** Linux XKB quoted symbol-list metadata: match the existing
+  explicit Group1 and fallback list patterns only outside quoted metadata.
+  A symbols-looking type name produced a wrong public base label (`z` instead
+  of native `a`). Reuse the unchanged quote skipper and preserve exact captured
+  bytes, explicit priority, fallback/index/group behavior and keysym spelling.
+  Sixty-four real native checks over eight compiled canonical maps reproduce
+  ten failed observations of this single defect and pass under current native
+  libraries and signed Ubuntu 22.04 luv/libuv dependencies; native XKB remains
+  the container library. Independent native a/q/2, exact hostile literals/raw
+  bodies, checked file publication and actual public refresh remain required.
+  Twenty additive pure cases reproduce ten failures and pass under LuaJIT and
+  Lua 5.4; all preceding sixty-eight assertions stay unchanged. Earlier native
+  block64/key72 regressions replay green under both mixes. Stock Lua 5.4 native
+  FFI and foreign runtime behavior are unexecuted. Windows/macOS use different
+  native layout APIs, with no equivalent text parser by source inspection.
+  Register future Linux CI without launching it. Angle-name lexical gaps and
+  wider raw-input grammar remain separate. No physical magic, reserved shortcut,
+  display/device, normalization, comment grammar or group policy change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

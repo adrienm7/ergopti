@@ -566,3 +566,46 @@ helpers.describe("xkb_keymap: quoted key definition metadata", function()
 		end)
 	end
 end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 7/ Quoted symbol-list metadata =========================
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("xkb_keymap: quoted symbol-list metadata", function()
+	local alphabetic = { AC01 = { "a", "A" } }
+	local cases = {
+		{ name = "ignores a quoted explicit fake list", body = [[key <AC01> { type="Readback symbols[Group1]= [ z, Z ] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a spaced quoted explicit fake list", body = [[key <AC01> { type="Readback symbols [ Group1 ] = [ z, Z ] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a nested quoted explicit fake list", body = [=[key <AC01> { type="Readback [[ symbols[Group1]= [ z, Z ] ]] type", symbols[Group1]=[ a, A ] };]=], expected = alphabetic },
+		{ name = "ignores repeated quoted explicit fake lists", body = [[key <AC01> { type="symbols[Group1]=[z,Z] symbols[Group1]=[s,S]", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores a quoted fallback fake list", body = [[key <AC01> { type="Readback [ z, Z ] type", [ a, A ] };]], expected = alphabetic },
+		{ name = "retains an earlier real fallback list", body = [[key <AC01> { [ a, A ], type="Readback [ z, Z ] type" };]], expected = alphabetic },
+		{ name = "retains an earlier real explicit list", body = [[key <AC01> { symbols[Group1]=[ a, A ], type="symbols[Group1]=[z,Z]" };]], expected = alphabetic },
+		{ name = "preserves explicit priority over an earlier fallback", body = [[key <AC01> { [ z, Z ], symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "preserves explicit Group1 priority over Group2", body = [[key <AC01> { symbols[Group2]=[ z, Z ], symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "preserves the existing fallback index behavior", body = [[key <AC01> { type[Group1]="Readback [ z, Z ] type", [ a, A ] };]], expected = { AC01 = { "Group1" } } },
+		{ name = "preserves the existing Group2-only fallback behavior", body = [[key <AC01> { symbols[Group2]=[ z, Z ] };]], expected = { AC01 = { "Group2" } } },
+		{ name = "preserves an empty explicit capture", body = [[key <AC01> { [ z, Z ], symbols[Group1]=[] };]], expected = { AC01 = { false } } },
+		{ name = "preserves raw keysym spelling and NoSymbol", body = [[key <AC01> { symbols[Group1]=[ U00E9, NoSymbol, A ] };]], expected = { AC01 = { "U00E9", false, "A" } } },
+		{ name = "ignores a fake list after an escaped quote", body = [[key <AC01> { type="Readback \" symbols[Group1]=[z,Z] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "closes metadata after even backslashes", body = [[key <AC01> { type="Readback \\" , symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "retains metadata after odd backslashes", body = [[key <AC01> { type="Readback \\\" symbols[Group1]=[z,Z] type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores braces and fake lists in the same type", body = [[key <AC01> { type="Readback } symbols[Group1]=[z,Z] { type", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "ignores fake lists in multiple metadata strings", body = [[key <AC01> { type="symbols[Group1]=[z,Z]", name="symbols[Group1]=[s,S]", symbols[Group1]=[ a, A ] };]], expected = alphabetic },
+		{ name = "preserves first outside-string match precedence", body = [[key <AC01> { mysymbols[Group1]=[ z, Z ], symbols[Group1]=[ a, A ] };]], expected = { AC01 = { "z", "Z" } } },
+		{ name = "retains the no-list contract", body = [[key <AC01> { type="Readback [ z, Z ] type" };]], expected = {} },
+	}
+	for _, spec in ipairs(cases) do
+		helpers.it("(xkb-symbol-list-strings) " .. spec.name, function()
+			local parser = helpers.load_module("infra.xkb_keymap")
+			helpers.assert_eq(parser.parse_symbols('xkb_symbols "healthy" {' .. spec.body .. '};'), spec.expected,
+				"quoted metadata does not own a list; existing unquoted priority and raw captures remain")
+		end)
+	end
+end)
