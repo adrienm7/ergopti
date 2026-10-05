@@ -551,6 +551,67 @@ class AppleEventBoundaryControls(unittest.TestCase):
             with self.assertRaisesRegex(probe.AppleEventBoundaryError, "delivery state"):
                 self.invoke(directory, unexpected_delivery=True)
 
+    def test_dead_receiver_retains_exact_nonreaping_status_and_checkpoint(self):
+        checkpoints = (
+            "readiness",
+            "before-unconfined-positive",
+            "before-deny-removal-positive",
+            "before-full-policy-denial",
+            "after-full-policy-denial",
+        )
+        # Independent portable native observations; these do not qualify Darwin.
+        for index, checkpoint in enumerate(checkpoints):
+            for code, kind, status in (
+                (21, "CLD_EXITED", 68),
+                (22, "CLD_KILLED", 6),
+                (23, "CLD_DUMPED", 6),
+            ):
+                with (
+                    self.subTest(checkpoint=checkpoint, kind=kind),
+                    TemporaryDirectory() as directory,
+                ):
+                    root = Path(directory)
+                    (root / "sandbox.sb").write_text(self.policy)
+                    children = self.model(root)
+                    acquire = children.start
+
+                    def start(arguments):
+                        child = acquire(arguments)
+                        children.groups[child].observe_exit.side_effect = [None] * index + [
+                            Mock(si_pid=73136, si_code=code, si_status=status)
+                        ]
+                        return child
+
+                    children.start = start
+                    with (
+                        patch.object(probe.uuid, "uuid4", return_value=self.nonce),
+                        patch.object(
+                            probe, "native_compiler", return_value=["modeled-native-clang"]
+                        ),
+                        patch.multiple(
+                            probe.os, CLD_EXITED=21, CLD_KILLED=22, CLD_DUMPED=23, create=True
+                        ),
+                    ):
+                        with self.assertRaises(probe.AppleEventBoundaryError) as refused:
+                            probe.admit_appleevent_boundary(children, root)
+                    expected = (
+                        "Native AppleEvent boundary unavailable: "
+                        "The exact owned AppleEvent receiver is no longer live: "
+                        f"checkpoint={checkpoint}, receiver_pid=73136, "
+                        f"waitid_kind={kind}, waitid_code={code}, waitid_status={status}"
+                    )
+                    self.assertEqual(str(refused.exception), expected)
+                    self.assertNotIn(directory, str(refused.exception))
+                    self.assertNotIn(self.nonce, str(refused.exception))
+                    self.assertEqual(len(children.sender_calls), max(0, index - 1))
+                    self.assertEqual(len(children.active), 1)
+                    child = children.active[0]
+                    self.assertEqual(children.groups[child].observe_exit.call_count, index + 1)
+                    self.assertFalse(children.groups[child].reaped)
+                    child.poll.assert_not_called()
+                    child.wait.assert_not_called()
+                    self.assertEqual((root / "sandbox.sb").read_text(), self.policy)
+
 
 class PhaseEvidenceControls(unittest.TestCase):
     """Actual bounded filesystem controls; these never substitute native process closure."""

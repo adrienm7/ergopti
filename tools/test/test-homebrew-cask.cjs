@@ -275,7 +275,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 30 tests in /);
+	assert.match(result.stderr, /Ran 31 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -309,6 +309,34 @@ check(
 		assert.doesNotMatch(boundary, /xcrun/);
 	}
 );
+
+check('owned AppleEvent liveness refusal preserves its nonreaping numeric observation', () => {
+	const helper = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+		'utf8'
+	);
+	const begin = helper.indexOf('    def same_live_receiver(checkpoint):');
+	assert.ok(begin >= 0);
+	const observation = helper.slice(begin, helper.indexOf('    deadline = ', begin));
+	assert.equal((observation.match(/group\.observe_exit\(\)/g) || []).length, 1);
+	assert.match(observation, /observation = group\.observe_exit\(\)/);
+	assert.match(observation, /if observation is not None:/);
+	for (const kind of ['CLD_EXITED', 'CLD_KILLED', 'CLD_DUMPED']) {
+		assert.ok(observation.includes(`os.${kind}: "${kind}"`));
+	}
+	assert.ok(observation.includes('waitid_code={observation.si_code}'));
+	assert.ok(observation.includes('waitid_status={observation.si_status}'));
+	assert.doesNotMatch(observation, /\.(?:poll|wait|settle|read_bytes|read_text)\(/);
+	for (const checkpoint of [
+		'readiness',
+		'before-unconfined-positive',
+		'before-deny-removal-positive',
+		'before-full-policy-denial',
+		'after-full-policy-denial'
+	]) {
+		assert.equal(helper.split(`same_live_receiver("${checkpoint}")`).length - 1, 1);
+	}
+});
 
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
 	const fixture = fs.readFileSync(

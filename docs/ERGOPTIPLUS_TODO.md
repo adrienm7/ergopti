@@ -1962,6 +1962,15 @@ Swift failure evidence is retained; archive packaging and installation are
 skipped, and publication is skipped. Keep item 36 open and preserve all
 physical ownership and independent positive/negative assertions.
 
+The AppleEvent liveness refusal now retains its existing exact nonreaping
+observation: five fixed checkpoints, the acquired receiver PID, native
+termination kind and numeric status. No new observation, polling, reaping,
+signal, raw stream or allowance is added. All thirty previous test methods
+and their 139 assertion calls remain byte-identical; thirty-one portable
+controls pass, and the old generic helper fails all fifteen new numeric-fact
+profiles. These diagnostic controls do not identify the native cause or
+qualify AppleEvent delivery, Brew lifecycle or item 36.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
