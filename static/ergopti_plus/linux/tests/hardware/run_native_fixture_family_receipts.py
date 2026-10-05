@@ -140,6 +140,98 @@ def policy_controls():
     )
 
 
+def verify_external_recovery(root, lua, fork, launcher):
+    """Lose a real helper, keep its red result, and retire only the owned case."""
+    case = root / "external-helper-loss"
+    case.mkdir()
+    owner = Family([], 1, None, "external-loss-owner")
+    process, observed, helper_fd = None, [], None
+    try:
+        owner.base = Path(tempfile.mkdtemp(prefix="owned-", dir=case))
+        owner.base.chmod(0o700)
+        stat = owner.base.lstat()
+        owner.base_identity = stat.st_dev, stat.st_ino
+        args = [str(launcher), str(lua), sys.executable, str(fork), str(case)]
+        receipt = case / "helper"
+        source = case / "wrapper.cjs"
+        source.write_text(
+            "const {run}=require(" + json.dumps(str(WRAPPER)) + ");"
+            "const {spawn}=require('node:child_process');const fs=require('node:fs');"
+            "run({fixtures:[{args:" + json.dumps(args) + ",timeout:5}],"
+            "spawnChild:(c,a,o)=>{const child=spawn(c,a,o);fs.writeFileSync("
+            + json.dumps(str(receipt))
+            + ",String(child.pid));return child;}})"
+            ".then(s=>{process.exitCode=s});\n"
+        )
+        process = subprocess.Popen(
+            ["node", str(source)],
+            cwd=DRIVER,
+            env=dict(os.environ, TMPDIR=str(owner.base)),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        owner.child = process
+        owner.acquire(process.pid)
+        deadline = time.monotonic() + 3
+        while not all((case / name).exists() for name in ["helper", "leader", "1", "2"]):
+            assert process.poll() is None and time.monotonic() < deadline
+            time.sleep(0.005)
+        pids = [int((case / "leader").read_text())]
+        for number in ["1", "2"]:
+            pids.extend(int(value) for value in (case / number).read_text().split())
+        assert len(set(pids)) == 5
+        for pid in pids:
+            observed.append((pid, os.pidfd_open(pid)))
+            assert not select.select([observed[-1][1]], [], [], 0)[0]
+        helper = int(receipt.read_text())
+
+        # The recorded PID is only an observation. Authority comes from the
+        # exact live root pidfd and its kernel direct-child census on both sides
+        # of acquiring the helper pidfd, never argv or a global process scan.
+        def root_children():
+            assert not owner.exited(process.pid)
+            return [
+                int(pid)
+                for pid in Path(f"/proc/{process.pid}/task/{process.pid}/children")
+                .read_text()
+                .split()
+            ]
+
+        assert helper in root_children()
+        helper_fd = os.pidfd_open(helper)
+        assert helper in root_children() and not select.select([helper_fd], [], [], 0)[0]
+        assert signal.pidfd_send_signal(helper_fd, signal.SIGKILL) is None
+        # A detached Lua leader may still hold the wrapper output pipes after
+        # the helper dies. Root exit is a separate physical observation: drain
+        # output only after this external owner retires the adopted family.
+        process.wait(timeout=15)
+        assert process.returncode == 1, "lost helper must remain a red native result"
+        assert owner.exited(process.pid), "exact wrapper root pidfd remained live"
+        assert owner.retire() is True and owner.settled and owner.namespace_absent
+        stdout, stderr = process.communicate(timeout=15)
+        assert "[BLOCKED] Native supervisor authority lost" in stderr
+        assert process.stdout.closed and process.stderr.closed
+        for pid, descriptor in observed:
+            assert select.select([descriptor], [], [], 0)[0]
+            assert not Path(f"/proc/{pid}").exists(), "exact adopted descendant remained unreaped"
+        assert select.select([helper_fd], [], [], 0)[0]
+        assert not Path(f"/proc/{helper}").exists()
+        assert owner.closed == len(owner.pidfds) == len(owner.reaped)
+        print("Native external recovery receipts: 1 passed, 0 failed, 0 skipped", flush=True)
+    finally:
+        assert owner.retire() is True and owner.settled and owner.namespace_absent
+        if process is not None:
+            process.wait()
+            for stream in [process.stdout, process.stderr]:
+                if stream is not None and not stream.closed:
+                    stream.close()
+        for _, descriptor in observed:
+            os.close(descriptor)
+        if helper_fd is not None:
+            os.close(helper_fd)
+
+
 def main():
     policy_controls()
     if "--policy-only" in sys.argv:
@@ -187,8 +279,17 @@ while true do uv.sleep(100) end
             case.mkdir()
             reader, writer = os.pipe()
             process, original_fds = None, []
+            owner = Family([], 1, None, "external-case-owner")
             frames = []
             try:
+                # This independent subreaper retains the case root pidfd before
+                # the wrapper can lose its own child authority. The private
+                # TMPDIR gives this owner an exact namespace to retire as well.
+                owner.base = Path(tempfile.mkdtemp(prefix="owned-", dir=case))
+                owner.base.chmod(0o700)
+                stat = owner.base.lstat()
+                owner.base_identity = stat.st_dev, stat.st_ino
+                case_env = dict(os.environ, TMPDIR=str(owner.base))
                 args = [str(launcher), str(lua), sys.executable, str(fork), str(case)]
                 if mode.startswith("wrapper_"):
                     wrapper_launch = case / "wrapper.cjs"
@@ -202,6 +303,7 @@ while true do uv.sleep(100) end
                     process = subprocess.Popen(
                         ["node", str(wrapper_launch)],
                         cwd=DRIVER,
+                        env=case_env,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
@@ -224,6 +326,7 @@ while true do uv.sleep(100) end
                             *args,
                         ],
                         cwd=DRIVER,
+                        env=case_env,
                         pass_fds=(writer,),
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
@@ -231,6 +334,8 @@ while true do uv.sleep(100) end
                     )
                     os.close(writer)
                     writer = None
+                owner.child = process
+                owner.acquire(process.pid)
                 ready = time.monotonic() + 3
                 while not all((case / name).exists() for name in ["leader", "1", "2"]):
                     assert process.poll() is None, (
@@ -256,9 +361,9 @@ while true do uv.sleep(100) end
                     "native descendants did not escape leader groups"
                 )
                 if mode in ["term", "wrapper_term"]:
-                    process.send_signal(signal.SIGTERM)
+                    owner.send(process.pid, signal.SIGTERM)
                 elif mode == "interrupt":
-                    process.send_signal(signal.SIGINT)
+                    owner.send(process.pid, signal.SIGINT)
                 stdout, stderr = process.communicate(timeout=15)
                 assert process.stdout.closed and process.stderr.closed, (
                     "owned native output descriptors retained debt"
@@ -294,13 +399,10 @@ while true do uv.sleep(100) end
                 # The observer became a subreaper before creating any helper.
                 # A deliberately broken helper therefore leaves children only
                 # in this exact observer scope, never at container PID 1.
-                if process is not None and process.poll() is None:
-                    process.terminate()
-                # Never wait with a throwing timeout before the exact-family
-                # sweep: that would skip observer cleanup on the very defect
-                # this control is intended to reproduce.
-                cleanup = Family([], 1, None, "observer-cleanup")
-                cleanup.retire()
+                # Refused signal/census/reap/close or a replaced namespace
+                # retains this exact owner. A red wrapper status stays red;
+                # physical cleanup cannot change any original assertion.
+                assert owner.retire() is True and owner.settled and owner.namespace_absent
                 if process is not None:
                     process.wait()
                     for stream in [process.stdout, process.stderr]:
@@ -312,6 +414,7 @@ while true do uv.sleep(100) end
                 if writer is not None:
                     os.close(writer)
         print(f"Native fixture family receipts: {checks} passed, 0 failed, 0 skipped")
+        verify_external_recovery(root, lua, fork, launcher)
 
 
 if __name__ == "__main__":

@@ -51,9 +51,18 @@ async function run({
 	let cancellation = null;
 	let active = null;
 	function forward(entry) {
-		if (!entry.ready || entry.nativeClosed || !cancellation) return;
+		if (
+			!entry.ready ||
+			entry.nativeClosed ||
+			entry.signalAccepted ||
+			entry.settled ||
+			!cancellation
+		)
+			return;
 		try {
-			entry.signalDebt = entry.child.kill(cancellation) === true ? null : 'native-signal-refused';
+			const accepted = entry.child.kill(cancellation) === true;
+			entry.signalDebt = accepted ? null : 'native-signal-refused';
+			if (accepted) entry.signalAccepted = true;
 		} catch {
 			entry.signalDebt = 'native-signal-refused';
 		}
@@ -92,7 +101,14 @@ async function run({
 					resolve(1);
 					return;
 				}
-				const entry = { child, ready: false, nativeClosed: false, signalDebt: null };
+				const entry = {
+					child,
+					ready: false,
+					nativeClosed: false,
+					signalDebt: null,
+					signalAccepted: false,
+					settled: false
+				};
 				active = entry;
 				let refused = false;
 				let buffer = '',
@@ -148,6 +164,7 @@ async function run({
 								)
 									throw new Error('physical debt');
 								terminal = frame;
+								entry.settled = true;
 							} else throw new Error('invalid receipt order');
 						} catch {
 							fault = true;

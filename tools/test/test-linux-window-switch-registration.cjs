@@ -243,8 +243,106 @@ function evidenceContract() {
 	}
 }
 
+/** Controls accepted cancellation without creating native processes. */
+async function acceptanceControl(mode) {
+	const signals = new EventEmitter(),
+		debts = new Map(),
+		errors = [];
+	let count = 0,
+		accepted = 0,
+		cancelled = false,
+		closed = false;
+	const status = mode === 'interrupt' ? 130 : mode === 'settled' ? 0 : 143;
+	const result = await run({
+		platform: 'linux',
+		signals,
+		debts,
+		fixtures: [{ args: ['controlled-no-native'], timeout: 1 }],
+		log() {},
+		error: (e) => errors.push(e),
+		spawnChild(_command, args) {
+			const token = args[args.indexOf('--token') + 1];
+			const child = new EventEmitter(),
+				receipt = new EventEmitter();
+			child.pid = 42001;
+			child.stdio = [null, null, null, receipt];
+			const frame = (stage, extra = {}) =>
+				receipt.emit(
+					'data',
+					Buffer.from(
+						JSON.stringify({ version: 1, token, supervisor: child.pid, stage, ...extra }) + '\n'
+					)
+				);
+			function close(code, signal) {
+				if (closed) return;
+				closed = true;
+				receipt.emit('end');
+				child.emit('close', code, signal);
+			}
+			child.kill = () => {
+				count++;
+				if (mode === 'refused_false' && count === 1) return false;
+				if (mode === 'refused_throw' && count === 1)
+					throw Object.assign(new Error('controlled signal refusal'), { code: 'EPERM' });
+				accepted++;
+				if (accepted > 1 || mode === 'settled') {
+					close(null, 'SIGTERM');
+					return true;
+				}
+				setTimeout(() => {
+					if (!closed)
+						frame('settled', { status, acquired: 1, reaped: 1, closed: 1, namespace_absent: true });
+				}, 65);
+				setTimeout(() => close(status, null), 100);
+				return true;
+			};
+			setImmediate(() => {
+				frame('ready');
+				if (mode === 'debt') {
+					close(null, 'SIGTERM');
+					return;
+				}
+				if (mode === 'settled') {
+					frame('settled', {
+						status: 0,
+						acquired: 1,
+						reaped: 1,
+						closed: 1,
+						namespace_absent: true
+					});
+					setTimeout(() => close(0, null), 60);
+				}
+				cancelled = true;
+				signals.emit(mode === 'interrupt' ? 'SIGINT' : 'SIGTERM');
+			});
+			return child;
+		}
+	});
+	if (mode === 'debt') {
+		assert.equal(result, 1);
+		assert.equal(debts.size, 1);
+		assert.equal(count, 0);
+		return;
+	}
+	assert.equal(result, status, mode + ': expected preserved exact exit');
+	assert.equal(debts.size, 0, mode + ': physical terminal/EOF/close must settle');
+	assert.equal(
+		accepted,
+		mode === 'settled' ? 0 : 1,
+		mode + ': accepted cancellation sent more than once'
+	);
+	assert.equal(
+		count,
+		mode === 'settled' ? 0 : mode.startsWith('refused_') ? 2 : 1,
+		mode + ': only refused delivery can retry'
+	);
+	assert(cancelled);
+}
+
 /** Runs causal registration mutations in private copies, never the checkout. */
 async function main() {
+	for (const mode of ['term', 'interrupt', 'refused_false', 'refused_throw', 'settled', 'debt'])
+		await acceptanceControl(mode);
 	validate(ROOT);
 	evidenceContract();
 	for (const platform of ['darwin', 'win32']) {
