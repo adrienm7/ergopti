@@ -1913,7 +1913,15 @@
 		},
 		{
 			"type": "list",
-			"id": "custom_layouts"
+			"id": "custom_layouts",
+			"status_rows": {
+				"none_installed": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.none_installed"
+					}
+				]
+			}
 		},
 		{
 			"type": "command",
@@ -1923,6 +1931,14 @@
 		{
 			"type": "list",
 			"id": "layout_bundle",
+			"status_rows": {
+				"no_bundle": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.no_bundle"
+					}
+				]
+			},
 			"platforms": [
 				"hs"
 			],
@@ -2974,6 +2990,17 @@
 	"about_version_separator": [
 		{
 			"type": "---"
+		}
+	],
+	"layout_active_source_empty_commands": [
+		{
+			"type": "command",
+			"id": "layout_open_preferences",
+			"i18n": "menu.layout.open_prefs",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
 		}
 	]
 }
