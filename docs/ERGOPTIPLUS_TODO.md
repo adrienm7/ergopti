@@ -3329,7 +3329,10 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   explicit pending-zero/no-rescue proof qualifies. The corrected physical
   consumer passes35 parser controls and three refusal controls;14 durable
   diagnostics and actual native82 checks pass. Real adoption, rescue and timeout
-  controls preserve their physical outcomes. Fresh hosted acceptance is pending.
+  controls preserve their physical outcomes. Hosted direct-source run37314770405 passes the actual official HTTPS installation,
+  model pull/chat and strict pending-zero/no-rescue acceptance step. The whole
+  Linux lane fails separate updater and negative-publication fixture steps;
+  packaging/install are skipped. Its public artifact bytes remain unavailable.
   Items16/38 remain.
 
 - [~] **47.** **Partial: authenticated local-server discovery and menus.** The
@@ -3353,11 +3356,10 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   bridge passes all 13 original/new controls per ABI. Synchronous cancellation
   retains its own UI completion before retirement: faithful composed controls
   pass180/0 plus daemon routing2/0 per ABI; the original fails two behaviors.
-  Windows14 source paths include panel/lifecycle and timer relocation. The coherent source tranche is committed; native
-  current-source qualification remains pending. Native
-  panel20 executed19/1; all4 timer cases passed in direct-source run37306690694.
-  The OnExit fixture declaration, balanced log and direct backend builder are
-  corrected from exact failures; their next native replay remains required. Nine shared
+  Windows14 source paths include panel/lifecycle and timer relocation. Direct-source
+  run37316704100 passes panel20, timers4, logical39, models20, private42, JOIN9
+  and all six succession controls. Its whole unit suite reports9303 passed/44
+  failed; downstream E2E/package/install are skipped. Nine shared
   renderer/declaration/test paths use canonical inert fallback rows; generated
   artifacts were regenerated through their owner. Final
   driver qualification remains required. Historical diagnostic
@@ -3382,7 +3384,14 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   refusal sequences are adopted. Native37313187012 passes panel20/20, timers4/4
   and logical controller39/39, but still exposes two subsequent recovered G2
   fixture markers. Their coordinated exact-owner finally restoration preserves
-  all139 original assertions; fresh full Windows replay remains pending. Complete native three-OS
+  all139 original assertions. Direct-source run37316704100 closes all twelve
+  earlier marker failures; its remaining44 failures retain their prior names.
+  The Linux no-clobber negative fixture now checks exact GNU version-specific
+  exit receipts without normalizing production outcomes. All34 original
+  assertions remain; native44 cases and the complete82 gate pass on both GNU9.4
+  and9.7 (164 final checks), with unchanged1164 source hashes and physical
+  pending-zero/no-rescue cleanup. Earlier read-only/incomplete scratch setup
+  attempts failed and did not qualify POST. Complete native three-OS
   qualification remains; items16/38 stay.
 
 - [~] **48.** **Partial: owned local-runtime repair and enable admission.** All
@@ -3403,11 +3412,13 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   passes per ABI; corrected root Linux8302/0 and E2E189/0 complete locally.
   The Linux cancellation fence and faithful managed fixture retain all original
   assertions; current native three-OS CI and physical acceptance remain pending.
-  Portable manual HTTPS/model CI ran and failed its outer physical receipt
-  classification after native child exit0; no complete acceptance is claimed.
-  The strict pending-zero/no-rescue receipt is adopted without relaxing any
-  archive/model/chat/source assertions; final local Linux8338/0, native82/0
-  and E2E189/0 pass. Fresh official HTTPS/model CI remains pending.
+  The earlier manual HTTPS/model CI failed its outer physical receipt after
+  native child exit0. Corrected direct-source run37314770405 passes actual
+  official HTTPS install/model/chat and strict pending-zero/no-rescue acceptance
+  without relaxing archive/model/chat/source assertions. Whole-lane updater
+  and negative-publication fixture failures skip package/install. The corrected
+  negative fixture passes44 native controls and complete82 checks on GNU9.4
+  and9.7; final local Linux8338/0 and E2E189/0 remain qualified slices.
   Actual local official HTTPS installation reached typed readiness and durable
   enable, then failed the model pull with exact child cleanup. Registry CONNECT403
   persists in this container; saved network configuration is not applied.
@@ -4185,9 +4196,12 @@ fix as explicit code work rather than unsupported-platform exceptions.
   antialiased marker pixels. The corrected locator and neutral-contrast weight observer preserve unchanged
   screenshots, independent prefix/font/color/geometry assertions and the1.03
   bold threshold. Original-source and removal-only controls fail as expected;
-  fresh native replay remains required.
-  Remaining: actual Mac canvas qualification, Windows current-source native and
-  real-device typography/geometry/retirement, Linux/Mac physical appearance/input,
+  Fresh native run37314015214 passes all12 signed-Hammerspoon captures and48
+  pure controls, with3082 exact source/probe hashes, all PNG hashes and actual
+  creator PID/PGID1767 physically retired. Its whole macOS package lane fails
+  five Swift cases (303 passed/5 failed), leaving install/launch skipped.
+  Direct-source Windows37316704100 passes all28 tooltip/GDI controls.
+  Remaining: real-device typography/geometry/retirement, Linux/Mac physical appearance/input,
   packaging/install and desktop acceptance. Preserve Windows PC steps 11,12 and
   all resource/line-corpus assertions. Transversal 16/38 remain required.
 
