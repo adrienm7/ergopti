@@ -617,7 +617,7 @@ _HSE_NewNotepadOwner(Spec, Replacement, EndCharPart, EraseUnits, Backspaces,
 	Snapshot := DispatchState["Buffer"]
 	if !(EraseUnits is Integer) || EraseUnits < 0 || EraseUnits > StrLen(Snapshot)
 		throw ValueError("The Notepad erasure must fit the captured hotstring buffer.")
-	return Map(
+	Owner := Map(
 		"Id", ++_HSE_TerminalOwnerSerial, "Pending", true, "NativeLiteral", true,
 		"FinalSucceeded", false, "Committed", false, "CompletionClaimed", false,
 		"OutputOwnershipReleased", false, "EraseUnits", EraseUnits,
@@ -638,6 +638,11 @@ _HSE_NewNotepadOwner(Spec, Replacement, EndCharPart, EraseUnits, Backspaces,
 		"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
 		"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 		"SyntheticOwner", SyntheticOwner)
+	if Spec.HasOwnProp("PublicationCurrent")
+		Owner["PublicationCurrent"] := Spec.PublicationCurrent
+	if Spec.HasOwnProp("UserCodeGeneration")
+		Owner["UserCodeOwned"] := true
+	return Owner
 }
 
 /** Admission preserves the original suffix; a later visible character revokes it. */
@@ -665,6 +670,13 @@ _HSE_CommitNotepadOwner(Owner) {
 	global _PrefixContentGeneration
 	if !A_IsCritical
 		throw Error("The Notepad canonical commit requires a Critical transaction.")
+	if Owner.Has("PublicationCurrent") {
+		try PublicationReceipt := Owner["PublicationCurrent"].Call()
+		catch
+			throw Error("The Notepad canonical commit lost its publication authority.")
+		if !(PublicationReceipt is Integer) || PublicationReceipt != 1
+			throw Error("The Notepad canonical commit lost its publication authority.")
+	}
 	if _HSE_TerminalOwner != Owner || !Owner["Pending"] || Owner["CompletionClaimed"]
 		throw Error("The Notepad canonical commit has no current owner.")
 	if Owner["Committed"]
