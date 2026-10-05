@@ -573,6 +573,59 @@ _TOML_ConfigSet(Document, Parts, Update) {
 	Node[Key] := Value
 }
 
+; Inline assignments own their complete existing container shape, including
+; empty members. Header ancestry alone does not confer that explicit ownership.
+_TOML_ConfigRetainedContainers(Value, Parts, Owners, Dropped) {
+	if !(Value is Map) || _TOML_ConfigPathDropped(Parts, Dropped)
+		return
+	Owners[_TOML_ConfigPathName(Parts)] := true
+	for Key, Child in Value {
+		ChildParts := Parts.Clone()
+		ChildParts.Push(Key)
+		_TOML_ConfigRetainedContainers(Child, ChildParts, Owners, Dropped)
+	}
+}
+
+; A removed leaf cannot leave an implicit table that has no physical declaration.
+; Preserve surviving source headers and inline containers instead of pruning
+; every empty map or changing the generic semantic setter's contract.
+_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned) {
+	if !Deleted.Length
+		return
+	Owners := Map()
+	Owners.CaseSense := "On"
+	for PhysicalRecord in Physical {
+		if PhysicalRecord.Kind != "header" || SubStr(Trim(PhysicalRecord.Text), 1, 2) == "[["
+			continue
+		Parts := _TOML_ConfigPath(PhysicalRecord.Section)
+		if !_TOML_ConfigPathDropped(Parts, Dropped)
+			Owners[_TOML_ConfigPathName(Parts)] := true
+	}
+	for Record in Records
+		_TOML_ConfigRetainedContainers(Record.Value, Record.Path, Owners, Dropped)
+	for Name, Parts in Owned {
+		Desired := _TOML_DocumentLookup(Expected, Parts)
+		if Desired["found"]
+			_TOML_ConfigRetainedContainers(Desired["value"], Parts, Owners, [])
+	}
+	for DeletedParts in Deleted {
+		Parts := DeletedParts.Clone()
+		Parts.Pop()
+		while Parts.Length {
+			Existing := _TOML_DocumentLookup(Expected, Parts)
+			if Existing["blocked"]
+				break
+			if Existing["found"] {
+				if !(Existing["value"] is Map) || Existing["value"].Count
+						|| Owners.Has(_TOML_ConfigPathName(Parts))
+					break
+				_TOML_ConfigSet(Expected, Parts, { Delete: 1 })
+			}
+			Parts.Pop()
+		}
+	}
+}
+
 /**
  * Renders explicit configuration effects against the complete semantic source.
  * @param {String} Source Exact source image captured by the existing I/O owner.
@@ -587,12 +640,13 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		if PhysicalRecord.Kind == "opaque"
 			throw ValueError("Cannot retain an unclassified configuration source record")
 	}
-	Dropped := []
+	Dropped := [], Deleted := []
 	for Prefix in Prefixes {
 		Parts := _TOML_ConfigPath(Prefix)
 		if !Parts.Length
 			throw ValueError("A configuration namespace replacement cannot own the root")
 		Dropped.Push(Parts)
+		Deleted.Push(Parts)
 		_TOML_ConfigSet(Expected, Parts, { Delete: 1 })
 	}
 	Owned := Map()
@@ -600,8 +654,11 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	for Update in Updates {
 		Parts := _TOML_ConfigPath(Update.Section, Update.Key)
 		_TOML_ConfigSet(Expected, Parts, Update)
+		if Update.HasOwnProp("Delete") && Update.Delete == 1
+			Deleted.Push(Parts)
 		Owned[_TOML_ConfigPathName(Parts)] := Parts
 	}
+	_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned)
 	if TOML_SameValue(Document, Expected)
 		return Map("content", Source, "preserve_source", true)
 
