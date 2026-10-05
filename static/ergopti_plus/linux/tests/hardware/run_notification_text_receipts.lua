@@ -22,6 +22,23 @@ local root = assert(uv.fs_mkdtemp("/tmp/ergopti-notification-text-XXXXXX"))
 local checks, failures = 0, 0
 local daemon, exited
 
+-- Dunst 1.9 history exposes category but no urgency. Fixture-owned urgency rules
+-- record their actual matched severity, independently of the expected cases.
+local URGENCY_RECEIPTS = {
+	["ergopti-fixture-low"] = "LOW",
+	["ergopti-fixture-normal"] = "NORMAL",
+	["ergopti-fixture-critical"] = "CRITICAL",
+}
+
+local function assert_native_urgency(note, expected)
+	local actual = URGENCY_RECEIPTS[note.category]
+	assert(actual, "native urgency rule did not produce a classified receipt")
+	if note.urgency ~= nil then
+		assert(note.urgency == actual, "native history urgency disagrees with the matched rule")
+	end
+	assert(actual == expected, "caller text changed the native urgency")
+end
+
 local function call(destination, object_path, interface, method, parameters, signature)
 	local answer, err = connection:call_sync(destination, object_path, interface, method,
 		parameters, signature and GLib.VariantType.new(signature) or nil,
@@ -62,8 +79,10 @@ local ok, err = xpcall(function()
 	assert(not owns_service(), "refusing to control a pre-existing desktop notification service")
 	local config = assert(io.open(root .. "/dunstrc", "w"))
 	assert(config:write("[global]\nhistory_length = 100\nignore_dbusclose = false\nmarkup = no\n"
-		.. "format = \"%s\\n%b\"\n[urgency_low]\ntimeout = 0\n"
-		.. "[urgency_normal]\ntimeout = 0\n[urgency_critical]\ntimeout = 0\n"))
+		.. "format = \"%s\\n%b\"\n[urgency_low]\ntimeout = 0\nset_category = ergopti-fixture-low\n"
+		.. "[urgency_normal]\ntimeout = 0\nset_category = ergopti-fixture-normal\n"
+		.. "[urgency_critical]\ntimeout = 0\nset_category = ergopti-fixture-critical\n"
+		.. "[fixture_wrong_urgency]\nsummary = Owned urgency-negative control\nset_category = ergopti-fixture-normal\n"))
 	assert(config:close())
 	local log = assert(uv.fs_open(root .. "/daemon.log", "w", 384))
 	daemon = assert(uv.spawn("dunst", { args = { "-config", root .. "/dunstrc" }, stdio = { nil, log, log } }, function()
@@ -102,10 +121,30 @@ local ok, err = xpcall(function()
 			assert(note.summary == (case.prefix or "") .. (case.title or "Ergopti+"), "native summary bytes changed")
 			assert(note.body == case.body, "native body bytes changed")
 			assert(note.appname == "Ergopti+", "caller text changed the native application identity")
-			assert(note.urgency == (case.urgency or "LOW"), "caller text changed the native urgency")
+			assert_native_urgency(note, case.urgency or "LOW")
 			assert(note.timeout == 5000000, "caller text changed the native timeout")
 		end)
 	end
+	check("native urgency proof rejects an independently misclassified native rule", function()
+		command("NotificationCloseAll")
+		command("NotificationClearHistory")
+		assert(Notifier.send("Owned negative-control body", { title = "Owned urgency-negative control", level = "info" }))
+		local history
+		assert(await(function()
+			command("NotificationCloseAll")
+			history = command("NotificationListHistory", "(aa{sv})")[1]
+			return #history > 0
+		end, 800), "negative-control notification did not reach native history")
+		assert(#history == 1)
+		local note = history[1]
+		assert(note.summary == "Owned urgency-negative control")
+		assert(note.body == "Owned negative-control body")
+		assert(note.appname == "Ergopti+")
+		assert(note.timeout == 5000000)
+		assert(note.category == "ergopti-fixture-normal", "the deliberate wrong native rule must actually run")
+		local accepted = pcall(assert_native_urgency, note, "LOW")
+		assert(accepted == false, "a wrong native severity receipt must not pass the original urgency assertion")
+	end)
 end, debug.traceback)
 
 if daemon and not exited then
