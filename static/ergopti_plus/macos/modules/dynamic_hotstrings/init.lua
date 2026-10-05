@@ -17,11 +17,13 @@ local M = {}
 
 local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
 local RulesEngine  = require("modules.dynamic_hotstrings.rules_engine")
+local UserCode     = require("modules.dynamic_hotstrings.user_code")
 local Logger       = require("infra.logger")
 local Manifest     = require("infra.manifest_reader")
 local LOG          = "dynamic_hotstrings"
 local _started     = false
 local _starting    = false
+local _stopping    = false
 local _started_keymap = nil
 
 
@@ -57,28 +59,34 @@ end
 --- @param reason string Failure context.
 --- @return boolean false
 local function rollback_start(reason)
-	-- Rules first: its callback can resolve personal data. Both stops are protected
-	-- so one teardown failure cannot leave the sibling generation live.
+	-- Retire user code first, then resolver callbacks that can expose personal data.
+	-- A failed acknowledgement retains startup inhibition until a stop retry.
+	local cleanup_owned = false
 	local stops = {
+		{ label = "user_code", stop = UserCode.stop },
 		{ label = "rules_engine", stop = RulesEngine.stop },
 		{ label = "personal_info", stop = PersonalInfo.stop },
 	}
 	for _, entry in ipairs(stops) do
 		local label, stop = entry.label, entry.stop
 		local ok, result = xpcall(stop, debug.traceback)
-		if not ok then
+		if not ok or (entry.label ~= "personal_info" and result ~= true) then
+			cleanup_owned = true
 			Logger.error(LOG, "Dynamic-hotstrings rollback could not stop %s "
 				.. "(callback content withheld; terminal type: %s).", label, type(result))
 		end
 	end
 	_started = false
 	_starting = false
-	_started_keymap = nil
+	_stopping = cleanup_owned
+	if not cleanup_owned then _started_keymap = nil end
 	Logger.error(LOG, "Dynamic hotstrings core start rolled back after %s.", tostring(reason))
 	return false
 end
 
 M.DEFAULT_STATE = {
+	dynamichotstrings_user_code_enabled = Manifest.default_for("hotstrings.dynamic.user_code.enabled"),
+	dynamichotstrings_user_code_time_activation_seconds = Manifest.default_for("hotstrings.dynamic.user_code.time_activation_seconds"),
 	personal_info                    = feat_enabled("hotstrings.dynamic.text_expansion_personal_information"),
 	dynamichotstrings_enabled        = Manifest.default_for("hotstrings.dynamic.enabled"),
 	dynamichotstrings_datefr         = feat_enabled("hotstrings.dynamic.date_fr"),
@@ -104,6 +112,10 @@ M.DEFAULT_STATE = {
 --- @param keymap_module table The active keymap module reference.
 --- @param info_toml_path string|nil Absolute path to personal_info.toml.
 function M.start(base_dir, keymap_module, info_toml_path)
+	if _stopping then
+		Logger.error(LOG, "Dynamic hotstrings core start refused while native cleanup remains owned.")
+		return false
+	end
 	if _started then
 		if _started_keymap == keymap_module then return true end
 		Logger.error(LOG, "Dynamic hotstrings core already owns a different keymap.")
@@ -149,6 +161,9 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	end) then
 		return rollback_start("rules-engine start")
 	end
+	if not run_start_step("programmable-user start", function()
+		return UserCode.start(keymap_module)
+	end) then return rollback_start("programmable-user start") end
 	
 	_started = true
 	_starting = false
@@ -162,10 +177,18 @@ function M.stop()
 	Logger.start(LOG, "Stopping dynamic hotstrings core…")
 	_started = false
 	_starting = false
-	_started_keymap = nil
-	RulesEngine.stop()
+	_stopping = true
+	local users_stopped = UserCode.stop() == true
+	local rules_stopped = RulesEngine.stop() == true
 	PersonalInfo.stop()
+	if not users_stopped or not rules_stopped then
+		Logger.error(LOG, "Dynamic hotstrings core retains exact cleanup ownership.")
+		return false
+	end
+	_started_keymap = nil
+	_stopping = false
 	Logger.success(LOG, "Dynamic hotstrings core stopped.")
+	return true
 end
 
 -- Proxy Personal Info UI and state controls for the menu
@@ -174,6 +197,18 @@ M.enable      = PersonalInfo.enable
 M.disable     = PersonalInfo.disable
 M.set_enabled = PersonalInfo.set_enabled
 M.is_enabled  = PersonalInfo.is_enabled
+M.reload_user_code = UserCode.reload
+M.set_user_code_enabled = UserCode.set_enabled
+M.user_code_source_path = UserCode.source_path
+M.user_code_count = UserCode.count
+M.create_user_code_example = UserCode.create_example
+M.set_user_code_time_activation = UserCode.set_time_activation
+M.user_code_is_enabled = UserCode.is_enabled
+M.user_code_time_activation = UserCode.time_activation
+M.user_code_scope_snapshot = UserCode.scope_snapshot
+M.user_code_scope_current = UserCode.scope_current
+M.user_code_scope_adopt = UserCode.scope_adopt
+M.user_code_scope_restore = UserCode.scope_restore
 
 --- Propagates a magic-key change to BOTH dynamic engines.
 ---

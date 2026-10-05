@@ -34,6 +34,7 @@ end
 local LOG    = "toml_reader"
 local Bom    = require("toml_codec.bom")
 local BasicString = require("toml_codec.basic_string")
+local KeyPath = require("toml_codec.key_path")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
@@ -475,7 +476,10 @@ local function parse_lines(lines)
 			end
 
 			-- Per-section meta block: [_meta.sections.<name>]
-			local meta_sec_name = line:match("^%[_meta%.sections%.([%w_%-]+)%]$")
+			local metadata_header = KeyPath.header(line)
+			local metadata_parts = metadata_header and not metadata_header.array and metadata_header.segments
+			local meta_sec_name = metadata_parts and #metadata_parts == 3
+				and metadata_parts[1] == "_meta" and metadata_parts[2] == "sections" and metadata_parts[3]
 			if meta_sec_name then
 				mode             = "meta_section"
 				current_meta_sec = meta_sec_name

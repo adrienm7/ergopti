@@ -163,9 +163,9 @@ local CANONICAL_LAYOUT_MENU = {
 	-- above and for the same reason: their choices are macOS input sources.
 	"list:number_row_policy",
 	"list:layout_switching",
-	"feature:hotstrings.magic_key.replace",
-	-- UPDATED 2026-09-30: the physical key the replace switch turns into the
-	-- magic key, chosen on every driver by pressing it or from the candidates
+	-- Replacement is controlled by the shipped Ergopti hotstrings extension.
+	-- The physical key remains selectable here on every driver by pressing it
+	-- or choosing from the candidates
 	-- (ui/menu/magic_key_source_menu.lua).
 	"list:magic_key_source",
 }

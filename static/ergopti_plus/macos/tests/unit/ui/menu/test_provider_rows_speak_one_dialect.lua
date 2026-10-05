@@ -225,4 +225,51 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 		helpers.assert_true(src:find('current_channel ~= offered_channel or type(current_offer) ~= "table"', 1, true) ~= nil,
 			"the retained release must also match the actual current channel before native dispatch")
 	end)
+
+	helpers.it("the shared native admission policy preserves admitted scope and neighbor callbacks exactly", function()
+		helpers.with_stub_scope({ "infra.manifest_menu", "infra.i18n" }, function()
+			local Manifest = helpers.load_with_stubs("infra.manifest_menu")
+			local Policy = require("menu.personal_files")
+			local i18n = require("infra.i18n")
+			local enabled, disabled, neighbor = function() return true end, function() return true end, function() return true end
+			local rows = Manifest.build("hotstring_category_menu", "Hotstrings", nil, nil, { commands = {
+				["hotstring_category_enable_all"] = enabled, ["hotstring_category_disable_all"] = disabled,
+			} }, { ["hotstring_category_file"] = function() return {} end,
+				["hotstring_category_sections"] = function() return { { label = "Independent neighbor", action = neighbor } } end })
+			local before = {}; for index, row in ipairs(rows) do before[index] = row end
+			helpers.assert_true(Policy.apply_category_admission(rows, {
+				manifest = Manifest, translate = i18n.get, current = function() return true end,
+			}) == rows, "admission preserves the actual native array identity")
+			for index, row in ipairs(rows) do helpers.assert_true(row == before[index]) end
+			helpers.assert_true(rows[1].fn == enabled and rows[2].fn == disabled)
+			helpers.assert_true(rows[#rows].fn == neighbor and rows[#rows].disabled ~= true)
+			helpers.assert_true(rows[#rows].fn())
+		end)
+	end)
+
+	helpers.it("the shared native admission policy closes only declared scope controls on strict owner refusal", function()
+		helpers.with_stub_scope({ "infra.manifest_menu", "infra.i18n" }, function()
+			local Manifest = helpers.load_with_stubs("infra.manifest_menu")
+			local Policy = require("menu.personal_files")
+			local i18n = require("infra.i18n")
+			for _, refusal in ipairs({ { value = false }, { value = nil }, { value = 1 }, { value = true, readonly = true } }) do
+				local calls = 0
+				local neighbor = function() calls = calls + 1; return true end
+				local rows = Manifest.build("hotstring_category_menu", "Hotstrings", nil, nil, { commands = {
+					["hotstring_category_enable_all"] = function() error("unavailable enable must not run") end,
+					["hotstring_category_disable_all"] = function() error("unavailable disable must not run") end,
+				} }, { ["hotstring_category_file"] = function() return {} end,
+					["hotstring_category_sections"] = function() return { { label = "Independent neighbor", action = neighbor } } end })
+				helpers.assert_true(Policy.apply_category_admission(rows, { manifest = Manifest, translate = i18n.get,
+					current = function() return refusal.value end, readonly = refusal.readonly }) == rows)
+				for index = 1, 2 do
+					helpers.assert_eq(rows[index].disabled, true)
+					helpers.assert_nil(rows[index].fn, "unavailable declared scope has no native callback")
+				end
+				helpers.assert_true(rows[#rows].fn == neighbor and rows[#rows].disabled ~= true)
+				helpers.assert_eq(rows[#rows].title, "Independent neighbor")
+				helpers.assert_true(rows[#rows].fn()); helpers.assert_eq(calls, 1)
+			end
+		end)
+	end)
 end)

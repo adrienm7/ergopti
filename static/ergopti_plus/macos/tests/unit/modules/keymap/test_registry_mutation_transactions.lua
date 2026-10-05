@@ -10,6 +10,20 @@
 
 local helpers = require("tests.helpers")
 
+--- Models the empty boot directory catalogue in registry-only menu fixtures.
+--- The actual registry/persistence owners stay live; importing the boot loader
+--- would construct an unrelated keymap against the already initialized registry.
+--- @param callback function Actual menu transaction and its assertions.
+--- @return ... Callback results.
+local function with_menu_diagnostics(callback)
+	return helpers.with_stub_scope({ "infra.personal_hotstrings" }, function()
+		package.loaded["infra.personal_hotstrings"] = {
+			unavailable_directories = function() return {} end,
+		}
+		return callback()
+	end)
+end
+
 
 --- Builds an initialized registry bound to a fresh in-memory Hammerspoon stub.
 --- @return table state
@@ -492,63 +506,65 @@ helpers.describe("personal menu: the real category persistence owner", function(
 	for _, enabled in ipairs({ true, false }) do
 		for _, publication in ipairs({ "true", "false", "nil", "throw" }) do
 			helpers.it("personal menu transaction " .. tostring(enabled) .. "/" .. publication, function()
-				local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
-				local state, registry = fresh_registry()
-				local names = { "personal", "personal_ext_work", "custom" }
-				for _, group in ipairs(names) do
-					registry.register_lua_group(group, group, { { name = "one" }, { name = "two" } })
-					for _, section in ipairs({ "one", "two" }) do
-						hs.settings.set("ergopti.hotstrings_section_" .. group .. "_" .. section, not enabled)
-					end
-					registry.set_post_load_hook(group, function()
+				return with_menu_diagnostics(function()
+					local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+					local state, registry = fresh_registry()
+					local names = { "personal", "personal_ext_work", "custom" }
+					for _, group in ipairs(names) do
+						registry.register_lua_group(group, group, { { name = "one" }, { name = "two" } })
 						for _, section in ipairs({ "one", "two" }) do
-							if registry.is_section_enabled(group, section) then add_group_mapping(registry, group, group .. section) end
+							hs.settings.set("ergopti.hotstrings_section_" .. group .. "_" .. section, not enabled)
 						end
-					end)
-					if enabled then helpers.assert_eq(registry.disable_group(group), true) end
-				end
-				registry.register_lua_group("spare", "Spare", {})
-				add_group_mapping(registry, "spare", "untouched")
-				local spare_mapping = state.mappings[#state.mappings]
-				local menu_state = { hotstrings = {}, keymap = false, trigger_char = "★" }
-				for _, group in ipairs(names) do menu_state.hotstrings[group] = not enabled end
-				local starts, updates, candidate = 0, 0, {}
-				registry.start = function() starts = starts + 1; return true end
-				local ctx = { state = menu_state, paused = true, keymap = registry,
-					hotfiles = { "personal.toml", "personal_ext_work.toml" },
-					get_group_name = function(path) return path:gsub("%.toml$", "") end,
-					applyTriggerChar = function(value) return value end,
-					hotstring_editor = { open = function() end },
-					updateMenu = function() updates = updates + 1 end,
-					save_prefs = function()
-						for _, group in ipairs(names) do
-							candidate[group] = { registry.is_group_enabled(group), menu_state.hotstrings[group],
-								registry.is_section_enabled(group, "one"), registry.is_section_enabled(group, "two") }
-						end
-						if publication == "throw" then error("personal owner publication refused") end
-						if publication == "nil" then return nil end
-						return publication == "true"
-					end,
-				}
-				local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
-				local committed = rows[enabled and 1 or 2].fn()
-				local accepted, wanted = publication == "true", not enabled
-				if accepted then wanted = enabled end
-				helpers.assert_eq(committed, accepted)
-				for _, group in ipairs(names) do
-					helpers.assert_eq(candidate[group], { enabled, enabled, enabled, enabled }, "one complete candidate reaches publication")
-					helpers.assert_eq(registry.is_group_enabled(group), wanted)
-					helpers.assert_eq(menu_state.hotstrings[group], wanted)
-					for _, section in ipairs({ "one", "two" }) do
-						helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_" .. group .. "_" .. section), wanted)
+						registry.set_post_load_hook(group, function()
+							for _, section in ipairs({ "one", "two" }) do
+								if registry.is_section_enabled(group, section) then add_group_mapping(registry, group, group .. section) end
+							end
+						end)
+						if enabled then helpers.assert_eq(registry.disable_group(group), true) end
 					end
-				end
-				helpers.assert_eq(registry.is_group_enabled("spare"), true)
-				local found_spare = false
-				for _, mapping in ipairs(state.mappings) do if mapping == spare_mapping then found_spare = true end end
-				helpers.assert_true(found_spare, "an unrelated group's exact native mapping survives")
-				helpers.assert_eq({ starts, updates }, { 0, accepted and 1 or 0 })
-				helpers.assert_eq(menu_state.keymap, false)
+					registry.register_lua_group("spare", "Spare", {})
+					add_group_mapping(registry, "spare", "untouched")
+					local spare_mapping = state.mappings[#state.mappings]
+					local menu_state = { hotstrings = {}, keymap = false, trigger_char = "★" }
+					for _, group in ipairs(names) do menu_state.hotstrings[group] = not enabled end
+					local starts, updates, candidate = 0, 0, {}
+					registry.start = function() starts = starts + 1; return true end
+					local ctx = { state = menu_state, paused = true, keymap = registry,
+						hotfiles = { "personal.toml", "personal_ext_work.toml" },
+						get_group_name = function(path) return path:gsub("%.toml$", "") end,
+						applyTriggerChar = function(value) return value end,
+						hotstring_editor = { open = function() end },
+						updateMenu = function() updates = updates + 1 end,
+						save_prefs = function()
+							for _, group in ipairs(names) do
+								candidate[group] = { registry.is_group_enabled(group), menu_state.hotstrings[group],
+									registry.is_section_enabled(group, "one"), registry.is_section_enabled(group, "two") }
+							end
+							if publication == "throw" then error("personal owner publication refused") end
+							if publication == "nil" then return nil end
+							return publication == "true"
+						end,
+					}
+					local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
+					local committed = rows[enabled and 1 or 2].fn()
+					local accepted, wanted = publication == "true", not enabled
+					if accepted then wanted = enabled end
+					helpers.assert_eq(committed, accepted)
+					for _, group in ipairs(names) do
+						helpers.assert_eq(candidate[group], { enabled, enabled, enabled, enabled }, "one complete candidate reaches publication")
+						helpers.assert_eq(registry.is_group_enabled(group), wanted)
+						helpers.assert_eq(menu_state.hotstrings[group], wanted)
+						for _, section in ipairs({ "one", "two" }) do
+							helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_" .. group .. "_" .. section), wanted)
+						end
+					end
+					helpers.assert_eq(registry.is_group_enabled("spare"), true)
+					local found_spare = false
+					for _, mapping in ipairs(state.mappings) do if mapping == spare_mapping then found_spare = true end end
+					helpers.assert_true(found_spare, "an unrelated group's exact native mapping survives")
+					helpers.assert_eq({ starts, updates }, { 0, accepted and 1 or 0 })
+					helpers.assert_eq(menu_state.keymap, false)
+				end)
 			end)
 		end
 	end
@@ -856,5 +872,29 @@ helpers.describe("Dynamic module acknowledged publication survives UI refresh re
 		helpers.assert_eq(f.preferences.load("config").personal_info, true)
 		helpers.assert_eq(f.module_calls, { true }, "an acknowledged module is never compensated because repaint failed")
 		helpers.assert_eq({ f.counts() }, { 0, 0, 1 })
+	end)
+end)
+
+helpers.describe("registry-only personal menu diagnostics isolation", function()
+	helpers.it("restores absent, false and captured boot catalogue caches after success and refusal", function()
+		helpers.with_fresh_modules({ "infra.personal_hotstrings" }, function()
+			local catalogue = { unavailable_directories = function() return { { label = "foreign" } } end }
+			for _, previous in ipairs({ { value = nil }, { value = false }, { value = catalogue } }) do
+				for _, refuse in ipairs({ false, true }) do
+					package.loaded["infra.personal_hotstrings"] = previous.value
+					local ok, result = pcall(with_menu_diagnostics, function()
+						local port = require("infra.personal_hotstrings")
+						helpers.assert_true(port ~= previous.value)
+						helpers.assert_eq(port.unavailable_directories(), {})
+						if refuse then error("injected menu fixture refusal", 0) end
+						return "completed"
+					end)
+					helpers.assert_eq(ok, not refuse)
+					if not refuse then helpers.assert_eq(result, "completed") end
+					helpers.assert_true(package.loaded["infra.personal_hotstrings"] == previous.value,
+						"the exact earlier boot catalogue identity must survive the scoped fixture")
+				end
+			end
+		end)
 	end)
 end)

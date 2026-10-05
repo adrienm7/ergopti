@@ -104,6 +104,8 @@ const WINDOWS_MECHANICS = {
 		'the native readiness receipt identifies its executable and reports the compiled flag',
 	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
 	'modules/keylogger/keylogger_prefetch.ahk': 'how a worker process is spawned',
+	'modules/dynamic_hotstrings/user_code.ahk':
+		'launch an owned personal-code worker with the bundled interpreter /script mode',
 	'modules/updater/core.ahk': 'the owner, Updater_IsLocalSource'
 };
 
