@@ -2005,6 +2005,35 @@ These are software implementations; final hardware verification remains below.
   notification/HTTP fixtures from dev. No global codec, query, numeric policy,
   schema, cache, configuration, menu, physical-input or foreign driver change.
 
+- [~] **L130.** Linux raw-event batches: wrap each typing, hotstring, shortcut
+  and app-switch script in a checked SQLite transaction. An INSERT trigger using
+  RAISE(FAIL) previously left earlier rows or trigger effects committed while the
+  public caller retained the entire refused batch; its retry then duplicated
+  events and diverged from derived totals. Roll back the refused script when the
+  checked CLI exits before COMMIT. Keep separately acknowledged event-ID
+  reservations and their gaps; this does not promise whole-flush atomicity,
+  ID rollback, COMMIT-refusal handling or exactly-once delivery after a lost
+  post-COMMIT acknowledgement. Twelve genuine native checks reproduce ten
+  failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. A separate actual-clock public Keylogger producer and independent
+  Python SQLite oracle reproduce five failures among twelve checks and pass after
+  on each profile. Producer exit zero before and after only means its snapshots
+  were collected: the oracle supplies the failing or passing verdict. Refused,
+  accepted and repeated-flush snapshots independently verify IDs, pending events,
+  raw/derived conservation, exact fractional WPM, local days and UTC timestamps.
+  Both native fixtures enforce their exact twelve-check floors. Eight registered
+  CLI-script unit assertions fail before and pass after on all three profiles.
+  Preserve every existing assertion and the unchanged Keylogger implementation.
+  macOS already checks its ingest transaction and rolls back failures in
+  log_manager; Windows journals transaction-delimited ingest scripts for its
+  detached replay worker. Those different native paths need their own runtime
+  validation and remain with the principal agent. No shared policy change is
+  required: transaction ownership belongs to each native SQLite adapter. Register
+  future Linux CI without launching it. These are real Linux software/database
+  executions with software-supplied input, not physical keyboard validation.
+  Preserve both PulseAudio language packs and principal notification/HTTP fixtures.
+  No schema, Reader, menu, configuration, foreign driver or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -745,3 +745,55 @@ helpers.describe("linux-sqlite-local-event-days", function()
 		end
 	end
 end)
+
+helpers.describe("linux-sqlite-raw-batch-transactions", function()
+	for _, fixture in ipairs({
+		{ table_name = "events_typing", method = "insert_typing_events", event = { app = "owned", text = "owned", events_json = "[]" } },
+		{ table_name = "events_hotstring", method = "insert_hotstring_events", event = { app = "owned", replacement = "owned" } },
+		{ table_name = "events_shortcut", method = "insert_shortcut_events", event = { app = "owned", key = "owned" } },
+		{ table_name = "events_app_switch", method = "insert_app_switch_events", event = { prev_app = "owned", next_app = "owned" } },
+	}) do
+		for _, status in ipairs({ 0, 7 }) do
+			it("linux-sqlite-raw-batch-transactions: " .. fixture.table_name .. " owns one transaction and receipt " .. status, function()
+				local command = require("modules.keylogger.sqlite_command")
+				local Cipher = require("modules.keylogger.text_cipher")
+				local previous_build, previous_cipher = command.build, Cipher.is_enabled()
+				local previous_execute, previous_popen = os.execute, io.popen
+				local captured, body, code = {}, "", 0
+				local path = os.tmpname()
+				local seed = assert(io.open(path, "w"))
+				assert(seed:write("owned native fixture") and seed:close())
+				Cipher.set_enabled(false)
+				command.build = function(selected, sql, options)
+					captured[#captured + 1] = sql
+					body, code = "", 0
+					if sql:find("SELECT sql FROM sqlite_master", 1, true) then
+						body = "CREATE TABLE devices(os CHECK(os IN ('linux')));\n"
+					elseif sql:find("SELECT CAST(value AS INTEGER)", 1, true) then body = "1\n"
+					elseif sql:find("INSERT OR IGNORE INTO " .. fixture.table_name, 1, true) then code = status end
+					return previous_build(selected, sql, options)
+				end
+				os.execute = function() return 0 end
+				io.popen = function()
+					local output = body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. code .. "\n"
+					return { read = function() return output end, close = function() return true end }
+				end
+				local Writer
+				local ok, err = xpcall(function()
+					Writer = helpers.load_module("modules.keylogger.sqlite_writer")
+					helpers.assert_true(Writer.open_db(path))
+					helpers.assert_eq(Writer[fixture.method]("owned", { fixture.event }), status == 0)
+					local sql = captured[#captured]
+					helpers.assert_contains(sql, "BEGIN IMMEDIATE;\nINSERT OR IGNORE INTO " .. fixture.table_name)
+					helpers.assert_true(sql:match("COMMIT;%s*$") ~= nil, "the final transaction command must be COMMIT")
+				end, debug.traceback)
+				command.build = previous_build
+				os.execute, io.popen = previous_execute, previous_popen
+				Cipher.set_enabled(previous_cipher)
+				if Writer then Writer.close_db() end
+				os.remove(path)
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+end)
