@@ -2565,6 +2565,8 @@ conservative boundary remains source work for complete future-data support;
 portable settings models do not prove actual Hammerspoon storage or atomic
 cross-process publication.
 
+The Linux formatting corpus now owns a private instance of the actual shared logger. The existing native shutdown owner retains its live suppression debt; every corpus assertion remains strict. Current and incoming-dev causal cohorts reproduce the old fixture failure, and isolated replay preserves the live singleton and its pending lines. This is validation isolation, not a global-reset behavior change.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -3395,6 +3397,8 @@ whole-file refusal, persisted-legacy-settings or native acceptance requirements.
 
 The 2026-10-05 continuation preserves malformed shortcut-order source rows and source-proven empty arrays instead of treating them as valid maps. Requested replacement refuses until explicit repair; valid reorders and resets retain unrelated source kinds. The Windows known-feature fixtures now target the currently published `names` owner, keeping the removed `caps` namespace as a source-preservation/explicit-cleanup control. The changed-publication/restart timing remains an explicit nondefault Float (0.75), with the separate 0.5 default test retained. Focused portable checks and independent source review pass; final composed and hosted Windows qualification remain pending.
 
+The declared macOS-only optional user-model list now reports obsolete scalar source once, keeps it outside runtime and unmarked for explicit cleanup, and preserves it during unrelated default-carried saves and published scope clear. A nonneutral replacement refuses before publication until explicit source repair. All original assertions remain; real typed-file oracles retain signed integers, precise floats, offset dates, literal dots and nested arrays. Linux has no supported owner for this leaf and preserves it; native Windows was inspected only. This bounded correction does not finish the remaining configuration catalogue.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -3877,6 +3881,10 @@ including future pair metadata. All native Windows causal fixtures and final
 packaging/install acceptance remain separately required.
 
 The 2026-10-05 continuation adds source-bound explicit Windows cleanup of retired physical sections, including empty section headers, exact case identities and verified backup bytes. Ordinary full saves preserve retired entries. New Windows namespace publication now uses an explicit native-readable header only when the semantic parser admits that declaration after explicitly owned drops; closed dotted/inline owners keep their existing legal insertion route. Complete independently written images and actual flat-reader assertions cover first publication and explicit replacement. Native qualification is still in progress; unsupported retired dotted/inline/table-array cleanup projections remain implementation work.
+
+Ordinary macOS snapshot and scope preparation now preserve an obsolete scalar at the optional user-model list. Neutral operations cannot silently delete it; nonneutral replacement refuses before source cleanup. Existing exact-source and typed-neighbor fences stay active.
+
+Windows explicit cleanup now offers the complete retired ahk root in dotted assignments, inline roots and table-array generations. Its private native receipt binds exact record identity, fields and complete source; cloned, forged, mutated, stale, partial and consumed records refuse before publication. Existing backup, lease, typed document writer and host action-only authority remain intact. Twenty-one native regression cases are added; native Windows qualification is pending. Lua collectors still cannot offer these root forms, and retirement policy is not yet centralized, so this slice does not complete the cross-driver item.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -4544,6 +4552,10 @@ corpora remain immutable. Full selected and all-OS native qualification remain
 required; the remaining fixed native families and physical acceptance are open.
 
 The 2026-10-05 Swipe continuation declares its fixed action separator, mode group and sensitivity group once in the shared manifest. Native selection, eighteen numeric sensitivity choices and acknowledged compensation remain their existing owners. Two captions use genuine translated prefixes in all 21 locales. Source/graph/callback controls and the old-producer inverse pass; final composed native and physical UI qualification remain pending. This does not complete the remaining fixed provider controls.
+
+Native Linux metrics equivalence now retains the established JSON-quoted token column in its independent raw-row SQL transport. All twenty-one assertions, aggregation rules and date/application filters remain unchanged. Real SQLite compares 648 grouped rows with 2808 raw rows; this repairs a validation prerequisite and changes no production metrics policy.
+
+The native Windows DelayRows provider now supplies all four required renderer arguments. The previous candidate failed loading before any native unit case; all eight production call sites retain the unchanged four-argument API. Two actual-provider regression cases cover complete physical rows, caption propagation, missing commands and withdrawn callback ownership. Native Windows qualification remains required on this successor.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama

@@ -427,3 +427,170 @@ helpers.describe("Explicit section-order namespace source-shape admission", func
 		end)
 	end)
 end)
+
+helpers.describe("Obsolete scalar user-model list preservation", function()
+	local LeafRows = require("toml_codec.leaf_rows")
+	local Outdated = require("config_outdated")
+	local Manifest = require("infra.manifest_reader")
+	local tail = '[llm.models]\nuser_models = TOKEN\nactive_backend = "ollama"\n[future]\nkeep = "independent"\nempty = []\nitems = [1, 2]\n"literal.dot" = { stamp = 2026-10-05T10:20:30Z, child = [] }\n'
+
+	local function with_file(source, body)
+		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "logger.shim" }, function()
+			local warnings, errors = {}, {}
+			local logger = helpers.make_logger_stub()
+			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["adapters.file_system"] = nil
+			Outdated.reset_for_tests()
+			local preferences = helpers.load_with_stubs("infra.preferences")
+			local path = os.tmpname()
+			local function write(bytes)
+				local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
+			end
+			local function read()
+				local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a"))
+				assert(file:close()); return bytes
+			end
+			write(source)
+			local ok, err = xpcall(function() body(preferences, path, read, write, warnings, errors) end, debug.traceback)
+			os.remove(path)
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	local function neutral_state(preferences, path)
+		local saved, status = preferences.load(path)
+		helpers.assert_eq(status, "ok")
+		helpers.assert_eq(saved.llm_user_models, nil, "obsolete list never enters native runtime")
+		local state = { llm_user_models = Manifest.default_for("llm.models.user_models"), gestures = true }
+		helpers.assert_eq(state.llm_user_models, {}, "consume the published native default")
+		preferences.merge_saved_data(state, saved)
+		return state
+	end
+
+	local function clear_rows()
+		local rows = {}
+		for _, row in ipairs(Manifest.scope_operations("llm", "clear")) do
+			if row.section == "llm.models" and row.key == "user_models" then rows[#rows + 1] = row end
+		end
+		helpers.assert_eq(#rows, 1, "actual published scope must own the exact optional list")
+		helpers.assert_eq(rows[1].delete, true)
+		return rows
+	end
+
+	for _, vector in ipairs({
+		{ id = "false", token = "false", value = false }, { id = "true", token = "true", value = true },
+		{ id = "integer", token = "42", value = 42 }, { id = "float", token = "1.25", value = 1.25 },
+		{ id = "text", token = '"obsolete"', value = "obsolete" },
+	}) do
+		helpers.it("preserves the complete file model for " .. vector.id .. " during a default-carried unrelated save", function()
+			with_file(tail:gsub("TOKEN", vector.token), function(preferences, path, read, _, warnings, errors)
+				local state = neutral_state(preferences, path)
+				local marks = {}
+				local document, shapes = LeafRows.decode_source(read())
+				preferences.mark_config_reads(document, function(...) marks[table.concat({ ... }, ".")] = true end, shapes)
+				helpers.assert_eq(marks["llm.models.user_models"], nil, "cleanup retains ownership of the obsolete leaf")
+				helpers.assert_eq(#warnings, 1, "load and cleanup-read warn once through the same policy")
+				helpers.assert_contains(warnings[1], "llm.models.user_models")
+				helpers.assert_eq(preferences.save(path, state, {}, {}), true)
+				helpers.assert_eq(TomlCodec.decode(read()), {
+					llm = { models = { user_models = vector.value, active_backend = "ollama" } },
+					future = { keep = "independent", empty = {}, items = { 1, 2 },
+						["literal.dot"] = { stamp = "2026-10-05T10:20:30Z", child = {} } },
+					gestures = { enabled = true }, hotstrings = { modules = {} }, shortcuts = { keys = {} },
+				}, "independent complete preserved-source model")
+				helpers.assert_contains(read(), "empty = []")
+				helpers.assert_contains(read(), "2026-10-05T10:20:30Z")
+				helpers.assert_eq(#errors, 0)
+			end)
+		end)
+	end
+
+	for _, source in ipairs({
+		'llm = { models = { user_models = false, active_backend = "ollama" }, future = { keep = [] } }\n',
+		'llm.models.user_models = false\nllm.models.active_backend = "ollama"\n',
+		'["llm"."models"]\n"user_models" = false\nactive_backend = "ollama"\n',
+	}) do
+		helpers.it("preserves an admitted equivalent scalar source spelling through ordinary save and actual neutral scope", function()
+			with_file(source, function(preferences, path, read, _, warnings)
+				local state = neutral_state(preferences, path)
+				helpers.assert_eq(preferences.save(path, state, {}, {}), true)
+				local snapshot = preferences.source_snapshot(path)
+				local rows = preferences.prepare_llm_updates(snapshot, clear_rows())
+				helpers.assert_eq(TomlWriter.batch_write(path, rows, require("adapters.file_system"), snapshot), true)
+				helpers.assert_eq(TomlCodec.decode(read()).llm.models, { user_models = false, active_backend = "ollama" })
+				helpers.assert_eq(#warnings, 1)
+			end)
+		end)
+	end
+
+	helpers.it("preserves the obsolete leaf while the real neutral scope updates a valid sibling", function()
+		with_file('[llm.models]\nuser_models = false\nactive_backend = "mlx"\n[future]\nempty = []\n', function(preferences, path, read)
+			neutral_state(preferences, path)
+			local snapshot = preferences.source_snapshot(path)
+			local rows = clear_rows(); rows[#rows + 1] = { section = "llm.models", key = "active_backend", value = "ollama" }
+			local prepared = preferences.prepare_llm_updates(snapshot, rows)
+			helpers.assert_eq(#prepared, 1, "only the declared neutral list delete is suppressed")
+			helpers.assert_eq(TomlWriter.batch_write(path, prepared, require("adapters.file_system"), snapshot), true)
+			helpers.assert_eq(TomlCodec.decode(read()), { llm = { models = { user_models = false, active_backend = "ollama" } }, future = { empty = {} } })
+			helpers.assert_contains(read(), "empty = []")
+		end)
+	end)
+
+	helpers.it("refuses nonneutral complete snapshots and scope replacements before publication", function()
+		with_file(tail:gsub("TOKEN", "false"), function(preferences, path, read, _, _, errors)
+			neutral_state(preferences, path)
+			local original = read()
+			for _, candidate in ipairs({ { { backend = "ollama", name = "new-valid-model" } }, false, 9, { named = "unsupported" } }) do
+				helpers.assert_eq(preferences.save(path, { llm_user_models = candidate, gestures = true }, {}, {}), false)
+				helpers.assert_eq(read(), original)
+				helpers.assert_contains(errors[#errors], "llm.models.user_models")
+				helpers.assert_contains(errors[#errors], "manual source cleanup")
+				local err = helpers.assert_throws(function()
+					preferences.prepare_llm_updates(preferences.source_snapshot(path),
+						{ { section = "llm.models", key = "user_models", value = candidate } })
+				end)
+				helpers.assert_contains(tostring(err), "manual source cleanup")
+				helpers.assert_eq(read(), original)
+			end
+		end)
+	end)
+
+	helpers.it("admits a valid model edit only after explicit source repair and reload", function()
+		with_file('[llm.models]\nuser_models = false\n[future]\nempty = []\n', function(preferences, path, read, write)
+			neutral_state(preferences, path)
+			local state = { llm_user_models = { { backend = "ollama", name = "new-valid-model" } } }
+			helpers.assert_eq(preferences.save(path, state, {}, {}), false)
+			write('[llm.models]\nuser_models = []\n[future]\nempty = []\n')
+			helpers.assert_eq(select(2, preferences.load(path)), "ok")
+			helpers.assert_eq(preferences.save(path, state, {}, {}), true)
+			helpers.assert_eq(TomlCodec.decode(read()), { llm = { models = { user_models = { { backend = "ollama", name = "new-valid-model" } } } },
+				future = { empty = {} }, hotstrings = { modules = {} }, shortcuts = { keys = {} } })
+		end)
+	end)
+
+	helpers.it("refuses a stale snapshot and preserves the newer obsolete generation on ordinary retry", function()
+		with_file('[llm.models]\nuser_models = false\n[future]\nempty = []\n', function(preferences, path, read, write)
+			local state = neutral_state(preferences, path)
+			local later = '[llm.models]\nuser_models = 19\n[future]\nempty = []\nkeep = "later"\n'
+			write(later)
+			helpers.assert_eq(preferences.save(path, state, {}, {}), false)
+			helpers.assert_eq(read(), later, "source mismatch never overwrites the newer file")
+			helpers.assert_eq(preferences.save(path, state, {}, {}), true)
+			helpers.assert_eq(TomlCodec.decode(read()), { llm = { models = { user_models = 19 } },
+				future = { empty = {}, keep = "later" }, gestures = { enabled = true }, hotstrings = { modules = {} }, shortcuts = { keys = {} } })
+		end)
+	end)
+
+	for _, source in ipairs({ '[llm.models]\nuser_models = []\n', '[llm.models.user_models]\n' }) do
+		helpers.it("retains the valid empty-array and historical empty-header runtime contracts", function()
+			with_file(source, function(preferences, path, _, _, warnings)
+				local saved, status = preferences.load(path)
+				helpers.assert_eq(status, "ok"); helpers.assert_eq(saved.llm_user_models, {})
+				helpers.assert_eq(preferences.save(path, { llm_user_models = {} }, {}, {}), true)
+				helpers.assert_eq(#warnings, 0)
+			end)
+		end)
+	end
+end)

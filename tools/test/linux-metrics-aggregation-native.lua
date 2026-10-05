@@ -89,7 +89,7 @@ refuses_rows(refused_receipt, 'native SQLite exit receipt failed:')
 -- Freeze the previous two SQL projections, not a second copy of Lua merge logic.
 command.build = function(db, sql, options)
 	if sql:find('FROM ngram_', 1, true) and not sql:find('FROM ngram_scancodes', 1, true) then
-		local columns = sql:find('SELECT app,', 1, true) and 'app, token, c, td, e, esrc_json' or 'token, c, td, e, esrc_json'
+		local columns = sql:find('SELECT app,', 1, true) and 'app, json_quote(token) AS token_json, c, td, e, esrc_json' or 'json_quote(token) AS token_json, c, td, e, esrc_json'
 		-- Remove only the new typed partition; retain the actual date/app filters.
 		sql = sql:gsub(" AND %(typeof%(c%).*$", ';')
 		sql = sql:gsub(" WHERE %(typeof%(c%).*$", ';')
