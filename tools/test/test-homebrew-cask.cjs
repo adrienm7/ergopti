@@ -275,10 +275,40 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 27 tests in /);
+	assert.match(result.stderr, /Ran 30 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
+
+check(
+	'owned AppleEvent compile boundary uses declared 64-bit dispatch and actual selected tools',
+	() => {
+		const receiver = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+			'utf8'
+		);
+		const helper = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+			'utf8'
+		);
+		assert.match(
+			receiver,
+			/ReceiveNextEvent\(1, &apple_event, kEventDurationForever, true, &event\)/
+		);
+		assert.match(receiver, /AEProcessEvent\(event\)/);
+		assert.match(receiver, /ReleaseEvent\(event\)/);
+		assert.doesNotMatch(receiver, /RunApplicationEventLoop\s*\(/);
+		assert.match(helper, /xcode-select", "--print-path"\], confined=True/);
+		assert.match(helper, /-isysroot/);
+		assert.match(helper, /-fmodules-cache-path=/);
+		assert.match(helper, /cache\.mkdir\(mode=0o700\)/);
+		const boundary = helper.slice(
+			helper.indexOf('def _admit_appleevent_boundary'),
+			helper.indexOf('def ', helper.indexOf('def _admit_appleevent_boundary') + 5)
+		);
+		assert.doesNotMatch(boundary, /xcrun/);
+	}
+);
 
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
 	const fixture = fs.readFileSync(

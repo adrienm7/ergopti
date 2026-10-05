@@ -1931,6 +1931,17 @@ key, path or URL is published by this diagnostic. Census admission and every
 existing native assertion and cleanup requirement are unchanged. The first
 failed native operation and its actual cause still require the next macOS run.
 
+The same run passes Brew sandbox grammar, then refuses the AppleEvent probe's
+compilation: RunApplicationEventLoop is a 32-bit-only Carbon API, and xcrun
+attempts writes outside the already private TMPDIR. The C probe now uses the
+documented 64-bit ReceiveNextEvent/AEProcessEvent/ReleaseEvent dispatch. Brew
+selects the actual compiler, adjacent linker and macOS SDK read-only, with an
+owned module-cache directory; sandbox allowances and the sender/nonce/reply
+oracle are unchanged. All 122 previous Python assertion lines remain intact;
+the original 27 controls and 30 candidate controls pass without skips. Actual
+compiler/linker confinement, both positive AppleEvent sends, the denied send
+and Brew install/upgrade/refusal/recovery still require macOS qualification.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

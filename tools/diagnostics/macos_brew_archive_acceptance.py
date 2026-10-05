@@ -638,7 +638,7 @@ def native_preconditions():
         "/usr/bin/osascript",
         "/usr/bin/xattr",
         "/usr/bin/tar",
-        "/usr/bin/xcrun",
+        "/usr/bin/xcode-select",
     ):
         require(
             Path(tool).is_file() and os.access(tool, os.X_OK),
@@ -731,11 +731,66 @@ def admit_appleevent_boundary(children, repository):
         ) from error
 
 
+def native_compiler(children):
+    """Resolve the selected native tools without xcrun's host temporary cache."""
+    selection = children.run(["/usr/bin/xcode-select", "--print-path"], confined=True)
+    value = selection.stdout
+    require(
+        0 < len(value) <= 4096
+        and value.endswith("\n")
+        and "\n" not in value[:-1]
+        and "\r" not in value
+        and "\0" not in value,
+        "Selected native developer directory receipt refused",
+    )
+    developer = Path(value[:-1])
+    require(developer.is_absolute(), "Selected native developer directory must be absolute")
+    developer = developer.resolve(strict=True)
+    layouts = [
+        (
+            developer / "Toolchains/XcodeDefault.xctoolchain/usr/bin",
+            developer / "Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+        ),
+        (developer / "usr/bin", developer / "SDKs/MacOSX.sdk"),
+    ]
+    admitted = []
+    for tools, sdk in layouts:
+        compiler, linker = tools / "clang", tools / "ld"
+        if not compiler.is_file() or not linker.is_file() or not sdk.is_dir():
+            continue
+        compiler, linker, sdk = (path.resolve(strict=True) for path in (compiler, linker, sdk))
+        require(
+            all(path.is_relative_to(developer) for path in (compiler, linker, sdk))
+            and compiler.parent == linker.parent
+            and os.access(compiler, os.X_OK)
+            and os.access(linker, os.X_OK),
+            "Selected native compiler, linker or SDK escaped its developer directory",
+        )
+        admitted.append((compiler, sdk))
+    require(
+        len(admitted) == 1, "Selected native compiler and macOS SDK are unavailable or ambiguous"
+    )
+    compiler, sdk = admitted[0]
+    cache = children.root / "native-compiler-cache"
+    cache.mkdir(mode=0o700)
+    # Explicit SDK and adjacent native linker avoid command-line shim lookup.
+    # Any Clang module cache is contained in the already admitted private root.
+    return [
+        str(compiler),
+        "-isysroot",
+        str(sdk),
+        "-B",
+        str(compiler.parent),
+        "-fmodules-cache-path=" + str(cache),
+    ]
+
+
 def _admit_appleevent_boundary(children, repository):
     """Require two real owned deliveries before admitting the full policy's refusal."""
     root = children.root
     nonce = str(uuid.uuid4())
     executables = {}
+    compiler = native_compiler(children)
     for role in ("receiver", "sender"):
         app = root / ("OwnedAppleEvent-" + role + ".app")
         executable = app / "Contents/MacOS" / role
@@ -753,8 +808,7 @@ def _admit_appleevent_boundary(children, repository):
             )
         )
         command = [
-            "/usr/bin/xcrun",
-            "clang",
+            *compiler,
             "-std=c11",
             "-O2",
             "-framework",
