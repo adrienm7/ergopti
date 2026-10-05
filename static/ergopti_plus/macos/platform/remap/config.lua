@@ -102,8 +102,18 @@ local INTEGRATION_SECTION = "karabiner"
 local INTEGRATION_KEY = "integration_enabled"
 -- Builds before 2026-09-22 defaulted to off and wrote `[karabiner] enabled =
 -- false` on first launch; later builds ignored it. It is not the user's
--- answer to the switch, so it is never read and a save drops it.
+-- answer to the switch, so it is ignored and retained until explicit cleanup.
 local LEGACY_INTEGRATION_KEY = "enabled"
+
+--- Reports the retired preference without interpreting it as integration consent.
+--- @param integration table|nil Parsed Karabiner section.
+--- @param path string Owning configuration file.
+local function report_retired_integration(integration, path)
+	if type(integration) == "table" and integration[LEGACY_INTEGRATION_KEY] ~= nil then
+		Outdated.report_in_file(path, { INTEGRATION_SECTION, LEGACY_INTEGRATION_KEY },
+			"the retired integration key is ignored; integration_enabled owns consent", Logger)
+	end
+end
 
 
 
@@ -520,6 +530,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 		integration_enabled = integration[INTEGRATION_KEY]
 	end
+	report_retired_integration(integration, user_config_path)
 
 	-- Saves are sparse against the neutral state: an absent table, key, slot or
 	-- timing IS the neutral value, so it is completed silently. Only a present
@@ -736,10 +747,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			end
 		end
 		local integration = document[INTEGRATION_SECTION]
-		if type(integration) == "table" and integration[LEGACY_INTEGRATION_KEY] ~= nil then
-			integration[LEGACY_INTEGRATION_KEY] = nil
-			if next(integration) == nil then document[INTEGRATION_SECTION] = nil end
-		end
+		report_retired_integration(integration, user_config_path)
 		-- A settings-only candidate carries no switch: only an explicit boolean
 		-- is an integration decision worth writing.
 		if state.enabled ~= nil then

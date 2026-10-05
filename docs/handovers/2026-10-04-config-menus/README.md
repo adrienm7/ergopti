@@ -109,6 +109,21 @@ actually applied and qualified. canonicalHoldOptions is already shared and must
 not be cosmetically reimplemented. Broader configuration catalogues, native
 acceptance and complete global composition remain in their original TODO blocks.
 
+## Continuation: retired integration preference
+
+The continuation feature applies the independently reviewed retired Karabiner
+preference correction after checking its exact Boolean-preservation parent.
+Ordinary saves and integration-consent changes retain `[karabiner] enabled`
+until explicit cleanup, with one precise warning; runtime consent still comes
+only from `integration_enabled`. The sole historical deletion expectation is
+corrected to exact preservation plus a complete independently specified model,
+as required by the maintainer's current policy. All other old assertions remain.
+Focused portable checks pass 32 new and 31 existing owner cases. The selected
+local gate passes formatting, 357 JS checks, 14,149 portable macOS unit cases
+and 101 macOS E2E checks with one host-specific skip. Hosted native,
+package/install and physical qualification remain pending; no TODO item is
+removed.
+
 ## Integration coordination
 
 Feature CI may run concurrently on each group's dedicated branch.

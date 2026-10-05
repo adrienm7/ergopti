@@ -1653,8 +1653,8 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
   (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
   layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
-  plain string (saves refused with a generic ERROR), Linux layers.toml refused
-  as a whole still stops the daemon, Windows sites 32, 34, 36, 37-60 and its
+  plain string (saves refused with a generic ERROR), native qualification of
+  Linux whole-file layers.toml boot isolation, Windows sites 32, 34, 36, 37-60 and its
   whole-file installed.json refusal, and the macOS boot-time unread-entries
   scan cost (36-56 ms on the
   main thread). Maintainer decisions are resolved: invalid schema stamps
@@ -1722,6 +1722,21 @@ Selected local gates passed 356 JS checks, 13,981 portable macOS unit cases
 and 101 macOS E2E checks (one host-specific scenario skipped). Hosted native
 qualification and broader binding-parent/repair-intent work remain pending;
 TODO33 is not complete.
+
+The macOS remap owner now ignores and warns once about the retired
+`[karabiner] enabled` entry while preserving its complete original value in
+ordinary saves and explicit integration-consent changes. Only
+`integration_enabled` grants consent; explicit whole-file reset retains its
+existing authority. Independent real-file controls cover Boolean, numeric,
+string, array and nested-table values, stale sources, invalid consent and
+publication refusal. The old deletion expectation conflicted with the
+maintainer's explicit preservation policy: its replacement requires the exact
+original false value and an additional complete handwritten source model;
+every other old assertion remains intact. Focused portable checks pass 32 new
+cases and 31 existing owner cases. Selected local gates pass formatting, 357
+JS checks, 14,149 portable macOS unit cases and 101 macOS E2E checks with one
+host-specific skip. Hosted native/package/install checks remain pending;
+TODO33 stays partial.
 
 A bounded Windows installed-layout record candidate partitions obsolete entries
 from usable neighbors and routes process-lifetime warnings through the shared
