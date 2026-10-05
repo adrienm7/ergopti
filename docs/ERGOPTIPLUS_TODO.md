@@ -1812,6 +1812,16 @@ Hosted native/package/install qualification remains pending. This bounded
 correction does not complete TODO33 or explicit cleanup and repair-intent
 ownership.
 
+Two independent actual-file diagnostics still fail on Linux's retired API
+provider reader and ordinary selection publisher: a removed provider remains
+active, and its complete old row gains defaults during a successful neighbor
+selection. Current native source hashes match the saved preparation. Coordinate
+explicit published cloud/local catalogue receipts with group4 before changing
+those native seams; empty or unavailable catalogue data cannot prove retirement.
+The frozen probe and exact dependency evidence are in the group1 handoff's
+`prepared/retired-api-provider-dependency.zip`. No source correction or native
+qualification is claimed for this open domain; TODO33 stays partial.
+
 The shared Lua installed-layout record owner now preserves omitted unowned
 members during verified same-id updates while removing omitted publisher-owned
 metadata, including an old extension replaced by a base layout. Verified
