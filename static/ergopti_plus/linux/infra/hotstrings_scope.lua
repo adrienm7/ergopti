@@ -70,6 +70,7 @@ function M.new(options)
 	local remove = options.remove or function(target) return os.remove(target) == true end
 	local owner, held, current_mode = {}, false, nil
 	local source, secondary, owned_set = nil, nil, nil
+	local active_snapshot
 
 	--- The catalogue identities the loaded runtime owns, as canonical paths.
 	local function inventory()
@@ -120,31 +121,39 @@ function M.new(options)
 		local config = Config.configuration_snapshot()
 		local preferences = Preferences.snapshot()
 		if type(config) ~= "table" or type(preferences) ~= "table" then return nil end
-		return { config = config, preferences = preferences, repeat_enabled = RepeatKey.is_enabled(),
+		local programmable = Dynamic and Dynamic.user_code_scope_snapshot and Dynamic.user_code_scope_snapshot()
+		if Dynamic and Dynamic.user_code_time_activation and Dynamic.user_code_time_activation() ~= nil
+			and type(programmable) ~= "table" then return nil end
+		active_snapshot = { config = config, preferences = preferences, programmable = programmable, repeat_enabled = RepeatKey.is_enabled(),
 			trigger = MagicKey.get(), terminators = Terminators.snapshot() }
+		return active_snapshot
 	end
 
 	--- Applies the dynamic owner and the preview renderer to the adopted leaves.
 	--- @param trigger string Effective magic key.
 	--- @param previous string Magic key before this step.
 	--- @return boolean acknowledged
-	local function apply_dependents(trigger, previous)
+	local function apply_dependents(trigger, previous, programmable, inverse)
 		if Dynamic then
 			if trigger ~= previous and Dynamic.init({ trigger_char = trigger }) ~= true then return false end
-			if Dynamic.refresh() ~= true and Dynamic.get_rules_count() > 0 then return false end
+			local acknowledged, reason = Dynamic.refresh(programmable, inverse)
+			if acknowledged ~= true and not (reason == "builtin-unavailable" and Dynamic.get_rules_count() == 0) then
+				return false
+			end
 		end
 		if preview and PreviewSettings.apply(preview) ~= #PreviewSettings.toggles() then return false end
 		return true
 	end
 
 	local function restore(snapshot)
+		if snapshot.programmable and Dynamic.user_code_scope_current(snapshot.programmable) ~= true then return false end
 		if secondary and secondary.restore() ~= true then return false end
 		if Preferences.restore(owner, snapshot.preferences) ~= true then return false end
 		if RepeatKey.restore_configuration(snapshot.repeat_enabled) ~= true then return false end
 		if Terminators.restore_configuration(snapshot.terminators) ~= true then return false end
 		local current = MagicKey.get()
 		if Config.restore_configuration(owner, snapshot.config) ~= true then return false end
-		return apply_dependents(snapshot.trigger, current)
+		return apply_dependents(snapshot.trigger, current, snapshot.programmable, true)
 	end
 
 	local transaction = Transaction.new({
@@ -184,7 +193,7 @@ function M.new(options)
 			local trigger = MagicKey.get()
 			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
 			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
-			if not apply_dependents(trigger, previous) then return false end
+			if not apply_dependents(trigger, previous, active_snapshot.programmable) then return false end
 			-- A first write creates the configuration folder the two files share.
 			local directory = options.path:match("^(.*)/[^/]+$")
 			if not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then return false end

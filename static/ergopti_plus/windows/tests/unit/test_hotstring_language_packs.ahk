@@ -25,7 +25,9 @@ _HLP_IndexDeclaresFrench() {
 	Pack := _HLP_FrenchPack()
 	Assert(Pack is Map, "the shared index must declare the French language pack")
 	AssertEqual("fr", Pack["locale"])
-	AssertEqual(3, Pack["categories"].Length, "French ships three category files")
+	AssertEqual(2, Pack["categories"].Length, "French ships its two independent language categories")
+	AssertEqual("autocorrection", Pack["categories"][1])
+	AssertEqual("magickey", Pack["categories"][2])
 	AssertEqual("Français", HotstringsLanguageName(Pack["locale"]),
 		"the submenu is labelled with the locale's native name")
 }
@@ -49,8 +51,10 @@ _HLP_CacheCoversLanguageGroups() {
 	Found := Map()
 	for _, Cat in All
 		Found[Cat] := true
-	for _, Group in ["french_autocorrection", "french_distancesreduction", "french_magickey", "autocorrection"]
+	for _, Group in ["french_autocorrection", "french_magickey", "autocorrection"]
 		AssertTrue(Found.Has(Group), "the bundled cache must cover " . Group)
+	AssertFalse(Found.Has("french_distancesreduction"), "Ergopti suffixes are bound extension data, outside the bundled cache")
+	AssertFalse(HotstringsIsLanguageGroup("french_distancesreduction"), "the extension-owned suffixes leave the language menu")
 	AssertTrue(HotstringsIsLanguageGroup("french_magickey"))
 	AssertFalse(HotstringsIsLanguageGroup("magickey"))
 }

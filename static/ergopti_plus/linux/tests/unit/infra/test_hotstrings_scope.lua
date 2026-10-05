@@ -17,21 +17,36 @@ local Codec = require("toml_codec")
 local CONFIG = '[hotstrings]\nunknown = "kept"\ngroups = { rolls = false, foreign = true }\n'
 	.. 'trigger_char = "§"\npreview_ai_enabled = true\n'
 	.. '[hotstrings.dynamic.date]\nenabled = true\n[other]\nvalue = 1\n'
-local OVERRIDES = '[autocorrection]\ndelay = 3\ncolor = "#111111"\n\n[autocorrection.caps]\ndelay = 9\n\n'
+-- Independently authored current runtime preimage: the former caps family is
+-- now three owned tables, each with the same explicit 9 s override.
+local COMMON_FAMILIES = { "names", "abbreviations", "technical_terms" }
+local COMMON_TRIGGERS = {
+	{ trigger = "cq", replacement = "names-result" },
+	{ trigger = "aq", replacement = "abbreviations-result" },
+	{ trigger = "tq", replacement = "technical-terms-result" },
+}
+local OVERRIDES = '[autocorrection]\ndelay = 3\ncolor = "#111111"\n\n'
+	.. '[autocorrection.names]\ndelay = 9\n\n'
+	.. '[autocorrection.abbreviations]\ndelay = 9\n\n'
+	.. '[autocorrection.technical_terms]\ndelay = 9\n\n'
 	.. '[rolls.hc]\npriority = 5\n\n[foreign]\ndelay = 4\nunknown_field = "kept"\n\n[_global]\ndelay = 2\n'
 
 --- The catalogue the stub loader publishes: real category ids, corpus delays
 --- that differ from and agree with the manifest recommendations, and a
 --- personal pack whose section shares a name with a manifest row.
 local CATEGORIES = {
-	autocorrection = { id = "autocorrection", delay = 1.0, sections_order = { "caps" }, sections = { caps = { count = 1 } } },
+	autocorrection = { id = "autocorrection", delay = 1.0,
+		sections_order = { "names", "abbreviations", "technical_terms" },
+		sections = { names = { count = 1 }, abbreviations = { count = 1 }, technical_terms = { count = 1 } } },
 	french_autocorrection = { id = "french_autocorrection", delay = 1.0, sections_order = { "accents" },
 		sections = { accents = { count = 1 } } },
 	rolls = { id = "rolls", delay = 0.5, sections_order = { "hc" }, sections = { hc = { count = 1 } } },
 	personal = { id = "personal", delay = 2.0, sections_order = { "code" }, sections = { code = { count = 1 } } },
 }
 local MAPPINGS = {
-	{ trigger = "cq", replacement = "caps-result", group = "autocorrection", section = "caps", auto_expand = true },
+	{ trigger = "cq", replacement = "names-result", group = "autocorrection", section = "names", auto_expand = true },
+	{ trigger = "aq", replacement = "abbreviations-result", group = "autocorrection", section = "abbreviations", auto_expand = true },
+	{ trigger = "tq", replacement = "technical-terms-result", group = "autocorrection", section = "technical_terms", auto_expand = true },
 	{ trigger = "hq", replacement = "rolls-result", group = "rolls", section = "hc", auto_expand = true },
 }
 
@@ -157,13 +172,17 @@ end
 helpers.describe("hotstrings scope: restore recommended", function()
 	helpers.it("enables the loaded catalogue, measures delays and keeps unknown entries", function()
 		with_scope(function(c)
-			helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, 9, "fixture override")
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 9, "fixture override: " .. family)
+			end
 			local committed, detail = c.scope.apply("recommended")
 			helpers.assert_true(committed, tostring(detail))
 
 			local config = Codec.decode(read(c.config_path))
 			for id in pairs(CATEGORIES) do helpers.assert_eq(config.hotstrings.groups[id], true, id) end
-			helpers.assert_eq(config.hotstrings.modules.autocorrection.caps, true)
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(config.hotstrings.modules.autocorrection[family], true, family)
+			end
 			helpers.assert_eq(config.hotstrings.groups.foreign, true, "an unknown category choice survives")
 			helpers.assert_eq(config.hotstrings.unknown, "kept")
 			helpers.assert_eq(config.other.value, 1)
@@ -179,8 +198,10 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			local overrides = Codec.decode(read(c.override_path))
 			helpers.assert_nil(overrides.autocorrection.delay)
 			helpers.assert_nil(overrides.autocorrection.color)
-			helpers.assert_eq(overrides.autocorrection.caps.delay, 0.5,
-				"deleting would inherit the corpus 1.0 s, so the recommendation is written")
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(overrides.autocorrection[family].delay, 0.5,
+					"deleting would inherit the corpus 1.0 s, so the recommendation is written: " .. family)
+			end
 			helpers.assert_eq(overrides.french_autocorrection.accents.delay, 0.5)
 			helpers.assert_nil((overrides.rolls or {}).hc and overrides.rolls.hc.delay,
 				"an inheritance equal to the recommendation stays sparse")
@@ -190,10 +211,14 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			helpers.assert_eq(overrides.foreign.unknown_field, "kept")
 			helpers.assert_nil((overrides.personal or {}).code, "user packs receive no recommendation")
 
-			helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, 0.5)
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 0.5, family)
+			end
 			helpers.assert_eq(c.Config.resolve("rolls", "hc").delay, 0.5)
 			helpers.assert_eq(c.Config.resolve("french_autocorrection", "accents").delay, 0.5)
-			helpers.assert_true(fires(c.engine, "cq", "caps-result"), "the restored catalogue reaches the engine")
+			for _, mapping in ipairs(COMMON_TRIGGERS) do
+				helpers.assert_true(fires(c.engine, mapping.trigger, mapping.replacement), "the restored catalogue reaches the engine")
+			end
 			helpers.assert_true(c.RepeatKey.is_enabled())
 			helpers.assert_eq(c.MagicKey.get(), c.MagicKey.default())
 			helpers.assert_eq(c.preview.star, true)
@@ -210,26 +235,36 @@ helpers.describe("hotstrings scope: clear", function()
 	helpers.it("returns every choice to neutral and every section to its corpus delay", function()
 		with_scope(function(c)
 			helpers.assert_true(c.Config.enable_group("autocorrection"))
-			helpers.assert_true(c.Config.toggle_section("autocorrection", "caps"))
-			helpers.assert_true(fires(c.engine, "cq", "caps-result"))
+			for index, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_true(c.Config.toggle_section("autocorrection", family))
+				local mapping = COMMON_TRIGGERS[index]
+				helpers.assert_true(fires(c.engine, mapping.trigger, mapping.replacement))
+			end
 			local committed, detail = c.scope.apply("clear")
 			helpers.assert_true(committed, tostring(detail))
 			local config = Codec.decode(read(c.config_path))
 			helpers.assert_nil(config.hotstrings.groups.autocorrection)
 			helpers.assert_eq(config.hotstrings.groups.foreign, true, "an unknown category choice survives")
 			for _, sections in pairs(config.hotstrings.modules or {}) do
-				helpers.assert_nil(sections.caps, "a known section choice is removed")
+				for _, family in ipairs(COMMON_FAMILIES) do
+					helpers.assert_nil(sections[family], "a known section choice is removed: " .. family)
+				end
 			end
 			helpers.assert_nil(config.hotstrings.trigger_char)
 			helpers.assert_nil(config.hotstrings.preview_ai_enabled, "clear revokes the AI preview")
 			helpers.assert_nil(config.hotstrings.dynamic.date.enabled)
 			helpers.assert_eq(config.hotstrings.unknown, "kept")
 			local overrides = Codec.decode(read(c.override_path))
-			helpers.assert_nil(overrides.autocorrection.caps.delay)
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_nil(overrides.autocorrection[family].delay, family)
+			end
 			helpers.assert_eq(overrides.foreign.unknown_field, "kept")
-			helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, 1.0,
-				"a cleared section resolves to its corpus inheritance")
-			helpers.assert_eq(fires(c.engine, "cq", "caps-result"), false, "nothing fires after clear")
+			for index, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 1.0,
+					"a cleared section resolves to its corpus inheritance: " .. family)
+				local mapping = COMMON_TRIGGERS[index]
+				helpers.assert_eq(fires(c.engine, mapping.trigger, mapping.replacement), false, "nothing fires after clear")
+			end
 			helpers.assert_eq(c.RepeatKey.is_enabled(), false)
 			helpers.assert_eq(c.preview.ai, false)
 		end)
@@ -244,7 +279,9 @@ helpers.describe("hotstrings scope: refusals", function()
 			helpers.assert_eq(committed, false)
 			helpers.assert_eq(read(c.config_path), CONFIG)
 			helpers.assert_eq(read(c.override_path), OVERRIDES, "the published override file is put back")
-			helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, 9, "the runtime is back")
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 9, "the runtime is back: " .. family)
+			end
 			helpers.assert_eq(c.MagicKey.get(), "§")
 			helpers.assert_eq(c.scope.pending(), false)
 			helpers.assert_true(c.Config.enable_group("rolls"), "a settled refusal releases the owners")
@@ -260,7 +297,9 @@ helpers.describe("hotstrings scope: refusals", function()
 			helpers.assert_eq(c.scope.apply("clear"), false)
 			helpers.assert_eq(read(c.config_path), external, "the external edit wins")
 			helpers.assert_eq(read(c.override_path), OVERRIDES)
-			helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, 9)
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 9, family)
+			end
 		end)
 	end)
 
@@ -274,7 +313,9 @@ helpers.describe("hotstrings scope: refusals", function()
 				"an engine that also refuses the previous catalogue leaves the inverse retained")
 			c.refuse_engine = false
 			helpers.assert_true(c.scope.retry_restore())
-			helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, 9)
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 9, family)
+			end
 			helpers.assert_true(c.Config.toggle_group("rolls"), "the settled inverse releases the owners")
 		end)
 	end)
@@ -309,7 +350,9 @@ helpers.describe("hotstrings scope: refusals", function()
 			write(c.override_path, candidate)
 			helpers.assert_true(c.scope.retry_restore(), "the inverse completes once its precondition holds")
 			helpers.assert_eq(read(c.override_path), OVERRIDES)
-			helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, 9)
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 9, family)
+			end
 			helpers.assert_eq(c.scope.pending(), false)
 			helpers.assert_true(c.Config.toggle_group("rolls"), "a settled inverse releases the owners")
 		end)
@@ -351,7 +394,9 @@ helpers.describe("hotstrings scope: refusals", function()
 					helpers.assert_eq(changed, 1)
 					helpers.assert_eq(questions, 0, "no scope row asks (restore-recommended-no-confirm)")
 					helpers.assert_eq(c.RepeatKey.is_enabled(), mode == "recommended")
-					helpers.assert_eq(c.Config.resolve("autocorrection", "caps").delay, mode == "clear" and 1.0 or 0.5)
+					for _, family in ipairs(COMMON_FAMILIES) do
+						helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, mode == "clear" and 1.0 or 0.5, family)
+					end
 				end)
 				root.top_level, os.execute = top, execute
 				if not passed then error(err, 0) end
@@ -385,8 +430,11 @@ helpers.describe("hotstrings scope: refusals", function()
 				helpers.assert_eq(type(action), "function", "the Configuration row is registered")
 				action()
 				helpers.assert_true(c.Config.is_group_enabled("rolls"), "an explicit off choice is restored on")
-				helpers.assert_true(c.Config.is_section_enabled("autocorrection", "caps"))
-				helpers.assert_true(fires(c.engine, "cq", "caps-result"), "the restored catalogue fires")
+				for index, family in ipairs(COMMON_FAMILIES) do
+					helpers.assert_true(c.Config.is_section_enabled("autocorrection", family))
+					local mapping = COMMON_TRIGGERS[index]
+					helpers.assert_true(fires(c.engine, mapping.trigger, mapping.replacement), "the restored catalogue fires")
+				end
 				helpers.assert_true(c.RepeatKey.is_enabled())
 				local document = Codec.decode(read(c.config_path))
 				helpers.assert_eq(document.hotstrings.groups.rolls, true)
@@ -495,7 +543,9 @@ helpers.describe("hotstrings scope: composition", function()
 		return {
 			autocorrection = c.Config.is_group_enabled("autocorrection"),
 			rolls = c.Config.is_group_enabled("rolls"),
-			caps_fires = fires(c.engine, "cq", "caps-result"),
+			names_fires = fires(c.engine, "cq", "names-result"),
+			abbreviations_fires = fires(c.engine, "aq", "abbreviations-result"),
+			technical_terms_fires = fires(c.engine, "tq", "technical-terms-result"),
 			rolls_fires = fires(c.engine, "hq", "rolls-result"),
 		}
 	end

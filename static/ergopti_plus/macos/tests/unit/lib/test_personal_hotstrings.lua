@@ -19,16 +19,33 @@ local helpers = require("tests.helpers")
 -- Save the real heavy deps so other suite files still get the genuine modules.
 local SAVED = {}
 local function mock(name, mod)
-	SAVED[name] = package.loaded[name]
+	SAVED[name] = { value = package.loaded[name] }
 	package.loaded[name] = mod
 end
 local function restore_all()
-	for name, prev in pairs(SAVED) do package.loaded[name] = prev end
+	for name, prev in pairs(SAVED) do package.loaded[name] = prev.value end
+	SAVED = {}
 	package.loaded["infra.personal_hotstrings"] = nil
+end
+
+--- Supplies explicit physical/source observations for these discovery-only doubles.
+--- Real hardlinks and stale bytes are exercised by the separate native-owner suite.
+local function mock_source_observations()
+	mock("infra.personal_file_adoption", nil)
+	mock("adapters.file_system", {
+		path_status = function(path)
+			local inode = 0
+			for index = 1, #path do inode = inode + path:byte(index) * index end
+			local attributes = hs.fs.attributes(path)
+			return "present", { mode = attributes and attributes.mode or "file", dev = 1, ino = inode }
+		end,
+		read_with_status = function() return "[probe]\nentry = \"source\"\n", "ok" end,
+	})
 end
 
 helpers.describe("infra/personal_hotstrings — load contract", function()
 	helpers.it("registers personal first, then extensions in stem order, skipping the canonical file", function()
+		mock_source_observations()
 		-- Record every keymap.load_toml call so we can assert order independently of
 		-- the returned list (the two must agree).
 		local registered = {}
@@ -39,6 +56,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			PERSONAL_GROUP_NAME = "personal",
 			load_toml = function(name, path, sections, source)
 				registered[#registered + 1] = { name = name, path = path, sections = sections, source = source }
+				return true
 			end,
 			source_priority = function(_) return nil end,
 		})
@@ -84,7 +102,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		local names = {}
 		for _, g in ipairs(loaded) do table.insert(names, g.name) end
 		helpers.assert_eq(table.concat(names, ","),
-			"personal,personal_ext_alpha,personal_ext_zebra",
+			"personal,personal-file:616c7068612e746f6d6c,personal-file:7a656272612e746f6d6c",
 			"personal must load first, extensions in alphabetical-by-stem order")
 
 		helpers.assert_nil(registered[1].source, "the canonical personal file retains its existing owner")
@@ -103,6 +121,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 	end)
 
 	helpers.it("terminates on a self-referential directory cycle instead of recursing forever (F-LOW-4)", function()
+		mock_source_observations()
 		-- Simulate a self-referential symlink: every directory named "loop"
 		-- contains one entry, also named "loop", that resolves to a directory
 		-- again — the exact shape hs.fs.attributes/fs_dir.entries cannot tell
@@ -110,7 +129,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- M.load would recurse until Lua's C-stack limit aborted the process.
 		mock("modules.keymap", {
 			PERSONAL_GROUP_NAME = "personal",
-			load_toml = function(_, _) end,
+			load_toml = function(_, _) return true end,
 			source_priority = function(_) return nil end,
 		})
 		mock("ui.hotstring_editor", { init = function() end })
@@ -150,7 +169,8 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			"and must answer a result, not a half-value: " .. tostring(err))
 	end)
 
-	helpers.it("warns instead of silently overwriting on a flat/nested group-name collision (F-LOW-5)", function()
+	helpers.it("warns and refuses ambiguous stored flat/nested owners without overwriting either source (F-LOW-5)", function()
+		mock_source_observations()
 		-- A flat "a__b.toml" and a nested "a/b.toml" both derive the group name
 		-- "personal_ext_a__b" — "__" is used both as a literal character allowed
 		-- in a stem AND as the path-segment join separator. Before the fix, the
@@ -162,7 +182,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- something sane rather than throwing.
 		mock("modules.keymap", {
 			PERSONAL_GROUP_NAME = "personal",
-			load_toml = function(_, _) end,
+			load_toml = function(_, _) return true end,
 			source_priority = function(_) return nil end,
 		})
 		mock("ui.hotstring_editor", { init = function() end })
@@ -201,7 +221,8 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		end
 
 		local PH = require("infra.personal_hotstrings")
-		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
+		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/",
+			saved_preferences = { hotstrings = { personal_ext_a__b = true } } })
 
 		Logger.warn = orig_warn
 		hs.fs.attributes, hs.json = prev_attr, prev_json
@@ -220,10 +241,13 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		helpers.assert_eq(#loaded, 3, "descriptor transport does not silently discard either legacy collision source")
 		local identities = {}
 		for _, record in ipairs(loaded) do
-			if record.personal_source then identities[record.personal_source.id] = record.name end
+			if record.personal_source then
+				identities[record.personal_source.id] = record.name
+				helpers.assert_eq(record.admitted, false, "an ambiguous stored legacy gate grants neither canonical source")
+			end
 		end
-		helpers.assert_eq(identities["personal-file:615f5f622e746f6d6c"], "personal_ext_a__b")
-		helpers.assert_eq(identities["personal-file:61:622e746f6d6c"], "personal_ext_a__b")
+		helpers.assert_eq(identities["personal-file:615f5f622e746f6d6c"], "personal-file:615f5f622e746f6d6c")
+		helpers.assert_eq(identities["personal-file:61:622e746f6d6c"], "personal-file:61:622e746f6d6c")
 		helpers.assert_true(collision_warned,
 			"a Logger.warn must fire naming the colliding group 'personal_ext_a__b' (got: "
 				.. table.concat(warnings, " | ") .. ")")

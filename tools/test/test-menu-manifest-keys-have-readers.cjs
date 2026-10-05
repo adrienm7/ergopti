@@ -45,6 +45,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
@@ -145,6 +146,9 @@ if (sources.length < MIN_SOURCES) {
 			'and every key below would then look unread'
 	);
 }
+
+// Shared policy is a reader only through a real native method delegation.
+sources.push(...delegatedMenuSources(sources, path.join(DRIVERS, '_shared', 'lua')));
 
 /** Files that reference a token outside a comment. */
 function readersOf(token) {

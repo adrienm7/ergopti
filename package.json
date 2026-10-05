@@ -422,7 +422,8 @@
 		"check:agent-skills": "node ./tools/agents/sync-skills.cjs check",
 		"sync:agent-skills": "node ./tools/agents/sync-skills.cjs write",
 		"test:windows-bundle-stamp-encoding": "node ./tools/test/test-windows-bundle-stamp-encoding.cjs",
-		"test:ahk-e2e-manifest": "node ./tools/test/test-ahk-e2e-manifest.cjs"
+		"test:ahk-e2e-manifest": "node ./tools/test/test-ahk-e2e-manifest.cjs",
+		"test:menu-shared-delegation": "node ./tools/test/test-menu-shared-delegation.cjs"
 	},
 	"type": "module",
 	"dependencies": {

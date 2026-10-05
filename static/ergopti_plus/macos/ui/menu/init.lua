@@ -1225,6 +1225,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					path = MenuPaths.get("ConfigTomlPath"), files = FileSystem,
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, keymap = keymap, config = HotstringsConfig,
+					dynamic = core_mods.dyn_hot_mod,
 					-- The magic-key row updates the editor with the keymap; the scope does too.
 					editor = hotstring_editor,
 					is_personal = function(name)
