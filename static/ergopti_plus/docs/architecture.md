@@ -37,6 +37,7 @@ graph TD
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
         LINUX_atspi_focus["AtspiFocus.lua"]
+        LINUX_atspi_native_identity["AtspiNativeIdentity.lua"]
         LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
@@ -48,6 +49,7 @@ graph TD
         LINUX_keyboard_hook["KeyboardHook.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
         LINUX_notifier["Notifier.lua"]
+        LINUX_owned_process["OwnedProcess.lua"]
         LINUX_process_lifecycle["ProcessLifecycle.lua"]
         LINUX_process_runner["ProcessRunner.lua"]
         LINUX_screen_capture["ScreenCapture.lua"]
@@ -57,6 +59,7 @@ graph TD
         LINUX_timer_scheduler["TimerScheduler.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
+        LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
         LINUX_window_info["WindowInfo.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
         LINUX_xkb_capture["XkbCapture.lua"]

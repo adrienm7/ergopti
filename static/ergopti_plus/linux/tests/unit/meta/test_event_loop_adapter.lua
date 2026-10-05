@@ -28,6 +28,7 @@ local function stop_fixture(source)
 		return handle
 	end
 	function backend.new_idle() return new_handle("idle") end
+	function backend.update_time() end -- native void-style clock refresh
 	function backend.new_timer() return new_handle("timer") end
 	function backend.idle_start(handle, callback) handle.active, handle.callback = true, callback; return 0 end
 	function backend.timer_start(handle, _, _, callback) handle.active, handle.callback = true, callback; return 0 end
@@ -51,7 +52,7 @@ local function stop_fixture(source)
 	local ok, loop = pcall(require, "adapters.event_loop")
 	package.loaded.luv, package.loaded["adapters.event_loop"] = previous_backend, previous_loop
 	if not ok then error(loop, 0) end
-	return loop, state
+	return loop, state, backend
 end
 
 helpers.describe("linux-event-stop-receipts", function()
@@ -347,6 +348,124 @@ helpers.describe("event_loop adapter", function()
 
 end)
 
+helpers.describe("linux-periodic-finite-admission", function()
+	for _, case in ipairs({ { name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge },
+		{ name = "positive converted overflow", value = 1e308 },
+		{ name = "negative converted overflow", value = -1e308 } }) do
+		helpers.it("linux-periodic-finite-admission: refuses " .. case.name .. " before allocation", function()
+			-- This explicit backend seam counts admission; the separate native
+			-- fixture proves actual libuv callbacks and foreign handle ownership.
+			local loop, state = stop_fixture("periodic")
+			local refused_calls, healthy_calls = 0, 0
+			local ok = pcall(loop.run, { periodSec = case.value,
+				onPeriodic = function() refused_calls = refused_calls + 1; loop.stop() end })
+			local allocated = #state.handles
+			helpers.assert_true(not loop.isRunning())
+			loop.run({ periodSec = 0.001,
+				onPeriodic = function() healthy_calls = healthy_calls + 1; loop.stop() end })
+			helpers.assert_eq(healthy_calls, 1, "duration refusal must release run ownership for retry")
+			helpers.assert_true(not ok)
+			helpers.assert_eq(refused_calls, 0)
+			helpers.assert_eq(allocated, 0, "invalid duration must not acquire idle or timer resources")
+		end)
+	end
+	for _, case in ipairs({ { name = "zero", value = 0, milliseconds = 1 },
+		{ name = "finite negative", value = -0.005, milliseconds = 1 },
+		{ name = "submillisecond fraction", value = 0.0005, milliseconds = 1 },
+		{ name = "fraction", value = 0.0055, milliseconds = 5 },
+		{ name = "numeric string", value = "0.002", milliseconds = 2 },
+		{ name = "default", milliseconds = 250 },
+		{ name = "nonnumeric default", value = "not a number", milliseconds = 250 },
+		{ name = "large finite", value = 1e12, milliseconds = 1e15 } }) do
+		helpers.it("linux-periodic-finite-admission: preserves " .. case.name .. " native conversion", function()
+			local loop, state, backend = stop_fixture("periodic")
+			local native_start, first, repeat_ms = backend.timer_start
+			backend.timer_start = function(handle, delay, interval, callback)
+				first, repeat_ms = delay, interval
+				return native_start(handle, delay, interval, callback)
+			end
+			local calls = 0
+			loop.run({ periodSec = case.value, onPeriodic = function() calls = calls + 1; loop.stop() end })
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(first, case.milliseconds)
+			helpers.assert_eq(repeat_ms, case.milliseconds)
+			helpers.assert_eq(#state.handles, 2)
+			for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+		end)
+	end
+	for _, value in ipairs({ 0 / 0, math.huge, 1e308 }) do
+		helpers.it("linux-periodic-finite-admission: idle-only ignores unused duration " .. tostring(value), function()
+			local loop, state = stop_fixture("idle")
+			loop.run({ periodSec = value, onIdle = function() loop.stop() end })
+			helpers.assert_eq(#state.handles, 1)
+			helpers.assert_true(state.handles[1].closed)
+		end)
+	end
+	if native_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-periodic-finite-admission: real libuv owns refusal and retry resources", function()
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_periodic_admission.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native periodic admission fixture must succeed")
+		end)
+	end
+end)
+
+
+helpers.describe("linux-sleep-completion-receipts", function()
+	local receipts = {
+		{ name = "boolean native success", result = true, expected = true },
+		{ name = "numeric native success", result = 0, expected = true },
+		{ name = "nil native failure", result = nil, expected = false },
+		{ name = "numeric native failure", result = 1792, expected = false },
+		{ name = "false native failure", result = false, expected = false },
+		{ name = "raised command failure", raises = true, expected = false },
+	}
+	for _, branch in ipairs({ "explicit FFI absence", "explicit cdef refusal" }) do
+		for _, case in ipairs(receipts) do
+			helpers.it("linux-sleep-completion-receipts: " .. branch .. " honors " .. case.name, function()
+				local dependency = false
+				if branch == "explicit cdef refusal" then
+					dependency = { cdef = function() error("controlled cdef refusal") end }
+				end
+				local loop = helpers.load_module_with_dependency("adapters.event_loop", "ffi", dependency)
+				local execute = os.execute
+				local commands = {}
+				os.execute = function(command)
+					commands[#commands + 1] = command
+					if #commands > 1 then return true, "exit", 0 end
+					if case.raises then error("controlled command exception") end
+					return case.result, "exit", case.expected and 0 or 7
+				end
+				local ok, err = xpcall(function()
+					helpers.assert_eq(loop.sleep_ms(20), case.expected)
+					helpers.assert_eq(commands[1], "sleep 0.020", "native command argument must remain unchanged")
+					helpers.assert_eq(loop.sleep_ms(25), true, "following native success must remain usable")
+					helpers.assert_eq(commands[2], "sleep 0.025")
+					helpers.assert_eq(loop.sleep_ms(-1), false)
+					helpers.assert_eq(loop.sleep_ms("25"), false)
+					helpers.assert_eq(#commands, 2, "invalid typed/negative waits must not execute a command")
+				end, debug.traceback)
+				os.execute = execute
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+end)
+
+if native_ok and package.config:sub(1, 1) == "/" then
+	helpers.it("linux-sleep-completion-receipts: native command wait and refusal receipts are truthful", function()
+		local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+		local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_sleep_receipts.lua"
+		local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+		local result = os.execute(quote(executable) .. " " .. quote(fixture))
+		helpers.assert_true(result == true or result == 0, "native wait completion fixture must succeed")
+	end)
+end
+
 helpers.describe("event loop backend isolation", function()
   helpers.it("dependency fixtures restore cached and preload values after success", function()
     local loaded, preload = package.loaded.luv, package.preload.luv
@@ -376,7 +495,7 @@ helpers.describe("event loop backend isolation", function()
 
   -- The isolated child uses the POSIX transport of this Linux driver.
   if native_ok and package.config:sub(1, 1) == "/" then
-    helpers.it("installed luv dispatches idle and periodic callbacks and closes its handles", function()
+    helpers.it("installed luv dispatches callbacks, closes its handles and waits through child exits", function()
       -- libuv's default loop is process-wide: other tests may own active handles.
       local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
       local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop.lua"
@@ -384,7 +503,98 @@ helpers.describe("event loop backend isolation", function()
       local result = os.execute(quote(executable) .. " " .. quote(fixture))
       helpers.assert_true(result == true or result == 0, "isolated native loop fixture must succeed")
     end)
+    helpers.it("installed luv unwinds failed loop startup and permits the next run", function()
+      local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
+      local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_startup.lua"
+      local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+      local result = os.execute(quote(executable) .. " " .. quote(fixture))
+      helpers.assert_true(result == true or result == 0, "isolated native startup ownership must succeed")
+    end)
   else
     print("  [native luv POSIX integration unavailable; explicit backend fixtures still run]")
   end
+end)
+
+helpers.describe("linux-event-reentry", function()
+	for _, source in ipairs({ "idle", "periodic", "deferred" }) do
+		for _, stopping in ipairs({ false, true }) do
+			helpers.it("linux-event-reentry: " .. source .. " guards " .. (stopping and "stopping" or "running") .. " ownership", function()
+				local loop, state = stop_fixture(source)
+				local outer, nested = 0, 0
+				local function callback()
+					outer = outer + 1
+					if stopping then loop.stop() end
+					loop.run({ onIdle = function() nested = nested + 1; loop.stop() end })
+					loop.stop()
+				end
+				local options = {}
+				if source == "idle" then options.onIdle = callback
+				elseif source == "periodic" then options.onPeriodic = callback
+				else loop.defer(callback); options.onIdle = function() end end
+				loop.run(options)
+				helpers.assert_eq(outer, 1)
+				helpers.assert_eq(nested, 0, "an unreturned run still owns its native handles")
+				helpers.assert_eq(#state.handles, source == "periodic" and 2 or 1,
+					"callback reentry must not acquire another native loop")
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+				helpers.assert_true(not loop.isRunning())
+			end)
+		end
+	end
+
+	helpers.it("linux-event-reentry: raised native run releases the admission guard for retry", function()
+		local loop, state, backend = stop_fixture("idle")
+		-- The retained backend is private to this fixture, so native refusal is
+		-- explicit rather than a claim that libuv itself threw spontaneously.
+		local run = backend.run
+		backend.run = function() error("simulated native run refusal") end
+		local ok, err = pcall(loop.run, { onIdle = function() loop.stop() end })
+		helpers.assert_true(not ok)
+		helpers.assert_contains(tostring(err), "simulated native run refusal")
+		helpers.assert_true(not loop.isRunning())
+		for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+		backend.run = run
+		local calls = 0
+		loop.run({ onIdle = function() calls = calls + 1; loop.stop() end })
+		helpers.assert_eq(calls, 1, "completed error cleanup must permit a later run")
+		for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+	end)
+
+	if native_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-event-reentry: installed libuv retains exact run ownership through stop", function()
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_reentry.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native reentry ownership fixture must succeed")
+		end)
+	end
+end)
+
+helpers.describe("linux-defer-finite-admission", function()
+	for _, case in ipairs({ { name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge } }) do
+		helpers.it("linux-defer-finite-admission: rejects " .. case.name .. " without queue ownership", function()
+			local loop = load_pump_loop()
+			local weak = setmetatable({}, { __mode = "v" })
+			local calls = 0
+			local function owned_callback()
+				local marker = {}
+				weak[1] = marker
+				return function() calls = calls + 1; return marker end
+			end
+			local callback = owned_callback()
+			helpers.assert_eq(loop.defer(callback, case.value), false)
+			callback = nil
+			collectgarbage("collect")
+			collectgarbage("collect")
+			helpers.assert_eq(weak[1], nil, "refused work must not remain owned by the deferred queue")
+			loop._run_idle_tick()
+			helpers.assert_eq(calls, 0)
+			loop.defer(function() calls = calls + 1 end)
+			loop._run_idle_tick()
+			helpers.assert_eq(calls, 1, "an invalid delay must not starve following healthy work")
+		end)
+	end
 end)

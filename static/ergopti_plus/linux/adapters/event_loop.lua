@@ -26,6 +26,9 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativeTimer = require("infra.native_timer")
+local NumberPolicy = require("number_policy")
+local ErrorDescription = require("error_description")
 local LOG = "adapters.event_loop"
 
 
@@ -38,6 +41,13 @@ local LOG = "adapters.event_loop"
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
+--- Completes the interpreter fallback wait or propagates its native refusal.
+--- @param seconds number Wait duration in seconds.
+local function command_nap(seconds)
+	local result = os.execute(string.format("sleep %.3f", seconds))
+	if result ~= true and result ~= 0 then error("sleep command failed", 0) end
+end
+
 --- A sleep that neither forks nor spins, bound once.
 ---
 --- The pump fallback below runs when luv is absent, and it used to fork
@@ -48,24 +58,29 @@ if not ok_luv then luv = nil end
 local nap = (function()
 	local ok_ffi, ffi = pcall(require, "ffi")
 	if not ok_ffi or type(ffi) ~= "table" then
-		return function(seconds)
-			pcall(os.execute, string.format("sleep %.3f", seconds))
-		end
+		return command_nap
 	end
 	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
 		struct timespec { long tv_sec; long tv_nsec; };
 		int nanosleep(const struct timespec *req, struct timespec *rem);
 	]])
 	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then
-		return function(seconds)
-			pcall(os.execute, string.format("sleep %.3f", seconds))
-		end
+		return command_nap
 	end
 	local req = ffi.new("struct timespec[1]")
+	local remaining = ffi.new("struct timespec[1]")
+	local EINTR = 4 -- Linux errno for a signal-interrupted wait.
 	return function(seconds)
 		req[0].tv_sec = math.floor(seconds)
 		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
-		ffi.C.nanosleep(req, nil)
+		-- A libuv child's SIGCHLD interrupts nanosleep even with SA_RESTART.
+		-- Resume its remaining duration; restarting the whole wait extends it.
+		while ffi.C.nanosleep(req, remaining) ~= 0 do
+			local code = ffi.errno()
+			if code ~= EINTR then error("nanosleep failed (errno " .. code .. ")", 0) end
+			req[0].tv_sec = remaining[0].tv_sec
+			req[0].tv_nsec = remaining[0].tv_nsec
+		end
 	end
 end)()
 
@@ -89,6 +104,7 @@ end
 -- =========================================
 
 local _running    = false   -- Set by run(), cleared by stop() or on exit.
+local _run_active = false   -- Retained until run() retires its owned handles.
 local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
@@ -110,7 +126,7 @@ local function _safe_idle(onIdle)
 	if type(onIdle) ~= "function" then return end
 	local ok, err = pcall(onIdle)
 	if not ok then
-		Logger.error(LOG, "onIdle callback raised: %s", tostring(err))
+		Logger.error(LOG, "onIdle callback raised: %s", ErrorDescription.describe(err))
 	end
 end
 
@@ -121,7 +137,7 @@ local function _run_idle_handlers()
 	for i = 1, #_idle_handlers do
 		local ok, err = pcall(_idle_handlers[i])
 		if not ok then
-			Logger.error(LOG, "Idle handler #%d raised: %s", i, tostring(err))
+			Logger.error(LOG, "Idle handler #%d raised: %s", i, ErrorDescription.describe(err))
 		end
 	end
 	if #_deferred == 0 then return end
@@ -136,7 +152,7 @@ local function _run_idle_handlers()
 	for _, entry in ipairs(due) do
 		local ok, err = pcall(entry.fn)
 		if not ok then
-			Logger.error(LOG, "Deferred callback raised: %s", tostring(err))
+			Logger.error(LOG, "Deferred callback raised: %s", ErrorDescription.describe(err))
 		end
 	end
 end
@@ -147,7 +163,21 @@ local function _safe_periodic(onPeriodic)
 	if type(onPeriodic) ~= "function" then return end
 	local ok, err = pcall(onPeriodic)
 	if not ok then
-		Logger.error(LOG, "onPeriodic callback raised: %s", tostring(err))
+		Logger.error(LOG, "onPeriodic callback raised: %s", ErrorDescription.describe(err))
+	end
+end
+
+--- Retires only the handles owned by this loop, including partial startup.
+local function _cleanup_luv()
+	if _idle_handle then
+		pcall(luv.idle_stop, _idle_handle)
+		pcall(luv.close, _idle_handle)
+		_idle_handle = nil
+	end
+	if _timer_handle then
+		pcall(luv.timer_stop, _timer_handle)
+		pcall(luv.close, _timer_handle)
+		_timer_handle = nil
 	end
 end
 
@@ -157,11 +187,25 @@ local function _run_luv(opts)
 	local onIdle     = opts.onIdle
 	local onPeriodic = opts.onPeriodic
 	local periodSec  = tonumber(opts.periodSec) or 0.25
+	local periodMs
+	if onPeriodic then
+		-- Admit both units before clamping: libuv bindings can turn nonfinite
+		-- values into a dormant huge timer or an unintended 1 ms repeat.
+		if not NumberPolicy.is_finite(periodSec) then
+			error("Event loop periodic duration must be finite", 0)
+		end
+		periodMs = periodSec * 1000
+		if not NumberPolicy.is_finite(periodMs) then
+			error("Event loop periodic milliseconds must be finite", 0)
+		end
+		periodMs = math.max(1, math.floor(periodMs))
+	end
 
 	-- Idle handle: fires whenever the event loop has nothing else to do.
 	-- This replaces the tight while loop for keyboard-hook + tray pumping.
 	_idle_handle = luv.new_idle()
-	luv.idle_start(_idle_handle, function()
+	if not _idle_handle then error("Unable to allocate event loop idle handle", 0) end
+	local idle_started, idle_error = luv.idle_start(_idle_handle, function()
 		if not _running then
 			if _idle_handle then
 				luv.idle_stop(_idle_handle)
@@ -173,12 +217,15 @@ local function _run_luv(opts)
 		_safe_idle(onIdle)
 		_run_idle_handlers()
 	end)
+	if idle_started == nil or idle_started == false then
+		error("Unable to start event loop idle handle: " .. tostring(idle_error), 0)
+	end
 
 	-- Periodic timer: drives process_lifecycle.tick() at a fixed interval.
 	if onPeriodic then
-		local periodMs = math.max(1, math.floor(periodSec * 1000))
 		_timer_handle = luv.new_timer()
-		luv.timer_start(_timer_handle, periodMs, periodMs, function()
+		if not _timer_handle then error("Unable to allocate event loop timer handle", 0) end
+		local timer_started, timer_error = NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
 			if not _running then
 				if _timer_handle then
 					luv.timer_stop(_timer_handle)
@@ -189,20 +236,13 @@ local function _run_luv(opts)
 			end
 			_safe_periodic(onPeriodic)
 		end)
+		if timer_started == nil or timer_started == false then
+			error("Unable to start event loop timer handle: " .. tostring(timer_error), 0)
+		end
 	end
 
 	-- stop() returns control even if another component still owns active handles.
 	luv.run()
-
-	-- Cleanup any handles that were not already stopped.
-	if _idle_handle then
-		pcall(function() luv.idle_stop(_idle_handle); luv.close(_idle_handle) end)
-		_idle_handle = nil
-	end
-	if _timer_handle then
-		pcall(function() luv.timer_stop(_timer_handle); luv.close(_timer_handle) end)
-		_timer_handle = nil
-	end
 end
 
 
@@ -279,13 +319,17 @@ end
 ---
 --- When neither onIdle nor onPeriodic is provided, returns immediately
 --- (there is nothing to pump — an empty loop would spin forever).
+--- Native startup failures retire owned handles and clear the running state
+--- before raising the error, so a later run can retry.
 ---
 --- @param opts table|nil
 ---   .onIdle     function  Called on every loop iteration (pump keyboard, tray, etc.).
 ---   .onPeriodic function  Called every periodSec seconds (process_lifecycle.tick, etc.).
 ---   .periodSec  number    Interval in seconds for onPeriodic (default 0.25).
 function M.run(opts)
-	if _running then
+	-- stop() clears the pumping flag inside callbacks, but the outer run still
+	-- owns its native handles until cleanup. Reentry must not replace them.
+	if _run_active then
 		Logger.warn(LOG, "run() called while already running — no-op.")
 		return
 	end
@@ -298,20 +342,25 @@ function M.run(opts)
 		return
 	end
 
+	_run_active = true
 	_running = true
+	local ran, run_error
 
 	if luv then
 		Logger.debug(LOG, "Starting luv native event loop (idle + periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)
-		_run_luv(options)
+		ran, run_error = pcall(_run_luv, options)
+		_cleanup_luv()
 	else
 		Logger.debug(LOG, "Starting pump fallback loop (1 ms sleep, periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)
-		_run_pump(options)
+		ran, run_error = pcall(_run_pump, options)
 	end
 
 	_running = false
+	_run_active = false
 	Logger.debug(LOG, "Event loop exited.")
+	if not ran then error(run_error, 0) end
 end
 
 --- Signals the event loop to stop at the next safe point.
@@ -361,7 +410,7 @@ end
 --- For work that must not hold up what the current callback returns: a bridge
 --- answers a window with what it already has and refreshes it after the page
 --- has painted. Runs on the daemon's own loop, with or without luv, so it needs
---- no timer backend. Fail-fast: a non-function or a negative delay is refused.
+--- no timer backend. Fail-fast: a non-function, non-finite or negative delay is refused.
 --- @param fn function Zero-arity callback.
 --- @param delay_ms number|nil Minimum delay in milliseconds (default 0).
 --- @return boolean True when the callback was queued.
@@ -371,8 +420,8 @@ function M.defer(fn, delay_ms)
 		return false
 	end
 	local delay = delay_ms == nil and 0 or delay_ms
-	if type(delay) ~= "number" or delay < 0 then
-		Logger.error(LOG, "defer() delay must be a non-negative number — got %s; ignoring.", tostring(delay_ms))
+	if not NumberPolicy.is_finite(delay) or delay < 0 then
+		Logger.error(LOG, "defer() delay must be a finite non-negative number — got %s; ignoring.", tostring(delay_ms))
 		return false
 	end
 	_deferred[#_deferred + 1] = { fn = fn, due_ms = Monotonic.now_ms() + delay }

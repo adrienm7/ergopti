@@ -199,6 +199,7 @@ global _DefaultLogsDir := _LogsDir
 ; date formatters). Definitions only — _DynHS_RegisterAll() is not called here,
 ; so no registration happens at harness load.
 #Include ../modules/dynamic_hotstrings/dynamic_hotstrings.ahk
+#Include ../modules/dynamic_hotstrings/user_code.ahk
 #Include ../infra/feature_io.ahk
 ; EnsurePersonalHotstringFeature is exercised directly by the F4 regression
 ; test (test_feature_io_locator.ahk) — RegisterPersonalFeature in the same file
@@ -427,6 +428,7 @@ InstallSendNoOps()
 #Include unit/test_hotstring_language_packs.ahk
 #Include unit/test_menu_languages_and_global_separator.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
+#Include unit/test_user_hotstrings.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk
 #Include unit/test_hotstring_override_global_transaction_20260813.ahk
@@ -459,6 +461,7 @@ InstallSendNoOps()
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
 #Include unit/test_hotstrings_scope.ahk
+#Include unit/test_personal_file_controls.ahk
 #Include unit/test_hotstring_delimiter_scope_preservation.ahk
 #Include unit/test_hotstring_category_scope.ahk
 #Include unit/test_global_config_scope.ahk
@@ -553,14 +556,20 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
 #Include ..\..\_shared\modules\llm\local_server_discovery.ahk
+#Include ../../_shared/modules/llm/local_server_menu.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include ../modules/llm/local_server_models.ahk
+#Include ../modules/llm/local_servers.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_local_server_auth.ahk
 #Include unit/test_local_server_discovery_policy.ahk
 #Include unit/test_local_server_models.ahk
+#Include unit/test_local_server_models_timer.ahk
+#Include unit/test_local_server_menu.ahk
+#Include unit/test_local_servers.ahk
+#Include unit/test_local_server_queue_timer.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
@@ -677,6 +686,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/backend_lifecycle.ahk
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/local_server_panel.ahk
 #Include ../ui/menu/menu_llm/menu_main.ahk
 #Include ../ui/menu/menu_llm/enable_admission.ahk
 #Include ../ui/menu/menu_llm/actions.ahk
@@ -692,6 +702,10 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
 #Include unit/test_local_server_private_publication.ahk
+#Include unit/test_local_server_write_admission.ahk
+#Include unit/test_local_server_join.ahk
+#Include unit/test_local_server_scope_cohort.ahk
+#Include unit/test_local_server_panel.ahk
 #Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
 #Include unit/test_llm_fixture_setup.ahk

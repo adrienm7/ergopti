@@ -8,8 +8,17 @@ with explicit Windows PC follow-ups; unfinished macOS and Karabiner requirements
 stay open in the TODO rather than being claimed complete.
 The initial inspected base was `689d30293704093feab2e3caa077604e88560eb6`.
 Current synchronization targets actual dev
-`02ad69e06ecea424de11facf3dced404a6fdd602`, preserving Group7, Group4, Group1
-and Group6 integrations. Group7 synchronization already passed formatting, 356 JS checks
+`25b879aac1e93e9f86d39c41d5ff4b2b2866c2a7`, preserving the latest Group1,
+Group2, Group4, Group6, Group7 and Linux integrations. The current composition
+preserves all739 non-conflicting incoming paths byte-for-byte and regenerates the
+architecture diagram through its owner. Its selected gates pass361 JS checks,
+UTF-8 BOM/LF for1,841 AHK sources,14,860 portable macOS units in1,513 modules,
+8,562 Linux units in410 modules, and the selected native Linux fixtures. Windows
+unit, parser and E2E execution are explicitly unavailable on this Linux host;
+the imported Windows PC follow-ups stay open. An initial formatting failure
+was confined to three retained legend indentation lines after the TODO conflict;
+the corrected documentation requires a fresh format and JS check before commit.
+Earlier counts below are historical. Group7 synchronization already passed formatting, 356 JS checks
 and AHK UTF-8 BOM/LF for 1,815 files. Group4 native Windows work remains in its
 imported PC handoff. The resulting non-Windows composition passed formatting,
 356 JS checks, AHK UTF-8 BOM/LF for 1,820 files, 13,954 portable macOS units,

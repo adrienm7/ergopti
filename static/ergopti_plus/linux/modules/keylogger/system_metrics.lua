@@ -67,6 +67,9 @@ local _day = nil
 -- The wireless listing read now: WIRELESS_PATH, or a test's fixture.
 local _wireless_path = WIRELESS_PATH
 
+-- Persistence is bound by the collector after its own database is opened.
+local _owner_database, _owner_device, _load_day = nil, nil, nil
+
 -- What the previous sample saw, for the transitions.
 local _last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
 
@@ -185,6 +188,22 @@ local function new_day(date)
 	}
 end
 
+--- Binds the collector's exact persistence identity and checked day loader.
+--- Reopening the same database preserves the live cumulative day.
+--- @param database string Database identity.
+--- @param device_id string Collector identity.
+--- @param loader function Returns row, accepted for one calendar day.
+function M.bind(database, device_id, loader)
+	assert(type(database) == "string" and database ~= "", "system metrics need a database identity")
+	assert(type(device_id) == "string" and device_id ~= "", "system metrics need a device identity")
+	assert(type(loader) == "function", "system metrics need a checked day loader")
+	if database ~= _owner_database or device_id ~= _owner_device then
+		_day = nil
+		_last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
+	end
+	_owner_database, _owner_device, _load_day = database, device_id, loader
+end
+
 --- Reads the machine once and folds the result into the day.
 ---
 --- @param now_ms number Monotonic milliseconds.
@@ -200,7 +219,14 @@ function M.sample(now_ms, date)
 	end
 	if _last.at_ms and (now_ms - _last.at_ms) < SAMPLE_INTERVAL_MS then return _day end
 
-	_day = _day or new_day(date)
+	if not _day then
+		if _load_day then
+			local ok, persisted, accepted = pcall(_load_day, date)
+			if not ok or accepted ~= true then return nil end
+			_day = persisted
+		end
+		_day = _day or new_day(date)
+	end
 	local elapsed = _last.at_ms and (now_ms - _last.at_ms) or 0
 
 	if elapsed > SLEEP_GAP_MS then
@@ -249,6 +275,7 @@ end
 
 --- Test seam: forgets everything, the wireless listing's path included.
 function M._reset()
+	_owner_database, _owner_device, _load_day = nil, nil, nil
 	_day = nil
 	_last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
 	_wireless_path = WIRELESS_PATH

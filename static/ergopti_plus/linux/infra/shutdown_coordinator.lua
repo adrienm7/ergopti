@@ -37,7 +37,8 @@ function M.new(opts)
 		end
 	end
 
-	local requested = false
+	local requested, complete, polling = false, false, false
+	local pending = {}
 	local coordinator = {}
 
 	--- Quiesces every registered owner exactly once.
@@ -46,13 +47,36 @@ function M.new(opts)
 	--- @return boolean started True only for the first request.
 	function coordinator.request(reason, emergency_reason)
 		if requested then return false end
-		requested = true
-		Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+		requested, polling = true, true
+		-- Pin every opt-in callback before any diagnostic or earlier owner can reenter.
+		local owners, claims, waits_for_native = {}, {}, false
+		for index, owner in ipairs(pre_wait) do
+			owners[index] = owner
+			if owner.wait_for_ack == true then
+				claims[index] = { name = owner.name, stop = owner.stop }
+				waits_for_native = true
+			end
+		end
+		if waits_for_native then
+			pcall(Logger.start, LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+		else
+			Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+		end
 
-		for _, owner in ipairs(pre_wait) do
-			local ok, failure = xpcall(owner.stop, debug.traceback)
+		for index, owner in ipairs(owners) do
+			local claim = claims[index]
+			local stop, name, waits = claim and claim.stop or owner.stop,
+				claim and claim.name or owner.name, claim ~= nil
+			local ok, failure = xpcall(stop, debug.traceback)
+			if waits and (not ok or failure ~= true) then
+				pending[#pending + 1] = { name = name, stop = stop }
+			end
 			if not ok then
-				Logger.error(LOG, "Shutdown owner '%s' failed: %s", owner.name, tostring(failure))
+				if waits_for_native then
+					pcall(Logger.error, LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
+				else
+					Logger.error(LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
+				end
 			end
 		end
 
@@ -63,10 +87,39 @@ function M.new(opts)
 				keyboard_hook.stop()
 			end
 		end
-		event_loop.stop()
-		Logger.done(LOG, "Shutdown quiescence complete.")
+		polling = false
+		if #pending == 0 then
+			complete = true
+			event_loop.stop()
+			Logger.done(LOG, "Shutdown quiescence complete.")
+		end
 		return true
 	end
+
+	--- Retries only opt-in native owners while the existing event loop remains alive.
+	--- Ordinary owners retain their original one-shot cleanup contract.
+	--- @return boolean complete Every opt-in owner acknowledged physical retirement.
+	function coordinator.poll()
+		if not requested or complete or polling then return complete end
+		polling = true
+		local retained = {}
+		for _, owner in ipairs(pending) do
+			local ok, acknowledged = xpcall(owner.stop, debug.traceback)
+			if not ok or acknowledged ~= true then retained[#retained + 1] = owner end
+		end
+		pending = retained
+		polling = false
+		if #pending == 0 then
+			complete = true
+			event_loop.stop()
+			Logger.done(LOG, "Shutdown quiescence complete.")
+		end
+		return complete
+	end
+
+	--- Reports the retained native cleanup barrier independently of first request.
+	--- @return boolean pending
+	function coordinator.is_pending() return requested and not complete end
 
 	--- Reports whether a request already owns shutdown.
 	--- @return boolean

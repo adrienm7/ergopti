@@ -492,7 +492,7 @@ const DRIVER_SPEC = {
 		exts: ['.lua'],
 		// hs.menubar consumes an array of row tables; a row is a `title =` that
 		// sits with an action, a checkmark, or a nested menu.
-		patterns: [/\btitle\s*=\s*\S/],
+		patterns: [/\btitle\s*=(?!=)\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
 		// Like Linux, this driver now renders through _shared/lua/menu/renderer.lua
 		// alone. builder.lua kept one tree in the driver dialect — the extension
@@ -505,7 +505,7 @@ const DRIVER_SPEC = {
 	linux: {
 		exts: ['.lua'],
 		// Same row shape as macOS — `{ title = …, fn = … }`.
-		patterns: [/\btitle\s*=\s*\S/],
+		patterns: [/\btitle\s*=(?!=)\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
 		// This driver's renderer lives entirely in _shared/lua/menu/renderer.lua;
 		// infra/manifest_menu.lua is the binding that hands it this platform's
@@ -608,6 +608,12 @@ const LUA_GRAMMAR = [
 	['far context', 'title = name\n-- a\n-- b\n-- c\nfn = choose', 0],
 	['plain window title', 'title = window_name', 0],
 	['provider', '{ label = name, action = choose }', 0],
+	[
+		'comparison does not create a row',
+		'if row.title == expected then\n row.disabled = true\n row.fn = nil\nend',
+		0
+	],
+	['native title assignment remains a row', 'row.title = expected\nrow.disabled = true', 1],
 	['comment', '-- { title = name, fn = choose }', 0]
 ];
 

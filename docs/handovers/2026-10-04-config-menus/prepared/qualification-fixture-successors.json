@@ -1,0 +1,492 @@
+{
+	"archive": "qualification-fixture-successors.zip",
+	"sha256": "d81a268c542c4745efdcac5704931012122e0595c109ba5462612ff91e70554b",
+	"entries": [
+		{
+			"path": "macos-utf8/REVIEW.md",
+			"sha256": "ec1bff77a1addf4bf9da2c41c60bce7c3715c713d39365ca5ee109dc28f1b0ca",
+			"bytes": 2045
+		},
+		{
+			"path": "macos-utf8/baseline-results.json",
+			"sha256": "60b08999dceb8f51299124bb2e7bf53fc99e4f80c553c806af15bfe505a67db6",
+			"bytes": 4521
+		},
+		{
+			"path": "macos-utf8/baseline-tests.unit.modules.gestures.test_actions_fixture_scope.log",
+			"sha256": "f36e4c61eae75d418b152c4a553f521d58abd67be11ec107c6022854e7c532b7",
+			"bytes": 25390
+		},
+		{
+			"path": "macos-utf8/baseline-tests.unit.ui.test_metrics_typing_scenario_scope.log",
+			"sha256": "f5cc26c897e3d1a77c237a8dc6586bb1a623823a9b4e475b83540beb2e2d176f",
+			"bytes": 1733
+		},
+		{
+			"path": "macos-utf8/baseline-tests.unit.ui.test_tooltip_renderer_fixture_scope.log",
+			"sha256": "eeef9fbfd861da1d88c4db65f5dc99549c431e30dcfb2281099c046eab0af259",
+			"bytes": 1158
+		},
+		{
+			"path": "macos-utf8/fixed-results.json",
+			"sha256": "3838f1ad21d450242d4209e818b307b4d75205e0b520af6fde58747202370f17",
+			"bytes": 491
+		},
+		{
+			"path": "macos-utf8/fixed-tests.unit.modules.gestures.test_actions_fixture_scope.log",
+			"sha256": "0f26a8fe00e8d2bea155ad4f4654aea33448adc614a0536465f3047efc989d8c",
+			"bytes": 915
+		},
+		{
+			"path": "macos-utf8/fixed-tests.unit.ui.test_metrics_typing_scenario_scope.log",
+			"sha256": "d6a880bede609d5685322b6e7879972fde3453fc0984d9c2a2bf2aa320616f9f",
+			"bytes": 1168
+		},
+		{
+			"path": "macos-utf8/fixed-tests.unit.ui.test_tooltip_renderer_fixture_scope.log",
+			"sha256": "96ac424551bdf4250053dba71c92b415587144fc905b60cd477b505c0004b12a",
+			"bytes": 558
+		},
+		{
+			"path": "macos-utf8/focused.lua",
+			"sha256": "1d0572c0d710767e6ca7eed60fa67dc9ebc656b1b58ad40e5a7416def2bf52db",
+			"bytes": 843
+		},
+		{
+			"path": "macos-utf8/old-source-discovery-results.json",
+			"sha256": "3838f1ad21d450242d4209e818b307b4d75205e0b520af6fde58747202370f17",
+			"bytes": 491
+		},
+		{
+			"path": "macos-utf8/old-source-discovery-tests.unit.modules.gestures.test_actions_fixture_scope.log",
+			"sha256": "0f26a8fe00e8d2bea155ad4f4654aea33448adc614a0536465f3047efc989d8c",
+			"bytes": 915
+		},
+		{
+			"path": "macos-utf8/old-source-discovery-tests.unit.ui.test_metrics_typing_scenario_scope.log",
+			"sha256": "d6a880bede609d5685322b6e7879972fde3453fc0984d9c2a2bf2aa320616f9f",
+			"bytes": 1168
+		},
+		{
+			"path": "macos-utf8/old-source-discovery-tests.unit.ui.test_tooltip_renderer_fixture_scope.log",
+			"sha256": "96ac424551bdf4250053dba71c92b415587144fc905b60cd477b505c0004b12a",
+			"bytes": 558
+		},
+		{
+			"path": "macos-utf8/old-source-tests.unit.modules.gestures.test_actions_fixture_scope.log",
+			"sha256": "0f26a8fe00e8d2bea155ad4f4654aea33448adc614a0536465f3047efc989d8c",
+			"bytes": 915
+		},
+		{
+			"path": "macos-utf8/old-source-tests.unit.ui.test_metrics_typing_scenario_scope.log",
+			"sha256": "1f16060b4fe656d935d935ea88eb5bc222d5d108a9a6c5abad8529b2155c974a",
+			"bytes": 1699
+		},
+		{
+			"path": "macos-utf8/old-source-tests.unit.ui.test_tooltip_renderer_fixture_scope.log",
+			"sha256": "96ac424551bdf4250053dba71c92b415587144fc905b60cd477b505c0004b12a",
+			"bytes": 558
+		},
+		{
+			"path": "macos-utf8/old-text-utils.lua",
+			"sha256": "410e25947fd9bfbf538abdde169b6ea5824b621f1bdd250c5cfeefe45771252f",
+			"bytes": 27010
+		},
+		{
+			"path": "macos-utf8/packet-integrity.json",
+			"sha256": "1c26ec876ff116a5df6e834c9e768f89122c940d42ea7045299bb3dbfdd97ec0",
+			"bytes": 3564
+		},
+		{
+			"path": "macos-utf8/postimages/static/ergopti_plus/macos/tests/support/gesture_actions_fixture.lua",
+			"sha256": "fd5547bc296180f4b2d7bd1d7e074a522f256f046c9c6735adc929368afab01d",
+			"bytes": 32917
+		},
+		{
+			"path": "macos-utf8/postimages/static/ergopti_plus/macos/tests/support/metrics_typing_scope.lua",
+			"sha256": "25fe09282c058ac2a09b4fb9090642d3b0eaf74a26ec7d51474a0347f7db10e5",
+			"bytes": 1375
+		},
+		{
+			"path": "macos-utf8/postimages/static/ergopti_plus/macos/tests/support/tooltip_renderer_fixture.lua",
+			"sha256": "5f8d4064b89e43b5e00c3b7336a5c001a937a9c083a0fc6f550587afc7ea279f",
+			"bytes": 1712
+		},
+		{
+			"path": "macos-utf8/preimages/static/ergopti_plus/macos/tests/support/gesture_actions_fixture.lua",
+			"sha256": "fc732300aa466039427ee613dcedf5ad3dd066c1d8f09c00ddc323f602d1aacf",
+			"bytes": 32901
+		},
+		{
+			"path": "macos-utf8/preimages/static/ergopti_plus/macos/tests/support/metrics_typing_scope.lua",
+			"sha256": "2735ba8dad225985d80f21f0d82533892f5c0d9db3dbdda12ae1af46b52cc927",
+			"bytes": 1359
+		},
+		{
+			"path": "macos-utf8/preimages/static/ergopti_plus/macos/tests/support/tooltip_renderer_fixture.lua",
+			"sha256": "a65c3f616d04917ab8cc640fb6af054c0849c119f0dee9e1316a02bac61a12d4",
+			"bytes": 1696
+		},
+		{
+			"path": "macos-utf8/preimages-postimages.json",
+			"sha256": "265a3b39a39fe99a9f549099aab96835aa40ccde0a951cbaba7a229f4723a49d",
+			"bytes": 1132
+		},
+		{
+			"path": "macos-utf8/restore-strict-utf8-fixture-owner.patch",
+			"sha256": "f2a050c2782818399e2b977c76dd845ba2878331647c5942388541236eddebf3",
+			"bytes": 1717
+		},
+		{
+			"path": "macos-json/README.md",
+			"sha256": "eb8915bc7f1601b832f154c19b07fff042ed6b561d89a7242ee4a76bb1f2b274",
+			"bytes": 2018
+		},
+		{
+			"path": "macos-json/fixed-byte-probe.log",
+			"sha256": "12d34a4cf9edc22c637f28f8bfc43718f9b02a7798733d3f48d14bdebd38f69b",
+			"bytes": 376
+		},
+		{
+			"path": "macos-json/fixed-codec-tree.log",
+			"sha256": "be33d1a60d8130c4e670ed713ea1be9c3ed899544937b65c0a18bdd1140ef0cc",
+			"bytes": 593
+		},
+		{
+			"path": "macos-json/fixed-corpus.log",
+			"sha256": "5f69f64e9908172aac179ab6d547cbe0a7a4bb91c1b9a9b1ba4a0d74ae92ac59",
+			"bytes": 3277
+		},
+		{
+			"path": "macos-json/fixed-decode-contract.log",
+			"sha256": "ae298ec27e132338ca8f38ab2652f2e646415c590fe8a846c4d5e8fcb2a05164",
+			"bytes": 713
+		},
+		{
+			"path": "macos-json/fixed-stub-controls.log",
+			"sha256": "325684ed197dbf91026aafa5fed6f0c8a55ad9ea7dc77aab57c3d0a6d55c5ed9",
+			"bytes": 86
+		},
+		{
+			"path": "macos-json/hs-after.lua",
+			"sha256": "c657e7a5f44060e999e23d59d92a7b2d8078d8e68d6a2a528cec8243a4005f45",
+			"bytes": 55210
+		},
+		{
+			"path": "macos-json/hs-before.lua",
+			"sha256": "9599fba59e7f2844fd571244713ce156e66ebd1f1d8c462dbfd16a8c7669a207",
+			"bytes": 55118
+		},
+		{
+			"path": "macos-json/isolated-original-corpus.log",
+			"sha256": "139bdbb403332f56ede45ace030141a64ea0af5e641e1cb33ee681bf00b6c56c",
+			"bytes": 3692
+		},
+		{
+			"path": "macos-json/macos-json-control-stub.patch",
+			"sha256": "3a95694e0313b43b6ceb0915b63b6fd6cd046325df26395f9b7249746b1202e4",
+			"bytes": 496
+		},
+		{
+			"path": "macos-json/manifest.json",
+			"sha256": "36fdad64b59d61cbf0ceeaecb09d8fa7f4d5ec54f72f64521226679508b30c6e",
+			"bytes": 2670
+		},
+		{
+			"path": "macos-json/notes-byte-probe.lua",
+			"sha256": "2765ba975083edfbd2b3d85ed6e133692d39c9dc89d0ec3b5d266bb9f66aac0e",
+			"bytes": 1590
+		},
+		{
+			"path": "macos-json/original-byte-probe.log",
+			"sha256": "3657616b452e3dc4c431d37c1501e3fb5208076cf7158505f93ee1468e9cdcd4",
+			"bytes": 386
+		},
+		{
+			"path": "macos-json-review/REVIEW.md",
+			"sha256": "d601c37ffe3601955a0220a3749855802ed0b53c649177bca583e9cca21300cb",
+			"bytes": 1585
+		},
+		{
+			"path": "macos-json-review/adjacent-results.json",
+			"sha256": "db3fd940421b4e156464dab1771b002d8555ed61e190905546d2b2f98e8c7812",
+			"bytes": 318
+		},
+		{
+			"path": "macos-json-review/after-owning-corpus.log",
+			"sha256": "56ec0b1a1d5c87b43293644ae5fd0877f7887712c3bc8cc7dafb6c5fc622e668",
+			"bytes": 2918
+		},
+		{
+			"path": "macos-json-review/before-owning-corpus.log",
+			"sha256": "34bba5462f9824ac0cb1ad954177ac0075f2a3d9169a4b6c563f594b73fdb2a8",
+			"bytes": 3473
+		},
+		{
+			"path": "macos-json-review/independent-control-probe.log",
+			"sha256": "eac119655d3a6191aa4221b8510007f766d8e4f2b099ad3a1ac8bcac088c4384",
+			"bytes": 100
+		},
+		{
+			"path": "macos-json-review/independent-control-probe.lua",
+			"sha256": "ef9b43f7af3963c73a4fb4a2ef6c9536b80de7adbc97b196b816fe1fc1ff0665",
+			"bytes": 983
+		},
+		{
+			"path": "macos-json-review/owning-results.json",
+			"sha256": "0b2f69fd89b932166560d6a9cecbe8ae29478092cf9cdb88f88368e76a5c7547",
+			"bytes": 236
+		},
+		{
+			"path": "macos-json-review/python-golden-proof.json",
+			"sha256": "27eeb159af52737ce0c93d2ec1f11c6b35a85f29ac5187f62e7eee8b27e499c8",
+			"bytes": 247
+		},
+		{
+			"path": "macos-json-review/review-manifest.json",
+			"sha256": "9d0138746c574493bd1141cded752556f94ebc2d24f2a00ead0d2ac0e3c10be4",
+			"bytes": 1164
+		},
+		{
+			"path": "macos-json-review/tests.unit.adapters.test_json_codec_decode_contract.log",
+			"sha256": "10a7b5ff979e9984d56b06675679afc7d1bb2c75f2477247d051fe45022df973",
+			"bytes": 352
+		},
+		{
+			"path": "macos-json-review/tests.unit.adapters.test_json_codec_tree.log",
+			"sha256": "c1ca7c784293336cfee7216507d030c3d767a675c53fc352c090276c4ce03138",
+			"bytes": 254
+		},
+		{
+			"path": "windows-head-v2/README.md",
+			"sha256": "21ecaa6de95cf52d8fb7b711e6d6d2d0b9daa464a041fbd5db22103fb1f1b638",
+			"bytes": 3158
+		},
+		{
+			"path": "windows-head-v2/ahk-static.log",
+			"sha256": "be7b53f8a87a0a3943e01527185114de968f03622d480d528d76dff46e1c80db",
+			"bytes": 73
+		},
+		{
+			"path": "windows-head-v2/bijection.log",
+			"sha256": "6de784ecb5d0ab1a4b7818eca553b263c2c94d64e5fefc12391d899f90e6b613",
+			"bytes": 72
+		},
+		{
+			"path": "windows-head-v2/encoding.log",
+			"sha256": "fccce9effbdda7e351882e34be372c680ffe870b5b7ce93932f8d66e960fde68",
+			"bytes": 73
+		},
+		{
+			"path": "windows-head-v2/manifest.log",
+			"sha256": "b7cfba8781c01aa85f3ede5b2bd73942bf30770d94eae278346098a8844779e2",
+			"bytes": 2137
+		},
+		{
+			"path": "windows-head-v2/postimages/static/ergopti_plus/windows/tests/meta/test_tap_hold_menu_register_dispatch.ahk",
+			"sha256": "e5d3521d6980ecafe5a9414fd728653c9fa550478cb0bec803de9df8292e68aa",
+			"bytes": 6791
+		},
+		{
+			"path": "windows-head-v2/postimages/static/ergopti_plus/windows/tests/unit/test_tap_hold_hand_sections.ahk",
+			"sha256": "20c3c991144922addd41dba4876a36ac169bf2f5acaac7ea61453260786ffe0f",
+			"bytes": 13850
+		},
+		{
+			"path": "windows-head-v2/preimages/static/ergopti_plus/windows/tests/meta/test_tap_hold_menu_register_dispatch.ahk",
+			"sha256": "c35473b340bcaa98d9e8aade2550e3a4926f49cfb184ae5355ad2cee065f223f",
+			"bytes": 5178
+		},
+		{
+			"path": "windows-head-v2/preimages/static/ergopti_plus/windows/tests/unit/test_tap_hold_hand_sections.ahk",
+			"sha256": "20b2f7ec0981c54fffa73d4daf23d02ea75f9e451a85b8f12467c9f9a6159b81",
+			"bytes": 13582
+		},
+		{
+			"path": "windows-head-v2/preimages-postimages.json",
+			"sha256": "dab9eef835eab1562782d56a58e3fb657633400dd1ca746134d9580c997fe8d9",
+			"bytes": 514
+		},
+		{
+			"path": "windows-head-v2/qualification.json",
+			"sha256": "7f366c0532c55e71029dc714b294486e98173a574305f49b96a110078785f897",
+			"bytes": 1907
+		},
+		{
+			"path": "windows-head-v2/registration.log",
+			"sha256": "9a552341776aeb7caca9a2b278992cc05192bdad9300f9f72a3b992e29fa6385",
+			"bytes": 68
+		},
+		{
+			"path": "windows-head-v2/source-guard-probe.py",
+			"sha256": "adc9b2cabe215171d9e9f9a75e6f63e7269862163c51ba3330b6b816e7ccb249",
+			"bytes": 5369
+		},
+		{
+			"path": "windows-head-v2/source-guard-proof.json",
+			"sha256": "f70643f89983e7d9bba6b39b491ec56469f57eeb98f35bf66a89782503f6b32b",
+			"bytes": 3390
+		},
+		{
+			"path": "windows-head-v2/windows-head-test-contracts-v2.patch",
+			"sha256": "d1db59f6bb7e0ba8fe292a9839bb461c7f5ce5bd0ae4643def83efd950deae8f",
+			"bytes": 6802
+		},
+		{
+			"path": "windows-head-review/REVIEW.md",
+			"sha256": "e7e7714859d698927b9e945c555fee9ba26975cf43a347744ad125abed1591a7",
+			"bytes": 2745
+		},
+		{
+			"path": "windows-head-review/initial-frozen-guard-gap.json",
+			"sha256": "b96967a76b0f42f57c4878c7c61fc736bd7467fb4c14b7b5ea9080d4f9dc9e52",
+			"bytes": 1136
+		},
+		{
+			"path": "windows-head-review/review-manifest.json",
+			"sha256": "6de2714f80fe224c7896a217fef7ddba37f2ce940713fec7fcd6d23fd42ba8b5",
+			"bytes": 724
+		},
+		{
+			"path": "windows-head-review/source-guard-proof.json",
+			"sha256": "f70643f89983e7d9bba6b39b491ec56469f57eeb98f35bf66a89782503f6b32b",
+			"bytes": 3390
+		},
+		{
+			"path": "windows-head-review/v2-preimages-postimages.json",
+			"sha256": "dab9eef835eab1562782d56a58e3fb657633400dd1ca746134d9580c997fe8d9",
+			"bytes": 514
+		},
+		{
+			"path": "windows-head-review/v2-source-guard-probe.log",
+			"sha256": "25c8255ce3404ddfb611b01f54540294a5ace19a00769767e1108361d0e8ab27",
+			"bytes": 131
+		},
+		{
+			"path": "windows-head-review/v2-source-guard-probe.py",
+			"sha256": "adc9b2cabe215171d9e9f9a75e6f63e7269862163c51ba3330b6b816e7ccb249",
+			"bytes": 5369
+		},
+		{
+			"path": "windows-metadata/README.md",
+			"sha256": "7c204ab835582704448d5fd2f68696d7a379702855cc17d106be333eb090d68b",
+			"bytes": 2919
+		},
+		{
+			"path": "windows-metadata/after.ahk",
+			"sha256": "5beca25bae1521794393446e5f20b664105cbe01a918cc0b932c3ec37a091d22",
+			"bytes": 41316
+		},
+		{
+			"path": "windows-metadata/before.ahk",
+			"sha256": "85937710123435a647a508e9ed6b73bb54b4176913745e0d80fbe7b3212555bb",
+			"bytes": 41079
+		},
+		{
+			"path": "windows-metadata/isolated/static/ergopti_plus/windows/tests/unit/test_personal_toml_live_transactions.ahk",
+			"sha256": "5beca25bae1521794393446e5f20b664105cbe01a918cc0b932c3ec37a091d22",
+			"bytes": 41316
+		},
+		{
+			"path": "windows-metadata/manifest.json",
+			"sha256": "46d1aa3d3cdd6cc3faa70422dd7f9f39d07a3fff833b722715d2e75b87c3fcf3",
+			"bytes": 2092
+		},
+		{
+			"path": "windows-metadata/static-mechanism-receipt.json",
+			"sha256": "b42fc8e9097f3b672505fed586cf739a74af0e5488abb5524412c79ba9a13e5b",
+			"bytes": 420
+		},
+		{
+			"path": "windows-metadata/verify-change-selection.json",
+			"sha256": "75c99489869b016e093d0940cfb582d60a493bd781f0c5a27babcbeed185907e",
+			"bytes": 564
+		},
+		{
+			"path": "windows-metadata/windows-personal-metadata-seed.patch",
+			"sha256": "ba20bd471f33b8e31c10db3a829dd2feae3c9a87546b4d41667ae1448edc42c9",
+			"bytes": 1256
+		},
+		{
+			"path": "windows-cache/README.md",
+			"sha256": "9debed54f1c7183cf60e192cf123b9740e7bf3c2d3a0773d147658328d1119be",
+			"bytes": 3559
+		},
+		{
+			"path": "windows-cache/after.ahk",
+			"sha256": "e6783fe27b45636c350eed43b601c72f1b606d4b573dfbba5ce4d60380b03f64",
+			"bytes": 40517
+		},
+		{
+			"path": "windows-cache/before.ahk",
+			"sha256": "053a2b9103d821ce87a5a933ba46c72a757acfd5421ffdae6494f833905f01dc",
+			"bytes": 40333
+		},
+		{
+			"path": "windows-cache/isolated/static/ergopti_plus/windows/tests/unit/test_hotstring_category_scope.ahk",
+			"sha256": "e6783fe27b45636c350eed43b601c72f1b606d4b573dfbba5ce4d60380b03f64",
+			"bytes": 40517
+		},
+		{
+			"path": "windows-cache/manifest.json",
+			"sha256": "f17d94e67791acee94a374092675677e91b5dc45cfdd9585d80713b017e63855",
+			"bytes": 2878
+		},
+		{
+			"path": "windows-cache/previous-feature-reader.txt",
+			"sha256": "5d23ea0623e0838f6cc338296fab29529b5278414a8b420aeacd3f262a3c05e0",
+			"bytes": 1186
+		},
+		{
+			"path": "windows-cache/snapshot-feature-reader.txt",
+			"sha256": "fc8ccd017935a0dbd6adb4252946bb681c7cc26c2bb39a38dff33a8aedd3768e",
+			"bytes": 1192
+		},
+		{
+			"path": "windows-cache/static-cache-mechanism-controls.json",
+			"sha256": "d657dfa07908ba76986e910c47feb56b84f0af5ad1b3378ce6b8fc3e0c0ecb84",
+			"bytes": 1751
+		},
+		{
+			"path": "windows-cache/windows-dynamic-cache-prime.patch",
+			"sha256": "eee95e268adda5068f8f855860b05baeb4cedd55c4b041eb109805769ff56956",
+			"bytes": 713
+		},
+		{
+			"path": "windows-preconditions-review/REVIEW.md",
+			"sha256": "1709d21fb8d1d9ac2f86493822b3397f6426a99851b9360c13b5018229a77438",
+			"bytes": 2857
+		},
+		{
+			"path": "windows-preconditions-review/byte-and-assertion-proof.json",
+			"sha256": "189ddddaa4964327472a442e1e609a0a2f4d5f0fe3fe78283227cf3796c068b2",
+			"bytes": 942
+		},
+		{
+			"path": "windows-preconditions-review/review-manifest.json",
+			"sha256": "40b012d41c4d6f37062cccc547f1af64862275a78b44bc0950f75f5acc0e1c3d",
+			"bytes": 728
+		},
+		{
+			"path": "windows-preconditions-review/windows-dynamic-cache-prime-manifest.json",
+			"sha256": "f17d94e67791acee94a374092675677e91b5dc45cfdd9585d80713b017e63855",
+			"bytes": 2878
+		},
+		{
+			"path": "windows-preconditions-review/windows-dynamic-cache-prime.patch",
+			"sha256": "eee95e268adda5068f8f855860b05baeb4cedd55c4b041eb109805769ff56956",
+			"bytes": 713
+		},
+		{
+			"path": "windows-preconditions-review/windows-personal-metadata-seed-manifest.json",
+			"sha256": "46d1aa3d3cdd6cc3faa70422dd7f9f39d07a3fff833b722715d2e75b87c3fcf3",
+			"bytes": 2092
+		},
+		{
+			"path": "windows-preconditions-review/windows-personal-metadata-seed.patch",
+			"sha256": "ba20bd471f33b8e31c10db3a829dd2feae3c9a87546b4d41667ae1448edc42c9",
+			"bytes": 1256
+		}
+	],
+	"status": "Applied fixture-only corrections; source review clear; native Windows/macOS qualification is recorded separately."
+}

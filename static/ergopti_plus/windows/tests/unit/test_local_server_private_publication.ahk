@@ -28,6 +28,7 @@ class _LSP_World {
 		this.ConfigPath := ConfigurationFile
 		this.ApiPath := _LLM_Menu_ApiEntriesPath()
 		this.ApplyCalls := 0
+		this.ReadCalls := 0
 		this.AdmissionCalls := 0
 		this.Mutation := ""
 		this.Mutated := false
@@ -75,6 +76,7 @@ class _LSP_World {
 			Owned["notify"] := _LMT_Notify
 			Owned["pause"] := ObjBindMethod(this, "Pause")
 			this.Owner := LLM_Menu_ApiPrivateSourceOwner(Owned)
+			_LSP_NativeFacts(this, "fixture_acquired")
 		} catch as Err {
 			this.Restore()
 			throw Err
@@ -120,6 +122,7 @@ class _LSP_World {
 	}
 
 	Read(Path) {
+		this.ReadCalls += 1
 		Content := FSReadUtf8Exact(Path)
 		if this.Mutation == "claim_model" && this.CommittedCalls >= 2 && !this.Mutated {
 			this.Mutated := true
@@ -186,6 +189,8 @@ class _LSP_World {
 		this.OwnedBundle := _ConfigWriteLeaseState().terminal
 		this.ConfigCandidate := FSReadUtf8Exact(this.ConfigPath)
 		this.ApiCandidate := FSReadUtf8Exact(this.ApiPath)
+		; The writer owns this durable boundary; the committed model callback is pure.
+		this.OldSourceAdmittedAfterDurability := this.Owner.Current(this.Receipt)
 		if this.Mutation == "committed_model"
 			this.ModelCurrent := false
 		if this.Mutation == "missing_wal" {
@@ -239,8 +244,7 @@ class _LSP_World {
 		if Phase == "committed" {
 			this.CommittedCalls += 1
 			this.CandidateSeen := true
-			this.OldSourceAdmittedAfterDurability := this.Owner.Current(this.Receipt)
-			return this.ModelCurrent && this.Owner.CandidateCurrent(Capability)
+			return this.ModelCurrent
 		}
 		return this.ModelCurrent && this.Owner.Current(this.Receipt)
 	}
@@ -581,6 +585,7 @@ _LSP_ApplicationDebt(World) {
 	World.Capture()
 	World.Mutation := "application"
 	AssertFalse(World.Apply(), "durable files do not fabricate native application success")
+	_LSP_NativeFacts(World, "application_debt")
 	AssertEqual(1, World.ApplyCalls)
 	AssertTrue(_LLM_Menu != World.OldMenu, "durable acknowledged candidate is already published")
 	AssertTrue(_ConfigWriteTerminalIsActive())
@@ -598,6 +603,7 @@ _LSP_CleanupDebt(World) {
 	World.Capture()
 	World.Mutation := "cleanup"
 	AssertFalse(World.Apply(), "a cleanup refusal cannot become saved success")
+	_LSP_NativeFacts(World, "cleanup_debt")
 	AssertTrue(World.CleanupRefused, "the real journal cleanup must reach the native delete seam")
 	AssertEqual(1, World.ApplyCalls)
 	AssertTrue(_LLM_Menu != World.OldMenu)
@@ -615,6 +621,7 @@ _LSP_PostDurableForeignImage(World) {
 	World.Mutation := "committed_external"
 	World.Replacement := StrReplace(World.ApiImage, "independent-active", "foreign-durable-sentinel")
 	AssertFalse(World.Apply())
+	_LSP_NativeFacts(World, "foreign_durable")
 	AssertTrue(World.Mutated)
 	AssertEqual(World.Replacement, FSReadUtf8Exact(World.ApiPath), "unknown external bytes survive refused durable publication")
 	AssertTrue(_LLM_Menu == World.OldMenu)
@@ -664,6 +671,7 @@ _LSP_FinalReadModelRefusal(World) {
 	World.Capture()
 	World.Mutation := "claim_model"
 	AssertFalse(World.Apply())
+	_LSP_NativeFacts(World, "final_reread_model")
 	AssertTrue(World.Mutated, "the actual final private reread must cross the independent model revocation boundary")
 	AssertEqual(2, World.CommittedCalls)
 	AssertEqual(1, World.ClaimCalls)
@@ -705,6 +713,7 @@ _LSP_MissingWalDebt(World) {
 	World.Capture()
 	World.Mutation := "missing_wal"
 	AssertFalse(World.Apply())
+	_LSP_NativeFacts(World, "missing_wal")
 	AssertTrue(World.Mutated, "the actual committed-new WAL must have been removed at the refusal boundary")
 	AssertTrue(ConfigTransitionResultIs(ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort()), "absent"))
 	AssertEqual(World.ConfigCandidate, FSReadUtf8Exact(World.ConfigPath))
@@ -890,3 +899,47 @@ _LSP_ShutdownCritical(World) {
 }
 Test("Local server source: pure shutdown attempt hooks restore inherited Critical on all outcomes (local-server-private-source)",
 	(*) => _LSP_WithWorld(_LSP_ShutdownCritical))
+
+
+_LSP_NativeFacts(World, Point) {
+	PreviousCritical := Critical("Off")
+	try {
+		Terminal := _ConfigWriteLeaseState().terminal
+		Retained := ConfigTransitionRetainedBarrier()
+		Owned := World.OwnedBundle
+		Tokens := Owned is Object && Owned.HasOwnProp("tokens") ? Owned.tokens : []
+		AllOwn := Tokens.Length > 0
+		for Token in Tokens
+			AllOwn := AllOwn && _ConfigWriteLeaseOwns(Token)
+		_TestPrint("# private-publication-native point=" . Point
+			. " prior_object=" . IsObject(World.PriorRetained)
+			. " retained_object=" . IsObject(Retained)
+			. " terminal_object=" . IsObject(Terminal)
+			. " owned_object=" . IsObject(Owned)
+			. " retained_owned=" . (Retained == Owned)
+			. " retained_terminal=" . (Retained == Terminal)
+			. " owned_terminal=" . (Owned == Terminal)
+			. " kind_exact=" . (Owned is Object && Owned.HasOwnProp("kind") && Owned.kind == "terminal_bundle")
+			. " tokens=" . Tokens.Length . " tokens_owned=" . AllOwn
+			. " committed=" . World.CommittedCalls . " claims=" . World.ClaimCalls
+			. " model_current=" . World.ModelCurrent
+			. " apply_calls=" . World.ApplyCalls)
+	} finally Critical(PreviousCritical)
+}
+
+
+_LSP_CommittedCallbackNoIO(World) {
+	World.Capture()
+	Reads := World.ReadCalls
+	Capability := LLM_Menu_ApiPrivateCandidateReceipt()
+	Admitted := World.Admission("committed", Capability)
+	AssertEqual(Reads, World.ReadCalls, "the retained model callback cannot acquire or reread private source files")
+	AssertTrue((Admitted is Integer) && Admitted == 1)
+	World.ModelCurrent := false
+	Admitted := World.Admission("committed", Capability)
+	AssertEqual(Reads, World.ReadCalls, "a refused retained model callback also remains source-port free")
+	AssertTrue((Admitted is Integer) && Admitted == 0)
+	World.AssertUnchanged()
+}
+Test("Local server publication: committed model callback performs no private source I/O (local-server-private-source)",
+	(*) => _LSP_WithWorld(_LSP_CommittedCallbackNoIO))

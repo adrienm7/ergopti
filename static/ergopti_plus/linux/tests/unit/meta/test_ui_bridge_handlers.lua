@@ -172,6 +172,15 @@ helpers.describe("ui.bridge_handlers", function()
     local real_create_gtk_window = wm._create_gtk_window
     local function fake_create_gtk_window() return true end
 
+    local function manager_without_gtk()
+      local original = package.loaded["ui.webview_manager"]
+      local ok, manager = pcall(helpers.load_module_with_dependency,
+        "ui.webview_manager", "lgi", false)
+      package.loaded["ui.webview_manager"] = original
+      if not ok then error(manager, 0) end
+      return manager
+    end
+
     helpers.it("exports init", function()
       helpers.assert_true(type(wm.init) == "function")
     end)
@@ -191,10 +200,11 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(wm.get_daemon_state) == "function")
     end)
     helpers.it("show fails without a native window instead of inventing visibility (lnx-067)", function()
-      helpers.assert_eq(wm.show("action_picker", "fr"), false)
-      helpers.assert_eq(wm.is_visible("action_picker"), false,
+      local headless = manager_without_gtk()
+      helpers.assert_eq(headless.show("action_picker", "fr"), false)
+      helpers.assert_eq(headless.is_visible("action_picker"), false,
         "headless bridge routing must not masquerade as a user-visible window")
-      helpers.assert_eq(wm.current_epoch("action_picker"), nil,
+      helpers.assert_eq(headless.current_epoch("action_picker"), nil,
         "failed native creation must roll back its provisional page context")
     end)
     wm._create_gtk_window = fake_create_gtk_window
@@ -352,11 +362,15 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     wm._create_gtk_window = real_create_gtk_window
     helpers.it("_create_gtk_window reports failure safely without GTK", function()
+      local headless = manager_without_gtk()
       -- Called directly: a raise fails with the real error. The claim is the
       -- refusal — with no GTK the window must not be registered, or every later
       -- show/focus call addresses a window that does not exist.
-      helpers.assert_eq(wm._create_gtk_window("test", "<html></html>", nil), false)
-      helpers.assert_true(wm.is_open == nil or wm.is_open("test") ~= true,
+      local created, detail = headless._create_gtk_window("action_picker", "<html></html>", nil)
+      helpers.assert_eq(created, false)
+      helpers.assert_eq(detail, "GTK/WebKit unavailable",
+        "the refusal must come from the explicitly unavailable native dependency")
+      helpers.assert_true(headless.is_open == nil or headless.is_open("action_picker") ~= true,
         "no GTK means no window, and no window means nothing registered")
     end)
     helpers.it("_destroy_gtk_window no-ops safely without GTK", function()

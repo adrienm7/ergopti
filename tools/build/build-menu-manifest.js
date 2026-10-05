@@ -53,7 +53,8 @@ const HEADER = {
 		"item types: 'toggle' = a category's first-row checkbox (its master gate, one i18n key), " +
 		"'feature' = manifest-path toggle, " +
 		"'action' = stateless button, 'dynamic' = rendered by platform code, " +
-		"'group' = named submenu, 'section_header' = disabled label, '---' = separator, " +
+		"'group' = named submenu, 'include' = reused child-template section, " +
+		"'section_header' = disabled label, '---' = separator, " +
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +
 		'the A-Z chooser. The last two were in use and undocumented here, which matters ' +
 		"because 'list' is the ONLY type that moves a row from the driver into the " +
@@ -122,6 +123,84 @@ function validateGreyedRows(menu) {
 			}
 		}
 	}
+}
+
+/** Refuses effects or ambiguous fields in an existing provider's inert status. */
+function validateProviderStatus(menu) {
+	for (const [key, rows] of Object.entries(menu)) {
+		if (!Array.isArray(rows)) continue;
+		for (const row of rows) {
+			if (row.status_rows === undefined) continue;
+			const where = `menu.${key} row "${row.id || row.type}"`;
+			if (
+				!['dynamic', 'list'].includes(row.type) ||
+				typeof row.id !== 'string' ||
+				row.id === '' ||
+				!row.status_rows ||
+				typeof row.status_rows !== 'object' ||
+				Array.isArray(row.status_rows) ||
+				Object.keys(row.status_rows).length === 0
+			)
+				throw new Error(
+					`${where}: status_rows needs an existing provider identity and named status`
+				);
+			for (const [status, declaration] of Object.entries(row.status_rows)) {
+				if (status === '' || !Array.isArray(declaration) || declaration.length === 0)
+					throw new Error(`${where}: provider status needs nonempty inert rows`);
+				for (const item of declaration) {
+					const label = item?.type === 'label' && typeof item.i18n === 'string' && item.i18n !== '';
+					if (
+						!item ||
+						typeof item !== 'object' ||
+						Array.isArray(item) ||
+						(item.type !== '---' && !label) ||
+						Object.keys(item).some((field) => field !== 'type' && !(label && field === 'i18n'))
+					)
+						throw new Error(
+							`${where}: provider status admits only inert separators and translated labels`
+						);
+				}
+			}
+		}
+	}
+}
+
+/** Validates the child-template composition and caption-reader vocabulary. */
+function validateChildTemplates(menu) {
+	for (const [key, rows] of Object.entries(menu)) {
+		if (!Array.isArray(rows)) continue;
+		for (const row of rows) {
+			const where = `menu.${key} row "${row.id || row.type}"`;
+			if (row.type === 'include') {
+				if (typeof row.section !== 'string' || !Array.isArray(menu[row.section]))
+					throw new Error(`${where}: include needs an existing menu section`);
+				if (Object.keys(row).some((field) => !['type', 'section'].includes(field)))
+					throw new Error(`${where}: include only composes an existing section`);
+			}
+			if (
+				row.caption_getter !== undefined &&
+				(!['command', 'group'].includes(row.type) ||
+					typeof row.caption_getter !== 'string' ||
+					row.caption_getter === '' ||
+					typeof row.id !== 'string' ||
+					row.id === '' ||
+					typeof row.i18n !== 'string' ||
+					row.i18n === '')
+			)
+				throw new Error(`${where}: caption_getter needs a labelled command or group identity`);
+		}
+	}
+	const visiting = new Set();
+	const visited = new Set();
+	function visit(key) {
+		if (visiting.has(key)) throw new Error(`menu.${key}: cyclic child-template include`);
+		if (visited.has(key)) return;
+		visiting.add(key);
+		for (const row of menu[key]) if (row.type === 'include') visit(row.section);
+		visiting.delete(key);
+		visited.add(key);
+	}
+	for (const [key, rows] of Object.entries(menu)) if (Array.isArray(rows)) visit(key);
 }
 
 /** Projects the updater's actual validated registry without inventing a feature enum. */
@@ -339,6 +418,8 @@ function build() {
 
 	projectChoices(parsed.menu, raw);
 	validateGreyedRows(parsed.menu);
+	validateChildTemplates(parsed.menu);
+	validateProviderStatus(parsed.menu);
 	const out = { ...HEADER, ...parsed.menu };
 	const json = JSON.stringify(out, null, '\t') + '\n';
 	writeFileSync(OUT_PATH, json, 'utf8');

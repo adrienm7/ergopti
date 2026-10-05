@@ -235,6 +235,12 @@ const CHECKS = [
 		repro: 'npm run test:typing-metrics-reset'
 	},
 	{
+		name: 'shared menu delegation follows reachable methods and refuses dormant or removed providers',
+		cmd: 'node',
+		args: ['tools/test/test-menu-shared-delegation.cjs'],
+		repro: 'node tools/test/test-menu-shared-delegation.cjs'
+	},
+	{
 		name: 'every menu-manifest field and section has a driver that reads it (no decorative declarations)',
 		cmd: 'node',
 		args: ['tools/test/test-menu-manifest-keys-have-readers.cjs'],
@@ -1027,10 +1033,22 @@ const CHECKS = [
 		repro: 'npm run test:linux-http-stream-registration'
 	},
 	{
+		name: 'Linux native runtime prerequisite gate retains both ABIs and mandatory receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-runtime-native-registration.cjs'],
+		repro: 'npm run test:linux-runtime-native-registration'
+	},
+	{
 		name: 'Desktop verdicts and parallel shared-core gates',
 		cmd: 'node',
 		args: ['tools/test/test-desktop-ci-evidence.cjs'],
 		repro: 'npm run test:desktop-ci-evidence'
+	},
+	{
+		name: 'macOS canvas job admission and pure Python ownership remain mandatory',
+		cmd: 'node',
+		args: ['tools/test/test-macos-tooltip-canvas-admission.cjs'],
+		repro: 'npm run test:macos-tooltip-canvas-admission'
 	},
 	{
 		name: 'Linux WebViews use pinned offline code and one bridge per page',
@@ -2122,6 +2140,12 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-keylogger-timings-single-source.cjs'],
 		repro: 'node tools/test/test-keylogger-timings-single-source.cjs'
+	},
+	{
+		name: 'SQLite event cursor numeric policy single source',
+		cmd: 'node',
+		args: ['tools/test/test-sqlite-event-id-single-source.cjs'],
+		repro: 'node tools/test/test-sqlite-event-id-single-source.cjs'
 	},
 	{
 		name: 'no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)',

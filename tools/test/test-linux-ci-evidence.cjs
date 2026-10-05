@@ -184,6 +184,7 @@ local uv = {}
 function uv.run() error('synchronous refusal needs no event loop') end
 function uv.new_pipe() return {} end
 function uv.new_timer() return {} end
+function uv.update_time() end -- Model native void-style refresh in this simulated backend.
 function uv.timer_start() return true end
 function uv.timer_stop() return true end
 function uv.read_start(pipe, callback) pipe.read = callback; return true end
@@ -201,6 +202,7 @@ end
 package.preload.luv = function() return uv end
 package.preload['logger.shim'] = function() return {
  debug = function() end,
+ info = function() end,
  error = function(_, format, detail)
   assert(not tostring(detail):find(os.getenv('GITHUB_TOKEN'), 1, true), 'native logger exposed CI authentication')
   if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end

@@ -47,6 +47,101 @@ local function write_fixture(path, content)
 	assert(fh:close())
 end
 
+helpers.describe("hotstrings_config: common section migration ownership", function()
+	helpers.it("(common-autocorrection-split) native initialization publishes the complete fan-out before resolving each new section", function()
+		local path = temp_path("common_fanout")
+		local function read(path)
+			local handle = assert(io.open(path, "rb")); local bytes = assert(handle:read("*a")); assert(handle:close())
+			return bytes
+		end
+		local input = read(helpers.shared("tests/corpus/common_autocorrection_migration/input.toml"))
+		local expected = read(helpers.shared("tests/corpus/common_autocorrection_migration/expected.toml"))
+		write_fixture(path, input)
+		local ok, detail = pcall(function()
+			local mod = fresh_module(path)
+			helpers.assert_eq(read(path), expected)
+			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
+				local actual = mod.get_user_override("autocorrection", section)
+				helpers.assert_eq(actual.delay, section == "names" and 0.2 or 0.875)
+				helpers.assert_eq(actual.color, section == "abbreviations" and "#abcdef" or "#123456")
+				helpers.assert_eq(actual.show_tooltip, section == "names")
+				helpers.assert_eq(actual.priority, 23)
+				local resolved = mod.resolve("autocorrection", section)
+				helpers.assert_eq(resolved.delay, actual.delay)
+				helpers.assert_eq(resolved.priority, 23)
+			end
+		end)
+		os.remove(path)
+		if not ok then error(detail) end
+	end)
+		helpers.it("(common-autocorrection-split) refused native migration blocks saves and retains the entire legacy source", function()
+		local path = temp_path("common_refused")
+		local input = '[autocorrection.caps]\ndelay = 0.3\n# independent original notes\n'
+		write_fixture(path, input)
+		local original = require("toml_codec.writer").publish_if_unchanged
+		local ok, detail = pcall(function()
+			require("toml_codec.writer").publish_if_unchanged = function() return false, "independent refusal" end
+			local mod = fresh_module(path)
+			helpers.assert_eq(mod.set_override("autocorrection", "names", "delay", 0.4), false)
+			local handle = assert(io.open(path, "rb")); local bytes = handle:read("*a"); assert(handle:close())
+			helpers.assert_eq(bytes, input)
+			helpers.assert_nil(mod.get_user_override("autocorrection", "names"), "unacknowledged candidates never become live")
+		end)
+		require("toml_codec.writer").publish_if_unchanged = original; os.remove(path)
+		if not ok then error(detail) end
+	end)
+		helpers.it("(common-autocorrection-split) unverified foreign bytes retain their native owner while requested common registration refuses", function()
+		local path = temp_path("common_foreign_guard")
+		local source = '[__global__]\nword_delimiters = "bad\\q"\n[rolls]\ndelay = 0.5\n'
+		write_fixture(path, source)
+		local ok, detail = pcall(function()
+			local mod = fresh_module(path)
+			helpers.assert_eq(mod.common_autocorrection_admitted(), false)
+			helpers.with_stub_scope({
+				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+				"modules.keymap.state", "modules.keymap.terminators", "adapters.storage", "infra.toml.reader",
+			}, function()
+				local State = helpers.load_with_stubs("modules.keymap.state")
+				local Registry = helpers.load_with_stubs("modules.keymap.registry")
+				local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+				helpers.assert_true(Registry.init(state))
+				Registry.set_group_context("foreign_guard")
+				Registry.add("foreign", "Preserved foreign", { is_word = true, is_case_sensitive = true, priority = 50 })
+				Registry.set_group_context(nil)
+				local before, sequence = { state.mappings[1] }, state.seq_counter
+				helpers.assert_true(require("adapters.storage").set("hotstrings_section_autocorrection_names", true))
+				helpers.assert_eq(Registry.load_toml("autocorrection", helpers.shared("modules/hotstrings/autocorrection.toml")), false)
+				helpers.assert_eq(state.mappings, before, "the actual native transaction keeps every previous mapping")
+				helpers.assert_eq(state.seq_counter, sequence)
+				local Boot = require("infra.common_hotstrings_boot")
+				local hotfiles, hotfile_paths = {}, {}
+				local refused = Boot.load(Registry, "autocorrection",
+					helpers.shared("modules/hotstrings/autocorrection.toml"), nil, hotfiles, hotfile_paths)
+				helpers.assert_eq(refused, { committed = false, complete = false, unavailable = { "autocorrection" } })
+				helpers.assert_eq(hotfiles, {}, "cold startup never advertises a refused common group")
+				helpers.assert_nil(hotfile_paths.autocorrection)
+				helpers.assert_eq(state.mappings, before, "cold refusal also leaves prior unrelated native rows intact")
+				helpers.assert_true(require("adapters.storage").set("hotstrings_section_french_autocorrection_names", true))
+				local french_path = helpers.shared("modules/hotstrings/french/autocorrection.toml")
+				local admitted = Boot.load(Registry, "french_autocorrection", french_path, nil, hotfiles, hotfile_paths)
+				helpers.assert_eq(admitted, { committed = true, complete = true, unavailable = {} })
+				helpers.assert_eq(hotfiles, { "french_autocorrection" }, "unrelated cold groups still load through the actual registry")
+				helpers.assert_eq(hotfile_paths, { french_autocorrection = french_path })
+				helpers.assert_true(#state.mappings > #before)
+				local found = false
+				for _, mapping in ipairs(state.mappings) do
+					if mapping.group == "french_autocorrection" and mapping.trigger == "aicha" then
+						found = mapping.repl == "Aïcha"
+					end
+				end
+				helpers.assert_true(found, "an independent French rule survives unavailable common families")
+			end)
+		end)
+		os.remove(path)
+		if not ok then error(detail) end
+	end)
+end)
+
 
 
 

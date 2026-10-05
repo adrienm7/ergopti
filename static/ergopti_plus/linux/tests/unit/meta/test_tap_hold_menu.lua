@@ -483,3 +483,200 @@ helpers.describe("declared native command reaches the actual Linux writer", func
 		if not ok then error(err, 0) end
 	end)
 end)
+
+helpers.describe("declared complete per-key head", function()
+	local function with_head(mutate, body)
+		local declaration = require("infra.manifest_menu").get_array("tap_hold_key_head")
+		local saved = {}
+		for index, row in ipairs(declaration) do
+			saved[index] = {}
+			for key, value in pairs(row) do saved[index][key] = value end
+		end
+		local Manager
+		local ok, err = pcall(function()
+			if mutate then mutate(declaration) end
+			local calls, picked, section = {}, {}, nil
+			section, Manager = build(calls, picked)
+			local i18n = require("infra.i18n")
+			local key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
+			body(key.menu, calls, picked, i18n)
+		end)
+		for index = #declaration, 1, -1 do declaration[index] = nil end
+		for index, row in ipairs(saved) do declaration[index] = row end
+		if Manager then restore(Manager) end
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("retains actual picker and hold writer behind shared order (tap-hold-key-head)", function()
+		with_head(nil, function(rows, calls, picked, i18n)
+			helpers.assert_eq(#rows, 5, "four declared head rows and original delay tail")
+			helpers.assert_eq(rows[1].title, i18n.get("tap_hold.action.disable"))
+			helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_true(type(rows[3].fn) == "function" and rows[3].menu == nil)
+			helpers.assert_true(type(rows[4].menu) == "table" and rows[4].fn == nil)
+			rows[3].fn()
+			helpers.assert_eq(picked.opts.current, "copy")
+			picked.confirm("paste")
+			helpers.assert_eq(calls[1], { "set_tap", "left_shift", "paste" })
+			assert(find(rows[4].menu, i18n.get("tap_hold.hold.nav_layer"))).fn()
+			helpers.assert_eq(calls[2], { "set_hold", "left_shift", "layer", "nav" })
+		end)
+	end)
+
+	helpers.it("follows declared Tap/Hold order with original payload (tap-hold-key-head)", function()
+		with_head(function(rows) rows[3], rows[5] = rows[5], rows[3] end, function(rows, calls, picked)
+			helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_type(rows[3].menu, "table")
+			helpers.assert_type(rows[4].fn, "function")
+			rows[4].fn()
+			helpers.assert_eq(picked.opts.current, "copy")
+			helpers.assert_eq(#calls, 0, "opening a picker does not write")
+		end)
+	end)
+
+	helpers.it("reads declared caption and selected getter without redirecting callback (tap-hold-key-head)", function()
+		with_head(function(rows)
+			rows[3].i18n, rows[3].caption_getter = "tap_hold.picker.hold", "tap_hold_key_hold_caption"
+		end, function(rows, _, picked, i18n)
+			helpers.assert_eq(rows[3].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
+			rows[3].fn()
+			helpers.assert_eq(picked.opts.current, "copy")
+		end)
+	end)
+
+	helpers.it("hides declared tap row without dropping hold payload (tap-hold-key-head)", function()
+		with_head(function(rows) rows[3].platforms = { "ahk" } end, function(rows, calls, _, i18n)
+			helpers.assert_eq(#rows, 4)
+			helpers.assert_eq(rows[2].title, "-")
+			assert(find(rows[3].menu, i18n.get("tap_hold.hold.nav_layer"))).fn()
+			helpers.assert_eq(calls[1], { "set_hold", "left_shift", "layer", "nav" })
+		end)
+	end)
+
+	helpers.it("replays full platform projection and literal captions in all 21 locales (tap-hold-key-head)", function()
+		local Json, Paths = require("json"), require("infra.paths")
+		local function read(relative)
+			local file = assert(io.open(Paths.shared(relative), "r"))
+			local text = file:read("*a"); file:close()
+			return Json.decode(text)
+		end
+		local corpus, locales = read("tests/corpus/menus/tap_hold_key_head.json"), read("data/locale_order.json").order
+		helpers.assert_eq(#locales, 21)
+		for _, code in ipairs(locales) do
+			local strings = read("data/locales/" .. code .. ".json")
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({ platform = platform,
+					manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+					json_decode = Json.decode, i18n = { get = function(key) return assert(strings[key]) end,
+						section = function(key) return assert(strings[key]) end },
+					logger = { error = function() end, warn = function() end, debug = function() end } }))
+				for _, configured in ipairs({ false, true }) do
+					local calls = {}
+					local rows = renderer.template_rows(corpus.section, {
+						tap_hold_key_native = function() calls[#calls + 1] = "native"; return true end,
+						tap_hold_key_no_action = function() calls[#calls + 1] = "none"; return true end,
+						tap_hold_key_tap = function() calls[#calls + 1] = "tap"; return true end,
+					}, { tap_hold_key_configured = function() return configured end,
+						tap_hold_key_tap_caption = function() return "copy 100%" end,
+						tap_hold_key_hold_caption = function() return "Ctrl / {}" end }, {
+						tap_hold_key_tap_picker = { { label = "tap-child" } },
+						tap_hold_key_hold = { { label = "hold-child" } },
+						tap_hold_key_hold_picker = { { label = "hold-child" } },
+					})
+					local expected = corpus.platforms[platform]
+					helpers.assert_eq(#rows, 4, code .. ": " .. platform)
+					helpers.assert_eq(rows[1].label, strings[platform == "hs" and "menu.tapholds.nothing_tap_hold" or "tap_hold.action.disable"])
+					helpers.assert_eq(rows[1].disabled == true, not configured)
+					helpers.assert_true(rows[2].separator)
+					helpers.assert_eq(rows[3].label, string.format(strings[expected.tap_label], "copy 100%"))
+					helpers.assert_eq(rows[4].label, string.format(strings[expected.hold_label], "Ctrl / {}"))
+					helpers.assert_eq(type(rows[3][expected.tap_kind]), expected.tap_kind == "action" and "function" or "table")
+					helpers.assert_eq(rows[4].items[1].label, "hold-child")
+					helpers.assert_eq(#calls, 0)
+					configured = false
+					helpers.assert_eq(rows[1].action(), false, "included retained callback rechecks the original gate")
+					helpers.assert_eq(#calls, 0)
+				end
+			end
+		end
+	end)
+
+	for _, mutation in ipairs({ "missing include", "cyclic include", "missing caption getter", "non-callable caption getter", "non-string caption", "missing children" }) do
+		helpers.it("refuses " .. mutation .. " as a complete template (tap-hold-key-head)", function()
+			local renderer = require("infra.manifest_menu")
+			local head = renderer.get_array("tap_hold_key_head")
+			local include, getter = head[1].section, head[3].caption_getter
+			local commands = { tap_hold_key_native = function() end, tap_hold_key_tap = function() end }
+			local getters = { tap_hold_key_configured = function() return true end,
+				tap_hold_key_tap_caption = function() return "Tap" end, tap_hold_key_hold_caption = function() return "Hold" end }
+			local children = { tap_hold_key_hold = {} }
+			if mutation == "missing include" then head[1].section = "absent_child_template" end
+			if mutation == "cyclic include" then head[1].section = "tap_hold_key_head" end
+			if mutation == "missing caption getter" then head[3].caption_getter = "absent_getter" end
+			if mutation == "non-callable caption getter" then getters.tap_hold_key_tap_caption = 42 end
+			if mutation == "non-string caption" then getters.tap_hold_key_tap_caption = function() return 42 end end
+			if mutation == "missing children" then children.tap_hold_key_hold = nil end
+			local ok, err = pcall(function()
+				helpers.assert_nil(renderer.template_rows("tap_hold_key_head", commands, getters, children))
+			end)
+			head[1].section, head[3].caption_getter = include, getter
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
+
+helpers.describe("inert existing-provider status data", function()
+	local function status_definition(Menu)
+		for _, item in ipairs(Menu.get_array("llm_menu")) do
+			if item.id == "llm_backend" then return item.status_rows.unavailable end
+		end
+		error("Canonical backend status declaration is missing")
+	end
+	local function assert_inert_rows(Menu, Mutate)
+		local definition = status_definition(Menu)
+		helpers.assert_eq(#definition, 3)
+		local header, unavailable = definition[2], definition[3]
+		local old_caption = unavailable.i18n
+		local ok, err = pcall(function()
+			if Mutate then
+				unavailable.i18n = "menu.llm.local_servers.rescan"
+				definition[2], definition[3] = unavailable, header
+			end
+			local rows = Menu.status_rows("llm_menu", "llm_backend", "unavailable")
+			helpers.assert_type(rows, "table")
+			helpers.assert_eq(#rows, 3)
+			helpers.assert_true(rows[1].separator)
+			local tr = require("infra.i18n").get
+			helpers.assert_eq(rows[2].label, tr(Mutate and "menu.llm.local_servers.rescan" or "menu.llm.local_servers.header"))
+			helpers.assert_eq(rows[3].label, tr(Mutate and "menu.llm.local_servers.header" or "menu.llm.unavailable"))
+			for index = 2, 3 do
+				helpers.assert_eq(rows[index].disabled, true)
+				helpers.assert_nil(rows[index].action)
+				helpers.assert_nil(rows[index].items)
+				helpers.assert_nil(rows[index].submenu)
+			end
+		end)
+		definition[2], definition[3] = header, unavailable
+		unavailable.i18n = old_caption
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("returns actual canonical inactive data without command owners", function()
+		assert_inert_rows(require("infra.manifest_menu"), false)
+	end)
+	helpers.it("reads actual canonical caption and order mutations", function()
+		assert_inert_rows(require("infra.manifest_menu"), true)
+	end)
+	helpers.it("refuses a malformed actual header without partial template data", function()
+		local Menu = require("infra.manifest_menu")
+		local item = status_definition(Menu)[3]
+		local saved = item.i18n
+		item.i18n = ""
+		local ok, err = pcall(function()
+			helpers.assert_nil(Menu.status_rows("llm_menu", "llm_backend", "unavailable"))
+		end)
+		item.i18n = saved
+		if not ok then error(err, 0) end
+	end)
+end)

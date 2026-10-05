@@ -89,6 +89,21 @@ for (const file of [
 		`${file}: native source proof must be selected`
 	);
 
+assert.equal(GATE_COMMANDS['macos-tooltip-canvas'].npm, 'test:macos-tooltip-canvas');
+for (const file of [
+	'tools/diagnostics/macos_tooltip_canvas.py',
+	'tools/diagnostics/macos_tooltip_canvas.lua',
+	'tools/diagnostics/macos_tooltip_canvas_observer.py',
+	'tools/diagnostics/macos_tooltip_canvas_test.py',
+	'tools/diagnostics/macos_owned_process.py',
+	'tools/test/run-macos-tooltip-canvas-tests.cjs'
+])
+	assert(
+		selectGates([file]).has('macos-tooltip-canvas'),
+		`${file}: pure canvas controls must be selected`
+	);
+assert(selectGates(['.github/workflows/ci-macos.yml']).has('js'));
+
 assert.equal(GATE_COMMANDS['linux-http-stream'].npm, 'test:linux:http-stream');
 for (const file of [
 	'static/ergopti_plus/linux/adapters/http_client.lua',
@@ -99,6 +114,31 @@ for (const file of [
 	assert(
 		selectGates([file]).has('linux-http-stream'),
 		`${file}: actual native streaming receipt proof must be selected`
+	);
+
+assert.equal(GATE_COMMANDS['linux-runtime-native'].npm, 'test:linux:runtime-native');
+for (const file of [
+	'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
+	'static/ergopti_plus/_shared/lua/llm/process_port.lua',
+	'static/ergopti_plus/_shared/lua/llm/finite_process_port.lua',
+	'static/ergopti_plus/_shared/lua/llm/process_limits.lua',
+	'static/ergopti_plus/_shared/lua/llm/ollama_archive_installer.lua',
+	'static/ergopti_plus/linux/adapters/owned_process.lua',
+	'static/ergopti_plus/linux/modules/llm/ollama_install_files.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_owned_process_native.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_finite_process_port_native.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_service_process_port_native.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_service_running_native.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.lua',
+	'static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.py',
+	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
+	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper_teardown.py',
+	'tools/test/run-linux-runtime-native.cjs',
+	'.github/workflows/ci-linux.yml'
+])
+	assert(
+		selectGates([file]).has('linux-runtime-native'),
+		`${file}: actual runtime prerequisite proof must be selected`
 	);
 
 const failures = [];

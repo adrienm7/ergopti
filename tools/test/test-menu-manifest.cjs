@@ -215,6 +215,15 @@ function main() {
 				}
 			}
 
+			for (const declaration of Object.values(item.status_rows || {})) {
+				for (const row of declaration) {
+					if (row.type !== 'label') continue;
+					for (const [locale, keys] of Object.entries(localeKeys))
+						if (!keys.has(row.i18n))
+							violations.push(`${where}: status label missing from ${locale}.json`);
+				}
+			}
+
 			if (item.platforms !== undefined) {
 				if (!Array.isArray(item.platforms)) {
 					violations.push(`${where}: "platforms" must be an array`);
@@ -296,6 +305,120 @@ function checkChoiceProjection() {
 		let result = execute(original);
 		assert.equal(result.status, 0, result.stderr);
 		let menu = JSON.parse(fs.readFileSync(output, 'utf8'));
+		const acknowledgedTemplates = fs.readFileSync(output);
+		const backendStatus = menu.llm_menu.find((row) => row.id === 'llm_backend').status_rows;
+		assert.deepEqual(
+			backendStatus.unavailable,
+			[
+				{ type: '---' },
+				{ type: 'label', i18n: 'menu.llm.local_servers.header' },
+				{ type: 'label', i18n: 'menu.llm.unavailable' }
+			],
+			'existing provider owns exact independent status data'
+		);
+		assert.equal(
+			Object.hasOwn(menu, 'llm_local_servers_unavailable'),
+			false,
+			'status is not another menu'
+		);
+		for (const [name, source, reason] of [
+			[
+				'status effect',
+				original.replace(
+					'type = "label", i18n = "menu.llm.unavailable"',
+					'type = "label", i18n = "menu.llm.unavailable", action = "foreign"'
+				),
+				/only inert/
+			],
+			[
+				'status empty caption',
+				original.replace(
+					'type = "label", i18n = "menu.llm.unavailable"',
+					'type = "label", i18n = ""'
+				),
+				/only inert/
+			],
+			[
+				'status submenu',
+				original.replace(
+					'type = "label", i18n = "menu.llm.unavailable"',
+					'type = "group", i18n = "menu.llm.unavailable"'
+				),
+				/only inert/
+			]
+		]) {
+			assert.notEqual(source, original, name + ': mutation reaches actual metadata');
+			result = execute(source);
+			assert.notEqual(result.status, 0, name + ': actual generator refuses');
+			assert.match(result.stderr, reason, name + ': classified refusal');
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedTemplates,
+				name + ': published data retained'
+			);
+		}
+
+		for (const [name, source, reason] of [
+			[
+				'missing include',
+				original.replace(
+					'section = "tap_hold_key_native_commands"',
+					'section = "absent_child_template"'
+				),
+				/include needs an existing menu section/
+			],
+			[
+				'cyclic include',
+				original.replace(
+					'section = "tap_hold_key_native_commands"',
+					'section = "tap_hold_key_head"'
+				),
+				/cyclic child-template include/
+			],
+			[
+				'include payload',
+				original.replace(
+					'section = "tap_hold_key_native_commands"',
+					'section = "tap_hold_key_native_commands"\ncommand = "foreign"'
+				),
+				/include only composes/
+			],
+			[
+				'empty caption getter',
+				original.replace('caption_getter = "tap_hold_key_tap_caption"', 'caption_getter = ""'),
+				/caption_getter needs a labelled command or group/
+			],
+			[
+				'numeric caption getter',
+				original.replace('caption_getter = "tap_hold_key_tap_caption"', 'caption_getter = 42'),
+				/caption_getter needs a labelled command or group/
+			],
+			[
+				'unsupported caption row',
+				original.replace(
+					'[[menu.tap_hold_key_head]]\ntype = "command"',
+					'[[menu.tap_hold_key_head]]\ntype = "list"'
+				),
+				/caption_getter needs a labelled command or group/
+			]
+		]) {
+			assert.notEqual(source, original, name + ': mutation targets a real declaration');
+			result = execute(source);
+			assert.notEqual(result.status, 0, name + ': actual generator must refuse invalid metadata');
+			assert.match(result.stderr, reason, name + ': classified refusal');
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedTemplates,
+				name + ': refusal cannot publish'
+			);
+		}
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			fs.readFileSync(output),
+			acknowledgedTemplates,
+			'template validation is repeatable'
+		);
 		assert.equal(menu.agent_menu[0].type, 'choice');
 		assert.equal(menu.agent_menu[0].show_current_choice, true);
 		assert.equal(
@@ -1810,16 +1933,149 @@ checkPrivacyTriggerControls();
 		})),
 		'the shared declaration owns each platform caption and per-key availability'
 	);
-	for (const [path, consumer, id] of [
-		['windows/ui/menu/menu_taphold.ahk', 'MenuRenderer_CommandRow', 'tap_hold_key_native'],
-		['macos/ui/menu/menu_tap_holds.lua', 'ManifestMenu.command_row', 'tap_hold_key_no_action'],
-		['linux/ui/menu/menu_builder.lua', 'ManifestMenu.command_row', 'tap_hold_key_native']
-	]) {
-		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', path), 'utf8');
+	const head = JSON.parse(
+		readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/tests/corpus/menus/tap_hold_key_head.json'),
+			'utf8'
+		)
+	);
+	assert.deepEqual(manifest[head.section], head.rows, 'independent full child-template order');
+	function assertWiring(source, consumer, nativeId, tapId, holdId, section, target) {
 		assert(
-			source.includes(consumer + '("tap_hold_key_native_commands", "' + id + '"'),
-			path + ' must consume the actual declared clearing command'
+			source.includes(consumer + '("' + section + '"'),
+			'actual provider consumes the declared template'
 		);
+		assert.equal(target[section][0].type, 'include', 'head begins with a real declared include');
+		assert.equal(
+			target[section][0].section,
+			corpus.section,
+			'head includes the original clearing declaration'
+		);
+		for (const binding of [
+			nativeId,
+			tapId,
+			holdId,
+			'tap_hold_key_configured',
+			'tap_hold_key_tap_caption',
+			'tap_hold_key_hold_caption'
+		]) {
+			const declaration =
+				consumer === 'MenuRenderer_TemplateRows'
+					? new RegExp('"' + binding + '"\\s*,\\s*(?:_TH_Make|_HoldRowsBuilder|\\(\\(Value\\))')
+					: new RegExp(
+							'\\["' + binding + '"\\]\\s*=\\s*(?:function|hold_rows|build_action_picker)'
+						);
+			assert(declaration.test(source), 'actual provider supplies literal binding: ' + binding);
+		}
+	}
+	for (const [path, consumer, nativeId, tapId, holdId, start, end] of [
+		[
+			'windows/ui/menu/menu_taphold.ahk',
+			'MenuRenderer_TemplateRows',
+			'tap_hold_key_native',
+			'tap_hold_key_tap',
+			'tap_hold_key_hold',
+			'_TH_KeyRows(Hand) {',
+			'; Return the "none" hold option'
+		],
+		[
+			'macos/ui/menu/menu_tap_holds.lua',
+			'ManifestMenu.template_rows',
+			'tap_hold_key_no_action',
+			'tap_hold_key_tap_picker',
+			'tap_hold_key_hold_picker',
+			'local function build_one_tap_hold_item(',
+			'--- Builds the tap / hold rows of one hand'
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'ManifestMenu.template_rows',
+			'tap_hold_key_native',
+			'tap_hold_key_tap',
+			'tap_hold_key_hold',
+			'local function hand_rows(hand)',
+			'local providers = {'
+		]
+	]) {
+		const file = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', path), 'utf8');
+		const begin = file.indexOf(start);
+		const finish = file.indexOf(end, begin);
+		assert(begin >= 0 && finish > begin, path + ': real provider body must exist');
+		const source = file.slice(begin, finish);
+		assertWiring(source, consumer, nativeId, tapId, holdId, head.section, manifest);
+		assert.throws(
+			() =>
+				assertWiring(
+					source.replace(consumer, 'WrongProvider'),
+					consumer,
+					nativeId,
+					tapId,
+					holdId,
+					head.section,
+					manifest
+				),
+			/actual provider/
+		);
+		assert.throws(
+			() =>
+				assertWiring(
+					source.replace('"' + head.section + '"', '"wrong_template"'),
+					consumer,
+					nativeId,
+					tapId,
+					holdId,
+					head.section,
+					manifest
+				),
+			/actual provider/
+		);
+		const broken = structuredClone(manifest);
+		broken[head.section][0].section = 'wrong_head';
+		assert.throws(
+			() => assertWiring(source, consumer, nativeId, tapId, holdId, head.section, broken),
+			/original clearing/
+		);
+		for (const binding of [
+			nativeId,
+			tapId,
+			holdId,
+			'tap_hold_key_configured',
+			'tap_hold_key_tap_caption',
+			'tap_hold_key_hold_caption'
+		])
+			assert.throws(
+				() =>
+					assertWiring(
+						source.replaceAll('"' + binding + '"', '"wrong_binding"'),
+						consumer,
+						nativeId,
+						tapId,
+						holdId,
+						head.section,
+						manifest
+					),
+				/literal binding/
+			);
+	}
+	const locales = JSON.parse(
+		readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locale_order.json'), 'utf8')
+	).order;
+	assert.equal(locales.length, 21);
+	for (const code of locales) {
+		const strings = JSON.parse(
+			readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json'),
+				'utf8'
+			)
+		);
+		for (const row of head.rows.filter((row) => row.caption_getter)) {
+			assert.equal(typeof strings[row.i18n], 'string', code + ': ' + row.i18n);
+			assert.equal(
+				(strings[row.i18n].match(/%s/g) || []).length,
+				1,
+				code + ': one current-action placeholder'
+			);
+		}
 	}
 	console.log('Tap-Hold key clearing: declared platform captions and unchanged native owners.');
 }

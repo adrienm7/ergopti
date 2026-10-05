@@ -644,6 +644,15 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		try("shortcuts", "shortcuts.set_chatgpt_url", core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
 	end
 	if core_mods.dyn_hot_mod then
+		if state.dynamichotstrings_user_code_time_activation_seconds ~= nil then
+			try_exact("programmable hotstrings", "dyn_hot.set_user_code_time_activation",
+				core_mods.dyn_hot_mod.set_user_code_time_activation,
+				state.dynamichotstrings_user_code_time_activation_seconds)
+		end
+		if type(state.dynamichotstrings_user_code_enabled) == "boolean" then
+			try_exact("programmable hotstrings", "dyn_hot.set_user_code_enabled",
+				core_mods.dyn_hot_mod.set_user_code_enabled, state.dynamichotstrings_user_code_enabled)
+		end
 		if state.personal_info then
 			if type(core_mods.dyn_hot_mod.enable) == "function" then try("personal_info", "dyn_hot.enable", core_mods.dyn_hot_mod.enable) end
 		else
