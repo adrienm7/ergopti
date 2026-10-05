@@ -1102,6 +1102,27 @@ These are software implementations; final hardware verification remains below.
   comparison and unlink. Full selected and hosted native qualification remain
   required; this bounded correction does not complete item 5.
 
+The macOS bulk remap journal now owns the exact private Config publication
+receipt, including a published write whose native cleanup refused. Forward
+cleanup must settle before any file/runtime inverse, and refused inverse
+publication or layer-removal cleanup retains its original capability. A
+completed removal cannot remove a successor again; the private bulk Config
+inverse additionally verifies current absence before acknowledging restoration.
+Shared scope transactions preserve their existing generic removal contract and
+settle exact forward/inverse cleanup before releasing verified backups. Explicit
+whole-file reset can restore its original malformed source bytes without
+granting ordinary malformed-file write authority. Independent actual-file
+boundary controls reproduce the old false acknowledgement and preserve all
+original assertions. The reset fixture now observes the actual conditional
+publisher and additionally requires the exact malformed-source precondition;
+all its prior assertion predicates remain intact. A wrong-source mutant fails
+the new independent fence check. Selected local gates pass formatting, 357 JS
+checks, 14,226 portable macOS and 6,760 Linux unit cases, plus 101 macOS E2E
+checks with one host-specific skip and 188 Linux E2E checks. Hosted native
+qualification remains pending. Nonbulk settings, activation/deactivation,
+startup and detached
+source-generation consumers remain separately prepared or open; TODO5 is partial.
+
 The native Linux metrics prerequisite now decodes the existing SQLite exit
 receipt before its instrumentation counts JSON rows, then returns the complete
 original output to production admission. It retains every old assertion and
