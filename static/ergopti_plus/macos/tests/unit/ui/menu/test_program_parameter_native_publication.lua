@@ -104,7 +104,18 @@ local function with_subject(stage, body, options)
 					apply = function(reporter, observer) return keyboard.set_action("cmd_1", "run_program", reporter, observer) == true end,
 					restore = function(previous, reporter, observer) return keyboard.set_action("cmd_1", previous, reporter, observer) == true end,
 				}
-				local function apply() return owner.apply("keyboard__cmd_1", "run_program", SCALAR, mutation) end
+				local function apply()
+					local result = owner.apply("keyboard__cmd_1", "run_program", SCALAR, mutation)
+					if stage ~= "healthy" and not (options and options.fail_before_publication) then
+						helpers.assert_eq(type(control.published_candidate), "string",
+							"postpublication control must observe its actual native rename")
+						helpers.assert_true(control.published_candidate ~= original,
+							"prepublication mutex debt cannot stand in for an assignment publication")
+						helpers.assert_eq(control.published_candidate, control.last_candidate,
+							"the native rename must publish this exact independently observed candidate")
+					end
+					return result
+				end
 				local function inspect() return { content = adapter.read_with_status(path), parameters = copy(parameters), action = keyboard.get_action("cmd_1") } end
 				local function reinstate_candidate() local file = assert(original_open(source_path, "w")); assert(file:write(control.published_candidate)); assert(file:close()) end
 				body(owner, apply, inspect, control, global, preferences, checkpoint, original, adapter, path, logs, reinstate_candidate)

@@ -151,3 +151,89 @@ helpers.describe("the macOS Tap-Holds submenu lists its keys by hand", function(
 		end
 	end)
 end)
+
+--- Runs the actual per-key menu and shared renderer with a controlled native port.
+--- @param configured boolean Whether the selected key has a tap assignment.
+--- @param body function Receives menu finder, observed native calls and declaration.
+local function with_native_key_menu(configured, body)
+	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
+		"infra.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local observed = { calls = {}, refreshes = 0, receipt = true }
+		local native = remap_double()
+		native.get_tap_action = function(kid) return configured and kid == "left_shift" and "copy" or "none" end
+		native.clear_tap_hold_binding = function(kid, on_done)
+			observed.calls[#observed.calls + 1] = kid
+			on_done(observed.receipt == true, "controlled-terminal", 1)
+			return observed.receipt
+		end
+		local function rows()
+			return menu.build({ karabiner = native,
+				updateMenu = function() observed.refreshes = observed.refreshes + 1 end }).submenu
+		end
+		local function first()
+			local prefix = require("infra.i18n").get("tap_hold.group.left_shift") .. "  :"
+			for _, row in ipairs(rows()) do
+				if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then
+					return row.menu[1], row.menu
+				end
+			end
+		end
+		body(first, observed, require("infra.manifest_menu").get_array("tap_hold_key_native_commands"))
+	end)
+end
+
+helpers.describe("the declared per-key native command", function()
+	for _, configured in ipairs({ true, false }) do
+		helpers.it("keeps configured=" .. tostring(configured) .. " availability (tap-hold-key-native)", function()
+			with_native_key_menu(configured, function(first, observed)
+				local row, children = first()
+				helpers.assert_type(row, "table")
+				helpers.assert_eq(row.title, "menu.tapholds.nothing_tap_hold")
+				helpers.assert_eq(row.disabled == true, not configured)
+				helpers.assert_eq(children[2].title, "-", "the original following separator stays native")
+				helpers.assert_eq(#observed.calls, 0, "constructing the row is inert")
+				if configured then
+					helpers.assert_eq(row.fn(), true)
+					helpers.assert_eq(observed.calls, { "left_shift" })
+				else
+					helpers.assert_eq(row.fn(), false)
+					helpers.assert_eq(#observed.calls, 0)
+				end
+			end)
+		end)
+	end
+
+	helpers.it("reads its actual shared caption and retains the native command (tap-hold-key-native)", function()
+		with_native_key_menu(true, function(first, observed, declaration)
+			helpers.assert_eq(#declaration, 2, "both platform caption variants are declared")
+			local row = declaration[2]
+			helpers.assert_eq(row.id, "tap_hold_key_no_action")
+			local previous = row.i18n
+			row.i18n = "menu.shortcuts.title"
+			local ok, err = pcall(function()
+				local selected = first()
+				helpers.assert_eq(selected.title, "menu.shortcuts.title")
+				helpers.assert_eq(selected.fn(), true)
+				helpers.assert_eq(observed.calls, { "left_shift" })
+			end)
+			row.i18n = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" },
+		{ name = "truthy", value = "accepted" } }) do
+		helpers.it("retains its native " .. receipt.name .. " refusal and retry (tap-hold-key-native)", function()
+			with_native_key_menu(true, function(first, observed)
+				local held = first().fn
+				observed.receipt = receipt.value
+				helpers.assert_eq(held(), false)
+				helpers.assert_eq(observed.calls, { "left_shift" })
+				observed.receipt = true
+				helpers.assert_eq(held(), true)
+				helpers.assert_eq(observed.calls, { "left_shift", "left_shift" })
+			end)
+		end)
+	end
+end)
