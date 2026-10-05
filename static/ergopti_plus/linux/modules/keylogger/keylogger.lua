@@ -692,7 +692,7 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 	end
 	_pending_hotstring_events[#_pending_hotstring_events + 1] = {
 		ts = os.date("!%Y-%m-%d %H:%M:%S"),
-		date = os.date("!%Y-%m-%d"),
+		date = os.date("%Y-%m-%d"),
 		app = dashboard_app_name(app_id),
 		kind = "fired",
 		trigger = trigger or "",
@@ -726,7 +726,7 @@ function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 	end
 	_pending_shortcut_events[#_pending_shortcut_events + 1] = {
 		ts   = os.date("!%Y-%m-%d %H:%M:%S"),
-		date = os.date("!%Y-%m-%d"),
+		date = os.date("%Y-%m-%d"),
 		app  = dashboard_app_name(type(app_id) == "string" and app_id or "unknown"),
 		key  = key,
 	}

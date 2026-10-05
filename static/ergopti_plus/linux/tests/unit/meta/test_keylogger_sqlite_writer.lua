@@ -664,3 +664,84 @@ helpers.describe("linux-sqlite-burst-histogram-keys", function()
 		end)
 	end)
 end)
+
+-- Date formatting and writer receipts below are declared unit doubles; the
+-- separate native fixture uses real libc and SQLite for the same public APIs.
+local function with_local_day_clock(body)
+	local previous_date = os.date
+	os.date = function(format, epoch)
+		if format == "%Y-%m-%d" then return "2026-01-02" end
+		if format == "!%Y-%m-%d" then return "2026-01-01" end
+		if format == "!%Y-%m-%d %H:%M:%S" then return "2026-01-01 23:59:59" end
+		return previous_date(format, epoch)
+	end
+	local ok, err = xpcall(body, debug.traceback)
+	os.date = previous_date
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-sqlite-local-event-days", function()
+	for _, kind in ipairs({ "hotstrings", "shortcuts" }) do
+		it("linux-sqlite-local-event-days: collector " .. kind .. " retains UTC instant and local day", function()
+			local writer_name, keylogger_name = "modules.keylogger.sqlite_writer", "modules.keylogger.keylogger"
+			local previous_writer, previous_keylogger = package.loaded[writer_name], package.loaded[keylogger_name]
+			local writer = require("tests.fakes").sqlite_writer()
+			package.loaded[writer_name], package.loaded[keylogger_name] = writer, nil
+			local ok, err = xpcall(function()
+				local keylogger = require(keylogger_name)
+				keylogger.init({ sqlite_path = "/tmp/owned-local-day-unit.sqlite" })
+				require("tests.support.metrics_consent_fixture").enable(keylogger)
+				with_local_day_clock(function()
+					keylogger.record_hotstring("owned", "q", "abc", 1000, "static", 0, false)
+					keylogger.record_shortcut("owned", "owned-action", 1000)
+					keylogger.flush()
+					helpers.assert_eq(#writer[kind], 1)
+					local row = writer[kind][1].row
+					helpers.assert_eq(row.date, "2026-01-02")
+					helpers.assert_eq(row.ts, "2026-01-01 23:59:59")
+					if kind == "hotstrings" then
+						helpers.assert_eq(row.trigger, "q")
+						helpers.assert_eq(row.replacement, "abc")
+					else helpers.assert_eq(row.key, "owned-action") end
+				end)
+			end, debug.traceback)
+			package.loaded[writer_name], package.loaded[keylogger_name] = previous_writer, previous_keylogger
+			if not ok then error(err, 0) end
+		end)
+	end
+	for _, method in ipairs({ "insert_typing_events", "insert_hotstring_events", "insert_shortcut_events", "insert_app_switch_events" }) do
+		for _, explicit in ipairs({ false, true }) do
+			it("linux-sqlite-local-event-days: " .. method .. (explicit and " retains explicit historical dates" or " defaults to local day"), function()
+				with_local_day_clock(function()
+					with_writer_read_receipts("1", 0, function(writer)
+						local previous_popen = io.popen
+						local cipher = require("modules.keylogger.text_cipher")
+						local enabled = cipher.is_enabled()
+						cipher.set_enabled(false)
+						local commands = {}
+						io.popen = function(command)
+							commands[#commands + 1] = command
+							if command:find(".output /dev/null", 1, true) then
+								return { read = function() return "\nERGOPTI_SQL_EXIT_STATUS=0\n" end,
+									close = function() return true end }
+							end
+							return previous_popen(command)
+						end
+						local event = explicit and { date = "1999-12-31", ts = "1999-12-31 23:59:59" } or {}
+						local original = require("json").encode(event)
+						local ok, err = xpcall(function()
+							helpers.assert_true(writer[method]("owned", { event }))
+							local ts = explicit and event.ts or "2026-01-01 23:59:59"
+							local date = explicit and event.date or "2026-01-02"
+							helpers.assert_contains(commands[#commands], "'" .. ts .. "','" .. date .. "'")
+							helpers.assert_eq(require("json").encode(event), original)
+						end, debug.traceback)
+						io.popen = previous_popen
+						cipher.set_enabled(enabled)
+						if not ok then error(err, 0) end
+					end)
+				end)
+			end)
+		end
+	end
+end)
