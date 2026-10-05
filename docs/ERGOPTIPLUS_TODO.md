@@ -1653,6 +1653,14 @@ boundary, not the earlier native termination. Native Swift compilation/execution
 and later package/install stages remain mandatory; an observed boundary alone
 does not explain a fault.
 
+The d1ef1f121 native rerun37244850361 compiles and completes XCTest but fails
+the independent-process launcher-log assertions retained under item40. Current
+dev02ad69e adds acknowledged diagnostic transport. Its merge preserves the
+74 closed phase witnesses and admits real keyboard fixtures before native reads;
+all seven pure diagnostic controls explicitly opt out of session enrollment.
+The combined native Swift/package/install verdict remains unexecuted until the
+next exact-source manual CI. No physical magic-key acceptance is inferred.
+
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
@@ -1952,6 +1960,102 @@ The stable-signing replay admits only the actual archive producer path with its 
 CI smoke and install/launch now prefer the first available archive declared by the shared macOS install policy. ZIP remains compatible only when the preferred XZ file is absent; malformed, changed or refused preferred input fails without fallback. The native signed source supplies the bundle snapshot, independent designated requirement and exact archive digests through a separate CI-only artifact. Launch evidence hashes the retained bytes actually installed. Public release assets, Sparkle ZIP signing/feed, Homebrew and ordinary helper ZIP output remain unchanged.
 
 The five-file source slice has 22 portable native-owner cases, seven actual workflow cases, two actual evidence controls, two original causal failures and six guard-removal failures. The original producer contract passes with closed filesystem and physical POSIX ports. Native extraction/signing/xattr and the two added Swift cases still require hosted macOS CI; root full selected qualification is pending. Item 36 remains partial until public archive migration and native acceptance are complete.
+
+The recovered public-archive cohort now signs and verifies both declared archives,
+binds the preferred tar.xz appcast and Homebrew cask to retained exact bytes,
+and verifies published assets through their REST digest. The CI-only bundle
+snapshot remains separate from public release inputs. The pinned Sparkle tools
+are available to native XCTest without exposing product signing keys on manual
+runs. TIS diagnostic transport preserves the raw XCTest verdict and retains
+its separately acknowledged session; both failures remain blocking.
+
+Appcast publication dates now come from the acknowledged explicit source
+revision rather than the clock. Five causal controls fail against the saved
+candidate and pass with the repair; 26 callable publication cases pass. The
+strict signing-step ownership and both XCTest/TIS status-order guards are
+adapted without dropping key-exposure or failure-retention assertions. The
+19 recovered preimages and candidate hashes match the historical review.
+The recovered cohort passes 13879 portable Lua cases in 1483 modules; these
+are driver tests on Linux, not native macOS archive acceptance. Formatting and
+encoding gates pass, and all 356 JavaScript checks pass after repairing the
+new Windows tests' loop capture and reserved parameter name. Actual Sparkle
+update plus Homebrew ZIP-install/XZ-upgrade acceptance remain pending. Native
+AHK and Swift gates are explicitly deferred to their respective runners.
+Item 36 remains partial.
+
+The registered native acceptance cohort now invokes the actual Sparkle updater
+with a signed preferred archive, preserves the old bundle after a wrong-key
+refusal and retries through its real installer/relaunch path. A separate native
+fixture invokes the generated Homebrew cask for ZIP installation, XZ upgrade,
+checksum/artifact refusal and recovery in an owned write sandbox. Two positive
+AppleEvent controls must establish that the sandbox actually prevents foreign
+application control before Brew is admitted.
+
+The shared fixture process owner reserves a nonreaped leader through native
+group census and retirement; cancellation keeps the ledger alive until cleanup
+is acknowledged. Swift invokers retain failed fixtures and never destroy a live
+ownership ledger. macOS Package now explicitly admits CPython 3.13 and the
+actual waitid/WNOWAIT APIs before XCTest. Native runtime observations still
+establish the physical behavior; API presence alone is not acceptance.
+
+Twenty Brew and fifteen process-owner portable controls pass without skips,
+along with four prerequisite controls, seven POSIX transport controls and the
+26 publication cases. Actual Ruby parses both generated casks in this container.
+Native Swift/C compilation, Sparkle installation/relaunch, AppleEvent sandbox
+containment, real Brew lifecycle and the final packaging/install matrix remain
+pending. These authored native tests do not close item 36.
+
+Archive acceptance now exports bounded typed checkpoints before prerequisite
+admission and during native cleanup, into one fresh CI-owned session. An
+independent always-upload step retains only those JSON facts, including an
+unclosed phase after interruption. Diagnostic refusal retains the private
+fixture instead of deleting evidence. Seven additive Python controls and three
+native Swift filesystem controls preserve all existing lifecycle assertions.
+The Sparkle fixture consumes byte-identical appcasts from the real publication
+CLI and official foreign/correct-key signing receipts; only its private signed
+application routes the exact admitted enclosure to its owned local server.
+Production TLS policy is unchanged. Final native compilation, generated-feed
+delivery, archive lifecycles and the complete packaging/install verdict remain
+required before removing item 36.
+
+Actual macOS CI run 37242083827 refused the Brew sandbox profile before
+containment: Seatbelt accepts the network address host `localhost` or `*`,
+not the numeric host in `127.0.0.1:*`. The fixture now declares only
+`localhost:*`; outbound denial, the native EPERM probe, write/symlink
+containment, AppleEvent controls and ownership retirement remain unchanged.
+The portable policy guard requires exactly one loopback outbound allowance
+and rejects the unrestricted host. This grammar correction still requires
+actual macOS requalification; the failed run does not qualify Brew install,
+upgrade, refusal/retry or the final packaging/install matrix. Item 36 remains
+partial.
+
+Native Sparkle command refusals now retain fixed operation phases and a
+bounded helper-PID/errno census diagnostic. No private child stream, signing
+key, path or URL is published by this diagnostic. Census admission and every
+existing native assertion and cleanup requirement are unchanged. The first
+failed native operation and its actual cause still require the next macOS run.
+
+Native run 37245029288 passes shared checks, macOS Lua units and stubbed E2E,
+then refuses the actual Sparkle process census. Archive signing is not that
+failed operation. The helper now adds bounded BSD snapshot facts using the
+existing exact native layout; schema, byte count, PID/UID identity and errno
+are checked before naming a state. A zombie snapshot is not retirement proof.
+The validated summary reaches XCTest annotations instead of plain print-only
+logs. All earlier controls and native ownership assertions remain intact;
+actual Darwin ABI/permission observations and the update lifecycle remain
+unqualified. Seventeen portable helper controls and six evidence-owner
+assertions pass; they are not native Sparkle acceptance.
+
+The same run passes Brew sandbox grammar, then refuses the AppleEvent probe's
+compilation: RunApplicationEventLoop is a 32-bit-only Carbon API, and xcrun
+attempts writes outside the already private TMPDIR. The C probe now uses the
+documented 64-bit ReceiveNextEvent/AEProcessEvent/ReleaseEvent dispatch. Brew
+selects the actual compiler, adjacent linker and macOS SDK read-only, with an
+owned module-cache directory; sandbox allowances and the sender/nonce/reply
+oracle are unchanged. All 122 previous Python assertion lines remain intact;
+the original 27 controls and 30 candidate controls pass without skips. Actual
+compiler/linker confinement, both positive AppleEvent sends, the denied send
+and Brew install/upgrade/refusal/recovery still require macOS qualification.
 
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
@@ -2871,6 +2975,102 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
       the `network.failure.*` keys). The Windows and Linux work stayed
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
+
+Windows remote API readiness and generation now reserve their actual request
+owner before asynchronous system-proxy admission. Native WinHTTP resolves the
+complete destination through configured PAC or WPAD, distinguishes acknowledged
+DIRECT from lookup refusal, and preserves exact child retirement and the
+original total admission budget. Environment selection follows the destination
+scheme. Strict requests do not reuse the application's PAC cache; changed system
+settings require a fresh lookup. Legacy updater behavior remains unchanged in
+this prerequisite.
+
+The registered native fixture serves controlled localhost PAC scripts and invokes
+the actual private-input production worker. Nine newly registered tests cover
+native receipt admission and that fixture; Windows execution, E2E, packaging and
+installation remain pending. Explicit unsupported relay lists are refused rather
+than silently truncated; successful WPAD, integrated authentication and enterprise
+certificate acceptance are not yet qualified. Linux routing, installer/server
+children, updater/rollback and usable shared failure actions remain required.
+Item 62 remains open.
+
+The shared managed-network policy now classifies only typed native receipts.
+Ambiguous TLS handshakes, DNS/timeouts, origin refusals and unstructured child
+stderr remain unknown. Reports expose cause, translated keys and admitted
+action ids, never native URLs, paths, credentials or stderr. Independent receipt
+and capability corpora preserve the same policy across the three drivers.
+Four additional labels and corrected certificate, proxy and route wording are
+translated in all 21 locale sources.
+
+macOS MLX failure dialogs retain a monotonic failed-intent revision and recheck
+both that owner and actual action capabilities after modal interaction. Network
+Retry reuses the ordinary installation path; only explicit Repair admits runtime
+rebuilding. Existing unrelated runtime diagnoses and repair controls remain.
+Actual MLX children still produce unstructured stderr, so these consumer changes
+do not prove a deployed typed receipt producer or enterprise-network coverage.
+Native action opening and the final three-driver qualification remain pending.
+
+Linux progress windows now retain the actual session, failed-intent epoch and
+fresh native capability predicates. Model retries fence callbacks from earlier
+attempts even when they reuse the request table. Update retries retain the exact
+cached release and original consent, and use authenticated download_release;
+verification/install failures keep their separate existing messages. Native
+failure receipts stay private while the shared page receives translated action
+records. The renderer retires actions on reset, successor sessions and success,
+and refuses delayed reports from older failures. Model diagnostics, proxy
+settings and download-folder opening remain unavailable where no qualified
+native owner exists. The production Linux proxy/receipt producer, real WebView
+actions, installer/pull and updater/rollback qualification remain pending.
+
+Native qualification now preserves SQLite's exit receipt while the observational
+row-count fixture decodes only its acknowledged payload. The same stale fixture
+failed on dev before this tranche; independent workload/equality assertions are
+unchanged. Gated-model retry records its error kind before retiring old managed
+controls, preserving the existing macOS wiring check. Shared CI failures expose
+only check names in GitHub annotations when archived logs cannot be retrieved.
+
+Windows continuation is explicitly deferred to the maintainer's PC. The portable
+[Windows handover](handovers/2026-10-04-group6-windows/README.md) preserves exact
+patches, source/preimage hashes, dependency order and unexecuted/WIP status.
+Its twelve numbered Windows TODO steps cover composition, actual AHK/WebView
+controls, WinHTTP/PAC/WPAD ownership, enterprise CA/SSPI, redirect/failover,
+installer/serve/pull, installed packaging and update/rollback. Verify each
+packet's preimages before applying it; preserve newer owners and independent
+assertions. Native Windows tests and release/install acceptance remain unrun.
+These Windows steps no longer block the requested group-6 merge; item 62 and
+transversal items 16/38 stay open for their remaining validation scope.
+
+The existing actual GTK/WebKit model-pull fixture now sends the progress
+bridge's session/failed-presentation epoch protocol. Its successful retry uses
+that actual owner, and its post-success stale retry reuses the same failed
+token. Every original assertion, native loop deadline and retirement check is
+unchanged. Actual Linux CI run 37243798345 on 846eb713514b3921b35594dbca92cc3cb5525aef
+passes this native GTK/WebKit/luv/curl scenario. The shared JS and Linux unit
+jobs also pass. Six other native E2E steps fail with unknown first assertions;
+Linux packaging and installation are consequently skipped. The available
+earlier reference run skips E2E after its unit failure and cannot prove these causes
+are historical. Preserve the focused follow-up steps in the Linux handover;
+this successful scenario does not qualify the whole lane or close item 62.
+
+New reference run 37245806103 executes the exact tree of dev b9a43969b9ac8917f32bf4af0d19b6f77a31668e.
+GTK application operands, updater ETag associations, virtual-audio locales and
+notifications fail there as executed scenarios. Their exact first assertions
+and causes remain unknown; matching source bytes are not causal diagnosis.
+SQLite profile and AT-SPI interpreter-option scenarios now pass after upstream
+fixture provisioning, which this branch preserves. The reference's older model
+protocol also passes; do not claim a baseline failure-to-success for that case.
+Final candidate and integrated native qualification remain required.
+
+The unintegrated Linux HTTP producer is preserved in the
+[Linux continuation](handovers/2026-10-04-group6-linux/README.md), with exact
+sources, preimages, independent controls and patches. Actual diagnostic privacy
+controls pass 12/12 after six causal failures, with eight bounded-diagnostic
+controls passing. Independent review still blocks integration on public owned
+cancellation/activity, admission behind cleanup debt, supported resolver failure
+fallback and total-deadline publication/admission. These preparations do not
+complete Linux enterprise-network coverage; preserve the original assertions,
+refresh native-core ownership and qualify the final composition before delivery.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

@@ -125,9 +125,15 @@ final class KeyboardSourceTestDiagnostics {
 	private(set) var events: [Event] = []
 	private(set) var omittedEvents = 0
 
-	init(_ test: String, writeWitness: @escaping (Data) -> Void = { FileHandle.standardOutput.write($0) }) {
+	private let enrollment: Int?
+
+	init(_ test: String, enroll: Bool = true,
+		writeWitness: @escaping (Data) -> Void = { FileHandle.standardOutput.write($0) }) {
 		self.test = .bounded(test)
 		self.writeWitness = writeWitness
+		// Enrollment precedes the caller's first native capture, including failure
+		// paths. Pure encoder controls explicitly opt out of the bundle session.
+		enrollment = enroll ? KeyboardSourceTestTransport.enroll() : nil
 	}
 
 	func witness(_ phase: String) {
@@ -242,7 +248,12 @@ final class KeyboardSourceTestDiagnostics {
 	}
 
 	func emit() {
-		Self.writeRecord(encode: { try JSONEncoder().encode(receipt()) })
+		guard let enrollment else { XCTFail("TIS diagnostic session was not admitted"); return }
+		Self.writeRecord(encode: { try JSONEncoder().encode(receipt()) }, write: { data in
+			if !KeyboardSourceTestTransport.publish(enrollment, data) {
+				XCTFail("TIS diagnostic publication was not acknowledged")
+			}
+		})
 	}
 }
 
@@ -265,7 +276,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 	}
 
 	func testReceiptRetainsNativeStatusAndEscapesIdentity() throws {
-		let recorder = KeyboardSourceTestDiagnostics("controlled.\"identity\n")
+		let recorder = KeyboardSourceTestDiagnostics("controlled.\"identity\n", enroll: false)
 		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,
 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil))
 		let data = try JSONEncoder().encode(recorder.receipt())
@@ -278,7 +289,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 	}
 
 	func testEventOverflowIsCountedWithoutChangingPriorReceipt() {
-		let recorder = KeyboardSourceTestDiagnostics("controlled.bounded")
+		let recorder = KeyboardSourceTestDiagnostics("controlled.bounded", enroll: false)
 		let event = KeyboardSourceTestDiagnostics.Event(phase: "controlled", uptime: 1, status: 0,
 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil)
 		for _ in 0..<67 { recorder.append(event) }
@@ -293,7 +304,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 extension KeyboardSourceTestDiagnosticsTests {
 	func testInitialNativeCallWitnessesPreserveExactBoundaries() throws {
 		var writes: [Data] = []
-		let recorder = KeyboardSourceTestDiagnostics("controlled", writeWitness: { writes.append($0) })
+		let recorder = KeyboardSourceTestDiagnostics("controlled", enroll: false, writeWitness: { writes.append($0) })
 		let expected = [
 			"original.capture.call.entered", "original.capture.call.returned",
 			"target.list.call.entered", "target.list.call.returned",
@@ -310,7 +321,7 @@ extension KeyboardSourceTestDiagnosticsTests {
 
 	func testPhaseWitnessIsPublishedBeforeObservationCollection() throws {
 		var writes: [Data] = []
-		let recorder = KeyboardSourceTestDiagnostics("private.identity", writeWitness: { writes.append($0) })
+		let recorder = KeyboardSourceTestDiagnostics("private.identity", enroll: false, writeWitness: { writes.append($0) })
 		let event = KeyboardSourceTestDiagnostics.Event(phase: "select.before", uptime: 1, status: nil,
 			original: nil, target: nil, current: nil, snapshotID: .bounded("private.source"),
 			keyboardType: nil, unicodeDataBytes: nil)
@@ -336,7 +347,7 @@ extension KeyboardSourceTestDiagnosticsTests {
 
 	func testPhaseVocabularyOverflowAndPrivacyAreBounded() throws {
 		var writes: [Data] = []
-		let recorder = KeyboardSourceTestDiagnostics("private.identity", writeWitness: { writes.append($0) })
+		let recorder = KeyboardSourceTestDiagnostics("private.identity", enroll: false, writeWitness: { writes.append($0) })
 		recorder.witness("/Users/private/TOKEN%\n::error::inert")
 		for _ in 0..<132 { recorder.witness("select.call.entered") }
 		XCTAssertEqual(writes.count, 129, "One final overflow witness bounds all subsequent writes")
@@ -358,7 +369,7 @@ extension KeyboardSourceTestDiagnosticsTests {
 	}
 
 	func testEvidenceWritesOneCompleteUTF8RecordBeforeFollowingReceipt() throws {
-		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity")
+		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity", enroll: false)
 		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,
 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil))
 		var writes: [Data] = []
@@ -393,7 +404,7 @@ extension KeyboardSourceTestDiagnosticsTests {
 	}
 
 	func testBoundedLargeReceiptKeepsTerminatorInTheSingleWrite() throws {
-		let recorder = KeyboardSourceTestDiagnostics(String(repeating: "é", count: 512))
+		let recorder = KeyboardSourceTestDiagnostics(String(repeating: "é", count: 512), enroll: false)
 		let event = KeyboardSourceTestDiagnostics.Event(phase: "controlled", uptime: 1, status: -50,
 			original: nil, target: nil, current: nil,
 			snapshotID: .bounded(String(repeating: "é", count: 512)), keyboardType: nil, unicodeDataBytes: nil)

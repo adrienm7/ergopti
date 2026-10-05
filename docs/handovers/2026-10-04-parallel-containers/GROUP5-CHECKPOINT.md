@@ -8,8 +8,8 @@ with explicit Windows PC follow-ups; unfinished macOS and Karabiner requirements
 stay open in the TODO rather than being claimed complete.
 The initial inspected base was `689d30293704093feab2e3caa077604e88560eb6`.
 Current synchronization targets actual dev
-`b9a43969b9ac8917f32bf4af0d19b6f77a31668e`, preserving Group7, Group4 and
-Group1 integrations. Group7 synchronization already passed formatting, 356 JS checks
+`02ad69e06ecea424de11facf3dced404a6fdd602`, preserving Group7, Group4, Group1
+and Group6 integrations. Group7 synchronization already passed formatting, 356 JS checks
 and AHK UTF-8 BOM/LF for 1,815 files. Group4 native Windows work remains in its
 imported PC handoff. The resulting non-Windows composition passed formatting,
 356 JS checks, AHK UTF-8 BOM/LF for 1,820 files, 13,954 portable macOS units,
@@ -18,10 +18,10 @@ imported PC handoff. The resulting non-Windows composition passed formatting,
 Those composition counts qualify the earlier `8f4b7ef` synchronization, not
 the current source. Group1's strict native SQLite receipt fixture is retained
 byte-for-byte; Group5 does not import a competing implementation or Group2's
-unintegrated hotstring delivery claims. All 140 imported upstream source images
-match dev. Group1 and Group5 TODO blocks and global items16/38 are preserved;
+unintegrated hotstring delivery claims. All 140 imported Group1 source images
+match devb9a43969b. Group1 and Group5 TODO blocks and global items16/38 are preserved;
 the independent legacy legend is retained and completed items13/35 stay removed.
-The current non-Windows composition passes formatting,356 JS checks, UTF-8
+Pushed synchronization7c9e5a1dd passes formatting,356 JS checks, UTF-8
 BOM/LF for1,821 AHK files,14,056 portable macOS units in1,488 modules,
 101 stubbed macOS E2E checks with one explicit skip,6,613 Linux units in360
 modules and188 Linux E2E checks. Real SQLite equivalence reads648 grouped rows
@@ -30,6 +30,14 @@ Actual libuv/curl streaming and authentication fixtures pass97 and48 checks.
 The actual private Xvfb source fixture passes28 checks; physical input and a
 native Wayland seat remain outside that evidence. JavaScript and native suites
 are serialized; Windows native execution is deferred to the maintainer's PC.
+The subsequent Group6 composition resolves only two overlapping diagnostics/test
+files, preserving both owners' assertions. Real keyboard fixtures enroll in the
+acknowledged transport before native calls; seven pure controls opt out. The
+bounded keyboard witnesses, logger frames and original status verdicts remain.
+Group6's transport/census controls, native source and CI workflows are preserved.
+Its frozen Windows/Linux preparation packets remain inactive. This254-file
+composition needs new source-selected gates and exact-source native CI; earlier
+receipts do not qualify its native package or installation.
 No old handover patch belongs to this group. This clone tracks main only:
 fetch dev with `git fetch origin refs/heads/dev:refs/remotes/origin/dev` and
 compare `git ls-remote --heads origin dev` with the tracking ref. A plain

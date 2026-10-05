@@ -1,0 +1,2109 @@
+{
+	"schema_version": 1,
+	"purpose": "Portable deferred Windows resumption preparations; no automatic application",
+	"packets": {
+		"routes": {
+			"status": "Source findings reviewed; native compile/ABI/PAC/WPAD/callback execution not run; unintegrated",
+			"frozen_manifest": "SHA256SUMS",
+			"frozen_manifest_sha256": "5558d230624ad9e3d9bf5830f1de661e648f07853a938b7623d6c0fe2edacf26",
+			"native_tests_executed": false
+		},
+		"curl-auth": {
+			"status": "Auth producer/pure-gate candidate; no native probe/challenge executed; unintegrated",
+			"frozen_manifest": "SHA256SUMS",
+			"frozen_manifest_sha256": "d9cf67cbd45094ec312ef295ced6432977e7413b8c5992fce3fbf0ddfe958902",
+			"native_tests_executed": false
+		},
+		"async-auth-wip": {
+			"status": "Unreviewed incomplete WIP; byte inspection only; shared PAC owner remains incomplete; unintegrated",
+			"frozen_manifest": "SHA256SUMS",
+			"frozen_manifest_sha256": "459175e2b4fa53ed9967752a42e13772faecbfaa0b8fb937f2cbe6974a533f36",
+			"native_tests_executed": false,
+			"dependency_note": "Inline selector replaces standalone curl-auth adapter include. Shared session PAC physical ownership/cancellation remains incomplete."
+		},
+		"managed-ca": {
+			"status": "Eight production-entrypoint CA/relay cases authored; no native execution; unintegrated",
+			"frozen_manifest": "SHA256SUMS",
+			"frozen_manifest_sha256": "c5d9d15023ff8795c9582750100f200aeb3e357e4974bad1fd2ec5caa69476a1",
+			"native_tests_executed": false
+		},
+		"updater-r3": {
+			"status": "Revision3 scratch candidate; native compile/download/auth/installation unexecuted; unintegrated",
+			"frozen_manifest": "handoff.json",
+			"frozen_manifest_sha256": "8402ac0a281f0a8a79ae27bc38eb101039336362ff04b1a1b3ff169ea8958bdc",
+			"native_tests_executed": false,
+			"review_note": "No remaining proven source blocker reported after oracle correction; runtime/native entirely unexecuted; real discovery/TLS/PAC/407/file/deadline/cancel/SSPI/installation remain required."
+		},
+		"native-staging-v1": {
+			"status": "Additive native fixture; eight original remote cases retained; native execution not run; unintegrated",
+			"frozen_manifest": "handoff.json",
+			"frozen_manifest_sha256": "15ff8901aa4d85d3bec5bda25cf0f741c4307a8208d055ac1af760fc7d0f2055",
+			"native_tests_executed": false,
+			"dependency_note": "Original metadata refers to intermediate routes62dca; compose final routes5558d230. Source bytes unchanged."
+		},
+		"native-staging-oracle": {
+			"status": "Source correction to new cancellation oracle only; uncompiled/unexecuted; unintegrated",
+			"frozen_manifest": "oracle-correction.json",
+			"frozen_manifest_sha256": "8641ff3d6a4a72290d501b834841d17de80eb6cf66211b2736e803dae5e3863e",
+			"native_tests_executed": false
+		},
+		"failure-callers-wip": {
+			"status": "Final da6de673 WIP; 38 controls unexecuted/uncompiled; no final independent review; unintegrated",
+			"frozen_manifest": "SHA256SUMS.tsv",
+			"frozen_manifest_sha256": "19f9e3afaa44f08dee64ddc2421b5ea98606be8a89eeb6892ce00733bba588f7",
+			"native_tests_executed": false
+		},
+		"versions14": {
+			"status": "14-path candidate; focused Lua/page controls passed; full/native/packaging unexecuted; unintegrated",
+			"frozen_manifest": "handoff.json",
+			"frozen_manifest_sha256": "5b62338617c60e9aa3ceaf4fbf528d4fe5e5fc7e6f77354ebf1876e7bc6a6d34",
+			"native_tests_executed": false
+		},
+		"ollama-boundaries": {
+			"status": "Historical read-only audit; pinned upstream proof; no installer/serve/pull implementation or native qualification",
+			"native_tests_executed": false,
+			"dependency_note": "Preserved by explicit coordinator instruction; audit reflects b88 and recorded origin/dev; read current code before continuing."
+		},
+		"shared-contract-dependencies": {
+			"status": "Original independent53-vector corpus and original contract controls; historical Lua57/0 policy result only. Windows native test not executed. Dependency snapshots; never overwrite newer integrated bindings.",
+			"native_tests_executed": false
+		},
+		"versions-dependencies": {
+			"status": "Exact independent Versions replay support and historical Linux bridge dependency provenance; snapshots only, unintegrated. No native claim.",
+			"native_tests_executed": false,
+			"linux_bridge_dependency": "Original cfb98d32 precedes fourth-callback-receipt slice; Versions14 preimage5b1ce90b is that prior caller source. The full unrelated eight-path Linux patch is intentionally omitted.",
+			"policy_dependency": "Versions22 replay uses root policy checkpoint26d77b68, preserved as failure-callers-wip policy preimage. Original contract policy e079edb6 is preserved separately and is not identical. Final timing candidate8c2fe2ab is separate again."
+		},
+		"bundle-metadata": {
+			"status": "Portable documentation/read-only byte checker only; no runtime integration or native validation",
+			"native_tests_executed": false
+		}
+	},
+	"files": [
+		{
+			"path": "packets/routes/SHA256SUMS",
+			"sha256": "5558d230624ad9e3d9bf5830f1de661e648f07853a938b7623d6c0fe2edacf26",
+			"bytes": 1073,
+			"packet": "routes",
+			"role": "metadata",
+			"original_relative": "SHA256SUMS",
+			"original_sha256": "5558d230624ad9e3d9bf5830f1de661e648f07853a938b7623d6c0fe2edacf26",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/routes/REVIEW.md",
+			"sha256": "f745b11944502dce805f402862e451d01de3b5da3168300ecf333e23ca506545",
+			"bytes": 7165,
+			"packet": "routes",
+			"role": "documentation",
+			"original_relative": "REVIEW.md",
+			"original_sha256": "b395eb122c72aea37f4cad93c06b527c1813dbe7101bf82d819c8cbc2018ed48",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/routes/controls/managed_routes_native_acceptance.ps1.source",
+			"sha256": "d5b6858067502a15f66377084e5a50ff38ad9c2d2372215d9431d6e7dde8dad3",
+			"bytes": 7431,
+			"packet": "routes",
+			"role": "independent-control",
+			"original_relative": "controls/managed_routes_native_acceptance.ps1",
+			"original_sha256": "d5b6858067502a15f66377084e5a50ff38ad9c2d2372215d9431d6e7dde8dad3",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/routes/proposed/static/ergopti_plus/windows/tests/fixtures/managed_routes_native.ps1.source",
+			"sha256": "d5b6858067502a15f66377084e5a50ff38ad9c2d2372215d9431d6e7dde8dad3",
+			"bytes": 7431,
+			"packet": "routes",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/fixtures/managed_routes_native.ps1",
+			"original_sha256": "d5b6858067502a15f66377084e5a50ff38ad9c2d2372215d9431d6e7dde8dad3",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/fixtures/managed_routes_native.ps1"
+		},
+		{
+			"path": "packets/routes/proposed/static/ergopti_plus/windows/tests/unit/test_managed_routes_native.ahk.source",
+			"sha256": "41ff7ef72833cc1668b1605e4d373a71a6d3d3c03563966f96c8af114a2e5602",
+			"bytes": 1584,
+			"packet": "routes",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/unit/test_managed_routes_native.ahk",
+			"original_sha256": "41ff7ef72833cc1668b1605e4d373a71a6d3d3c03563966f96c8af114a2e5602",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_routes_native.ahk"
+		},
+		{
+			"path": "packets/routes/proposed/static/ergopti_plus/windows/vendor/ergopti_native_proxy_ex.ps1.source",
+			"sha256": "cbcad25a42b31784e75e2c15ccce2bdb72b389308ce5a7d6497b2f45bb04ae39",
+			"bytes": 14419,
+			"packet": "routes",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/vendor/ergopti_native_proxy_ex.ps1",
+			"original_sha256": "cbcad25a42b31784e75e2c15ccce2bdb72b389308ce5a7d6497b2f45bb04ae39",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_native_proxy_ex.ps1"
+		},
+		{
+			"path": "packets/routes/proposed/static/ergopti_plus/windows/vendor/ergopti_network_routes.ps1.source",
+			"sha256": "84707657b1f233ecc742039880a4dfdd80ca8267fc6e49c433a8b6d03cc95c2d",
+			"bytes": 18029,
+			"packet": "routes",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/vendor/ergopti_network_routes.ps1",
+			"original_sha256": "84707657b1f233ecc742039880a4dfdd80ca8267fc6e49c433a8b6d03cc95c2d",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_network_routes.ps1"
+		},
+		{
+			"path": "packets/routes/proposed/static/ergopti_plus/windows/vendor/ergopti_windows_proxy_config.ps1.source",
+			"sha256": "28cf558954d749bd32d0c86247729ff08d88e650033d6b1554e7dd038cbe8c65",
+			"bytes": 3436,
+			"packet": "routes",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/vendor/ergopti_windows_proxy_config.ps1",
+			"original_sha256": "28cf558954d749bd32d0c86247729ff08d88e650033d6b1554e7dd038cbe8c65",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_windows_proxy_config.ps1"
+		},
+		{
+			"path": "packets/routes/registration.txt",
+			"sha256": "41311d07c20972fe38307492adb8e1fc40699b89bb2f32a2e97921be7b4ea697",
+			"bytes": 45,
+			"packet": "routes",
+			"role": "registration",
+			"original_relative": "registration.txt",
+			"original_sha256": "41311d07c20972fe38307492adb8e1fc40699b89bb2f32a2e97921be7b4ea697",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/routes/shared-policy-amendment.json",
+			"sha256": "a1f7897e52edaae639519522b8f6df47b1f4b2b3e2508bb710fe16e9167d61c8",
+			"bytes": 1036,
+			"packet": "routes",
+			"role": "metadata",
+			"original_relative": "shared-policy-amendment.json",
+			"original_sha256": "55415219ff6e5278a20f85a51eddc40bb7b774661341b507f370d5bd6d587c7b",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/curl-auth/SHA256SUMS",
+			"sha256": "d9cf67cbd45094ec312ef295ced6432977e7413b8c5992fce3fbf0ddfe958902",
+			"bytes": 591,
+			"packet": "curl-auth",
+			"role": "metadata",
+			"original_relative": "SHA256SUMS",
+			"original_sha256": "d9cf67cbd45094ec312ef295ced6432977e7413b8c5992fce3fbf0ddfe958902",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/curl-auth/REVIEW.md",
+			"sha256": "2cb9e89d9c1c3915bb37b6c0b6f768dd09238397e691ee9a1b6a8fd0931c6da8",
+			"bytes": 5113,
+			"packet": "curl-auth",
+			"role": "documentation",
+			"original_relative": "REVIEW.md",
+			"original_sha256": "a92a251d0405e76ea7e18d653fc4cede72e78bc49a1510a67ad746370914daaa",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/curl-auth/proposed/static/ergopti_plus/windows/adapters/curl_proxy_auth_policy.ahk.source",
+			"sha256": "8aeb1a38d288c0cd8fa5c6945b13aa11d5942e1a68e30aa83b719370fc29af4b",
+			"bytes": 1044,
+			"packet": "curl-auth",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/adapters/curl_proxy_auth_policy.ahk",
+			"original_sha256": "8aeb1a38d288c0cd8fa5c6945b13aa11d5942e1a68e30aa83b719370fc29af4b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/adapters/curl_proxy_auth_policy.ahk"
+		},
+		{
+			"path": "packets/curl-auth/proposed/static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_policy.ahk.source",
+			"sha256": "5e1fd2b7982619c9fe04285b8008497f8a62937fab700242f6e1b93d6ab317bc",
+			"bytes": 4269,
+			"packet": "curl-auth",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_policy.ahk",
+			"original_sha256": "5e1fd2b7982619c9fe04285b8008497f8a62937fab700242f6e1b93d6ab317bc",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_policy.ahk"
+		},
+		{
+			"path": "packets/curl-auth/proposed/static/ergopti_plus/windows/vendor/ergopti_curl_capabilities_worker.ps1.source",
+			"sha256": "11df64a9d6bd66b3d3f9e4102b8a1d5db6ea1eeab35ee2c2e50e5948e23c419b",
+			"bytes": 5644,
+			"packet": "curl-auth",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/vendor/ergopti_curl_capabilities_worker.ps1",
+			"original_sha256": "11df64a9d6bd66b3d3f9e4102b8a1d5db6ea1eeab35ee2c2e50e5948e23c419b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_curl_capabilities_worker.ps1"
+		},
+		{
+			"path": "packets/curl-auth/registration.txt",
+			"sha256": "b7ce0b68225b919e5a0808dfdc826cc44431438210384a2f3385ac0679c1a05e",
+			"bytes": 94,
+			"packet": "curl-auth",
+			"role": "registration",
+			"original_relative": "registration.txt",
+			"original_sha256": "b7ce0b68225b919e5a0808dfdc826cc44431438210384a2f3385ac0679c1a05e",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/async-auth-wip/SHA256SUMS",
+			"sha256": "459175e2b4fa53ed9967752a42e13772faecbfaa0b8fb937f2cbe6974a533f36",
+			"bytes": 1598,
+			"packet": "async-auth-wip",
+			"role": "metadata",
+			"original_relative": "SHA256SUMS",
+			"original_sha256": "459175e2b4fa53ed9967752a42e13772faecbfaa0b8fb937f2cbe6974a533f36",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/async-auth-wip/WINDOWS-RESUME.md",
+			"sha256": "f27eeb11c7f4e42c7dfacc5437d3e84e0d3df32d5c147ac0b8b5559620f10bd2",
+			"bytes": 7832,
+			"packet": "async-auth-wip",
+			"role": "documentation",
+			"original_relative": "WINDOWS-RESUME.md",
+			"original_sha256": "31b36f2b5a5a943a8777a507716ce1dfd6fb13aa61a1dac83a0b801db8a577fa",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/async-auth-wip/async-auth-integration-WIP.patch",
+			"sha256": "1327ffbab68f25be95bde2580f26e6046395a511bf6a537584a194ae6d596d5c",
+			"bytes": 40112,
+			"packet": "async-auth-wip",
+			"role": "patch",
+			"original_relative": "async-auth-integration-WIP.patch",
+			"original_sha256": "1327ffbab68f25be95bde2580f26e6046395a511bf6a537584a194ae6d596d5c",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/adapters/http_client.ahk.source",
+			"sha256": "ff5f3584461e46b3bfd114372ea7751cadb2946995d22b88fb37d745a217b62b",
+			"bytes": 43254,
+			"packet": "async-auth-wip",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/adapters/http_client.ahk",
+			"original_sha256": "ff5f3584461e46b3bfd114372ea7751cadb2946995d22b88fb37d745a217b62b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/adapters/http_client.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/modules/llm/api_remote.ahk.source",
+			"sha256": "72761bb37f4f8dc624129ef09b8fa02e0a6fbb01c00b3d2770768224834b1483",
+			"bytes": 88063,
+			"packet": "async-auth-wip",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/modules/llm/api_remote.ahk",
+			"original_sha256": "72761bb37f4f8dc624129ef09b8fa02e0a6fbb01c00b3d2770768224834b1483",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/llm/api_remote.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk.source",
+			"sha256": "514b73a2a78715a7ca5603efe2067124487a8bded2163ed213333bbac0c64de9",
+			"bytes": 38263,
+			"packet": "async-auth-wip",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk",
+			"original_sha256": "514b73a2a78715a7ca5603efe2067124487a8bded2163ed213333bbac0c64de9",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk.source",
+			"sha256": "bb32f8cbcb6280478e6badb7116490de4b67afc2347ba9f4397a90a8c8cdc817",
+			"bytes": 66662,
+			"packet": "async-auth-wip",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk",
+			"original_sha256": "bb32f8cbcb6280478e6badb7116490de4b67afc2347ba9f4397a90a8c8cdc817",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/preimages.json",
+			"sha256": "f4205e3a8c77f9eed3cdd77b242836d3442b10c9cf8d08b259232f6a2833f61e",
+			"bytes": 539,
+			"packet": "async-auth-wip",
+			"role": "metadata",
+			"original_relative": "preimages.json",
+			"original_sha256": "dd94a622f9dbd7d3ff0868a70db3c65f939ffdb135c222ebf3c699ec16702ea4",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/async-auth-wip/proposed/static/ergopti_plus/windows/adapters/http_client.ahk.source",
+			"sha256": "857eeda4449b1be50e471411ef936655987a7656b1a02c6643e11d2713303712",
+			"bytes": 53647,
+			"packet": "async-auth-wip",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/adapters/http_client.ahk",
+			"original_sha256": "857eeda4449b1be50e471411ef936655987a7656b1a02c6643e11d2713303712",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/adapters/http_client.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/proposed/static/ergopti_plus/windows/modules/llm/api_remote.ahk.source",
+			"sha256": "cbbec2e1d94e20d597f889dc03d8c62094defb19cbf292471d2efcc230975c68",
+			"bytes": 93389,
+			"packet": "async-auth-wip",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/modules/llm/api_remote.ahk",
+			"original_sha256": "cbbec2e1d94e20d597f889dc03d8c62094defb19cbf292471d2efcc230975c68",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/llm/api_remote.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/proposed/static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk.source",
+			"sha256": "c9f1d35aac65efcb80dc891f0a85ee808ff0a6e340cfe620c35062495dd6cc9a",
+			"bytes": 38459,
+			"packet": "async-auth-wip",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk",
+			"original_sha256": "c9f1d35aac65efcb80dc891f0a85ee808ff0a6e340cfe620c35062495dd6cc9a",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/proposed/static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_integration.ahk.source",
+			"sha256": "53212c18d435a9d7bc22160405c82043403ea0ad75a96b736f15340731ba50c7",
+			"bytes": 8720,
+			"packet": "async-auth-wip",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_integration.ahk",
+			"original_sha256": "53212c18d435a9d7bc22160405c82043403ea0ad75a96b736f15340731ba50c7",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_integration.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/proposed/static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk.source",
+			"sha256": "db4999501b4f079bbaa0318a776795197da1a8ea5f00fcf36cf814bf6313cb21",
+			"bytes": 67068,
+			"packet": "async-auth-wip",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk",
+			"original_sha256": "db4999501b4f079bbaa0318a776795197da1a8ea5f00fcf36cf814bf6313cb21",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk"
+		},
+		{
+			"path": "packets/async-auth-wip/registration.txt",
+			"sha256": "6c1daf999818a58782d96b957a7842ae522906e1287a198044edc6561db6461a",
+			"bytes": 97,
+			"packet": "async-auth-wip",
+			"role": "registration",
+			"original_relative": "registration.txt",
+			"original_sha256": "6c1daf999818a58782d96b957a7842ae522906e1287a198044edc6561db6461a",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/managed-ca/SHA256SUMS",
+			"sha256": "c5d9d15023ff8795c9582750100f200aeb3e357e4974bad1fd2ec5caa69476a1",
+			"bytes": 754,
+			"packet": "managed-ca",
+			"role": "metadata",
+			"original_relative": "SHA256SUMS",
+			"original_sha256": "c5d9d15023ff8795c9582750100f200aeb3e357e4974bad1fd2ec5caa69476a1",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/managed-ca/REVIEW.md",
+			"sha256": "bfe7e6e0cae37e541b79e41cc9209242ffbf74663cac0c6b54add1b4c0b51b85",
+			"bytes": 4761,
+			"packet": "managed-ca",
+			"role": "documentation",
+			"original_relative": "REVIEW.md",
+			"original_sha256": "bfe7e6e0cae37e541b79e41cc9209242ffbf74663cac0c6b54add1b4c0b51b85",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/managed-ca/CHECKS.md",
+			"sha256": "dc3e226bbdf144f301096876d1e4ea55f0d21770c7de115d11ef961ed3da1922",
+			"bytes": 2856,
+			"packet": "managed-ca",
+			"role": "documentation",
+			"original_relative": "CHECKS.md",
+			"original_sha256": "41e5cb47d5f2dee86415c5259259b9b8359a3323e6ee4ae0b9cc2674d60e1857",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/managed-ca/preimages.json",
+			"sha256": "c343b9bd3ec83999c410c99a47fbaf6bf7c4552105a74fb0ffe694c753480f75",
+			"bytes": 190,
+			"packet": "managed-ca",
+			"role": "metadata",
+			"original_relative": "preimages.json",
+			"original_sha256": "7e29030aec5506725b430819d94d59b4cc019c2ee0562ef0922f566f45ebb614",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/managed-ca/managed-remote-native-acceptance.patch",
+			"sha256": "b0caa8e845269300356431441b77a8d1d826886ae9a5b75f4bde84b49066f77a",
+			"bytes": 39966,
+			"packet": "managed-ca",
+			"role": "patch",
+			"original_relative": "managed-remote-native-acceptance.patch",
+			"original_sha256": "b0caa8e845269300356431441b77a8d1d826886ae9a5b75f4bde84b49066f77a",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/managed-ca/proposed/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1.source",
+			"sha256": "3e3201f10b67b549a7fc57342cfb13315085045fbcd0bb1b492191e7d5f1948e",
+			"bytes": 19937,
+			"packet": "managed-ca",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1",
+			"original_sha256": "3e3201f10b67b549a7fc57342cfb13315085045fbcd0bb1b492191e7d5f1948e",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1"
+		},
+		{
+			"path": "packets/managed-ca/proposed/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk.source",
+			"sha256": "6d474ec459b012a0abc450b05f286a3b9c50eb8f6e2d7f0dae7b3f024aed5508",
+			"bytes": 17969,
+			"packet": "managed-ca",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk",
+			"original_sha256": "6d474ec459b012a0abc450b05f286a3b9c50eb8f6e2d7f0dae7b3f024aed5508",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk"
+		},
+		{
+			"path": "packets/managed-ca/proposed/static/ergopti_plus/windows/tests/run_all.ahk.source",
+			"sha256": "4d45fb1c567a90d853724c5469bd2dbcb751c743e39f762593fb81375f5625ac",
+			"bytes": 105876,
+			"packet": "managed-ca",
+			"role": "candidate",
+			"original_relative": "proposed/static/ergopti_plus/windows/tests/run_all.ahk",
+			"original_sha256": "4d45fb1c567a90d853724c5469bd2dbcb751c743e39f762593fb81375f5625ac",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/run_all.ahk"
+		},
+		{
+			"path": "packets/managed-ca/preimage-run_all.ahk.source",
+			"sha256": "df87170eb7de0aa235f7e3b76a44794e436d3581d9fec13f5f827501161f569c",
+			"bytes": 105828,
+			"packet": "managed-ca",
+			"role": "preimage",
+			"original_relative": "preimage-run_all.ahk",
+			"original_sha256": "df87170eb7de0aa235f7e3b76a44794e436d3581d9fec13f5f827501161f569c",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/run_all.ahk"
+		},
+		{
+			"path": "packets/updater-r3/handoff.json",
+			"sha256": "6e4b7687809dc2236b3c65158378fbd0b3fe5dbe58f54aadc53e0a8af9958ded",
+			"bytes": 2360,
+			"packet": "updater-r3",
+			"role": "metadata",
+			"original_relative": "handoff.json",
+			"original_sha256": "8402ac0a281f0a8a79ae27bc38eb101039336362ff04b1a1b3ff169ea8958bdc",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/updater-r3/source/static/ergopti_plus/windows/modules/updater/self_update.ahk.source",
+			"sha256": "fd9ff413b5a640ed234aba271660f77369bff143b942a151397da1783d873acb",
+			"bytes": 145779,
+			"packet": "updater-r3",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/modules/updater/self_update.ahk",
+			"original_sha256": "fd9ff413b5a640ed234aba271660f77369bff143b942a151397da1783d873acb",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/updater/self_update.ahk"
+		},
+		{
+			"path": "packets/updater-r3/preimages/static/ergopti_plus/windows/modules/updater/self_update.ahk.source",
+			"sha256": "42a8207f381c63c7f0b01ccbb3bfae8442a364a3b5dfe51c08ec5bb9a0a2ac80",
+			"bytes": 130969,
+			"packet": "updater-r3",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/modules/updater/self_update.ahk",
+			"original_sha256": "42a8207f381c63c7f0b01ccbb3bfae8442a364a3b5dfe51c08ec5bb9a0a2ac80",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/updater/self_update.ahk"
+		},
+		{
+			"path": "packets/updater-r3/source/static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1.source",
+			"sha256": "add50110af2096cb69ec9df1fdadf0eda9a38fb966d48221f68ebeb037f07f8a",
+			"bytes": 10800,
+			"packet": "updater-r3",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1",
+			"original_sha256": "add50110af2096cb69ec9df1fdadf0eda9a38fb966d48221f68ebeb037f07f8a",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1"
+		},
+		{
+			"path": "packets/updater-r3/preimages/static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1.source",
+			"sha256": "a5690a076530c0940126ccfd6c2f8a75f9d87885fb23f5c8533327c39dc5e7d3",
+			"bytes": 10707,
+			"packet": "updater-r3",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1",
+			"original_sha256": "a5690a076530c0940126ccfd6c2f8a75f9d87885fb23f5c8533327c39dc5e7d3",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1"
+		},
+		{
+			"path": "packets/updater-r3/source/static/ergopti_plus/windows/tests/fixtures/updater_download_receipts.ps1.source",
+			"sha256": "e87f6db3150259894d112540c4267fd01113be95b6c17ab03c2ae4fe47deb0cf",
+			"bytes": 7358,
+			"packet": "updater-r3",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/fixtures/updater_download_receipts.ps1",
+			"original_sha256": "e87f6db3150259894d112540c4267fd01113be95b6c17ab03c2ae4fe47deb0cf",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/fixtures/updater_download_receipts.ps1"
+		},
+		{
+			"path": "packets/updater-r3/source/static/ergopti_plus/windows/tests/unit/test_updater_managed_failure.ahk.source",
+			"sha256": "7875700e3a0a1537643ddd50b0fe183b7579ef1182b1ac5e054c740ecaed383d",
+			"bytes": 19193,
+			"packet": "updater-r3",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/unit/test_updater_managed_failure.ahk",
+			"original_sha256": "7875700e3a0a1537643ddd50b0fe183b7579ef1182b1ac5e054c740ecaed383d",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_updater_managed_failure.ahk"
+		},
+		{
+			"path": "packets/updater-r3/source/static/ergopti_plus/windows/vendor/ergopti_native_proxy.ps1.source",
+			"sha256": "3bb0f2bc868e05b4e45811e4bebe3657f216e28ef21ce1aa0ceebebab066391e",
+			"bytes": 6822,
+			"packet": "updater-r3",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/vendor/ergopti_native_proxy.ps1",
+			"original_sha256": "3bb0f2bc868e05b4e45811e4bebe3657f216e28ef21ce1aa0ceebebab066391e",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_native_proxy.ps1"
+		},
+		{
+			"path": "packets/updater-r3/source/static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1.source",
+			"sha256": "a6466bc36a3fd8c5cc5ea20ff06e99f4c5651754defe18086e01c34bacb1508a",
+			"bytes": 2427,
+			"packet": "updater-r3",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1",
+			"original_sha256": "a6466bc36a3fd8c5cc5ea20ff06e99f4c5651754defe18086e01c34bacb1508a",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1"
+		},
+		{
+			"path": "packets/updater-r3/preimages/static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1.source",
+			"sha256": "bd1619c56068fe64cdde9c9a4fb27843cbaff4585cd5f86971aea1e8cec169f4",
+			"bytes": 8936,
+			"packet": "updater-r3",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1",
+			"original_sha256": "bd1619c56068fe64cdde9c9a4fb27843cbaff4585cd5f86971aea1e8cec169f4",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1"
+		},
+		{
+			"path": "packets/updater-r3/source/static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1.source",
+			"sha256": "4d29b809eeb660b8ed95b6c345b99bfed515ca082ef009a798882c18712e6b45",
+			"bytes": 15892,
+			"packet": "updater-r3",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1",
+			"original_sha256": "4d29b809eeb660b8ed95b6c345b99bfed515ca082ef009a798882c18712e6b45",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1"
+		},
+		{
+			"path": "packets/updater-r3/updater-managed-download.patch",
+			"sha256": "35e3964f4b8ce4d7fd170a28efa53f93d81d1e4b9b22dbc6c94c52d31b99c7a7",
+			"bytes": 92239,
+			"packet": "updater-r3",
+			"role": "patch",
+			"original_relative": "updater-managed-download.patch",
+			"original_sha256": "35e3964f4b8ce4d7fd170a28efa53f93d81d1e4b9b22dbc6c94c52d31b99c7a7",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/updater-r3/HANDOVER.md",
+			"sha256": "7810f5a2a303bc98ba873d2d613e01f0223869727a2bc029ef2b439c7c50ba7f",
+			"bytes": 3788,
+			"packet": "updater-r3",
+			"role": "documentation",
+			"original_relative": "HANDOVER.md",
+			"original_sha256": "7810f5a2a303bc98ba873d2d613e01f0223869727a2bc029ef2b439c7c50ba7f",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/updater-r3/staging-worker.ps1.source",
+			"sha256": "35c43c75e74f6718ba118a8622551828d79a3656608612cb9aee5bc241178845",
+			"bytes": 2936,
+			"packet": "updater-r3",
+			"role": "staging-script",
+			"original_relative": "staging-worker.ps1",
+			"original_sha256": "35c43c75e74f6718ba118a8622551828d79a3656608612cb9aee5bc241178845",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/native-staging-v1/handoff.json",
+			"sha256": "1b3cd5d2695142f47bfea9502330430e089b60193ce2243c5e17686c76f44933",
+			"bytes": 1558,
+			"packet": "native-staging-v1",
+			"role": "metadata",
+			"original_relative": "handoff.json",
+			"original_sha256": "15ff8901aa4d85d3bec5bda25cf0f741c4307a8208d055ac1af760fc7d0f2055",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/native-staging-v1/source/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1.source",
+			"sha256": "44a762ae678fba8c8f9f91eb7e69759a301f25bb40f0659d9c8984ec64106f7a",
+			"bytes": 27107,
+			"packet": "native-staging-v1",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1",
+			"original_sha256": "44a762ae678fba8c8f9f91eb7e69759a301f25bb40f0659d9c8984ec64106f7a",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1"
+		},
+		{
+			"path": "packets/native-staging-v1/preimages/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1.source",
+			"sha256": "3e3201f10b67b549a7fc57342cfb13315085045fbcd0bb1b492191e7d5f1948e",
+			"bytes": 19937,
+			"packet": "native-staging-v1",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1",
+			"original_sha256": "3e3201f10b67b549a7fc57342cfb13315085045fbcd0bb1b492191e7d5f1948e",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1"
+		},
+		{
+			"path": "packets/native-staging-v1/source/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk.source",
+			"sha256": "ad182698718381cae37cb3fe5075e400fc86f9aba871e91d6ff09ad6ebdc3392",
+			"bytes": 18124,
+			"packet": "native-staging-v1",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk",
+			"original_sha256": "ad182698718381cae37cb3fe5075e400fc86f9aba871e91d6ff09ad6ebdc3392",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk"
+		},
+		{
+			"path": "packets/native-staging-v1/preimages/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk.source",
+			"sha256": "6d474ec459b012a0abc450b05f286a3b9c50eb8f6e2d7f0dae7b3f024aed5508",
+			"bytes": 17969,
+			"packet": "native-staging-v1",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk",
+			"original_sha256": "6d474ec459b012a0abc450b05f286a3b9c50eb8f6e2d7f0dae7b3f024aed5508",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk"
+		},
+		{
+			"path": "packets/native-staging-v1/source/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk.source",
+			"sha256": "d72c706c357b53d5a9699139af342e60902d1310e9f17ff5776239778fde9f27",
+			"bytes": 16256,
+			"packet": "native-staging-v1",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk",
+			"original_sha256": "d72c706c357b53d5a9699139af342e60902d1310e9f17ff5776239778fde9f27",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk"
+		},
+		{
+			"path": "packets/native-staging-v1/updater-native-acceptance.patch",
+			"sha256": "9c7834a8d76a141f21b3d0b23d2fc0680d4e42a9c5b16fcd8c8a163e472a41ba",
+			"bytes": 28568,
+			"packet": "native-staging-v1",
+			"role": "patch",
+			"original_relative": "updater-native-acceptance.patch",
+			"original_sha256": "9c7834a8d76a141f21b3d0b23d2fc0680d4e42a9c5b16fcd8c8a163e472a41ba",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/native-staging-v1/HANDOVER.md",
+			"sha256": "0cfe5220b5888c796f15ccc88456afbc34512364b7917b69b48c9bfabffe6768",
+			"bytes": 4728,
+			"packet": "native-staging-v1",
+			"role": "documentation",
+			"original_relative": "HANDOVER.md",
+			"original_sha256": "0cfe5220b5888c796f15ccc88456afbc34512364b7917b69b48c9bfabffe6768",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/native-staging-v1/registration.txt",
+			"sha256": "bb89f4b1383ecf14c206af620fc70be60469037f1b022033821359baa2e75687",
+			"bytes": 235,
+			"packet": "native-staging-v1",
+			"role": "registration",
+			"original_relative": "registration.txt",
+			"original_sha256": "bb89f4b1383ecf14c206af620fc70be60469037f1b022033821359baa2e75687",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/native-staging-oracle/oracle-correction.json",
+			"sha256": "4637290d10dacb8385a3e8d5e6268bff71128245d18b9e660a0379483ecc8a69",
+			"bytes": 1314,
+			"packet": "native-staging-oracle",
+			"role": "metadata",
+			"original_relative": "oracle-correction.json",
+			"original_sha256": "8641ff3d6a4a72290d501b834841d17de80eb6cf66211b2736e803dae5e3863e",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/native-staging-oracle/source/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk.source",
+			"sha256": "d6ffa285db7a0410002e4fc1c4a86708fa12b003fdae63de2d9b75ad5513cb18",
+			"bytes": 17593,
+			"packet": "native-staging-oracle",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk",
+			"original_sha256": "d6ffa285db7a0410002e4fc1c4a86708fa12b003fdae63de2d9b75ad5513cb18",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk"
+		},
+		{
+			"path": "packets/native-staging-oracle/preimages/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk.source",
+			"sha256": "d72c706c357b53d5a9699139af342e60902d1310e9f17ff5776239778fde9f27",
+			"bytes": 16256,
+			"packet": "native-staging-oracle",
+			"role": "preimage",
+			"target": "static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk",
+			"original_relative": "native-staging-v1/source/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk",
+			"original_sha256": "d72c706c357b53d5a9699139af342e60902d1310e9f17ff5776239778fde9f27",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/native-staging-oracle/native-terminal-oracle.patch",
+			"sha256": "88ee9e17264f72b5526f6013648f01e2ba8174be260079c97572ccf32487c773",
+			"bytes": 2466,
+			"packet": "native-staging-oracle",
+			"role": "patch",
+			"original_relative": "native-terminal-oracle.patch",
+			"original_sha256": "88ee9e17264f72b5526f6013648f01e2ba8174be260079c97572ccf32487c773",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/native-staging-oracle/RESUME.md",
+			"sha256": "3b005c6fdad6ce5fd4864d455ab166888ac937a0a740f195bfa4da9e6c82d977",
+			"bytes": 5091,
+			"packet": "native-staging-oracle",
+			"role": "documentation",
+			"original_relative": "RESUME.md",
+			"original_sha256": "3b005c6fdad6ce5fd4864d455ab166888ac937a0a740f195bfa4da9e6c82d977",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/SHA256SUMS.tsv",
+			"sha256": "19f9e3afaa44f08dee64ddc2421b5ea98606be8a89eeb6892ce00733bba588f7",
+			"bytes": 2842,
+			"packet": "failure-callers-wip",
+			"role": "metadata",
+			"original_relative": "SHA256SUMS.tsv",
+			"original_sha256": "19f9e3afaa44f08dee64ddc2421b5ea98606be8a89eeb6892ce00733bba588f7",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/preimages/static/ergopti_plus/windows/ErgoptiPlus.ahk.source",
+			"sha256": "c87e3c3963040c065a17b2d8e8c0ce88bbdb6fc1d24b22c6cc5dac437bca6c79",
+			"bytes": 81051,
+			"packet": "failure-callers-wip",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"original_sha256": "c87e3c3963040c065a17b2d8e8c0ce88bbdb6fc1d24b22c6cc5dac437bca6c79",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ErgoptiPlus.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/preimages/static/ergopti_plus/windows/tests/run_all.ahk.source",
+			"sha256": "2b4860279dfbaa20e395c01ec740a5b6507cddc6ead7389e3d05c7a221d2fa1f",
+			"bytes": 105926,
+			"packet": "failure-callers-wip",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/windows/tests/run_all.ahk",
+			"original_sha256": "2b4860279dfbaa20e395c01ec740a5b6507cddc6ead7389e3d05c7a221d2fa1f",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/run_all.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/preimages/static/ergopti_plus/_shared/modules/network/managed_network.json.source",
+			"sha256": "26d77b6849bbb654be60544fe7df6a83d662047d9bc4fcf1d496be083e0aee4b",
+			"bytes": 7292,
+			"packet": "failure-callers-wip",
+			"role": "preimage",
+			"original_relative": "preimages/static/ergopti_plus/_shared/modules/network/managed_network.json",
+			"original_sha256": "26d77b6849bbb654be60544fe7df6a83d662047d9bc4fcf1d496be083e0aee4b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/modules/network/managed_network.json"
+		},
+		{
+			"path": "packets/failure-callers-wip/source/static/ergopti_plus/windows/ErgoptiPlus.ahk.source",
+			"sha256": "3cad8b20b2c09536a85d04fa1daf66d43dd0ceac288c6056b11683096662c63f",
+			"bytes": 81365,
+			"packet": "failure-callers-wip",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"original_sha256": "3cad8b20b2c09536a85d04fa1daf66d43dd0ceac288c6056b11683096662c63f",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ErgoptiPlus.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/source/static/ergopti_plus/windows/tests/run_all.ahk.source",
+			"sha256": "71b7230bd29f3c2f99d14fd25431731773b73a30568aa172c4fa37e948439209",
+			"bytes": 106109,
+			"packet": "failure-callers-wip",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/run_all.ahk",
+			"original_sha256": "71b7230bd29f3c2f99d14fd25431731773b73a30568aa172c4fa37e948439209",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/run_all.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/source/static/ergopti_plus/windows/modules/network/failure_host.ahk.source",
+			"sha256": "552a54119031f3f5ff1a8fcab2c3bc08f85a76bda7268dcbc4f77761de4c737b",
+			"bytes": 13876,
+			"packet": "failure-callers-wip",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/modules/network/failure_host.ahk",
+			"original_sha256": "552a54119031f3f5ff1a8fcab2c3bc08f85a76bda7268dcbc4f77761de4c737b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/network/failure_host.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/source/static/ergopti_plus/windows/ui/download_window/session.ahk.source",
+			"sha256": "2476f4542527105a5dc8cf94d6b1af0ccc25eabfb2ef0635e43667b14531402c",
+			"bytes": 5913,
+			"packet": "failure-callers-wip",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/ui/download_window/session.ahk",
+			"original_sha256": "2476f4542527105a5dc8cf94d6b1af0ccc25eabfb2ef0635e43667b14531402c",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/download_window/session.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/source/static/ergopti_plus/windows/ui/download_window/init.ahk.source",
+			"sha256": "4a9ee3f7b04bca03a7014d90c80c577d9a583ed2203dae83db8372c1aae757da",
+			"bytes": 18783,
+			"packet": "failure-callers-wip",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/ui/download_window/init.ahk",
+			"original_sha256": "4a9ee3f7b04bca03a7014d90c80c577d9a583ed2203dae83db8372c1aae757da",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/download_window/init.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/source/static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk.source",
+			"sha256": "bd3602ae676c0a5887fe2dd1937bab6901ea6d9112312a1c8d3f4f0a1bed21d6",
+			"bytes": 34094,
+			"packet": "failure-callers-wip",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk",
+			"original_sha256": "bd3602ae676c0a5887fe2dd1937bab6901ea6d9112312a1c8d3f4f0a1bed21d6",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/source/static/ergopti_plus/_shared/modules/network/managed_network.json.source",
+			"sha256": "8c2fe2abe3330ff2d6da0ab941d194351646f302b968286683b82ca39702b9ba",
+			"bytes": 7347,
+			"packet": "failure-callers-wip",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/_shared/modules/network/managed_network.json",
+			"original_sha256": "8c2fe2abe3330ff2d6da0ab941d194351646f302b968286683b82ca39702b9ba",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/modules/network/managed_network.json"
+		},
+		{
+			"path": "packets/failure-callers-wip/windows-registration.patch",
+			"sha256": "db944fc38a453b88ad15b41f7478c48e4db14a0b7d029de5b95096cdf885b841",
+			"bytes": 2051,
+			"packet": "failure-callers-wip",
+			"role": "patch",
+			"original_relative": "windows-registration.patch",
+			"original_sha256": "db944fc38a453b88ad15b41f7478c48e4db14a0b7d029de5b95096cdf885b841",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/windows-failure-callers.patch",
+			"sha256": "da6de673be2c8bdc497c58cb5436c5cb3c3f9edf826de9b1c03039a53f031b91",
+			"bytes": 74819,
+			"packet": "failure-callers-wip",
+			"role": "patch",
+			"original_relative": "windows-failure-callers.patch",
+			"original_sha256": "da6de673be2c8bdc497c58cb5436c5cb3c3f9edf826de9b1c03039a53f031b91",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/presentation-timeout-policy.patch",
+			"sha256": "622a2540f02afb89680b330f6072b836ad4570e14c5bdab751fe07fd9256f9e1",
+			"bytes": 268,
+			"packet": "failure-callers-wip",
+			"role": "patch",
+			"original_relative": "presentation-timeout-policy.patch",
+			"original_sha256": "622a2540f02afb89680b330f6072b836ad4570e14c5bdab751fe07fd9256f9e1",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/causal-preimages/static/ergopti_plus/windows/modules/network/failure_host.ahk.source",
+			"sha256": "4e65f9040ff8453d5a089b1b8780ddaadcc240fad6bcaa929aeabfeecd1ee560",
+			"bytes": 11680,
+			"packet": "failure-callers-wip",
+			"role": "causal-preimage",
+			"original_relative": "causal-preimages/static/ergopti_plus/windows/modules/network/failure_host.ahk",
+			"original_sha256": "4e65f9040ff8453d5a089b1b8780ddaadcc240fad6bcaa929aeabfeecd1ee560",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/network/failure_host.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/causal-preimages/static/ergopti_plus/windows/ui/download_window/session.ahk.source",
+			"sha256": "06c8b1cda64d4ecb0784c4c28798581beb4a294193d950a5871fcdfba8b6a4eb",
+			"bytes": 5351,
+			"packet": "failure-callers-wip",
+			"role": "causal-preimage",
+			"original_relative": "causal-preimages/static/ergopti_plus/windows/ui/download_window/session.ahk",
+			"original_sha256": "06c8b1cda64d4ecb0784c4c28798581beb4a294193d950a5871fcdfba8b6a4eb",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/download_window/session.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/causal-preimages/static/ergopti_plus/windows/ui/download_window/init.ahk.source",
+			"sha256": "d4b47b7ed686899221e1efc83652790b038bf033dac499b3aaada51d15bdc178",
+			"bytes": 11954,
+			"packet": "failure-callers-wip",
+			"role": "causal-preimage",
+			"original_relative": "causal-preimages/static/ergopti_plus/windows/ui/download_window/init.ahk",
+			"original_sha256": "d4b47b7ed686899221e1efc83652790b038bf033dac499b3aaada51d15bdc178",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/download_window/init.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/causal-preimages/static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk.source",
+			"sha256": "3230112ac3d199d388bbcd7b295757f6b7486c3b9c67e69b8fc50ce4b40dfb0b",
+			"bytes": 18896,
+			"packet": "failure-callers-wip",
+			"role": "causal-preimage",
+			"original_relative": "causal-preimages/static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk",
+			"original_sha256": "3230112ac3d199d388bbcd7b295757f6b7486c3b9c67e69b8fc50ce4b40dfb0b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/reviewed-timeout-preimages/static/ergopti_plus/windows/modules/network/failure_host.ahk.source",
+			"sha256": "b3a0d765a777f204165208a19c4c415139652ddc4f7d96585d5ea9254fe5b305",
+			"bytes": 13444,
+			"packet": "failure-callers-wip",
+			"role": "reviewed-preimage",
+			"original_relative": "reviewed-timeout-preimages/static/ergopti_plus/windows/modules/network/failure_host.ahk",
+			"original_sha256": "b3a0d765a777f204165208a19c4c415139652ddc4f7d96585d5ea9254fe5b305",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/network/failure_host.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/reviewed-timeout-preimages/static/ergopti_plus/windows/ui/download_window/session.ahk.source",
+			"sha256": "06c8b1cda64d4ecb0784c4c28798581beb4a294193d950a5871fcdfba8b6a4eb",
+			"bytes": 5351,
+			"packet": "failure-callers-wip",
+			"role": "reviewed-preimage",
+			"original_relative": "reviewed-timeout-preimages/static/ergopti_plus/windows/ui/download_window/session.ahk",
+			"original_sha256": "06c8b1cda64d4ecb0784c4c28798581beb4a294193d950a5871fcdfba8b6a4eb",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/download_window/session.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/reviewed-timeout-preimages/static/ergopti_plus/windows/ui/download_window/init.ahk.source",
+			"sha256": "d31522590353f39a591734ea7c2a87abb5e277947e92827b55eb032668b3d787",
+			"bytes": 14495,
+			"packet": "failure-callers-wip",
+			"role": "reviewed-preimage",
+			"original_relative": "reviewed-timeout-preimages/static/ergopti_plus/windows/ui/download_window/init.ahk",
+			"original_sha256": "d31522590353f39a591734ea7c2a87abb5e277947e92827b55eb032668b3d787",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/download_window/init.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/reviewed-timeout-preimages/static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk.source",
+			"sha256": "4765da5b9629c099f0e72446138fd775d3dd352379c90da66e2c3430563f7739",
+			"bytes": 25997,
+			"packet": "failure-callers-wip",
+			"role": "reviewed-preimage",
+			"original_relative": "reviewed-timeout-preimages/static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk",
+			"original_sha256": "4765da5b9629c099f0e72446138fd775d3dd352379c90da66e2c3430563f7739",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk"
+		},
+		{
+			"path": "packets/failure-callers-wip/HANDOVER.md",
+			"sha256": "9a6ae378ce1b274a808769a9c92d5d727523934a3b3fa4bd63670dbb69cc8cfd",
+			"bytes": 11020,
+			"packet": "failure-callers-wip",
+			"role": "documentation",
+			"original_relative": "HANDOVER.md",
+			"original_sha256": "9a6ae378ce1b274a808769a9c92d5d727523934a3b3fa4bd63670dbb69cc8cfd",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/REVIEW-FINDINGS.md",
+			"sha256": "9d7b3055fea14be4e9aaab9a8b92ff712bef16cc789161be0a0ef4850fafb65d",
+			"bytes": 3639,
+			"packet": "failure-callers-wip",
+			"role": "documentation",
+			"original_relative": "REVIEW-FINDINGS.md",
+			"original_sha256": "9d7b3055fea14be4e9aaab9a8b92ff712bef16cc789161be0a0ef4850fafb65d",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/WINDOWS-PC-RESUMPTION.md",
+			"sha256": "254aa420633f91a49920614fae2bbc6696b15d6c63b88e973586d097e7c6a392",
+			"bytes": 3946,
+			"packet": "failure-callers-wip",
+			"role": "documentation",
+			"original_relative": "WINDOWS-PC-RESUMPTION.md",
+			"original_sha256": "254aa420633f91a49920614fae2bbc6696b15d6c63b88e973586d097e7c6a392",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/failure-callers-wip/validation/RESULTS.md",
+			"sha256": "7d18360cf11cd95c0d07b79ecbfd97aa2f37bbe434adbc2e2906780915b95fab",
+			"bytes": 5089,
+			"packet": "failure-callers-wip",
+			"role": "documentation",
+			"original_relative": "validation/RESULTS.md",
+			"original_sha256": "fd7d664e7c7aa164a1f0e317547faab4cb12a2928727da36ad4b37dc1d901c89",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/versions14/handoff.json",
+			"sha256": "6e4619ddcaa337f4130aee55d1d53bc8504ab3241fac52502b2aca83aa3cc5b4",
+			"bytes": 358,
+			"packet": "versions14",
+			"role": "metadata",
+			"original_relative": "handoff.json",
+			"original_sha256": "5b62338617c60e9aa3ceaf4fbf528d4fe5e5fc7e6f77354ebf1876e7bc6a6d34",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/_shared/lua/updater/release_install.lua.source",
+			"sha256": "51aa760e8da10c4dfcff0d0d4903932714e99c8c8f4ca70933f442bd8fa678f7",
+			"bytes": 11730,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/_shared/lua/updater/release_install.lua",
+			"original_sha256": "51aa760e8da10c4dfcff0d0d4903932714e99c8c8f4ca70933f442bd8fa678f7",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/lua/updater/release_install.lua"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/_shared/ui/changelog/script.js.source",
+			"sha256": "a7333b388e6beb4f96631ac45751aed989c1306814c6a7c001075927fd770100",
+			"bytes": 46900,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/_shared/ui/changelog/script.js",
+			"original_sha256": "a7333b388e6beb4f96631ac45751aed989c1306814c6a7c001075927fd770100",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/ui/changelog/script.js"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/_shared/ui/changelog/index.html.source",
+			"sha256": "72dff53d666d51b5dcc9d5422266edc88aac661e2fc89d3a32dfa1f15431b0dc",
+			"bytes": 2541,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/_shared/ui/changelog/index.html",
+			"original_sha256": "72dff53d666d51b5dcc9d5422266edc88aac661e2fc89d3a32dfa1f15431b0dc",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/ui/changelog/index.html"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/linux/ui/changelog/bridge.lua.source",
+			"sha256": "77d0b001ec9d286f61576861aef3641e1e98d4f98b412ea75ac9570c324bd5e8",
+			"bytes": 24143,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/linux/ui/changelog/bridge.lua",
+			"original_sha256": "77d0b001ec9d286f61576861aef3641e1e98d4f98b412ea75ac9570c324bd5e8",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/linux/ui/changelog/bridge.lua"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/macos/ui/changelog/init.lua.source",
+			"sha256": "59cba8e76770896a88fdbc719a3db79ebf329a7c5dabfa057d612e0dd348d81a",
+			"bytes": 36517,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/macos/ui/changelog/init.lua",
+			"original_sha256": "59cba8e76770896a88fdbc719a3db79ebf329a7c5dabfa057d612e0dd348d81a",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/macos/ui/changelog/init.lua"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/windows/modules/updater/release_install.ahk.source",
+			"sha256": "17d542bfcd05aa93f0c494c2837e93857fb90d3d46b70397017cd38d3db4af8c",
+			"bytes": 14620,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/modules/updater/release_install.ahk",
+			"original_sha256": "17d542bfcd05aa93f0c494c2837e93857fb90d3d46b70397017cd38d3db4af8c",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/updater/release_install.ahk"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/windows/ui/changelog/init.ahk.source",
+			"sha256": "bb80240fb4073c003d18980c9034bf510ddc161266a5c34c16f46156517b79d0",
+			"bytes": 46272,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/ui/changelog/init.ahk",
+			"original_sha256": "bb80240fb4073c003d18980c9034bf510ddc161266a5c34c16f46156517b79d0",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/changelog/init.ahk"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua.source",
+			"sha256": "042ef0d30e392bb7658f50963421af1986f6f7c04e71a200e8449fb375632358",
+			"bytes": 1278,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua",
+			"original_sha256": "042ef0d30e392bb7658f50963421af1986f6f7c04e71a200e8449fb375632358",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua.source",
+			"sha256": "6597250e9a52a31c06970ebbbe1d0b603b3cdb01a3af8962eeb8adb92bfca285",
+			"bytes": 1223,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua",
+			"original_sha256": "6597250e9a52a31c06970ebbbe1d0b603b3cdb01a3af8962eeb8adb92bfca285",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/_shared/lua/test/release_install_network_contract.lua.source",
+			"sha256": "e9d07286b7973f4ed9d5c358419030a85f8dd4ea2b268c590c6d067d8f379680",
+			"bytes": 7979,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/_shared/lua/test/release_install_network_contract.lua",
+			"original_sha256": "e9d07286b7973f4ed9d5c358419030a85f8dd4ea2b268c590c6d067d8f379680",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/lua/test/release_install_network_contract.lua"
+		},
+		{
+			"path": "packets/versions14/source/tools/test/test-changelog-managed-failure.cjs.source",
+			"sha256": "fe8dcdea90014c2b4d3c88f9e91e6cbcd03806ff2c137eeb07a51977cdeb6539",
+			"bytes": 5274,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/tools/test/test-changelog-managed-failure.cjs",
+			"original_sha256": "fe8dcdea90014c2b4d3c88f9e91e6cbcd03806ff2c137eeb07a51977cdeb6539",
+			"metadata_rewritten": false,
+			"target": "tools/test/test-changelog-managed-failure.cjs"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/windows/tests/unit/test_release_install.ahk.source",
+			"sha256": "78c4f2688916dffb5ee10b0679367a650e97dcf4e474e0fbc4dff9d0c6fdef2a",
+			"bytes": 15815,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/windows/tests/unit/test_release_install.ahk",
+			"original_sha256": "78c4f2688916dffb5ee10b0679367a650e97dcf4e474e0fbc4dff9d0c6fdef2a",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_release_install.ahk"
+		},
+		{
+			"path": "packets/versions14/source/tools/test/browser/changelog-release-install.playwright.cjs.source",
+			"sha256": "d4d40aba568f12eeab85a046b5c2df6d2c9e82fe0ae0fa1b657993ee9fe7eaf9",
+			"bytes": 8252,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/tools/test/browser/changelog-release-install.playwright.cjs",
+			"original_sha256": "d4d40aba568f12eeab85a046b5c2df6d2c9e82fe0ae0fa1b657993ee9fe7eaf9",
+			"metadata_rewritten": false,
+			"target": "tools/test/browser/changelog-release-install.playwright.cjs"
+		},
+		{
+			"path": "packets/versions14/source/static/ergopti_plus/_shared/ui/changelog/style.css.source",
+			"sha256": "36f1039a85025ed4f3b2c4f7e4ed8b7fae06c77c20107661915ba99b20b2f5f6",
+			"bytes": 11640,
+			"packet": "versions14",
+			"role": "candidate",
+			"original_relative": "source/static/ergopti_plus/_shared/ui/changelog/style.css",
+			"original_sha256": "36f1039a85025ed4f3b2c4f7e4ed8b7fae06c77c20107661915ba99b20b2f5f6",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/ui/changelog/style.css"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/_shared/lua/updater/release_install.lua.source",
+			"sha256": "d35452ae5a5595b5dbb32975f11d4617bf76f32d55b14e6c827f8f02446e120d",
+			"bytes": 7926,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/_shared/lua/updater/release_install.lua",
+			"original_sha256": "d35452ae5a5595b5dbb32975f11d4617bf76f32d55b14e6c827f8f02446e120d",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/lua/updater/release_install.lua"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/_shared/ui/changelog/script.js.source",
+			"sha256": "a72e37984e7378529b5b82ea375152951a445f258d4b13d0cc57ec2354af4477",
+			"bytes": 44303,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/_shared/ui/changelog/script.js",
+			"original_sha256": "a72e37984e7378529b5b82ea375152951a445f258d4b13d0cc57ec2354af4477",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/ui/changelog/script.js"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/_shared/ui/changelog/index.html.source",
+			"sha256": "ae45f7451b709bab484ac1fd4f86daabe783a0183b7143c4ad8a112dfcdc9a5b",
+			"bytes": 2474,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/_shared/ui/changelog/index.html",
+			"original_sha256": "ae45f7451b709bab484ac1fd4f86daabe783a0183b7143c4ad8a112dfcdc9a5b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/ui/changelog/index.html"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/linux/ui/changelog/bridge.lua.source",
+			"sha256": "5b1ce90b51e1c4f4327d0213ebffa6e2ae1417f706ba34a7db5c62612e7be5ad",
+			"bytes": 22214,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/linux/ui/changelog/bridge.lua",
+			"original_sha256": "5b1ce90b51e1c4f4327d0213ebffa6e2ae1417f706ba34a7db5c62612e7be5ad",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/linux/ui/changelog/bridge.lua"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/macos/ui/changelog/init.lua.source",
+			"sha256": "a1e37a59e52984d8369a909b0711d7cd6a4cad7cdc280250d2d754493402bc4b",
+			"bytes": 35346,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/macos/ui/changelog/init.lua",
+			"original_sha256": "a1e37a59e52984d8369a909b0711d7cd6a4cad7cdc280250d2d754493402bc4b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/macos/ui/changelog/init.lua"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/windows/modules/updater/release_install.ahk.source",
+			"sha256": "d56a742370ac305ce039cf65b43ef4019086a9077d8830f26e41e7719bcf89c8",
+			"bytes": 8574,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/windows/modules/updater/release_install.ahk",
+			"original_sha256": "d56a742370ac305ce039cf65b43ef4019086a9077d8830f26e41e7719bcf89c8",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/modules/updater/release_install.ahk"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/windows/ui/changelog/init.ahk.source",
+			"sha256": "479b9cf49d24dfa4a59cfeebb392324d79dcd887c5935d301608199c5e81c09c",
+			"bytes": 44715,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/windows/ui/changelog/init.ahk",
+			"original_sha256": "479b9cf49d24dfa4a59cfeebb392324d79dcd887c5935d301608199c5e81c09c",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/ui/changelog/init.ahk"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua.source",
+			"sha256": "fa6b9f67dda3ea1e1ed817d8dd580bc82dc642eb4c036dcbe4884ee97766a061",
+			"bytes": 960,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua",
+			"original_sha256": "fa6b9f67dda3ea1e1ed817d8dd580bc82dc642eb4c036dcbe4884ee97766a061",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua.source",
+			"sha256": "6c77f0240c09cdf5e32a88ea6c625e917b5a0dd020cf265f1affbd533249505b",
+			"bytes": 926,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua",
+			"original_sha256": "6c77f0240c09cdf5e32a88ea6c625e917b5a0dd020cf265f1affbd533249505b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/windows/tests/unit/test_release_install.ahk.source",
+			"sha256": "1477e0a0d6b442135a9a53c698f7fbf15ef72563407c0b71135310f47537402b",
+			"bytes": 13464,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/windows/tests/unit/test_release_install.ahk",
+			"original_sha256": "1477e0a0d6b442135a9a53c698f7fbf15ef72563407c0b71135310f47537402b",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/windows/tests/unit/test_release_install.ahk"
+		},
+		{
+			"path": "packets/versions14/preimage/tools/test/browser/changelog-release-install.playwright.cjs.source",
+			"sha256": "1331c0ddab2af034fc1268a902c3cc550c547b096ebc560e0e410f8a49a5cde9",
+			"bytes": 6464,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/tools/test/browser/changelog-release-install.playwright.cjs",
+			"original_sha256": "1331c0ddab2af034fc1268a902c3cc550c547b096ebc560e0e410f8a49a5cde9",
+			"metadata_rewritten": false,
+			"target": "tools/test/browser/changelog-release-install.playwright.cjs"
+		},
+		{
+			"path": "packets/versions14/preimage/static/ergopti_plus/_shared/ui/changelog/style.css.source",
+			"sha256": "a2040172a42dd9fad7f8d8c9a0db37963957ddb5b8bafdc7ee201cb015588d2d",
+			"bytes": 11487,
+			"packet": "versions14",
+			"role": "preimage",
+			"original_relative": "preimage/static/ergopti_plus/_shared/ui/changelog/style.css",
+			"original_sha256": "a2040172a42dd9fad7f8d8c9a0db37963957ddb5b8bafdc7ee201cb015588d2d",
+			"metadata_rewritten": false,
+			"target": "static/ergopti_plus/_shared/ui/changelog/style.css"
+		},
+		{
+			"path": "packets/versions14/managed-versions-failure.patch",
+			"sha256": "58b9282525fe1060dce52fc547330ca9b53bd235e2f6303f8a879857b88dd68a",
+			"bytes": 52210,
+			"packet": "versions14",
+			"role": "patch",
+			"original_relative": "managed-versions-failure.patch",
+			"original_sha256": "58b9282525fe1060dce52fc547330ca9b53bd235e2f6303f8a879857b88dd68a",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/versions14/HANDOVER.md",
+			"sha256": "6eb26b219fd495a1222cec4574ac1d34405fd36ade710bcbe6d3d9982170b935",
+			"bytes": 5712,
+			"packet": "versions14",
+			"role": "documentation",
+			"original_relative": "HANDOVER.md",
+			"original_sha256": "6eb26b219fd495a1222cec4574ac1d34405fd36ade710bcbe6d3d9982170b935",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/versions14/preimages.json",
+			"sha256": "28ca703f12229ed231a606764ecf24715288a45f6c65bd2922e94eccd98d6b42",
+			"bytes": 2116,
+			"packet": "versions14",
+			"role": "metadata",
+			"original_relative": "preimages.json",
+			"original_sha256": "9a0a752160a697b3e7ac5e9e251bab8d537f5d617a2e493eee0567cb249682e7",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/versions14/sources.json",
+			"sha256": "8bc54c27cfd20ba7ae147f5971f0c120c860f88f9580296b793fff046c308fe6",
+			"bytes": 2222,
+			"packet": "versions14",
+			"role": "metadata",
+			"original_relative": "sources.json",
+			"original_sha256": "dc63909656f368fbe1675f31f894790c2d3364a547c2ffd8ae23ef45975d0ce7",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "packets/versions14/validation.json",
+			"sha256": "8d4561a6e0d4881b744d1a9b4f95321249dae027193812d7e7cf409c0db10113",
+			"bytes": 1813,
+			"packet": "versions14",
+			"role": "metadata",
+			"original_relative": "validation.json",
+			"original_sha256": "27dd6fb17fe9cff001fca4db989389063cb5cd0e7f0b02b386ea1ffbfe4f9598",
+			"metadata_rewritten": true
+		},
+		{
+			"path": "dependencies/ollama-boundaries/REVIEW.md",
+			"sha256": "cac64e6a7c0761808bff594d9a6611ed22debe687437a038dc7955150095b33c",
+			"bytes": 10103,
+			"packet": "ollama-boundaries",
+			"role": "documentation",
+			"original_relative": "remaining-windows62/REVIEW.md",
+			"original_sha256": "cac64e6a7c0761808bff594d9a6611ed22debe687437a038dc7955150095b33c",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "packets/updater-r3/registration-proposal.txt",
+			"sha256": "4510b27c3ac05a34fa0f5338ac33562a4784bad68f9e229f778139074e95a240",
+			"bytes": 441,
+			"packet": "updater-r3",
+			"role": "metadata",
+			"original_relative": "registration-proposal.txt",
+			"original_sha256": "4510b27c3ac05a34fa0f5338ac33562a4784bad68f9e229f778139074e95a240",
+			"metadata_rewritten": false,
+			"provenance": "Exact include/manifest names from review_brew_boundary bounded metadata response; accompanying comments authored for portability."
+		},
+		{
+			"path": "dependencies/shared-contract/source/static/ergopti_plus/_shared/tests/corpus/network/failure_vectors.json.source",
+			"sha256": "31ddbf8a0bd632f07b990609a27cc61eea03d5f70ca0cc647acc633551c5daf9",
+			"bytes": 12488,
+			"packet": "shared-contract-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/tests/corpus/network/failure_vectors.json",
+			"original_relative": "static/ergopti_plus/_shared/tests/corpus/network/failure_vectors.json",
+			"original_sha256": "31ddbf8a0bd632f07b990609a27cc61eea03d5f70ca0cc647acc633551c5daf9",
+			"metadata_rewritten": false,
+			"provenance": "Exact immutable source hash supplied by shared_failure62; independent authored expectations retained."
+		},
+		{
+			"path": "dependencies/shared-contract/source/static/ergopti_plus/windows/tests/unit/test_managed_network_failure.ahk.source",
+			"sha256": "9278e42c77a5d5abf5c4afe1ab3688ec5d7e5c64085f602493055e0760d29d54",
+			"bytes": 3506,
+			"packet": "shared-contract-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_network_failure.ahk",
+			"original_relative": "static/ergopti_plus/windows/tests/unit/test_managed_network_failure.ahk",
+			"original_sha256": "9278e42c77a5d5abf5c4afe1ab3688ec5d7e5c64085f602493055e0760d29d54",
+			"metadata_rewritten": false,
+			"provenance": "Exact immutable source hash supplied by shared_failure62; independent authored expectations retained."
+		},
+		{
+			"path": "dependencies/shared-contract/source/static/ergopti_plus/_shared/lua/test/managed_network_contract.lua.source",
+			"sha256": "159e4c17b61280ccb7a2a76c293b9ac39c87a84b24b8507ea53638f98e1df521",
+			"bytes": 3782,
+			"packet": "shared-contract-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/lua/test/managed_network_contract.lua",
+			"original_relative": "static/ergopti_plus/_shared/lua/test/managed_network_contract.lua",
+			"original_sha256": "159e4c17b61280ccb7a2a76c293b9ac39c87a84b24b8507ea53638f98e1df521",
+			"metadata_rewritten": false,
+			"provenance": "Exact immutable source hash supplied by shared_failure62; independent authored expectations retained."
+		},
+		{
+			"path": "dependencies/shared-contract/source/tools/test/prove_failure_contract.lua.source",
+			"sha256": "e9542b35e35571d8d662ea29f83a4c02b4b732f29574bfd3a7521683fe53b211",
+			"bytes": 1408,
+			"packet": "shared-contract-dependencies",
+			"role": "independent-control",
+			"target": "tools/test/prove_failure_contract.lua",
+			"original_relative": "tools/test/prove_failure_contract.lua",
+			"original_sha256": "e9542b35e35571d8d662ea29f83a4c02b4b732f29574bfd3a7521683fe53b211",
+			"metadata_rewritten": false,
+			"provenance": "Exact immutable source hash supplied by shared_failure62; independent authored expectations retained."
+		},
+		{
+			"path": "dependencies/versions/source-original/static/ergopti_plus/linux/ui/changelog/bridge.lua.source",
+			"sha256": "cfb98d328ffcd4bed4a6fa38abef6d13aec5fb55bb57c820fb189f1306eddb96",
+			"bytes": 22175,
+			"packet": "versions-dependencies",
+			"role": "preimage",
+			"target": "static/ergopti_plus/linux/ui/changelog/bridge.lua",
+			"original_relative": "linux-callers/preimages/static/ergopti_plus/linux/ui/changelog/bridge.lua",
+			"original_sha256": "cfb98d328ffcd4bed4a6fa38abef6d13aec5fb55bb57c820fb189f1306eddb96",
+			"metadata_rewritten": false
+		},
+		{
+			"path": "dependencies/versions/source/tools/test/support/changelog-page-dom.cjs.source",
+			"sha256": "92ed11830fff5c95400765f98dbfd4c5e1026feb4c819ff761ffd6432fad12d4",
+			"bytes": 6579,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "tools/test/support/changelog-page-dom.cjs",
+			"original_relative": "versions-replay/tools/test/support/changelog-page-dom.cjs",
+			"original_sha256": "92ed11830fff5c95400765f98dbfd4c5e1026feb4c819ff761ffd6432fad12d4",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/tools/test/test-changelog-release-install.cjs.source",
+			"sha256": "97e3c9b7bb03b14959fc38899c77fd43a346db82b41a6bfbcef78baac293e9f9",
+			"bytes": 13337,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "tools/test/test-changelog-release-install.cjs",
+			"original_relative": "versions-replay/tools/test/test-changelog-release-install.cjs",
+			"original_sha256": "97e3c9b7bb03b14959fc38899c77fd43a346db82b41a6bfbcef78baac293e9f9",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/data/locales/en.json.source",
+			"sha256": "29b1f2065c7a7354b84d003507ca2d732e8f6f8373e05441d79b6baffa905c32",
+			"bytes": 216369,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/data/locales/en.json",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/data/locales/en.json",
+			"original_sha256": "29b1f2065c7a7354b84d003507ca2d732e8f6f8373e05441d79b6baffa905c32",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/modules/updater/channels.json.source",
+			"sha256": "1a6d8b03866bfaaefe2d5b175f0e8888ae8bc1a89bb8ac179de3ef65e4dcd023",
+			"bytes": 1875,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/modules/updater/channels.json",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/modules/updater/channels.json",
+			"original_sha256": "1a6d8b03866bfaaefe2d5b175f0e8888ae8bc1a89bb8ac179de3ef65e4dcd023",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/markdown.js.source",
+			"sha256": "4472eb7b6fb5825a2b9a39607b676b0f8b033cc1ceea82a5f7981812cbcf7445",
+			"bytes": 21598,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/markdown.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/markdown.js",
+			"original_sha256": "4472eb7b6fb5825a2b9a39607b676b0f8b033cc1ceea82a5f7981812cbcf7445",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/repository_links.js.source",
+			"sha256": "0a9249f10a10002f69e9a2fc2db898391e4a0b14d583f711b2d3988f003ebefc",
+			"bytes": 1658,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/repository_links.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/repository_links.js",
+			"original_sha256": "0a9249f10a10002f69e9a2fc2db898391e4a0b14d583f711b2d3988f003ebefc",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/changelog/atom_feed.js.source",
+			"sha256": "b3a36d1f453c2ae6d51a292aa49f25080778d80aeef93969ee844d7c0a11b6bc",
+			"bytes": 17207,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/changelog/atom_feed.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/changelog/atom_feed.js",
+			"original_sha256": "b3a36d1f453c2ae6d51a292aa49f25080778d80aeef93969ee844d7c0a11b6bc",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/changelog/release_body.js.source",
+			"sha256": "055dddfab989a27ce6aa732397f6025c041f8af67a61377daa40a5422c5da1f5",
+			"bytes": 12264,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/changelog/release_body.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/changelog/release_body.js",
+			"original_sha256": "055dddfab989a27ce6aa732397f6025c041f8af67a61377daa40a5422c5da1f5",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/_generated/update_channel_registry.js.source",
+			"sha256": "2675f441d634ff9235ba4c8305f046913939e07c60d113f57f5d78d44475f3a9",
+			"bytes": 1251,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/_generated/update_channel_registry.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/_generated/update_channel_registry.js",
+			"original_sha256": "2675f441d634ff9235ba4c8305f046913939e07c60d113f57f5d78d44475f3a9",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/update_channels.js.source",
+			"sha256": "6e85a606934cb2fd3b43aa0be35ffb60314fb4ecb68ff289f6ac351dcc91bf81",
+			"bytes": 14178,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/update_channels.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/update_channels.js",
+			"original_sha256": "6e85a606934cb2fd3b43aa0be35ffb60314fb4ecb68ff289f6ac351dcc91bf81",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/version_order.js.source",
+			"sha256": "4950735c7c4b504624cff169c618b5751a4eecd983c914061eb70d9e06fb62f6",
+			"bytes": 3424,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/version_order.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/version_order.js",
+			"original_sha256": "4950735c7c4b504624cff169c618b5751a4eecd983c914061eb70d9e06fb62f6",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/host_bridge.js.source",
+			"sha256": "cb67df1cce74b7ff025410a232541a35adb274a404af3350ee96c574154e82e6",
+			"bytes": 5373,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/host_bridge.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/host_bridge.js",
+			"original_sha256": "cb67df1cce74b7ff025410a232541a35adb274a404af3350ee96c574154e82e6",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/ui/i18n.js.source",
+			"sha256": "ba10c06dd792b1fb898d40d0a7196f9a27249193b7beae98ad1c0784febf5bef",
+			"bytes": 11990,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/ui/i18n.js",
+			"original_relative": "versions-replay/static/ergopti_plus/_shared/ui/i18n.js",
+			"original_sha256": "ba10c06dd792b1fb898d40d0a7196f9a27249193b7beae98ad1c0784febf5bef",
+			"metadata_rewritten": false,
+			"provenance": "Exact support source hash supplied by Versions14 author; snapshot only. Generated update_channel_registry.js is preserved provenance; regenerate through its owner for final composition."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/lua/json.lua.source",
+			"sha256": "6d846aedd7bc8ecc680fff9ec18ccfcbada8cf428c1997a89aa30a8c5b100ab2",
+			"bytes": 10388,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/lua/json.lua",
+			"original_relative": "repository-checkpoint/static/ergopti_plus/_shared/lua/json.lua",
+			"original_sha256": "6d846aedd7bc8ecc680fff9ec18ccfcbada8cf428c1997a89aa30a8c5b100ab2",
+			"metadata_rewritten": false,
+			"provenance": "Read-only exact source checkpoint supplied by Versions14 author; ten original release controls unchanged. Interpreter snapshot is dependency evidence, never replace newer integrated bindings."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/lua/compat/utf8.lua.source",
+			"sha256": "d62fc294924d345f7ffd8636a0808bcbee98ea4bb5280c3790ca3927d3013a9c",
+			"bytes": 7637,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/lua/compat/utf8.lua",
+			"original_relative": "repository-checkpoint/static/ergopti_plus/_shared/lua/compat/utf8.lua",
+			"original_sha256": "d62fc294924d345f7ffd8636a0808bcbee98ea4bb5280c3790ca3927d3013a9c",
+			"metadata_rewritten": false,
+			"provenance": "Read-only exact source checkpoint supplied by Versions14 author; ten original release controls unchanged. Interpreter snapshot is dependency evidence, never replace newer integrated bindings."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/lua/test/release_install_contract.lua.source",
+			"sha256": "c8e7b76489d8c892c96045420ede5eced600c1a24b7d04a70df11bca9313e508",
+			"bytes": 7540,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/lua/test/release_install_contract.lua",
+			"original_relative": "repository-checkpoint/static/ergopti_plus/_shared/lua/test/release_install_contract.lua",
+			"original_sha256": "c8e7b76489d8c892c96045420ede5eced600c1a24b7d04a70df11bca9313e508",
+			"metadata_rewritten": false,
+			"provenance": "Read-only exact source checkpoint supplied by Versions14 author; ten original release controls unchanged. Interpreter snapshot is dependency evidence, never replace newer integrated bindings."
+		},
+		{
+			"path": "dependencies/versions/source/static/ergopti_plus/_shared/lua/network/failure.lua.source",
+			"sha256": "487094140f53c05228e90057f08bf3237f582e0d31bc87556c65403ed5c64de5",
+			"bytes": 6266,
+			"packet": "versions-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/lua/network/failure.lua",
+			"original_relative": "repository-checkpoint/static/ergopti_plus/_shared/lua/network/failure.lua",
+			"original_sha256": "487094140f53c05228e90057f08bf3237f582e0d31bc87556c65403ed5c64de5",
+			"metadata_rewritten": false,
+			"provenance": "Read-only exact source checkpoint supplied by Versions14 author; ten original release controls unchanged. Interpreter snapshot is dependency evidence, never replace newer integrated bindings."
+		},
+		{
+			"path": "dependencies/shared-contract/original-policy/static/ergopti_plus/_shared/modules/network/managed_network.json.source",
+			"sha256": "e079edb600f2256dc1911351f3465d23c51b072e13dc384993367a645e1bbd7e",
+			"bytes": 6262,
+			"packet": "shared-contract-dependencies",
+			"role": "independent-control",
+			"target": "static/ergopti_plus/_shared/modules/network/managed_network.json",
+			"original_relative": "original-shared-contract/static/ergopti_plus/_shared/modules/network/managed_network.json",
+			"original_sha256": "e079edb600f2256dc1911351f3465d23c51b072e13dc384993367a645e1bbd7e",
+			"metadata_rewritten": false,
+			"provenance": "Historical policy for original independent contract; distinct from root checkpoint26d77 and timing candidate8c2fe. Never silently substitute those policies."
+		},
+		{
+			"path": "README.md",
+			"sha256": "9abcf3a0916bddc9ff49ca0477e19a79b879237dd686bd86ff3423c0e0252823",
+			"bytes": 8674,
+			"packet": "bundle-metadata",
+			"role": "documentation",
+			"original_relative": "README.md",
+			"original_sha256": "702f8c55399ae939261a4b7d7b636184c6a25917c78fa36a43f377dec60af25c",
+			"metadata_rewritten": true,
+			"provenance": "Portable bundle metadata/checker authored for this handover; no source/expectation rewrite."
+		},
+		{
+			"path": "verify_bundle.py",
+			"sha256": "71f5b9e8ac7efcfd9866ee82838b93378f7910b6059c39727c36d2d4a59cd242",
+			"bytes": 6330,
+			"packet": "bundle-metadata",
+			"role": "metadata",
+			"original_relative": "verify_bundle.py",
+			"original_sha256": "d66a16a98b25340369d7734ce26c4e4fcad015bbf91279229449e37723fc5f67",
+			"metadata_rewritten": true,
+			"provenance": "Portable bundle metadata/checker authored for this handover; no source/expectation rewrite."
+		},
+		{
+			"path": "dependencies/README.md",
+			"sha256": "df82371b1623f80db6d02db0fae8c3fac13d1e164ebee408aab02cc1bef22820",
+			"bytes": 2482,
+			"packet": "bundle-metadata",
+			"role": "documentation",
+			"original_relative": "dependencies/README.md",
+			"original_sha256": "df82371b1623f80db6d02db0fae8c3fac13d1e164ebee408aab02cc1bef22820",
+			"metadata_rewritten": false,
+			"provenance": "Portable bundle metadata/checker authored for this handover; no source/expectation rewrite."
+		}
+	],
+	"preimages": [
+		{
+			"packet": "routes",
+			"target": "static/ergopti_plus/windows/tests/fixtures/managed_routes_native.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "routes",
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_routes_native.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "routes",
+			"target": "static/ergopti_plus/windows/vendor/ergopti_native_proxy_ex.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "routes",
+			"target": "static/ergopti_plus/windows/vendor/ergopti_network_routes.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "routes",
+			"target": "static/ergopti_plus/windows/vendor/ergopti_windows_proxy_config.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "curl-auth",
+			"target": "static/ergopti_plus/windows/adapters/curl_proxy_auth_policy.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "curl-auth",
+			"target": "static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_policy.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "curl-auth",
+			"target": "static/ergopti_plus/windows/vendor/ergopti_curl_capabilities_worker.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "async-auth-wip",
+			"target": "static/ergopti_plus/windows/adapters/http_client.ahk",
+			"sha256": "ff5f3584461e46b3bfd114372ea7751cadb2946995d22b88fb37d745a217b62b",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/adapters/http_client.ahk.source"
+		},
+		{
+			"packet": "async-auth-wip",
+			"target": "static/ergopti_plus/windows/modules/llm/api_remote.ahk",
+			"sha256": "72761bb37f4f8dc624129ef09b8fa02e0a6fbb01c00b3d2770768224834b1483",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/modules/llm/api_remote.ahk.source"
+		},
+		{
+			"packet": "async-auth-wip",
+			"target": "static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk",
+			"sha256": "514b73a2a78715a7ca5603efe2067124487a8bded2163ed213333bbac0c64de9",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk.source"
+		},
+		{
+			"packet": "async-auth-wip",
+			"target": "static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk",
+			"sha256": "bb32f8cbcb6280478e6badb7116490de4b67afc2347ba9f4397a90a8c8cdc817",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/async-auth-wip/preimages/static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk.source"
+		},
+		{
+			"packet": "async-auth-wip",
+			"target": "static/ergopti_plus/windows/tests/unit/test_curl_proxy_auth_integration.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "managed-ca",
+			"target": "static/ergopti_plus/windows/tests/run_all.ahk",
+			"sha256": "df87170eb7de0aa235f7e3b76a44794e436d3581d9fec13f5f827501161f569c",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/managed-ca/preimage-run_all.ahk.source"
+		},
+		{
+			"packet": "managed-ca",
+			"target": "static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "managed-ca",
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "updater-r3",
+			"target": "static/ergopti_plus/windows/modules/updater/self_update.ahk",
+			"sha256": "42a8207f381c63c7f0b01ccbb3bfae8442a364a3b5dfe51c08ec5bb9a0a2ac80",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/updater-r3/preimages/static/ergopti_plus/windows/modules/updater/self_update.ahk.source"
+		},
+		{
+			"packet": "updater-r3",
+			"target": "static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1",
+			"sha256": "a5690a076530c0940126ccfd6c2f8a75f9d87885fb23f5c8533327c39dc5e7d3",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/updater-r3/preimages/static/ergopti_plus/windows/tests/fixtures/system_proxy_native.ps1.source"
+		},
+		{
+			"packet": "updater-r3",
+			"target": "static/ergopti_plus/windows/tests/fixtures/updater_download_receipts.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "updater-r3",
+			"target": "static/ergopti_plus/windows/tests/unit/test_updater_managed_failure.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "updater-r3",
+			"target": "static/ergopti_plus/windows/vendor/ergopti_native_proxy.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "updater-r3",
+			"target": "static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1",
+			"sha256": "bd1619c56068fe64cdde9c9a4fb27843cbaff4585cd5f86971aea1e8cec169f4",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/updater-r3/preimages/static/ergopti_plus/windows/vendor/ergopti_system_proxy_worker.ps1.source"
+		},
+		{
+			"packet": "updater-r3",
+			"target": "static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "native-staging-v1",
+			"target": "static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1",
+			"sha256": "3e3201f10b67b549a7fc57342cfb13315085045fbcd0bb1b492191e7d5f1948e",
+			"absent": false,
+			"comparison_scope": "after managed-ca",
+			"snapshot": "packets/native-staging-v1/preimages/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1.source"
+		},
+		{
+			"packet": "native-staging-v1",
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk",
+			"sha256": "6d474ec459b012a0abc450b05f286a3b9c50eb8f6e2d7f0dae7b3f024aed5508",
+			"absent": false,
+			"comparison_scope": "after managed-ca",
+			"snapshot": "packets/native-staging-v1/preimages/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk.source"
+		},
+		{
+			"packet": "native-staging-v1",
+			"target": "static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "after managed-ca"
+		},
+		{
+			"packet": "native-staging-oracle",
+			"target": "static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk",
+			"sha256": "d72c706c357b53d5a9699139af342e60902d1310e9f17ff5776239778fde9f27",
+			"absent": false,
+			"comparison_scope": "after native-staging-v1",
+			"snapshot": "packets/native-staging-oracle/preimages/static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk.source"
+		},
+		{
+			"packet": "failure-callers-wip",
+			"target": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"sha256": "c87e3c3963040c065a17b2d8e8c0ce88bbdb6fc1d24b22c6cc5dac437bca6c79",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/failure-callers-wip/preimages/static/ergopti_plus/windows/ErgoptiPlus.ahk.source"
+		},
+		{
+			"packet": "failure-callers-wip",
+			"target": "static/ergopti_plus/windows/tests/run_all.ahk",
+			"sha256": "2b4860279dfbaa20e395c01ec740a5b6507cddc6ead7389e3d05c7a221d2fa1f",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/failure-callers-wip/preimages/static/ergopti_plus/windows/tests/run_all.ahk.source"
+		},
+		{
+			"packet": "failure-callers-wip",
+			"target": "static/ergopti_plus/_shared/modules/network/managed_network.json",
+			"sha256": "26d77b6849bbb654be60544fe7df6a83d662047d9bc4fcf1d496be083e0aee4b",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/failure-callers-wip/preimages/static/ergopti_plus/_shared/modules/network/managed_network.json.source"
+		},
+		{
+			"packet": "failure-callers-wip",
+			"target": "static/ergopti_plus/windows/modules/network/failure_host.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "failure-callers-wip",
+			"target": "static/ergopti_plus/windows/ui/download_window/session.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "failure-callers-wip",
+			"target": "static/ergopti_plus/windows/ui/download_window/init.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "failure-callers-wip",
+			"target": "static/ergopti_plus/windows/tests/unit/test_managed_network_windows_actions.ahk",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/_shared/lua/updater/release_install.lua",
+			"sha256": "d35452ae5a5595b5dbb32975f11d4617bf76f32d55b14e6c827f8f02446e120d",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/_shared/lua/updater/release_install.lua.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/_shared/ui/changelog/script.js",
+			"sha256": "a72e37984e7378529b5b82ea375152951a445f258d4b13d0cc57ec2354af4477",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/_shared/ui/changelog/script.js.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/_shared/ui/changelog/index.html",
+			"sha256": "ae45f7451b709bab484ac1fd4f86daabe783a0183b7143c4ad8a112dfcdc9a5b",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/_shared/ui/changelog/index.html.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/linux/ui/changelog/bridge.lua",
+			"sha256": "5b1ce90b51e1c4f4327d0213ebffa6e2ae1417f706ba34a7db5c62612e7be5ad",
+			"absent": false,
+			"comparison_scope": "after prior Linux caller dependency",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/linux/ui/changelog/bridge.lua.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/macos/ui/changelog/init.lua",
+			"sha256": "a1e37a59e52984d8369a909b0711d7cd6a4cad7cdc280250d2d754493402bc4b",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/macos/ui/changelog/init.lua.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/windows/modules/updater/release_install.ahk",
+			"sha256": "d56a742370ac305ce039cf65b43ef4019086a9077d8830f26e41e7719bcf89c8",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/windows/modules/updater/release_install.ahk.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/windows/ui/changelog/init.ahk",
+			"sha256": "479b9cf49d24dfa4a59cfeebb392324d79dcd887c5935d301608199c5e81c09c",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/windows/ui/changelog/init.ahk.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua",
+			"sha256": "fa6b9f67dda3ea1e1ed817d8dd580bc82dc642eb4c036dcbe4884ee97766a061",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua",
+			"sha256": "6c77f0240c09cdf5e32a88ea6c625e917b5a0dd020cf265f1affbd533249505b",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/_shared/lua/test/release_install_network_contract.lua",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "versions14",
+			"target": "tools/test/test-changelog-managed-failure.cjs",
+			"sha256": null,
+			"absent": true,
+			"comparison_scope": "repository"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/windows/tests/unit/test_release_install.ahk",
+			"sha256": "1477e0a0d6b442135a9a53c698f7fbf15ef72563407c0b71135310f47537402b",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/windows/tests/unit/test_release_install.ahk.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "tools/test/browser/changelog-release-install.playwright.cjs",
+			"sha256": "1331c0ddab2af034fc1268a902c3cc550c547b096ebc560e0e410f8a49a5cde9",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/tools/test/browser/changelog-release-install.playwright.cjs.source"
+		},
+		{
+			"packet": "versions14",
+			"target": "static/ergopti_plus/_shared/ui/changelog/style.css",
+			"sha256": "a2040172a42dd9fad7f8d8c9a0db37963957ddb5b8bafdc7ee201cb015588d2d",
+			"absent": false,
+			"comparison_scope": "repository",
+			"snapshot": "packets/versions14/preimage/static/ergopti_plus/_shared/ui/changelog/style.css.source"
+		}
+	]
+}

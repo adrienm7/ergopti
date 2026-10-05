@@ -1,0 +1,5 @@
+# After the root-owned test_managed_remote_transport.ahk include:
+#Include unit/test_updater_managed_transport.ahk
+
+# Add the generated suite manifest entry through its existing owner/generator:
+unit/test_updater_managed_transport.ahk

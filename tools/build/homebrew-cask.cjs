@@ -33,7 +33,7 @@
  * 4. The postflight clears the quarantine flag: the app is not notarised, and
  *    Gatekeeper would otherwise refuse to open it.
  *
- * USAGE:  node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir>
+ * USAGE:  node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> [declared-asset]
  *         Prints the path of the cask it wrote, relative to <tap-dir>.
  *         node tools/build/homebrew-cask.cjs --token <channel>
  *         Prints the cask token of a channel (the release notes name it).
@@ -45,6 +45,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const { bindings } = require('./macos-release-publication.cjs');
 const { loadChannels, REGISTRY_PATH } = require('./release-channel.cjs');
 
 // Repository publishing the releases and the Sparkle appcasts
@@ -54,7 +55,8 @@ const SOURCE_REPOSITORY = 'adrienm7/ergopti';
 const APPCAST_BRANCH = 'sparkle-appcasts';
 
 // Release asset and bundle name (tools/build/build_macos_app.sh)
-const ASSET_NAME = 'ErgoptiPlus.app.zip';
+const ASSET_NAME = bindings().find((archive) => archive.format === 'zip')?.name;
+if (!ASSET_NAME) throw new Error('The historical macOS cask binding is absent.');
 const APP_NAME = 'ErgoptiPlus.app';
 
 // Launcher bundle identifier (tools/build/build_macos_app.sh BUNDLE_ID)
@@ -99,10 +101,12 @@ function tokenForChannel(id) {
 /**
  * Renders the cask of one release.
  * @param {string} tag Release tag, e.g. "v0.0.0-dev.142".
- * @param {string} sha256 Lowercase hex checksum of the release's app zip.
+ * @param {string} sha256 Lowercase hex checksum of the selected release archive.
  * @return {{token: string, file: string, text: string}}
  */
-function renderCask(tag, sha256) {
+function renderCask(tag, sha256, assetName = ASSET_NAME) {
+	if (!bindings().some((archive) => archive.name === assetName))
+		throw new Error('homebrew-cask: undeclared macOS archive.');
 	if (typeof tag !== 'string' || !tag.startsWith('v')) {
 		throw new Error(`homebrew-cask: a release tag starts with "v", got ${JSON.stringify(tag)}.`);
 	}
@@ -124,7 +128,7 @@ function renderCask(tag, sha256) {
 		`  version "${version}"`,
 		`  sha256 "${sha256}"`,
 		'',
-		`  url "https://github.com/${SOURCE_REPOSITORY}/releases/download/v#{version}/${ASSET_NAME}"`,
+		`  url "https://github.com/${SOURCE_REPOSITORY}/releases/download/v#{version}/${assetName}"`,
 		`  name "Ergopti+${suffix}"`,
 		'  desc "Ergopti keyboard layout companion: hotstrings, tap-holds, gestures and AI"',
 		'  homepage "https://ergopti.fr/"',
@@ -183,14 +187,14 @@ function main(args) {
 		process.stdout.write(`${tokenForChannel(args[1])}\n`);
 		return 0;
 	}
-	if (args.length !== 3 || args.some((arg) => arg === '')) {
+	if (![3, 4].includes(args.length) || args.some((arg) => arg === '')) {
 		console.error(
-			'usage: node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> | --token <channel>'
+			'usage: node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> [declared-asset] | --token <channel>'
 		);
 		return 1;
 	}
-	const [tag, sha256, tapDir] = args;
-	const cask = renderCask(tag, sha256);
+	const [tag, sha256, tapDir, assetName = ASSET_NAME] = args;
+	const cask = renderCask(tag, sha256, assetName);
 	const target = path.join(tapDir, cask.file);
 	fs.mkdirSync(path.dirname(target), { recursive: true });
 	fs.writeFileSync(target, cask.text);
