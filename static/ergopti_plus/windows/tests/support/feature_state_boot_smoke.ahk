@@ -350,13 +350,18 @@ _FeatureStateSmokePersistedSemantic(Path) {
 		throw Error("The actual saved semantic source was refused at boot")
 	ReadScriptConfig(Cache)
 	_FeatureStateSmokeAssert("@", ScriptInformation["MagicKey"], "durable dotted trigger")
-	Timing := IniCacheGet(Cache, "hotstrings.autocorrection.names", "time_activation_seconds")
+	Names := IniCacheGet(Cache, "hotstrings.autocorrection", "names")
+	if !(Names is Map) || Names.Count != 3
+		throw Error("The actual declared inline feature record must retain all three source children")
+	_FeatureStateSmokeAssert("_", IniCacheGet(Cache, "hotstrings.autocorrection.names", "time_activation_seconds"),
+		"a declared record is not a flattened child section")
+	Timing := Names["time_activation_seconds"]
 	if !(Timing is Float) || Timing != 0.75
 		throw Error("The durable inline timing must remain the exact native Float")
-	Value := IniCacheGet(Cache, "hotstrings.autocorrection.names", "enabled")
+	Value := Names["enabled"]
 	if !(Value is String) || StrCompare(Value, "true", true) != 0
 		throw Error("The obsolete inline scalar must remain text in the retained source")
-	_FeatureStateSmokeAssert("retain", IniCacheGet(Cache, "hotstrings.autocorrection.names", "future"), "durable foreign child")
+	_FeatureStateSmokeAssert("retain", Names["future"], "durable foreign child")
 	if StrCompare(Before, FileRead(Path, "UTF-8"), true) != 0
 		throw Error("A bootstrap read changed the actual durable source")
 }
