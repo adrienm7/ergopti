@@ -1761,3 +1761,180 @@ helpers.describe("storage ordinary initialization lifetime", function()
 		end)
 	end)
 end)
+
+helpers.describe("first owned native storage publication", function()
+	local function missing_parent(body)
+		storage_cohort_fixture(nil, function(storage, files, path, backup, write, read)
+			local directory = path:match("^(.*)/[^/]+$")
+			assert(os.remove(directory), "the actual storage parent starts absent")
+			local Shell = require("adapters.shell_runner")
+			local native_run, commands = Shell.run, {}
+			local hook
+			Shell.run = function(command)
+				if command:find("mkdir -p ", 1, true) then
+					commands[#commands + 1] = command
+					if hook then return hook(command, native_run) end
+				end
+				return native_run(command)
+			end
+			local ok, err = xpcall(function()
+				body(storage, files, path, backup, write, read, commands,
+					function(callback) hook = callback end)
+			end, debug.traceback)
+			Shell.run = native_run
+			if not ok then error(err, 0) end
+		end)
+	end
+	helpers.it("owned-storage-parent: first native effect creates the real parent and restores exact absence", function()
+		missing_parent(function(storage, files, path, backup, _, read, commands, inject)
+			local owner = { pending = function() return false end }
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt, cells = storage.capture_owned(owner)
+			helpers.assert_eq(cells, { a = { present = false } })
+			local calls, reentry = {}, {}
+			inject(function(command, native)
+				reentry = { storage.set("foreign", true), storage.release_owned(owner), storage.capture_owned(owner) }
+				return native(command)
+			end)
+			local observed = { delete = files.delete, write_if_unchanged = function(target, bytes, expected)
+				calls[#calls + 1] = target
+				if target == path then
+					helpers.assert_eq(expected, { status = "absent" })
+					helpers.assert_not_nil(read(backup), "the verified backup precedes the first effect")
+				end
+				return files.write_if_unchanged(target, bytes, expected)
+			end }
+			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, observed))
+			helpers.assert_eq(#commands, 1)
+			helpers.assert_eq(reentry[1], false); helpers.assert_eq(reentry[2], false); helpers.assert_nil(reentry[3])
+			helpers.assert_eq(calls, { backup, path })
+			helpers.assert_eq(read(path), '{"a":true}')
+			local saved = require("json").decode_lossless(read(backup))
+			helpers.assert_eq(saved.source, { status = "absent" }); helpers.assert_eq(saved.cells, { a = { present = false } })
+			helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_nil(read(path))
+			helpers.assert_true(storage.release_owned(owner)); helpers.assert_true(storage.forget_owned(owner, receipt))
+		end)
+	end)
+	for _, refusal in ipairs({
+		{ "false", function() return false end }, { "nil", function() return nil end },
+		{ "truthy string", function() return "true" end }, { "wrong object", function() return {} end },
+		{ "exception", function() error("native directory preparation refused") end },
+	}) do
+		helpers.it("owned-storage-parent: strict native preparation " .. refusal[1] .. " leaves the receipt unspent", function()
+			missing_parent(function(storage, files, path, backup, _, read, commands, inject)
+				local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				local receipt = assert(storage.capture_owned(owner))
+				inject(refusal[2])
+				helpers.assert_eq(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files), false)
+				helpers.assert_eq(#commands, 1); helpers.assert_nil(read(path)); helpers.assert_nil(read(backup))
+				helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+				inject(nil)
+				helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
+				helpers.assert_eq(read(path), '{"a":true}'); helpers.assert_eq(#commands, 2)
+				helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_nil(read(path))
+				helpers.assert_true(storage.release_owned(owner))
+			end)
+		end)
+	end
+	helpers.it("owned-storage-parent: a claimed preparation success never fabricates a native file effect", function()
+		missing_parent(function(storage, files, path, backup, _, read, _, inject)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner)); inject(function() return true end)
+			helpers.assert_eq(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files), false)
+			helpers.assert_nil(read(path)); helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_nil(read(path))
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("owned-storage-parent: a source successor during real preparation is never adopted before staging", function()
+		missing_parent(function(storage, files, path, backup, write, read, _, inject)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner)); local successor = ' {"foreign":[]}\n'
+			inject(function(command, native)
+				local prepared = native(command); assert(prepared == true); write(path, successor); return prepared
+			end)
+			helpers.assert_eq(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files), false)
+			helpers.assert_eq(read(path), successor); helpers.assert_nil(read(backup)); helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+			inject(nil)
+			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
+			helpers.assert_true(require("json").is_array(require("json").decode_lossless(read(path)).foreign))
+			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_eq(read(path), successor)
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("owned-storage-parent: native producer withdrawal during preparation refuses before backup", function()
+		missing_parent(function(storage, files, path, backup, _, read, _, inject)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner)); local comparisons = 0
+			local mt = { __eq = function() comparisons = comparisons + 1; return true end }
+			setmetatable(storage, mt); local successor = setmetatable({}, mt)
+			inject(function(command, native)
+				local prepared = native(command); package.loaded["adapters.storage"] = successor; return prepared
+			end)
+			local accepted = storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files)
+			package.loaded["adapters.storage"] = storage; setmetatable(storage, nil)
+			helpers.assert_eq(accepted, false); helpers.assert_eq(comparisons, 0)
+			helpers.assert_nil(read(path)); helpers.assert_nil(read(backup)); helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+			inject(nil)
+			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
+			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	helpers.it("owned-storage-parent: native file callback replacement during preparation refuses before staging", function()
+		missing_parent(function(storage, files, path, backup, _, read, _, inject)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner)); local calls = 0
+			local producer = { delete = files.delete, write_if_unchanged = files.write_if_unchanged }
+			inject(function(command, native)
+				local prepared = native(command)
+				producer.write_if_unchanged = function() calls = calls + 1; return true end
+				return prepared
+			end)
+			helpers.assert_eq(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, producer), false)
+			helpers.assert_eq(calls, 0); helpers.assert_nil(read(path)); helpers.assert_nil(read(backup))
+			helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+			producer.write_if_unchanged = files.write_if_unchanged; inject(nil)
+			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, producer))
+			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+	for _, method in ipairs({ "write_if_unchanged", "delete" }) do
+		helpers.it("owned-storage-parent: source reread withdrawal of " .. method .. " refuses before staging", function()
+			missing_parent(function(storage, files, path, backup, _, read, _, inject)
+				local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+				local receipt = assert(storage.capture_owned(owner))
+				local producer = { delete = files.delete, write_if_unchanged = files.write_if_unchanged }
+				local reader = require("infra.regular_file_reader")
+				local original_open, prepared, replaced, calls = reader.open, false, false, 0
+				inject(function(command, native)
+					local accepted = native(command); prepared = accepted == true; return accepted
+				end)
+				reader.open = function(target, ...)
+					if prepared and target == path and not replaced then
+						replaced = true
+						producer[method] = function(...)
+							calls = calls + 1; return files[method](...)
+						end
+					end
+					return original_open(target, ...)
+				end
+				local called, accepted = pcall(storage.publish_owned, owner, receipt,
+					{ a = { present = true, value = true } }, backup, producer)
+				reader.open = original_open
+				-- Observe receipts/effects outside the protected publication callback.
+				helpers.assert_eq(called, true); helpers.assert_eq(replaced, true)
+				helpers.assert_eq(accepted, false); helpers.assert_eq(calls, 0)
+				helpers.assert_nil(read(path)); helpers.assert_nil(read(backup))
+				helpers.assert_eq(storage.pending_owned(owner, receipt), false)
+				producer[method] = files[method]; inject(nil)
+				helpers.assert_true(storage.publish_owned(owner, receipt,
+					{ a = { present = true, value = true } }, backup, producer))
+				helpers.assert_eq(read(path), '{"a":true}')
+				helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_nil(read(path))
+				helpers.assert_true(storage.release_owned(owner))
+			end)
+		end)
+	end
+
+end)

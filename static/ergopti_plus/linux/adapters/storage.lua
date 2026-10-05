@@ -447,6 +447,13 @@ local function _open_owned_temp()
 	}
 end
 
+--- Creates the native storage directory through the existing shell owner.
+--- @param directory string Captured destination's parent directory.
+--- @return boolean prepared
+local function prepare_config_dir(directory)
+	return Shell.run(string.format("mkdir -p %s 2>/dev/null", Shell.quote(directory))) == true
+end
+
 --- Persists a staged cache to disk atomically.
 --- @param staged table Candidate store that is not yet published in memory.
 --- @param prepared table Private source payload, admission and native effect journal.
@@ -469,7 +476,7 @@ local function _flush(staged, prepared)
 		-- keeps an already-existing directory independent of shell flavour while
 		-- still requiring mkdir's exact result on a first write. The path comes
 		-- from the environment and is quoted as one inert POSIX word.
-		if not Shell.run(string.format("mkdir -p %s 2>/dev/null", Shell.quote(_config_dir()))) then
+		if not prepare_config_dir(_config_dir()) then
 			Logger.error(LOG, "_flush(): configuration directory could not be created.")
 			return false
 		end
@@ -783,6 +790,22 @@ function M.publish_owned(owner, receipt, updates, backup_path, files)
 		for _, cell in pairs(detached) do if cell.present then cell.value = json.decode_lossless(assert(json.encode(cell.value))) end end
 		local candidate, candidate_document, candidate_proof = json.splice_root_object_source(proof, detached)
 		if not candidate or not owned_source_cells_safe(record.keys, candidate_document, candidate_proof) then return false end
+		if source.status == "absent" then
+			-- First owned publication needs the same directory admission as an
+			-- ordinary write. Serialize preparation as a same-file native effect.
+			local publish, remove = files.write_if_unchanged, files.delete
+			local prepared = owned_file_effect(function()
+				return prepare_config_dir(_STORE_PATH:match("^(.*)/[^/]+$"))
+			end, _STORE_PATH)
+			if prepared ~= true or not rawequal(files.write_if_unchanged, publish)
+				or not rawequal(files.delete, remove) then return false end
+			-- A native preparation callback may publish a successor or withdraw
+			-- authority. Never adopt it as this already-admitted source.
+			local current, current_document, current_proof = owned_store_source()
+			if not current or not owned_store_current(record, current_document, current_proof)
+				or current.status ~= source.status or current.content ~= source.content
+				or not rawequal(files.write_if_unchanged, publish) or not rawequal(files.delete, remove) then return false end
+		end
 		record.used, record.files, record.updates = true, owned_file_adapter(files), detached
 		record.file_owner, record.file_methods = files, { write_if_unchanged = files.write_if_unchanged, delete = files.delete }
 		record.before, record.candidate = source, candidate
