@@ -71,7 +71,15 @@ placeholder stamped with the current version.
 - **Rename or move a key**: add a `rename`, `move_section` or `merge_into` op to
   a new step **in the same commit** that renames it. Readers drop the old
   spelling at once: no runtime alias, no fallback read of the old name.
-- **Remove a feature or a key**: add a `delete` op in the same commit.
+- **Remove a feature or a key**: add a `delete` op in the same commit,
+  except when the retired entry is reported by the explicit outdated-key
+  cleanup. Such entries remain on disk until the user invokes that cleanup;
+  boot migrations and ordinary saves must preserve them. Readers still drop
+  the retired spelling immediately, without a runtime alias. The existing
+  retirement-only steps remain in the version chain with empty ops, so older
+  files advance their stamp without discarding the user's entries. This
+  exception does not remove the generic `delete` opcode or its interpreter
+  contract.
 - **Change a value's domain** (an enum renamed, `0`/`1` turned into booleans):
   add a `map_value` op; its `from` and `to` sets are disjoint so a replay
   changes nothing.

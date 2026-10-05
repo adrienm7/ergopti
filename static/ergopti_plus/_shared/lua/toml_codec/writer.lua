@@ -889,7 +889,7 @@ end
 --- @param operation_policy table|nil `{ require_conditional, on_error }`.
 --- @return boolean removed
 --- @return string|nil error_message
---- @return table|nil receipt Optional retained native physical inverse owner.
+--- @return table|function|nil receipt Private physical inverse or ordinary release-only owner.
 function M.remove_if_unchanged(path, file_adapter, expected_source, operation_policy)
 	if type(path) ~= "string" or path == "" or type(expected_source) ~= "table"
 		or expected_source.status ~= "ok" or type(expected_source.content) ~= "string" then
@@ -901,9 +901,22 @@ function M.remove_if_unchanged(path, file_adapter, expected_source, operation_po
 	end
 	local on_error = operation_policy and operation_policy.on_error
 	if type(file_adapter) == "table" and type(file_adapter.remove_if_unchanged) == "function" then
-		local called, removed, detail, receipt = pcall(file_adapter.remove_if_unchanged, path, expected_source, on_error)
+		local called, removed, detail, receipt, retry_cleanup = pcall(file_adapter.remove_if_unchanged, path, expected_source, on_error)
 		if not called then return false, tostring(removed) end
-		return removed == true, detail, receipt
+		if operation_policy and operation_policy.require_conditional == true then
+			return removed == true, detail, receipt
+		end
+		-- Ordinary inverse owners keep their exact release-only capability. A
+		-- private program inverse separately requires the guarded rich receipt.
+		if removed == true then return true end
+		local refusal_detail = tostring(detail or "conditional removal refused")
+		if type(receipt) == "function" then return false, refusal_detail, receipt end
+		if type(receipt) == "table" and receipt.path == path
+			and type(receipt.expected) == "table" and receipt.expected.status == expected_source.status
+			and receipt.expected.content == expected_source.content and type(retry_cleanup) == "function" then
+			return false, refusal_detail, retry_cleanup
+		end
+		return false, refusal_detail
 	end
 	if operation_policy and operation_policy.require_conditional == true then
 		return false, "conditional removal capability is unavailable"

@@ -10,6 +10,38 @@ local helpers = require("tests.helpers")
 local fixture = require("tests.support.onboarding_delivery_fixture")
 
 helpers.describe("onboarding configuration import transaction", function()
+	for _, route in ipairs({ "ready", "loadExistingConfig" }) do
+		helpers.it("(onboarding-import-transaction) " .. route .. " preserves empty maps at the native JSON boundary", function()
+			fixture.with_delivery(function(_, state, pending, errors, evaluations)
+				-- Native LuaSkin returns NSArray for an empty Lua table. This
+				-- independent boundary model is deliberately different from Json.encode.
+				state.native_encode = function(value, encode)
+					local function native_shape(item)
+						if type(item) ~= "table" then return item end
+						if next(item) == nil then return require("json").array({}) end
+						local result = {}
+						for key, child in pairs(item) do result[key] = native_shape(child) end
+						return result
+					end
+					return encode(native_shape(value))
+				end
+				local inspect = hs.fs.symlinkAttributes
+				hs.fs.symlinkAttributes = function(path)
+					if path:match("/config%.toml$") then return nil, "PRIVATE_NATIVE_DETAIL" end
+					return inspect(path)
+				end
+				fixture.dispatch(route, state, pending)
+				helpers.assert_eq(#evaluations, 1, "a successful absent read publishes exactly once")
+				local field = route == "ready" and "current" or "values"
+				helpers.assert_eq(next(state.payload[field]), nil, "the actual published map is empty")
+				helpers.assert_true(evaluations[1].code:find('"' .. field .. '":{}', 1, true) ~= nil,
+					"the actual JavaScript publication preserves an object-shaped empty map")
+				helpers.assert_nil(evaluations[1].code:find('"' .. field .. '":[]', 1, true),
+					"native empty-array conversion cannot reach the strict page contract")
+				helpers.assert_eq(#errors, 0)
+			end)
+		end)
+	end
 	helpers.it("(onboarding-import-transaction) new configuration directory restarts the pages from neutral values", function()
 		fixture.with_delivery(function(_, state, pending, errors, evaluations)
 			local debug_messages = {}
