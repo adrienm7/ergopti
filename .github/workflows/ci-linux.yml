@@ -438,6 +438,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Encode literal synthetic source keys through native SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
+        timeout-minutes: 1
+
       - name: Preserve canonical Unicode character classes through native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

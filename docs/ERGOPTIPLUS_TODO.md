@@ -2303,6 +2303,29 @@ These are software implementations; final hardware verification remains below.
   schema, source-count admission, session cursor, configuration, menu, foreign
   driver or reserved implementation change.
 
+- [~] **L142.** Linux literal ngram source keys: use the existing shared JSON
+  encoder for each admitted source label instead of escaping quotation marks
+  alone. Preserve count admission, flooring, SQL escaping, the delivered numeric
+  map conflict accumulator and every scalar. Actual public synthetic output and
+  native SQLite reproduce five failures among fifteen independent readonly
+  Python checks before, then all pass after on LuaJIT, Lua 5.4 and the signed
+  Jammy luv/libuv mixed profile. Each profile runs one actual native producer
+  successfully and one fifteen-subject oracle; these are not two test suites.
+  Backslash, newline, tab and carriage-return labels remain literal; quoted
+  Unicode, ordinary labels, raw tagged events, manual attribution and character
+  totals provide healthy controls. Production SQLite3.46.1 writes the database;
+  Python SQLite3.53.1 validates it independently. Eight additive registered units
+  reproduce five failures before and pass after; preserve the complete old
+  41826-byte Writer owner and its104 subjects. The complete112-subject owner
+  passes on all three profiles. Unit SQL receipts are modeled, while the public
+  producer uses real native libraries and storage; no physical input validation
+  is claimed. Windows/macOS source inspection finds existing full JSON encoders
+  on insertion, without native validation or a claim about macOS conflict-key
+  parity. Register both future Linux CI commands without launching workflows.
+  Preserve both language packs and principal notification/HTTP assertions. No
+  collector, Reader, count policy, schema, raw timing, session cursor, menu,
+  configuration, foreign driver or reserved implementation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
