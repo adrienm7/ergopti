@@ -344,9 +344,9 @@ try {
 		const observations = [];
 		for (const [index, archive] of policy.entries())
 			fs.writeFileSync(path.join(directory, archive.name), Buffer.alloc(32, index + 1));
-		function execute(tool, args) {
+		function execute(tool, args, filesystem = fs) {
 			const target = args.includes('--verify') ? args[3] : args[2];
-			const payload = fs.readFileSync(target);
+			const payload = filesystem.readFileSync(target);
 			observations.push({
 				tool,
 				args: [...args],
@@ -593,12 +593,78 @@ try {
 		assert.throws(() => Publication.validatePublication(directory));
 	});
 	check('preferred symlink refuses', ({ directory, observations, execute }) => {
-		fs.unlinkSync(path.join(directory, policy[0].name));
-		fs.symlinkSync(policy[1].name, path.join(directory, policy[0].name));
-		assert.throws(() =>
-			Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute })
+		const {
+			ArchiveContractFilesystem,
+			loadPublicationProducer,
+			verifyArchiveFilesystemModel
+		} = require('./fixtures/archive-contract-filesystem.cjs');
+		const defaults = JSON.parse(
+			fs.readFileSync(require('../lib/paths.cjs').shared('modules/updater/defaults.json'), 'utf8')
 		);
-		assert.equal(observations.length, 0);
+		verifyArchiveFilesystemModel(os.tmpdir());
+		const model = new ArchiveContractFilesystem(os.tmpdir());
+		const owner = loadPublicationProducer(
+			path.resolve(__dirname, '../build/macos-release-publication.cjs'),
+			model
+		);
+		const owned = model.mkdtempSync(path.join(os.tmpdir(), 'sparkle-link-contract-'));
+		const positive = path.join(owned, 'positive');
+		const negative = path.join(owned, 'negative');
+		model.mkdirSync(positive);
+		model.mkdirSync(negative);
+		try {
+			for (const archive of policy) {
+				const bytes = fs.readFileSync(path.join(directory, archive.name));
+				model.writeFileSync(path.join(positive, archive.name), bytes);
+				model.writeFileSync(path.join(negative, archive.name), bytes);
+			}
+			const modelExecute = (tool, args) => execute(tool, args, model);
+			const signed = owner.signArchives(positive, 'owned-signer', 'owned-key', {
+				execute: modelExecute,
+				defaults
+			});
+			assert.deepEqual(
+				signed.archives.map((record) => record.name),
+				policy.map((archive) => archive.name)
+			);
+			assert.equal(
+				observations.length,
+				policy.length * 2,
+				'the actual closed owner signs and verifies both real seeded archive bytes'
+			);
+			observations.length = 0;
+			model.unlinkSync(path.join(negative, policy[0].name));
+			model.symlinkSync(policy[1].name, path.join(negative, policy[0].name));
+			assert.throws(() =>
+				owner.signArchives(negative, 'owned-signer', 'owned-key', {
+					execute: modelExecute,
+					defaults
+				})
+			);
+			assert.equal(
+				observations.length,
+				0,
+				'the actual preferred-link refusal acquires no signer or fallback'
+			);
+			assert.equal(model.existsSync(path.join(negative, owner.RECEIPT)), false);
+			assert.equal(
+				model.descriptors.size,
+				0,
+				'every publication read retires its exact descriptor'
+			);
+		} finally {
+			model.rmSync(owned, { recursive: true });
+		}
+		assert.deepEqual(model.readdirSync(os.tmpdir()), []);
+		if (process.platform !== 'win32') {
+			// The original physical POSIX refusal remains the same mandatory contract.
+			fs.unlinkSync(path.join(directory, policy[0].name));
+			fs.symlinkSync(policy[1].name, path.join(directory, policy[0].name));
+			assert.throws(() =>
+				Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute })
+			);
+			assert.equal(observations.length, 0);
+		}
 	});
 	function asset(archive, payload = Buffer.alloc(32, 1)) {
 		return {
@@ -837,27 +903,34 @@ try {
 			rawPath,
 			JSON.stringify({ draft: false, tag_name: tag, assets: [asset(policy[0])] })
 		);
-		const shim = path.join(bin, 'gh');
+		const shim = path.join(bin, process.platform === 'win32' ? 'gh-shim.cjs' : 'gh');
 		fs.writeFileSync(
 			shim,
 			`#!${process.execPath}\n` +
 				`
 'use strict';
 const fs = require('node:fs'), path = require('node:path');
-const args = process.argv.slice(2);
+if (process.platform !== 'win32' || path.basename(process.execPath).toLowerCase() === 'gh.exe') {
+const args = process.platform === 'win32'
+ ? [path.basename(process.argv[1]), ...process.argv.slice(2)]
+ : process.argv.slice(2);
 fs.appendFileSync(process.env.OWNED_GH_CALLS, JSON.stringify(args) + '\\n');
 if (args[0] === 'api') {
  if (process.env.OWNED_GH_HTTP_REFUSAL === '1') { process.stderr.write('INERT_PRIVATE_GH_FAILURE'); process.exit(1); }
- process.stdout.write(fs.readFileSync(process.env.OWNED_GH_RELEASE));
+ fs.writeSync(1, fs.readFileSync(process.env.OWNED_GH_RELEASE));
 } else if (args[0] === 'release' && args[1] === 'download') {
  fs.copyFileSync(process.env.OWNED_GH_PAYLOAD, path.join(args[args.indexOf('--dir') + 1], args[args.indexOf('--pattern') + 1]));
 } else if (args[0] === 'release' && args[1] === 'view') {
  const raw = JSON.parse(fs.readFileSync(process.env.OWNED_GH_RELEASE));
- process.stdout.write(JSON.stringify({isDraft: raw.draft, tagName: raw.tag_name, assets: raw.assets.map(({name,size}) => ({name,size}))}));
+ fs.writeSync(1, JSON.stringify({isDraft: raw.draft, tagName: raw.tag_name, assets: raw.assets.map(({name,size}) => ({name,size}))}));
 } else process.exit(2);
+process.exit(0);
+}
 `,
 			{ mode: 0o700 }
 		);
+		// Windows executes PE binaries rather than a POSIX executable shebang.
+		if (process.platform === 'win32') fs.copyFileSync(process.execPath, path.join(bin, 'gh.exe'));
 		const environment = {
 			...process.env,
 			PATH: bin + path.delimiter + process.env.PATH,
@@ -865,6 +938,11 @@ if (args[0] === 'api') {
 			OWNED_GH_RELEASE: rawPath,
 			OWNED_GH_PAYLOAD: payloadPath
 		};
+		if (process.platform === 'win32')
+			environment.NODE_OPTIONS =
+				(process.env.NODE_OPTIONS || '') +
+				' --require ' +
+				JSON.stringify(shim.replaceAll('\\', '/'));
 		const owner = require.resolve('../build/macos-release-publication.cjs');
 		const target = path.join(directory, 'cli-download');
 		const success = spawnSync(
