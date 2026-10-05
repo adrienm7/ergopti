@@ -1315,6 +1315,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		return Map("capture_source", ObjBindMethod(this, "Capture"),
 			"source_current", ObjBindMethod(this, "Current"),
 			"entry", ObjBindMethod(this, "Entry"),
+			"entry_bound", ObjBindMethod(this, "EntryBound"),
 			"admit", ObjBindMethod(this, "Admit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
@@ -1448,6 +1449,33 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !this.Current(Receipt)
 			throw Error("The private API source authority changed during resolution.")
 		return Entry is Map ? LLM_Menu_DeepClone(Entry) : false
+	}
+
+	/**
+	 * Resolves detached entries from the exact originating verified source.
+	 * @param {String} ProviderId Native local-provider identifier.
+	 * @param {LLM_Menu_ApiPrivateSourceReceipt} Receipt Same-owner captured authority.
+	 * @returns {Map|Integer} Detached entry, or false only for verified absence.
+	 */
+	EntryBound(ProviderId, Receipt) {
+		PreviousCritical := Critical("Off")
+		try return this._EntryBoundNonCritical(ProviderId, Receipt)
+		finally Critical(PreviousCritical)
+	}
+
+	_EntryBoundNonCritical(ProviderId, Receipt) {
+		Held := this._Held(Receipt)
+		if !(Held is Map)
+			throw Error("The private API source receipt is unavailable.")
+		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+			throw ValueError("The requested local server is outside the native catalogue.")
+		if !this.Current(Receipt)
+			throw Error("The private API source authority changed during resolution.")
+		Entry := this._EntryFrom(Held, ProviderId)
+		Detached := Entry is Map ? LLM_Menu_DeepClone(Entry) : false
+		if !this.Current(Receipt)
+			throw Error("The private API source authority changed during resolution.")
+		return Detached
 	}
 
 	/** Applies exact configured fields through the existing joint WAL and native lifecycle. */
