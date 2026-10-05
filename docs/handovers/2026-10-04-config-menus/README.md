@@ -83,7 +83,8 @@ Release publication was skipped. Final integrated-source CI remains mandatory.
 `prepared/packets.json` records eight frozen patches and exact SHA256 values.
 The continuation feature branch applies the macOS Boolean-leaf packet after
 matching its exact source preimage; its native qualification remains pending.
-The other seven packets remain unapplied. Frozen patch bytes and review receipts
+The shared Lua installed-record packet is also applied after matching all source
+and test preimages. The other six packets remain unapplied. Frozen patch bytes and review receipts
 are historical evidence and must not be rewritten to reflect new integration.
 Each subdirectory preserves its author's source review, dependency/preimage
 metadata and bounded qualification notes. The shared-menu dependency order is
