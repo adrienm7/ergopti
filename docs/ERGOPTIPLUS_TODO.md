@@ -3423,6 +3423,33 @@ the reader's required token_json transport column; the owner is notified without
 changing or waiving its assertions. These results do not qualify the newer pause
 composition or complete TODO31.
 
+A shared two-source lifecycle-facts transducer now combines exact engine/system
+prefixes and source retirement without collecting a second history. It copies
+independent source tokens, revisions and private capability methods; a genuine
+hardware-generation replacement clears old observations. Initial posture stays
+unknown and notification-derived posture stays observed-only. Output contains
+neither permission nor a global transition timestamp, clock domain or wall epoch.
+Both exact source scopes must detach and complete their real writer frames before
+aggregate retirement. Independent review passes28 author and ten additional
+controls on Lua54/LuaJIT, including held real actor frames, notifier coroutine
+debt, copied-output/port mutation and old-source retirement without querying a
+successor. Nine exact mutations are rejected on both interpreters. The packet's
+original536d actor dependency is preserved as evidence; separate qualification
+of actual1834 plus unchanged62/48/31 controls passes179/0. Final Root gates
+must cover that actual dependency. One review-only incorrect busy-detach
+expectation is retained unqualified; its stronger successor asserts refused
+in-callback detach and actual successful retirement after the writer unwinds.
+
+The native pause API now also forwards its optional fourth refusal callback to
+the existing actor, matching engine/system subscriptions. It preserves three-arg
+behavior and returns the original token/reason/scope. The original31 test prefix
+is byte-identical; five added outside-callback cases fail before forwarding and
+pass afterward (36/0), with63 unchanged native-fixture cases. Four independent
+fixtures pass and reject the four exact mutations; four shared actor controls
+pass on both Lua ABIs. Native adapter fixtures use actual Lua54 math.type and
+are not credited as native LuaJIT execution. Refusal revokes before notification
+and keeps actual terminal frame debt; no permission or capture is activated.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
