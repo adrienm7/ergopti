@@ -3920,6 +3920,8 @@ Explicit cleanup meta controls now inspect the authenticated RootReceipt through
 
 Explicit Windows namespace deletion now normalizes its semantic expectation only for emptied implicit parents. Real retained header and inline-container identities are preserved, including quoted literal dots, empty quoted segments and case twins. Two independent source reviews pass57/0 portable predicates and preserve every old assertion; no-op checks measure exact source and modification time, not inode identity. Actual Windows syntax, all14 subjects and native cleanup causality remain pending.
 
+The shared physical record scanner now reuses the existing strict quote-aware assignment splitter instead of taking the first equals sign inside quoted keys. Actual Linux cleanup admits the proven ahk root beside an unowned quoted key containing equals, verifies the exact backup and preserves the complete independently handwritten survivor, including empty-array kind. The original valid-source limitation fixture now has stronger identity/removal/backup predicates; malformed, forged and stale refusals and447 earlier corpora remain unchanged. Independent Linux201/0 on both number models and portable macOS222/0 reproduce18 predecessor failures; actual Hammerspoon and final selected/native CI remain separately required.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical

@@ -726,24 +726,7 @@ end
 --- Parse a single key=value line, splitting on the FIRST '=' that is not
 --- inside a quoted region. Returns the trimmed key/value and original RHS,
 --- preserving string-owned whitespace for a pending multiline value.
-split_kv = function(line)
-	local in_dbl, in_sgl, escape = false, false, false
-	for i = 1, #line do
-		local c = line:sub(i, i)
-		if escape then
-			escape = false
-		elseif c == "\\" and in_dbl then
-			escape = true
-		elseif c == '"' and not in_sgl then
-			in_dbl = not in_dbl
-		elseif c == "'" and not in_dbl then
-			in_sgl = not in_sgl
-		elseif not in_dbl and not in_sgl and c == "=" then
-			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1)), line:sub(i + 1)
-		end
-	end
-	return nil, nil
-end
+split_kv = RecordScanner.split_assignment
 
 --- Parse assignment segments with the same quoted identity as table headers.
 parse_key = function(raw)
