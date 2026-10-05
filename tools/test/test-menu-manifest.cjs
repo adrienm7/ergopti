@@ -351,6 +351,38 @@ function checkChoiceProjection() {
 				name + ': refusal cannot publish'
 			);
 		}
+		const statusHeader = '[[menu.metrics_migration_unavailable_rows]]\ntype = "label"\n';
+		for (const [name, mutated] of [
+			[
+				'missing identity',
+				original.replace(statusHeader + 'id = "metrics_migration_unavailable"\n', statusHeader)
+			],
+			[
+				'empty caption',
+				original.replace('i18n = "menu.metrics.migration_unavailable"', 'i18n = ""')
+			],
+			[
+				'numeric caption',
+				original.replace('i18n = "menu.metrics.migration_unavailable"', 'i18n = 42')
+			],
+			...['command', 'caption_getter', 'checked_when', 'disabled', 'I18N'].map((field) => [
+				field,
+				original.replace(statusHeader, statusHeader + field + ' = "foreign"\n')
+			])
+		]) {
+			assert.notEqual(mutated, original, name + ': label mutation must target the real source');
+			result = execute(mutated);
+			assert.notEqual(result.status, 0, name + ': the compiler rejects invalid inert labels');
+			assert.match(
+				result.stderr,
+				/inert label needs an identity and caption without behavior metadata/
+			);
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedTemplates,
+				name + ': rejected label cannot publish'
+			);
+		}
 		result = execute(original);
 		assert.equal(result.status, 0, result.stderr);
 		assert.deepEqual(
@@ -2017,4 +2049,95 @@ checkPrivacyTriggerControls();
 		}
 	}
 	console.log('Tap-Hold key clearing: declared platform captions and unchanged native owners.');
+}
+
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(
+				REPO_ROOT,
+				'static/ergopti_plus/_shared/tests/corpus/metrics/migration_status_menu.json'
+			),
+			'utf8'
+		)
+	);
+	assert.equal(corpus.statuses.length, 2, 'exactly the two existing fixed migration statuses');
+	for (const status of corpus.statuses)
+		assert.deepEqual(
+			manifest[status.section],
+			[status.row],
+			'handwritten inert-status declaration'
+		);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	const begin = source.indexOf('local function _migration_row(k)');
+	const end = source.indexOf('--- Renders the rows of the metrics submenu', begin);
+	assert(begin >= 0 && end > begin, 'actual native migration provider must exist');
+	const body = source.slice(begin, end);
+	function assertStatusWiring(text, statuses) {
+		for (const status of statuses)
+			assert(
+				text.includes('ManifestMenu.template_rows("' + status.section + '")'),
+				'actual native provider must consume each shared inert-status declaration'
+			);
+		assert.match(text, /if type\(k\.get_migration_progress\) ~= "function" then/);
+		assert.match(text, /if not progress\.running then/);
+		assert.match(
+			text,
+			/label = string\.format\(i18n_safe\("menu\.metrics\.migration_progress"\),\s*progress\.scanned, progress\.total\)/
+		);
+		assert.match(
+			text,
+			/if type\(k\.cancel_migration\) == "function" then k\.cancel_migration\(\) end/
+		);
+	}
+	assertStatusWiring(body, corpus.statuses);
+	assert.throws(
+		() =>
+			assertStatusWiring(
+				body.replaceAll('ManifestMenu.template_rows', 'WrongProvider'),
+				corpus.statuses
+			),
+		/consume each shared/
+	);
+	for (const status of corpus.statuses)
+		assert.throws(
+			() =>
+				assertStatusWiring(
+					body.replace('"' + status.section + '"', '"wrong_status"'),
+					corpus.statuses
+				),
+			/consume each shared/
+		);
+	const locales = JSON.parse(
+		readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locale_order.json'), 'utf8')
+	).order;
+	assert.equal(locales.length, 21);
+	for (const code of locales) {
+		const strings = JSON.parse(
+			readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json'),
+				'utf8'
+			)
+		);
+		for (const status of corpus.statuses) {
+			assert.equal(typeof strings[status.row.i18n], 'string', code + ': existing inert caption');
+			assert.notEqual(strings[status.row.i18n], '');
+			if (status.locales[code]) assert.equal(strings[status.row.i18n], status.locales[code]);
+		}
+		if (corpus.running.locales[code])
+			assert.equal(
+				strings['menu.metrics.migration_progress']
+					.replace('%d', corpus.running.scanned)
+					.replace('%d', corpus.running.total),
+				corpus.running.locales[code]
+			);
+	}
+	console.log(
+		'Metrics migration labels: independent inert declarations, 21 translations and actual state-provider wiring.'
+	);
 }

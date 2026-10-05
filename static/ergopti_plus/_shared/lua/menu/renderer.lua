@@ -625,6 +625,17 @@ function M.new(deps)
 						for _, child in ipairs(included) do rows[#rows + 1] = child end
 					elseif item.type == "---" then
 						row = { separator = true }
+					elseif item.type == "label" then
+						local fields = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
+						local valid = type(item.id) == "string" and item.id ~= ""
+							and type(item.i18n) == "string" and item.i18n ~= ""
+							and (item.unavailable == nil or item.unavailable == "hide")
+						for field in pairs(item) do if not fields[field] then valid = false end end
+						if not valid then
+							Logger.error(LOG, "Invalid inert label in template '%s' — provider rows refused.", key)
+							return nil
+						end
+						row = { label = i18n.get(item.i18n), disabled = true }
 					elseif item.type == "command" then
 						row = R.command_row(key, item.id, commands, getters)
 						if not row then return nil end

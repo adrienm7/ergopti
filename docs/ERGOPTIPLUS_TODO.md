@@ -3650,13 +3650,23 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 95, macOS 152, Linux 96, each
+  drivers still build (current baseline: Windows 95, macOS 152, Linux 94, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+
+Linux Metrics unavailable/idle migration readouts now consume shared inert label
+templates. Running progress and cancellation retain their native owners. The
+composition graph credits executable template publication per platform and keeps
+clicked-submenu action requirements intact; independent malformed-row and native
+state cases retain the original assertions. The census retires exactly two Linux
+fixed-caption sites. Source-selected local gates pass 359 JavaScript checks,
+14,667 portable macOS and 7,860 Linux unit cases, plus 101/189 portable E2E
+checks (one macOS host-specific skip). Items 54/81 stay partial; native Windows,
+three-OS packaging/installation and installed-device acceptance remain required.
 
 The fixed per-key native/no-action command now consumes one shared command
 declaration on all three drivers, with the existing Windows/Linux and macOS
@@ -4217,7 +4227,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 95, macOS 152 and Linux 96 rows are still built by the
+  Windows 95, macOS 152 and Linux 94 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
