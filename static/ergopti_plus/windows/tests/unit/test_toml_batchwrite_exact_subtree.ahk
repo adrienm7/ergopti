@@ -224,7 +224,7 @@ _TBES_ConfigDeletionAncestorVectors() {
 			Expected: '[future]`ntext="001" # exact neighbor`nflag=false`n' },
 		{ Id: 'inline explicit empty container', Source: 'stale = {section = {label = "old"}, empty = {}}`n[future]`ntext="001" # exact neighbor`nflag=false`n',
 			Updates: [{ Section: 'stale.section', Key: 'label', Delete: 1 }], Prefixes: [],
-			Expected: 'stale = {empty = {}, section = {}}`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
+			Expected: 'stale = {section = {}, empty = {}}`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
 		{ Id: 'removed inline container parent', Source: 'stale = {section = {label = "old"}}`n[future]`ntext="001" # exact neighbor`nflag=false`n',
 			Updates: [], Prefixes: ['stale.section'],
 			Expected: 'stale = {}`n[future]`ntext="001" # exact neighbor`nflag=false`n' },
