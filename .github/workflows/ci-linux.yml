@@ -376,6 +376,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Project native modifier-hold statistics into actual dashboard consumers
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" node tests/hardware/run_sqlite_kc_hold_consumers.cjs
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_READER_TEST_LUA=lua5.4 node tests/hardware/run_sqlite_kc_hold_consumers.cjs
+        timeout-minutes: 1
+
       - name: Refuse malformed release pages through existing strict JSON admission
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

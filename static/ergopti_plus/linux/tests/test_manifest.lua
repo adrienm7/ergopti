@@ -249,6 +249,7 @@ return {
 	"tests.unit.modules.keylogger.test_keylogger_privacy_filters",
 	"tests.unit.modules.keylogger.test_metrics_collector_privacy",
 	"tests.unit.modules.keylogger.test_metrics_toggles_persist",
+	"tests.unit.modules.keylogger.test_reader_kc_hold_contract",
 	"tests.unit.modules.keylogger.test_sqlite_command",
 	"tests.unit.modules.keylogger.test_sqlite_first_open",
 	"tests.unit.modules.keylogger.test_suggestion_counters",
