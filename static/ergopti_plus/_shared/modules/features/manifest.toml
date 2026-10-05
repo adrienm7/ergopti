@@ -492,12 +492,28 @@ platforms = ["hs", "linux"]
 # ===========================================
 
 [[features.hotstrings.autocorrection]]
-id = "caps"
+id = "names"
 default = { enabled = false, time_activation_seconds = 0.5 }
 recommended = { enabled = false, time_activation_seconds = 0.5 }
 input_altering = true
 type = "feature"
-description_key = "menu.hotstrings.autocorrection.caps"
+description_key = "menu.hotstrings.autocorrection.names"
+
+[[features.hotstrings.autocorrection]]
+id = "abbreviations"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+input_altering = true
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.abbreviations"
+
+[[features.hotstrings.autocorrection]]
+id = "technical_terms"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+input_altering = true
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.technical_terms"
 
 
 
@@ -1026,6 +1042,14 @@ recommended = { enabled = false }
 input_altering = true
 type = "feature"
 description_key = "menu.hotstrings.dynamic.ssn_prefixes"
+
+[[features.hotstrings.dynamic]]
+id = "user_code"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+input_altering = true
+type = "feature"
+description_key = "menu.hotstrings.user_code.title"
 
 [[features.hotstrings.dynamic]]
 id = "text_expansion_personal_information"
@@ -3646,6 +3670,87 @@ linux_section = "personal_info"
 i18n = "dynamichotstrings.textexpansionpersonalinformation"
 legacy_key = "TextExpansionPersonalInformation"
 is_module_placeholder = true
+
+# Programmable hotstrings remain opt-in. Native adapters supply file execution
+# and source-opening ports; the labels and command order have one shared owner.
+[[menu.programmable_hotstring_entry]]
+type = "group"
+id = "programmable_hotstrings"
+i18n = "menu.hotstrings.user_code.title"
+platforms = ["hs", "linux"]
+# Windows projects the declared source controls inline in its dynamic category.
+# The additional parent belongs only to the Lua category providers.
+unavailable = "hide"
+
+[[menu.programmable_hotstrings]]
+type = "feature"
+path = "hotstrings.dynamic.user_code"
+i18n = "menu.hotstrings.user_code.title"
+
+[[menu.programmable_hotstrings]]
+type = "command"
+id = "open_user_hotstring_source"
+i18n = "menu.hotstrings.user_code.open_source"
+
+[[menu.programmable_hotstrings]]
+type = "command"
+id = "reload_user_hotstring_source"
+i18n = "menu.hotstrings.user_code.reload_source"
+
+[[menu.programmable_hotstrings]]
+type = "command"
+id = "create_user_hotstring_example"
+i18n = "menu.hotstrings.user_code.create_example"
+
+# Personal-source controls share their order and capability refusal policy.
+[[menu.personal_file_controls]]
+type = "check"
+id = "personal_file_enabled"
+i18n = "menu.common.enabled"
+checked_when = ["personal_file_enabled"]
+disabled_when = ["personal_file_owner_ready"]
+
+[[menu.personal_file_controls]]
+type = "command"
+id = "personal_file_delay"
+i18n = "hs_config.label_delay"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_file_controls]]
+type = "command"
+id = "personal_file_priority"
+i18n = "hs_config.label_priority"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_file_controls]]
+type = "command"
+id = "personal_file_color"
+i18n = "hs_config.label_color"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_file_controls]]
+type = "check"
+id = "personal_file_tooltip"
+i18n = "hs_config.label_tooltip"
+checked_when = ["personal_file_tooltip"]
+disabled_when = ["personal_file_owner_ready"]
+
+[[menu.personal_file_unavailable]]
+type = "command"
+id = "personal_file_unavailable"
+i18n = "healthcheck.state.unavailable"
+disabled_when = ["personal_file_owner_ready"]
+disabled_reason_key = "menu.hotstrings.personal_file_unavailable"
+
+[[menu.personal_directory_unavailable]]
+type = "command"
+id = "personal_directory_unavailable"
+i18n = "healthcheck.state.unavailable"
+disabled_when = ["personal_directory_ready"]
+disabled_reason_key = "menu.hotstrings.personal_directory_unavailable"
 
 [menu.gesture_slots]
 2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]

@@ -18,7 +18,7 @@ local Groups = require("modules.keymap.registry_groups")
 local i18n   = require("infra.i18n")
 local ManifestReader = require("infra.manifest_reader")
 local Languages = require("hotstrings.languages")
-local BulkScope = require("hotstrings.bulk_scope")
+local PersonalFiles = require("hotstrings.personal_files")
 local LOG    = "keymap.registry"
 
 local _state = nil
@@ -85,6 +85,16 @@ end
 --- @param section_sources table|nil Sections a layout extension's files supply.
 function M.load_toml(name, path, section_sources, personal_source)
 	return Groups.load_toml(name, path, section_sources, personal_source)
+end
+
+--- Replaces a registered native personal source inside its existing journal.
+--- @param name string
+--- @param path string
+--- @param candidate string
+--- @param publish function
+--- @return boolean committed
+function M.replace_personal_source(name, path, candidate, publish, resolution)
+	return Groups.replace_personal_source(name, path, candidate, publish, resolution)
 end
 
 --- Atomically replaces one enabled TOML group while preserving a deliberately
@@ -168,6 +178,12 @@ function M.personal_file_scope_binding(name)
 	return Groups.personal_file_scope_binding(name)
 end
 
+--- Captures the private native journal of one admitted personal publisher.
+--- @return table|nil owner Bound publication and inverse acknowledgements.
+function M.capture_publication_owner()
+	return Groups.capture_publication_owner()
+end
+
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.
@@ -217,6 +233,7 @@ function M.set_repeat_feature_enabled(enabled)
 		Logger.error(LOG, "Magic-key repeat state must be a boolean.")
 		return false
 	end
+	Groups.note_registry_mutation()
 	_repeat_enabled = enabled
 	-- A user-facing feature toggle with no log line leaves the repeat engine's
 	-- state unrecoverable from the logs, which is where every other setting's
@@ -358,11 +375,22 @@ function M.set_category_scope_enabled(targets, enabled, publish)
 			end
 		end
 	end
-	local plan, reason = BulkScope.plan(inventory, targets, enabled)
+	local plan, reason = require("hotstrings.personal_adoption").plan_selection(inventory, targets, enabled)
 	if not plan then
 		Logger.error(LOG, "Category selection refused: %s.", reason)
 		return false
 	end
+	for _, id in ipairs(targets) do
+		if PersonalFiles.components(id) then
+			local record = require("infra.personal_hotstrings").adoption(id)
+			local native = M.personal_file_scope_binding(id)
+			if not record or not native or native.current() ~= true
+				or require("infra.personal_hotstrings").adoption_current(record) ~= true then return false end
+		end
+	end
+	local personal = false
+	for _, id in ipairs(targets) do if PersonalFiles.components(id) then personal = true; break end end
+	if personal and require("infra.preferences").personal_choices_available(plan) ~= true then return false end
 	local changes, by_id = {}, {}
 	for _, choice in ipairs(plan) do
 		if choice.section == nil then

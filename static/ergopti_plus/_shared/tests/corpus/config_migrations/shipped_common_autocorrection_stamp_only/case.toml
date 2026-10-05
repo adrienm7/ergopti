@@ -1,0 +1,6 @@
+[case]
+description = "A file without a legacy common section receives only the shipped schema stamp and no new activation choices."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 10
+to_version = 11

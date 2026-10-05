@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local M = {}
+local PersonalFiles = require("hotstrings.personal_files")
 local hs            = hs
 local Logger        = require("infra.logger")
 local DeferredWork  = require("infra.deferred_work")
@@ -45,6 +46,8 @@ local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local HotstringLanguages = require("hotstrings.languages")
 local BulkScope = require("hotstrings.bulk_scope")
 local ManifestReader = require("infra.manifest_reader")
+local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
+local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 
 
 
@@ -455,7 +458,8 @@ function M.build_groups(ctx, only, counts)
 	-- A section an extension binds is drawn in that extension's submenu instead.
 	local _, bound_by_group = M.bound_sections(ctx)
 	for _, name in ipairs(top_names) do
-		if name == "custom" or name == "personal" or name:sub(1, 13) == "personal_ext_" then goto continue_group end
+		if name == "custom" or name == "personal" or name:sub(1, 13) == "personal_ext_"
+			or PersonalFiles.components(name) then goto continue_group end
 		if type(only) == "table" and not only[name] then goto continue_group end
 
 		local enabled  = groupEnabled(ctx, name)
@@ -463,6 +467,9 @@ function M.build_groups(ctx, only, counts)
 		local has_secs = type(sections) == "table" and #sections > 0
 
 		local total = (counts and counts.group_counts) and (counts.group_counts[name] or 0) or 0
+		if name == "dynamichotstrings" and enabled and dh_mod.user_code_is_enabled() then
+			total = total + dh_mod.user_code_count()
+		end
 		local base_label = groupLabel(ctx, name)
 		local item = {
 			-- Always show count (even 0) — only enabled sections contribute
@@ -538,6 +545,11 @@ function M.build_groups(ctx, only, counts)
 						prev_was_sep = false
 					end
 				end
+			end
+			if name == "dynamichotstrings" then
+				local programmable = ProgrammableMenuPolicy.build_entry_rows(ManifestMenu,
+					function() return ProgrammableHotstrings.build(ctx) end)
+				for _, row in ipairs(programmable) do sec_menu[#sec_menu + 1] = row end
 			end
 			local toml_path = toml_path_for_group(ctx, name)
 			local render_ctx = { commands = {

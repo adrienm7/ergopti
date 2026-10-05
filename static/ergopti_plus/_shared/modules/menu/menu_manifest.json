@@ -60,6 +60,113 @@
 			}
 		]
 	},
+	"programmable_hotstring_entry": [
+		{
+			"type": "group",
+			"id": "programmable_hotstrings",
+			"i18n": "menu.hotstrings.user_code.title",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"programmable_hotstrings": [
+		{
+			"type": "feature",
+			"path": "hotstrings.dynamic.user_code",
+			"i18n": "menu.hotstrings.user_code.title"
+		},
+		{
+			"type": "command",
+			"id": "open_user_hotstring_source",
+			"i18n": "menu.hotstrings.user_code.open_source"
+		},
+		{
+			"type": "command",
+			"id": "reload_user_hotstring_source",
+			"i18n": "menu.hotstrings.user_code.reload_source"
+		},
+		{
+			"type": "command",
+			"id": "create_user_hotstring_example",
+			"i18n": "menu.hotstrings.user_code.create_example"
+		}
+	],
+	"personal_file_controls": [
+		{
+			"type": "check",
+			"id": "personal_file_enabled",
+			"i18n": "menu.common.enabled",
+			"checked_when": [
+				"personal_file_enabled"
+			],
+			"disabled_when": [
+				"personal_file_owner_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "personal_file_delay",
+			"i18n": "hs_config.label_delay",
+			"disabled_when": [
+				"personal_file_owner_ready"
+			],
+			"disabled_reason_key": "menu.hotstrings.personal_file_unavailable"
+		},
+		{
+			"type": "command",
+			"id": "personal_file_priority",
+			"i18n": "hs_config.label_priority",
+			"disabled_when": [
+				"personal_file_owner_ready"
+			],
+			"disabled_reason_key": "menu.hotstrings.personal_file_unavailable"
+		},
+		{
+			"type": "command",
+			"id": "personal_file_color",
+			"i18n": "hs_config.label_color",
+			"disabled_when": [
+				"personal_file_owner_ready"
+			],
+			"disabled_reason_key": "menu.hotstrings.personal_file_unavailable"
+		},
+		{
+			"type": "check",
+			"id": "personal_file_tooltip",
+			"i18n": "hs_config.label_tooltip",
+			"checked_when": [
+				"personal_file_tooltip"
+			],
+			"disabled_when": [
+				"personal_file_owner_ready"
+			]
+		}
+	],
+	"personal_file_unavailable": [
+		{
+			"type": "command",
+			"id": "personal_file_unavailable",
+			"i18n": "healthcheck.state.unavailable",
+			"disabled_when": [
+				"personal_file_owner_ready"
+			],
+			"disabled_reason_key": "menu.hotstrings.personal_file_unavailable"
+		}
+	],
+	"personal_directory_unavailable": [
+		{
+			"type": "command",
+			"id": "personal_directory_unavailable",
+			"i18n": "healthcheck.state.unavailable",
+			"disabled_when": [
+				"personal_directory_ready"
+			],
+			"disabled_reason_key": "menu.hotstrings.personal_directory_unavailable"
+		}
+	],
 	"gesture_slots": {
 		"2": [
 			"tap_2",

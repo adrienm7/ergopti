@@ -12,8 +12,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Measured delays. The shared planner writes an explicit delay wherever the
 ---    corpus inheritance this registry resolves differs from the manifest's
----    recommendation: deleting the override alone leaves autocorrection.caps on
----    its file-level 1.0 s where 0.5 s is recommended.
+---    recommendation: deleting overrides leaves the three common families on
+---    their file-level 1.0 s where 0.5 s is recommended.
 --- 2. Reader-verified candidate. The override candidate is parsed back by the
 ---    reader the engine uses and must say exactly what the plan wrote, so a
 ---    spelling the writer cannot address refuses the scope instead of surviving.
@@ -57,6 +57,10 @@ local OWNERS = {
 	{ key = "preview_colored_tooltips", setter = "set_preview_colored_tooltips" },
 	{ key = "preview_ai_enabled", setter = "set_preview_ai_enabled" },
 	{ key = "dynamichotstrings_enabled" },
+	{ key = "dynamichotstrings_user_code_time_activation_seconds", native = "dynamic",
+		setter = "set_user_code_time_activation", getter = "user_code_time_activation" },
+	{ key = "dynamichotstrings_user_code_enabled", native = "dynamic",
+		setter = "set_user_code_enabled", getter = "user_code_is_enabled" },
 }
 local OWNER = {}
 for _, owner in ipairs(OWNERS) do OWNER[owner.key] = owner end
@@ -121,6 +125,7 @@ end
 function M.new(options)
 	assert(type(options) == "table", "hotstrings scope options are required")
 	local keymap, Config, state = options.keymap, options.config, options.state
+	local Dynamic = options.dynamic or require("modules.dynamic_hotstrings")
 	assert(type(keymap) == "table" and type(Config) == "table" and type(state) == "table",
 		"hotstrings scope needs the keymap, the override owner and the menu state")
 	for _, name in ipairs({ "list_groups", "get_sections", "is_section_enabled", "is_group_enabled",
@@ -132,9 +137,13 @@ function M.new(options)
 		assert(type(keymap[name]) == "function", "hotstrings scope delimiter port missing: " .. name)
 	end
 	for _, owner in ipairs(OWNERS) do
+		local native = owner.native == "dynamic" and Dynamic or keymap
 		for _, name in ipairs({ owner.setter, owner.getter }) do
-			assert(type(keymap[name]) == "function", "hotstrings scope keymap port missing: " .. name)
+			assert(type(native[name]) == "function", "hotstrings scope native port missing: " .. name)
 		end
+	end
+	for _, name in ipairs({ "user_code_scope_snapshot", "user_code_scope_adopt", "user_code_scope_restore" }) do
+		assert(type(Dynamic[name]) == "function", "hotstrings scope dynamic port missing: " .. name)
 	end
 	assert(type(keymap.DELAY_KEY_TO_CATEGORY) == "table", "hotstrings scope needs the legacy delay owners")
 	for _, name in ipairs({ "scope_snapshot", "adopt_scope_source", "parse_override_content", "delay_projection",
@@ -151,7 +160,8 @@ function M.new(options)
 	--- @param key string Menu-state key.
 	--- @return any
 	local function current(key)
-		if OWNER[key].getter then return keymap[OWNER[key].getter]() end
+		local owner = OWNER[key]
+		if owner.getter then return (owner.native == "dynamic" and Dynamic or keymap)[owner.getter]() end
 		return state[key]
 	end
 
@@ -259,13 +269,20 @@ function M.new(options)
 	--- Applies scalar values and the engine switch through their native owners.
 	--- @param values table Menu-state key to value.
 	--- @return boolean committed
-	local function apply_values(values)
+	local function apply_values(values, programmable)
 		for _, owner in ipairs(OWNERS) do
 			local value = values[owner.key]
-			if value ~= nil and owner.setter and current(owner.key) ~= value then
+			if value ~= nil and owner.native ~= "dynamic" and owner.setter and current(owner.key) ~= value then
 				if keymap[owner.setter](value) ~= true then return false end
 				if owner.key == "trigger_char" and options.editor then options.editor.set_trigger_char(value) end
 			end
+		end
+		if programmable then
+			local seconds, enabled = values.dynamichotstrings_user_code_time_activation_seconds,
+				values.dynamichotstrings_user_code_enabled
+			if seconds == nil then seconds = current("dynamichotstrings_user_code_time_activation_seconds") end
+			if enabled == nil then enabled = current("dynamichotstrings_user_code_enabled") end
+			if Dynamic.user_code_scope_adopt(programmable, seconds, enabled) ~= true then return false end
 		end
 		for _, owner in ipairs(OWNERS) do
 			if values[owner.key] ~= nil then state[owner.key] = clone(values[owner.key]) end
@@ -361,7 +378,9 @@ function M.new(options)
 	ports.runtime = {
 		capture = function()
 			local config = Config.scope_snapshot()
-			if type(config) ~= "table" or type(state.hotstrings) ~= "table" or type(state.delays) ~= "table" then
+			local programmable = Dynamic.user_code_scope_snapshot()
+			if type(config) ~= "table" or type(programmable) ~= "table"
+				or type(state.hotstrings) ~= "table" or type(state.delays) ~= "table" then
 				return nil
 			end
 			local groups, sections = {}, {}
@@ -381,7 +400,7 @@ function M.new(options)
 			for _, def in ipairs(keymap.get_terminator_defs()) do
 				if def.key then terminators[def.key] = keymap.is_terminator_enabled(def.key) end
 			end
-			local snapshot = { config = config, groups = groups, sections = sections, values = values,
+			local snapshot = { config = config, programmable = programmable, groups = groups, sections = sections, values = values,
 				hotstrings = clone(state.hotstrings), delays = clone(state.delays), reloaded = {},
 				candidate = active.overrides, terminators = terminators,
 				terminator_states = clone(state.terminator_states) }
@@ -425,9 +444,10 @@ function M.new(options)
 			local retained = clone(state.terminator_states or {})
 			for key in pairs(defaults) do retained[key] = nil end
 			state.terminator_states = retained
-			return apply_values(values)
+			return apply_values(values, active.programmable)
 		end,
 		restore = function(snapshot)
+			if Dynamic.user_code_scope_restore(snapshot.programmable) ~= true then return false end
 			if snapshot.adopted then
 				if Config.adopt_scope_source(fence, snapshot.config.source, secondary.restore) ~= true then return false end
 				snapshot.adopted = false

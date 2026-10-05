@@ -313,6 +313,16 @@ local function strip_comments(source)
 	return table.concat(out)
 end
 
+--- Removes the comment of one physical line without treating quoted hashes as comments.
+--- Continuation ownership stays with the caller's existing record scanner.
+--- @param source string One physical TOML line.
+--- @return string line The original non-comment bytes.
+function M.strip_inline_comment(source)
+	assert(type(source) == "string" and not source:find("\n", 1, true),
+		"strip_inline_comment needs one physical TOML line")
+	return strip_comments(source)
+end
+
 --- Splits a TOML array or inline-table body on top-level commas.
 --- Both basic and literal strings, including their multiline forms, suppress
 --- structural delimiters inside their content.

@@ -76,8 +76,10 @@ helpers.describe("registry init: nested commitments and ownership", function()
 	helpers.it("Registry accepts only the exact active state on duplicate init", function()
 		local group_calls = 0
 		local index_calls = 0
+		local mutation_calls = 0
 		with_stubbed_module("modules.keymap.registry", {
 			["modules.keymap.registry_groups"] = {
+				note_registry_mutation = function() mutation_calls = mutation_calls + 1 end,
 				init = function()
 					group_calls = group_calls + 1
 					return true
@@ -102,6 +104,7 @@ helpers.describe("registry init: nested commitments and ownership", function()
 				"duplicates must not reinitialize the index dependency")
 			registry.add("owner", "OWNER", { is_case_sensitive = true })
 			helpers.assert_eq(#state1.mappings, 1)
+			helpers.assert_eq(mutation_calls, 1, "the committed add must notify its actual group mutation owner")
 			helpers.assert_eq(#state2.mappings, 0,
 				"the refused state must never become the registry owner")
 		end)

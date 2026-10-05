@@ -65,15 +65,8 @@ _HS_RegisterPersonal() {
 	    }
 	}
 
-	; Extension personal TOML files — any *.toml in the hotstrings\ folder other than
-	; personal_hotstrings.toml is loaded as an extension pack (all sections enabled,
-	; no per-section toggle). Sub-folders generate hierarchical category labels.
-	; Shared with the preview-index rebuild (HS_EnumeratePersonalExtFiles). The two
-	; used to walk the tree independently — this one recursively, the index from a
-	; single hardcoded path — so every pack registered here expanded with no tooltip
-	; and nothing anywhere reported the gap. One enumeration means they cannot drift
-	; apart again.
-	for _, Pack in HS_EnumeratePersonalExtFiles()
-		LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"])
+	; Explicit adoption grants each additional file its independent native gate.
+	; Generic loaders still accept provenance without acquiring that capability.
+	PersonalFileControls.Register()
 	try BootProfile_Mark("HS sub: personal + extension TOML registered")
 }

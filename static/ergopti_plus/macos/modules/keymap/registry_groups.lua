@@ -30,6 +30,16 @@ local LOG = "keymap.registry"
 local _delay_resolver = nil
 local _state     = nil
 local _callbacks = nil  -- {add, sort_mappings, is_section_enabled, resolve_priority, rebuild_lookup, rebuild_tail_indexes}
+local _publication_epoch = 0
+local _publication_owner
+local _owned_rebuild
+
+--- Advances a token that journal rollback never rewinds.
+--- @param kind string|nil Exact derived callback, or a committed source mutation.
+function M.note_registry_mutation(kind)
+	if _owned_rebuild ~= nil and kind == _owned_rebuild then return end
+	_publication_epoch = _publication_epoch + 1
+end
 
 --- Guard: verifies that M.init() was called before any public function.
 --- @param func_name string Name of the calling function (for error messages).
@@ -136,7 +146,7 @@ end
 
 --- Restores a registry snapshot after a failed transaction.
 --- @param snapshot table
-local function restore_registry(snapshot)
+local function restore_registry(snapshot, strict)
 	-- A direct loader can refresh an existing entry in place before a later
 	-- entry throws. Restore those table values before reattaching the old indexes,
 	-- because every index intentionally points at the same mapping objects.
@@ -156,18 +166,130 @@ local function restore_registry(snapshot)
 	-- Failed helpers may replace any index table before failing. Rebuild every
 	-- derived structure from the restored corpus instead of retaining aliases to
 	-- tables that the attempted mutation could have modified in place.
-	local lookup_ok, lookup_err = pcall(_callbacks.rebuild_lookup)
-	local tail_ok, tail_err = pcall(_callbacks.rebuild_tail_indexes)
+	local function rebuild(kind, callback)
+		if strict then _owned_rebuild = kind end
+		local called, accepted = pcall(callback)
+		_owned_rebuild = nil
+		return called and (not strict or accepted == true), accepted
+	end
+	local lookup_ok, lookup_err = rebuild("lookup", _callbacks.rebuild_lookup)
+	local tail_ok, tail_err = rebuild("tail", _callbacks.rebuild_tail_indexes)
 	if not lookup_ok or not tail_ok then
 		Logger.error(LOG, "Registry rollback could not rebuild indexes: %s / %s.",
 			tostring(lookup_err), tostring(tail_err))
 	end
 	-- A cache cleared by the failed mutation is harmless; a cache populated for
 	-- its temporary corpus is not. Always discard it after restoring the corpus.
-	local ok, err = pcall(_callbacks.drop_classify_cache)
+	local ok, err = rebuild("cache", _callbacks.drop_classify_cache)
 	if not ok then
 		Logger.error(LOG, "Registry rollback could not clear the classification cache: %s.", tostring(err))
 	end
+	return lookup_ok and tail_ok and ok
+end
+
+local function copy_image(value, seen)
+	if type(value) ~= "table" then return value end
+	seen = seen or {}
+	if seen[value] then return seen[value] end
+	local copy = {}; seen[value] = copy
+	for key, child in pairs(value) do copy[key] = copy_image(child, seen) end
+	return copy
+end
+
+local function same_image(actual, expected, seen)
+	if type(actual) ~= type(expected) then return false end
+	if type(actual) ~= "table" then return actual == expected end
+	seen = seen or {}
+	if seen[expected] then return seen[expected] == actual end
+	seen[expected] = actual
+	for key, value in pairs(expected) do if not same_image(actual[key], value, seen) then return false end end
+	for key in pairs(actual) do if expected[key] == nil then return false end end
+	return true
+end
+
+--- Captures native image evidence independently of the rollback's copied roots.
+local function image_guard(include_indexes)
+	local state, epoch = _state, _publication_epoch
+	local mappings, groups = state.mappings, state.groups
+	local group_objects, values = copy_map(groups), copy_image(snapshot_registry())
+	local mapping_objects = copy_array(mappings)
+	local magic, lifecycle = state.magic_key, state.lifecycle_generation
+	local indexes = include_indexes and { state.mappings_lookup, state.mappings_by_tail_char,
+		state.mappings_by_star_tail_char, state.mappings_by_first_char, state.mappings_by_literal_magic_tail } or nil
+	return function()
+		if _state ~= state or _publication_epoch ~= epoch or state.mappings ~= mappings or state.groups ~= groups
+			or state.magic_key ~= magic or state.lifecycle_generation ~= lifecycle then return false end
+		for name, group in pairs(group_objects) do if groups[name] ~= group then return false end end
+		for name in pairs(groups) do if group_objects[name] == nil then return false end end
+		for index, mapping in ipairs(mapping_objects) do if mappings[index] ~= mapping then return false end end
+		if #mappings ~= #mapping_objects or not same_image(snapshot_registry(), values) then return false end
+		if indexes then
+			return indexes[1] == state.mappings_lookup and indexes[2] == state.mappings_by_tail_char
+				and indexes[3] == state.mappings_by_star_tail_char and indexes[4] == state.mappings_by_first_char
+				and indexes[5] == state.mappings_by_literal_magic_tail
+		end
+		return true
+	end
+end
+
+--- Owns one personal publication journal and its acknowledged private inverse.
+--- Captured image equality checks revocation; only this journal's actual restore
+--- acknowledgement admits copied rollback records to the returned owner.
+--- @return table|nil owner Bound run/capture_current/current/retry_inverse methods.
+function M.capture_publication_owner()
+	if not require_state("capture_publication_owner") or _publication_owner ~= nil then return nil end
+	local original_current = image_guard(true)
+	local original = snapshot_registry()
+	original.groups = copy_image(original.groups)
+	for mapping, values in pairs(original.mapping_values) do original.mapping_values[mapping] = copy_image(values) end
+	local owner = { state = _state, original = original, phase = "captured", used = false }
+	local function current()
+		return _state == owner.state and owner.guard ~= nil and owner.guard() == true
+	end
+	local function inverse()
+		if not owner.used then return owner.phase == "captured" end
+		if owner.phase == "restored" then return current() end
+		if _publication_owner ~= owner or not current() then return false end
+		owner.phase = "restoring"
+		M.note_registry_mutation()
+		local token = _publication_epoch
+		local restored = restore_registry(owner.original, true)
+		-- No callback may attach a foreign generation, even when its visible
+		-- result happens to equal the private preimage.
+		if _state ~= owner.state or _publication_epoch ~= token then owner.guard = nil; return false end
+		if not same_image(snapshot_registry(), owner.original) then owner.guard = nil; return false end
+		owner.guard = image_guard(restored)
+		if restored ~= true then return false end
+		owner.phase = "restored"
+		return current()
+	end
+	local function capture_current()
+		if _publication_owner ~= owner or owner.phase ~= "staging" then return false end
+		owner.guard, owner.phase = image_guard(true), "publishing"
+		return current()
+	end
+	local function run(mutation)
+		if owner.used or owner.phase ~= "captured" or type(mutation) ~= "function"
+			or _publication_owner ~= nil or not original_current() then return false end
+		owner.used, owner.phase, _publication_owner = true, "staging", owner
+		local called, committed = xpcall(mutation, debug.traceback)
+		if owner.phase == "staging" then capture_current() end
+		if called and committed == true and not owner.refused and current() then
+			owner.phase = "committed"
+			return true
+		end
+		inverse()
+		return false
+	end
+	local function release()
+		if not owner.used and owner.phase == "captured" then owner.phase = "released"; return true end
+		if _publication_owner ~= owner or (owner.phase ~= "restored" and owner.phase ~= "committed")
+			or not current() then return false end
+		_publication_owner, owner.guard, owner.phase = nil, nil, "released"
+		M.note_registry_mutation()
+		return true
+	end
+	return { run = run, capture_current = capture_current, current = current, retry_inverse = inverse, release = release }
 end
 
 --- Executes one all-or-nothing registry mutation.
@@ -176,6 +298,13 @@ end
 --- @param mutation function
 --- @return boolean committed
 local function run_transaction(label, mutation)
+	M.note_registry_mutation()
+	if _publication_owner and _publication_owner.phase == "staging" then
+		local ok, committed = xpcall(mutation, debug.traceback)
+		if ok and committed == true then return true end
+		_publication_owner.refused = true
+		return false
+	end
 	local snapshot = snapshot_registry()
 	local ok, committed = xpcall(mutation, debug.traceback)
 	if ok and committed == true then return true end
@@ -193,6 +322,7 @@ end
 function M.with_hotstring_delays(resolve, publish)
 	if not require_state("with_hotstring_delays") then return false end
 	if type(resolve) ~= "function" or type(publish) ~= "function" then return false end
+	local owned = _publication_owner and _publication_owner.phase == "staging" and _publication_owner
 	local committed = run_transaction("hotstring delay projection", function()
 		for name, group in pairs(_state.groups) do
 			if group.enabled and group.kind == "toml" then
@@ -212,7 +342,11 @@ function M.with_hotstring_delays(resolve, publish)
 		_state.recompute_word_timeout()
 		return publish() == true
 	end)
-	if committed then _delay_resolver = resolve end
+	if committed then
+		local admitted = owned and _publication_owner == owned and owned.phase == "publishing" and owned.guard() == true
+		_delay_resolver = resolve
+		if admitted then owned.guard = image_guard(true) else M.note_registry_mutation() end
+	end
 	return committed
 end
 
@@ -474,7 +608,7 @@ end
 --- @param path string Absolute path to the TOML file.
 --- @param section_sources table|nil Sections other files supply, as { path,
 ---   sections } records; kept with the group so every reload reads them again.
-function M.load_toml(name, path, section_sources, personal_source)
+function M.load_toml(name, path, section_sources, personal_source, source_content, resolution)
 	if not require_state("load_toml") then return false end
 	if type(name) ~= "string" or name == "" then
 		Logger.error(LOG, "load_toml: name must be a non-empty string."); return false
@@ -491,11 +625,24 @@ function M.load_toml(name, path, section_sources, personal_source)
 		return false
 	end
 	local owned_source = personal_source and PersonalFiles.copy(personal_source) or nil
+	if source_content ~= nil then
+		local current = _state.groups[name]
+		if type(source_content) ~= "string" or not PersonalFiles.components(name) or not current
+			or current.path ~= path or not PersonalFiles.is_descriptor(current.personal_source)
+			or current.personal_source.id ~= name then return false end
+	end
+	if resolution ~= nil and (source_content == nil or type(resolution) ~= "table"
+		or type(resolution.priority_reader) ~= "function" or type(resolution.delay_resolver) ~= "function") then return false end
 	return run_transaction("load_toml:" .. name, function()
 		Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
 
 		local toml_reader       = require("infra.toml.reader")
-		local ok, data, committed = pcall(toml_reader.parse, path)
+		local ok, data, committed
+		if source_content ~= nil then
+			ok, data, committed = pcall(require("toml_codec.reader").parse_text, source_content)
+		else
+			ok, data, committed = pcall(toml_reader.parse, path)
+		end
 		if not ok or type(data) ~= "table" or committed ~= true then
 			Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))
 			return false
@@ -507,6 +654,18 @@ function M.load_toml(name, path, section_sources, personal_source)
 				return false
 			end
 			data = merged
+		end
+		if name == "autocorrection" then
+			local ok_owner, owner = pcall(require, "modules.hotstrings.hotstrings_config")
+			if ok_owner and type(owner.common_autocorrection_admitted) == "function"
+				and owner.common_autocorrection_admitted() == false then
+				for section in pairs(data.sections or {}) do
+					if _callbacks.is_section_enabled(name, section) then
+						Logger.error(LOG, "Common autocorrection overrides are unadmitted; the registry was not replaced.")
+						return false
+					end
+				end
+			end
 		end
 
 	ensure_group_order(name)
@@ -526,6 +685,7 @@ function M.load_toml(name, path, section_sources, personal_source)
 	local ok_hcfg, hcfg = pcall(require, "modules.hotstrings.hotstrings_config")
 	local hotstrings_config = ok_hcfg and hcfg or nil
 	local function user_priority(section_name)
+		if resolution then return resolution.priority_reader(section_name) end
 		if not hotstrings_config or type(hotstrings_config.get_user_override) ~= "function" then
 			return nil
 		end
@@ -656,10 +816,11 @@ function M.load_toml(name, path, section_sources, personal_source)
 			end
 		end
 	end
-	if _delay_resolver then
+	local delay_resolver = resolution and resolution.delay_resolver or _delay_resolver
+	if delay_resolver then
 		for _, section in ipairs(sections_info) do
 			if section.name ~= "-" and not section.is_module_placeholder then
-				local delay = _delay_resolver(name, section.name, data.meta or {})
+				local delay = delay_resolver(name, section.name, data.meta or {})
 				assert(type(delay) == "number" and delay == delay and delay >= 0 and delay < math.huge,
 					"registered hotstring delay must be finite and non-negative")
 				group_section_delays[section.name] = delay
@@ -736,6 +897,30 @@ function M.reload_toml(name, path)
 	end)
 end
 
+--- Stages an admitted personal source before its final conditional publication.
+--- The existing registry journal preserves mappings, indexes and disabled gates
+--- whenever candidate parsing, native adoption or the publisher refuses.
+--- @param name string Canonical owner already registered by the native loader.
+--- @param path string Exact registered source route.
+--- @param candidate string Proposed source bytes, never a temporary source path.
+--- @param publish function Exact conditional source publication acknowledgement.
+--- @return boolean committed
+function M.replace_personal_source(name, path, candidate, publish, resolution)
+	if not require_state("replace_personal_source") or type(publish) ~= "function" then return false end
+	local group = _state.groups[name]
+	if not group or group.path ~= path or not PersonalFiles.components(name)
+		or not PersonalFiles.is_descriptor(group.personal_source) or group.personal_source.id ~= name then return false end
+	local parsed, committed = require("toml_codec.reader").parse_text(candidate)
+	if committed ~= true or type(parsed) ~= "table" then return false end
+	local enabled, source = group.enabled, PersonalFiles.copy(group.personal_source)
+	return run_transaction("replace_personal_source:" .. name, function()
+		if M.disable_group(name) ~= true then return false end
+		if M.load_toml(name, path, nil, source, candidate, resolution) ~= true then return false end
+		if enabled ~= true and M.disable_group(name) ~= true then return false end
+		return publish() == true
+	end)
+end
+
 
 
 
@@ -754,6 +939,7 @@ end
 --- @param name string|nil Group name.
 function M.set_group_context(name)
 	if not require_state("set_group_context") then return end
+	M.note_registry_mutation()
 	if name and name ~= "" then ensure_group_order(name) end
 	_state.current_group = name
 end
@@ -763,6 +949,7 @@ end
 --- @param f function The post-load hook.
 function M.set_post_load_hook(name, f)
 	if not require_state("set_post_load_hook") then return end
+	M.note_registry_mutation()
 	if type(f) ~= "function" then
 		Logger.error(LOG, "set_post_load_hook: f must be a function."); return
 	end
@@ -779,7 +966,7 @@ function M.disable_group(name)
 		Logger.warn(LOG, "disable_group: unknown group '%s'.", tostring(name))
 		return false
 	end
-	if not g.enabled then return true end
+	if not g.enabled then M.note_registry_mutation(); return true end
 
 	return run_transaction("disable_group:" .. tostring(name), function()
 		g.enabled = false
@@ -826,7 +1013,7 @@ function M.personal_file_scope_binding(name)
 	local group = _state.groups[name]
 	if not group or group.kind ~= "toml" or not PersonalFiles.is_descriptor(group.personal_source) then return nil end
 	return { source = PersonalFiles.copy(group.personal_source), path = group.path,
-		current = function() return _state.groups[name] == group end }
+		current = function() return _publication_owner == nil and _state.groups[name] == group end }
 end
 
 --- Returns a flat table of {name → enabled} for all registered groups.
@@ -845,6 +1032,7 @@ end
 --- @param sections table|nil Array of section descriptor tables.
 function M.register_lua_group(name, meta_description, sections)
 	if not require_state("register_lua_group") then return end
+	M.note_registry_mutation()
 	if type(name) ~= "string" or name == "" then
 		Logger.error(LOG, "register_lua_group: name must be a non-empty string."); return
 	end
@@ -869,7 +1057,7 @@ function M.enable_group(name)
 		Logger.warn(LOG, "enable_group: unknown group '%s'.", tostring(name))
 		return false
 	end
-	if g.enabled then return true end
+	if g.enabled then M.note_registry_mutation(); return true end
 
 	return run_transaction("enable_group:" .. tostring(name), function()
 		Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", name, g.kind or "?")
