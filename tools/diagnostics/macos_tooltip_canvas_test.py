@@ -459,5 +459,163 @@ class IndependentObserverControls(unittest.TestCase):
                 self.assertEqual(observer.color_class(pixel), expected)
 
 
+class TypedBodyRasterControls(unittest.TestCase):
+    """Independent bitmap geometry, not regenerated native or production expectations."""
+
+    def setUp(self):
+        self.temporary = TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+
+    def capture(self, *, marker=False, missing=False, fragment=False, typed_shift=0, other_shift=0):
+        from PIL import Image, ImageDraw
+
+        image = Image.new("RGBA", (210, 60), (32, 32, 32, 255))
+        draw = ImageDraw.Draw(image)
+        # Four independently authored regular M glyphs advance by 12 pixels.
+        # A thicker second run supplies the existing independent bold-ink proof.
+        bitmap = [
+            "1000000001",
+            "1100000011",
+            "1010000101",
+            "1001001001",
+            "1000110001",
+            "1000110001",
+            "1000000001",
+            "1000000001",
+            "1000000001",
+            "1000000001",
+        ]
+
+        def run(left, top, color, bold=False):
+            for letter in range(4):
+                for y, row in enumerate(bitmap):
+                    for x, value in enumerate(row):
+                        if value == "1":
+                            draw.point((left + letter * 12 + x, top + y), fill=color)
+                            if bold:
+                                draw.point((left + letter * 12 + x + 1, top + y), fill=color)
+
+        for row, top in enumerate((4, 24, 44), 1):
+            if row == 1:
+                if marker:
+                    # Marker antialiasing is gray, but it is not a typed glyph.
+                    draw.rectangle((12, top, 14, top + 9), fill=(128, 128, 128, 255))
+                if fragment:
+                    draw.rectangle((34, top, 36, top + 9), fill=(128, 128, 128, 255))
+                elif not missing:
+                    run(34 + typed_shift, top, (128, 128, 128, 255))
+                run(82, top, (64, 230, 102, 255))
+                run(130, top, (255, 158, 26, 255))
+            else:
+                left = 10 + (other_shift if row == 2 else 0)
+                run(left, top, (128, 128, 128, 255))
+                run(left + 48, top, (128, 128, 128, 255), bold=True)
+        path = self.root / "independent-bitmap.png"
+        image.save(path, "PNG")
+        return {
+            "image": path.name,
+            "frame": {"w": 210, "h": 60},
+            "predictions_frame": {"x": 0, "y": 0, "w": 210, "h": 60},
+            "selected": 1,
+            "prefix_advances": [27, 3],
+            "glyph_widths": [48, 48],
+        }
+
+    def test_independent_typed_bitmap_keeps_literal_prefix_alignment(self):
+        case = self.capture()
+        pixels = observer.validate_pixels(case, self.root)
+        self.assertEqual([row["typed_left"] for row in pixels["rows"]], [34, 10, 10])
+
+    def test_gray_marker_antialias_cannot_own_the_typed_start(self):
+        case = self.capture(marker=True)
+        before = (self.root / case["image"]).read_bytes()
+        pixels = observer.validate_pixels(case, self.root)
+        self.assertEqual([row["typed_left"] for row in pixels["rows"]], [34, 10, 10])
+        self.assertEqual((self.root / case["image"]).read_bytes(), before)
+
+    def test_marker_only_cannot_replace_the_missing_typed_body(self):
+        with self.assertRaisesRegex(ValueError, "typed body missing"):
+            observer.validate_pixels(self.capture(marker=True, missing=True), self.root)
+
+    def test_gray_fragment_cannot_borrow_the_regular_typed_glyph_width(self):
+        with self.assertRaisesRegex(ValueError, "typed body width"):
+            observer.validate_pixels(self.capture(fragment=True), self.root)
+
+    def test_typed_body_moved_left_cannot_borrow_the_correction_anchor(self):
+        with self.assertRaisesRegex(ValueError, "typed body"):
+            observer.validate_pixels(self.capture(typed_shift=-8), self.root)
+
+    def test_typed_body_moved_right_cannot_borrow_the_correction_anchor(self):
+        with self.assertRaisesRegex(ValueError, "typed body"):
+            observer.validate_pixels(self.capture(typed_shift=6), self.root)
+
+    def test_wrong_inactive_indent_still_fails_with_marker_contamination(self):
+        with self.assertRaisesRegex(ValueError, "indentation"):
+            observer.validate_pixels(self.capture(marker=True, other_shift=8), self.root)
+
+
+class BoldContrastRasterControls(unittest.TestCase):
+    """Literal foreground coverage controls, independent of native captured pixels."""
+
+    def setUp(self):
+        self.temporary = TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+
+    def capture(self, weight):
+        from PIL import Image, ImageDraw
+
+        case = TypedBodyRasterControls.capture(self)
+        path = self.root / case["image"]
+        with Image.open(path) as decoded:
+            image = decoded.convert("RGBA")
+        draw = ImageDraw.Draw(image)
+        bitmap = [
+            "1000000001",
+            "1100000011",
+            "1010000101",
+            "1001001001",
+            "1000110001",
+            "1000110001",
+            "1000000001",
+            "1000000001",
+            "1000000001",
+            "1000000001",
+        ]
+        for top in (24, 44):
+            draw.rectangle((10, top, 107, top + 9), fill=(32, 32, 32, 255))
+            for left, bold in ((10, False), (58, True)):
+                for letter in range(4):
+                    for y, row in enumerate(bitmap):
+                        for x, value in enumerate(row):
+                            if value != "1" or (bold and weight == "less" and x not in (0, 9)):
+                                continue
+                            point = (left + letter * 12 + x, top + y)
+                            draw.point(point, fill=(128, 128, 128, 255))
+                            if bold and weight == "antialiased":
+                                # Solid neutral cores remain visible even above
+                                # the separate role classifier's upper bound.
+                                draw.point((point[0] + 1, point[1]), fill=(146, 146, 146, 255))
+        image.save(path, "PNG")
+        return case
+
+    def test_antialiased_bold_cores_add_visible_contrast(self):
+        case = self.capture("antialiased")
+        before = (self.root / case["image"]).read_bytes()
+        observed = observer.validate_pixels(case, self.root)
+        for row in observed["rows"][1:]:
+            self.assertGreater(row["bold_ink"], row["regular_ink"] * 1.03)
+        self.assertEqual((self.root / case["image"]).read_bytes(), before)
+
+    def test_equal_regular_and_correction_coverage_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "not visibly heavier"):
+            observer.validate_pixels(self.capture("equal"), self.root)
+
+    def test_less_correction_coverage_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "not visibly heavier"):
+            observer.validate_pixels(self.capture("less"), self.root)
+
+
 if __name__ == "__main__":
     unittest.main()

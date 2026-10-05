@@ -3371,7 +3371,8 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   unit14665/0 and E2E101/0 plus one driver-specific skip qualify their selected
   sources. Hosted Linux8337/1 exposed a cache-only fixture admitting an extra runtime
   offer on trusted-root hosts. Explicit unavailable-runtime isolation preserves
-  every old assertion and passes all58 admission controls per ABI. Six Windows
+  every old assertion and passes all58 admission controls per ABI. The final
+  local Linux suite passes8338/0 across406 modules after current dev integration. Six Windows
   retained writer/JOIN failures are traced to the scope fixture retaining its
   recovered barrier. Exact-owner fixture restoration and six original native
   refusal sequences are adopted; their native replay remains pending. Complete native three-OS
@@ -4166,6 +4167,7 @@ fix as explicit code work rather than unsupported-platform exceptions.
   observer are adopted. Mandatory pure/native registration is committed;
   the hosted three-OS manual run will qualify the exact composed tree. The original38 pure observer/supervisor controls and ten added controls
   pass48/0. Replaying all12 unchanged signed-Hammerspoon screenshots passes12/0.
+  The canonically formatted final observer also passes48/0 and12/0 replay.
   These image replays do not replace fresh native creator and source-freeze
   qualification; missing GUI/trust/capture/cleanup must fail, not skip.
   Direct-source manual run37306690694 produced all12 Mac native captures with
