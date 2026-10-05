@@ -1707,6 +1707,10 @@ The five-file source slice has 22 portable native-owner cases, seven actual work
   with real GUI dependencies and explicit negative GTK premises. Hosted macOS
   packaging/installation and deferred Windows acceptance remain required before removing this item. Preserve the real-device
   acceptance in item 38.
+  The Linux native metrics prerequisite now counts only the JSON body after
+  validating the terminal SQLite receipt. Real SQLite equivalence preserves
+  nonempty projections and transports 648 grouped versus 2,808 raw rows;
+  missing and nonzero native receipts are independently refused.
   Windows continuation is explicitly deferred to the maintainer's PC:
   - [ ] Run the actual AHK unit/meta and engine E2E suites on the integrated SHA,
         including extension, language-pack and category-scope cases; retain complete

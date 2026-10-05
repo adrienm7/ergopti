@@ -13,15 +13,25 @@ local command = require('modules.keylogger.sqlite_command')
 local reader = require('modules.keylogger.sqlite_reader')
 local original_build, original_popen = command.build, io.popen
 local row_count = 0
+local first_native_output
+local function decode_native_rows(output)
+	local accepted, body, detail = command.read_exit_receipt(output)
+	assert(accepted == true, detail or 'native SQLite terminal receipt refused')
+	local rows = body == '' and {} or json.decode(body)
+	assert(type(rows) == 'table', 'native SQLite must return JSON rows')
+	return rows
+end
 io.popen = function(...)
 	local pipe = assert(original_popen(...))
 	return {
 		read = function(_, mode)
-			local body = pipe:read(mode)
-			local rows = body == '' and {} or json.decode(body)
-			assert(type(rows) == 'table', 'native SQLite must return JSON rows')
+			local output = pipe:read(mode)
+			local rows = decode_native_rows(output)
+			first_native_output = first_native_output or output
 			row_count = row_count + #rows
-			return body
+			-- The production reader owns its terminal receipt; only the fixture's
+			-- transport census decodes the JSON body before that receipt.
+			return output
 		end,
 		close = function()
 			local ok, kind, status = pipe:close()
@@ -51,6 +61,13 @@ local function workload()
 end
 local candidate = workload()
 local grouped_rows = row_count
+assert(type(first_native_output) == 'string', 'real native output control required')
+local missing_receipt, removed = first_native_output:gsub('\n[^\n]+\n$', '')
+assert(removed == 1 and missing_receipt ~= first_native_output, 'missing-receipt control must change native output')
+assert(not pcall(decode_native_rows, missing_receipt), 'transport census must reject a missing terminal receipt')
+local refused_receipt, replaced = first_native_output:gsub('0\n$', '7\n')
+assert(replaced == 1 and refused_receipt ~= first_native_output, 'refused-receipt control must change native output')
+assert(not pcall(decode_native_rows, refused_receipt), 'transport census must reject a nonzero native status')
 -- Freeze the previous two SQL projections, not a second copy of Lua merge logic.
 command.build = function(db, sql, options)
 	if sql:find('FROM ngram_', 1, true) and not sql:find('FROM ngram_scancodes', 1, true) then
