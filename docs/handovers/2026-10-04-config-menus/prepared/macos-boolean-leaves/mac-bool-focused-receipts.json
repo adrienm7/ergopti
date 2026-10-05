@@ -1,0 +1,34 @@
+{
+	"test_config": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  31", "Failed tests:  0"]
+	},
+	"test_config_corrupt_toml": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  5", "Failed tests:  0"]
+	},
+	"test_config_corrupt_toml_write_guard": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  9", "Failed tests:  0"]
+	},
+	"test_config_owned_fields": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  9", "Failed tests:  0"]
+	},
+	"test_config_scope_source": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  5", "Failed tests:  0"]
+	},
+	"test_config_sparse_load": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  18", "Failed tests:  0"]
+	},
+	"test_config_known_scalar_preservation": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  9", "Failed tests:  0"]
+	},
+	"test_config_bool_leaf_policy": {
+		"status": 0,
+		"counts": ["Total modules: 1", "Passed tests:  28", "Failed tests:  0"]
+	}
+}

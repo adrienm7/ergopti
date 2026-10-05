@@ -1,0 +1,16 @@
+{
+	"docs/ERGOPTIPLUS_TODO.md": "266d01ac691be85f270b843cc9dcd3f3b601889064230d51c41f7a4b61594253",
+	"static/ergopti_plus/_shared/lua/menu/renderer.lua": "1ee02b52028c57b38de90aae6ed4f4bc1baff7bc82f8adc7507f089303e938d2",
+	"static/ergopti_plus/_shared/modules/features/manifest.toml": "71ebc3e76d733b2a8f732ec5b68970d1c4ba59a30b8430884283c7a09b39f7e9",
+	"static/ergopti_plus/_shared/modules/menu/menu_manifest.json": "cc0baec3287e107d446ccacda464c0e4afb3a8acb208d3920ca687c039f9782f",
+	"static/ergopti_plus/_shared/tests/corpus/metrics/migration_status_menu.json": null,
+	"static/ergopti_plus/linux/tests/unit/ui/test_metrics_widget_menu_parity.lua": "f57476a0edad883c297f523cb938b2f52ecd8cdb02648244224b1094cea752f5",
+	"static/ergopti_plus/linux/ui/menu/menu_builder.lua": "c06599b5eee24498f5e56d7f15fce77b3c3752d51d4655c6ef0040232f0ebe84",
+	"static/ergopti_plus/macos/tests/unit/ui/menu/test_metrics_widget_menu_parity.lua": "aaf8aec5f8b36c33df38bb99a2d5bb6a678640b9d4314ac7306561ecc08c3d6d",
+	"static/ergopti_plus/windows/infra/manifest_menu.ahk": "04905e3bdb480940e26bb35f1525a55adc0b183947ea74a5f4beceae218efa3d",
+	"static/ergopti_plus/windows/tests/unit/test_metrics_widget_menu_parity.ahk": "77dd415df2ee13c5c9b7d9629be8ef2a39aa5f1f73f973fa1fead585982e834c",
+	"tools/build/build-menu-manifest.js": "70ebd2e89f45465dbd9ef21e711e86f6fa6dc7e6e2d3d0d2d3330190acd628ff",
+	"tools/test/native-menu-rows-baseline.json": "25a73e9621a8567160cc5a00d1478254b82172ab9f756a005d8b9a7bebb4ba2f",
+	"tools/test/test-menu-manifest.cjs": "421a47f6e3c78dd9c9704acfa56878656d96aa15b41ee81771fe473ccbce7b7b",
+	"tools/test/test-menu-parity.cjs": "f76474d64dd7293da888a29ca3feb61d5b871c93828c5361f52031db5c7a3038"
+}

@@ -880,10 +880,15 @@ function cataloguePaths(driver) {
 			);
 		}
 	}
-	assert.equal(described.magic_key, undefined, 'the Linux tray owns the trigger character');
+	assert.deepEqual(
+		described.magic_key.options.map((option) => option.value),
+		['★'],
+		'Linux offers only the preset its runtime accepts'
+	);
+	assert.equal(described.magic_key.validation, 'safe_magic_key');
 	assert.ok(
 		!operations.some((op) => op.path === 'hotstrings.trigger_char'),
-		'Linux never receives a trigger its runtime does not read from config.toml'
+		'the default trigger is sparse until the user changes it'
 	);
 })();
 
@@ -1290,7 +1295,7 @@ function assertSeparated(row, where) {
 			);
 		}
 	}
-	assert.equal(checked, 2, 'Windows and macOS ask for the trigger');
+	assert.equal(checked, 3, 'each driver asks for a trigger its owner can validate');
 })();
 
 (function magicKeyFollowsTheSystemLayoutAndRefusesAnEmptyCustomValue() {
@@ -1330,6 +1335,210 @@ function assertSeparated(row, where) {
 		done.answers.operations.find((op) => op.path === 'hotstrings.trigger_char'),
 		{ path: 'hotstrings.trigger_char', value: '§' }
 	);
+})();
+
+(function linuxTriggerChoiceKeepsRuntimePolicyAndCustomAnswer() {
+	for (const system_layout of ['French - PC', 'US', 'Ergopti']) {
+		const page = openWizard({ platform: 'linux', system_layout });
+		page.platform = 'linux';
+		goToPage(page, 'hotstrings');
+		answer(page, true);
+		const rows = page.el('page-magic-options').children;
+		assert.deepEqual(
+			rows.slice(0, -1).map((row) => row.children[0].value),
+			['★']
+		);
+		assert.equal(
+			rows.find((row) => row.children[0].checked).children[0].value,
+			'★',
+			`${system_layout}: Linux never proposes a common character`
+		);
+		const custom = rows[rows.length - 1].children[0];
+		custom.checked = true;
+		custom.dispatch('change');
+		const input = page.el('page-magic-options').querySelector('magic-input');
+		assert.equal(input.maxLength, 2, 'one supplementary Unicode scalar fits the browser input');
+		input.value = '§';
+		input.dispatch('input');
+		const done = finish(page);
+		assert.deepEqual(
+			done.answers.operations.find((op) => op.path === 'hotstrings.trigger_char'),
+			{ path: 'hotstrings.trigger_char', value: '§' }
+		);
+	}
+	const page = openWizard({ platform: 'linux', current: { 'hotstrings.trigger_char': '§' } });
+	page.platform = 'linux';
+	goToPage(page, 'hotstrings');
+	answer(page, true);
+	const input = page.el('page-magic-options').querySelector('magic-input');
+	assert.equal(input.value, '§', 'a re-run shows the stored custom trigger');
+	assert.ok(
+		!finish(page).answers.operations.some((op) => op.path === 'hotstrings.trigger_char'),
+		'a kept custom trigger is not overwritten'
+	);
+})();
+
+(function linuxRerunPreservesAnOutdatedTriggerUntilExplicitChoice() {
+	for (const stale of [';', 'ù']) {
+		for (const replace of [false, true]) {
+			const page = openWizard({ platform: 'linux', current: { 'hotstrings.trigger_char': stale } });
+			page.platform = 'linux';
+			goToPage(page, 'hotstrings');
+			answer(page, true);
+			assert.equal(
+				page.el('page-magic-options').querySelector('magic-input').value,
+				stale,
+				'an outdated stored scalar is shown without changing it'
+			);
+			if (replace) {
+				const star = page.el('page-magic-options').children[0].children[0];
+				star.checked = true;
+				star.dispatch('change');
+			}
+			const operation = finish(page).answers.operations.find(
+				(op) => op.path === 'hotstrings.trigger_char'
+			);
+			assert.deepEqual(
+				operation,
+				replace ? { path: 'hotstrings.trigger_char', value: '★' } : undefined,
+				'only an explicit replacement answers the old trigger'
+			);
+		}
+	}
+})();
+
+(function existingOutdatedRecordsRequireExplicitTriggerIntent() {
+	const outdated = [7, false, '', { retained: 'independent' }];
+	for (const platform of ['windows', 'macos', 'linux']) {
+		for (const value of outdated) {
+			const current = { 'hotstrings.trigger_char': value };
+			const untouched = openWizard({ platform, current });
+			untouched.platform = platform;
+			goToPage(untouched, 'hotstrings');
+			answer(untouched, true);
+			assert.ok(
+				!finish(untouched).answers.operations.some((op) => op.path === 'hotstrings.trigger_char'),
+				`${platform}/${JSON.stringify(value)}: Hotstrings Yes never answers an untouched outdated trigger`
+			);
+			const changed = openWizard({ platform, current });
+			changed.platform = platform;
+			goToPage(changed, 'hotstrings');
+			answer(changed, true);
+			const options = changed.el('page-magic-options').children;
+			const custom = options[options.length - 1].children[0];
+			custom.checked = true;
+			custom.dispatch('change');
+			const input = changed.el('page-magic-options').querySelector('magic-input');
+			input.value = '';
+			input.dispatch('input');
+			changed.click('btn-next');
+			assert.equal(
+				changed.el('page-title').textContent,
+				locale('en')['menu.hotstrings.title'],
+				'explicit empty custom input blocks Next even over an outdated record'
+			);
+			assert.ok(input.classList.contains('invalid'));
+			input.value = '§';
+			input.dispatch('input');
+			assert.deepEqual(
+				finish(changed).answers.operations.find((op) => op.path === 'hotstrings.trigger_char'),
+				{ path: 'hotstrings.trigger_char', value: '§' },
+				'only the explicit valid choice answers the owned leaf'
+			);
+		}
+	}
+})();
+
+(function changedFoldersRetirePreviousTriggerIntentAndCallbacks() {
+	for (const platform of ['windows', 'macos', 'linux']) {
+		const page = openWizard({ platform, current: { 'hotstrings.trigger_char': '§' } });
+		page.platform = platform;
+		goToPage(page, 'hotstrings');
+		answer(page, true);
+		const rows = page.el('page-magic-options').children;
+		const previousCustom = rows[rows.length - 1].children[0];
+		previousCustom.checked = true;
+		previousCustom.dispatch('change');
+		const previousInput = page.el('page-magic-options').querySelector('magic-input');
+		previousInput.value = '±';
+		previousInput.dispatch('input');
+		for (let i = 0; i < 1 + APPROVED_ORDER.indexOf('hotstrings'); i++) page.click('btn-back');
+		page.window.setConfigDir('/tmp/second-trigger-folder');
+		page.messages.splice(0);
+		page.click('btn-next');
+		const request = page.messages.find(
+			(message) => message.action === 'loadExistingConfig'
+		).request;
+		page.window.applyCurrentValues({
+			request: request - 1,
+			values: { 'hotstrings.trigger_char': '→' }
+		});
+		page.window.applyCurrentValues({ request, values: { 'hotstrings.trigger_char': 7 } });
+		next(page, APPROVED_ORDER.indexOf('hotstrings'));
+		answer(page, true);
+		previousInput.value = '😀';
+		previousInput.dispatch('input');
+		previousCustom.dispatch('change');
+		const done = finish(page);
+		assert.equal(done.answers.config_dir, '/tmp/second-trigger-folder');
+		assert.ok(
+			!done.answers.operations.some((op) => op.path === 'hotstrings.trigger_char'),
+			'old-folder intent and retained callbacks cannot replace the untouched record of the new folder'
+		);
+	}
+})();
+
+(function triggerOptionProjectionRejectsInvalidDeclarations() {
+	const generatorPath = path.join(ROOT, 'tools/codegen/codegen-onboarding-catalogue.cjs');
+	const generatorSource = fs.readFileSync(generatorPath, 'utf8');
+	const originalRequire = require('node:module').createRequire(generatorPath);
+	const manifestPath = path.join(SHARED, 'modules/features/manifest.toml');
+	const original = fs.readFileSync(manifestPath, 'utf8');
+	function buildWith(choice) {
+		const declaration = TOML.stringify({
+			onboarding: { pages: { hotstrings: { magic_key: choice } } }
+		});
+		const manifest = original.replace(
+			/\[onboarding\.pages\.hotstrings\.magic_key\][\s\S]*?(?=\[onboarding\.pages\.llm\])/,
+			declaration + '\n'
+		);
+		const module = { exports: {} };
+		const fakeFs = Object.assign({}, fs, {
+			readFileSync(file, encoding) {
+				return file === manifestPath ? manifest : fs.readFileSync(file, encoding);
+			}
+		});
+		vm.runInNewContext(
+			generatorSource,
+			{
+				module,
+				require: (name) => (name === 'fs' ? fakeFs : originalRequire(name)),
+				console
+			},
+			{ filename: generatorPath }
+		);
+		return JSON.parse(JSON.stringify(module.exports.buildCatalogue()));
+	}
+	const choice = TOML.parse(original).onboarding.pages.hotstrings.magic_key;
+	const projected = buildWith(choice);
+	for (const driver of ['windows', 'macos', 'linux']) {
+		const described = projected.platforms[driver].pages.find((page) => page.id === 'hotstrings');
+		assert.deepEqual(
+			described.magic_key.options.map((option) => option.value),
+			driver === 'linux' ? ['★'] : ['★', 'ù', ';']
+		);
+		assert.equal(described.magic_key.validation, driver === 'linux' ? 'safe_magic_key' : undefined);
+	}
+	for (const platforms of [[], ['unknown'], ['linux', 'linux'], 'linux']) {
+		const malformed = JSON.parse(JSON.stringify(choice));
+		malformed.options[0].platforms = platforms;
+		assert.throws(() => buildWith(malformed), /option platforms must be a nonempty known subset/);
+	}
+	for (const validation of ['safe_magic_key', { linux: 'anything' }, { hs: 'safe_magic_key' }]) {
+		const malformed = JSON.parse(JSON.stringify(choice));
+		malformed.validation = validation;
+		assert.throws(() => buildWith(malformed), /validation|unsupported/);
+	}
 })();
 
 // ======================================
@@ -1543,6 +1752,8 @@ function assertSeparated(row, where) {
 		'the chosen folder survives a re-render'
 	);
 
+	page.click('btn-next');
+	page.window.applyCurrentValues({ request: 1, values: {} });
 	const done = finish(page);
 	assert.equal(
 		done.answers.config_dir,
@@ -1605,6 +1816,7 @@ function advanceToMetrics(page) {
 		config_dir: '/Volumes/Data/Ergopti/',
 		request: 1
 	});
+	page.window.applyCurrentValues({ request: 1, values: {} });
 	page.window.setMetricsPath({ request: 1, path: '/Volumes/Data/Ergopti/metrics' });
 	next(page, APPROVED_ORDER.length - 1);
 	const warning = page.el('page-consent').textContent;
@@ -1619,7 +1831,9 @@ function advanceToMetrics(page) {
 	const page = openWizard();
 	page.click('btn-next');
 	page.el('config-input').value = '/late/';
-	advanceToMetrics(page);
+	page.click('btn-next');
+	page.window.applyCurrentValues({ request: 1, values: {} });
+	next(page, APPROVED_ORDER.length - 1);
 	page.window.setMetricsPath({ request: 1, path: '/late/metrics' });
 	assert.ok(
 		page.el('page-consent').textContent.includes('/late/metrics'),
@@ -1638,6 +1852,7 @@ function advanceToMetrics(page) {
 	page.messages.splice(0);
 	page.click('btn-next');
 	assert.equal(page.messages.find((m) => m.action === 'resolveMetricsPath').request, 2);
+	page.window.applyCurrentValues({ request: 2, values: {} });
 	// The late reply for the first folder must not overwrite the second one.
 	page.window.setMetricsPath({ request: 2, path: '/second/metrics' });
 	page.window.setMetricsPath({ request: 1, path: '/first/metrics' });
@@ -1683,6 +1898,138 @@ function advanceToMetrics(page) {
 		() => page.window.initData({ platform: 'amiga', strings: {}, current: {} }),
 		/unknown platform/
 	);
+})();
+
+(function pendingFolderCannotFinishAndCanRetryTheSameTarget() {
+	for (const platform of ['windows', 'macos', 'linux']) {
+		const page = openWizard({ platform, current: { 'hotstrings.trigger_char': '§' } });
+		page.platform = platform;
+		goToPage(page, 'hotstrings');
+		answer(page, true);
+		const custom = page.el('page-magic-options').children.slice(-1)[0].children[0];
+		custom.checked = true;
+		custom.dispatch('change');
+		const oldInput = page.el('page-magic-options').querySelector('magic-input');
+		oldInput.value = '±';
+		oldInput.dispatch('input');
+		for (let i = 0; i < 1 + APPROVED_ORDER.indexOf('hotstrings'); i++) page.click('btn-back');
+		page.window.setConfigDir('/tmp/second-trigger-folder');
+		page.messages.splice(0);
+		page.click('btn-next');
+		assert.deepEqual(
+			page.messages.find((m) => m.action === 'loadExistingConfig'),
+			{
+				action: 'loadExistingConfig',
+				config_dir: '/tmp/second-trigger-folder',
+				request: 1
+			}
+		);
+		assert.equal(
+			page.el('btn-next').disabled,
+			true,
+			platform + ': unknown target gates feature navigation'
+		);
+		assert.equal(page.el('btn-next').textContent, locale('en')['common.loading']);
+		const initialTitle = page.el('page-title').textContent;
+		for (const reply of [
+			null,
+			{ request: 0, values: {} },
+			{ request: 1, values: null },
+			{ request: 1, values: [] },
+			{ request: '1', values: {} }
+		]) {
+			page.window.applyCurrentValues(reply);
+			next(page, 20);
+			assert.equal(
+				page.el('page-title').textContent,
+				initialTitle,
+				platform + ': missing or malformed reply cannot admit the target'
+			);
+			assert.ok(
+				!page.messages.some((m) => m.action === 'finish'),
+				platform + ': pending target cannot finish'
+			);
+		}
+		// Read failure has no success envelope. Back remains usable and Next
+		// explicitly retries the same folder rather than marking it loaded.
+		page.click('btn-back');
+		assert.equal(page.el('config-input').value, '/tmp/second-trigger-folder');
+		assert.equal(page.el('btn-next').disabled, false);
+		page.messages.splice(0);
+		page.click('btn-next');
+		assert.equal(page.messages.find((m) => m.action === 'loadExistingConfig').request, 2);
+		page.window.applyCurrentValues({ request: 1, values: { 'hotstrings.trigger_char': '±' } });
+		assert.equal(
+			page.el('btn-next').disabled,
+			true,
+			'the retired request cannot acknowledge the retry'
+		);
+		page.window.applyCurrentValues({ request: 2, values: { 'hotstrings.trigger_char': 7 } });
+		assert.equal(page.el('btn-next').disabled, false);
+		next(page, APPROVED_ORDER.indexOf('hotstrings'));
+		answer(page, true);
+		// Captured prior-folder controls and duplicate success envelopes must
+		// not reintroduce old intent after the new target is admitted.
+		oldInput.value = '→';
+		oldInput.dispatch('input');
+		custom.checked = true;
+		custom.dispatch('change');
+		page.window.applyCurrentValues({ request: 2, values: { 'hotstrings.trigger_char': '±' } });
+		const done = finish(page);
+		assert.equal(done.answers.config_dir, '/tmp/second-trigger-folder');
+		assert.ok(
+			!done.answers.operations.some((op) => op.path === 'hotstrings.trigger_char'),
+			platform + ': untouched admitted outdated trigger is preserved'
+		);
+	}
+})();
+
+(function anEmptySuccessfulFolderReadAdmitsFirstRunChoices() {
+	const page = openWizard({ platform: 'linux', current: { 'hotstrings.trigger_char': '§' } });
+	page.platform = 'linux';
+	page.click('btn-next');
+	page.window.setConfigDir('/tmp/new-trigger-folder');
+	page.click('btn-next');
+	page.window.applyCurrentValues({ request: 1, values: {} });
+	next(page, APPROVED_ORDER.indexOf('hotstrings'));
+	answer(page, true);
+	const rows = page.el('page-magic-options').children;
+	assert.equal(
+		rows.find((row) => row.children[0].checked).children[0].value,
+		'★',
+		'successful empty read establishes absence and shows the first-run recommendation'
+	);
+	const custom = rows[rows.length - 1].children[0];
+	custom.checked = true;
+	custom.dispatch('change');
+	const input = page.el('page-magic-options').querySelector('magic-input');
+	input.value = '±';
+	input.dispatch('input');
+	const done = finish(page);
+	assert.deepEqual(
+		done.answers.operations.filter((op) => op.path === 'hotstrings.trigger_char'),
+		[{ path: 'hotstrings.trigger_char', value: '±' }],
+		'a successfully admitted empty folder receives the new explicit choice'
+	);
+})();
+
+(function aReplyCannotAdmitADifferentPickerTarget() {
+	const page = openWizard({ platform: 'linux' });
+	page.click('btn-next');
+	page.window.setConfigDir('/tmp/first-pending-target');
+	page.click('btn-next');
+	page.click('btn-back');
+	page.window.setConfigDir('/tmp/second-pending-target');
+	page.window.applyCurrentValues({ request: 1, values: { 'hotstrings.trigger_char': '§' } });
+	page.click('btn-next');
+	assert.equal(page.messages.filter((m) => m.action === 'loadExistingConfig').length, 2);
+	assert.equal(
+		page.el('btn-next').disabled,
+		true,
+		'a picker change cannot be admitted by the prior target reply'
+	);
+	page.window.applyCurrentValues({ request: 2, values: {} });
+	assert.equal(page.el('btn-next').disabled, false);
 })();
 
 console.log(
