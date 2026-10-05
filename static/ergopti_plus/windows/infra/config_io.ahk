@@ -549,13 +549,14 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
 	global ConfigurationFile
 	try {
-		if IsSet(ConfigurationFile) && ConfigurationFile != ""
-				&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+		IsConfiguration := IsSet(ConfigurationFile) && ConfigurationFile != ""
+			&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+		if IsConfiguration
 			Updates := _ConfigPrepareTypedUpdates(Updates)
 		if HasMethod(WriterFn, "Call")
 			Written := WriterFn.Call(Path, Updates)
 		else
-			Written := TOML_BatchWrite(Path, Updates)
+			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates) : TOML_BatchWrite(Path, Updates)
 	} catch as Err {
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " failed: " . Err.Message
