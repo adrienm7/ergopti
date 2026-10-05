@@ -2235,6 +2235,26 @@ These are software implementations; final hardware verification remains below.
   assertions. No Writer, live delta, input hook, shared admission change, schema,
   configuration, menu, normalization, foreign driver or reserved change.
 
+- [~] **L139.** Shared typing metrics NONE selection: use one selection policy
+  for historical dictionaries, live known/Unknown applications and per-app KPIs.
+  Explicit NONE excludes all input while retaining existing ALL, uninitialized,
+  explicit selection, Unknown inclusion, discovery and cache ownership outside
+  NONE. Twelve registered JS controls cover all ngram families and actual raw/
+  hotstring SFB computations; all pass after the fix. Fifteen existing request
+  ownership controls remain green. Real Linux WebKit 2.54 under virtual X11 and
+  private D-Bus reproduces two failures among nine before, then nine pass after:
+  a mandatory visible owned h/count7 row is cleared, leaving zero data rows and
+  the genuine translated colspan8 no-data placeholder. The production manager,
+  keylogger, native SQLite and actual picker open/select/close transaction run;
+  literal SQL historical and flushed software counts remain healthy. Preserve
+  all eight original GUI checks, the ninth rendered-row assertion and subject
+  floor. Register the exact future CI command without launching GitHub CI.
+  The UI policy is shared by Windows/macOS/Linux; backend empty-array semantics
+  differ and are unchanged. Foreign native WebViews, Ubuntu 22.04 WebKit and
+  physical input are unexecuted. Preserve both PulseAudio language packs and
+  principal notification/HTTP assertions. No bridge, backend, input hook, menu,
+  configuration, source-admission, translation or reserved implementation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

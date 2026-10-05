@@ -328,7 +328,7 @@ function compute_manifest_metrics() {
 		if (end_val && date_str > end_val) return;
 
 		Object.keys(window.metrics_manifest[date_str]).forEach((app_name) => {
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+			if (!matches_typing_app_selection(app_name)) return;
 
 			const app = window.metrics_manifest[date_str][app_name];
 
@@ -659,7 +659,7 @@ function recompute_speed_kpi() {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
 		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_name) => {
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+			if (!matches_typing_app_selection(app_name)) return;
 			accumulate(window.metrics_manifest[date_str][app_name]);
 		});
 	});
@@ -668,7 +668,7 @@ function recompute_speed_kpi() {
 		(!start_val || today_str >= start_val) && (!end_val || today_str <= end_val);
 	if (today_in_range && app_state.today_live_data) {
 		Object.entries(app_state.today_live_data).forEach(([app_name, app_data]) => {
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+			if (!matches_typing_app_selection(app_name)) return;
 			accumulate(app_data);
 		});
 	}
@@ -790,6 +790,28 @@ function invalidate_typing_projection_cache() {
 	window.typingFilterPerformance.entries = 0;
 }
 
+/**
+ * Aggregated historical dictionaries have no app IDs, so explicit NONE must
+ * reject them before merging. An empty set in another selection mode retains
+ * its existing Unknown and historical-data behavior.
+ * @returns {boolean} Whether app data may enter the typing projection.
+ */
+function has_typing_app_selection() {
+	return app_state.app_selection_mode !== APP_SELECTION_MODE.NONE;
+}
+
+/**
+ * Applies the same selection policy to every per-app typing metric.
+ * Unknown keeps its existing inclusion rule outside explicit NONE.
+ * @param {string} app_name Application identifier.
+ * @returns {boolean} Whether this app contributes to the selected metrics.
+ */
+function matches_typing_app_selection(app_name) {
+	return (
+		has_typing_app_selection() && (app_name === 'Unknown' || app_state.selected_apps.has(app_name))
+	);
+}
+
 function apply_local_filters() {
 	if (!app_state.historical_cache && !app_state.today_live_data) return;
 	if (
@@ -871,7 +893,7 @@ function apply_local_filters() {
 		};
 
 		const merge_source = (source_cache) => {
-			if (!source_cache) return;
+			if (!has_typing_app_selection() || !source_cache) return;
 			Object.keys(app_state.data).forEach((tab) => {
 				merge_dict(
 					app_state.data[tab],
@@ -892,7 +914,7 @@ function apply_local_filters() {
 			Object.keys(app_state.today_live_data).forEach((app_name) => {
 				if (app_name === '_sys' || app_name === '_system') return;
 
-				if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+				if (!matches_typing_app_selection(app_name)) return;
 
 				const app_data = app_state.today_live_data[app_name];
 				Object.keys(app_state.data).forEach((tab) => {
@@ -1150,7 +1172,7 @@ function render_sfb_kpi() {
 	// Build a manual-only bg dict regardless of the current source mode toggles.
 	const raw_bg = {};
 	const merge_raw = (src) => {
-		if (!src?.bg) return;
+		if (!has_typing_app_selection() || !src?.bg) return;
 		merge_dict(raw_bg, src.bg, false, true, false, false, true, 'bg');
 	};
 	merge_raw(app_state.historical_cache);
@@ -1162,9 +1184,8 @@ function render_sfb_kpi() {
 		if (start_val && today_str < start_val) include_today = false;
 		if (end_val && today_str > end_val) include_today = false;
 		if (include_today) {
-			const selected = app_state.selected_apps;
 			Object.entries(app_state.today_live_data).forEach(([app_name, app_data]) => {
-				if (app_name !== 'Unknown' && !selected.has(app_name)) return;
+				if (!matches_typing_app_selection(app_name)) return;
 				merge_dict(raw_bg, app_data?.bg, false, true, false, false, true, 'bg');
 			});
 		}
@@ -1236,7 +1257,7 @@ function render_sfb_kpi() {
 	// These are output bigrams the user never had to type physically thanks to hotstrings.
 	const hs_bg = {};
 	const merge_hs = (src) => {
-		if (!src?.bg) return;
+		if (!has_typing_app_selection() || !src?.bg) return;
 		merge_dict(hs_bg, src.bg, false, true, true, false, false, 'bg');
 	};
 	merge_hs(app_state.historical_cache);
@@ -1248,9 +1269,8 @@ function render_sfb_kpi() {
 		if (start_val2 && today_str2 < start_val2) include_today2 = false;
 		if (end_val2 && today_str2 > end_val2) include_today2 = false;
 		if (include_today2) {
-			const selected2 = app_state.selected_apps;
 			Object.entries(app_state.today_live_data).forEach(([app_name, app_data]) => {
-				if (app_name !== 'Unknown' && !selected2.has(app_name)) return;
+				if (!matches_typing_app_selection(app_name)) return;
 				merge_dict(hs_bg, app_data?.bg, false, true, true, false, false, 'bg');
 			});
 		}
@@ -2387,7 +2407,7 @@ function render_roi_kpi() {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
 		Object.keys(window.metrics_manifest[date_str] || {}).forEach((app_name) => {
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+			if (!matches_typing_app_selection(app_name)) return;
 			accumulate(window.metrics_manifest[date_str][app_name]);
 		});
 	});
@@ -2396,7 +2416,7 @@ function render_roi_kpi() {
 		(!start_val || today_str >= start_val) && (!end_val || today_str <= end_val);
 	if (today_in_range && app_state.today_live_data) {
 		Object.entries(app_state.today_live_data).forEach(([app_name, app_data]) => {
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+			if (!matches_typing_app_selection(app_name)) return;
 			accumulate(app_data);
 		});
 	}
@@ -2573,7 +2593,7 @@ function _foreach_filtered_app(fn) {
 		if (start_val && date_str < start_val) return;
 		if (end_val && date_str > end_val) return;
 		Object.entries(window.metrics_manifest[date_str] || {}).forEach(([app_name, app]) => {
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+			if (!matches_typing_app_selection(app_name)) return;
 			fn(app, date_str, app_name);
 		});
 	});
@@ -2582,7 +2602,7 @@ function _foreach_filtered_app(fn) {
 		(!start_val || today_str >= start_val) && (!end_val || today_str <= end_val);
 	if (today_in_range && app_state.today_live_data) {
 		Object.entries(app_state.today_live_data).forEach(([app_name, app]) => {
-			if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+			if (!matches_typing_app_selection(app_name)) return;
 			fn(app, today_str, app_name);
 		});
 	}
@@ -2769,7 +2789,7 @@ function render_records_kpi() {
 	const per_day = {};
 
 	const visit = (app, date_str, app_name) => {
-		if (app_name !== 'Unknown' && !app_state.selected_apps.has(app_name)) return;
+		if (!matches_typing_app_selection(app_name)) return;
 		const cpm = app.burst_max_cpm || 0;
 		if (cpm > max_cpm) max_cpm = cpm;
 		const burst = app.burst_max_chars || 0;
