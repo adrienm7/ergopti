@@ -828,8 +828,19 @@ end
 --- @param deps table|nil Optional filesystem collaborators.
 --- @return table|nil { pack = dir } scanner root; nil when the registry is not shipped.
 function M.shipped_extension_root(deps)
-	local resolved, reason = resolve_deps(deps)
-	if not resolved then error(reason, 0) end
+	local resolved = deps
+	if resolved == nil then
+		-- Offline shipped data belongs to the local registry. Its source path
+		-- never needs the updater's initialized transport or installed channel.
+		local layouts, layouts_error = read_shared_json("modules/layouts/defaults.json")
+		if not layouts then error(layouts_error, 0) end
+		local updater, updater_error = read_shared_json("modules/updater/defaults.json")
+		if not updater then error(updater_error, 0) end
+		local settings, settings_error = Registry.resolve(layouts, updater)
+		if not settings then error(settings_error, 0) end
+		resolved = { settings = settings, exists = FileSystem.exists,
+			bundled_dir = M.bundled_dir(Paths.driver_root(), settings, FileSystem.exists) }
+	end
 	local root = Extension.shipped_root(resolved.bundled_dir, resolved.settings, resolved.exists)
 	if root == nil then
 		Logger.warn(LOG, "No shipped Ergopti extension: the driver ships no layout registry.")

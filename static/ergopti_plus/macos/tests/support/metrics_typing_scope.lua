@@ -11,6 +11,7 @@ local M = {}
 local OWNERS = {
 	"compat.utf8",
 	"adapters.webview_result",
+	"diagnostics.operation_reporter",
 	"adapters.file_system", "adapters.timer_scheduler", "infra.logger", "infra.paths",
 	"infra.i18n", "infra.fs_dir", "infra.text_utils", "text_utils",
 	"hs.fs", "hs.json", "json", "ui.ui_builder", "ui.metrics_typing",

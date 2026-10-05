@@ -1849,18 +1849,24 @@ end
 --- Opens one synthetic transaction.
 --- @param owner string Stable producer name.
 --- @param effect string replacement|action.
+--- @param publication table|nil Optional full/off-hook and cached/RAM output guards.
 --- @return table tx Opaque transaction.
-function M.begin(owner, effect)
+function M.begin(owner, effect, publication)
 	assert(type(owner) == "string" and owner ~= "",
 		"adapters.synthetic_input.begin: owner must be a non-empty string")
 	assert(EFFECTS[effect] == true,
 		"adapters.synthetic_input.begin: effect must be 'replacement' or 'action'")
 	assert(_admission_fence == nil,
 		"adapters.synthetic_input.begin: lifecycle admission is fenced")
+	if publication ~= nil then
+		assert(type(publication) == "table" and type(publication.current) == "function"
+			and type(publication.cached) == "function", "synthetic publication requires full and cached guards")
+	end
 	_generation = _generation + 1
 	local tx = {
 		_marker = TRANSACTION_MARKER,
 		owner = owner,
+		publication = publication,
 		effect = effect,
 		generation = _generation,
 		sealed = false,
@@ -1988,6 +1994,10 @@ function M.cancel(tx)
 	for _, batch in ipairs(tx.batches) do
 		local owner = batch.paced_owner
 		if owner and owner.committed == true and batch.status == "queued" then
+			if tx.publication ~= nil then
+				owner.publication_cancelled = true
+				return false
+			end
 			defer_diagnostic("warn",
 				"Cancellation deferred behind committed paced output for '%s'.",
 				tostring(tx.owner))
@@ -3020,6 +3030,35 @@ local function finish_paced_batch(batch)
 end
 
 
+--- Drops a guarded suffix while releasing an already-posted key down exactly.
+--- @param batch table Targeted paced publication.
+--- @param owner table Exact periodic owner and next native ordinal.
+local function refuse_paced_publication(batch, owner)
+	if owner.ordinal % 2 == 0 and owner.ordinal <= #owner.events then
+		local posted, failure = pcall(owner.events[owner.ordinal].post, owner.events[owner.ordinal], owner.app)
+		if not posted then
+			retain_or_fail_post(batch, owner, "Programmable cleanup key-up", failure)
+			return
+		end
+		owner.ordinal = owner.ordinal + 1
+	end
+	discard_unposted_suffix(batch, owner.ordinal)
+	if owner.publication_cancelled then batch.tx.cancelled = true end
+	finish_serial_batch(batch, owner, "failed", "programmable publication is no longer current")
+end
+
+--- Evaluates a retained publication; full checks run only on the timer path.
+--- @param publication table|nil Optional domain owner.
+--- @param cached boolean Selects the RAM-only check.
+--- @return boolean current
+local function publication_allowed(publication, cached)
+	if publication == nil then return true end
+	local check = publication.current
+	if cached then check = publication.cached end
+	local ok, current = pcall(check)
+	return ok and current == true
+end
+
 --- Posts one complete delete pair per periodic render turn, then the replacement
 --- suffix contiguously. A refusal advances no ordinal and returns to the already
 --- running periodic owner; it never allocates or immediately retries post-commit.
@@ -3032,6 +3071,10 @@ pump_paced_batch = function(batch)
 		"adapters.synthetic_input: queued paced batch has no committed owner")
 	if owner.awaiting_settlement == true then
 		finish_paced_batch(batch)
+		return
+	end
+	if owner.publication_cancelled or publication_allowed(batch.tx.publication, false) ~= true then
+		refuse_paced_publication(batch, owner)
 		return
 	end
 	if not target_is_live(owner.app, owner.target_pid) then
@@ -3056,6 +3099,10 @@ pump_paced_batch = function(batch)
 		stop_index = math.min(stop_index, owner.delete_event_count)
 	end
 	for index = owner.ordinal, stop_index do
+		if owner.publication_cancelled or publication_allowed(batch.tx.publication, true) ~= true then
+			refuse_paced_publication(batch, owner)
+			return
+		end
 		local event = owner.events[index]
 		local posted, post_error = xpcall(function()
 			event:post(owner.app)
@@ -3902,6 +3949,7 @@ function M.abort_callback()
 	for _, batch in ipairs(collector.batches) do
 		local owner = batch.paced_owner
 		if owner and owner.committed == true and batch.status == "queued" then
+			if batch.tx.publication ~= nil then owner.publication_cancelled = true end
 			consume_original = true
 		elseif not batch.tx.cancelled then
 			local cancelled_ok, cancelled_or_error = pcall(M.cancel, batch.tx)

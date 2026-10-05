@@ -1,0 +1,23 @@
+# _shared/data/hotstrings/common_autocorrection_migration.toml
+# Owned override leaves fan out independently of config.toml schema versioning.
+# Explicit destination choices win; unknown legacy leaves remain untouched.
+
+[migration]
+ops = [
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "delay", to_section = "autocorrection.names" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "delay", to_section = "autocorrection.abbreviations" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "delay", to_section = "autocorrection.technical_terms" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "color", to_section = "autocorrection.names" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "color", to_section = "autocorrection.abbreviations" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "color", to_section = "autocorrection.technical_terms" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "show_tooltip", to_section = "autocorrection.names" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "show_tooltip", to_section = "autocorrection.abbreviations" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "show_tooltip", to_section = "autocorrection.technical_terms" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "priority", to_section = "autocorrection.names" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "priority", to_section = "autocorrection.abbreviations" },
+	{ op = "copy_if_absent", section = "autocorrection.caps", key = "priority", to_section = "autocorrection.technical_terms" },
+	{ op = "delete", section = "autocorrection.caps", key = "delay" },
+	{ op = "delete", section = "autocorrection.caps", key = "color" },
+	{ op = "delete", section = "autocorrection.caps", key = "show_tooltip" },
+	{ op = "delete", section = "autocorrection.caps", key = "priority" },
+]

@@ -108,6 +108,8 @@ class El {
 		return copy;
 	}
 	matches(selector) {
+		if (selector.includes(','))
+			return selector.split(',').some((part) => this.matches(part.trim()));
 		if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
 		const attribute = /^\[([\w-]+)(?:=([\w-]+))?\]$/.exec(selector);
 		if (attribute) {
@@ -235,6 +237,66 @@ cards()[0].querySelector('.cat-title').click();
 assert.equal(cards()[0].querySelector('.sections').hidden, false, 'a click on the title unfolds');
 cards()[1].querySelector('.cat-title').click();
 assert.equal(cards()[1].querySelector('.sections').hidden, true, 'a click on the title folds');
+
+// 5/ A refused personal owner exposes its data without offering mutations.
+// A later admitted state rebuild restores ordinary editability.
+const ownedState = hostState();
+ownedState.categories[0].readonly = true;
+sandbox.setData(ownedState);
+const controls = (card) => card.querySelectorAll('input, select, button');
+assert.ok(controls(cards()[0]).length > 0, 'actual template controls are exercised');
+assert.ok(
+	controls(cards()[0]).every((control) => control.disabled === true),
+	'readonly disables file and section controls'
+);
+assert.ok(
+	controls(cards()[1]).some((control) => control.disabled !== true),
+	'a sibling remains editable'
+);
+sandbox.setData(hostState());
+assert.ok(
+	controls(cards()[0]).some((control) => control.disabled !== true),
+	'an admitted replacement restores editability'
+);
+
+// 6/ An ambiguous source field disables only that control; other source controls
+// and sections stay editable, and a fresh authoritative state clears the flag.
+const fieldState = hostState();
+fieldState.categories[0].readonly_metadata = { delay: true };
+fieldState.categories[0].readonly_metadata_reason = 'Edit this field in the source file.';
+fieldState.categories[0].sections[0].readonly_metadata = { color: true };
+fieldState.categories[0].sections[0].readonly_metadata_reason =
+	'Edit this section field in the source file.';
+sandbox.setData(fieldState);
+const fileFields = cards()[0];
+const sectionFields = fileFields.querySelector('.sections').children[0];
+assert.ok(
+	controls(fileFields.querySelector('.field-delay')).every((control) => control.disabled === true)
+);
+assert.equal(
+	fileFields.querySelector('.field-delay').title,
+	fieldState.categories[0].readonly_metadata_reason
+);
+assert.ok(
+	controls(fileFields.querySelector('.field-color')).some((control) => control.disabled !== true)
+);
+assert.ok(
+	controls(sectionFields.querySelector('.field-color')).every(
+		(control) => control.disabled === true
+	)
+);
+assert.equal(
+	sectionFields.querySelector('.field-color').title,
+	fieldState.categories[0].sections[0].readonly_metadata_reason
+);
+assert.ok(
+	controls(sectionFields.querySelector('.field-delay')).some((control) => control.disabled !== true)
+);
+assert.ok(controls(cards()[1]).some((control) => control.disabled !== true));
+sandbox.setData(hostState());
+assert.ok(
+	controls(cards()[0].querySelector('.field-delay')).some((control) => control.disabled !== true)
+);
 
 console.log(
 	'[OK] hotstrings config window: sections fold from the caret and the title, stay folded across a host push, and [hidden] is honoured.'

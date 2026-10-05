@@ -9,6 +9,13 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.test_user_hotstring_destination",
+	"tests.unit.infra.test_user_hotstring_runtime",
+	"tests.unit.ui.test_ergopti_extension_selection",
+	"tests.unit.ui.test_user_hotstring_menu",
+	"tests.unit.infra.test_personal_file_adoption",
+	"tests.unit.infra.test_personal_file_adoption_native",
+	"tests.unit.meta.test_user_code_contract",
 	"tests.unit.modules.llm.test_local_server_discovery",
 	"tests.unit.modules.llm.test_api_remote_base_url",
 	"tests.unit.meta.test_callback_error_description",

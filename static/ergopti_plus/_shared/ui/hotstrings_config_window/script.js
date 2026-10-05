@@ -153,6 +153,7 @@ function render() {
 		bindColor(card.querySelector('.field-color'), cat, null);
 		bindPriority(card.querySelector('.field-priority'), cat, null);
 		bindTooltip(card.querySelector('.field-tooltip'), cat, null);
+		applyMetadataAvailability(card, cat);
 
 		// Sections
 		for (const sec of cat.sections) {
@@ -163,7 +164,11 @@ function render() {
 			bindColor(secNode.querySelector('.field-color'), cat, sec);
 			bindPriority(secNode.querySelector('.field-priority'), cat, sec);
 			bindTooltip(secNode.querySelector('.field-tooltip'), cat, sec);
+			applyMetadataAvailability(secNode, sec);
 			sectionsBox.appendChild(secNode);
+		}
+		if (cat.readonly === true) {
+			for (const control of card.querySelectorAll('input, select, button')) control.disabled = true;
 		}
 
 		main.appendChild(node);
@@ -173,6 +178,22 @@ function render() {
 // ============================================================
 // 4/ Field bindings
 // ============================================================
+
+function applyMetadataAvailability(node, target) {
+	const unavailable = target.readonly_metadata || {};
+	for (const [key, selector] of [
+		['delay', 'delay'],
+		['color', 'color'],
+		['priority', 'priority'],
+		['show_tooltip', 'tooltip']
+	]) {
+		if (unavailable[key] !== true) continue;
+		const field = node.querySelector('.field-' + selector);
+		if (!field) continue;
+		field.title = target.readonly_metadata_reason || '';
+		for (const control of field.querySelectorAll('input, select, button')) control.disabled = true;
+	}
+}
 
 function bindDelay(field, cat, sec) {
 	const ms = sec ? sec.delay_ms : cat.delay_ms;

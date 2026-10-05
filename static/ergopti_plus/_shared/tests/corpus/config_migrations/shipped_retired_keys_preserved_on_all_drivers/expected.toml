@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_retired_keys_preserved_on_all_drivers/expected.toml
 
 [_meta]
-schema_version = 10
+schema_version = 11
 
 [gestures]
 enabled = true

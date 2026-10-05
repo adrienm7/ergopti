@@ -20,10 +20,8 @@ helpers.describe("FileSystem publication stays in-process and nonblocking", func
 	helpers.it("contains no synchronous task/helper publication path", function()
 		-- This declaration is unique to adapters/file_system.lua. Reading by symbol
 		-- keeps the invariant valid if the adapter is moved or renamed.
-		local source = helpers.read_driver_source(
-			"local function write_atomic(path, content, expected_source)"
-		)
-		helpers.assert_type(source, "string", "the FileSystem implementation must be locatable")
+		local source, detail = helpers.read_driver_unit("local function write_atomic(")
+		helpers.assert_type(source, "string", "the FileSystem implementation must be uniquely locatable: " .. tostring(detail))
 		local code = strip_comments(source)
 		helpers.assert_true(code:find("waitUntilExit", 1, true) == nil,
 			"FileSystem writes must never synchronously wait for a child process")
