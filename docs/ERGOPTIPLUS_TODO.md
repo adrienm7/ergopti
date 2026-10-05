@@ -2210,6 +2210,15 @@ Linux now consumes the shared catalogue-ordered local-server menu and discovery 
 
 The 48-check native curl fixture exercises real loopback models and chat, private-file restart, HTTP/model refusal and exact owned cancellation settlement. Its backend selection callback is injected; it does not itself prove the production prediction engine's second admission check or native desktop application behavior. The separately prepared real-engine preference-owner regression and full hosted three-OS qualification remain distinct obligations. Shared generations invalidate logical discovery tickets; native HTTP successor admission still requires the exact process exit and every owned handle-close acknowledgement. No server installation, start or automatic Windows discovery/menu completion is claimed.
 
+The Linux owned HTTP close receipt now binds its callback to the exact admitted
+close attempt. Synchronous or delayed callbacks from a refused/throwing close,
+including callbacks arriving after a retry, cannot settle the request or release
+its successor slot. Six independent refusal controls reproduce the previous
+defect on both Lua ABIs; the accepted synchronous control retains exactly-once
+delivery. The full HTTP adapter fixture passes 295 cases per ABI. Detached
+descendant absence, runtime acquisition and complete native qualification remain
+separate requirements; this checkpoint does not complete item 47.
+
 Actual root integration command for the extended mandatory native fixture, after activation and in the Linux driver directory:
 
 ```sh
