@@ -2,107 +2,124 @@
 
 # Group 4 AI continuation — 2026-10-05
 
-TODO 46, 47, 48 and 88 remain partial; no item is removed. Transversal 16/38
-retain physical input, desktop appearance, packaging, installation and restart
-requirements. Differential updates 22 remain withdrawn. The maintainer permits
-partial dev integration and feature-branch deletion after reviewed terminal CI,
-serialized ownership coordination and confirmation all integrated commits
-reached dev; retain unfinished TODO items and their receipts.
+TODO 46, 47, 48 and 88 remain partial; no item is removed. Transversal 16/38 retain
+physical input, appearance, packaging, installation and restart requirements.
+Differential updates 22 remain withdrawn. Partial dev integration and branch
+deletion are authorized after reviewed terminal CI and serialized ownership
+coordination; retain unfinished TODOs and receipts.
 
-The latest corrective commits are b685130a6f154631b90590b123461eb7adc4d0fe,
-48ea5b4afda3fe4dd2176bfcf9c9d46147e37730 and
-aed951939eb0b05a51bf6a3e59a99c793f4c09ec. The earlier 143-path count describes
-the precommit implementation checkpoint; these three handover documents and
-later repairs are additional scope. Earlier d94 snapshots and the dev18c merge
-6b6aa4b110594451a98abfb94f5446cee925f769 are historical identities.
+This is a pre-integration snapshot at feature
+`a5fa596f12f2801f983a1788a032284166aeb071`. It includes the three durable documents
+and source-approved G2 fixture repairs preserving 139 assertions. Their native replay now passes all Group4 cohorts. Current final integration
+is not claimed.
+Earlier d94 snapshots, 143-path implementation counts and dev18c merge 6b6 are
+historical. QUALIFICATION.json preserves exact source/tested trees and statuses.
 
-## Current bounded checkpoints
+## Current native evidence
 
-| Scope                                | Result                                   | Qualification limit                                                                           |
-| ------------------------------------ | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Corrected canonical Linux units      | 8338 passed, 0 failed across 406 modules | Scripted/controlled GTK fixtures are not physical GTK evidence                                |
-| Linux engine E2E                     | 189 passed, 0 failed                     | Final helper checkpoint, not desktop/model acceptance                                         |
-| Mandatory actual Linux prerequisites | 82 passed, 0 failed                      | 64 retained checks plus 18 POST checks; actual adopted descendants 3, pending 0, rescue 0     |
-| Registered Linux diagnostics         | 14 passed                                | Registration/diagnostic evidence, distinct from official hosted model acceptance              |
-| Strict physical-receipt parser       | 35 controls plus 3 source guards passed  | Parser/source proof; corrected hosted physical-closure replay remains pending                 |
-| Current corrective JS                | 361 passed, 0 failed                     | Before the final Linux guard addition; subsequent full JS rerun is scheduled                  |
-| Formatted Mac observer/supervisor    | 48 passed, 0 failed, 0 skipped           | Source observer prefix d494 and test prefix b329; pure controls, not fresh native Hammerspoon |
-| Immutable captured-image replay      | All 12 passed, 0 failed, 0 skipped       | Replay of untouched existing images; fresh native capture/observer CI pending                 |
-| Current AHK BOM/LF                   | 1841 sources passed, 0 failed            | Encoding receipt, not native AHK/Windows GUI execution                                        |
+| Lane/run            | Bounded successes                                                                                                                               | Whole result and remaining failures                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Windows 37316704100 | private 42, JOIN 9, cohort 6, panel 20, models 20, timer 4, logical 39 and native item 88/GDI 28 passed                                         | 9303 passed, 44 failed, 0 skipped of 9347; all 12 former marker failures closed, same 44 remaining names; later steps skipped |
+| Mac 37314015214     | Fresh signed Hammerspoon: 48 pure controls, 12 native captures, 3079 production+3 probe hashes audited, all 12 image hashes, group 1767 retired | Whole lane FAIL; Swift 308 cases=303 passed/5 failed, 17 assertions/4unexpected; install and release skipped                  |
+| Linux 37314770405   | Actual official archive/model/inference, source freeze and strict physical closure acceptance STEP PASS; Linux units PASS                       | Whole lane FAIL; E2E 119 steps passed, 2 failed, 2 skipped; package/install skipped; hosted native 82 FAILED                  |
 
-QUALIFICATION.json records raw-log references/hashes when present and root
-terminal reports. Source prefixes are not full SHA receipts. No result here
-proves completion of a currently running or undispatched native lane.
+All three tested exact source trees without fixture variants. Latest Windows
+source a5fa was tested 65e28/tree71f6; Mac source aed was tested b574/tree5c70;
+Linux source d60 was tested c5/tree361f. The previous Windows b685 checkpoint
+was tested 7e80/treef756. Full identities are in QUALIFICATION.json.
 
-Earlier bounded receipts remain valid at their stated sources: portable Mac Lua
-14665/0; Mac engine E2E 101/0 with one driver/host skip; controlled managed consumer
-180/0 per ABI and two actual onIdle/on_periodic callback-body cases per ABI with
-controlled shutdown/input ports. Those two cases prove no daemon launch,
-loopback or native service behavior. Same-fixture baseline 16/2 is a causal
-rejection, retaining original 93+487 assertions. Page-epoch bridge 13/0 per ABI
-uses controlled creation/presentation and proves no physical GTK close ACK.
+Latest [Windows 37316704100](https://github.com/adrienm7/ergopti/actions/runs/37316704100)
+tested source a5fa/test 65e28/tree 71f6 without variants and finished FAIL overall:
+9303 passed, 44 failed, 0 skipped; all 9347 mirrored IDs agree. Every Group4 cohort
+passes, and all 12 former marker-dependent failures are closed. Actual fixture
+acquisition shows prior_object=0; owned refusal points retained_owned=1 and exact
+terminal/token debt. The original 139 G2 assertions are preserved. Core JS and
+properties pass; E2E/package/install/isolated LLM/startup/release are skipped.
+Do not call the remaining 44 failures foreign or waived solely from filenames.
 
-## Native CI and official model evidence
+The GNU no-clobber V2 source 7d195155 is independently approved. Its exact source
+SHA is recorded in QUALIFICATION.json. Candidate 44 targeted native cases pass;
+full 82 passes under GNU 9.4 and separately under GNU 9.7 (164 total), with 1164
+immutable source hashes unchanged and outer pending 0/rescue 0. Trusted native 16
+probes and original 9.4 causal RED versus original 9.7 22 PASS remain separate.
+Earlier EROFS/incomplete-projection setup attempts FAILED and left POST probes
+unexecuted; they are not silently converted to passes. The final qualified rerun
+is distinct. No future corrected hosted CI or final dev integration is claimed.
 
-Corrected Windows manual run [37313187012](https://github.com/adrienm7/ergopti/actions/runs/37313187012)
-is running, source b685130a6f154631b90590b123461eb7adc4d0fe, tested prefix 7e80,
-identical tree prefix f756, with no fixture variants. Full tested/tree identities
-and outcome remain pending. New corrected Linux/Mac manual runs are not yet
-supplied; their run/source/tested/tree/outcome fields remain null.
+## Qualification boundaries
 
-Historical direct-source all-OS run [37306690694](https://github.com/adrienm7/ergopti/actions/runs/37306690694)
-failed on source 6b6/test 4bc/tree 00aa, without fixture variants. JS/properties
-passed; Windows 9288/53/0 executed 9341; Linux 8337/1 exposed the subsequently
-corrected cache fixture. Finite-owned Windows corrections await replay; none
-of the 53 failures is automatically exonerated.
+Mac [37314015214](https://github.com/adrienm7/ergopti/actions/runs/37314015214)
+proves genuine production native rendering, independent pixel/style/indentation
+observation and exact child retirement. The original official Hammerspoon 1.1.1
+Gatekeeper assessment and original/copied codesign checks passed. Copied-app
+Gatekeeper assessment was unexecuted. Source/hash audit covers 3082 immutable Git
+blobs. Physical typing, watcher orchestration, Launch Services and complete
+installed-package behavior remain unmeasured. Native launcher/helper inputs are
+byte-identical to 18c; no baseline native rerun or package-failure exemption is
+claimed. Foreign Swift ownership does not turn five failing cases into passes.
 
-That hosted official runtime/model probe emitted child exit 0 and six inference
-controls but refused outer physical closure, so whole acceptance failed. The
-corrected parser now has bounded source proof; hosted replay remains required.
-A local official HTTPS archive/pin, typed readiness and durable enable attempt
-succeeded, then model pull failed with zero allocated model. No local inference
-is claimed. The earlier registry CONNECT403 and cache-copy install are separate
-historical evidence.
+Linux [37314770405](https://github.com/adrienm7/ergopti/actions/runs/37314770405)
+passed the actual official model/chat acceptance step through strict physical
+shutdown. The complete workflow log ZIP was obtained after a terminal retry;
+raw model-acceptance JSON artifact bytes still return 403. Its E2E failures are
+foreign ETag 503 E1-versus-E2 (Group1 ownership) and our native 82 no-clobber race
+fixture expecting 0 where GNU 9.4 truthfully returns 1. Local GNU 9.7 returns 0.
+The narrow V2 fixture repair is now approved and qualified 44/164 as above.
+Generic positive 0 and physical-refusal assertions remain; no production 0/1
+normalization is allowed. Historical hosted 82 remains FAILED, distinct from
+local qualified 82 and the final candidate reruns.
 
-The failed Mac job produced 12 signed-Hammerspoon captures and retired its child,
-then failed independent observation. Corrected formatted observer controls and
-immutable image replay now pass; this does not substitute for a fresh native
-run. Foreign Swift package prerequisite failed and installation was skipped;
-foreign ownership is not an exemption from package/install qualification.
+The earlier local official archive/pin/readiness/enable attempt succeeded but
+model pull failed with zero allocated model; it does not qualify inference.
+The older 37306690694 run failed, including observer and outer-closure refusals.
+Later bounded native successes supersede those scopes, not their whole-lane
+results. Historical eight-variant Windows 9278/43 and foreign Group3 run 65 failures
+cannot qualify current unchanged sources.
 
-## Remaining production and desktop scope
+## Local and controlled receipts
+
+Current full selected JS/doc verification 361/0 and AHK BOM/LF 1841/0 pass.
+Earlier local Linux 8338/0 across 406 modules, E2E 189/0 and actual native 82/0 remain
+bounded source checkpoints. Scripted GTK tests are not physical GTK acceptance.
+Pure Mac 48/0 and immutable image replay 12/0 are separate from the fresh native
+producer above. Portable Hammerspoon Lua 14665/0 and E2E 101/0+one driver/host skip
+remain Linux-hosted fixtures.
+
+Managed consumer 180/0 per ABI and two actual onIdle/on_periodic callback bodies
+use controlled shutdown/input ports; those two prove no daemon launch, loopback
+or native service behavior. Same-fixture baseline 16/2 is causal, preserving
+original 93+487 assertions. Page-epoch bridge 13/0 per ABI uses controlled native
+creation/presentation and proves no physical GTK close ACK.
+
+## Remaining production and device scope
 
 Windows archive installer, runtime-source acquisition, daemon handoff and model
 orchestration remain prepared SOURCE PROPOSALS requiring production integration.
-Their 25 native controls remain unexecuted. WINDOWS-PC-STEPS.md preserves the 12
-essential requirements; steps 8–10 need implementation plus qualification, not
-merely device clicks. Final Windows panel 20 and timer 4 require exact completed
-native receipts. Older eight-variant diagnostic 9278/43 and foreign Group3
-run 37288850992/65 cannot qualify current unmodified sources.
+Their 25 native controls remain unexecuted. Recover these proposals using the
+[archived recovery instructions](../2026-10-04-ai-windows/README.md#recover-the-preparations)
+and that directory's independently hashed packets. Historical source statuses
+in that recovery checkpoint are superseded only by the exact newer receipts.
+WINDOWS-PC-STEPS.md preserves 12
+requirements; steps 8–10 need implementation plus qualification, not just clicks.
+Successful panel/timer/tooltip cohorts do not close these source gaps.
 
-Qualify final Mac 12 fresh signed-runtime captures and independent observation,
-Linux official HTTPS/model inference with physical closure, final source/model
-admission and application handoff, real chat, per-user installation/restart,
-packaging and physical input/appearance. Missing GUI, trust, output, retirement
-or native prerequisites must fail rather than skip-green. Keep physical process
-cleanup, source authority, private writer admission and configured model enable
-as separate receipts.
+Keep actual model/chat handoff, source and credential/model authority, separate
+consent, private writer admission and physical process/file cleanup qualified
+at their exact final sources. Packaging, per-user installation/restart and
+physical appearance/input remain open across the three OS under 16/38. Missing
+GUI, trust, output or retirement must fail rather than skip-green.
 
-## Resume and finalize
+## Resume and integrate
 
-Read current AGENTS, routed memory, verify-change, driver skills, TODO and
-parallel ownership. Fetch actual origin/dev; preserve tree/index and foreign
-work. Recover adopted sources from committed history. Verify older recovery
-archive hashes before extraction; do not overwrite current sources from old
-candidates. Use tools/rtk/rtk.sh, registered gates and independent corpora.
-Regenerate artifacts with their owners; keep AHK BOM/LF. Serialize native gates
-and avoid JS drift checks overlapping native suites.
+Read current AGENTS, memory, verify-change, driver skills, TODO and ownership.
+Fetch current dev; preserve tree/index and foreign work. Recover adopted sources
+from committed history; verify older recovery archive hashes before extraction.
+Use tools/rtk/rtk.sh and registered gates, preserve independent corpus assertions,
+regenerate with artifact owners and keep AHK BOM/LF. Serialize native gates and
+avoid overlapping JS drift checks with native suites.
 
-Record completed run URLs/attempts, exact source/tested trees, passed/failed/
-skipped/unexecuted cases and final integration identities before finalizing
-this handover. Cancel automatic workflows on exact pushed SHAs and use the
-authorized serial no-squash partial integration protocol. This lean packet
-excludes full TAP dumps, private profiles, obsolete full source copies and
-runtime/model binaries. Final corrected CI and integration claims remain pending.
-
-The final Linux physical-closure source is committed in `d60abbd42d412cf8861a2f1426c20e9352bb0cf4`. Its selected full JS gate passes361/0, full Linux passes8338/0, native prerequisites pass82/0 and E2E passes189/0. Corrected native manual runs are Windows37313187012, Mac37314015214 and Linux37314770405, all on exact committed trees without fixture variants. This is a pre-integration checkpoint; future results are not asserted here.
+Record completed runs, exact tested trees, passed/failed/skipped/unexecuted cases
+and actual integration identity. Cancel automatic workflows on exact pushed
+SHAs; use the authorized serial no-squash partial integration. This lean packet
+excludes full logs, private profiles, runtime/model binaries and obsolete source
+dumps. Future corrected hosted CI and final integration are explicitly not claimed.
