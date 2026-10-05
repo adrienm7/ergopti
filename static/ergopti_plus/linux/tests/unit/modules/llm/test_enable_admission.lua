@@ -15,7 +15,7 @@ local function with_owner(body, options)
 	options = options or {}
 	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "infra.llm_preferences",
-		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
+		"modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.runtime_factory", "adapters.keyboard_hook",
 		"adapters.shell_runner", "infra.i18n", "window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -32,6 +32,12 @@ local function with_owner(body, options)
 			world.cancels[#world.cancels + 1] = owner
 			return world.cancel_ok
 		end,
+	}
+	-- Cached-server admission owns this fixture. Managed runtime choices have
+	-- their separate acquisition fixture and must not depend on the host's
+	-- actual install directory, root-namespace ownership or available tools.
+	package.loaded["modules.llm.runtime_factory"] = {
+		new = function() return nil, "fixture_runtime_unavailable" end,
 	}
 	world.owned_http = {}
 	package.loaded["adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
