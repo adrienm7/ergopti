@@ -480,7 +480,12 @@ class AppleEventBoundaryControls(unittest.TestCase):
         root = Path(directory)
         (root / "sandbox.sb").write_text(self.policy)
         children = self.model(root, **options)
-        with patch.object(probe.uuid, "uuid4", return_value=self.nonce):
+        with (
+            patch.object(probe.uuid, "uuid4", return_value=self.nonce),
+            patch.object(
+                probe, "native_compiler", return_value=[str(root / "modeled-native-clang")]
+            ),
+        ):
             receipt = probe.admit_appleevent_boundary(children, root)
         return children, receipt
 
@@ -715,6 +720,100 @@ class PhaseEvidenceControls(unittest.TestCase):
                 self.assertLessEqual(max(path.stat().st_size for path in root.iterdir()), 4096)
             finally:
                 writer.close()
+
+
+class NativeCompilerSelectionControls(unittest.TestCase):
+    """Qualify path/cache admission only, never actual macOS compilation."""
+
+    def selected(self, root, developer):
+        owner = Mock(root=root)
+        owner.run.return_value = subprocess.CompletedProcess([], 0, str(developer) + "\n", "")
+        return owner
+
+    def make_layout(self, developer, xcode):
+        tools = developer / ("Toolchains/XcodeDefault.xctoolchain/usr/bin" if xcode else "usr/bin")
+        sdk = developer / (
+            "Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" if xcode else "SDKs/MacOSX.sdk"
+        )
+        tools.mkdir(parents=True)
+        sdk.mkdir(parents=True)
+        for tool in ("clang", "ld"):
+            (tools / tool).write_bytes(b"Independent nonnative tool-path fixture")
+            (tools / tool).chmod(0o700)
+        return tools, sdk
+
+    def test_selected_xcode_and_clt_paths_have_explicit_sdk_linker_and_private_cache(self):
+        for xcode in [True, False]:
+            with self.subTest(xcode=xcode), TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                developer = root / "Selected Developer With Spaces"
+                tools, sdk = self.make_layout(developer, xcode)
+                owner = self.selected(root, developer)
+                plan = probe.native_compiler(owner)
+                owner.run.assert_called_once_with(
+                    ["/usr/bin/xcode-select", "--print-path"], confined=True
+                )
+                self.assertEqual(
+                    plan,
+                    [
+                        str(tools / "clang"),
+                        "-isysroot",
+                        str(sdk),
+                        "-B",
+                        str(tools),
+                        "-fmodules-cache-path=" + str(root / "native-compiler-cache"),
+                    ],
+                )
+                self.assertTrue((root / "native-compiler-cache").is_dir())
+                self.assertNotIn("/usr/bin/xcrun", plan)
+                self.assertNotIn("/usr/bin/clang", plan)
+
+    def test_unknown_or_malformed_selection_refuses_before_any_cache_acquisition(self):
+        for value in ["relative\n", "missing\nsecond\n", "", "/missing-native-developer\n"]:
+            with self.subTest(value=value), TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                owner = self.selected(root, root)
+                owner.run.return_value.stdout = value
+                with self.assertRaises((probe.AdmissionError, FileNotFoundError)):
+                    probe.native_compiler(owner)
+                self.assertFalse((root / "native-compiler-cache").exists())
+
+    def test_foreign_sdk_symlink_and_prior_cache_are_refused(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            developer = root / "Selected Developer"
+            tools, sdk = self.make_layout(developer, True)
+            sdk.rmdir()
+            foreign = root / "Foreign SDK"
+            foreign.mkdir()
+            # Model the escape independently; native symlink semantics remain a CI gate.
+            original = probe.Path.resolve
+
+            def resolve(path, *args, **kwargs):
+                if path == sdk:
+                    return foreign
+                return original(path, *args, **kwargs)
+
+            with (
+                patch.object(
+                    probe.Path,
+                    "is_dir",
+                    autospec=True,
+                    side_effect=lambda path: path == sdk or path == foreign,
+                ),
+                patch.object(probe.Path, "resolve", autospec=True, side_effect=resolve),
+            ):
+                with self.assertRaisesRegex(probe.AdmissionError, "escaped"):
+                    probe.native_compiler(self.selected(root, developer))
+            self.assertFalse((root / "native-compiler-cache").exists())
+            sdk.mkdir()
+            (root / "native-compiler-cache").write_bytes(b"Independent preexisting private input")
+            with self.assertRaises(FileExistsError):
+                probe.native_compiler(self.selected(root, developer))
+            self.assertEqual(
+                (root / "native-compiler-cache").read_bytes(),
+                b"Independent preexisting private input",
+            )
 
 
 if __name__ == "__main__":

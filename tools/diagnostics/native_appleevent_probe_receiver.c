@@ -98,10 +98,27 @@ int main(int argc, char **argv) {
         DisposeAEEventHandlerUPP(handler);
         return 67;
     }
-    // Carbon dispatches AppleEvents without launching a production app or window.
-    // The parent owns physical shutdown; this receiver deliberately stays alive
-    // through unconfined and deny-removal positives and the denied third send.
-    RunApplicationEventLoop();
+    // RunApplicationEventLoop is 32-bit only. The documented 64-bit dispatch
+    // dequeues only AppleEvents and routes them to the unchanged nonce handler.
+    // The parent retains physical shutdown ownership through all three sends.
+    const EventTypeSpec apple_event = {kEventClassAppleEvent, kEventAppleEvent};
+    for (;;) {
+        EventRef event = NULL;
+        status = ReceiveNextEvent(1, &apple_event, kEventDurationForever, true, &event);
+        if (status != noErr || event == NULL) {
+            if (event != NULL) ReleaseEvent(event);
+            fprintf(stderr, "Owned AppleEvent receipt failed: %d\n", (int)status);
+            break;
+        }
+        status = AEProcessEvent(event);
+        ReleaseEvent(event);
+        // A rejected nonce remains an AppleEvent handler refusal, as before;
+        // it does not close the receiver or fabricate a successful reply.
+        if (status != noErr && status != errAEEventNotHandled) {
+            fprintf(stderr, "Owned AppleEvent dispatch failed: %d\n", (int)status);
+            break;
+        }
+    }
     AERemoveEventHandler(probe_class, probe_event, handler, false);
     DisposeAEEventHandlerUPP(handler);
     return 68;
