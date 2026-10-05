@@ -232,3 +232,71 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 		helpers.assert_eq(#calls.copy, 0, "a feature request copies nothing")
 	end)
 end)
+
+
+-- These adapter receipts are simulated; the native fixture separately exercises
+-- real regular-file write and close failures through the production save effect.
+helpers.describe("healthcheck checked save receipts (linux)", function()
+	local function default_save(write, mkdir_ok, reveal_ok)
+		local saved_fs = package.loaded["adapters.file_system"]
+		local saved_shell = package.loaded["adapters.shell_runner"]
+		local writes, directories = {}, {}
+		package.loaded["adapters.file_system"] = { write = function(path, text)
+			writes[#writes + 1] = { path = path, text = text }
+			return write(path, text)
+		end }
+		package.loaded["adapters.shell_runner"] = {
+			quote = function(value) return "'" .. value .. "'" end,
+			run = function(command) directories[#directories + 1] = command; return mkdir_ok ~= false end,
+		}
+		local ok, result, calls = pcall(function()
+			return perform({ action = "save", text = REPORT, name = NAME }, function(overrides)
+				overrides.save = nil
+				if reveal_ok == false then overrides.reveal = function() return false end end
+			end)
+		end)
+		package.loaded["adapters.file_system"] = saved_fs
+		package.loaded["adapters.shell_runner"] = saved_shell
+		helpers.assert_true(ok, tostring(result))
+		return result, calls, writes, directories
+	end
+
+	helpers.it("save requires the filesystem's completed write receipt (report-save-receipt)", function()
+		local result, calls, writes, directories = default_save(function() return true end)
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(writes, { { path = LOGS_DIR .. "/diagnostics/" .. NAME,
+			text = "# ErgoptiPlus diagnostics\n\nconfig_dir: ~/.config/ergopti_plus (<user>)\n" } })
+		helpers.assert_eq(#directories, 1)
+		helpers.assert_eq(calls.reveal, { result.path })
+	end)
+
+	for _, receipt in ipairs({ "false", "nil", "zero", "string", "throw" }) do
+		helpers.it("save refuses the filesystem " .. receipt .. " receipt before reveal (report-save-receipt)", function()
+			local result, calls, writes = default_save(function()
+				if receipt == "false" then return false end
+				if receipt == "nil" then return nil end
+				if receipt == "zero" then return 0 end
+				if receipt == "string" then return "true" end
+				error("simulated adapter exception")
+			end)
+			helpers.assert_eq(#writes, 1)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_nil(result.path)
+			helpers.assert_eq(#calls.reveal, 0)
+		end)
+	end
+
+	helpers.it("save refuses directory creation before acquiring a write (report-save-receipt)", function()
+		local result, calls, writes = default_save(function() return true end, false)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#writes, 0)
+		helpers.assert_eq(#calls.reveal, 0)
+	end)
+
+	helpers.it("save keeps a completed file successful when revealing its folder fails (report-save-receipt)", function()
+		local result, _, writes = default_save(function() return true end, true, false)
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(result.path, LOGS_DIR .. "/diagnostics/" .. NAME)
+		helpers.assert_eq(#writes, 1)
+	end)
+end)

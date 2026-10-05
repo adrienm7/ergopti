@@ -127,7 +127,10 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 				Extra := Candidate.image
 				if !(Extra is Map) || Extra.Get("status", "") != "ok" || Extra.Get("kind", "") != "rendered"
 					throw Error("A scoped file candidate could not be rendered.")
-				if Extra["content"] == Extra["source_content"]
+				if Extra.Has("force_target") && (!(Extra["force_target"] is Integer)
+						|| (Extra["force_target"] != 0 && Extra["force_target"] != 1))
+					throw TypeError("A scoped source precondition must be an explicit Boolean.")
+				if Extra["content"] == Extra["source_content"] && !Extra.Get("force_target", false)
 					continue
 				ExpectedExtra := ConfigTransitionExpectedOld(Extra["source_present"], Extra["source_content"], Port)
 				if !(ExpectedExtra is Map)

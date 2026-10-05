@@ -64,7 +64,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 10
+current_version = 11
 unstamped_version = 2
 
 
@@ -265,4 +265,24 @@ drivers = ["ahk"]
 reason = "The Windows number-row switch becomes an explicit native, digits or symbols policy; only genuine legacy booleans are mapped."
 ops = [
 	{ op = "map_value", section = "layout", key = "direct_access_digits", map = [{ from = false, to = "native" }, { from = true, to = "digits" }] },
+]
+
+[steps.v10_to_v11]
+from = 10
+to = 11
+drivers = ["ahk", "hs", "linux"]
+reason = "Common autocorrections become independently selectable names, abbreviations and technical terms; existing destinations and unrelated legacy fields retain their values."
+ops = [
+	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "enabled", to_section = "hotstrings.autocorrection.names" },
+	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds", to_section = "hotstrings.autocorrection.names" },
+	{ op = "copy_if_absent", section = "hotstrings.modules.autocorrection", key = "caps", to_key = "names" },
+	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "enabled", to_section = "hotstrings.autocorrection.abbreviations" },
+	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds", to_section = "hotstrings.autocorrection.abbreviations" },
+	{ op = "copy_if_absent", section = "hotstrings.modules.autocorrection", key = "caps", to_key = "abbreviations" },
+	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "enabled", to_section = "hotstrings.autocorrection.technical_terms" },
+	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds", to_section = "hotstrings.autocorrection.technical_terms" },
+	{ op = "copy_if_absent", section = "hotstrings.modules.autocorrection", key = "caps", to_key = "technical_terms" },
+	{ op = "delete", section = "hotstrings.autocorrection.caps", key = "enabled" },
+	{ op = "delete", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds" },
+	{ op = "delete", section = "hotstrings.modules.autocorrection", key = "caps" },
 ]

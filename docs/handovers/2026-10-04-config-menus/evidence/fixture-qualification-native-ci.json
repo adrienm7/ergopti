@@ -1,0 +1,127 @@
+{
+	"source_sha": "709dc545e902682e8d4e287b8a3ce56000a7d6ec",
+	"tested_ci_sha": "c895ae17a809c89f7ac98ba7970da5cb8a23460c",
+	"previous_ci_sha": "4800d5c83878e653622941b790390e1497cab6c5",
+	"tree": "986e60b762c06509adab958353727e33e51de993",
+	"same_source_tree": true,
+	"os_lanes": "windows+macos",
+	"release": "workflow_dispatch emits release=false",
+	"status": "completed",
+	"conclusion": "failure",
+	"databaseId": 37282444315,
+	"headSha": "c895ae17a809c89f7ac98ba7970da5cb8a23460c",
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/37282444315",
+	"completed_at": "2026-10-05T08:29:10Z",
+	"jobs": [
+		{
+			"name": "Validate / Checks and plan",
+			"id": 111673436673,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / properties",
+			"id": 111673700657,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / js",
+			"id": 111673700686,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Windows / Unit tests",
+			"id": 111673700908,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "macOS / Unit tests (stubbed)",
+			"id": 111673700952,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Linux",
+			"id": 111673702344,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "macOS / E2E tests (stubbed)",
+			"id": 111676200893,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "macOS / Package",
+			"id": 111676588926,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Windows / Verdict",
+			"id": 111677685468,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Windows / Package",
+			"id": 111677685654,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Windows / E2E tests (engine)",
+			"id": 111677685781,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Windows / Install and launch",
+			"id": 111677686440,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "macOS / Verdict",
+			"id": 111677994087,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+			"id": 111677994418,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Validate / Selected OS verdict",
+			"id": 111678094009,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Release / Publish",
+			"id": 111678095786,
+			"status": "completed",
+			"conclusion": "skipped"
+		}
+	],
+	"windows_units": {
+		"passed": 9175,
+		"failed": 14,
+		"previous_passed": 9164,
+		"previous_failed": 25,
+		"corrected_group1_failures": 11
+	},
+	"macos_qualification": {
+		"units": "success",
+		"e2e": "success",
+		"package": "failure: Sparkle native process census and Homebrew owned AppleEvent receiver",
+		"installation": "skipped"
+	},
+	"release_conclusion": "skipped"
+}

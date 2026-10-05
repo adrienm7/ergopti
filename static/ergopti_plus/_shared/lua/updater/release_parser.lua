@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: GitHub Release JSON Parser (Shared)
 --- DESCRIPTION:
---- Pure functions for parsing GitHub Releases API JSON payloads without a
---- full JSON decoder. Extracted from macos/infra/updater.lua (parse_tag,
+--- Pure functions for parsing GitHub Releases API JSON payloads. Tags, assets,
+--- notes, publication times and flags decode JSON at their metadata boundaries.
+--- Extracted from macos/infra/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
 --- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
 --- _Updater_SplitReleasesArray, _Updater_ParsePrerelease) so both drivers
@@ -17,6 +18,7 @@
 --- This module is PURE Lua — no driver imports, no io/network, no OS calls.
 --- ==============================================================================
 
+local Json = require("json")
 local M = {}
 
 
@@ -29,50 +31,46 @@ local M = {}
 -- ==========================================
 -- ==========================================
 
---- Extracts the "tag_name" field from a GitHub release JSON string.
---- @param body string Raw JSON (single object or array wrapper)
+--- Extracts the selected release's own "tag_name" without reading nested fields.
+--- An array wrapper selects its first release, preserving publication order.
+--- @param body string Raw JSON (single object or array wrapper).
 --- @return string tag or ""
 function M.parse_tag(body)
-	if not body or body == "" then return "" end
-	return body:match('"tag_name"%s*:%s*"([^"]+)"') or ""
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" then return "" end
+	if type(release[1]) == "table" then release = release[1] end
+	return type(release.tag_name) == "string" and release.tag_name or ""
 end
 
 
 --- Extracts the "body" field (release notes markdown) from a GitHub release
---- JSON string. Handles GitHub's "body": null sentinel and unescapes the
---- common JSON escape sequences (\n, \r, \t, \", \\).
---- @param body string Raw JSON
+--- object. JSON escapes decode once; the established carriage-return removal
+--- applies to decoded notes, preserving literal backslash examples.
+--- @param body string Raw single-release JSON object.
 --- @return string notes or ""
 function M.parse_notes(body)
-	if not body or body == "" then return "" end
-	-- GitHub sets "body": null when a release has no description
-	if body:match('"body"%s*:%s*null') then return "" end
-	local raw = body:match('"body"%s*:%s*"(.-[^\\])"')
-	if not raw then return "" end
-	return (raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\"))
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" or type(release.body) ~= "string" then return "" end
+	return (release.body:gsub("\r", ""))
 end
 
 
 --- Extracts the browser_download_url for a named asset from a GitHub release
---- JSON string. Walks the "assets" array looking for a matching "name" field.
---- @param body string Raw JSON
+--- JSON object. Decoding keeps delimiters and nested metadata inside their
+--- own fields; a label cannot terminate an asset or supply its name or URL.
+--- @param body string Raw single-release JSON object.
 --- @param asset_name string The asset filename to find (e.g. "ErgoptiPlus.app.zip")
 --- @return string url or ""
 function M.parse_asset_url(body, asset_name)
-	if not body or body == "" then return "" end
-	if not asset_name or asset_name == "" then return "" end
-	-- Isolate the "assets" array BEFORE iterating objects. On a real single-
-	-- release payload the outermost %b{} spans the ENTIRE release object, so
-	-- iterating `body` directly yields one chunk and `"name"` then matches the
-	-- release title, not any asset — the wanted asset is never found. Scoping to
-	-- the assets array makes each %b{} an individual asset, so its name and
-	-- browser_download_url come from the SAME object.
-	local assets = body:match('"assets"%s*:%s*(%b[])')
-	if not assets then return "" end
-	for obj in assets:gmatch("%b{}") do
-		local name = obj:match('"name"%s*:%s*"([^"]+)"')
-		if name == asset_name then
-			return obj:match('"browser_download_url"%s*:%s*"([^"]+)"') or ""
+	if type(body) ~= "string" or body == "" then return "" end
+	if type(asset_name) ~= "string" or asset_name == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" or type(release.assets) ~= "table" then return "" end
+	for _, asset in ipairs(release.assets) do
+		if type(asset) == "table" and asset.name == asset_name then
+			return type(asset.browser_download_url) == "string" and asset.browser_download_url or ""
 		end
 	end
 	return ""
@@ -88,21 +86,26 @@ function M.parse_html_url(body)
 end
 
 
---- Extracts the "published_at" ISO-8601 timestamp from a release object.
---- @param body string Raw JSON
+--- Extracts the selected release object's own "published_at" string.
+--- JSON escapes decode once; timestamp validation remains with its consumers.
+--- @param body string Raw single-release JSON object.
 --- @return string timestamp or ""
 function M.parse_published_at(body)
-	if not body or body == "" then return "" end
-	return body:match('"published_at"%s*:%s*"([^"]+)"') or ""
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" then return "" end
+	return type(release.published_at) == "string" and release.published_at or ""
 end
 
 
---- Extracts the boolean "prerelease" flag from a release JSON object.
---- @param body string Raw JSON
+--- Extracts the selected release object's own boolean "prerelease" flag.
+--- Channel membership stays with the tag registry, independently of this flag.
+--- @param body string Raw single-release JSON object.
 --- @return boolean true if prerelease flag is true, false otherwise
 function M.parse_prerelease_flag(body)
-	if not body or body == "" then return false end
-	return body:match('"prerelease"%s*:%s*true') ~= nil
+	if type(body) ~= "string" or body == "" then return false end
+	local release = Json.decode(body)
+	return type(release) == "table" and release.prerelease == true
 end
 
 
@@ -114,9 +117,9 @@ end
 -- ================================================
 -- ================================================
 
---- Splits a top-level JSON array of releases into one substring per object,
---- honouring quoted strings and escape sequences so a "}" inside a release
---- body field cannot fool the depth counter.
+--- Splits a complete top-level array of release objects into exact raw spans.
+--- The JSON owner validates syntax; span fencing preserves bytes and order,
+--- refusing non-object root elements rather than offering their nested objects.
 --- @param json string Raw JSON array string
 --- @return table Array of object-JSON strings
 function M.split_releases_array(json)
@@ -124,7 +127,10 @@ function M.split_releases_array(json)
 	if type(json) ~= "string" or json == "" then return out end
 	local trimmed = json:match("^%s*(.*)$") or json
 	if trimmed:sub(1, 1) ~= "[" then return out end
+	local decoded = Json.decode(json)
+	if type(decoded) ~= "table" then return out end
 	local pos, depth, start = 2, 0, 0
+	local array_depth = 1
 	local in_str, esc = false, false
 	while pos <= #trimmed do
 		local c = trimmed:sub(pos, pos)
@@ -133,8 +139,12 @@ function M.split_releases_array(json)
 			elseif c == "\\" then esc = true
 			elseif c == '"' then in_str = false end
 		elseif c == '"' then in_str = true
+		elseif c == "[" then array_depth = array_depth + 1
+		elseif c == "]" then
+			array_depth = array_depth - 1
+			if array_depth == 0 then break end
 		elseif c == "{" then
-			if depth == 0 then start = pos end
+			if depth == 0 and array_depth == 1 then start = pos end
 			depth = depth + 1
 		elseif c == "}" then
 			depth = depth - 1
@@ -145,6 +155,7 @@ function M.split_releases_array(json)
 		end
 		pos = pos + 1
 	end
+	if #out ~= #decoded then return {} end
 	return out
 end
 

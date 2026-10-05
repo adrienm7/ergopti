@@ -108,7 +108,7 @@ end
 -- ======================================
 
 --- Composes the `sqlite3` invocation that reads `sql` from standard input.
---- @param db_path string Absolute path to the database file.
+--- @param db_path string Filesystem path to the database file.
 --- @param sql     string Complete SQL script; may contain arbitrary user text.
 --- @param opts    table|nil { flags = string[]?, capture_stderr?, capture_exit? }.
 --- @return string|nil The command, or nil when the arguments are unusable.
@@ -134,7 +134,11 @@ function M.build(db_path, sql, opts)
 	for _, flag in ipairs(opts.flags or {}) do
 		words[#words + 1] = Shell.quote(flag)
 	end
-	words[#words + 1] = Shell.quote(db_path)
+	-- sqlite3 interprets bare relative file: names as URIs, :memory: as a
+	-- special database, and leading dashes as options. This API accepts file
+	-- paths: an explicit relative prefix preserves their filesystem identity.
+	local filename = db_path:sub(1, 1) == "/" and db_path or ("./" .. db_path)
+	words[#words + 1] = Shell.quote(filename)
 	words[#words + 1] = opts.capture_stderr and STDERR_TO_STDOUT or STDERR_DISCARDED
 
 	local command = Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
