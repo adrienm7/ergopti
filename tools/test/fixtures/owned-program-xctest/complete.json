@@ -1,0 +1,71 @@
+{
+	"schema_version": 1,
+	"script_status": 0,
+	"tee_status": 0,
+	"complete": true,
+	"summary": { "tests": 15, "failures": 0, "unexpected": 0 },
+	"completed_tests": [
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testLiteralRawUnicodeArgumentsRemainHeldUntilActivation]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testSourceChangeBeforeActivationCannotProduceSideEffect]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testIndependentPOSIXScriptWithUnicodePathPreservesLiteralArgumentsAndPrivateStreams]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testCancelledHeldPayloadNeverActivates]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testSymlinkTargetChangedToFIFOCannotBlockCancellationOrExecutePayload]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testLeaderExitCannotSettleTermResistantOutputtingDescendant]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testLargePrivateStreamsNeverReachControlPipesAndNonzeroStatusIsExact]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFWhileExitedLeaderHasLiveDescendantStillProvesGroupRetirement]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFBeforeActivationCancelsPhysicalHeldChild]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFBeforeAnyRequestReturnsProvenConstructorRefusal]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testIncompleteRequestThenEOFReturnsProvenConstructorRefusal]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testMissingExecutableReturnsClosedConstructorRefusal]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testExistingSymlinkedCanonicalSourceStillAdmitsRawPreimage]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OwnedProgramWorkerTests testMalformedRequestsAndReceiptsFailClosedWithoutQuotingSecrets]",
+			"result": "passed"
+		},
+		{
+			"name": "-[ErgoptiPlusTests.OtherNativeTests testOtherOwner]",
+			"result": "passed"
+		}
+	],
+	"failures": [],
+	"exit_status": 0
+}
