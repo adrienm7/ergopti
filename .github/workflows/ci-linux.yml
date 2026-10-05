@@ -113,11 +113,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install LuaJIT
-        # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
-        # back to io.popen("find") when lfs is unavailable — no luarocks needed.
+        # Bound extension sections require actual no-follow source identity.
+        # Test discovery alone does not prove their filesystem admission.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit sqlite3
+          sudo apt-get install -y luajit lua-filesystem sqlite3
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool

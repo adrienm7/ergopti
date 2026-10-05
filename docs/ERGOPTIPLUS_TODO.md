@@ -1993,6 +1993,22 @@ and Brew install/upgrade/refusal/recovery still require macOS qualification.
 
 Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo37-shipped-ergopti-sections) for this item; prepared sources and portable checks do not establish Windows runtime success.
 
+The Linux E2E job now installs native LuaFileSystem before the unchanged scripted
+keyboard harness. Manual run 37265099229 at CI head 0b8a57021 (the exact source
+of feature c04072754) passed JS 358/0 and Linux units 6,892/0 but reproduced
+22 magic-source failures in 188 E2E assertions. Its separate initial job had
+neither LuaFileSystem nor libuv, so the shipped file could not establish native
+identity and the bound replacement section stayed unavailable. An unchanged
+physical-module control reproduces exactly 166/188 with neither provider and
+passes 188/188 with actual LuaFileSystem alone; native libuv alone is also a
+sufficient alternative. All 22 failure labels and expected/actual receipts
+match hosted CI. Source bytes, admission policy and every assertion are unchanged.
+The corrected hosted E2E job still requires qualification. This scripted replay
+does not establish physical input, packaging, installation or deferred Windows
+acceptance. Native updater validator, audio-locale and notification failures,
+and the macOS Homebrew/Sparkle archive acceptance failures, remain separately
+owned blockers; their assertions and package/install requirements are retained.
+
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings
       (provenance fix), Windows tooltip rendering on 10/11, every new menu row and
