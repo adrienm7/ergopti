@@ -434,6 +434,25 @@ if (layoutSection < 0 || applicationSection <= layoutSection) {
 	errors.push('release notes must explain keyboard layouts before the companion application');
 }
 
+// Fresh public macOS artifacts are admitted by their actual canonical owner,
+// in addition to the retained historical/common release requirements above.
+const publication = require('../build/macos-release-publication.cjs');
+const freshMacosFiles = publication
+	.bindings()
+	.flatMap((archive) => [archive.name, `_${archive.name}.sig`]);
+freshMacosFiles.push(publication.RECEIPT);
+for (const name of freshMacosFiles) {
+	if (!uploadedNames.has(name) && !uploadedGlobs.some((pattern) => pattern.test(name)))
+		errors.push(`the fresh macOS publication file ${name} has no assets-* upload owner`);
+}
+if (
+	!preflight.includes('if [ "$create_release" = true ]; then') ||
+	!preflight.includes('node tools/build/macos-release-publication.cjs validate release-assets')
+)
+	errors.push(
+		'fresh macOS publication must validate its whole canonical signing receipt before publication'
+	);
+
 if (errors.length > 0) {
 	console.error(
 		'\x1b[31m[FAIL] the release notes link to files the release does not contain:\x1b[0m'

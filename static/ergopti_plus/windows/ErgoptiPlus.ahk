@@ -375,6 +375,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
+#Include ../_shared/modules/network/failure.ahk
 #Include adapters/http_client.ahk
 #Include adapters/secure_field_detector.ahk
 #Include adapters/storage.ahk

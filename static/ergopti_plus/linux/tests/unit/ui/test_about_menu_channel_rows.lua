@@ -55,6 +55,33 @@ local CHANNEL_AT = 3
 -- names is: the checkout itself is a source run, whose Update row is greyed.
 local IDENTITY = { kind = "release", version = "0.0.0-dev.140", commit = "c3005e0b9" }
 
+--- Keeps an installed-build fixture's native owner live through the later click.
+--- The real consent bridge is exercised with an explicitly unavailable progress
+--- window; these tray fixtures do not claim a native GUI or real download.
+local function bind_action_owners(items, source_run)
+	local unpack_results = table.unpack or unpack
+	local function packed(...) return { n = select("#", ...), ... } end
+	for _, item in ipairs(items) do
+		if type(item.fn) == "function" then
+			local action = item.fn
+			item.fn = function(...)
+				local Installation = require("infra.installation")
+				local original_owner = Installation.is_source_run
+				local original_progress = package.loaded["ui.download_window.bridge"]
+				Installation.is_source_run = function() return source_run == true end
+				package.loaded["ui.download_window.bridge"] = { show = function() return nil end }
+				local result = packed(pcall(action, ...))
+				Installation.is_source_run = original_owner
+				package.loaded["ui.download_window.bridge"] = original_progress
+				if not result[1] then error(result[2], 0) end
+				return unpack_results(result, 2, result.n)
+			end
+		end
+		if type(item.menu) == "table" then bind_action_owners(item.menu, source_run) end
+	end
+	return items
+end
+
 --- @param source_run boolean|nil True to build the tray of a local version.
 local function build(up, changed, source_run)
 	local Version = require("infra.version")
@@ -73,7 +100,7 @@ local function build(up, changed, source_run)
 	Version.identity = real_identity
 	Installation.is_source_run = real_is_source_run
 	if not ok then error(items, 0) end
-	return items
+	return bind_action_owners(items, source_run)
 end
 
 helpers.describe("tray (linux): the About submenu owns the updater rows", function()
