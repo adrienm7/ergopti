@@ -39,6 +39,12 @@ PINS = (
     "static/ergopti_plus/_shared/lua/compat/utf8.lua",
     "tools/diagnostics/macos_owned_process.py",
 )
+DIAGNOSTIC_PINS = (
+    "tools/diagnostics/native_hs_program_providers/fixture.lua",
+    "tools/diagnostics/native_hs_program_providers/fixture_shim.lua",
+    "tools/diagnostics/native_hs_program_providers/run_native.py",
+)
+DIAGNOSTIC_CONTRACT = "macos-native-hs-program-provider-diagnostic-facts"
 FULL = (
     "actual_native_runtime",
     "exact_source_pins_before",
@@ -147,6 +153,109 @@ def validate_receipt(value, scenario, source_sha, nonce, pid, hashes):
     return len(expected)
 
 
+def validate_diagnostic_facts(value, primary, scenario, source_sha, nonce, pid, hashes):
+    """Admit closed diagnostic facts only; this never admits a native PASS."""
+    fields = {
+        "schema",
+        "contract",
+        "source_sha",
+        "nonce",
+        "pid",
+        "scenario",
+        "source_hashes",
+        "case_facts",
+        "runtime",
+        "interpreter",
+        "expected_path_equal",
+    }
+    require(type(value) is dict and set(value) == fields, "diagnostic_fields_refused")
+    require(type(value["schema"]) is int and value["schema"] == 1, "diagnostic_schema_refused")
+    require(value["contract"] == DIAGNOSTIC_CONTRACT, "diagnostic_contract_refused")
+    require(
+        re.fullmatch(r"[0-9a-f]{40}", source_sha) is not None
+        and re.fullmatch(r"[0-9a-f]{32}", nonce) is not None
+        and value["source_sha"] == source_sha
+        and value["nonce"] == nonce
+        and value["scenario"] == scenario,
+        "diagnostic_stale",
+    )
+    require(
+        type(value["pid"]) is int and value["pid"] == pid and pid > 0, "diagnostic_owner_refused"
+    )
+    require(
+        type(hashes) is dict
+        and set(hashes) == set(DIAGNOSTIC_PINS)
+        and all(
+            type(digest) is str and re.fullmatch(r"[0-9a-f]{64}", digest)
+            for digest in hashes.values()
+        )
+        and value["source_hashes"] == hashes,
+        "diagnostic_sources_refused",
+    )
+    expected = FULL if scenario == "full" else SHIM if scenario == "shim" else ()
+    require(
+        type(primary) is dict and type(primary.get("cases")) is list, "diagnostic_census_refused"
+    )
+    require(bool(expected) and len(primary["cases"]) == len(expected), "diagnostic_census_refused")
+    require(
+        type(value["case_facts"]) is list and len(value["case_facts"]) == len(expected),
+        "diagnostic_census_refused",
+    )
+    for primary_item, item, identifier in zip(primary["cases"], value["case_facts"], expected):
+        require(
+            type(primary_item) is dict
+            and set(primary_item) == {"id", "status"}
+            and primary_item["id"] == identifier
+            and primary_item["status"] in ("passed", "failed"),
+            "diagnostic_census_refused",
+        )
+        require(
+            type(item) is dict
+            and set(item) == {"case", "kind", "ordinal"}
+            and item["case"] == identifier
+            and type(item["ordinal"]) is int,
+            "diagnostic_failure_refused",
+        )
+        if primary_item["status"] == "passed":
+            require(item["kind"] == "none" and item["ordinal"] == 0, "diagnostic_failure_refused")
+        else:
+            require(
+                (item["kind"] == "check" and 0 < item["ordinal"] < (1 << 53))
+                or (item["kind"] == "raised" and item["ordinal"] == 0),
+                "diagnostic_failure_refused",
+            )
+    runtime = value["runtime"]
+    function_fields = {"dir", "attributes", "symlink_attributes", "path_to_absolute", "file_open"}
+    require(
+        type(runtime) is dict and set(runtime) == function_fields | {"lua_version"},
+        "diagnostic_runtime_refused",
+    )
+    require(
+        runtime["lua_version"] in ("Lua 5.1", "Lua 5.2", "Lua 5.3", "Lua 5.4", "Lua 5.5", "other"),
+        "diagnostic_runtime_refused",
+    )
+    require(
+        all(
+            runtime[name] in ("C", "Lua", "main", "missing", "unknown") for name in function_fields
+        ),
+        "diagnostic_runtime_refused",
+    )
+    interpreter = value["interpreter"]
+    require(
+        type(interpreter) is dict
+        and set(interpreter)
+        == {
+            "resolved_scalar_observed",
+            "interpreter_equal",
+            "argv_count_equal",
+            "script_argument_equal",
+        }
+        and all(type(item) is bool for item in interpreter.values())
+        and type(value["expected_path_equal"]) is bool,
+        "diagnostic_interpreter_refused",
+    )
+
+
 def lua_string(value):
     return '"' + "".join("\\%03d" % byte for byte in value.encode("utf-8")) + '"'
 
@@ -180,10 +289,10 @@ def owned_tool(arguments, native, ownership, accepted=(0,), **options):
         return out.read(1048577), err.read(1048577), group.process.returncode
 
 
-def source_hashes(root, sha):
+def source_hashes(root, sha, paths=PINS):
     require(re.fullmatch(r"[0-9a-f]{40}", sha) is not None, "source_sha_refused")
     result = {}
-    for path in PINS:
+    for path in paths:
         committed = subprocess.check_output(["git", "show", sha + ":" + path], cwd=root)
         raw = (root / path).read_bytes()
         require(raw == committed, "source_worktree_drift")
@@ -377,26 +486,84 @@ def await_packet(path, group, timeout=TIMEOUT, clock=time.monotonic, pause=time.
         pause(0.05)
 
 
-def run_case(scenario, app_binary, root, sha, output, hashes, native, ownership):
+def runtime_origin(app_binary):
+    """Pin exact official packaged wrapper/native library; no runtime API mock."""
+    app = Path(app_binary).parent.parent.parent
+    selected = {
+        "script": (
+            app / "Contents/Resources/extensions/hs/fs.lua",
+            "7006e6d4917d1cd9d2eefdcdfe8de99ab6ee8242d5da3b2d656b0fdede959b45",
+        ),
+        "native": (
+            app / "Contents/Frameworks/hs/libfs.dylib",
+            "a1e0626a5ce6f013033fdc7fe0ff74dfc242d72e98b3620bf328c82af46775f6",
+        ),
+    }
+    pins = {}
+    for name, (path, expected) in selected.items():
+        before = path.stat()
+        require(
+            stat.S_ISREG(before.st_mode) and not path.is_symlink(), "runtime_origin_file_refused"
+        )
+        with path.open("rb") as handle:
+            raw = handle.read(1048577)
+        after = path.stat()
+        require(
+            len(raw) <= 1048576
+            and before.st_dev == after.st_dev
+            and before.st_ino == after.st_ino
+            and hashlib.sha256(raw).hexdigest() == expected,
+            "runtime_origin_bytes_refused",
+        )
+        pins[name] = {
+            "path": str(path),
+            "dev": after.st_dev,
+            "ino": after.st_ino,
+            "sha256": expected,
+        }
+    return pins
+
+
+def run_case(
+    scenario, app_binary, root, sha, output, hashes, native, ownership, diagnostic_hashes=None
+):
     base = Path(tempfile.mkdtemp(prefix=scenario + "-", dir=output))
     base.chmod(0o700)
     nonce = secrets.token_hex(16)
     value = prepare(base, root, sha, nonce, hashes, scenario)
+    value["runtime_origin"] = runtime_origin(app_binary)
+    if scenario == "full":
+        link = base / "bin/python3"
+        target = Path(os.path.realpath(sys.executable))
+        link_stat, target_stat = link.lstat(), target.stat()
+        require(
+            stat.S_ISLNK(link_stat.st_mode) and stat.S_ISREG(target_stat.st_mode),
+            "runtime_link_witness_refused",
+        )
+        value["runtime_link_witness"] = {
+            "link": str(link),
+            "target": str(target),
+            "link_identity": {"dev": link_stat.st_dev, "ino": link_stat.st_ino},
+            "target_identity": {"dev": target_stat.st_dev, "ino": target_stat.st_ino},
+        }
     template = (
         Path(__file__)
         .with_name("fixture.lua" if scenario == "full" else "fixture_shim.lua")
         .read_text()
     )
     startup = base / "init.lua"
-    startup.write_text(
-        template.replace("__INPUT_JSON__", lua_string(json.dumps(value, ensure_ascii=False)))
-    )
     environment = dict(
         os.environ,
         PATH=str(base / "bin") + ":/bin:/usr/bin" if scenario == "full" else "/usr/bin:/bin",
     )
     environment.pop("__CFBundleIdentifier", None)
     environment.pop("__CFBundlePath", None)
+    value["diagnostic_source_hashes"] = diagnostic_hashes
+    value["diagnostic_facts"] = str(base / "diagnostic-facts.json")
+    value["expected_path"] = environment["PATH"]
+    startup.write_text(
+        template.replace("__INPUT_JSON__", lua_string(json.dumps(value, ensure_ascii=False)))
+    )
     owners = []
     group = None
     packet = None
@@ -437,6 +604,10 @@ def run_case(scenario, app_binary, root, sha, output, hashes, native, ownership)
                     ),
                     flush=True,
                 )
+        facts = read_packet(Path(value["diagnostic_facts"]))
+        validate_diagnostic_facts(
+            facts, packet, scenario, sha, nonce, group.process.pid, diagnostic_hashes
+        )
         validate_receipt(packet, scenario, sha, nonce, group.process.pid, hashes)
         group.wait_for_exit(5)
     finally:
@@ -482,6 +653,7 @@ def main():
     native = ownership.NativeProcessGroups()
     args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     hashes = source_hashes(root, args.source_sha)
+    diagnostic_hashes = source_hashes(root, args.source_sha, DIAGNOSTIC_PINS)
     asset = trusted_asset(args.output)
     archive, app = args.archive, args.app
     if args.download:
@@ -516,7 +688,15 @@ def main():
     try:
         runs = [
             run_case(
-                scenario, app_binary, root, args.source_sha, args.output, hashes, native, ownership
+                scenario,
+                app_binary,
+                root,
+                args.source_sha,
+                args.output,
+                hashes,
+                native,
+                ownership,
+                diagnostic_hashes,
             )
             for scenario in ("full", "shim")
         ]
@@ -527,6 +707,10 @@ def main():
             "persistent_config_preference_changed",
         )
     require(source_hashes(root, args.source_sha) == hashes, "source_postrun_drift")
+    require(
+        source_hashes(root, args.source_sha, DIAGNOSTIC_PINS) == diagnostic_hashes,
+        "diagnostic_source_postrun_drift",
+    )
     summary = {
         "schema": 1,
         "contract": CONTRACT,

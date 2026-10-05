@@ -5014,6 +5014,26 @@ Native catalogue retrieval itself is unbounded; empty discovery does not qualify
 invocation. No automation is imported or executed, and service cancellation,
 chosen-ID revalidation and a safe native invocation fixture remain unfinished.
 
+Hosted native run 37288850992 retains 14 passing owned-program Swift XCTest
+cases, but its complete native suite fails and packaging/installation do not
+execute. The signed Hammerspoon provider inventory records 14/16 passes; both
+`actual_native_runtime` and `real_interpreter_symlink` fail and the five shim
+cases do not execute. Artifact retention now whitelists closed receipts rather
+than recursively collecting the deliberately newline-named private scripts.
+Closed diagnostics preserve every case and verdict. Official Hammerspoon 1.1.1
+implements public `symlinkAttributes` as a Lua wrapper: its incorrect public-C
+premise is replaced by stricter verified script/native bytes, wrapper bytecode,
+captured C upvalue, loader identities and real lstat/stat witness checks. All
+other original conditions and the primary receipt schema remain unchanged.
+Portable Python diagnostics pass 17/0, and nine controlled origin cases plus
+four independent omission controls pass; final native macOS qualification is
+still required. The independent interpreter-equality failure remains unresolved.
+Read-only Apple Shortcuts catalogue retrieval timed out after 20 seconds; CLI
+identifier help passed, permission was not determined, and invocation was not
+qualified. The Windows handoff now records nine actual program-action failures,
+two missing lifecycle/timer inventories and two unchanged OS-purity ratchets.
+These are explicit repair steps for the maintainer's PC, not completed scope.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
