@@ -2802,6 +2802,17 @@ manifest registration with current dev and qualify actual catalogue publication
 before claiming obsolete-row completion. Windows sites and remaining
 catalogues above still need implementation/qualification, not only device UI.
 
+Final partial integration `c8e4434a0` is tested by manual Windows run37287365425:
+9,218 passed and 50 failed; incoming dev's native run37283538700 has 9,213/55
+on the same 9,268-case census. Both failure sets include the six configuration
+snapshot subjects and legacy Boolean admission. On Windows capture the complete
+native result/execution manifest, reproduce these subjects with the explicit
+personal-file activation owner, and coordinate the configuration/hotstrings
+fixture and production boundaries with group2. Keep strict source fences and
+obsolete-value preservation; do not remove assertions. Full failure annotations
+are truncated; the exact known subjects and limits are in the current partial
+delivery evidence. E2E/package/install remain skipped, not passed.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -4071,7 +4082,7 @@ partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
-- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 96). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
+- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 95). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
 Partial dev handoff (2026-10-05): Metrics V3 is reviewed but unapplied.
