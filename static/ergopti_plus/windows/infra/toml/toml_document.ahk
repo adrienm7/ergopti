@@ -621,6 +621,8 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	}
 	Pending := Map()
 	Pending.CaseSense := "On"
+	NewTables := Map()
+	NewTables.CaseSense := "On"
 	for Name, Parts in Owned {
 		Desired := _TOML_DocumentLookup(Expected, Parts)
 		if !Desired["found"]
@@ -635,6 +637,32 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		}
 		if Covered
 			continue
+		SectionParts := [], ParentParts := []
+		loop Parts.Length - 1
+			SectionParts.Push(Parts[A_Index])
+		loop Max(SectionParts.Length - 1, 0)
+			ParentParts.Push(SectionParts[A_Index])
+		; A new dynamic section follows its explicit sibling headers. Existing
+		; native flat readers must see it immediately, before replacement boot;
+		; a root dotted insertion is semantically valid but invisible to them.
+		NewSibling := false
+		if ParentParts.Length && !_TOML_DocumentLookup(Document, SectionParts)["found"] {
+			for Header in Headers {
+				if Header.Length == SectionParts.Length
+						&& _TOML_ConfigPathUnder(Header, ParentParts) {
+					NewSibling := true
+					break
+				}
+			}
+		}
+		if NewSibling {
+			Identity := _TOML_ConfigPathName(SectionParts)
+			if !NewTables.Has(Identity)
+				NewTables[Identity] := []
+			NewTables[Identity].Push(TOML_RenderKey(Parts[Parts.Length]) . " = "
+				. TOML_RenderValue(Desired["value"]) . "`n")
+			continue
+		}
 		Owner := []
 		for Header in Headers {
 			if Header.Length < Parts.Length && Header.Length > Owner.Length
@@ -697,6 +725,11 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		}
 	}
 	Flush(Current)
+	for Identity, Entries in NewTables {
+		Append("[" . Identity . "]`n")
+		for Text in Entries
+			Append(Text)
+	}
 	if Pending.Count
 		throw ValueError("A configuration update lost its physical table owner")
 	Candidate := Chr(0xFEFF) . Content

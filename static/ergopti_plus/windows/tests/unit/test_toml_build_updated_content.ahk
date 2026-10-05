@@ -695,3 +695,35 @@ _TBUI_ConfigInlineFullSaveAdmissionProbe() {
 		_TBUI_ConfigInlineFullSaveAdmission)
 }
 Test("toml config document writer: native full-save probe retains strict refusal and observes exact semantic no-op", _TBUI_ConfigInlineFullSaveAdmissionProbe)
+
+
+; The native scope owner keeps a live flat reader until replacement boot. A new
+; peer of an explicit dynamic section must therefore retain that physical shape.
+_TBUI_ConfigNewSiblingRetainsNativeReadability() {
+	for Parent in ["hotstrings.personal", "features.dynamic"] {
+		Path := _TBUI_NewPath()
+		Source := Chr(0xFEFF) . "[" . Parent . ".first]`nenabled = false # keep first`n"
+			. '[private]`nfuture = "keep" # exact neighbor`n'
+		Expected := Source . "[" . Parent . ".second]`nenabled = true`n"
+		try {
+			AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+			Cached := ParseTomlFile(Path)
+			Updates := [{ Section: Parent . ".second", Key: "enabled", Value: TOML_Bool(true) }]
+			Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
+			AssertEqual("ok", Candidate["status"])
+			AssertEqual(Expected, Candidate["content"], "new peers keep their explicit native section family")
+			AssertTrue(Cached == ParseTomlFile(Path), "preparation cannot invalidate the live flat cache")
+			AssertTrue(FSUtf8ExactMatches(Path, Source))
+			AssertTrue(TOML_ConfigBatchWrite(Path, Updates))
+			AssertTrue(FSUtf8ExactMatches(Path, Expected))
+			AssertEqual(1, TOML_Read(Path, Parent . ".second", "enabled", false),
+				"the actual post-publication native reader sees the newly discovered section")
+			AssertEqual(0, TOML_Read(Path, Parent . ".first", "enabled", true))
+			AssertTrue(TOML_SameValue(TOML_ParseDocument(Expected), TOML_ParseDocument(FSReadUtf8Exact(Path))))
+			AssertEqual(Expected, TOML_BuildConfigUpdatedContent(Path, Updates)["content"],
+				"a subsequent semantic no-op retains the full byte image")
+		} finally FSDelete(Path)
+	}
+}
+Test("toml config document writer: new dynamic peer headers retain native readback (config-semantic-native-readback)",
+	_TBUI_ConfigNewSiblingRetainsNativeReadability)
