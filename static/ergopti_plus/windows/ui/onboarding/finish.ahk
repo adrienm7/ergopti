@@ -203,7 +203,7 @@ _Onboarding_Commit(Locale, ConfigDir, Rows, TapHoldKeys, BeforeReloadFn := 0) {
 			; A config.toml the wizard creates carries this build's schema version.
 			updates := ConfigMigrateStampNewFile(updates, CandidateConfig)
 			updates := _ConfigPrepareTypedUpdates(updates)
-			CandidateResult := TOML_BuildUpdatedContent(CandidateConfig, updates)
+			CandidateResult := TOML_BuildConfigUpdatedContent(CandidateConfig, updates)
 			if !ConfigTransitionResultIs(CandidateResult, "rendered")
 					|| !CandidateResult.Has("content")
 					|| !(CandidateResult["content"] is String)

@@ -177,8 +177,8 @@ TomlConfigForeignOwner(SectionPath, Key) {
 
 ; Classifies a section header the loader deliberately does not apply.
 ; ``[_*]`` metadata and ``[updater]`` belong to other readers ("foreign");
-; the dissolved ``[ahk.*]`` silo is "obsolete" and the next canonical full save
-; removes it. Returns "" for a section the manifest tree must account for.
+; the dissolved ``[ahk.*]`` silo is "obsolete" and remains on disk until
+; explicit cleanup. Returns "" for a section the manifest tree must account for.
 TomlConfigSectionSkipKind(Header) {
 	if (Header == "ahk" or InStr(Header, "ahk.") == 1)
 		return "obsolete"
@@ -703,7 +703,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 
 	if ObsoleteDriverSections > 0 {
 		try LoggerWarn("TomlConfigLoader",
-			"Ignored {1} obsolete [ahk.*] section(s); the next canonical save removes them.",
+			"Ignored {1} obsolete [ahk.*] section(s); they remain until explicit cleanup.",
 			ObsoleteDriverSections)
 	}
 	if UnknownKeys > 0 {

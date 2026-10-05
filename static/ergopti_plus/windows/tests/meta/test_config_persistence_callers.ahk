@@ -213,7 +213,9 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; adds one exact-source publication beneath its existing borrowed lease.
 	; Privacy adds one more publisher, audited above against actual native source
 	; and independently exercised by the retained-source race regression.
-	AssertEqual(5, Calls, "audit every internal publisher before changing its complete inventory")
+	; The configuration-specific build/write gateways and source-bound explicit
+	; cleanup add three consumers, independently audited in the semantic cohort.
+	AssertEqual(8, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
@@ -465,3 +467,34 @@ _CPC_NumberRowRetainsSourceAndStrictAck() {
 	AssertContains(Commit, 'if !(Written is Integer) || Written != true')
 }
 Test("AHK-15-persistence: number-row choice consumes its exact-source leased publisher", _CPC_NumberRowRetainsSourceAndStrictAck)
+
+
+_CPC_SemanticConfigPublishersRetainSource() {
+	Build := _StripFullLineComments(_DriverFuncBody("TOML_BuildConfigUpdatedContent"))
+	Publish := _StripFullLineComments(_DriverFuncBody("TOML_ConfigBatchWrite"))
+	Cleanup := _StripFullLineComments(_DriverFuncBody("ConfigUnusedKeysRemove"))
+	Assert(Build != "" && Publish != "" && Cleanup != "", "all three new source/result owners must exist")
+	Assert(InStr(Build, 'SourceBytes := SourcePresent ? FSReadUtf8Exact(Path) : ""') > 0
+		&& InStr(Build, 'Result := _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "build",') > 0
+		&& InStr(Build, "SourceBytes, SourcePresent, true)") > 0
+		&& InStr(Build, "return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)") > 0,
+		"semantic preparation retains its exact source through final admission")
+	Assert(InStr(Publish,
+		'return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)') > 0,
+		"semantic publication retains the canonical writer result and its fresh source owner")
+	ReadPos := InStr(Cleanup, "Source := FSReadUtf8Exact(FilePath)")
+	OwnPos := InStr(Cleanup, "SourceImage := Source",, ReadPos)
+	BackupPos := InStr(Cleanup, "Written := WriteBackup.Call(BackupPath, Source)",, OwnPos)
+	VerifyPos := InStr(Cleanup, "FSUtf8ExactMatches(BackupPath, Source)",, BackupPos)
+	Assert(ReadPos > 0 && OwnPos > ReadPos && BackupPos > OwnPos && VerifyPos > BackupPos,
+		"explicit cleanup owns and verifies the backup of the exact publication source")
+	Assert(InStr(Cleanup, 'return _TOML_BatchWriteImpl(Path, Updates, DropSections, "write",') > 0
+		&& InStr(Cleanup, "SourceImage, 1, true)") > 0,
+		"explicit cleanup cannot reread a successor as its backed-up source")
+	Assert(InStr(Cleanup, 'Writer := HasMethod(WriterFn, "Call") ? WriterFn : WriteUpdates') > 0
+		&& InStr(Cleanup, 'Committed := ConfigCommitBuilt(FilePath, "the unused configuration key cleanup",') > 0
+		&& InStr(Cleanup, "BuildPlan, Writer,") > 0,
+		"the exact-source publisher remains inside the native claimed transaction")
+}
+Test("AHK-15-persistence: semantic configuration and explicit cleanup retain exact source/result owners",
+	_CPC_SemanticConfigPublishersRetainSource)
