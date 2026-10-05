@@ -29,6 +29,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ErrorDescription = require("error_description")
 local Json = require("json")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
@@ -498,7 +499,7 @@ local function open_exchange(on_done)
 		_active = nil
 		if type(on_done) == "function" then
 			local ok, callback_err = pcall(on_done, ...)
-			if not ok then Logger.error(LOG, "Terminal callback raised — %s", tostring(callback_err)) end
+			if not ok then Logger.error(LOG, "Terminal callback raised — %s", ErrorDescription.describe(callback_err)) end
 		end
 	end
 	return epoch, done

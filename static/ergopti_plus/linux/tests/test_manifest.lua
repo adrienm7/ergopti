@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.modules.llm.test_api_remote_callback_siblings",
+	"tests.unit.modules.llm.test_api_remote_callbacks",
 	"tests.unit.modules.llm.test_local_server_discovery",
 	"tests.unit.modules.llm.test_api_remote_base_url",
 	"tests.unit.meta.test_callback_error_description",

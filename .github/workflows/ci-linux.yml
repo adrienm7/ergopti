@@ -392,6 +392,16 @@ jobs:
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_json_admission.py
         timeout-minutes: 1
 
+      - name: Isolate terminal callback diagnostics with real provider TLS receipts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_remote_provider_callbacks.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_provider_callbacks.py
+          python3 tests/hardware/run_llm_remote_callback_siblings.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_callback_siblings.py
+        timeout-minutes: 3
+
       - name: Preserve fractional WPM through native collector and SQLite writes
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

@@ -1905,6 +1905,37 @@ These are software implementations; final hardware verification remains below.
   not validate physical keyboards. No formula, schema, collection, persistence,
   reserved policy or foreign driver change.
 
+- [~] **L126.** Linux remote terminal callback diagnostics: describe caught
+  errors with the existing shared ErrorDescription policy. Calling tostring on
+  an error object invoked caller formatting again and could throw during failure
+  reporting. Reuse the shared helper through one import and one formatter call;
+  keep owner clearing before the caller, callback arguments/count/order, retries,
+  successors, decoders and HTTP transport identical. Per native configuration,
+  sixty-three public Chat/Models/Test and ordinary-string Vision scenarios issue
+  145 genuine verified-TLS requests: thirty-two formatter-policy failures before,
+  none after under current LuaJIT, signed Ubuntu 22.04 curl/luv/libuv dependencies
+  and Lua 5.4. The mixed profile retains host kernel/Lua/libc and recorded OpenSSL;
+  current and stock Lua use curl 8.14/libuv 1.50, the mixed profile 7.81/1.43.
+  All native primary/successor/retry tuples, arity, model IDs and captured ownership
+  are asserted outside protected callbacks after settlement, alongside exact wire
+  inventory, one terminal callback and zero retained handles. Preserve every
+  original assertion: five deliberate software tuple mutations demonstrate that
+  the former protected assertions could falsely pass and that outside oracles
+  refuse them. Forty-seven independent software sensitivity controls cover the
+  new oracles on both Lua runtimes; these are not native or physical validation.
+  Seventy-eight registered unit cases reproduce fifty-three failures and pass
+  after. Preserve the four original pcall-status assertions and additionally
+  assert the genuinely returned caller-delivery records outside protection;
+  four software mutation pairs on both runtimes prove these unit oracles can
+  fail. The unchanged complete-tree JS false-green ratchet stays at zero.
+  Existing API admission/UTF8/IPv6 regressions remain byte-identical.
+  Register future Linux CI without launching it. macOS callback traceback/object
+  formatting remains a source-only analogue; Windows uses native protected
+  callbacks whose error getters need separate native evidence. Leave their gates
+  to the principal agent. Vision object diagnostics and outer HTTP diagnostics
+  remain separate, unmeasured scopes. No menu, magic, transport, persistence,
+  physical hardware or foreign driver change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
