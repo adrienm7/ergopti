@@ -334,7 +334,14 @@ class LocalServerModelsOwner {
 	}
 
 	_NativeTimer(Callback, Period) {
-		SetTimer(Callback, Period)
+		; This owner only cancels or rearms one exact record's one-shot. An
+		; opaque positive interval must never become an idle repeating poller.
+		if !(Period is Integer) || Period > 0
+			throw TypeError("Models timers require cancellation or a negative one-shot period.")
+		if Period == 0
+			SetTimer(Callback, 0)
+		else
+			SetTimer(Callback, -Abs(Period))
 		return true
 	}
 

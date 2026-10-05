@@ -561,6 +561,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_local_server_auth.ahk
 #Include unit/test_local_server_discovery_policy.ahk
 #Include unit/test_local_server_models.ahk
+#Include unit/test_local_server_models_timer.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
