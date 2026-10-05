@@ -2873,6 +2873,21 @@ case, and a deliberately wrong native rule must be rejected. Neither product
 adapters nor the existing literal-text/options assertions are weakened. Hosted
 confirmation remains pending until the next exact-source manual run.
 
+The E2E job also declares the existing driver/shared Lua namespace for native
+Python children. Terminal manual run37274473330 proves seven newly adopted
+controls otherwise fail at real app_dirs/json/logger imports; three more lack
+xkbcli. Audio gives6/0 on each interpreter, notifications13/0 and unchanged
+GTK4/4 on that runner. Source module imports and native compiler readiness are
+runner prerequisites; no fixture/assertion is rewritten. The distinct POST NUL
+body dispatch assertion and HTTP503 ETag control remain with the HTTP owner.
+
+The subsequent native XKB controls adopted from dev now receive the actual
+xkbcli compiler before their first execution. Their unchanged symbol-list,
+key-definition and block fixtures pass64/0,72/0 and64/0 with the signed native
+compiler; absence refuses the original admission. Manual run37274473330 confirms
+the audio and notification corrections on Ubuntu while its remaining verdict
+is still tracked separately. No foreign product or fixture source is changed.
+
 The maintainer now explicitly requests delivery into dev after feasible container
 and CI work, with genuine remaining native/device failures documented rather than
 holding the feature indefinitely. Follow the [device/native continuation](handovers/2026-10-04-parallel-containers/GROUP2-DEVICE-TODO.md)

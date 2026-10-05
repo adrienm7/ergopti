@@ -109,15 +109,19 @@ jobs:
     name: 'E2E tests'
     needs: [test-linux]
     runs-on: ubuntu-latest
+    env:
+      # Python-owned native children also resolve the production shared modules.
+      LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
     steps:
       - uses: actions/checkout@v4
 
       - name: Install LuaJIT
         # Bound extension sections require actual no-follow source identity.
         # Test discovery alone does not prove their filesystem admission.
+        # Canonical XKB controls below require xkbcli before their first use.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit lua-filesystem sqlite3
+          sudo apt-get install -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool
