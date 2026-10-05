@@ -16,7 +16,11 @@ Execute the work in this order:
 2. Execute the stored group 7 prompt for TODO items 19, 49, 50, 51 and 101.
    Revalidate the current checkout, remote state, owners and referenced handovers
    before starting; the recorded commits are historical checkpoints.
-3. Resume the broader Windows AutoHotkey bug audit and regression coverage.
+3. Finish the Windows-specific TODO features left unimplemented or unqualified
+   by the seven parallel containers. Inventory the latest `dev` handovers first.
+
+The user paused the broader AutoHotkey bug audit on 2026-10-05. Do not resume
+that campaign after group 7; feature completion is the current priority.
 
 The current agents continue the Notepad work. This queued request does not stop
 or restart their in-flight tasks. The stored push authorization and serialized
