@@ -14,23 +14,40 @@ local reader = require('modules.keylogger.sqlite_reader')
 local original_build, original_popen = command.build, io.popen
 local row_count = 0
 local first_native_output
-local function decode_native_rows(output)
-	local accepted, body, detail = command.read_exit_receipt(output)
-	assert(accepted == true, detail or 'native SQLite terminal receipt refused')
+local function native_rows(output)
+	local accepted, body, reason = command.read_exit_receipt(output)
+	assert(accepted == true, 'native SQLite exit receipt failed: ' .. tostring(reason))
 	local rows = body == '' and {} or json.decode(body)
 	assert(type(rows) == 'table', 'native SQLite must return JSON rows')
 	return rows
 end
+local function refuses_rows(output, reason)
+	local ok, detail = pcall(native_rows, output)
+	assert(ok == false and tostring(detail):find(reason, 1, true),
+		'native SQLite refusal must retain its specific receipt or JSON failure')
+end
+assert(#native_rows('[]\n\nERGOPTI_SQL_EXIT_STATUS=0\n') == 0, 'empty JSON rows must remain admitted')
+assert(#native_rows('\nERGOPTI_SQL_EXIT_STATUS=0\n') == 0, 'empty successful output must remain admitted')
+refuses_rows('[]\n', 'native SQLite exit receipt failed:')
+refuses_rows('[]\n\nERGOPTI_SQL_EXIT_STATUS=1\n', 'native SQLite exit receipt failed:')
+refuses_rows('[]\n\nERGOPTI_SQL_EXIT_STATUS=invalid\n', 'native SQLite exit receipt failed:')
+refuses_rows('{malformed}\n\nERGOPTI_SQL_EXIT_STATUS=0\n', 'native SQLite must return JSON rows')
+-- Exercise the native CLI failure too; LuaJIT's pclose can conceal its exit status.
+local failure_command = assert(command.build(database, 'SELECT missing_synthetic_column;', {
+	flags = { '-readonly', '-json' }, capture_exit = true,
+}))
+local failure_pipe = assert(original_popen(failure_command, 'r'))
+local failure_output = assert(failure_pipe:read('*a'))
+failure_pipe:close()
+refuses_rows(failure_output, 'native SQLite exit receipt failed:')
 io.popen = function(...)
 	local pipe = assert(original_popen(...))
 	return {
 		read = function(_, mode)
 			local output = pipe:read(mode)
-			local rows = decode_native_rows(output)
+			local rows = native_rows(output)
 			first_native_output = first_native_output or output
 			row_count = row_count + #rows
-			-- The production reader owns its terminal receipt; only the fixture's
-			-- transport census decodes the JSON body before that receipt.
 			return output
 		end,
 		close = function()
@@ -61,13 +78,14 @@ local function workload()
 end
 local candidate = workload()
 local grouped_rows = row_count
+-- Mutate an actual successful native output as well as the independent literals.
 assert(type(first_native_output) == 'string', 'real native output control required')
 local missing_receipt, removed = first_native_output:gsub('\n[^\n]+\n$', '')
 assert(removed == 1 and missing_receipt ~= first_native_output, 'missing-receipt control must change native output')
-assert(not pcall(decode_native_rows, missing_receipt), 'transport census must reject a missing terminal receipt')
+refuses_rows(missing_receipt, 'native SQLite exit receipt failed:')
 local refused_receipt, replaced = first_native_output:gsub('0\n$', '7\n')
 assert(replaced == 1 and refused_receipt ~= first_native_output, 'refused-receipt control must change native output')
-assert(not pcall(decode_native_rows, refused_receipt), 'transport census must reject a nonzero native status')
+refuses_rows(refused_receipt, 'native SQLite exit receipt failed:')
 -- Freeze the previous two SQL projections, not a second copy of Lua merge logic.
 command.build = function(db, sql, options)
 	if sql:find('FROM ngram_', 1, true) and not sql:find('FROM ngram_scancodes', 1, true) then

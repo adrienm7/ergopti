@@ -38,6 +38,8 @@ var _steps = [STEP_LANGUAGE, STEP_CONFIG];
 var _stepIndex = 0;
 var _configDir = '';
 var _loadedDir = '';
+var _requestedDir = '';
+var _configPending = false;
 var _current = {};
 var _pageState = {};
 
@@ -242,7 +244,14 @@ function _countItems(group, state) {
  * @returns {object}
  */
 function _initialState(page) {
-	var state = { answer: false, checked: {}, prefilled: false, magic: null, custom: '' };
+	var state = {
+		answer: false,
+		checked: {},
+		prefilled: false,
+		magic: null,
+		custom: '',
+		magicChanged: false
+	};
 	var configured = false;
 	_eachItem(page.groups, function (item) {
 		var on = _currentlyOn(item);
@@ -306,8 +315,12 @@ function _contextMagicKey(choice) {
 	var system = (window.SYSTEM_LAYOUT || '').toLowerCase();
 	if ((layoutPage && layoutPage.answer) || system.indexOf('ergopti') !== -1)
 		return choice.recommended;
-	if (system.indexOf('french') !== -1 || system.indexOf('azerty') !== -1) return 'ù';
-	return ';';
+	var candidate = system.indexOf('french') !== -1 || system.indexOf('azerty') !== -1 ? 'ù' : ';';
+	return choice.options.some(function (option) {
+		return option.value === candidate;
+	})
+		? candidate
+		: choice.recommended;
 }
 
 /**
@@ -378,7 +391,12 @@ function _operations() {
 				operations.push({ path: gate.path, value: wanted ? gate.value : gate.default });
 			}
 		});
-		if (page.magic_key) {
+		// An outdated stored value is preserved until the trigger itself is
+		// edited; a display recommendation never grants permission to replace it.
+		if (
+			page.magic_key &&
+			(state.magicChanged || !Object.prototype.hasOwnProperty.call(_current, page.magic_key.path))
+		) {
 			var chosen = _magicValue(page);
 			if (chosen !== _currentValue(page.magic_key)) {
 				operations.push({ path: page.magic_key.path, value: chosen });
@@ -435,8 +453,10 @@ function _render() {
 	back.textContent = _t('onboarding.back');
 	back.classList.toggle('hidden', _stepIndex === 0);
 	var last = _stepIndex === _steps.length - 1;
-	document.getElementById('btn-next').textContent = _t(
-		last ? 'onboarding.finish' : 'onboarding.next'
+	var next = document.getElementById('btn-next');
+	next.disabled = _configPending && !!page;
+	next.textContent = _t(
+		next.disabled ? 'common.loading' : last ? 'onboarding.finish' : 'onboarding.next'
 	);
 	document.title = _t('onboarding.welcome.title');
 }
@@ -606,7 +626,9 @@ function _renderMagicKey(page, state) {
 	var input = document.createElement('input');
 	input.type = 'text';
 	input.className = 'magic-input';
-	input.maxLength = choice.max_characters;
+	// A supplementary Unicode symbol occupies two browser UTF-16 units, but
+	// the Linux runtime still validates exactly one scalar before saving.
+	input.maxLength = choice.max_characters * (choice.validation === 'safe_magic_key' ? 2 : 1);
 	input.value = isPreset
 		? state.custom
 		: state.magic === CUSTOM_MAGIC_VALUE
@@ -614,6 +636,7 @@ function _renderMagicKey(page, state) {
 			: chosen;
 	input.disabled = isPreset;
 	input.addEventListener('input', function () {
+		state.magicChanged = true;
 		state.magic = CUSTOM_MAGIC_VALUE;
 		state.custom = input.value;
 		input.classList.remove('invalid');
@@ -641,6 +664,7 @@ function _magicRow(page, value, text, checked) {
 	radio.checked = checked;
 	radio.addEventListener('change', function () {
 		if (!radio.checked) return;
+		state.magicChanged = true;
 		if (value === CUSTOM_MAGIC_VALUE && state.magic !== CUSTOM_MAGIC_VALUE) {
 			state.custom = state.custom || _magicValue(page);
 		}
@@ -829,6 +853,8 @@ window.initData = function (data) {
 	window.SYSTEM_LAYOUT = data.system_layout || '';
 	_configDir = typeof data.config_dir === 'string' ? data.config_dir : '';
 	_loadedDir = _configDir;
+	_requestedDir = '';
+	_configPending = false;
 	_current = data.current && typeof data.current === 'object' ? data.current : {};
 	_metricsPath = typeof data.metrics_path === 'string' ? data.metrics_path : '';
 	_resetStates();
@@ -864,8 +890,16 @@ window.setMetricsPath = function (payload) {
  * @param {{request: number, values: Object}} payload
  */
 window.applyCurrentValues = function (payload) {
-	if (!payload || typeof payload.values !== 'object' || payload.values === null) return;
-	if (payload.request !== _configRequest) return;
+	if (
+		!payload ||
+		typeof payload.values !== 'object' ||
+		payload.values === null ||
+		Array.isArray(payload.values)
+	)
+		return;
+	if (!_configPending || payload.request !== _configRequest || _configDir !== _requestedDir) return;
+	_loadedDir = _requestedDir;
+	_configPending = false;
 	_current = payload.values;
 	_resetStates();
 	if (_pageAt(_stepIndex)) _render();
@@ -894,8 +928,14 @@ window.setGestureRegisterStatus = function (ok) {
 /** Leaves the config step: the folder's configuration and metrics store. */
 function _leaveConfig() {
 	_configDir = (document.getElementById('config-input').value || '').trim();
-	if (_configDir !== _loadedDir) {
-		_loadedDir = _configDir;
+	if (_configPending || _configDir !== _loadedDir) {
+		// A requested folder is not an admitted configuration. Retire prior
+		// values and choices now, and allow the config step to retry the same
+		// folder when the host could not read it or no reply arrived.
+		_requestedDir = _configDir;
+		_configPending = true;
+		_current = {};
+		_resetStates();
 		_configRequest += 1;
 		_post({ action: 'loadExistingConfig', config_dir: _configDir, request: _configRequest });
 	}
@@ -910,6 +950,11 @@ function _leaveConfig() {
  */
 function _pageComplete(page) {
 	if (!page || !page.magic_key || !_pageState[page.id].answer) return true;
+	if (
+		!_pageState[page.id].magicChanged &&
+		Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)
+	)
+		return true;
 	if (_magicValue(page) !== '') return true;
 	var input = document.getElementById('page-magic-options').querySelector('.magic-input');
 	if (input) {
@@ -921,6 +966,7 @@ function _pageComplete(page) {
 
 document.getElementById('btn-next').addEventListener('click', function () {
 	var step = _steps[_stepIndex];
+	if (_configPending && _pageAt(_stepIndex)) return;
 	if (step === STEP_LANGUAGE) {
 		_post({ action: 'localeSelected', locale: _selectedLocale });
 	} else if (step === STEP_CONFIG) {

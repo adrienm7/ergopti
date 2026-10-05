@@ -28,7 +28,8 @@ local Logger = require("infra.logger")
 local LOG = "menu.global_scope"
 
 --- The remap engine's part of one scope, as an asynchronous participant: its
---- inverse is the settings snapshot the engine restores through the same gate.
+--- inverse includes its settings snapshot and exact navigation-layer import
+--- receipt, both restored through the same native cohort gate.
 --- The next category never runs on the Karabiner terminal's own stack: the
 --- continuation is deferred, so a second regeneration is not requested from
 --- inside the callback that settles the first. A `persisted-guardian-…`
@@ -42,7 +43,7 @@ local LOG = "menu.global_scope"
 --- @param defer function fn -> true once fn is scheduled off this stack.
 --- @return table participant See config_scope_composition.
 local function remap_participant(remap, scope, backup_path, defer)
-	local snapshot, committed = nil, false
+	local snapshot, committed, layer_receipt, missing_receipt = nil, false, nil, false
 	local participant = {}
 	local function settle(done, ok, reason)
 		if defer(function() return done(ok, reason) end) == true then return end
@@ -52,23 +53,44 @@ local function remap_participant(remap, scope, backup_path, defer)
 		return done(ok, reason)
 	end
 	function participant.apply(mode, done)
-		snapshot, committed = remap.snapshot_settings(), false
+		snapshot, committed, layer_receipt, missing_receipt = remap.snapshot_settings(), false, nil, false
 		if type(snapshot) ~= "table" then return done(false, "remap settings are owned by another transaction") end
-		remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path(scope) }, function(ok, reason)
+		remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path(scope) }, function(ok, reason, _, receipt)
 			committed = ok == true
+			if committed and scope == "tap_holds" and mode == "recommended" then
+				if type(receipt) ~= "table" then
+					missing_receipt = true
+					return settle(done, false, "missing-navigation-layer-receipt")
+				end
+				layer_receipt = receipt
+			end
 			return settle(done, committed, reason)
 		end)
 	end
 	function participant.revert(done)
 		if not committed then return done(false, "no committed remap scope to revert") end
+		if missing_receipt then return done(false, "missing-navigation-layer-receipt") end
 		remap.restore_settings(snapshot, function(ok, reason)
 			if ok == true then committed = false end
 			return settle(done, ok == true, reason)
-		end)
+		end, layer_receipt)
 	end
-	function participant.release() snapshot, committed = nil, false end
-	function participant.pending() return remap.settings_pending() == true end
-	function participant.retry_restore(done) return done(remap.retry_settings_recovery() == true) end
+	function participant.release()
+		assert(committed and not missing_receipt and remap.settings_pending() == false,
+			"remap scope cannot release an unacknowledged cohort")
+		snapshot, committed, layer_receipt = nil, false, nil
+	end
+	function participant.pending() return missing_receipt or remap.settings_pending() == true end
+	function participant.retry_restore(done)
+		if missing_receipt then return done(false, "missing-navigation-layer-receipt") end
+		if remap.retry_settings_recovery() ~= true or remap.settings_pending() ~= false then
+			return done(false, "remap settings recovery remains pending")
+		end
+		-- A failed restore's own inverse recovers the pre-restore settings.
+		-- The parent's snapshot is still owed until its true terminal.
+		if committed then return participant.revert(done) end
+		return done(true)
+	end
 	return participant
 end
 
