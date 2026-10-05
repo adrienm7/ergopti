@@ -1303,4 +1303,108 @@ helpers.describe("conditional publication retained admission", function()
 		end)
 	end)
 
+	for _, source_present in ipairs({ false, true }) do
+		helpers.it("retains refused scalar setter publication with source_present=" .. tostring(source_present), function()
+			with_owned_publication(function(path, fs, control, seed)
+				with_native_remap(path, fs, control, seed, function(remap, source, driver)
+					if not source_present then assert(os.remove(path)) end
+					helpers.assert_eq(remap.set_tap_action("left_shift", "paste"), false)
+					helpers.assert_eq(remap.settings_pending(), true, "the failed scalar setter retains its actual file effect")
+					helpers.assert_eq(remap.get_tap_action("left_shift"), "escape")
+					helpers.assert_eq(remap.retry_settings_recovery(), false)
+					helpers.assert_eq(remap.set_hold_action("left_shift", "shift"), false)
+					helpers.assert_eq(control.writes, 1)
+					control.blocked = false
+					helpers.assert_eq(remap.retry_settings_recovery(), true)
+					local bytes, status = fs.read_with_status(path)
+					helpers.assert_eq(status, source_present and "ok" or "absent")
+					if source_present then helpers.assert_eq(bytes, source) end
+					helpers.assert_eq(remap.get_tap_action("left_shift"), "escape")
+					helpers.assert_eq(driver.regenerations, 0, "a refused setter never adopted or deployed its candidate")
+				end)
+			end)
+		end)
+	end
+
+	helpers.it("does not replace a successor when a scalar setter's inverse release settles", function()
+		with_owned_publication(function(path, fs, control, seed)
+			with_native_remap(path, fs, control, seed, function(remap, source)
+				helpers.assert_eq(remap.set_tap_action("left_shift", "paste"), false)
+				control.blocked = false
+				control.after_close = function() control.blocked = true; control.after_close = nil end
+				helpers.assert_eq(remap.retry_settings_recovery(), false)
+				helpers.assert_eq(fs.read_with_status(path), source)
+				seed(path, "foreign setter successor")
+				control.blocked = false
+				helpers.assert_eq(remap.retry_settings_recovery(), false)
+				helpers.assert_eq(remap.settings_pending(), true)
+				helpers.assert_eq(remap.set_tap_action("left_shift", "copy"), false)
+				helpers.assert_eq(fs.read_with_status(path), "foreign setter successor")
+				helpers.assert_eq(control.writes, 2, "inverse cleanup cannot republish an already restored source")
+				seed(path, source)
+				helpers.assert_eq(remap.retry_settings_recovery(), true)
+			end)
+		end)
+	end)
+
+	--- Uses the actual serializer and classified file port before the remap
+	--- facade has any runtime state. Only its lifecycle/data/fcntl ports are controlled.
+	local function with_native_detached(path, fs, control, seed, body)
+		require("tests.support.remap_transaction_fixture")(function(fixture)
+			local remap, calls = fixture.load_enabled_remap({ skip_init = true })
+			local configured = package.loaded["platform.remap.config"]
+			configured.build_default_state = function()
+				return { tap_holds_enabled = false, tap_hold_config = { left_shift = { tap = "none", hold = "none" } },
+					mod_combos_config = {}, tap_hold_timeout_ms = 200, sticky_timeout_ms = 1000,
+					simultaneous_threshold_ms = 50, combo_symmetric = false }
+			end
+			package.loaded["platform.remap.defaults"].tap_hold = { left_shift = { "escape", "none" } }
+			package.loaded["infra.config_paths"].get = function() return path end
+			local captured_files = require("adapters.file_system")
+			for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
+				captured_files[method] = fs[method]
+			end
+			package.loaded["adapters.file_system"] = fs
+			package.loaded["platform.remap.config"] = nil
+			local actual = helpers.load_with_stubs("platform.remap.config")
+			configured.save_user_config, configured.load_user_config = actual.save_user_config, actual.load_user_config
+			package.loaded["platform.remap.config"] = configured
+			body(remap, calls)
+		end)
+	end
+
+	for _, phase in ipairs({ "created", "replaced", "backup", "no-effect" }) do
+		helpers.it("retains detached wizard " .. phase .. " native publication debt before init", function()
+			with_owned_publication(function(path, fs, control, seed)
+				with_native_detached(path, fs, control, seed, function(remap, calls)
+					local source = "[custom]\nkeep = 19\n[karabiner]\nintegration_enabled = false\n"
+					if phase ~= "created" then seed(path, source) end
+					if phase == "backup" then control.target = path .. ".backup" end
+					if phase == "no-effect" then control.refuse_rename = true end
+					local request = { keys = { "left_shift" }, path = path, backup_path = path .. ".backup" }
+					helpers.assert_eq(remap.save_recommended_keys(request), false)
+					helpers.assert_eq(remap.has_pending_settings_save(), true, "a detached refusal retains its private owner")
+					helpers.assert_eq(remap.is_running(), false)
+					helpers.assert_eq(remap.retry_settings_recovery(), false)
+					helpers.assert_eq(remap.save_recommended_keys(request), false)
+					helpers.assert_eq(remap.init({ expand_path = function(value) return value end }), false, "init cannot adopt unacknowledged file bytes")
+					helpers.assert_eq(calls.lease_init, 0)
+					if phase == "no-effect" then seed(path, "foreign detached successor") end
+					control.blocked = false
+					helpers.assert_eq(remap.retry_settings_recovery(), true)
+					helpers.assert_eq(remap.settings_pending(), false)
+					local bytes, status = fs.read_with_status(path)
+					helpers.assert_eq(status, phase == "created" and "absent" or "ok")
+					if phase ~= "created" then
+						helpers.assert_eq(bytes, phase == "no-effect" and "foreign detached successor" or source)
+						helpers.assert_eq(fs.read_with_status(path .. ".backup"), source, "verified wizard backup data survives cleanup")
+					end
+					local writes, unlocks = control.writes, control.unlocks
+					helpers.assert_eq(remap.retry_settings_recovery(), true)
+					helpers.assert_eq(control.writes, writes); helpers.assert_eq(control.unlocks, unlocks)
+				end)
+			end)
+		end)
+	end
+
 end)
