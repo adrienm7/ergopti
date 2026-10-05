@@ -117,9 +117,9 @@ end
 -- ================================================
 -- ================================================
 
---- Splits a top-level JSON array of releases into one substring per object,
---- honouring quoted strings and escape sequences so a "}" inside a release
---- body field cannot fool the depth counter.
+--- Splits a complete top-level array of release objects into exact raw spans.
+--- The JSON owner validates syntax; span fencing preserves bytes and order,
+--- refusing non-object root elements rather than offering their nested objects.
 --- @param json string Raw JSON array string
 --- @return table Array of object-JSON strings
 function M.split_releases_array(json)
@@ -127,7 +127,10 @@ function M.split_releases_array(json)
 	if type(json) ~= "string" or json == "" then return out end
 	local trimmed = json:match("^%s*(.*)$") or json
 	if trimmed:sub(1, 1) ~= "[" then return out end
+	local decoded = Json.decode(json)
+	if type(decoded) ~= "table" then return out end
 	local pos, depth, start = 2, 0, 0
+	local array_depth = 1
 	local in_str, esc = false, false
 	while pos <= #trimmed do
 		local c = trimmed:sub(pos, pos)
@@ -136,8 +139,12 @@ function M.split_releases_array(json)
 			elseif c == "\\" then esc = true
 			elseif c == '"' then in_str = false end
 		elseif c == '"' then in_str = true
+		elseif c == "[" then array_depth = array_depth + 1
+		elseif c == "]" then
+			array_depth = array_depth - 1
+			if array_depth == 0 then break end
 		elseif c == "{" then
-			if depth == 0 then start = pos end
+			if depth == 0 and array_depth == 1 then start = pos end
 			depth = depth + 1
 		elseif c == "}" then
 			depth = depth - 1
@@ -148,6 +155,7 @@ function M.split_releases_array(json)
 		end
 		pos = pos + 1
 	end
+	if #out ~= #decoded then return {} end
 	return out
 end
 
