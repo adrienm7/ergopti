@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: GitHub Release JSON Parser (Shared)
 --- DESCRIPTION:
---- Pure functions for parsing GitHub Releases API JSON payloads. Asset lookup
---- uses the shared JSON decoder to preserve metadata boundaries. Extracted
+--- Pure functions for parsing GitHub Releases API JSON payloads. Assets and
+--- notes use the shared JSON decoder to preserve metadata boundaries. Extracted
 --- from macos/infra/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
 --- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
@@ -41,17 +41,15 @@ end
 
 
 --- Extracts the "body" field (release notes markdown) from a GitHub release
---- JSON string. Handles GitHub's "body": null sentinel and unescapes the
---- common JSON escape sequences (\n, \r, \t, \", \\).
---- @param body string Raw JSON
+--- object. JSON escapes decode once; the established carriage-return removal
+--- applies to decoded notes, preserving literal backslash examples.
+--- @param body string Raw single-release JSON object.
 --- @return string notes or ""
 function M.parse_notes(body)
-	if not body or body == "" then return "" end
-	-- GitHub sets "body": null when a release has no description
-	if body:match('"body"%s*:%s*null') then return "" end
-	local raw = body:match('"body"%s*:%s*"(.-[^\\])"')
-	if not raw then return "" end
-	return (raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\"))
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" or type(release.body) ~= "string" then return "" end
+	return (release.body:gsub("\r", ""))
 end
 
 

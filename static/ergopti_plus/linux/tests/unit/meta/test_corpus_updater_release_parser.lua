@@ -162,6 +162,8 @@ helpers.describe("updater release parser corpus — vector replay", function()
 	end
 
 	-- parse_notes vectors
+	require("test.release_parser_contract").run(helpers, P)
+
 	for _, vec in ipairs(by_cat["parse_notes"] or {}) do
 		helpers.it("parse_notes: " .. vec.id, function()
 			helpers.assert_eq(dispatch(P, vec), vec.expected,
