@@ -85,19 +85,19 @@ _TH_KeyRows(Hand) {
 		; resolve the wrong function body (see HIGH-07 regression guard).
 		_HoldRowsBuilder := _TH_HoldPickerRows
 
+		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_head",
+			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
+				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl)),
+			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
+				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
+				"tap_hold_key_hold_caption", ((Value) => Value).Bind(HoldLbl)),
+			Map("tap_hold_key_hold", _HoldRowsBuilder(KeyId)))
+		if !(KeyRows is Array)
+			continue
 		Rows.Push(Map(
 			"label",   ParentLabel,
 			"checked", IsConfigured,
-			"items", [
-				MenuRenderer_CommandRow("tap_hold_key_native_commands", "tap_hold_key_native",
-					Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId)),
-					Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured))),
-				Map("separator", true),
-				Map("label",  StrReplace(t("tap_hold.picker.tap"), "%s", TapLbl),
-					"action", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl)),
-				Map("label", StrReplace(t("tap_hold.picker.hold"), "%s", HoldLbl),
-					"items", _HoldRowsBuilder(KeyId))
-			]))
+			"items",   KeyRows))
 	}
 	return Rows
 }
