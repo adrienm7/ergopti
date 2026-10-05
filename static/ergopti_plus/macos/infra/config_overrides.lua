@@ -129,6 +129,22 @@ local function admit_known_value(row, decoded)
 	return fits
 end
 
+--- Reads one declared native setting through its published value catalogue.
+--- Obsolete persisted defaults are ignored without granting deletion authority;
+--- absent values remain available to the caller's canonical preference fallback.
+--- @param path string Logical native setting and declared feature path.
+--- @return any value Admitted value, or nil when absent or obsolete.
+function M.read_native_value(path)
+	local entry = assert(Manifest.find_declared_entry_by_path(path),
+		"native setting has no published declaration: " .. tostring(path))
+	local value = Storage.get(path)
+	if value == nil then return nil end
+	local fits, detail = ConfigOutdated.manifest_value_fits(entry, value, "hs")
+	if fits then return value end
+	ConfigOutdated.report_in_file("hs.settings", { path }, detail, Logger)
+	return nil
+end
+
 --- Marks each original source path the legacy setting projection consumes.
 --- @param decoded table Decoded config.toml.
 --- @param mark function mark(...segments) from config_unused_keys.
