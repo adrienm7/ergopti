@@ -306,3 +306,32 @@ helpers.describe("Local API models transport (local-api-optional-auth)", functio
 		helpers.assert_eq(observations[2].reason, "invalid_models")
 	end)
 end)
+
+
+helpers.describe("Remote provider error envelopes", function()
+	local contract = require("test.response_error_contract")
+	assert(#contract.vectors == 23, "every independent Lua response vector executes")
+	for _, vector in ipairs(contract.vectors) do
+		helpers.it("provider response: " .. vector.name, function()
+			local remote = load_remote()
+			local actual = remote.extract_text(vector.format, vector.body)
+			unload()
+			helpers.assert_eq(actual, vector.expected, vector.name)
+		end)
+	end
+end)
+
+
+helpers.describe("Shared provider response error ownership", function()
+	helpers.it("checks only a decoded root's own field and preserves false and null", function()
+		local formats = require("llm.remote_formats")
+		for _, body in ipairs({ '{"error":null}', '{"error":false}', '{"error":""}', '{"error":{}}' }) do
+			helpers.assert_true(formats.response_has_error(assert(Json.decode(body))), body)
+		end
+		for _, value in ipairs({ false, 0, "error", {}, { metadata = { error = true } },
+			setmetatable({}, { __index = { error = true } }) }) do
+			helpers.assert_eq(formats.response_has_error(value), false)
+		end
+		helpers.assert_eq(formats.response_has_error(nil), false)
+	end)
+end)

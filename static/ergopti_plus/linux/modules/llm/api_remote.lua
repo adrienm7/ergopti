@@ -433,7 +433,7 @@ end
 --- @return string|nil
 function M.extract_text(format, body)
 	local root = type(body) == "string" and Json.decode(body) or nil
-	if type(root) ~= "table" then return nil end
+	if type(root) ~= "table" or Formats.response_has_error(root) then return nil end
 	if format == "anthropic" then
 		for _, block in ipairs(type(root.content) == "table" and root.content or {}) do
 			if type(block) == "table" and block.type == "text" and type(block.text) == "string" then return block.text end

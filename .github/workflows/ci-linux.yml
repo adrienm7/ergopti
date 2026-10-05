@@ -376,6 +376,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Refuse provider error envelopes before publishing completion text
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_response_errors.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_response_errors.py
+        timeout-minutes: 1
+
       - name: Preserve complete native SQLite metadata scalar values
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

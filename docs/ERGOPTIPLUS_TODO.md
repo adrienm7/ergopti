@@ -1674,6 +1674,26 @@ These are software implementations; final hardware verification remains below.
   its native owner's diagnosis. No foreign, physical input, TOML, schema, generic
   query, migration, cache or flush change.
 
+- [~] **L115.** Linux provider-error completion admission: use one pure shared
+  predicate to refuse any own root `error` field before extracting chat text,
+  including explicit null or false. Canonical decoy completion fields previously
+  escaped that error envelope. Preserve nested/inherited metadata, first-part
+  selection, the existing empty-reply outcome and every original parser vector.
+  Twenty-three genuine verified TLS/public provider calls have twelve original
+  failures and pass on current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04
+  curl/luv/libuv dependencies. Complete independent response bytes, child exit,
+  one terminal callback, successful chunks or absent error chunks and zero native
+  handles remain checked. Forty-one registered provider tests pass on both
+  runtimes; introducing the pure helper before caller integration reproduces
+  twelve actual extraction failures while the earlier seventeen tests stay green.
+  Register future Linux CI without launching it. Windows already checks root
+  error-field presence by source; macOS needs a classifier guard and native
+  nested-null retention validation before claiming equivalent coverage. An
+  earlier unprinted callback recorder failure in the unchanged HTTP fixture
+  remains unresolved; passing original-source replays do not prove its cause.
+  No foreign native gate, transport, Backboard/decisions, menu, persistence,
+  multipart-policy or physical input change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
