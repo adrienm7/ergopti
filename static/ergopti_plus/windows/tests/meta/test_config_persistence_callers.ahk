@@ -124,13 +124,19 @@ _CPC_IndentWriterReturnsItsNativeStatus() {
 Test("AHK-15-persistence: the indentation caller returns its native ACK and rejects discarded-result mutations",
 	_CPC_IndentWriterReturnsItsNativeStatus)
 
+; Include semantic public and exact-source private gateways in the same class.
+_CPC_IsQualifiedTomlCaller(Line) {
+	return RegExMatch(Line,
+		"\b(?:TOML_(?:Write|BatchWrite|ConfigBatchWrite)|_TOML_BatchWriteImpl|ConfigCommit(?:Updates|Built))\(")
+}
+
 _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-15 TOML caller scan")
 	Calls := 0
 	Lines := StrSplit(Src, "`n", "`r")
 	for Index, Line in Lines {
-		if !RegExMatch(Line, "\b(?:TOML_(?:Write|BatchWrite)|ConfigCommit(?:Updates|Built))\(")
+		if !_CPC_IsQualifiedTomlCaller(Line)
 			continue
 		if _CPC_IsFunctionDeclaration(Lines, Index)
 			continue
@@ -138,20 +144,14 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 		Assert(_CPC_LineConsumesResult(Lines, Index),
 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
 	}
-	; Audited inventory: config_io (7), config_shortcuts (2), unused-key cleanup
-	; (2), feature_io (2), gestures (4), and one each in i18n, TOML_Write,
-	; updater, editors, menu rebuild, personal editor, WPM, the error window and scoped configuration.
-	; Both admitted builders and direct-update gateways count. Pin the census so
-	; deleting a caller cannot make this class guard progressively vacuous, while
-	; every future sibling is still inspected by the loop above before the
-	; inventory assertion is reached.
-	; SetScriptShortcutChordsOn added the seventh config_io caller: its strict
-	; false return precedes reload, covered by the real refused-write case.
-	; SetKeyCombinationHold and ClearKeyCombination (infra/key_combinations.ahk)
-	; added two: each returns false before its reload when the commit is refused.
-	; _LLM_Menu_IndentWrite adds one leaf-owned caller: its native status is
-	; returned unchanged to the borrowed lease's strict Integer-1 ACK gate.
-	AssertEqual(29, Calls,
+	; Historical 29 public calls map to 27 unchanged consumption sites, plus
+	; SaveFullConfig's semantic public gateway and cleanup's exact-source private
+	; gateway. The expanded 28 public + 8 internal inventory is 36. Build-mode
+	; results are qualified maps; write-mode results are native Boolean ACKs.
+	; Every private result is also checked by the independent 8-call guard below.
+	; The exact 29 -> 27 mapping was audited against parent 681cbaf41^: only the
+	; two migrated gateways left the old regex, and no caller disappeared.
+	AssertEqual(36, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -491,10 +491,82 @@ _CPC_SemanticConfigPublishersRetainSource() {
 	Assert(InStr(Cleanup, 'return _TOML_BatchWriteImpl(Path, Updates, DropSections, "write",') > 0
 		&& InStr(Cleanup, "SourceImage, 1, true)") > 0,
 		"explicit cleanup cannot reread a successor as its backed-up source")
-	Assert(InStr(Cleanup, 'Writer := HasMethod(WriterFn, "Call") ? WriterFn : WriteUpdates') > 0
-		&& InStr(Cleanup, 'Committed := ConfigCommitBuilt(FilePath, "the unused configuration key cleanup",') > 0
-		&& InStr(Cleanup, "BuildPlan, Writer,") > 0,
-		"the exact-source publisher remains inside the native claimed transaction")
+	Assert(_CPC_RetiredRootPublisherChain(Cleanup),
+		"the exact-source publisher and retained root receipt remain inside the native claimed transaction")
+	Ack := _StripFullLineComments(_DriverFuncBody("_ConfigInvokeCommitWriter"))
+	Assert(InStr(Ack, "if !((Written is Integer) && Written == 1)") > 0,
+		"the claimed transaction refuses every malformed writer receipt")
 }
 Test("AHK-15-persistence: semantic configuration and explicit cleanup retain exact source/result owners",
 	_CPC_SemanticConfigPublishersRetainSource)
+
+_CPC_RetiredRootPublisherChain(Cleanup) {
+	; Exact native bindings need line anchors: an unrelated identifier cannot
+	; lend its suffix to the callback retained by ConfigCommitBuilt.
+	SelectPos := RegExMatch(Cleanup,
+		'm)^[ `t]*Publish := HasMethod\(WriterFn, "Call"\) \? WriterFn : WriteUpdates[ `t]*$')
+	if !SelectPos
+		return false
+	WrapperPos := RegExMatch(Cleanup, "m)^[ `t]*Writer\(Path, Updates\) \{[ `t]*$",, SelectPos)
+	if !WrapperPos
+		return false
+	ValidatePos := RegExMatch(Cleanup, "m)^[ `t]*ValidateRootReceipts\(SourceImage\)[ `t]*$",, WrapperPos)
+	if !ValidatePos
+		return false
+	ForwardPos := RegExMatch(Cleanup, "m)^[ `t]*return Publish\.Call\(Path, Updates\)[ `t]*$",, ValidatePos)
+	if !ForwardPos
+		return false
+	CommitPos := RegExMatch(Cleanup,
+		'm)^[ `t]*Committed := ConfigCommitBuilt\(FilePath, "the unused configuration key cleanup",[ `t]*$',, ForwardPos)
+	if !CommitPos
+		return false
+	BuilderPos := RegExMatch(Cleanup, "m)^[ `t]*BuildPlan, Writer,",, CommitPos)
+	return WrapperPos > SelectPos && ValidatePos > WrapperPos
+		&& ForwardPos > ValidatePos && CommitPos > ForwardPos && BuilderPos > CommitPos
+		&& RegExMatch(Cleanup, "\bReceipt\.Accepts\(Entry, FilePath, Source\)")
+}
+
+_CPC_SemanticCallerInventoryAndRootReceiptMutations() {
+	Full := _StripFullLineComments(_DriverFuncBody("SaveFullConfig"))
+	Cleanup := _StripFullLineComments(_DriverFuncBody("ConfigUnusedKeysRemove"))
+	Calls := 0
+	for Body in [Full, Cleanup] {
+		Lines := StrSplit(Body, "`n", "`r")
+		for Index, Line in Lines {
+			if !InStr(Line, "Written := TOML_ConfigBatchWrite(")
+					&& !InStr(Line, "return _TOML_BatchWriteImpl(")
+				continue
+			Calls += 1
+			AssertTrue(_CPC_IsQualifiedTomlCaller(Line), "the migrated native owner joins the complete inventory")
+			AssertTrue(_CPC_LineConsumesResult(Lines, Index), "the actual migrated native status is consumed")
+			Discarded := Lines.Clone()
+			Discarded[Index] := StrReplace(StrReplace(Line, "Written := ", ""), "return ", "")
+			AssertFalse(_CPC_LineConsumesResult(Discarded, Index), "discarded migrated results cannot pass")
+			Assigned := Lines.Clone()
+			Assigned[Index] := StrReplace(StrReplace(Line, "Written := ", "Ignored := "), "return ", "Ignored := ")
+			AssertFalse(_CPC_LineConsumesResult(Assigned, Index), "assigned but untested migrated results cannot pass")
+		}
+	}
+	AssertEqual(2, Calls, "both historically migrated gateway sites are independently audited")
+	AssertTrue(_CPC_RetiredRootPublisherChain(Cleanup), "the actual retained-source chain remains admitted")
+	AssertFalse(_CPC_RetiredRootPublisherChain(StrReplace(Cleanup,
+		"Receipt.Accepts(Entry, FilePath, Source)", "UnrelatedReceipt.Accepts(Entry, FilePath, Source)")),
+		"a suffix-sharing receiver cannot lend the retained Receipt source authority")
+	AssertFalse(_CPC_RetiredRootPublisherChain(StrReplace(Cleanup,
+		"Writer(Path, Updates) {", "UnrelatedWriter(Path, Updates) {")),
+		"a suffix-sharing callback declaration cannot lend an unresolved Writer binding")
+	AssertFalse(_CPC_RetiredRootPublisherChain(StrReplace(Cleanup,
+		'Publish := HasMethod(WriterFn, "Call") ? WriterFn : WriteUpdates',
+		'UnrelatedPublish := HasMethod(WriterFn, "Call") ? WriterFn : WriteUpdates')),
+		"a suffix-sharing assignment cannot lend an unresolved Publish binding")
+	AssertFalse(_CPC_RetiredRootPublisherChain(StrReplace(Cleanup,
+		"ValidateRootReceipts(SourceImage)", "ValidateSomethingElse(SourceImage)")), "losing the final root receipt refuses the chain")
+	AssertFalse(_CPC_RetiredRootPublisherChain(StrReplace(Cleanup,
+		"return Publish.Call(Path, Updates)", "Publish.Call(Path, Updates)")), "discarding the native callback receipt refuses the chain")
+	AssertFalse(_CPC_RetiredRootPublisherChain(StrReplace(Cleanup,
+		"BuildPlan, Writer,", "BuildPlan, Publish,")), "bypassing the validated wrapper refuses the chain")
+	AssertFalse(_CPC_RetiredRootPublisherChain(StrReplace(Cleanup,
+		"Receipt.Accepts(Entry, FilePath, Source)", "true")), "bypassing actual source/entry receipt validation refuses the chain")
+}
+Test("AHK-15-persistence: actual semantic gateways retain census, native ACK and root-receipt mutation controls",
+	_CPC_SemanticCallerInventoryAndRootReceiptMutations)

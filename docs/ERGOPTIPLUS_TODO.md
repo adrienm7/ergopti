@@ -2575,6 +2575,8 @@ Actual Windows CI exposed two fixture premises in the new semantic snapshot cont
 
 The canonical JSON codec now offers private strict root-object source receipts and explicit root-member splicing. It retains unowned numeric/container tokens, escaped identities and source trivia without whole-document encoding, and reparses the complete candidate. All122 prior corpus behaviors and registered test prefixes remain unchanged; independent Linux33/0 and macOS25/0 pass on both runtimes, while actual whole-encode controls fail12 cases. This is a pure source primitive: it grants no file liveness or publication authority, and native owned/ordinary Storage adoption remains necessary before the conservative numeric boundary can be lifted.
 
+Windows semantic publication meta controls now follow the actual strict full-save and claimed cleanup gateways. The historical29 callers are independently audited:27 unchanged, two migrated. Coverage expands to28 public plus8 private gateways, retaining the separate private8 guard and distinguishing Map preparation receipts from Boolean publication. Exact binding/order/Integer acknowledgement and causal suffix-renaming controls preserve prior safety predicates. Portable63 source predicates pass; native AHK rerun remains required.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -3899,6 +3901,8 @@ Windows explicit cleanup now offers the complete retired ahk root in dotted assi
 The trusted macOS/Linux native cleanup owners now preview and explicitly remove wholly unread dotted, inline and table-array roots through authenticated source ranges. Generic source-only cleanup and ordinary writes retain their previous contracts. Private receipts bind exact record/source/path identity and recheck the actual unread collector before backup, after verified backup and before native conditional publication. Protected or partially consumed roots remain untouched; raw selection identity and plain-array admission refuse equality proxies. Independent actual private-file Linux67/0 passes both runtimes and controlled macOS82/0 passes Lua5.4; previous producers fail22 new cases. No retired-root catalogue is inferred, and quoted root assignments containing equals remain conservatively unavailable. Actual Hammerspoon, Windows and final native/installed qualification remain separate.
 
 Native Windows diagnostics executed the complete root cleanup subjects but three shared neighbor checks used a comma expectation for an existing pipe-delimited diagnostic joiner. The successor additionally requires Array shape, length, Integer kinds and both original ordered values before the correct pipe expectation. Production cleanup and all other asserted neighbors remain unchanged. Source review is clear; actual Windows rerun remains required.
+
+Explicit cleanup meta controls now inspect the authenticated RootReceipt through the actual private publisher and claimed ConfigCommitBuilt chain, retaining backup, exact-current-source and strict acknowledgement gates. Anchored lexical binding controls reject renamed unresolved Publisher/Writer/Receipt aliases. Native Windows execution is still required; no production cleanup rule or assertion was disabled.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
