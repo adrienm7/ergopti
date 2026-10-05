@@ -1028,6 +1028,860 @@ These are software implementations; final hardware verification remains below.
   device metadata. The registered unit reopens the production writer. Windows
   and macOS schema paths do not use this truncated CLI DDL probe; their native
   suites remain deferred. No shared schema or reserved configuration was changed.
+- [~] **L76.** Linux digest replacement admission: validate the complete native
+  sha256sum argument vector before cancelling an incumbent or allocating its
+  replacement. An absolute path containing NUL previously cancelled a valid
+  pending digest before being refused. Two of seven actual native process
+  regressions fail before and all pass after: the original FIFO digest survives
+  both ordinary and raising refusal callbacks and finishes the known abc hash
+  exactly once. Controls retain relative-path refusal, accepted replacement,
+  FIFO and /dev/zero deadlines, explicit cancellation and native handle cleanup.
+  The registered regression uses actual LuaJIT/libuv processes and files, with
+  no simulated syscall receipts or physical device validation. macOS hashes
+  in-process and Windows owns its hashing worker; neither uses this Linux
+  singleton admission path. Their native suites remain deferred. Separate
+  caller ownership isolation is covered separately by L80.
+- [~] **L77.** Linux event-loop wait completion: retry nanosleep with its
+  remaining duration after EINTR and reject other native errors. Real libuv
+  child exits previously shortened a successful 400 ms wait to about 50 ms.
+  The registered native fixture now starts three actual sleep processes,
+  requires the full wall-clock delay with bounded CPU consumption, checks that
+  all children exited during the wait, and reaps them without leaked handles.
+  No signal delivery or syscall result is simulated. Windows uses its native
+  Sleep path without POSIX EINTR; macOS delegates to hs.timer.usleep, whose
+  underlying interruption behavior cannot be established in this container.
+  Their native suites remain deferred. The separate reserved injector wait
+  has an analogous source diagnosis and remains unchanged for its owner.
+- [~] **L78.** Linux buffered HTTP body bounds: enforce the exact caller body
+  limit after separating curl's status trailer. The transport read budget
+  reserves trailer space; response bytes previously borrowed that allowance
+  and exposed oversized success or refusal bodies. Thirty of 84 actual local
+  curl/libuv checks fail before and all pass after across GET, POST and owned
+  GET, Content-Length/chunked framing, HTTP 200/401, small boundaries and the
+  updater's 2 MiB boundary. Requests and sockets are real; no native result is
+  simulated. Registered unit controls preserve split-trailer handling and
+  single completion. Windows uses its native response budget/file path and
+  macOS its native HTTP callback rather than this Linux trailer allowance;
+  their runtime suites remain deferred. Existing shared size policy is retained.
+- [~] **L79.** Linux HTTP refusal completeness: publish error-body bytes only
+  after curl proves a completed transfer, including its ordinary exit 22 for
+  fail-with-body. Keep the actual HTTP status while omitting partial transfer
+  prefixes; a syntactically valid missing-model JSON prefix previously offered
+  a model download after a truncated 404. Twenty-one of 262 actual local
+  curl/libuv checks fail before and all pass after, including GET, POST,
+  download, streaming POST and owned GET. All 15 incoming dev owned-request
+  settlement/cancellation/retry checks remain intact. Four registered unit
+  cases add simulated exit 18/23/56 and signal controls without weakening
+  existing assertions. Windows publishes curl response bytes only after exit
+  zero; macOS suppresses body bytes on negative native network status by source.
+  Their native runtime suites remain deferred. Shared model policy is unchanged.
+- [~] **L80.** Linux digest caller ownership: isolate updater and layout-registry
+  requests so an idle updater cancellation cannot terminate a valid layout
+  digest, and one caller's replacement cannot discard another caller's hash.
+  Keep historical unnamed-owner replacement/cancellation and preflight refusal
+  semantics. Six actual native component cases fail before and pass after,
+  using real sha256sum/FIFO processes, updater.cancel_update, and the actual
+  private layout digest collaborator obtained through guarded upvalue lookup.
+  This collaborator check is not a network refresh or installation E2E, and no
+  physical device is involved. Unit controls check archive owner forwarding;
+  the E2E lane registers the native component fixture in addition to its existing
+  scenarios. macOS hashes layouts synchronously and owns its updater child;
+  Windows hashes in its own worker by source, without this Linux singleton.
+  Their native suites remain deferred. No shared hash policy changed.
+- [~] **L81.** Linux logger repoint ownership: acquire candidate append channels
+  before retiring the working pair. Previously a refused destination closed
+  the old handles and attempted a path-based rollback, which lost a healthy
+  journal when permissions changed after its original acquisition. Three of
+  18 actual native file/permission/descriptor cases fail before and all pass
+  after, preserving all 13 prior write controls plus refusal, retry, partial
+  candidate cleanup, successful switching and optional-mirror refusal. Twelve
+  unit controls distinguish simulated open faults and assert ownership order,
+  nil/false/throw refusal, stdout-only and degraded-sink behavior. macOS folder
+  changes reload into a new logger session; Windows reloads and acquires files
+  per batch rather than retaining this pair by source. Their native suites
+  remain deferred. Reserved persistence and paths-editor production are unchanged.
+- [~] **L82.** Linux SQLite event ID reservation: replace the process-local
+  cursor with one BEGIN IMMEDIATE reservation acknowledged only after COMMIT.
+  Interleaved actual collector processes previously reused IDs and silently lost
+  accepted raw typing through INSERT OR IGNORE. Validate serialized positive
+  decimal cursors and keep the entire reserved range within the shared Lua
+  exact-integer policy; malformed or exhausted metadata refuses without mutation
+  and retains pending typing for recovery. Seven of twelve native interleaving,
+  trigger rollback and held-reader COMMIT cases fail before; thirty of thirty-four
+  native cursor, recovery and boundary cases fail before; all pass after. These
+  execute genuine SQLite/process paths with synthetic software key events, not
+  physical keyboard input. Four registered native unit regressions and a shared
+  policy source guard cover the same boundaries. Packaged graphical startup has
+  its own single-instance flock; independent collector/CLI connections remain
+  supported by this reservation. macOS also caches a Lua cursor and has separate
+  numeric-bound/independent-writer debt by source; Windows uses native integer
+  IDs and a journal recovery ledger. Their native suites and hosted CI remain
+  deferred. Database schema, encryption format and reserved UI are unchanged.
+- [~] **L83.** Linux literal HTTP URL admission: disable curl's URL globbing
+  after its required first --disable argument. Brackets and braces in a caller
+  URL previously failed parsing, changed the target or issued multiple requests
+  for one get/get_owned/post/postStream/download operation. Thirty-five of
+  fifty-five actual curl/loopback IPv4 and IPv6 cases fail before and all pass
+  after, checking one exact target, exact POST bytes, response bytes and native
+  retirement. Five registered unit cases pin every request method to the same
+  native builder. Percent-encoded URLs and ordinary requests remain controls.
+  Windows' curl adapter has the same source-level omission; its bounded proposal
+  remains separate for the principal owner. macOS uses native hs.http without
+  curl's glob language by source. Foreign native suites and hosted CI are
+  deferred; no URL, endpoint or request ownership policy changed.
+- [~] **L84.** Linux relative native timer arming: refresh libuv's cached clock
+  immediately before arming newly requested delays through one native helper.
+  Blocking work outside or inside a callback previously consumed a new delay:
+  80 ms timers fired in about 0.05 ms and valid 40 ms children lost new 100 ms
+  deadlines. Cover after/every, ProcessRunner, FileDigest, HTTP, ShellRunner and
+  EventLoop admission without changing their start receipts or teardown policy.
+  Seven of eight core and eight of nine sibling native cases fail before; all
+  seventeen pass after with actual timers, FIFO/sha256sum, loopback curl, shell
+  children, process-group termination/reaping and zero retained handles. Five
+  registered unit cases include the two native fixtures, native result-tuple
+  preservation and two explicitly simulated refresh exceptions. Native void-style
+  update_time is accepted; existing test backends now model it faithfully without
+  weakened assertions. These are native component receipts, not keyboard hardware
+  or a physical graphical session. Windows SetTimer and macOS hs.timer/hs.task
+  do not expose this cached Lua/libuv clock by source; their native duration
+  qualification remains deferred. No reserved input, menu or title source changed.
+- [~] **L85.** Linux diagnostics export completion: delegate report saves to
+  the established FileSystem.write owner and require its exact true receipt
+  before revealing the path. Previously a buffered write could succeed while
+  fclose failed with EFBIG, leaving a truncated report advertised as complete.
+  Two of seven actual kernel/file/permission cases fail before and all pass
+  after on LuaJIT and Lua 5.4: partial and zero-byte closes, immediate write
+  refusal, read-only file, unwritable directory, exact literal path/content and
+  redaction controls. Native write/close results are unmodified; reveal alone
+  is a simulated UI observer, not a physical graphical validation. Eight unit
+  controls explicitly simulate adapter receipts and preserve failure, directory
+  admission and successful save/reveal separation. macOS has the same unchecked
+  report close by source; its existing checked FileSystem.write is the bounded
+  follow-up proposal for the principal owner. Windows uses its native Write/Close
+  exception boundary by source. Foreign native suites and hosted CI are deferred.
+  No new writer policy or reserved configuration/diagnostic gate was introduced.
+- [~] **L86.** Linux process supervision admission: require the returned
+  native timer/stdout/stderr start receipts as well as their protected call
+  status. Libuv returns nil/error without raising; pcall success previously
+  admitted an unsupervised process. Refusal now terminates the owned group,
+  retires handles and publishes one failure, while native zero remains success.
+  Three of four component checks fail before and all pass after: the fixture
+  explicitly simulates invalidation of an actual timer or pipe before its
+  genuine EINVAL start receipt. Child processes, group termination, reaping and
+  handle cleanup are real; ordinary production invalidation is not claimed.
+  Six unit cases simulate nil/false receipt forms and preserve the existing
+  clock, argv, output and late-callback assertions. The native clock helper
+  remains in use. Windows uses native process/SetTimer paths and macOS hs.task
+  by source; their native admission behavior remains unqualified and deferred.
+  No reserved source or public process API changed.
+- [~] **L87.** Linux event loop startup ownership: admit idle and periodic
+  handles only after their native start receipts succeed; unwind partial
+  construction on an exception or nil/false receipt, clear the running state
+  and raise the original refusal so the next run can retry. The rollback
+  retires only loop-owned handles, preserving an independently active timer.
+  Seven native component cases fail before and pass after: constructor/start
+  exceptions and allocation refusals are explicitly simulated; invalidating a
+  real timer produces the genuine EINVAL receipt. Acquired handles, foreign
+  ownership and healthy recovery runs use installed libuv. The registered
+  regression preserves existing clock and stop-boundary assertions. Windows
+  and macOS use their host message loops and native timer backends by source;
+  there is no equivalent Lua-owned loop startup transaction. Their runtime
+  suites and hosted CI remain deferred; physical input is untested here.
+- [~] **L88.** Linux SQLite device registration: refresh only mutable host
+  fields with a transactional UPSERT, preserving creation/import metadata,
+  unknown schema columns and existing UPDATE triggers. REPLACE previously
+  deleted that durable history and bypassed update refusals. Registration now
+  returns the checked native write receipt and logs success only when accepted.
+  Eleven real collector/SQLite cases have ten failures before and none after;
+  the intermediate UPSERT alone still fails the AFTER UPDATE rollback case.
+  BEGIN IMMEDIATE/COMMIT therefore keeps row and trigger writes atomic when
+  an AFTER trigger raises FAIL or an independent native reader refuses COMMIT.
+  Healthy retries, first insert, reopen, row bytes, schema/index/trigger and
+  actual CLI receipts pass. Three registered native unit regressions preserve
+  all allocator/cursor and schema assertions. The fixture reuses L75's genuine
+  shared-reader child. macOS still uses REPLACE by source and can reset import
+  and extension fields; its persisted device creation timestamp differs. That
+  bounded native follow-up remains with the principal owner. Windows has no
+  equivalent devices-table registration by source. No metrics enable/fallback,
+  reserved input/configuration policy, foreign runtime suite or hosted CI changed.
+- [~] **L89.** Linux asynchronous shell admission: capture each allocation
+  before another constructor can fail; protect and require native timer and
+  stdout/stderr activation receipts, retaining NativeTimer and zero-valued
+  success. Refused startup returns nil/error synchronously with no completion
+  callback, preserving callers' single-report contract. Partial native handles
+  are retired and any spawned group follows the existing termination/late-exit
+  cleanup path. Five of eight native component checks fail before and all pass
+  after: constructor refusals and handle invalidation are explicitly simulated;
+  actual EINVAL, real handles, stdout/stderr, child groups, deadline/cancellation
+  and reaping are observed. Nineteen registered units cover each nil/false/raised
+  allocation/start receipt and invoke the native fixture. Healthy termination
+  is proved for those children; kill-refusal settlement/debt is not qualified
+  or redesigned here. macOS checks hs.task construction/start and retains a
+  task on terminate refusal by source; Windows uses native startup/termination
+  accounting by source. Foreign runtime suites, hosted CI and physical input
+  remain deferred. No caller, shared API or reserved surface changed.
+- [~] **L90.** Linux owned HTTP replacement admission: validate and compose
+  metadata before cancelling an active regular predecessor, then reuse that
+  exact configuration. An invalid owned replacement previously cancelled a
+  still-usable request before rejecting its NUL/type/raising metadata. Seven
+  of twenty-four actual loopback/curl/libuv cases fail before and all pass
+  after. Existing regular preflight, literal ETag/download files, exactly one
+  wire request, valid replacement, single construction and native settlement
+  controls remain. An already-owned slot still refuses before evaluating
+  hostile metadata; first owned construction retains its existing late
+  allocation and physical close-acknowledgment contract. Ten unit cases
+  preserve delayed ACK, predecessor delivery and every incoming owned test.
+  This follows the existing native owner protocol rather than adding an
+  operation API. Windows uses native generation/staging ownership and macOS
+  hs.http/hs.task by source; equivalent replacement behavior remains unqualified
+  without their runtime suites. No foreign source, reserved surface or hosted
+  CI changed; sockets/processes/files are real, not physical keyboard tests.
+- [~] **L91.** Linux native POST redirect semantics: let the data option select
+  POST instead of forcing a method word that survives curl's retrieval rewrite.
+  Optional followed 301/302/303 requests now become GET without the original
+  body; 307/308 retain POST and exact bytes. Six of thirty-three actual
+  loopback/curl/libuv cases fail before and all pass after, including direct
+  nil/empty/literal bodies, explicit no-follow, synthetic credential fences,
+  ordinary/owned GET and downloads. Seventeen registered units preserve flag
+  and callback contracts. No active LLM caller is claimed to follow redirects;
+  this fixes the supported optional adapter path. Windows async curl does not
+  enable native following; its synchronous WinHttp and macOS hs.http delegate
+  redirects to their platforms by source. Foreign runtime suites remain
+  deferred. Native regression is registered for Linux CI without launching
+  hosted CI; no TLS, credential, owner, shared API or reserved policy changed.
+- [~] **L92.** Linux literal POST body transport: send text through a genuine
+  inherited anonymous pipe instead of curl's size-limited configuration line.
+  Buffered and streaming POST preserve exact large JSON, quotes, leading at
+  signs and escaped JSON NUL. Literal NUL previously reached a truncating
+  parser; it now refuses before replacing an owner. Twelve of twenty actual
+  loopback/curl/libuv controls fail before and all pass after, covering 7/10/12
+  MiB bodies, complete/incomplete refusals, backpressured cancellation and
+  deadlines. Capture stable native handles and original raw descriptor identity
+  before transfer; exceptional close debt fences successors and withholds the
+  result until physical settlement. Fourteen explicitly simulated refusal
+  cases on real pipes/children/descriptor reuse fail before hardening and pass
+  after. Twenty-nine registered units cover delivery and cleanup boundaries.
+  Actual current Ubuntu 22.04 curl/libcurl and luv/libuv packages also pass
+  both fixtures using native pipe2 where luv.pipe is unavailable; remaining
+  runtime/kernel are this container's, not a full Ubuntu session. Request body
+  bytes stay off argv and owned transport files. Windows uses its own staged
+  body and macOS hs.http by source; foreign runtime suites remain deferred.
+  No public/shared API, credential/TLS, reserved surface or hosted CI changed.
+- [~] **L93.** Linux digest partial allocation: capture each native pipe and
+  timer immediately inside the existing protected constructor block. A later
+  raised constructor previously lost earlier handles while reporting refusal.
+  Two of four actual-handle controls fail before and all pass after; constructor
+  refusal seams are simulated, while pipes, foreign timer ownership, real abc
+  hashing, child reaping and zero retained handles are observed natively. Seven
+  registered regressions preserve nil/raised admission, exactly one error
+  callback, no spawn and inert cancellation. Existing path preflight, owner
+  isolation, hash/argv limits, NativeTimer and cleanup policies stay intact.
+  No memory-pressure failure or native kill/close-refusal debt is claimed.
+  macOS uses hs.hash and Windows Get-FileHash by source, without this libuv
+  allocation frame; foreign runtime suites remain deferred. No caller, shared
+  API, reserved surface or hosted CI changed.
+- [~] **L94.** Linux file write/append endpoint admission: pin a writable
+  nonblocking descriptor without truncation, require native regular-file
+  metadata, then reopen that exact inode for buffered overwrite or append.
+  FIFOs with or without readers, directories and sockets refuse without
+  blocking or emitting bytes. Regular symlinks, creation/umask and exact NUL/
+  UTF-8/CRLF bytes remain supported. Actual RLIMIT_FSIZE failures exercise
+  partial write and buffered close receipts; simulated path-edit timing and
+  metadata refusal are explicitly labeled over real native resources.
+  Twenty-four checks have ten original failures per FFI/luv backend and pass
+  after; Lua 5.4's actual luv backend also passes all twenty-four. Each case
+  checks descriptor retirement. Thirty-four simulated units and one native
+  matrix registration preserve existing write/close assertions. macOS's current
+  atomic overwrite already rejects nonregular destinations by source, while
+  its direct append still needs equivalent native admission; that reserved
+  native work and Windows runtime checks remain with the principal agent.
+  Windows FileOpen is not this Linux POSIX FIFO implementation. No claim of
+  atomic publication or recovery from ambiguous raw-close errors is added.
+  Register all three native backend runs without launching hosted CI.
+
+- [~] **L95.** Linux ProcessRunner partial allocation: capture stdout, stderr
+  and timer immediately inside the existing protected constructor block.
+  A later raised constructor previously hid one or two earlier native handles
+  from terminal cleanup. Two of four actual-handle controls fail before and all
+  pass after; nil/raised constructor receipts are explicitly simulated while
+  preceding libuv handles, foreign timer isolation, later real child output,
+  reaping and zero final handles are native. Seven registered regressions retain
+  all previous assertions, exactly one allocation-error callback and no spawn
+  or extra constructors after refusal. No OS memory-pressure, descriptor
+  exhaustion or new kill/close-refusal debt behavior is claimed. macOS's
+  hs.task and Windows's shell/native collaborators have no equivalent Linux
+  three-constructor frame by source; foreign runtime gates remain deferred.
+  The native fixture uses genuine handle ownership without recent-only libuv
+  introspection so current and verified Ubuntu 22.04 bindings are exercised;
+  stock Lua 5.4's actual native backend also passes. No caller, shared API,
+  reserved feature or hosted CI changed.
+
+- [~] **L96.** Linux queued WebView messages after retirement: reject every
+  captured native epoch that differs from the current page epoch, including
+  when public hide has removed the page. An actual WebKit document posts two
+  messages; an explicitly injected public-hide timing seam in the first
+  handler retires the real window before the second native signal arrives.
+  Original behavior executes an extra handler; four virtual-GUI receipts go
+  from three passing to all four passing, including a live control, healthy
+  sibling and explicitly reopened responding document. Five registered unit
+  regressions go from three passing to all five passing, preserving current
+  epochs and legacy epochless calls. GTK/WebKit execute under owned Xvfb,
+  Openbox and D-Bus with private profiles; this is no physical desktop claim.
+  Windows deferred dispatch already rejects reset/retired epochs; macOS
+  metrics delivery checks generations and exact owned WebViews by source.
+  Foreign runtime gates remain deferred. No titles, metrics policy, menus,
+  input, shared API or hosted CI changed.
+
+- [~] **L97.** Linux updater conditional cache completion: require the HTTP
+  adapter's existing completed-response receipt before reusing a cached page
+  for status 304. A native TLS server sends a new ETag in an interrupted 304
+  header, then performs a real TCP reset. Curl exits 56 while retaining status
+  304 and saving the new ETag; the original updater incorrectly reuses its old
+  release page. Refuse that incomplete response through the existing error
+  path, invalidating the page/validator association. Preserve the physical ETag
+  sidecar, omit conditional headers until a fresh complete 200, then resume
+  ordinary complete-304 reuse. Five actual TLS controls have two original
+  failures and pass after with current and verified Ubuntu 22.04 curl/libuv;
+  exact wire headers, one callback and native handle settlement are checked.
+  Four registered simulated completion-shape regressions preserve all existing
+  assertions and completed-304 fixtures now carry the actual empty-string
+  receipt. Register the native fixture for future Linux CI without launching
+  hosted workflows. Windows WinHttp rejects failed Send/Wait before cache
+  interpretation and its curl adapter publishes status only after successful
+  exit; macOS maps negative native network failure to status zero by source.
+  Foreign runtime gates remain deferred. No shared contract, release/install
+  behavior, reserved surface or native transport policy changed.
+
+- [~] **L98.** Linux native HTTP empty-field serialization: curl interprets
+  `Name:` as removal, silently omitting a caller's valid present-empty field.
+  Serialize empty or SP/HTAB-only values using curl's semicolon syntax after the
+  unchanged shared header validation. Preserve ordinary values, absent fields,
+  native default overrides and sensitive-header redirect policy across GET,
+  owned GET, POST and streaming POST. Fifty-six real native controls retain the original forty-four and add
+  twelve whitespace cases, passing after with current and verified Ubuntu
+  22.04 curl/libuv, plus stock Lua 5.4's actual native backend. Thirty-two wire
+  requests check field presence/defaults and redirect receipts; twenty-four
+  actual metadata refusals retain callback policy and never spawn curl. Sixteen
+  registered unit regressions preserve every previous HTTP assertion; exact
+  nonempty configuration bytes and narrow whitespace handling are checked. Register
+  both native interpreter runs for future Linux CI without launching workflows.
+  Windows's curl serializer has the same colon-only empty-value bug by source;
+  a matching native serialization proposal is documented without editing the
+  principal agent's driver. WinHttp and macOS consume native header maps;
+  foreign runtime qualification remains deferred. No common header policy,
+  duplicate-field rule, reserved surface or shared port changed.
+
+- [~] **L99.** Linux historical metrics calendar boundary: derive yesterday
+  from the already captured local date using native calendar normalization at
+  noon, instead of subtracting 86,400 elapsed seconds. A late 25-hour day had
+  duplicated today's rows into history; midnight after a 23-hour day had omitted
+  the preceding day's rows. Eight actual SQLite/public collector controls have
+  two original failures and pass after, conserving selected row bytes and
+  revision. The deterministic fixture explicitly supplies wall-clock input
+  while libc DST/date normalization, native CLI processes, database writes and
+  public range readers remain real. A separate actual-clock reproduction is
+  preserved. Six registered units cover ordinary/midnight/leap/month/year dates
+  and a clock crossing midnight after capturing today, with one original
+  failure; their CLI and clock inputs are explicitly simulated. Register the
+  native matrix for future Linux CI without launching hosted workflows.
+  macOS already derives the previous calendar day at noon; Windows uses native
+  DateAdd by source. No suitable shared exported calendar owner exists, so the
+  bounded Linux native calendar adapter follows that existing policy without
+  adding a framework. Foreign runtime gates remain deferred. Range selection,
+  date validation, persistence and reserved surfaces are unchanged.
+
+- [~] **L100.** Linux localectl variant alignment: preserve an empty first
+  variant slot instead of borrowing the second layout's variant. Real native
+  compilation, checked files and libxkbcommon capture/inverse resolution expose
+  three failures in eight controls before the fix and pass all eight after.
+  Three registered units cover empty, explicit and absent first variants plus
+  existing sibling parsers; one fails before and all pass after. Localectl's
+  text is supplied by fixtures; neither systemd nor a physical keyboard is
+  claimed. Register the native matrix for future Linux CI without launching
+  hosted workflows. Windows uses native keyboard-layout handles and macOS TIS
+  identifiers, so neither parses Linux variant lists; foreign runtime gates
+  remain deferred. Multi-group recovery and reserved input paths are unchanged.
+
+- [~] **L101.** Shared release asset JSON boundaries: use the existing pure
+  JSON decoder at the common asset selector instead of scanning balanced text.
+  Valid labels containing closing braces or brackets had hidden canonical
+  assets; nested uploader fields could supply a different identity or URL, and
+  escaped URLs retained raw JSON escapes. Preserve exact first matching asset
+  names and the existing string URL/empty refusal contract. Twenty new common
+  corpus vectors and a registered direct-type case retain every original
+  assertion: fifty-two focused checks have twelve failures before and pass
+  after. Eight real verified-TLS/public updater cases have six failures before
+  and pass after on current curl/LuaJIT, the signed Ubuntu 22.04 dependency mix,
+  and actual stock Lua 5.4. Each checks complete response bytes, one callback,
+  exact canonical URLs and native handle settlement; no archive is requested
+  or installed. Register both interpreters for future Linux CI without
+  launching workflows. Windows and macOS actual asset owners already inspect
+  decoded object fields by source; foreign runtime gates remain deferred.
+  Other parser helpers, URL admission, update policy and reserved surfaces
+  are unchanged; no duplicate Linux selector is introduced.
+
+- [~] **L102.** Shared release-notes JSON decoding: read the selected release
+  object's string body with the existing common decoder. Sequential manual
+  substitutions had corrupted literal backslash examples, left tab/Unicode
+  escapes encoded and captured extra metadata after empty/trailing-backslash
+  notes. Nested body/null fields could hide the real description. Decode once,
+  preserve the established Lua carriage-return removal and single return
+  value, and retain every prior assertion. Ten universal common vectors and
+  an explicit shared Lua contract cover twenty-one new registered checks;
+  all seventy-three focused checks pass after sixteen original failures.
+  Twelve real verified-TLS/public updater cases have eight original failures
+  and pass after on current curl/LuaJIT, signed Ubuntu 22.04 dependencies and
+  actual stock Lua 5.4. Preserve exact independently authored text, canonical
+  assets, complete responses, callback count and native handle settlement;
+  no archive is fetched or installed. Register both native interpreters for
+  future Linux CI without launching workflows. Windows already decodes the
+  universal escapes by source but retains distinct legacy wrapper, textual
+  field and CR behavior; those differences remain documented, unmodified and
+  unexecuted. macOS displays notes through the shared JSON.parse frontend.
+  This fix depends on L101's shared decoder import. Other parser helpers,
+  Markdown policy, native transports and reserved surfaces are unchanged.
+
+- [~] **L103.** Linux event-loop reentry ownership: retain a separate active-run
+  guard until the owning call requests cleanup. Calling stop then run inside
+  idle, periodic or deferred callbacks had overwritten the outer idle handle
+  and leaked it. Preserve stop semantics and reject reentry during that window;
+  normal or raised cleanup still permits later healthy runs. Nine real libuv
+  controls have four original failures and pass after on current LuaJIT,
+  actual stock Lua 5.4 and the signed Ubuntu 22.04 dependency mix. Exact native
+  handle inspection preserves a healthy foreign timer and proves final zero
+  owned handles; throwing callbacks and sequential restarts are exercised.
+  One start-refusal receipt is explicitly simulated after real activation.
+  Eight registered regressions retain every existing assertion and include the
+  native child fixture. Register both native interpreters for future Linux CI
+  without launching workflows. Windows SetTimer and macOS Hammerspoon timers
+  have no equivalent synchronous run/stop owner by source; foreign runtime
+  gates remain deferred. The separately diagnosed no-luv periodic clock issue
+  stays unmodified pending coordination; reserved surfaces are unchanged.
+
+- [~] **L104.** Shared selected-release tag decoding: read the release object's
+  own tag through the existing JSON decoder. Valid escaped tags were ignored,
+  while a preceding nested author tag could offer the wrong version. Preserve
+  the documented first-entry array wrapper, raw decoded string identity and
+  existing version/channel admission; do not fall through an unusable first
+  wrapper entry. Ten real verified TLS/public Linux updater controls have six
+  original failures and pass after on current LuaJIT, stock Lua 5.4 and the
+  signed Ubuntu 22.04 dependency mix. Full-list selection and stable/beta
+  controls remain intact; the server sees only release-list requests, with no
+  artifact fetch, installation or publication. Twenty shared Lua vectors and
+  one typed/single-return case retain all earlier corpus assertions: 94 focused
+  checks have 14 original failures and pass after. Register both native
+  interpreters for future Linux CI without launching it. macOS production
+  checks consume the corrected shared helper; Windows' analogous raw regex
+  flaw is documented with a source-only proposal, without editing its reserved
+  native work. Foreign runtime gates remain deferred. Depends on L101/L102.
+
+- [~] **L105.** Linux finite timer admission: use a tiny pure shared finite-number
+  predicate before native allocation. NaN or infinite seconds, and finite
+  seconds whose millisecond conversion overflows, had armed invalid timers;
+  NaN/infinite deferred work could remain permanently queued. Preserve ordinary
+  finite negative clamps, zero/fractional delivery and large finite delays;
+  introduce no native range ceiling. Twenty-four genuine libuv controls have
+  twelve original failures on current LuaJIT and signed Ubuntu 22.04 dependencies,
+  eight on stock Lua 5.4, then all pass. Stock54's four existing native conversion
+  refusals remain healthy controls. Callback delivery, cancellation, following
+  healthy work, deferred payload GC and exact final resources are exercised;
+  no backend is replaced in that fixture. Twenty-three registered checks have
+  twenty-one original failures and pass after; their adapter seams are explicitly
+  simulated and the native child is included. Preserve every existing assertion
+  and replay all nine native reentry controls across the three runtimes. Register
+  both native interpreters for future Linux CI without running workflows. Windows
+  already bounds native milliseconds by source; macOS protected construction
+  remains unexecuted and has a proposal reusing the common predicate. Foreign
+  gates stay deferred. The separate native huge-range and no-luv clock diagnoses
+  remain unmodified; physical input and reserved surfaces are unchanged.
+
+- [~] **L106.** Linux UTF-8 inverse-plan admission: validate the complete input
+  with the existing strict shared UTF-8 owner before checking layout availability
+  or walking characters. Malformed bytes could be skipped and return a partial
+  successful plan; rejected malformed sequences also reported invalid blockers.
+  Refuse every malformed input with nil/nil in both genuinely absent and loaded
+  map states. Preserve valid unsupported characters, empty/nonstring receipts
+  and the established first-byte blocker when a valid input has no loaded map.
+  Genuine native French compilation, owned file loading and libxkbcommon replay
+  pass all sixteen loaded-map controls after nine original failures; the public
+  absent/loaded availability fixture passes thirty-eight checks after eighteen
+  original failures. These cover the same nine malformed categories in both
+  states, not eighteen separate defects. Five registered cases have two original
+  failures and pass under LuaJIT and Lua 5.4, retaining every earlier assertion.
+  Registered table injection is simulated; actual native compilation and library
+  events require LuaJIT FFI and are not physical keyboard injection. Register the
+  two native fixtures for future Linux CI without launching it. No graphical
+  session or physical device is used. Shared scalar-validation policy is unchanged;
+  foreign adapters do not share this missing-table/plan API by source, and their
+  runtime gates remain deferred. Physical selection and reserved surfaces stay
+  unmodified.
+
+- [~] **L107.** Shared release publication-time decoding: read the selected
+  object's own string through the existing JSON decoder. Equivalent escaped
+  timestamps could falsely announce an older dev release, hide a newer release
+  or leave encoded bytes in offered/cache metadata; nested timestamps could
+  replace the release's own date. Preserve existing date/version/channel rules,
+  exact decoded identity and the selected-object contract; do not normalize dates
+  or add wrapper selection. Twelve real verified TLS/public Linux updater checks
+  have six original failures and pass after on current LuaJIT, stock Lua 5.4 and
+  signed Ubuntu 22.04 dependencies. Retain ordinary older/equal/newer notices,
+  same-channel up-to-date, typed refusal, exact complete response/callback/native
+  settlement and cache controls; no artifact is fetched or installed. Twenty
+  shared Lua vectors plus one typed/single-return case retain all earlier
+  assertions: 115 focused checks have eleven original failures and pass after.
+  All six other parser helpers remain byte-identical. Register both native
+  interpreters for future Linux CI without launching it. macOS production checks
+  use the corrected shared classification helper; Windows has the same raw-regex
+  issue by source, with a bounded proposal but no foreign implementation change.
+  Foreign runtime gates remain deferred. Depends on L104's shared tag decoding;
+  no timestamp policy, transport, frontend or reserved surface is changed.
+
+- [~] **L108.** Shared release prerelease metadata: decode the selected object's
+  own Boolean through the existing JSON owner. Escaped keys previously lost true;
+  nested true fields could override an own false or populate absent/null/string
+  metadata. Return true exclusively for an own Boolean true, preserving existing
+  false refusals and tag-registry channel/badge policies. Eight real verified
+  TLS/public Linux updater checks have five original failures and pass after on
+  current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 dependencies; complete
+  responses, callback settlement and offered/cache identity are retained. No
+  artifact is fetched or installed. Sixteen additive shared Lua vectors and one
+  typed/single-return case preserve all earlier 115 contracts: 132 focused checks
+  have ten original failures and pass after. All six other parser helpers remain
+  byte-identical. Register both native interpreters for future Linux CI without
+  launching it. Windows reads the first raw true/false token, with related key and
+  boundary flaws by source; the bounded proposal uses existing root-member spans
+  to distinguish Boolean true from numeric one. macOS shares the Lua corpus; no
+  additional live flag consumer or foreign runtime validation is claimed. Foreign
+  runtime gates remain deferred. Depends on L107's parser-contract stack; no
+  visible channel/badge correction, draft policy, transport or reserved change.
+
+- [~] **L109.** Linux native periodic-duration admission: apply L105's shared
+  finite-number policy to resolved seconds and converted milliseconds before
+  clamping or allocating `EventLoop.run` resources. NaN/infinities and conversion
+  overflow could create a dormant huge timer or unintended 1 ms repetition;
+  refuse them through existing run cleanup. Preserve numeric strings, default and
+  nonnumeric-default periods, finite negative/zero/fraction clamps, large finite
+  durations and idle-only calls with unused invalid periods. Sixteen actual
+  libuv cases have five original failures on current LuaJIT and signed Ubuntu
+  22.04 dependencies, three on stock Lua 5.4, and pass after. Real finite foreign
+  watchdogs bound observations; exact foreign ownership and healthy same-instance
+  restart survive every refusal. Seventeen registered cases have six original
+  failures and pass under LuaJIT and Lua 5.4; allocation/conversion seams are
+  explicitly simulated, with a separate real native child. Retain all earlier
+  assertions and reentry/stop ownership. Register future Linux CI without
+  launching it. Windows/macOS have different timer-owner APIs by source; no
+  foreign runtime validation is claimed. No maximum/native-width policy, callback
+  type, pump/clock, sleep-completion or reserved change.
+
+- [~] **L110.** Shared release-array admission: keep exact raw object spans and
+  publication order while refusing non-object root elements. The old brace-only
+  scan treated nested-array objects as releases; its entry count could still
+  match the decoded root count, admitting an unintended higher version. Reuse
+  the existing JSON decoder for whole-document admission and fence spans to
+  direct root-array objects, retaining existing decoder semantics and selected
+  release/version/channel policies. Eleven actual verified TLS/public Linux
+  updater checks have three original failures and pass after on current LuaJIT,
+  stock Lua 5.4 and signed Ubuntu 22.04 dependencies. Incomplete/trailing/mixed
+  payloads already refused by Linux remain healthy controls; do not count them
+  as new native regressions. Complete response/callback/handle/cache receipts,
+  ordinary releases, nested metadata, quoted delimiters and highest-version
+  selection survive. No artifact is fetched or installed. Sixteen additive
+  raw-span/shape vectors plus one typed/single-result case preserve all earlier
+  132 contracts: 149 focused checks have nine original failures and pass after.
+  All six other helpers remain byte-identical. Register future Linux CI without
+  launching it. macOS already validates decoded entry tags before this helper;
+  Windows's brace scanner has a related source-only gap and a bounded proposal.
+  Foreign runtime gates remain deferred. Depends on L108's parser-contract stack;
+  no JSON reencoding, new grammar, transport, frontend or reserved change.
+
+- [~] **L111.** Linux SQLite filesystem identity: represent every admitted
+  relative database filename with an explicit `./` prefix at the CLI argument
+  boundary. A bare `file:` path could open or mutate another database through URI
+  interpretation even though filesystem admission selected the literal file;
+  percent/query/fragment spellings, `:memory:` and leading dashes also changed
+  its meaning. Preserve absolute argument bytes, public diagnostic spellings,
+  shared SQL encoding, flags, scripts, schema and exit receipts. Thirty-five real
+  filesystem/SQLite/public Reader/Writer/Keylogger checks have 23 original
+  failures and pass after under current LuaJIT, stock Lua 5.4 and signed Ubuntu
+  22.04 luv/libuv dependencies. SQLite itself remains the container's binary in
+  that dependency mix; this is not a full Jammy SQLite/OS validation. Intended
+  files gain exact expected counters/raw software-event bytes while URI-decoy
+  files remain byte-identical; corrupt/missing/creation and ordinary/UTF-8/quote
+  controls survive. Four additive registered cases have three original failures
+  and pass; all 65 earlier command-owner cases remain, with 69 checks passing
+  under LuaJIT and Lua 5.4. Register future Linux CI without launching it. This
+  native filename representation has no dependency on queued SQL projection
+  fixes. Windows/macOS use native open APIs without CLI option parsing; their
+  compiled URI configuration is not validated, and explicit memory APIs must
+  not inherit this filesystem-only encoding. No physical input, foreign runtime,
+  TOML/configuration or reserved change.
+
+- [~] **L112.** Linux timer callback error isolation: use one pure shared error
+  description owner at the six callback reporting boundaries. Unprotected
+  `tostring` of an error table with a throwing formatter escaped `pcall` and
+  libuv's callback guard, terminating the interpreter with exit 255. Preserve
+  primitive diagnostic text and describe object types without running foreign
+  formatting code; no logger, callback execution or lifecycle refactor. Twelve
+  genuine native cases have six fatal object failures before and pass after on
+  current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 luv/libuv dependencies.
+  Each after/every/idle/periodic/registered-idle/deferred path retains an ordinary
+  string control, real 5 ms successor and 30 ms foreign watchdog; after correction
+  the formatter is never called, the watchdog survives owner cleanup and no
+  native handles remain. Fatal baseline processes never reach cleanup assertions;
+  do not certify their post-exit resources. Twenty-three registered tests have
+  six native failures and pass under LuaJIT and Lua 5.4; eleven pure helper cases
+  already pass before caller integration. Register the exact manual test manifest
+  and future native Linux CI without launching it. Existing finite/periodic,
+  reentry/stop and every other adapter body remain byte-identical. macOS has a
+  similar source-only error-formatting gap; Windows uses a different exception
+  reporting contract. Foreign runtime gates remain deferred, and no reserved
+  dynamic-hotstring owner, physical input or foreign source is changed.
+
+- [~] **L113.** Linux bracketed IPv6 provider ports: split the already admitted
+  bracketed host before its numeric port, retaining DNS/IPv4 parsing and all
+  existing guards and reason strings. Valid local IPv6 inference endpoints
+  previously failed host admission before native dispatch. Eight public provider
+  checks have four original failures and pass after on current LuaJIT, stock
+  Lua 5.4 and signed Ubuntu 22.04 luv/libuv dependencies. Four independent real
+  IPv6 curl controls verify owned TLS; eight public IPv4/IPv6 requests then
+  retain exact model, authentication, Unicode prompt and generation fields,
+  terminal callbacks, child exits and zero remaining native handles. Forty
+  registered cases pass on both runtimes; the seven baseline failures comprise
+  five valid-address cases and two invalid-port diagnostic-routing checks.
+  Invalid ports remain refused. Preserve every earlier provider assertion and
+  callback manifest entry; register future Linux CI without launching it.
+  macOS already splits bracketed hosts explicitly, and Windows has no matching
+  DNS-only splitter by source inspection; foreign native behavior is untested.
+  No persistence, transport, menu, general URL grammar or physical input change.
+
+- [~] **L114.** Linux SQLite metadata scalar fidelity: quote the selected value
+  with native `json_quote` and decode it through the existing shared JSON owner
+  after the unchanged checked scalar receipt. Raw CLI text stopped at NUL, and
+  first-line framing stopped at LF although SQLite stored the complete value.
+  Twenty genuine filesystem/SQLite/public metadata checks have eleven original
+  failures and pass after under current LuaJIT, stock Lua 5.4 and signed Ubuntu
+  22.04 luv/libuv dependencies. Independent `hex(value)` verifies complete stored
+  bytes, including NUL suffixes; missing/empty, Unicode, quotes, compact cursor,
+  actual CLI refusal and same-owner retry controls remain. SQLite remains the
+  container binary in the Jammy dependency mix. Twenty additive registered cases
+  pass on both runtimes; fourteen baseline failures cover seven framing vectors
+  and seven malformed/non-string adapter responses. Preserve every earlier
+  writer assertion and all other writer bodies. Register future native Linux CI
+  without launching it. This repairs supported metadata API fidelity, without
+  claiming corruption of ordinary compact production migration cursors. macOS
+  avoids CLI line framing through native rows; its NUL binding is untested.
+  Windows has a possible source-only zero-terminated TEXT analogue that requires
+  its native owner's diagnosis. No foreign, physical input, TOML, schema, generic
+  query, migration, cache or flush change.
+
+- [~] **L115.** Linux provider-error completion admission: use one pure shared
+  predicate to refuse any own root `error` field before extracting chat text,
+  including explicit null or false. Canonical decoy completion fields previously
+  escaped that error envelope. Preserve nested/inherited metadata, first-part
+  selection, the existing empty-reply outcome and every original parser vector.
+  Twenty-three genuine verified TLS/public provider calls have twelve original
+  failures and pass on current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04
+  curl/luv/libuv dependencies. Complete independent response bytes, child exit,
+  one terminal callback, successful chunks or absent error chunks and zero native
+  handles remain checked. Forty-one registered provider tests pass on both
+  runtimes; introducing the pure helper before caller integration reproduces
+  twelve actual extraction failures while the earlier seventeen tests stay green.
+  Register future Linux CI without launching it. Windows already checks root
+  error-field presence by source; macOS needs a classifier guard and native
+  nested-null retention validation before claiming equivalent coverage. An
+  earlier unprinted callback recorder failure in the unchanged HTTP fixture
+  remains unresolved; passing original-source replays do not prove its cause.
+  No foreign native gate, transport, Backboard/decisions, menu, persistence,
+  multipart-policy or physical input change.
+
+- [~] **L116.** Linux structured completion syntax admission: use the existing
+  canonical strict JSON decoder at this response boundary instead of the legacy
+  decoder that normalizes malformed escapes and accepts invalid number grammar.
+  Preserve the preceding own-error guard, first-part/candidate selection, typed
+  refusals, Unicode bytes and the existing empty-reply result. Fifty-four actual
+  verified TLS/public provider requests have thirty original failures and pass
+  after under current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 curl/luv/libuv
+  dependencies. Eighteen vectors have independently rejected JSON grammar;
+  twelve are existing strict-owner refusals for duplicate keys, lone surrogates
+  and non-finite decoded numbers, and twenty-four are healthy controls. They do
+  not represent thirty separate bugs. Exact wire bodies, curl exit, terminal
+  callback, chunk policy, retries and zero native handles remain asserted. All
+  ninety-five provider unit cases pass on both runtimes, retaining the preceding
+  forty-one and the unchanged universal forty-seven-vector corpus. Register future
+  Linux CI without launching it. Windows has source-level grammar/finite/surrogate
+  guards but currently permits duplicate keys; macOS native decoder behavior must
+  be measured independently before changing its owner. No shared decoder policy,
+  legacy caller, foreign native gate, transport, Backboard/decisions, menu,
+  persistence, multipart policy or physical input change.
+
+- [~] **L117.** Linux provider error-message UTF-8 boundaries: use one shared
+  byte-prefix helper at the existing selected diagnostic field. Retain the
+  200-byte ceiling and longest complete prefix of valid source text instead of
+  cutting a multibyte scalar in half. Preserve field priority, empty explanations
+  and pre-existing malformed-source raw-prefix behavior; this does not repair or
+  newly admit malformed provider strings. Forty-five actual verified TLS/public
+  provider HTTP 401 calls have twenty-four original boundary failures and pass
+  after on current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 curl/luv/libuv
+  dependencies. Independent Python prefixes, complete `error_body`, empty success
+  body, curl exit 22/signal zero, one callback, no chunks and zero native handles
+  remain checked. Six shared-helper cases and forty-seven provider cases pass
+  on both runtimes, covering scalar splits, byte budgets, invalid arguments,
+  ordinary controls and explicit unchanged malformed-source behavior. Preserve
+  earlier helpers, provider owners and manual callback/IPv6 manifest entries;
+  register future Linux CI without launching it. macOS has the same source byte
+  cut and can adopt the shared helper after native validation. Windows has a
+  different UTF-16 unit ceiling and ellipsis; supplementary-pair safety needs
+  its own native proof. No foreign source/runtime, decoder policy, transport,
+  menu, persistence, physical input or character-budget expansion.
+
+- [~] **L118.** Linux XKB outer-block quoted metadata: locate block keywords and
+  structural openers outside quoted strings, then balance only unquoted braces.
+  Quoted type/level names could select a false symbols block, and group metadata
+  braces truncated its body. Preserve exact raw body bytes and refuse unfinished
+  strings; no comment/angle grammar, normalization, group or shortcut policy.
+  Sixty-four native checks over eight genuinely compiled and canonically retained
+  maps have twenty-five original failures and pass after under current libraries
+  and signed Ubuntu 22.04 luv/libuv dependencies. libxkbcommon remains the
+  container library in that mix. Native a/q/2 oracles, checked files, complete
+  entry floors and public layout refresh/base labels remain checked. Twenty-five
+  additive pure cases have twelve original failures and pass under LuaJIT and
+  Lua 5.4, including escaped-byte parity and unfinished input. Preserve all
+  earlier assertions and helpers after the block reader; register future Linux
+  CI without launching it. Native fixtures require LuaJIT FFI, so stock Lua 5.4
+  validates only the pure matrix. Initial dispatcher setup failures are retained
+  separately; corrected native baseline loads the exact saved HEAD parser source
+  without replacing production files. Windows/macOS use different native layout
+  owners, with no equivalent text parser by source inspection; foreign native
+  behavior is untested. Per-key definitions, symbols-looking quoted lists and
+  angle-name lexical gaps remain separate. No display, device, physical magic
+  selection, repeat, recovery or reserved shortcut change.
+
+- [~] **L119.** Linux XKB quoted key definitions: iterate real declarations
+  outside quoted metadata and reuse the existing quote-aware block owner to
+  return exact complete definitions. Per-key type names containing braces could
+  truncate definitions; quoted phantom declarations also created false parser
+  entries. Preserve every earlier scanner, list/group/keycode/keysym expression
+  and fallback priority. Seventy-two native checks over eight genuinely compiled
+  canonical maps have nine original failures and pass under current libraries
+  and signed Ubuntu 22.04 luv/libuv dependencies; native libxkbcommon remains the
+  container library in that mix. Retained hostile literals, independent native
+  a/q/2, public checked-file refresh/base labels and phantom-entry refusal remain
+  checked. The phantom-only case repairs a parser contract, without claiming a
+  previously wrong public label. Sixteen additive pure cases have eight original
+  failures and pass under LuaJIT and Lua 5.4; all preceding fifty-two assertions
+  and the earlier sixty-four native checks remain green. Register future Linux CI
+  without launching it. Stock Lua 5.4 native FFI is unexecuted; Windows/macOS have
+  different native layout owners and foreign runtime behavior is untested. Quoted
+  symbols-looking lists and angle-name lexical gaps remain separate. No display,
+  physical device, magic selection/repeat/recovery, reserved shortcut, comment
+  grammar, normalization or group policy change.
+
+- [~] **L120.** Linux XKB quoted symbol-list metadata: match the existing
+  explicit Group1 and fallback list patterns only outside quoted metadata.
+  A symbols-looking type name produced a wrong public base label (`z` instead
+  of native `a`). Reuse the unchanged quote skipper and preserve exact captured
+  bytes, explicit priority, fallback/index/group behavior and keysym spelling.
+  Sixty-four real native checks over eight compiled canonical maps reproduce
+  ten failed observations of this single defect and pass under current native
+  libraries and signed Ubuntu 22.04 luv/libuv dependencies; native XKB remains
+  the container library. Independent native a/q/2, exact hostile literals/raw
+  bodies, checked file publication and actual public refresh remain required.
+  Twenty additive pure cases reproduce ten failures and pass under LuaJIT and
+  Lua 5.4; all preceding sixty-eight assertions stay unchanged. Earlier native
+  block64/key72 regressions replay green under both mixes. Stock Lua 5.4 native
+  FFI and foreign runtime behavior are unexecuted. Windows/macOS use different
+  native layout APIs, with no equivalent text parser by source inspection.
+  Register future Linux CI without launching it. Angle-name lexical gaps and
+  wider raw-input grammar remain separate. No physical magic, reserved shortcut,
+  display/device, normalization, comment grammar or group policy change.
+
+- [~] **L121.** Linux native application category/score edit: publish the
+  existing category UPDATE and score INSERT in one checked SQLite transaction.
+  Previously a score-write refusal could leave the category changed and report
+  success. Native statement errors now stop before COMMIT; closing the native
+  connection rolls back the unfinished edit, including AFTER trigger FAIL
+  effects. Fifteen genuine Bridge/Keylogger/Writer/SQLite checks reproduce
+  three failures and pass under current LuaJIT, signed Ubuntu 22.04 luv/libuv
+  dependencies and Lua 5.4; SQLite/kernel/libc stay current in the mixed profile.
+  Retain unchanged category/score/cache on ABORT and FAIL, truthful saved replies,
+  healthy retries, existing defaults/floors/filtering/escaping and CRLF/Unicode
+  controls. Writer-only NUL hex/value fidelity is checked separately; the older
+  fourteen-case diagnostic retains its unresolved Reader NUL projection and
+  is not claimed green. Six additive command-adapter unit cases reproduce two
+  failures and pass on both Lua runtimes, with every previous assertion intact;
+  prior native metadata20 remains green on all three profiles. Register future
+  Linux CI without launching it. This proves statement-error rollback; a lost
+  receipt after successful COMMIT remains outside this guarantee. macOS uses
+  one categories-object publication; Windows has a different category-only
+  sidecar and no equivalent two-statement SQL action by source inspection.
+  Foreign native behavior is untested. No Reader/schema/cache/flush/TOML,
+  physical input or reserved title/shortcut change.
+
+- [~] **L122.** Linux update release-page admission: use the existing shared
+  strict JSON decoder at the completed-page boundary. Legacy decoding could
+  offer a release from malformed grammar, duplicate keys, lone surrogates or
+  nonfinite metadata; duplicate selected tags could change the offered version.
+  Change one decoder call while keeping the legacy API, shared release parser,
+  tag/assets/notes/publication/prerelease selectors, channels, transport and
+  caching byte-identical. Thirty-four real verified-TLS/public updater checks
+  reproduce twenty-two wrong offers (eight grammar cases plus fourteen existing
+  strict-policy controls) and pass on current LuaJIT, signed Ubuntu 22.04
+  curl/luv/libuv dependencies and Lua 5.4. The mixed profile retains current
+  kernel/Lua/libc. Twelve native healthy controls retain tag, canonical download
+  and checksum URLs and cache identity; thirty-four scripted unit cases retain
+  those fields plus notes/time/prerelease and pass on both Lua runtimes. Every
+  prior parser assertion stays intact. Six unchanged native updater fixtures
+  totaling sixty-one checks remain green under all three configurations.
+  Native curl exits/status/full bytes, one callback and zero handles are required.
+  Register future Linux CI without launching it. macOS uses native hs.json
+  admission whose strict-policy details are unmeasured; Windows uses nonempty
+  payload/span parsing by source inspection. Keep foreign diagnoses separate
+  and leave their native gates to the principal agent. No release publication,
+  website, transport, persistence, physical input or reserved policy change.
+
+- [~] **L123.** Linux modifier-hold statistics projection: publish the existing
+  shared `s/n/m/tap/hold` record names instead of leaking native SQL column names.
+  SQLite stored correct sums/counts/maxima, but Apps displayed zero duration and
+  event counts and Typing displayed an em dash. Change exactly five keys in three
+  Reader lines; keep SQL SUM/MAX, defaults, numeric values/rounding, filters,
+  Writer/schema, shared contract and consumers identical. Twelve real public
+  Writer/SQLite/Reader checks reproduce eight failures and pass under current
+  LuaJIT, signed Ubuntu 22.04 luv/libuv dependencies and Lua 5.4; SQLite/kernel/
+  libc remain current in the mixed profile. Independent SQL establishes totals,
+  maximum across devices, legitimate zero and existing fraction-floor controls.
+  Separately run five actual Apps/Typing consumer checks on each native manifest:
+  four fail before and all pass after, restoring 1570 ms/seven samples and the
+  300 ms/600 ms Typing figures. Node VM supplies explicitly simulated DOM/state;
+  this is software integration, without a browser session or physical tap-hold
+  validation. Eight new registered unit cases fail before and pass on both Lua
+  runtimes, preserving every previous owner assertion. The final CJS refuses a
+  failed native child before consumer checks; its after run validates both layers.
+  Register future Linux CI without launching it. Windows already emits canonical
+  fields; macOS emits sum/count/max/tap/hold by source inspection, retaining a
+  separate duration/count/maximum diagnosis without a native run or foreign edit.
+  No alias policy, SQL/schema/cache/flush, physical hook/remap, magic/shortcut,
+  persistence, brightness or title change.
+
+- [~] **L124.** Linux supplied burst histogram keys: encode complete JSON keys
+  with the existing shared codec instead of escaping only quotes. Backslash-b
+  changed the stored key bytes; backslash-l and literal controls produced invalid
+  JSON and refused the next merge. Normal collection uses numeric and `500+`
+  labels and stays unchanged. Eighteen real public Writer/SQLite checks reproduce
+  five failures and pass under current LuaJIT, signed Ubuntu 22.04 luv/libuv
+  dependencies and Lua 5.4; SQLite/kernel/libc remain current in the mixed profile.
+  Independent native `json_valid` and `json_each`/`hex(key)` assertions cover
+  supplied key bytes, repeated writes, filtering, floors, empty defaults and a
+  genuine SQLite statement refusal/retry. Eight registered scripted unit cases
+  reproduce three failures and pass on both Lua runtimes; every prior owner
+  assertion stays intact. Existing category and metadata native regressions
+  remain green under all three configurations. Reuse the already imported shared
+  JSON encoder, retaining caller data, counts, SQL/schema and all other Writer
+  paths. Register future Linux CI without launching it. Check Windows and macOS
+  histogram serialization by source inspection; leave their native gates to the
+  principal agent. NUL-key projection is a separate diagnosis outside this fix.
+  No collection policy, cache/flush, persistence, reserved surface or physical
+  keyboard validation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
