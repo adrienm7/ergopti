@@ -3896,6 +3896,8 @@ Windows explicit cleanup now offers the complete retired ahk root in dotted assi
 
 The trusted macOS/Linux native cleanup owners now preview and explicitly remove wholly unread dotted, inline and table-array roots through authenticated source ranges. Generic source-only cleanup and ordinary writes retain their previous contracts. Private receipts bind exact record/source/path identity and recheck the actual unread collector before backup, after verified backup and before native conditional publication. Protected or partially consumed roots remain untouched; raw selection identity and plain-array admission refuse equality proxies. Independent actual private-file Linux67/0 passes both runtimes and controlled macOS82/0 passes Lua5.4; previous producers fail22 new cases. No retired-root catalogue is inferred, and quoted root assignments containing equals remain conservatively unavailable. Actual Hammerspoon, Windows and final native/installed qualification remain separate.
 
+Native Windows diagnostics executed the complete root cleanup subjects but three shared neighbor checks used a comma expectation for an existing pipe-delimited diagnostic joiner. The successor additionally requires Array shape, length, Integer kinds and both original ordered values before the correct pipe expectation. Production cleanup and all other asserted neighbors remain unchanged. Source review is clear; actual Windows rerun remains required.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -4571,6 +4573,8 @@ The fixed separator after the native About build/version row now comes from one 
 
 The packaged macOS About check row now consumes its existing shared command and readiness getter. Both manual and offered-release callbacks retain the actual shared live-admission wrapper; the original strict tag/channel consent body and every prior registered assertion remain byte-exact. Independent Lua5.4 passes36/0; original provider30/6 and the discarded direct-callback override34/2 prove the regressions. Raw LuaJIT fails at the inherited fixture table.pack boundary; explicit fixture-only compatibility replay is recorded separately. The unchanged scanner measures Windows82/macOS123/Linux92. Actual native CI, installed menu acceptance and other fixed families remain required. The registered provider dialect guard now verifies actual declared rendering, manual/offered dispatch and stale-offer refusal instead of the retired caption location. Its six other About predicates and original assertion message remain exact; independent current11/0, original/current7/1, original/old8/0 and strengthened/old8/3 distinguish the regression.
 
+The newly registered Windows Wrap provider controls now load the actual seven-group shared catalogue, while the older two-pair transaction fixture and all its assertions remain untouched. Actual renderer acknowledgement counts labelled rows, and independent Win32 item/position/caption checks require all15 native rows including3 separators. The handwritten corpus is unchanged; source review is clear and native rerun remains required.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4825,6 +4829,8 @@ The composed 2026-10-05 source census is Windows 83, macOS 126 and Linux 93 afte
 The About build/version separator now consumes the same shared fragment on all three drivers. Independent actual provider and mutation controls retain all earlier assertions; the unchanged source scanner measures Windows82/macOS124/Linux92 fixed sites. Native Windows and final three-OS qualification remain required. Other fixed provider families stay open.
 
 The packaged macOS About check uses the existing shared command for both native callbacks, preserving offered-release consent and declaration withdrawal refusal. Its actual owning scanner lowers only macOS124 to123 fixed sites; Windows82 and Linux92 remain. Final native qualification and the remaining fixed families stay open.
+
+Windows Wrap validation now observes its actual shared catalogue and separately checks labelled acknowledgement and all15 Win32 rows with3 separators. Production rendering and independent catalogue expectations remain unchanged; this fixture correction needs actual Windows rerun and does not complete the remaining menu families.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
