@@ -67,6 +67,20 @@ expectation, native assertion or corpus was weakened. These faithful native
 doubles do not qualify actual task/shutdown acceptance. The runtime, production
 termination coordinator and remaining WP3/WP4 work stay unactivated.
 
+The next matched-delivery slice retains immutable original press attribution
+per exact capture/device/cookie, resolves entire privacy intervals and transfers
+one HID-derived release to the existing real LogManager FIFO. Whole raw batches
+qualify before callbacks; constructor-bound ports and immediate revocation fences
+protect mutation and reentry. Native clock acceptance precedes the mandatory
+production interval/release ports. Independent original-source controls pass121
+cases/fail19; four additional controls fail against the first private candidate
+and the reviewed final private tree passes140/0. Existing119 controls, all old
+assertions and frozen corpora remain unchanged. Full root gates pass formatting,
+357 JS checks,14,168 portable macOS units in1,491 modules and101 stubbed E2E
+checks with one explicit skip. Actual native qualification is still pending;
+production activation/history/recovery/shutdown are not implemented by this
+prerequisite.
+
 ## Pushed changes
 
 | Commit                                     | Scope                                                                                 |
@@ -231,6 +245,15 @@ collect the remaining physical checks together after CI has resolved everything
 it can prove. Hardware double results cannot close these acceptance requirements.
 
 ## Native CI status
+
+Most recent exact-source manual run37252831698 at pushed7e5abf006 selects
+macOS only. Shared Core and portable macOS units/E2E pass; native release build
+and311 XCTest cases execute. Raw artifact11321921834 confirms309 passed and
+two failed cases (Brew/Sparkle prerequisites), with seven assertion failures/two
+unexpected. All logger and keyboard cases pass. Packaging and installation
+remain unqualified; Linux/Windows and Release are skipped. The exact-SHA census
+finds only this retained terminal manual run. No final integration lock/ref or
+dev push has occurred. These sources precede the matched-delivery slice above.
 
 Manual run37238984667 tested CI SHA
 `e405575f60a078866468057b05952f3df9ee821b`, whose tree exactly equals feature

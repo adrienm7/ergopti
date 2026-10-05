@@ -367,6 +367,55 @@ end)
 -- ===========================================
 
 helpers.describe("log_manager append transaction ownership", function()
+	helpers.it("owns an acknowledged matched press and release in FIFO order across storage refusal", function()
+		with_fixture(function() return load_log_manager_fixture(1) end, function(fixture)
+			local Delivery = require("modules.keylogger.physical_delivery")
+			local Clock = require("modules.keylogger.physical_clock")
+			local Context = require("modules.keylogger.physical_context")
+			local Frames = require("tests.support.physical_stream_frames")
+			local convert = Clock.new({ version = 1, domain = "mach_absolute_time", numer = 125, denom = 3 })
+			local history = Context.new(4, function() return "2026-10-04 23:59:59.500" end)
+			history.observe(0, { allowed = true, app = "Original", epoch = 1000 })
+			history.observe(1100000000, { allowed = true, app = "Later", epoch = 2000 })
+			local frames = Frames.new("holds-outbox", "8", { "41" })
+			for _, frame in pairs(frames) do frame.coverage = "complete" end
+			helpers.assert_true(fixture.mode.select_stream("holds-owner"))
+			local receiver = Delivery.new({ batch_limit = 8,
+				admit = function()
+					helpers.assert_true(fixture.mode.admit("holds-owner", "holds-outbox/8", "complete"))
+					return "holds-outbox/8"
+				end,
+				keycode = Frames.keycode,
+				context = function(ticks) return history.resolve(convert(ticks)) end,
+				emit = fixture.manager.log_physical_press,
+				holds = { convert = convert,
+					context = function(first, last) return history.resolve_interval(convert(first), convert(last)) end,
+					emit = fixture.manager.log_physical_release },
+			})
+			Frames.start(receiver, frames)
+			-- Delivery uses the retained decision, not the current disabled/private state.
+			fixture.state.is_enabled, fixture.state.is_private_window = false, true
+			local function row(sequence, ticks, value)
+				return { sequence = sequence, timestamp = ticks, device = "41", page = 7, usage = 44,
+					has_page = true, has_usage = true, has_cookie = true, cookie = 44, value = value }
+			end
+			local receipt = receiver.deliver({ version = 1, kind = "batch", coverage = "complete",
+				incarnation = "holds-outbox", lease = "8", records = {
+					row("1", "24000000", "1"), row("2", "30120000", "0") } })
+			helpers.assert_eq(receipt, "2", "Both real FIFO owners accept before acknowledgement")
+			helpers.assert_eq(fixture.appended, {}, "FIFO ownership is not durable storage")
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended, {}, "Refused storage retains the actual ordered FIFO")
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended, {
+				{ type = "system_event", action = "physical_press", capture = "holds-outbox/8", device = "41",
+					keycode = 49, app = "Original", timestamp = "2026-10-04 23:59:59.500" },
+				{ type = "system_event", action = "physical_release", capture = "holds-outbox/8", device = "41",
+					keycode = 49, app = "Original", timestamp = "2026-10-04 23:59:59.500", hold_ms = 255 },
+			})
+		end)
+	end)
+
 	helpers.it("owns a copied physical release and retains it across storage refusal", function()
 		with_fixture(function() return load_log_manager_fixture(2) end, function(fixture)
 			local release = { capture = "sink-test", device = "18446744073709551615", keycode = 53,

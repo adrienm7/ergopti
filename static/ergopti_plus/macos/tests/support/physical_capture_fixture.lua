@@ -12,7 +12,7 @@ function M.run(callback)
 		"infra.logger", "modules.keylogger.physical_capture",
 		"modules.keylogger.physical_accounting_mode",
 	}, function()
-		local observed = { tasks = {}, spawns = {}, warnings = {}, errors = {}, credits = {}, writes = {}, clocks = {} }
+		local observed = { tasks = {}, spawns = {}, warnings = {}, errors = {}, credits = {}, releases = {}, writes = {}, clocks = {} }
 		local logger = helpers.make_logger_stub()
 		function logger.warn(_, message, ...) observed.warnings[#observed.warnings + 1] = string.format(message, ...) end
 		function logger.error(_, message, ...) observed.errors[#observed.errors + 1] = string.format(message, ...) end
@@ -56,8 +56,10 @@ function M.run(callback)
 				return true
 			end,
 			context = function() return { allowed = true, app = "ObservedApp", timestamp = "2026-09-12 12:00:00.000" } end,
+			context_interval = function() return { allowed = true } end,
 			keycode = Frames.keycode,
 			emit = function(press) observed.credits[#observed.credits + 1] = press; return true end,
+			emit_release = function(release) observed.releases[#observed.releases + 1] = release; return true end,
 		}
 		controls.dependencies = dependencies
 		controls.options = { executable = "/owned/runtime/karabiner_cli", arguments = { "--hs274-capture", "25" },

@@ -1687,8 +1687,8 @@ lock refusal. No physical magic-key acceptance is inferred.
   calendar date; cancel the entire duration across any pause, private interval
   or capture/source gap. Privacy cancellation is the maintainer's explicit
   decision; initial-press attribution follows the delegated routine decisions.
-  Matched delivery and production history wiring still need implementation;
-  every new hold prerequisite still needs native acceptance.
+  Production history wiring, bounded recovery and controlled shutdown remain
+  incomplete; every new hold prerequisite still needs native acceptance.
   About 30-40 agent-days plus maintainer
   hardware time.
 
@@ -1785,6 +1785,24 @@ shutdown without wiring the production termination coordinator, enabling capture
 or completing WP3. Full selected gates pass formatting,357 JS checks,14,147
 portable macOS unit cases in1,490 modules and101 stubbed E2E checks with one
 explicit skip. Real native task/shutdown acceptance remains required.
+
+Matched delivery now retains each permitted fresh press under its exact capture,
+device and element cookie, and emits one HID-derived physical release through
+the existing ordered LogManager sink. Original application/date survive delayed
+delivery and app changes; any forbidden observation cancels the entire duration.
+Inherited, repeated, unmapped and unmatched releases cannot credit a hold.
+Whole-batch identity qualification precedes external callbacks; captured ports,
+copied records and revocation fences prevent callback mutation from changing a
+later duration or repairing invalid input. Production capture requires explicit
+interval/release ports and uses only its accepted native clock converter.
+Independent original-source controls pass121 cases and fail19 new cases;
+the first private candidate fails four further callback/mutation controls. The
+reviewed private composition passes140 cases, including the real LogManager
+FIFO/storage-refusal replay. Full selected gates pass formatting,357 JS checks,
+14,168 portable macOS units in1,491 modules and101 stubbed E2E checks with one
+explicit skip. Actual native acceptance remains pending. Production history,
+recovery and shutdown wiring remain open;
+this dormant prerequisite does not complete WP3 or enable the owned runtime.
 
 ## Remaining work after the 2026-09-30 releases
 

@@ -131,19 +131,20 @@ function M.new(descriptor)
 		end)
 	end
 
-	--- Advances state for all raw observations, crediting only fresh post-opening presses.
-	--- A release inherited from a held key updates state without creating a press.
+	--- Advances state once and reports qualified post-opening transitions.
+	--- An inherited release reports a transition without an owned matched press;
+	--- matching and historical permission remain the delivery owner's obligation.
 	---@param row table Raw row whose sequence, usage flags and timestamp were validated.
-	---@return boolean press
-	function baseline.press(row)
+	---@return string|nil transition "press", "release", or no qualified transition.
+	function baseline.transition(row)
 		return guarded(function()
 			assert(status == "ready", "Physical baseline is not ready")
 			local device = devices[row.device]
 			assert(device, "Physical event has no baseline device")
-			if not row.has_page or Wire.KEY_PAGES[row.page] ~= true then return false end
+			if not row.has_page or Wire.KEY_PAGES[row.page] ~= true then return nil end
 			assert(row.page ~= Wire.PAGE_KEYBOARD or device.keyboard, "Keyboard input arrived on a consumer interface")
 			assert(row.has_usage, "Physical key usage is missing")
-			if row.usage == 0 or row.usage == -1 then return false end
+			if row.usage == 0 or row.usage == -1 then return nil end
 			Wire.integer(row.usage, 1, usage_max(row.page))
 			assert(row.has_cookie == true, "Physical element cookie is missing")
 			local key = device.keys[Wire.integer(row.cookie, 0, 4294967295)]
@@ -156,13 +157,19 @@ function M.new(descriptor)
 				and (timestamp ~= key.last_at or down == key.last_down)), "Physical element chronology changed")
 			assert(timestamp ~= key.frontier or down == key.initial, "Physical observation contradicts baseline")
 			key.last_at, key.last_down = timestamp, down
-			if not Wire.less(key.frontier, timestamp) then return false end
+			if not Wire.less(key.frontier, timestamp) then return nil end
 			local changed = key.down ~= down
 			assert(not changed or timestamp ~= boundary, "Physical transition is ambiguous at opening")
 			key.down = down
-			return changed and down and Wire.less(boundary, timestamp)
+			if changed and Wire.less(boundary, timestamp) then return down and "press" or "release" end
+			return nil
 		end)
 	end
+
+	--- Preserves the press-only contract while advancing the same qualified state.
+	---@param row table Raw observation whose common fields were already validated.
+	---@return boolean press Fresh post-opening down; releases never create a press.
+	function baseline.press(row) return baseline.transition(row) == "press" end
 
 	return baseline
 end

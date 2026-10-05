@@ -173,7 +173,7 @@ local function publish_clock(candidate)
 		unavailable(candidate, "clock_context_refused", "Context owner refused the validated native clock")
 		return
 	end
-	candidate.clock_published = true
+	candidate.clock_published, candidate.convert = true, convert
 	start_stream(candidate)
 end
 
@@ -281,13 +281,16 @@ end
 --- The caller owns retained privacy/time context and the acknowledged log sink.
 --- clock_ready(information, convert) must return literal true after accepting the
 --- native timebase; context still resolves original ticks through that owner.
----@param ports table spawn, decode, encode, clock_ready, context, keycode and emit callbacks.
+--- context_interval(first_ticks, last_ticks, device) must resolve the entire
+--- retained interval; emit_release transfers the approved match to its FIFO.
+---@param ports table spawn, decode, encode, clock_ready, context, context_interval, keycode, emit and emit_release.
 ---@return boolean initialized
 function M.init(ports)
 	if dependencies then return false end
 	assert(type(ports) == "table", "Missing physical capture native ports")
 	local snapshot = {}
-	for _, name in ipairs({ "spawn", "decode", "encode", "clock_ready", "context", "keycode", "emit" }) do
+	for _, name in ipairs({ "spawn", "decode", "encode", "clock_ready", "context", "context_interval",
+		"keycode", "emit", "emit_release" }) do
 		assert(type(ports[name]) == "function", "Missing physical capture port: " .. name)
 		snapshot[name] = ports[name]
 	end
@@ -330,6 +333,19 @@ function M.start(options)
 				and Accounting.admitted_capture() == press.capture, "Physical capture publication was revoked")
 			return dependencies.emit(press)
 		end,
+		holds = {
+			convert = function(ticks)
+				assert(current(candidate) and candidate.state == "capturing" and candidate.clock_published,
+					"Physical hold clock was revoked")
+				return candidate.convert(ticks)
+			end,
+			context = dependencies.context_interval,
+			emit = function(release)
+				assert(current(candidate) and candidate.state == "capturing"
+					and Accounting.admitted_capture() == release.capture, "Physical capture publication was revoked")
+				return dependencies.emit_release(release)
+			end,
+		},
 	})
 	local previous = session
 	session = candidate
