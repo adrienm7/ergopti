@@ -315,3 +315,119 @@ helpers.describe("system metrics: network changes", function()
 	end)
 
 end)
+
+
+helpers.describe("system metrics: owned restart hydration", function()
+	local function persisted(date, awake)
+		return {
+			date = date, wifi_changes = 4, space_switches = 0,
+			battery_sum = 150, battery_count = 2, battery_min = 70, battery_max = 80,
+			audio_muted_ms = 1000, locked_ms = 2000, sleep_ms = 3000, awake_ms = awake,
+			passive_count = 0, night_wake_count = 0,
+		}
+	end
+
+	helpers.it("hydrates the owned cumulative row before its first sample", function()
+		with_shell({}, function(metrics)
+			metrics.bind("owned-a", "device-a", function(date) return persisted(date, 4000), true end)
+			local day = metrics.sample(500000, "2026-10-05")
+			helpers.assert_eq(day.awake_ms, 4000)
+			helpers.assert_eq(day.wifi_changes, 4)
+			helpers.assert_eq(day.locked_ms, 2000)
+			helpers.assert_eq(day.audio_muted_ms, 1000)
+			helpers.assert_eq(day.battery_count, 2)
+		end)
+	end)
+
+	helpers.it("seeds an acknowledged absent row without invented history", function()
+		with_shell({}, function(metrics)
+			metrics.bind("owned-a", "device-a", function() return nil, true end)
+			local day = metrics.sample(500000, "2026-10-05")
+			helpers.assert_eq(day.awake_ms, 0)
+			helpers.assert_nil(day.battery_min)
+		end)
+	end)
+
+	helpers.it("refuses unread history and retries without a writable zero day", function()
+		with_shell({}, function(metrics)
+			local attempts = 0
+			metrics.bind("owned-a", "device-a", function(date)
+				attempts = attempts + 1
+				if attempts == 1 then return nil, false end
+				return persisted(date, 4000), true
+			end)
+			helpers.assert_nil(metrics.sample(500000, "2026-10-05"))
+			helpers.assert_nil(metrics.current())
+			helpers.assert_eq(metrics.sample(500001, "2026-10-05").awake_ms, 4000)
+			helpers.assert_eq(attempts, 2)
+		end)
+	end)
+
+	helpers.it("same database and device rebinding retains the accumulated day", function()
+		with_shell({}, function(metrics)
+			local loads = 0
+			local function load(date) loads = loads + 1; return persisted(date, 4000), true end
+			metrics.bind("owned-a", "device-a", load)
+			metrics.sample(0, "2026-10-05")
+			metrics.sample(30000, "2026-10-05")
+			metrics.bind("owned-a", "device-a", load)
+			helpers.assert_eq(metrics.sample(60000, "2026-10-05").awake_ms, 64000)
+			helpers.assert_eq(loads, 1)
+		end)
+	end)
+
+	for _, identity in ipairs({ { "owned-b", "device-a" }, { "owned-a", "device-b" } }) do
+		helpers.it("isolates changed database or device " .. table.concat(identity, "/"), function()
+			with_shell({}, function(metrics)
+				metrics.bind("owned-a", "device-a", function(date) return persisted(date, 4000), true end)
+				metrics.sample(0, "2026-10-05")
+				metrics.bind(identity[1], identity[2], function(date) return persisted(date, 9000), true end)
+				helpers.assert_nil(metrics.current())
+				helpers.assert_eq(metrics.sample(900000, "2026-10-05").awake_ms, 9000)
+				helpers.assert_eq(metrics.current().sleep_ms, 3000)
+			end)
+		end)
+	end
+
+	helpers.it("hydrates a new date without inheriting yesterday's sample clock", function()
+		with_shell({}, function(metrics)
+			local loads = 0
+			metrics.bind("owned-a", "device-a", function(date)
+				loads = loads + 1
+				return persisted(date, loads * 4000), true
+			end)
+			metrics.sample(0, "2026-10-05")
+			local day = metrics.sample(900000, "2026-10-06")
+			helpers.assert_eq(day.awake_ms, 8000)
+			helpers.assert_eq(day.sleep_ms, 3000)
+			helpers.assert_eq(loads, 2)
+		end)
+	end)
+
+	helpers.it("folds new battery readings into the persisted extrema and sum", function()
+		with_shell({ { match = "power_supply", out = "50" } }, function(metrics)
+			metrics.bind("owned-a", "device-a", function(date) return persisted(date, 4000), true end)
+			local day = metrics.sample(0, "2026-10-05")
+			helpers.assert_eq(day.battery_sum, 200)
+			helpers.assert_eq(day.battery_count, 3)
+			helpers.assert_eq(day.battery_min, 50)
+			helpers.assert_eq(day.battery_max, 80)
+		end)
+	end)
+
+	helpers.it("a throwing loader cannot publish a destructive zero day", function()
+		with_shell({}, function(metrics)
+			metrics.bind("owned-a", "device-a", function() error("owned read refused") end)
+			helpers.assert_nil(metrics.sample(0, "2026-10-05"))
+			helpers.assert_nil(metrics.current())
+		end)
+	end)
+
+	helpers.it("reset clears the owned loader as well as the sampling state", function()
+		with_shell({}, function(metrics)
+			metrics.bind("owned-a", "device-a", function() return nil, false end)
+			metrics._reset()
+			helpers.assert_eq(metrics.sample(0, "2026-10-05").awake_ms, 0)
+		end)
+	end)
+end)
