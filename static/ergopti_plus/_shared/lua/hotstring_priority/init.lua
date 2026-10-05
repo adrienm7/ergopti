@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local PersonalFiles = require("hotstrings.personal_files")
 
 
 
@@ -67,6 +68,7 @@ function M.source_priority(category, tiers)
 	-- had at startup instead of silently dropping to common.
 	if c == "custom" then return t.personal end
 	if c:sub(1, 13) == "personal_ext_" then return t.package end
+	if PersonalFiles.components(category) then return t.package end
 	-- "ext.<id>" is the preference owner of an extension; "ext:<id>:<stem>" is
 	-- the group each of its hotstring files registers under on every driver.
 	-- Both are the package tier, as the Windows engine scores them.

@@ -27,6 +27,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../../modules/hotstrings/hotstrings_autocorrection.ahk
+
 
 
 
@@ -199,12 +201,23 @@ _HsCacheCommonReference() {
 		. "\tests\corpus\hotstrings\common_autocorrection_entries.json", "UTF-8"))
 }
 
+; The independently frozen pre-split input retains its original reader routes.
+_HsCacheLegacyRoot() {
+	Root := A_Temp . "\ergopti-legacy-common-" . A_TickCount . "-" . Random(100000, 999999)
+	DirCreate(Root . "\modules\hotstrings")
+	FileCopy(_HsCacheTestSharedDir() . "\tests\corpus\hotstrings\common_autocorrection_legacy\autocorrection.toml",
+		Root . "\modules\hotstrings\autocorrection.toml")
+	FileAppend('[menu]`ncategories_order = ["autocorrection"]`n[languages]`norder = []`n',
+		Root . "\modules\hotstrings\_index.toml", "UTF-8")
+	return Root
+}
+
 _HsCacheCommonReferenceRows() {
 	global _SharedDir, HotstringGroupConfig
 	SavedShared := _SharedDir
 	SavedMetadata := HotstringGroupConfig
 	try {
-		_SharedDir := _HsCacheTestSharedDir()
+		_SharedDir := _HsCacheLegacyRoot()
 		HotstringGroupConfig := Map()
 		Reference := _HsCacheCommonReference()
 		AssertEqual(140, Reference["entries"].Length)
@@ -240,6 +253,7 @@ _HsCacheCommonReferenceRows() {
 		AssertEqual(1, Order.Length)
 		AssertEqual(Reference["meta"]["sections_order"][1], Order[1])
 	} finally {
+		DirDelete(_SharedDir, true)
 		_SharedDir := SavedShared
 		HotstringGroupConfig := SavedMetadata
 	}
@@ -255,7 +269,7 @@ _HsCacheCommonReferenceNative(UseCache, SourceOrdered := false) {
 	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED,
 		_GENERATED_HOTSTRINGS, _HotstringsOverrides, HotstringGroupConfig]
 	try {
-		_SharedDir := _HsCacheTestSharedDir()
+		_SharedDir := _HsCacheLegacyRoot()
 		Reference := _HsCacheCommonReference()
 		_HotstringsOverrides := Map(), HotstringGroupConfig := Map()
 		HotstringsResolveBumpGen()
@@ -288,6 +302,7 @@ _HsCacheCommonReferenceNative(UseCache, SourceOrdered := false) {
 		}
 	} finally {
 		HSE_TestReset()
+		DirDelete(_SharedDir, true)
 		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
 		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5]
 		HotstringGroupConfig := Saved[6]
@@ -504,3 +519,122 @@ Test("common autocorrection: ordered consumer preserves actual bound caps owner 
 	_HsCacheSourceOrderNative.Bind(true, true, "bound"))
 Test("common autocorrection: missing bound caps owner cannot use bundled cached rows (source-ordered-autocorrection)",
 	_HsCacheSourceOrderNative.Bind(true, true, "missing"))
+
+; The reviewed editorial map, independently authored before the source split.
+_HsCacheCommonAssignment() {
+	Classification := JsonParse(FileRead(_HsCacheTestSharedDir()
+		. "\data\hotstrings\common_autocorrection_sections.json", "UTF-8"))
+	Assignment := Map()
+	for Section in Classification["sections"]
+		for Trigger in Section["triggers"] {
+			AssertFalse(Assignment.Has(Trigger), "each independent trigger has one current section")
+			Assignment[Trigger] := Section["id"]
+		}
+	return Assignment
+}
+
+; Qualify the actual shared source, typed cache and current native admission.
+_HsCacheCommonSplitNative(Selection, ThroughTsv := false, ThroughRegistrar := false) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, HotstringGroupConfig, HSE_RegistryByGroup, _HotstringBoundSources
+	global HSE_Buffer, HSE_StartIsWordBoundary, Features
+	SavedFeatures := Features
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources]
+	Tsv := A_Temp . "\ergopti-common-split-" . A_TickCount . "-" . Random(100000, 999999) . ".tsv"
+	try {
+		_SharedDir := _HsCacheTestSharedDir()
+		Reference := _HsCacheCommonReference(), Assignment := _HsCacheCommonAssignment()
+		_HS_CACHE_ROWS := _HotstringsCacheBuildRows()
+		if ThroughTsv {
+			_HotstringsCacheWriteTsv(Tsv, _HS_CACHE_ROWS)
+			_HS_CACHE_ROWS := _HotstringsCacheReadTsv(FileRead(Tsv, "UTF-8"))
+		}
+		ExpectedCounts := Map("names", 34, "abbreviations", 95, "technical_terms", 11)
+		for Section, Count in ExpectedCounts
+			AssertEqual(Count, _HS_CACHE_ROWS["autocorrection." . Section].Length)
+		AssertFalse(_HS_CACHE_ROWS.Has("autocorrection.caps"), "the shipped source has three independent section identities")
+		_HS_CACHE_LOADED := true, _GENERATED_HOTSTRINGS := Map()
+		_HotstringsOverrides := Map(), HotstringGroupConfig := Map(), _HotstringBoundSources := Map()
+		HotstringsResolveBumpGen()
+		Sections := Map()
+		for Section in ["names", "abbreviations", "technical_terms"]
+			Sections[Section] := Map("enabled", Selection == "all" || Selection == Section)
+		HSE_TestReset()
+		if ThroughRegistrar {
+			French := Map()
+			for Section in ["typographic_apostrophe", "errors", "ou", "multiple_punctuation_marks",
+				"suffixes_a_chaining", "minus", "minus_apostrophe", "names", "accents"]
+				French[Section] := Map("enabled", false)
+			Features := Map("hotstrings", Map("autocorrection", Sections, "french_autocorrection", French))
+			_HS_RegisterAutocorrection()
+		} else
+			LoadHotstringsCategory("autocorrection", Sections)
+		Observed := Map(), RegisteredCount := 0
+		for Key, Specs in HSE_RegistryByGroup
+			for Spec in Specs {
+				if ThroughRegistrar && !RegExMatch(Key, "^autocorrection\.(names|abbreviations|technical_terms)$")
+					continue
+				Observed[Spec.Seq] := Spec
+				RegisteredCount += 1
+			}
+		AssertEqual(Selection == "all" ? 140 : ExpectedCounts[Selection], RegisteredCount)
+		Index := 0
+		for Row in Reference["entries"] {
+			Section := Assignment[Row["trigger"]]
+			if Selection != "all" && Selection != Section
+				continue
+			Index += 1
+			AssertTrue(Observed.Has(Index), "the registration owner assigns every historical subset sequence")
+			Actual := Observed[Index]
+			Assert(Actual.Trigger == Row["trigger"], "each selection keeps historical relative order")
+			Assert(Actual.Replacement == Row["output"], "the independent output remains unchanged")
+			AssertEqual(Row["is_word"], Actual.IsWord)
+			AssertEqual(Row["auto_expand"], Actual.Auto)
+			AssertEqual(Row["final_result"], Actual.FinalResult)
+			AssertEqual(false, Actual.CaseSensitive)
+			AssertEqual(Reference["source_priority"], Actual.Priority)
+			AssertEqual(Reference["meta"]["delay"], Actual.TimeActivationSeconds)
+			AssertTrue(HSE_RegistryByGroup.Has("autocorrection." . Section), "the current section owns its native registrations")
+		}
+		for ExpansionCase in [
+			{ Section: "names", Trigger: "chatgpt", Output: "ChatGPT" },
+			{ Section: "abbreviations", Trigger: "api", Output: "API" },
+			{ Section: "technical_terms", Trigger: "adaboost", Output: "AdaBoost" }] {
+			HSE_Buffer := ExpansionCase.Trigger . " ", HSE_StartIsWordBoundary := true
+			Match := HSE_FindMatchAtEnd(" ")
+			if Selection == "all" || Selection == ExpansionCase.Section {
+				AssertTrue(Match is Object, "the real matcher executes the selected section")
+				Assert(Match.Replacement == ExpansionCase.Output, "actual native matching keeps the independent typed result")
+			} else
+				AssertFalse(Match is Object, "the real matcher cannot execute another selection")
+		}
+		for Section in Sections
+			Sections[Section]["enabled"] := false
+		HSE_TestReset()
+		if ThroughRegistrar
+			_HS_RegisterAutocorrection()
+		else
+			LoadHotstringsCategory("autocorrection", Sections)
+		AssertEqual(0, HSE_RegistryByGroup.Count, "disabled current sections publish no owned mappings")
+	} finally {
+		if FileExist(Tsv)
+			FileDelete(Tsv)
+		HSE_TestReset()
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5]
+		HotstringGroupConfig := Saved[6], _HotstringBoundSources := Saved[7]
+		Features := SavedFeatures
+		HotstringsResolveBumpGen()
+	}
+}
+for _hsSplit_Selection in ["all", "names", "abbreviations", "technical_terms"] {
+	Test("common source split: native selection " . _hsSplit_Selection . " (common-autocorrection-split)",
+		_HsCacheCommonSplitNative.Bind(_hsSplit_Selection, false))
+	Test("common source split: TSV selection " . _hsSplit_Selection . " (common-autocorrection-split)",
+		_HsCacheCommonSplitNative.Bind(_hsSplit_Selection, true))
+}
+
+for _hsSplit_Selection in ["all", "names", "abbreviations", "technical_terms"]
+	Test("common source split: actual native boot registrar " . _hsSplit_Selection . " (common-autocorrection-split)",
+		_HsCacheCommonSplitNative.Bind(_hsSplit_Selection, false, true))

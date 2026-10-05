@@ -87,4 +87,7 @@ cases = [
 	"shipped_number_row_typed_8",
 	"shipped_number_row_typed_9",
 	"shipped_number_row_typed_10",
+	"shipped_common_autocorrection_fanout",
+	"shipped_common_autocorrection_occupied",
+	"shipped_common_autocorrection_stamp_only",
 ]

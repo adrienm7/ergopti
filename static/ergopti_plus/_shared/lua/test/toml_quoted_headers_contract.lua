@@ -14,6 +14,33 @@ return function(helpers)
 	end
 	local section = "hotstrings.modules.ext:ergopti:rolls"
 	helpers.describe("shared TOML quoted headers", function()
+		helpers.it("updates deletes and inserts quoted literal dotted leaves without touching nested paths", function()
+			for _, key in ipairs({ "b.c", "dotted.Équipe" }) do
+				local quoted = require("toml_codec.key_path").render({ key })
+				local source = '[a]\n' .. quoted .. ' = 1\nb.c = 2\nunknown = "retained"\n'
+				local updated, detail, content = prepare(source, { { section = "a", key = key, value = 3, literal_key = true } })
+				helpers.assert_eq(updated, true, detail)
+				helpers.assert_eq(Codec.decode(content).a[key], 3)
+				helpers.assert_eq(Codec.decode(content).a.b.c, 2)
+				local deleted, delete_detail, without = prepare(content, { { section = "a", key = key, delete = true, literal_key = true } })
+				helpers.assert_eq(deleted, true, delete_detail)
+				helpers.assert_eq(without, '[a]\nb.c = 2\nunknown = "retained"\n')
+				local inserted, insert_detail, again = prepare(without, { { section = "a", key = key, value = false, literal_key = true } })
+				helpers.assert_eq(inserted, true, insert_detail)
+				helpers.assert_eq(Codec.decode(again).a[key], false)
+				helpers.assert_eq(Codec.decode(again).a.b.c, 2)
+				helpers.assert_eq(Scanner.scan_records(source).records[1].quoted, nil)
+				for _, row in ipairs({ { section = "a", key = key, delete = true },
+					{ section = "a", key = key, delete = true, literal_key = false },
+					{ section = "a", key = key, delete = true, literal_key = "true" },
+					{ section = "a", key = key, delete = true, literal_key = 1 } }) do
+					helpers.assert_eq(prepare(source, { row }), false)
+				end
+			end
+			for _, source in ipairs({ 'a = { "b.c" = 1 }\n', 'a."b.c" = 1\n', '[[a]]\n"b.c" = 1\n' }) do
+				helpers.assert_eq(prepare(source, { { section = "a", key = "b.c", delete = true, literal_key = true } }), false)
+			end
+		end)
 		helpers.it("deletes an owned extension leaf while preserving all neighboring bytes", function()
 			local prefix = '# retained\n[hotstrings.modules."ext:ergopti:rolls"] # identity\n'
 			local tail = 'unknown = [\n  "[quoted.data]",\n]\n[neighbor]\ncustom = true\n'

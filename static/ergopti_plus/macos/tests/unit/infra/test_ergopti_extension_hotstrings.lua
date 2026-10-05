@@ -93,7 +93,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		local ergopti
 		for _, pack in ipairs(found) do if pack.id == "ergopti" then ergopti = pack end end
 		helpers.assert_true(ergopti ~= nil, "the Ergopti extension the app ships is installed")
-		helpers.assert_eq(#ergopti.bound_files, 4)
+		helpers.assert_eq(#ergopti.bound_files, 6)
 		helpers.assert_eq(#ergopti.toml_files, 0, "none of its files becomes an ext: category")
 		local sfbs = Packs.route("sfbsreduction", nil)
 		local rolls = Packs.route("rolls", nil)
@@ -101,16 +101,17 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		helpers.assert_true(rolls:find("/layouts/registry/ergopti/hotstrings/rolls.toml", 1, true) ~= nil, rolls)
 		local magickey, sources = Packs.route("magickey", "/bundled/magickey.toml")
 		helpers.assert_eq(magickey, "/bundled/magickey.toml", "the magic key keeps its bundled file")
-		helpers.assert_eq(#sources, 1)
-		helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
+		helpers.assert_eq(#sources, 2)
+		helpers.assert_eq(sources[1].sections, { "replace" })
+		helpers.assert_eq(sources[2].sections, { "repeat_corrections" })
 		local unbundled = Packs.unbundled_routes({ magickey = true })
-		helpers.assert_eq(#unbundled, 3, "the three whole categories load without a bundled copy")
+		helpers.assert_eq(#unbundled, 4, "every whole category loads without a bundled copy")
 
 		-- One historical expansion per moved group, with the flags it always had.
 		for _, case in ipairs({
 			{ path = sfbs, section = "comma", trigger = ",t", output = "pt" },
 			{ path = rolls, section = "hc", trigger = "hc", output = "wh" },
-			{ path = sources[1].path, section = "repeat_corrections", trigger = "ccê", output = "ccu" },
+			{ path = sources[2].path, section = "repeat_corrections", trigger = "ccê", output = "ccu" },
 		}) do
 			local found_entry = entry(case.path, case.section, case.trigger)
 			helpers.assert_true(found_entry ~= nil, case.trigger)
@@ -144,8 +145,10 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 
 		helpers.assert_eq(routed, { rolls, n = 2 },
 			"the user's copy of a category an extension binds whole is an explicit override")
-		helpers.assert_eq(with_fixes, { fixes, n = 2 },
-			"a user's magickey.toml keeps the repeat corrections it declares itself")
+		helpers.assert_eq(with_fixes[1], fixes, "a user's magickey.toml keeps the repeat corrections it declares itself")
+		helpers.assert_eq(with_fixes.n, 2)
+		helpers.assert_eq(#with_fixes[2], 1)
+		helpers.assert_eq(with_fixes[2][1].sections, { "replace" }, "the extension supplies only the missing native feature")
 		helpers.assert_eq(without_fixes, others)
 		helpers.assert_eq(#sources, 1, "the extension supplies the repeat corrections a user's copy lacks")
 		helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
@@ -196,7 +199,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		helpers.assert_eq(type(descriptions.repeat_corrections), "table",
 			"with the localized description of the extension's file, not its raw id")
 		helpers.assert_true(tostring(descriptions.repeat_corrections.en):find("(ê→u)", 1, true) ~= nil)
-		helpers.assert_eq(without, { "replace", "text_expansion_symbols", "text_expansion_symbols_typst" },
+		helpers.assert_eq(without, { "text_expansion_symbols", "text_expansion_symbols_typst" },
 			"the magic key's own file no longer carries it")
 
 		local boot = helpers.read_driver_source("local function is_user_hotstrings_copy(path)")
@@ -319,6 +322,71 @@ helpers.describe("Ergopti extension distance reduction", function()
 			helpers.assert_true(Registry.reload_toml("distancesreduction", path))
 			helpers.assert_eq(Registry.is_group_enabled("distancesreduction"), false)
 			helpers.assert_eq(#state.mappings, 0)
+			Packs._reset()
+		end)
+	end)
+end)
+
+
+helpers.describe("Ergopti suffix and native-feature relocation", function()
+	helpers.it("(ergopti-suffixes-ext) registers every suffix through the actual bound-source registry and supports live withdrawal", function()
+		helpers.with_stub_scope({
+			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
+			"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
+			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+		}, function()
+			package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
+			local State = helpers.load_with_stubs("modules.keymap.state")
+			local Registry = helpers.load_with_stubs("modules.keymap.registry")
+			local Storage = require("adapters.storage")
+			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+			helpers.assert_true(Registry.init(state))
+			Packs._reset()
+			Packs.discover(roots(true), real_io())
+			local path = Packs.route("french_distancesreduction", nil)
+			helpers.assert_true(type(path) == "string")
+			helpers.assert_true(path:find("/ergopti/hotstrings/suffixes_a.toml", 1, true) ~= nil)
+			helpers.assert_true(Storage.set("hotstrings_section_french_distancesreduction_suffixes_a", true))
+			helpers.assert_true(Registry.load_toml("french_distancesreduction", path))
+			local expected = {
+	{ "à'", "ance" }, { "àa", "aire" }, { "àc", "ction" }, { "àd", "would" },
+	{ "àê", "able" }, { "àf", "iste" }, { "àg", "ought" }, { "àh", "ight" },
+	{ "ài", "ying" }, { "àk", "ique" }, { "àl", "elle" }, { "àm", "isme" },
+	{ "àn", "ation" }, { "àp", "ence" }, { "àq", "ique" }, { "àr", "erre" },
+	{ "às", "ement" }, { "àt", "ettre" }, { "àv", "ment" }, { "àx", "ieux" },
+	{ "àz", "ez-vous" }, { "à’", "ance" }, { "càd", "could" }, { "shàd", "should" },
+			}
+			local previous = 0
+			for _, row in ipairs(expected) do
+				local found
+				for _, mapping in ipairs(state.mappings) do
+					if mapping.group == "french_distancesreduction" and mapping.trigger == row[1] then found = mapping; break end
+				end
+				helpers.assert_true(found ~= nil, row[1])
+				helpers.assert_eq(found.repl, row[2])
+				helpers.assert_eq(found.section, "suffixes_a")
+				helpers.assert_eq(found.priority, Registry.PRIORITY_COMMON)
+				helpers.assert_eq(found.is_word, false)
+				helpers.assert_eq(found.auto, true)
+				helpers.assert_eq(found.final_result, false)
+				helpers.assert_true(found.seq > previous, "canonical suffix registration preserves historical source order")
+				previous = found.seq
+			end
+			helpers.assert_eq(state.groups.french_distancesreduction.delay_metadata.delay, 0.5)
+			helpers.assert_eq(state.groups.french_distancesreduction.delay_metadata.show_tooltip, false)
+			helpers.assert_true(Storage.set("hotstrings_section_french_distancesreduction_suffixes_a", false))
+			helpers.assert_true(Registry.reload_toml("french_distancesreduction", path))
+			for _, mapping in ipairs(state.mappings) do helpers.assert_true(mapping.group ~= "french_distancesreduction") end
+			local common = static_dir() .. "/ergopti_plus/_shared/modules/hotstrings/magickey.toml"
+			local _, sources = Packs.route("magickey", common)
+			helpers.assert_eq(#sources, 2)
+			helpers.assert_eq(sources[1].sections, { "replace" })
+			local replacement = TomlCodec.decode(assert(real_io().read_file(sources[1].path)))
+			helpers.assert_eq(replacement._meta.sections.replace.en, "Transform a key into the ★ key")
+			helpers.assert_nil(replacement.replace, "native replacement owns no fabricated mapping")
+			Packs._reset()
+			Packs.discover(roots(false), real_io())
+			helpers.assert_nil(Packs.route("french_distancesreduction", nil))
 			Packs._reset()
 		end)
 	end)

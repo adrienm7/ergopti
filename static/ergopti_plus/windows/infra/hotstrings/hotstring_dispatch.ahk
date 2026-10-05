@@ -136,6 +136,23 @@ HSE_TerminalTransactionPending() {
 		|| (_HSE_TerminalReplayPending is Map)
 }
 
+; Optional authority comes only from an explicitly adopted native producer.
+; Ordinary and built-in Specs retain their existing sender behavior.
+_HSE_PublicationGuardCurrent(Spec) {
+	if !Spec.HasOwnProp("PublicationCurrent")
+		return true
+	try {
+		Receipt := Spec.PublicationCurrent.Call()
+		return (Receipt is Integer) && Receipt == 1
+	}
+	catch
+		return false
+}
+
+_HSE_PublishGuarded(Spec, SendFn) {
+	return _HSE_PublicationGuardCurrent(Spec) ? SendFn.Call() : false
+}
+
 _HSE_TerminalOwnerIsCurrent(Owner) {
 	global _HSE_TerminalOwner, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, HSE_Buffer
@@ -143,6 +160,14 @@ _HSE_TerminalOwnerIsCurrent(Owner) {
 		return false
 	if A_IsSuspended
 		return false
+	if Owner.Has("PublicationCurrent") {
+		try {
+			Receipt := Owner["PublicationCurrent"].Call()
+			if !(Receipt is Integer) || Receipt != 1
+				return false
+		} catch
+			return false
+	}
 	if (HSE_RegistryGeneration != Owner["RegistryGeneration"]
 			|| HSE_RuntimeDecisionGeneration != Owner["DecisionGeneration"]
 			|| _PrefixInputContextGeneration != Owner["InputGeneration"]
@@ -359,6 +384,7 @@ _HSE_ReleaseTerminalCapture(Owner, Committed) {
 	Replay := Map("Token", Owner["Id"], "Committed", Committed,
 		"Port", Owner.Get("Port", 0),
 		"TrailingText", Committed ? Owner.Get("TrailingText", "") : "",
+		"UserCodeOwned", Owner.Get("UserCodeOwned", false),
 		"TrailingChars", Committed ? Owner.Get("TrailingChars", []) : [],
 		"ObservedChars", [],
 		"ReplayVisibleFn", Owner.Get("ReplayVisibleFn", 0))
@@ -472,6 +498,18 @@ _HSE_FinishTerminalOwner(Owner, OutputSucceeded, TrailingText := "") {
 	return Committed
 }
 
+_HSE_EmitOwnedTerminalBurst(Owner, Payload) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_HSE_TerminalOwnerIsCurrent(Owner)
+			return false
+		if HasMethod(Owner["EmitFn"], "Call")
+			return _SendVerdictSucceeded(Owner["EmitFn"].Call(Payload))
+		SendEvent(Payload)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _HSE_RunOwnedTerminalTransaction(Owner) {
 	global HSE_Buffer
 	RunnerCritical := Critical("On")
@@ -496,7 +534,8 @@ _HSE_RunOwnedTerminalTransaction(Owner) {
 			OutputSucceeded := _HSE_SendTerminalPaced(
 				Owner["Backspaces"] + _TextCodepointLength(TrailingText),
 				Tail, Owner["DelayMs"],
-				Owner["EmitFn"], Owner["DelayFn"])
+				Owner.Has("PublicationCurrent") ? _HSE_EmitOwnedTerminalBurst.Bind(Owner) : Owner["EmitFn"],
+				Owner["DelayFn"])
 			if !OutputSucceeded
 				try LoggerError("HSE", "Terminal expansion sender refused an event.")
 		}
@@ -967,7 +1006,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								; BackSpaceSeq is a control sequence, not emitted text. The actual
 								; last character is recorded explicitly below after the atomic paste.
 								Fired := _HSE_SendWithAltGrUp(
-										() => SendInstant(Replacement . EndCharEmitted, BackSpaceSeq))
+										() => _HSE_PublishGuarded(Spec, () => SendInstant(Replacement . EndCharEmitted, BackSpaceSeq)))
 						} finally {
 								Critical(_NpCrit)
 						}
@@ -1022,6 +1061,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"SyntheticOwner", SyntheticOwner,
 									"Port", 0
 								)
+								if Spec.HasOwnProp("PublicationCurrent")
+									DeferredOwner["PublicationCurrent"] := Spec.PublicationCurrent
+								if Spec.HasOwnProp("UserCodeGeneration")
+									DeferredOwner["UserCodeOwned"] := true
 								TerminalOwnershipTransferred := true
 								BeginResult := _HSE_BeginOwnedTerminalTransaction(DeferredOwner)
 								if BeginResult is Map {
@@ -1067,6 +1110,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								; Nested so the burst runs inside _HSE_SendWithAltGrUp; it reads the
 								; burst and the hook from this call.
 								SendAtomicBurst() {
+										if !_HSE_PublicationGuardCurrent(Spec)
+												return false
 										if _SendHook {
 												Hook := _SendHook
 												return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))

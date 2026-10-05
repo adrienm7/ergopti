@@ -30,6 +30,8 @@ local ParameterLabel = require("action_parameter_label")
 
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
+local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFileMenu = require("menu.personal_files")
 local Languages = require("hotstrings.languages")
 local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
@@ -40,6 +42,8 @@ local Modal = require("ui.modal")
 local TextPrompt = require("ui.text_prompt")
 local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
+local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
+local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
 
 --- Keeps private executable/argv data out of persistent menu presentation.
@@ -437,43 +441,6 @@ local function _build_layouts(ctx)
 		return ctx.webview.show("layout_manager")
 	end
 
-	-- The manifest owns this switch and its position before the physical picker.
-	-- The canonical choice owner also owns the runtime publication and redraw.
-	render_ctx.feature_rows = {}
-	for key, value in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[key] = value end
-	local replace_path = "hotstrings.magic_key.replace"
-	for _, declaration in ipairs(ManifestMenu and ManifestMenu.get_array("layout_menu") or {}) do
-		if declaration.type == "feature" and declaration.path == replace_path then
-			render_ctx.feature_rows[replace_path] = function()
-				local config = ctx.config
-				if type(config) ~= "table" or type(config.is_group_enabled) ~= "function"
-					or type(config.is_section_checked) ~= "function" or type(config.toggle_section) ~= "function" then
-					Logger.error(LOG, "No canonical magic replacement choice owner in the layout menu.")
-					return nil
-				end
-				local function admitted()
-					return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
-						and config.is_group_enabled("magickey") == true
-				end
-				local enabled = admitted()
-				return {
-					label = i18n_safe(declaration.i18n),
-					checked = config.is_section_checked("magickey", "replace") == true,
-					disabled = not enabled,
-					action = enabled and function()
-						if not admitted() then return false end
-						local ok, committed = pcall(config.toggle_section, "magickey", "replace")
-						if not ok or committed ~= true then
-							Logger.error(LOG, "Magic replacement choice was not committed: %s.", tostring(committed))
-							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
-							return false
-						end
-						return true
-					end or nil,
-				}
-			end
-		end
-	end
 
 	local providers = {
 		-- The custom layout picker: the registry layouts the layout manager
@@ -679,6 +646,10 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @param category table|nil Category metadata from the loader.
 	--- @return string
 	local function category_label(id, category)
+		if PersonalFiles.components(id) and category and PersonalFiles.is_descriptor(category.personal_source) then
+			local descriptor = category.personal_source
+			return descriptor.label ~= "" and descriptor.label or descriptor.components[#descriptor.components]
+		end
 		local description = category and category.description or nil
 		-- A pack whose [_meta] description is a plain string, not a locale table —
 		-- which is what the editor writes for personal.toml — used to fall straight
@@ -796,6 +767,13 @@ local function _manifest_hotstring_rows(ctx, config)
 		local category = (type(config.get_category) == "function") and config.get_category(id) or nil
 		local on = config.is_group_enabled and config.is_group_enabled(id)
 		local count = category and category.count or 0
+		local personal = PersonalFiles.components(id) ~= nil
+		local binding = personal and type(config.personal_file_scope_binding) == "function"
+			and config.personal_file_scope_binding(id) or nil
+		local function current_source()
+			return not personal or type(binding) == "table" and type(binding.current) == "function"
+				and binding.current() == true
+		end
 
 		local sub = {}
 
@@ -826,6 +804,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					disabled = not on,
 					action = function()
 						local called, committed = pcall(function()
+							if not current_source() then return false end
 							if type(config.toggle_section) ~= "function" then return false end
 							return config.toggle_section(id, name)
 						end)
@@ -842,6 +821,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		local function commit_scope(enabled)
 			local called, committed = pcall(function()
+				if not current_source() then return false end
 				return config.set_category_scope_enabled({ id }, enabled)
 			end)
 			if called and committed == true then return true end
@@ -870,13 +850,36 @@ local function _manifest_hotstring_rows(ctx, config)
 				end,
 				["hotstring_category_sections"] = function() return sub end,
 			})
+		if personal then
+			local controls = type(config.personal_metadata_controls) == "function" and config.personal_metadata_controls(id) or nil
+			local rows = PersonalFileMenu.build({ manifest = ManifestMenu, current = current_source,
+				enabled = function() return type(config.is_group_enabled) == "function" and config.is_group_enabled(id) == true end,
+				available = function(field) return controls ~= nil and controls.file[field] ~= true end,
+				enable = function(enabled)
+					return (enabled and config.enable_group or config.disable_group)(id) == true
+				end,
+				tooltip_enabled = function() return type(config.resolve) == "function" and config.resolve(id, nil).show_tooltip == true end,
+				tooltip = function(value) return config.set_personal_metadata(id, nil, "show_tooltip", value) == true end,
+				edit = function() return ctx.webview ~= nil and type(ctx.webview.show) == "function"
+					and ctx.webview.show("hotstrings_config_window") == true end,
+				metadata_reason = function() return i18n_safe("menu.hotstrings.personal_metadata_unavailable") end,
+				changed = function() if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end,
+			})
+			for index = #rows, 1, -1 do table.insert(rendered, 1, rows[index]) end
+		end
+		if personal then
+			PersonalFileMenu.apply_category_admission(rendered, {
+				manifest = ManifestMenu, translate = i18n_safe, current = current_source,
+			})
+		end
 
 		return {
 			-- The ACTIVE count, not the file's total. A user reads this figure as
 			-- "what is firing right now" and checks a disable by watching it fall;
 			-- it never moved, so a fully disabled Autocorrection went on advertising
 			-- every entry it would have had.
-			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category)),
+			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category))
+				.. (personal and not current_source() and (" — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")) or ""),
 			checked = on and true or false,
 			submenu = rendered,
 		}
@@ -1370,6 +1373,9 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- category would have advertised 3 while offering 13, and would not have
 			-- moved when a family was switched off.
 			local count = type(dyn.active_count) == "function" and dyn.active_count() or 0
+			if on and type(dyn.user_code_is_enabled) == "function" and dyn.user_code_is_enabled() then
+				count = count + dyn.user_code_count()
+			end
 
 			local sub = {
 				{
@@ -1465,6 +1471,10 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
+			local programmable = ProgrammableMenuPolicy.build_entry_rows(ManifestMenu,
+				function() return ProgrammableHotstrings.build(ctx) end)
+			for _, row in ipairs(programmable) do sub[#sub + 1] = row end
+
 			local function commit_scope(enabled)
 				local called, committed = pcall(function() return dyn.set_scope_enabled(enabled, config) end)
 				if not called or committed ~= true then
@@ -1557,7 +1567,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			rows[#rows + 1] = { separator = true }
 
-			local added = 0
+			local added, represented = 0, {}
 			for _, name in ipairs(groups) do
 				-- Extension packs are unclassified too, but they are not personal
 				-- files: they belong to the extension that shipped them and get their
@@ -1565,6 +1575,31 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- heading that told the user they had written them.
 				if not classified[name] and not Extensions.parse_category_key(name) then
 					rows[#rows + 1] = group_row(name)
+					represented[name] = true
+					added = added + 1
+				end
+			end
+			-- Empty or unavailable sources still own a file row; mappings are not
+			-- a discovery inventory and must not hide their source controls.
+			if type(config.personal_file_sources) == "function" then
+				for _, source in ipairs(config.personal_file_sources()) do
+					local descriptor = source.descriptor
+					if PersonalFiles.is_descriptor(descriptor) and not represented[descriptor.id] then
+						local row = group_row(descriptor.id)
+						row.label = descriptor.label .. " (0)"
+						if type(config.personal_file_scope_binding) ~= "function"
+							or config.personal_file_scope_binding(descriptor.id) == nil then
+							row.label = row.label .. " — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")
+						end
+						rows[#rows + 1], represented[descriptor.id] = row, true
+						added = added + 1
+					end
+				end
+			end
+			if type(config.personal_unavailable_directories) == "function" then
+				for _, blocked in ipairs(config.personal_unavailable_directories()) do
+					rows[#rows + 1] = { label = blocked.label,
+						submenu = PersonalFileMenu.directory_unavailable(ManifestMenu) }
 					added = added + 1
 				end
 			end
@@ -1622,7 +1657,8 @@ local function _manifest_hotstring_rows(ctx, config)
 						names[extension.id] = names[extension.id] or extension.name
 						local list = bound_sections[extension.id] or {}
 						bound_sections[extension.id] = list
-						list[#list + 1] = { category = name, section = section, count = record.count or 0 }
+						list[#list + 1] = { category = name, section = section, count = record.count or 0,
+							description = record.description }
 					end
 				end
 			end
@@ -1646,9 +1682,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				local packs = by_extension[extension_id]
 				local sub = {}
 				local function commit_gates(enabled)
+					if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+					local bindings = {}
+					for _, leaf in ipairs(bound_sections[extension_id] or {}) do
+						bindings[#bindings + 1] = { group = leaf.category, section = leaf.section }
+					end
 					local called, committed = pcall(function()
-						if type(config.set_category_gates_enabled) ~= "function" then return false end
-						return config.set_category_gates_enabled(packs, enabled)
+						if type(config.set_extension_sections_enabled) ~= "function" then return false end
+						return config.set_extension_sections_enabled(packs, bindings, enabled)
 					end)
 					if called and committed == true then
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -1682,12 +1723,20 @@ local function _manifest_hotstring_rows(ctx, config)
 					local checked = config.is_section_checked
 						and config.is_section_checked(bound.category, bound.section)
 						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
+					local description = bound.description
+					if type(description) == "table" then
+						local locale = require("infra.i18n").get_locale()
+						description = description[locale] or description.en
+					end
+					if type(description) ~= "string" or description == "" then description = bound.section end
 					sub[#sub + 1] = {
-						label    = string.format("%s (%d)", bound.section, bound.count),
+						label    = string.format("%s (%d)", description, bound.count),
 						checked  = checked and true or false,
 						-- Greyed while its category is off, like a section row there.
-						disabled = not category_on,
-						action   = function()
+						disabled = not category_on or ctx.paused == true,
+						action   = (category_on and ctx.paused ~= true) and function()
+							if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused())
+								or config.is_group_enabled(bound.category) ~= true then return false end
 							local called, committed = pcall(function()
 								if type(config.toggle_section) ~= "function" then return false end
 								return config.toggle_section(bound.category, bound.section)
@@ -1697,7 +1746,7 @@ local function _manifest_hotstring_rows(ctx, config)
 								called and "owner-not-committed" or "owner-error")
 							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 							return false
-						end,
+						end or nil,
 					}
 				end
 

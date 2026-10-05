@@ -272,8 +272,9 @@ local function publish_content(path, content, file_adapter, expected_source, on_
 		else
 			call_ok, written, write_detail, receipt = pcall(publisher, path, content)
 		end
+		if type(on_error) ~= "function" and type(receipt) ~= "function" then receipt = nil end
 		if call_ok and written == true then
-			if receipt ~= nil then return true, nil, receipt end
+			if receipt ~= nil and type(receipt) ~= "function" then return true, nil, receipt end
 			return true
 		end
 		local detail = tostring((call_ok and write_detail) or written or "adapter write failed")
@@ -599,6 +600,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if type(u.key) ~= "string" or u.key == "" then
 			return reject_row(index, "key must be a non-empty string")
 		end
+		if u.literal_key ~= nil and type(u.literal_key) ~= "boolean" then
+			return reject_row(index, "literal_key capability must be Boolean")
+		end
 		if u.delete ~= nil and u.delete ~= true then
 			return reject_row(index, "delete must be true when present")
 		end
@@ -618,10 +622,14 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		end
 		local intent_ok, intentional = pcall(require("shortcuts.assignment").is_intentional, u)
 		if not intent_ok then return reject_row(index, tostring(intentional)) end
+		local personal_ok, personal_intent = pcall(require("hotstrings.personal_adoption").is_preference_intent, u)
+		if not personal_ok then return reject_row(index, tostring(personal_intent)) end
+		intentional = intentional or personal_intent
 		if defaults and manifest_path and not u.delete and not intentional and defaults.has_default(manifest_path) then
 			u = defaults.sparse_operation(manifest_path, u.value)
 		end
-		u = { section = KeyPath.render(segments), segments = segments, key = u.key, value = u.value, delete = u.delete }
+		u = { section = KeyPath.render(segments), segments = segments, key = u.key, value = u.value, delete = u.delete,
+			literal_key = u.literal_key == true }
 		normalized[#normalized + 1] = u
 
 		local sl = u.section:lower()
@@ -692,25 +700,25 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			end
 		end
 	end
-	-- A key outside the bare and dotted alphabet, such as an extension pack's
+	-- A key outside the bare alphabet, such as an extension pack's
 	-- `ext:pack:stem`, is written quoted so it stays one key a reader can parse.
-	local function key_text(key)
-		if key:match("^[A-Za-z0-9_%-%.]+$") then return key end
+	local function key_text(key, literal)
+		if key:match(literal and "^[A-Za-z0-9_%-]+$" or "^[A-Za-z0-9_%-%.]+$") then return key end
 		return KeyPath.render({ key })
 	end
 	local applied, replacements, removed = {}, {}, {}
 	for _, record in ipairs(scanned.records) do
 		local section, key = record.section, record.key
 		if not record.addressable and record.quoted then section, key = record.quoted.section, record.quoted.key end
-		if record.addressable or record.quoted then
+		if record.quoted or (record.addressable and #record.key_segments == 1) then
 			local sl, kl = section:lower(), key:lower()
 			local u = lookup[sl] and lookup[sl][kl]
-			if u then
+			if u and (not record.quoted or not key:find(".", 1, true) or u.literal_key) then
 				if applied[sl .. "\0" .. kl] then return false, "ambiguous batch key identity" end
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
-					replacements[record.first] = key_text(u.key) .. " = " .. to_toml_value(u.value)
+					replacements[record.first] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value)
 						.. scanned.lines[record.last].eol
 				end
 			end
@@ -787,7 +795,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if insertions[index] then
 			if line.eol == "" then lines[#lines + 1] = "\n" end
 			for _, u in ipairs(insertions[index]) do
-				lines[#lines + 1] = key_text(u.key) .. " = " .. to_toml_value(u.value) .. "\n"
+				lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
 			end
 		end
 	end
@@ -799,7 +807,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
-			lines[#lines + 1] = key_text(u.key) .. " = " .. to_toml_value(u.value) .. "\n"
+			lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
 		end
 	end
 
