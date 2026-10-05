@@ -3320,6 +3320,10 @@ document/config dotted assignments with independent expected models. Preserve
 retired scalar collisions until explicit cleanup; ordinary saves must refuse
 them. Installed-driver restart and actual menu persistence remain acceptance.
 
+The shared TOML leaf writer preserves authenticated same-source array,
+object and scalar kinds. Stale and forged kind hints refuse. Portable
+real-file fixtures pass; complete unused-key projections remain open.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical

@@ -593,6 +593,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		return false, detail
 	end
 	for index, u in ipairs(updates) do
+		local source_row = u
 		if type(u) ~= "table" then return reject_row(index, "row must be a table") end
 		if type(u.section) ~= "string" or u.section == "" then
 			return reject_row(index, "section must be a non-empty string")
@@ -616,7 +617,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if not segments then return reject_row(index, "section is not a valid table path") end
 		-- Manifest paths use semantic dots; a quoted literal dot must never inherit
 		-- the neutral value of a different, nested configuration key.
+		local literal_key = source_row.literal_key == true or source_row.source_shape ~= nil
 		local manifest_path = table.concat(segments, ".") .. "." .. u.key
+		if literal_key and u.key:find(".", 1, true) then manifest_path = nil end
 		for _, segment in ipairs(segments) do
 			if segment:find(".", 1, true) then manifest_path = nil; break end
 		end
@@ -629,7 +632,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			u = defaults.sparse_operation(manifest_path, u.value)
 		end
 		u = { section = KeyPath.render(segments), segments = segments, key = u.key, value = u.value, delete = u.delete,
-			literal_key = u.literal_key == true }
+			literal_key = literal_key, source_row = source_row }
 		normalized[#normalized + 1] = u
 
 		local sl = u.section:lower()
@@ -641,7 +644,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	updates = normalized
 
 	-- Serialise a Lua value to a TOML literal
-	local to_toml_value = Codec.encode_value
+	local function to_toml_value(row)
+		return row.source_literal or Codec.encode_value(row.value)
+	end
 
 	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
@@ -656,7 +661,13 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			return false, "source changed before preparing the batch"
 		end
 	end
-	local decoded_ok, decoded = pcall(Codec.decode, source or "")
+	for _, row in ipairs(updates) do
+		local called, literal = pcall(require("toml_codec.leaf_rows").publication_literal, row.source_row, source or "")
+		if not called then return false, tostring(literal) end
+		row.source_literal = literal
+		if require("toml_codec.leaf_rows").publication_capability(row.source_row) then row.literal_key = true end
+	end
+	local decoded_ok, decoded = pcall(require("toml_codec.leaf_rows").decode_source, source or "")
 	if not decoded_ok or type(decoded) ~= "table" then
 		return false, "the existing destination is not valid TOML"
 	end
@@ -718,7 +729,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
-					replacements[record.first] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value)
+					replacements[record.first] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u)
 						.. scanned.lines[record.last].eol
 				end
 			end
@@ -744,7 +755,8 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			end
 			local existing = nil
 			if type(node) == "table" then existing = node[u.key] end
-			if existing ~= nil and not u.delete and same_value(existing, u.value) then
+			if existing ~= nil and not u.delete and same_value(existing, u.value)
+				and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal) then
 				applied[identity] = true
 			elseif existing ~= nil then
 				local path = row_path(u)
@@ -795,7 +807,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if insertions[index] then
 			if line.eol == "" then lines[#lines + 1] = "\n" end
 			for _, u in ipairs(insertions[index]) do
-				lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
+				lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u) .. "\n"
 			end
 		end
 	end
@@ -807,7 +819,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
-			lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
+			lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u) .. "\n"
 		end
 	end
 
