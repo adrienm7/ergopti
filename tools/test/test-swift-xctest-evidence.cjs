@@ -175,6 +175,41 @@ assert.match(
 	'empty or invalid output must still have a fixed visible native diagnostic'
 );
 
+// Independently fixed directory facts survive the real annotation parser.
+const directoryFacts =
+	'Native Sparkle census refusal: code=directory-refused helper_pid=9123 reason=mode';
+const directoryErrors = evaluate(
+	failed + `\n${censusFile}:260: error: failed - ${directoryFacts}\n`,
+	1,
+	0
+);
+const directoryFailure = directoryErrors.failures.find((failure) =>
+	failure.message.endsWith(directoryFacts)
+);
+assert.notEqual(
+	directoryFailure,
+	undefined,
+	'the directory refusal reason is available without raw logs'
+);
+assert.match(annotation(directoryFailure), /code=directory-refused helper_pid=9123 reason=mode$/);
+assert.equal(directoryErrors.exit_status, 1, 'a reason cannot admit a directory');
+assert.equal(
+	evaluate(passed + '\n' + directoryFacts, 1, 0).failures.some((failure) =>
+		failure.message.includes('reason=mode')
+	),
+	false,
+	'a plain directory-fact print is still not an XCTest diagnostic'
+);
+assert.match(
+	censusAnnotation,
+	/Set\(packet.keys\) == Set\(\["schema", "code", "helper_pid", "reason"\]\)/
+);
+assert.match(censusAnnotation, /reasons\.contains\(reason\)/);
+assert.match(
+	censusAnnotation,
+	/XCTFail\("Native Sparkle census refusal: code=directory-refused helper_pid=/
+);
+
 const compile = evaluate(`${file}:12:9: error: cannot find 'WindowTitles' in scope\n`, 42, 0);
 assert.equal(compile.exit_status, 42, 'the actual native process failure is retained');
 assert.ok(

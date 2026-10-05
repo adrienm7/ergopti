@@ -575,5 +575,190 @@ class NativeCensusStageControls(unittest.TestCase):
             )
 
 
+class NativeDirectoryReasonControls(unittest.TestCase):
+    """Reason projection observes unchanged native admission and exact exceptions."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("sparkle_directory_reason", HELPER)
+        self.helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.helper)
+
+    def testAllSevenDirectoryRefusalsKeepTheirOriginalExceptionAndBoundedReceipt(self):
+        helper = self.helper
+        cases = [
+            ("metadata", PermissionError(13, "PRIVATE_METADATA", "/PRIVATE_KEY")),
+            ("missing", FileNotFoundError(2, "PRIVATE_MISSING", "/PRIVATE_KEY")),
+            ("not-absolute", None),
+            ("not-directory", None),
+            ("mode", None),
+            ("owner", None),
+            ("canonical", None),
+        ]
+        for reason, original in cases:
+            with self.subTest(reason=reason):
+                path = mock.MagicMock()
+                path.is_absolute.return_value = reason != "not-absolute"
+                path.resolve.return_value = object() if reason == "canonical" else path
+                metadata = mock.Mock()
+                metadata.st_mode = (0o100000 if reason == "not-directory" else 0o040000) | (
+                    0o755 if reason == "mode" else 0o700
+                )
+                metadata.st_uid = 1001 if reason == "owner" else 1000
+                path.lstat.return_value = metadata
+                if original is not None:
+                    path.lstat.side_effect = original
+                with (
+                    mock.patch.object(helper, "Path", return_value=path),
+                    mock.patch.object(helper.sys, "platform", "darwin"),
+                    mock.patch.object(helper.os, "geteuid", return_value=1000, create=True),
+                    mock.patch.object(helper.ctypes, "CDLL") as library,
+                ):
+                    expected = type(original) if original is not None else RuntimeError
+                    with self.assertRaises(expected) as caught:
+                        helper.census(["/PRIVATE_KEY"])
+                    if original is not None:
+                        self.assertIs(caught.exception, original)
+                        self.assertEqual(caught.exception.errno, original.errno)
+                    else:
+                        self.assertEqual(str(caught.exception), "Private Sparkle directory refused")
+                    self.assertEqual(caught.exception._sparkle_directory_reason, reason)
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with (
+                        contextlib.redirect_stdout(stdout),
+                        contextlib.redirect_stderr(stderr),
+                    ):
+                        status = helper.entrypoint(["census", "/PRIVATE_KEY"])
+                    self.assertEqual(status, 1)
+                    self.assertEqual(stderr.getvalue(), "Private Sparkle fixture refused.\n")
+                    self.assertEqual(
+                        json.loads(stdout.getvalue()),
+                        {
+                            "schema": 4,
+                            "code": "directory-refused",
+                            "helper_pid": os.getpid(),
+                            "reason": reason,
+                        },
+                    )
+                    self.assertNotIn("PRIVATE", stdout.getvalue() + stderr.getvalue())
+                    self.assertLessEqual(len(stdout.getvalue().encode()), 512)
+                    library.assert_not_called()
+                    self.assertEqual(
+                        path.lstat.call_count, 2, "one metadata snapshot per admission"
+                    )
+
+    def testPredicateOrderAndShortCircuitKeepOneMetadataSnapshotAndNoExtraReads(self):
+        helper = self.helper
+        ordered = [
+            "metadata",
+            "not-absolute",
+            "not-directory",
+            "mode",
+            "owner",
+            "canonical",
+        ]
+        for failure_index in range(1, 6):
+            with self.subTest(first_refusal=ordered[failure_index]):
+                calls = []
+                path = mock.MagicMock()
+                metadata = mock.Mock(st_mode=0o040700, st_uid=1000)
+                path.lstat.side_effect = lambda: (calls.append("metadata"), metadata)[1]
+                path.is_absolute.side_effect = lambda: (
+                    calls.append("not-absolute"),
+                    failure_index != 1,
+                )[1]
+                path.resolve.side_effect = lambda: (
+                    calls.append("canonical"),
+                    object(),
+                )[1]
+                with (
+                    mock.patch.object(helper, "Path", return_value=path),
+                    mock.patch.object(
+                        helper.stat,
+                        "S_ISDIR",
+                        side_effect=lambda _: (
+                            calls.append("not-directory"),
+                            failure_index != 2,
+                        )[1],
+                    ),
+                    mock.patch.object(
+                        helper.stat,
+                        "S_IMODE",
+                        side_effect=lambda _: (
+                            calls.append("mode"),
+                            0o755 if failure_index == 3 else 0o700,
+                        )[1],
+                    ),
+                    mock.patch.object(
+                        helper.os,
+                        "geteuid",
+                        side_effect=lambda: (
+                            calls.append("owner"),
+                            1001 if failure_index == 4 else 1000,
+                        )[1],
+                        create=True,
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError, "^Private Sparkle directory refused$"
+                    ) as caught:
+                        helper.private_directory("/PRIVATE_KEY")
+                self.assertEqual(calls, ordered[: failure_index + 1])
+                self.assertEqual(caught.exception._sparkle_directory_reason, ordered[failure_index])
+                path.lstat.assert_called_once()
+
+    def testPhysicalDirectoryRefusalsAndForeignReasonTextCannotAdmitOrLeak(self):
+        helper = self.helper
+        with tempfile.TemporaryDirectory(prefix="sparkle-directory-control-") as temporary:
+            root = Path(temporary).resolve()
+            root.chmod(0o700)
+            self.assertEqual(helper.private_directory(root), root)
+            root.chmod(0o755)
+            with self.assertRaisesRegex(
+                RuntimeError, "^Private Sparkle directory refused$"
+            ) as caught:
+                helper.private_directory(root)
+            self.assertEqual(caught.exception._sparkle_directory_reason, "mode")
+            root.chmod(0o700)
+            with self.assertRaises(FileNotFoundError) as caught:
+                helper.private_directory(root / "PRIVATE_MISSING")
+            self.assertEqual(caught.exception._sparkle_directory_reason, "missing")
+            if os.name != "nt":
+                (root / "physical").mkdir(mode=0o700)
+                (root / "alias").symlink_to(root / "physical", target_is_directory=True)
+                (root / "physical" / "child").mkdir(mode=0o700)
+                with self.assertRaisesRegex(
+                    RuntimeError, "^Private Sparkle directory refused$"
+                ) as caught:
+                    helper.private_directory(root / "alias" / "child")
+                self.assertEqual(caught.exception._sparkle_directory_reason, "canonical")
+        for reason in [None, True, ["mode"], "PRIVATE_KEY", "mode\nPRIVATE_ARGV"]:
+            failure = RuntimeError("PRIVATE_METADATA")
+            failure._sparkle_census_stage = "private-root"
+            failure._sparkle_directory_reason = reason
+            self.assertEqual(
+                helper.census_stage_packet(failure),
+                {
+                    "schema": 3,
+                    "code": "stage-refused",
+                    "helper_pid": os.getpid(),
+                    "stage": "private-root",
+                },
+            )
+        failure._sparkle_directory_reason = "mode"
+        for pid in [0, True, 2147483648, "PRIVATE_KEY"]:
+            with mock.patch.object(helper.os, "getpid", return_value=pid):
+                self.assertIsNone(helper.census_stage_packet(failure))
+        failure._sparkle_census_stage = "library"
+        self.assertEqual(
+            helper.census_stage_packet(failure),
+            {
+                "schema": 3,
+                "code": "stage-refused",
+                "helper_pid": os.getpid(),
+                "stage": "library",
+            },
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
