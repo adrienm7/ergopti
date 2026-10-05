@@ -2571,6 +2571,8 @@ The existing installed-Hammerspoon supplementary owner now requires a complete a
 
 The existing before-package native Canvas gate now requires the same actual Hammerspoon Script SDK and inverse measurement through a private diagnostic source layout. It starts only after the original Canvas process owner settles and reuses the strict native bootstrap, source hashes and retirement receipts. All original Canvas assertions remain. This makes actual SDK execution possible despite independent Sparkle/Brew package failures, but cannot qualify an installed release application; manual macOS CI remains required.
 
+Actual Windows CI exposed two fixture premises in the new semantic snapshot controls: a stale caps raw-row lookup despite a names source, and an applied-record count omitting the independently supplied trigger. The successor retains all other assertions, checks the real trigger positively and expects both valid records. Native Windows execution remains required; no production loader or retirement policy changes.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
