@@ -161,6 +161,7 @@ local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_
 -- Dynamic hotstrings engine (optional — loads personal_info.toml, registers
 -- @-tag letter shortcuts and date expansion rules).
 local dyn_hotstrings = RuntimeGuard.optional_require("modules.dynamic_hotstrings.manager")
+local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 
 -- Updater engine (optional — checks GitHub releases, downloads and installs updates).
 local updater = RuntimeGuard.optional_require("modules.updater.manager")
@@ -204,6 +205,12 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local ShutdownCoordinator = require("infra.shutdown_coordinator")
 local shutdown = ShutdownCoordinator.new({
 	pre_wait = {
+		{
+			name = "programmable hotstrings",
+			stop = function()
+				return not dyn_hotstrings or dyn_hotstrings.stop_user_code() == true
+			end,
+		},
 		{
 			name = "updater background checks",
 			stop = function()
@@ -658,9 +665,15 @@ local function main()
 		end)
 	end
 
-	local mapping_count = hotstrings_config.load_all()
-	Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
-		mapping_count, hotstrings_config.parse_error_count())
+	local mapping_count, committed, _, receipt = hotstrings_config.load_all(nil, true)
+	if committed ~= true then
+		Logger.warn(LOG, "The startup hotstring catalogue is unavailable; unrelated app features continue.")
+	elseif type(receipt) ~= "table" or receipt.complete ~= true then
+		Logger.warn(LOG, "Common autocorrection is unavailable; %d unrelated hotstring mapping(s) loaded.", mapping_count)
+	else
+		Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
+			mapping_count, hotstrings_config.parse_error_count())
+	end
 	BootProfiler.stage_done("config", string.format("%d mapping(s), %d parse error(s), log level %s",
 		mapping_count, hotstrings_config.parse_error_count(), ScriptSettings.current()))
 
@@ -698,6 +711,7 @@ local function main()
 	-- captures it as an upvalue — otherwise on_char would read a never-assigned
 	-- global that stays nil, silently disabling password-app suppression.
 	local _cached_app_id = nil
+	local user_hotstring_native
 
 	-- The expansion that just fired, kept only until the next keystroke. A
 	-- Backspace pressed immediately after an expansion means "that is not what I
@@ -769,6 +783,8 @@ local function main()
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
+			if user_hotstring_native then user_hotstring_native.observe_input() end
+			if dyn_hotstrings then dyn_hotstrings.invalidate_user_code("script pause transition") end
 			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
 			-- modifier held through the pause is released.
 			TapHold.set_paused(paused)
@@ -816,10 +832,43 @@ local function main()
 			end
 		end,
 	})
+	local on_char
+	if dyn_hotstrings then
+		local native = UserHotstringRuntime.new({
+			engine = engine, injector = injector, magic = MagicKey,
+			detector = secure_field_detector, focus_guard = secure_focus_guard,
+			capture_gate = input_capture_gate, dynamic = dyn_hotstrings,
+			window_info = window_info, keylogger = keylogger,
+			paused = script_actions.is_paused,
+			replay_input = function(queued_input)
+				for _, queued in ipairs(queued_input) do
+					local ch = type(queued) == "table" and queued.char or queued
+					local scancode = type(queued) == "table" and queued.scancode or nil
+					if not pcall(on_char, ch, scancode) then
+						Logger.error(LOG, "Programmable output committed but queued input replay failed.")
+						return false
+					end
+				end
+				return true
+			end,
+		})
+		user_hotstring_native = native
+		if dyn_hotstrings.start_user_code(native) ~= true then
+			error("programmable hotstring native generation did not initialize")
+		end
+		local user_preferences = require("infra.hotstring_preferences")
+		if dyn_hotstrings.set_user_code_time_activation(
+			user_preferences.get("hotstrings.dynamic.user_code.time_activation_seconds")) ~= true then
+			error("canonical programmable-hotstring interval did not commit before hook startup")
+		end
+		if dyn_hotstrings.set_user_code_enabled(user_preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then
+			Logger.error(LOG, "Programmable hotstrings remain closed after source admission refusal.")
+		end
+	end
 
 	-- 8.5) Define the character callback.
-	local on_char
 	local function handle_char(ch, scancode)
+		if user_hotstring_native then user_hotstring_native.observe_input() end
 		-- If an injection is in flight, queue this character so it is replayed
 		-- after the synthetic backspace+replacement events complete. This
 		-- prevents physical keystrokes from interleaving with injected text
@@ -1094,12 +1143,12 @@ local function main()
 			-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
 			-- Must run AFTER the static hotstring matcher so explicit triggers
 			-- take precedence over dynamic expansions.
-			if dyn_hotstrings and dyn_hotstrings.is_enabled() then
+			if dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
 				local ok_dh2, expanded, dynamic_event = pcall(function()
 					return dyn_hotstrings.on_trigger(buf, ch)
 				end)
 				if ok_dh2 and expanded then
-					if dynamic_event then
+					if dynamic_event and not dynamic_event.pending_user then
 						-- The seventh argument is not optional, whatever its default
 						-- says. The STATIC path a hundred lines up has always passed
 						-- `result.is_private`; this one never did, so every @-tag
@@ -1115,7 +1164,7 @@ local function main()
 					end
 					-- Dynamic expansion consumed the trigger — reset the engine
 					-- buffer so the expansion text doesn't trigger further matches.
-					engine:reset()
+					if not dynamic_event or not dynamic_event.pending_user then engine:reset() end
 				end
 			end
 		end
@@ -1131,6 +1180,7 @@ local function main()
 	local capture_owned_scancodes = {}
 	local function handle_physical(scancode, _key_name, _char, value)
 		if value ~= InputEvent.VALUE_DOWN then return end
+		if user_hotstring_native then user_hotstring_native.observe_input() end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
 			keylogger.suppress()
@@ -1226,6 +1276,7 @@ local function main()
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
 	-- 8.7) Define the control-key callback.
 	local function handle_control(key_name, detail)
+		if user_hotstring_native then user_hotstring_native.observe_input() end
 		-- A modifier chord. Two things happen here that could not happen before,
 		-- because the hook reported the bare string "shortcut" and dropped which
 		-- key it was: the user's own binding runs, and the press is recorded.

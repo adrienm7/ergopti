@@ -34,28 +34,74 @@
 			"uk": "Автовиправлення",
 			"zh": "自动纠错"
 		},
-		"hotstrings/autocorrection.toml#caps": {
-			"ar": "أحرف كبيرة تلقائية: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"cs": "Automatická velká písmena: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"da": "Automatisk stort begyndelsesbogstav: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"de": "Automatische Großschreibung: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"en": "Auto capitalisation: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"es": "Mayúsculas automáticas: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"fr": "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"he": "אותיות גדולות אוטומטיות: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"hi": "स्वचालित बड़े अक्षर: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"it": "Maiuscole automatiche: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"ja": "自動大文字化：chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"ko": "자동 대문자: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"nl": "Automatische hoofdletters: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"no": "Automatisk stor bokstav: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"pl": "Automatyczne wielkie litery: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"pt": "Maiúsculas automáticas: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"ru": "Автоматические заглавные буквы: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"sv": "Automatisk versalisering: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"tr": "Otomatik büyük harf: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"uk": "Автоматичні великі літери: chatgpt = ChatGPT, powerpoint = PowerPoint, …",
-			"zh": "自动大写：chatgpt = ChatGPT，powerpoint = PowerPoint，…"
+		"hotstrings/autocorrection.toml#names": {
+			"ar": "الأسماء والمنتجات",
+			"cs": "Jména a produkty",
+			"da": "Navne og produkter",
+			"de": "Namen und Produkte",
+			"en": "Names and products",
+			"es": "Nombres y productos",
+			"fr": "Noms et produits",
+			"he": "שמות ומוצרים",
+			"hi": "नाम और उत्पाद",
+			"it": "Nomi e prodotti",
+			"ja": "名前と製品",
+			"ko": "이름과 제품",
+			"nl": "Namen en producten",
+			"no": "Navn og produkter",
+			"pl": "Nazwy i produkty",
+			"pt": "Nomes e produtos",
+			"ru": "Имена и продукты",
+			"sv": "Namn och produkter",
+			"tr": "Adlar ve ürünler",
+			"uk": "Назви та продукти",
+			"zh": "名称和产品"
+		},
+		"hotstrings/autocorrection.toml#abbreviations": {
+			"ar": "الاختصارات",
+			"cs": "Zkratky",
+			"da": "Forkortelser",
+			"de": "Abkürzungen",
+			"en": "Abbreviations",
+			"es": "Abreviaturas",
+			"fr": "Abréviations",
+			"he": "קיצורים",
+			"hi": "संक्षिप्त रूप",
+			"it": "Abbreviazioni",
+			"ja": "略語",
+			"ko": "약어",
+			"nl": "Afkortingen",
+			"no": "Forkortelser",
+			"pl": "Skróty",
+			"pt": "Abreviações",
+			"ru": "Сокращения",
+			"sv": "Förkortningar",
+			"tr": "Kısaltmalar",
+			"uk": "Скорочення",
+			"zh": "缩写"
+		},
+		"hotstrings/autocorrection.toml#technical_terms": {
+			"ar": "المصطلحات التقنية",
+			"cs": "Technické termíny",
+			"da": "Tekniske termer",
+			"de": "Technische Begriffe",
+			"en": "Technical terms",
+			"es": "Términos técnicos",
+			"fr": "Termes techniques",
+			"he": "מונחים טכניים",
+			"hi": "तकनीकी शब्द",
+			"it": "Termini tecnici",
+			"ja": "技術用語",
+			"ko": "기술 용어",
+			"nl": "Technische termen",
+			"no": "Tekniske termer",
+			"pl": "Terminy techniczne",
+			"pt": "Termos técnicos",
+			"ru": "Технические термины",
+			"sv": "Tekniska termer",
+			"tr": "Teknik terimler",
+			"uk": "Технічні терміни",
+			"zh": "技术术语"
 		},
 		"hotstrings/magickey.toml": {
 			"ar": "مفتاح ★ وتوسيع النص",
@@ -1892,13 +1938,35 @@
 									],
 									"items": [
 										{
-											"path": "hotstrings.autocorrection.caps.enabled",
+											"path": "hotstrings.autocorrection.names.enabled",
 											"value": true,
 											"default": false,
 											"recommended": false,
 											"label": [
 												{
-													"text_ref": "hotstrings/autocorrection.toml#caps"
+													"text_ref": "hotstrings/autocorrection.toml#names"
+												}
+											]
+										},
+										{
+											"path": "hotstrings.autocorrection.abbreviations.enabled",
+											"value": true,
+											"default": false,
+											"recommended": false,
+											"label": [
+												{
+													"text_ref": "hotstrings/autocorrection.toml#abbreviations"
+												}
+											]
+										},
+										{
+											"path": "hotstrings.autocorrection.technical_terms.enabled",
+											"value": true,
+											"default": false,
+											"recommended": false,
+											"label": [
+												{
+													"text_ref": "hotstrings/autocorrection.toml#technical_terms"
 												}
 											]
 										}
@@ -3509,13 +3577,35 @@
 									],
 									"items": [
 										{
-											"path": "hotstrings.modules.autocorrection.caps",
+											"path": "hotstrings.modules.autocorrection.names",
 											"value": true,
 											"default": false,
 											"recommended": false,
 											"label": [
 												{
-													"text_ref": "hotstrings/autocorrection.toml#caps"
+													"text_ref": "hotstrings/autocorrection.toml#names"
+												}
+											]
+										},
+										{
+											"path": "hotstrings.modules.autocorrection.abbreviations",
+											"value": true,
+											"default": false,
+											"recommended": false,
+											"label": [
+												{
+													"text_ref": "hotstrings/autocorrection.toml#abbreviations"
+												}
+											]
+										},
+										{
+											"path": "hotstrings.modules.autocorrection.technical_terms",
+											"value": true,
+											"default": false,
+											"recommended": false,
+											"label": [
+												{
+													"text_ref": "hotstrings/autocorrection.toml#technical_terms"
 												}
 											]
 										}
@@ -4635,13 +4725,35 @@
 									],
 									"items": [
 										{
-											"path": "hotstrings.modules.autocorrection.caps",
+											"path": "hotstrings.modules.autocorrection.names",
 											"value": true,
 											"default": false,
 											"recommended": false,
 											"label": [
 												{
-													"text_ref": "hotstrings/autocorrection.toml#caps"
+													"text_ref": "hotstrings/autocorrection.toml#names"
+												}
+											]
+										},
+										{
+											"path": "hotstrings.modules.autocorrection.abbreviations",
+											"value": true,
+											"default": false,
+											"recommended": false,
+											"label": [
+												{
+													"text_ref": "hotstrings/autocorrection.toml#abbreviations"
+												}
+											]
+										},
+										{
+											"path": "hotstrings.modules.autocorrection.technical_terms",
+											"value": true,
+											"default": false,
+											"recommended": false,
+											"label": [
+												{
+													"text_ref": "hotstrings/autocorrection.toml#technical_terms"
 												}
 											]
 										}

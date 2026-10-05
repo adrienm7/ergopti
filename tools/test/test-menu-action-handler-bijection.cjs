@@ -51,6 +51,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -188,18 +189,23 @@ for (const { key, driver, ext } of PLATFORMS) {
 	// The driver's production source, as one corpus. A handler is "named" when
 	// the row id appears as a quoted string: every driver dispatches by id, and
 	// the id has to be written down somewhere to be dispatched on.
-	const chunks = [];
+	const chunks = [],
+		nativeSources = [];
 	(function walk(dir) {
 		for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
 			const p = path.join(dir, e.name);
 			if (e.isDirectory()) {
 				if (e.name !== 'tests' && e.name !== 'vendor' && e.name !== 'node_modules') walk(p);
 			} else if (path.extname(e.name) === ext) {
-				chunks.push(fs.readFileSync(p, 'utf8'));
+				const src = fs.readFileSync(p, 'utf8');
+				chunks.push(src);
+				nativeSources.push({ rel: path.relative(base, p), src });
 			}
 		}
 	})(base);
-	const corpus = chunks.join('\n');
+	const delegated = delegatedMenuSources(nativeSources, path.join(SP, '_shared', 'lua'));
+	const sharedHandlers = new Set(delegated.flatMap((source) => [...source.handlers]));
+	const corpus = chunks.concat(delegated.map((source) => source.src)).join('\n');
 
 	if (chunks.length < 20) {
 		errors.push(`${driver}: read only ${chunks.length} source file(s) — the scan is broken`);
@@ -233,7 +239,8 @@ for (const { key, driver, ext } of PLATFORMS) {
 	}
 
 	const unresolved = declared.filter(
-		({ id }) => !corpus.includes(`"${id}"`) && !corpus.includes(`'${id}'`)
+		({ id }) =>
+			!corpus.includes(`"${id}"`) && !corpus.includes(`'${id}'`) && !sharedHandlers.has(id)
 	);
 	summary.push(`${key} ${unresolved.length}/${BASELINE[key]}`);
 

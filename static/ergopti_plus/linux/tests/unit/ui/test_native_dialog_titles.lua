@@ -16,7 +16,8 @@ local Shell = require("adapters.shell_runner")
 local function scenario(body)
 	local names = { "ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
 		"modules.gestures.system_actions", "infra.i18n", "adapters.shell_runner", "ui.modal",
-		"adapters.storage", "adapters.event_loop" }
+		"adapters.storage", "adapters.event_loop", "adapters.keyboard_hook",
+		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local original_popen = io.popen
@@ -24,8 +25,13 @@ local function scenario(body)
 		["dialog.config_folder.select_title"] = "Select configuration folder",
 		["menu.gestures.conflict_title"] = "Gesture conflicts",
 		["dialog.confirm_action.title"] = "Confirm action",
+		["common.error_title"] = "Native 'error'",
+		["menu.hotstrings.user_code.error"] = "Preserved <programmable failure>",
+		["menu.hotstrings.user_code.open_source"] = "Open source",
+		["common.close"] = "Keep closed",
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end }
+	package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+		section = function(key) return labels[key] or key end }
 	package.loaded["ui.modal"] = { run = function(fn) observed.modals = observed.modals + 1; return fn() end }
 	package.loaded["adapters.storage"] = {
 		get = function(_, default) return default end,
@@ -186,6 +192,89 @@ h.describe("native menu dialog captions", function()
 end)
 
 
+h.describe("programmable source native dialog caption", function()
+	local replies = {
+		{ name = "affirmative repair", dialog = true, repair = true },
+		{ name = "cancelled dialog", dialog = false },
+		{ name = "unavailable dialog", dialog = nil },
+		{ name = "nonboolean dialog acknowledgement", dialog = "yes" },
+		{ name = "repair command refusal", dialog = true, repair = false },
+		{ name = "foreign owner during affirmative dialog", dialog = true, foreign = true },
+		{ name = "modal handoff refusal", modal_refused = true },
+	}
+	for _, reply in ipairs(replies) do
+		h.it("(linux-native-titles-programmable) actual error callback preserves caption and repair policy: " .. reply.name, function()
+			scenario(function(observed, shell)
+				local calls = { reload = 0, create = 0, enable = 0, time = 0, path = 0, changed = 0 }
+				local native = {
+					is_enabled = function() return true end,
+					reload_user_code = function() calls.reload = calls.reload + 1; return false end,
+					create_user_code_example = function() calls.create = calls.create + 1; return false end,
+					set_user_code_enabled = function() calls.enable = calls.enable + 1; return false end,
+					set_user_code_time_activation = function() calls.time = calls.time + 1; return false end,
+					user_code_source_path = function() calls.path = calls.path + 1; return "/owned/source 'programmable'.lua" end,
+				}
+				local ctx = { dyn_hotstrings = native, paused = false, is_paused = function() return false end,
+					on_menu_changed = function() calls.changed = calls.changed + 1 end }
+				package.loaded["infra.hotstring_preferences"] = { get = function(key)
+					if key == "hotstrings.dynamic.user_code.enabled" then return false end
+					h.assert_eq(key, "hotstrings.dynamic.user_code.time_activation_seconds")
+					return 0.5
+				end }
+				-- Exercise genuine modal delegation with an exact native keyboard
+				-- handoff receipt, rather than replacing the dialog consumer itself.
+				local released = false
+				package.loaded["adapters.keyboard_hook"] = { while_released = function(fn, options)
+					observed.modals = observed.modals + 1
+					h.assert_nil(options)
+					if reply.modal_refused then return false end
+					released = true
+					local result = fn()
+					released = false
+					return result
+				end }
+				package.loaded["ui.modal"] = nil
+				shell.run = function(command)
+					observed.commands[#observed.commands + 1] = command
+					if command:find("zenity --question", 1, true) == 1 then
+						h.assert_true(released, "the native dialog owns a released keyboard")
+						if reply.foreign then ctx.dyn_hotstrings = {} end
+						return reply.dialog
+					end
+					h.assert_eq(released, false, "repair runs after the modal keyboard receipt returns")
+					return reply.repair
+				end
+				local rows = require("ui.menu.programmatic_hotstrings").build(ctx)
+				h.assert_eq(#rows, 4, "the actual manifest renderer must expose all declared source controls")
+				h.assert_eq(calls, { reload = 0, create = 0, enable = 0, time = 0, path = 0, changed = 0 },
+					"rendering cannot enter any native source loading or factory execution port")
+				h.assert_eq(#observed.commands, 0)
+				h.assert_eq(observed.modals, 0)
+				h.assert_type(rows[3].fn, "function", "the actual declared reload command must be reachable")
+				h.assert_eq(rows[3].fn(), false, "native reload refusal remains a refusal even after repair is offered")
+				h.assert_eq(calls.reload, 1)
+				h.assert_eq(calls.create, 0); h.assert_eq(calls.enable, 0); h.assert_eq(calls.time, 0)
+				h.assert_eq(calls.changed, 0, "failed source publication cannot refresh successful state")
+				h.assert_eq(observed.modals, 1)
+				h.assert_eq(released, false)
+				if reply.modal_refused then
+					h.assert_eq(observed.commands, {})
+				else
+					h.assert_eq(observed.commands[1], "zenity --question --title=" .. Shell.quote("ErgoptiPlus — Native 'error'")
+						.. " --text='Preserved <programmable failure>' --ok-label='Open source' --cancel-label='Keep closed' 2>/dev/null")
+				end
+				local opened = reply.dialog == true and not reply.foreign
+				h.assert_eq(calls.path, opened and 1 or 0, "only affirmative repair can read the captured owner's source path")
+				h.assert_eq(#observed.commands, reply.modal_refused and 0 or (opened and 2 or 1))
+				if opened then
+					h.assert_eq(observed.commands[2], "xdg-open " .. Shell.quote("/owned/source 'programmable'.lua") .. " >/dev/null 2>&1 &")
+				end
+			end)
+		end)
+	end
+end)
+
+
 h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
@@ -195,6 +284,9 @@ h.describe("native caption consumer inventory", function()
 			["ui/gesture_conflicts.lua"] = 1,
 			["modules/gestures/system_actions.lua"] = 2,
 			["ui/menu/menu_builder.lua"] = 3,
+			-- The seven real programmable error-callback cases above prove its exact
+			-- branded question caption, modal handoff and affirmative-only repair.
+			["ui/menu/programmatic_hotstrings.lua"] = 1,
 			["modules/llm/local_model_offer.lua"] = 2,
 			-- The enable refusal tests prove both policy-owned native captions and modal receipts.
 			["ui/llm_enable_refusal.lua"] = 2,

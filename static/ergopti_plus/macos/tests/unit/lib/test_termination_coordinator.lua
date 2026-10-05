@@ -42,6 +42,7 @@ local function load_coordinator(options)
 	local coordinator = require("infra.termination_coordinator")
 	helpers.assert_true(coordinator.is_initialized() == false)
 	local initialized = coordinator.init({
+		capture_publication_admission = options.capture_publication_admission,
 		request_lease = function(reason, callback)
 			calls.lease_requests = calls.lease_requests + 1
 			calls.reason = reason
@@ -152,6 +153,88 @@ local function load_coordinator(options)
 end
 
 helpers.describe("controlled termination coordinator", function()
+	helpers.it("refuses publication debt before requesting a fence or arming the user-quit watchdog", function()
+		local captures = 0
+		local coordinator, calls = load_coordinator({ capture_publication_admission = function()
+			captures = captures + 1
+			return nil
+		end })
+		helpers.assert_eq(coordinator.request_reload("pending-source"), false)
+		helpers.assert_eq(coordinator.request_user_exit("pending-source"), false)
+		helpers.assert_eq(captures, 2)
+		helpers.assert_eq(calls.lease_requests, 0)
+		helpers.assert_nil(calls.watchdog_callback)
+		helpers.assert_eq(calls.teardowns, 0)
+		helpers.assert_eq(calls.fatal_exits, 0)
+	end)
+
+	helpers.it("retains the same admitted token across delayed reload and quit upgrade", function()
+		local live, captures, releases = true, 0, 0
+		local token = { current = function() return live end, abort = function()
+			releases = releases + 1; live = false; return true
+		end }
+		local coordinator, calls = load_coordinator({ capture_publication_admission = function()
+			captures = captures + 1; return token
+		end })
+		helpers.assert_true(coordinator.request_reload("first"))
+		helpers.assert_true(coordinator.request_user_exit("quit"))
+		helpers.assert_eq(captures, 1, "an upgrade retains the existing exact admission")
+		helpers.assert_eq(calls.lease_requests, 1)
+		helpers.assert_eq(releases, 0)
+		calls.lease_callback(true, "stopped")
+		helpers.assert_eq(calls.exits, 1)
+		helpers.assert_eq(releases, 0, "a terminal transition never reopens publication")
+	end)
+
+	helpers.it("retains refused admission abort and caller compensation until the same release acknowledges", function()
+		local release, captures, aborts, compensated = false, 0, 0, 0
+		local token = { current = function() return true end, abort = function()
+			aborts = aborts + 1; return release
+		end }
+		local coordinator, calls = load_coordinator({ capture_publication_admission = function()
+			captures = captures + 1; return token
+		end })
+		helpers.assert_true(coordinator.request_reload_owned("first", function() compensated = compensated + 1 end))
+		calls.lease_callback(false, "refused")
+		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(coordinator.pending_stage(), "hotstring-publication-admission-abort")
+		helpers.assert_eq(compensated, 0)
+		helpers.assert_eq(coordinator.request_user_exit("second"), false)
+		helpers.assert_eq(captures, 1)
+		helpers.assert_nil(calls.watchdog_callback)
+		helpers.assert_eq(calls.fatal_exits, 0)
+		release = true
+		helpers.assert_true(coordinator.request_reload("retry"))
+		helpers.assert_eq(compensated, 1)
+		helpers.assert_eq(captures, 2)
+		helpers.assert_eq(aborts, 3)
+	end)
+
+	helpers.it("releases an acquired token when the lease request rejects before a callback", function()
+		local releases = 0
+		local coordinator, calls = load_coordinator({ request_accepted = false,
+			capture_publication_admission = function() return { current = function() return true end,
+				abort = function() releases = releases + 1; return true end } end })
+		helpers.assert_eq(coordinator.request_reload("refused"), false)
+		helpers.assert_eq(releases, 1)
+		helpers.assert_eq(coordinator.is_pending(), false)
+		helpers.assert_eq(calls.teardowns, 0)
+	end)
+
+	helpers.it("uses the existing fatal path if a retained admission is revoked after native STOPPED", function()
+		local live, releases = true, 0
+		local coordinator, calls = load_coordinator({ capture_publication_admission = function()
+			return { current = function() return live end, abort = function() releases = releases + 1; return true end }
+		end })
+		helpers.assert_true(coordinator.request_reload("revoked"))
+		live = false
+		calls.lease_callback(true, "stopped")
+		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_eq(calls.teardowns, 1)
+		helpers.assert_eq(calls.fatal_exits, 1)
+		helpers.assert_eq(releases, 0)
+	end)
+
 	helpers.it("retains an exclusive reload caller until the exact lease aborts", function()
 		local coordinator, calls = load_coordinator()
 		local aborted = 0

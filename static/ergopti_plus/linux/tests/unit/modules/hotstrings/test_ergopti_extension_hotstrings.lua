@@ -331,6 +331,74 @@ helpers.describe("Ergopti extension hotstrings: the user's own copies", function
 		end)
 end)
 
+helpers.describe("Ergopti extension hotstrings: explicit user source publication", function()
+	helpers.it("(ergopti-user-bound-source) publishes both user replacements through the actual compiled engine", function()
+		local dir = user_folder()
+		write(dir .. "/distancesreduction.toml", one_entry_pack("qu", "qa", "my distance"))
+		write(dir .. "/rolls.toml", one_entry_pack("mine", "zqx", "my roll"))
+		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		Config._set_override_config_dir_for_test(dir)
+		local engine = require("hotstring_engine").new()
+		local Choices = require("tests.support.hotstring_choices")
+		local ok, err = pcall(function()
+			Choices.with_file(Config, '[hotstrings]\ngroups = { distancesreduction = true, rolls = true }\n'
+				.. '[hotstrings.modules]\ndistancesreduction = { qu = true }\nrolls = { mine = true }\n', function(choice_path)
+				local before = Choices.read(choice_path)
+				helpers.assert_true(Config.init(engine, dir))
+				local _, accepted = Config.load_all(); helpers.assert_true(accepted)
+				local categories = Config.get_categories()
+				for _, row in ipairs({ { "distancesreduction", "qa", "my distance" }, { "rolls", "zqx", "my roll" } }) do
+					helpers.assert_eq(categories[row[1]].path, dir .. "/" .. row[1] .. ".toml")
+					helpers.assert_eq(categories[row[1]].count, 1)
+					engine:reset(); local result
+					for char in row[2]:gmatch(".") do result = engine:on_char(char) end
+					helpers.assert_not_nil(result, "the actual selected source reaches the matcher")
+					helpers.assert_eq(result.group, row[1]); helpers.assert_eq(result.replacement, row[3])
+				end
+				helpers.assert_eq(Choices.read(choice_path), before, "source routing does not rewrite stored category choices")
+			end)
+		end)
+		for _, name in ipairs({ "distancesreduction.toml", "rolls.toml", "hotstrings_overrides.toml", "hotstrings_overrides.toml.tmp" }) do
+			os.remove(dir .. "/" .. name)
+		end
+		os.remove(dir)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("Ergopti extension hotstrings: no-follow user source discovery", function()
+	helpers.it("(ergopti-user-bound-source) keeps a linked user copy from replacing the exact shipped category", function()
+		local dir = user_folder()
+		local target = os.tmpname()
+		write(target, one_entry_pack("mine", "zqx", "Foreign roll"))
+		local link = dir .. "/rolls.toml"
+		assert(require("lfs").link(target, link, true))
+		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		Config._set_override_config_dir_for_test(dir)
+		local engine = require("hotstring_engine").new()
+		local Choices = require("tests.support.hotstring_choices")
+		local ok, err = pcall(function()
+			Choices.with_file(Config, '[hotstrings]\ngroups = { rolls = true }\n[hotstrings.modules]\nrolls = { hc = true }\n', function(choice_path)
+				local before = Choices.read(choice_path)
+				helpers.assert_true(Config.init(engine, dir))
+				local _, accepted = Config.load_all(); helpers.assert_true(accepted)
+				local category = Config.get_categories().rolls
+				helpers.assert_true(category.path:find("/layouts/registry/ergopti/hotstrings/rolls.toml", 1, true) ~= nil)
+				helpers.assert_eq(category.count, 35)
+				helpers.assert_eq(Config.personal_file_sources(), {}, "native no-follow discovery grants no descriptor for the link")
+				engine:reset(); engine:on_char("h")
+				local shipped = engine:on_char("c")
+				helpers.assert_not_nil(shipped); helpers.assert_eq(shipped.group, "rolls"); helpers.assert_eq(shipped.replacement, "wh")
+				engine:reset(); engine:on_char("z"); engine:on_char("q")
+				helpers.assert_nil(engine:on_char("x"), "an excluded link never activates its payload")
+				helpers.assert_eq(Choices.read(choice_path), before)
+			end)
+		end)
+		os.remove(link); os.remove(target); os.remove(dir)
+		if not ok then error(err, 0) end
+	end)
+end)
+
 helpers.describe("Ergopti extension hotstrings: the Hotstrings scope", function()
 	-- The scope planner writes a manifest recommendation only for a bundled
 	-- category. Listing the bundled folder alone left the moved categories out,

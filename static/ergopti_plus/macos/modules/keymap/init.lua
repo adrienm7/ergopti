@@ -167,6 +167,9 @@ local loopback_keyup_tap = nil
 local eventtap_is_enabled
 local start_eventtap
 local _started = false
+local _user_hotstring_lifecycle = {}
+local _user_hotstring_input = {}
+local _user_hotstring_elapsed = 0
 local _one_shot_shift = nil
 local _diagnostic_mailbox_started = false
 
@@ -474,6 +477,7 @@ end
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
 --- @return boolean committed
 function M.pause_processing()
+	_user_hotstring_lifecycle = {}
 	CoreState.processing_paused = true
 	discard_paused_text_context()
 	if pause_observed_context_reconcile() ~= true then
@@ -644,6 +648,7 @@ M.invalidate_hotstring_preview = LLMBridge.invalidate_hotstring_preview
 --- @return function wrapped
 local function preview_fenced_registry_mutation(fn, changes_source)
 	return function(...)
+		_user_hotstring_lifecycle = {}
 		if LLMBridge.invalidate_hotstring_preview() ~= true then
 			Logger.error(LOG, "Registry mutation refused because the active hotstring preview could not be revoked.")
 			return false
@@ -662,11 +667,13 @@ end
 M.add                   = preview_fenced_registry_mutation(Registry.add)
 M.load_file             = preview_fenced_registry_mutation(Registry.load_file, true)
 M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, true)
+M.replace_personal_source = preview_fenced_registry_mutation(Registry.replace_personal_source, true)
 -- Exposed so the hotstring editor can show the personal source default (the
 -- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
 -- hardcoding it in the UI.
 M.source_priority       = Registry.source_priority
 M.personal_file_scope_binding = Registry.personal_file_scope_binding
+M.capture_publication_owner = Registry.capture_publication_owner
 M.is_section_enabled    = Registry.is_section_enabled
 M.disable_section       = preview_fenced_registry_mutation(Registry.disable_section, true)
 M.enable_section        = preview_fenced_registry_mutation(Registry.enable_section, true)
@@ -802,7 +809,9 @@ end
 --- @param emit_action function Emitter returning (count, emitted[, logical]).
 --- @param source_variant string|nil Telemetry variant tag.
 --- @param is_private boolean|nil True when the payload is PII and must be redacted.
-function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_private)
+--- @param publication table|nil Retained programmable output guards.
+--- @param target table|userdata|nil Exact captured target for guarded publication.
+function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_private, publication, target)
 	local next_buffer, splice_error =
 		text_utils.replace_utf8_tail(CoreState.buffer, deletes, result_text)
 	if next_buffer == nil then
@@ -829,8 +838,161 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_
 		false, -- is_ignored
 		"hotstring",
 		source_variant,
-		is_private
+		is_private, nil, target, publication
 	)
+end
+
+--- Applies the canonical programmable-family delay through the existing owner.
+--- @param seconds number Nonnegative activation interval.
+--- @return boolean committed
+function M.set_user_hotstring_time_activation(seconds)
+	if type(seconds) ~= "number" or seconds < 0 or seconds ~= seconds or seconds == math.huge then return false end
+	_user_hotstring_lifecycle = {}
+	local sections = CoreState.SECTION_DELAYS.dynamichotstrings
+	if not sections then sections = {}; CoreState.SECTION_DELAYS.dynamichotstrings = sections end
+	sections.user_code = seconds
+	CoreState.recompute_word_timeout()
+	return true
+end
+
+--- Returns whether ordinary registered mappings already own this magic action.
+--- @param buffer string Text preceding the physical magic event.
+--- @return boolean owned
+function M.has_registered_magic_action(buffer)
+	local resolution = Expander.resolve_magic_action(buffer)
+	return resolution ~= nil and #resolution.attempts > 0
+end
+
+--- Captures the exact input, lifecycle and classified native destination.
+--- @param rule table Admitted programmable suffix descriptor.
+--- @return table|nil capture
+function M.capture_user_hotstring(rule)
+	if not _started or CoreState.processing_paused == true
+		or not SyntheticInput.admission_open() then return nil end
+	local destination = km_utils.capture_text_destination()
+	if not destination or CoreState.buffer:sub(-#rule.suffix) ~= rule.suffix
+		or M.has_registered_magic_action(CoreState.buffer) then return nil end
+	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = "user_code" },
+		_user_hotstring_elapsed, 1) ~= true then return nil end
+	return { lifecycle = _user_hotstring_lifecycle, input = _user_hotstring_input,
+		epoch = SyntheticInput.current_action_epoch(), buffer = CoreState.buffer,
+		destination = destination, magic = M.get_trigger_char() }
+end
+
+--- Admits a deferred programmable action only for its original cursor context.
+--- @param capture table Exact receipt returned by capture_user_hotstring().
+--- @return boolean current
+function M.owns_user_hotstring(capture)
+	return type(capture) == "table" and _started == true
+		and CoreState.processing_paused ~= true and SyntheticInput.admission_open()
+		and capture.lifecycle == _user_hotstring_lifecycle
+		and capture.input == _user_hotstring_input
+		and capture.epoch == SyntheticInput.current_action_epoch()
+		and capture.buffer == CoreState.buffer and capture.magic == M.get_trigger_char()
+		and km_utils.owns_text_destination(capture.destination) == true
+end
+
+--- Checks the original physical owner after its own logical buffer commit.
+--- @param capture table Programmable input receipt.
+--- @return boolean current
+function M.owns_user_hotstring_publication_cached(capture)
+	local destination = km_utils.capture_text_destination()
+	return type(capture) == "table" and _started == true and CoreState.processing_paused ~= true
+		and SyntheticInput.admission_open() and capture.lifecycle == _user_hotstring_lifecycle
+		and capture.input == _user_hotstring_input and capture.magic == M.get_trigger_char()
+		and M.is_group_enabled("dynamichotstrings") == true and destination ~= nil
+		and destination.generation == capture.destination.generation
+		and destination.pid == capture.destination.pid and destination.window_id == capture.destination.window_id
+		and destination.element == capture.destination.element
+end
+
+--- Probes native destination only outside the raw event tap.
+--- @param capture table Programmable input receipt.
+--- @return boolean current
+function M.owns_user_hotstring_publication(capture)
+	return M.owns_user_hotstring_publication_cached(capture) == true
+		and km_utils.owns_text_destination(capture.destination) == true
+		and M.owns_user_hotstring_publication_cached(capture) == true
+end
+
+--- Retains exact native output, scheduler cleanup and clipboard debt settlement.
+--- @param transaction table Synthetic replacement transaction.
+--- @param capture table Original physical owner.
+--- @return table receipt Strict asynchronous cancellation and settlement ports.
+local function publication_receipt(transaction, capture)
+	local callbacks, notified, observers_ready = {}, false, true
+	local receipt = {}
+	function receipt.is_settled()
+		if transaction.completed ~= true or km_utils.publication_clipboard_settled(transaction) ~= true then return false end
+		for _, batch in ipairs(transaction.batches) do
+			if batch.paced_owner and batch.paced_owner.timer ~= nil then return false end
+		end
+		return true
+	end
+	local function notify()
+		if notified or receipt.is_settled() ~= true then return end
+		notified = true
+		if transaction.completion_status ~= "complete" and capture.input == _user_hotstring_input then
+			CoreState.buffer, CoreState.llm_buffer = "", ""
+			CoreState.start_is_word_boundary = false
+		end
+		for _, callback in ipairs(callbacks) do callback(transaction.completion_status) end
+	end
+	function receipt.on_settled(callback)
+		if type(callback) ~= "function" then return false end
+		if notified then callback(transaction.completion_status); return true end
+		callbacks[#callbacks + 1] = callback
+		notify()
+		return observers_ready
+	end
+	function receipt.cancel()
+		if transaction.completed ~= true then pcall(SyntheticInput.cancel, transaction) end
+		if transaction.completed == true then km_utils.cancel_publication_clipboard(transaction) end
+		notify()
+		return receipt.is_settled() == true
+	end
+	local observed = pcall(SyntheticInput.on_complete, transaction, function()
+		local ok, registered = pcall(km_utils.observe_publication_clipboard, transaction, notify)
+		if not ok or registered ~= true then observers_ready = false end
+		notify()
+	end)
+	if not observed then observers_ready = false end
+	for _, batch in ipairs(transaction.batches) do
+		local owner = batch.paced_owner
+		if owner and owner.timer then
+			local ok, registered = pcall(TimerScheduler.onSettled, owner.timer, notify)
+			if not ok or registered ~= true then observers_ready = false end
+		end
+	end
+	local ok, registered = pcall(km_utils.observe_publication_clipboard, transaction, notify)
+	if not ok or registered ~= true then observers_ready = false end
+	return receipt, observers_ready
+end
+
+--- Commits one admitted user result through the ordinary replacement owner.
+--- @param result string|boolean Replacement, action acknowledgement or cancellation.
+--- @param capture table Original input owner.
+--- @param rule table Original suffix descriptor.
+--- @param admit function|nil Full retained source/generation guard for completion.
+--- @param publication table|nil Independent guards surviving callback completion.
+--- @return boolean committed Native publication accepted.
+--- @return table|nil receipt Actual output and cleanup settlement owner.
+function M.commit_user_hotstring(result, capture, rule, admit, publication)
+	if admit then
+		if admit() ~= true then return false end
+	elseif M.owns_user_hotstring(capture) ~= true then return false end
+	if result == true then return true end
+	local deletes, replacement = utf8.len(rule.suffix), result
+	if result == false then deletes, replacement = 0, capture.magic end
+	local guarded = result ~= false and publication or nil
+	local committed, transaction = M.inject_dynamic(deletes, replacement, function()
+		return km_utils.emit_text(replacement)
+	end, "user_dynamic", true, guarded, guarded and capture.destination.app or nil)
+	if guarded and transaction ~= nil then
+		local receipt, observed = publication_receipt(transaction, capture)
+		return committed == true and observed == true, receipt
+	end
+	return committed == true
 end
 
 --- Starts a provenance-bearing replacement transaction for an external injector.
@@ -1278,6 +1440,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	end
 
 	local dt  = now - CoreState.last_key_time
+	_user_hotstring_elapsed = dt
 	CoreState.last_key_time = now
 	local flags = e:getFlags()
 
@@ -1558,6 +1721,7 @@ local function onKeyDown(e)
 		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
 		return true, fence_events
 	end
+	if provenance_status ~= EventProvenance.STATUS_OWNED then _user_hotstring_input = {} end
 
 	-- Synthetic injectors reached below build tagged Quartz events instead of
 	-- posting them recursively from inside this eventtap. The collector hands the
@@ -1707,6 +1871,7 @@ shift_tap = eventtap.new(
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
 		if provenance then return false end
+		_user_hotstring_input = {}
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			_shift_left_down = false
 			_shift_right_down = false
@@ -2002,6 +2167,7 @@ end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
+	_user_hotstring_lifecycle = {}
 	if _started and _watchdog_committed == true
 		and taps_are_enabled() and watchdog_is_running(_watchdog_timer)
 		and diagnostic_mailbox_is_running()
@@ -2108,6 +2274,7 @@ end
 --- Stops the eventtap listeners and cleans up prediction state.
 --- @param teardown boolean|nil Also destroy ignored-window watchers on reload/quit.
 function M.stop(teardown)
+	_user_hotstring_lifecycle = {}
 	Logger.start(LOG, "Stopping keymap engine…")
 	-- A held submit key still depends on the replacement's settle fence. Keep
 	-- context guards and taps alive until replay settles; an early teardown would

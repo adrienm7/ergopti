@@ -5,4 +5,4 @@ description = "Shipped migrations preserve the retired macOS Layer + Scroll swit
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 6
-to_version = 10
+to_version = 11

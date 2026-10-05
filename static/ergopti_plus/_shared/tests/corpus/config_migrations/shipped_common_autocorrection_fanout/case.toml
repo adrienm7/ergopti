@@ -1,0 +1,6 @@
+[case]
+description = "The shipped common autocorrection split fans out both native activation shapes and timing while retaining explicit new choices and unknown legacy leaves."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 10
+to_version = 11

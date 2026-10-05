@@ -1760,8 +1760,14 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
   file/runtime/next-save state and restores its snapshot on refusal.
   Windows native units, engine E2E, packaging and installation passed in
   validation run 37084553184. The overall run remains unsuccessful because of
-  the macOS clean-launch gate. Editing hand-written array-of-table delimiters
-  remains unfinished.
+  the macOS clean-launch gate. Both Lua drivers now admit handwritten
+  `[[hotstrings.terminators]]` records and expose Add/Delete/toggle through
+  their source-fenced whole-list persistence owners. Restart, refusal and
+  unowned-neighbor preservation have callable regression coverage. Changed
+  lists normalize to inline TOML; standalone comments remain preserved.
+  Windows currently consumes native delimiter strings rather than custom
+  record lists; the missing record consumer/editor is an explicit PC
+  implementation step below, alongside native qualification.
 
 The measured-delay native fixture now isolates the real corpus metadata
 cache from the earlier resolution-cascade double and restores the exact
@@ -1812,6 +1818,8 @@ valid duplicate retained after removal may become admitted on a later reload.
 Complete three-OS native qualification remains pending, so item 34 stays partial.
 
 Pending custom-delimiter additions and changes are now admitted through the real reader against the planned preserved list before publication or an empty-plan acknowledgement. A retained duplicate cannot silently mask a new key, character, label or consume choice. Semantic refusal preserves source bytes and leaves the delta available for rollback or retry after explicit cleanup; actual writer source fencing and unknown record/comment preservation remain intact. Linux focused registered tests qualify both Delete→Add cases and changed-record collisions; complete three-OS native qualification remains pending.
+
+Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo34-delays-and-handwritten-delimiters) for this item; prepared sources and portable checks do not establish Windows runtime success.
 
 - [~] **35.** Unregister the remap guardian LaunchAgent when key remapping
   is turned OFF or its rules are removed. The same owned transaction now joins
@@ -1982,6 +1990,9 @@ and Brew install/upgrade/refusal/recovery still require macOS qualification.
   - [ ] Build/install/upgrade/uninstall that same Windows source SHA without a
         release; verify both required extension TOML files, no retired French source
         fallback, no duplicate Layout row and preserved personal files/preferences.
+
+Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo37-shipped-ergopti-sections) for this item; prepared sources and portable checks do not establish Windows runtime success.
+
 - [ ] **38.** Real-device checks the container cannot run: macOS tap-holds and
       the guardian's Login Items steps, the Homebrew install writing settings
       (provenance fix), Windows tooltip rendering on 10/11, every new menu row and
@@ -3479,75 +3490,75 @@ source-consent, transaction and metadata assertion remains intact. This is a
 fixture correction, not additional personal-file gate completion. Native
 execution and complete qualification of the corrected fixture remain pending.
 
+Controlled macOS personal-source tests pass 30/0 and native registry ownership tests pass 10/0; focused Linux controls pass 20/0. The actual producer is composed, but its staging-only cleanup receipt omission and final regular-file identity boundary remain unqualified producer follow-ups. Pending recovery closes normal reload/quit admission before the watchdog; physical native qualification is still required.
+
+Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo102-personal-files-and-source-controls) for this item; prepared sources and portable checks do not establish Windows runtime success.
+
 - [~] **104.** Split common autocorrections into meaningful selectable sections.
-  An independent pre-split corpus now freezes all 140 rules, flags, metadata,
-  delays, common priority and historical order. The shared editorial catalogue
-  classifies 34 names, 95 abbreviations and 11 technical terms outside runtime
-  category discovery. Actual reader/registry/cache regressions compare the
-  complete legacy corpus on every driver; native Windows CI remains pending.
-  No source, section ID, label or activation choice changes in this slice.
-  The runtime split still needs conditional fan-out migration of config.toml
-  choices and the independent hotstrings_overrides.toml timing/presentation
-  overrides, preserved global order, 21-locale names and per-section E2E.
-  Never regenerate these historical expectations from the split source.
-  The Windows value-clone owner now preserves Map comparison modes and
-  independently owns typed TOML Boolean wrappers. Four registered native
-  regressions cover distinct quoted keys, nested mutation in both directions,
-  typed render/readback and an isolated generic clone without the TOML class.
-  Native Windows proof remains pending; unsupported opaque objects keep their
-  previous identity contract.
-  The native clone probe now sets Map.CaseSense while the fixture map is
-  empty, before inserting values; AHK forbids changing that setting afterwards.
-  Checkpoint 37056318950 demonstrated the fixture setup error. Production
-  cloning and all independence/case-sensitivity assertions remain unchanged.
-  Checkpoint 37061649827 additionally exposed the redundant global class
-  declaration through the unchanged native namespace audit. Read-only class
-  references already resolve the global constant, so the clone owner now
-  keeps its IsSet guard without redeclaring TOML_Bool. The absent-class probe
-  and every typed-copy assertion remain intact; native validation is pending.
-  Shared Lua, Windows and the JS reference now specify `copy_if_absent`:
-  copy an existing source into an unoccupied destination, retaining the source
-  and every explicit destination, including false and occupied ancestor or
-  descendant namespaces. Copies independently own supported collections and
-  preserve source records. Three independent fixtures and five registry
-  defects cover ordering, repeated/no-op copies and strict shape validation;
-  the original engine failed five new cases. Focused JS, macOS 40/40 and Linux
-  LuaJIT 37/37 passed; full/native Windows validation remains pending.
-  Schema version remains 8 and no runtime subsection split is introduced.
-  The Windows registry now owns every registration sequence identity;
-  transported builder or caller metadata cannot replace it. The independent
-  140-rule corpus exposed the second sequence allocator in native CI; its
-  historical order assertions remain intact. Four registered native cases
-  cover prebuilt metadata, mixed factories, override attempts and group
-  isolation. The corresponding Lua registries retain their existing single
-  sequence owners. Checkpoint 37061649827 then exposed a distinct Windows
-  admission bug: an earlier case-conform rule wins mixed input it subsequently
-  refuses, hiding an executable exact-case entry. STAR and END matchers now
-  consult the existing pure conform policy before arbitration, matching the
-  shared Lua engine. Regressions cover both insertion orders, actual priorities
-  and sequences, valid case forms, exact mixed fallback and no-op masking,
-  without invoking callbacks during matching. The original circumflex matrix
-  and independent historical corpora remain intact; native validation is pending.
+  The runtime source now contains 34 names, 95 abbreviations and 11 technical
+  terms, with genuinely translated labels in all 21 languages. The independent
+  pre-split corpus still freezes all 140 rules, flags, metadata, delays,
+  historical order and common priority; never regenerate those expectations
+  from the split implementation. French contextual packs retain their own
+  existing identities, choices and registration order.
+  Schema version 11 conditionally fans out stored common choices through
+  `copy_if_absent`, preserving explicit destinations, including false and
+  occupied ancestor or descendant namespaces. Override migration copies only
+  recognized delay/color/show_tooltip/priority leaves into unoccupied family
+  destinations, then removes only the recognized old leaves. Unknown records,
+  global preferences, comments and unrelated sources remain preserved. Strict
+  source classification and compare-and-swap ownership fence preparation,
+  publication and inverse restoration; malformed owned state cannot be
+  advertised as successfully migrated or admitted.
+  Cold startup reports a partial receipt when common admission is refused:
+  unrelated categories may still load, while unavailable common sources are
+  omitted before parsing and registration. Ordinary live reload retains its
+  complete-image refusal policy and prior committed image. Desired choices
+  remain unchanged. Registered regressions cover occupied destinations,
+  repeated migrations, invalid sources, historical case/order arbitration,
+  native cache identities and default/live refusal after partial cold startup.
+  The actual Linux common suite passes 19 cases; portable macOS cold-start
+  ownership checks and the independent migration/reference checks pass.
+  Native post-publication refusal and retained lock-release debt remain
+  unqualified. The common migration must retain that invocation's physical
+  receipt and exact forward/inverse ownership; observing converted bytes on
+  a later reload cannot acknowledge the original failed write or clear debt.
+  Full selected verification, native Windows/macOS qualification, per-section
+  E2E, packaging and installation remain required before removing this item.
+  Portable Lua and source checks do not qualify physical native input.
 
-TODO 104 remains partial: the shared hotstring reader now retains physical entry order, and common autocorrection consumes it through the three native registry/cache owners. Independent interleaving tests preserve cross-section insertion precedence while French packs and bound-source owners keep their existing declared order. The current caps identity and all 140 historical rules, flags, metadata, delays and common priority remain unchanged. The runtime family split, config/override migration and full hosted parity validation remain outstanding.
+Focused recovery passes 14/0, including five terminal-admission cases. The composed producer now retains staging-only receipts, pins regular-file and staging-directory identities, and preserves ordinary release-only cleanup alongside guarded private inverses through one native removal implementation. Serial portable Mac-target conditional-removal, cooperative configuration, Writer and staging controls pass 178/0, retaining the original refusal assertions. Native release debt remains owned across forward and inverse publication. This is cooperative pathname ownership; portable controls do not establish hosted macOS locking, physical input, packaging or installation.
 
-Windows native qualification follow-up: the new ordered-cache fixtures now use the existing JsonParse owner. Privacy/options and two-sided magic-marker source guards inspect the shared native row registrar and explicitly verify both the legacy generated-section and source-ordered category routes, including the bound-source fallback. Two additional native route cases preserve privacy, preview snapshots, both marker replacements and caller-map independence. Portable source/convention/encoding checks pass; actual Windows CI qualification remains required. TODO104 remains partial: the runtime family split and owned migration are not implemented.
-
-Partial: Windows source-order regression inputs now use independently authored legal native inline-table fields and explicit flags, preserving the frozen shared interleaving expectations, metadata, defaults and historical 140-rule corpus. The real parser must admit every fixture record before cache and registry order are judged. Portable controls reproduce the old zero-row admission and qualify all six interleaved/four bound inputs; actual native AHK and full three-OS CI remain pending. No production parser or registration policy changed.
-
-Linux ordinary hotstring override setters and clears now edit only changed owned delay/color/show_tooltip/priority leaves through the existing shared TOML writer. Classified load checkpoints fence preparation and publication; unknown records, quoted identities and untouched comments survive, stale/unreadable/malformed sources and refused I/O retain RAM/cache, and scope publication/restoration threads the actual ScopeFile classified target (including absent versus present-empty). Ten focused Linux cases pass; seven of the original nine fail against the original writer, and an additional absent-scope case fails against the first candidate. The unchanged real engine priority/restart fixture and all 52 original assertions remain. Root selected verification and full three-OS CI remain pending. This is an override ownership prerequisite only: the runtime section split, schema/config fanout and override migration remain unfinished. The existing isolated delay/priority fixture now initializes its real classified source checkpoint before saving; all former assertions remain intact and its previously failing actual case passes.
+Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo104-common-autocorrection-families) for this item; prepared sources and portable checks do not establish Windows runtime success.
 
 The hotstring formatter now supports an explicit preamble directive for sources whose physical registration order is intentional. Marked files retain interleaved array boundaries and rule order while canonical rule layout and syntax admission remain mandatory; unmarked files keep the existing sorter. The independent 140-rule corpus remains unchanged. This is a tooling prerequisite for the prepared family split; runtime migration and native acceptance remain separate.
 
-- [ ] **105.** Let users define programmable dynamic hotstrings on Windows,
-      macOS and Linux, separately from the ordinary hotstrings editor. Provide
-      a documented user-code entry point under "Dynamic hotstrings", examples
-      and a callback API that lets users compute any replacement/action rather
-      than limiting them to the editor's fields. Share the trigger, callback,
-      enable/disable and lifecycle contracts; isolate native implementations.
-      Preserve user source files, report load/execution errors visibly, and
-      cover real callback execution, live enable/disable, cancellation and
-      suspended/privacy-filtered input with automated cross-driver tests.
+- [~] **105.** Let users define programmable dynamic hotstrings on Windows,
+  macOS and Linux, separately from the ordinary hotstrings editor. Provide
+  a documented user-code entry point under "Dynamic hotstrings", examples
+  and a callback API that lets users compute any replacement/action rather
+  than limiting them to the editor's fields. Share the trigger, callback,
+  enable/disable and lifecycle contracts; isolate native implementations.
+  Preserve user source files, report load/execution errors visibly, and
+  cover real callback execution, live enable/disable, cancellation and
+  suspended/privacy-filtered input with automated cross-driver tests.
+  Prepared shared trigger/source/lifecycle policy and native facades now
+  cover opt-in loading, callback execution, private destination admission,
+  cancellation debt and source-preserving menu commands. Configuration
+  inverses must retain admitted callbacks without evaluating the factory
+  again, require the same native owner and operation-assigned revision,
+  and refuse foreign mutations or unsettled cancellation. Missing sources
+  may support an acknowledged closed-only inverse, never active admission.
+  Portable and real Linux GTK/AT-SPI checks have executed; reopened scope
+  regressions are still being qualified. The compiled Windows worker probe
+  is prepared and independently reviewed, but has not executed natively.
+  Full final-source verification, Windows/macOS execution, E2E, packaging
+  and installation remain required. These checks do not replace items 16
+  and 38 or establish physical X11/Wayland keyboard behavior.
+
+Final focused Lua validation passes macOS runtime53/scope30/shared40/transport86 and Linux runtime49/shared40/transport31, with no failures or skips in those selections. Deferred output retains the actual native publication receipt after callback completion; source/lifecycle fences and strict cleanup acknowledgement remain required. Foreign clipboard ownership leaves honest unsettled debt. Hosted native/installation and physical input remain unqualified.
+
+Windows-dependent acceptance is explicitly deferred to the maintainer PC. Complete the [Group 2 Windows continuation](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo105-programmable-hotstrings) for this item; prepared sources and portable checks do not establish Windows runtime success.
 
 - [ ] **106.** Expand the shared gesture/keyboard action catalogue for user
       automation. Discover and offer Apple Shortcuts on macOS; inventory and

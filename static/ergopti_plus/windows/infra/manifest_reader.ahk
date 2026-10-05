@@ -35,6 +35,8 @@
 ; check the generated file's encoding before debugging the codegen logic.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\personal_file_descriptors.ahk
+
 ; Defensive optional include — file is produced by ``npm run build:manifest``,
 ; committed, and drift-gated. The ``*i`` flag means a missing manifest (deleted
 ; or not yet regenerated) is surfaced by ManifestEnsureLoaded() instead of
@@ -230,7 +232,10 @@ ManifestDynamicEntry(V2Path) {
 }
 
 ; The neutral value is the sole interpretation of an absent setting.
-ManifestDefaultFor(V2Path) => ManifestValueFor(V2Path, "default")
+ManifestDefaultFor(V2Path) {
+	AdditionalDefault := PersonalFilePreferenceDefault(V2Path)
+	return AdditionalDefault is Integer ? AdditionalDefault : ManifestValueFor(V2Path, "default")
+}
 
 ; Recommendations are imported only by an explicit configuration action.
 ManifestRecommendedFor(V2Path) => ManifestValueFor(V2Path, "recommended")
@@ -253,6 +258,18 @@ ManifestValuesEqual(Left, Right) {
 
 ; Create one native TOML batch row with explicit deletion intent.
 ManifestConfigRow(V2Path, Value := unset, Delete := false) {
+	if PersonalFilePreferenceDefault(V2Path) is Integer {
+		Parts := TOML_ParseKeyPath(V2Path, true)
+		Key := Parts.Pop(), Section := ""
+		for Part in Parts
+			Section .= (Section == "" ? "" : ".") . TOML_RenderKey(Part)
+		Row := { Section: Section, Key: Key }
+		if Delete
+			Row.Delete := 1
+		else
+			Row.Value := ManifestCloneValue(Value)
+		return Row
+	}
 	Dot := InStr(V2Path, ".", true, -1)
 	if !Dot
 		throw Error("Configuration paths require a section and key.")

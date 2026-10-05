@@ -46,6 +46,7 @@ const { SHARED_REL } = require('../lib/paths.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUILDER = path.join(ROOT, 'tools', 'build', 'build_static_bundle.py');
 const MANIFEST = path.join(ROOT, 'tools', 'build', 'windows_bundle_manifest.json');
+const REQUIRED_RUNTIME_ASSETS = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).required;
 const DRIVER_REL = 'static/ergopti_plus/windows';
 const ENTRY_REL = `${DRIVER_REL}/ErgoptiPlus.ahk`;
 const VENDOR_REL = `${DRIVER_REL}/vendor`;
@@ -85,7 +86,10 @@ const NEVER_RUNTIME = [
 const NEVER_SHIPPED = [
 	['machine-specific stub', (arc) => /(?:^|\/)(?:personal_shortcuts\.ahk|paths\.toml)$/.test(arc)],
 	['runtime cache', (arc) => /(?:^|\/)prefetch[^/]*\.json$/.test(arc) || arc.endsWith('.tsv')],
-	['compile-time library', (arc) => /^vendor\/[^/]*\.ahk$/.test(arc)]
+	[
+		'compile-time library',
+		(arc) => /^vendor\/[^/]*\.ahk$/.test(arc) && arc !== 'vendor/ergopti_user_hotstrings.ahk'
+	]
 ];
 
 const errors = [];
@@ -678,6 +682,12 @@ function audit(shipped, refs) {
 		if (!shipped.has(arc)) problems.push(`${arc} is not shipped but ${why}`);
 	};
 
+	// Separately executed workers can be named through an external command
+	// boundary. The manifest's required runtime contract also applies to every
+	// selection mutation, independently of the source-reference extractor.
+	for (const asset of REQUIRED_RUNTIME_ASSETS)
+		need(asset.dest, 'the bundle manifest declares it a required runtime asset');
+
 	// Literal file names in the AutoHotkey sources.
 	for (const lit of refs.literals) {
 		// "..\x" climbs from a runtime folder the gate cannot know; the suffix
@@ -818,6 +828,7 @@ if (selection && refs) {
 	const mutations = [
 		['drop', `${SHARED_REL}/modules/llm/models.json`, 'a file name passed to a helper'],
 		['drop', 'vendor/sqlite3.dll', 'a root-anchored file'],
+		['drop', 'vendor/ergopti_user_hotstrings.ahk', 'the separately executed user callback worker'],
 		[
 			'drop',
 			'static/layouts/registry/ergopti/hotstrings/suffixes_a.toml',
@@ -840,7 +851,12 @@ if (selection && refs) {
 		],
 		['drop', `${registryFolder}/ergol/ergol.keylayout`, 'a file the registry index names'],
 		['add', sharedTest, 'a shared test corpus'],
-		['add', 'vendor/UIA.ahk', 'a compile-time library']
+		['add', 'vendor/UIA.ahk', 'a compile-time library'],
+		...REQUIRED_RUNTIME_ASSETS.map((asset) => [
+			'drop',
+			asset.dest,
+			'a declared required runtime asset'
+		])
 	];
 	for (const [kind, arc, label] of mutations) {
 		if (!arc || (kind === 'drop' && !shipped.has(arc))) {

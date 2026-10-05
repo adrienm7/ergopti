@@ -56,7 +56,7 @@ _MetaCheckBootDeferredTasks() {
 	; rule: they are part of the advertised input contract and must finish before
 	; ready.  A first trigger must never be literal because its registration timer
 	; has not run yet, nor may that timer contend with the user's first keystroke.
-	HotstringsPos := InStr(Body, "RegisterAllHotstrings(false)")
+	HotstringsPos := InStr(Body, "RegisterAllHotstrings(false, true)")
 	PrefixIndexPos := InStr(Body, "HotstringPrefixWatcherRebuildIndex()")
 	Assert(HotstringsPos > 0,
 		"ErgoptiPlus.ahk must register all hotstrings synchronously at boot")
