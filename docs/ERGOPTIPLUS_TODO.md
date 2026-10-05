@@ -3104,6 +3104,12 @@ checks pass; native execution, actual HTTP acceptance and production discovery
 menu integration remain required. This transport prerequisite does not close
 item 47.
 
+The Windows models timer producer now explicitly accepts exact cancellation or a
+negative native one-shot and refuses positive/untyped periods. This addresses
+the strict repeating-timer inventory failure without changing that inventory.
+Two additional registered native controls require real one-shot expiry and
+exact cancellation; hosted Windows qualification remains pending.
+
 Windows checkpoint 37227446912 at 02ddf2e18 actually passed all 17 discovery
 policy cases. The full unit result was 9053 passed and one pre-existing personal
 metadata fixture failure; E2E, packaging and installation did not execute.
