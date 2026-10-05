@@ -29,6 +29,7 @@ local ConfigOutdated = require("config_outdated")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local AuthPolicy = require("llm.local_server_auth")
 local SourceWriter = require("toml_codec.writer")
+local ProviderConfig = require("llm.provider_config_policy")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -130,8 +131,10 @@ end
 
 --- A usable entry, or nil.
 --- @param raw any
+--- @param stored boolean|nil True only for an existing physical source row.
 --- @return table|nil
-local function valid_entry(raw)
+--- @return string|nil detail Exact obsolete identity reason, when proven.
+local function valid_entry(raw, stored)
 	if type(raw) ~= "table" then return nil end
 	for _, key in ipairs({ "id", "provider", "label" }) do
 		if type(raw[key]) ~= "string" or raw[key] == "" then return nil end
@@ -139,8 +142,21 @@ local function valid_entry(raw)
 	for _, key in ipairs({ "model", "base_url" }) do
 		if raw[key] ~= nil and type(raw[key]) ~= "string" then return nil end
 	end
-	local _, servers = LocalCatalogue.load({})
-	if not AuthPolicy.token_allowed(raw.provider, raw.token, servers) then return nil end
+	if type(raw.token) ~= "string" then return nil end
+	local identity
+	if stored == true then
+		local receipt = require("modules.llm.api_remote").provider_config_receipt()
+		identity = ProviderConfig.classify(raw.provider, receipt)
+		if identity == "retired" then
+			return nil, "its provider is absent from the published cloud and local catalogues"
+		end
+	end
+	-- An unavailable inventory cannot disprove a stored optional-auth choice.
+	-- Candidate admission keeps its existing strict authentication owner.
+	if identity ~= "unpublished" then
+		local _, servers = LocalCatalogue.load({})
+		if not AuthPolicy.token_allowed(raw.provider, raw.token, servers) then return nil end
+	end
 	return {
 		id = raw.id,
 		provider = raw.provider,
@@ -214,7 +230,7 @@ local function state()
 	end
 	local ids = {}
 	for index, raw in ipairs(root.entries) do
-		local entry = valid_entry(raw)
+		local entry, outdated_reason = valid_entry(raw, true)
 		_state.row_order[#_state.row_order + 1] = { id = entry and entry.id or nil, raw = raw }
 		if entry and ids[entry.id] then _state.write_refusal = "it contains duplicate API entry identities" end
 		if entry then ids[entry.id] = true end
@@ -225,7 +241,7 @@ local function state()
 		else
 			_state.outdated[#_state.outdated + 1] = raw
 			ConfigOutdated.report_in_file(M.path(), entry_name(raw, index),
-				"its entry fields do not match this build's supported text types")
+				outdated_reason or "its entry fields do not match this build's supported text types")
 		end
 	end
 	if type(root.active_id) == "string" and M.get(root.active_id) then
