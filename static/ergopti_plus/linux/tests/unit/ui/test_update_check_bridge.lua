@@ -60,6 +60,7 @@ local function load_bridge(answer)
 	package.loaded["ui.changelog.bridge"] = {
 		push_subscribed_channel = function(id) context.channel_pushes[#context.channel_pushes + 1] = id end,
 	}
+	context.release = { tag = "v0.0.0-dev.150", download_url = "https://example.invalid/bundle.tar.gz" }
 	context.updater = {
 		get_channel = function() return context.channel end,
 		current_version = function() return "0.0.0-dev.144" end,
@@ -79,9 +80,8 @@ local function load_bridge(answer)
 		end,
 		get_state = function() return context.state end,
 		set_channel = function(id) context.sets[#context.sets + 1] = id; context.channel = id; return true end,
-		get_cached_release = function()
-			return { tag = "v0.0.0-dev.150", download_url = "https://example.invalid/bundle.tar.gz" }
-		end,
+		-- The real updater owns one cached record until the next actual offer.
+		get_cached_release = function() return context.release end,
 		download_update = function(url, callback)
 			context.downloads[#context.downloads + 1] = url
 			callback("/tmp/update.tar.gz", nil)

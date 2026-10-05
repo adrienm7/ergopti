@@ -39,15 +39,8 @@ local OPEN_BIN = "/usr/bin/open"
 -- System Settings > Network, where the relay (proxy) of a managed Mac is set.
 local NETWORK_SETTINGS_URL = "x-apple.systempreferences:com.apple.Network-Settings.extension"
 
--- The actions each network class offers, in display order (the order of
--- _shared/modules/network/managed_network.json, with the ones MLX can serve:
--- a retry, the network settings, and Ollama in place of an API).
-local NETWORK_ACTIONS = {
-	certificate  = { "retry", "alternative" },
-	proxy        = { "open_network_settings", "retry" },
-	host_blocked = { "retry", "alternative" },
-	offline      = { "retry", "open_network_settings" },
-}
+-- Immutable canonical policy, loaded once through the native shared-path owner.
+local _network_contract = nil
 
 -- Stateful singletons are resolved at call time: tests and reloads replace them.
 local function checker() return require("modules.llm.mlx_deps_checker") end
@@ -81,6 +74,60 @@ local _last_repair_failure = nil
 -- ======= 1/ Internal Helpers =========
 -- =====================================
 -- =====================================
+
+--- Loads shared policy data without a per-driver action or cause fallback.
+local function network_contract()
+	if _network_contract then return _network_contract end
+	local path = require("infra.paths").shared("modules/network/managed_network.json")
+	assert(type(path) == "string", "the shared managed network policy path is unavailable")
+	local text = assert(require("adapters.file_system").read(path), "the shared managed network policy is unreadable")
+	_network_contract = require("network.failure").new(require("json").decode(text))
+	return _network_contract
+end
+
+local function network_cause(cause)
+	if type(cause.network_report) == "table" then return cause.network_report.cause end
+	return cause.kind == "network_unknown" and "unknown" or cause.kind
+end
+
+local function has_network_contract(cause)
+	return type(cause.network_report) == "table" or Diagnosis.NETWORK_KINDS[cause.kind] == true
+end
+
+--- Rechecks the native revision after a modal chooser can run other callbacks.
+local function failure_is_current(cause)
+	return type(cause) == "table" and type(checker().failure_action_admitted) == "function"
+		and checker().failure_action_admitted(cause.failure_revision) == true
+end
+
+--- Capabilities describe actual native openers and the current failed intent.
+local function network_capabilities(cause)
+	local shell = require("adapters.shell_runner")
+	local fs = require("adapters.file_system")
+	local function regular_file(path)
+		if type(path) ~= "string" or path:sub(1, 1) ~= "/" then return false end
+		local status, attributes = fs.path_status(path)
+		return status == "present" and type(attributes) == "table" and attributes.mode == "file"
+	end
+	local can_open = type(shell.spawn) == "function" and regular_file(OPEN_BIN)
+	local log_path = Logger.today_log_path()
+	local log_exists = can_open and regular_file(log_path)
+	return {
+		owner_alive = failure_is_current(cause),
+		retry_available = not _installation_running and type(router().select_mlx) == "function",
+		proxy_settings_available = can_open == true,
+		diagnostics_available = log_exists == true,
+		alternative_backend_available = type(_alternative) == "function",
+	}, log_exists and log_path or nil
+end
+
+local function admitted_network_action(cause, id)
+	if not failure_is_current(cause) then return false end
+	for _, action in ipairs(network_contract().actions(network_cause(cause), network_capabilities(cause))) do
+		if action.id == id then return failure_is_current(cause) end
+	end
+	return false
+end
 
 --- Shows a path in the Finder.
 --- @param path string Absolute path.
@@ -130,21 +177,18 @@ local function dialog_for(cause)
 		venv = ok_venv and venv or nil,
 		log_path = Logger.today_log_path(),
 	})
-	if NETWORK_ACTIONS[cause.kind] then
-		-- A network failure: its plain cause and the actions that can fix it.
-		local labels = {
-			retry = i18n().get("network.action.retry"),
-			open_network_settings = i18n().get("network.action.open_proxy_settings"),
-			alternative = type(_alternative) == "function" and i18n().get("mlx.use_ollama") or nil,
-		}
-		local choices, actions = {}, {}
-		for _, action in ipairs(NETWORK_ACTIONS[cause.kind]) do
-			if labels[action] then
-				choices[#choices + 1] = labels[action]
-				actions[#actions + 1] = action
-			end
+	if has_network_contract(cause) then
+		local capabilities = network_capabilities(cause)
+		local actions = network_contract().actions(network_cause(cause), capabilities)
+		local choices, ids = {}, {}
+		for _, action in ipairs(actions) do
+			choices[#choices + 1] = i18n().get(action.label_key)
+			ids[#ids + 1] = action.id
 		end
-		return { title = i18n().get("mlx.repair_title"), body = body, choices = choices, actions = actions }
+		if #choices == 0 then
+			return { title = i18n().get("mlx.repair_title"), body = body, primary = i18n().get("common.ok") }
+		end
+		return { title = i18n().get("mlx.repair_title"), body = body, choices = choices, actions = ids }
 	end
 	if cause.kind == "unsupported" then
 		if type(_alternative) == "function" then
@@ -190,6 +234,10 @@ local function present(cause)
 		-- offer names what was found and carries the install.
 		return require("ui.python_runtime_offer").offer(cause.state)
 	end
+	if has_network_contract(cause) and not failure_is_current(cause) then
+		Logger.debug(LOG, "Retained MLX network failure is stale or its native task owner is still active.")
+		return false
+	end
 	local dialog = dialog_for(cause)
 	Logger.warn(LOG, "Offering the MLX %s action for a %s failure.",
 		tostring(dialog.action or (dialog.actions and table.concat(dialog.actions, "/")) or "acknowledge"),
@@ -206,17 +254,31 @@ local function present(cause)
 			return false
 		end
 		local action = chosen and dialog.actions[chosen] or nil
+		if action ~= nil and not admitted_network_action(cause, action) then
+			Logger.debug(LOG, "Retained MLX failure choice refused after its modal dialog: %s.", tostring(action))
+			return false
+		end
 		if action == "retry" then
-			M.repair()
-		elseif action == "open_network_settings" then
+			M.retry_failure(cause.failure_revision)
+		elseif action == "proxy_settings" then
 			local opened, started = pcall(function()
+				if not failure_is_current(cause) then return false end
 				local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { NETWORK_SETTINGS_URL }, nil)
 				return handle ~= nil and handle.start() == true
 			end)
 			if not opened or started ~= true then
 				Logger.error(LOG, "The network settings could not be opened: %s.", tostring(started))
 			end
-		elseif action == "alternative" then
+		elseif action == "diagnostics" then
+			local _, log_path = network_capabilities(cause)
+			if not log_path or not failure_is_current(cause) then return false end
+			local opened, started = pcall(function()
+				local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { log_path }, nil)
+				return handle ~= nil and handle.start() == true
+			end)
+			if not opened or started ~= true then Logger.error(LOG, "The failure log could not be opened.") end
+		elseif action == "alternative_backend" then
+			if not failure_is_current(cause) then return false end
 			local called, selected = pcall(_alternative)
 			if not called or selected == false then
 				Logger.error(LOG, "Selecting Ollama instead of MLX failed: %s.", tostring(selected))
@@ -310,16 +372,23 @@ end
 --- Runs the MLX runtime installation the user asked for through the router,
 --- then restarts the MLX model. A failure is presented by the router, which
 --- opens this offer again with its cause and the repair button.
---- @param mode string "install" for an absent runtime, "repair" to rebuild it.
+--- @param mode string "install" for an absent runtime, "repair" to rebuild it, "retry" to reuse it when valid.
+--- @param failure_revision number|nil Captured failed intent, required for a network retry.
 --- @return boolean accepted
-local function run_installation(mode)
-	local label = mode == "repair" and "repair" or "installation"
+local function run_installation(mode, failure_revision)
+	local label = mode == "repair" and "repair" or mode == "retry" and "retry" or "installation"
+	if failure_revision ~= nil and checker().failure_action_admitted(failure_revision) ~= true then return false end
 	if _installation_running then
 		Logger.info(LOG, "An MLX installation or repair is already running.")
 		return false
 	end
 	_installation_running = true
 	Logger.start(LOG, "Running the MLX %s on the user's request…", label)
+	if failure_revision ~= nil and checker().failure_action_admitted(failure_revision) ~= true then
+		_installation_running = false
+		Logger.warn(LOG, "MLX failure retry retired before native selection admission.")
+		return false
+	end
 	local ok, accepted = pcall(function()
 		return router().select_mlx(function(done)
 			_installation_running = false
@@ -349,7 +418,8 @@ local function run_installation(mode)
 				end
 			end
 			return true
-		end, mode == "repair" and { repair = true } or nil)
+		end, mode == "repair" and { repair = true }
+			or failure_revision ~= nil and { failure_revision = failure_revision } or nil)
 	end)
 	if not ok or accepted ~= true then
 		_installation_running = false
@@ -366,6 +436,13 @@ function M.repair()
 	return run_installation("repair")
 end
 
+--- Retries the exact failed native intent without granting a full runtime repair.
+--- @param revision number Captured failure receipt revision.
+--- @return boolean accepted
+function M.retry_failure(revision)
+	return run_installation("retry", revision)
+end
+
 --- Installs the absent MLX runtime, as selecting the MLX backend does, then
 --- restarts the MLX model; a failure opens the offer again with its own cause
 --- and the repair button.
@@ -378,6 +455,7 @@ end
 function M.reset()
 	_alternative, _resume, _pending_cause = nil, nil, nil
 	_scheduled, _asking, _installation_running, _last_repair_failure = false, false, false, nil
+	_network_contract = nil
 end
 
 return M

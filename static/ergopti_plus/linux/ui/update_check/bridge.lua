@@ -42,6 +42,7 @@ local APP = "update_check"
 -- The open window's session and the menu context it was opened with
 local _session = nil
 local _ctx = nil
+local _offer_serial = 0
 
 
 
@@ -76,49 +77,117 @@ local function push(message)
 		"if(window.receiveUpdateCheck)window.receiveUpdateCheck(" .. json .. ")")
 end
 
---- Downloads and installs the offered release, with its progress in the
---- shared download window; on_update_finished restarts the daemon on it.
---- @param updater table modules.updater.manager
---- @param result table The answer that offered the release.
+--- Downloads the exact consented offer for the dialog and the tray entrypoint.
+--- @param updater table Native updater owner.
+--- @param release table Exact cached authenticated release.
+--- @param ctx table|nil Captured menu hooks and current pause owner.
 --- @return boolean started
+function M.download_offered(updater, release, ctx)
+	if type(release) ~= "table" or updater.get_cached_release() ~= release
+		or Installation.is_source_run() then return false end
+	local state = updater.get_state()
+	if state == "checking" or state == "downloading" or state == "installing" then return false end
+	ctx = type(ctx) == "table" and ctx or {}
+	_offer_serial = _offer_serial + 1
+	local serial = _offer_serial
+	local tag, url, checksum = release.tag, release.download_url, release.checksum_url
+	local channel = updater.get_channel()
+	local owner = { active = false, terminal = false, attempt = 0, failed_download = false }
+	local session_id
+	local I18n = require("infra.i18n")
+	local DownloadWindow = require("ui.download_window.bridge")
+	local function current()
+		if serial ~= _offer_serial or owner.cancelled or owner.succeeded
+			or updater.get_cached_release() ~= release or release.tag ~= tag
+			or release.download_url ~= url or release.checksum_url ~= checksum
+			or updater.get_channel() ~= channel or Installation.is_source_run() then return false end
+		if type(ctx.is_paused) == "function" then
+			local ok, paused = pcall(ctx.is_paused)
+			if not ok or paused ~= false then return false end
+		elseif ctx.paused == true then return false end
+		-- A menu predicate may reenter the owner while checking current pause state.
+		return serial == _offer_serial and not owner.cancelled and not owner.succeeded
+			and updater.get_cached_release() == release and release.tag == tag
+			and release.download_url == url and release.checksum_url == checksum
+			and updater.get_channel() == channel
+	end
+	local function can_retry()
+		if not current() or owner.active or not owner.failed_download then return false end
+		local state = updater.get_state()
+		return (state == "idle" or state == "available") and type(updater.download_release) == "function"
+	end
+	local function diagnostics_available()
+		if not current() or type(ctx.on_open_today_log) ~= "function" then return false end
+		local shell = require("adapters.shell_runner")
+		if shell.has_command("xdg-open") ~= true then return false end
+		local file = io.open(require("infra.logger_sink").main_log_path(), "rb")
+		return file ~= nil and file:close() == true
+	end
+	local function finished(installed, stage)
+		if type(ctx.on_update_finished) ~= "function" then return end
+		local ok = pcall(ctx.on_update_finished, installed, tag, stage)
+		if not ok then Logger.error(LOG, "The bound update-completion hook raised.") end
+	end
+	local function dispatch(retry)
+		if not current() or owner.active or (retry and not can_retry()) then return false end
+		owner.attempt = owner.attempt + 1
+		local attempt = owner.attempt
+		owner.active, owner.terminal, owner.failed_download = true, false, false
+		local function done(archive, err, stage, failure_receipt)
+			if serial ~= _offer_serial or attempt ~= owner.attempt or owner.terminal or owner.cancelled then return end
+			owner.active, owner.terminal = false, true
+			if not current() then
+				if session_id and type(DownloadWindow.retire) == "function" then DownloadWindow.retire(session_id) end
+				return
+			end
+			local installed = archive ~= nil and updater.install_update(archive) == true
+			owner.succeeded = installed
+			owner.failed_download = archive == nil and stage ~= "verify"
+			if installed then Logger.success(LOG, "Update %s installed.", tag)
+			else Logger.error(LOG, "Update %s failed at the %s: %s.", tag,
+				archive and "install" or (stage or "download"), tostring(err)) end
+			if session_id ~= nil then
+				DownloadWindow.complete(session_id, installed, installed
+					and I18n.get("updater.installed_restarting"):gsub("{1}", function() return tag end)
+					or (stage == "verify"
+						and I18n.get("changelog_window.install_error_verify"):gsub("{tag}", function() return tag end)
+						or I18n.get(archive and "updater.install_error" or "updater.install_error_download")),
+					archive == nil and stage ~= "verify" and failure_receipt or nil)
+			end
+			finished(installed, archive and "install" or (stage or "download"))
+		end
+		local started
+		if retry then started = updater.download_release(release, done)
+		else started = updater.download_update(url, done) end
+		if started ~= true and not owner.terminal then done(nil, "update dispatch refused", "download") end
+		return started == true
+	end
+	session_id = DownloadWindow.show({
+		kind = "app_update", label = "ErgoptiPlus " .. tag,
+		is_current = current, can_retry = can_retry,
+		classify_failure = function() return owner.failed_download end,
+		on_retry = function() return dispatch(true) end,
+		on_cancel = function()
+			if not current() or not owner.active or updater.cancel_update() ~= true then return false end
+			owner.cancelled, owner.active = true, false
+			owner.attempt = owner.attempt + 1
+			return true
+		end,
+		on_diagnostics = ctx.on_open_today_log, can_open_diagnostics = diagnostics_available,
+	})
+	if session_id == nil then Logger.warn(LOG, "The download window could not open; the update downloads without it.") end
+	Logger.start(LOG, "Downloading the update %s…", tag)
+	return dispatch(false)
+end
+
+--- The check page transfers its consent to one exact cached download owner.
 local function install(updater, result)
 	local release = updater.get_cached_release()
 	if type(release) ~= "table" or release.tag ~= result.latest then
 		Logger.error(LOG, "Refused to install %s: the updater no longer offers it.", tostring(result.latest))
 		return false
 	end
-	-- A source run has no installation to replace; the menu greys its Update
-	-- row for the same reason. Nothing is downloaded.
-	if Installation.is_source_run() then
-		Logger.warn(LOG, "Refused to install %s: this is a local version run from source.", release.tag)
-		return false
-	end
-	local I18n = require("infra.i18n")
-	local DownloadWindow = require("ui.download_window.bridge")
-	local session_id = DownloadWindow.show({
-		kind = "app_update",
-		label = "ErgoptiPlus " .. release.tag,
-		on_cancel = function() return updater.cancel_update() == true end,
-	})
-	if session_id == nil then
-		Logger.warn(LOG, "The download window could not open; the update downloads without it.")
-	end
-	Logger.start(LOG, "Downloading the update %s…", release.tag)
-	return updater.download_update(release.download_url, function(archive, err)
-		local installed = archive ~= nil and updater.install_update(archive) == true
-		if installed then
-			Logger.success(LOG, "Update %s installed.", release.tag)
-		else
-			Logger.error(LOG, "Update %s failed at the %s: %s.", release.tag,
-				archive and "install" or "download", tostring(err))
-		end
-		if session_id ~= nil then
-			DownloadWindow.complete(session_id, installed, installed
-				and I18n.get("updater.installed_restarting"):gsub("{1}", function() return release.tag end)
-				or I18n.get(archive and "updater.install_error" or "updater.install_error_download"))
-		end
-		hook("on_update_finished", installed, release.tag, archive and "install" or "download")
-	end) == true
+	return M.download_offered(updater, release, _ctx)
 end
 
 --- Builds the session of one window over the updater and the menu hooks.
@@ -226,6 +295,7 @@ function M.open(ctx)
 		Logger.done(LOG, "Update-check window not opened: the updater is busy (%s).", busy)
 		return true
 	end
+	_offer_serial = _offer_serial + 1
 	-- A click while the window shows an answer checks again, over the updater
 	-- and hooks of the menu that asked; the replaced session's late answer is
 	-- ignored
@@ -266,6 +336,7 @@ end
 function M._reset()
 	M.on_window_closed()
 	_ctx = nil
+	_offer_serial = 0
 end
 
 return M

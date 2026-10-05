@@ -88,7 +88,14 @@ final class KeyboardSourceTestDiagnostics {
 	private(set) var events: [Event] = []
 	private(set) var omittedEvents = 0
 
-	init(_ test: String) { self.test = .bounded(test) }
+	private let enrollment: Int?
+
+	init(_ test: String, enroll: Bool = true) {
+		self.test = .bounded(test)
+		// Enrollment precedes the caller's first native capture, including failure
+		// paths. Pure encoder controls explicitly opt out of the bundle session.
+		enrollment = enroll ? KeyboardSourceTestTransport.enroll() : nil
+	}
 
 	func append(_ event: Event) {
 		guard events.count < 64 else { omittedEvents += 1; return }
@@ -171,7 +178,12 @@ final class KeyboardSourceTestDiagnostics {
 	}
 
 	func emit() {
-		Self.writeRecord(encode: { try JSONEncoder().encode(receipt()) })
+		guard let enrollment else { XCTFail("TIS diagnostic session was not admitted"); return }
+		Self.writeRecord(encode: { try JSONEncoder().encode(receipt()) }, write: { data in
+			if !KeyboardSourceTestTransport.publish(enrollment, data) {
+				XCTFail("TIS diagnostic publication was not acknowledged")
+			}
+		})
 	}
 }
 
@@ -194,7 +206,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 	}
 
 	func testReceiptRetainsNativeStatusAndEscapesIdentity() throws {
-		let recorder = KeyboardSourceTestDiagnostics("controlled.\"identity\n")
+		let recorder = KeyboardSourceTestDiagnostics("controlled.\"identity\n", enroll: false)
 		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,
 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil))
 		let data = try JSONEncoder().encode(recorder.receipt())
@@ -207,7 +219,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 	}
 
 	func testEventOverflowIsCountedWithoutChangingPriorReceipt() {
-		let recorder = KeyboardSourceTestDiagnostics("controlled.bounded")
+		let recorder = KeyboardSourceTestDiagnostics("controlled.bounded", enroll: false)
 		let event = KeyboardSourceTestDiagnostics.Event(phase: "controlled", uptime: 1, status: 0,
 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil)
 		for _ in 0..<67 { recorder.append(event) }
@@ -221,7 +233,7 @@ final class KeyboardSourceTestDiagnosticsTests: XCTestCase {
 // call Carbon, change a source, or relax the strict XCTest receipt reader.
 extension KeyboardSourceTestDiagnosticsTests {
 	func testEvidenceWritesOneCompleteUTF8RecordBeforeFollowingReceipt() throws {
-		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity")
+		let recorder = KeyboardSourceTestDiagnostics("controlled.é\nidentity", enroll: false)
 		recorder.append(.init(phase: "restore.after", uptime: 123, status: -50,
 			original: nil, target: nil, current: nil, snapshotID: nil, keyboardType: nil, unicodeDataBytes: nil))
 		var writes: [Data] = []
@@ -256,7 +268,7 @@ extension KeyboardSourceTestDiagnosticsTests {
 	}
 
 	func testBoundedLargeReceiptKeepsTerminatorInTheSingleWrite() throws {
-		let recorder = KeyboardSourceTestDiagnostics(String(repeating: "é", count: 512))
+		let recorder = KeyboardSourceTestDiagnostics(String(repeating: "é", count: 512), enroll: false)
 		let event = KeyboardSourceTestDiagnostics.Event(phase: "controlled", uptime: 1, status: -50,
 			original: nil, target: nil, current: nil,
 			snapshotID: .bounded(String(repeating: "é", count: 512)), keyboardType: nil, unicodeDataBytes: nil)
