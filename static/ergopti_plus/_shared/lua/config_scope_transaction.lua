@@ -33,7 +33,8 @@ end
 --- to its host; it must return true, detail, candidate bytes and exact source.
 --- Optional presets[id] = { path, backup_path, prefixes, render } owns the file
 --- of a manifest preset: rows under `prefixes` are routed to it, and
---- render(mode, source_document, rows) returns its complete candidate bytes.
+--- render(mode, source_document, rows, shapes) returns its complete candidate
+--- bytes; the optional canonical receipt keeps empty arrays distinct from maps.
 --- Optional select(path) narrows a scope to the rows it returns true for: a
 --- submenu that restores or clears one part of its scope (the script chords of
 --- the Shortcuts scope) keeps the scope's owner, backup and compensation.
@@ -86,14 +87,15 @@ function M.new(options)
 		if status ~= "ok" and status ~= "absent" then
 			return nil, "preset " .. id .. " source is unreadable: " .. tostring(detail)
 		end
-		local document = Codec.decode(content or "")
+		local document, shapes = Codec.decode_with_shapes(content or "")
 		if type(document) ~= "table" then return nil, "preset " .. id .. " source is not valid TOML" end
-		local candidate = port.render(mode, document, rows)
+		local candidate = port.render(mode, document, rows, shapes)
 		if type(candidate) ~= "string" then return nil, "preset " .. id .. " rendered no candidate" end
-		local decoded = Codec.decode(candidate)
+		local decoded, candidate_shapes = Codec.decode_with_shapes(candidate)
 		if type(decoded) ~= "table" then return nil, "preset " .. id .. " candidate is not valid TOML" end
 		return {
-			id = id, path = port.path, backup_path = port.backup_path, decoded = decoded, candidate = candidate,
+			id = id, path = port.path, backup_path = port.backup_path,
+			decoded = decoded, shapes = candidate_shapes, candidate = candidate,
 			source = { status = status, content = status == "ok" and content or nil },
 		}
 	end
@@ -183,7 +185,7 @@ function M.new(options)
 			for _, preset in ipairs(presets) do
 				local file, why = prepare_preset(preset.id, preset.port, mode, preset.rows)
 				if not file then return false, why end
-				rendered[preset.id] = { decoded = file.decoded, candidate = file.candidate, source = file.source }
+				rendered[preset.id] = { decoded = file.decoded, shapes = file.shapes, candidate = file.candidate, source = file.source }
 				files[#files + 1] = file
 			end
 			if config then files[#files + 1] = config end

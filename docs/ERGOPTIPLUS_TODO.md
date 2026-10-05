@@ -1694,6 +1694,21 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
 
 Linux ordinary TapHold saves and recommended imports now use the existing shared classified reader: only native ENOENT permits an absent document; access, other open, read and close failures refuse before mutation, backup/staging/publication or reload. Malformed-source behavior and unknown fields remain unchanged. The registered real-writer module retains all 26 original cases and adds 13 controls: the original writer gives 28 passes / 11 failures, the corrected writer 39 / 0. macOS and Windows already refuse classified unreadable sources through their existing owners. Full selected verification and hosted native CI remain pending; TODO33 stays partial.
 
+The Linux TapHold owner now ignores and reports obsolete scalar/array parents and
+known bindings once, preserving their values during unrelated saves and scope
+clear. Colliding setters and recommendation imports refuse before publication
+until explicit source repair. Optional canonical parser receipts retain array
+shapes and unchanged numeric tokens without changing default codec APIs or
+independent corpus expectations. Reload success requires explicit true; refused
+or raised acknowledgements report saved-but-not-in-force rather than inventing
+an inverse of the published preferences. The reviewed shared scope additions are
+composed with the existing publication-recovery owners. The explicit Linux
+runner manifest retains every prior module and registers all three new modules.
+Selected local gates pass formatting, 357 JS checks, 14,226 portable macOS and
+6,853 Linux unit cases, macOS E2E101 with one host-specific skip and Linux
+E2E188. Hosted native/package/install and physical qualification remain
+required; TODO33 stays partial.
+
 The Linux daemon now isolates only the existing shared loader’s classified whole-file layers.toml refusals during its initial tap-hold engine load. It logs the refused navigation file, leaves its bytes untouched and installs the independently valid tap-holds with an empty navigation layer, matching the existing Windows and macOS boot policy. Shared registry and native compilation failures still raise; every subsequent reload and scope candidate remains strict and retains the acknowledged engine on refusal. The registered real-manager regressions fail five cases against the original owner and pass all ten after the fix; all 29 existing hook/manager/writer integration cases pass with LuaJIT. This is bounded portable owner evidence, not physical Linux startup or complete three-OS acceptance. Full selected verification and hosted native qualification remain required, and TODO33 stays partial.
 
 After the classified-read prerequisite, Linux TapHold ordinary setters and recommended imports now require an acknowledged temporary-file write and close before rename or reload. Genuine LuaJIT/Lua5.1 Boolean true and Lua5.4 same-file write receipts are both accepted; nil, false, wrong objects/strings and exceptions refuse. Refused candidates are cleaned only at the owned temporary path; cleanup refusal still leaves the original source and runtime untouched. Unknown fields and existing post-publication reload semantics are preserved. All 39 prior registered cases remain exact; 13 added controls give old 40 passes / 12 failures and corrected 52 / 0 on both Lua runtimes. Windows and macOS already require their native staging writer acknowledgements. Full selected/hosted native qualification remains pending; TODO33 stays partial.
