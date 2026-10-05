@@ -1956,6 +1956,45 @@ These are software implementations; final hardware verification remains below.
   comparison and unlink. Full selected and hosted native qualification remain
   required; this bounded correction does not complete item 5.
 
+The macOS bulk remap journal now owns the exact private Config publication
+receipt, including a published write whose native cleanup refused. Forward
+cleanup must settle before any file/runtime inverse, and refused inverse
+publication or layer-removal cleanup retains its original capability. A
+completed removal cannot remove a successor again; the private bulk Config
+inverse additionally verifies current absence before acknowledging restoration.
+Shared scope transactions preserve their existing generic removal contract and
+settle exact forward/inverse cleanup before releasing verified backups. Explicit
+whole-file reset can restore its original malformed source bytes without
+granting ordinary malformed-file write authority. Independent actual-file
+boundary controls reproduce the old false acknowledgement and preserve all
+original assertions. The reset fixture now observes the actual conditional
+publisher and additionally requires the exact malformed-source precondition;
+all its prior assertion predicates remain intact. A wrong-source mutant fails
+the new independent fence check. Selected local gates pass formatting, 357 JS
+checks, 14,226 portable macOS and 6,760 Linux unit cases, plus 101 macOS E2E
+checks with one host-specific skip and 188 Linux E2E checks. Hosted native
+qualification remains pending. The separately reviewed lifecycle consumers
+are applied below; detached semantic-source admission remains separate. TODO5
+is partial.
+
+The macOS scalar setters and detached recommendation saves now retain the actual
+private file receipt when a refused save published or still owes cleanup. Retry
+settles that exact owner before another mutation or initialization, without
+regenerating a detached runtime. Activation and deactivation retain file debt
+inside their existing native transitions: STOPPED must be proven before an
+aborted enable restores its source, while a refused disable inverse must settle
+before READY restoration. The existing two-return ports retain their previous
+contracts. Startup captures migration/default-publication cleanup before native
+lease/runtime construction, preserving both phase-specific save calls and all
+seven existing literal-false init exits. Pending startup cleanup blocks another
+init; settled retry rereads current source. These capabilities are process-local,
+not a journal surviving VM exit. Independent controls pass 170 setter cases,
+13 enabled cases and 211 composed startup cases; original owners fail the new
+native-file boundaries. Selected local gates pass formatting, 357 JS checks,
+14,253 portable macOS unit cases and 101 macOS E2E checks with one host-specific
+skip. Hosted native/package/install and physical/global acceptance remain
+required. TODO5 stays partial.
+
 The native Linux metrics prerequisite now decodes the existing SQLite exit
 receipt before its instrumentation counts JSON rows, then returns the complete
 original output to production admission. It retains every old assertion and
@@ -2023,6 +2062,21 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
   use real DOM, native bridge and file publication; the restart port is an
   observer, not a restarted daemon. Hosted native qualification, physical input,
   Wayland and physical-device wizard re-runs remain pending.
+
+The detached macOS recommendation owner now binds its candidate to optional raw
+path/status/bytes returned by the same Config read that admitted the model.
+A personalized source replacing neutral admitted bytes before backup refuses
+without publishing over the successor. Backup/publication retain their existing
+classified source and exact conditional-writer fences; no disconnected reread
+manufactures model authority. Existing return values and custom two-return
+producers retain their prior contracts. Independent controls pass 266 composed
+owner cases; the same nine new cases give original 5/4 and corrected 9/0.
+An independent real-file A/B source race gives original 54/1 and corrected 55/0.
+The evidence covers path/raw bytes, not cross-read inode/symlink ABA identity.
+Selected final-source local gates pass formatting, 357 JS checks, 14,262
+portable macOS unit cases and 101 macOS E2E checks with one host-specific skip.
+Hosted native/package/install qualification and physical wizard re-runs remain
+open. TODO7 stays partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
@@ -2507,8 +2561,8 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   sites 76 (no catalogue of parameter bindings), macOS 14/93 and order overrides
   (no "catalogue published" signal), 16/91 (expert `[script]`/`[features]`
   layer), 18 (dynamic model list), 19, 24, 26, 28, a Karabiner key bound to a
-  plain string (saves refused with a generic ERROR), Linux layers.toml refused
-  as a whole still stops the daemon, Windows sites 32, 34, 36, 37-60 and its
+  plain string (saves refused with a generic ERROR), native qualification of
+  Linux whole-file layers.toml boot isolation, Windows sites 32, 34, 36, 37-60 and its
   whole-file installed.json refusal, and the macOS boot-time unread-entries
   scan cost (36-56 ms on the
   main thread). Maintainer decisions are resolved: invalid schema stamps
@@ -2525,7 +2579,30 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   their caller's Critical state and reentry observes the claimed report.
   Native Windows and complete three-OS acceptance remain pending.
 
+Native Linux qualification fixtures now observe real Notify wire byte hints
+and exact owned service identities, preserving the text/history assertions on
+Dunst 1.9 and newer versions. The failed HTTP 503 unchanged-validator control
+explicitly returns the previous ETag, retaining every corrupt-body/follow-up
+assertion across curl versions. Independent old/new native replays pass; hosted
+final-source qualification remains pending. These are fixture prerequisites,
+not completion of the remaining configuration policy or physical acceptance.
+
 Linux ordinary TapHold saves and recommended imports now use the existing shared classified reader: only native ENOENT permits an absent document; access, other open, read and close failures refuse before mutation, backup/staging/publication or reload. Malformed-source behavior and unknown fields remain unchanged. The registered real-writer module retains all 26 original cases and adds 13 controls: the original writer gives 28 passes / 11 failures, the corrected writer 39 / 0. macOS and Windows already refuse classified unreadable sources through their existing owners. Full selected verification and hosted native CI remain pending; TODO33 stays partial.
+
+The Linux TapHold owner now ignores and reports obsolete scalar/array parents and
+known bindings once, preserving their values during unrelated saves and scope
+clear. Colliding setters and recommendation imports refuse before publication
+until explicit source repair. Optional canonical parser receipts retain array
+shapes and unchanged numeric tokens without changing default codec APIs or
+independent corpus expectations. Reload success requires explicit true; refused
+or raised acknowledgements report saved-but-not-in-force rather than inventing
+an inverse of the published preferences. The reviewed shared scope additions are
+composed with the existing publication-recovery owners. The explicit Linux
+runner manifest retains every prior module and registers all three new modules.
+Selected local gates pass formatting, 357 JS checks, 14,226 portable macOS and
+6,853 Linux unit cases, macOS E2E101 with one host-specific skip and Linux
+E2E188. Hosted native/package/install and physical qualification remain
+required; TODO33 stays partial.
 
 The Linux daemon now isolates only the existing shared loader’s classified whole-file layers.toml refusals during its initial tap-hold engine load. It logs the refused navigation file, leaves its bytes untouched and installs the independently valid tap-holds with an empty navigation layer, matching the existing Windows and macOS boot policy. Shared registry and native compilation failures still raise; every subsequent reload and scope candidate remains strict and retains the acknowledged engine on refusal. The registered real-manager regressions fail five cases against the original owner and pass all ten after the fix; all 29 existing hook/manager/writer integration cases pass with LuaJIT. This is bounded portable owner evidence, not physical Linux startup or complete three-OS acceptance. Full selected verification and hosted native qualification remain required, and TODO33 stays partial.
 
@@ -2577,6 +2654,68 @@ and 101 macOS E2E checks (one host-specific scenario skipped). Hosted native
 qualification and broader binding-parent/repair-intent work remain pending;
 TODO33 is not complete.
 
+The macOS ordinary remap saver now preserves unchanged source numeric kinds,
+precision, signed zero, temporal values and complete arrays through optional
+canonical full-document receipts. Default codec APIs and independent corpora
+remain unchanged. Same-read array identities also distinguish obsolete arrays
+at native tap-hold/combination dictionaries and known bindings: runtime reads
+are neutral with one precise warning, unrelated saves retain their complete
+original values, and colliding candidates refuse before publication until
+explicit source repair. Unsafe Karabiner array parents retain the existing
+strict consent refusal. Historical scalar-parent refusals and every corruption
+fixture predicate remain intact. Independently reviewed real-file and Python
+typed-model controls reproduce predecessor loss and pass on the candidate;
+selected root verification passes 14,339 portable macOS and 6,878 Linux unit
+cases, plus 101 macOS and 188 Linux E2E checks with one macOS host-specific
+skip. The shared test helper retains every predicate while using the codec's
+existing optional math subtype alias; 25 focused cases pass on each Lua runtime,
+and its covering JS repair passes all 357 checks.
+Hosted native/package/install qualification remains pending. This bounded
+correction does not complete TODO33 or explicit cleanup and repair-intent
+ownership.
+
+Two independent actual-file diagnostics still fail on Linux's retired API
+provider reader and ordinary selection publisher: a removed provider remains
+active, and its complete old row gains defaults during a successful neighbor
+selection. Current native source hashes match the saved preparation. Coordinate
+explicit published cloud/local catalogue receipts with group4 before changing
+those native seams; empty or unavailable catalogue data cannot prove retirement.
+The frozen probe and exact dependency evidence are in the group1 handoff's
+`prepared/retired-api-provider-dependency.zip`. No source correction or native
+qualification is claimed for this open domain; TODO33 stays partial.
+
+The shared Lua installed-layout record owner now preserves omitted unowned
+members during verified same-id updates while removing omitted publisher-owned
+metadata, including an old extension replaced by a base layout. Verified
+incoming fields take precedence; obsolete predecessors contribute no ignored
+data. Invalid optional extensions are classified before root discovery through
+the existing published validator, with lossless object/array/null admission.
+Their complete rows remain on disk beside usable neighbors, and ordinary
+install/remove operations do not grant native deletion authority over them.
+Independent full-model vectors and real-file manager controls pass 98 macOS
+and 88 Linux focused cases on each available Lua runtime. All previous
+registered cases and corpus expectations remain intact. Selected executable
+local gates pass formatting, 357 JS checks, 14,202 portable macOS and 6,758
+Linux unit cases, plus 101 macOS and 188 Linux E2E checks; one macOS
+host-specific scenario is skipped. The selected AHK unit gate is not executed
+on this Linux host and remains a Windows workstation step. Hosted
+native/package/install qualification remains pending; TODO33 stays partial.
+
+The macOS remap owner now ignores and warns once about the retired
+`[karabiner] enabled` entry while preserving its complete original value in
+ordinary saves and explicit integration-consent changes. Only
+`integration_enabled` grants consent; explicit whole-file reset retains its
+existing authority. Independent real-file controls cover Boolean, numeric,
+string, array and nested-table values, stale sources, invalid consent and
+publication refusal. The old deletion expectation conflicted with the
+maintainer's explicit preservation policy: its replacement requires the exact
+original false value and an additional complete handwritten source model;
+every other old assertion remains intact. Focused portable checks pass 32 new
+cases and 31 existing owner cases. Selected local gates pass formatting, 357
+JS checks, 14,149 portable macOS unit cases and 101 macOS E2E checks with one
+host-specific skip. Hosted native/package/install checks remain pending;
+TODO33 stays partial.
+
 A bounded Windows installed-layout record candidate partitions obsolete entries
 from usable neighbors and routes process-lifetime warnings through the shared
 file-entry reporter. A narrow native JSON member-span owner preserves obsolete
@@ -2597,6 +2736,33 @@ AHK BOM/LF files, all 356 JS checks, 13,981 portable macOS unit cases and
 on this Linux host; native CI and packaging/installation remain required. Shared Lua
 record writes still need qualification of top-level future fields and
 default-decoder null/array identity; this prerequisite does not complete TODO33.
+
+The frozen macOS Boolean-leaf packet is now applied to the current feature
+source. Unusable tap_holds.enabled and mod_combos.symmetric values retain their
+complete scalar, array or inline-table models during unrelated saves, with one
+warning per file/path/reason. An implicit non-neutral replacement refuses before
+publication until explicit source repair. All 28 independent real-file controls
+pass; the exact source preimage matches the reviewed packet. Selected formatting,
+356 JS checks, 14,030 portable macOS unit cases and macOS E2E (101 passed, one
+host-specific skip) pass. Hosted native qualification remains required. This is
+a bounded TODO33 correction, not completion of its remaining domains or physical
+checks.
+
+The frozen shared Lua installed-record packet is now applied after exact source
+and test preimage checks. Installed-only lossless decoding preserves unknown root
+members and obsolete rows, including JSON null, empty arrays, false and a source
+member named outdated. Detached private source identity survives chained builders;
+verified same-id replacement does not resurrect an ignored row on later removal.
+Generic JSON decoding, Windows owners, syntax/header/schema refusals and native
+artifact publication policies are unchanged. Current focused Mac catalogue and
+manager cases and the Linux installed-record controls pass. Selected formatting,
+356 JS checks, 14,044 portable macOS unit cases, 6,627 Linux unit cases and both
+portable E2E suites pass. The corpus guard includes their actual shared replay
+helpers; its assertions and every corpus expectation remain intact. The AHK
+unit gate was not executed on this Linux host; hosted native qualification is
+still required. Preserved future members on updates of already usable entries
+and invalid extension classification are separate follow-ups. TODO33 remains
+partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
@@ -2887,6 +3053,16 @@ key-definition and block fixtures pass64/0,72/0 and64/0 with the signed native
 compiler; absence refuses the original admission. Manual run37274473330 confirms
 the audio and notification corrections on Ubuntu while its remaining verdict
 is still tracked separately. No foreign product or fixture source is changed.
+
+Composition with the partial configuration/menu delivery preserves both native
+publication protocols: private hotstring receipts retain exact source identity
+and native debt, while ordinary configuration inverses receive their exact
+cleanup callback. Dynamic rollback also checks retained secondary-file debt.
+The stronger typed D-Bus byte notification control keeps the independent wrong
+urgency-rule negative. The new version-neutral HTTP503 E1 control is retained,
+and the original changed-error ETag E2 stimulus is restored as a seventh case;
+its canonical E1 assertion remains mandatory. Final composed gates and native
+qualification are tracked separately; no lost stimulus is called unchanged.
 
 The maintainer now explicitly requests delivery into dev after feasible container
 and CI work, with genuine remaining native/device failures documented rather than
@@ -3401,7 +3577,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 96, macOS 153, Linux 97, each
+  drivers still build (current baseline: Windows 95, macOS 152, Linux 96, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -3417,6 +3593,17 @@ fixed caption source per driver: Windows/macOS/Linux 97/154/98 to 96/153/97.
 Independent caption/state/platform corpus and actual menu callback regressions
 cover the bounded slice; hosted Windows execution, physical native validation
 and the final complete three-OS gate remain required. This item stays partial.
+
+The per-key Tap-Hold head now uses one shared ordered child template on all
+three drivers, including the original platform captions and declared separator.
+Native picker, acknowledged writer and refusal owners remain authoritative.
+Independent handwritten order/caption tests and original-provider inversions
+cover this slice. The reader guard follows includes only from actual native
+read roots and rejects missing, cyclic and disconnected consumers. Both owner
+generators reproduce the artifacts; the census falls from 96/153/97 to 95/152/96.
+Items 54/81 remain partial for delay, picker children and other menu families.
+Full selected verification and three-OS native CI are tracked separately;
+physical tray and input acceptance remain required on installed devices.
 
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
@@ -3943,7 +4130,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 96, macOS 153 and Linux 97 rows are still built by the
+  Windows 95, macOS 152 and Linux 96 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:

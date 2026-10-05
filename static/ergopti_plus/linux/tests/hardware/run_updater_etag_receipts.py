@@ -51,7 +51,7 @@ else
 	local _, _, options = Manager._build_fetch_request("main", 1)
 	local file = assert(io.open(options.etag_save, "rb"))
 	local etag = assert(file:read("*a")); assert(file:close())
-	if mode == "http-error" then assert(etag:find("E1", 1, true), "HTTP-error control changed its prior native validator")
+	if mode == "http-error" or mode == "http-error-new-validator" then assert(etag:find("E1", 1, true), "HTTP-error control changed its prior native validator")
 	else assert(etag:find("E2", 1, true), "failed native response did not actually change the file validator") end
 	local third = fetch()
 	if mode == "truncated" then
@@ -129,7 +129,11 @@ def main():
                     separators=(",", ":"),
                 ).encode()
                 status = 200
-                if phase > 1 and self.headers.get("If-None-Match") == tag and mode != "http-error":
+                if (
+                    phase > 1
+                    and self.headers.get("If-None-Match") == tag
+                    and mode not in ("http-error", "http-error-new-validator")
+                ):
                     status, body = 304, b""
                 elif phase in (2, 3) and mode == "invalid-json":
                     body = b"{synthetic malformed JSON"
@@ -138,7 +142,11 @@ def main():
                         [{"tag_name": f"v2.0.{index}"} for index in range(21)],
                         separators=(",", ":"),
                     ).encode()
-                elif phase in (2, 3) and mode == "http-error":
+                elif phase in (2, 3) and mode in ("http-error", "http-error-new-validator"):
+                    # The unchanged-validator control supplies its original tag
+                    # explicitly: curl versions differ on saving ETags from 503.
+                    if mode == "http-error":
+                        tag = '"E1"'
                     status, body = 503, b"Synthetic unavailable response"
                 self.send_response(status)
                 self.send_header("ETag", tag)
@@ -164,6 +172,7 @@ def main():
                 "http-error",
                 "not-modified",
                 "updated",
+                "http-error-new-validator",
             ):
                 checks += 1
                 case_root = root / mode

@@ -6438,6 +6438,47 @@ disabled_when = ["tap_hold_key_configured"]
 platforms = ["hs"]
 unavailable = "hide"
 
+# Per-key providers supply callback and picker data; this head owns row order,
+# platform caption variants and interpolation of the current action labels.
+[[menu.tap_hold_key_head]]
+type = "include"
+section = "tap_hold_key_native_commands"
+
+[[menu.tap_hold_key_head]]
+type = "---"
+
+[[menu.tap_hold_key_head]]
+type = "command"
+id = "tap_hold_key_tap"
+i18n = "tap_hold.picker.tap"
+caption_getter = "tap_hold_key_tap_caption"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_head]]
+type = "group"
+id = "tap_hold_key_tap_picker"
+i18n = "menu.tapholds.tap_arrow"
+caption_getter = "tap_hold_key_tap_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_head]]
+type = "group"
+id = "tap_hold_key_hold"
+i18n = "tap_hold.picker.hold"
+caption_getter = "tap_hold_key_hold_caption"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_head]]
+type = "group"
+id = "tap_hold_key_hold_picker"
+i18n = "menu.tapholds.hold_arrow"
+caption_getter = "tap_hold_key_hold_caption"
+platforms = ["hs"]
+unavailable = "hide"
+
 # Native prompts and modifier picker subtrees retain their own settings owners.
 [[menu.llm_navigation_rows]]
 type = "list"
