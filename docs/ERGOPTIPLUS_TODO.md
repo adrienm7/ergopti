@@ -1818,12 +1818,28 @@ negative test was strengthened with semantic reasons and a healthy detached-copy
 control; the original shared source fails all five cases and two semantic/alias
 mutants fail. Independent review is clear. Source-selected runtime gates pass
 14,209 portable macOS units in1,492 modules,101 stubbed E2E cases with one skip,
-6,696 Linux units in363 modules and188 Linux E2E cases. Final format/JS checks
-must pass before publication; actual native clock invocation remains pending.
+6,696 Linux units in363 modules and188 Linux E2E cases. Final formatting and
+357 JS checks pass; actual native clock invocation remains pending.
 This dormant subscription contains configuration only, with no
 permission/history/context/capture authority.
 ContextTracker, pause/sleep writers, recovery, termination and runtime activation
 remain unfinished; TODO31 stays open.
+
+The dormant ContextTracker now observes actual app, window and secure-field
+writers with denied boundaries, copied policy fields and exact owner/generation
+fences. A separate explicit correlated binding checks the current window's
+native application PID against the conclusively observed native app PID and
+current state; later writers cannot reuse stale identity. Unknown or refused
+observations remain denied. Ordinary unbound queries, aliases and returns are
+preserved. Independent review is clear:29 field controls and32 correlation
+controls pass, while original sources fail28 and30 respectively. Five semantic
+mutations fail;37 shared assertions pass on Lua5.4 and LuaJIT. Two negative
+controls additionally require exact errors, native callback evidence and healthy
+legacy outcomes; all29 cases and prior assertions remain, and three exception
+or payload mutations fail. These observations do not constitute permission
+history, process-incarnation or stream correlation,
+native AX acceptance or capture admission. Full root/native qualification,
+pause/sleep/start/stop bindings and retained-history composition remain required.
 
 ## Remaining work after the 2026-09-30 releases
 

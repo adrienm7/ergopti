@@ -84,6 +84,157 @@ end
 
 
 
+-- Dormant observation ownership is separate from native watcher ownership.
+-- No cached context is promoted on bind; expected child writers share one ticket.
+local _physical_context_binding
+local _context_transaction
+local _expected_context_transaction
+
+local function mark_context(component, complete)
+	local frame = _context_transaction
+	if frame and rawequal(_physical_context_binding, frame.binding) then
+		frame.binding.channel.mark(frame.ticket, component, complete)
+		if component == "app" and frame.binding.correlated then
+			local pid = complete == true and math.type(_state.active_app_pid) == "integer"
+				and _state.active_app_pid > 0 and _state.active_app_pid or nil
+			frame.binding.channel.mark_app_pid(frame.ticket, pid)
+		end
+	end
+end
+
+--- Reads only native window identity while the exact correlated writer owns it.
+local function observe_window_identity(window)
+	local frame = _context_transaction
+	if not frame or not frame.binding.correlated then return end
+	local function current()
+		return rawequal(_context_transaction, frame) and rawequal(_physical_context_binding, frame.binding)
+			and frame.binding.channel.owns(frame.ticket)
+	end
+	if not current() then return end
+	local ok_app, app = pcall(function() return window:application() end)
+	if not current() then return end
+	local pid
+	if ok_app and app then
+		local ok_pid, value = pcall(function() return app:pid() end)
+		if not current() then return end
+		if ok_pid and math.type(value) == "integer" and value > 0 then pid = value end
+	end
+	frame.binding.channel.mark_window_pid(frame.ticket, pid)
+end
+
+local function secure_element_observer(app_pid)
+	if not _context_transaction or not _physical_context_binding then return nil end
+	return function(complete)
+		mark_context("secure", complete == true and math.type(app_pid) == "integer"
+			and rawequal(app_pid, _state.active_app_pid))
+	end
+end
+
+local function secure_refresh_observer()
+	if not _context_transaction or not _physical_context_binding then return nil end
+	return function(complete, pid)
+		mark_context("secure", complete == true and math.type(pid) == "integer"
+			and rawequal(pid, _state.active_app_pid))
+	end
+end
+
+local function invoke_context_writer(writer, ...)
+	if not _physical_context_binding and not _context_transaction then return writer(...) end
+	local previous = _expected_context_transaction
+	_expected_context_transaction = _context_transaction
+	local results = table.pack(pcall(writer, ...))
+	_expected_context_transaction = previous
+	if not results[1] then error(results[2], 0) end
+	return table.unpack(results, 2, results.n)
+end
+
+--- Runs an observed transaction only for an explicitly bound trusted owner.
+local function run_context_write(source, writer, ...)
+	local expected = _expected_context_transaction
+	_expected_context_transaction = nil
+	local binding = _physical_context_binding
+	if not binding or expected then return writer(...) end
+	local ticket = binding.channel.begin(source)
+	local frame = { binding = binding, ticket = ticket }
+	local previous = _context_transaction
+	_context_transaction = frame
+	local results = table.pack(pcall(writer, ...))
+	_context_transaction = previous
+	if not results[1] then
+		binding.channel.refuse("Physical context writer failed")
+		error(results[2], 0)
+	end
+	if rawequal(_physical_context_binding, binding) then
+		local ok, paused = pcall(_is_paused)
+		if not ok then binding.channel.refuse("Physical context pause predicate failed")
+		else binding.channel.finish(ticket, _state, paused, binding.may_persist) end
+	end
+	return table.unpack(results, 2, results.n)
+end
+
+local function bind_context_observer(owner, capacity, receive, on_refused, may_persist, correlated)
+	assert(type(owner) == "table" and type(receive) == "function" and type(on_refused) == "function"
+		and type(may_persist) == "function", "Invalid physical context subscriber")
+	assert(math.type(capacity) == "integer" and capacity > 0, "Invalid physical context receipt budget")
+	if not require_state("bind_physical_context_observer") then return false, "Context tracker is not initialized" end
+	if _physical_context_binding then return false, "Physical context subscriber already bound" end
+	local binding = { owner = owner, token = {}, may_persist = may_persist, correlated = correlated }
+	binding.channel = require("keylogger.physical_context_observation").new(capacity,
+		require("adapters.physical_observation_clock").now,
+		function(record) return receive(record, binding.token) end,
+		function(reason) Logger.callback(LOG, "Physical context refusal observer", on_refused, reason) end, correlated)
+	_physical_context_binding = binding
+	local accepted, reason = binding.channel.seed()
+	if accepted ~= true then
+		if rawequal(_physical_context_binding, binding) then
+			_physical_context_binding = nil; binding.channel.close()
+		end
+		return false, reason
+	end
+	return true, binding.token
+end
+
+--- Binds dormant native-writer receipts; retained permission history is separate.
+---@param owner table Exact trusted caller identity, compared without equality hooks.
+---@param capacity integer Maximum acknowledged receipts before exact replacement.
+---@param receive function Receives (copied record, exact detach token), accepting true.
+---@param on_refused function Once-only terminal denial notification.
+---@param may_persist function Existing authoritative persistence decision, accepting true.
+---@return boolean bound False if initial denied observation is refused.
+---@return table|string token Exact detach token or refusal reason.
+function M.bind_physical_context_observer(owner, capacity, receive, on_refused, may_persist)
+	return bind_context_observer(owner, capacity, receive, on_refused, may_persist)
+end
+
+--- Binds explicit native window/app PID correlation through the same owner slot.
+--- Correlation is observed field evidence; retained permission history is separate.
+---@param owner table Exact trusted caller identity, compared without equality hooks.
+---@param capacity integer Maximum acknowledged receipts before exact replacement.
+---@param receive function Receives (copied record, exact detach token), accepting true.
+---@param on_refused function Once-only terminal denial notification.
+---@param may_persist function Existing authoritative persistence decision, accepting true.
+---@return boolean bound False if the initial denied observation is refused.
+---@return table|string token Exact detach token or refusal reason.
+function M.bind_physical_correlated_context_observer(owner, capacity, receive, on_refused, may_persist)
+	return bind_context_observer(owner, capacity, receive, on_refused, may_persist, true)
+end
+
+--- Detaches only the exact owner and token, including a retired subscription.
+---@param owner table Exact trusted identity.
+---@param token table Exact token delivered by this acquisition.
+---@return boolean detached False for forged, competing or stale identities.
+function M.unbind_physical_context_observer(owner, token)
+	local binding = _physical_context_binding
+	if not binding or not rawequal(binding.owner, owner) or not rawequal(binding.token, token) then return false end
+	if not rawequal(_physical_context_binding, binding) then return false end
+	_physical_context_binding = nil; binding.channel.close()
+	return true
+end
+
+
+
+
+
 -- ==========================================
 -- ==========================================
 -- ======= 2/ Accessibility Observers =======
@@ -94,7 +245,7 @@ end
 --- Called whenever the focused element changes so the engine can stop logging
 --- immediately when a password field receives focus.
 --- @param element table The newly focused AX element (may be nil).
-local function update_secure_field_state(element)
+local function update_secure_field_state(element, app_pid)
 	-- The app-level guard must be OR-ed into EVERY assignment of is_secure_field.
 	-- The activation path (handle_app_switch) sets the flag to the union
 	-- isSecureField() or isSecureApp(), but this AX callback recomputed it from the
@@ -107,10 +258,11 @@ local function update_secure_field_state(element)
 	local in_secure_app = SecureFieldDetector.isSecureApp(_state.active_app_name)
 
 	if not element then
+		mark_context("secure", false)
 		_state.is_secure_field = in_secure_app
 		return
 	end
-	local is_secure = SecureFieldDetector.isElementSecure(element) or in_secure_app
+	local is_secure = SecureFieldDetector.isElementSecure(element, secure_element_observer(app_pid)) or in_secure_app
 	if is_secure ~= _state.is_secure_field then
 		_state.is_secure_field = is_secure
 		if is_secure then
@@ -211,6 +363,7 @@ end
 --- @param detail any Setup failure detail.
 --- @return false
 local function reject_ax_observer_candidate(detail)
+	mark_context("secure", false)
 	Logger.warn(LOG, "Accessibility observer setup failed: %s.", tostring(detail))
 	if stop_ax_observer("Accessibility observer rollback") ~= true then
 		Logger.error(LOG, "Accessibility observer cleanup remains pending.")
@@ -225,6 +378,7 @@ end
 --- @return boolean attached True only when the requested observer commits.
 function M.update_ax_observer(app_pid)
 	if not require_state("update_ax_observer") then return false end
+	mark_context("secure", false)
 
 	-- Tear down any existing observer before attaching a new one
 	if _state.ax_observer then
@@ -287,16 +441,19 @@ function M.update_ax_observer(app_pid)
 			local ok_val, val = pcall(function() return focused:attributeValue("AXValue") end)
 			if ok_val and type(val) == "string" then _last_ax_value = val end
 		end
-		update_secure_field_state(focused)
+		update_secure_field_state(focused, app_pid)
 	end
 
 	local callback_ok, callback_result = xpcall(function()
 		return observer:callback(function(element, event, watcher, _)
+			if _physical_context_binding and (not _state or not rawequal(_state.ax_observer, observer)
+				or not rawequal(watcher, observer)) then return end
 			if not _state or _state.ax_observer ~= observer
 				or _ax_observer_committed ~= true or _state.is_enabled == false
 				or watcher ~= observer then return end
 			Logger.callback(LOG, "Accessibility observer", function()
 				if event == "AXFocusedUIElementChanged" then
+					return run_context_write("secure_focus", function()
 					-- Revoke callback authority before crossing the native detach boundary.
 					-- The exact old element remains retained until removal commits, so a
 					-- later focus notification can retry it without overlapping successors.
@@ -304,14 +461,14 @@ function M.update_ax_observer(app_pid)
 					if _last_focused_element then
 						if not mutate_ax_value_watcher(watcher, "removeWatcher",
 							_last_focused_element, "Previous AXValueChanged watcher cleanup") then
-							update_secure_field_state(element)
+							update_secure_field_state(element, app_pid)
 							return
 						end
 						_last_focused_element = nil
 					end
 					_last_ax_value = ""
 
-					update_secure_field_state(element)
+					update_secure_field_state(element, app_pid)
 
 					if element then
 						if mutate_ax_value_watcher(watcher, "addWatcher", element,
@@ -324,6 +481,7 @@ function M.update_ax_observer(app_pid)
 							if ok_val and type(val) == "string" then _last_ax_value = val end
 						end
 					end
+					end)
 				elseif event == "AXValueChanged" then
 					if _ax_value_watch_committed and element == _last_focused_element then
 						handle_ax_value_changed(element)
@@ -453,7 +611,7 @@ function M.capture_frontmost_app()
 		Logger.debug(LOG, "capture_frontmost_app(): foreground application has no usable name.")
 		return false
 	end
-	M.app_watcher_cb(app_name, hs.application.watcher.activated, app)
+	invoke_context_writer(M.app_watcher_cb, app_name, hs.application.watcher.activated, app)
 	return true
 end
 
@@ -462,6 +620,7 @@ end
 --- Called on every app switch and on browser window focus/title changes.
 function M.update_private_status()
 	if not require_state("update_private_status") then return end
+	mark_context("window", false)
 	-- « pause = tout éteint »: a paused script records NOTHING
 	-- (project-suspend-pause-invariant). Window TITLES are the most identifying
 	-- payload this module handles, and hs.window.filter keeps firing while paused.
@@ -473,13 +632,15 @@ function M.update_private_status()
 	_state.session_document_path = nil
 
 	if not win then return end
+	observe_window_identity(win)
 
 	-- hs.window:isFullScreen() returns nil for a window that does not expose the
 	-- attribute, and is_fullscreen feeds an INTEGER NOT NULL column — coerce to a
 	-- boolean here so a nil can never reach the writer in the first place.
 	_state.is_fullscreen = win:isFullScreen() == true
 
-	local title = win:title() or ""
+	local native_title = win:title()
+	local title = native_title or ""
 	local now   = hs.timer.absoluteTime() / 1000000
 
 	-- Log intra-app window switches (tab changes, new windows in the same app)
@@ -523,6 +684,7 @@ function M.update_private_status()
 			end)
 		end
 	end
+	mark_context("window", type(native_title) == "string")
 end
 
 --- Reads one application property without allowing a dying native object to
@@ -544,7 +706,7 @@ local function read_active_app_property(app_object, reader_name, app_name)
 			reader_name, tostring(app_name), tostring(value))
 		return nil
 	end
-	return value
+	return value, true
 end
 
 --- Application watcher callback: fires when a new application gains focus.
@@ -586,15 +748,16 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	-- Each reader crosses into a process that may already be terminating. Keep
 	-- the reads independent so one refusal cannot suppress the remaining state
 	-- publication or retain the previous application's AX observer.
-	local new_bundle = read_active_app_property(app_object, "bundleID", app_name)
-	local new_path   = read_active_app_property(app_object, "path", app_name)
-	local new_pid    = read_active_app_property(app_object, "pid", app_name)
+	local new_bundle, ok_bundle = read_active_app_property(app_object, "bundleID", app_name)
+	local new_path, ok_path = read_active_app_property(app_object, "path", app_name)
+	local new_pid, ok_pid = read_active_app_property(app_object, "pid", app_name)
 
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now
 	_state.active_app_bundle = new_bundle
 	_state.active_app_path   = new_path
 	_state.active_app_pid    = new_pid
+	mark_context("app", ok_bundle and ok_path and ok_pid)
 
 	-- Arm the "time-to-first-key after focus" measurement: the next manual
 	-- keystroke in this app will compute (now - focus_pending_at) and feed the
@@ -607,7 +770,7 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	-- observer. This closes the short activation-to-observer gap for known vaults
 	-- and keeps the adapter as the single fallback for environments without AX
 	-- notifications.
-	SecureFieldDetector.refresh()
+	SecureFieldDetector.refresh(secure_refresh_observer())
 	_state.is_secure_field = SecureFieldDetector.isSecureField()
 		or SecureFieldDetector.isSecureApp(app_name)
 
@@ -615,8 +778,8 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	_last_win_title = nil
 	_last_win_time  = now
 
-	M.update_private_status()
-	M.update_ax_observer(new_pid)
+	invoke_context_writer(M.update_private_status)
+	invoke_context_writer(M.update_ax_observer, new_pid)
 end
 
 --- Re-synchronises the cached context with the app that is frontmost RIGHT NOW,
@@ -661,20 +824,21 @@ function M.resync_context()
 
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now
-	pcall(function() _state.active_app_bundle = app:bundleID() end)
-	pcall(function() _state.active_app_path   = app:path() end)
+	local ok_bundle = pcall(function() _state.active_app_bundle = app:bundleID() end)
+	local ok_path = pcall(function() _state.active_app_path   = app:path() end)
 	local ok_pid, new_pid = pcall(function() return app:pid() end)
 	if ok_pid then _state.active_app_pid = new_pid end
+	mark_context("app", ok_bundle and ok_path and ok_pid)
 
-	SecureFieldDetector.refresh()
+	SecureFieldDetector.refresh(secure_refresh_observer())
 	_state.is_secure_field = SecureFieldDetector.isSecureField()
 		or SecureFieldDetector.isSecureApp(app_name)
 
 	_last_win_title = nil
 	_last_win_time  = now
 
-	M.update_private_status()
-	if ok_pid then M.update_ax_observer(new_pid) end
+	invoke_context_writer(M.update_private_status)
+	if ok_pid then invoke_context_writer(M.update_ax_observer, new_pid) end
 
 	Logger.debug(LOG, "Context re-synchronised on resume (app '%s', secure=%s).",
 		app_name, tostring(_state.is_secure_field))
@@ -731,6 +895,22 @@ function M.init(core_state, log_manager_mod, is_paused_fn)
 	_is_paused   = is_paused_fn
 	Logger.success(LOG, "Context tracker initialized.")
 	return true
+end
+
+local function observe_writer(name, source)
+	local writer = M[name]
+	M[name] = function(...) return run_context_write(source, writer, ...) end
+end
+
+observe_writer("update_ax_observer", "secure_setup")
+observe_writer("update_private_status", "private")
+observe_writer("close_active_app", "closure")
+observe_writer("capture_frontmost_app", "capture")
+observe_writer("resync_context", "resync")
+local app_writer = M.app_watcher_cb
+M.app_watcher_cb = function(app_name, event_type, app_object)
+	if event_type ~= hs.application.watcher.activated then return app_writer(app_name, event_type, app_object) end
+	return run_context_write("activation", app_writer, app_name, event_type, app_object)
 end
 
 return M

@@ -99,11 +99,20 @@ end
 --- marker only through AXSubrole, so either read failing leaves the classification
 --- uncertain and must fail closed.
 --- @param element userdata|table|nil Focused accessibility element.
+--- @param observe function|nil Optional completeness callback from these exact reads.
 --- @return boolean True for a secure or incompletely classified element.
-function M.isElementSecure(element)
-	if not element then return false end
+function M.isElementSecure(element, observe)
+	if not element then
+		if observe then observe(false) end
+		return false
+	end
 	local ok_role, role    = pcall(function() return element:attributeValue("AXRole") end)
 	local ok_sub,  subrole = pcall(function() return element:attributeValue("AXSubrole") end)
+	if observe then
+		local confirmed_secure = (ok_role and role == SECURE_ROLE) or (ok_sub and subrole == SECURE_ROLE)
+		observe(confirmed_secure or (ok_role and ok_sub and type(role) == "string" and role ~= ""
+			and (subrole == nil or type(subrole) == "string")))
+	end
 	if (ok_role and role == SECURE_ROLE) or (ok_sub and subrole == SECURE_ROLE) then
 		return true
 	end
@@ -121,9 +130,10 @@ end
 --- Unlike refresh(), this does not consult frontmostApplication(), so a focused
 --- floating panel cannot accidentally inherit the previous application's answer.
 --- @param application_or_pid table|userdata|number Application object or PID.
+--- @param observe function|nil Optional callback receiving completeness and inspected PID.
 --- @return boolean|nil secure Nil means the focused element could not be read.
 --- @return any error_detail
-function M.inspectFocusedElement(application_or_pid)
+function M.inspectFocusedElement(application_or_pid, observe)
 	local pid = resolve_pid(application_or_pid)
 	if pid == nil then return nil, "application PID is unavailable" end
 	if not (hs.axuielement and hs.axuielement.applicationElementForPID) then
@@ -135,7 +145,7 @@ function M.inspectFocusedElement(application_or_pid)
 		if not app_element then return nil end
 		local focused = app_element:attributeValue("AXFocusedUIElement")
 		if not focused then return nil end
-		return M.isElementSecure(focused)
+		return M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
 	end)
 	if not ok then return nil, result end
 	if type(result) ~= "boolean" then return nil, "focused Accessibility element is unavailable" end
@@ -207,7 +217,10 @@ end
 --- Re-reads the focused element and caches its secure-field verdict.
 --- Uses applicationElementForPID + AXFocusedUIElement, the stable Hammerspoon API
 --- for reaching the focused accessibility element.
-function M.refresh()
+--- @param observe function|nil Optional completeness callback after the existing cache update.
+function M.refresh(observe)
+	assert(observe == nil or type(observe) == "function", "Invalid secure classification observer")
+	local complete, inspected_pid = false, nil
 	local function clear_cache()
 		_cached_secure = false
 	end
@@ -215,7 +228,9 @@ function M.refresh()
 	local ok, err = pcall(function()
 		local app = hs.application.frontmostApplication()
 		if not app then clear_cache(); return end
-		local secure = M.inspectFocusedElement(app)
+		local secure = M.inspectFocusedElement(app, observe and function(known, pid)
+			complete, inspected_pid = known, pid
+		end)
 		if secure == nil then clear_cache(); return end
 		_cached_secure = secure
 	end)
@@ -223,7 +238,11 @@ function M.refresh()
 	if not ok then
 		Logger.debug(LOG, "refresh(): axuielement unavailable — %s", tostring(err))
 		clear_cache()
+		complete = false
 	end
+	-- Optional evidence follows the exact existing reads and cache assignment.
+	-- The default path has no observer and retains its nil/void return contract.
+	if observe then observe(complete, inspected_pid) end
 end
 
 --- Returns true if the currently focused element is a secure text field.

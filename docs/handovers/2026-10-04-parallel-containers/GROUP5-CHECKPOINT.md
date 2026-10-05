@@ -96,9 +96,30 @@ test without removing its assertions or changing a ratchet baseline. Original
 shared source fails all five final controls; two semantic/alias mutants fail.
 Root runtime gates pass14,209 macOS units in1,492 modules,101 stubbed E2E
 cases with one explicit skip,6,696 Linux units in363 modules and188 Linux E2E
-cases. Final format/JS verification is required before committing. Native Swift
+cases. Final formatting and357 JS checks pass before publication. Native Swift
 is explicitly deferred on Linux; actual Hammerspoon clock invocation remains
 pending. ContextTracker, watcher and pause observation boundaries remain unfinished.
+
+The next dormant context slice observes actual ContextTracker writers with
+denied transaction boundaries and conclusively refreshed policy fields. Its
+separate correlated API shares the exact ownership engine, requiring current
+native window/app PID agreement without extra unbound identity queries. Every
+writer revokes prior window correlation; secure-only callbacks cannot borrow
+an earlier proof, and mutable CoreState cannot replace the observed native app
+PID. Independent reviews are clear. Candidate29 field cases and32 correlation
+cases pass; original field and correlated preimages fail28 and30 cases. All29
+field controls remain byte-identical across the correlation change; eleven
+original modules preserve55 grouped and11 top-level assertions on both trees.
+Shared37 assertions pass under real Lua5.4 and LuaJIT; five semantic mutations
+are rejected. Pinned Hammerspoon1.1.1 window/application API sources establish
+the native integer PID contract by source review, not native execution.
+The two formerly status-only rejection controls additionally require exact
+errors, native callback payloads and healthy legacy results. All29 controls and
+existing assertions remain; the scanner drops from two weak occurrences to zero
+and three exception/payload mutations fail. Permission history, process-incarnation/
+stream correlation, real AX, lifecycle subscriptions and capture admission remain
+unqualified; full root gates must
+qualify the final source before publication.
 
 ## Pushed changes
 
