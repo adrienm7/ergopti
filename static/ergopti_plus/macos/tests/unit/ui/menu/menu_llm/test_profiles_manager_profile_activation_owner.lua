@@ -79,6 +79,7 @@ local function with_profiles_fixture(options, body)
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
+			template_rows = renderer.template_rows,
 		}
 		package.loaded["infra.notifications"] = {notify = function()
 			notification_count = notification_count + 1
@@ -262,6 +263,7 @@ local function with_profiles_fixture(options, body)
 				return result
 			end,
 			manager = manager,
+			native_dependencies = deps,
 			state = state,
 			selections = selections,
 			direct_saves = function() return direct_saves end,
@@ -562,6 +564,152 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			helpers.assert_eq(fixture.direct_menus(), 0)
 		end)
 	end)
+end)
+
+-- Independent child presentation consumes the actual provider and native transactions.
+helpers.describe("shared custom profile child: native macOS owner", function()
+	local Renderer = require("menu.renderer")
+	local Json = require("json")
+	local function read_json(relative)
+		local file = assert(io.open(helpers.shared(relative), "rb"))
+		local value = Json.decode(file:read("*a")); file:close()
+		return value
+	end
+	local expected = read_json("tests/corpus/menus/custom_profile_children.json")
+	local function with_child(options, body)
+		options = options or {}
+		options.user_profiles = {{ id = "user_custom", label = "Custom" }}
+		with_profiles_fixture(options, function(fixture)
+			local document = read_json("modules/menu/menu_manifest.json")
+			local i18n = package.loaded["infra.i18n"]
+			local renderer = assert(Renderer.new({
+				platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+				json_decode = function() return document end, i18n = i18n, logger = package.loaded["infra.logger"],
+			}))
+			local binding = package.loaded["infra.manifest_menu"]
+			binding.template_rows, binding.render_rows = renderer.template_rows, renderer.render_rows
+			local function child()
+				local rows = fixture.manager.get_menu_item().menu
+				for _, row in ipairs(rows) do if row.title == "Custom" then return row.menu or {} end end
+				error("native custom profile parent disappeared")
+			end
+			body(fixture, child, document, i18n)
+		end)
+	end
+	local function captions(rows)
+		local result = {}
+		for _, row in ipairs(rows) do result[#result + 1] = row.title end
+		return result
+	end
+	helpers.it("custom-profile-child: exact independent declared child and actual native order", function()
+		with_child({}, function(fixture, child, document)
+			helpers.assert_eq(document[expected.section], expected.declaration)
+			helpers.assert_eq(captions(child()), { "menu.profiles.use_profile", "menu.profiles.shortcut_prefix", "-", "menu.profiles.edit_profile", "menu.profiles.delete_profile" })
+			helpers.assert_eq(child()[1].checked, false)
+			helpers.assert_eq(child()[1].fn(), true)
+			helpers.assert_eq(fixture.selections[1].id, "user_custom")
+			helpers.assert_eq(child()[1].checked, true, "fresh native active owner supplies the shared checkbox")
+		end)
+	end)
+	helpers.it("custom-profile-child: actual refused Use receipt remains false", function()
+		with_child({selection_result = false}, function(fixture, child)
+			helpers.assert_eq(child()[1].fn(), false)
+			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
+			helpers.assert_eq(#fixture.selections, 1)
+		end)
+	end)
+	helpers.it("custom-profile-child: source order and caption changes flow through actual menu", function()
+		with_child({}, function(fixture, child, document)
+			local rows = document[expected.section]
+			rows[1].i18n = "button.cancel"
+			rows[4], rows[5] = rows[5], rows[4]
+			helpers.assert_eq(captions(child()), { "button.cancel", "menu.profiles.shortcut_prefix", "-", "menu.profiles.delete_profile", "menu.profiles.edit_profile" })
+			helpers.assert_eq(child()[1].fn(), true)
+			helpers.assert_eq(fixture.selections[1].id, "user_custom")
+		end)
+	end)
+	for _, mutation in ipairs({"missing", "wrong command", "hidden platform"}) do
+		helpers.it("custom-profile-child: actual native publication refuses " .. mutation, function()
+			with_child({}, function(fixture, child, document)
+				if mutation == "missing" then document[expected.section] = nil
+				elseif mutation == "wrong command" then document[expected.section][1].id = "absent_profile_owner"
+				else for _, row in ipairs(document[expected.section]) do row.platforms = {"linux"} end end
+				helpers.assert_eq(child(), {})
+				helpers.assert_eq(#fixture.selections, 0)
+				helpers.assert_eq(fixture.editor_calls(), 0)
+				helpers.assert_eq(fixture.direct_saves(), 0)
+			end)
+		end)
+	end
+	helpers.it("custom-profile-child: retained declared leaves refuse after declaration withdrawal", function()
+		with_child({}, function(fixture, child, document)
+			local held = child()
+			document[expected.section] = nil
+			for _, index in ipairs({1, 2, 4, 5}) do helpers.assert_eq(held[index].fn(), false) end
+			helpers.assert_eq(#fixture.selections, 0)
+			helpers.assert_eq(fixture.editor_calls(), 0)
+			helpers.assert_eq(fixture.direct_saves(), 0)
+		end)
+	end)
+	helpers.it("custom-profile-child: native pause and removed profile refuse held delivery", function()
+		with_child({}, function(fixture, child)
+			local held = child()
+			fixture.native_dependencies.script_control.is_paused = function() return true end
+			for _, index in ipairs({1, 2, 4, 5}) do helpers.assert_eq(held[index].fn(), false) end
+			local paused = child()
+			for _, index in ipairs({1, 2, 4, 5}) do
+				helpers.assert_true(paused[index].disabled); helpers.assert_nil(paused[index].fn)
+			end
+			fixture.native_dependencies.script_control.is_paused = function() return false end
+			fixture.state.llm_user_profiles = {}
+			for _, index in ipairs({1, 2, 4, 5}) do helpers.assert_eq(held[index].fn(), false) end
+			helpers.assert_eq(#fixture.selections, 0); helpers.assert_eq(fixture.editor_calls(), 0)
+			helpers.assert_eq(fixture.direct_saves(), 0)
+		end)
+	end)
+	for _, owner in ipairs({"missing", "throw", "wrong receipt"}) do
+		helpers.it("custom-profile-child: missing/refused native pause owner " .. owner, function()
+			with_child({}, function(fixture, child)
+				local held = child()
+				if owner == "missing" then fixture.native_dependencies.script_control = nil
+				elseif owner == "throw" then fixture.native_dependencies.script_control.is_paused = function() error("native pause read refused") end
+				else fixture.native_dependencies.script_control.is_paused = function() return "false" end end
+				for _, index in ipairs({1, 2, 4, 5}) do helpers.assert_eq(held[index].fn(), false) end
+				helpers.assert_eq(#fixture.selections, 0); helpers.assert_eq(fixture.editor_calls(), 0)
+			end)
+		end)
+	end
+	helpers.it("custom-profile-child: all 21 original native captions stay translated", function()
+		with_child({}, function(_, child, _, i18n)
+			local languages = read_json("data/locale_order.json").order
+			assert(#languages == 21, "the independent caption control must exercise 21 locales")
+			for _, language in ipairs(languages) do
+				local values = read_json("data/locales/" .. language .. ".json")
+				i18n.get = function(key) return values[key] or key end
+				helpers.assert_eq(captions(child()), { values["menu.profiles.use_profile"], values["menu.profiles.shortcut_prefix"], "-", values["menu.profiles.edit_profile"], values["menu.profiles.delete_profile"] }, language)
+			end
+		end)
+	end)
+	helpers.it("custom-profile-child: held native leaves require raw owner identity without equality dispatch", function()
+		with_child({}, function(fixture, child)
+			local original = fixture.state.llm_user_profiles[1]
+			local equality_calls = 0
+			local equal = { __eq = function() equality_calls = equality_calls + 1; return true end }
+			setmetatable(original, equal)
+			local held = child()
+			local successor = setmetatable({ id = original.id, label = original.label }, equal)
+			helpers.assert_eq(rawequal(original, successor), false)
+			fixture.state.llm_user_profiles = { successor }
+			local results = {}
+			for _, index in ipairs({1, 2, 4, 5}) do results[#results + 1] = held[index].fn() end
+			helpers.assert_eq(results, { false, false, false, false })
+			helpers.assert_eq(equality_calls, 0, "a replaced owner cannot run an equality metamethod")
+			helpers.assert_eq(#fixture.selections, 0)
+			helpers.assert_eq(fixture.editor_calls(), 0)
+			helpers.assert_eq(fixture.direct_saves(), 0)
+		end)
+	end)
+
 end)
 
 return true

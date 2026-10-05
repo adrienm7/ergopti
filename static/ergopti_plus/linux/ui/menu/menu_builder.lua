@@ -1993,10 +1993,8 @@ local function _build_llm(ctx)
 			}
 		end
 		local bounds = TriggerSettings.bounds("debounce_ms")
-		delay_choices[#delay_choices + 1] = { separator = true }
-		delay_choices[#delay_choices + 1] = {
-			label = i18n_safe("menu.llm.generation.custom_value"),
-			action = function()
+		local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+			["llm_numeric_custom_value"] = function()
 				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
 				if not ok_prompt then
 					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
@@ -2015,7 +2013,8 @@ local function _build_llm(ctx)
 					end,
 				}, ctx.webview)
 			end,
-		}
+		})
+		for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
 		rows[#rows + 1] = {
 			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
 			items = delay_choices,
@@ -2245,21 +2244,22 @@ local function _build_llm(ctx)
 			local profile_id = profile.id
 			local label = profile.label
 			if effective == profile_id then effective_label = label end
+			local function child_ready()
+				if type(ProfileSettings.list_user) ~= "function" then return false end
+				local ok, current = pcall(ProfileSettings.list_user)
+				if not ok or type(current) ~= "table" then return false end
+				local matches = 0
+				for _, entry in ipairs(current) do
+					if entry.id == profile_id then matches = matches + 1 end
+				end
+				return matches == 1
+			end
 			rows[#rows + 1] = {
 				label = label,
-				items = {
-					{
-						label = i18n_safe("menu.profiles.use_profile"),
-						checked = effective == profile_id,
-						action = function() return select_profile(profile_id) end,
-					},
-					{
-						label = i18n_safe("menu.profiles.edit_profile"),
-						action = function() return open_editor(owned_profile, false) end,
-					},
-					{
-						label = i18n_safe("menu.profiles.delete_profile"),
-						action = function()
+				items = ManifestMenu.template_rows("llm_custom_profile_controls", {
+					["llm_profile_use"] = function() return select_profile(profile_id) end,
+					["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
+					["llm_profile_delete"] = function()
 							local title = string.format(
 								i18n_safe("menu.profiles.delete_confirm_title"), label)
 							local confirmed
@@ -2277,8 +2277,12 @@ local function _build_llm(ctx)
 							if deleted then refresh() end
 							return deleted
 						end,
-					},
-				},
+				}, {
+					["llm_custom_profile_active"] = function()
+						return ProfileSettings.effective_profile(current_model) == profile_id
+					end,
+					["llm_custom_profile_ready"] = child_ready,
+				}, {}) or {},
 			}
 		end
 
@@ -2620,10 +2624,8 @@ local function _build_llm(ctx)
 			-- capability, which is convergence downwards.
 			local bounds = Settings.bounds(setting.name)
 			if bounds then
-				choices[#choices + 1] = { separator = true }
-				choices[#choices + 1] = {
-					label = i18n_safe("menu.llm.generation.custom_value"),
-					action = function()
+				local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+					["llm_numeric_custom_value"] = function()
 						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
 						if not ok_prompt then
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
@@ -2642,7 +2644,8 @@ local function _build_llm(ctx)
 							end,
 						}, ctx.webview)
 					end,
-				}
+				})
+				for _, row in ipairs(custom_rows or {}) do choices[#choices + 1] = row end
 			end
 
 			rows[#rows + 1] = {

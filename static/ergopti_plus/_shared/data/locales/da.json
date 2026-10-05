@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Kør et program [kan indstilles]",
 	"menu.hotstrings.personal_metadata_unavailable": "Ikke tilgængeligt her: redigér feltet direkte i kildefilen.",
 	"menu.gestures.mode_current": "Tilstand: %s",
-	"menu.gestures.sensitivity_current": "Følsomhed: %s"
+	"menu.gestures.sensitivity_current": "Følsomhed: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "Disse kontroller administrerer den gemte liste »Mine modeller« på macOS. Windows og Linux bruger deres egne modellister."
 }

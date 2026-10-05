@@ -3218,5 +3218,6 @@
 	"sg_actions.run_program": "▶️ Запустить программу [настраиваемое]",
 	"menu.hotstrings.personal_metadata_unavailable": "Здесь недоступно: измените это поле непосредственно в исходном файле.",
 	"menu.gestures.mode_current": "Режим: %s",
-	"menu.gestures.sensitivity_current": "Чувствительность: %s"
+	"menu.gestures.sensitivity_current": "Чувствительность: %s",
+	"platform_reason.llm_saved_user_models_are_macos": "Эти элементы управления работают с сохранённым списком «Мои модели» в macOS. Windows и Linux используют собственные списки моделей."
 }

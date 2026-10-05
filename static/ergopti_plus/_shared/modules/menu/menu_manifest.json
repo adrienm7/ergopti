@@ -3002,5 +3002,116 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"llm_custom_profile_controls": [
+		{
+			"type": "check",
+			"id": "llm_profile_use",
+			"i18n": "menu.profiles.use_profile",
+			"checked_when": [
+				"llm_custom_profile_active"
+			],
+			"disabled_when": [
+				"llm_custom_profile_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_profile_shortcut",
+			"i18n": "menu.profiles.shortcut_prefix",
+			"disabled_when": [
+				"llm_custom_profile_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_profile_edit",
+			"i18n": "menu.profiles.edit_profile",
+			"disabled_when": [
+				"llm_custom_profile_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_profile_delete",
+			"i18n": "menu.profiles.delete_profile",
+			"disabled_when": [
+				"llm_custom_profile_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_user_model_controls": [
+		{
+			"type": "check",
+			"id": "llm_user_model_select",
+			"i18n": "menu.llm.select_model",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide",
+			"checked_when": [
+				"llm_user_model_selected"
+			],
+			"disabled_when": [
+				"llm_user_model_selection_ready",
+				"llm_user_model_live"
+			]
+		},
+		{
+			"type": "command",
+			"id": "llm_user_model_remove",
+			"i18n": "menu.llm.remove_user_model",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide",
+			"disabled_when": [
+				"llm_user_model_live"
+			]
+		}
+	],
+	"llm_numeric_custom_rows": [
+		{
+			"type": "---",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_numeric_custom_value",
+			"i18n": "menu.llm.generation.custom_value",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
 	]
 }
