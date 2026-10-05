@@ -7,4 +7,12 @@ return {
 	xkbcommon_x11 = "libxkbcommon-x11.so.0",
 	x11 = "libX11.so.6",
 	x11_xcb = "libX11-xcb.so.1",
+	network_runtime = {
+		libraries = {
+			gio = "libgio-2.0.so.0",
+			gobject = "libgobject-2.0.so.0",
+			glib = "libglib-2.0.so.0",
+		},
+		proxy_schema = "org.gnome.system.proxy",
+	},
 }

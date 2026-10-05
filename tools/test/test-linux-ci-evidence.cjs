@@ -382,7 +382,7 @@ end
 					GITHUB_ACTIONS: ci,
 					GITHUB_TOKEN: token,
 					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
 					UPDATER_TRUSTED_RELEASE_URL: `${variant.origin}?per_page=100`,
 					UPDATER_HTTP_STATUS: String(variant.status),
 					UPDATER_ECHO_CI_TOKEN: variant.echo ? 'true' : 'false',
@@ -450,6 +450,211 @@ end
 			assert.ok(!captured.includes(privateText), 'artifact leaked private request state');
 		}
 	}
+
+	// The complete original auth matrix above exercises the sole extracted curl
+	// producer: exact origin/header/stdin/privacy/status laws are unchanged.
+	// These additional controls load the actual managed public port. Native
+	// callbacks remain simulated libuv ports; this is not a native-wire proof.
+	const managedAuthenticationHarness = authenticationHarness
+		.replace(
+			'local native = { requests = 0 }',
+			`local native = { requests = 0, acquired = 0, closed = 0 }
+local function allocated(kind)
+ native.acquired = native.acquired + 1
+ return { kind = kind }
+end`
+		)
+		.replace(
+			'function uv.new_pipe() return {} end',
+			"function uv.new_pipe() return allocated('pipe') end"
+		)
+		.replace(
+			'function uv.new_timer() return {} end',
+			"function uv.new_timer() return allocated('timer') end\nfunction uv.hrtime() return 1000000 end"
+		)
+		.replace(
+			'function uv.close(handle) handle.closing = true end',
+			`function uv.close(handle, callback)
+ assert(not handle.closed, 'managed fixture retried an acknowledged native close')
+ handle.closing, handle.closed = true, true
+ native.closed = native.closed + 1
+ if callback then callback() end
+end`
+		)
+		.replace(
+			'return {}, 4000 + native.requests',
+			"return allocated('process'), 4000 + native.requests"
+		)
+		.replace(
+			"if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end",
+			`if format == 'HTTP terminal callback raised: %s.'
+   or format == 'Owned HTTP terminal callback raised: %s.'
+   or format == 'Owned HTTP settlement callback raised: %s.'
+   or (format == '%s' and type(detail) == 'string' and detail:find('callback raised.', 1, true)) then
+   native.callback_error = 'protected callback raised'
+  end`
+		)
+		.replace(
+			"assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')",
+			`assert(delivered and not Client.isActive('updater'), 'native terminal receipt did not settle')
+ assert(native.acquired == native.closed, 'managed public completion lost a physical close ACK')`
+		);
+	const managedCases = [
+		[releaseOrigin, true],
+		[`${releaseOrigin}?per_page=20&page=2`, true],
+		[customOrigin, false],
+		['https://release-assets.githubusercontent.com/package.tar.gz', false],
+		['https://API.GITHUB.COM/repos/adrienm7/ergopti/releases', false],
+		['https://api.github.com.evil.invalid/repos/adrienm7/ergopti/releases', false],
+		['https://user:password@api.github.com/repos/adrienm7/ergopti/releases', false]
+	];
+	const managedVariants = [
+		{ name: 'ci-scoped', ci: 'true', status: 403 },
+		{ name: 'non-ci', ci: 'false', status: 403 },
+		{ name: 'conditional', ci: 'true', status: 304 }
+	];
+	const managedEnvironment = (evidence, ci, status, cases) => ({
+		...process.env,
+		LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+		GITHUB_ACTIONS: ci,
+		GITHUB_TOKEN: fixtureToken,
+		ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
+		UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+		UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
+		UPDATER_HTTP_STATUS: String(status),
+		UPDATER_ECHO_CI_TOKEN: 'false',
+		UPDATER_AUTH_CASES: JSON.stringify(cases),
+		// Real canonical environment admission, confined to this simulated child.
+		// No OS settings/helper/route receipt override is provided.
+		http_proxy: 'http://127.0.0.1:9',
+		https_proxy: 'http://127.0.0.1:9',
+		HTTP_PROXY: '',
+		HTTPS_PROXY: '',
+		all_proxy: '',
+		ALL_PROXY: '',
+		NO_PROXY: '',
+		no_proxy: ''
+	});
+	for (const variant of managedVariants) {
+		const evidence = path.join(updaterScratch, `managed-authentication-${variant.name}`);
+		fs.mkdirSync(evidence);
+		const observed = spawnSync(
+			nativeLua,
+			['-e', managedAuthenticationHarness, updaterProbe, updaterDriver, updaterScratch],
+			{
+				encoding: 'utf8',
+				env: managedEnvironment(evidence, variant.ci, variant.status, managedCases)
+			}
+		);
+		assert.ifError(observed.error);
+		assert.strictEqual(
+			observed.status,
+			1,
+			'managed authentication cannot forgive the original update refusal'
+		);
+		assert.match(observed.stdout, /FAIL the newest release is found/);
+		assert.ok(
+			observed.stdout.includes(`scoped request and cleanup observations: 7${NATIVE_LUA_EOL}`)
+		);
+		const captured = fs.readFileSync(path.join(evidence, 'http.json'), 'utf8');
+		const responses = JSON.parse(captured).responses;
+		assert.strictEqual(responses.length, 7);
+		assert.ok(responses.every((response) => response.status === variant.status));
+		if (variant.status === 304) {
+			assert.strictEqual(
+				(observed.stderr.match(/^::notice title=Linux updater live HTTP::/gm) || []).length,
+				7
+			);
+			assert.doesNotMatch(observed.stderr, /^::error title=Linux updater live HTTP::/m);
+			assert.ok(
+				responses.every((response) => response.body === '' && response.headers_available === false)
+			);
+		}
+		for (const privateText of [fixtureToken, 'Authorization', 'original-etag', 'user:password']) {
+			assert.ok(
+				!observed.stdout.includes(privateText),
+				'managed stdout leaked private request state'
+			);
+			assert.ok(
+				!observed.stderr.includes(privateText),
+				'managed stderr leaked private request state'
+			);
+			assert.ok(!captured.includes(privateText), 'managed artifact leaked private request state');
+		}
+	}
+	// A malformed external URI must still reach the original observational
+	// wrapper without CI authentication, then fail closed before acquisition.
+	const originalGetStart = managedAuthenticationHarness.indexOf('local original_get = function');
+	const originalGetEnd = managedAuthenticationHarness.indexOf('local trusted_url, getter_calls');
+	assert.ok(originalGetStart >= 0 && originalGetEnd > originalGetStart);
+	const refusedGet = `local original_get = function(url, headers, sent_options, callback)
+ assert(url == expected[1], 'managed refusal changed the exact invalid URI')
+ assert(headers == original_headers and headers.Authorization == nil, 'invalid URI was authenticated')
+ assert(sent_options == options, 'invalid URI changed caller options')
+ count = count + 1
+ local delivered = false
+ local sent = Client.get(url, headers, sent_options, function(result)
+  assert(result.ok == false and result.status == 0 and result.body == '', 'invalid route fabricated an HTTP response')
+  assert(result.error == 'proxy-route-invalid', 'invalid route lost its canonical refusal')
+  answer = result
+  assert(callback(result, 'original callback receipt') == 'original callback return')
+  delivered = true
+ end)
+ assert(sent == false and delivered, 'invalid route must refuse before native dispatch')
+ assert(native.requests == 0 and native.acquired == 0 and native.closed == 0, 'invalid route acquired a native owner')
+ assert(native.callback_error == nil and not Client.isActive('updater'), 'invalid refusal lost its completion fence')
+ return sent
+end
+`;
+	const refusedManagerStart = managedAuthenticationHarness.indexOf(
+		'manager.check_for_updates = function'
+	);
+	const refusedManagerEnd = managedAuthenticationHarness.indexOf(
+		"package.preload['modules.updater.manager']"
+	);
+	assert.ok(refusedManagerStart > originalGetEnd && refusedManagerEnd > refusedManagerStart);
+	const refusedManager = `manager.check_for_updates = function(_, callback)
+ assert(#rows == 1, 'invalid route fixture inventory changed')
+ expected = rows[1]
+ assert(manager._http_client.get(expected[1], original_headers, options, function(result, receipt)
+  assert(result == answer and receipt == 'original callback receipt', 'invalid refusal changed response ownership')
+  callbacks = callbacks + 1
+  return 'original callback return'
+ end) == false, 'invalid route dispatch was admitted')
+ assert(count == 1 and callbacks == 1, 'invalid route skipped its observed request')
+ callback(false, nil, answer.error)
+end
+`;
+	const managedRefusalHarness =
+		managedAuthenticationHarness.slice(0, originalGetStart) +
+		refusedGet +
+		managedAuthenticationHarness.slice(originalGetEnd, refusedManagerStart) +
+		refusedManager +
+		managedAuthenticationHarness.slice(refusedManagerEnd);
+	const invalidEvidence = path.join(updaterScratch, 'managed-authentication-invalid-newline');
+	fs.mkdirSync(invalidEvidence);
+	const invalid = spawnSync(
+		nativeLua,
+		['-e', managedRefusalHarness, updaterProbe, updaterDriver, updaterScratch],
+		{
+			encoding: 'utf8',
+			env: managedEnvironment(invalidEvidence, 'true', 403, [[`${releaseOrigin}?page=2\n`, false]])
+		}
+	);
+	assert.ifError(invalid.error);
+	assert.strictEqual(invalid.status, 1, 'a refused managed route must keep the updater red');
+	assert.match(invalid.stdout, /FAIL the newest release is found/);
+	assert.ok(invalid.stdout.includes(`scoped request and cleanup observations: 1${NATIVE_LUA_EOL}`));
+	const invalidCaptured = fs.readFileSync(path.join(invalidEvidence, 'http.json'), 'utf8');
+	assert.strictEqual(JSON.parse(invalidCaptured).responses.length, 1);
+	assert.strictEqual(JSON.parse(invalidCaptured).responses[0].status, 0);
+	assert.strictEqual(JSON.parse(invalidCaptured).responses[0].error, 'proxy-route-invalid');
+	for (const privateText of [fixtureToken, 'Authorization', 'original-etag', 'user:password']) {
+		assert.ok(!invalid.stdout.includes(privateText));
+		assert.ok(!invalid.stderr.includes(privateText));
+		assert.ok(!invalidCaptured.includes(privateText));
+	}
+
 	for (const token of [
 		'',
 		fixtureToken + '\n',
@@ -476,7 +681,7 @@ end
 					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
 					GITHUB_ACTIONS: 'true',
 					GITHUB_TOKEN: token,
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
 					UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
 					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
 				}
@@ -508,7 +713,7 @@ end
 					GITHUB_TOKEN: fixtureToken,
 					UPDATER_GETTER_ABSENT: endpoint === null ? 'true' : 'false',
 					UPDATER_TRUSTED_RELEASE_URL: endpoint || '',
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
 					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
 				}
 			}
@@ -1245,6 +1450,13 @@ for (const line of [
 		`the test-linux evidence must read its count with: ${line}`
 	);
 }
+assert.ok(
+	recordScript.includes(
+		'network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")'
+	),
+	'the actual runtime count must come from its independently validated native receipt'
+);
+assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-network-runtime'], 4);
 const recorded = [...recordScript.join('\n').matchAll(/--subject "?([a-z0-9-]+)=([^\s"]+)"?/g)];
 assert.deepStrictEqual(
 	recorded.map((match) => match[1]).sort(),
@@ -1260,7 +1472,8 @@ for (const [, subject, value] of recorded) {
 			unit: '$unit_assertions',
 			'hotstring-e2e': '$e2e_assertions',
 			'xkb-source-qualification': '$xkb_source_assertions',
-			'http-stream-receipts': '$http_stream_assertions'
+			'http-stream-receipts': '$http_stream_assertions',
+			'managed-network-runtime': '$network_runtime_assertions'
 		}[subject] ?? '1';
 	assert.strictEqual(
 		value,

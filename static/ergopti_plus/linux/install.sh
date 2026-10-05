@@ -239,6 +239,12 @@ _required_dependency_package() {
 		apk:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
 		apk:libX11.so.6) echo "libx11" ;;
 		apk:libX11-xcb.so.1) echo "libx11" ;;
+		apt:curl) echo "curl" ;;
+		dnf:curl) echo "curl" ;;
+		zypper:curl) echo "curl" ;;
+		pacman:curl) echo "curl" ;;
+		xbps:curl) echo "curl" ;;
+		apk:curl) echo "curl" ;;
 		# END GENERATED LINUX NATIVE PACKAGES
 		apt:luajit) echo "luajit" ;;
 		dnf:luajit) echo "luajit" ;;
@@ -376,6 +382,45 @@ _check_or_install_library() {
 	echo "  ✔  ${soname} — capacité vérifiée"
 }
 
+# BEGIN GENERATED LINUX NETWORK PROVIDERS
+_network_runtime_packages() {
+	case "$1" in
+		apt) echo "glib-networking gsettings-desktop-schemas lua-luv" ;;
+		dnf) return 1 ;;
+		zypper) echo "glib-networking gsettings-desktop-schemas luajit-luv" ;;
+		pacman) echo "glib-networking gsettings-desktop-schemas lua51-luv" ;;
+		xbps) return 1 ;;
+		apk) echo "glib-networking gsettings-desktop-schemas lua5.1-luv" ;;
+		*) return 1 ;;
+	esac
+}
+# END GENERATED LINUX NETWORK PROVIDERS
+
+# Read-only native admission shares the lookup child's ABI and resolver factory.
+# A loadable GLib alone cannot replace an installed proxy module or LuaJIT luv.
+_network_runtime_available() {
+	luajit "${SRC_DRIVER}/platform/network/runtime_probe.lua" "${SRC_SHARED}" >/dev/null 2>&1
+}
+
+_ensure_network_runtime() {
+	if _network_runtime_available; then return 0; fi
+	local manager
+	local packages
+	manager="$(_detect_pkg_manager)"
+	if ! packages="$(_network_runtime_packages "${manager}")"; then
+		echo "proxy-backend-unavailable: no verified ${manager} runtime provider; install the documented prerequisites." >&2
+		return 1
+	fi
+	local package_name
+	for package_name in ${packages}; do
+		if ! _install_required_package "${manager}" "${package_name}"; then return 1; fi
+	done
+	if ! _network_runtime_available; then
+		echo "proxy-backend-unavailable: installed packages did not provide the required native runtime." >&2
+		return 1
+	fi
+}
+
 if $SKIP_DEPS; then
 	echo ""
 	echo "=== Dépendances ignorées (--no-deps) ==="
@@ -402,6 +447,7 @@ _check_or_install_library libxkbcommon.so.0
 _check_or_install_library libxkbcommon-x11.so.0
 _check_or_install_library libX11.so.6
 _check_or_install_library libX11-xcb.so.1
+_check_or_install curl
 # END GENERATED LINUX NATIVE CAPABILITIES
 
 # The desktop half: the tray icon and the windows it opens. Best effort rather
@@ -489,9 +535,8 @@ _ensure_gnome_tray_host
 _ensure_desktop_backend tray "icône de la barre système (libayatana-appindicator)" \
 	"local ffi=require('ffi'); for _, n in ipairs({'libayatana-appindicator3.so.1','libappindicator3.so.1'}) do if pcall(ffi.load, n) then os.exit(0) end end; os.exit(1)"
 
-# Optional Lua libraries — the daemon degrades gracefully without them,
-# but the full feature set (async event loop, webview rendering, tray SNI,
-# signal handlers) requires these packages.
+# Networking requires LuaJIT luv and a supported GIO proxy resolver. The other
+# Lua modules below remain optional for webviews, filesystem and signal features.
 echo ""
 echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) ==="
 
@@ -503,7 +548,8 @@ echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) 
 # aborted the install before a single driver file was copied.
 #
 # So: a list of candidates per manager, the 5.1/LuaJIT build first; each one is
-# tried until luajit can require the module; a missing package is never fatal.
+# tried until luajit can require the optional module; missing optional packages
+# are not fatal. Networking uses the mandatory canonical provider path instead.
 _lua_module_installed() {
 	luajit -e "require('$1')" >/dev/null 2>&1
 }
@@ -564,7 +610,8 @@ _install_lua_module() {
 	echo "  ⚠  ${mod} (${label}) indisponible pour LuaJIT — fonction dégradée." >&2
 }
 
-_install_lua_module luv   "boucle d'évènements, inotify"
+# Networking owns luv as a required native ABI, after any repair attempt.
+_ensure_network_runtime
 _install_lua_module lfs   "système de fichiers"
 _install_lua_module posix "signaux SIGTERM/SIGHUP"
 _install_lua_module lgi   "fenêtres WebKit, compteur de vitesse"

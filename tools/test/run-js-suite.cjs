@@ -1099,6 +1099,18 @@ const CHECKS = [
 		repro: 'node tools/test/test-linux-launcher-deps.cjs'
 	},
 	{
+		name: 'Linux managed networking admits actual runtime after package repair',
+		cmd: 'node',
+		args: ['tools/test/test-linux-network-runtime.cjs'],
+		repro: 'npm run test:linux-network-runtime'
+	},
+	{
+		name: 'Linux native network runtime is registered and refuses omitted receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-network-runtime-registration.cjs'],
+		repro: 'npm run test:linux-network-runtime-registration'
+	},
+	{
 		name: 'extension-pack paths resolve (every read site lands on a real pack; pre-reorg prefix ratcheted out)',
 		cmd: 'node',
 		args: ['tools/test/test-extensions-path-resolves.cjs'],

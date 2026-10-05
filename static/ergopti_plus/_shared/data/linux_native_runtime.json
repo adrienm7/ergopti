@@ -69,7 +69,10 @@
 			"passwd",
 			"util-linux",
 			"lua-lgi",
-			"gir1.2-webkit2-4.1"
+			"gir1.2-webkit2-4.1",
+			"glib-networking",
+			"gsettings-desktop-schemas",
+			"lua-luv"
 		],
 		"rpm": [
 			"luajit >= 2.1",
@@ -88,7 +91,16 @@
 			"util-linux"
 		],
 		"arch": ["luajit", "xclip", "libnotify", "curl", "libxkbcommon", "at-spi2-core"],
-		"nix_library_path": ["libayatana-appindicator", "gtk3", "glib", "libxkbcommon", "at-spi2-core"]
+		"nix_library_path": [
+			"libayatana-appindicator",
+			"gtk3",
+			"glib",
+			"libxkbcommon",
+			"at-spi2-core",
+			"glib-networking",
+			"libproxy",
+			"dconf"
+		]
 	},
 	"package_sources": {
 		"apt": "https://packages.debian.org/stable/libxkbcommon-x11-0",
@@ -97,5 +109,23 @@
 		"pacman": "https://gitlab.archlinux.org/archlinux/packaging/packages/libxkbcommon/-/blob/main/PKGBUILD",
 		"xbps": "https://github.com/void-linux/void-packages/blob/master/srcpkgs/libxkbcommon/template",
 		"apk": "https://github.com/alpinelinux/aports/blob/master/main/libxkbcommon/APKBUILD"
+	},
+	"network_runtime": {
+		"libraries": {
+			"gio": "libgio-2.0.so.0",
+			"gobject": "libgobject-2.0.so.0",
+			"glib": "libglib-2.0.so.0"
+		},
+		"proxy_schema": "org.gnome.system.proxy",
+		"providers": {
+			"apt": ["glib-networking", "gsettings-desktop-schemas", "lua-luv"],
+			"dnf": null,
+			"zypper": ["glib-networking", "gsettings-desktop-schemas", "luajit-luv"],
+			"pacman": ["glib-networking", "gsettings-desktop-schemas", "lua51-luv"],
+			"xbps": null,
+			"apk": ["glib-networking", "gsettings-desktop-schemas", "lua5.1-luv"]
+		},
+		"description": "A provider list is admitted only from recorded distribution metadata; null means no verified repair provider. Actual LuaJIT ABI, supported GIO resolver and required GNOME schema are always re-probed. Libproxy selection does not prove every desktop setting or PAC evaluation.",
+		"curl_package": "curl"
 	}
 }

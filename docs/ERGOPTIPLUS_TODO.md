@@ -4341,9 +4341,31 @@ the old port fails twelve of those controls. Both native window fixtures now
 use the actual pause controller; model retries traverse the actual admitted
 page bridge and decode native responses. Original assertions and deadlines
 remain intact. Selected verification passes formatting, 361 JavaScript checks,
-Linux E2E and 7,934 Linux tests in 384 modules. These corrections still require
-actual GTK/WebKit CI execution; packaging and installation remain unqualified.
-Item 62 stays partial.
+Linux E2E and 7,934 Linux tests in 384 modules. Actual GTK/WebKit model retry and
+Versions listing both pass in manual run 37315291545 at
+5ce6bc2c9ac682f0764d8f204ef8ca271de18947. Shared checks and Linux units pass;
+application operands and the curl-version-sensitive ETag fixture still fail,
+leaving packaging and installation skipped. Those scenarios still require diagnosis or their owners' pending
+corrections. Item 62 stays partial.
+
+The Linux public HTTP adapter now delegates initial destination routing to
+shared proxy policy and an owned native GIO lookup child. Ordered native relay
+choices, explicit DIRECT, environment precedence and inherited bypass rules
+retain the original absolute budget and physical settlement before successors.
+Exact curl/helper image admission uses retained descriptors and decimal native
+inode receipts, preserving large kernel identities without floating-point loss.
+Runtime prerequisites and package-manager declarations come from one generated
+catalogue; package success alone cannot admit missing luv, GIO or proxy schemas.
+
+Normal qualification passes 363 JavaScript checks, 8,206 Linux tests in 403
+modules, local Linux/macOS E2E, the existing actual libuv/curl streaming gate,
+and four actual Linux runtime groups. The full portable macOS suite passes
+14,728 tests; all twelve shared policy controls also pass after the final
+normalization correction. New native CI and installed-format qualification
+remain required. Per-hop redirects, retained archive-output integration and
+portable package closure are separate ongoing slices; enterprise authentication
+and recipient system trust acceptance are not inferred. Synchronous filesystem
+metadata cannot be hard-preempted. Item 62 remains partial.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard

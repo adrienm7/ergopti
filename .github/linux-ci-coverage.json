@@ -15,6 +15,7 @@
 				"system-keymaps": 1,
 				"xkb-source-qualification": 26,
 				"http-stream-receipts": 55,
+				"managed-network-runtime": 4,
 				"x11-display": 1,
 				"wayland-display": 1,
 				"tray-symbols": 1,
