@@ -37,6 +37,7 @@ local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
 local TextCipher    = require("modules.keylogger.text_cipher")
 local EventIdPolicy = require("sqlite.event_id_policy")
+local Json          = require("json")
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -1105,7 +1106,17 @@ end
 --- @return string|nil The stored value, or nil when absent.
 function M.get_meta(key)
 	if not M.is_available() or type(key) ~= "string" or key == "" then return nil end
-	return _query_scalar(string.format("SELECT value FROM meta WHERE key = '%s';", _sql_escape(key)))
+	-- Native raw TEXT output stops at NUL and scalar line framing stops at LF.
+	-- Quote just this value so the existing checked scalar path carries one line
+	-- while the shared decoder restores every byte, including an empty string.
+	local encoded = _query_scalar(string.format("SELECT json_quote(value) FROM meta WHERE key = '%s';", _sql_escape(key)))
+	if encoded == nil then return nil end
+	local ok, value = pcall(Json.decode, encoded)
+	if not ok or type(value) ~= "string" then
+		Logger.warn(LOG, "SQLite metadata read returned an invalid JSON string.")
+		return nil
+	end
+	return value
 end
 
 --- Writes one meta key.
