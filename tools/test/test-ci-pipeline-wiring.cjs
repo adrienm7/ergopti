@@ -220,6 +220,13 @@ const STEP_CONDITIONS = [
 		'${{ always() }}'
 	],
 	[MACOS_BOX, 'package-macos', 'Observe native Apple Shortcuts discovery', '${{ always() }}'],
+	[MACOS_BOX, 'package-macos', 'Observe native global application switcher', '${{ always() }}'],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Retain native global application switcher observations',
+		'${{ always() }}'
+	],
 	[MACOS_BOX, 'package-macos', 'Retain native Apple Shortcuts observation', '${{ always() }}'],
 	[MACOS_BOX, 'package-macos', 'Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
@@ -1354,6 +1361,23 @@ const NATIVE_ACTION_PROBES = [
 			'failure.json',
 			'pending-retirement.json'
 		]
+	},
+	{
+		run: 'Observe native global application switcher',
+		retain: 'Retain native global application switcher observations',
+		folder: 'native-global-switcher',
+		commands: [
+			"python3 -m unittest discover -s tools/diagnostics/native_global_switcher -p 'test_*.py' -v",
+			'brew install lua@5.4',
+			'test -x "$global_switcher_lua54"',
+			'python3 tools/diagnostics/native_global_switcher/run_owner_controls.py --lua "$global_switcher_lua54"',
+			'python3 tools/diagnostics/native_global_switcher/run_ci_probe.py',
+			'--source-root "$GITHUB_WORKSPACE"',
+			'--output "$RUNNER_TEMP/native-global-switcher"',
+			'2>&1 | tee "$RUNNER_TEMP/native-global-switcher-ci.log"'
+		],
+		files: ['report.json', 'native-result.json'],
+		extraPaths: ['${{ runner.temp }}/native-global-switcher-ci.log']
 	}
 ];
 
@@ -1391,6 +1415,7 @@ function nativeActionProbeProblems(files) {
 			}
 		}
 		const expected = spec.files.map((file) => '${{ runner.temp }}/' + spec.folder + '/' + file);
+		expected.push(...(spec.extraPaths ?? []));
 		if (
 			JSON.stringify(paths) !== JSON.stringify(expected) ||
 			pipeline.stepField(artifact, 'if') !== '${{ always() }}' ||
@@ -1455,6 +1480,8 @@ for (const name of [
 	'Retain native Hammerspoon provider inventory',
 	'Observe native notification constructors',
 	'Retain native notification constructor observations',
+	'Observe native global application switcher',
+	'Retain native global application switcher observations',
 	'Observe native Apple Shortcuts discovery',
 	'Retain native Apple Shortcuts observation'
 ]) {
