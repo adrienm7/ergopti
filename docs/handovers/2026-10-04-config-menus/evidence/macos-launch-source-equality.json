@@ -1,0 +1,388 @@
+{
+	"revisions": {
+		"upstream": "2f11cf2642a85da986d1ab0905fc94f3699f2c0f",
+		"feature_tested": "68d536e1e5d0180a498792587fbb2a0d7c6db9f0",
+		"current": "38f2add0df777c1d49f04cb3a09e7ea8450c8b0f"
+	},
+	"source_files": [
+		{
+			"path": "static/ergopti_plus/macos/launcher/ErgoptiPlus.entitlements",
+			"sha256": "cf524985728773d68b86dbea451272d4b62f06feec23180680c8def77ba032d2",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Package.swift",
+			"sha256": "c7eaf90b391643010effe78d3fba40926631fcb6bcd5233f308429fa0afbf505",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/README.md",
+			"sha256": "5edccd8b7f2ba344a7b4527138fc031f21b4d81a652fb5e110d074885df1b5f4",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/CPOSIXCompatibility.c",
+			"sha256": "884d6ff39c5ff6ed70e4c0a724755aed88b6a46d3681b4f71f19c359b6fce381",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+			"sha256": "8bd1cc8845812d19892b90a0524b475f8717d328dbb778f3b1e397ff8fdfdad1",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift",
+			"sha256": "3f7386a84fb211d9408386d59883a86cebbab2956e8eef6c521002be16f9b4b7",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/CatalogUpdateUserDriver.swift",
+			"sha256": "aae21c1cbdc600e51b2148a4f08ce9fa6a029787f2022d00741459d0964cb0ac",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedChildActivity.swift",
+			"sha256": "632daf75c473f4f6afc0d5f6ada29cd5751b8fc8079a8dda583e8b294856ba18",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedFatalReport.swift",
+			"sha256": "607cdabf2221fc1366081686ba5833d98d8a3cd4fccac2ac624e436671ca403d",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedProcessExitMonitor.swift",
+			"sha256": "4f54a6bc5d1d3e3ebb5db922b0fa75b49dedd7a2b96cff418f5e3840bda78584",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeyboardSourceProbe.swift",
+			"sha256": "c8c05f6dfb62086055cad8f4d0095940d48bf5c95a4dda864472ae8ecf356273",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeychainTokenWorker.swift",
+			"sha256": "99caecf494cba9387a83ff14c69a1b0a8c5e91e2d0f87a9a3f204f7ad4523ffc",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift",
+			"sha256": "b7e8331bba602456ce21fd3324cae990a8c60bba4b94dcffa141635c94d67b96",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherLocalization.swift",
+			"sha256": "9841f9d335d8c20b1192538e403897c20d1b9c2a0b377e235459427c0fc666e4",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerDatagramWorker.swift",
+			"sha256": "90ced95432fd51e81f33bf452b2cbef0e0babf2bfd73cc92f21cc775cc8cbf5f",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift",
+			"sha256": "c2202a13a61a6c6bf704b5379d38dc0796229f5f694c5d9a9a97340ac9fabdb2",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoginStartupWorker.swift",
+			"sha256": "5a50ea3ae94f0453802c42c145392c2bbf00af571fa5e743891be4a1872a8d9f",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedLogDirectory.swift",
+			"sha256": "b620bd72dacf4a19e8c968a7607d37369214de1bdfc3efa9b25a336dc0515b91",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/POSIXCompatibility.swift",
+			"sha256": "5ee5bc5af37117db462063f68a0bf3010e4fe3b52f75e8446bb336bf64683d4b",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseGuardian.swift",
+			"sha256": "26b613cf32cb95e890f97f0c43dd502a53af2a07f2bfef3f0b6d1a11230a0905",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift",
+			"sha256": "50a155a06dfa6afcca03eb3c0e40e06e4aca1c01e1c5743d08410eab33ce1445",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UninstallWorker.swift",
+			"sha256": "a6793af8ceb844789b478ca8574dcb4d3793d7e81135c977b2f203d92c1dbf97",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateChannelFeed.swift",
+			"sha256": "65cae66efeeccd6c547d047fe11b19fd7f0ad9c434d6bdb2eab84f29c025d9d1",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateChannels.generated.swift",
+			"sha256": "70b0c2f5d638b0edf7da2ab73178c4713a82bf8ea62bc6c65dad69514fe32cc2",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateConsentPolicy.swift",
+			"sha256": "21745a1d772f49561b8fcee0fe6a4e70971e7dbc45aede997e02141fc08fec1f",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdatePromptPanel.swift",
+			"sha256": "cb5e190fc77932b0a99e6f6141fe50c7c3d17078b1e7875dbbb237612c9b1c57",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdatePromptTexts.swift",
+			"sha256": "fa26c25a680336e85f0b069064a9e7563c0db3e3f7a259d61b0d7157a568fdc9",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdaterCommandRouter.swift",
+			"sha256": "0dc961f1548c7ee21c3b3bdd82b0c536c24bf9dde521f09a190e346e1446ac84",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/WindowTitles.generated.swift",
+			"sha256": "a2024365c1d65b727da2fc12ce1ddc7122ab7b86c21e447ef469b7f8c418d8a7",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+			"sha256": "c82dcd82814b74d4df92ab432f6d6c64fac8cb21a42a01e3658d400863037cbf",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ApplicationPickerPanelTests.swift",
+			"sha256": "c821c6f6e3c116feed3a4e2426c3582bdd6c9976ca57ecafc98b10a1d68bd8fb",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/BundleValidationTests.swift",
+			"sha256": "463737cbe57d068403053d93395791bcd98bc079b6cc1bed3814e602619f16d4",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/CatalogUpdateUserDriverTests.swift",
+			"sha256": "3bcc017302bf5c42eb2cfe64618b0a7690ecee798e2237d74162a8d1986a7fc1",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/EmbeddedFatalReportTests.swift",
+			"sha256": "0d0e8b8d1d6a555bcd8aecfdb8853ae7df31b28b539adce5c820600697e3c1fb",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianRegistrationTests.swift",
+			"sha256": "e08a37391e69a591ef1adf0697b8333852a7c88336a9b745e189c90d219c499f",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianUnregistrationTests.swift",
+			"sha256": "f173cd9dc3fbdcb1ff193c243e9d54ccf52052d90c89d396a10f34275fdde414",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardCharacterMappingTests.swift",
+			"sha256": "058cd9625029e0a15f416a89a5eacdace414eacccd49c87687396d24ebff422e",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceProbeTests.swift",
+			"sha256": "7a8416dcb470965a87cce4f308615939200b7de8aafdb6c072328f6b90347b7b",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift",
+			"sha256": "7b45dbee3fb79c4afa73abe0560355ce3d13016368911534c89fa34210912d54",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeychainTokenWorkerTests.swift",
+			"sha256": "65f5d2b2f6e7b822c459288e2bb16254dc5ab3f3b178031b11296489889e54f6",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift",
+			"sha256": "9fd86109a8ac00057ed5f3e43face8b4e1c52445c9a188f7ea107d7041e5929c",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherLogTests.swift",
+			"sha256": "7c1c82dda758663b0e93740c55ab0139eb3dc626c6cf274a7957fb7fb8474d94",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LoggerDatagramWorkerTests.swift",
+			"sha256": "ded61f9a65667acd2a8e445a4da758a06d6281f2a5573426dcee5f4622f7b35c",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LoginStartupWorkerTests.swift",
+			"sha256": "ca29b59d78c4f4e02acef564c774311cbea84d57c8b34f99fa5d4d36a9df4293",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NativeFixtureChildEnvironmentTests.swift",
+			"sha256": "86829d26bc3d233ad0d6353376525c70c30a0f2d51f05f2d5d16ccbf7d66a8b3",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedLogDirectoryTests.swift",
+			"sha256": "71423ce63bd394f8f630e0870f03635ce0ba0f485f4ccff09324b41a30a0c636",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/POSIXCompatibilityTests.swift",
+			"sha256": "2d8659dfaaf3f261706181ae932ce7c186168670e9388c3ab5f1fbdb3c1a416e",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift",
+			"sha256": "3a7263b6ec4de716b201666523e0488a9a5edb5187c063ae9dc5322bdfd5034f",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift",
+			"sha256": "d3637e9c4d0e8c846e99af05ba379a6cdd7fe20856e11159ab43dc22eb94058f",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UninstallWorkerTests.swift",
+			"sha256": "92a28189ad211dfa9be2b1e12ce259f89d9b0a6f457aca6a0871ca2299f80382",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UpdateChannelFeedTests.swift",
+			"sha256": "91a8fe87483e24225f29e219091c122804322f3cdc4c6030f507702938bee421",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UpdateConsentPolicyTests.swift",
+			"sha256": "0882228f6c25ab76f6132fb3a804c192d9ab67ea0f8b7a73ba3bd8338b3d1ffd",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UpdaterCommandRouterTests.swift",
+			"sha256": "c52a49d58a89688ffe3b334ae18e8ae4baa16405cf9bb538a1f9871ee9f7c476",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/WindowTitlePolicyTests.swift",
+			"sha256": "1baf071c760158f7c34b6e7b8df63eaf083bd27d49fcc1d4c0637ac3f26f16fb",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist",
+			"sha256": "873f8b310db98db7882629e1d5b616335f4d3445109e9b91e0dd1041f07e9962",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": ".github/workflows/ci-macos.yml",
+			"sha256": "00a8786fa318d9f716dd45ab044fb47117b36bbb41a4d1238dd20f08b6f4db68",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/build/build_macos_app.sh",
+			"sha256": "c4e0a7649e2b6bf10ade3148a04f43919799975a40c39f85443a8a744ae3355e",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/build/macos-bundle-manifest.json",
+			"sha256": "029fee1c5c318f02b1b16900c52d29350a70283ecb13eeffddcfff7bb442ad14",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/build/macos-bundle-payload.cjs",
+			"sha256": "aa84751d376cbe19b624c954ce6c1b7e91efb77f825efc760e4fcb94eddca877",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/build/bundle-macos-luasocket.sh",
+			"sha256": "0540526c70d4c71068294fc9eebbd9f594c331e533e3ae505364d86efdfc8c8b",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/init.lua",
+			"sha256": "1ee1b8bcf97f46dc4871ce0d1297488430fa39f69bceadae63e8170184f04508",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/macos_launch_gate.py",
+			"sha256": "a0cf510dfa95e6793cf1224164018304622519d9d6e1242a61c6988074e82939",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/macos_launch_gate_test.py",
+			"sha256": "527ed43d908dd0bcecbb13552b5aa76f4f0386184fd871524f36c51e8bdaa12a",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_delayed_timer_probe.py",
+			"sha256": "5a455ba8ce197bcaedb380be01042b606899e5753f9efc44f0fd22e207d9e56a",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_delayed_timer_probe_test.py",
+			"sha256": "c0e3224a3656ad465386a2d4dd9bb0aa0b259debffe3f926705b0669a0cf86a9",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_delayed_timer_native.lua",
+			"sha256": "93dd8baba5c673b456c1f2ab564829c7c1276ad904575fd6709c6a0484b1ccdb",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_delayed_timer_contract.json",
+			"sha256": "7ce32fe72da3e18c88defbb06b2e0ddfc5c5952b67617319f6c595aeb7dfe158",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_karabiner_config_probe.py",
+			"sha256": "e8b5079adbdd1d7f37696a596dc4638e053a68d9ca89468fc36c01172c16bb41",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_karabiner_config_probe_test.py",
+			"sha256": "aebe85570330e564e1395c57522047c80390764656e31ed9a4db3574a3b09a84",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_karabiner_config_native.lua",
+			"sha256": "c43d82d937309fad095dde140c82f26f24f08a0d47ed1bb13318422a90573384",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_karabiner_config_contract.json",
+			"sha256": "63d69897200ad173472138c7bd8cc93e0e6b87f6f868a091f1d26beb1ee70f43",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_native_bootstrap_probe.py",
+			"sha256": "82c5db3f10c06e1456a277b5a5a8a3eeff557b5785864e75efde60f327245829",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_native_bootstrap_probe_test.py",
+			"sha256": "08c24fb9ae172f8c87cf729da141d8f4270926e1db8eb19fc9a23d2b1744ea6c",
+			"all_three_revisions_and_actual_source_equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs_native_bootstrap.lua",
+			"sha256": "70f5ed17e519e97879c8196e40d17bb45fc200382e00540d99c3e759fb41c90a",
+			"all_three_revisions_and_actual_source_equal": true
+		}
+	],
+	"Hammerspoon_archive_pin": "1.1.1 from identical build_macos_app.sh default; archive contents not independently hashed here",
+	"whole_runtime_or_package_equality": false,
+	"production_remap_source_changes": [
+		"M\tstatic/ergopti_plus/macos/platform/remap/config.lua",
+		"M\tstatic/ergopti_plus/macos/platform/remap/init.lua",
+		"A\tstatic/ergopti_plus/macos/platform/remap/scope_layer.lua"
+	],
+	"group5_probe_delta_vs_upstream": "native_failure_notice/journal-observation publication and retained task/file-read sample ancestry only; no original transport/deadline/admission fix established",
+	"native_cause": "unresolved; annotation timeouts do not establish TCC/handler/mainqueue/signature cache cause"
+}

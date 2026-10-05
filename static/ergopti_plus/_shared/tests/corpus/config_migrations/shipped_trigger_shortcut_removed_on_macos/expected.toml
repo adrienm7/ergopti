@@ -9,5 +9,9 @@ enabled = true
 [llm.trigger]
 debounce_ms = 200
 
+[llm.trigger.shortcut]
+mods = ["ctrl"]
+key = "space"
+
 [shortcuts.keyboard]
 hs_ctrl_space = "llm_generate_prediction"
