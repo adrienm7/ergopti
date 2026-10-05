@@ -31,6 +31,7 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Transaction = require("config_scope_transaction")
+local FencedTransaction = require("config_scope_fenced_transaction")
 local Writer = require("toml_codec.writer")
 local LeafRows = require("toml_codec.leaf_rows")
 local KeyPath = require("toml_codec.key_path")
@@ -68,7 +69,7 @@ function M.new(options)
 		"hotstrings scope owners are incomplete")
 	local files = options.files or require("adapters.file_system")
 	local remove = options.remove or function(target) return os.remove(target) == true end
-	local owner, held, current_mode = {}, false, nil
+	local owner, current_mode = {}, nil
 	local source, secondary, owned_set = nil, nil, nil
 	local active_snapshot
 
@@ -206,63 +207,17 @@ function M.new(options)
 		end,
 	})
 
-	local function release()
-		assert(Config.release(owner) and Preferences.release(owner), "hotstring configuration release refused")
-		held = false
+	-- The primary planner consumes the admitted mode after both exact native
+	-- claims are held; refused releases remain part of the public journal.
+	local apply_transaction = transaction.apply
+	transaction.apply = function(scope, mode)
+		current_mode = mode
+		return apply_transaction(scope, mode)
 	end
-
-	function owner.pending() return transaction.pending() end
-
-	--- Runs one scope operation.
-	--- @param mode string "recommended" or "clear".
-	--- @return boolean committed
-	--- @return string|nil reason
-	function owner.apply(mode)
-		if held or (mode ~= "recommended" and mode ~= "clear") or options.is_paused() then
-			return false, "the hotstrings scope cannot start"
-		end
-		if not Config.acquire(owner) then return false, "hotstring configuration is already owned" end
-		if not Preferences.acquire(owner) then
-			Config.release(owner)
-			return false, "hotstring preferences are already owned"
-		end
-		held, current_mode = true, mode
-		local committed, detail = transaction.apply("hotstrings", mode)
-		if not transaction.pending() then release() end
-		return committed, detail
-	end
-
-	--- Retries a refused restoration and releases the owners once it settles.
-	--- @return boolean restored
-	function owner.retry_restore()
-		if transaction.retry_restore() ~= true then return false end
-		if held then release() end
-		return true
-	end
-
-	--- Undoes the last committed operation when a later scope of the same
-	--- composition is refused: the runtime and the override file first, then
-	--- config.toml, each only while it still holds this scope's bytes. A refused
-	--- step stays pending and keeps the owners held until retry_restore().
-	--- @return boolean reverted
-	--- @return string|nil reason
-	function owner.revert()
-		if held then return false, "the hotstrings scope is still held" end
-		if not Config.acquire(owner) then return false, "hotstring configuration is already owned" end
-		if not Preferences.acquire(owner) then
-			Config.release(owner)
-			return false, "hotstring preferences are already owned"
-		end
-		held = true
-		local reverted, detail = transaction.revert()
-		if not transaction.pending() then release() end
-		return reverted == true, detail
-	end
-
-	--- Forgets the last commit's inverse once its composition has committed.
-	function owner.release() transaction.release() end
-
-	return owner
+	return FencedTransaction.new({ owner = owner, transaction = transaction, scope = "hotstrings",
+		fences = { { acquire = Config.acquire, release = Config.release },
+			{ acquire = Preferences.acquire, release = Preferences.release } },
+		available = function() return not options.is_paused() end })
 end
 
 --- Applies a menu request with the daemon's owners, retaining a refused inverse.
