@@ -479,6 +479,8 @@ Test("toml writer admission: semantic no-ops do not hide ignored-root deletes or
 
 
 ; Independent complete images pin the configuration-only writer's new boundary.
+; Inline member order follows the unchanged native Map contract also pinned by
+; the existing _TIT_Render fixture, rather than source insertion order.
 ; The generic writer's historical namespace-loss refusals above remain intact.
 _TBUI_ConfigDocumentVectors() {
 	return [
@@ -508,7 +510,7 @@ _TBUI_ConfigDocumentVectors() {
 			Expected: 'layout.ergopti_altgr = false # retained`n' },
 		{ Id: "inline leaf addition", Source: 'layout = { ergopti_base = true, future = "001" }`n',
 			Updates: [{ Section: "layout", Key: "ergopti_altgr", Value: TOML_Bool(false) }],
-			Expected: 'layout = {ergopti_base = true, future = "001", ergopti_altgr = false}`n' },
+			Expected: 'layout = {ergopti_altgr = false, ergopti_base = true, future = "001"}`n' },
 		{ Id: "exact Unicode quoted identities", Source: 'hotstrings.personal."é.Case".enabled = true`nhotstrings.personal."É.Case".enabled = false # distinct retained owner`n',
 			Updates: [{ Section: 'hotstrings.personal."é.Case"', Key: "enabled", Value: TOML_Bool(false) }],
 			Expected: 'hotstrings.personal."é.Case".enabled = false`nhotstrings.personal."É.Case".enabled = false # distinct retained owner`n' },

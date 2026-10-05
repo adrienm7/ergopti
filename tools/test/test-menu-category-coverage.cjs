@@ -37,7 +37,11 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
+const assert = require('node:assert/strict');
+const {
+	delegatedMenuSources,
+	publishesMenuTemplate
+} = require('../lib/menu-shared-delegation.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -64,18 +68,69 @@ function driverSource(driver) {
 			}
 		}
 	})(path.join(SP, DIR[driver]));
-	return out
-		.concat(
-			delegatedMenuSources(nativeSources, path.join(SP, '_shared', 'lua')).map(
-				(source) => source.src
+	return {
+		nativeSources,
+		text: out
+			.concat(
+				delegatedMenuSources(nativeSources, path.join(SP, '_shared', 'lua')).map(
+					(source) => source.src
+				)
 			)
-		)
-		.join('\n');
+			.join('\n')
+	};
 }
 
 const src = Object.fromEntries(['ahk', 'hs', 'linux'].map((d) => [d, driverSource(d)]));
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 const visible = (row, p) => !Array.isArray(row.platforms) || row.platforms.includes(p);
+
+/** Inert provider identities need a reached template, rather than a handler. */
+function inertTemplateRow(row) {
+	return (
+		['label', 'section_header'].includes(row.type) &&
+		typeof row.id === 'string' &&
+		row.id !== '' &&
+		typeof row.i18n === 'string' &&
+		row.i18n !== '' &&
+		Object.keys(row).every((key) =>
+			['type', 'id', 'i18n', 'platforms', 'unavailable'].includes(key)
+		)
+	);
+}
+
+// Independently authored controls keep commands and behavior-bearing labels in
+// the handler census, and refuse decorative source as evidence of publication.
+{
+	const row = { type: 'label', id: 'fixture_label', i18n: 'fixture.caption' };
+	assert.equal(inertTemplateRow(row), true);
+	assert.equal(inertTemplateRow({ ...row, type: 'section_header' }), true);
+	for (const change of [
+		{ type: 'command' },
+		{ command: 'run' },
+		{ callback: 'run' },
+		{ caption_getter: 'caption' },
+		{ id: '' },
+		{ i18n: '' }
+	]) {
+		assert.equal(inertTemplateRow({ ...row, ...change }), false);
+	}
+	for (const [extension, call, prefix] of [
+		['.lua', 'ManifestMenu.template_rows("fixture")', '-- '],
+		['.ahk', 'MenuRenderer_TemplateRows("fixture")', '; ']
+	]) {
+		assert.equal(publishesMenuTemplate(call, extension, 'fixture'), true);
+		for (const source of [
+			prefix + call,
+			JSON.stringify(call),
+			'function ' + call,
+			call.replace('fixture', 'other'),
+			call.replace('("fixture")', '("fixture" .. "tail")'),
+			'Foreign.' + call
+		]) {
+			assert.equal(publishesMenuTemplate(source, extension, 'fixture'), false);
+		}
+	}
+}
 
 const rows = [];
 for (const [key, list] of Object.entries(manifest)) {
@@ -85,7 +140,14 @@ for (const [key, list] of Object.entries(manifest)) {
 		const shown = list.filter((r) => visible(r, p));
 		// Rows that need the driver to name something: an id it dispatches on.
 		const needing = shown.filter((r) => typeof r.id === 'string' && r.id !== '---');
-		const missing = needing.filter((r) => !src[p].includes(r.id));
+		const missing = needing.filter(
+			(r) =>
+				!src[p].text.includes(r.id) &&
+				!(
+					inertTemplateRow(r) &&
+					src[p].nativeSources.some((native) => publishesMenuTemplate(native.src, EXT[p], key))
+				)
+		);
 		cell[p] = { shown: shown.length, missing: missing.map((r) => r.id) };
 	}
 	rows.push({ key, cell });

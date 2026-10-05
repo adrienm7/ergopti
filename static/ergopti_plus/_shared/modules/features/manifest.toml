@@ -158,6 +158,11 @@ platforms = ["ahk", "hs", "linux"]
 description_key = "menu.hotstrings.personal"
 platforms = ["ahk", "hs", "linux"]
 
+# macOS alone persists optional per-category menu orders; this data has no toggle.
+[sections.hotstrings.order_overrides]
+description_key = "menu.hotstrings"
+platforms = ["hs"]
+
 
 
 # ===================
@@ -216,7 +221,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs", "linux"]
-subsections = ["key_combination_taps", "keyboard", "personal", "script_control", "tap_keys"]
+subsections = ["key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols"]
 
 [sections.category_enabled]
 description_key = "menu.category_enabled"
@@ -247,6 +252,11 @@ platforms = ["ahk"]
 [sections.shortcuts.script_control]
 description_key = "menu.shortcuts.script_control"
 platforms = ["ahk", "hs", "linux"]
+
+# macOS persists its native wrap choices in this optional canonical namespace.
+[sections.shortcuts.wrap_symbols]
+description_key = "menu.shortcuts.wrap_symbols"
+platforms = ["hs"]
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"
@@ -3958,6 +3968,13 @@ type = "---"
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_backend"
+# Static provider status belongs to this live backend row, not another menu.
+# Inert labels are status text, not section headings or executable commands.
+status_rows.unavailable = [
+	{ type = "---" },
+	{ type = "label", i18n = "menu.llm.local_servers.header" },
+	{ type = "label", i18n = "menu.llm.unavailable" },
+]
 disabled_when_off = false
 health_dot = false
 platforms = ["ahk", "hs"]
@@ -4688,6 +4705,158 @@ id = "extensions_shortcuts"
 # own switch, the only one the combinations follow on every OS: macOS
 # persists it as [mod_combos] enabled in config_karabiner.toml, Windows as
 # [category_enabled] key_combinations; absent, it is on.
+# Complete per-key menus reuse the head and expose the existing native timing owner.
+[[menu.tap_hold_karabiner_off_rows]]
+type = "label"
+id = "tap_hold_karabiner_off"
+i18n = "menu.tapholds.karabiner_off_hint"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_guardian_approval_rows]]
+type = "label"
+id = "tap_hold_guardian_approval"
+i18n = "menu.tapholds.guardian_requires_approval"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_guardian_approval_rows]]
+type = "command"
+id = "tap_hold_login_items_steps"
+i18n = "menu.tapholds.show_login_items_steps"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_guardian_unavailable_rows]]
+type = "label"
+id = "tap_hold_guardian_unavailable"
+i18n = "menu.tapholds.guardian_unavailable"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_login_items_open_rows]]
+type = "command"
+id = "tap_hold_login_items_open"
+i18n = "menu.tapholds.open_login_items"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_legacy_rules_rows]]
+type = "command"
+id = "tap_hold_legacy_rules_cleanup"
+i18n = "menu.tapholds.legacy_rules_pending"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_rows]]
+type = "include"
+section = "tap_hold_key_head"
+
+[[menu.tap_hold_key_rows]]
+type = "include"
+section = "tap_hold_key_delay_tail"
+
+[[menu.tap_hold_key_delay_tail]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_key_delay_tail]]
+type = "group"
+id = "tap_hold_key_delay"
+i18n = "menu.tapholds.key_tap_delay"
+caption_getter = "tap_hold_key_delay_caption"
+
+[[menu.tap_hold_key_delay_rows]]
+type = "command"
+id = "tap_hold_key_delay_set"
+i18n = "menu.tapholds.key_tap_delay_set"
+
+[[menu.tap_hold_key_delay_rows]]
+type = "check"
+id = "tap_hold_key_delay_use_global"
+i18n = "menu.tapholds.key_tap_delay_use_global"
+caption_getter = "tap_hold_key_global_delay_caption"
+checked_when = ["tap_hold_key_delay_is_global"]
+disabled_when = ["tap_hold_key_delay_has_override"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "command"
+id = "wrap_symbols_enable_all"
+i18n = "menu.shortcuts.wrap_symbols_check_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "command"
+id = "wrap_symbols_disable_all"
+i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "command"
+id = "wrap_symbols_restore"
+i18n = "common.restore_recommended"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_global_controls]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_group_controls]]
+type = "command"
+id = "wrap_symbols_enable_group"
+i18n = "menu.shortcuts.wrap_symbols_check_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_group_controls]]
+type = "command"
+id = "wrap_symbols_disable_group"
+i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_group_controls]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_custom_separator]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_custom_controls]]
+type = "command"
+id = "wrap_symbols_delete_custom"
+i18n = "button.delete"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_add_controls]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.wrap_symbols_add_controls]]
+type = "command"
+id = "wrap_symbols_add_custom"
+i18n = "menu.shortcuts.wrap_symbols_add_custom"
+disabled_when = ["wrap_symbols_ready"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
 [[menu.key_combinations_group]]
 type = "toggle"
 id = "key_combinations_toggle"
@@ -5688,6 +5857,49 @@ id = "gesture_reading_linux"
 platforms = ["linux"]
 reason_key = "platform_reason.libinput_reader_is_linux_only"
 
+[[menu.gesture_slot_mode_commands]]
+type = "check"
+id = "gesture_mode_single"
+i18n = "menu.gestures.mode_single"
+checked_when = ["gesture_mode_is_single"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_slot_mode_commands]]
+type = "check"
+id = "gesture_mode_incremental"
+i18n = "menu.gestures.mode_incremental"
+checked_when = ["gesture_mode_is_incremental"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_sensitivity_head]]
+type = "section_header"
+id = "gesture_sensitivity_heading"
+i18n = "menu.gestures.sensitivity_label"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_sensitivity_head]]
+type = "label"
+id = "gesture_sensitivity_hint"
+i18n = "menu.gestures.sensitivity_hint"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_sensitivity_head]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_change_action]]
+type = "command"
+id = "gesture_slot_change_action"
+i18n = "menu.gestures.change_action"
+disabled_when = ["gesture_slot_choice_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_holds_menu]]
 type = "toggle"
 id = "tapholds_toggle"
@@ -6514,3 +6726,45 @@ id = "number_row_mode"
 path = "layout.direct_access_digits"
 i18n = "menu.layout.number_row"
 choice_label_prefix = "menu.layout.number_row_"
+
+[[menu.apps_empty_rows]]
+type = "label"
+id = "apps_empty"
+i18n = "menu.apps.no_apps"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Existing native refresh capability only; Linux cached desktop rows have no refresh command.
+[[menu.gesture_system_status_controls]]
+type = "command"
+id = "gesture_system_refresh"
+i18n = "ui_apps.btn_refresh"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+# Fixed swipe child presentation only; native payloads remain actual child owners.
+[[menu.gesture_swipe_slot_menu]]
+type = "include"
+section = "gesture_change_action"
+
+[[menu.gesture_swipe_slot_menu]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_swipe_slot_menu]]
+type = "group"
+id = "gesture_mode_options"
+i18n = "menu.gestures.mode_current"
+caption_getter = "gesture_mode_current_label"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_swipe_slot_menu]]
+type = "group"
+id = "gesture_sensitivity_options"
+i18n = "menu.gestures.sensitivity_current"
+caption_getter = "gesture_sensitivity_current_label"
+disabled_when = ["gesture_mode_incremental_ready"]
+platforms = ["hs"]
+unavailable = "hide"

@@ -579,3 +579,177 @@ helpers.describe("hotstrings scope: composition", function()
 		end)
 	end)
 end)
+
+helpers.describe("hotstrings retained native release debt", function()
+	local expected_config = { hotstrings = { unknown = "kept", groups = { rolls = false, foreign = true },
+		trigger_char = "§", preview_ai_enabled = true, dynamic = { date = { enabled = true } } }, other = { value = 1 } }
+	local expected_overrides = { autocorrection = { delay = 3, color = "#111111", names = { delay = 9 },
+		abbreviations = { delay = 9 }, technical_terms = { delay = 9 } }, rolls = { hc = { priority = 5 } },
+		foreign = { delay = 4, unknown_field = "kept" }, _global = { delay = 2 } }
+	local receipts = {
+		{ name = "nil", reply = function() return nil end },
+		{ name = "false", reply = function() return false end },
+		{ name = "truthy string", reply = function() return "true" end },
+		{ name = "wrong object", reply = function() return {} end },
+		{ name = "exception", reply = function() error("native hotstrings release refused") end },
+	}
+	--- Wraps the actual claims without releasing a token on a controlled refusal.
+	local function controlled_scope(c, selected, refusal)
+		local blocked, live, acknowledged, faults = true, {}, {}, {}
+		for _, entry in ipairs({ { "config", c.Config }, { "preferences", c.Preferences } }) do
+			local name, native = entry[1], entry[2]
+			local acquire, release = native.acquire, native.release
+			native.acquire = function(token)
+				if faults.acquire == name or (faults.reacquire == name and acknowledged[name]) then return false end
+				local accepted = acquire(token)
+				if accepted == true then
+					helpers.assert_nil(live[name], "an acknowledged claim is not acquired twice")
+					live[name] = token
+				end
+				return accepted
+			end
+			native.release = function(token)
+				helpers.assert_eq(live[name], token, "only the exact live claim can be released")
+				if name == selected and blocked then return refusal() end
+				local accepted = release(token)
+				if accepted == true then live[name] = nil; acknowledged[name] = (acknowledged[name] or 0) + 1 end
+				return accepted
+			end
+		end
+		local scope = require("infra.hotstrings_scope").new({ path = c.config_path, backup_suffix = c.suffix,
+			files = c.files, is_paused = function() return c.paused end,
+			config = c.Config, preferences = c.Preferences, repeat_key = c.RepeatKey, magic_key = c.MagicKey,
+			preview_settings = require("modules.hotstrings.preview_settings"), terminators = c.Terminators,
+			dynamic = c.dynamic, preview = c.preview_port })
+		return scope, function(value) blocked = value == true end, live, faults
+	end
+	local function restored(c, live)
+		helpers.assert_eq(Codec.decode(read(c.config_path)), expected_config, "complete authored configuration preimage")
+		helpers.assert_eq(Codec.decode(read(c.override_path)), expected_overrides, "complete authored override preimage")
+		helpers.assert_eq(c.MagicKey.get(), "§")
+		helpers.assert_eq(c.Config.is_group_enabled("rolls"), false)
+		for _, family in ipairs(COMMON_FAMILIES) do helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 9) end
+		helpers.assert_eq(next(live), nil, "every actual native claim is acknowledged")
+	end
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		for _, receipt in ipairs(receipts) do
+			helpers.it("compensates both files and runtime on " .. mode .. " " .. receipt.name .. " release", function()
+				with_scope(function(c)
+					local scope, unblock, live = controlled_scope(c, "config", receipt.reply)
+					local called, committed = pcall(scope.apply, mode)
+					helpers.assert_eq(called, true, "native refusal is a retained acknowledgement")
+					helpers.assert_eq(committed, false)
+					helpers.assert_eq(scope.pending(), true)
+					helpers.assert_eq(scope.release(), false)
+					helpers.assert_eq(scope.apply("recommended"), false)
+					helpers.assert_eq(c.Config.enable_group("rolls"), false, "ordinary setters cannot replace owned debt")
+					unblock()
+					helpers.assert_eq(scope.retry_restore(), true)
+					helpers.assert_eq(scope.pending(), false)
+					restored(c, live)
+				end)
+			end)
+		end
+	end
+	helpers.it("retains a partial native acquisition whose acquired claim cannot release", function()
+		with_scope(function(c)
+			local scope, unblock, live, faults = controlled_scope(c, "config", function() return false end)
+			faults.acquire = "preferences"
+			local called, committed = pcall(scope.apply, "clear")
+			helpers.assert_eq(called, true)
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(scope.pending(), true)
+			helpers.assert_eq(read(c.config_path), CONFIG)
+			helpers.assert_eq(read(c.override_path), OVERRIDES)
+			helpers.assert_eq(#c.published, 0)
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(scope.pending(), false)
+			restored(c, live)
+		end)
+	end)
+	helpers.it("retains a committed candidate while a released claim refuses inverse reacquisition", function()
+		with_scope(function(c)
+			local scope, unblock, live, faults = controlled_scope(c, "config", function() return false end)
+			faults.reacquire = "preferences"
+			helpers.assert_eq(scope.apply("recommended"), false)
+			local config, override = read(c.config_path), read(c.override_path)
+			helpers.assert_true(config ~= CONFIG and override ~= OVERRIDES, "both candidate files are actually committed")
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(read(c.config_path), config)
+			helpers.assert_eq(read(c.override_path), override)
+			faults.reacquire = nil
+			helpers.assert_eq(scope.retry_restore(), true)
+			restored(c, live)
+		end)
+	end)
+	helpers.it("preserves an external source successor until exact inverse repair", function()
+		with_scope(function(c)
+			local scope, unblock, live = controlled_scope(c, "config", function() return false end)
+			local publish, writes, candidate = c.files.write_if_unchanged, 0, nil
+			local foreign = '[external]\nowner = "later"\n'
+			c.files.write_if_unchanged = function(target, content, expected)
+				if target == c.config_path then writes = writes + 1; if writes == 2 then write(target, foreign) end end
+				local ok, detail = publish(target, content, expected)
+				if target == c.config_path and writes == 1 and ok == true then candidate = read(target) end
+				return ok, detail
+			end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(read(c.config_path), foreign)
+			helpers.assert_eq(read(c.override_path), OVERRIDES, "the override inverse is already acknowledged")
+			unblock()
+			helpers.assert_eq(scope.retry_restore(), false)
+			helpers.assert_eq(read(c.config_path), foreign)
+			local calls = #c.dynamic_calls
+			write(c.config_path, candidate) -- Explicit fixture repair of the retained candidate generation.
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(#c.dynamic_calls, calls, "the acknowledged runtime inverse is not repeated")
+			restored(c, live)
+		end)
+	end)
+	helpers.it("retries only release after an acknowledged explicit inverse", function()
+		with_scope(function(c)
+			local scope, block, live = controlled_scope(c, "config", function() return false end)
+			block(false)
+			helpers.assert_eq(scope.apply("recommended"), true)
+			block(true)
+			helpers.assert_eq(scope.revert(), false)
+			helpers.assert_eq(scope.pending(), true)
+			local calls = #c.dynamic_calls
+			block(false)
+			helpers.assert_eq(scope.retry_restore(), true)
+			helpers.assert_eq(#c.dynamic_calls, calls)
+			restored(c, live)
+		end)
+	end)
+	helpers.it("stops the actual global composition before later categories on native release debt", function()
+		with_scope(function(c)
+			local scope, unblock, live = controlled_scope(c, "preferences", function() return false end)
+			local trace = {}
+			local before = { apply = function(_, done) trace[#trace + 1] = "before.apply"; done(true) end,
+				revert = function(done) trace[#trace + 1] = "before.revert"; done(true) end,
+				release = function() end, pending = function() return false end, retry_restore = function(done) done(true) end }
+			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
+				revert = function(done) done(true) end, release = function() end,
+				pending = function() return false end, retry_restore = function(done) done(true) end }
+			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
+			local global = require("config_scope_composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+				logger = logger, participants = function() return { tap_holds = before, hotstrings = actual, llm = after } end })
+			local verdict, report
+			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
+			helpers.assert_eq(verdict, false)
+			helpers.assert_eq(report.failed, "hotstrings")
+			helpers.assert_eq(global.pending(), true)
+			helpers.assert_eq(trace, { "before.apply" })
+			unblock()
+			local settled
+			global.retry_restore(function(ok) settled = ok end)
+			helpers.assert_eq(settled, true)
+			helpers.assert_eq(trace, { "before.apply", "before.revert" })
+			helpers.assert_eq(global.pending(), false)
+			restored(c, live)
+		end)
+	end)
+end)

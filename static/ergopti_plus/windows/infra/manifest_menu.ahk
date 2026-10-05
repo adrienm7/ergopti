@@ -549,9 +549,38 @@ MenuRenderer_TemplateRows(ManifestKey, Commands, StateGetters, Children) {
 	return _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Map())
 }
 
+/**
+ * Supplies inert status declared on an existing live provider row.
+ * @param {String} ManifestKey Owning menu declaration.
+ * @param {String} RowId Existing provider identity.
+ * @param {String} Status Named native status to project.
+ * @returns {Array|false} Translated inactive data or a refused declaration.
+ */
+MenuRenderer_StatusRows(ManifestKey, RowId, Status) {
+	Owner := _MR_FindItemById(ManifestKey, RowId)
+	Statuses := Owner is Map ? Owner.Get("status_rows", false) : false
+	Def := Statuses is Map ? Statuses.Get(Status, false) : false
+	if !(Def is Array) || Def.Length == 0 {
+		try LoggerError("MenuRenderer", "Missing provider status '{1}.{2}.{3}' — rows refused.", ManifestKey, RowId, Status)
+		return false
+	}
+	for Item in Def {
+		if !(Item is Map)
+			return false
+		ItemType := Item.Get("type", "")
+		Label := ItemType == "label" && Item.Get("i18n", false) is String && Item["i18n"] != ""
+		if ItemType != "---" && !Label
+			return false
+		for Field in Item
+			if Field != "type" && !(Label && Field == "i18n")
+				return false
+	}
+	return _MR_TemplateRows(ManifestKey, Map(), Map(), Map(), Map(), Def)
+}
+
 ; Includes retain their declaration's original command readiness policy.
-_MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting) {
-	Def := _MR_GetMenuDef(ManifestKey)
+_MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, StatusDefinition := unset) {
+	Def := IsSet(StatusDefinition) ? StatusDefinition : _MR_GetMenuDef(ManifestKey)
 	if Visiting.Has(ManifestKey) || Def.Length == 0 {
 		try LoggerError("MenuRenderer", "Missing or cyclic child template '{1}' — provider rows refused.", ManifestKey)
 		return false
@@ -559,7 +588,7 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting) {
 	Visiting[ManifestKey] := true
 	Rows := []
 	for Item in Def {
-		if !_MR_IsForAhk(Item)
+		if !_MR_IsForAhk(Item) && !(_MR_Get(Item, "type") == "section_header" && _MR_Get(Item, "unavailable") == "grey")
 			continue
 		ItemType := _MR_Get(Item, "type")
 		Id := _MR_Get(Item, "id")
@@ -573,6 +602,8 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting) {
 		}
 		if ItemType == "---"
 			Row := Map("separator", true)
+		else if IsSet(StatusDefinition) && ItemType == "label"
+			Row := Map("label", t(Item["i18n"]), "disabled", true)
 		else if ItemType == "label" {
 			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true, "unavailable", true)
 			I18nKey := _MR_Get(Item, "i18n")
@@ -589,12 +620,47 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting) {
 			}
 			Row := Map("label", t(I18nKey), "disabled", true)
 		}
+		else if ItemType == "section_header" {
+			Fields := Map("type", true, "id", true, "i18n", true, "platforms", true,
+				"unavailable", true, "reason_key", true)
+			I18nKey := _MR_Get(Item, "i18n")
+			Unavailable := _MR_Get(Item, "unavailable")
+			Reason := _MR_Get(Item, "reason_key")
+			Valid := (!Item.Has("id") || (Type(Id) == "String" && Id != ""))
+				&& Type(I18nKey) == "String" && I18nKey != ""
+				&& (!Item.Has("unavailable") || Unavailable == "hide" || Unavailable == "grey")
+				&& (Unavailable != "grey" || Item.Has("reason_key"))
+				&& (!Item.Has("reason_key") || (Type(Reason) == "String" && Reason != ""
+					&& Unavailable != "hide"))
+			for Field in Item {
+				if !Fields.Has(Field)
+					Valid := false
+			}
+			if !Valid {
+				try LoggerError("MenuRenderer", "Invalid section header in template '{1}' — provider rows refused.", ManifestKey)
+				return false
+			}
+			if _MR_IsForAhk(Item)
+				Row := Map("label", MenuSectionTitle(t(I18nKey)), "disabled", true)
+			else
+				Row := Map("label", t(I18nKey) . " — " . _MR_ReasonHead(t(Reason)), "disabled", true)
+		}
 		else if ItemType == "command" {
 			Row := MenuRenderer_CommandRow(ManifestKey, Id, Commands, StateGetters)
 			if !(Row is Map)
 				return false
-		} else if ItemType == "group" && Children.Has(Id) && Children[Id] is Array
+		} else if ItemType == "check" {
+			Row := MenuRenderer_CheckRow(ManifestKey, Id, Commands, StateGetters)
+			if !(Row is Map)
+				return false
+		} else if ItemType == "group" && Children.Has(Id) && Children[Id] is Array {
 			Row := Map("label", t(_MR_Get(Item, "i18n")), "items", Children[Id])
+			if Item.Has("disabled_when") && MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
+				Row["disabled"] := true
+				if Item.Has("disabled_reason_key")
+					Row["disabled_reason_key"] := Item["disabled_reason_key"]
+			}
+		}
 		else {
 			try LoggerError("MenuRenderer", "Missing child data or unsupported row in template '{1}' — provider rows refused.", ManifestKey)
 			return false

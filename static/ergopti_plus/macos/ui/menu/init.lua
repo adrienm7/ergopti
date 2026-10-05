@@ -27,6 +27,7 @@ local Builder       = require("ui.menu.builder")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
+local WrapMutation  = require("menu.wrap_mutation")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("adapters.storage")
@@ -942,9 +943,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local ok_txt, text_acts_mod = pcall(require, "modules.shortcuts.actions.text")
 			if ok_txt and type(text_acts_mod.build_active_wrap_pairs) == "function" then
 				pcall(core_mods.shortcuts_mod.set_wrap_pairs_getter, function()
+					local wrap = WrapMutation.view(state)
 					return text_acts_mod.build_active_wrap_pairs(
-						state.wrap_symbol_states  or {},
-						state.custom_wrap_symbols or {}
+						wrap.wrap_symbol_states  or {},
+						wrap.custom_wrap_symbols or {}
 					)
 				end)
 			end
@@ -1129,11 +1131,37 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local llm_scope = nil
 	local shortcuts_scope = nil
 	local hotstrings_scope = nil
+	local script_scope = nil
 	--- The scoped owner of one config.toml category, created on first use, or
 	--- nil when this session cannot own it (read-only, or its runtime absent).
 	--- @param scope string Manifest scope id.
 	--- @return table|nil owner
 	local function preference_scope_owner(scope)
+		if scope == "global" then
+			if read_only_reason ~= nil or type(core_mods.shortcuts_mod) ~= "table"
+				or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+			if not script_scope then
+				local script_backup
+				script_scope = require("infra.script_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function() return core_mods.shortcuts_mod.is_paused() end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						script_backup = MenuPaths.get("ConfigTomlPath") .. ".script-"
+							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+						return script_backup
+					end,
+					storage_backup_path = function()
+						assert(type(script_backup) == "string", "script settings backup has no primary owner")
+						return script_backup .. ".settings"
+					end,
+				})
+			end
+			return script_scope
+		end
 		if scope == "shortcuts" then
 			if read_only_reason ~= nil or type(core_mods.shortcuts_mod) ~= "table"
 				or type(menu_mods.shortcuts) ~= "table"
@@ -1315,7 +1343,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if read_only_reason ~= nil then return false end
 		if not global_scope then
 			local owners = { gestures = gesture_scope_owner }
-			for _, scope in ipairs({ "shortcuts", "keyboard_layout", "hotstrings", "llm", "metrics" }) do
+			for _, scope in ipairs({ "shortcuts", "keyboard_layout", "hotstrings", "llm", "metrics", "global" }) do
 				owners[scope] = function() return preference_scope_owner(scope) end
 			end
 			-- The Hotstrings owner also needs its override file: one it cannot

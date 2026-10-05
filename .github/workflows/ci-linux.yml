@@ -82,6 +82,28 @@ jobs:
         # summary on failure. report.cjs lives at the repo root tools/.
         run: node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua
 
+      # This external acceptance is deliberate manual validation, separate from
+      # the frozen prerequisite gate and every package/installed-driver subject.
+      - name: Run manual official runtime and model acceptance
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends curl zstd
+          python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \
+            --repository "$GITHUB_WORKSPACE" \
+            --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \
+            --lua luajit
+        timeout-minutes: 18
+
+      - name: Upload manual runtime acceptance evidence
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-runtime-acceptance-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/ollama-runtime-acceptance/ollama-runtime-acceptance.json
+          if-no-files-found: error
+
       - name: Record mandatory unit evidence
         run: |
           set -euo pipefail
@@ -394,6 +416,199 @@ jobs:
         run: |
           python3 tests/hardware/run_updater_release_json_admission.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_json_admission.py
+        timeout-minutes: 1
+
+      - name: Isolate terminal callback diagnostics with real provider TLS receipts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_remote_provider_callbacks.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_provider_callbacks.py
+          python3 tests/hardware/run_llm_remote_callback_siblings.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_callback_siblings.py
+        timeout-minutes: 3
+
+      - name: Preserve additional synthetic sources through native SQLite projections
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_extra_sources.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_extra_sources.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_source_controls.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_source_controls.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py lua5.4
+        timeout-minutes: 1
+
+      - name: Preserve pending synthetic source labels in native live projections
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_live_source_projection.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_live_source_projection.lua
+        timeout-minutes: 1
+
+      - name: Accumulate arbitrary ngram source keys across native SQLite conflicts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          for ERGOPTI_SOURCE_RUNTIME in luajit lua5.4; do
+            ERGOPTI_SOURCE_PROOF=$(mktemp -d)
+            "$ERGOPTI_SOURCE_RUNTIME" tests/hardware/run_sqlite_ngram_source_maps.lua "$ERGOPTI_SOURCE_PROOF"
+            python3 tests/hardware/run_sqlite_ngram_source_maps.py "$ERGOPTI_SOURCE_PROOF"
+          done
+        timeout-minutes: 1
+
+      - name: Encode literal synthetic source keys through native SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
+        timeout-minutes: 1
+
+      - name: Roll back refused ngram groups and trigger effects in native SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py lua5.4
+        timeout-minutes: 1
+
+      - name: Preserve cumulative system-day metrics across native restarts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+          for ERGOPTI_SYSTEM_RUNTIME in luajit lua5.4; do
+            ERGOPTI_SYSTEM_PROFILE=$(mktemp -d)
+            export XDG_CONFIG_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/config"
+            export XDG_DATA_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/data"
+            export XDG_CACHE_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/cache"
+            export XDG_STATE_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/state"
+            mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME"
+            "$ERGOPTI_SYSTEM_RUNTIME" "$PWD/tests/hardware/run_system_day_restart.lua" first "$ERGOPTI_SYSTEM_PROFILE/native.sqlite" "$ERGOPTI_SYSTEM_PROFILE/first.json"
+            "$ERGOPTI_SYSTEM_RUNTIME" "$PWD/tests/hardware/run_system_day_restart.lua" restart "$ERGOPTI_SYSTEM_PROFILE/native.sqlite" "$ERGOPTI_SYSTEM_PROFILE/first.json"
+          done
+        timeout-minutes: 3
+
+      - name: Retain canonical backspace unigrams through native SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -o pipefail
+          export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+          for ERGOPTI_BACKSPACE_RUNTIME in luajit lua5.4; do
+            ERGOPTI_BACKSPACE_LOG=$(mktemp)
+            "$ERGOPTI_BACKSPACE_RUNTIME" tests/hardware/run_sqlite_backspace_unigrams.lua | tee "$ERGOPTI_BACKSPACE_LOG"
+            ERGOPTI_BACKSPACE_PROFILE=$(sed -n 's/^PROFILE //p' "$ERGOPTI_BACKSPACE_LOG")
+            test -n "$ERGOPTI_BACKSPACE_PROFILE"
+            python3 tests/hardware/run_sqlite_backspace_unigrams.py "$ERGOPTI_BACKSPACE_PROFILE"
+          done
+        timeout-minutes: 1
+
+      - name: Preserve canonical Unicode character classes through native SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py lua5.4
+        timeout-minutes: 1
+
+      - name: Propagate native fallback wait refusal and retain healthy recovery
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
+        timeout-minutes: 1
+
+      - name: Keep manual correction markers out of canonical character totals
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_manual_marker_chars.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manual_marker_chars.lua
+        timeout-minutes: 1
+
+      - name: Preserve hourly manual corrections and cumulative error histograms
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_hourly_manual_errors.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_hourly_manual_errors.lua
+        timeout-minutes: 1
+
+      - name: Project directed application transitions with independent native SQL controls
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_projection.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_projection.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_sql_oracles.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_sql_oracles.lua
+        timeout-minutes: 1
+
+      - name: Publish native layout counts in the canonical shared manifest field
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_layouts_seen.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_layouts_seen.lua
+        timeout-minutes: 1
+
+      - name: Recover same-revision native reads without caching a refused manifest
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_manifest_completion.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manifest_completion.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_completion_public_cache.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_completion_public_cache.lua
+        timeout-minutes: 1
+
+      - name: Roll back refused raw batches before the public flush retry
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_raw_batch_transactions.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_raw_batch_transactions.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua lua5.4
+        timeout-minutes: 1
+
+      - name: Preserve absent SQL scalars at the native Reader boundary
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_null_boundary.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_null_boundary.lua
+        timeout-minutes: 1
+
+      - name: Preserve native n-gram text through SQLite JSON projection
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_text_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_text_receipts.lua
+        timeout-minutes: 1
+
+      - name: Keep native event dates on the real local calendar day
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_local_days_real_clock.lua
+          env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_local_days_real_clock.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_local_event_days.lua
+        timeout-minutes: 1
+
+      - name: Preserve fractional WPM through native collector and SQLite writes
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_wpm_fraction.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_wpm_fraction.lua
         timeout-minutes: 1
 
       - name: Preserve supplied histogram key bytes in real SQLite
@@ -1082,6 +1297,15 @@ jobs:
           npm run test:linux:http-stream | tee "$RUNNER_TEMP/linux-http-stream.log"
         timeout-minutes: 3
 
+      # This prerequisite proof is independent of official runtime/model downloads.
+      - name: Qualify native runtime prerequisites
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends zstd
+          npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"
+        timeout-minutes: 5
+
       # The AI a user runs locally, run: the official Ollama serving a small
       # model, asked through the production modules and the real curl transport
       # for its model list, a download, streamed predictions, and — on its
@@ -1248,6 +1472,16 @@ jobs:
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
+        timeout-minutes: 5
+
+      - name: Typing NONE clears actual WebKit rows and retains ALL controls
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          timeout 180s dbus-run-session -- xvfb-run -a luajit tests/hardware/run_typing_none_webkit.lua
         timeout-minutes: 5
 
       # The release list a user opens from the tray, opened: real WebKit, the

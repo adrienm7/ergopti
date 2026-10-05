@@ -216,6 +216,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 		local fixture_captions = {
 			tap_hold_key_tap_caption = i18n.get("tap_hold.tap.none"),
 			tap_hold_key_hold_caption = i18n.get("tap_hold.hold.none"),
+			tap_hold_key_delay_caption = "0 ms",
 		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do

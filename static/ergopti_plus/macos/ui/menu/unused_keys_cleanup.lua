@@ -41,9 +41,9 @@ local ConfigOutdated = require("config_outdated")
 --- each one consumes.
 --- @param decoded table Decoded config.toml.
 --- @param mark function mark(...segments).
-function M.collect(decoded, mark)
+function M.collect(decoded, mark, shapes)
 	require("infra.config_overrides").mark_config_reads(decoded, mark)
-	require("infra.preferences").mark_config_reads(decoded, mark)
+	require("infra.preferences").mark_config_reads(decoded, mark, shapes)
 	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
 	require("ui.onboarding").config_values(decoded, mark)

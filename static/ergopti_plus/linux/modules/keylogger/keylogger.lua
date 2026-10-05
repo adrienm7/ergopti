@@ -36,6 +36,7 @@ local PrivateWindow = require("keylogger.private_window")
 -- WPM ring cap single-sourced from the shared keylogger metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
 local SharedMetrics    = require("keylogger.metrics")
+local Utils            = require("keylogger.utils")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 -- The WPM readouts' live speed and last source, the same tracker macOS reads.
@@ -398,6 +399,13 @@ function M.init(opts)
 	-- Open the SQLite database (bootstraps schema on first run).
 	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
 		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+		if SystemMetrics then
+			local database, device = _sqlite_path, _device_id
+			SystemMetrics.bind(database, device, function(date)
+				if SqliteWriter.get_db_path() ~= database then return nil, false end
+				return SqliteWriter.read_system_day(device, date)
+			end)
+		end
 		Logger.info(LOG, "SQLite persistence active: %s", _sqlite_path)
 	else
 		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
@@ -529,7 +537,8 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	end
 	app.last_key_at = timestamp_ms
 
-	app.keystroke_count = app.keystroke_count + 1
+	-- A correction remains an input event, but contributes no typed character.
+	if ch ~= "[BS]" then app.keystroke_count = app.keystroke_count + 1 end
 	-- Against the window it was typed into, not the application. Both are useful
 	-- and only one of them was recorded.
 	if _current_title then
@@ -692,7 +701,7 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 	end
 	_pending_hotstring_events[#_pending_hotstring_events + 1] = {
 		ts = os.date("!%Y-%m-%d %H:%M:%S"),
-		date = os.date("!%Y-%m-%d"),
+		date = os.date("%Y-%m-%d"),
 		app = dashboard_app_name(app_id),
 		kind = "fired",
 		trigger = trigger or "",
@@ -726,7 +735,7 @@ function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 	end
 	_pending_shortcut_events[#_pending_shortcut_events + 1] = {
 		ts   = os.date("!%Y-%m-%d %H:%M:%S"),
-		date = os.date("!%Y-%m-%d"),
+		date = os.date("%Y-%m-%d"),
 		app  = dashboard_app_name(type(app_id) == "string" and app_id or "unknown"),
 		key  = key,
 	}
@@ -888,8 +897,10 @@ local function persisted_manifest()
 	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
 		return _manifest_cache.manifest
 	end
-	local fresh = SqliteReader.read_manifest(_sqlite_path)
-	_manifest_cache = { revision = revision, manifest = fresh }
+	local fresh, complete = SqliteReader.read_manifest(_sqlite_path)
+	if complete then
+		_manifest_cache = { revision = revision, manifest = fresh }
+	end
 	return fresh
 end
 
@@ -958,9 +969,13 @@ local function add_live_ngram_delta(today_payload)
 				local llm_delta = math.max(0,
 					((stats.ngram_sources[token] or {}).llm or 0)
 					- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
-				local other_delta = math.max(0,
-					((stats.ngram_sources[token] or {}).other or 0)
-					- (((_flushed_app_sources[app_id] or {})[token] or {}).other or 0))
+				local other_delta = 0
+				local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
+				for label, source_count in pairs(stats.ngram_sources[token] or {}) do
+					if Utils.is_other_synthetic_source(label) then
+						other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
+					end
+				end
 				item.hs = (item.hs or 0) + source_delta
 				item.llm = (item.llm or 0) + llm_delta
 				item.o = (item.o or 0) + other_delta

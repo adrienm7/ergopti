@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "长按 → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "此键短按 / 长按的延迟（毫秒）\n（当前：%d 毫秒）",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -1779,6 +1780,8 @@
 	"mlx.use_ollama": "使用 Ollama",
 	"mlx.machine_intel": "Intel 处理器",
 	"mlx.machine_apple_silicon": "Apple 芯片",
+	"ollama.runtime_repair_failed": "无法准备本地 Ollama。请检查日志并重试。",
+	"ollama.runtime_start": "启动 Ollama",
 	"python.not_native_title": "没有适用于此 Mac 的 Python",
 	"python.not_native_body": "此操作需要为 {1} 构建的 Python 3。此 Mac 上安装的 Python 仅为其他处理器构建，macOS 将通过即将停用的 Rosetta 运行它们：\n{2}",
 	"python.missing_title": "缺少 Python 3",
@@ -3213,5 +3216,7 @@
 	"menu.hotstrings.user_code.title": "可编程文本快捷方式",
 	"platform_reason.program_runner_unavailable": "不可用: 原生程序运行功能或此绑定不可用。",
 	"sg_actions.run_program": "▶️ 运行程序 [可配置]",
-	"menu.hotstrings.personal_metadata_unavailable": "此处无法修改：请直接在源文件中编辑此字段。"
+	"menu.hotstrings.personal_metadata_unavailable": "此处无法修改：请直接在源文件中编辑此字段。",
+	"menu.gestures.mode_current": "模式：%s",
+	"menu.gestures.sensitivity_current": "灵敏度：%s"
 }

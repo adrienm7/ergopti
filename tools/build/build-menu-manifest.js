@@ -125,6 +125,46 @@ function validateGreyedRows(menu) {
 	}
 }
 
+/** Refuses effects or ambiguous fields in an existing provider's inert status. */
+function validateProviderStatus(menu) {
+	for (const [key, rows] of Object.entries(menu)) {
+		if (!Array.isArray(rows)) continue;
+		for (const row of rows) {
+			if (row.status_rows === undefined) continue;
+			const where = `menu.${key} row "${row.id || row.type}"`;
+			if (
+				!['dynamic', 'list'].includes(row.type) ||
+				typeof row.id !== 'string' ||
+				row.id === '' ||
+				!row.status_rows ||
+				typeof row.status_rows !== 'object' ||
+				Array.isArray(row.status_rows) ||
+				Object.keys(row.status_rows).length === 0
+			)
+				throw new Error(
+					`${where}: status_rows needs an existing provider identity and named status`
+				);
+			for (const [status, declaration] of Object.entries(row.status_rows)) {
+				if (status === '' || !Array.isArray(declaration) || declaration.length === 0)
+					throw new Error(`${where}: provider status needs nonempty inert rows`);
+				for (const item of declaration) {
+					const label = item?.type === 'label' && typeof item.i18n === 'string' && item.i18n !== '';
+					if (
+						!item ||
+						typeof item !== 'object' ||
+						Array.isArray(item) ||
+						(item.type !== '---' && !label) ||
+						Object.keys(item).some((field) => field !== 'type' && !(label && field === 'i18n'))
+					)
+						throw new Error(
+							`${where}: provider status admits only inert separators and translated labels`
+						);
+				}
+			}
+		}
+	}
+}
+
 /** Validates the child-template composition and caption-reader vocabulary. */
 function validateChildTemplates(menu) {
 	for (const [key, rows] of Object.entries(menu)) {
@@ -152,8 +192,22 @@ function validateChildTemplates(menu) {
 					`${where}: inert label needs an identity and caption without behavior metadata`
 				);
 			if (
+				row.type === 'section_header' &&
+				((row.id !== undefined && (typeof row.id !== 'string' || row.id === '')) ||
+					typeof row.i18n !== 'string' ||
+					row.i18n === '' ||
+					(row.unavailable !== undefined && !['hide', 'grey'].includes(row.unavailable)) ||
+					(row.reason_key !== undefined &&
+						(typeof row.reason_key !== 'string' || row.reason_key === '')) ||
+					Object.keys(row).some(
+						(field) =>
+							!['type', 'id', 'i18n', 'platforms', 'unavailable', 'reason_key'].includes(field)
+					))
+			)
+				throw new Error(`${where}: section header needs a caption without behavior metadata`);
+			if (
 				row.caption_getter !== undefined &&
-				(!['command', 'group'].includes(row.type) ||
+				(!['command', 'check', 'group'].includes(row.type) ||
 					typeof row.caption_getter !== 'string' ||
 					row.caption_getter === '' ||
 					typeof row.id !== 'string' ||
@@ -161,7 +215,9 @@ function validateChildTemplates(menu) {
 					typeof row.i18n !== 'string' ||
 					row.i18n === '')
 			)
-				throw new Error(`${where}: caption_getter needs a labelled command or group identity`);
+				throw new Error(
+					`${where}: caption_getter needs a labelled command, check or group identity`
+				);
 		}
 	}
 	const visiting = new Set();
@@ -393,6 +449,7 @@ function build() {
 	projectChoices(parsed.menu, raw);
 	validateGreyedRows(parsed.menu);
 	validateChildTemplates(parsed.menu);
+	validateProviderStatus(parsed.menu);
 	const out = { ...HEADER, ...parsed.menu };
 	const json = JSON.stringify(out, null, '\t') + '\n';
 	writeFileSync(OUT_PATH, json, 'utf8');

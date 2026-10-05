@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "Hold → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Verzögerung für kurzes / langes Drücken dieser Taste in Millisekunden\n(aktuell: %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -1779,6 +1780,8 @@
 	"mlx.use_ollama": "Ollama verwenden",
 	"mlx.machine_intel": "Intel-Prozessor",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Die lokale Ollama-Instanz konnte nicht vorbereitet werden. Prüfe das Protokoll und versuche es erneut.",
+	"ollama.runtime_start": "Ollama starten",
 	"python.not_native_title": "Kein Python für diesen Mac",
 	"python.not_native_body": "Diese Aktion benötigt ein für {1} gebautes Python 3. Die auf diesem Mac installierten Python-Versionen sind nur für einen anderen Prozessor gebaut, und macOS würde sie über Rosetta ausführen, das eingestellt wird:\n{2}",
 	"python.missing_title": "Python 3 fehlt",
@@ -3213,5 +3216,7 @@
 	"menu.hotstrings.user_code.title": "Programmierbare Textkürzel",
 	"platform_reason.program_runner_unavailable": "Nicht verfügbar: Der native Programmstarter oder diese Zuordnung ist nicht verfügbar.",
 	"sg_actions.run_program": "▶️ Programm ausführen [konfigurierbar]",
-	"menu.hotstrings.personal_metadata_unavailable": "Hier nicht verfügbar: Bearbeiten Sie dieses Feld direkt in der Quelldatei."
+	"menu.hotstrings.personal_metadata_unavailable": "Hier nicht verfügbar: Bearbeiten Sie dieses Feld direkt in der Quelldatei.",
+	"menu.gestures.mode_current": "Modus: %s",
+	"menu.gestures.sensitivity_current": "Empfindlichkeit: %s"
 }

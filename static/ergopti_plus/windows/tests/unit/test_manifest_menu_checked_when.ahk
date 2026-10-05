@@ -124,3 +124,44 @@ _MMC_DeclaresCheckedWhen(ItemId) {
 	}
 	return false
 }
+
+; The template branch delegates the existing native check owner; it must not
+; invent a new checked/readiness policy or lose a retained refusal receipt.
+_MMC_TemplateProbe() {
+	Root := _MR_GetManifestRoot()
+	ProbeKey := "__checked_template_probe"
+	Assert(!Root.Has(ProbeKey), "independent fixture owns its exact temporary section")
+	Root[ProbeKey] := [Map("type", "check", "id", "probe_check", "i18n", "menu.gestures.mode_single",
+		"checked_when", ["probe_checked"], "disabled_when", ["probe_ready"])]
+	State := Map("ready", true, "checked", true, "calls", 0)
+	Commands := Map("probe_check", () => _MMC_TemplateRefusal(State))
+	Getters := Map("probe_checked", () => State["checked"], "probe_ready", () => State["ready"])
+	Rendered := Menu()
+	try {
+		Rows := MenuRenderer_TemplateRows(ProbeKey, Commands, Getters, Map())
+		Assert(Rows is Array && Rows.Length == 1, "real native template returns one check row")
+		Assert(Rows[1]["checked"], "declared checked getter reaches provider data")
+		AssertEqual(1, _MR_RenderRows(Rendered, Rows, ProbeKey, 1), "actual native renderer consumes check template")
+		NativeFlags := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(NativeFlags != 0xFFFFFFFF && (NativeFlags & 0x8), "actual Win32 item is checked")
+		State["ready"] := false
+		AssertEqual(false, Rows[1]["action"].Call(), "held callback refuses current readiness withdrawal")
+		AssertEqual(0, State["calls"], "withdrawal never delivers to command")
+		State["ready"] := true
+		AssertEqual(false, Rows[1]["action"].Call(), "native command refusal receipt is propagated")
+		AssertEqual(1, State["calls"], "ready command delivered exactly once")
+		AssertEqual(false, MenuRenderer_TemplateRows(ProbeKey, Map(), Getters, Map()), "missing command refuses entire template")
+		Root[ProbeKey][1]["platforms"] := ["hs", "linux"]
+		Hidden := MenuRenderer_TemplateRows(ProbeKey, Commands, Getters, Map())
+		Assert(Hidden is Array && Hidden.Length == 0, "template hides unavailable native check rows")
+	} finally {
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+		Root.Delete(ProbeKey)
+	}
+}
+_MMC_TemplateRefusal(State) {
+	State["calls"] += 1
+	return false
+}
+Test("checked_when: real check template preserves native flags, current readiness and refusal", _MMC_TemplateProbe)

@@ -77,6 +77,16 @@ local function refusal_key(path)
 	return (tostring(path):gsub("\\", "/"):gsub("/+", "/"))
 end
 
+--- Runs the captured final admission without treating exceptions as permission.
+--- @param admission function|nil
+--- @return boolean admitted
+local function publication_admitted(admission)
+	if admission == nil then return true end
+	if type(admission) ~= "function" then return false end
+	local called, admitted = pcall(admission)
+	return called and admitted == true
+end
+
 --- Publishes complete content through a same-directory staging file.
 --- A protected call only proves that Lua did not raise; file methods also
 --- return nil/false for ordinary I/O failures, so every terminal result is
@@ -86,7 +96,7 @@ end
 --- @param expected_source table|nil Optional `{ status, content }` precondition.
 --- @return boolean committed
 --- @return string|nil error_message
-local function publish(path, content, expected_source)
+local function publish(path, content, expected_source, admission)
 	-- A synchronous fallback can acknowledge the current image after its exact
 	-- source recheck. Explicit adapters retain their own serialization boundary.
 	if type(expected_source) == "table" and expected_source.status == "ok"
@@ -95,6 +105,7 @@ local function publish(path, content, expected_source)
 		if status ~= "ok" or current ~= content then
 			return false, "source changed before unchanged acknowledgement: " .. tostring(detail or status)
 		end
+		if not publication_admitted(admission) then return false, "publication admission refused" end
 		return true
 	end
 	local tmp_path = path .. ".tmp"
@@ -122,11 +133,17 @@ local function publish(path, content, expected_source)
 		end
 	end
 
+	-- The last classified source read has completed. No logical reader or
+	-- observer runs between this captured admission and native publication.
+	if not publication_admitted(admission) then
+		pcall(os.remove, tmp_path)
+		return false, "publication admission refused"
+	end
 	local rename_ok, renamed, rename_err = pcall(os.rename, tmp_path, path)
 	-- POSIX replaces an existing destination atomically. Windows' C runtime does
 	-- not, so keep the old file recoverable while replacing it on test/Linux
 	-- hosts running under Windows.
-	if (not rename_ok or renamed ~= true) and package.config:sub(1, 1) == "\\" then
+	if admission == nil and (not rename_ok or renamed ~= true) and package.config:sub(1, 1) == "\\" then
 		local backup = path .. ".bak"
 		pcall(os.remove, backup)
 		local backup_ok, backed_up = pcall(os.rename, path, backup)
@@ -240,7 +257,18 @@ local read_existing
 --- @param expected_source table|nil Optional `{ status, content }` precondition.
 --- @return boolean written
 --- @return string|nil error_message
-local function publish_content(path, content, file_adapter, expected_source, on_error)
+local function publish_content(path, content, file_adapter, expected_source, on_error, admission)
+	if admission ~= nil and type(admission) ~= "function" then
+		return false, "publication admission must be a function"
+	end
+	local admitted_publisher
+	if admission ~= nil and type(file_adapter) == "table" then
+		-- Capture the advertised owner before its classified reader can reenter.
+		admitted_publisher = type(expected_source) == "table" and file_adapter.write_if_unchanged_admitted
+		if type(admitted_publisher) ~= "function" then
+			return false, "explicit file adapter has no final publication admission"
+		end
+	end
 	local refusal = _refused_writes[refusal_key(path)]
 	if refusal then
 		return false, "writes to this file are refused for the session: " .. refusal
@@ -259,15 +287,22 @@ local function publish_content(path, content, file_adapter, expected_source, on_
 		-- optional capability because its ordinary FileSystem.write contract is
 		-- deliberately two-argument; passing a third Lua argument to write() merely
 		-- discards it and leaves a race between this precheck and lock acquisition.
-		local publisher = type(expected_source) == "table"
-			and type(file_adapter.write_if_unchanged) == "function"
-			and file_adapter.write_if_unchanged
-			or file_adapter.write
+		local publisher
+		if admission ~= nil then
+			publisher = admitted_publisher
+		else
+			publisher = type(expected_source) == "table"
+				and type(file_adapter.write_if_unchanged) == "function"
+				and file_adapter.write_if_unchanged
+				or file_adapter.write
+		end
 		if type(publisher) ~= "function" then
 			return false, "explicit file adapter has no compatible publication method"
 		end
 		local call_ok, written, write_detail, receipt
-		if publisher == file_adapter.write_if_unchanged then
+		if admission ~= nil then
+			call_ok, written, write_detail, receipt = pcall(publisher, path, content, expected_source, on_error, admission)
+		elseif publisher == file_adapter.write_if_unchanged then
 			call_ok, written, write_detail, receipt = pcall(publisher, path, content, expected_source, on_error)
 		else
 			call_ok, written, write_detail, receipt = pcall(publisher, path, content)
@@ -282,7 +317,7 @@ local function publish_content(path, content, file_adapter, expected_source, on_
 		return false, detail
 	end
 
-	return publish(path, content, expected_source)
+	return publish(path, content, expected_source, admission)
 end
 
 --- Reads existing content through a classified platform adapter when supplied.
@@ -593,6 +628,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		return false, detail
 	end
 	for index, u in ipairs(updates) do
+		local source_row = u
 		if type(u) ~= "table" then return reject_row(index, "row must be a table") end
 		if type(u.section) ~= "string" or u.section == "" then
 			return reject_row(index, "section must be a non-empty string")
@@ -616,7 +652,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if not segments then return reject_row(index, "section is not a valid table path") end
 		-- Manifest paths use semantic dots; a quoted literal dot must never inherit
 		-- the neutral value of a different, nested configuration key.
+		local literal_key = source_row.literal_key == true or source_row.source_shape ~= nil
 		local manifest_path = table.concat(segments, ".") .. "." .. u.key
+		if literal_key and u.key:find(".", 1, true) then manifest_path = nil end
 		for _, segment in ipairs(segments) do
 			if segment:find(".", 1, true) then manifest_path = nil; break end
 		end
@@ -629,7 +667,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			u = defaults.sparse_operation(manifest_path, u.value)
 		end
 		u = { section = KeyPath.render(segments), segments = segments, key = u.key, value = u.value, delete = u.delete,
-			literal_key = u.literal_key == true }
+			literal_key = literal_key, source_row = source_row }
 		normalized[#normalized + 1] = u
 
 		local sl = u.section:lower()
@@ -641,7 +679,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	updates = normalized
 
 	-- Serialise a Lua value to a TOML literal
-	local to_toml_value = Codec.encode_value
+	local function to_toml_value(row)
+		return row.source_literal or Codec.encode_value(row.value)
+	end
 
 	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
@@ -656,7 +696,13 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			return false, "source changed before preparing the batch"
 		end
 	end
-	local decoded_ok, decoded = pcall(Codec.decode, source or "")
+	for _, row in ipairs(updates) do
+		local called, literal = pcall(require("toml_codec.leaf_rows").publication_literal, row.source_row, source or "")
+		if not called then return false, tostring(literal) end
+		row.source_literal = literal
+		if require("toml_codec.leaf_rows").publication_capability(row.source_row) then row.literal_key = true end
+	end
+	local decoded_ok, decoded = pcall(require("toml_codec.leaf_rows").decode_source, source or "")
 	if not decoded_ok or type(decoded) ~= "table" then
 		return false, "the existing destination is not valid TOML"
 	end
@@ -718,7 +764,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
-					replacements[record.first] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value)
+					replacements[record.first] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u)
 						.. scanned.lines[record.last].eol
 				end
 			end
@@ -744,7 +790,8 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			end
 			local existing = nil
 			if type(node) == "table" then existing = node[u.key] end
-			if existing ~= nil and not u.delete and same_value(existing, u.value) then
+			if existing ~= nil and not u.delete and same_value(existing, u.value)
+				and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal) then
 				applied[identity] = true
 			elseif existing ~= nil then
 				local path = row_path(u)
@@ -795,7 +842,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if insertions[index] then
 			if line.eol == "" then lines[#lines + 1] = "\n" end
 			for _, u in ipairs(insertions[index]) do
-				lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
+				lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u) .. "\n"
 			end
 		end
 	end
@@ -807,7 +854,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
-			lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
+			lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u) .. "\n"
 		end
 	end
 
@@ -823,6 +870,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 end
 
 --- Prepares and atomically publishes one explicit set/delete batch.
+--- @param admission function|nil Captured final logical admission.
 --- @param path string Destination path.
 --- @param updates table Explicit set/delete operations.
 --- @param file_adapter table|nil Platform file adapter.
@@ -833,11 +881,12 @@ end
 --- @return string|nil content Committed bytes.
 --- @return table|nil receipt Optional private native publication/release capability.
 --- @return string|nil candidate Prepared bytes only when a native receipt is returned.
-function M.batch_write(path, updates, file_adapter, expected_source, on_error)
+function M.batch_write(path, updates, file_adapter, expected_source, on_error, admission)
+	if admission ~= nil and type(admission) ~= "function" then return false, "publication admission must be a function" end
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	local prepared, detail, content, source = M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	if not prepared then return false, detail end
-	local published, publish_err, receipt = publish_content(path, content, file_adapter, source, on_error)
+	local published, publish_err, receipt = publish_content(path, content, file_adapter, source, on_error, admission)
 	if not published then
 		report("publication", "error", "batch_write: publication to '%s' failed — %s.", path, tostring(publish_err))
 		if receipt ~= nil then return false, tostring(publish_err), nil, receipt, content end
@@ -866,6 +915,7 @@ function M.read_classified(path, file_adapter, on_error)
 	return read_existing(path, file_adapter, on_error)
 end
 
+--- @param admission function|nil Captured final logical admission.
 --- Publishes exact bytes only while the destination still matches
 --- expected_source. `{ status = "absent" }` creates a file that must not exist,
 --- and `{ status = "ok", content = … }` replaces exactly the bytes a caller read.
@@ -876,13 +926,13 @@ end
 --- @param on_error function|nil Receives only fixed failure categories.
 --- @return boolean committed
 --- @return string|nil error_message
---- @return table|function|nil receipt Private publication owner or ordinary refusal cleanup.
-function M.publish_if_unchanged(path, content, file_adapter, expected_source, on_error)
+--- @return function|table|nil receipt Ordinary cleanup callback or opaque private native receipt.
+function M.publish_if_unchanged(path, content, file_adapter, expected_source, on_error, admission)
 	if type(path) ~= "string" or path == "" or type(content) ~= "string"
 		or type(expected_source) ~= "table" then
 		return false, "publish_if_unchanged needs a path, a string payload and a source precondition"
 	end
-	return publish_content(path, content, file_adapter, expected_source, on_error)
+	return publish_content(path, content, file_adapter, expected_source, on_error, admission)
 end
 
 --- Settles one private native publication cleanup receipt without writing a file.

@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "Утримання → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Затримка короткого / довгого натискання цієї клавіші в мілісекундах\n(поточне значення: %d мс)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -1779,6 +1780,8 @@
 	"mlx.use_ollama": "Використати Ollama",
 	"mlx.machine_intel": "процесор Intel",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Не вдалося підготувати локальну Ollama. Перевірте журнал і спробуйте ще раз.",
+	"ollama.runtime_start": "Запустити Ollama",
 	"python.not_native_title": "Немає Python для цього Mac",
 	"python.not_native_body": "Для цієї дії потрібен Python 3, зібраний для {1}. Версії Python на цьому Mac зібрані лише для іншого процесора, і macOS запускала б їх через Rosetta, підтримка якої припиняється:\n{2}",
 	"python.missing_title": "Python 3 не встановлено",
@@ -3213,5 +3216,7 @@
 	"menu.hotstrings.user_code.title": "Програмовані текстові скорочення",
 	"platform_reason.program_runner_unavailable": "Недоступно: Нативний запуск програм або ця прив’язка недоступні.",
 	"sg_actions.run_program": "▶️ Запустити програму [налаштовуване]",
-	"menu.hotstrings.personal_metadata_unavailable": "Тут недоступно: змініть це поле безпосередньо у вихідному файлі."
+	"menu.hotstrings.personal_metadata_unavailable": "Тут недоступно: змініть це поле безпосередньо у вихідному файлі.",
+	"menu.gestures.mode_current": "Режим: %s",
+	"menu.gestures.sensitivity_current": "Чутливість: %s"
 }

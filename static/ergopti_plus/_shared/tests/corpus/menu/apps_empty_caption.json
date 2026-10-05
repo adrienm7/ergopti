@@ -1,0 +1,33 @@
+{
+	"section": "apps_empty_rows",
+	"row": {
+		"type": "label",
+		"id": "apps_empty",
+		"i18n": "menu.apps.no_apps",
+		"platforms": ["hs"],
+		"unavailable": "hide"
+	},
+	"captions": {
+		"ar": "لم يُعثر على تطبيقات",
+		"cs": "Žádné aplikace nenalezeny",
+		"da": "Ingen applikationer fundet",
+		"de": "Keine Anwendungen gefunden",
+		"en": "No applications found",
+		"es": "No se encontraron aplicaciones",
+		"fr": "Aucune application trouvée",
+		"he": "לא נמצאו יישומים",
+		"hi": "कोई अनुप्रयोग नहीं मिला",
+		"it": "Nessuna applicazione trovata",
+		"ja": "アプリケーションが見つかりません",
+		"ko": "응용 프로그램을 찾을 수 없습니다",
+		"nl": "Geen toepassingen gevonden",
+		"no": "Ingen applikasjoner funnet",
+		"pl": "Nie znaleziono aplikacji",
+		"pt": "Nenhum aplicativo encontrado",
+		"ru": "Приложения не найдены",
+		"sv": "Inga applikationer hittades",
+		"tr": "Uygulama bulunamadı",
+		"uk": "Програми не знайдено",
+		"zh": "未找到应用程序"
+	}
+}

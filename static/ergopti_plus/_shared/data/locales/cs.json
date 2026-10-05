@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "Přidržení → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Prodleva krátkého / dlouhého stisku této klávesy v milisekundách\n(aktuálně: %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -1779,6 +1780,8 @@
 	"mlx.use_ollama": "Použít Ollamu",
 	"mlx.machine_intel": "procesor Intel",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Místní Ollama se nepodařilo připravit. Zkontrolujte protokol a zkuste to znovu.",
+	"ollama.runtime_start": "Spustit Ollama",
 	"python.not_native_title": "Žádný Python pro tento Mac",
 	"python.not_native_body": "Tato akce potřebuje Python 3 sestavený pro {1}. Verze Pythonu nainstalované na tomto Macu jsou sestavené jen pro jiný procesor a macOS by je spouštěl přes Rosettu, která končí:\n{2}",
 	"python.missing_title": "Chybí Python 3",
@@ -3213,5 +3216,7 @@
 	"menu.hotstrings.user_code.title": "Programovatelné textové zkratky",
 	"platform_reason.program_runner_unavailable": "Nedostupné: Nativní spouštěč nebo tato vazba není dostupná.",
 	"sg_actions.run_program": "▶️ Spustit program [nastavitelné]",
-	"menu.hotstrings.personal_metadata_unavailable": "Zde není k dispozici: upravte toto pole přímo ve zdrojovém souboru."
+	"menu.hotstrings.personal_metadata_unavailable": "Zde není k dispozici: upravte toto pole přímo ve zdrojovém souboru.",
+	"menu.gestures.mode_current": "Režim: %s",
+	"menu.gestures.sensitivity_current": "Citlivost: %s"
 }

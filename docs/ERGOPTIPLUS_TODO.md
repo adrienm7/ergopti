@@ -1882,13 +1882,531 @@ These are software implementations; final hardware verification remains below.
   No collection policy, cache/flush, persistence, reserved surface or physical
   keyboard validation change.
 
+- [~] **L125.** Linux fractional WPM persistence: serialize the admitted rate
+  as a double instead of an integer. A real two-character collector flush with
+  1300 ms elapsed stored 18 instead of 240/13 WPM under LuaJIT; Lua 5.4 threw
+  before writing the raw batch. Keep the shared formula, caller data, ID cursor,
+  dates, other SQL columns and all prior category/metadata/histogram fixes intact.
+  Thirteen real collector/Writer/SQLite checks reproduce nine LuaJIT failures
+  and the Lua 5.4 production exception, then pass under current LuaJIT, signed
+  Ubuntu 22.04 luv/libuv dependencies and Lua 5.4. SQLite/kernel/libc stay current
+  in the mixed profile. Seven independently specified native scalar controls
+  cover fractions, numeric text, integers, zero and existing invalid-text fallback;
+  the first collector check also retains the shared computation assertion.
+  Nonfinite serialization now receives a genuine SQLite refusal instead of an
+  acknowledged coerced integer; unchanged accepted rows and healthy retry are
+  checked, without claiming ID rollback or whole-flush atomicity. Six registered
+  unit cases reproduce three failures and pass on both runtimes. Every original
+  assertion remains intact; existing histogram/category/metadata native fixtures
+  also pass under all three configurations. Register future Linux CI without
+  launching it. macOS and Windows retain their existing one-decimal WPM policy
+  and numeric SQL serialization by source inspection; their native checks remain
+  with the principal agent. Software collector calls are synthetic input and do
+  not validate physical keyboards. No formula, schema, collection, persistence,
+  reserved policy or foreign driver change.
+
+- [~] **L126.** Linux remote terminal callback diagnostics: describe caught
+  errors with the existing shared ErrorDescription policy. Calling tostring on
+  an error object invoked caller formatting again and could throw during failure
+  reporting. Reuse the shared helper through one import and one formatter call;
+  keep owner clearing before the caller, callback arguments/count/order, retries,
+  successors, decoders and HTTP transport identical. Per native configuration,
+  sixty-three public Chat/Models/Test and ordinary-string Vision scenarios issue
+  145 genuine verified-TLS requests: thirty-two formatter-policy failures before,
+  none after under current LuaJIT, signed Ubuntu 22.04 curl/luv/libuv dependencies
+  and Lua 5.4. The mixed profile retains host kernel/Lua/libc and recorded OpenSSL;
+  current and stock Lua use curl 8.14/libuv 1.50, the mixed profile 7.81/1.43.
+  All native primary/successor/retry tuples, arity, model IDs and captured ownership
+  are asserted outside protected callbacks after settlement, alongside exact wire
+  inventory, one terminal callback and zero retained handles. Preserve every
+  original assertion: five deliberate software tuple mutations demonstrate that
+  the former protected assertions could falsely pass and that outside oracles
+  refuse them. Forty-seven independent software sensitivity controls cover the
+  new oracles on both Lua runtimes; these are not native or physical validation.
+  Seventy-eight registered unit cases reproduce fifty-three failures and pass
+  after. Preserve the four original pcall-status assertions and additionally
+  assert the genuinely returned caller-delivery records outside protection;
+  four software mutation pairs on both runtimes prove these unit oracles can
+  fail. The unchanged complete-tree JS false-green ratchet stays at zero.
+  Existing API admission/UTF8/IPv6 regressions remain byte-identical.
+  Register future Linux CI without launching it. macOS callback traceback/object
+  formatting remains a source-only analogue; Windows uses native protected
+  callbacks whose error getters need separate native evidence. Leave their gates
+  to the principal agent. Vision object diagnostics and outer HTTP diagnostics
+  remain separate, unmeasured scopes. No menu, magic, transport, persistence,
+  physical hardware or foreign driver change.
+
+- [~] **L127.** Linux raw event calendar days: use the local day for hotstring
+  and shortcut collection and the four raw Writer defaults, matching existing
+  typing and daily aggregates. Keep UTC timestamps and caller-supplied dates
+  unchanged. Genuine public software events, Writer, Reader and dashboard APIs
+  with real SQLite reproduce six mismatches in thirteen checks before and pass
+  after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile.
+  The genuine-clock fixture starts only its process with POSIX TZ=OWN-24, an
+  artificial UTC+24 offset that guarantees distinct real local/UTC days. It
+  replaces no clock or adapter, verifies clock identity and UTC bounds, rejects
+  calendar crossing during setup, and checks repeat flushes and durable IDs.
+  This does not represent a geographic timezone or physical keyboard input.
+  Nineteen additional checks with explicitly simulated Lua clock inputs and real
+  libc/SQLite cover east/west/UTC and midnight boundaries: nine failures before,
+  none after under current and mixed-profile LuaJIT. Their FFI requirement leaves
+  this fixture unexecuted under Lua 5.4. Ten registered unit cases reproduce six
+  failures and pass after on all three profiles. Native fixtures assert their
+  exact check floors; preserve every original test and assertion. Windows
+  KL_Today and macOS aggregator.today already use local calendar days in source;
+  foreign native validation remains with the principal agent. Register future
+  Linux CI without launching it. No migration of historical events, formula,
+  schema, shared policy, physical-input, menu or reserved configuration change.
+
+- [~] **L128.** Linux n-gram text projection: preserve embedded NUL and distinct
+  admitted UTF-8 tokens through the SQLite CLI. Raw TEXT in its JSON mode truncates
+  at NUL, losing tokens or merging them with a prefix. Project json_quote(token)
+  and decode its string with the existing shared JSON codec at the native adapter
+  boundary; retain grouping, counts, delays, error/source totals and malformed
+  numeric fallback. Twenty-nine native checks across all nine character/word
+  families reproduce nineteen failures and pass after on current LuaJIT, Lua 5.4
+  and the signed Jammy luv/libuv mixed profile, all with actual SQLite 3.46.
+  Public synthetic output, flush, range and historical/today split APIs retain
+  exact NUL, quotes, whitespace and accented text. Independent durable hex(token)
+  and seven distinct token identities verify the original bytes and counters.
+  Empty-range and ordinary-text controls remain healthy. Use a fixed historical
+  fixture day with a distinct-day precondition rather than subtracting 24 hours,
+  which can still be today on a 25-hour calendar day. Preserve all original native
+  assertions and add an exact twenty-nine-check floor. The registered regression
+  fails before and passes after on all three profiles; forty-four Reader owner
+  checks, including canonical modifier-hold data, pass after. Their CLI adapters
+  are explicitly simulated; the native fixture runs real software/database paths
+  and does not validate physical input. macOS uses native binding rows in source;
+  Windows has a separate source analogue in SQLite_Utf8ToStr, which calls StrGet
+  without a byte length. Its direct text queries need native evidence and a
+  length-aware or JSON-framed read strategy from the principal agent. No foreign
+  driver changes or native gates here. Register future Linux CI without launching
+  it. No NULL policy, completion cache, schema, Writer, menu or reserved change.
+
+- [~] **L129.** Linux SQLite NULL boundary: use the existing shared lossless JSON
+  decoder for native result rows and remove only top-level tagged NULL scalars.
+  Legacy empty-table sentinels defeated numeric zero defaults and published absent
+  optional extrema or first/last minutes as objects. Keep arrays, ordinary objects,
+  nested tagged NULL and embedded JSON text unchanged; do not change the shared
+  decoder contract or SQL queries. Eight genuine public Writer/Reader checks with
+  native SQLite reproduce three failures and pass after under current LuaJIT,
+  Lua 5.4 and the signed Jammy luv/libuv mixed profile. Optional manifest fields
+  reach the runtime projection; read_system_days is a public API with no current
+  Linux runtime caller. Native tests assert their exact eight-check floor and all
+  original assertions remain unchanged. Three registered CLI-response unit cases
+  reproduce three failures and pass after on all three profiles. Forty-seven
+  complete Reader owner checks, including n-gram byte identity and canonical
+  modifier-hold fields, pass after; replay all twenty-nine native n-gram checks
+  on each profile. Windows already uses COALESCE for system totals and removes
+  absent battery extrema represented by empty strings in source; macOS uses
+  binding-native nullable values. Foreign binding and driver execution remains
+  untested here and belongs to the principal agent. Register future Linux CI
+  without launching it. Preserve both PulseAudio language packs and principal
+  notification/HTTP fixtures from dev. No global codec, query, numeric policy,
+  schema, cache, configuration, menu, physical-input or foreign driver change.
+
+- [~] **L130.** Linux raw-event batches: wrap each typing, hotstring, shortcut
+  and app-switch script in a checked SQLite transaction. An INSERT trigger using
+  RAISE(FAIL) previously left earlier rows or trigger effects committed while the
+  public caller retained the entire refused batch; its retry then duplicated
+  events and diverged from derived totals. Roll back the refused script when the
+  checked CLI exits before COMMIT. Keep separately acknowledged event-ID
+  reservations and their gaps; this does not promise whole-flush atomicity,
+  ID rollback, COMMIT-refusal handling or exactly-once delivery after a lost
+  post-COMMIT acknowledgement. Twelve genuine native checks reproduce ten
+  failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. A separate actual-clock public Keylogger producer and independent
+  Python SQLite oracle reproduce five failures among twelve checks and pass after
+  on each profile. Producer exit zero before and after only means its snapshots
+  were collected: the oracle supplies the failing or passing verdict. Refused,
+  accepted and repeated-flush snapshots independently verify IDs, pending events,
+  raw/derived conservation, exact fractional WPM, local days and UTC timestamps.
+  Both native fixtures enforce their exact twelve-check floors. Eight registered
+  CLI-script unit assertions fail before and pass after on all three profiles.
+  Preserve every existing assertion and the unchanged Keylogger implementation.
+  macOS already checks its ingest transaction and rolls back failures in
+  log_manager; Windows journals transaction-delimited ingest scripts for its
+  detached replay worker. Those different native paths need their own runtime
+  validation and remain with the principal agent. No shared policy change is
+  required: transaction ownership belongs to each native SQLite adapter. Register
+  future Linux CI without launching it. These are real Linux software/database
+  executions with software-supplied input, not physical keyboard validation.
+  Preserve both PulseAudio language packs and principal notification/HTTP fixtures.
+  No schema, Reader, menu, configuration, foreign driver or reserved change.
+
+- [~] **L131.** Linux native manifest completion: retain the useful partial first
+  result after a refused SQLite query, but cache a revision only when every
+  projection query completed. Otherwise a temporary failure in the base, error
+  or session query remained cached after native recovery at the same revision.
+  Preserve successful empty reads, accepted cache reuse and explicit cache clear;
+  malformed native JSON and invalid paths refuse completion. Ten actual public
+  collector/SQLite/Reader checks reproduce seven failures and pass after on
+  current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. A separate
+  three-check public cache regression independently reproduces three failures
+  and passes after on each profile: literal native SQL proves accepted chars3,
+  errors7 and sessions2 while the recovered public payload previously retained
+  an omitted field. This supplemental oracle does not depend on the new completion
+  flag; preserve its entire original body and exact three-check floor. The primary
+  fixture enforces ten checks. Eight registered CLI-response unit cases reproduce
+  eight failures and pass after on all three profiles; all fifty-five checks in
+  the three existing Reader owners remain green, with every old assertion and
+  complete unit prefix preserved. Select only the first return in the existing
+  NULL and two filesystem fixture calls to next, preserving their assertions and
+  eight/thirty-five floors. The two additional calls failed with invalid keys
+  after the API change; all thirty-five native path checks pass after the caller
+  adaptation on each profile. macOS source likewise has no manifest completion
+  result, but this alone does not reproduce a macOS revision-cache defect.
+  Windows has separate candidate/last-good refresh guards; neither foreign
+  runtime is executed or modified here. Completion acceptance belongs to the
+  native Reader/cache adapter, with no shared SQL or numeric policy change.
+  Register future Linux CI without launching it. Software events and schema
+  obstructions exercise real native software/database paths, not physical input.
+  Preserve both language packs and principal notification/HTTP fixtures. No
+  Writer, schema, menus, configuration, foreign driver or reserved change.
+
+- [~] **L132.** Linux layout-count projection: publish persisted counts as the
+  canonical layouts_seen map consumed by the shared Apps/Typing dashboard.
+  Linux previously emitted layouts, leaving healthy native metadata invisible
+  to that consumer. Change only the two field statements; preserve SQL grouping,
+  filters, optional absence, numeric zero, revision-cache completion and stored
+  event/aggregate bytes. Ten genuine public collector/SQLite/Reader/dashboard
+  checks reproduce seven failures and pass after on current LuaJIT, Lua 5.4 and
+  the signed Jammy luv/libuv mixed profile. The actual keyboard module supplies
+  its default qwerty label without hook initialization; two software key calls
+  produce a durable count2 independently observed in native SQL. Explicit metadata
+  covers multiple devices, quoted UTF-8 labels, date/app filters and recovery.
+  This proves software metadata persistence/projection, not physical input,
+  desktop-layout discovery or an initialized XKB/Wayland keyboard hook. Preserve
+  all fifty-one original native assertion lines and enforce the exact ten-check
+  floor. Four registered CLI-response unit cases reproduce one failure and pass
+  after on all three profiles. All fifty-nine checks from the existing Reader
+  owners remain green; retain the entire old unit prefix and every assertion.
+  Replay native NULL8, completion10 and independent public-cache3 on each profile.
+  macOS and Windows already publish layouts_seen in source, and shared consumers
+  already read it; no shared policy or UI change is required. Their native gates
+  remain with the principal agent. Register future Linux CI without launching
+  it. Preserve both language packs and principal notification/HTTP fixtures.
+  No Writer, Keylogger, SQL, schema, UI labels, menu, configuration, physical-input,
+  foreign driver or reserved change.
+
+- [~] **L133.** Linux directed application transitions: project persisted
+  agg_app_day_switches_to rows into the canonical switches_to map. Sum device
+  contributions by date, source and destination; reuse inclusive date and source
+  application filters while retaining destinations outside that selection.
+  Preserve optional absence, typed zero, quoted UTF-8 names, aggregate/raw bytes
+  and native completion-cache refusal/recovery. Thirteen real public software
+  collector/SQLite/Reader/dashboard controls reproduce nine failures and pass
+  after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile.
+  Five independent native SQL controls reproduce three failures and pass after
+  on each profile, including literal directed 6|2, reverse 1|1 and zero integer
+  0|1|integer oracles. Both fixtures enforce their exact thirteen/five floors.
+  Four registered CLI-response unit cases reproduce three failures and pass
+  after; all sixty-three existing Reader owner cases and every old assertion
+  remain. Replay native NULL8, completion10, public-cache3 and layouts10 on all
+  three profiles. Shared consumers already use switches_to; no shared policy
+  change is needed. macOS/Windows source also produces transitions but their
+  Reader manifests omit this field; this is a source diagnosis, with native
+  foreign validation and corresponding fixes left to the principal agent.
+  Register future Linux CI without launching it. Explicit software focus calls
+  exercise native databases, not physical input or foreground-window discovery.
+  Preserve both language packs and principal notification/HTTP assertions.
+  No Writer, Keylogger, schema, UI, configuration or reserved change.
+
+- [~] **L134.** Linux hourly manual corrections: credit the existing software
+  [BS] protocol to local hourly/min5 error counters and cumulative delay bins,
+  while preserving typed-character totals and synthetic exclusion. Persist
+  numeric histogram deltas through the existing native SQLite merge policy;
+  extract the existing burst expression without changing its behavior.
+  Twelve genuine public collector/SQLite/Reader/dashboard checks reproduce
+  eight failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy
+  luv/libuv mixed profile. Enforce the exact twelve-check floor and preserve
+  every original assertion. Literal SQL controls cover raw bytes, daily errors,
+  cumulative thresholds, multiple flushes/devices, repeated direct deltas,
+  caller preservation, filters and RAISE(ABORT) statement refusal/recovery.
+  This proves that tested statement rollback, not general transaction recovery
+  or automatic retry durability. Four registered Walker cases reproduce three
+  failures and pass after; all forty-five Walker owner cases remain green with
+  the entire old unit prefix preserved. Replay native burst18, WPM13, raw-batch12
+  and completion10 on each profile. macOS/Windows already count manual corrections
+  in hour/min5 bins and persist their histograms in source; native foreign gates
+  remain with the principal agent. Reuse shared bucket thresholds/helpers and
+  the canonical schema, with no new policy or shared-data change. Register future
+  Linux CI without launching it. Real clocks/native processes/databases with
+  explicit software event timestamps do not validate physical Backspace capture,
+  which currently does not supply this marker. Preserve both language packs and
+  principal notification/HTTP assertions. No input hook, Reader, Keylogger, schema,
+  configuration, menu, foreign driver or reserved change.
+
+- [~] **L135.** Linux canonical manual-character count: exclude the exact
+  software correction marker [BS] from the per-app character accumulator.
+  Preserve its raw event/bytes, correction counters, elapsed-time admission,
+  global/live/raw-event WPM, ngrams and exact-marker distinction. The software
+  a/[BS]/b stream previously exposed live/durable chars3 while class/hour totals
+  correctly remained2; correction-only input incorrectly contributed a character.
+  Nine real public collector/SQLite/Reader/dashboard controls reproduce five
+  failures and pass after on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. Keep the existing exact nine-check floor. Literal SQL independently
+  requires daily2, classes2, hourly2, raw hex615B42535D62 with three input events,
+  and backspaces1. A second c/[BS] flush adds one character for cumulative3;
+  an empty flush preserves all raw ID/text/event bytes and the ASCII control2.
+  Four registered unit cases reproduce three failures and pass after, including
+  Unicode/whitespace, marker-only and [BS]x controls. All forty-five old/new owner
+  cases pass; preserve the entire 28658-byte old unit prefix and all ninety-eight
+  assertion lines. The frozen author README undercounts those lines as97; keep
+  that receipt unchanged and use the measured count here. Shared Apps/Typing,
+  macOS/Windows source already separate manual chars from corrections; no new
+  policy or foreign-native claim. Native foreign gates remain principal-owned.
+  Register future Linux CI without launching it. This software protocol does not
+  validate physical Backspace collection, which currently does not feed this
+  marker. Preserve both language packs and principal notification/HTTP assertions.
+  No physical hook, timing policy, Writer, Reader, Walker, schema, configuration,
+  window-title logic, menu, foreign driver or reserved change.
+
+- [~] **L136.** Linux fallback wait completion: accept the interpreter-native
+  os.execute success receipts true/0 and propagate refusal instead of reporting
+  a completed wait after an ignored command failure. Preserve duration conversion,
+  native nanosleep/EINTR behavior, luv pump/clock/reentry and existing shared timing
+  helpers. Eight actual native controls reproduce four failures and pass after
+  on current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile, with
+  the original exact eight-check floor. A private executable returns exit7;
+  genuine sleep recovery completes at least25ms with exact0.020/0.025 arguments.
+  Stock Lua naturally lacks FFI; LuaJIT FFI absence and cdef refusal are explicitly
+  simulated selection seams around real commands. Thirteen registered controls
+  reproduce nine failures and pass after on all three profiles while loading
+  all382 modules without errors. Twelve model CLI/FFI receipts; the thirteenth
+  executes the real native child fixture. Preserve the entire old unit by the
+  remove-only inverse of the unchanged2567-byte internal insertion before the
+  unique backend-isolation block; this is not an appended-prefix claim. macOS
+  uses hs.timer.usleep with a void adapter contract, Windows native timer methods
+  use SetTimer; neither supplies this Linux boolean external-command wait path.
+  The macOS exception suppression is a separate source observation, not foreign
+  native validation or proof of an equivalent completion defect. Shared policies
+  remain unchanged; foreign native gates stay principal-owned. Register future
+  Linux CI without launching it. Real software waits/processes do not validate
+  physical input or new signal/lifecycle behavior. Preserve both language packs
+  and principal notification/HTTP assertions. No shared helper, foreign driver,
+  input hook, configuration, menu or reserved change.
+
+- [~] **L137.** Linux Unicode character classes: replace the private multibyte
+  shortcut with the existing shared coarse classifier, preserving codepoint
+  lengths, source counters and manual/synthetic separation. Actual public
+  software ingestion and native SQLite reproduce three failures among fourteen
+  independent Python-oracle controls before and pass after on current LuaJIT,
+  Lua 5.4 and the signed Jammy luv/libuv mixed profile. Han and emoji belong to
+  other; NBSP and NNBSP belong to space. ASCII, accented letters, combining
+  codepoints and synthetic output retain their literal counts. This existing
+  coarse policy does not implement Unicode general categories or graphemes.
+  Nine registered unit controls reproduce four failures and pass after on all
+  three profiles; the supplemental CR/VT/FF control checks other while tab/LF
+  stay space. That supplemental control is a Walker unit, not native hardware
+  coverage; the fourteen native controls remain unchanged. Preserve the entire
+  original eight-case unit prefix and all forty-five previous Walker controls.
+  macOS already delegates to the same shared classifier. Windows agrees on the
+  concrete Han, emoji, NBSP/NNBSP and accent cases; broader letter ranges and
+  combining behavior differ, so this is not full foreign taxonomy parity.
+  Foreign native validation remains principal-owned. Register future Linux CI
+  without launching it. Preserve both language packs and principal notification
+  and HTTP assertions. No input hook, shared policy, schema, source counters,
+  normalization, menu, configuration or reserved change.
+
+- [~] **L138.** Linux stored ngram source projection: retain all admitted string
+  source labels except hotstring, llm and none in the canonical other bucket.
+  A shared Utils predicate owns that membership; Linux retains native JSON
+  projection and its existing tonumber scalar admission/fallback. Actual SQLite
+  Writer/Reader controls reproduce one failure among six, scalar/shape controls
+  one among seven, and public software collector/flush/SQLite/Reader/dashboard
+  five among nine before, then pass after on current LuaJIT, Lua 5.4 and the
+  signed Jammy luv/libuv mixed profile. Independent read-only Python SQLite
+  verifies literal c11/hs1/llm2/o6; producer exit0 means collection, not success
+  of the independent oracle. The word-family check is an explicit Writer seam,
+  separate from the collector's synthetic-word exclusion. Ten original unit
+  controls reproduce three source failures; an additional pure membership case
+  covers twelve literal labels/types and adds a separate pre-fix API absence.
+  All eleven pass after, along with all seventy-four current Reader controls.
+  Preserve the complete old34969-byte unit and its110 assertions, the entire
+  frozen ten-case prefix, native6/7/9 floors and all older ngram/NULL/completion/
+  cache/layout/switch/Unicode regressions. macOS/Windows already project extra
+  string labels into other; source inspection establishes that supported
+  taxonomy, not full scalar/fallback parity or foreign native execution.
+  This slice covers stored reads. The live unflushed projection and Writer
+  conflict merge have separately reproduced omissions and remain queued; do
+  not claim complete source accounting. Register future Linux CI without
+  launching it. Preserve both language packs and principal notification/HTTP
+  assertions. No Writer, live delta, input hook, shared admission change, schema,
+  configuration, menu, normalization, foreign driver or reserved change.
+
+- [~] **L139.** Shared typing metrics NONE selection: use one selection policy
+  for historical dictionaries, live known/Unknown applications and per-app KPIs.
+  Explicit NONE excludes all input while retaining existing ALL, uninitialized,
+  explicit selection, Unknown inclusion, discovery and cache ownership outside
+  NONE. Twelve registered JS controls cover all ngram families and actual raw/
+  hotstring SFB computations; all pass after the fix. Fifteen existing request
+  ownership controls remain green. Real Linux WebKit 2.54 under virtual X11 and
+  private D-Bus reproduces two failures among nine before, then nine pass after:
+  a mandatory visible owned h/count7 row is cleared, leaving zero data rows and
+  the genuine translated colspan8 no-data placeholder. The production manager,
+  keylogger, native SQLite and actual picker open/select/close transaction run;
+  literal SQL historical and flushed software counts remain healthy. Preserve
+  all eight original GUI checks, the ninth rendered-row assertion and subject
+  floor. Register the exact future CI command without launching GitHub CI.
+  The UI policy is shared by Windows/macOS/Linux; backend empty-array semantics
+  differ and are unchanged. Foreign native WebViews, Ubuntu 22.04 WebKit and
+  physical input are unexecuted. Preserve both PulseAudio language packs and
+  principal notification/HTTP assertions. No bridge, backend, input hook, menu,
+  configuration, source-admission, translation or reserved implementation change.
+
+- [~] **L140.** Linux ngram source conflicts: reuse the existing numeric-map
+  SQL accumulator so successive flushes retain every admitted literal source key.
+  Preserve existing string/positive-number admission, floors, scalar counters,
+  schema and generic helper. Actual public software output and native SQLite
+  reproduce four failures among twelve before, then pass after, on current
+  LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. An independent
+  read-only Python connection verifies the same twelve outcomes from native
+  snapshots. Eight healthy controls retain known-source addition, manual absence,
+  raw tagged events, exact c/td/cd/e, device/date isolation and numeric admission.
+  Quoted Unicode/dotted keys and persisted numeric-string counts accumulate.
+  Four additive registered units pass; all104 Writer controls remain green.
+  Strengthen only three old source-shape assertions into captured public Writer
+  SQL, decoded known/extra input maps, cumulative literal-key inputs and scalar
+  bindings; preserve every other old byte and assertion. All six focused faulty
+  mutations are caught by the original strengthened subject and native fixture.
+  Register future native/Python CI pairs without launching workflows. Windows
+  already enumerates literal source keys; macOS uses generic JSON-path merging,
+  supporting conventional labels by source inspection, without establishing
+  dotted/quoted/empty literal-key parity. Foreign native runtimes and physical
+  input are unexecuted. This conflict slice does not fix control-character key
+  encoding, pending live-source projection or cross-flush session accounting.
+  Preserve both language packs and principal notification/HTTP assertions. No
+  collector, Reader, shared helper, raw event, timing, schema, configuration,
+  menu, reserved implementation or foreign driver change.
+
+- [~] **L141.** Linux live ngram source projection: use the delivered shared
+  source-membership predicate and subtract each source's own flushed snapshot
+  before summing its positive pending contribution into the other bucket.
+  Preserve logical, hotstring and LLM deltas, raw events, flush receipts, timing,
+  producer admission and persistence. Public software output, real private
+  SQLite and range/dashboard requests reproduce seven failures among fifteen
+  before, then all pass after on LuaJIT, Lua 5.4 and the signed Jammy luv/libuv
+  mixed profile. Known-source/manual controls remain healthy; repeated reads
+  retain exact pending counts without flushing the durable database. Twelve
+  additive registered units reproduce seven failures before and pass after;
+  preserve the complete old31208-byte owner and all45 old subjects. The root
+  complete owner explicitly requires57 subjects and passes on all three
+  profiles. Caller-supplied API timestamps are software inputs; no mocked clock
+  or physical clipboard/input validation is claimed. The shared predicate owns
+  label membership; native source maps/deltas remain the Linux implementation.
+  Foreign source inspection establishes supported string taxonomy only, without
+  native Windows/macOS validation. The separate delivered Writer conflict fix
+  retains persisted labels; this slice covers pending projection. Register the
+  future CI commands without launching workflows. Preserve both language packs
+  and principal notification/HTTP assertions. No Writer, Reader, input hook,
+  schema, source-count admission, session cursor, configuration, menu, foreign
+  driver or reserved implementation change.
+
+- [~] **L142.** Linux literal ngram source keys: use the existing shared JSON
+  encoder for each admitted source label instead of escaping quotation marks
+  alone. Preserve count admission, flooring, SQL escaping, the delivered numeric
+  map conflict accumulator and every scalar. Actual public synthetic output and
+  native SQLite reproduce five failures among fifteen independent readonly
+  Python checks before, then all pass after on LuaJIT, Lua 5.4 and the signed
+  Jammy luv/libuv mixed profile. Each profile runs one actual native producer
+  successfully and one fifteen-subject oracle; these are not two test suites.
+  Backslash, newline, tab and carriage-return labels remain literal; quoted
+  Unicode, ordinary labels, raw tagged events, manual attribution and character
+  totals provide healthy controls. Production SQLite3.46.1 writes the database;
+  Python SQLite3.53.1 validates it independently. Eight additive registered units
+  reproduce five failures before and pass after; preserve the complete old
+  41826-byte Writer owner and its104 subjects. The complete112-subject owner
+  passes on all three profiles. Unit SQL receipts are modeled, while the public
+  producer uses real native libraries and storage; no physical input validation
+  is claimed. Windows/macOS source inspection finds existing full JSON encoders
+  on insertion, without native validation or a claim about macOS conflict-key
+  parity. Register both future Linux CI commands without launching workflows.
+  Preserve both language packs and principal notification/HTTP assertions. No
+  collector, Reader, count policy, schema, raw timing, session cursor, menu,
+  configuration, foreign driver or reserved implementation change.
+
+- [~] **L143.** Linux canonical backspace unigrams: retain each correction
+  marker through the existing Walker accumulator, with its actual delay and
+  manual, hotstring or LLM source. The common metrics UI and both foreign
+  drivers already retain this token; this slice covers unigrams only. Preserve
+  correction errors, cascades, recovery, sequence breaks, raw events and scalar
+  character totals. Actual public software events, native clocks and SQLite
+  reproduce five failures among fourteen checks before, then all pass after on
+  LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. Independent
+  readonly Python checks reproduce two failures among eight, then all pass.
+  Four additive registered units reproduce three failures before and pass
+  after; preserve the complete old Walker owner and its45 subjects. All49 owner
+  subjects pass on every profile. Controls cover source attribution, an actual
+  forty-millisecond manual delay, literal four-codepoint "[BS]" text, dashboard
+  and filtered Reader projection, unchanged scalar counts and idempotent flush.
+  Unit events are modeled; production collector, clocks and storage are native.
+  No physical keyboard or foreign native runtime validation is claimed. Broader
+  backspace bigrams/trigrams and existing corpus differences remain outside this
+  slice. Register future Linux CI commands without launching workflows. Preserve
+  both language packs and principal notification/HTTP assertions. No input hook,
+  schema, source-count policy, configuration, menu or reserved implementation
+  change.
+
+- [~] **L144.** Linux system-day restart retention: hydrate the sampler's
+  cumulative row for its exact database, device and calendar day before the
+  first sample. Preserve replacement/idempotence semantics and reset previous
+  process clocks and sensor transitions. A checked Writer read distinguishes
+  accepted absence from refusal; failed reads publish no writable zero day and
+  remain retryable. Rebinding the same database preserves the live day, while
+  changed database/device/day identities load their own row. Actual public
+  collector and SQLite in two separate native processes reproduce three
+  history-loss failures; a genuine thirty-second monotonic interval is retained
+  after restart on LuaJIT, Lua 5.4 and the signed Jammy mixed profile. Each profile
+  preserves two first-process controls and changes twelve restart checks from
+  ten failures to zero; seven baseline failures cover the newly introduced
+  checked-loader API, not seven further old data-loss bugs. Complete sampler25
+  and Writer122 owners change ten failures each to zero, retaining all old
+  assertions. The truthful in-memory Writer model and its23-case protocol owner
+  remain explicit software tests, with detached rows and owned identity checks.
+  Supplied sensor history, reset seams and the next-date adapter are modeled;
+  clocks, native processes, library calls and SQLite refusal/recovery are real.
+  No physical sensor, keyboard, systemd or foreign runtime claim. Foreign source
+  inspection finds additive system deltas on macOS and additive/SQL-rebuilt
+  system fields on Windows, rather than this Linux cumulative zero overwrite.
+  Register future native Linux CI commands without launching workflows. Preserve
+  both language packs and principal notification/HTTP assertions. No schema,
+  raw-event, menu, title, configuration or reserved implementation change.
+
+- [~] **L145.** Linux ngram group refusal atomicity: reuse the existing checked
+  batch transaction for the single multirow upsert. Actual SQLite RAISE(FAIL)
+  previously retained earlier additive token updates and trigger effects despite
+  a false receipt; a later retry duplicated those earlier contributions. Preserve
+  the native bail/connection settlement and helper body, literal source encoder,
+  source-map merging, count admission and scalar fields. Each LuaJIT, Lua 5.4 and
+  signed Jammy mixed profile runs one successful native Writer producer and one
+  independent readonly Python oracle: eight checks with four failures before,
+  then eight passes after. These are not two eight-subject suites. Refusal at the
+  first token preserves counts but leaves a trigger effect; refusal at the last
+  token additionally retains an earlier update. Both become unchanged rows and
+  zero effects, followed by exactly-once healthy retry. ABORT and untriggered
+  controls retain all scalar and known/arbitrary source values. Two registered
+  units reproduce one failure before and pass after; the entire old122-subject
+  Writer prefix and assertions remain intact, and all124 subjects pass on every
+  profile. Unit CLI receipts are simulated; native processes, triggers, files and
+  SQLite reads/writes are real. No physical input or foreign native validation.
+  Foreign source inspection finds outer aggregate transactions/rollback paths,
+  without claiming every foreign caller's FAIL behavior. This slice does not
+  implement a collector derived retry queue, raw replay, session cursor changes,
+  whole-flush atomicity or post-COMMIT lost-receipt recovery. Register future
+  Linux CI commands without launching workflows. Preserve both language packs
+  and principal notification/HTTP assertions. No schema, configuration, menu,
+  foreign source or reserved implementation change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
   acknowledgement, external-write conflict detection and retryable rollback.
-  Recommended delay values must match effective runtime inheritance: deleting
-  `autocorrection.caps` currently inherits 1.0 s while the manifest recommends
-  0.5 s. Do not assume deletion implements the recommendation. Hotstrings: Linux
+  Recommended delay values must match effective runtime inheritance for the
+  currently published feature catalogue. The retired `autocorrection.caps`
+  namespace is obsolete source data, preserved until explicit cleanup; it is
+  not a current recommendation target. Do not assume deletion implements the
+  recommendation. Hotstrings: Linux
   categories, sections and scalar settings are canonical config.toml leaves,
   with a one-shot import of legacy storage.json choices; both Lua drivers have a
   two-file recommended/clear owner whose planner writes explicit delays where
@@ -2028,6 +2546,25 @@ publication/rollback owners in code before device acceptance. On Windows,
 replay fresh/existing/moved folder recommendation and clear with exact backups,
 strict external-write refusal, restart and actual input; retain items 16/38.
 
+Current global composition now retains its exact admitted participant cohort,
+including refused finalization. Linux Shortcuts, Hotstrings, Metrics and AI
+scope owners keep the actual file/runtime claims through compensation; an
+acknowledged sibling release is reacquired before a retained rollback may run.
+Retry settles only the outstanding phase and does not repeat accepted inverses
+or overwrite successor runtime owners. Independent focused contracts pass;
+current full selected and hosted qualification are recorded separately. Direct
+Script participation is now implemented on Linux/macOS through the shared
+planner, live logger/locale/error owners and acknowledged native settings
+receipts. Initial same-threshold successor defects refuse through raw parent
+identity fences. Final composed, installed and device acceptance remain open.
+
+The native Script settings cohort refuses valid JSON source whose current
+codec cannot preserve exact decimal semantics, including large integers and
+some fractional spellings. It preserves the original source on refusal. This
+conservative boundary remains source work for complete future-data support;
+portable settings models do not prove actual Hammerspoon storage or atomic
+cross-process publication.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -2092,6 +2629,13 @@ Partial dev handoff (2026-10-05): actual virtual X11 wizard probes are
 qualified separately. Installed Windows and macOS wizard reruns, restart and
 physical input remain device acceptance; work-machine logs/screenshots need
 not be exported. Follow PARTIAL-DELIVERY.md and record the exact artifact.
+
+The shared Lua wizard planner now uses the canonical strict UTF-8 owner for
+single-character answers. Overlong encodings, surrogate values and values above
+U+10FFFF refuse before writes on macOS, while valid BMP/non-BMP symbols and the
+existing Linux rare-symbol policy retain their previous behavior. Independent
+actual-catalogue controls pass on both Lua runtimes; this source qualification
+does not establish native WebView transport or installed-device acceptance.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
@@ -2840,6 +3384,17 @@ obsolete-value preservation; do not remove assertions. Full failure annotations
 are truncated; the exact known subjects and limits are in the current partial
 delivery evidence. E2E/package/install remain skipped, not passed.
 
+Additional native macOS source-policy controls preserve carried nonstring
+combination leaves on unrelated saves and refuse requested replacement until
+explicit repair. Known expert script logger thresholds and manifest-declared
+feature values are admitted through their actual published catalogues; invalid
+values remain unread, warned and byte-preserved. Metadata inspection is pure and
+does not resolve a hardware backend. Deliberate arbitrary expert scalar fields
+retain their existing API. These bounded slices do not complete the catalogue,
+whole-file refusal, persisted-legacy-settings or native acceptance requirements.
+
+The 2026-10-05 continuation preserves malformed shortcut-order source rows and source-proven empty arrays instead of treating them as valid maps. Requested replacement refuses until explicit repair; valid reorders and resets retain unrelated source kinds. The Windows known-feature fixtures now target the currently published `names` owner, keeping the removed `caps` namespace as a source-preservation/explicit-cleanup control. The changed-publication/restart timing remains an explicit nondefault Float (0.75), with the separate 0.5 default test retained. Focused portable checks and independent source review pass; final composed and hosted Windows qualification remain pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -3311,6 +3866,18 @@ document/config dotted assignments with independent expected models. Preserve
 retired scalar collisions until explicit cleanup; ordinary saves must refuse
 them. Installed-driver restart and actual menu persistence remain acceptance.
 
+Ordinary Windows full-save, onboarding and AI configuration candidates now use
+the same semantic-document writer as targeted configuration updates, preserving
+root-dotted, quoted and inline source identities through the existing leases,
+staging and durable receipt owners. Shared Lua leaf publication and explicit
+unused-key cleanup retain authenticated source array/object kinds and opaque
+scalar lexemes; stale or forged shape hints refuse. Native macOS custom wrap
+choices publish through their canonical typed namespace and conditional writer,
+including future pair metadata. All native Windows causal fixtures and final
+packaging/install acceptance remain separately required.
+
+The 2026-10-05 continuation adds source-bound explicit Windows cleanup of retired physical sections, including empty section headers, exact case identities and verified backup bytes. Ordinary full saves preserve retired entries. New Windows namespace publication now uses an explicit native-readable header only when the semantic parser admits that declaration after explicitly owned drops; closed dotted/inline owners keep their existing legal insertion route. Complete independently written images and actual flat-reader assertions cover first publication and explicit replacement. Native qualification is still in progress; unsupported retired dotted/inline/table-array cleanup projections remain implementation work.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -3339,236 +3906,129 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   Registered macOS tests pass 12908 cases, and private eager-acquisition and
   consumer-refusal mutations are rejected. Native macOS qualification and
   manual hardware acceptance remain pending.
-- [ ] **46. (partial)** Local-model presence and download offers now share one
-      policy on Windows, macOS and Linux. Agent and screen-reading requests
-      distinguish an absent model from an unavailable or malformed model list;
-      a model removed after listing is reported through the same owned offer.
-      Linux streaming HTTP keeps real status and complete bounded error-body
-      receipts, and consent resumes only after modal input ownership is restored.
-      Complete the three-OS native CI, packaging and installation validations
-      before removing this item. Cloud loopback transport and scripted owner
-      regressions do not qualify physical desktop input.
-      The Windows native run 37088969640 exposed two contract regressions:
-      deferred preflight now declares one-shot/cancel timer semantics, and each
-      reserved curl slot declares its transitory tags-owner fields before
-      acquisition. Timer delivery/cancellation and the real dispatcher have
-      added regressions; the repaired native Windows gate remains pending.
+- [~] **46.** **Partial: local model admission and download offers.** Windows,
+  macOS and Linux share model-presence policy for chat, agents and screen
+  reading. Missing, removed, unavailable and malformed model lists remain
+  distinct; model receipts belong to their originating endpoint and newest
+  joint listing generation. Complete bounded HTTP failures and restored modal
+  ownership fence download offers and request resumption. Mac endpoint/epoch
+  controls and Linux loopback/source/retirement controls are qualified slices,
+  not final desktop acceptance.
+  Remaining: actual models/chat/download/retry on final native sources,
+  consent and exact source/endpoint/model admission, held dialog and modal
+  restoration, packaging, per-user installation/restart and physical desktop
+  input. Windows steps 1,10,12 and Mac native Hammerspoon qualification remain
+  required. Preserve one-shot/cancel timer and native curl-slot assertions.
+  Direct-source manual run37306690694 attempted actual HTTPS/model validation.
+  Its native child exited0 with inference6 bytes, but the supervisor rejected
+  its physical-reaping counter; this remains a failed whole acceptance until
+  explicit pending-zero/no-rescue proof qualifies. The corrected physical
+  consumer passes35 parser controls and three refusal controls;14 durable
+  diagnostics and actual native82 checks pass. Real adoption, rescue and timeout
+  controls preserve their physical outcomes. Hosted direct-source run37314770405 passes the actual official HTTPS installation,
+  model pull/chat and strict pending-zero/no-rescue acceptance step. The whole
+  Linux lane fails separate updater and negative-publication fixture steps;
+  packaging/install are skipped. Its public artifact bytes remain unavailable.
+  Items16/38 remain.
 
-macOS chat and vision requests now bind acknowledged model inventories to the
-canonical server origin and newest joint listing epoch. A changed endpoint,
-forgotten inventory or older independent menu response cannot admit private
-request bytes or replace newer model state. Final checks after parsing,
-logging and native callbacks retain same-endpoint admitted responses. The
-registered independent cases pass 21/0 on Lua 5.4 and LuaJIT; unchanged source
-fails 15 of those cases, and removing only final publication checks fails seven.
-Existing API, agent and HTTP-owner cases pass 38/0, 5/0 and 5/0. Native
-Hammerspoon execution, full packaging/install and desktop acceptance still
-require qualification; item 46 remains partial.
+- [~] **47.** **Partial: authenticated local-server discovery and menus.** The
+  shared catalogue owns optional empty authentication only for declared local
+  providers; cloud/generic/unknown providers retain typed key requirements.
+  Exact configured HTTP(S) endpoints and secret bytes remain authoritative,
+  with no empty Authorization header. Private source order, unknown values,
+  classified reads, DPAPI/0600 publication and existing writer admission remain
+  required. Mac joint discovery and Linux four-owned-GET menus preserve ordered
+  generations, typed models, held-dialog freshness and saved-but-not-selected
+  refusal; neither permits a logical ticket to acknowledge native cleanup.
+  Linux owned HTTP retains creator, detached group, body descriptors, native
+  close ACKs and literal source authority until physical settlement. The final
+  POST source 4171a254 qualifies 424+17 cases on LuaJIT and 421+17 on Lua 5.4,
+  actual POST 4 and descendant 5 per ABI. Its final 82-check native gate passes on both ABIs, including physical
+  process/file/POST teardown; the earlier 64 checks remain intact. New fixture loaders
+  restore their exact ShellRunner/monotonic dependencies without changing old
+  assertions: original prefix 159/0 per ABI, 24 cache controls and 6 causal REDs.
+  Final daemon consumers pass 162/0 and actual routing 2/0 per ABI; 12 causal
+  variants reject 30 named assertions per ABI. The manual-page-close
+  bridge passes all 13 original/new controls per ABI. Synchronous cancellation
+  retains its own UI completion before retirement: faithful composed controls
+  pass180/0 plus daemon routing2/0 per ABI; the original fails two behaviors.
+  Windows14 source paths include panel/lifecycle and timer relocation. Direct-source
+  run37316704100 passes panel20, timers4, logical39, models20, private42, JOIN9
+  and all six succession controls. Its whole unit suite reports9303 passed/44
+  failed; downstream E2E/package/install are skipped. Nine shared
+  renderer/declaration/test paths use canonical inert fallback rows; generated
+  artifacts were regenerated through their owner. Final
+  driver qualification remains required. Historical diagnostic
+  run 37285932690 source 6e7363b247 tested 3857b87767 passed the Group4 join,
+  orchestration/models/private/tooltip cohorts but finished 9278 passed/43 failed
+  using eight fixture variants; E2E/package/install skipped. It does not qualify
+  new unmodified sources. Remaining: final unchanged-source Windows/Mac/native HTTP/UI discovery,
+  cache/source/credential/model/menu supersession, pause/resume/shutdown and
+  page-close cleanup, exact private writes and restart, renderer duplicate-row
+  identity, actual model/chat/consent, packaging/install and physical input.
+  Preserve C1/full cloud endpoint semantics, timer inventory, original corpus
+  and existing private-file/DPAPI/WAL assertions. Lua 5.4 authenticated private
+  file fixture's17 baseline FFI failures are unresolved qualification, not green.
+  Corrected root Linux passes8302/0 and E2E189/0. JS361/0, portable macOS
+  unit14665/0 and E2E101/0 plus one driver-specific skip qualify their selected
+  sources. Hosted Linux8337/1 exposed a cache-only fixture admitting an extra runtime
+  offer on trusted-root hosts. Explicit unavailable-runtime isolation preserves
+  every old assertion and passes all58 admission controls per ABI. The final
+  local Linux suite passes8338/0 across406 modules after current dev integration. Six Windows
+  retained writer/JOIN failures are traced to the scope fixture retaining its
+  recovered barrier. Exact-owner fixture restoration and six original native
+  refusal sequences are adopted. Native37313187012 passes panel20/20, timers4/4
+  and logical controller39/39, but still exposes two subsequent recovered G2
+  fixture markers. Their coordinated exact-owner finally restoration preserves
+  all139 original assertions. Direct-source run37316704100 closes all twelve
+  earlier marker failures; its remaining44 failures retain their prior names.
+  The Linux no-clobber negative fixture now checks exact GNU version-specific
+  exit receipts without normalizing production outcomes. All34 original
+  assertions remain; native44 cases and the complete82 gate pass on both GNU9.4
+  and9.7 (164 final checks), with unchanged1164 source hashes and physical
+  pending-zero/no-rescue cleanup. Earlier read-only/incomplete scratch setup
+  attempts failed and did not qualify POST. Complete native three-OS
+  qualification remains; items16/38 stay.
 
-Windows continuation is explicitly deferred to the maintainer's PC: complete
-steps 1, 10 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md).
-Native model-owner, real-model, E2E, packaging and installation acceptance
-remain required; this deferral is not completion.
-
-- [~] **47.** **Partial: catalogue-owned optional authentication.** Manually configured
-  OpenAI-compatible entries for oMLX, LM Studio, llama-server/LocalAI and Jan
-  can use an explicitly empty key on all three drivers. The shared local
-  catalogue owns that capability; cloud, generic and unknown providers still
-  require a typed key. Configured HTTP(S) addresses and provided secret bytes
-  remain authoritative, and empty credentials do not create Authorization
-  headers. Linux keeps foreign row order and unknown fields during private
-  saves; Windows refuses unsupported source replacement under the existing
-  transaction owner. Linux already supports address, key and model text
-  prompts. Independent credential/models fixtures, actual entry restart and
-  configurable curl loopback models/chat/refusal/cancellation regressions
-  qualify this prerequisite locally. Native Windows/macOS application and
-  complete three-OS CI remain pending. Remaining work: Windows/Linux automatic
-  asynchronous discovery and model/menu rows matching the existing macOS
-  local-server owner, with source fencing and physical acceptance. This
-  tranche does not install or start a server.
-
-The controlled Linux HTTP lane independently qualifies unauthenticated models
-and chat requests, supplied secret bytes, authentication refusal, cancellation,
-source changes and complete task retirement. Its original 55 streaming checks
-remain mandatory beside the 28 new local-API checks. macOS and Windows use the
-same catalogue capability and independent credential/model vectors through
-their existing API owners; actual Windows execution and complete native CI
-remain pending. Automatic local-server discovery remains a separate tranche.
-
-The Linux HTTP port now exposes an optional retained GET operation for
-discovery. Signal acceptance and logical inactivity remain the historical
-boolean ABI; the new operation fences delivery on cancellation and blocks
-same-owner successors until exact process exit and every native handle-close
-callback acknowledge retirement. Independent constructor, refusal, timeout
-and premature-settlement regressions, 70 actual curl streaming/owned-GET
-checks and the unchanged 28 local-API checks qualify this prerequisite
-locally. Automatic discovery and model/menu rows remain unfinished.
-
-The macOS local-server owner now consumes a shared logical discovery controller
-for ordered joint publication, cache age and superseding search generations.
-Captured provider/address snapshots and a dispatch fence prevent a changed
-target or a synchronously reentrant newer search from dispatching the old loop.
-The existing credential, HTTP and persistence owners remain authoritative.
-Independent traces run through both Lua drivers; native task retirement and
-Windows/Linux discovery/menu integration remain separate requirements. The
-macOS probe also checks a shared generation ticket and its live in-memory
-provider/address/stored-key identity before credential callbacks acquire HTTP
-and before responses publish. Held old credentials and independent address/key
-changes are refused; this does not assert fresh private-file reads or physical
-HTTP retirement.
-
-The Linux private API-entry owner now captures its actual classified disk
-source and rechecks it before private staging and immediately before rename.
-Observed external replacements, absent-to-created drift, failed reads and
-reentrant publications are refused while cached list/selection mutations roll
-back. Independent physical-file regressions retain all existing credential,
-foreign-row and 0600 assertions. This synchronous source fence does not claim
-a cross-process kernel compare/exchange or complete automatic discovery.
-
-Linux now consumes the shared catalogue-ordered local-server menu and discovery controller through four independent owned HTTP GETs. Actual configured endpoints, typed models and private-source receipts fence model/configuration callbacks, including held dialogs and observed source drift. Same-provider successors wait for exact native process exit and all handle-close acknowledgements; pause/shutdown invalidate logical tickets while keeping the last cache. Model selection uses the private 0600 publisher before the separate acknowledged backend preference. A backend refusal after JSON publication leaves a truthful saved-but-not-selected result rather than claiming multi-file atomicity. Address/key edits without a saved model remain session-pending, matching macOS. The controlled native curl fixture retains its prior 28 assertions and now qualifies 48 models/menu/selection/chat/restart/refusal/cancellation checks; focused Linux65 and Mac22 pass locally. Windows automatic discovery/model-menu rows and complete native three-OS CI remain pending. The existing Linux shutdown coordinator is unchanged: retained native cleanup debt is reported, not presented as a physical retirement acknowledgement. The final native admission callback runs before the final classified source comparison, so a callback that independently replaces disk bytes cannot borrow the earlier source check or acknowledge an overwrite. The Linux backend-provider context is composed over the Personal, Info Bar and privacy controls without replacing their menu owners.
-
-The 48-check native curl fixture exercises real loopback models and chat, private-file restart, HTTP/model refusal and exact owned cancellation settlement. Its backend selection callback is injected; it does not itself prove the production prediction engine's second admission check or native desktop application behavior. The separately prepared real-engine preference-owner regression and full hosted three-OS qualification remain distinct obligations. Shared generations invalidate logical discovery tickets; native HTTP successor admission still requires the exact process exit and every owned handle-close acknowledgement. No server installation, start or automatic Windows discovery/menu completion is claimed.
-
-Actual root integration command for the extended mandatory native fixture, after activation and in the Linux driver directory:
-
-```sh
-luajit tests/hardware/run_local_api_auth.lua
-```
-
-The existing registered native HTTP runner also invokes this fixture as its second mandatory owner; preserve the original streaming suite and all 28 pre-discovery local-API assertions.
-
-Partial: the Linux prediction engine now has causal coverage for its second local-backend admission check after actual dismissal. Real canonical preference and filesystem owners preserve exact source bytes when the dismissal changes pause, source or explicit admission; an unchanged control acknowledges a durable backend through a fresh reader. Focused 18 cases pass, while removing only the second check from the actual engine produces 4 failures. This strengthens the frozen Discovery 15 owner; complete native discovery and multi-OS qualification remain pending.
-
-A registered Linux regression now observes the existing native private-file owner when quarantine of malformed API registry bytes is refused. It preserves the exact foreign source, refuses publication and acknowledgement, and leaves no staged replacement or RAM entry. The original defective quarantine branch reproduces the failure; the delivered source publisher and corrected local-server admission keep the full owner suite green. This additional native-file proof is independent of the real-engine second-admission regression. Complete hosted qualification and the remaining Windows local-server UI keep item47 partial.
-
-The Windows logical discovery controller now ports the shared policy against
-the unchanged independent eight-trace corpus. Registered native cases also
-cover superseding dispatch, detached observers, exact model/address identity,
-reentrant clocks and caller Critical restoration. Small atomic publication
-claims fence AHK timer interruption; logical tickets never acknowledge native
-HTTP/process retirement. This is a prerequisite only: Windows asynchronous
-models transport, menu integration and complete native qualification remain
-unfinished. No model or server installation is claimed.
-
-The Windows native models-request owner now acquires the existing tree-owned
-curl adapter with a dispatch fence after private-file staging. Provider slots
-retain creator, cancellation, timeout, private-file and timer-stop debts until
-their exact observable owners settle; ShellRunner retains its independent
-capture cleanup. Twenty registered cases exercise typed receipts, source
-order, superseding requests and native locks/handles. Source review and static
-checks pass; native execution, actual HTTP acceptance and production discovery
-menu integration remain required. This transport prerequisite does not close
-item 47.
-
-Windows checkpoint 37227446912 at 02ddf2e18 actually passed all 17 discovery
-policy cases. The full unit result was 9053 passed and one pre-existing personal
-metadata fixture failure; E2E, packaging and installation did not execute.
-The new models transport was added afterward and still requires native
-qualification. The separate shared-CI native-read dependency failure also
-prevents treating this checkpoint as complete qualification.
-
-Windows private local-server publication now retains exact configuration/API
-images and their decoded native authority through the existing joint WAL.
-Ordinary source receipts never gain permission from newly committed files;
-separate candidate capabilities remain bound to their originating receipt and
-exact transaction. Final publication validates complete images and model state
-before a bounded native generation claim. Missing journals retain cleanup debt
-unless the original images are independently proven restored. Equal ordinary
-reloads preserve source receipts; invalid schema versions remain refused.
-Forty-one actual-file/DPAPI/WAL cases are prepared for Windows execution.
-Six new cases cover exact active shutdown attempts, stale veto tokens, fresh
-authority after an honored veto, terminal debt and final publication epochs.
-The historical OnExit reason remains diagnostic; active private shutdown
-authority and receipt generations remain independent. These additions have
-not executed.
-Independent source review passed; this prerequisite does not yet provide the
-automatic discovery panel or qualify native persistence, packaging or install.
-Item 47 remains partial.
-
-The shared Core CI now provisions Lua 5.4's native luv module for the actual
-installed registry probe. Plain Lua without luv independently reproduces the
-native-reader refusal on a readable source; the correction retains exact
-descriptor admission and all discovery/count assertions. A fresh hosted
-checkpoint is required to qualify this prerequisite.
-
-Windows continuation is explicitly deferred to the maintainer's PC: the
-[AI Windows handover](handovers/2026-10-04-ai-windows/README.md) records steps
-1 to 5 and 12, with recoverable source/preimage/test packets. Native models
-transport delivery and 41 private publication cases, real controller/WAL composition,
-post-transition panel recovery, URL parity, duplicate native rows and actual
-discovery/chat/restart remain required. Saved inactive preparations are not
-integrated functionality. Item 47 remains partial.
-
-Manual Windows checkpoint [37239438795](https://github.com/adrienm7/ergopti/actions/runs/37239438795)
-at 2f11cf264 ran the 20 new models-owner cases without individual failures.
-The full result was 9073 passed and two failed: the existing personal metadata
-fixture and the new generic repeating callback missing from the strict timer
-inventory. The PC must declare the actual owned callback and period without
-weakening that assertion. Windows E2E, packaging and installation were skipped;
-the later 41 private publication cases were not in this tested source.
-
-- [~] **48.** **Partial: shared read-only enable admission.** Ordinary Ollama activation now waits for a complete, successful response from the configured `/api/version` endpoint before publishing `llm.enabled = true` through the existing preference owner. Redirects, unreadable responses, HTTP or transport failures, stale backend/model/source generations, pause and scoped-writer refusal keep the AI off. Native refusal offers name the configured address and keep the AI off. An explicit Retry requests a new receipt only after the same source and native restoration are acknowledged; existing macOS repair choices retain their own consent. API activation remains independent of a local Ollama model or server. The shared Lua/AHK policy and independent receipt corpus are consumed by all three drivers. Existing explicit macOS repair actions retain their ownership and require a fresh response before enabling. Remaining work: Windows/Linux owned runtime start/install and server discovery/replacement actions, the dependencies listed in item 47, and physical/manual acceptance. Do not remove this item until those remaining behaviors and complete three-OS validation are finished.
-
-The native Windows strict version receipts exposed an older test that leaked
-an intentionally unsoldable zero-handle process record into the genuine global
-cleanup ledger. Its synthetic ledger now restores the exact predecessor ledger,
-retry timer, counter, delay and native Critical state even after interruption.
-The refused release and retry still retain their exact synthetic owner; no PID
-reopening, termination, fabricated handle or settlement is allowed. Production
-admission and the physical-wait/foreign-origin assertions remain unchanged.
-Portable gates pass; repaired callbacks await native Windows CI. Explicit
-Windows/Linux start/install and local-server discovery remain unfinished.
-
-Windows live-mode unit fixtures now share one protected invoke-and-retire boundary for the actual gesture action and both actual live-menu callbacks. The real pending notice is captured and retired before the fixture releases its fake typing ports, including refusal and thrown callbacks. AllowTimers=true and every existing live-mode/state/task-count assertion remain unchanged. The new native unit regression checks exact false/error/notice behavior, exact caller Critical restoration, pending notice/surface retirement and preservation of an opaque foreign task identity/count. Run37098105470 demonstrates the original unprotected menu case task count0→1 and a later28-case foreign-task precondition cascade; these are not30 independent production faults. Local source plus qualification-onlyTODO48 selected gates passed353JavaScript checks, formatting and1801AHK BOM/LF files. Native execution and full suite recovery require the next Windows CI.
-
-Native checkpoint 37102040657 stopped before executing any selected Windows
-case: the live-mode test fixture's same-line captured catch was parsed as an
-invalid class. The catch body now uses a legal block, with every observation,
-exception assertion, Critical restoration and notice/timer retirement unchanged.
-The existing registered AHK syntax guard rejects this exact original file and
-checks thirteen legal, typed, multiline, comment and literal controls. Selected
-portable gates pass; the repaired include graph, native notice lifecycle and
-semantic TOML corpus still require the next non-release Windows execution.
-
-Linux refusal now offers an explicit replacement from an already answered,
-fresh local-server cache. It publishes the exact private entry before selecting
-the backend and requesting fresh enable admission. Modal restoration admits
-only its own native resynchronization; post-dialog freshness and exact engine
-and preference revisions refuse unrelated cancellation or source drift,
-including same-byte rewrites. The focused owner suites pass 60 cases on each of
-LuaJIT and Lua 5.4; causal mutations reproduce the three corrected admission
-failures. Native dialogs, physical keyboard restoration, owned runtime
-start/install and complete qualification remain unfinished. Item 48 stays
-partial.
-
-Linux replacement and retry dialogs now retain one native caption site per
-installed dialog tool, with replacement controls asserting the actual composed
-and quoted title. The unchanged independent caption inventory is preserved;
-21 focused UI/caption cases pass. The real X11/WebKit full candidate passes
-6514 cases with two GTK-absence fixture failures; unchanged origin/dev under
-the identical graphical environment reproduces both (6487 passed, two failed).
-These failures are retained and routed to the Linux fixture owner, not counted
-as successful qualification. Native dialogs and physical acceptance remain
-required.
-
-Ollama v0.24.0 release pins now have one closed shared catalogue for macOS,
-Linux amd64/arm64 and Windows amd64/arm64. The registered generator owns the
-existing macOS shell projection and preserves its exact version, digest and
-size. Independent official-asset expectations cover all five records, strict
-schema and CLI admission, generation and no-write drift refusal; 112 focused
-cases pass, and three causal controls reject broken drift, projection and
-registration. This is an installation prerequisite: no official archive,
-owned runtime or model has been downloaded or installed by these checks.
-Item 48 and its native, packaging and physical acceptance remain open.
-
-Windows continuation is explicitly deferred to the maintainer's PC: complete
-steps 6 to 10 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md).
-The versioned file-port/download preparations, independent review blockers,
-inert ZIP fixtures and 25 unexecuted native cases are saved for recovery.
-User-local installation without administrator rights is the chosen scope.
-Native construction receipts, namespace admission, per-user resolver, version
-lease, exact foreground service/readiness, model consent and delivery
-acceptance remain unfinished; Linux runtime composition is also incomplete.
+- [~] **48.** **Partial: owned local-runtime repair and enable admission.** All
+  three drivers require a fresh configured /api/version receipt before the
+  existing preference writer can publish AI enable. Redirect, malformed or
+  incomplete response, stale backend/model/source, pause and scoped-writer
+  refusal keep AI off. Retry needs fresh source/native restoration; API mode
+  remains independent of a local model/server. Start/install/replacement and
+  model actions retain separate explicit consent and originating authority.
+  Canonical Ollama 0.24 archive pins cover five OS/architecture assets without
+  rewriting the independent expectations. Linux user-only installation uses
+  one 30-minute bootstrap budget, a complete executable/library tree and exact
+  physical process/file cleanup. Actual official cached archive install and
+  CLI startup, and owned engine/version/preference handoff, are qualified slices;
+  they do not prove HTTPS transfer, model inference or physical UI acceptance.
+  The daemon consumer 162/0 and actual routing 2/0 per ABI are fresh focused
+  results;12 variants reject 30 named assertions per ABI. Manual-page-close13
+  passes per ABI; corrected root Linux8302/0 and E2E189/0 complete locally.
+  The Linux cancellation fence and faithful managed fixture retain all original
+  assertions; current native three-OS CI and physical acceptance remain pending.
+  The earlier manual HTTPS/model CI failed its outer physical receipt after
+  native child exit0. Corrected direct-source run37314770405 passes actual
+  official HTTPS install/model/chat and strict pending-zero/no-rescue acceptance
+  without relaxing archive/model/chat/source assertions. Whole-lane updater
+  and negative-publication fixture failures skip package/install. The corrected
+  negative fixture passes44 native controls and complete82 checks on GNU9.4
+  and9.7; final local Linux8338/0 and E2E189/0 remain qualified slices.
+  Actual local official HTTPS installation reached typed readiness and durable
+  enable, then failed the model pull with exact child cleanup. Registry CONNECT403
+  persists in this container; saved network configuration is not applied.
+  Remaining: genuine archive/model HTTPS under system proxy/TLS, cancellation,
+  timeout/size/digest/redirect errors, native model/chat and fresh enable,
+  app-owned shutdown/pause/manual-close handoff, packaging, per-user install,
+  restart and physical desktop acceptance on final sources.
+  Windows PC steps 6-10,12 retain DACL/handle/reparse/ancestor/namespace proof,
+  construction receipts, finite downloader, architecture resolver/version lease
+  and exact foreground Job/service readiness. No extra producer argument,
+  empty task state, accepted signal or cache-copy success proves settlement.
+  Never kill an external server, run an administrator/system installer or
+  overwrite foreign configuration. Saved Windows v3/file-port sources remain
+  proposals until review and native 25-case qualification. Items 16/38 remain.
 
 - [~] **49.** Windows keyboard-hook order audit: AutoHotkey removes and
   reinstalls its own low-level keyboard hook around every SendInput (upstream
@@ -4071,6 +4531,20 @@ blocked by those predecessors; Gesture mode has no complete test/generation
 qualification. Continue remaining families to the actual zero-site ratchet.
 These are implementation tasks; separate installed tray/input acceptance.
 
+Further fixed Wrap, Gesture mode/sensitivity/action and Tap-Hold duration and
+Karabiner guidance controls now consume shared declarations through actual
+native templates. Inert labels, named composed headers and checked templates
+retain strict field and getter contracts; clicked submenus still require a
+usable child. Each native composition edge carries executable source evidence,
+and transparent includes retain cycle, missing-target and duplicate-identity
+refusal. The Windows per-key duration path preserves physical TOML source and
+requires the precise native publication witness before reload. Its current-value
+prompt is genuinely translated in all 21 locales. Independent historical
+corpora remain immutable. Full selected and all-OS native qualification remain
+required; the remaining fixed native families and physical acceptance are open.
+
+The 2026-10-05 Swipe continuation declares its fixed action separator, mode group and sensitivity group once in the shared manifest. Native selection, eighteen numeric sensitivity choices and acknowledged compensation remain their existing owners. Two captions use genuine translated prefixes in all 21 locales. Source/graph/callback controls and the old-producer inverse pass; final composed native and physical UI qualification remain pending. This does not complete the remaining fixed provider controls.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4320,42 +4794,39 @@ Complete the source steps under item 54, then native E2E/package/install and
 real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
 fix as explicit code work rather than unsupported-platform exceptions.
 
-- [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
-  is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
-  ported by Windows, pinned by
-  `_shared/tests/corpus/tooltip/llm_line_vectors.json`. Seen on a real
-  Windows 11 on 2026-10-01 (grey typed, green corrected, orange next,
-  indentation 0, +2, -1 and -3). Remaining: look at the Linux GTK panel
-  and the macOS canvas on real machines (the suites cover the rows, not
-  the pixels). Windows now retains the shared suppression/emphasis receipt
-  through parsing and prediction execution, paints corrected/next segments in
-  the declared weight and measures each actual font before placing the panel.
-  Its native GDI cache owns separate family/height/weight identities and
-  preserves deletion debt. Shared corpus assertions now require the Windows
-  bold result; native HFONT/Text-control regressions cover real font weights,
-  widths and painted geometry. Focused portable checks passed; full integration
-  and native Windows CI remain pending. The Mac/Linux visual acceptance remains
-  under this item.
-  Real production Linux GTK/cairo/Pango appearance is now qualified on
-  ea6e849df82f2a67e321b1ca7aa885f145101b93 in an isolated Xvfb X11 session:
-  twelve untouched native-window captures retain canonical gray/green/orange,
-  inactive corrected/next emphasis, both selections and indentation
-  0, +2, -1 and -3. Actual glyph pixels confirm the aligned -3 origins and
-  greater bold than regular ink; native mapped/focus-free flags are observed.
-  Source and screenshot hashes accompany the receipts. This is headless X11
-  appearance evidence, not physical input, Wayland or macOS canvas acceptance;
-  item 88 and the interactive obligations in items 16/38 remain open.
-  Windows continuation is explicitly deferred to the maintainer's PC: complete
-  steps 11 and 12 in the [AI Windows handover](handovers/2026-10-04-ai-windows/README.md),
-  preserving native GDI/font/geometry/deletion assertions and actual desktop
-  acceptance. The recoverable Mac canvas probe remains unexecuted; neither
-  this handoff nor headless X11 closes the remaining physical validations.
-  Native checkpoint 37069995600 exposed missing typography initialization in
-  the headless Windows paint fixture. It now reads the canonical font family
-  and size, asserts valid values and restores the prior aliases in finally.
-  Actual WM_GETFONT bold/regular weights, geometry, control counts and GDI
-  retirement assertions remain unchanged; native Windows confirmation is
-  pending.
+The composed 2026-10-05 source census is Windows 83, macOS 126 and Linux 93 after the additional three macOS Swipe sites are migrated. The canonical generator owns the 76 menu sections and the baseline generator owns this lower ceiling. Clicked mode children and the composed sensitivity heading are distinct proof edges; the latter does not claim the eighteen numeric native choices. Other fixed/native provider controls remain source work, so this item stays partial.
+
+- [~] **88.** **Partial: native prediction tooltip appearance.** Shared
+  llm-line-style policy and the unchanged independent line corpus retain grey
+  typed, green corrected, orange next, inactive emphasis, both selections and
+  indentation 0,+2,-1,-3. Windows uses actual font/weight measurements and owned
+  GDI deletion debt; diagnostic run 37285932690 passed28 native GDI/line-layout
+  controls, without qualifying later unmodified source or whole delivery.
+  Linux production GTK/cairo/Pango has12 untouched headless X11 captures on
+  ea6e849df82f2a67e321b1ca7aa885f145101b93, with real glyph pixels, alignment,
+  bold/regular ink and mapped/focus-free flags. This is not physical input or
+  native Wayland acceptance. Source/screenshot hashes remain in the handover.
+  Mac production formatter/styledtext/canvas diagnostics and independent pixel
+  observer are adopted. Mandatory pure/native registration is committed;
+  the hosted three-OS manual run will qualify the exact composed tree. The original38 pure observer/supervisor controls and ten added controls
+  pass48/0. Replaying all12 unchanged signed-Hammerspoon screenshots passes12/0.
+  The canonically formatted final observer also passes48/0 and12/0 replay.
+  These image replays do not replace fresh native creator and source-freeze
+  qualification; missing GUI/trust/capture/cleanup must fail, not skip.
+  Direct-source manual run37306690694 produced all12 Mac native captures with
+  exact child retirement, but failed its independent typed-text locator on
+  antialiased marker pixels. The corrected locator and neutral-contrast weight observer preserve unchanged
+  screenshots, independent prefix/font/color/geometry assertions and the1.03
+  bold threshold. Original-source and removal-only controls fail as expected;
+  Fresh native run37314015214 passes all12 signed-Hammerspoon captures and48
+  pure controls, with3082 exact source/probe hashes, all PNG hashes and actual
+  creator PID/PGID1767 physically retired. Its whole macOS package lane fails
+  five Swift cases (303 passed/5 failed), leaving install/launch skipped.
+  Direct-source Windows37316704100 passes all28 tooltip/GDI controls.
+  Remaining: real-device typography/geometry/retirement, Linux/Mac physical appearance/input,
+  packaging/install and desktop acceptance. Preserve Windows PC steps 11,12 and
+  all resource/line-corpus assertions. Transversal 16/38 remain required.
+
 - [~] **91.** Windows: « Combinaisons de touches » as on macOS. Done on
   2026-10-02: every ordered pair of the keys of `[tap_hold.catalog]`
   (key 1 then key 2 is not key 2 then key 1), each with « hold 1 + tap

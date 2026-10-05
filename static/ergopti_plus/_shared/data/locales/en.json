@@ -1664,6 +1664,7 @@
 	"menu.tapholds.hold_arrow": "Hold → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Tap / hold delay for this key, in milliseconds\n(current: %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -1796,6 +1797,8 @@
 	"mlx.use_ollama": "Use Ollama",
 	"mlx.machine_intel": "Intel processor",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Local Ollama could not be prepared. Check the log and try again.",
+	"ollama.runtime_start": "Start Ollama",
 	"python.not_native_title": "No Python for this Mac",
 	"python.not_native_body": "This action needs a Python 3 built for {1}. The Python versions installed on this Mac are built for another processor only, and macOS would run them through Rosetta, which is being retired:\n{2}",
 	"python.missing_title": "Python 3 is missing",
@@ -3213,5 +3216,7 @@
 	"menu.hotstrings.user_code.title": "Programmable hotstrings",
 	"platform_reason.program_runner_unavailable": "Unavailable: The native program runner or this binding is unavailable.",
 	"sg_actions.run_program": "▶️ Run a program [configurable]",
-	"menu.hotstrings.personal_metadata_unavailable": "Unavailable here: edit this field directly in the source file."
+	"menu.hotstrings.personal_metadata_unavailable": "Unavailable here: edit this field directly in the source file.",
+	"menu.gestures.mode_current": "Mode: %s",
+	"menu.gestures.sensitivity_current": "Sensitivity: %s"
 }
