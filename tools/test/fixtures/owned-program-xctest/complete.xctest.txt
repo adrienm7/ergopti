@@ -1,0 +1,33 @@
+Test Suite 'All tests' started at 2026-10-05 00:00:00.000.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testLiteralRawUnicodeArgumentsRemainHeldUntilActivation]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testLiteralRawUnicodeArgumentsRemainHeldUntilActivation]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testSourceChangeBeforeActivationCannotProduceSideEffect]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testSourceChangeBeforeActivationCannotProduceSideEffect]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testIndependentPOSIXScriptWithUnicodePathPreservesLiteralArgumentsAndPrivateStreams]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testIndependentPOSIXScriptWithUnicodePathPreservesLiteralArgumentsAndPrivateStreams]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testCancelledHeldPayloadNeverActivates]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testCancelledHeldPayloadNeverActivates]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testSymlinkTargetChangedToFIFOCannotBlockCancellationOrExecutePayload]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testSymlinkTargetChangedToFIFOCannotBlockCancellationOrExecutePayload]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testLeaderExitCannotSettleTermResistantOutputtingDescendant]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testLeaderExitCannotSettleTermResistantOutputtingDescendant]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testLargePrivateStreamsNeverReachControlPipesAndNonzeroStatusIsExact]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testLargePrivateStreamsNeverReachControlPipesAndNonzeroStatusIsExact]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFWhileExitedLeaderHasLiveDescendantStillProvesGroupRetirement]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFWhileExitedLeaderHasLiveDescendantStillProvesGroupRetirement]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFBeforeActivationCancelsPhysicalHeldChild]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFBeforeActivationCancelsPhysicalHeldChild]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFBeforeAnyRequestReturnsProvenConstructorRefusal]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testEOFBeforeAnyRequestReturnsProvenConstructorRefusal]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testIncompleteRequestThenEOFReturnsProvenConstructorRefusal]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testIncompleteRequestThenEOFReturnsProvenConstructorRefusal]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testMissingExecutableReturnsClosedConstructorRefusal]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testMissingExecutableReturnsClosedConstructorRefusal]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testExistingSymlinkedCanonicalSourceStillAdmitsRawPreimage]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testExistingSymlinkedCanonicalSourceStillAdmitsRawPreimage]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testMalformedRequestsAndReceiptsFailClosedWithoutQuotingSecrets]' started.
+Test Case '-[ErgoptiPlusTests.OwnedProgramWorkerTests testMalformedRequestsAndReceiptsFailClosedWithoutQuotingSecrets]' passed (0.100 seconds).
+Test Case '-[ErgoptiPlusTests.OtherNativeTests testOtherOwner]' started.
+Test Case '-[ErgoptiPlusTests.OtherNativeTests testOtherOwner]' passed (0.100 seconds).
+Test Suite 'All tests' passed at 2026-10-05 00:00:02.000.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 2.000 seconds
