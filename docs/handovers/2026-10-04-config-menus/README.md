@@ -2,7 +2,7 @@
 
 Current partial delivery (2026-10-05): [PARTIAL-DELIVERY.md](PARTIAL-DELIVERY.md)
 and the current partial-delivery receipt supersede the historical unmerged
-continuation statements below. Merge `a550193eb` is already pushed to dev;
+continuation statements below. Merges `a550193eb` and `c8e4434a0` are pushed to dev;
 items 5/7/33/42/54/81 remain partial. Frozen preparations are preserved in
 [the resumed delivery index](prepared/resumed-delivery-index.json).
 
