@@ -1014,6 +1014,7 @@ def compile_native(source, owner, seconds, seal_path=None):
                 "SYMROOT=" + str(project / "build"),
                 "CODE_SIGNING_ALLOWED=NO",
                 "CODE_SIGNING_REQUIRED=NO",
+                "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
             ],
             project,
         )

@@ -658,6 +658,19 @@ existing300-second owned deadline. The Brew receiver and Sparkle retirement
 also failed; packaging/installation and Release were skipped. These failures
 remain open, and this run does not qualify the later local composition.
 
+The source-build calibration now disables debugging metadata for each of its
+three actual unsigned Release xcodebuild targets. Run37376590825 compiled the
+Core-Service in156.293 seconds before the CLI exceeded the unchanged300-second
+shared deadline; its retained main objects devote approximately79 percent of
+their bytes to DWARF. The correction preserves both architectures, optimization,
+source generators, warnings, products, receipts and300/305/10-second ownership
+bounds. Normal and optimized discovery pass85 policy tests, including82 unchanged
+controls; a new Swift XCTest invokes the three actual Python command-policy
+controls in the native CI suite. An independently frozen command-flow regression
+rejects the original and a CLI-only mutation. These controlled products do not prove native compilation
+or a speedup. Final local formatting/JS checks and a fresh exact-SHA native
+macOS/Linux run remain required; TODO31 stays partial.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native
