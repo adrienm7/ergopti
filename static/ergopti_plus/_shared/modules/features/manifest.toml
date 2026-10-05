@@ -5279,6 +5279,7 @@ i18n = "menu.layout.header_custom"
 [[menu.layout_menu]]
 type = "list"
 id = "custom_layouts"
+status_rows.none_installed = [{ type = "label", i18n = "menu.layout.none_installed" }]
 
 # Opens the shared layout manager window (_shared/ui/layout_manager): the
 # catalogue of the layout registry, to install, update or uninstall a layout.
@@ -5299,6 +5300,7 @@ i18n = "menu.layout.manage"
 [[menu.layout_menu]]
 type = "list"
 id = "layout_bundle"
+status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
@@ -6773,3 +6775,12 @@ unavailable = "hide"
 # The fixed separator after each native About version/build identity row.
 [[menu.about_version_separator]]
 type = "---"
+
+# The empty native Input Sources list still offers macOS Keyboard preferences.
+# The native owner retains its URL and launch behavior; the shared command owns presentation.
+[[menu.layout_active_source_empty_commands]]
+type = "command"
+id = "layout_open_preferences"
+i18n = "menu.layout.open_prefs"
+platforms = ["hs"]
+unavailable = "hide"

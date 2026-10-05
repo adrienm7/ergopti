@@ -458,7 +458,9 @@ local function _build_layouts(ctx)
 				}
 			end
 			if #rows == 0 then
-				rows[1] = { label = i18n_safe("menu.layout.none_installed"), disabled = true }
+				if type(ManifestMenu) ~= "table" or type(ManifestMenu.status_rows) ~= "function" then return {} end
+				local status = ManifestMenu.status_rows("layout_menu", "custom_layouts", "none_installed")
+				return type(status) == "table" and status or {}
 			end
 			return rows
 		end,

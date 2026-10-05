@@ -86,6 +86,13 @@ const SEPARATOR = '---';
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
 const OPENS_SUBMENU = {
+	// The empty native Input Sources provider composes its actual shared command.
+	active_layouts: {
+		menu: 'layout_active_source_empty_commands',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
+	},
 	apps_installed: {
 		menu: 'apps_empty_rows',
 		platforms: ['hs'],
