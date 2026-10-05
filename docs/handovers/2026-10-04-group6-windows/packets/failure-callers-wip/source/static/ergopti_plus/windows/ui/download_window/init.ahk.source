@@ -1,0 +1,498 @@
+﻿; ui/download_window/init.ahk
+
+; ==============================================================================
+; MODULE: Managed Download Failure Window
+; DESCRIPTION:
+; The live updater failure surface uses the shared download window and the
+; existing native WebViewHost. Exact document, controller, window session and
+; failure epoch checks precede action dispatch. Native receipts remain private.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+; Configured into the updater's staging producer by root boot, never the page.
+; @param Failure {Map} Native valid/reason/receipt envelope from the staging parser.
+; @param Owner {Map} Exact private terminal updater request.
+; @returns {Boolean} True when a current failure window is created or refreshed.
+_Updater_ShowManagedDownloadFailure(Failure, Owner) {
+	if !(Failure is Map) || !(Owner is Map)
+		|| !(_ManagedNetwork_Equal(Failure.Get("reason", ""), "download")
+			|| _ManagedNetwork_Equal(Failure.Get("reason", ""), "deadline"))
+		|| !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+		return false
+	Receipt := _ManagedNetworkWindows_True(Failure.Get("valid", false)) ? Failure.Get("receipt", Map()) : Map()
+	if !(Receipt is Map)
+		Receipt := Map()
+	return ManagedDownloadFailureWindow.Show(Receipt, Owner,
+		_Updater_ManagedFailureOwnerIsCurrent.Bind(Owner), _Updater_RetryManagedFailure.Bind(Owner))
+}
+
+; A delayed retirement may close only the same exact private request it captured.
+; @param Owner {Map} Retired updater request.
+_Updater_RetireManagedDownloadFailure(Owner) {
+	Host := ManagedDownloadFailureWindow.Current
+	if IsObject(Host) && Host.Failure.Owner == Owner
+		Host.Close()
+}
+
+class ManagedDownloadFailureWindow extends WebViewHost {
+	static Current := 0
+	Building := false
+	Cancelled := false
+	DocumentUrl := ""
+	DocumentPrefix := ""
+	RenderedEpoch := 0
+	RenderWork := 0
+	RenderBudget := 0
+	TimerFn := SetTimer
+
+	static Show(Receipt, Owner, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0) {
+		_ManagedNetworkWindows_RequireInitialized()
+		Existing := ManagedDownloadFailureWindow.Current
+		if IsObject(Existing) && !Existing.ResetDone && !Existing.Cancelled {
+			if Existing.Building || !Existing.Failure.Publish(Receipt, Owner, IsCurrentFn, RetryFn, OwnedFolderFn)
+				return false
+			return Existing.Publish()
+		}
+		if WebViewHost._Instances.Has("download_window")
+			return false
+		WebViewHost._LoadManifest()
+		Host := ManagedDownloadFailureWindow()
+		Host.AppId := "download_window"
+		Host.Failure := ManagedDownloadFailureSession()
+		Host.Opts := Map("Title", t("download_window.window_title"), "NoActivate", true)
+		if !Host.Failure.Publish(Receipt, Owner, IsCurrentFn, RetryFn, OwnedFolderFn)
+			return false
+		if !Host._ReserveCurrent(Existing) {
+			Host.Failure.Close()
+			return false
+		}
+		try Built := Host._Build()
+		catch Any as Err {
+			Host.Close()
+			LoggerWarn("ManagedDownload", "The failure window could not be built (error_type={1}).", Type(Err))
+			return false
+		}
+		if !Built || Host.Cancelled || !Host._FailureIsCurrent(Owner, Host.Failure.Epoch) {
+			Host.Close()
+			return false
+		}
+		PreviousCritical := Critical("On")
+		try {
+			Admitted := ManagedDownloadFailureWindow.Current == Host && !WebViewHost._Instances.Has("download_window")
+			if Admitted
+				WebViewHost._Instances["download_window"] := Host
+		} finally {
+			Critical(PreviousCritical)
+		}
+		if !Admitted {
+			Host.Close()
+			return false
+		}
+		Host.Gui.OnEvent("Escape", (*) => Host.Close())
+		return Host.Publish()
+	}
+
+
+	; Native admission probes may reenter Show before the build starts.
+	; Reserve only if the captured singleton and the factory registry are unchanged.
+	_ReserveCurrent(ExpectedExisting) {
+		PreviousCritical := Critical("On")
+		try {
+			if ManagedDownloadFailureWindow.Current != ExpectedExisting || WebViewHost._Instances.Has(this.AppId)
+				return false
+			ManagedDownloadFailureWindow.Current := this
+			return true
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+
+	; A distinct native origin for every host also fences retained controller caches.
+	_VhostName() {
+		return super._VhostName() . ".session" . this.Failure.Id
+	}
+
+	_Build() {
+		this.Building := true
+		this.DocumentPrefix := "https://" . this._VhostName() . "/ui/download_window/index.html?cb="
+		try {
+			return super._Build() && !this.Cancelled
+		} finally {
+			this.Building := false
+			if this.Cancelled
+				this.Close()
+		}
+	}
+
+	_HostIsCurrent(ExpectedWindowEpoch) {
+		return !A_IsSuspended && !this.ResetDone && !this.Cancelled && !this.Building
+			&& ExpectedWindowEpoch == this.Epoch && ManagedDownloadFailureWindow.Current == this
+			&& this.HasOwnProp("WebView")
+	}
+
+	_NativeIsCurrent(ExpectedWindowEpoch) {
+		return this._HostIsCurrent(ExpectedWindowEpoch) && this.DocumentUrl != ""
+	}
+
+	; Navigate is asynchronous: capture its admitted actual URL only after navigation.
+	; Every subsequent callback and script uses this exact immutable document URL.
+	_CaptureDocument(Source, ExpectedWindowEpoch) {
+		if !this._HostIsCurrent(ExpectedWindowEpoch) || !(Source is String)
+			return false
+		if this.DocumentUrl != ""
+			return StrCompare(Source, this.DocumentUrl, true) == 0
+		Prefix := this.DocumentPrefix
+		if Prefix == "" || SubStr(Source, 1, StrLen(Prefix)) != Prefix
+			|| !RegExMatch(SubStr(Source, StrLen(Prefix) + 1), "^[0-9]+$")
+			return false
+		this.DocumentUrl := Source
+		return this._NativeIsCurrent(ExpectedWindowEpoch)
+	}
+
+
+	; COM reads can pump replacement, navigation, or producer retirement.
+	_DocumentIsCurrent(ExpectedWindowEpoch, ExpectedController) {
+		if !this._NativeIsCurrent(ExpectedWindowEpoch) || this.WebView != ExpectedController
+			return false
+		try Source := ExpectedController.Source
+		catch
+			return false
+		return this._NativeIsCurrent(ExpectedWindowEpoch) && this.WebView == ExpectedController
+			&& Source is String && StrCompare(Source, this.DocumentUrl, true) == 0
+	}
+
+	_PresentationAdmission(ExpectedWindowEpoch, ExpectedController, Owner, FailureEpoch) {
+		Work := this.RenderWork
+		if IsObject(Work) && Work.owner == Owner && Work.failure_epoch == FailureEpoch
+			&& TickExpired64(Work.start_tick, Work.duration_ms, ManagedNetworkFailureWindows_Now()) {
+			this._RenderAcknowledgementExpired(Work)
+			return false
+		}
+		if !this._FailureIsCurrent(Owner, FailureEpoch) || !this._DocumentIsCurrent(ExpectedWindowEpoch, ExpectedController)
+			return false
+		; Recheck the native producer after COM reentry, then reread its document.
+		if !this.Failure.IsCurrent(Owner, FailureEpoch) || !this._DocumentIsCurrent(ExpectedWindowEpoch, ExpectedController)
+			return false
+		return !this.Failure.Closed && this.Failure.Owner == Owner && this.Failure.Epoch == FailureEpoch
+	}
+
+	_FailureIsCurrent(Owner, FailureEpoch) {
+		return this._HostIsCurrent(this.Epoch) && this.Failure.IsCurrent(Owner, FailureEpoch)
+	}
+
+	_OnWebMessage(Handler, Args) {
+		ExpectedWindowEpoch := this.Epoch
+		if !this._HostIsCurrent(ExpectedWindowEpoch)
+			return
+		; The vendored wrapper creates a fresh sender facade for COM callbacks.
+		; Compare its actual native pointer, not AHK wrapper object identity.
+		if !IsObject(Handler) || !HasProp(Handler, "Ptr") || !HasProp(this.WebView, "Ptr") || Handler.Ptr != this.WebView.Ptr
+			return
+		ExpectedController := this.WebView
+		try Source := Args.Source
+		catch
+			return
+		if !this._CaptureDocument(Source, ExpectedWindowEpoch) || !this._NativeIsCurrent(ExpectedWindowEpoch) || this.WebView != ExpectedController
+			return
+		try Raw := Args.TryGetWebMessageAsString()
+		catch
+			return
+		if !this._NativeIsCurrent(ExpectedWindowEpoch) || this.WebView != ExpectedController || !(Raw is String)
+			|| StrLen(Raw) > 2048 || InStr(Raw, Chr(0))
+			return
+		if _ManagedNetwork_Equal(Raw, "ready") {
+			this._FlushQueue()
+			return
+		}
+		try Payload := JsonParse(Raw)
+		catch
+			return
+		if !(Payload is Map)
+			return
+		this.TimerFn.Call(this.Deliver.Bind(this, ExpectedWindowEpoch, Payload, ExpectedController), -1)
+	}
+
+	_OnNavigationCompleted(Handler, Args) {
+		ExpectedWindowEpoch := this.Epoch
+		if !this._HostIsCurrent(ExpectedWindowEpoch)
+			return
+		try Source := this.WebView.Source
+		catch
+			return
+		if this._CaptureDocument(Source, ExpectedWindowEpoch)
+			this._FlushQueue()
+	}
+
+	Deliver(ExpectedWindowEpoch, Payload, ExpectedController := 0) {
+		if !this._NativeIsCurrent(ExpectedWindowEpoch)
+			return false
+		if !IsObject(ExpectedController)
+			ExpectedController := this.WebView
+		if !this._DocumentIsCurrent(ExpectedWindowEpoch, ExpectedController)
+			return false
+		FailureEpoch := this.Failure.Epoch
+		Owner := this.Failure.Owner
+		CurrentFn := this._PresentationAdmission.Bind(this, ExpectedWindowEpoch, ExpectedController, Owner, FailureEpoch)
+		if _ManagedNetwork_Equal(_ManagedNetwork_Get(Payload, "action"), "failure_rendered") {
+			Session := _ManagedNetwork_Get(Payload, "session")
+			Epoch := _ManagedNetwork_Get(Payload, "epoch")
+			if !(Session is Integer) || Session != this.Failure.Id || !(Epoch is Integer) || Epoch != FailureEpoch
+				|| !CurrentFn.Call()
+				return false
+			Work := this.RenderWork
+			if !IsObject(Work) || Work.owner != Owner || Work.failure_epoch != FailureEpoch || Work.window_epoch != ExpectedWindowEpoch
+				return false
+			if TickExpired64(Work.start_tick, Work.duration_ms, ManagedNetworkFailureWindows_Now()) {
+				this._RenderAcknowledgementExpired(Work)
+				return false
+			}
+			if !CurrentFn.Call() || this.RenderWork != Work
+				return false
+			if _ManagedNetworkWindows_True(_ManagedNetwork_Get(Payload, "ok")) {
+				PreviousCritical := Critical("On")
+				try {
+					if !this._HostIsCurrent(ExpectedWindowEpoch) || this.Failure.Owner != Owner || this.Failure.Epoch != FailureEpoch || this.RenderWork != Work
+						return false
+					; A_TickCount is native monotonic and does not perform COM/I/O.
+					Expired := TickExpired64(Work.start_tick, Work.duration_ms, ManagedNetworkFailureWindows_Now())
+					if this.RenderWork != Work || this.Failure.Owner != Owner || this.Failure.Epoch != FailureEpoch
+						return false
+					if !Expired
+						this.RenderedEpoch := FailureEpoch
+				} finally {
+					Critical(PreviousCritical)
+				}
+				if Expired {
+					this._RenderAcknowledgementExpired(Work)
+					return false
+				}
+				this._CancelRenderAcknowledgement(Work)
+				return true
+			}
+			this._SurfaceFallback(ExpectedWindowEpoch, Owner, FailureEpoch, Work)
+			return false
+		}
+		try Accepted := this.Failure.Handle(Payload, CurrentFn)
+		catch Any as Err {
+			LoggerWarn("ManagedDownload", "The failure action was refused (error_type={1}).", Type(Err))
+			return false
+		}
+		if this.Failure.Owner == 0 && this.Failure.Epoch == FailureEpoch + 1
+			this.Close()
+		return Accepted
+	}
+
+	; Read actual translated bytes before the shared renderer runs; no language fallback.
+	_LocaleScript() {
+		global _SharedDir, _I18nLocale
+		Raw := FileRead(_SharedDir . "\data\locales\" . _I18nLocale . ".json", "UTF-8")
+		if !(JsonParse(Raw) is Map)
+			throw TypeError("The managed failure locale is invalid")
+		return "window._i18n_strings=" . Raw . ";window.i18n_apply(window._i18n_strings);"
+	}
+
+	Publish() {
+		Owner := this.Failure.Owner
+		FailureEpoch := this.Failure.Epoch
+		if !this._FailureIsCurrent(Owner, FailureEpoch)
+			return false
+		Report := this.Failure.Report
+		LocaleScript := this._LocaleScript()
+		if !this._FailureIsCurrent(Owner, FailureEpoch)
+			return false
+		Js := "(function(){let ok=false;try{" . LocaleScript
+			. "window.clearNetworkFailure();setKind('app_update',null,null," . this.Failure.Id . ");"
+			. "done(false,window._i18n_strings[" . JsonStringLiteral(Report["message_key"]) . "]);"
+			. "ok=window.showNetworkFailure(" . ManagedNetworkFailureWindows_ReportJson(Report) . "," . this.Failure.Id . "," . FailureEpoch . ")===true;"
+			. "}catch(error){ok=false;}makeHostBridge('dl_bridge')({action:'failure_rendered',session:"
+			. this.Failure.Id . ",epoch:" . FailureEpoch . ",ok});})();"
+		if !this._FailureIsCurrent(Owner, FailureEpoch)
+			return false
+		if !this._FailureIsCurrent(Owner, FailureEpoch)
+			return false
+		Work := {window_epoch: this.Epoch, failure_epoch: FailureEpoch, owner: Owner, js: Js}
+		if this.Ready
+			this.TimerFn.Call(this._RunFailureScript.Bind(this, Work), -1)
+		else
+			this.Queue.Push(Work)
+		return true
+	}
+
+	_RunFailureScript(Work) {
+		if !this._NativeIsCurrent(Work.window_epoch) || !this._FailureIsCurrent(Work.owner, Work.failure_epoch)
+			return false
+		try Source := this.WebView.Source
+		catch
+			return false
+		if !this._CaptureDocument(Source, Work.window_epoch) || !this._FailureIsCurrent(Work.owner, Work.failure_epoch)
+			return false
+		if !this._ArmRenderAcknowledgement(Work)
+			return false
+		if !this._NativeIsCurrent(Work.window_epoch) || !this._FailureIsCurrent(Work.owner, Work.failure_epoch)
+			return false
+		return WebView_RunScriptAsync(this.WebView, Work.js, "ManagedDownload.Failure",
+			this._ScriptSettled.Bind(this, Work.window_epoch, Work.owner, Work.failure_epoch))
+	}
+
+
+	; Retain the exact timer callback so teardown cancels its physical registration.
+	_ArmRenderAcknowledgement(Work) {
+		this._CancelRenderAcknowledgement()
+		if !this._NativeIsCurrent(Work.window_epoch) || !this._FailureIsCurrent(Work.owner, Work.failure_epoch)
+			return false
+		Budget := this.RenderBudget
+		if !IsObject(Budget) || Budget.owner != Work.owner || Budget.failure_epoch != Work.failure_epoch || Budget.window_epoch != Work.window_epoch {
+			Budget := {owner: Work.owner, failure_epoch: Work.failure_epoch, window_epoch: Work.window_epoch,
+				start_tick: ManagedNetworkFailureWindows_Now(), duration_ms: ManagedNetworkFailureWindows_RenderAckTimeout()}
+			this.RenderBudget := Budget
+		}
+		Work.start_tick := Budget.start_tick
+		Work.duration_ms := Budget.duration_ms
+		Work.ack_timer := this._RenderAcknowledgementExpired.Bind(this, Work)
+		this.RenderWork := Work
+		Remaining := TickRemaining64(Work.start_tick, Work.duration_ms, ManagedNetworkFailureWindows_Now())
+		if Remaining == 0 {
+			this._RenderAcknowledgementExpired(Work)
+			return false
+		}
+		try this.TimerFn.Call(Work.ack_timer, -Remaining)
+		catch Any as Err {
+			LoggerWarn("ManagedDownload", "The rendering deadline could not be registered (error_type={1}).", Type(Err))
+			this._SurfaceFallback(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
+			return false
+		}
+		return true
+	}
+
+	_CancelRenderAcknowledgement(ExpectedWork := 0) {
+		PreviousCritical := Critical("On")
+		try {
+			Work := this.RenderWork
+			if IsObject(ExpectedWork) && Work != ExpectedWork
+				return false
+			this.RenderWork := 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+		if IsObject(Work) && Work.HasOwnProp("ack_timer") {
+			try this.TimerFn.Call(Work.ack_timer, 0)
+			catch Any as Err {
+				; Private ownership is already invalidated, so a queued callback is inert.
+				LoggerWarn("ManagedDownload", "The rendering deadline could not be cancelled physically (error_type={1}).", Type(Err))
+				return false
+			}
+		}
+		return true
+	}
+
+	_RenderAcknowledgementExpired(Work) {
+		if this.RenderWork != Work
+			return false
+		Remaining := TickRemaining64(Work.start_tick, Work.duration_ms, ManagedNetworkFailureWindows_Now())
+		if this.RenderWork != Work
+			return false
+		if Remaining > 0 {
+			try this.TimerFn.Call(Work.ack_timer, -Remaining)
+			catch
+				return this._SurfaceFallback(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
+			return false
+		}
+		; Pause suppresses the notice, never retirement of expired action consent.
+		return this._SurfaceFallback(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
+	}
+
+	_ScriptSettled(ExpectedWindowEpoch, Owner, FailureEpoch, NativeSucceeded) {
+		if !NativeSucceeded
+			this._SurfaceFallback(ExpectedWindowEpoch, Owner, FailureEpoch)
+	}
+
+	_SurfaceFallback(ExpectedWindowEpoch, Owner, FailureEpoch, ExpectedWork := 0) {
+		Detached := this._DetachForClose(ExpectedWindowEpoch, Owner, FailureEpoch, ExpectedWork)
+		if !IsObject(Detached)
+			return false
+		this._FinishClose(Detached)
+		; The captured producer admission is separate from the retired presentation.
+		return ManagedNetworkFailureWindows_ShowNotice(Detached.message_key, Detached.producer_current)
+	}
+
+	_FlushQueue() {
+		if !this._NativeIsCurrent(this.Epoch)
+			return
+		this.Ready := true
+		Queue := this.Queue
+		this.Queue := []
+		for Work in Queue
+			this.TimerFn.Call(this._RunFailureScript.Bind(this, Work), -1)
+	}
+
+	_SafetyFlush() {
+		ExpectedWindowEpoch := this.Epoch
+		if this.Ready || !this._HostIsCurrent(ExpectedWindowEpoch)
+			return
+		try Source := this.WebView.Source
+		catch
+			Source := ""
+		if this._CaptureDocument(Source, ExpectedWindowEpoch)
+			this._FlushQueue()
+		else
+			this._SurfaceFallback(ExpectedWindowEpoch, this.Failure.Owner, this.Failure.Epoch)
+	}
+
+	; All private consent and work is detached before any cancellation or native call.
+	_DetachForClose(ExpectedWindowEpoch := unset, Owner := 0, FailureEpoch := 0, ExpectedWork := 0) {
+		PreviousCritical := Critical("On")
+		try {
+			if IsSet(ExpectedWindowEpoch) {
+				if this.ResetDone || this.Cancelled || ExpectedWindowEpoch != this.Epoch
+					|| ManagedDownloadFailureWindow.Current != this || this.Failure.Closed
+					|| this.Failure.Owner != Owner || this.Failure.Epoch != FailureEpoch
+					|| !(this.Failure.Report is Map) || (IsObject(ExpectedWork) && this.RenderWork != ExpectedWork)
+					return 0
+			}
+			Detached := {work: this.RenderWork, gui: this.Gui, building: this.Building,
+				message_key: this.Failure.Report is Map ? this.Failure.Report["message_key"] : "",
+				producer_current: this.Failure.IsCurrentFn}
+			this.RenderWork := 0
+			this.RenderBudget := 0
+			this.Cancelled := true
+			if !this.Failure.Closed
+				this.Failure.Close()
+			if ManagedDownloadFailureWindow.Current == this
+				ManagedDownloadFailureWindow.Current := 0
+			if WebViewHost._Instances.Has(this.AppId) && WebViewHost._Instances[this.AppId] == this
+				WebViewHost._Instances.Delete(this.AppId)
+			return Detached
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+
+	_FinishClose(Detached) {
+		if IsObject(Detached.work) && Detached.work.HasOwnProp("ack_timer") {
+			try this.TimerFn.Call(Detached.work.ack_timer, 0)
+			catch Any as Err
+				LoggerWarn("ManagedDownload", "The rendering deadline could not be cancelled physically (error_type={1}).", Type(Err))
+		}
+		if Detached.building {
+			if Detached.gui
+				try Detached.gui.Hide()
+			return
+		}
+		this._Reset(true)
+		if Detached.gui
+			try Detached.gui.Destroy()
+		this.Gui := 0
+		PreviousCritical := Critical("On")
+		try {
+			if WebViewHost._Instances.Has(this.AppId) && WebViewHost._Instances[this.AppId] == this
+				WebViewHost._Instances.Delete(this.AppId)
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+
+	Close() {
+		this._FinishClose(this._DetachForClose())
+	}
+}
