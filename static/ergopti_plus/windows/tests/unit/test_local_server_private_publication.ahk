@@ -33,6 +33,7 @@ class _LSP_World {
 		this.Mutation := ""
 		this.Mutated := false
 		this.ArmRead := false
+		this.ArmFinalModelRead := false
 		this.Replacement := ""
 		this.ModelCurrent := true
 		this.CandidateSeen := false
@@ -124,7 +125,7 @@ class _LSP_World {
 	Read(Path) {
 		this.ReadCalls += 1
 		Content := FSReadUtf8Exact(Path)
-		if this.Mutation == "claim_model" && this.CommittedCalls >= 2 && !this.Mutated {
+		if this.Mutation == "claim_model" && this.ArmFinalModelRead && !this.Mutated {
 			this.Mutated := true
 			this.ModelCurrent := false
 		}
@@ -244,6 +245,9 @@ class _LSP_World {
 		if Phase == "committed" {
 			this.CommittedCalls += 1
 			this.CandidateSeen := true
+			; Arm after the pure model admission; the writer owns its source reread.
+			if this.Mutation == "claim_model" && this.CommittedCalls >= 2
+				this.ArmFinalModelRead := true
 			return this.ModelCurrent
 		}
 		return this.ModelCurrent && this.Owner.Current(this.Receipt)
