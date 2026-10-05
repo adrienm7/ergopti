@@ -404,3 +404,76 @@ helpers.describe("sqlite_writer", function()
   end)
 
 end)
+
+
+--- Models the native CLI's two scalar representations without replacing the
+--- production builder, checked receipt parser or shared JSON decoder.
+local function with_meta_value_output(value, status, test)
+	local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+	local previous_execute, previous_popen = os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	assert(file:write("existing native database fixture") and file:close())
+	os.execute = function() return 0 end
+	io.popen = function(command)
+		local content, code = "", status
+		if command:find("SELECT sql FROM sqlite_master", 1, true) then
+			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
+		elseif command:find("SELECT json_quote(value)", 1, true) then
+			content = value == nil and "" or require("json").encode(value) .. "\n"
+		elseif command:find("SELECT value FROM meta", 1, true) then
+			-- sqlite3's raw TEXT printer stops at NUL; scalar Lua framing stops at LF.
+			content = value == nil and "" or (value:match("^[^%z]*") .. "\n")
+		else
+			error("metadata test received an unexpected query")
+		end
+		return {
+			read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. code .. "\n" end,
+			close = function() return true end,
+		}
+	end
+	local ok, reason = xpcall(function()
+		helpers.assert_true(writer.open_db(path))
+		test(writer)
+	end, debug.traceback)
+	os.execute, io.popen = previous_execute, previous_popen
+	writer.close_db()
+	os.remove(path)
+	if not ok then error(reason, 0) end
+end
+
+helpers.describe("linux-sqlite-meta-framing", function()
+	for _, case in ipairs({
+		{ "compact cursor", '{"table":"events_typing","id":7}' },
+		{ "empty", "" },
+		{ "UTF-8 CR quote tab", "été ' \r\t literal" },
+		{ "LF", "one\ntwo" },
+		{ "leading LF", "\ntwo" },
+		{ "trailing LF", "one\n" },
+		{ "CRLF", "one\r\ntwo" },
+		{ "NUL suffix", "one\0two" },
+		{ "leading NUL", "\0two" },
+		{ "trailing NUL", "one\0" },
+		{ "JSON-looking text", "null" },
+	}) do
+		it("linux-sqlite-meta-framing: " .. case[1] .. " retains the complete stored string", function()
+			with_meta_value_output(case[2], 0, function(writer)
+				helpers.assert_eq(writer.get_meta("owned-key"), case[2])
+			end)
+		end)
+	end
+
+	it("linux-sqlite-meta-framing: missing rows retain nil", function()
+		with_meta_value_output(nil, 0, function(writer) helpers.assert_nil(writer.get_meta("owned-key")) end)
+	end)
+
+	it("linux-sqlite-meta-framing: failed receipts refuse even complete encoded rows", function()
+		with_meta_value_output("one\0two", 7, function(writer) helpers.assert_nil(writer.get_meta("owned-key")) end)
+	end)
+
+	for _, body in ipairs({ "not JSON\n", "null\n", "false\n", "42\n", "{}\n", "[]\n", '"unfinished\n' }) do
+		it("linux-sqlite-meta-framing: refuses malformed or non-string scalar " .. body:sub(1, -2), function()
+			with_writer_read_receipts(body, 0, function(writer) helpers.assert_nil(writer.get_meta("owned-key")) end)
+		end)
+	end
+end)

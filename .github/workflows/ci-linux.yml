@@ -376,6 +376,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Preserve complete native SQLite metadata scalar values
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_meta_values.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_meta_values.lua
+        timeout-minutes: 1
+
       - name: Dispatch provider requests through verified IPv4 and IPv6 TLS
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

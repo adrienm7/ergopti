@@ -1654,6 +1654,26 @@ These are software implementations; final hardware verification remains below.
   DNS-only splitter by source inspection; foreign native behavior is untested.
   No persistence, transport, menu, general URL grammar or physical input change.
 
+- [~] **L114.** Linux SQLite metadata scalar fidelity: quote the selected value
+  with native `json_quote` and decode it through the existing shared JSON owner
+  after the unchanged checked scalar receipt. Raw CLI text stopped at NUL, and
+  first-line framing stopped at LF although SQLite stored the complete value.
+  Twenty genuine filesystem/SQLite/public metadata checks have eleven original
+  failures and pass after under current LuaJIT, stock Lua 5.4 and signed Ubuntu
+  22.04 luv/libuv dependencies. Independent `hex(value)` verifies complete stored
+  bytes, including NUL suffixes; missing/empty, Unicode, quotes, compact cursor,
+  actual CLI refusal and same-owner retry controls remain. SQLite remains the
+  container binary in the Jammy dependency mix. Twenty additive registered cases
+  pass on both runtimes; fourteen baseline failures cover seven framing vectors
+  and seven malformed/non-string adapter responses. Preserve every earlier
+  writer assertion and all other writer bodies. Register future native Linux CI
+  without launching it. This repairs supported metadata API fidelity, without
+  claiming corruption of ordinary compact production migration cursors. macOS
+  avoids CLI line framing through native rows; its NUL binding is untested.
+  Windows has a possible source-only zero-terminated TEXT analogue that requires
+  its native owner's diagnosis. No foreign, physical input, TOML, schema, generic
+  query, migration, cache or flush change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
