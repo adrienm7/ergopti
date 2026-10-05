@@ -1,0 +1,24 @@
+--- Scratch-only pure corpus replay; no driver suite or native transport.
+local packet = assert(arg[1], "packet root required")
+local repo = assert(arg[2], "repository root required")
+package.path = packet .. "/static/ergopti_plus/_shared/lua/?.lua;"
+	.. repo .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
+local Json = require("json")
+local function read(relative)
+	local f = assert(io.open(packet .. "/static/ergopti_plus/_shared/" .. relative, "rb"))
+	local raw = f:read("*a"); f:close(); return Json.decode(raw)
+end
+local passed, failed = 0, 0
+local helpers = {}
+function helpers.assert_eq(actual, expected, message)
+	assert(actual == expected, (message or "equality") .. ": got " .. tostring(actual) .. ", expected " .. tostring(expected))
+end
+function helpers.assert_true(value, message) assert(value == true, message or "expected true") end
+function helpers.it(name, body)
+	local ok, why = pcall(body)
+	if ok then passed = passed + 1 else failed = failed + 1; print("FAIL " .. name .. ": " .. tostring(why)) end
+end
+require("test.managed_network_contract").run(read("modules/network/managed_network.json"),
+	read("tests/corpus/network/failure_vectors.json"), helpers)
+print(tostring(passed) .. " pure classifier cases passed; " .. tostring(failed) .. " failed. Native networking not executed.")
+assert(failed == 0 and passed == 57, "complete independent receipt and boundary inventory")

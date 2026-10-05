@@ -1050,7 +1050,8 @@ end
 --- @param stage string|nil "download" or "verify": where a failure happened.
 --- @param release table|nil The release the archive belongs to.
 --- @param failure_state string The updater state a failure returns to.
-local function publish_download(callback, path, err, stage, release, failure_state)
+--- @param failure_receipt table|nil Structured native evidence, never inferred from err.
+local function publish_download(callback, path, err, stage, release, failure_state, failure_receipt)
 	_state = path and "available" or failure_state
 	_verified_archive = path
 	_verified_release = path and release or nil
@@ -1058,7 +1059,7 @@ local function publish_download(callback, path, err, stage, release, failure_sta
 	_download_dest = nil
 	if err then Logger.error(LOG, "Update download failed (%s): %s.", tostring(stage), tostring(err)) end
 	if type(callback) ~= "function" then return end
-	local ok, callback_error = pcall(callback, path, err, path and nil or stage)
+	local ok, callback_error = pcall(callback, path, err, path and nil or stage, failure_receipt)
 	if not ok then Logger.error(LOG, "Update download callback raised: %s.", tostring(callback_error)) end
 end
 
@@ -1071,7 +1072,7 @@ end
 --- archive only when its SHA-256 matches.
 --- @param release table { tag, download_url, checksum_url }
 --- @param download_url string
---- @param callback function|nil Receives verified path, error, failing stage.
+--- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
 --- @param failure_state string The updater state a failure returns to.
 --- @return boolean Whether the checksum request was dispatched.
 local function start_download(release, download_url, callback, failure_state)
@@ -1088,9 +1089,9 @@ local function start_download(release, download_url, callback, failure_state)
 	_download_part = temp_path
 	_state = "downloading"
 
-	local function fail(message, stage)
+	local function fail(message, stage, failure_receipt)
 		remove_partial_download()
-		publish_download(callback, nil, message, stage or "download", release, failure_state)
+		publish_download(callback, nil, message, stage or "download", release, failure_state, failure_receipt)
 	end
 	local checksum_dispatched = M._http_client.get(release.checksum_url, {
 		["User-Agent"] = USER_AGENT,
@@ -1102,7 +1103,8 @@ local function start_download(release, download_url, callback, failure_state)
 		https_only = true,
 	}, function(checksum_result)
 		if not checksum_result or checksum_result.ok ~= true then
-			fail(checksum_result and checksum_result.error or "checksum request failed")
+			fail(checksum_result and checksum_result.error or "checksum request failed", "download",
+				type(checksum_result) == "table" and checksum_result.failure_receipt or nil)
 			return
 		end
 		local expected, checksum_error = parse_checksum(checksum_result.body)
@@ -1116,7 +1118,8 @@ local function start_download(release, download_url, callback, failure_state)
 			https_only = true,
 		}, function(download_result)
 			if not download_result or download_result.ok ~= true then
-				fail(download_result and download_result.error or "archive request failed")
+				fail(download_result and download_result.error or "archive request failed", "download",
+					type(download_result) == "table" and download_result.failure_receipt or nil)
 				return
 			end
 			local size = file_size(_download_part)
@@ -1147,7 +1150,7 @@ end
 
 --- Downloads and verifies the canonical update archive asynchronously.
 --- @param url string|nil Must match the cached release URL when provided.
---- @param callback function|nil Receives verified path, error, failing stage.
+--- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
 --- @return boolean Whether the checksum request was dispatched.
 function M.download_update(url, callback)
 	local release = _cached_release

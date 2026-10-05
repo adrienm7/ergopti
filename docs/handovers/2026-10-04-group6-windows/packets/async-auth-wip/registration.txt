@@ -1,0 +1,2 @@
+#Include unit/test_curl_proxy_auth_integration.ahk
+#Include unit/test_curl_proxy_auth_policy.ahk
