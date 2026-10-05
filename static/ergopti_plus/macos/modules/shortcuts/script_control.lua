@@ -166,6 +166,23 @@ local _pause_rollback_debt_steps = nil
 -- re-pause operation must first settle.
 local _resume_rollback_debt_steps = nil
 
+--- An additive observer never replaces the existing pause-change singleton.
+local _physical_pause = require("keylogger.physical_lifecycle_observation").new("pause", function()
+	return require("adapters.physical_observation_clock").now()
+end, function(reason) Logger.error(LOG, "Physical pause observer retired: %s.", tostring(reason)) end)
+
+local function physical_pause_snapshot()
+	return { paused = _is_paused, transition_generation = _pause_transition_serial,
+		admission_released = _pause_admission_fence == nil,
+		settled = _pause_transition == nil and _queued_pause_target == nil
+			and (_pause_rollback_debt_steps == nil or #_pause_rollback_debt_steps == 0)
+			and (_resume_rollback_debt_steps == nil or #_resume_rollback_debt_steps == 0)
+			and not (_pause_admission_fence ~= nil and _is_paused ~= true) }
+end
+local function finish_physical_pause(ticket, committed)
+	return _physical_pause.finish(ticket, physical_pause_snapshot, committed == true)
+end
+
 local _keymap     = nil
 local _shortcuts  = nil
 local _gestures   = nil
@@ -1010,6 +1027,7 @@ local function complete_pause_transition(transaction, ok, reason)
 			release_pause_admission(transaction.admission_fence)
 		end
 	end
+	finish_physical_pause(transaction.physical_ticket, ok == true)
 	if ok ~= true then
 		report_pause_transition_failure(transaction.target, reason)
 	else
@@ -1180,7 +1198,7 @@ end
 --- and a second toggle is coalesced as latest intent.
 --- @param target_paused boolean Desired state.
 --- @return boolean True when accepted or already satisfied.
-request_pause_transition = function(target_paused, input_drained, admission_fence)
+request_pause_transition = function(target_paused, input_drained, admission_fence, physical_ticket)
 	target_paused = target_paused == true
 	if _pause_transition then
 		local desired = desired_pause_state()
@@ -1199,13 +1217,24 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		-- the recovery port: retry only those exact local re-pause operations, with
 		-- no new admission fence or native Karabiner transaction.
 		if target_paused and _resume_rollback_debt_steps ~= nil then
+			local ticket = _physical_pause.begin("pause")
 			local settled, settle_reason = settle_resume_rollback_debt()
+			finish_physical_pause(ticket, false)
 			if not settled then
 				report_pause_transition_failure(true, settle_reason)
 				return false
 			end
 		end
 		return true
+	end
+	if physical_ticket == nil then
+		physical_ticket = _physical_pause.begin(target_paused and "pause" or "resume")
+		-- A foreign observer may explicitly request another transition. Join its
+		-- actual native owner through the existing coordinator instead of replacing it.
+		if physical_ticket ~= nil and (_pause_transition ~= nil or _is_paused == target_paused) then
+			finish_physical_pause(physical_ticket, false)
+			return request_pause_transition(target_paused, input_drained, admission_fence)
+		end
 	end
 	if target_paused and input_drained ~= true and _pause_admission_fence ~= nil then
 		-- A failed preflight rollback keeps this exact token active and admission
@@ -1221,6 +1250,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			id = _pause_transition_serial,
 			target = true,
 			stage = "synthetic-input-drain",
+			physical_ticket = physical_ticket,
 		}
 		_pause_transition = transaction
 		local drain_ok, accepted_or_error = pcall(SyntheticInput.when_idle, function()
@@ -1229,22 +1259,25 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			_queued_pause_target = nil
 			if queued == false then
 				_pause_transition = nil
+				finish_physical_pause(physical_ticket, false)
 				return
 			end
 			local acquired_ok, fence_or_error = pcall(
 				SyntheticInput.acquire_admission_fence, "script_pause")
 			if not acquired_ok or fence_or_error == nil then
 				_pause_transition = nil
+				finish_physical_pause(physical_ticket, false)
 				report_pause_transition_failure(true,
 					"synthetic input admission fence was not committed: "
 						.. tostring(fence_or_error))
 				return
 			end
 			_pause_transition = nil
-			request_pause_transition(true, true, fence_or_error)
+			request_pause_transition(true, true, fence_or_error, physical_ticket)
 		end)
 		if not drain_ok or accepted_or_error ~= true then
 			_pause_transition = nil
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(true,
 				"synthetic input drain was not committed: " .. tostring(accepted_or_error))
 			return false
@@ -1257,6 +1290,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			local acquired_ok, fence_or_error = pcall(
 				SyntheticInput.acquire_admission_fence, "script_pause")
 			if not acquired_ok or fence_or_error == nil then
+				finish_physical_pause(physical_ticket, false)
 				report_pause_transition_failure(true,
 					"synthetic input admission fence was not committed: "
 						.. tostring(fence_or_error))
@@ -1270,6 +1304,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 	end
 	if target_paused and admission_fence ~= nil then
 		if _pause_admission_fence ~= nil and _pause_admission_fence ~= admission_fence then
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(true,
 				"synthetic input admission fence ownership changed before pause")
 			return false
@@ -1281,6 +1316,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		local release_ok = not target_paused or release_pause_admission(admission_fence)
 		local reason = "Karabiner enabled-state API unavailable"
 		if not release_ok then reason = reason .. "; admission rollback remains pending" end
+		finish_physical_pause(physical_ticket, false)
 		report_pause_transition_failure(target_paused, reason)
 		return false
 	end
@@ -1292,6 +1328,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 				or ("Karabiner enabled-state API returned "
 					.. type(enabled_or_err) .. ", expected boolean")
 			if not release_ok then reason = reason .. "; admission rollback remains pending" end
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(target_paused, reason)
 			return false
 		end
@@ -1301,12 +1338,14 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		local committed, commit_reason = commit_pause_state(target_paused)
 		if not committed then
 			if target_paused then release_pause_admission(admission_fence) end
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(target_paused, commit_reason)
 			return false
 		end
 		if target_paused then
 			_pause_admission_fence = admission_fence
 		end
+		finish_physical_pause(physical_ticket, true)
 		return true
 	end
 
@@ -1316,6 +1355,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		target = target_paused,
 		timer = nil,
 		admission_fence = target_paused and admission_fence or _pause_admission_fence,
+		physical_ticket = physical_ticket,
 	}
 	_pause_transition = transaction
 	local ok_timer, timer_or_err = pcall(hs.timer.doAfter, 0, function()
@@ -2010,6 +2050,35 @@ end
 function M.resume_all()
 	Logger.info(LOG, "Programmatic resume transaction requested.")
 	return request_pause_transition(false)
+end
+
+
+--- Binds an additive dormant pause-writer observer without sampling native input.
+---@param owner table Exact observer owner.
+---@param capacity integer Positive native receipt budget.
+---@param receive function Literal-true acknowledger receiving record and exact token.
+---@return table|nil token Exact observer token, or nil on refusal.
+function M.bind_physical_pause_observer(owner, capacity, receive)
+	if math.type(capacity) ~= "integer" then return nil, "Invalid native pause receipt budget" end
+	return _physical_pause.bind(owner, capacity, receive)
+end
+
+--- Detaches only the exact additive pause observer, never the legacy singleton.
+---@param owner table Exact observer owner.
+---@param token table Exact binding token.
+---@return boolean detached Whether the owned observer was detached.
+function M.unbind_physical_pause_observer(owner, token) return _physical_pause.unbind(owner, token) end
+
+local original_stop = M.stop
+--- Denies before actual stop cleanup; a stop is never a resume commit.
+---@return boolean settled Unchanged native cleanup result.
+function M.stop()
+	local ticket = _physical_pause.begin("stop")
+	if ticket == nil then return original_stop() end
+	local ok, result = pcall(original_stop)
+	finish_physical_pause(ticket, false)
+	if not ok then error(result, 0) end
+	return result
 end
 
 return M

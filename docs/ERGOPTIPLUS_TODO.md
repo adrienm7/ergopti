@@ -3310,7 +3310,7 @@ The dormant lifecycle channel now observes real keylogger start/stop/shutdown,
 resync, hardware and sleep/wake writers under exact owner/generation fences.
 It records denied boundaries before foreign posture work and requires complete
 writer facts before recording completion; every receipt remains allowed=false.
-The actual pause writer is still unbound: resync cannot prove unpause. Independent
+Production pause subscription remains absent: resync cannot prove unpause. Independent
 review passes62 focused cases (41 new and21 unchanged), preserves171 grouped plus
 14 top-level original assertions, and passes40 shared assertions on both Lua
 ABIs; six semantic mutants are rejected. The one context dependency drift is
@@ -3390,6 +3390,38 @@ source mutations and two equivalent independent recipes, distinguished in the
 review. This binding token is not a qualified native clock domain. Loaded-host
 execution, Mach timebase comparison, permission normalization, pause integration,
 production recovery and capture activation remain outstanding; TODO31 stays open.
+
+The actual native pause/resume writer now exposes an additive dormant exact-owner
+subscription. It denies before native drain and finishes only after the existing
+committed state, resume admission acknowledgement and post-commit singleton.
+Original action effects, return values, callbacks and all four published writer
+body segments remain byte-identical. Exact asynchronous tickets retain their
+snapshot/clock/publication frames until terminal unwind; nested completion cannot
+consume the outer ticket or make retirement succeed early. Independent final
+composition passes399 cases in25 normally discovered modules, including the
+unchanged strengthened48 retirement cases, plus four externally asserted native
+fixture controls. Original pause48/lifecycle40 and five independent retirement
+controls pass on both interpreters; two exact frame/completion mutants are
+rejected. The two explicitly strengthened assertion expressions retain their
+meaning and add outside-callback evidence; literal text conservation is not
+claimed for those expressions. Native source coordination reserves only these
+pause/resume/commit hunks, with unchanged upstream/actions preimages and no
+reported active overlap. No production capture subscription is installed.
+
+Manual macOS+Linux CI37357748200 tested exact190e2eb2788fadd8ebb4693eab5e8cd23dd5fa2f
+and ended FAILED with Release skipped. Actual XCTest completes320 cases:
+317 pass and three fail, with nine assertions/two unexpected errors. Eight of
+nine HS274 native cases pass, including real Clang C++17/C++23 policy execution,
+CoreFoundation decoding, SDK bindings and the53 controller checks. Full source
+compilation stops before cloning/compiling at a0.264-second official XcodeGen
+HTTPS acquisition refusal; the retained generic transport receipt does not prove
+its cause. The other two failed cases are the owned Brew/Sparkle acceptance
+fixtures. macOS stubbed units/E2E and twelve native canvas captures pass;
+packaging/install are skipped. Linux's real-SQLite comparison fails identically
+on this candidate and exact origin/dev25b879a because its raw-row oracle removes
+the reader's required token_json transport column; the owner is notified without
+changing or waiving its assertions. These results do not qualify the newer pause
+composition or complete TODO31.
 
 ## Remaining work after the 2026-09-30 releases
 

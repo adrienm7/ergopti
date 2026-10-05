@@ -34,12 +34,12 @@ function M.system_event(constants, event)
 end
 
 --- Creates one lazily bound lifecycle actor, shared by native writer adapters.
----@param domain string Engine or system domain.
+---@param domain string Engine, system or actual pause-writer domain.
 ---@param clock function One exact native nanosecond sample, with no fallback.
 ---@param on_refused function Once-only notification after subscription retirement.
 ---@return table actor Exact-owner dormant lifecycle ports.
 function M.new(domain, clock, on_refused)
-	assert(domain == "engine" or domain == "system", "Invalid lifecycle domain")
+	assert(domain == "engine" or domain == "system" or domain == "pause", "Invalid lifecycle domain")
 	assert(type(clock) == "function" and type(on_refused) == "function", "Missing lifecycle ports")
 	local actor, binding, frame = {}, nil, nil
 
@@ -90,7 +90,18 @@ function M.new(domain, clock, on_refused)
 			if type(enabled) == "boolean" then record.enabled = enabled end
 			if type(paused) == "boolean" then record.paused = paused end
 			local known = type(enabled) == "boolean" and type(paused) == "boolean"
-			if domain == "engine" then
+			if domain == "pause" then
+				local generation = rawget(fields, "transition_generation")
+				local released, settled = rawget(fields, "admission_released"), rawget(fields, "settled")
+				known = type(paused) == "boolean" and integral(generation)
+					and type(released) == "boolean" and type(settled) == "boolean"
+				if integral(generation) then record.transition_generation = generation end
+				if type(released) == "boolean" then record.admission_released = released end
+				if type(settled) == "boolean" then record.settled = settled end
+				committed = committed == true and settled == true
+					and ((source.source == "pause" and paused == true)
+						or (source.source == "resume" and paused == false and released == true))
+			elseif domain == "engine" then
 				local generation = rawget(fields, "runtime_generation")
 				if integral(generation) then record.runtime_generation = generation else known = false end
 			else
@@ -195,6 +206,52 @@ function M.new(domain, clock, on_refused)
 		if rawequal(frame, ticket) then frame = nil end
 		if not results[1] then error(results[2], 0) end
 		return unpack_values(results, 2, results.n)
+	end
+
+	--- Denies before an asynchronous native writer without granting completion.
+	---@param source string|table Declared writer or independent native event.
+	---@return table|nil ticket Opaque exact writer ticket, or nil while unbound.
+	function actor.begin(source)
+		local candidate = binding
+		if not current(candidate) then return nil end
+		if frame or candidate.dispatching then refuse(candidate, "Lifecycle asynchronous writer reentered"); return nil end
+		local pending = { binding = candidate, source = source_fields(source), manual = true, token = {} }
+		pending.subscription_frame = candidate.lifetime.enter()
+		frame = pending
+		-- Even refusal retains this exact terminal ticket until the native writer settles.
+		candidate.lifetime.run(publish, candidate, pending.source)
+		return pending.token
+	end
+
+	--- Completes only the current asynchronous writer after its actual commit.
+	---@param ticket table|nil Exact opaque writer ticket.
+	---@param snapshot function Current copied scalar fields, never a native poll.
+	---@param committed boolean Literal true only after the native/local commit.
+	---@return boolean delivered Whether the exact terminal receipt was acknowledged.
+	function actor.finish(ticket, snapshot, committed)
+		local pending = frame
+		if not pending or pending.manual ~= true or ticket == nil or not rawequal(pending.token, ticket) then return false end
+		-- Foreign clock/snapshot/receiver ports cannot consume the outer terminal.
+		if pending.completing then return refuse(pending.binding, "Lifecycle asynchronous completion reentered") end
+		pending.completing = true
+		local candidate, delivered = pending.binding, false
+		if current(candidate) then
+			if candidate.dispatching then refuse(candidate, "Lifecycle asynchronous completion reentered")
+			elseif candidate.revision >= candidate.capacity then refuse(candidate, "Lifecycle receipt budget exhausted")
+			else
+				local at = sample(candidate)
+				if at ~= nil and current(candidate) and rawequal(frame, pending) then
+					local observed, fields = pcall(snapshot)
+					if current(candidate) and rawequal(frame, pending) then
+						if not observed or type(fields) ~= "table" then fields = {} end
+						delivered = publish(candidate, pending.source, fields, committed == true, at)
+					end
+				end
+			end
+		end
+		if rawequal(frame, pending) then frame = nil end
+		assert(candidate.lifetime.leave(pending.subscription_frame), "Async subscription frame was already retired")
+		return delivered
 	end
 
 	--- Observes one actual writer while preserving its unbound queries and returns.
