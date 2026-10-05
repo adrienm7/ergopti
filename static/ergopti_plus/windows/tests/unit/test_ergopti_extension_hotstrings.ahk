@@ -59,7 +59,7 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 				Ergopti := Pack
 		Assert(IsObject(Ergopti), "the Ergopti extension the driver ships is installed")
 		AssertEqual("Ergopti+", Ergopti.name, "the shared pack keeps its plus in the display name")
-		AssertEqual(4, Ergopti.bound_files.Length)
+		AssertEqual(6, Ergopti.bound_files.Length)
 		AssertEqual(0, Ergopti.toml_files.Length, "none of its files becomes an ext: category")
 		Registry := _LCT_RegistryDir() . "ergopti\hotstrings\"
 		AssertEqual(Registry . "sfbsreduction.toml", HotstringsBoundTomlPath("sfbsreduction", "comma"))
@@ -67,6 +67,10 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 			"the menu's spelling reaches the same file")
 		AssertEqual(Registry . "rolls.toml", HotstringsBundledTomlPath("rolls"))
 		AssertEqual(Registry . "repeatcorrections.toml", HotstringsBoundTomlPath("magickey", "repeat_corrections"))
+		AssertEqual(Registry . "magickeyreplace.toml", HotstringsBoundTomlPath("magickey", "replace"))
+		AssertEqual(Registry . "suffixes_a.toml", HotstringsBundledTomlPath("french_distancesreduction"))
+		AssertEqual(24, CountTomlSection("french_distancesreduction", "suffixes_a"))
+		AssertEqual(0, CountTomlSection("magickey", "replace"), "the native feature owns no fabricated mapping")
 		AssertEqual("", HotstringsBoundTomlPath("magickey", "text_expansion_symbols"),
 			"the other magic key sections stay bundled")
 		Assert(InStr(HotstringsBundledTomlPath("magickey"), "\modules\hotstrings\magickey.toml"))
@@ -89,6 +93,8 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 		AssertEqual("ergopti", Route["section_extensions"]["repeat_corrections"],
 			"the repeat corrections name the extension whose submenu lists them")
 		AssertEqual("ergopti", _HotstringBoundSources["rolls"]["extension"])
+		AssertEqual("ergopti", Route["section_extensions"]["replace"])
+		AssertEqual("ergopti", _HotstringBoundSources["frenchdistancesreduction"]["extension"])
 	}
 }
 Test("ergopti extension: the shipped groups load from the extension under their historical ids (ergopti-hotstrings-ext)",
@@ -378,3 +384,46 @@ _EHX_DistanceGateReadByNativeOwner(Path, Expected) {
 		. " distance_gate " . Quote . Path . Quote . " " . (Expected ? "true" : "false")
 	AssertEqual(0, RunWait(Command, A_ScriptDir, "Hide"), "the actual gate owner preserves the distance choice")
 }
+
+
+; Independently authored original suffix vectors, exercised through the real loader.
+_EHX_SuffixesLoadNatively() {
+	_EHX_WithRoutes(_LCT_RegistryDir(), Check)
+	Check(Packs) {
+		global HSE_RegistryByGroup
+		Expected := [
+			["à'", "ance"], ["àa", "aire"], ["àc", "ction"], ["àd", "would"],
+			["àê", "able"], ["àf", "iste"], ["àg", "ought"], ["àh", "ight"],
+			["ài", "ying"], ["àk", "ique"], ["àl", "elle"], ["àm", "isme"],
+			["àn", "ation"], ["àp", "ence"], ["àq", "ique"], ["àr", "erre"],
+			["às", "ement"], ["àt", "ettre"], ["àv", "ment"], ["àx", "ieux"],
+			["àz", "ez-vous"], ["à’", "ance"], ["càd", "could"], ["shàd", "should"]]
+		AssertEqual(24, CountTomlSection("french_distancesreduction", "suffixes_a"))
+		HSE_TestReset()
+		try {
+			LoadHotstringsSection("french_distancesreduction", "suffixes_a", { Enabled: true })
+			Group := "french_distancesreduction.suffixes_a"
+			Assert(HSE_RegistryByGroup.Has(Group), "the native registry admits the bound suffix category")
+			Previous := 0
+			for Row in Expected {
+				Found := 0
+				for Spec in HSE_RegistryByGroup[Group]
+					if Spec.Trigger == Row[1] {
+						Found := Spec
+						break
+					}
+				Assert(IsObject(Found), "the native loader registers " . Row[1])
+				AssertEqual(Row[2], Found.Replacement)
+				AssertEqual(false, Found.IsWord)
+				AssertEqual(true, Found.Auto)
+				AssertEqual(false, Found.FinalResult)
+				AssertEqual(HSE_PRIORITY_COMMON, Found.Priority)
+				AssertEqual(0.5, Found.TimeActivationSeconds)
+				Assert(Found.Seq > Previous, "canonical suffixes retain historical registration order")
+				Previous := Found.Seq
+			}
+		} finally HSE_TestReset()
+	}
+}
+Test("ergopti extension: every relocated suffix loads through the native registry (ergopti-suffixes-ext)",
+	_EHX_SuffixesLoadNatively)

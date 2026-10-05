@@ -81,7 +81,7 @@ local function make_adapter(scenario)
 	}
 
 	local function file_attributes(path)
-		if state.locks[path] ~= nil then return { mode = "directory" } end
+		if state.locks[path] ~= nil then return HOST_ATTRIBUTES(path) end
 		return HOST_ATTRIBUTES(path)
 	end
 
@@ -510,9 +510,11 @@ helpers.describe("adapters.file_system: file-handle failures are fail-closed", f
 		local original_rename = os.rename
 		local rename_calls = 0
 		local staged_path = nil
+		local native_handle, injected_calls = nil, 0
 		os.remove(path)
 
 		local function injected_failure()
+			injected_calls = injected_calls + 1
 			local message = "injected " .. failing_method .. " " .. failure_kind
 			if failure_kind == "false" then return false, message end
 			if failure_kind == "nil" then return nil, message end
@@ -522,14 +524,15 @@ helpers.describe("adapters.file_system: file-handle failures are fail-closed", f
 		io.open = function(open_path, mode)
 			if mode == "w" and open_path ~= path then
 				staged_path = open_path
+				native_handle = assert(original_open(open_path, mode))
 				local handle = {}
-				handle.write = function()
+				handle.write = function(_, content)
 					if failing_method == "write" then return injected_failure() end
-					return handle
+					return native_handle:write(content)
 				end
 				handle.close = function()
 					if failing_method == "close" then return injected_failure() end
-					return true
+					return native_handle:close()
 				end
 				return handle
 			end
@@ -544,6 +547,7 @@ helpers.describe("adapters.file_system: file-handle failures are fail-closed", f
 		end, debug.traceback)
 		io.open = original_open
 		os.rename = original_rename
+		if native_handle then pcall(function() return native_handle:close() end) end
 
 		local lock_path = staged_path and staging_lock_path(staged_path) or nil
 		local retained_owner = lock_path and state.locks[lock_path] or nil
@@ -560,6 +564,7 @@ helpers.describe("adapters.file_system: file-handle failures are fail-closed", f
 		if not call_ok then error(write_ok) end
 
 		local label = failing_method .. " " .. failure_kind
+		helpers.assert_eq(injected_calls, 1, label .. " must reach the actual selected handle fault")
 		helpers.assert_eq(write_ok, false, label .. " must reject the write")
 		helpers.assert_eq(rename_calls, 0, label .. " must precede publication")
 		helpers.assert_true(staged_path ~= nil, label .. " must exercise a reserved staging area")

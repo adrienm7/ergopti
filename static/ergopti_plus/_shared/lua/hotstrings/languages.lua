@@ -158,4 +158,18 @@ function M.section_default(features, group, section)
 	return nil
 end
 
+--- Whether a section carries a persisted choice rather than an inert module marker.
+--- The declared native replacement feature has no mappings; unrelated module
+--- placeholders remain owned by their module even when that module has a feature.
+--- @param features table Generated feature declarations.
+--- @param group string Registered TOML category.
+--- @param section table Reader section descriptor.
+--- @return boolean
+function M.section_actionable(features, group, section)
+	if type(section) ~= "table" or type(section.name) ~= "string" or section.name == "-" then return false end
+	if not section.is_module_placeholder then return true end
+	local entry = M.section_feature(features, group, section.name)
+	return entry ~= nil and entry.type == "feature" and entry.path == "hotstrings.magic_key.replace"
+end
+
 return M

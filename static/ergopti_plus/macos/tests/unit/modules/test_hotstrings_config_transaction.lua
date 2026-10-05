@@ -250,8 +250,10 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 		helpers.assert_eq(events[2], "retarget-refused",
 			"publication must remain delegated to the symlink-revalidating adapter")
 		helpers.assert_eq(events[3], "read",
-			"a failed publication must revalidate whether the committed source changed")
-		helpers.assert_eq(#events, 3)
+			"native recovery must prove that the refused compatibility publication left its source unchanged")
+		helpers.assert_eq(events[4], "read",
+			"the failed setter must then revalidate whether a newer external source needs adoption")
+		helpers.assert_eq(#events, 4)
 		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.33)
 		helpers.assert_eq(mod.resolve("rolls", nil), before,
 			"the last committed memo must survive a TOCTOU refusal")

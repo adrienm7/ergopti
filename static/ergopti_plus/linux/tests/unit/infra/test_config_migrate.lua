@@ -15,6 +15,7 @@ local helpers = require("tests.helpers")
 
 require("test.config_migrate_contract").register(helpers, { driver = "linux" })
 require("test.config_migrate_records_contract").register(helpers, { driver = "linux" })
+require("test.common_autocorrection_migration_contract").register(helpers, require("infra.paths").shared)
 
 --- The daemon entry point with line comments removed: main() cannot run
 --- headless, so its order is read from the source.

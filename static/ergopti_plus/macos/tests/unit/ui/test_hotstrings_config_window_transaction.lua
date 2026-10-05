@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PersonalFixture = require("tests.support.hotstrings_config_window_fixture")
 
 local SENTINEL = "[_meta]\ndelay = 0.33\n"
 
@@ -85,7 +86,7 @@ local function install_personal_catalogue(path)
 			return {}
 		end,
 	}
-	return dir, "personal:" .. name, dir .. "/" .. name .. ".toml"
+	return PersonalFixture.install_personal_binding(path, read_fixture(path))
 end
 
 --- Finds a named closure upvalue recursively from the real bridge handler.
@@ -131,7 +132,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			}
 			local personal_dir, category = install_personal_catalogue(path)
 			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-			win.setup({ personal_dir = personal_dir })
+			PersonalFixture.prepare_personal_window(win, personal_dir)
 			local notifications = 0
 			win._on_config_changed = function() notifications = notifications + 1 end
 
@@ -159,7 +160,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		win.setup({ personal_dir = personal_dir })
+		PersonalFixture.prepare_personal_window(win, personal_dir)
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
@@ -197,12 +198,14 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 				return true
 			end,
 		}
+		local personal_dir, category = PersonalFixture.install_personal_binding("/personal/allowed.toml", SENTINEL)
+		helpers.assert_eq(category, "personal-file:616c6c6f7765642e746f6d6c")
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		win.setup({ personal_dir = "/personal" })
+		PersonalFixture.prepare_personal_window(win, personal_dir)
 
 		helpers.assert_eq(win._on_message({ body = {
 			action = "set_delay",
-			category = "personal:allowed",
+			category = category,
 			group = "personal",
 			personal_path = "/outside/attacker-selected.toml",
 			ms = 420,
@@ -214,7 +217,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 
 		helpers.assert_eq(win._on_message({ body = {
 			action = "set_delay",
-			category = "personal:missing",
+			category = "personal-file:6d697373696e672e746f6d6c",
 			group = "personal",
 			personal_path = "/personal/allowed.toml",
 			ms = 500,
@@ -222,6 +225,35 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			"an undiscovered category must not become writable through a forged path")
 		helpers.assert_eq(#reads, 1, "a missing native catalogue entry must fail before reading")
 		helpers.assert_eq(#writes, 1, "a missing native catalogue entry must fail before publishing")
+	end)
+
+	helpers.it("canonical provenance and retired display stems never grant an uncaptured native binding", function()
+		install_config_stub()
+		local reads, writes, notifications = 0, 0, 0
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function() reads = reads + 1 return SENTINEL, "ok" end,
+			write_if_unchanged = function() writes = writes + 1 return true end,
+		}
+		local root, category, path, context = PersonalFixture.install_personal_binding("/personal/allowed.toml", SENTINEL)
+		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		win.setup({ personal_dir = root })
+		win._on_config_changed = function() notifications = notifications + 1 end
+		local body = { action = "set_delay", group = "personal", category = category,
+			personal_path = path, personal_source = context.record.source, ms = 420 }
+		helpers.assert_eq(win._on_message({ body = body }), false,
+			"a valid canonical descriptor and correct path are not a rendered native capability")
+		PersonalFixture.prepare_personal_window(win, root)
+		body.category = "personal:allowed"
+		helpers.assert_eq(win._on_message({ body = body }), false,
+			"the old display-stem route cannot reuse a captured canonical binding")
+		body.category = category
+		context.current = false
+		helpers.assert_eq(win._on_message({ body = body }), false,
+			"a captured binding still requires current native acknowledgement")
+		helpers.assert_eq(context.applications, 1, "only the captured canonical request reaches the exclusive owner")
+		helpers.assert_eq(reads, 0)
+		helpers.assert_eq(writes, 0)
+		helpers.assert_eq(notifications, 0)
 	end)
 
 	helpers.it("rejects hostile colors before any personal or shared publication", function()
@@ -303,7 +335,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		win.setup({ personal_dir = personal_dir })
+		PersonalFixture.prepare_personal_window(win, personal_dir)
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
@@ -339,7 +371,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		win.setup({ personal_dir = personal_dir })
+		PersonalFixture.prepare_personal_window(win, personal_dir)
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
@@ -389,7 +421,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 				write_if_unchanged = function() writes = writes + 1 return true end,
 			}
 			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-			win.setup({ personal_dir = personal_dir })
+			PersonalFixture.prepare_personal_window(win, personal_dir)
 			local committed = win._on_message({ body = {
 				action = "set_delay", category = category,
 				group = "personal", personal_path = path, ms = 420,
@@ -422,7 +454,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			end,
 		}
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		win.setup({ personal_dir = personal_dir })
+		PersonalFixture.prepare_personal_window(win, personal_dir)
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
@@ -473,7 +505,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			end,
 		}
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
-		win.setup({ personal_dir = personal_dir })
+		PersonalFixture.prepare_personal_window(win, personal_dir)
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
@@ -525,6 +557,10 @@ helpers.describe("hotstrings config window: incomplete TOML reads are withheld",
 			end,
 		}
 
+		PersonalFixture.install_personal_binding("/personal/private.toml", SENTINEL)
+		package.loaded["infra.toml.reader"] = { parse = function()
+			return { meta = { delay = 0.99, sections = {} }, sections = {}, sections_order = {} }, false
+		end }
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window", {
 			fs = {
 				attributes = function(path)
@@ -550,7 +586,7 @@ helpers.describe("hotstrings config window: incomplete TOML reads are withheld",
 		helpers.assert_eq(saw_extension_group, false,
 			"an extension group with no committed file must be withheld")
 		for _, category in ipairs(state.categories) do
-			helpers.assert_true(category.name ~= "personal:private",
+			helpers.assert_true(category.name ~= "personal-file:707269766174652e746f6d6c",
 				"uncommitted personal bytes must not become a fake category")
 			helpers.assert_true(category.name ~= "ext:demo:extension",
 				"uncommitted extension bytes must not become a fake category")

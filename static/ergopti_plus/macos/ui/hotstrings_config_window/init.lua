@@ -32,10 +32,10 @@ local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
 local TomlReader        = require("infra.toml.reader")
-local TomlRecordEditor  = require("infra.toml.record_editor")
 local FileSystem        = require("adapters.file_system")
 local i18n              = require("infra.i18n")
 local Paths            = require("infra.paths")
+local PersonalFiles    = require("hotstrings.personal_files")
 
 local LOG = "hotstrings_config_window"
 
@@ -53,6 +53,7 @@ local _webview     = nil
 local _usercontent = nil
 local _closing_webview = nil
 local _owner = nil
+local _personal_bindings = {}
 
 --- Tests delivery authority independently from retained native cleanup debt.
 --- @param owner table Captured window session.
@@ -252,19 +253,6 @@ local function stem(toml_path)
 	return name
 end
 
---- Resolves a personal category through the server-owned directory catalogue.
---- The WebView receives display data, not filesystem authority: a bridge
---- message may identify a rendered category, but it may never choose a path.
---- @param category any Expected `personal:<stem>` category identifier.
---- @return string|nil toml_path
-local function personal_toml_path(category)
-	if type(category) ~= "string" or category == "" then return nil end
-	for _, toml_path in ipairs(list_toml_files(_config.personal_dir)) do
-		if category == "personal:" .. stem(toml_path) then return toml_path end
-	end
-	return nil
-end
-
 --- Discovers installed extensions that expose hotstrings.
 --- Returns an array of { ext_id, label, files = { { toml_path, stem } } }.
 --- Each extension lives in a subdirectory of extensions_dir and must have a
@@ -341,7 +329,7 @@ local function source_priority_for(group, name)
 	if not ok or type(keymap.source_priority) ~= "function" then return nil end
 	local category
 	if group == "personal" then
-		category = "personal"
+		category = PersonalFiles.components(name) and name or "personal"
 	elseif type(group) == "string" and group:sub(1, 4) == "ext:" then
 		category = "ext." .. group:sub(5)
 	else
@@ -465,24 +453,24 @@ local function build_state()
 
 
 	-- 3.2) Personal TOML files
-	local personal_files = list_toml_files(_config.personal_dir)
+	local personal_files = require("infra.personal_hotstrings").adoptions()
+	_personal_bindings = {}
 	if #personal_files > 0 then
 		local personal_entries = {}
-		for _, toml_path in ipairs(personal_files) do
+		for _, source in ipairs(personal_files) do
+			local toml_path = source.path
 			local parsed = read_committed_toml(toml_path)
 			if parsed then
-				local file_stem = stem(toml_path)
+				local file_stem = source.source.label ~= "" and source.source.label
+					or source.source.components[#source.source.components]
 				local file_meta = read_file_meta(parsed)
 				local file_secs = read_file_sections(parsed)
-				local effective = {
-					delay        = file_meta.delay,
-					color        = file_meta.color,
-					show_tooltip = file_meta.show_tooltip,
-					priority     = file_meta.priority,
-				}
+				local effective = hotstrings_config.resolve(source.owner, nil)
+				local binding = require("infra.personal_file_controls").capture(source.owner)
+				_personal_bindings[source.owner] = binding
 
 				local entry = build_cat_entry(
-					"personal:" .. file_stem,
+					source.owner,
 					file_stem,
 					"personal",
 					effective,
@@ -492,8 +480,7 @@ local function build_state()
 					function(sec_name)
 						local sec_data = file_meta.sections[sec_name] or {}
 						return {
-							effective = { delay = sec_data.delay, color = sec_data.color,
-								show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
+							effective = hotstrings_config.resolve(source.owner, sec_name),
 							default_meta = { delay = sec_data.delay, color = sec_data.color,
 								show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
 							override = {},
@@ -502,6 +489,19 @@ local function build_state()
 				)
 				entry.delay_overridden = false
 				entry.color_overridden = false
+				entry.readonly = binding == nil
+				if entry.readonly then entry.title = entry.title .. " — " .. i18n.get("menu.hotstrings.personal_source_unavailable") end
+				if binding then
+					local legacy = hotstrings_config.get_user_override(source.owner, nil) or {}
+					local Metadata = require("hotstrings.personal_metadata")
+					local reason = i18n.get("menu.hotstrings.personal_metadata_unavailable")
+					entry.readonly_metadata = Metadata.readonly_fields(binding.record.content, nil, legacy)
+					entry.readonly_metadata_reason = reason
+					for _, section in ipairs(entry.sections) do
+						section.readonly_metadata = Metadata.readonly_fields(binding.record.content, section.name, legacy)
+						section.readonly_metadata_reason = reason
+					end
+				end
 				table.insert(personal_entries, entry)
 			end
 		end
@@ -587,66 +587,6 @@ end
 --- @param section string|nil Section name, or nil for the file-level [_meta].
 --- @param field string "delay" or "color".
 --- @param value string|number|nil The new value, or nil to remove the field.
-local function patch_personal_toml(toml_path, section, field, value)
-	if not ConfigSchema.is_section(section) then
-		Logger.error(LOG, "patch_personal_toml: section must be a supported bare identifier.")
-		return false
-	end
-	if field == "color" and value ~= nil and not ConfigSchema.is_color(value) then
-		Logger.error(LOG, "patch_personal_toml: color must contain 3 to 8 hexadecimal digits.")
-		return false
-	end
-	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, toml_path)
-	if not read_ok or read_status ~= "ok" or type(content) ~= "string" then
-		Logger.error(LOG, "patch_personal_toml: source read did not commit for '%s' — %s.",
-			toml_path, tostring(read_ok and read_detail or content))
-		return false
-	end
-	-- The header we are looking for depends on whether section is set
-	local target_header = section
-		and ("[_meta.sections." .. section .. "]")
-		or  "[_meta]"
-	local val_str = nil
-	if value ~= nil then
-		if field == "delay" or field == "priority" then
-			val_str = tostring(value)
-		elseif field == "show_tooltip" then
-			val_str = value and "true" or "false"
-		else
-			val_str = ConfigSchema.encode_basic_string(value)
-			if not val_str then
-				Logger.error(LOG, "patch_personal_toml: string field received an invalid value type.")
-				return false
-			end
-		end
-	end
-	local patched, patch_err = TomlRecordEditor.patch_table_field(
-		content,
-		target_header,
-		field,
-		val_str
-	)
-	if not patched then
-		Logger.error(LOG, "patch_personal_toml: source scan failed for '%s' — %s.",
-			toml_path, tostring(patch_err))
-		return false
-	end
-
-	local write_ok, committed = pcall(
-		FileSystem.write_if_unchanged,
-		toml_path,
-		patched,
-		{ status = "ok", content = content }
-	)
-	if not write_ok or committed ~= true then
-		Logger.error(LOG, "patch_personal_toml: atomic publication failed for '%s'.", toml_path)
-		return false
-	end
-
-	Logger.debug(LOG, "Personal TOML patched: '%s' [%s] %s = %s.",
-		toml_path, section or "_meta", field, tostring(value))
-	return true
-end
 
 
 
@@ -749,11 +689,14 @@ local function on_message(msg, owner)
 	local group   = body.group
 	local sec     = body.section
 	if sec == "" then sec = nil end
-	if not ConfigSchema.is_section(sec) then
+	local canonical_personal = group == "personal" and PersonalFiles.components(cat) ~= nil
+	if not ((canonical_personal and (sec == nil or (type(sec) == "string" and sec ~= "")))
+		or ConfigSchema.is_section(sec)) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid section.")
 		return false
 	end
-	if action == "set_color" and not ConfigSchema.is_color(body.hex) then
+	if action == "set_color" and not (canonical_personal and require("hotstrings.personal_metadata").valid("color", body.hex))
+		and not ConfigSchema.is_color(body.hex) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid color.")
 		return false
 	end
@@ -799,27 +742,31 @@ local function on_message(msg, owner)
 
 	-- Per-category mutations — dispatch by group
 	if group == "personal" then
-		local toml_path = personal_toml_path(cat)
-		if not toml_path then
+		local binding = _personal_bindings[cat]
+		if not binding then
 			Logger.error(LOG, "Rejected a personal hotstrings mutation for an unknown native category.")
 			return false
 		end
+		local function patch(_, requested_section, field, value)
+			return require("infra.personal_file_controls").apply(binding, requested_section, field, value)
+		end
+		local toml_path = binding.record.path
 		if action == "set_delay" and type(body.ms) == "number" then
-			committed = patch_personal_toml(toml_path, sec, "delay", body.ms / 1000)
+			committed = patch(toml_path, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
-			committed = patch_personal_toml(toml_path, sec, "delay", nil)
+			committed = patch(toml_path, sec, "delay", nil)
 		elseif action == "set_color" then
-			committed = patch_personal_toml(toml_path, sec, "color", body.hex)
+			committed = patch(toml_path, sec, "color", body.hex)
 		elseif action == "clear_color" then
-			committed = patch_personal_toml(toml_path, sec, "color", nil)
+			committed = patch(toml_path, sec, "color", nil)
 		elseif action == "set_tooltip" then
-			committed = patch_personal_toml(toml_path, sec, "show_tooltip", body.show_tooltip == true)
+			committed = patch(toml_path, sec, "show_tooltip", body.show_tooltip)
 		elseif action == "clear_tooltip" then
-			committed = patch_personal_toml(toml_path, sec, "show_tooltip", nil)
+			committed = patch(toml_path, sec, "show_tooltip", nil)
 		elseif action == "set_priority" and type(body.priority) == "number" then
-			committed = patch_personal_toml(toml_path, sec, "priority", body.priority)
+			committed = patch(toml_path, sec, "priority", body.priority)
 		elseif action == "clear_priority" then
-			committed = patch_personal_toml(toml_path, sec, "priority", nil)
+			committed = patch(toml_path, sec, "priority", nil)
 		else
 			return false
 		end

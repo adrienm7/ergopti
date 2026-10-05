@@ -59,7 +59,7 @@ _THRD_ButtonsAreCommands() {
 		"_BuildTapHoldsSubmenu must not register rows itself — the renderer owns the menu shape")
 	; RegExMatch, not InStr: AHK's InStr is case-INSENSITIVE, and this function's
 	; OWN name ends in "Submenu()" — which contains "menu()".
-	Assert(!RegExMatch(Body, "Menu\(\)"),
+	Assert(!RegExMatch(Body, "\bMenu\(\)"),
 		"_BuildTapHoldsSubmenu must not build a Menu itself (HIGH-07)")
 }
 Test("meta fix-tapholds-menu-raw-add: the two buttons are declared commands",
@@ -78,18 +78,41 @@ _THRD_KeyRowsReturnData() {
 	Body := _DriverFuncBody("_TH_KeyRows")
 	Assert(Body != "", "_TH_KeyRows must be present in the driver source")
 
-	Assert(!RegExMatch(Body, "Menu\(\)"),
+	Assert(!RegExMatch(Body, "\bMenu\(\)"),
 		"_TH_KeyRows must return row data, never build a Menu — a Menu it filled itself would carry "
 		. "callbacks outside the WM_COMMAND retry path (HIGH-07)")
 	Assert(!InStr(Body, "RegisterMenuItem("),
 		"_TH_KeyRows must not register menu items itself (HIGH-07)")
-	; Every actionable row carries its callback as data under "action", which the
-	; renderer wires with RegisterMenuItem.
-	for _, Fn in ["_TH_MakeDisableFn", "_TH_MakeTapPickerFn"] {
-		Assert(RegExMatch(Body, Chr(34) . "action" . Chr(34) . "\s*,\s*" . Fn),
-			"_TH_KeyRows must carry " . Fn . " as an " . Chr(34) . "action" . Chr(34)
-			. " row field so the renderer wires it (HIGH-07)")
+	; The provider binds each native owner to its shared command identity. The
+	; template materializes action data through the same renderer as every list.
+	Assert(InStr(Body, 'MenuRenderer_TemplateRows("tap_hold_key_head"') > 0,
+		"_TH_KeyRows must delegate the complete child head to the shared template")
+	for Id, Fn in Map("tap_hold_key_native", "_TH_MakeDisableFn",
+		"tap_hold_key_tap", "_TH_MakeTapPickerFn") {
+		Assert(RegExMatch(Body, Chr(34) . Id . Chr(34) . "\s*,\s*" . Fn),
+			"_TH_KeyRows must bind " . Fn . " to its declared command " . Id . " (HIGH-07)")
 	}
+	Head := _MR_GetMenuDef("tap_hold_key_head")
+	Assert(Head.Length > 0 && Head[1]["type"] == "include"
+		&& Head[1]["section"] == "tap_hold_key_native_commands",
+		"the shared head must include its actual native command declaration")
+	for Section, Id in Map("tap_hold_key_native_commands", "tap_hold_key_native",
+		"tap_hold_key_head", "tap_hold_key_tap") {
+		Item := _MR_FindItemById(Section, Id)
+		Assert(Item is Map && Item["type"] == "command" && _MR_IsForAhk(Item),
+			"the bound callback must remain a reachable Windows command: " . Id)
+	}
+	Assert(InStr(_DriverFuncBody("_MR_TemplateRows"), "MenuRenderer_CommandRow(") > 0,
+		"the template must materialize each declared command through the native provider")
+	Assert(InStr(_DriverFuncBody("MenuRenderer_CommandRow"), "_MR_DeclaredProviderRow(") > 0,
+		"the command provider must use the actual declaration owner")
+	Assert(InStr(_DriverFuncBody("_MR_DeclaredProviderRow"), "_MR_CommandRowData(") > 0,
+		"the declaration owner must materialize canonical command row data")
+	Assert(RegExMatch(_DriverFuncBody("_MR_CommandRowData"),
+		Chr(34) . "action" . Chr(34) . "\s*,\s*Commands\[CmdId\]"),
+		"canonical command data must retain its callback as an action field (HIGH-07)")
+	Assert(InStr(_DriverFuncBody("_MR_RenderRows"), 'RegisterMenuItem(TargetMenu, Label, Row["action"])') > 0,
+		"the actual native renderer must register action data through the WM_COMMAND retry owner")
 }
 Test("meta fix-tapholds-menu-raw-add: the per-key provider returns data, not a menu",
 	_THRD_KeyRowsReturnData)
@@ -98,7 +121,7 @@ _THRD_HoldPickerReturnsData() {
 	Body := _DriverFuncBody("_TH_HoldPickerRows")
 	Assert(Body != "", "_TH_HoldPickerRows must be present in the driver source")
 
-	Assert(!RegExMatch(Body, "Menu\(\)"),
+	Assert(!RegExMatch(Body, "\bMenu\(\)"),
 		"_TH_HoldPickerRows must return row data, never build a Menu (HIGH-07)")
 	Assert(!InStr(Body, "RegisterMenuItem("),
 		"_TH_HoldPickerRows must not register menu items itself (HIGH-07)")

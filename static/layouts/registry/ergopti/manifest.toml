@@ -13,7 +13,7 @@ author = "Adrien Moyaux"
 key = "KeyC"
 
 # The hotstrings written for Ergopti's key positions: distance and SFB
-# reduction, rolls and the magic key's repeat corrections. Each keeps its
+# reduction, rolls, suffixes and magic-key features. Each keeps its
 # historical category, feature section and common priority tier, so every preference still
 # addresses it. They are available wherever this extension is installed, and
 # the drivers count the Ergopti they ship as installed.
@@ -36,4 +36,15 @@ source = "common"
 category = "magickey"
 feature_section = "hotstrings.magic_key"
 sections = ["repeat_corrections"]
+source = "common"
+
+[extension.hotstring_bindings.magickeyreplace]
+category = "magickey"
+feature_section = "hotstrings.magic_key"
+sections = ["replace"]
+source = "common"
+
+[extension.hotstring_bindings.suffixes_a]
+category = "french_distancesreduction"
+feature_section = "hotstrings.french_distancesreduction"
 source = "common"

@@ -91,8 +91,13 @@ return function(helpers)
 				"hotstrings.modules.ext:ergopti:rolls.custom", "hotstrings.modules.french_probe.accents" })
 			local plan = Manifest.scope_plan("hotstrings", "clear", owned)
 			local indexed = {}
-			for _, row in ipairs(plan.operations) do indexed[row.section .. "." .. row.key] = row end
+			for _, row in ipairs(plan.operations) do
+				local segments = assert(require("toml_codec.key_path").parse(row.section))
+				indexed[table.concat(segments, ".") .. "." .. row.key] = row
+			end
 			for _, path in ipairs(owned) do helpers.assert_eq(indexed[path].delete, true) end
+			helpers.assert_eq(indexed["hotstrings.modules.ext:ergopti:rolls.custom"].section,
+				'hotstrings.modules."ext:ergopti:rolls"', "the colon identity stays one valid TOML section segment")
 			helpers.assert_eq(indexed["hotstrings.modules.ext:ergopti:rolls.unknown"], nil)
 			helpers.assert_eq(indexed["shortcuts.personal.other_scope"], nil)
 		end)
