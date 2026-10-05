@@ -47,6 +47,52 @@ local ConfigOutdated = require("config_outdated")
 local LOG           = "config_unused_keys"
 local BOM           = string.char(0xEF, 0xBB, 0xBF)
 
+local RootCleanup = require("toml_codec.cleanup_roots")
+local root_receipts = setmetatable({}, { __mode = "k" })
+
+local function protected_root(root)
+	return root:sub(1, 1) == "_" or root == "updater"
+end
+
+local function root_fields_match(entry, receipt, source)
+	if receipt.consumed or receipt.source ~= source or getmetatable(entry) ~= nil then return false end
+	local allowed = { section = true, key = true, kind = true, value = true, path = true }
+	local count = 0
+	for key in pairs(entry) do if not allowed[key] then return false end; count = count + 1 end
+	if count ~= 5 or entry.section ~= receipt.root or entry.key ~= "" or entry.kind ~= "section"
+		or entry.value ~= receipt.value or entry.path ~= receipt.path or getmetatable(entry.path) ~= nil then return false end
+	count = 0
+	for key in pairs(entry.path) do if key ~= 1 then return false end; count = count + 1 end
+	return count == 1 and entry.path[1] == receipt.root
+end
+
+local function still_unread(receipt, source)
+	local ok, decoded, shapes = pcall(TomlCodec.decode_with_shapes, source)
+	if not ok or type(decoded) ~= "table" or protected_root(receipt.root) then return false end
+	local consumption = M.new_consumption()
+	local admitted = pcall(function()
+		ConfigOutdated.collect_reports(function() receipt.collect(decoded, consumption.mark, shapes) end)
+	end)
+	return admitted and not consumption.touches({ receipt.root })
+end
+
+local function root_selection(source, keys, native_path)
+	local roots, selected = {}, {}
+	for _, entry in ipairs(keys) do
+		local receipt = root_receipts[entry]
+		if receipt then
+			if not root_fields_match(entry, receipt, source) or selected[receipt.root]
+				or (native_path ~= nil and (receipt.file_path ~= native_path or not still_unread(receipt, source))) then
+				return nil, "the whole-root preview lost its exact source, record or unread ownership"
+			end
+			selected[receipt.root] = true; roots[#roots + 1] = receipt.root
+		elseif entry.key == "" or (type(entry.path) == "table" and #entry.path < 2) then
+			return nil, "a whole-root request needs its private native preview"
+		end
+	end
+	return roots
+end
+
 --- The confirmation dialog lists at most this many keys; the rest are counted.
 --- Pinned to CONFIG_UNUSED_KEYS_DISPLAY_LIMIT of the Windows driver by test.
 M.DISPLAY_LIMIT = 30
@@ -212,7 +258,7 @@ end
 --- @param source string Exact file content.
 --- @param collect function `collect(decoded, mark, shapes)`: the driver's readers; receipt is optional for old consumers.
 --- @return table scan `{ status = "ok"|"malformed", keys }`.
-function M.find_in_source(source, collect)
+local function find_in_source(source, collect, whole_unread_roots)
 	if type(collect) ~= "function" then
 		error("config_unused_keys: a collector of the driver's readers is required", 2)
 	end
@@ -228,14 +274,26 @@ function M.find_in_source(source, collect)
 	-- reader also reads it: warned and offered are one set.
 	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark, shapes) end)
 
-	local keys = {}
+	local keys, whole_roots = {}, {}
+	local projection = whole_unread_roots and RootCleanup.scan(source)
+	if projection then
+		for _, root in ipairs(projection.order) do
+			if root ~= "" and not protected_root(root) and not consumption.touches({ root }) then
+				local value = TomlCodec.encode_value_with_shapes(projection.document[root], projection.shapes, projection.document, root)
+				local entry = { section = root, key = "", kind = "section", value = value, path = { root } }
+				root_receipts[entry] = { source = source, root = root, value = value, path = entry.path,
+					collect = collect, consumed = false }
+				keys[#keys + 1] = entry; whole_roots[root] = true
+			end
+		end
+	end
 	for _, record in ipairs(scan.records) do
 		-- A [_*] table is metadata no reader marks: [_meta] holds the schema
 		-- stamp the boot migration reads before any reader runs. The Windows
 		-- loader skips the same tables.
 		local metadata = record.addressable and record.path[1]:sub(1, 1) == "_"
 		local stale = record.addressable and outdated[table.concat(record.path, ".")] == true
-		if record.addressable and not metadata and (stale or not consumption.touches(record.path)) then
+		if record.addressable and not whole_roots[record.path[1]] and not metadata and (stale or not consumption.touches(record.path)) then
 			keys[#keys + 1] = {
 				section = record.section,
 				key     = record.key,
@@ -245,11 +303,16 @@ function M.find_in_source(source, collect)
 				kind    = consumption.touches(record.header.segments) and "leaf" or "section",
 				path    = record.path,
 			}
-		elseif record.addressable and not metadata and type(lookup(decoded, record.path)) == "table" then
+		elseif record.addressable and not whole_roots[record.path[1]] and not metadata and type(lookup(decoded, record.path)) == "table" then
 			for _, entry in ipairs(inline_members(record, outdated, decoded)) do keys[#keys + 1] = entry end
 		end
 	end
 	return { status = "ok", keys = keys }
+end
+
+--- Retains the conservative addressing of the historical source-only API.
+function M.find_in_source(source, collect)
+	return find_in_source(source, collect, false)
 end
 
 --- Lists the unused keys of a config file. A missing file is "ok" with no
@@ -265,7 +328,13 @@ function M.find(opts)
 	if status ~= "ok" or type(content) ~= "string" then
 		return { status = "unreadable", keys = {} }
 	end
-	local scan = M.find_in_source(content, opts.collect)
+	if opts.whole_unread_roots ~= nil and type(opts.whole_unread_roots) ~= "boolean" then
+		error("whole unread roots need explicit native Boolean intent", 2)
+	end
+	local scan = find_in_source(content, opts.collect, opts.whole_unread_roots == true)
+	for _, entry in ipairs(scan.keys) do
+		if root_receipts[entry] then root_receipts[entry].file_path = opts.path end
+	end
 	scan.source = content
 	return scan
 end
@@ -345,6 +414,20 @@ end
 --- @return string|nil candidate Cleaned content.
 --- @return number|string removed_or_error Number of records cut, or a failure detail.
 function M.remove_from_source(source, keys)
+	local roots, root_error = root_selection(source, keys)
+	if not roots then return nil, root_error end
+	if #roots > 0 then
+		local remaining = {}
+		for _, entry in ipairs(keys) do if not root_receipts[entry] then remaining[#remaining + 1] = entry end end
+		local candidate, count = RootCleanup.render(source, roots)
+		if not candidate then return nil, count end
+		if #remaining > 0 then
+			local remainder, removed = M.remove_from_source(candidate, remaining)
+			if not remainder then return nil, removed end
+			candidate, count = remainder, count + removed
+		end
+		return candidate, count
+	end
 	local scan, scan_err = M.scan_records(source)
 	if not scan then return nil, scan_err end
 	local listed, unknown_sections, members = {}, {}, {}
@@ -474,6 +557,8 @@ function M.remove(opts)
 		error("config_unused_keys.remove needs at least one key to remove", 2)
 	end
 	local path = opts.path
+	local captured_keys = {}
+	for index, entry in ipairs(opts.keys) do captured_keys[index] = entry end
 	local stamp = opts.stamp or os.date(M.STAMP_FORMAT)
 	local backup = M.backup_path(path, stamp)
 	local create_backup = opts.create_backup or function(target, content)
@@ -503,6 +588,22 @@ function M.remove(opts)
 		return result
 	end
 
+	local function validate_roots()
+		local roots, detail = root_selection(source, captured_keys, path)
+		if not roots then return false, detail end
+		if #roots > 0 then
+			if getmetatable(opts.keys) ~= nil or #opts.keys ~= #captured_keys then
+				return false, "the native root selection changed"
+			end
+			for index, entry in ipairs(captured_keys) do
+				if not rawequal(opts.keys[index], entry) then return false, "the captured native root row changed" end
+			end
+		end
+		return true
+	end
+	local admitted, admission_error = validate_roots()
+	if not admitted then return refuse("write_failed", admission_error) end
+
 	-- The copy is created where nothing exists yet and read back before any
 	-- byte of the configuration can change.
 	local create_ok, created, create_detail = pcall(create_backup, backup, source)
@@ -514,9 +615,13 @@ function M.remove(opts)
 		return refuse("backup_failed", "the backup '" .. backup .. "' does not hold the exact bytes")
 	end
 
-	local candidate, removed_or_err = M.remove_from_source(source, opts.keys)
+	admitted, admission_error = validate_roots()
+	if not admitted then return refuse("write_failed", admission_error) end
+	local candidate, removed_or_err = M.remove_from_source(source, captured_keys)
 	if not candidate then return refuse("write_failed", removed_or_err) end
 	if candidate ~= source then
+		admitted, admission_error = validate_roots()
+		if not admitted then return refuse("write_failed", admission_error) end
 		local publish_ok, published, publish_detail = pcall(publish, path, candidate,
 			{ status = "ok", content = source })
 		if not publish_ok or published ~= true then
@@ -524,6 +629,9 @@ function M.remove(opts)
 		end
 	end
 
+	for _, entry in ipairs(captured_keys) do
+		if root_receipts[entry] then root_receipts[entry].consumed = true end
+	end
 	result.status = "removed"
 	result.removed = removed_or_err
 	result.previous = source
