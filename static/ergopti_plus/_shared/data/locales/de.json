@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Ziffern zuerst",
 	"menu.layout.number_row_symbols": "Symbole zuerst",
 	"platform_reason.number_row_override_unsupported": "Nicht unterstützt: Dieser Treiber behält die native Ziffernreihe des Systems bei; erzwungene Ziffern und Symbole sind nicht verfügbar.",
-	"platform_reason.number_row_source_unavailable": "Nicht verfügbar: Symbole zuerst erfordert ein aktives emuliertes Layout mit gültigen Ziffern- und Symbolebenen an jeder Position der Ziffernreihe."
+	"platform_reason.number_row_source_unavailable": "Nicht verfügbar: Symbole zuerst erfordert ein aktives emuliertes Layout mit gültigen Ziffern- und Symbolebenen an jeder Position der Ziffernreihe.",
+	"sg_actions.run_program": "▶️ Programm ausführen [konfigurierbar]",
+	"dialog.gestures.param_program": "Wählen Sie einen absoluten Programmpfad und geben Sie jedes Argument einzeln ein. Wählen Sie für ein Skript dessen Interpreter und fügen Sie den Skriptpfad als Argument hinzu.",
+	"dialog.gestures.param_err_program": "Verwenden Sie einen absoluten Pfad und unveränderte Textargumente.",
+	"dialog.action_picker.program_executable": "Ausführbare Datei",
+	"dialog.action_picker.program_arguments": "Argumente (eines pro Feld)",
+	"dialog.action_picker.program_add_argument": "Argument hinzufügen",
+	"dialog.action_picker.program_remove_argument": "Argument entfernen",
+	"platform_reason.program_runner_unavailable": "Nicht verfügbar: Der native Programmstarter oder diese Zuordnung ist nicht verfügbar."
 }

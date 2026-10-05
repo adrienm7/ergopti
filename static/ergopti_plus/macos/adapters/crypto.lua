@@ -62,8 +62,9 @@ end
 
 --- Computes the SHA-256 digest of an arbitrary binary string.
 --- @param data string The exact byte string to hash.
+--- @param on_error function|nil Scoped callback receiving a fixed failure category.
 --- @return string Lowercase hex digest (64 chars), or "" on failure.
-function M.sha256_bytes(data)
+function M.sha256_bytes(data, on_error)
 	local ok, result = pcall(function()
 		if type(data) ~= "string" then return "" end
 		if type(hs.hash) ~= "table" or type(hs.hash.new) ~= "function" then return "" end
@@ -80,7 +81,13 @@ function M.sha256_bytes(data)
 		return digest
 	end)
 	if not ok then
-		Logger.error(LOG, "sha256_bytes(): unexpected error — %s", tostring(result))
+		if type(on_error) == "function" then
+			-- Private source bytes can appear in a native error. Never pass that
+			-- value to the scoped reporter or fall back after reporter refusal.
+			pcall(on_error, "native-hash-error")
+		else
+			Logger.error(LOG, "sha256_bytes(): unexpected error — %s", tostring(result))
+		end
 		return ""
 	end
 	return type(result) == "string" and result or ""

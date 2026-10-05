@@ -2988,8 +2988,21 @@ not integrate or qualify the pending executable/provider feature.
 
 The shared Core CI preparation reuses the independently released Group4
 `lua-luv` provisioning fix so stock Lua 5.4 can run native descriptor-admission
-checks. Manual validation still requires the dedicated CI branch and owned
-lock; this prerequisite does not qualify native program execution.
+checks. Preparatory native checks may use the owned `codex/ci-actions` branch
+without the integration lock. Final integrated qualification still owns
+`codex/ci-lock` and uses only `codex/ci-validation`; this prerequisite does not
+qualify native program execution.
+
+The bounded publisher correction now retains prepublication staging debt and
+pins physical published/staged identities before use. Retrying cleanup cannot
+unlink a replaced directory or payload, relearn unknown allocation identity,
+or turn a refused publication into success. Independent temporary-I/O controls
+pass108/0 on target Lua5.4 with CI umask022;19 conditional cases pass on both Lua
+ABIs. The metadata-copy fixture now performs the real acknowledged copy and
+proves each intended post-rename premise. The prior no-op copy reproduces the
+five hosted failures; it is not evidence of native publication. These checks
+retain the cooperative pathname boundary and do not claim atomic fd-relative
+CAS, restrictive staging permissions or actual Hammerspoon/fcntl validation.
 
 The inactive three-source native publisher handoff is pinned under
 `docs/handovers/2026-10-04-parallel-containers/group3-native-publisher/` for
@@ -3429,6 +3442,15 @@ completion waits for physical acknowledgements; paused or revoked operations
 retain their cleanup debt. This independent prerequisite does not implement
 cursor-display switching or qualify the prepared native adapters. The Linux
 packet, full composed gates and native display acceptance remain pending.
+
+The Linux tap-hold route now retains the canonical source slot through immediate,
+release, replay and timed dispatch. Cursor-display admission captures and rechecks
+that exact source generation and configured action; a retired global alias cannot
+substitute for it. Focused routing and admission controls pass172/0 on both Lua
+ABIs. The actual pre-integration Linux suite passes6632/0 after its picker fixture
+owns the real Magic dependency left cached by an earlier missing-default test;
+the independent two-failure causal prefix remains preserved. Source-port controls
+and virtual X11 checks do not establish physical tap-hold/display behavior.
 
 Windows continuation for item111 (explicitly deferred to the maintainer's PC):
 

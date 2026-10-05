@@ -39,6 +39,15 @@ function M.new(opts)
 
 	local requested = false
 	local coordinator = {}
+	local pending, registering, input_stopped = {}, false, false
+	local completed = false
+	local function finish()
+		if not completed and not registering and input_stopped and next(pending) == nil then
+			completed = true
+			event_loop.stop()
+			Logger.done(LOG, "Shutdown quiescence complete.")
+		end
+	end
 
 	--- Quiesces every registered owner exactly once.
 	--- @param reason string Human-readable shutdown trigger.
@@ -49,10 +58,22 @@ function M.new(opts)
 		requested = true
 		Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
 
+		registering = true
 		for _, owner in ipairs(pre_wait) do
 			local ok, failure = xpcall(owner.stop, debug.traceback)
 			if not ok then
 				Logger.error(LOG, "Shutdown owner '%s' failed: %s", owner.name, tostring(failure))
+			end
+			if type(owner.when_settled) == "function" and (not ok or failure ~= true) then
+				local token = {}
+				pending[token] = owner
+				pcall(owner.when_settled, function()
+					if pending[token] ~= owner then return end
+					local checked, settled = pcall(owner.stop)
+					if not checked or settled ~= true then return end
+					pending[token] = nil
+					finish()
+				end)
 			end
 		end
 
@@ -63,8 +84,8 @@ function M.new(opts)
 				keyboard_hook.stop()
 			end
 		end
-		event_loop.stop()
-		Logger.done(LOG, "Shutdown quiescence complete.")
+		input_stopped, registering = true, false
+		finish()
 		return true
 	end
 

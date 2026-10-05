@@ -43,6 +43,7 @@ local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
+local OperationReporter = require("diagnostics.operation_reporter")
 
 
 
@@ -239,14 +240,14 @@ local read_existing
 --- @param expected_source table|nil Optional `{ status, content }` precondition.
 --- @return boolean written
 --- @return string|nil error_message
-local function publish_content(path, content, file_adapter, expected_source)
+local function publish_content(path, content, file_adapter, expected_source, on_error)
 	local refusal = _refused_writes[refusal_key(path)]
 	if refusal then
 		return false, "writes to this file are refused for the session: " .. refusal
 	end
 	if type(file_adapter) == "table" then
 		if type(expected_source) == "table" then
-			local current, current_status, current_detail = read_existing(path, file_adapter)
+			local current, current_status, current_detail = read_existing(path, file_adapter, on_error)
 			if current_status ~= expected_source.status
 				or (current_status == "ok" and current ~= expected_source.content) then
 				return false, "source changed before publication: "
@@ -265,9 +266,20 @@ local function publish_content(path, content, file_adapter, expected_source)
 		if type(publisher) ~= "function" then
 			return false, "explicit file adapter has no compatible publication method"
 		end
-		local call_ok, written, write_detail = pcall(publisher, path, content, expected_source)
-		if call_ok and written == true then return true end
-		return false, tostring((call_ok and write_detail) or written or "adapter write failed")
+		local call_ok, written, write_detail, receipt
+		if publisher == file_adapter.write_if_unchanged then
+			call_ok, written, write_detail, receipt = pcall(publisher, path, content, expected_source, on_error)
+		else
+			call_ok, written, write_detail = pcall(publisher, path, content)
+		end
+		if type(on_error) ~= "function" then receipt = nil end
+		if call_ok and written == true then
+			if receipt ~= nil then return true, nil, receipt end
+			return true
+		end
+		local detail = tostring((call_ok and write_detail) or written or "adapter write failed")
+		if call_ok and receipt ~= nil then return false, detail, receipt end
+		return false, detail
 	end
 
 	return publish(path, content, expected_source)
@@ -279,9 +291,9 @@ end
 --- @return string|nil content
 --- @return string status `ok`, `absent`, or `error`.
 --- @return string|nil detail
-read_existing = function(path, file_adapter)
+read_existing = function(path, file_adapter, on_error)
 	if type(file_adapter) == "table" and type(file_adapter.read_with_status) == "function" then
-		local call_ok, content, status, detail = pcall(file_adapter.read_with_status, path)
+		local call_ok, content, status, detail = pcall(file_adapter.read_with_status, path, on_error)
 		if not call_ok then return nil, "error", tostring(content) end
 		if status == "ok" and type(content) == "string" then return content, "ok" end
 		if status == "absent" then return nil, "absent", detail end
@@ -534,17 +546,19 @@ end
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
 --- @param file_adapter table|nil Classified platform file adapter.
 --- @param expected_source table|nil Exact source precondition.
+--- @param on_error function|nil Receives only fixed failure categories.
 --- @return boolean prepared
 --- @return string|nil detail
 --- @return string|nil content Candidate bytes.
 --- @return table|nil source Exact publication precondition.
-function M.prepare_batch(path, updates, file_adapter, expected_source)
+function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "batch_write: invalid path.")
+		report("validation", "error", "batch_write: invalid path.")
 		return false, "Invalid path."
 	end
 	if type(updates) ~= "table" then
-		Logger.error(LOG, "batch_write: updates must be a table.")
+		report("validation", "error", "batch_write: updates must be a table.")
 		return false, "updates must be a table."
 	end
 
@@ -575,7 +589,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 	end
 	local function reject_row(index, reason)
 		local detail = "Invalid update row at index " .. tostring(index) .. ": " .. reason
-		Logger.error(LOG, "batch_write: %s.", detail)
+		report("preparation", "error", "batch_write: %s.", detail)
 		return false, detail
 	end
 	for index, u in ipairs(updates) do
@@ -624,9 +638,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source)
 
 	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
-	local source, read_status, read_detail = read_existing(path, file_adapter)
+	local source, read_status, read_detail = read_existing(path, file_adapter, on_error)
 	if read_status == "error" then
-		Logger.error(LOG, "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
+		report("read", "error", "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
 		return false, tostring(read_detail)
 	end
 	if expected_source ~= nil then
@@ -806,18 +820,24 @@ end
 --- @param updates table Explicit set/delete operations.
 --- @param file_adapter table|nil Platform file adapter.
 --- @param expected_source table|nil Exact source precondition.
+--- @param on_error function|nil Receives only fixed failure categories.
 --- @return boolean committed
 --- @return string|nil detail
 --- @return string|nil content Committed bytes.
-function M.batch_write(path, updates, file_adapter, expected_source)
-	local prepared, detail, content, source = M.prepare_batch(path, updates, file_adapter, expected_source)
+--- @return table|nil receipt Optional private native publication/release capability.
+--- @return string|nil candidate Prepared bytes only when a native receipt is returned.
+function M.batch_write(path, updates, file_adapter, expected_source, on_error)
+	local report = OperationReporter.new(on_error, Logger, LOG)
+	local prepared, detail, content, source = M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	if not prepared then return false, detail end
-	local published, publish_err = publish_content(path, content, file_adapter, source)
+	local published, publish_err, receipt = publish_content(path, content, file_adapter, source, on_error)
 	if not published then
-		Logger.error(LOG, "batch_write: publication to '%s' failed — %s.", path, tostring(publish_err))
+		report("publication", "error", "batch_write: publication to '%s' failed — %s.", path, tostring(publish_err))
+		if receipt ~= nil then return false, tostring(publish_err), nil, receipt, content end
 		return false, tostring(publish_err)
 	end
 	Logger.info(LOG, "batch_write: committed %d operation(s) to '%s'.", #updates, path)
+	if receipt ~= nil then return true, nil, content, receipt, content end
 	return true, nil, content
 end
 
@@ -831,11 +851,12 @@ end
 --- with absence, through the platform adapter when one is supplied.
 --- @param path string Source path.
 --- @param file_adapter table|nil Platform file adapter.
+--- @param on_error function|nil Receives only fixed failure categories.
 --- @return string|nil content Exact bytes when the status is `ok`.
 --- @return string status `ok`, `absent`, or `error`.
 --- @return string|nil detail Failure detail.
-function M.read_classified(path, file_adapter)
-	return read_existing(path, file_adapter)
+function M.read_classified(path, file_adapter, on_error)
+	return read_existing(path, file_adapter, on_error)
 end
 
 --- Publishes exact bytes only while the destination still matches
@@ -845,26 +866,31 @@ end
 --- @param content string Complete payload.
 --- @param file_adapter table|nil Platform file adapter.
 --- @param expected_source table `{ status, content }` precondition.
+--- @param on_error function|nil Receives only fixed failure categories.
 --- @return boolean committed
 --- @return string|nil error_message
-function M.publish_if_unchanged(path, content, file_adapter, expected_source)
+--- @return table|nil receipt Optional private native publication/release capability.
+function M.publish_if_unchanged(path, content, file_adapter, expected_source, on_error)
 	if type(path) ~= "string" or path == "" or type(content) ~= "string"
 		or type(expected_source) ~= "table" then
 		return false, "publish_if_unchanged needs a path, a string payload and a source precondition"
 	end
-	return publish_content(path, content, file_adapter, expected_source)
+	return publish_content(path, content, file_adapter, expected_source, on_error)
 end
 
 --- Removes a file only while it still holds exactly the bytes a caller published.
 --- This restores a proven absence: a created file that was edited since is kept.
---- The macOS adapter exposes `remove_exact`, the Linux one `delete`; an explicit
---- adapter with neither is refused instead of reaching around it.
+--- Uses an optional adapter-owned conditional mutex transaction when available.
+--- Legacy callers retain the compare-before-unlink fallback; owners requiring
+--- the stronger capability refuse adapters which cannot provide it.
 --- @param path string File to remove.
 --- @param file_adapter table|nil Platform file adapter.
 --- @param expected_source table `{ status = "ok", content = string }` precondition.
+--- @param operation_policy table|nil `{ require_conditional, on_error }`.
 --- @return boolean removed
 --- @return string|nil error_message
-function M.remove_if_unchanged(path, file_adapter, expected_source)
+--- @return table|nil receipt Optional retained native physical inverse owner.
+function M.remove_if_unchanged(path, file_adapter, expected_source, operation_policy)
 	if type(path) ~= "string" or path == "" or type(expected_source) ~= "table"
 		or expected_source.status ~= "ok" or type(expected_source.content) ~= "string" then
 		return false, "remove_if_unchanged needs a path and the exact bytes it must still hold"
@@ -873,7 +899,16 @@ function M.remove_if_unchanged(path, file_adapter, expected_source)
 	if refusal then
 		return false, "writes to this file are refused for the session: " .. refusal
 	end
-	local current, status, detail = read_existing(path, file_adapter)
+	local on_error = operation_policy and operation_policy.on_error
+	if type(file_adapter) == "table" and type(file_adapter.remove_if_unchanged) == "function" then
+		local called, removed, detail, receipt = pcall(file_adapter.remove_if_unchanged, path, expected_source, on_error)
+		if not called then return false, tostring(removed) end
+		return removed == true, detail, receipt
+	end
+	if operation_policy and operation_policy.require_conditional == true then
+		return false, "conditional removal capability is unavailable"
+	end
+	local current, status, detail = read_existing(path, file_adapter, on_error)
 	if status ~= "ok" or current ~= expected_source.content then
 		return false, "source changed before removal: " .. tostring(detail or status)
 	end

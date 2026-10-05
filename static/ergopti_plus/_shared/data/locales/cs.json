@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "Nejprve číslice",
 	"menu.layout.number_row_symbols": "Nejprve symboly",
 	"platform_reason.number_row_override_unsupported": "Nepodporováno: Tento ovladač zachovává nativní číselnou řadu systému; vynucení číslic ani symbolů není dostupné.",
-	"platform_reason.number_row_source_unavailable": "Nedostupné: Symboly nejprve vyžadují aktivní emulované rozložení s platnými úrovněmi číslic a symbolů na každé pozici číselné řady."
+	"platform_reason.number_row_source_unavailable": "Nedostupné: Symboly nejprve vyžadují aktivní emulované rozložení s platnými úrovněmi číslic a symbolů na každé pozici číselné řady.",
+	"sg_actions.run_program": "▶️ Spustit program [nastavitelné]",
+	"dialog.gestures.param_program": "Vyberte absolutní cestu k programu a každý argument zadejte zvlášť. U skriptu vyberte interpret a přidejte cestu ke skriptu jako argument.",
+	"dialog.gestures.param_err_program": "Použijte absolutní cestu a doslovné textové argumenty.",
+	"dialog.action_picker.program_executable": "Spustitelný soubor",
+	"dialog.action_picker.program_arguments": "Argumenty (jeden v každém poli)",
+	"dialog.action_picker.program_add_argument": "Přidat argument",
+	"dialog.action_picker.program_remove_argument": "Odebrat argument",
+	"platform_reason.program_runner_unavailable": "Nedostupné: Nativní spouštěč nebo tato vazba není dostupná."
 }

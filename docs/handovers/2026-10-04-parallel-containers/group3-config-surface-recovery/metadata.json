@@ -1,0 +1,11 @@
+{
+	"product_path": "tools/test/test-driver-config-surface-is-declared.cjs",
+	"preimage_sha256": "066dd32252ef75bc1736e590a4de05469600933aa5a42f6ab65523160124b2e9",
+	"postimage_sha256": "4729f45bff5258ddc40d90d886cd5afda43630f905592c18a8f1c66b23ad91a7",
+	"patch_sha256": "7b97857aae285e90eac6445d1454353e81b1d1fac5801d76a92b9a9e57f6c17e",
+	"helper_source_sha256": "aec4eea88e9289dd479a4d2725dcfbda6a26f76bbdcbd18e4e557fd240642f33",
+	"source_packets": [
+		"https://github.com/adrienm7/ergopti/issues/86#issuecomment-5985783565",
+		"https://github.com/adrienm7/ergopti/issues/86#issuecomment-5985879054"
+	]
+}

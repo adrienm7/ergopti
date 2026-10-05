@@ -3189,5 +3189,13 @@
 	"menu.layout.number_row_digits": "ספרות תחילה",
 	"menu.layout.number_row_symbols": "סמלים תחילה",
 	"platform_reason.number_row_override_unsupported": "לא נתמך: מנהל התקן זה שומר על שורת הספרות המקורית של המערכת; אי אפשר לכפות ספרות או סמלים.",
-	"platform_reason.number_row_source_unavailable": "לא זמין: העדפת סמלים דורשת פריסה מדומה פעילה עם רמות תקינות לספרות ולסמלים בכל מיקום בשורת הספרות."
+	"platform_reason.number_row_source_unavailable": "לא זמין: העדפת סמלים דורשת פריסה מדומה פעילה עם רמות תקינות לספרות ולסמלים בכל מיקום בשורת הספרות.",
+	"sg_actions.run_program": "▶️ הפעלת תוכנית [ניתן להגדרה]",
+	"dialog.gestures.param_program": "בחר נתיב מוחלט לתוכנית והזן כל ארגומנט בנפרד. עבור סקריפט, בחר את המפרש והוסף את נתיב הסקריפט כארגומנט.",
+	"dialog.gestures.param_err_program": "השתמש בנתיב מוחלט ובארגומנטים טקסטואליים ללא פענוח.",
+	"dialog.action_picker.program_executable": "קובץ הפעלה",
+	"dialog.action_picker.program_arguments": "ארגומנטים (אחד בכל שדה)",
+	"dialog.action_picker.program_add_argument": "הוספת ארגומנט",
+	"dialog.action_picker.program_remove_argument": "הסרת ארגומנט",
+	"platform_reason.program_runner_unavailable": "לא זמין: מפעיל התוכניות המובנה או שיוך זה אינם זמינים."
 }

@@ -160,7 +160,14 @@ local function load_fixture(opts)
 
 	package.loaded["ui.menu.init"] = nil
 	local Menu = require("ui.menu.init")
-	local menu = Menu.start("/virtual/", {}, {}, {}, {}, {}, nil, {})
+	local program_admission
+	local gestures = { configure_program_admission = function(callback)
+		helpers.assert_type(callback, "function")
+		program_admission = callback
+		return true
+	end }
+	local menu = Menu.start("/virtual/", {}, gestures, {}, {}, {}, nil, {})
+	helpers.assert_type(program_admission, "function", "startup registers its required program admission owner")
 	return {
 		menu = menu,
 		state = state,
