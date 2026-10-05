@@ -163,7 +163,7 @@ end
 --- Shows a short notice for an action that had nothing to act on.
 --- @param key string Locale key.
 local function notify(key)
-	local ok, Notifier = pcall(require, "adapters.notifier")
+	local ok, Notifier = pcall(require, "adapters.application_notifier")
 	if not ok or type(Notifier.send) ~= "function" then
 		Logger.warn(LOG, "No notifier to show '%s'.", key)
 		return

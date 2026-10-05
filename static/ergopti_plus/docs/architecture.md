@@ -36,6 +36,7 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
+        LINUX_application_notifier["ApplicationNotifier.lua"]
         LINUX_atspi_focus["AtspiFocus.lua"]
         LINUX_atspi_native_identity["AtspiNativeIdentity.lua"]
         LINUX_clipboard["Clipboard.lua"]
@@ -71,6 +72,7 @@ graph TD
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
         MACOS_accessibility_permission["AccessibilityPermission.lua"]
         MACOS_app_launcher["AppLauncher.lua"]
+        MACOS_application_notifier["ApplicationNotifier.lua"]
         MACOS_boot_fatal["BootFatal.lua"]
         MACOS_boot_journal["BootJournal.lua"]
         MACOS_clipboard["Clipboard.lua"]
