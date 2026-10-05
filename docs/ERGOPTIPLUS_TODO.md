@@ -2858,6 +2858,11 @@ Published declaration metadata is available without resolving hardware
 defaults, supporting strict expert-value admission through the actual
 catalogue. This additive API does not complete expert-field coverage.
 
+Native macOS logger and known feature admission uses the published
+catalogues. Malformed carried combination leaves stay byte-preserved on
+unrelated saves and refuse requested replacement. Both portable native
+suites pass; wider expert catalogue and installed acceptance remain open.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

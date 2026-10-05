@@ -764,8 +764,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			for id, values in pairs(updates or {}) do
 				assert(type(id) == "string" and type(values) == "table", "invalid remap binding candidate")
 				local preserve_array = not overwrite_corrupt and document_shapes and document_shapes.arrays[target[id]]
-				local preserve_scalar = not overwrite_corrupt and section == "tap_holds"
-					and target[id] ~= nil and type(target[id]) ~= "table"
+				-- Combo strings keep their distinct explicit legacy migration path.
+				local preserve_scalar = not overwrite_corrupt and target[id] ~= nil and type(target[id]) ~= "table"
+					and (section == "tap_holds" or (section == "mod_combos" and type(target[id]) ~= "string"))
 				if preserve_scalar or preserve_array then
 					Outdated.report_in_file(user_config_path, { section, "config", id },
 						(preserve_array and OUTDATED_ARRAY_REASON
