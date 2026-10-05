@@ -1,0 +1,111 @@
+{
+	"run_id": 37295598500,
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/37295598500",
+	"event": "workflow_dispatch",
+	"source_sha": "e253e0a904bd34a3be13b3fbec67fca56d633778",
+	"tested_ci_sha": "0de30a1e2c4cf6eb7ac736d936a1dbc68da98e67",
+	"same_source_tree": true,
+	"os_lanes": "linux",
+	"status": "completed",
+	"conclusion": "failure",
+	"native_unit": {
+		"Total modules": 381,
+		"Passed tests": 7841,
+		"Failed tests": 0
+	},
+	"jobs": [
+		{
+			"name": "Validate / Checks and plan",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / properties",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / js",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Linux / Unit tests",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "macOS",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Windows",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Linux / E2E tests",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Linux / Verdict",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Linux / Package",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Linux / Install and launch \u00b7 ${{ matrix.label }}",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Validate / Selected OS verdict",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Release / Publish",
+			"status": "completed",
+			"conclusion": "skipped"
+		}
+	],
+	"failed_native_subjects": [
+		"Launch option-looking application ids through actual GTK desktop entries",
+		"Preserve release-page associations after failed native validator saves"
+	],
+	"failure_details": {
+		"application_operand": {
+			"passed": 3,
+			"failed": 1,
+			"subject": "ordinary-app",
+			"message": "the selected desktop entry did not launch",
+			"other_identities": ["--version", "-help", "app with ' quote"]
+		},
+		"updater_etag": {
+			"checks": 7,
+			"failed": 1,
+			"mode": "http-error-new-validator",
+			"message": "HTTP-error control changed its prior native validator",
+			"local_current": {
+				"passed": 7,
+				"failed": 0
+			},
+			"local_889091244": {
+				"passed": 7,
+				"failed": 0
+			},
+			"cause": "not established by local success"
+		}
+	},
+	"not_executed": ["installed physical-device acceptance"],
+	"release": "skipped; no publication",
+	"raw_log_access": "completed job logs retrieved successfully; old access failures do not describe this current run",
+	"feature_branch": "retain until native qualification succeeds",
+	"todo_removed": []
+}

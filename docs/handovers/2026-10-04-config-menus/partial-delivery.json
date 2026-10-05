@@ -1,7 +1,7 @@
 {
 	"delivery": "Maintainer-authorized partial integration; group1 remains incomplete",
-	"integrated_merge": "a550193ebc31aa819c369f701a61ebed72d86216",
-	"integrated_source_tree": "e81b6544720c382f4521f6ec094062e88f60e786",
+	"integrated_merge": "c8e4434a0a1f0e321897621621d8024f27558431",
+	"integrated_source_tree": "b027bce06ef601951f3560ff223aeedf92eaffab",
 	"integrated_commits_since_previous_dev": [
 		{
 			"sha": "62f4005cad8def25b5abe9bbe1e0769a7a84a77a",
@@ -82,7 +82,7 @@
 			"subject": "test(config): establish Windows source preservation preconditions"
 		}
 	],
-	"followup_status": "Four commits pushed; fixture-only native run completed with failure. Eleven group1 Windows failures and twelve macOS failures corrected; final serialized integration remains pending.",
+	"followup_status": "Reviewed fixture successors and immutable preparations integrated without squash; final exact-tree Windows manual CI completed with failure. Delivery remains partial under explicit maintainer instruction.",
 	"todo_items": [5, 7, 33, 42, 54, 81],
 	"removed_items": [],
 	"transverse_items_retained": [16, 38],
@@ -102,14 +102,14 @@
 			"failed": 0,
 			"format": "UTF-8 BOM plus LF"
 		},
-		"ahk_native": "Windows runner executed: 9175 passed, 14 failed; engine E2E/package/install skipped. Physical acceptance remains unexecuted.",
+		"ahk_native": "Historical source709 Windows runner: 9175/14. Final integrated sourcec8 Windows runner: 9218/50, engine E2E/package/install skipped. Physical acceptance remains unexecuted.",
 		"environment_retries": "Read-only /var/tmp and protected ancestor .git markers produced failing local runs. Exact gates were rerun with writable/native temporary directories without source/assertion changes."
 	},
 	"hosted_integrated_ci": "evidence/partial-integrated-native-ci.json",
 	"followup_native_ci": "evidence/fixture-qualification-native-ci.json",
 	"preserved_preparations": "prepared/resumed-delivery-index.json",
 	"feature_branch": "feat/config-menus",
-	"feature_branch_status": "Retained until followup integration and terminal qualification",
+	"feature_branch_status": "All source commits integrated; the branch is no longer required to preserve unfinished work. Cleanup follows this documentation integration.",
 	"physical_limits": [
 		"No Linux physical input devices or uinput",
 		"Wayland and installed-session restart unqualified",
@@ -128,5 +128,54 @@
 		"previous_failed": 25,
 		"corrected_group1_failures": 11
 	},
-	"native_failure_boundary": "evidence/fixture-native-failure-boundary.json"
+	"native_failure_boundary": "evidence/fixture-native-failure-boundary.json",
+	"initial_integrated_merge": "a550193ebc31aa819c369f701a61ebed72d86216",
+	"initial_integrated_source_tree": "e81b6544720c382f4521f6ec094062e88f60e786",
+	"followup_integrated_commits": [
+		{
+			"sha": "f56886138c2e857dde69f0ee0d76c87f02b0fbd1",
+			"subject": "docs(config): preserve partial delivery and remaining implementation steps"
+		},
+		{
+			"sha": "b2a1f0cc63e53e34b109534e37a72793250816d0",
+			"subject": "docs(config): record native fixture qualification and remaining failures"
+		},
+		{
+			"sha": "750ee017b1e16a6677c43aceb3ca96e6e67274aa",
+			"subject": "chore(config): compose current hotstrings integration"
+		},
+		{
+			"sha": "c8e4434a0a1f0e321897621621d8024f27558431",
+			"subject": "chore(config): integrate native fixture qualification and partial handoff"
+		}
+	],
+	"final_integrated_ci": "evidence/final-integrated-native-ci.json",
+	"composition_evidence": "evidence/current-dev-composition.json",
+	"local_final_composition_qualification": {
+		"source_sha": "c8e4434a0a1f0e321897621621d8024f27558431",
+		"format_checked_files": 200,
+		"js_passed": 359,
+		"js_failed": 0,
+		"ahk_encoding_checked_files": 1830,
+		"ahk_native_local": "skipped on Linux; final Windows runner dispatch owns execution",
+		"source_scope": "Only three Windows fixtures differ from incoming dev6e; all Mac fixture resolutions preserve incoming stronger source."
+	},
+	"final_native_results": {
+		"source_sha": "c8e4434a0a1f0e321897621621d8024f27558431",
+		"tested_ci_sha": "8221ec5ff188705b61d5ecb1c7998c5f5b1c5520",
+		"manual_run": "https://github.com/adrienm7/ergopti/actions/runs/37287365425",
+		"conclusion": "failure",
+		"windows_units": {
+			"passed": 9218,
+			"failed": 50
+		},
+		"shared_js": "passed",
+		"shared_properties": "passed",
+		"windows_engine_e2e_package_install": "skipped",
+		"macos_linux": "deliberately unselected",
+		"release": "skipped",
+		"physical_acceptance": "not executed",
+		"baseline_comparison": "evidence/final-native-baseline-comparison.json",
+		"detail_limits": "All-failures annotation is truncated during case22; 21 complete details are visible, not all50."
+	}
 }
