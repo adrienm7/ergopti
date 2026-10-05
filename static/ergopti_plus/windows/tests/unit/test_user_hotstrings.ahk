@@ -798,3 +798,89 @@ for _UCHScopeId in ["global", "hotstrings"] {
 }
 Test("programmable hotstrings: real scoped restore refuses native cancellation debt without losing its owner",
 	_UCHScopedConfiguration.Bind("hotstrings", "recommended", true))
+
+/** Native-literal invalidation revokes admission without claiming sender cleanup. */
+_UCHNativeNotepadInvalidation() {
+	_HNP_Run(_UCHNativeNotepadInvalidationBody)
+}
+
+_UCHNativeNotepadInvalidationBody() {
+	global _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs, _UserHotstringsLoadEpoch
+	global _HSE_TerminalOwner, _HSE_TerminalReplayPending, HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer
+	global _PrefixWatcherSuppressed, _HSE_FireLogQueue
+	Saved := {Owner: _UserHotstringsOwner, Loader: _UserHotstringsLoader,
+		Jobs: _UserHotstringsJobs, LoadEpoch: _UserHotstringsLoadEpoch,
+		Replay: _HSE_TerminalReplayPending}
+	try {
+		Fixture := _UCHFixture()
+		_UserHotstringsOwner := Fixture.owner
+		_UserHotstringsLoader := 0
+		_UserHotstringsJobs := Map()
+		_HSE_TerminalReplayPending := 0
+		ExpectedGeneration := Fixture.owner.generation
+		HSE_Buffer := "xxab", _PrefixBuffer := "xxab", _LLM_Bridge_Buffer := "xxab"
+		OutputHostResolverPrimeForTest("notepad.exe")
+		State := Map("Requests", [], "ReleaseCalls", 0)
+		Spec := _AHK04_NormalSpec()
+		Spec.UserCodeGeneration := ExpectedGeneration
+		Spec.PublicationCurrent := () => Fixture.owner.generation == ExpectedGeneration
+		Owner := HSE_DispatchMatch(Spec, "", &Effect, false, _HNP_Record.Bind(State))
+		AssertTrue(Owner is Map && Owner["Pending"], "the actual native sender retains pending publication")
+		AssertTrue(Owner.Get("UserCodeOwned", false), "the programmable receipt must reach the native owner")
+		Owner["Port"] := Map("abort_terminal", _UCHNativeNotepadRelease.Bind(State))
+		AssertTrue(_HSE_NotepadOwnerIsCurrent(Owner), "the original programmable generation admits publication")
+		AssertFalse(UserHotstringsInvalidate("native-notepad-fixture"),
+			"native completion still owns cleanup after publication revocation")
+		AssertTrue(Owner["Pending"] && _HSE_TerminalOwner == Owner,
+			"invalidation cannot retire the actual pending native sender")
+		AssertEqual(0, State["ReleaseCalls"], "Notepad never acquired the legacy terminal capture")
+		AssertEqual(0, _HSE_TerminalReplayPending, "invalidation must not fabricate terminal replay debt")
+		AssertEqual(1, _PrefixWatcherSuppressed, "native completion retains its sole suppression lease")
+		AssertFalse(Owner["OutputOwnershipReleased"], "only actual native completion releases output ownership")
+		AssertFalse(_HSE_NotepadOwnerIsCurrent(Owner), "the old publication generation is revoked")
+		Request := State["Requests"][1]
+		PreviousCritical := Critical("On")
+		try {
+			Refused := false
+			try Request.Opts["atomic_commit"].Call()
+			catch as CommitFailure {
+				if Type(CommitFailure) != "Error"
+						|| CommitFailure.Message != "The Notepad canonical commit lost its publication authority."
+					throw CommitFailure
+				Refused := true
+			}
+			AssertTrue(Refused, "the actual commit rejects the revoked publication receipt")
+		} finally Critical(PreviousCritical)
+		Request.Callback.Call(false, "recorded native refusal")
+		AssertTrue(Owner["CompletionClaimed"] && Owner["OutputOwnershipReleased"] && !Owner["Pending"],
+			"the real callback settles its retained owner exactly once")
+		AssertEqual(0, _PrefixWatcherSuppressed, "actual completion releases suppression")
+		AssertEqual(0, Keylogger.synth_active, "actual completion releases its synthetic marker")
+		AssertEqual("xxab", HSE_Buffer, "refusal preserves the original typed buffer")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "revoked output cannot report a fire")
+		AssertTrue(UserHotstringsInvalidate("native-notepad-retry"), "settled native completion permits cleanup retry")
+		Request.Callback.Call(false, "duplicate recorded refusal")
+		AssertEqual(0, _PrefixWatcherSuppressed, "duplicate completion cannot release the same lease twice")
+		AssertEqual(0, State["ReleaseCalls"], "no legacy terminal release occurs at completion or retry")
+	} finally {
+		try {
+			if (_HSE_TerminalOwner is Map) && _HSE_TerminalOwner.Get("Pending", false)
+				_HSE_CompleteNotepadOwner(_HSE_TerminalOwner, false, "fixture cleanup")
+		} finally {
+			_UserHotstringsOwner := Saved.Owner
+			_UserHotstringsLoader := Saved.Loader
+			_UserHotstringsJobs := Saved.Jobs
+			_UserHotstringsLoadEpoch := Saved.LoadEpoch
+			_HSE_TerminalReplayPending := Saved.Replay
+		}
+	}
+}
+
+/** Records accidental legacy release without invoking the native DLL. */
+_UCHNativeNotepadRelease(State, Token) {
+	State["ReleaseCalls"] += 1
+	return 1
+}
+
+Test("programmable hotstrings: Notepad invalidation retains native completion ownership (notepad-publication)",
+	_UCHNativeNotepadInvalidation)

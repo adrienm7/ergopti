@@ -173,7 +173,11 @@ UserHotstringsInvalidate(Reason := "lifecycle") {
 		TerminalOwner := _HSE_TerminalOwner
 		; Claim the scheduled runner exactly once. Its generation is revoked,
 		; so it aborts output and releases capture; a late timer cannot do it twice.
-		_HSE_RunOwnedTerminalTransaction(TerminalOwner)
+		; Native text output retains its own completion callback and suppression.
+		; Revoked publication is observed by admission/commit; the terminal runner
+		; cannot retire this sender or release a capture it never acquired.
+		if !TerminalOwner.Get("NativeLiteral", false)
+			_HSE_RunOwnedTerminalTransaction(TerminalOwner)
 		Ready := !TerminalOwner["Pending"] && Ready
 	}
 	if (_HSE_TerminalReplayPending is Map) && _HSE_TerminalReplayPending.Get("UserCodeOwned", false)

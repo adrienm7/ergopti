@@ -1426,3 +1426,122 @@ _ULN_Complete(State, Callback, Ok, ErrorMessage := "") {
 	State.Callbacks += 1
 	Callback.Call(Ok, ErrorMessage)
 }
+
+/** Exercises upstream publication authority through the actual deferred native owner. */
+_HNPG_PublicationReceipt(Gate) {
+	global _PrefixContentGeneration
+	Gate["Reads"] += 1
+	if Gate.Get("Throws", false)
+		throw Error("recorded publication refusal")
+	if Gate.Get("MutatesContext", false)
+		_PrefixContentGeneration += 1
+	return Gate["Verdict"]
+}
+
+_HNPG_Dispatch(State, Gate) {
+	global HSE_Buffer, _PrefixBuffer, _LLM_Bridge_Buffer
+	HSE_Buffer := "xxab"
+	_PrefixBuffer := "xxab"
+	_LLM_Bridge_Buffer := "xxab"
+	OutputHostResolverPrimeForTest("notepad.exe")
+	Spec := _AHK04_NormalSpec()
+	Spec.PublicationCurrent := _HNPG_PublicationReceipt.Bind(Gate)
+	Spec.UserCodeGeneration := 123
+	Effect := 0
+	Owner := HSE_DispatchMatch(Spec, "", &Effect, false, _HNP_Record.Bind(State))
+	AssertTrue(Owner is Map, "native dispatch must retain its actual pending owner")
+	AssertTrue(Owner.Has("PublicationCurrent"), "the native owner must retain upstream publication authority")
+	AssertTrue(Owner["PublicationCurrent"] == Spec.PublicationCurrent,
+		"the native owner must retain the exact supplied publication callback")
+	AssertTrue(Owner["UserCodeOwned"], "the native owner must retain user-code ownership")
+	AssertEqual(1, State["Requests"].Length, "one native request must reach the actual recording sender")
+	return Owner
+}
+
+_HNPG_CurrentPublicationCommits() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _LLM_Bridge_Buffer, _HSE_FireLogQueue, _PrefixWatcherSuppressed
+		Gate := Map("Verdict", 1, "Reads", 0)
+		State := Map("Requests", [])
+		Owner := _HNPG_Dispatch(State, Gate)
+		AssertTrue(State["Requests"][1].Opts["admission"].Call(),
+			"strict current publication must admit the original native request")
+		ReadsBefore := Gate["Reads"]
+		_HNP_Settle(State)
+		AssertTrue(Gate["Reads"] > ReadsBefore, "the commit must consult publication again")
+		AssertEqual("xxZ", HSE_Buffer, "authorized completion must commit the actual HSE effect")
+		AssertEqual("xxZ", _LLM_Bridge_Buffer, "authorized completion must commit the paired mirror")
+		AssertTrue(Owner["FinalSucceeded"], "authorized completion must finish successfully")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "authorized completion must publish exactly one fire")
+		AssertEqual(0, _PrefixWatcherSuppressed, "authorized completion must release suppression")
+	}
+}
+Test("Notepad publication: current upstream receipt commits once (notepad-publication)",
+	_HNPG_CurrentPublicationCommits)
+
+_HNPG_RefusedPublicationBody(Mode) {
+	global HSE_Buffer, _LLM_Bridge_Buffer, _HSE_FireLogQueue, _PrefixWatcherSuppressed
+	Gate := Map("Verdict", 1, "Reads", 0)
+	State := Map("Requests", [])
+	Owner := _HNPG_Dispatch(State, Gate)
+	Request := State["Requests"][1]
+	AssertTrue(Request.Opts["admission"].Call(), "the request starts with genuine current publication")
+	if Mode == "revoked"
+		Gate["Verdict"] := 0
+	else if Mode == "malformed"
+		Gate["Verdict"] := "1"
+	else if Mode == "throwing"
+		Gate["Throws"] := true
+	else if Mode == "context"
+		Gate["MutatesContext"] := true
+	else
+		throw ValueError("The publication fixture mode is unknown.")
+	AssertFalse(Request.Opts["admission"].Call(), "changed publication authority must refuse admission")
+	Failure := 0
+	PreviousCritical := Critical("On")
+	try {
+		try Request.Opts["atomic_commit"].Call()
+		catch as CommitFailure
+			Failure := CommitFailure
+	} finally Critical(PreviousCritical)
+	AssertEqual("Error", Type(Failure), "the actual canonical commit must refuse the stale receipt")
+	ExpectedMessage := Mode == "context"
+		? "The Notepad canonical commit lost its original input context."
+		: "The Notepad canonical commit lost its publication authority."
+	AssertEqual(ExpectedMessage, Failure.Message, "the exact authority guard must cause the refusal")
+	AssertEqual("xxab", HSE_Buffer, "refused publication must not edit HSE")
+	AssertEqual("xxab", _LLM_Bridge_Buffer, "refused publication must not edit the paired mirror")
+	AssertFalse(Owner["Committed"], "refused publication must not claim a canonical commit")
+	AssertEqual(0, _HSE_FireLogQueue.Length, "refused publication must not publish a fire")
+	Request.Callback.Call(false, "recorded publication refusal")
+	AssertFalse(Owner["FinalSucceeded"], "authority refusal cannot report successful output")
+	AssertEqual(0, _PrefixWatcherSuppressed, "refusal completion must release owned suppression")
+	AssertEqual(0, Keylogger.synth_active, "refusal completion must release its synthetic marker")
+	Request.Callback.Call(false, "duplicate recorded refusal")
+	AssertEqual(0, _PrefixWatcherSuppressed, "duplicate completion cannot release ownership twice")
+}
+
+_HNPG_RevokedPublicationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("revoked"))
+}
+Test("Notepad publication: revoked receipt refuses admission and commit (notepad-publication)",
+	_HNPG_RevokedPublicationRefuses)
+
+_HNPG_MalformedPublicationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("malformed"))
+}
+Test("Notepad publication: String receipt cannot impersonate Integer1 (notepad-publication)",
+	_HNPG_MalformedPublicationRefuses)
+
+_HNPG_ThrowingPublicationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("throwing"))
+}
+Test("Notepad publication: callback refusal cannot reach canonical mutation (notepad-publication)",
+	_HNPG_ThrowingPublicationRefuses)
+
+_HNPG_ContextMutationRefuses() {
+	_HNP_Run(_HNPG_RefusedPublicationBody.Bind("context"))
+}
+Test("Notepad publication: callback context mutation is checked afterward (notepad-publication)",
+	_HNPG_ContextMutationRefuses)
