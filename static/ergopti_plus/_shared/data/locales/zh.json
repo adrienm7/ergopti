@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "可执行文件",
 	"dialog.action_picker.program_arguments": "参数（每个字段一个）",
 	"dialog.action_picker.program_add_argument": "添加参数",
+	"dialog.action_picker.program_provider_changed": "脚本或解释器已更改。请重新打开操作选择器。",
+	"dialog.action_picker.program_provider_empty": "未找到可运行的脚本。",
+	"dialog.action_picker.program_provider_hint": "将 shell 或 Python 脚本放在配置文件夹的 scripts 子文件夹中。",
+	"dialog.action_picker.program_provider_label": "脚本",
+	"dialog.action_picker.program_provider_manual": "输入可执行文件",
+	"dialog.action_picker.program_provider_truncated": "部分脚本未列出。请减少文件夹内容并重新打开选择器。",
+	"dialog.action_picker.program_provider_unavailable": "无法发现脚本。请改为输入可执行文件。",
 	"dialog.action_picker.program_remove_argument": "移除参数",
 	"platform_reason.program_runner_unavailable": "不可用: 原生程序运行功能或此绑定不可用。"
 }

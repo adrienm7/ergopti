@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Eseguibile",
 	"dialog.action_picker.program_arguments": "Argomenti (uno per campo)",
 	"dialog.action_picker.program_add_argument": "Aggiungi argomento",
+	"dialog.action_picker.program_provider_changed": "Lo script o il suo interprete è cambiato. Riapri il selettore delle azioni.",
+	"dialog.action_picker.program_provider_empty": "Nessuno script eseguibile trovato.",
+	"dialog.action_picker.program_provider_hint": "Inserisci gli script shell o Python nella sottocartella scripts della cartella di configurazione.",
+	"dialog.action_picker.program_provider_label": "Script",
+	"dialog.action_picker.program_provider_manual": "Inserisci un eseguibile",
+	"dialog.action_picker.program_provider_truncated": "Alcuni script non sono elencati. Riduci il contenuto della cartella e riapri il selettore.",
+	"dialog.action_picker.program_provider_unavailable": "La ricerca degli script non è disponibile. Inserisci un eseguibile.",
 	"dialog.action_picker.program_remove_argument": "Rimuovi argomento",
 	"platform_reason.program_runner_unavailable": "Non disponibile: Il lanciatore nativo o questa associazione non è disponibile."
 }

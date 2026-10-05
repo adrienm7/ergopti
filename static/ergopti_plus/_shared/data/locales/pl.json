@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Plik wykonywalny",
 	"dialog.action_picker.program_arguments": "Argumenty (jeden w każdym polu)",
 	"dialog.action_picker.program_add_argument": "Dodaj argument",
+	"dialog.action_picker.program_provider_changed": "Skrypt lub jego interpreter uległ zmianie. Otwórz ponownie wybór akcji.",
+	"dialog.action_picker.program_provider_empty": "Nie znaleziono skryptów, które można uruchomić.",
+	"dialog.action_picker.program_provider_hint": "Umieść skrypty powłoki lub Pythona w podfolderze scripts folderu konfiguracji.",
+	"dialog.action_picker.program_provider_label": "Skrypt",
+	"dialog.action_picker.program_provider_manual": "Wprowadź plik wykonywalny",
+	"dialog.action_picker.program_provider_truncated": "Niektóre skrypty nie są wyświetlane. Zmniejsz zawartość folderu i otwórz ponownie wybór.",
+	"dialog.action_picker.program_provider_unavailable": "Wyszukiwanie skryptów jest niedostępne. Wprowadź plik wykonywalny.",
 	"dialog.action_picker.program_remove_argument": "Usuń argument",
 	"platform_reason.program_runner_unavailable": "Niedostępne: Natywny mechanizm uruchamiania lub to przypisanie jest niedostępne."
 }

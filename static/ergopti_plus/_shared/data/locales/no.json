@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Programfil",
 	"dialog.action_picker.program_arguments": "Argumenter (ett per felt)",
 	"dialog.action_picker.program_add_argument": "Legg til argument",
+	"dialog.action_picker.program_provider_changed": "Skriptet eller tolken er endret. Åpne handlingsvelgeren på nytt.",
+	"dialog.action_picker.program_provider_empty": "Ingen kjørbare skript ble funnet.",
+	"dialog.action_picker.program_provider_hint": "Legg skall- eller Python-skript i undermappen scripts i konfigurasjonsmappen.",
+	"dialog.action_picker.program_provider_label": "Skript",
+	"dialog.action_picker.program_provider_manual": "Angi en kjørbar fil",
+	"dialog.action_picker.program_provider_truncated": "Noen skript vises ikke. Reduser mappeinnholdet og åpne velgeren på nytt.",
+	"dialog.action_picker.program_provider_unavailable": "Skriptsøk er utilgjengelig. Angi en kjørbar fil i stedet.",
 	"dialog.action_picker.program_remove_argument": "Fjern argument",
 	"platform_reason.program_runner_unavailable": "Utilgjengelig: Den innebygde programstarteren eller denne tilordningen er utilgjengelig."
 }

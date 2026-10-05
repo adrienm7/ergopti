@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "الملف التنفيذي",
 	"dialog.action_picker.program_arguments": "الوسائط (واحدة لكل حقل)",
 	"dialog.action_picker.program_add_argument": "إضافة وسيطة",
+	"dialog.action_picker.program_provider_changed": "تغير البرنامج النصي أو المفسر. أعد فتح منتقي الإجراءات.",
+	"dialog.action_picker.program_provider_empty": "لم يتم العثور على برامج نصية قابلة للتشغيل.",
+	"dialog.action_picker.program_provider_hint": "ضع برامج shell أو Python النصية في المجلد الفرعي scripts داخل مجلد الإعدادات.",
+	"dialog.action_picker.program_provider_label": "برنامج نصي",
+	"dialog.action_picker.program_provider_manual": "إدخال ملف تنفيذي",
+	"dialog.action_picker.program_provider_truncated": "بعض البرامج النصية غير معروضة. قلل محتويات المجلد وأعد فتح المنتقي.",
+	"dialog.action_picker.program_provider_unavailable": "اكتشاف البرامج النصية غير متاح. أدخل ملفًا تنفيذيًا بدلًا من ذلك.",
 	"dialog.action_picker.program_remove_argument": "إزالة وسيطة",
 	"platform_reason.program_runner_unavailable": "غير متاح: مشغّل البرامج الأصلي أو هذا الربط غير متاح."
 }

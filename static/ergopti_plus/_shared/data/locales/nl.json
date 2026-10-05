@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Uitvoerbaar bestand",
 	"dialog.action_picker.program_arguments": "Argumenten (één per veld)",
 	"dialog.action_picker.program_add_argument": "Argument toevoegen",
+	"dialog.action_picker.program_provider_changed": "Het script of de interpreter is gewijzigd. Open de actiekiezer opnieuw.",
+	"dialog.action_picker.program_provider_empty": "Geen uitvoerbare scripts gevonden.",
+	"dialog.action_picker.program_provider_hint": "Plaats shell- of Python-scripts in de submap scripts van uw configuratiemap.",
+	"dialog.action_picker.program_provider_label": "Script",
+	"dialog.action_picker.program_provider_manual": "Uitvoerbaar bestand invoeren",
+	"dialog.action_picker.program_provider_truncated": "Sommige scripts worden niet weergegeven. Verminder de mapinhoud en open de kiezer opnieuw.",
+	"dialog.action_picker.program_provider_unavailable": "Scripts zoeken is niet beschikbaar. Voer een uitvoerbaar bestand in.",
 	"dialog.action_picker.program_remove_argument": "Argument verwijderen",
 	"platform_reason.program_runner_unavailable": "Niet beschikbaar: De native programmastarter of deze toewijzing is niet beschikbaar."
 }

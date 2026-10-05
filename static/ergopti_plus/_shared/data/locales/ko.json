@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "실행 파일",
 	"dialog.action_picker.program_arguments": "인수 (필드당 하나)",
 	"dialog.action_picker.program_add_argument": "인수 추가",
+	"dialog.action_picker.program_provider_changed": "스크립트 또는 인터프리터가 변경되었습니다. 작업 선택기를 다시 여세요.",
+	"dialog.action_picker.program_provider_empty": "실행 가능한 스크립트를 찾지 못했습니다.",
+	"dialog.action_picker.program_provider_hint": "셸 또는 Python 스크립트를 설정 폴더의 scripts 하위 폴더에 넣으세요.",
+	"dialog.action_picker.program_provider_label": "스크립트",
+	"dialog.action_picker.program_provider_manual": "실행 파일 입력",
+	"dialog.action_picker.program_provider_truncated": "일부 스크립트가 표시되지 않습니다. 폴더 내용을 줄이고 선택기를 다시 여세요.",
+	"dialog.action_picker.program_provider_unavailable": "스크립트 검색을 사용할 수 없습니다. 대신 실행 파일을 입력하세요.",
 	"dialog.action_picker.program_remove_argument": "인수 제거",
 	"platform_reason.program_runner_unavailable": "사용 불가: 기본 프로그램 실행 기능 또는 이 할당을 사용할 수 없습니다."
 }

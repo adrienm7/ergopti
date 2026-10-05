@@ -3200,6 +3200,13 @@
 	"dialog.action_picker.program_executable": "Исполняемый файл",
 	"dialog.action_picker.program_arguments": "Аргументы (по одному в поле)",
 	"dialog.action_picker.program_add_argument": "Добавить аргумент",
+	"dialog.action_picker.program_provider_changed": "Скрипт или интерпретатор изменился. Откройте выбор действий заново.",
+	"dialog.action_picker.program_provider_empty": "Скрипты, доступные для запуска, не найдены.",
+	"dialog.action_picker.program_provider_hint": "Поместите скрипты оболочки или Python в подпапку scripts папки конфигурации.",
+	"dialog.action_picker.program_provider_label": "Скрипт",
+	"dialog.action_picker.program_provider_manual": "Указать исполняемый файл",
+	"dialog.action_picker.program_provider_truncated": "Некоторые скрипты не показаны. Уменьшите содержимое папки и откройте выбор заново.",
+	"dialog.action_picker.program_provider_unavailable": "Поиск скриптов недоступен. Укажите исполняемый файл.",
 	"dialog.action_picker.program_remove_argument": "Удалить аргумент",
 	"platform_reason.program_runner_unavailable": "Недоступно: Нативный запуск программ или эта привязка недоступны."
 }
