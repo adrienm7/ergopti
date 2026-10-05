@@ -1594,6 +1594,28 @@ These are software implementations; final hardware verification remains below.
   Foreign runtime gates remain deferred. Depends on L108's parser-contract stack;
   no JSON reencoding, new grammar, transport, frontend or reserved change.
 
+- [~] **L111.** Linux SQLite filesystem identity: represent every admitted
+  relative database filename with an explicit `./` prefix at the CLI argument
+  boundary. A bare `file:` path could open or mutate another database through URI
+  interpretation even though filesystem admission selected the literal file;
+  percent/query/fragment spellings, `:memory:` and leading dashes also changed
+  its meaning. Preserve absolute argument bytes, public diagnostic spellings,
+  shared SQL encoding, flags, scripts, schema and exit receipts. Thirty-five real
+  filesystem/SQLite/public Reader/Writer/Keylogger checks have 23 original
+  failures and pass after under current LuaJIT, stock Lua 5.4 and signed Ubuntu
+  22.04 luv/libuv dependencies. SQLite itself remains the container's binary in
+  that dependency mix; this is not a full Jammy SQLite/OS validation. Intended
+  files gain exact expected counters/raw software-event bytes while URI-decoy
+  files remain byte-identical; corrupt/missing/creation and ordinary/UTF-8/quote
+  controls survive. Four additive registered cases have three original failures
+  and pass; all 65 earlier command-owner cases remain, with 69 checks passing
+  under LuaJIT and Lua 5.4. Register future Linux CI without launching it. This
+  native filename representation has no dependency on queued SQL projection
+  fixes. Windows/macOS use native open APIs without CLI option parsing; their
+  compiled URI configuration is not validated, and explicit memory APIs must
+  not inherit this filesystem-only encoding. No physical input, foreign runtime,
+  TOML/configuration or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

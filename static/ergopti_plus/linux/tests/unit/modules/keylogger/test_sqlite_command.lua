@@ -455,3 +455,29 @@ helpers.describe("keylogger SQLite paths stage nothing on disk", function()
 		end
 	end)
 end)
+
+
+helpers.describe("sqlite_command — native filesystem database paths", function()
+	for _, mode in ipairs({ "write", "json", "scalar" }) do
+		helpers.it("linux-sqlite-filesystem-path: " .. mode .. " keeps every relative spelling literal", function()
+			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
+			for _, path in ipairs({ "metrics.sqlite", "./metrics.sqlite", "../metrics.sqlite",
+				"file:owned.sqlite", "file:encoded%20name.sqlite", "file:query.sqlite?mode=ro",
+				"file:fragment.sqlite#tail", ":memory:", "-metrics.sqlite", "-", "été ' .sqlite" }) do
+				local command = assert(Cmd.build(path, "SELECT 42;", { flags = flags, capture_exit = true }))
+				local quoted = require("adapters.shell_runner").quote("./" .. path)
+				helpers.assert_contains(command, quoted, "the CLI must open the filesystem path, not its URI or option interpretation")
+				helpers.assert_contains(command, "SELECT 42;")
+				helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
+			end
+		end)
+	end
+
+	helpers.it("linux-sqlite-filesystem-path: leaves absolute database bytes unchanged", function()
+		for _, path in ipairs({ "/db/metrics.sqlite", "/db/file:owned.sqlite", "/db/:memory:", "/db/été ' .sqlite" }) do
+			local command = assert(Cmd.build(path, "SELECT 42;"))
+			helpers.assert_contains(command, require("adapters.shell_runner").quote(path))
+			assert_absent(command, "./" .. path, "absolute filesystem identities must not change")
+		end
+	end)
+end)
