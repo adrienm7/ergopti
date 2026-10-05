@@ -3408,8 +3408,14 @@ The Windows orchestration prerequisite now composes the shared discovery owner,
 exact native models slots, queued logical one-shots and private-source write
 admission. The unchanged 37 independent controls are registered with two real
 queue-timer controls and nine actual private-file/DPAPI/full-collector/WAL join
-controls. Source review passed; all 48 newly registered native cases still await
-Windows execution. The production discovery panel, actual HTTP/UI/application
+controls. Windows checkpoint 37280857181 passed the 37 orchestration controls
+and both real queue-timer controls. Its nine join controls failed at two fixture
+calls to an undefined serializer, before reaching native writes; those calls now
+use the existing canonical six-field serializer with identity encryption for
+independently encrypted DPAPI records. All original assertions remain. The
+corrected join requires another native replay. The complete checkpoint passed
+9214 units and failed 27; E2E, packaging and installation were skipped, and
+Release/Publish were skipped. The production discovery panel, actual HTTP/UI
 acceptance and complete packaging/install qualification remain unfinished.
 This prerequisite does not complete item 47.
 
