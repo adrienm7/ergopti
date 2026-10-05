@@ -60,8 +60,8 @@ _SFND_SaveFullConfigNoDelete() {
 		"SaveFullConfig must not call FileDelete before TOML_BatchWrite — TOML_BatchWrite already uses atomic FileMove(overwrite=true); pre-deleting creates a data-loss window on crash (savefullconfig-filedelete-data-loss)")
 
 	; Confirm TOML_BatchWrite is still called (the write must still happen)
-	Assert(InStr(Body, "TOML_BatchWrite") > 0,
-		"SaveFullConfig must still call TOML_BatchWrite to persist the configuration")
+	Assert(InStr(Body, "TOML_ConfigBatchWrite(BoundPath, Updates)") > 0,
+		"SaveFullConfig must persist through its leased semantic configuration writer")
 }
 Test("ErgoptiPlus: SaveFullConfig has no FileDelete before TOML_BatchWrite (savefullconfig-filedelete-data-loss)", _SFND_SaveFullConfigNoDelete)
 
@@ -125,7 +125,7 @@ _SFND_SaveFullConfigOwnsOneCausalBatchWrite() {
 	Assert(InStr(Body, "PrevCanonState") = 0
 		and InStr(Body, "_TOML_STRICT_CANON_IN_PROGRESS") = 0,
 		"SaveFullConfig must not carry the obsolete guard for a nested full save that the batch writer no longer performs")
-	WriteNeedle := "TOML_BatchWrite(BoundPath, Updates,"
+	WriteNeedle := "TOML_ConfigBatchWrite(BoundPath, Updates)"
 	WritePos := InStr(Body, WriteNeedle)
 	Assert(WritePos > 0,
 		"SaveFullConfig must write through the path selected by its exact lease owner")

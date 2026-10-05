@@ -41,9 +41,12 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\first_boot.ahk
 
 try {
-    if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate"))
+    if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
+			&& !(A_Args.Length == 2 && A_Args[1] == "persisted_semantic"))
         throw Error("expected exactly one startup fixture name")
     switch A_Args[1] {
+		case "persisted_semantic":
+			_FeatureStateSmokePersistedSemantic(A_Args[2])
         case "distance_gate":
 			ReadCategoryEnabled(TOML_ParseFreshFile(A_Args[2]))
 			if CategoryEnabled["DistancesReduction"] != (A_Args[3] == "true")
@@ -332,4 +335,27 @@ _FeatureStateSmokeSemanticConfig(Root) {
 	} finally {
 		try FileDelete(TempConfig)
 	}
+}
+
+
+; Reads the parent test's actual saved file without creating a replacement seed.
+_FeatureStateSmokePersistedSemantic(Path) {
+	global ScriptInformation, _ConfigBootReadFailed
+	if !FileExist(Path)
+		throw Error("The actual semantic publication is absent")
+	Before := FileRead(Path, "UTF-8")
+	Cache := ParseConfigTomlFile(Path)
+	if _ConfigBootReadFailed
+		throw Error("The actual saved semantic source was refused at boot")
+	ReadScriptConfig(Cache)
+	_FeatureStateSmokeAssert("@", ScriptInformation["MagicKey"], "durable dotted trigger")
+	Timing := IniCacheGet(Cache, "hotstrings.autocorrection.names", "time_activation_seconds")
+	if !(Timing is Float) || Timing != 0.75
+		throw Error("The durable inline timing must remain the exact native Float")
+	Value := IniCacheGet(Cache, "hotstrings.autocorrection.names", "enabled")
+	if !(Value is String) || StrCompare(Value, "true", true) != 0
+		throw Error("The obsolete inline scalar must remain text in the retained source")
+	_FeatureStateSmokeAssert("retain", IniCacheGet(Cache, "hotstrings.autocorrection.names", "future"), "durable foreign child")
+	if StrCompare(Before, FileRead(Path, "UTF-8"), true) != 0
+		throw Error("A bootstrap read changed the actual durable source")
 }

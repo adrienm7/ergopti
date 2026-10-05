@@ -2863,6 +2863,10 @@ catalogues. Malformed carried combination leaves stay byte-preserved on
 unrelated saves and refuse requested replacement. Both portable native
 suites pass; wider expert catalogue and installed acceptance remain open.
 
+Windows known-feature fixtures use the current names declaration and
+retain strict publication generations, native restart timing and obsolete
+source preservation. Composed native Windows qualification remains open.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -3342,6 +3346,12 @@ New Windows sections publish native-readable headers only after semantic
 admission against surviving physical source. First publication and
 explicit replacement pass in targeted Windows CI; the composed native
 suite, E2E, packaging and installation remain separately required.
+
+Ordinary Windows full saves preserve obsolete settings and route their
+collected leaves through the semantic writer. Explicit retired physical
+section cleanup owns and verifies its exact backup source inside the
+existing transaction. Unsupported dotted, inline and table-array cleanup
+projections remain source work; final native acceptance is still required.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the

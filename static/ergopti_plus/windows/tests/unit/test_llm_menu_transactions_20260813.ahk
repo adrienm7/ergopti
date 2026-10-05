@@ -2634,3 +2634,60 @@ _LMT_SharedNavigationDeclarationOwner() {
 	AssertTrue(Root["llm_navigation_rows"] == SavedDefinitions, "the exact canonical cache identity is restored")
 }
 Test("LLM navigation: actual child declaration owns label order presence and native prompts", _LMT_SharedNavigationDeclarationOwner)
+
+
+; Only the unrelated collector/JSON ports are controlled; configuration rendering
+; and both WAL filesystem targets use their actual production implementations.
+_LMT_ApiSemanticRows(CandidateFeatures, CandidateMenu) {
+	return [
+		{ Section: "llm", Key: "enabled", Value: TOML_Bool(CandidateMenu["enabled"]) },
+		{ Section: "llm", Key: "api_entry_id", Value: CandidateMenu["api_entry_id"] }
+	]
+}
+_LMT_ApiSemanticDetachedBuilder() {
+	global ConfigurationFile, _PathsFile, _LLM_Menu, Features, _LMT_ApiPath
+	global _LMT_ApplyCalls, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	global _ConfigBootOutdatedEntries, _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots
+	Previous := _LMT_InstallApiFixture()
+	OldRead := _ConfigBootReadFailed, OldRejected := _ConfigBootRejectedOverrides
+	OldOutdated := _ConfigBootOutdatedEntries
+	Source := 'llm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Expected := Chr(0xFEFF) . 'llm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	try {
+		_ConfigBootReadFailed := false
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		AssertEqual(1, FSWrite(ConfigurationFile, Source))
+		BeforeFeatures := Features
+		BeforeMenu := _LLM_Menu
+		Result := LLM_Menu_CommitApiEntriesMutation("the semantic API entry",
+			_LMT_ApiMutate, _LMT_Apply, ConfigTransitionProductionPort(),
+			_LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_ApiSemanticRows,
+			0, _LMT_ApiSerialize)
+		AssertTrue((Result is Integer) && Result == 1, "the actual detached builder admits the complete inline source")
+		AssertEqual(Expected, FSReadUtf8Exact(ConfigurationFile))
+		AssertEqual('[{"Id":"api_new"}]', FSReadUtf8Exact(_LMT_ApiPath))
+		AssertEqual("api_new", _LLM_Menu["api_entry_id"])
+		AssertTrue(_LLM_Menu["enabled"])
+		AssertEqual(1, _LMT_ApplyCalls)
+		AssertFalse(BeforeMenu["enabled"], "publication cannot mutate the old detached menu authority")
+		AssertFalse(BeforeFeatures["llm"]["enabled"], "publication cannot mutate the old feature authority")
+		AssertFalse(FSStrictExists(ConfigTransitionWalPath(_PathsFile)) == 1)
+		AssertFalse(_ConfigWriteTerminalIsActive())
+		AssertFalse(ConfigWriteLeaseBusy())
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		AssertEqual("api_new", IniCacheGet(Cache, "llm", "api_entry_id"))
+		AssertEqual("retain", IniCacheGet(Cache, "llm", "future"))
+	} finally {
+		_ConfigBootReadFailed := OldRead
+		_ConfigBootRejectedOverrides := OldRejected
+		_ConfigBootOutdatedEntries := OldOutdated
+		for Store in [_ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshots] {
+			if Store.Has(ConfigurationFile)
+				Store.Delete(ConfigurationFile)
+		}
+		_LMT_RestoreApiFixture(Previous)
+	}
+}
+Test("LLM API entries: actual detached config builder preserves inline and future records (config-full-semantic-successor)",
+	_LMT_ApiSemanticDetachedBuilder)
