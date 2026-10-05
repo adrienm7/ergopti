@@ -27,7 +27,7 @@
 		"name": "lua-installed-record",
 		"patch": "prepared/lua-installed-record/lua-installed-record-preservation.patch",
 		"sha256": "1ff70d8d757215bab7c057bfec2e073867faf421a0844cc74de18d32dfdf343e",
-		"status": "prepared, unapplied; qualification remains pending"
+		"status": "applied to continuation feature sources; selected executable portable gates passed; AHK/native qualification pending"
 	},
 	{
 		"name": "tap-hold-guidance",
@@ -39,7 +39,7 @@
 		"name": "macos-boolean-leaves",
 		"patch": "prepared/macos-boolean-leaves/macos-obsolete-boolean-leaves.patch",
 		"sha256": "8daad075bd4bd0ce806fddfc66fdf29c9c18938f87604cb06913844d2ad3f1f0",
-		"status": "prepared, unapplied; qualification remains pending"
+		"status": "applied to continuation feature sources; selected portable gates passed; native qualification pending"
 	},
 	{
 		"name": "publication-debt-partial",
