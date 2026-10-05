@@ -2796,11 +2796,21 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] Replay retired-key and invalid-schema cases in test_config_migrate.ahk and boot/write-fence tests; retain retired keys until explicit cleanup and keep invalid-stamp session refusal strict.
 - [ ] Audit the remaining Windows configuration-reader domains already listed above; add causal regressions before changing them. Do not repeat completed features without evidence.
 
-Partial dev handoff (2026-10-05): the reviewed retired API-provider
-publication candidate is preserved but unapplied. Compose its single Linux
-manifest registration with current dev and qualify actual catalogue publication
-before claiming obsolete-row completion. Windows sites and remaining
-catalogues above still need implementation/qualification, not only device UI.
+Completion continuation (2026-10-05): the reviewed retired API-provider
+publication candidate is applied after all five source preimages match current
+dev. Its single Linux test registration preserves every newer inventory entry.
+Stored provider rows consume detached cloud/local publication receipts; missing,
+empty or unacknowledged catalogues cannot prove retirement. Ordinary neighbor
+writes preserve obsolete rows and future values, while explicit candidate
+authentication retains its existing owner. Independent current-source focused
+checks pass 168 LuaJIT and 140 Lua 5.4 cases, including 36 new cases per runtime
+and both catalogue/store initialization orders. Selected local gates pass:
+format, 359 JS checks, portable macOS unit/E2E, Linux E2E and actual Linux
+HTTP-stream receipts. The first Linux unit run exposed two incomplete provider
+receipt stubs; their assertions remain unchanged and the corrected unit rerun
+passes all 7,841 tests. Native runner packaging/installation qualification remains
+pending. Windows sites and remaining catalogues above still need implementation
+and qualification, not only device UI; TODO33 remains partial.
 
 Final partial integration `c8e4434a0` is tested by manual Windows run37287365425:
 9,218 passed and 50 failed; incoming dev's native run37283538700 has 9,213/55
