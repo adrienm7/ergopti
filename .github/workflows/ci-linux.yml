@@ -439,6 +439,14 @@ jobs:
           env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
         timeout-minutes: 1
 
+      - name: Reject nested arrays instead of offering their release objects
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
+        timeout-minutes: 1
+
       - name: Reject interrupted conditional release responses before cache reuse
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

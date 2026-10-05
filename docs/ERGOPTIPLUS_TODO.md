@@ -1573,6 +1573,27 @@ These are software implementations; final hardware verification remains below.
   foreign runtime validation is claimed. No maximum/native-width policy, callback
   type, pump/clock, sleep-completion or reserved change.
 
+- [~] **L110.** Shared release-array admission: keep exact raw object spans and
+  publication order while refusing non-object root elements. The old brace-only
+  scan treated nested-array objects as releases; its entry count could still
+  match the decoded root count, admitting an unintended higher version. Reuse
+  the existing JSON decoder for whole-document admission and fence spans to
+  direct root-array objects, retaining existing decoder semantics and selected
+  release/version/channel policies. Eleven actual verified TLS/public Linux
+  updater checks have three original failures and pass after on current LuaJIT,
+  stock Lua 5.4 and signed Ubuntu 22.04 dependencies. Incomplete/trailing/mixed
+  payloads already refused by Linux remain healthy controls; do not count them
+  as new native regressions. Complete response/callback/handle/cache receipts,
+  ordinary releases, nested metadata, quoted delimiters and highest-version
+  selection survive. No artifact is fetched or installed. Sixteen additive
+  raw-span/shape vectors plus one typed/single-result case preserve all earlier
+  132 contracts: 149 focused checks have nine original failures and pass after.
+  All six other helpers remain byte-identical. Register future Linux CI without
+  launching it. macOS already validates decoded entry tags before this helper;
+  Windows's brace scanner has a related source-only gap and a bounded proposal.
+  Foreign runtime gates remain deferred. Depends on L108's parser-contract stack;
+  no JSON reencoding, new grammar, transport, frontend or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

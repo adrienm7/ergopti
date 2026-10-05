@@ -240,6 +240,57 @@ local PRERELEASE = {
 		expected = false },
 }
 
+local SPLIT = {
+	{ id = "nested_only",
+		body = "[[{\"tag_name\":\"v9.9.9\"}]]",
+		expected = {  } },
+	{ id = "nested_after_object",
+		body = "[{\"tag_name\":\"v1.2.0\"},[{\"tag_name\":\"v9.9.9\"}]]",
+		expected = {  } },
+	{ id = "nested_before_object",
+		body = "[[{\"tag_name\":\"v9.9.9\"}],{\"tag_name\":\"v1.2.0\"}]",
+		expected = {  } },
+	{ id = "false_root_element",
+		body = "[false,{\"tag_name\":\"v1.2.0\"}]",
+		expected = {  } },
+	{ id = "null_root_element",
+		body = "[null,{\"tag_name\":\"v1.2.0\"}]",
+		expected = {  } },
+	{ id = "string_root_element",
+		body = "[\"ignored\",{\"tag_name\":\"v1.2.0\"}]",
+		expected = {  } },
+	{ id = "trailing_object",
+		body = "[{\"tag_name\":\"v1.2.0\"}] {\"tag_name\":\"v9.9.9\"}",
+		expected = {  } },
+	{ id = "incomplete_root_array",
+		body = "[{\"tag_name\":\"v1.2.0\"}",
+		expected = {  } },
+	{ id = "trailing_comma",
+		body = "[{\"tag_name\":\"v1.2.0\"},]",
+		expected = {  } },
+	{ id = "empty_array",
+		body = "[]",
+		expected = {  } },
+	{ id = "object_root",
+		body = "{\"tag_name\":\"v1.2.0\"}",
+		expected = {  } },
+	{ id = "nested_metadata_raw_bytes",
+		body = "[ {\"tag_name\":\"v1.2.0\",\"author\":{\"releases\":[{\"tag_name\":\"v9.9.9\"}]}} ]",
+		expected = { "{\"tag_name\":\"v1.2.0\",\"author\":{\"releases\":[{\"tag_name\":\"v9.9.9\"}]}}" } },
+	{ id = "publication_order_and_raw_whitespace",
+		body = " \n[\t{ \"tag_name\" : \"v1.2.0\", \"body\" : \"Order and bytes\" } , {\n\"tag_name\":\"v9.9.9\"\n} \n]\t ",
+		expected = { "{ \"tag_name\" : \"v1.2.0\", \"body\" : \"Order and bytes\" }", "{\n\"tag_name\":\"v9.9.9\"\n}" } },
+	{ id = "quoted_delimiter_raw_bytes",
+		body = "[{\"tag_name\":\"v1.2.0\",\"body\":\"[ ] { } and \\\\ \\\" backslashes\"}]",
+		expected = { "{\"tag_name\":\"v1.2.0\",\"body\":\"[ ] { } and \\\\ \\\" backslashes\"}" } },
+	{ id = "empty_object_schema_unchanged",
+		body = "[ {} ]",
+		expected = { "{}" } },
+	{ id = "quoted_object_not_release",
+		body = "[\"{ \\\"tag_name\\\" : \\\"v1.2.0\\\", \\\"body\\\" : \\\"Order and bytes\\\" }\"]",
+		expected = {  } },
+}
+
 --- Registers the shared Lua object and normalization contract in a driver suite.
 --- @param helpers table Case registration and assertions.
 --- @param Parser table Actual shared release parser under test.
@@ -305,6 +356,21 @@ function M.run(helpers, Parser)
 		for _, row in ipairs(PRERELEASE) do
 			helpers.it("parse_prerelease_flag: " .. row.id, function()
 				helpers.assert_eq(Parser.parse_prerelease_flag(row.body), row.expected, row.id)
+			end)
+		end
+	end)
+	helpers.describe("shared Lua release array object contract", function()
+		helpers.it("split_releases_array: refuses nonstring input with one empty result", function()
+			helpers.assert_eq(#SPLIT, 16, "every raw-span and root-shape vector is retained")
+			for _, value in ipairs({ false, true, 1, {}, function() end }) do
+				helpers.assert_eq(Parser.split_releases_array(value), {}, "release JSON must be a string")
+			end
+			helpers.assert_eq(Parser.split_releases_array(nil), {})
+			helpers.assert_eq(select("#", Parser.split_releases_array("[]")), 1)
+		end)
+		for _, row in ipairs(SPLIT) do
+			helpers.it("split_releases_array: " .. row.id, function()
+				helpers.assert_eq(Parser.split_releases_array(row.body), row.expected, row.id)
 			end)
 		end
 	end)
