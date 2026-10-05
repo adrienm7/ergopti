@@ -1971,6 +1971,15 @@ controls pass, and the old generic helper fails all fifteen new numeric-fact
 profiles. These diagnostic controls do not identify the native cause or
 qualify AppleEvent delivery, Brew lifecycle or item 36.
 
+Sparkle census failures before path observation now project only four fixed
+stages through a strict schema: private-root, library, inventory or unexpected.
+The original exception, native predicates and physical refusal are preserved;
+unknown or malformed output emits a fixed diagnostic-unavailable XCTest failure.
+No raw exception, process path, argv or key is exported. All seventeen prior
+Python controls and existing Swift assertion lines are retained. Twenty
+portable helper controls and ten focused evidence-owner assertions pass;
+these diagnostics do not prove a native cause or qualify the archive lifecycle.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey

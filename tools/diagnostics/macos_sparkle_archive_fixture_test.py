@@ -458,5 +458,122 @@ class NativeBSDDiagnosticControls(unittest.TestCase):
                     self.helper.NativeCensusRefusal(errno.ESRCH, packet)
 
 
+class NativeCensusStageControls(unittest.TestCase):
+    """Observe real helper failure boundaries with independent fixed expectations."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("sparkle_census_stage", HELPER)
+        self.helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.helper)
+
+    def boundary(self, library):
+        helper = self.helper
+        stack = contextlib.ExitStack()
+        stack.enter_context(mock.patch.object(helper.sys, "platform", "darwin"))
+        stack.enter_context(mock.patch.object(helper.os, "geteuid", return_value=1000, create=True))
+        stack.enter_context(
+            mock.patch.object(helper, "private_directory", return_value=Path("/PRIVATE_ROOT"))
+        )
+        stack.enter_context(mock.patch.object(helper.ctypes, "CDLL", return_value=library))
+        stack.enter_context(
+            mock.patch.object(
+                helper.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, stdout="91234 1000\n"),
+            )
+        )
+        return stack
+
+    def capture(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            status = self.helper.entrypoint(["census", "/PRIVATE_ROOT"])
+        self.assertEqual(status, 1)
+        self.assertEqual(stderr.getvalue(), "Private Sparkle fixture refused.\n")
+        self.assertNotIn("PRIVATE", stdout.getvalue() + stderr.getvalue())
+        self.assertLessEqual(len(stdout.getvalue().encode()), 512)
+        return stdout.getvalue()
+
+    def testDirectoryLibraryInventoryAndUnforeseenErrorsKeepTheirExactOriginalException(self):
+        helper = self.helper
+        cases = [
+            ("private-root", "root", PermissionError("PRIVATE_KEY_PATH")),
+            ("library", "library", OSError("PRIVATE_NATIVE_PATH")),
+            ("inventory", "inventory", subprocess.TimeoutExpired("PRIVATE_ARGV", 5)),
+            ("inventory", "inventory", subprocess.CalledProcessError(71, "PRIVATE_ARGV")),
+            ("unexpected", "native", PermissionError("PRIVATE_NATIVE_PATH")),
+        ]
+        for stage, boundary, failure in cases:
+            with self.subTest(stage=stage, boundary=boundary):
+                library = mock.Mock()
+                with self.boundary(library):
+                    target = {
+                        "root": (helper, "private_directory"),
+                        "library": (helper.ctypes, "CDLL"),
+                        "inventory": (helper.subprocess, "run"),
+                        "native": (library, "proc_pidpath"),
+                    }[boundary]
+                    with mock.patch.object(*target, side_effect=failure):
+                        with self.assertRaises(type(failure)) as caught:
+                            helper.census(["/PRIVATE_ROOT"])
+                        self.assertIs(caught.exception, failure)
+                        packet = json.loads(self.capture())
+                self.assertEqual(
+                    packet,
+                    {
+                        "schema": 3,
+                        "code": "stage-refused",
+                        "helper_pid": os.getpid(),
+                        "stage": stage,
+                    },
+                )
+
+    def testMalformedNativeInventoryStillFailsBeforeAnyExecutableObservation(self):
+        helper = self.helper
+        library = mock.Mock()
+        with self.boundary(library):
+            with mock.patch.object(
+                helper.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, stdout="PRIVATE_INVALID_RECORD\n"),
+            ):
+                packet = json.loads(self.capture())
+        self.assertEqual(
+            packet,
+            {"schema": 3, "code": "stage-refused", "helper_pid": os.getpid(), "stage": "inventory"},
+        )
+        library.proc_pidpath.assert_not_called()
+
+    def testForeignStageTextAndInvalidHelperIdentityCannotBecomePublicFacts(self):
+        helper = self.helper
+        for stage in [None, True, ["inventory"], "PRIVATE_KEY_PATH", "inventory\nPRIVATE_ARGV"]:
+            failure = RuntimeError("PRIVATE_KEY_PATH")
+            failure._sparkle_census_stage = stage
+            with mock.patch.object(helper, "main", side_effect=failure):
+                self.assertEqual(self.capture(), "")
+        failure = RuntimeError("PRIVATE_KEY_PATH")
+        failure._sparkle_census_stage = "inventory"
+        for pid in [0, True, 2147483648, "PRIVATE_KEY_PATH"]:
+            with (
+                mock.patch.object(helper, "main", side_effect=failure),
+                mock.patch.object(helper.os, "getpid", return_value=pid),
+            ):
+                self.assertEqual(self.capture(), "")
+        failure = RuntimeError("PRIVATE_KEY_PATH")
+        failure._sparkle_census_stage = "unexpected"
+        failure.argv = "PRIVATE_ARGV"
+        failure.path = "PRIVATE_NATIVE_PATH"
+        with mock.patch.object(helper, "main", side_effect=failure):
+            self.assertEqual(
+                json.loads(self.capture()),
+                {
+                    "schema": 3,
+                    "code": "stage-refused",
+                    "helper_pid": os.getpid(),
+                    "stage": "unexpected",
+                },
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -927,14 +927,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 17 tests in /);
+	assert.match(result.stderr, /Ran 20 tests in /);
 	const skipped = process.platform === 'win32' ? 5 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${17 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${20 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -995,6 +995,13 @@ try {
 		/let schema = integer\("schema", maximum: 2\), schema == 1 \|\| schema == 2/
 	);
 	assert.match(annotation, /guard bytes == 136, nativeErrno == 0/);
+	assert.match(
+		annotation,
+		/Set\(packet.keys\) == Set\(\["schema", "code", "helper_pid", "stage"\]\)/
+	);
+	assert.match(annotation, /\["private-root", "library", "inventory", "unexpected"\]/);
+	assert.match(fixture, /XCTFail\("Native Sparkle census refusal: code=diagnostic-unavailable"\)/);
+
 	assert.doesNotMatch(
 		annotation,
 		/(?:print|XCTFail)\(stdout|summary \+= stdout|packet\["(?:argv|path|stderr|comm|name)"\]/

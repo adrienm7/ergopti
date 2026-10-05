@@ -157,6 +157,24 @@ assert.doesNotMatch(
 	'raw helper output stays private'
 );
 
+// A pre-path failure has its own bounded visible stage; no raw exception crosses.
+const stageFacts =
+	'Native Sparkle census refusal: code=stage-refused helper_pid=9123 stage=private-root';
+const stageErrors = evaluate(failed + `\n${censusFile}:255: error: failed - ${stageFacts}\n`, 1, 0);
+const stageFailure = stageErrors.failures.find((failure) => failure.message.endsWith(stageFacts));
+assert.notEqual(
+	stageFailure,
+	undefined,
+	'private directory rejection is visible before proc_pidpath'
+);
+assert.match(annotation(stageFailure), /stage=private-root$/);
+assert.match(censusAnnotation, /\["private-root", "library", "inventory", "unexpected"\]/);
+assert.match(
+	censusHostSource,
+	/XCTFail\("Native Sparkle census refusal: code=diagnostic-unavailable"\)/,
+	'empty or invalid output must still have a fixed visible native diagnostic'
+);
+
 const compile = evaluate(`${file}:12:9: error: cannot find 'WindowTitles' in scope\n`, 42, 0);
 assert.equal(compile.exit_status, 42, 'the actual native process failure is retained');
 assert.ok(
