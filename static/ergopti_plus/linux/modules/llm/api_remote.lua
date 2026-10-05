@@ -432,7 +432,7 @@ end
 --- @param body string
 --- @return string|nil
 function M.extract_text(format, body)
-	local root = type(body) == "string" and Json.decode(body) or nil
+	local root = type(body) == "string" and Json.decode_lossless(body) or nil
 	if type(root) ~= "table" or Formats.response_has_error(root) then return nil end
 	if format == "anthropic" then
 		for _, block in ipairs(type(root.content) == "table" and root.content or {}) do
