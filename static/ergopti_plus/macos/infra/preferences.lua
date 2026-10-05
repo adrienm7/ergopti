@@ -832,6 +832,10 @@ local function flatten_from_disk(grouped, mark, shapes)
 								local fk     = _reverse_scalar[lookup]
 								if fk then
 									take_value(fk, inner_val, sec_name, disk_key, inner_key)
+								elseif _reverse_nested[lookup] == "llm_user_models" then
+									-- A neutral runtime list cannot authorize deleting an
+									-- obsolete scalar through the ordinary sparse save.
+									ConfigOutdated.report({ sec_name, disk_key, inner_key }, "a list of user model records is expected here")
 								end
 							end
 						end
@@ -1256,6 +1260,17 @@ function M.prepare_gesture_updates(source, updates)
 	return rows
 end
 
+--- Detects only the obsolete scalar at the declared optional model-list leaf.
+--- Legacy table spellings and record-level policy remain with their owners.
+--- @param document table|nil Exact decoded source model.
+--- @return boolean obsolete
+local function user_models_scalar_is_obsolete(document)
+	local llm = type(document) == "table" and document.llm or nil
+	local models = type(llm) == "table" and llm.models or nil
+	if type(models) ~= "table" then return false end
+	return models.user_models ~= nil and type(models.user_models) ~= "table"
+end
+
 --- Rewrites only declared LLM leaves inside existing inline preference tables.
 --- The scanner owns TOML syntax; this owner clones parsed values and preserves
 --- neighboring fields before handing one complete inline value to the writer.
@@ -1267,6 +1282,19 @@ local function prepare_inline_updates(source, updates, root)
 	assert(scanned, detail)
 	local LeafRows = require("toml_codec.leaf_rows")
 	local decoded = LeafRows.decode_source(source.content or "")
+	if root == "llm" and user_models_scalar_is_obsolete(decoded) then
+		local preserved = {}
+		for _, row in ipairs(updates) do
+			local path = require("toml_codec.key_path").parse(row.section, true)
+			if path then path[#path + 1] = row.key end
+			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == "user_models" then
+				-- A scope's neutral list is not an explicit obsolete-entry cleanup.
+				assert(row.delete or type(row.value) == "table" and next(row.value) == nil,
+					"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
+			else preserved[#preserved + 1] = row end
+		end
+		updates = preserved
+	end
 	local inline, candidates, rows = {}, {}, {}
 	local function parts(path)
 		if root == "hotstrings" then
@@ -1720,6 +1748,12 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		local document, shapes
 		if expected_source.status == "ok" then
 			document, shapes = require("toml_codec.leaf_rows").decode_source(expected_source.content)
+		end
+		if user_models_scalar_is_obsolete(document) and existing.llm_user_models ~= nil then
+			-- Reject a changed carried snapshot before sparse encoding can omit it
+			-- or overwrite the obsolete source without an explicit cleanup.
+			assert(type(existing.llm_user_models) == "table" and next(existing.llm_user_models) == nil,
+				"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
 		end
 		local hotstrings = document and type(document.hotstrings) == "table" and document.hotstrings or {}
 		local orders, desired = hotstrings.order_overrides, existing.sections_order_overrides
