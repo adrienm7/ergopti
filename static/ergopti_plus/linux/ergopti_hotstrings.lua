@@ -201,8 +201,20 @@ local file_watchers = RuntimeGuard.optional_require("infra.file_watchers")
 -- daemon used to perform only after run() returned.
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShutdownCoordinator = require("infra.shutdown_coordinator")
+local shutdown_runtime = prediction_engine and prediction_engine.shutdown_runtime
+local shutdown_webviews = webview_manager and webview_manager.shutdown
+local runtime_shutdown_ack = not prediction_engine
 local shutdown = ShutdownCoordinator.new({
 	pre_wait = {
+		{
+			name = "app-owned Ollama runtime",
+			wait_for_ack = true,
+			stop = function()
+				local acknowledged = not prediction_engine or shutdown_runtime() == true
+				if acknowledged then runtime_shutdown_ack = true end
+				return acknowledged
+			end,
+		},
 		{
 			name = "programmable hotstrings",
 			stop = function()
@@ -279,10 +291,13 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "webview manager",
+			wait_for_ack = true,
 			stop = function()
-				if webview_manager and type(webview_manager.shutdown) == "function" then
-					webview_manager.shutdown()
-				end
+				-- The known download session must publish cancellation and retire
+				-- before its native host disappears during pending HTTP cleanup.
+				if not runtime_shutdown_ack then return false end
+				if type(shutdown_webviews) == "function" then shutdown_webviews() end
+				return true
 			end,
 		},
 		{
@@ -2229,6 +2244,7 @@ local function main()
 	local function flush_due_repeats() Logger.flush_repeats(false) end
 
 	local on_periodic = function()
+		if shutdown.is_requested() then shutdown.poll(); return end
 		tick_count = tick_count + 1
 		RuntimeGuard.call("logger repeat flush", flush_due_repeats)
 		-- Here rather than in onIdle: it re-reads /proc/bus/input/devices, which
@@ -2320,6 +2336,7 @@ local function main()
 
 	event_loop.run({
 		onIdle = function()
+			if shutdown.is_requested() then shutdown.poll(); return end
 			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
 				shutdown.request("keyboard hook stopped")
 				return
@@ -2355,6 +2372,7 @@ local function main()
 	-- quiesced before any final resource is destroyed, and duplicate requests are
 	-- harmless.
 	shutdown.request("event loop returned")
+	if shutdown.is_pending() then error("App-owned Ollama cleanup remains unacknowledged after event-loop return", 0) end
 	if tooltip_preview then tooltip_preview.destroy() end
 	if llm_overlay then llm_overlay.hide() end
 	injector.close_fast_channel()

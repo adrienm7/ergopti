@@ -379,6 +379,7 @@ LLM_Menu_ActivateRuntime(ActivateHotkeysFn := 0, ScheduleBackendFn := 0, HealthT
 	HealthTimer := HasMethod(HealthTimerFn, "Call") ? HealthTimerFn : SetTimer
 	HealthTimer.Call(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
 	_LLM_Menu_RuntimeActivated := true
+	LLM_Menu_LocalServersInit()
 	if Attempt > 1 && IsSet(_DriverReady) && _DriverReady
 			&& IsSet(_MenuStartupCommands) && _MenuStartupCommands is MenuStartupCommands
 		_MenuStartupCommands.NotifyReady()

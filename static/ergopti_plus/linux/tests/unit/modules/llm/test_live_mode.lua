@@ -86,6 +86,7 @@ local function scenario(opts, body)
 			end,
 			cancel = function() return true end,
 		}
+		require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
 		package.loaded["modules.llm.api_entries"] = { active = function() return ENTRY end }
 		local ai_on = opts.disabled ~= true
 		package.loaded["modules.llm.profiles"] = {

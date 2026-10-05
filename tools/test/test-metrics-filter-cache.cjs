@@ -161,6 +161,7 @@ function typingFixture() {
 	context.get_source_mode_flags = () => modes;
 	context.get_local_date_string = () => today;
 	context.update_app_btn_text = () => {};
+	const actualSfb = context.render_sfb_kpi;
 	for (const key of Object.keys(context)) {
 		if (/^render_.*_kpi$/.test(key)) context[key] = () => {};
 	}
@@ -179,6 +180,7 @@ function typingFixture() {
 		today: (value) => {
 			today = value;
 		},
+		actualSfb,
 		modes: (value) => {
 			modes = value;
 		},
@@ -268,5 +270,155 @@ test('typing native acceptance, stale responses, in-place live pushes and Reset 
 	f.context.request_cache_reset();
 	assert.equal(f.stats.entries, 0);
 });
+
+// These cases execute the shipped data pipeline in a simulated DOM, not WebKit.
+test('typing NONE excludes every historical and live n-gram family', () => {
+	const f = typingFixture();
+	const tabs = [
+		'c',
+		'bg',
+		'tg',
+		'qg',
+		'pg',
+		'hx',
+		'hp',
+		'w',
+		'sc',
+		'sc_bg',
+		'sc_tg',
+		'sc_qg',
+		'sc_pg',
+		'w_bg',
+		'w_tg',
+		'w_qg',
+		'w_pg',
+		'kc'
+	];
+	for (const tab of tabs) {
+		f.state.historical_cache[tab] = { historical: { c: 7 } };
+		f.state.today_live_data.Editor[tab] = { known: { c: 2 } };
+		f.state.today_live_data.Unknown[tab] = { unknown: { c: 3 } };
+	}
+	f.state.app_selection_mode = 'none';
+	f.state.selected_apps.clear();
+	f.apply();
+	assert.equal(Object.keys(f.state.data).length, 18, 'all shipped families must be exercised');
+	for (const tab of tabs)
+		assert.deepEqual(Object.keys(f.state.data[tab]), [], `${tab} must be empty`);
+	assert.equal(
+		f.context.get_app_selection_request_apps().length,
+		0,
+		'native empty-app request remains unchanged'
+	);
+});
+
+test('typing selection modes preserve Unknown except explicit NONE', () => {
+	const f = typingFixture();
+	for (const mode of ['all', 'uninitialized', 'subset']) {
+		f.state.app_selection_mode = mode;
+		f.state.selected_apps.clear();
+		f.apply();
+		assert.equal(f.state.data.c.u.count, 1, `${mode} retains Unknown without a selected app`);
+		assert.equal(f.state.data.c.a.count, 3, `${mode} does not admit unselected known live apps`);
+		assert.equal(f.state.data.c.A.count, 2, `${mode} retains aggregated historical manual data`);
+	}
+	f.state.app_selection_mode = 'none';
+	f.state.selected_apps.add('Editor');
+	f.apply();
+	assert.deepEqual(
+		Object.keys(f.state.data.c),
+		[],
+		'explicit NONE wins even over a stale selected set'
+	);
+});
+
+test('typing NONE preserves availability discovery and cache ownership', () => {
+	const f = typingFixture();
+	f.state.app_selection_mode = 'none';
+	f.state.selected_apps.clear();
+	f.state.today_live_data.New = { c: { n: { c: 9 } } };
+	f.state.today_live_data._sys = { c: { invalid: { c: 100 } } };
+	f.state.today_live_data._system = { c: { invalid: { c: 100 } } };
+	f.apply();
+	assert.ok(f.state.available_apps.includes('New'), 'discovery must continue with NONE');
+	assert.equal(f.state.selected_apps.size, 0, 'discovery must not select apps under NONE');
+	assert.equal(f.state.available_apps.includes('_sys'), false);
+	assert.equal(f.state.available_apps.includes('_system'), false);
+	const none = f.state.data;
+	f.apply();
+	assert.strictEqual(f.state.data, none);
+	f.state.app_selection_mode = 'all';
+	f.apply();
+	assert.notStrictEqual(f.state.data, none, 'empty ALL and empty NONE are different queries');
+	assert.equal(f.state.data.c.u.count, 1);
+	assert.equal(f.state.data.c.invalid, undefined);
+	f.state.app_selection_mode = 'none';
+	f.apply();
+	assert.strictEqual(f.state.data, none, 'returning to NONE reuses its own empty projection');
+});
+
+test('typing NONE filters historical and live per-app KPI inputs', () => {
+	const f = typingFixture();
+	f.state.manifest_dates_sorted = [];
+	f.context.metrics_manifest = {
+		'2026-10-01': { Editor: { chars: 7 }, Unknown: { chars: 3 }, _sys: { chars: 100 } },
+		'2026-09-30': { Unknown: { chars: 200 } }
+	};
+	const visits = () => {
+		const result = [];
+		f.context._foreach_filtered_app((app, date, name) => result.push([date, name]));
+		return result;
+	};
+	assert.equal(visits().length, 4, 'literal known and Unknown historical/live control');
+	f.state.selected_apps.clear();
+	f.state.app_selection_mode = 'subset';
+	assert.equal(
+		visits().length,
+		2,
+		'Unknown survives subset while dates and system exclusion remain'
+	);
+	f.state.app_selection_mode = 'none';
+	assert.deepEqual(visits(), [], 'NONE refuses Unknown across both data sources');
+});
+
+test('typing NONE empties actual raw and hotstring SFB computations', () => {
+	const f = typingFixture();
+	// Restore the actual function captured before the fixture's presentation stubs.
+	f.context.render_sfb_kpi = f.actualSfb;
+	f.context.KEYCODE_NAMES = { 1: 'a' };
+	f.context.SFB_COLUMNS = { 1: 'index_left' };
+	f.context.FINGER_LABELS_FR = { index_left: 'Index G' };
+	f.context.format_number = String;
+	f.context._t = (key) => key;
+	f.context.INFO_SVG = '';
+	f.context.render_sfb_table = () => {};
+	f.elements.sfb_pct = {};
+	f.elements.sfb_avoided = {};
+	f.state.historical_cache = { bg: { aa: { c: 7, hs: 2 } } };
+	f.state.today_live_data = {
+		Editor: { bg: { aa: { c: 2, hs: 1 } } },
+		Unknown: { bg: { aa: { c: 3, hs: 1 } } }
+	};
+	f.context.render_sfb_kpi();
+	assert.equal(f.elements.sfb_pct.innerHTML, '8 ui_typing.sfb_raw_count');
+	assert.equal(f.elements.sfb_avoided.innerHTML, '4 ui_typing.sfb_avoided (50.0%)');
+	f.state.selected_apps.clear();
+	f.state.app_selection_mode = 'subset';
+	f.context.render_sfb_kpi();
+	assert.equal(f.elements.sfb_pct.innerHTML, '7 ui_typing.sfb_raw_count');
+	assert.equal(f.elements.sfb_avoided.innerHTML, '3 ui_typing.sfb_avoided (42.9%)');
+	f.state.app_selection_mode = 'none';
+	f.context.render_sfb_kpi();
+	assert.equal(f.elements.sfb_pct.innerHTML, '0 ui_typing.sfb_raw_count');
+	assert.equal(f.elements.sfb_avoided.innerHTML, 'ui_typing.sfb_avoided_none');
+	assert.equal(
+		vm.runInContext('_sfb_data.length', f.context),
+		0,
+		'the actual detail data must be empty'
+	);
+	assert.equal(vm.runInContext('Object.keys(_sfb_heatmap_full.sfb_by_kc).length', f.context), 0);
+});
+
+assert.equal(passed, 12, 'all original seven and five selection regressions must execute');
 
 console.log(`${passed} passed, 0 failed.`);

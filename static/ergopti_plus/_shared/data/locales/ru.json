@@ -1780,6 +1780,8 @@
 	"mlx.use_ollama": "Использовать Ollama",
 	"mlx.machine_intel": "процессор Intel",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Не удалось подготовить локальную Ollama. Проверьте журнал и повторите попытку.",
+	"ollama.runtime_start": "Запустить Ollama",
 	"python.not_native_title": "Нет Python для этого Mac",
 	"python.not_native_body": "Для этого действия нужен Python 3, собранный для {1}. Версии Python на этом Mac собраны только для другого процессора, и macOS запускала бы их через Rosetta, поддержка которой прекращается:\n{2}",
 	"python.missing_title": "Python 3 не установлен",

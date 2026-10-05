@@ -1780,6 +1780,8 @@
 	"mlx.use_ollama": "Bruk Ollama",
 	"mlx.machine_intel": "Intel-prosessor",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Lokal Ollama kunne ikke klargjøres. Kontroller loggen og prøv igjen.",
+	"ollama.runtime_start": "Start Ollama",
 	"python.not_native_title": "Ingen Python for denne Macen",
 	"python.not_native_body": "Denne handlingen trenger en Python 3 bygd for {1}. Python-versjonene som er installert på denne Macen, er bare bygd for en annen prosessor, og macOS ville kjørt dem via Rosetta, som fases ut:\n{2}",
 	"python.missing_title": "Python 3 mangler",
