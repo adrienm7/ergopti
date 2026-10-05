@@ -1694,6 +1694,26 @@ These are software implementations; final hardware verification remains below.
   No foreign native gate, transport, Backboard/decisions, menu, persistence,
   multipart-policy or physical input change.
 
+- [~] **L116.** Linux structured completion syntax admission: use the existing
+  canonical strict JSON decoder at this response boundary instead of the legacy
+  decoder that normalizes malformed escapes and accepts invalid number grammar.
+  Preserve the preceding own-error guard, first-part/candidate selection, typed
+  refusals, Unicode bytes and the existing empty-reply result. Fifty-four actual
+  verified TLS/public provider requests have thirty original failures and pass
+  after under current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 curl/luv/libuv
+  dependencies. Eighteen vectors have independently rejected JSON grammar;
+  twelve are existing strict-owner refusals for duplicate keys, lone surrogates
+  and non-finite decoded numbers, and twenty-four are healthy controls. They do
+  not represent thirty separate bugs. Exact wire bodies, curl exit, terminal
+  callback, chunk policy, retries and zero native handles remain asserted. All
+  ninety-five provider unit cases pass on both runtimes, retaining the preceding
+  forty-one and the unchanged universal forty-seven-vector corpus. Register future
+  Linux CI without launching it. Windows has source-level grammar/finite/surrogate
+  guards but currently permits duplicate keys; macOS native decoder behavior must
+  be measured independently before changing its owner. No shared decoder policy,
+  legacy caller, foreign native gate, transport, Backboard/decisions, menu,
+  persistence, multipart policy or physical input change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

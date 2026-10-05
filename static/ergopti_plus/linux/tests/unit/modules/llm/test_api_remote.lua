@@ -335,3 +335,17 @@ helpers.describe("Shared provider response error ownership", function()
 		helpers.assert_eq(formats.response_has_error(nil), false)
 	end)
 end)
+
+
+helpers.describe("Remote completion strict JSON admission", function()
+	local contract = require("tests.fixtures.llm_response_syntax_contract")
+	assert(#contract.vectors == 54, "every independent strict-admission vector executes")
+	for _, vector in ipairs(contract.vectors) do
+		helpers.it("structured syntax: " .. vector.name, function()
+			local remote = load_remote()
+			local actual = remote.extract_text(vector.format, vector.body)
+			unload()
+			helpers.assert_eq(actual, vector.expected, vector.name)
+		end)
+	end
+end)
