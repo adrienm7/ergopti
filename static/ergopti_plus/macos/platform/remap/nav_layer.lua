@@ -478,13 +478,14 @@ end
 --- @param opts table|nil { shared_root, config_dir, file_adapter }; each defaults to the driver's own.
 --- @return table|nil import What keymap.layer_preset.import_if_absent() returned.
 --- @return string|nil err Why the absent file could not be created.
+--- @return table|nil failed Private refused-import cleanup record.
 function M.import_recommended(opts)
 	opts = opts or {}
 	local shared_root = opts.shared_root or require("infra.paths").shared_root()
 	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
 	local LayerPreset = require("keymap.layer_preset")
 	Logger.start(LOG, "Importing the recommended navigation layer into '%s' when it has none…", tostring(config_dir))
-	local ok, import, err = pcall(LayerPreset.import_if_absent, {
+	local ok, import, err, failed = pcall(LayerPreset.import_if_absent, {
 		shared_root  = shared_root,
 		config_dir   = config_dir,
 		toml_decode  = require("toml_codec").decode,
@@ -493,7 +494,7 @@ function M.import_recommended(opts)
 	if not ok then import, err = nil, tostring(import) end
 	if not import then
 		Logger.error(LOG, "The recommended navigation layer was not imported: %s.", tostring(err))
-		return nil, err
+		return nil, err, failed
 	end
 	if import.status == LayerPreset.IMPORTED then
 		Logger.success(LOG, "Recommended navigation layer imported into '%s'.", import.path)

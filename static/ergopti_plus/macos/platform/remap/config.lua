@@ -644,7 +644,9 @@ end
 ---        action — the one case where clobbering an unparseable file is the intent.
 --- @param expected_source table|nil `{ status, content }` a scope transaction read
 ---        and backed up: the save refuses when the file no longer holds exactly it.
---- @return boolean True when the state reached disk, false when nothing was saved.
+--- @return boolean True only after publication and native cleanup settle.
+--- @return string|nil detail Publication refusal.
+--- @return table|nil receipt Private exact source/candidate and retained native cleanup.
 function M.save_user_config(state, user_config_path, overwrite_corrupt, expected_source)
 	assert(expected_source == nil or (not overwrite_corrupt and type(expected_source) == "table"
 		and (expected_source.status == "absent" or (expected_source.status == "ok"
@@ -684,6 +686,14 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		elseif source_status ~= "absent" then
 			Logger.error(LOG, "Refusing to overwrite user config at '%s' after an unclassified read.",
 				user_config_path)
+			return false
+		end
+	else
+		-- Explicit repair owns corrupt bytes, not a later writer's replacement.
+		-- Retain the raw source even when decoding is deliberately bypassed.
+		source, source_status = FileSystem.read_with_status(user_config_path)
+		if source_status ~= "ok" and source_status ~= "absent" then
+			Logger.error(LOG, "Refusing to repair unreadable user config at '%s'.", user_config_path)
 			return false
 		end
 	end
@@ -787,27 +797,21 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		return false
 	end
 
-	local expected_source
-	if not overwrite_corrupt then
-		expected_source = {
-			status = source_status,
-			content = source,
-		}
-	end
-	local writer = expected_source and FileSystem.write_if_unchanged or FileSystem.write
-	local write_ok, written
-	if expected_source then
-		write_ok, written = pcall(writer, user_config_path, payload, expected_source)
-	else
-		write_ok, written = pcall(writer, user_config_path, payload)
-	end
+	local publication_source = { status = source_status, content = source }
+	local write_ok, written, detail, retry_cleanup = pcall(FileSystem.write_if_unchanged,
+		user_config_path, payload, publication_source)
+	local receipt = { path = user_config_path, source = publication_source, candidate = payload, verify_absence = true }
+	if type(retry_cleanup) == "function" then receipt.publication_cleanup = retry_cleanup end
 	if not write_ok or written ~= true then
 		Logger.error(LOG, "Cannot atomically publish user config to '%s' — settings NOT saved.",
 			user_config_path)
-		return false
+		-- A refusal can follow publication. Only its exact native receipt can
+		-- distinguish that inverse from a proven no-effect cleanup on retry.
+		return false, tostring(write_ok and detail or written),
+			type(retry_cleanup) == "function" and receipt or nil
 	end
 	Logger.debug(LOG, "User config saved.")
-	return true
+	return true, nil, receipt
 end
 
 return M

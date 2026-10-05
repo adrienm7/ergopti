@@ -3896,11 +3896,12 @@ end
 --- @param label string Stable operation label for diagnostics.
 --- @param expected_source table|nil Exact bytes a scope backed up before this save.
 --- @return boolean committed
+--- @return table|nil receipt Exact native publication ownership.
 local function persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
 	local payload = clone_settings_state(candidate)
 	-- Settings compensation must never roll back a separately owned preference
 	payload.enabled = _state.enabled == true
-	local call_ok, saved = pcall(
+	local call_ok, saved, _, receipt = pcall(
 		Config.save_user_config,
 		payload,
 		resolve_user_config(),
@@ -3910,10 +3911,10 @@ local function persist_and_publish_settings(candidate, overwrite_corrupt, label,
 	if not call_ok or saved ~= true then
 		Logger.error(LOG, "%s did not persist; live Karabiner settings were preserved: %s.",
 			tostring(label), tostring(saved))
-		return false
+		return false, call_ok and receipt or nil
 	end
 	publish_settings_state(payload)
-	return true
+	return true, receipt
 end
 
 -- Refusals M.regenerate() reports synchronously before it builds or deploys
@@ -4113,9 +4114,17 @@ end
 retry_bulk_settings_recovery = function()
 	local transaction = _bulk_settings_transaction
 	if not transaction then return true end
+	-- Backup data is retained. Its only inverse is exact native cleanup, which
+	-- must settle before a no-write or sibling shortcut can retire this owner.
+	if transaction.backup_cleanup ~= nil
+		and TomlWriter.retry_publication_cleanup(transaction.backup_cleanup) ~= true then return false end
+	if transaction.file ~= nil and require("config_file_inverse").settle_publication(transaction.file) ~= true then return false end
 	if transaction.phase == "rollback-persistence" then
 		Logger.warn(LOG, "Retrying retained %s inverse persistence.", transaction.label)
-		if not persist_and_publish_settings(
+		if transaction.file ~= nil then
+			if require("config_file_inverse").restore(transaction.file, FileSystem) ~= true then return false end
+			publish_settings_state(transaction.snapshot)
+		elseif not persist_and_publish_settings(
 			transaction.snapshot,
 			transaction.overwrite_corrupt,
 			transaction.label .. " inverse"
@@ -4189,6 +4198,13 @@ local function reject_bulk_settings_candidate(transaction, reason, refused_befor
 	transaction.phase = "rollback-persistence"
 	Logger.error(LOG, "%s failed after settings commit; restoring the exact prior configuration.",
 		transaction.label)
+	if transaction.file ~= nil then
+		retry_bulk_settings_recovery()
+		if _bulk_settings_transaction == transaction then
+			finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+		end
+		return
+	end
 	if not persist_and_publish_settings(
 		transaction.snapshot,
 		transaction.overwrite_corrupt,
@@ -4211,13 +4227,17 @@ end
 --- @param source_path string|nil The settings file, the running one by default.
 --- @return table|nil source `{ status, content }` precondition for the save.
 --- @return string|nil detail Refusal reason.
+--- @return table|nil cleanup Private release-only backup receipt.
 local function back_up_settings_source(backup_path, source_path)
 	local path = source_path or resolve_user_config()
 	local content, status = FileSystem.read_with_status(path)
 	if status == "absent" then return { status = "absent" } end
 	if status ~= "ok" or type(content) ~= "string" then return nil, "remap source is unreadable" end
-	local backed, detail = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
-	if backed ~= true then return nil, "backup refused: " .. tostring(detail) end
+	local backed, detail, retry_cleanup = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
+	if backed ~= true then
+		local cleanup = type(retry_cleanup) == "function" and { publication_cleanup = retry_cleanup } or nil
+		return nil, "backup refused: " .. tostring(detail), cleanup
+	end
 	local observed, observed_status = FileSystem.read_with_status(backup_path)
 	if observed_status ~= "ok" or observed ~= content then return nil, "backup verification failed" end
 	return { status = "ok", content = content }
@@ -4305,10 +4325,18 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 	local expected_source
 	if backup_path ~= nil then
 		local backup_detail
-		expected_source, backup_detail = back_up_settings_source(backup_path)
+		expected_source, backup_detail, transaction.backup_cleanup = back_up_settings_source(backup_path)
 		if not expected_source then
-			Logger.error(LOG, "%s refused before any write: %s.", label, tostring(backup_detail))
-			_bulk_settings_transaction = nil
+			Logger.error(LOG, "%s refused before any settings write: %s.", label, tostring(backup_detail))
+			if transaction.backup_cleanup ~= nil then
+				transaction.failure_reason = "backup-refused"
+				transaction.inverse_redeploy_required = false
+				transaction.refused_deploy_serial = _deploy_serial
+				transaction.phase = "rollback-sibling"
+				retry_bulk_settings_recovery()
+			else
+				_bulk_settings_transaction = nil
+			end
 			finish_bulk_settings_callback(transaction, false, "backup-refused")
 			return false
 		end
@@ -4325,11 +4353,13 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 			return false
 		end
 	end
-	if not persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source) then
+	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
+	transaction.file = file
+	if saved ~= true then
 		transaction.failure_reason = "candidate-persistence-failed"
 		transaction.inverse_redeploy_required = false
 		transaction.refused_deploy_serial = _deploy_serial
-		transaction.phase = "rollback-sibling"
+		transaction.phase = file ~= nil and "rollback-persistence" or "rollback-sibling"
 		retry_bulk_settings_recovery()
 		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
 		return false

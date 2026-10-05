@@ -16,6 +16,7 @@
 
 local M = {}
 local Writer = require("toml_codec.writer")
+local FileInverse = require("config_file_inverse")
 
 --- Creates the participant for one transaction.
 --- @param options table { path, backup_path, remove = function(path) -> boolean,
@@ -29,6 +30,7 @@ function M.new(options)
 	local files = options.files
 	local participant = {}
 	local source, candidate, published = nil, nil, false
+	local inverse, backup_receipt, publication_debt = nil, nil, false
 
 	--- Whether the candidate differs from the exact source it was prepared from.
 	--- @return boolean
@@ -46,6 +48,7 @@ function M.new(options)
 		local prepared, detail, content, exact = Writer.prepare_batch(options.path, rows, files)
 		if prepared ~= true then return false, detail end
 		source, candidate = exact, content
+		inverse = { path = options.path, source = exact, candidate = content, remove = options.remove }
 		return true
 	end
 
@@ -75,8 +78,9 @@ function M.new(options)
 	function participant.backup()
 		assert(source ~= nil, "a scope file must be prepared before its backup")
 		if source.status ~= "ok" or not changed() then return true end
-		local written, detail = Writer.publish_if_unchanged(options.backup_path, source.content, files,
+		local written, detail, retry_cleanup = Writer.publish_if_unchanged(options.backup_path, source.content, files,
 			{ status = "absent" })
+		if type(retry_cleanup) == "function" then backup_receipt = { publication_cleanup = retry_cleanup } end
 		if written ~= true then return false, "backup refused: " .. tostring(detail) end
 		local observed, status = Writer.read_classified(options.backup_path, files)
 		if status ~= "ok" or observed ~= source.content then return false, "backup verification failed" end
@@ -89,7 +93,10 @@ function M.new(options)
 	function participant.publish()
 		assert(source ~= nil, "a scope file must be prepared before its publication")
 		if not changed() then return true end
-		local written, detail = Writer.publish_if_unchanged(options.path, candidate, files, source)
+		local written, detail, retry_cleanup = Writer.publish_if_unchanged(options.path, candidate, files, source)
+		if type(retry_cleanup) == "function" then
+			inverse.publication_cleanup, publication_debt = retry_cleanup, true
+		end
 		if written ~= true then return false, detail end
 		published = true
 		return true
@@ -99,17 +106,25 @@ function M.new(options)
 	--- A file another writer changed since is left alone and reported.
 	--- @return boolean restored
 	function participant.restore()
-		if not published then return true end
-		local restored
-		if source.status == "ok" then
-			restored = Writer.publish_if_unchanged(options.path, source.content, files,
-				{ status = "ok", content = candidate }) == true
-		else
-			local current, status = Writer.read_classified(options.path, files)
-			restored = status == "ok" and current == candidate and options.remove(options.path) == true
+		if backup_receipt ~= nil then
+			if Writer.retry_publication_cleanup(backup_receipt) ~= true then return false end
+			backup_receipt = nil
 		end
-		if restored then published = false end
+		if inverse and inverse.publication_cleanup ~= nil then
+			if FileInverse.settle_publication(inverse) ~= true then return false end
+			published = inverse.restored ~= true
+		end
+		if not published then publication_debt = false; return true end
+		local restored = FileInverse.restore(inverse, files)
+		if restored then published, publication_debt = false, false else publication_debt = true end
 		return restored
+	end
+
+	--- Whether a refused native publication or inverse still owns cleanup.
+	--- @return boolean pending
+	function participant.pending()
+		return publication_debt or backup_receipt ~= nil or (inverse ~= nil and (inverse.publication_cleanup ~= nil
+			or inverse.inverse_receipt ~= nil or inverse.removal_cleanup ~= nil))
 	end
 
 	return participant

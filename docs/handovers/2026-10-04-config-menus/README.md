@@ -142,6 +142,24 @@ is not executed on this host. Hosted native/package/install qualification
 remains pending; these Lua-only corrections do not qualify the separate
 Windows record owner.
 
+## Continuation: exact bulk publication recovery
+
+The independently reviewed bulk packet `c9d77463…` applies after the exact
+retired-preference Config prerequisite. All fourteen source/test preimages and
+postimages match its manifest. Native cleanup capabilities propagate through
+the shared writer/layer/scope owners into the actual macOS remap bulk journal;
+retry settles them before another inverse, runtime regeneration or backup
+release. Its private Config creation inverse verifies current absence without
+rewriting a successor or changing the generic scope contract. Every original
+assertion remains intact. The explicit-reset fixture follows the conditional
+publisher and adds a handwritten exact malformed-source fence; its previous
+predicates are unchanged and an independently mutated wrong fence is refused.
+Selected local gates pass formatting, 357 JS checks, 14,226 portable macOS and
+6,760 Linux unit cases, macOS E2E101 with one host-specific skip, and Linux
+E2E188. Hosted native qualification remains pending; nonbulk setter,
+activation, startup and detached semantic-source
+admission packets are separate and do not establish complete TODO5 acceptance.
+
 ## Integration coordination
 
 Feature CI may run concurrently on each group's dedicated branch.
