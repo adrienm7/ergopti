@@ -4140,7 +4140,8 @@ fix as explicit code work rather than unsupported-platform exceptions.
   bold/regular ink and mapped/focus-free flags. This is not physical input or
   native Wayland acceptance. Source/screenshot hashes remain in the handover.
   Mac production formatter/styledtext/canvas diagnostics and independent pixel
-  observer are adopted. The 38 pure Python observer/supervisor controls pass and remain distinct
+  observer are adopted. Mandatory pure/native registration is committed;
+  the hosted three-OS manual run will qualify the exact composed tree. The 38 pure Python observer/supervisor controls pass and remain distinct
   from12 unexecuted native signed-Hammerspoon captures. Unchanged style/alignment expectations and exact
   child retirement remain pending manual CI; missing GUI/trust/capture/cleanup must fail, not skip.
   Remaining: actual Mac canvas qualification, Windows current-source native and
