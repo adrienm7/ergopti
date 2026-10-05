@@ -2004,6 +2004,17 @@ projection control. Native C registration, positive AppleEvent delivery,
 sandbox containment and Brew install/upgrade remain pending; no runtime fix
 or full item-36 qualification is claimed.
 
+Native run 37259548678 confirms GetCurrentProcess succeeds and the disposable
+receiver's UIElement transformation refuses with OSStatus -50 at readiness.
+The receiver now requests the documented self UIElement/background-to-foreground
+transition, without front activation or a window request. It may have a private
+Dock presence; no invisible-registration claim is made. Both noErr/exit-65 guards,
+the existing event loop/handlers, sandbox policy and two-positive/one-deny
+requirements stay intact. All thirty-five Python controls and 175 assertion
+calls remain byte-identical and pass; the source guard rejects the old target
+and an independently injected front-activation call. Native registration,
+delivery, containment, physical retirement and Brew lifecycle remain pending.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
