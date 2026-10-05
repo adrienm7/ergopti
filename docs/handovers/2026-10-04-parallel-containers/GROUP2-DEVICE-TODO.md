@@ -56,10 +56,15 @@ SHA, then physical input/refusal recovery and all 21 translated menus.
       refusing cached-page use after transfer failure and preserving private
       native ownership/cleanup debt. Original six cases stay unchanged. Actual
       Curl8.14 passes6/0 locally; hosted Curl8.5 previously fails one case.
-- [ ] Confirm exact-source hosted audio and notification results after prerequisite
-      corrections. Actual gettext audio gives6/0 on both native Lua interpreters;
-      absence gives6/4. Dunst1.12 gives13/0 with actual urgency-rule receipts and
-      wrong-rule rejection. The Ubuntu1.9.2 producer requires hosted qualification.
+- [ ] Preserve the now-qualified audio and notification prerequisite receipts:
+      manual37274473330 confirms audio6/0 on each interpreter and notifications
+      13/0 on Ubuntu1.9.2. Absence of real gettext gives6/4 locally. Final integrated
+      native confirmation remains separate; no byte or urgency output is fabricated.
+- [ ] The native HTTP owner must diagnose the POST NUL-body dispatch ACK failure
+      at run_http_url_nul_receipts.lua135. Six other URL/public-request controls
+      pass; this step already has the proper shared namespace. Keep its original
+      assertion and all inputs, and obtain a causal fix rather than interpreting
+      it as another import or compiler prerequisite.
 - [ ] Investigate any recurrence of the ordinary GTK application launch failure
       using its actual launcher stderr/exit and selected-entry identity. All four
       original cases pass locally; no deadline or assertion was relaxed.

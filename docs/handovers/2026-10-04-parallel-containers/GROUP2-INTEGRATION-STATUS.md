@@ -90,8 +90,17 @@ actual urgency rules classify native receipt categories independently of expecte
 inputs, and history urgency is additionally checked when exported. Its actual
 wrong-rule negative control is rejected; all thirteen checks pass locally.
 Debian Dunst 1.9.0 lacks the required ClearHistory method, so its failed local
-probe does not qualify Ubuntu Dunst 1.9.2. Exact-source hosted confirmation is
-pending and must be recorded separately in the final delivery receipt.
+probe does not qualify Ubuntu Dunst 1.9.2. Manual [37274473330](https://github.com/adrienm7/ergopti/actions/runs/37274473330)
+at `3321b957fb5465be57b810841c686b27fb5e23c2` is terminal failed, but
+confirms audio six/zero on each interpreter, notifications thirteen/zero and
+unchanged GTK four/four. Its tree is exactly d561cbf57. Core JS/properties and
+Linux units pass. Twelve native E2E steps fail: seven shared-module import
+prerequisites, three missing xkbcli controls and two distinct HTTP-owner controls
+(POST NUL body dispatch acknowledgement, HTTP503 ETag). Packaging/installation
+are skipped and Release/Publish skipped. The next bounded workflow correction
+provides the real XKB compiler and shared Lua namespace before their first use,
+retaining all original fixtures. Actual local XKB gives64/0+72/0+64/0; absence
+reproduces the exact hosted line83 refusal. Hosted final confirmation is pending.
 
 ## Required continuation
 
@@ -102,6 +111,10 @@ pending and must be recorded separately in the final delivery receipt.
   carrying E2 on Curl 8.5, without overwriting a foreign winner or discarding
   cleanup debt. The original six adversarial inputs/expectations remain intact.
   Curl 8.14 passes six/zero locally; this does not fix older supported Curl.
+- The separate native URL-byte fixture still fails its POST NUL-body dispatch
+  acknowledgement at line135; six other actual URL/public-request controls pass.
+  The fixture already declares the shared namespace, so the import correction
+  cannot explain or qualify this distinct refusal. Request a causal HTTP-owner fix.
 - Group 6 retains Homebrew/Sparkle archive acceptance. Latest inspected manual
   run [37267530410](https://github.com/adrienm7/ergopti/actions/runs/37267530410)
   at `4d026ba9abbc8449d68f8be932f21a7e9cac6c0b` still fails: 309 Swift cases,
