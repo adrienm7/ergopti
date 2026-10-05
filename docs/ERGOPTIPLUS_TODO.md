@@ -1817,6 +1817,28 @@ These are software implementations; final hardware verification remains below.
   Foreign native behavior is untested. No Reader/schema/cache/flush/TOML,
   physical input or reserved title/shortcut change.
 
+- [~] **L122.** Linux update release-page admission: use the existing shared
+  strict JSON decoder at the completed-page boundary. Legacy decoding could
+  offer a release from malformed grammar, duplicate keys, lone surrogates or
+  nonfinite metadata; duplicate selected tags could change the offered version.
+  Change one decoder call while keeping the legacy API, shared release parser,
+  tag/assets/notes/publication/prerelease selectors, channels, transport and
+  caching byte-identical. Thirty-four real verified-TLS/public updater checks
+  reproduce twenty-two wrong offers (eight grammar cases plus fourteen existing
+  strict-policy controls) and pass on current LuaJIT, signed Ubuntu 22.04
+  curl/luv/libuv dependencies and Lua 5.4. The mixed profile retains current
+  kernel/Lua/libc. Twelve native healthy controls retain tag, canonical download
+  and checksum URLs and cache identity; thirty-four scripted unit cases retain
+  those fields plus notes/time/prerelease and pass on both Lua runtimes. Every
+  prior parser assertion stays intact. Six unchanged native updater fixtures
+  totaling sixty-one checks remain green under all three configurations.
+  Native curl exits/status/full bytes, one callback and zero handles are required.
+  Register future Linux CI without launching it. macOS uses native hs.json
+  admission whose strict-policy details are unmeasured; Windows uses nonempty
+  payload/span parsing by source inspection. Keep foreign diagnoses separate
+  and leave their native gates to the principal agent. No release publication,
+  website, transport, persistence, physical input or reserved policy change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

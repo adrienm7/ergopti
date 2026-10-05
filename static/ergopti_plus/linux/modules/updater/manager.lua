@@ -553,7 +553,7 @@ local function _fetch_releases(channel, callback)
 			else
 				all_unchanged = false
 			end
-			local valid, decoded = pcall(Json.decode, body)
+			local valid, decoded = pcall(Json.decode_lossless, body)
 			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
 				or type(decoded) ~= "table" then
 				finish(nil, status, "invalid release page JSON", "parse_failed")

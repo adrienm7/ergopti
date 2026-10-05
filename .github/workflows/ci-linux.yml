@@ -376,6 +376,14 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Refuse malformed release pages through existing strict JSON admission
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_updater_release_json_admission.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_json_admission.py
+        timeout-minutes: 1
+
       - name: Roll back native category and score edits after SQLite refusal
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
