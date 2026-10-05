@@ -3721,9 +3721,15 @@ the owned-program C header is absent from the umbrella export. The umbrella
 now includes that header, preserving the existing POSIX declarations. An
 independent declaration/signature probe fails against the original umbrella
 and passes against the corrected source; this is portable C evidence, without
-macOS SDK qualification. The native14 cases, package completion and installation
-remain unexecuted pending the corrected hosted run. These bounded fixes do not
-qualify those surfaces or finish the item.
+macOS SDK qualification from that probe alone. Manual run37262044694 at
+3efd4eb8c87758f540b064b78f2563ded42a724e now passes the release build and all14
+owned-program native XCTest cases:14 started/completed/passed, zero skipped,
+failed, duplicated or unexecuted. Its native launcher target tree is identical
+to feature commit e9c9f240201e13a5022423da4b7487fcbbf351fb. The mandatory receipt
+guard preserves the complete XCTest verdict: the root suite still fails the
+Homebrew and Sparkle archive acceptance cases, so package completion and
+installation remain unexecuted. Native Hammerspoon publication, provider
+discovery and physical acceptance are still separate unfinished scope.
 
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
