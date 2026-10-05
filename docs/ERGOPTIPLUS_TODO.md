@@ -2209,6 +2209,32 @@ These are software implementations; final hardware verification remains below.
   and HTTP assertions. No input hook, shared policy, schema, source counters,
   normalization, menu, configuration or reserved change.
 
+- [~] **L138.** Linux stored ngram source projection: retain all admitted string
+  source labels except hotstring, llm and none in the canonical other bucket.
+  A shared Utils predicate owns that membership; Linux retains native JSON
+  projection and its existing tonumber scalar admission/fallback. Actual SQLite
+  Writer/Reader controls reproduce one failure among six, scalar/shape controls
+  one among seven, and public software collector/flush/SQLite/Reader/dashboard
+  five among nine before, then pass after on current LuaJIT, Lua 5.4 and the
+  signed Jammy luv/libuv mixed profile. Independent read-only Python SQLite
+  verifies literal c11/hs1/llm2/o6; producer exit0 means collection, not success
+  of the independent oracle. The word-family check is an explicit Writer seam,
+  separate from the collector's synthetic-word exclusion. Ten original unit
+  controls reproduce three source failures; an additional pure membership case
+  covers twelve literal labels/types and adds a separate pre-fix API absence.
+  All eleven pass after, along with all seventy-four current Reader controls.
+  Preserve the complete old34969-byte unit and its110 assertions, the entire
+  frozen ten-case prefix, native6/7/9 floors and all older ngram/NULL/completion/
+  cache/layout/switch/Unicode regressions. macOS/Windows already project extra
+  string labels into other; source inspection establishes that supported
+  taxonomy, not full scalar/fallback parity or foreign native execution.
+  This slice covers stored reads. The live unflushed projection and Writer
+  conflict merge have separately reproduced omissions and remain queued; do
+  not claim complete source accounting. Register future Linux CI without
+  launching it. Preserve both language packs and principal notification/HTTP
+  assertions. No Writer, live delta, input hook, shared admission change, schema,
+  configuration, menu, normalization, foreign driver or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

@@ -11,6 +11,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Utils = require("keylogger.utils")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keylogger.sqlite_reader"
@@ -423,7 +424,18 @@ local function source_count(esrc_json, source)
 	if type(esrc_json) ~= "string" or esrc_json == "" then return 0 end
 	if ok_json then
 		local ok, decoded = pcall(Json.decode, esrc_json)
-		if ok and type(decoded) == "table" then return tonumber(decoded[source]) or 0 end
+		if ok and type(decoded) == "table" then
+			if source ~= "other" then return tonumber(decoded[source]) or 0 end
+			-- All additional synthetic labels belong to the shared other bucket.
+			-- Numeric array keys are not source labels; scalar admission is unchanged.
+			local count = 0
+			for label, value in pairs(decoded) do
+				if Utils.is_other_synthetic_source(label) then
+					count = count + (tonumber(value) or 0)
+				end
+			end
+			return count
+		end
 	end
 	local raw = esrc_json:match('"' .. source .. '"%s*:%s*(%d+)')
 	return tonumber(raw) or 0

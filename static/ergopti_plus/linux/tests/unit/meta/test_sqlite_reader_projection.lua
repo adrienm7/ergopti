@@ -807,3 +807,75 @@ helpers.describe("linux-sqlite-switch-projection", function()
 		end)
 	end)
 end)
+
+helpers.describe("linux-ngram-extra-sources", function()
+	local cases = {
+		{ "extra labels across identical source blobs", '{"hotstring":1,"llm":3,"other":2,"none":9,"case-transform":4,"owned-extension":1}', 2, 2, 6, 14 },
+		{ "known sources and manual none exclusion", '{"hotstring":1,"llm":2,"other":3,"none":4}', 1, 1, 2, 3 },
+		{ "safe recognized scalar admission", '{"hotstring":"3","llm":"4","other":"2","none":100,"string":"owned","table":{},"bool":true,"nil":null,"array":[9]}', 1, 3, 4, 2 },
+		{ "extra scalar admission", '{"hotstring":1.5,"llm":2.5,"other":"3","case-transform":4.5,"owned-extension":"5","none":100}', 1, 1.5, 2.5, 12.5 },
+		{ "array keys are not labels", '[1,2,3]', 1, 0, 0, 0 },
+		{ "JSON null blob", 'null', 1, 0, 0, 0 },
+		{ "JSON null values", '{"hotstring":null,"llm":null,"other":null,"owned":null}', 1, 0, 0, 0 },
+		{ "JSON scalar blob", 'false', 1, 0, 0, 0 },
+		{ "malformed legacy literal fallback", '{"hotstring":3,"llm":4,"other":5,owned', 1, 3, 4, 5 },
+	}
+	for _, case in ipairs(cases) do
+		helpers.it("linux-ngram-extra-sources: " .. case[1], function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM ngram_chars", 1, true) then
+					return Json.encode({ { token_json = Json.encode("owned"), c = 40, td = 90, e = 6,
+						esrc_json = case[2], source_rows = case[3] } })
+				end
+				return "[]"
+			end, function(reader)
+				local item = reader.read_ngrams("/db/owned.sqlite").c.owned
+				helpers.assert_eq(item.c, 40)
+				helpers.assert_eq(item.t, 90)
+				helpers.assert_eq(item.e, 6)
+				helpers.assert_eq(item.hs, case[4])
+				helpers.assert_eq(item.llm, case[5])
+				helpers.assert_eq(item.o, case[6])
+			end)
+		end)
+	end
+	helpers.it("linux-ngram-extra-sources: split-today uses the same source taxonomy", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM ngram_chars", 1, true) and sql:find("app,", 1, true) then
+				return Json.encode({ { app = "owned", token_json = Json.encode("x"), c = 8, td = 20, e = 1,
+					esrc_json = '{"hotstring":1,"llm":2,"none":99,"case-transform":5}', source_rows = 1 } })
+			end
+			return "[]"
+		end, function(reader)
+			local split = reader.read_range_split_today("/db/owned.sqlite")
+			local item = split.today.owned.c.x
+			helpers.assert_eq(item.c, 8)
+			helpers.assert_eq(item.hs, 1)
+			helpers.assert_eq(item.llm, 2)
+			helpers.assert_eq(item.o, 5)
+		end)
+	end)
+end)
+
+helpers.describe("linux-ngram-source-policy", function()
+	helpers.it("linux-ngram-source-policy: shared other-source membership excludes dedicated and nonlabel keys", function()
+		local Utils = require("keylogger.utils")
+		local cases = {
+			{ label = "other", expected = true },
+			{ label = "case-transform", expected = true },
+			{ label = "owned-extension", expected = true },
+			{ label = "", expected = true },
+			{ label = "hotstring", expected = false },
+			{ label = "llm", expected = false },
+			{ label = "none", expected = false },
+			{ label = 1, expected = false },
+			{ label = true, expected = false },
+			{ label = false, expected = false },
+			{ label = {}, expected = false },
+			{ expected = false },
+		}
+		for _, case in ipairs(cases) do
+			helpers.assert_eq(Utils.is_other_synthetic_source(case.label), case.expected)
+		end
+	end)
+end)
