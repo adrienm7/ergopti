@@ -41,6 +41,7 @@ local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
+local Bom = require("toml_codec.bom")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 local OperationReporter = require("diagnostics.operation_reporter")
@@ -576,7 +577,8 @@ end
 --- by table headers (`[t.key]`, `[t.key.sub]`, `[[t.key]]`) is replaced as one
 --- value: those header lines and their assignments go, comments stay. A value
 --- the file already holds in any spelling is left untouched, and a changed key
---- inside an inline table or a root-level entry is refused with its path.
+--- inside an inline table or a root container is refused with its path. Strict
+--- root dotted scalar records are replaced or removed through their own span.
 --- @param path    string Absolute path to the config.toml to write.
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
 --- @param file_adapter table|nil Classified platform file adapter.
@@ -753,7 +755,66 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		return KeyPath.render({ key })
 	end
 	local applied, replacements, removed = {}, {}, {}
+	local root_owned = {}
 	for _, record in ipairs(scanned.records) do
+		-- A strict root dotted assignment names one scalar leaf without a header.
+		-- Its physical record owns only that leaf; inline descendants and array
+		-- elements still need a different publication capability.
+		local root_path = record.header == nil and record.key_text and KeyPath.parse(record.key_text) or nil
+		if root_path and #root_path > 1 and not root_path[#root_path]:find(".", 1, true) then
+			local parents = {}
+			for index = 1, #root_path - 1 do parents[index] = root_path[index] end
+			local sl, kl = KeyPath.render(parents):lower(), root_path[#root_path]:lower()
+			local u = lookup[sl] and lookup[sl][kl]
+			local exact = u ~= nil and u.key == root_path[#root_path] and #u.segments == #parents
+			for index, segment in ipairs(parents) do
+				if not u or u.segments[index] ~= segment then exact = false end
+			end
+			local existing = decoded
+			for _, segment in ipairs(root_path) do
+				if type(existing) ~= "table" then existing = nil; break end
+				existing = existing[segment]
+			end
+			local kind = type(existing)
+			local scalar = kind == "string" or kind == "boolean"
+				or (kind == "number" and existing == existing and math.abs(existing) ~= math.huge)
+			local desired = u and u.value
+			local desired_kind = type(desired)
+			local desired_scalar = desired_kind == "string" or desired_kind == "boolean"
+				or (desired_kind == "number" and desired == desired and math.abs(desired) ~= math.huge)
+			if exact and scalar and (u.delete or desired_scalar) then
+				local identity = sl .. "\0" .. kl
+				if applied[identity] then return false, "ambiguous batch key identity" end
+				applied[identity] = true
+				root_owned[#root_owned + 1] = { path = root_path, row = u }
+				local unchanged = not u.delete and same_value(existing, u.value)
+					and (kind ~= "number" or existing ~= 0 or 1 / existing == 1 / u.value)
+					and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal)
+				if not unchanged then
+					for _, other in ipairs(updates) do
+						local inner = row_path(other)
+						if other ~= u and #inner > #root_path and has_prefix(inner, root_path, true) then
+							return false, "the batch replaces " .. KeyPath.render(root_path)
+								.. " and also writes " .. KeyPath.render(inner) .. " inside it"
+						end
+					end
+					for index = record.first, record.last do removed[index] = true end
+					local first_text = scanned.lines[record.first].text
+					local prefix = record.first == 1 and first_text:sub(1, #first_text - #Bom.strip_prefix(first_text)) or ""
+					if u.delete and prefix ~= "" then replacements[record.first] = prefix end
+					if not u.delete then
+						-- This new scalar capability uses the existing optional precise codec;
+						-- default/header publication keeps its established encoder.
+						local literal_ok, literal = pcall(function()
+							return u.source_literal or require("toml_codec.leaf_rows").value_literal(u.value)
+						end)
+						if not literal_ok then return false, "the root scalar cannot be encoded exactly" end
+						replacements[record.first] = prefix .. record.key_text .. " = " .. literal
+							.. scanned.lines[record.last].eol
+					end
+				end
+			end
+		end
 		local section, key = record.section, record.key
 		if not record.addressable and record.quoted then section, key = record.quoted.section, record.quoted.key end
 		if record.quoted or (record.addressable and #record.key_segments == 1) then
@@ -862,6 +923,20 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	local content_ok, content_value = pcall(Codec.decode, content)
 	if not content_ok or type(content_value) ~= "table" then
 		return false, "the batch cannot address the destination without ambiguous TOML keys"
+	end
+	-- Parsing proves syntax; this capability additionally proves the requested
+	-- owned scalar before a native publisher can acknowledge the candidate.
+	for _, owned in ipairs(root_owned) do
+		local actual = content_value
+		for _, segment in ipairs(owned.path) do
+			if type(actual) ~= "table" then actual = nil; break end
+			actual = actual[segment]
+		end
+		local wanted = owned.row.value
+		local exact = owned.row.delete and actual == nil or not owned.row.delete
+			and type(actual) == type(wanted) and actual == wanted
+			and (type(wanted) ~= "number" or wanted ~= 0 or 1 / actual == 1 / wanted)
+		if not exact then return false, "the root scalar candidate differs from the requested value" end
 	end
 	return true, nil, content, {
 		status = read_status,
