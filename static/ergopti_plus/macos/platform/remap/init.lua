@@ -4415,12 +4415,24 @@ end
 --- scope's candidate can only replace the bytes that backup holds.
 --- @param backup_path string Unique backup destination that must not exist.
 --- @param source_path string|nil The settings file, the running one by default.
+--- @param admitted_source table|nil Optional exact Config read-generation receipt.
 --- @return table|nil source `{ status, content }` precondition for the save.
 --- @return string|nil detail Refusal reason.
 --- @return table|nil cleanup Private release-only backup receipt.
-local function back_up_settings_source(backup_path, source_path)
+local function back_up_settings_source(backup_path, source_path, admitted_source)
 	local path = source_path or resolve_user_config()
 	local content, status = FileSystem.read_with_status(path)
+	if admitted_source ~= nil then
+		-- Recommendation admission used this exact native read, not the later
+		-- backup generation. A personalized successor must never be adopted as
+		-- authority for a candidate validated against older neutral bindings.
+		if type(admitted_source) ~= "table" or admitted_source.path ~= path
+			or (admitted_source.status ~= "ok" and admitted_source.status ~= "absent")
+			or status ~= admitted_source.status
+			or (status == "ok" and content ~= admitted_source.content) then
+			return nil, "remap source changed after recommendation admission"
+		end
+	end
 	if status == "absent" then return { status = "absent" } end
 	if status ~= "ok" or type(content) ~= "string" then return nil, "remap source is unreadable" end
 	local backed, detail, retry_cleanup = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
@@ -5143,7 +5155,7 @@ function M.save_recommended_keys(request)
 	local mod_combos = Config.load_mod_combos(MOD_COMBOS_FILE)
 	if not key_defs or not mod_combos then return false, "the remap data files are unreadable" end
 	Logger.start(LOG, "%s: %d key(s) into '%s'…", label, type(request.keys) == "table" and #request.keys or 0, path)
-	local state, status = Config.load_user_config(key_defs, mod_combos, path)
+	local state, status, admitted_source = Config.load_user_config(key_defs, mod_combos, path)
 	if type(state) ~= "table" or status == "error" then
 		Logger.error(LOG, "%s refused: '%s' is unsafe.", label, path)
 		return false, "'" .. path .. "' is unsafe"
@@ -5153,7 +5165,7 @@ function M.save_recommended_keys(request)
 		Logger.error(LOG, "%s refused: %s.", label, tostring(refusal))
 		return false, refusal
 	end
-	local expected, backup_detail, backup_cleanup = back_up_settings_source(request.backup_path, path)
+	local expected, backup_detail, backup_cleanup = back_up_settings_source(request.backup_path, path, admitted_source)
 	if not expected then
 		if backup_cleanup ~= nil then
 			_bulk_settings_transaction = { label = label, detached = true,

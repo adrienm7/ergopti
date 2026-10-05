@@ -1209,6 +1209,21 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
   observer, not a restarted daemon. Hosted native qualification, physical input,
   Wayland and physical-device wizard re-runs remain pending.
 
+The detached macOS recommendation owner now binds its candidate to optional raw
+path/status/bytes returned by the same Config read that admitted the model.
+A personalized source replacing neutral admitted bytes before backup refuses
+without publishing over the successor. Backup/publication retain their existing
+classified source and exact conditional-writer fences; no disconnected reread
+manufactures model authority. Existing return values and custom two-return
+producers retain their prior contracts. Independent controls pass 266 composed
+owner cases; the same nine new cases give original 5/4 and corrected 9/0.
+An independent real-file A/B source race gives original 54/1 and corrected 55/0.
+The evidence covers path/raw bytes, not cross-read inode/symlink ABA identity.
+Selected final-source local gates pass formatting, 357 JS checks, 14,262
+portable macOS unit cases and 101 macOS E2E checks with one host-specific skip.
+Hosted native/package/install qualification and physical wizard re-runs remain
+open. TODO7 stays partial.
+
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] On Windows, exercise all seven wizard pages, cancellation, Finish/restart/rerun, changed-folder reads, delayed/stale responses and explicit trigger choices on a disposable profile. Preserve untouched obsolete trigger values.
