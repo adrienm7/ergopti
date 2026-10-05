@@ -408,8 +408,9 @@ local function install_session()
 		download = function(record, _, done)
 			local manager = updater()
 			if not manager then return false end
-			return manager.download_release(record, function(path, err, stage)
-				done(path, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download, err)
+			return manager.download_release(record, function(path, err, stage, failure_receipt)
+				done(path, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download, err,
+					failure_receipt)
 			end) == true
 		end,
 		install = function(path, _, record)

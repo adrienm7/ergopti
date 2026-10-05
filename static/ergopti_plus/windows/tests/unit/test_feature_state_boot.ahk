@@ -116,3 +116,11 @@ TestFeatureStateBootSourceWiring() {
         "feature-state must not use the boot-fragile Func(...).Call accessor")
 }
 Test("Feature-state startup: production include order and direct loader dependency stay wired (feature-state-boot-wiring)", TestFeatureStateBootSourceWiring)
+
+TestFeatureStateBootSemanticSources() {
+	_FeatureStateBootRun("semantic_root")
+	_FeatureStateBootRun("semantic_section")
+	_FeatureStateBootRun("semantic_inline")
+}
+Test("feature-state startup: semantic root and section sources reach actual readers (config-semantic-snapshot)",
+	TestFeatureStateBootSemanticSources)

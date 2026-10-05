@@ -1,0 +1,8 @@
+# Revision3 registration metadata supplied by the staging author; not an existing frozen file.
+# After existing unit/test_updater.ahk and canonical shared managed-network contract include:
+#Include unit/test_updater_managed_failure.ahk
+
+# Add through the existing suite manifest owner/generator:
+unit/test_updater_managed_failure.ahk
+
+# updater_download_receipts.ps1 is invoked by the registered unit; no separate top-level fixture include.

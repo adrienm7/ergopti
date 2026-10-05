@@ -264,6 +264,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/json.ahk
 #Include ../infra/program_parameter.ahk
 #Include ../infra/program_actions.ahk
+#Include ../../_shared/modules/network/failure.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
@@ -553,11 +554,15 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\..\_shared\modules\llm\local_server_discovery.ahk
 #Include ../modules/llm/api_remote.ahk
+#Include ../modules/llm/local_server_models.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_local_server_auth.ahk
+#Include unit/test_local_server_discovery_policy.ahk
+#Include unit/test_local_server_models.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
@@ -688,6 +693,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_numeric_option_ranges.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
+#Include unit/test_local_server_private_publication.ahk
 #Include unit/test_llm_enable_admission.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
 #Include unit/test_llm_fixture_setup.ahk
@@ -1047,6 +1053,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_remote_generate_curl_dispatch.ahk
 #Include unit/test_network_dispatch_nonblocking.ahk
+#Include unit/test_managed_network_failure.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk

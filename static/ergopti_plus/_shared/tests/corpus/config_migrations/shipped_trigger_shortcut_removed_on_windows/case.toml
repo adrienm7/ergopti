@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_trigger_shortcut_removed_on_windows/case.toml
 
 [case]
-description = "The shipped v3 to v4 step deletes the retired [llm] trigger_shortcut from a Windows file and keeps its siblings."
+description = "Shipped migrations preserve the retired Windows llm.trigger_shortcut and its siblings until explicit cleanup."
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 3

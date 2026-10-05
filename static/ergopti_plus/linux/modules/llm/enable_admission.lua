@@ -45,7 +45,8 @@ function M.new(context)
 	end
 
 	local function reject(request, reason, receipt)
-		local choice = context.reject(request.snapshot.origin, reason, receipt)
+		local choice = context.reject(request.snapshot.origin, reason, receipt,
+			request.snapshot, function() return matches(request) end)
 		-- A modal choice can outlive source, pause or scope admission.
 		if choice == "retry" and matches(request) then return owner.enable() end
 		return false
@@ -111,7 +112,7 @@ function M.new(context)
 		if not called or dispatched ~= true then
 			request.cancelled = true
 			if Http.cancel(OWNER) == true and active == request then active = nil end
-			if matches(request) then reject(request, "ollama_unreachable", nil) end
+			if matches(request) then return reject(request, "ollama_unreachable", nil) end
 			return false
 		end
 		if request.receipt then settle(request, request.receipt) end

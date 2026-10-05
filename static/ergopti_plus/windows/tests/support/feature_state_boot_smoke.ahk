@@ -50,6 +50,12 @@ try {
 				throw Error("The native distance gate differs from the saved preference.")
         case "parsed":
             _FeatureStateSmokeParsedConfig()
+		case "semantic_root":
+			_FeatureStateSmokeSemanticConfig(true)
+		case "semantic_inline":
+			_FeatureStateSmokeSemanticConfig("inline")
+		case "semantic_section":
+			_FeatureStateSmokeSemanticConfig(false)
         case "missing":
             _FeatureStateSmokeMissingSections()
 		case "neutral":
@@ -103,7 +109,7 @@ _FeatureStateSmokeParsedConfig() {
     try {
         try FileDelete(TempConfig)
         FileAppend('[hotstrings]`ntrigger_char = "@"`nmagic_key_source = "KeyN"`nmagic_key_source_char = "n"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
-        Cache := ParseTomlFile(TempConfig)
+        Cache := ParseConfigTomlFile(TempConfig)
         ReadScriptConfig(Cache)
         ReadCategoryEnabled(Cache)
     } finally {
@@ -301,4 +307,29 @@ _FeatureStateSmokeInvalidCategory(Value) {
 _FeatureStateSmokeAssert(Expected, Actual, Label) {
     if (Expected != Actual)
         throw Error(Label . ": expected " . Expected . ", got " . Actual)
+}
+
+; Independent complete source spellings reach the actual native bootstrap readers.
+_FeatureStateSmokeSemanticConfig(Root) {
+	global ScriptInformation, CategoryEnabled, HSE_RepeatEnabled
+	TempConfig := A_Temp . "\ergopti_feature_state_semantic_" . DllCall("GetCurrentProcessId") . ".toml"
+	Source := Root
+		? 'hotstrings.trigger_char = "@"`nhotstrings.magic_key_source = "KeyN"`nhotstrings.magic_key_source_char = "n"`nhotstrings.repeat_key_enabled = true`nscript.alt_gr_is_kana_remap = true`ncategory_enabled.hotstrings = true`n'
+		: '[hotstrings]`ntrigger_char = "@"`nmagic_key_source = "KeyN"`nmagic_key_source_char = "n"`nrepeat_key_enabled = true`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = true`n'
+	if Root == "inline"
+		Source := 'hotstrings = { trigger_char = "@", magic_key_source = "KeyN", magic_key_source_char = "n", repeat_key_enabled = true }`nscript = { alt_gr_is_kana_remap = true }`ncategory_enabled = { hotstrings = true }`n'
+	try {
+		FileAppend(Source, TempConfig, "UTF-8")
+		Cache := ParseConfigTomlFile(TempConfig)
+		ReadScriptConfig(Cache)
+		ReadCategoryEnabled(Cache)
+		_FeatureStateSmokeAssert("@", ScriptInformation["MagicKey"], "semantic trigger_char")
+		_FeatureStateSmokeAssert("KeyN", ScriptInformation["MagicKeySource"], "semantic source key")
+		_FeatureStateSmokeAssert("n", ScriptInformation["MagicKeySourceChar"], "semantic source character")
+		_FeatureStateSmokeAssert(true, ScriptInformation["AltGrIsKanaRemap"], "semantic Kana override")
+		_FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "semantic repeat key")
+		_FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "semantic master gate")
+	} finally {
+		try FileDelete(TempConfig)
+	}
 }
