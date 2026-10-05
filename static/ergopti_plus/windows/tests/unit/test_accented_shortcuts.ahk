@@ -166,8 +166,10 @@ _ACS_LayoutSectionsCase() {
 		Assert(_ACS_TokenIndex(Tokens, Row) > Custom && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
 			Row . " belongs to the custom layout section")
 	for Row in ["number_row_policy", "accented_letters",
-			"hotstrings.magic_key.replace", "layout.ctrl_magic_save"]
+			"magic_key_source", "layout.ctrl_magic_save"]
 		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")
+	AssertEqual(0, _ACS_CountLayoutToken(Tokens, "hotstrings.magic_key.replace"),
+		"the removed replacement switch must not reappear in the Layout menu")
 	_ACS_LayoutProviderPlacement(Tokens, AnyLayout)
 	Assert(InStr(_TrayRootBuilderBodies(), "group_accented") == 0,
 		"the accented-letter group must stay enabled without the Ergopti emulation")
@@ -209,4 +211,12 @@ _ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
 		for Key, Value in SavedState
 			State[Key] := Value
 	}
+}
+
+_ACS_CountLayoutToken(Tokens, Token) {
+	Count := 0
+	for Value in Tokens
+		if Value == Token
+			Count += 1
+	return Count
 }

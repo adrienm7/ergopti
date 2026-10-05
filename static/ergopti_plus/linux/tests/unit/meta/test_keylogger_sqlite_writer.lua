@@ -20,7 +20,7 @@ local function with_writer_read_receipts(body, status, test)
 	assert(file:write("existing native database fixture") and file:close())
 	os.execute = function() return 0 end
 	io.popen = function(command)
-		local content, code = body, status
+		local content, code = type(body) == "function" and body(command) or body, status
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
 			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
 		end
@@ -171,6 +171,40 @@ helpers.describe("linux-sqlite-read-receipts", function()
 	end
 end)
 
+helpers.describe("linux-sqlite-wpm-fraction", function()
+	for _, fixture in ipairs({
+		{ label = "fraction", value = 18.461538461538463, expected = 18.461538461538463 },
+		{ label = "sub-unit fraction", value = 0.125, expected = 0.125 },
+		{ label = "numeric text", value = "2.75", expected = 2.75 },
+		{ label = "integer", value = 60, expected = 60 },
+		{ label = "zero", value = 0, expected = 0 },
+		{ label = "invalid text fallback", value = "not a number", expected = 0 },
+	}) do
+		it("linux-sqlite-wpm-fraction: typing SQL preserves " .. fixture.label, function()
+			local command = require("modules.keylogger.sqlite_command")
+			local previous_build, inserted = command.build, nil
+			command.build = function(path, sql, options)
+				if sql:find("INSERT OR IGNORE INTO events_typing", 1, true) then inserted = sql end
+				return previous_build(path, sql, options)
+			end
+			local ok, err = xpcall(function()
+				with_writer_read_receipts(function(cmd)
+					return cmd:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or ""
+				end, 0, function(writer)
+					helpers.assert_true(writer.insert_typing_events("owned", {
+						{ app = "owned", text = "owned text", events_json = "[]", wpm = fixture.value },
+					}))
+				end)
+			end, debug.traceback)
+			command.build = previous_build
+			if not ok then error(err, 0) end
+			helpers.assert_type(inserted, "string", "the actual writer must compose a typing INSERT")
+			local scalar = inserted:match(",0%.0,([^,]+),'owned text'")
+			helpers.assert_eq(tonumber(scalar), fixture.expected, "REAL WPM must retain the admitted numeric value")
+		end)
+	end
+end)
+
 helpers.describe("linux-sqlite-writer-receipts", function()
 	for _, status in ipairs({ 1, 7, 23, 127, 255 }) do
 		it("linux-sqlite-writer-receipts: silent status " .. status .. " cannot acknowledge a write", function()
@@ -207,6 +241,21 @@ helpers.describe("linux-sqlite-writer-receipts", function()
 	end
 end)
 
+--- Captures actual Writer SQL while simulating only the CLI exit receipt.
+local function with_ngram_sql(test)
+	local command = require("modules.keylogger.sqlite_command")
+	local previous_build, statements = command.build, {}
+	command.build = function(path, sql, options)
+		if sql:find("INSERT INTO ngram_", 1, true) then statements[#statements + 1] = sql end
+		return previous_build(path, sql, options)
+	end
+	local ok, reason = xpcall(function()
+		with_category_commands(nil, function(writer) test(writer, statements) end)
+	end, debug.traceback)
+	command.build = previous_build
+	if not ok then error(reason, 0) end
+end
+
 helpers.describe("sqlite_writer", function()
 
   -- ==========================================================================
@@ -241,10 +290,31 @@ helpers.describe("sqlite_writer", function()
 		local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
 		local fh = assert(io.open(path, "r"))
 		local src = fh:read("*a"); fh:close()
-		helpers.assert_true(src:find("esrc_json = json_object", 1, true) ~= nil,
-			"source histogram must be merged across flushes instead of overwritten")
-		helpers.assert_true(src:find("'hotstring'", 1, true) ~= nil)
-		helpers.assert_true(src:find("'llm'", 1, true) ~= nil)
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 14, td = 7, cd = 2, e = 1,
+					sources = { hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5 } },
+			}))
+			helpers.assert_eq(#statements, 1, "the actual Writer must compose one n-gram SQL subject")
+			local sql = statements[1]
+			helpers.assert_type(sql, "string")
+			helpers.assert_true(sql ~= "", "source-preservation checks need an actual SQL subject")
+			helpers.assert_contains(sql, "(device_id, date, app, token, c, td, cd, e, esrc_json)")
+			local admitted = sql:match(",14,7,2,1,'([^']*)'")
+			helpers.assert_type(admitted, "string", "known and arbitrary source counts must accompany the scalar fields")
+			helpers.assert_eq(require("json").decode(admitted), {
+				hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5,
+			})
+			helpers.assert_contains(sql, "ON CONFLICT(device_id, date, app, token) DO UPDATE SET")
+			helpers.assert_contains(sql, "esrc_json = (SELECT json_group_object(k, v)")
+			helpers.assert_contains(sql, "SELECT key AS k, SUM(value) AS v")
+			helpers.assert_contains(sql, "SELECT key, value FROM json_each(esrc_json)")
+			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(excluded.esrc_json)")
+			helpers.assert_contains(sql, "GROUP BY key")
+			for _, scalar in ipairs({ "c", "td", "cd", "e" }) do
+				helpers.assert_contains(sql, scalar .. " = " .. scalar .. " + excluded." .. scalar .. ", ")
+			end
+		end)
 		helpers.assert_true(src:find("INSERT INTO ngram_scancodes", 1, true) ~= nil,
 			"evdev hardware counts must be persisted in the canonical scancode table")
 	end)
@@ -627,6 +697,355 @@ helpers.describe("linux-sqlite-burst-histogram-keys", function()
 	it("linux-sqlite-burst-histogram-keys: empty histogram keeps the empty-object default", function()
 		with_burst_histogram_statement({ date = "2000-01-01", app = "owned-app", length_buckets = {} }, function(decoded)
 			helpers.assert_eq(next(decoded), nil)
+		end)
+	end)
+end)
+
+-- Date formatting and writer receipts below are declared unit doubles; the
+-- separate native fixture uses real libc and SQLite for the same public APIs.
+local function with_local_day_clock(body)
+	local previous_date = os.date
+	os.date = function(format, epoch)
+		if format == "%Y-%m-%d" then return "2026-01-02" end
+		if format == "!%Y-%m-%d" then return "2026-01-01" end
+		if format == "!%Y-%m-%d %H:%M:%S" then return "2026-01-01 23:59:59" end
+		return previous_date(format, epoch)
+	end
+	local ok, err = xpcall(body, debug.traceback)
+	os.date = previous_date
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("linux-sqlite-local-event-days", function()
+	for _, kind in ipairs({ "hotstrings", "shortcuts" }) do
+		it("linux-sqlite-local-event-days: collector " .. kind .. " retains UTC instant and local day", function()
+			local writer_name, keylogger_name = "modules.keylogger.sqlite_writer", "modules.keylogger.keylogger"
+			local previous_writer, previous_keylogger = package.loaded[writer_name], package.loaded[keylogger_name]
+			local writer = require("tests.fakes").sqlite_writer()
+			package.loaded[writer_name], package.loaded[keylogger_name] = writer, nil
+			local ok, err = xpcall(function()
+				local keylogger = require(keylogger_name)
+				keylogger.init({ sqlite_path = "/tmp/owned-local-day-unit.sqlite" })
+				require("tests.support.metrics_consent_fixture").enable(keylogger)
+				with_local_day_clock(function()
+					keylogger.record_hotstring("owned", "q", "abc", 1000, "static", 0, false)
+					keylogger.record_shortcut("owned", "owned-action", 1000)
+					keylogger.flush()
+					helpers.assert_eq(#writer[kind], 1)
+					local row = writer[kind][1].row
+					helpers.assert_eq(row.date, "2026-01-02")
+					helpers.assert_eq(row.ts, "2026-01-01 23:59:59")
+					if kind == "hotstrings" then
+						helpers.assert_eq(row.trigger, "q")
+						helpers.assert_eq(row.replacement, "abc")
+					else helpers.assert_eq(row.key, "owned-action") end
+				end)
+			end, debug.traceback)
+			package.loaded[writer_name], package.loaded[keylogger_name] = previous_writer, previous_keylogger
+			if not ok then error(err, 0) end
+		end)
+	end
+	for _, method in ipairs({ "insert_typing_events", "insert_hotstring_events", "insert_shortcut_events", "insert_app_switch_events" }) do
+		for _, explicit in ipairs({ false, true }) do
+			it("linux-sqlite-local-event-days: " .. method .. (explicit and " retains explicit historical dates" or " defaults to local day"), function()
+				with_local_day_clock(function()
+					with_writer_read_receipts("1", 0, function(writer)
+						local previous_popen = io.popen
+						local cipher = require("modules.keylogger.text_cipher")
+						local enabled = cipher.is_enabled()
+						cipher.set_enabled(false)
+						local commands = {}
+						io.popen = function(command)
+							commands[#commands + 1] = command
+							if command:find(".output /dev/null", 1, true) then
+								return { read = function() return "\nERGOPTI_SQL_EXIT_STATUS=0\n" end,
+									close = function() return true end }
+							end
+							return previous_popen(command)
+						end
+						local event = explicit and { date = "1999-12-31", ts = "1999-12-31 23:59:59" } or {}
+						local original = require("json").encode(event)
+						local ok, err = xpcall(function()
+							helpers.assert_true(writer[method]("owned", { event }))
+							local ts = explicit and event.ts or "2026-01-01 23:59:59"
+							local date = explicit and event.date or "2026-01-02"
+							helpers.assert_contains(commands[#commands], "'" .. ts .. "','" .. date .. "'")
+							helpers.assert_eq(require("json").encode(event), original)
+						end, debug.traceback)
+						io.popen = previous_popen
+						cipher.set_enabled(enabled)
+						if not ok then error(err, 0) end
+					end)
+				end)
+			end)
+		end
+	end
+end)
+
+helpers.describe("linux-sqlite-raw-batch-transactions", function()
+	for _, fixture in ipairs({
+		{ table_name = "events_typing", method = "insert_typing_events", event = { app = "owned", text = "owned", events_json = "[]" } },
+		{ table_name = "events_hotstring", method = "insert_hotstring_events", event = { app = "owned", replacement = "owned" } },
+		{ table_name = "events_shortcut", method = "insert_shortcut_events", event = { app = "owned", key = "owned" } },
+		{ table_name = "events_app_switch", method = "insert_app_switch_events", event = { prev_app = "owned", next_app = "owned" } },
+	}) do
+		for _, status in ipairs({ 0, 7 }) do
+			it("linux-sqlite-raw-batch-transactions: " .. fixture.table_name .. " owns one transaction and receipt " .. status, function()
+				local command = require("modules.keylogger.sqlite_command")
+				local Cipher = require("modules.keylogger.text_cipher")
+				local previous_build, previous_cipher = command.build, Cipher.is_enabled()
+				local previous_execute, previous_popen = os.execute, io.popen
+				local captured, body, code = {}, "", 0
+				local path = os.tmpname()
+				local seed = assert(io.open(path, "w"))
+				assert(seed:write("owned native fixture") and seed:close())
+				Cipher.set_enabled(false)
+				command.build = function(selected, sql, options)
+					captured[#captured + 1] = sql
+					body, code = "", 0
+					if sql:find("SELECT sql FROM sqlite_master", 1, true) then
+						body = "CREATE TABLE devices(os CHECK(os IN ('linux')));\n"
+					elseif sql:find("SELECT CAST(value AS INTEGER)", 1, true) then body = "1\n"
+					elseif sql:find("INSERT OR IGNORE INTO " .. fixture.table_name, 1, true) then code = status end
+					return previous_build(selected, sql, options)
+				end
+				os.execute = function() return 0 end
+				io.popen = function()
+					local output = body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. code .. "\n"
+					return { read = function() return output end, close = function() return true end }
+				end
+				local Writer
+				local ok, err = xpcall(function()
+					Writer = helpers.load_module("modules.keylogger.sqlite_writer")
+					helpers.assert_true(Writer.open_db(path))
+					helpers.assert_eq(Writer[fixture.method]("owned", { fixture.event }), status == 0)
+					local sql = captured[#captured]
+					helpers.assert_contains(sql, "BEGIN IMMEDIATE;\nINSERT OR IGNORE INTO " .. fixture.table_name)
+					helpers.assert_true(sql:match("COMMIT;%s*$") ~= nil, "the final transaction command must be COMMIT")
+				end, debug.traceback)
+				command.build = previous_build
+				os.execute, io.popen = previous_execute, previous_popen
+				Cipher.set_enabled(previous_cipher)
+				if Writer then Writer.close_db() end
+				os.remove(path)
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+end)
+
+helpers.describe("linux-sqlite-ngram-source-map", function()
+	it("linux-sqlite-ngram-source-map: each admitted source is merged as a literal key", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 4, td = 7, cd = 2, e = 1, sources = { extension = 2, hotstring = 1, llm = 1, other = 1 } },
+			}))
+			helpers.assert_eq(#statements, 1)
+			local sql = statements[1]
+			helpers.assert_contains(sql, "json_each(esrc_json)")
+			helpers.assert_contains(sql, "json_each(excluded.esrc_json)")
+			helpers.assert_contains(sql, "SUM(value)")
+			helpers.assert_contains(sql, "GROUP BY key")
+			for _, key in ipairs({ "extension", "hotstring", "llm", "other" }) do
+				helpers.assert_contains(sql, '"' .. key .. '":')
+			end
+			for _, scalar in ipairs({ "c", "td", "cd", "e" }) do
+				helpers.assert_contains(sql, scalar .. " = " .. scalar .. " + excluded." .. scalar .. ", ")
+			end
+		end)
+	end)
+
+	it("linux-sqlite-ngram-source-map: all nine native table families share literal-key merging", function()
+		with_ngram_sql(function(writer, statements)
+			local families = 0
+			for target in pairs(writer.NGRAM_TABLES) do
+				families = families + 1
+				helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+					x = { c = 1, sources = { ["extension.v2"] = 1 } },
+				}, target))
+				local sql = statements[families]
+				helpers.assert_contains(sql, "INSERT INTO " .. target .. " ")
+				helpers.assert_contains(sql, "json_each(esrc_json)")
+				helpers.assert_contains(sql, "json_each(excluded.esrc_json)")
+			end
+			helpers.assert_eq(families, 9)
+			helpers.assert_eq(#statements, 9)
+		end)
+	end)
+
+	it("linux-sqlite-ngram-source-map: original numeric admission and floors retain every string label", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 1, sources = { extension = 2.9, [""] = 1.9, string_count = "3", zero = 0, negative = -1 } },
+			}))
+			local sql = statements[1]
+			helpers.assert_contains(sql, '"extension":2')
+			helpers.assert_contains(sql, '"":1')
+			helpers.assert_true(not sql:find("string_count", 1, true))
+			helpers.assert_true(not sql:find('"zero"', 1, true))
+			helpers.assert_true(not sql:find('"negative"', 1, true))
+		end)
+	end)
+
+	it("linux-sqlite-ngram-source-map: refused native receipt never acknowledges a source delta", function()
+		for _, status in ipairs({ 7, 127, "missing" }) do
+			with_writer_read_receipts("", status, function(writer)
+				helpers.assert_eq(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+					x = { c = 1, sources = { extension = 1 } },
+				}), false)
+			end)
+		end
+	end)
+end)
+
+helpers.describe("linux-sqlite-ngram-source-encoding", function()
+	local cases = {
+		{ "ordinary", "addon" },
+		{ "quoted UTF-8", "addon.é'\"" },
+		{ "literal backslash escape", "addon\\t" },
+		{ "unknown backslash escape", "addon\\q" },
+		{ "newline", "addon\nline" },
+		{ "tab", "addon\tfield" },
+		{ "carriage return", "addon\rfield" },
+	}
+	for _, case in ipairs(cases) do
+		it("linux-sqlite-ngram-source-encoding: " .. case[1] .. " remains one exact JSON key", function()
+			with_ngram_sql(function(writer, statements)
+				helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+					x = { c = 2, td = 7, cd = 2, e = 1, sources = { [case[2]] = 2 } },
+				}))
+				helpers.assert_eq(#statements, 1)
+				local source_json = statements[1]:match(",2,7,2,1,'(.-)'%)")
+				helpers.assert_type(source_json, "string", "actual admitted SQL must carry the source map")
+				-- SQL quotes are doubled after JSON encoding; restore only that outer layer.
+				source_json = source_json:gsub("''", "'")
+				local expected = { [case[2]] = 2 }
+				helpers.assert_eq(require("json").decode(source_json), expected)
+				helpers.assert_eq(source_json, require("json").encode(expected))
+			end)
+		end)
+	end
+	it("linux-sqlite-ngram-source-encoding: original numeric admission and floors are unchanged", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				x = { c = 2, sources = { ["addon\n"] = 2.9, [""] = 0.5,
+					string_count = "3", zero = 0, negative = -1, [1] = 4 } },
+			}))
+			local source_json = statements[1]:match(",2,0,0,0,'(.-)'%)")
+			helpers.assert_type(source_json, "string")
+			helpers.assert_eq(require("json").decode(source_json), { ["addon\n"] = 2, [""] = 0 })
+		end)
+	end)
+end)
+
+
+helpers.describe("linux-system-day-owned-read", function()
+	local complete = '{"date":"2026-10-05","wifi_changes":4,"space_switches":0,"battery_sum":150,"battery_count":2,"battery_min":70,"battery_max":80,"audio_muted_ms":1000,"locked_ms":2000,"sleep_ms":3000,"awake_ms":4000,"passive_count":0,"night_wake_count":0}'
+
+	it("linux-system-day-owned-read: accepts the complete typed native row", function()
+		with_writer_read_receipts(complete, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(row.awake_ms, 4000)
+			helpers.assert_eq(row.wifi_changes, 4)
+			helpers.assert_eq(row.battery_min, 70)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: distinguishes accepted absence", function()
+		with_writer_read_receipts("", 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_nil(row)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: preserves absent battery bounds", function()
+		local body = complete:gsub('"battery_min":70', '"battery_min":null')
+			:gsub('"battery_max":80', '"battery_max":null')
+			:gsub('"battery_sum":150', '"battery_sum":null')
+			:gsub('"battery_count":2', '"battery_count":null')
+		with_writer_read_receipts(body, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_nil(row.battery_min)
+			helpers.assert_nil(row.battery_max)
+			helpers.assert_eq(row.battery_sum, 0)
+			helpers.assert_eq(row.battery_count, 0)
+		end)
+	end)
+
+	for _, status in ipairs({ 1, "missing" }) do
+		it("linux-system-day-owned-read: refuses unacknowledged native row " .. status, function()
+			with_writer_read_receipts(complete, status, function(writer)
+				local row, accepted = writer.read_system_day("owned", "2026-10-05")
+				helpers.assert_eq(accepted, false)
+				helpers.assert_nil(row)
+			end)
+		end)
+	end
+
+	for _, body in ipairs({ "not-json", "[" .. complete .. "]" }) do
+		it("linux-system-day-owned-read: refuses malformed or array-shaped row " .. body, function()
+			with_writer_read_receipts(body, 0, function(writer)
+				local row, accepted = writer.read_system_day("owned", "2026-10-05")
+				helpers.assert_eq(accepted, false)
+				helpers.assert_nil(row)
+			end)
+		end)
+	end
+
+	it("linux-system-day-owned-read: refuses another day in the returned row", function()
+		with_writer_read_receipts(complete, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-06")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_nil(row)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: refuses a typed string counter", function()
+		with_writer_read_receipts(complete:gsub('"awake_ms":4000', '"awake_ms":"4000"'), 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_nil(row)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: query names only the exact escaped device and date", function()
+		local captured
+		with_writer_read_receipts(function(command)
+			if command:find("FROM agg_system_day", 1, true) then captured = command end
+			return complete
+		end, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned' a", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(row.awake_ms, 4000)
+			helpers.assert_contains(captured, "WHERE device_id='owned'' a' AND date='2026-10-05'")
+		end)
+	end)
+end)
+
+
+helpers.describe("linux-sqlite-ngram-group-transaction", function()
+	helpers.it("linux-sqlite-ngram-group-transaction: one checked transaction owns admitted tokens", function()
+		with_ngram_sql(function(writer, statements)
+			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
+				alpha = { c = 3, td = 20, cd = 2, e = 1, sources = { hotstring = 1, addon = 2 } },
+				beta = { c = 5, td = 40, cd = 3, e = 2, sources = { llm = 2, addon = 3 } },
+				rejected = 0,
+			}))
+			helpers.assert_eq(#statements, 1)
+			helpers.assert_contains(statements[1], "BEGIN IMMEDIATE;\nINSERT INTO ngram_chars")
+			helpers.assert_contains(statements[1], ";\nCOMMIT;")
+			helpers.assert_contains(statements[1], "'alpha',3,20,2,1,")
+			helpers.assert_contains(statements[1], "'beta',5,40,3,2,")
+			helpers.assert_true(not statements[1]:find("'rejected'", 1, true))
+		end)
+	end)
+
+	helpers.it("linux-sqlite-ngram-group-transaction: native refusal remains false", function()
+		with_writer_read_receipts("", 7, function(writer)
+			helpers.assert_eq(writer.upsert_ngrams("owned", "2000-01-01", "owned", { alpha = 3, beta = 5 }), false)
 		end)
 	end)
 end)

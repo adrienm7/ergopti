@@ -80,6 +80,126 @@ function luaRuntime() {
 	return null;
 }
 
+/** Windows runs installed discovery with real bytes, not Linux-only fd aliases. */
+function installedReaderPort(lib) {
+	if (process.platform !== 'win32') return [];
+	const admitted = [];
+	const owned = path.resolve(lib);
+	const identity = (filename) => path.resolve(filename).toLowerCase();
+	function requireOwnedPhysicalPath(filename) {
+		const literal = path.resolve(filename);
+		const native = fs.realpathSync(filename);
+		if (
+			identity(native) !== identity(literal) ||
+			(identity(literal) !== identity(owned) &&
+				!identity(literal).startsWith(identity(owned) + path.sep))
+		)
+			throw new Error('The installed reader fixture refuses a substituted native path.');
+	}
+	requireOwnedPhysicalPath(lib);
+	function visit(directory) {
+		for (const name of fs.readdirSync(directory)) {
+			const filename = path.join(directory, name);
+			requireOwnedPhysicalPath(filename);
+			const stat = fs.lstatSync(filename);
+			if (stat.isDirectory()) visit(filename);
+			else if (stat.isFile()) admitted.push(path.resolve(filename).replaceAll('\\', '/'));
+			else
+				throw new Error(
+					'The installed reader fixture requires physical regular files: ' + filename
+				);
+		}
+	}
+	// A real owned junction must not turn a foreign tree into installed input.
+	const foreign = fs.mkdtempSync(path.join(path.dirname(lib), 'reader-foreign-'));
+	const junction = path.join(lib, '.reader-junction-control');
+	const sentinel = path.join(foreign, 'sentinel.txt');
+	fs.writeFileSync(sentinel, 'Independent foreign fixture bytes\n');
+	let acquired = false;
+	try {
+		fs.symlinkSync(foreign, junction, 'junction');
+		acquired = true;
+		let refused = false;
+		try {
+			requireOwnedPhysicalPath(junction);
+		} catch (error) {
+			if (error.message !== 'The installed reader fixture refuses a substituted native path.')
+				throw error;
+			refused = true;
+		}
+		if (!refused) throw new Error('The installed reader admitted an external junction.');
+		if (fs.readFileSync(sentinel, 'utf8') !== 'Independent foreign fixture bytes\n')
+			throw new Error('The foreign fixture sentinel changed.');
+	} finally {
+		try {
+			if (acquired) fs.unlinkSync(junction);
+		} finally {
+			fs.rmSync(foreign, { recursive: true });
+		}
+	}
+	visit(lib);
+	assertInstalledReaderInputs(admitted, lib);
+	return [
+		'local installed_reader_files = {',
+		...admitted.map(
+			(filename) => `  [${JSON.stringify(filename.toLowerCase())}] = ${JSON.stringify(filename)},`
+		),
+		'}',
+		'local function installed_reader_key(filename)',
+		'  if type(filename) ~= "string" then return nil end',
+		'  local normalized = filename:gsub("\\\\", "/")',
+		'  local drive, tail = normalized:match("^([A-Za-z]):/(.*)$")',
+		'  if not drive then return nil end',
+		'  local parts = {}',
+		'  for part in tail:gmatch("[^/]+") do',
+		'    if part == ".." then',
+		'      if #parts == 0 then return nil end',
+		'      table.remove(parts)',
+		'    elseif part ~= "." then parts[#parts + 1] = part end',
+		'  end',
+		'  return (drive .. ":/" .. table.concat(parts, "/")):lower()',
+		'end',
+		'package.preload["infra.regular_file_reader"] = function()',
+		'  return { open = function(filename)',
+		'    local admitted_filename = installed_reader_files[installed_reader_key(filename)]',
+		'    if not admitted_filename then',
+		'      return nil, "outside the admitted installed fixture", 5',
+		'    end',
+		'    return io.open(admitted_filename, "r")',
+		'  end }',
+		'end',
+		'local fixture_reader = require("infra.regular_file_reader")',
+		`assert(fixture_reader.open(${JSON.stringify(path.resolve(lib).replaceAll('\\', '/'))}) == nil, "directories cannot acquire read admission")`,
+		`assert(fixture_reader.open(${JSON.stringify(path.resolve(lib, '../unowned.txt').replaceAll('\\', '/'))}) == nil, "existing foreign fixture files cannot acquire read admission")`,
+		`assert(fixture_reader.open(${JSON.stringify(path.resolve(lib).replaceAll('\\', '/') + '/../unowned.txt')}) == nil, "traversal cannot acquire read admission")`,
+		`local admitted_stream = assert(fixture_reader.open(${JSON.stringify(path.resolve(lib, '_shared/modules/layouts/defaults.json').replaceAll('\\', '/'))}))`,
+		'assert(type(admitted_stream:read("*a")) == "string"); assert(admitted_stream:close())',
+		'local equivalent_filenames = {',
+		...[
+			path.resolve(lib).replaceAll('\\', '/') + '/linux/../_shared/modules/layouts/defaults.json',
+			path.resolve(lib, '_shared/modules/layouts/defaults.json'),
+			path.resolve(lib, '_shared/modules/layouts/defaults.json').toUpperCase()
+		].map((filename) => `  ${JSON.stringify(filename)},`),
+		'}',
+		'for _, filename in ipairs(equivalent_filenames) do',
+		'  local stream = assert(fixture_reader.open(filename), "owned equivalent paths must read the admitted physical defaults")',
+		`  assert(stream:read("*a") == ${JSON.stringify(fs.readFileSync(DEFAULTS, 'utf8'))}, "equivalent paths preserve exact physical bytes")`,
+		'  assert(stream:close())',
+		'end'
+	];
+}
+
+/** The actual copy must contain the exact shared discovery defaults. */
+function assertInstalledReaderInputs(admitted, lib) {
+	const defaults = path.resolve(lib, '_shared/modules/layouts/defaults.json').replaceAll('\\', '/');
+	if (!admitted.includes(defaults) || !fs.readFileSync(defaults).equals(fs.readFileSync(DEFAULTS)))
+		throw new Error('The installed defaults must be physical and byte-exact before discovery.');
+	fs.writeFileSync(
+		path.resolve(lib, '../unowned.txt'),
+		'Owned negative fixture: never admitted.\n'
+	);
+}
+
 // ==========================================
 // ==========================================
 // ======= 1/ The installer's own steps =======
@@ -214,6 +334,12 @@ try {
 							'  local file = assert(io.open(command_file, "wb"))',
 							'  assert(file:write(command .. "\\n")); assert(file:close())',
 							`  return native_popen('""' .. bash .. '" -s < "' .. command_file .. '""', mode)`,
+							'end',
+							'local native_execute = os.execute',
+							'os.execute = function(command)',
+							'  local file = assert(io.open(command_file, "wb"))',
+							'  assert(file:write(command .. "\\n")); assert(file:close())',
+							`  return native_execute('""' .. bash .. '" -s < "' .. command_file .. '""')`,
 							'end'
 						]
 					: [];
@@ -221,12 +347,20 @@ try {
 				probe,
 				[
 					...shellBridge,
+					...installedReaderPort(lib),
 					'local root = arg[1]',
 					'package.path = root .. "/linux/?.lua;" .. root .. "/linux/?/init.lua;"',
 					'	.. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path',
 					'local Paths = require("infra.paths")',
 					'local Config = require("modules.hotstrings.hotstrings_config")',
 					'local Loader = require("modules.hotstrings.loader")',
+					...(process.platform === 'win32'
+						? [
+								'local Shell = require("adapters.shell_runner")',
+								`assert(Shell.run(${JSON.stringify('test -e ' + shellQuote(path.join(lib, 'linux', settings.folder, settings.index_file).replaceAll('\\', '/')) + ' 2>/dev/null')}), "the actual installed registry exists through the real Bash status port")`,
+								`assert(not Shell.run(${JSON.stringify('test -e ' + shellQuote(path.join(lib, '__absent_shell_control__').replaceAll('\\', '/')) + ' 2>/dev/null')}), "the real Bash status port preserves a missing-path failure")`
+							]
+						: []),
 					'local found = Config.discover_extensions()',
 					'for _, pack in ipairs(found) do',
 					'	for _, file in ipairs(pack.bound_files) do',
