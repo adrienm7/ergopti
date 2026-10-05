@@ -351,6 +351,8 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 				local owner = helpers.load_module("modules.llm.api_entries")
 				owner._set_path_for_test(path)
 				package.loaded["modules.llm.api_remote"] = {
+					-- The chosen provider is known; this removal does not publish a catalogue.
+					provider_config_receipt = function() return { published = false, ids = { cerebras = true } } end,
 					provider = function() return { default_model = "qwen", base_url = "https://example.invalid/v1" } end,
 					providers = function() return {} end,
 					serves = function() return true end,
