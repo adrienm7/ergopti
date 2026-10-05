@@ -2,6 +2,13 @@
 """Independent controller contract, authored before receiving implementation."""
 
 import hashlib
+import io
+import zipfile
+import stat
+import socket
+import ssl
+import struct
+import warnings
 import importlib.util
 import json
 import os
@@ -11,6 +18,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 
 def digest(data):
@@ -325,11 +333,7 @@ class ControllerContract(unittest.TestCase):
         self.assertTrue(fifo.exists())
 
     def test_late_success_keeps_refused_terminal_and_actual_exit_status(self):
-        args = [
-            sys.executable,
-            "-c",
-            "import time; time.sleep(0.5); print('independent-late')",
-        ]
+        args = [sys.executable, "-c", "import time; time.sleep(0.5); print('independent-late')"]
         self.refused(
             "phase_deadline",
             subject.run_phase,
@@ -358,8 +362,7 @@ class ControllerContract(unittest.TestCase):
         self.assertEqual(pending, {"schema": 1, "phase": "late", "status": "pending"})
         self.assertEqual(len(terminals), 1)
         self.assertEqual(
-            set(terminals[0]),
-            {"schema", "phase", "status", "exit_status", "elapsed_seconds"},
+            set(terminals[0]), {"schema", "phase", "status", "exit_status", "elapsed_seconds"}
         )
         self.assertEqual(terminals[0]["status"], "refused")
         self.assertEqual(terminals[0]["exit_status"], 0)
@@ -367,11 +370,409 @@ class ControllerContract(unittest.TestCase):
         evidence = b"".join(p.read_bytes() for p in self.root.rglob("*") if p.is_file())
         self.assertIn(b"independent-late", evidence)
 
+    def _tool_metadata(self):
+        return {
+            "id": 478866069,
+            "name": "xcodegen.zip",
+            "size": 4278764,
+            "digest": "sha256:4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806",
+            "browser_download_url": "https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip",
+        }
+
+    def _tool_zip(self, members=None, compression=zipfile.ZIP_DEFLATED):
+        if members is None:
+            members = [
+                ("xcodegen/bin/xcodegen", b"UNIQUE_NATIVE_TOOL"),
+                ("xcodegen/share/xcodegen/SettingPresets/base.yml", b"independent: true\n"),
+            ]
+        output = io.BytesIO()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            with zipfile.ZipFile(output, "w", compression=compression) as archive:
+                for name, data in members:
+                    if isinstance(name, zipfile.ZipInfo):
+                        info = name
+                    else:
+                        info = zipfile.ZipInfo(name)
+                        info.create_system = 3
+                        info.external_attr = (stat.S_IFREG | 0o600) << 16
+                    info.compress_type = compression
+                    archive.writestr(info, data)
+        return output.getvalue()
+
+    def test_tool_metadata_exact_copy(self):
+        metadata = self._tool_metadata()
+        metadata["unrelated_official_field"] = {"nested": "not admitted"}
+        result = subject.verify_xcodegen_metadata(metadata)
+        self.assertEqual(result, self._tool_metadata())
+        self.assertIsNot(result, metadata)
+        metadata["id"] = 7
+        self.assertEqual(result["id"], 478866069)
+
+    def test_tool_metadata_wrong_values_and_scalar_types(self):
+        changes = [
+            ("id", 7),
+            ("id", True),
+            ("id", 478866069.0),
+            ("name", "xcodegen-other.zip"),
+            ("name", b"xcodegen.zip"),
+            ("size", 4278763),
+            ("size", True),
+            ("size", 4278764.0),
+            ("digest", "sha256:" + "0" * 64),
+            ("digest", None),
+            (
+                "browser_download_url",
+                "http://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip",
+            ),
+            ("browser_download_url", "https://example.invalid/xcodegen.zip"),
+        ]
+        for key, value in changes:
+            with self.subTest(key=key, value=value):
+                data = self._tool_metadata()
+                data[key] = value
+                self.refused("xcodegen_metadata", subject.verify_xcodegen_metadata, data)
+
+    def test_tool_metadata_missing_and_nonobject(self):
+        for key in self._tool_metadata():
+            with self.subTest(missing=key):
+                data = self._tool_metadata()
+                del data[key]
+                self.refused("xcodegen_metadata", subject.verify_xcodegen_metadata, data)
+        for value in [None, [], "metadata", 7, True]:
+            with self.subTest(value=value):
+                self.refused("xcodegen_metadata", subject.verify_xcodegen_metadata, value)
+
+    def test_tool_archive_refuses_wrong_length_first(self):
+        for data in [b"", b"ordinary independent data", b"x" * 4278765]:
+            with self.subTest(length=len(data)):
+                self.refused("xcodegen_size", subject.verify_xcodegen_archive, data)
+
+    def test_tool_archive_refuses_correct_size_wrong_digest(self):
+        self.refused("xcodegen_digest", subject.verify_xcodegen_archive, b"\0" * 4278764)
+
+    def test_tool_zip_healthy_keeps_binary_and_presets_owned(self):
+        destination = self.root / "tool"
+        binary = subject.extract_xcodegen_zip(self._tool_zip(), destination)
+        self.assertEqual(binary, destination / "xcodegen/bin/xcodegen")
+        self.assertEqual(binary.read_bytes(), b"UNIQUE_NATIVE_TOOL")
+        self.assertEqual(stat.S_IMODE(binary.stat().st_mode), 0o700)
+        preset = destination / "xcodegen/share/xcodegen/SettingPresets/base.yml"
+        self.assertEqual(preset.read_bytes(), b"independent: true\n")
+        self.assertEqual(stat.S_IMODE(preset.stat().st_mode), 0o600)
+        for directory in [destination, binary.parent, preset.parent]:
+            self.assertEqual(stat.S_IMODE(directory.stat().st_mode), 0o700)
+
+    def test_tool_zip_malformed_has_no_partial_destination(self):
+        destination = self.root / "tool"
+        self.refused("xcodegen_archive", subject.extract_xcodegen_zip, b"not a zip", destination)
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_missing_and_empty_binary(self):
+        for members in [[("xcodegen/share/base.yml", b"x")], [("xcodegen/bin/xcodegen", b"")]]:
+            with self.subTest(members=members):
+                destination = self.root / "tool"
+                self.refused(
+                    "xcodegen_binary",
+                    subject.extract_xcodegen_zip,
+                    self._tool_zip(members),
+                    destination,
+                )
+                self.assertFalse(destination.exists())
+
+    def test_tool_zip_unsafe_paths_refuse_before_any_write(self):
+        paths = [
+            "../escape",
+            "xcodegen/../../escape",
+            "xcodegen/a/../b",
+            "/xcodegen/file",
+            "C:/xcodegen/file",
+            "xcodegen\\bin\\file",
+            "xcodegen//share/file",
+            "xcodegen/./share/file",
+            "outside/file",
+            "xcodegen/share/bïnary",
+        ]
+        for path in paths:
+            with self.subTest(path=path):
+                destination = self.root / "tool"
+                data = self._tool_zip([("xcodegen/bin/xcodegen", b"tool"), (path, b"bad")])
+                self.refused("xcodegen_member", subject.extract_xcodegen_zip, data, destination)
+                self.assertFalse(destination.exists())
+                self.assertFalse((self.root.parent / "escape").exists())
+
+    def test_tool_zip_duplicate_name_refuses_atomically(self):
+        destination = self.root / "tool"
+        data = self._tool_zip(
+            [("xcodegen/bin/xcodegen", b"first"), ("xcodegen/bin/xcodegen", b"second")]
+        )
+        self.refused("xcodegen_member", subject.extract_xcodegen_zip, data, destination)
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_symlink_and_special_entries_refuse_atomically(self):
+        for kind in [stat.S_IFLNK, stat.S_IFCHR, stat.S_IFBLK, stat.S_IFIFO, stat.S_IFSOCK]:
+            with self.subTest(kind=kind):
+                info = zipfile.ZipInfo("xcodegen/share/foreign")
+                info.create_system = 3
+                info.external_attr = (kind | 0o700) << 16
+                destination = self.root / "tool"
+                data = self._tool_zip([("xcodegen/bin/xcodegen", b"tool"), (info, b"../escape")])
+                self.refused("xcodegen_member", subject.extract_xcodegen_zip, data, destination)
+                self.assertFalse(destination.exists())
+
+    def test_tool_zip_file_parent_collision_refuses(self):
+        destination = self.root / "tool"
+        data = self._tool_zip(
+            [("xcodegen/bin/xcodegen", b"tool"), ("xcodegen/bin", b"file parent")]
+        )
+        self.refused("xcodegen_member", subject.extract_xcodegen_zip, data, destination)
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_member_count_limit_refuses_before_write(self):
+        destination = self.root / "tool"
+        members = [("xcodegen/bin/xcodegen", b"tool")] + [
+            ("xcodegen/share/f" + str(i), b"x") for i in range(128)
+        ]
+        self.refused(
+            "xcodegen_limit", subject.extract_xcodegen_zip, self._tool_zip(members), destination
+        )
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_individual_expansion_limit_refuses_before_write(self):
+        destination = self.root / "tool"
+        members = [
+            ("xcodegen/bin/xcodegen", b"tool"),
+            ("xcodegen/share/large", b"x" * (16 * 1024 * 1024 + 1)),
+        ]
+        self.refused(
+            "xcodegen_limit", subject.extract_xcodegen_zip, self._tool_zip(members), destination
+        )
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_total_expansion_limit_refuses_before_write(self):
+        destination = self.root / "tool"
+        members = [("xcodegen/bin/xcodegen", b"tool")] + [
+            ("xcodegen/share/f" + str(i), b"x" * (12 * 1024 * 1024)) for i in range(3)
+        ]
+        self.refused(
+            "xcodegen_limit", subject.extract_xcodegen_zip, self._tool_zip(members), destination
+        )
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_crc_failure_refuses_before_destination_mutation(self):
+        destination = self.root / "tool"
+        data = bytearray(self._tool_zip(compression=zipfile.ZIP_STORED))
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            info = archive.getinfo("xcodegen/bin/xcodegen")
+            offset = info.header_offset + 30 + len(info.filename.encode()) + len(info.extra)
+        data[offset] ^= 1
+        self.refused("xcodegen_archive", subject.extract_xcodegen_zip, bytes(data), destination)
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_encrypted_entry_refuses_before_write(self):
+        destination = self.root / "tool"
+        data = bytearray(self._tool_zip(compression=zipfile.ZIP_STORED))
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            local = archive.getinfo("xcodegen/bin/xcodegen").header_offset
+        struct.pack_into("<H", data, local + 6, 1)
+        central = data.find(b"PK\x01\x02")
+        self.assertGreaterEqual(central, 0)
+        struct.pack_into("<H", data, central + 8, 1)
+        self.refused("xcodegen_member", subject.extract_xcodegen_zip, bytes(data), destination)
+        self.assertFalse(destination.exists())
+
+    def test_tool_zip_existing_destinations_remain_untouched(self):
+        data = self._tool_zip()
+        for kind in ["file", "directory", "symlink"]:
+            with self.subTest(kind=kind):
+                destination = self.root / kind
+                if kind == "file":
+                    destination.write_bytes(b"independent sentinel")
+                elif kind == "directory":
+                    destination.mkdir()
+                else:
+                    destination.symlink_to(self.root / "absent foreign")
+                self.refused("unsafe_path", subject.extract_xcodegen_zip, data, destination)
+                if kind == "file":
+                    self.assertEqual(destination.read_bytes(), b"independent sentinel")
+                elif kind == "directory":
+                    self.assertEqual(list(destination.iterdir()), [])
+                else:
+                    self.assertTrue(destination.is_symlink())
+
+    def test_tool_zip_nul_original_name_does_not_become_truncated_alias(self):
+        destination = self.root / "tool"
+        name = b"xcodegen/share/nul-placeholder"
+        data = self._tool_zip([("xcodegen/bin/xcodegen", b"tool"), (name.decode(), b"bad")])
+        self.assertEqual(data.count(name), 2)
+        corrupted = data.replace(name, name.replace(b"-", b"\0", 1))
+        self.refused("xcodegen_member", subject.extract_xcodegen_zip, corrupted, destination)
+        self.assertFalse(destination.exists())
+
+    def _timed_acquisition(self, kind):
+        # Identity/download seams isolate time ordering; these synthetic bytes
+        # provide no authentic executable, transport or Darwin qualification.
+        owner = self.root / ("temporal-" + kind)
+        owner.mkdir(mode=0o700)
+        archive = self._tool_zip()
+        clock = [0.0]
+        extraction_calls = []
+        original_json = subject.write_json
+        original_file = subject.write_exclusive
+        original_extract = subject.extract_xcodegen_zip
+
+        def download(url, maximum, deadline, metadata=False):
+            data = json.dumps(self._tool_metadata()).encode() if metadata else archive
+            return data, {"status": 200, "TLS": "isolated-test-input", "bytes": len(data)}
+
+        def evidence(path, value):
+            original_json(path, value)
+            if kind == "late-identity" and path.name == "xcodegen-identity.json":
+                clock[0] = 2.0
+
+        def persistence(path, value):
+            original_file(path, value)
+            if kind == "late-archive" and path.name == "xcodegen-official.zip":
+                clock[0] = 2.0
+
+        def extraction(data, destination):
+            extraction_calls.append(destination)
+            return original_extract(data, destination)
+
+        with (
+            mock.patch.object(subject.time, "monotonic", side_effect=lambda: clock[0]),
+            mock.patch.object(subject, "_download_tool_input", side_effect=download),
+            mock.patch.object(
+                subject,
+                "verify_xcodegen_archive",
+                return_value={"bytes": len(archive), "sha256": hashlib.sha256(archive).hexdigest()},
+            ) as identity_gate,
+            mock.patch.object(
+                subject, "XCODEGEN_BINARY_SHA256", hashlib.sha256(b"UNIQUE_NATIVE_TOOL").hexdigest()
+            ),
+            mock.patch.object(subject, "write_json", side_effect=evidence),
+            mock.patch.object(subject, "write_exclusive", side_effect=persistence),
+            mock.patch.object(subject, "extract_xcodegen_zip", side_effect=extraction),
+        ):
+            try:
+                binary, record = subject.acquire_xcodegen(owner, 1.0)
+                outcome = {"returned": True, "binary": binary, "record": record}
+            except subject.NativeBuildError as error:
+                outcome = {"returned": False, "code": error.code}
+            identity_gate.assert_called_once_with(archive)
+        return owner, outcome, extraction_calls
+
+    def test_tool_acquisition_healthy_temporal_control_retains_owned_inputs(self):
+        owner, outcome, calls = self._timed_acquisition("healthy")
+        self.assertTrue(outcome["returned"])
+        self.assertEqual(outcome["record"]["status"], "passed")
+        self.assertEqual(outcome["record"]["elapsed_seconds"], 0.0)
+        self.assertFalse(outcome["record"]["child_process_executed"])
+        self.assertEqual(outcome["binary"].read_bytes(), b"UNIQUE_NATIVE_TOOL")
+        self.assertEqual(len(calls), 1)
+        identity = json.loads((owner / "xcodegen-identity.json").read_text())
+        self.assertFalse(identity["installer_executed"])
+        self.assertFalse(identity["global_installation_executed"])
+
+    def test_tool_acquisition_rechecks_deadline_after_identity_evidence(self):
+        owner, outcome, calls = self._timed_acquisition("late-identity")
+        self.assertFalse(outcome["returned"])
+        self.assertEqual(outcome["code"], "phase_deadline")
+        self.assertEqual(len(calls), 1)
+        self.assertTrue((owner / "xcodegen-identity.json").is_file())
+        terminal = json.loads((owner / "xcodegen_acquisition.receipt.json").read_text())
+        self.assertEqual(terminal["status"], "refused")
+        self.assertEqual(terminal["code"], "phase_deadline")
+        self.assertEqual(terminal["elapsed_seconds"], 2.0)
+
+    def test_tool_acquisition_rechecks_deadline_after_archive_before_extraction(self):
+        owner, outcome, calls = self._timed_acquisition("late-archive")
+        self.assertFalse(outcome["returned"])
+        self.assertEqual(outcome["code"], "phase_deadline")
+        self.assertEqual(calls, [])
+        self.assertTrue((owner / "xcodegen-official.zip").is_file())
+        self.assertFalse((owner / "xcodegen-package").exists())
+        terminal = json.loads((owner / "xcodegen_acquisition.receipt.json").read_text())
+        self.assertEqual(terminal["status"], "refused")
+        self.assertEqual(terminal["code"], "phase_deadline")
+        self.assertEqual(terminal["elapsed_seconds"], 2.0)
+
+    def test_tool_download_rechecks_deadline_after_TLS_before_any_request(self):
+        clock = [0.0]
+        requests = []
+        context = ssl.create_default_context()
+
+        def delayed_context():
+            clock[0] = 2.0
+            return context
+
+        class Opener:
+            def open(self, request, timeout):
+                requests.append(timeout)
+                # Actual offline socket validation reproduces the negative-timeout
+                # error without a network request or an executable launch.
+                with socket.socket() as descriptor:
+                    descriptor.settimeout(timeout)
+                raise RuntimeError("Expired request must not proceed")
+
+        with (
+            mock.patch.object(subject.time, "monotonic", side_effect=lambda: clock[0]),
+            mock.patch.object(subject.ssl, "create_default_context", side_effect=delayed_context),
+            mock.patch.object(subject.urllib.request, "build_opener", return_value=Opener()),
+        ):
+            self.refused(
+                "phase_deadline",
+                subject._download_tool_input,
+                subject.XCODEGEN_METADATA_URL,
+                65_536,
+                1.0,
+                True,
+            )
+        self.assertEqual(requests, [])
+
+    def test_tool_acquisition_passed_duration_uses_the_qualified_terminal_sample(self):
+        # Independent transport/identity seams leave real ordinary extraction and
+        # evidence writes. This tests timestamp consistency, never tool trust.
+        owner = self.root / "terminal-sample"
+        owner.mkdir(mode=0o700)
+        archive = self._tool_zip()
+        samples = []
+
+        def now():
+            samples.append(len(samples) + 1)
+            return 2.0 if len(samples) >= 6 else 0.0
+
+        def download(url, maximum, deadline, metadata=False):
+            data = json.dumps(self._tool_metadata()).encode() if metadata else archive
+            return data, {"status": 200, "TLS": "isolated-test-input", "bytes": len(data)}
+
+        with (
+            mock.patch.object(subject.time, "monotonic", side_effect=now),
+            mock.patch.object(subject, "_download_tool_input", side_effect=download),
+            mock.patch.object(
+                subject,
+                "verify_xcodegen_archive",
+                return_value={"bytes": len(archive), "sha256": digest(archive)},
+            ) as identity_gate,
+            mock.patch.object(subject, "XCODEGEN_BINARY_SHA256", digest(b"UNIQUE_NATIVE_TOOL")),
+        ):
+            binary, record = subject.acquire_xcodegen(owner, 1.0)
+            identity_gate.assert_called_once_with(archive)
+        self.assertEqual(binary.read_bytes(), b"UNIQUE_NATIVE_TOOL")
+        self.assertEqual(record["status"], "passed")
+        self.assertEqual(record["elapsed_seconds"], 0.0)
+        self.assertLessEqual(record["elapsed_seconds"], 1.0)
+        self.assertFalse(record["child_process_executed"])
+        self.assertEqual(samples, [1, 2, 3, 4, 5])
+        self.assertEqual(
+            json.loads((owner / "xcodegen_acquisition.receipt.json").read_text()), record
+        )
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(ControllerContract)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
-    successful = result.testsRun == 29 and result.wasSuccessful() and not result.skipped
+    successful = result.testsRun == 53 and result.wasSuccessful() and not result.skipped
     if successful:
-        print("PASS independent native build controller tests=29 failures=0 errors=0 skipped=0")
+        print("PASS independent native build controller tests=53 failures=0 errors=0 skipped=0")
     raise SystemExit(0 if successful else 1)

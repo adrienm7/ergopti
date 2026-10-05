@@ -380,6 +380,26 @@ Full composed gates and native acceptance remain mandatory. No production histor
 pause admission, recovery, controlled shutdown or runtime is activated; TODO31
 stays open.
 
+## Owned pinned build-tool qualification
+
+Owned native build-tool acquisition now pins the official XcodeGen2.46.0
+asset identity,4278764-byte archive and SHA256 before bounded all-member ZIP
+validation, exclusive private extraction and executable hash admission. It
+retains required presets without running the archive installer or changing the
+global toolchain/workflows. Actual Linux TLS acquisition and extraction pass;
+Mach-O execution and full Darwin compilation remain unexecuted until CI.
+
+Independent review qualifies53 normally discovered controller tests without
+failures, errors or skips, alongside the unchanged48-test frozen control entry.
+Three late-operation cases and one inconsistent final timing record reproduce
+before correction. Typed deadline refusal fences TLS creation, persistence,
+extraction and identity publication; one final measured sample drives both
+admission and elapsed duration. All previous test ASTs, archive checks, strict
+phase receipts and guardian ownership stay intact. SDK budgets remain30/35/10
+seconds; full-source calibration remains300/305/10, with19 measured phases.
+The strict25-file inactive producer seal and live baseline1/CLI1 are unchanged.
+No capture, install, runtime activation or completedTODO31 is inferred.
+
 ## Native CI status
 
 Most recent exact-source manual run37255224392 at pushedb1c0864dc selects

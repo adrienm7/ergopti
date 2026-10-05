@@ -3,16 +3,24 @@
 
 import argparse
 import hashlib
+import http.client
+import io
 import json
 import math
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
+import ssl
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import zipfile
+import zlib
 
 UPSTREAM = "9312593e1a3bf72b94c63c524ebabe2637442e8a"
 CPM = "6a8b2d64b993746d489432b45455e33b7fb8e09f"
@@ -20,6 +28,14 @@ VIRTUAL_HID = "bdfcb459b2eaca8ccda680a73b0dc898f330f4bb"
 CALIBRATION_SECONDS = 300
 MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_LOG_BYTES = 32 * 1024 * 1024
+XCODEGEN_VERSION = "2.46.0"
+XCODEGEN_ASSET_ID = 478866069
+XCODEGEN_ARCHIVE_BYTES = 4_278_764
+XCODEGEN_ARCHIVE_SHA256 = "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806"
+XCODEGEN_BINARY_SHA256 = "8774da746668bc18fe74e54cbaf10f2631a1fb05947cd374179aa912f14f99db"
+XCODEGEN_BINARY_RELATIVE = "xcodegen/bin/xcodegen"
+XCODEGEN_URL = "https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip"
+XCODEGEN_METADATA_URL = "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/478866069"
 
 
 class NativeBuildError(RuntimeError):
@@ -122,6 +138,365 @@ def write_json(path, value):
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def verify_xcodegen_metadata(value):
+    """Admit a fresh exact pinned asset identity from the official API response."""
+    expected = {
+        "id": XCODEGEN_ASSET_ID,
+        "name": "xcodegen.zip",
+        "size": XCODEGEN_ARCHIVE_BYTES,
+        "digest": "sha256:" + XCODEGEN_ARCHIVE_SHA256,
+        "browser_download_url": XCODEGEN_URL,
+    }
+    require(isinstance(value, dict), "xcodegen_metadata", "Official tool metadata is not an object")
+    require(
+        all(
+            key in value and type(value[key]) is type(wanted) and value[key] == wanted
+            for key, wanted in expected.items()
+        ),
+        "xcodegen_metadata",
+        "Official tool metadata differs from the pinned asset",
+    )
+    return {key: value[key] for key in expected}
+
+
+def verify_xcodegen_archive(data):
+    """Authenticate the complete official artifact before persistence or extraction."""
+    require(
+        type(data) is bytes and len(data) == XCODEGEN_ARCHIVE_BYTES,
+        "xcodegen_size",
+        "Official tool archive does not have its exact pinned byte size",
+    )
+    require(
+        digest(data) == XCODEGEN_ARCHIVE_SHA256,
+        "xcodegen_digest",
+        "Official tool archive does not match its authoritative digest",
+    )
+    return {"bytes": len(data), "sha256": digest(data)}
+
+
+def _xcodegen_members(data):
+    """Validate all bounded ordinary ZIP members and CRCs before creating output."""
+    require(type(data) is bytes, "xcodegen_archive", "Tool archive is not ordinary bytes")
+    require(len(data) <= 8 * 1024 * 1024, "xcodegen_limit", "Tool ZIP exceeds its structural bound")
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            inventory = archive.infolist()
+            require(
+                0 < len(inventory) <= 128,
+                "xcodegen_limit",
+                "Tool ZIP member count exceeds its bound",
+            )
+            require(
+                all(0 <= item.file_size <= 16 * 1024 * 1024 for item in inventory)
+                and sum(item.file_size for item in inventory) <= 32 * 1024 * 1024,
+                "xcodegen_limit",
+                "Tool ZIP expansion exceeds its bound",
+            )
+            paths = {}
+            for item in inventory:
+                name = item.filename
+                directory = item.is_dir()
+                ordinary_name = name[:-1] if directory else name
+                components = ordinary_name.split("/")
+                require(
+                    item.orig_filename == name
+                    and "\0" not in name
+                    and len(name) <= 512
+                    and len(components) <= 16
+                    and components[0] == "xcodegen"
+                    and all(
+                        part not in {"", ".", ".."}
+                        and re.fullmatch(r"[A-Za-z0-9_.-]+", part) is not None
+                        for part in components
+                    ),
+                    "xcodegen_member",
+                    "Tool ZIP member path is not canonical within its root",
+                )
+                mode = stat.S_IFMT(item.external_attr >> 16)
+                require(
+                    mode in ({0, stat.S_IFDIR} if directory else {0, stat.S_IFREG})
+                    and not item.flag_bits & 1
+                    and (not directory or item.file_size == 0),
+                    "xcodegen_member",
+                    "Tool ZIP member is encrypted or not ordinary",
+                )
+                require(
+                    ordinary_name not in paths, "xcodegen_member", "Tool ZIP repeats a member path"
+                )
+                paths[ordinary_name] = (item, directory)
+            for name in paths:
+                for parent in PurePosixPath(name).parents:
+                    require(
+                        str(parent) not in paths or paths[str(parent)][1],
+                        "xcodegen_member",
+                        "Tool ZIP file shadows a parent directory",
+                    )
+            binary = paths.get(XCODEGEN_BINARY_RELATIVE)
+            require(
+                binary is not None and not binary[1] and binary[0].file_size > 0,
+                "xcodegen_binary",
+                "Tool ZIP lacks its nonempty expected binary",
+            )
+            rows = []
+            for name, (item, directory) in paths.items():
+                payload = archive.read(item)
+                require(
+                    len(payload) == item.file_size,
+                    "xcodegen_archive",
+                    "Tool ZIP member is incomplete",
+                )
+                rows.append((name, directory, payload))
+            return rows
+    except (
+        zipfile.BadZipFile,
+        zipfile.LargeZipFile,
+        RuntimeError,
+        NotImplementedError,
+        EOFError,
+        zlib.error,
+    ) as error:
+        if isinstance(error, NativeBuildError):
+            raise
+        raise NativeBuildError(
+            "xcodegen_archive", "Tool ZIP is malformed or failed CRC validation"
+        ) from error
+
+
+def extract_xcodegen_zip(data, destination):
+    """Extract only validated ordinary members into a new private owner directory."""
+    destination = Path(destination)
+    owner = validate_owner_root(destination.parent)
+    require(
+        destination.is_absolute()
+        and destination.parent == owner
+        and not destination.exists()
+        and not destination.is_symlink(),
+        "unsafe_path",
+        "Tool extraction destination already exists or redirects",
+    )
+    rows = _xcodegen_members(data)
+    # CRC, path, type and expansion checks above finish before any filesystem mutation.
+    destination.mkdir(mode=0o700)
+    directories = {destination}
+    for name, directory, payload in rows:
+        target = destination / name
+        required_parent = target if directory else target.parent
+        pending = []
+        while required_parent not in directories:
+            pending.append(required_parent)
+            required_parent = required_parent.parent
+        for parent in reversed(pending):
+            parent.mkdir(mode=0o700)
+            directories.add(parent)
+        if not directory:
+            write_exclusive(target, payload)
+    binary = destination / XCODEGEN_BINARY_RELATIVE
+    binary.chmod(0o700)
+    return binary
+
+
+class _PinnedToolRedirect(urllib.request.HTTPRedirectHandler):
+    """Prevent transport downgrade or unrelated-host redirects before acquisition."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _tool_https_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _tool_https_url(url):
+    """Allow only verified HTTPS destinations belonging to this official acquisition."""
+    try:
+        target = urllib.parse.urlsplit(url)
+        admitted = (
+            target.scheme == "https"
+            and target.hostname
+            in {
+                "api.github.com",
+                "github.com",
+                "release-assets.githubusercontent.com",
+                "objects.githubusercontent.com",
+            }
+            and target.port in {None, 443}
+            and target.username is None
+            and target.password is None
+        )
+    except ValueError as error:
+        raise NativeBuildError("xcodegen_transport", "Official tool URL is malformed") from error
+    require(admitted, "xcodegen_transport", "Official tool URL redirects outside verified HTTPS")
+    return target
+
+
+def _download_tool_input(url, maximum, deadline, metadata=False):
+    """Acquire bounded complete bytes through the default verified TLS context."""
+    _tool_https_url(url)
+    require(
+        type(deadline) in (int, float) and math.isfinite(deadline) and time.monotonic() < deadline,
+        "phase_deadline",
+        "Tool acquisition deadline elapsed before request",
+    )
+    headers = {"User-Agent": "Ergopti-owned-native-source-qualification"}
+    if metadata:
+        headers.update(
+            {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+        )
+    opener = urllib.request.build_opener(
+        _PinnedToolRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context())
+    )
+    # TLS context/opener acquisition can consume the remaining absolute budget.
+    # Admit its freshly measured remainder before passing any timeout to urllib.
+    remaining = deadline - time.monotonic()
+    require(remaining > 0, "phase_deadline", "Tool TLS preparation exceeded calibration deadline")
+    try:
+        with opener.open(
+            urllib.request.Request(url, headers=headers),
+            timeout=min(30, remaining),
+        ) as response:
+            final = _tool_https_url(response.geturl())
+            require(
+                response.status == 200, "xcodegen_transport", "Official tool HTTP status is not 200"
+            )
+            advertised = response.headers.get("Content-Length")
+            require(
+                advertised is None or (advertised.isdecimal() and int(advertised) <= maximum),
+                "xcodegen_size",
+                "Official tool response exceeds its advertised bound",
+            )
+            chunks, size = [], 0
+            while True:
+                require(
+                    time.monotonic() < deadline,
+                    "phase_deadline",
+                    "Tool acquisition exceeded calibration deadline",
+                )
+                chunk = response.read(min(65_536, maximum + 1 - size))
+                if not chunk:
+                    break
+                size += len(chunk)
+                require(
+                    size <= maximum,
+                    "xcodegen_size",
+                    "Official tool response exceeds its measured bound",
+                )
+                chunks.append(chunk)
+            require(
+                advertised is None or size == int(advertised),
+                "xcodegen_size",
+                "Official tool response ended before its advertised byte size",
+            )
+            require(
+                time.monotonic() <= deadline,
+                "phase_deadline",
+                "Tool acquisition completed after its deadline",
+            )
+            return b"".join(chunks), {
+                "status": response.status,
+                "TLS": "default-verified",
+                "final_host": final.hostname,
+                "bytes": size,
+            }
+    except (OSError, urllib.error.URLError, http.client.HTTPException) as error:
+        raise NativeBuildError(
+            "xcodegen_transport", "Official tool HTTPS acquisition failed"
+        ) from error
+
+
+def acquire_xcodegen(owner, deadline):
+    """Acquire the official fixed tool entirely within the existing worker's budget."""
+    owner = validate_owner_root(owner)
+    started = time.monotonic()
+    name = "xcodegen_acquisition"
+    write_json(owner / (name + ".begin.json"), {"schema": 1, "phase": name, "status": "pending"})
+    try:
+        raw, metadata_transport = _download_tool_input(
+            XCODEGEN_METADATA_URL, 65_536, deadline, metadata=True
+        )
+
+        def unique(pairs):
+            value = {}
+            for key, item in pairs:
+                require(
+                    key not in value,
+                    "xcodegen_metadata",
+                    "Official tool metadata repeats a JSON key",
+                )
+                value[key] = item
+            return value
+
+        try:
+            metadata = verify_xcodegen_metadata(json.loads(raw, object_pairs_hook=unique))
+        except (ValueError, UnicodeError) as error:
+            raise NativeBuildError(
+                "xcodegen_metadata", "Official tool metadata is not complete JSON"
+            ) from error
+        archive, transport = _download_tool_input(XCODEGEN_URL, XCODEGEN_ARCHIVE_BYTES, deadline)
+        identity = verify_xcodegen_archive(archive)
+        require(
+            time.monotonic() <= deadline,
+            "phase_deadline",
+            "Tool admission exceeded calibration deadline",
+        )
+        write_exclusive(owner / "xcodegen-official.zip", archive)
+        require(
+            time.monotonic() <= deadline,
+            "phase_deadline",
+            "Tool persistence exceeded calibration deadline",
+        )
+        binary = extract_xcodegen_zip(archive, owner / "xcodegen-package")
+        require(
+            digest(read_regular(binary, 16 * 1024 * 1024)) == XCODEGEN_BINARY_SHA256,
+            "xcodegen_digest",
+            "Extracted official tool binary differs from its pinned digest",
+        )
+        require(
+            time.monotonic() <= deadline,
+            "phase_deadline",
+            "Tool extraction exceeded calibration deadline",
+        )
+        write_json(
+            owner / "xcodegen-identity.json",
+            {
+                "schema": 1,
+                "version": XCODEGEN_VERSION,
+                "metadata": metadata,
+                "archive": identity,
+                "metadata_transport": metadata_transport,
+                "archive_transport": transport,
+                "binary_sha256": XCODEGEN_BINARY_SHA256,
+                "binary_relative_path": str(binary.relative_to(owner)),
+                "global_installation_executed": False,
+                "installer_executed": False,
+            },
+        )
+        ended = time.monotonic()
+        require(
+            ended <= deadline,
+            "phase_deadline",
+            "Tool identity evidence exceeded calibration deadline",
+        )
+    except NativeBuildError as error:
+        write_json(
+            owner / (name + ".receipt.json"),
+            {
+                "schema": 1,
+                "phase": name,
+                "status": "refused",
+                "code": error.code,
+                "elapsed_seconds": time.monotonic() - started,
+            },
+        )
+        raise
+    record = {
+        "schema": 1,
+        "phase": name,
+        "status": "passed",
+        "elapsed_seconds": ended - started,
+        "operation": "verified-HTTPS-download-and-ordinary-extraction",
+        "child_process_executed": False,
+    }
+    write_json(owner / (name + ".receipt.json"), record)
+    return binary, record
 
 
 def candidate_path(name):
@@ -444,7 +819,7 @@ def compile_native(source, owner, seconds, seal_path=None):
         "tool_unavailable",
         "Actual Darwin SDK qualification requires macOS",
     )
-    tools = {name: shutil.which(name) for name in ["git", "xcodegen", "xcodebuild", "xcrun"]}
+    tools = {name: shutil.which(name) for name in ["git", "xcodebuild", "xcrun"]}
     require(
         all(tools.values()),
         "tool_unavailable",
@@ -469,6 +844,9 @@ def compile_native(source, owner, seconds, seal_path=None):
         phases.append(run_phase(name, args, cwd, owner, deadline))
 
     phase("xcode_version", [tools["xcodebuild"], "-version"])
+    binary, acquisition = acquire_xcodegen(owner, deadline)
+    phases.append(acquisition)
+    tools["xcodegen"] = str(binary)
     phase("xcodegen_version", [tools["xcodegen"], "--version"])
     phase("sdk_path", [tools["xcrun"], "--show-sdk-path"])
     checkout = owner / "upstream"

@@ -14,8 +14,8 @@ extension HS274NativePolicyQualificationTests {
 				["python3", source("hs274_native_build_test.py").path], root: root)
 			XCTAssertEqual(receipt.status, 0)
 			XCTAssertEqual(receipt.stdout,
-				"PASS independent native build controller tests=29 failures=0 errors=0 skipped=0\n")
-			XCTAssertTrue(receipt.stderr.contains("Ran 29 tests in "))
+				"PASS independent native build controller tests=53 failures=0 errors=0 skipped=0\n")
+			XCTAssertTrue(receipt.stderr.contains("Ran 53 tests in "))
 			XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
 		}
 	}
@@ -40,14 +40,14 @@ extension HS274NativePolicyQualificationTests {
 			guard receipt.status == 0 else { return }
 			XCTAssertTrue(receipt.stderr.isEmpty)
 			let lines = receipt.stdout.split(separator: "\n", omittingEmptySubsequences: false)
-			XCTAssertEqual(lines.count, 21)
+			XCTAssertEqual(lines.count, 22)
 			XCTAssertEqual(lines.first,
 				"PASS unsigned pinned Core-Service and CLI compilation; native capture and installation unexecuted")
-			let expected = ["xcode_version", "xcodegen_version", "sdk_path", "acquisition", "checkout",
+			let expected = ["xcode_version", "xcodegen_acquisition", "xcodegen_version", "sdk_path", "acquisition", "checkout",
 				"submodules", "identity_upstream", "identity_cpm", "identity_vhd", "source_clean", "version",
 				"instrumentation", "duktape_generate", "duktape_build", "core_generate", "core_build",
 				"cli_generate", "cli_build"]
-			guard lines.count == 21 else { return }
+			guard lines.count == 22 else { return }
 			for (index, phase) in expected.enumerated() {
 				let prefix = "PHASE " + phase + " seconds="
 				XCTAssertTrue(lines[index + 1].hasPrefix(prefix))
@@ -65,13 +65,13 @@ extension HS274NativePolicyQualificationTests {
 				guard size.int64Value <= 65_536 else { return }
 				let expectedCandidate = try JSONDecoder().decode(CandidateMarker.self,
 					from: Data(contentsOf: seal)).patch_sha256
-				let marker = String(lines[19])
+				let marker = String(lines[20])
 				XCTAssertEqual(marker, "CANDIDATE " + expectedCandidate)
 				let digest = marker.dropFirst("CANDIDATE ".count)
 				XCTAssertEqual(digest.count, 64)
 				XCTAssertTrue(digest.allSatisfy { "0123456789abcdef".contains($0) })
 			}
-			XCTAssertEqual(lines[20], "")
+			XCTAssertEqual(lines[21], "")
 			for relative in ["upstream/vendor/duktape-src/build/Release/libduktape.a",
 				"upstream/src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service",
 				"upstream/src/bin/cli/build/Release/karabiner_cli", "native-build-result.json"] {
