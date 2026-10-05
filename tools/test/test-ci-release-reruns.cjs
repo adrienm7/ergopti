@@ -182,6 +182,10 @@ function repository(name, branch) {
 	for (const relative of [
 		'tools/build/release-channel.cjs',
 		'tools/build/publish-verified-release.cjs',
+		'tools/build/macos-release-publication.cjs',
+		'tools/build/macos-release-archives.cjs',
+		'tools/lib/paths.cjs',
+		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js'
 	]) {
@@ -727,6 +731,26 @@ function preflight(
 		const flattened = runScript(flattenScript, cwd, {});
 		if (flattened.status !== 0) return { ...flattened, ghCalls: [] };
 	}
+	// The new fresh-publication owner is exercised with actual private files.
+	// It signs only through controlled native ports; no native crypto claim.
+	const publication = require('../build/macos-release-publication.cjs');
+	for (const archive of publication.bindings()) {
+		const target = path.join(assets, archive.name);
+		if (!fs.existsSync(target)) fs.writeFileSync(target, `${archive.name}\n`);
+		const signature = path.join(assets, `_${archive.name}.sig`);
+		if (fs.existsSync(signature)) fs.unlinkSync(signature);
+	}
+	publication.signArchives(assets, 'private-fixture-signer', 'private-fixture-key', {
+		execute: (tool, args) => ({
+			status: 0,
+			stdout: args.includes('--verify')
+				? ''
+				: `sparkle:edSignature="${'A'.repeat(86)}==" length="${fs.statSync(args[2]).size}"\n`,
+			stderr: ''
+		})
+	});
+	if (missingAsset && fs.existsSync(path.join(assets, missingAsset)))
+		fs.unlinkSync(path.join(assets, missingAsset));
 	const ghLog = stubLog('gh');
 	const result = runScript(
 		preflightScript,
@@ -1302,6 +1326,33 @@ check(
 		assert.equal(result.ghCalls.length, 1);
 	}
 );
+
+// The existing actual preflight must distinguish missing new output from an
+// already published historical inventory, without guessing release existence.
+check('fresh publication refuses missing preferred archive', () => {
+	const publication = require('../build/macos-release-publication.cjs');
+	const result = preflight('v0.0.0-dev.20', { missingAsset: publication.bindings()[0].name });
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /Public macOS archive operation refused/);
+	assert.deepEqual(result.outputs, {});
+});
+check('fresh publication refuses missing preferred signature', () => {
+	const publication = require('../build/macos-release-publication.cjs');
+	const result = preflight('v0.0.0-dev.20', {
+		missingAsset: `_${publication.bindings()[0].name}.sig`
+	});
+	assert.notEqual(result.status, 0);
+	assert.deepEqual(result.outputs, {});
+});
+check('published historical resume does not require rebuilt preferred archive', () => {
+	const publication = require('../build/macos-release-publication.cjs');
+	const result = preflight('v0.0.0-dev.13', {
+		ghMode: 'published',
+		missingAsset: publication.bindings()[0].name
+	});
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.equal(result.outputs.create_release, 'false');
+});
 
 // ==========================================
 // ==========================================
