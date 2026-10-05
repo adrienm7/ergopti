@@ -1,0 +1,50 @@
+{
+	"phase": "qualified-finite-owned-receiving-caller",
+	"source_refs_exact_before_after": 268,
+	"actual_dll_sha256": "fd5cc433e6344155c6015e660fb2f10d4eb7139aa3cfe00a56de1f6f5d387676",
+	"cases": [
+		"ok 1 - llm-insertion actual_caller=LLM phase=4 retired=1",
+		"ok 2 - llm-incident-16-50 actual_caller=LLM phase=4 retired=1",
+		"ok 3 - llm-supplementary-tail actual_caller=LLM phase=4 retired=1",
+		"ok 4 - hse-ct-star actual_caller=HSE phase=4 retired=1",
+		"ok 5 - hse-uppercase actual_caller=HSE phase=4 retired=1",
+		"ok 6 - hse-consumed-delimiter actual_caller=HSE phase=4 retired=1"
+	],
+	"retirement": "Natural sender exit0 before exact retained owned target/launcher retirement; no clipboard/keyboard.",
+	"warnings_retained": 48,
+	"refs": [
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\receipt.json",
+			"sha256": "23637f79b6657338eb6fa4bb323b7687d0c18a3c5df86183442cdb81155c9fbd"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\probe.ahk",
+			"sha256": "d8b858080fad6b4c9e858b0aa5d5855d0bad68862f8b537e150431c60d447a27"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\observe.ps1",
+			"sha256": "0f650e8dc60113897dd61355b5d2703cda056c69e56bba3c420ed503613ab34a"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\stdout.log",
+			"sha256": "5f701d88605347526ff198692cfa8c2458804f9a3d16731d7532accc26a3f804"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\stderr.log",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\source-before.json",
+			"sha256": "b098f4b8eb0f5afb8d956d911c40724a67d567a05f9f7e08ecaa134c4c2b3ba4"
+		},
+		{
+			"path": "D:\\Documents\\GitHub\\ergopti\\reports\\.codex-notepad-work\\caller-probe-v8\\source-after.json",
+			"sha256": "16a961eb8e23dfe1e0da2fc86e31da0e41a60d254028e0bf2b72079f19d71b97"
+		}
+	],
+	"limits": [
+		"Same exact six V7 cases, controlled scheduler/admission and synthetic document, actual production canonical callers and native worker receiving.",
+		"No physical/default InputHook trigger, production startup, persisted journal or performance distribution claim.",
+		"Broad private include-graph warning stdout retained; not a clean-warning qualification."
+	]
+}

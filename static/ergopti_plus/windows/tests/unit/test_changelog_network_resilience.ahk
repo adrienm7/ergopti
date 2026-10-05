@@ -180,7 +180,11 @@ _CNR_PacFailureKeepsStaticProxy() {
 	_SYSTEM_PROXY_PAC_CACHE := Map()
 	Spawned := []
 	Terminated := []
-	Handle := { start: (*) => true, terminate: (*) => Terminated.Push(1) }
+	Terminate(*) {
+		Terminated.Push(1)
+		return true
+	}
+	Handle := { start: (*) => true, terminate: Terminate }
 	FakeSpawn(Exe, Args, OnDone) {
 		Spawned.Push(OnDone)
 		return Handle
@@ -488,10 +492,12 @@ _CNR_PacRejectsPartialAnswers() {
 	}
 	First := "https://one.invalid/one"
 	Second := "https://two.invalid/two"
+	InvalidEndpoint := "http://valid.corp:invalid"
+	AssertFalse(SystemProxy_IsValidProxyUrl(InvalidEndpoint), "the malformed fixture endpoint is independently rejected")
 	try {
 		SystemProxy_ResolveAsync([First, Second], (R) => Results.Push(R),
 			() => _CNR_Config("fallback.corp:80", "", "http://wpad.corp/proxy.pac"), Spawn)
-		Done[1].Call(0, "http://valid.corp:80`nnot-a-valid-answer", "")
+		Done[1].Call(0, "http://valid.corp:80`n" . InvalidEndpoint, "")
 		AssertEqual(0, _SYSTEM_PROXY_PAC_CACHE.Count, "one malformed answer must reject the whole receipt")
 		AssertEqual("http://fallback.corp:80", Results[1][First])
 		AssertEqual("http://fallback.corp:80", Results[1][Second])
@@ -766,7 +772,7 @@ _CNR_ControlledNativePacFixture() {
 		AssertEqual(1, Observed.Length, "owned native fixture must settle within its bounded test budget")
 		AssertEqual(0, Observed[1]["exit"], "real WinHTTP PAC ABI and destination policy must agree")
 		AssertEqual("", Observed[1]["stderr"], "native fixture must expose no hidden failure")
-		AssertContains(Observed[1]["stdout"], "[OK] 10 controlled native WinHTTP PAC fixtures")
+		AssertContains(Observed[1]["stdout"], "[OK] 11 controlled native WinHTTP PAC fixtures")
 		AssertTrue(InStr(Observed[1]["stdout"], "native_failover=first_only") > 0
 			|| InStr(Observed[1]["stdout"], "native_failover=list_two") > 0, "the actual native failover representation must be explicitly qualified")
 	} finally {
@@ -776,7 +782,7 @@ _CNR_ControlledNativePacFixture() {
 			AssertEqual(0, _SR_CaptureRemove(Capture), "fixture private input must be removed after exact tree retirement")
 	}
 }
-Test("system proxy native: actual WinHTTP PAC evaluates exact scheme port path query and DIRECT", _CNR_ControlledNativePacFixture)
+Test("system proxy native: actual WinHTTP PAC evaluates HTTP full URL, HTTPS native scope and DIRECT", _CNR_ControlledNativePacFixture)
 
 _CNR_NativeEndpointPolicy() {
 	AssertEqual("http://selected.invalid:3128", _SystemProxy_UsableNativeProxy("selected.invalid:3128", "https"))

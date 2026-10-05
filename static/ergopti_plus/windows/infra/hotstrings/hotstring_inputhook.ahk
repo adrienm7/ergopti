@@ -1434,7 +1434,8 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 					_PrefixRecordMagicOutcome(Char, "pending")
 					; Scheduling is not a fire verdict. The owner will commit buffers,
 					; preview, metrics, and ring state after successful output.
-					_PrefixAppendTypedChar(Char)
+					if !_HSE_RetainNotepadPrefixChar(_HseFired, Char)
+						_PrefixAppendTypedChar(Char)
 					return
 				}
 				; Log the fired hotstring. ``h_type`` is taken from the

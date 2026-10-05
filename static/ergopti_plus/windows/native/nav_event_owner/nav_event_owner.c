@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "nav_event_owner.h"
+#include "editor_replace.h"
 
 
 
@@ -843,7 +844,8 @@ static bool NavCaptureTerminalEventLocked(
  */
 static bool NavDrainCompleteLocked(const NavState *state)
 {
-	return !NavHasSuppressHoldLocked(state)
+	return !ErgoptiEditor_IsBusy()
+		&& !NavHasSuppressHoldLocked(state)
 		&& state->menu_guard_passed_lr == 0
 		&& state->menu_guard_suppressed_lr == 0
 		&& !NavHasPendingReceiptLocked(state)
@@ -2365,7 +2367,7 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_Start(
 
 
 /** Implements ErgoptiNav_Stop. */
-ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_Stop(void)
+static int32_t NavStopCore(void)
 {
 	HANDLE thread_handle;
 	HANDLE stop_event;
@@ -2455,6 +2457,19 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_Stop(void)
 	return stop_status == ERGOPTI_NAV_STATUS_OK
 		? ERGOPTI_NAV_STATUS_OK
 		: ERGOPTI_NAV_STATUS_STOPPED_WITH_ERROR;
+}
+
+
+
+/** Stops only inside an admission interval which cannot acquire a new worker. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_Stop(void)
+{
+	int32_t status;
+	if (!ErgoptiEditor_TryFenceAdmission())
+		return ERGOPTI_NAV_STATUS_BUSY;
+	status = NavStopCore();
+	ErgoptiEditor_UnfenceAdmission();
+	return status;
 }
 
 

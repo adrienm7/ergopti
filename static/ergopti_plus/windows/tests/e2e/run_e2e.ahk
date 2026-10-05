@@ -42,6 +42,7 @@ global _AHK_DRY_RUN := false
 #Include ../test_framework.ahk
 ; Explicit launch receipts remain private; ordinary CI keeps its sibling file.
 global TEST_RESULTS_FILE := _TestResultsPath(A_ScriptDir . "\test_results.txt")
+_TestResultsBeginRun()
 ; The shared app-context simulators publish into KLHook, just as the main
 ; runner does. Load the definition here so E2E never depends on ambient state.
 #Include ../../modules/keylogger/keylogger_hook.ahk

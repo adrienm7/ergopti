@@ -31,6 +31,8 @@ class ArchiveContractFilesystem {
 		this.root = path.resolve(namespace);
 		this.entries = new Map([[this.root, { kind: 'directory', mode: 0o755 }]]);
 		this.sequence = 0;
+		this.descriptors = new Map();
+		this.constants = Object.freeze({ O_RDONLY: 0, O_NOFOLLOW: 0x20000 });
 	}
 
 	key(value) {
@@ -80,6 +82,15 @@ class ArchiveContractFilesystem {
 		throw refusal('EEXIST', key);
 	}
 
+	existsSync(value) {
+		try {
+			this.lookup(value);
+			return true;
+		} catch (error) {
+			if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false;
+			throw error;
+		}
+	}
 	lstatSync(value) {
 		const { node } = this.lookup(value, false);
 		return this.statRecord(node);
@@ -143,16 +154,67 @@ class ArchiveContractFilesystem {
 		} catch (error) {
 			if (error.code !== 'ENOENT') throw error;
 			const key = path.join(this.parent(value), path.basename(this.key(value)));
-			target = { key, node: { kind: 'file', mode: 0o644, bytes: Buffer.alloc(0) } };
+			target = { key, node: { kind: 'file', mode: options.mode ?? 0o644, bytes: Buffer.alloc(0) } };
 			this.entries.set(key, target.node);
 		}
 		target.node.bytes = Buffer.from(bytes);
 	}
 
 	readFileSync(value, encoding) {
-		const { key, node } = this.lookup(value);
+		const { key, node } = Number.isInteger(value) ? this.descriptor(value) : this.lookup(value);
 		if (node.kind !== 'file') throw refusal('EISDIR', key);
 		return encoding ? node.bytes.toString(encoding) : Buffer.from(node.bytes);
+	}
+
+	/** Native-read contract: retain the exact admitted inode, never follow a final link. */
+	openSync(value, flags) {
+		assert.equal(flags, this.constants.O_RDONLY | this.constants.O_NOFOLLOW);
+		const target = this.lookup(value, false);
+		if (target.node.kind === 'symlink') throw refusal('ELOOP', target.key);
+		const descriptor = ++this.sequence;
+		this.descriptors.set(descriptor, target);
+		return descriptor;
+	}
+
+	descriptor(value) {
+		const target = this.descriptors.get(value);
+		if (!target) throw refusal('EBADF', String(value));
+		return target;
+	}
+
+	fstatSync(value) {
+		return this.statRecord(this.descriptor(value).node);
+	}
+
+	closeSync(value) {
+		this.descriptor(value);
+		this.descriptors.delete(value);
+	}
+
+	/** Publication moves the same subtree and inodes inside the closed namespace. */
+	renameSync(source, destination) {
+		const present = this.lookup(source, false);
+		const target = this.key(destination);
+		this.parent(target);
+		if (present.key === this.root) throw refusal('EACCES', present.key);
+		if (target === present.key) return;
+		if (target.startsWith(present.key + path.sep)) throw refusal('EINVAL', target);
+		try {
+			const previous = this.lookup(target, false);
+			if (previous.node.kind === 'directory') {
+				if (present.node.kind !== 'directory') throw refusal('EISDIR', target);
+				if (this.readdirSync(target).length) throw refusal('ENOTEMPTY', target);
+			} else if (present.node.kind === 'directory') throw refusal('ENOTDIR', target);
+			this.entries.delete(target);
+		} catch (error) {
+			if (error.code !== 'ENOENT') throw error;
+		}
+		const moving = [...this.entries].filter(
+			([key]) => key === present.key || key.startsWith(present.key + path.sep)
+		);
+		for (const [key] of moving) this.entries.delete(key);
+		for (const [key, node] of moving)
+			this.entries.set(target + key.slice(present.key.length), node);
 	}
 
 	appendFileSync(value, bytes) {
@@ -265,6 +327,31 @@ function loadArchiveProducer(
 	return local.exports;
 }
 
+/** Load actual publication and archive owners against the same closed filesystem. */
+function loadPublicationProducer(filename, filesystem) {
+	const source = nativeFs.readFileSync(filename, 'utf8');
+	assert(source.length > 1000, 'The actual publication owner source is required');
+	const local = new Module(filename, module);
+	const resolve = createRequire(filename);
+	local.require = (name) => {
+		if (name === 'node:fs') return filesystem;
+		if (name === './macos-release-archives.cjs')
+			return loadArchiveProducer(resolve.resolve(name), filesystem);
+		if (name === 'node:child_process')
+			return {
+				spawnSync() {
+					throw new Error('Native publication tools are forbidden by the contract fixture');
+				}
+			};
+		if (['node:path', 'node:crypto', '../lib/paths.cjs'].includes(name)) return resolve(name);
+		throw new Error('Unowned publication fixture dependency: ' + name);
+	};
+	local._compile(source, filename);
+	assert.equal(typeof local.exports.signArchives, 'function');
+	assert.equal(typeof local.exports.validatePublication, 'function');
+	return local.exports;
+}
+
 /** Literal observations keep model errors separate from producer contract checks. */
 function verifyArchiveFilesystemModel(namespace) {
 	const fs = new ArchiveContractFilesystem(namespace);
@@ -287,6 +374,42 @@ function verifyArchiveFilesystemModel(namespace) {
 	assert(fs.lstatSync(dangling).isSymbolicLink());
 	assert.throws(() => fs.statSync(dangling), { code: 'ENOENT' });
 	assert.equal(fs.readlinkSync(dangling), 'foreign-absent');
+	const modeFile = path.join(root, 'created-mode');
+	fs.writeFileSync(modeFile, 'Independent creation bytes', { flag: 'wx', mode: 0o751 });
+	assert.equal(fs.lstatSync(modeFile).mode & 0o7777, 0o751);
+	fs.writeFileSync(modeFile, 'Replaced bytes', { mode: 0o700 });
+	assert.equal(
+		fs.lstatSync(modeFile).mode & 0o7777,
+		0o751,
+		'Updating bytes does not chmod the existing inode'
+	);
+	assert.throws(() => fs.writeFileSync(modeFile, 'foreign', { flag: 'wx' }), { code: 'EEXIST' });
+	assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Replaced bytes');
+	fs.unlinkSync(modeFile);
+	const descriptor = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+	assert(fs.fstatSync(descriptor).isFile());
+	assert.throws(() => fs.openSync(link, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW), {
+		code: 'ELOOP'
+	});
+	assert.throws(
+		() => fs.openSync(path.join(source, 'absent'), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW),
+		{ code: 'ENOENT' }
+	);
+	const moved = path.join(root, 'moved');
+	fs.renameSync(source, moved);
+	assert.throws(() => fs.lstatSync(source), { code: 'ENOENT' });
+	assert.equal(fs.readlinkSync(path.join(moved, 'owned-link')), 'données.txt');
+	assert.equal(fs.lstatSync(path.join(moved, 'données.txt')).mode & 0o7777, 0o751);
+	fs.unlinkSync(path.join(moved, 'données.txt'));
+	assert.deepEqual(fs.readFileSync(descriptor), Buffer.from('Literal café 😀\n'));
+	assert.equal(fs.fstatSync(descriptor).size, Buffer.byteLength('Literal café 😀\n'));
+	fs.closeSync(descriptor);
+	assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+	assert.throws(() => fs.readFileSync(descriptor), { code: 'EBADF' });
+	assert.throws(() => fs.closeSync(descriptor), { code: 'EBADF' });
+	fs.renameSync(moved, source);
+	fs.writeFileSync(file, 'Literal café 😀\n');
+	fs.chmodSync(file, 0o751);
 	const restored = path.join(root, 'restored');
 	fs.cpSync(source, restored, { recursive: true, verbatimSymlinks: true });
 	assert.equal(fs.lstatSync(restored).mode & 0o7777, 0o750);
@@ -327,4 +450,9 @@ function verifyArchiveFilesystemModel(namespace) {
 	assert.deepEqual(fs.readdirSync(namespace), []);
 }
 
-module.exports = { ArchiveContractFilesystem, loadArchiveProducer, verifyArchiveFilesystemModel };
+module.exports = {
+	ArchiveContractFilesystem,
+	loadArchiveProducer,
+	loadPublicationProducer,
+	verifyArchiveFilesystemModel
+};

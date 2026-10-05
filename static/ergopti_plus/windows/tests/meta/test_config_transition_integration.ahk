@@ -248,3 +248,50 @@ _CTIM_RuntimeDropsCriticalAtEveryIoEntry() {
 Test("config transition integration: no filesystem/logger I/O inherits Critical "
 	. "(config-transition-integration-no-critical-io)",
 	_CTIM_RuntimeDropsCriticalAtEveryIoEntry)
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 4/ Selected Boot Root Wiring =======
+; ============================================
+; ============================================
+
+; Returns one executable match without letting duplicate ownership pass.
+; @param Source {String} Canonical code-only production source.
+; @param Pattern {String} Exact executable expression under test.
+; @param Description {String} Diagnostic ownership label.
+_CTIM_BootUniqueCodeMatch(Source, Pattern, Description) {
+	Position := RegExMatch(Source, Pattern, &Found)
+	Assert(Position > 0, Description . " must exist in executable source")
+	Assert(RegExMatch(Source, Pattern, , Position + Found.Len) == 0,
+		Description . " must have one executable match")
+	return Position
+}
+
+_CTIM_BootSelectionPrecedesConfigFilesystem() {
+	; These four unique expressions occupy one contiguous boot block in the
+	; canonical concatenation; unrelated files cannot reorder their positions.
+	RawBoot := _DriverSourceConcat()
+	Boot := _DriverMaskNonCode(&RawBoot)
+	Assert(Boot != "", "the actual production source must be readable")
+	SelectionPattern := "im)^\s*global\s+_ConfigDir\s*:=\s*"
+		. "ConfigTransitionSelectBootConfigDir\(\s*_PathsOverrides\s*,"
+		. "\s*_DefaultConfigDir\s*\)"
+	Selected := _CTIM_BootUniqueCodeMatch(Boot, SelectionPattern,
+		"qualified boot configuration-root assignment")
+	Read := _CTIM_BootUniqueCodeMatch(Boot,
+		"im)^\s*global\s+_PathsOverrides\s*:=\s*ReadPathsToml\(",
+		"boot locator read")
+	Probe := _CTIM_BootUniqueCodeMatch(Boot,
+		"i)\bDirExist\s*\(\s*_ConfigDir\s*\)", "boot config-root probe")
+	Create := _CTIM_BootUniqueCodeMatch(Boot,
+		"i)\bDirCreate\s*\(\s*_ConfigDir\s*\)", "boot config-root creation")
+	Assert(Selected > Read && Probe > Selected && Create > Selected,
+		"selection must follow locator parsing and precede config-root I/O")
+}
+Test("config transition integration: selected boot root is admitted before I/O "
+	. "(config-transition-integration-boot-selected-root)",
+	_CTIM_BootSelectionPrecedesConfigFilesystem)

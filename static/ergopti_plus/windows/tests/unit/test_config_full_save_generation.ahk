@@ -930,3 +930,63 @@ _CFGFS_LlmAppendRefusalAbortsWholeCollection() {
 Test("config full save: LLM append refusal aborts the whole candidate "
 	. "(llm-persisted-option-type-boundary-collector-atomic)",
 	_CFGFS_LlmAppendRefusalAbortsWholeCollection)
+
+#Include %A_LineFile%\..\..\fixtures\startup_full_save_observer.ahk
+
+_CFGFS_StartupObserverDrain() {
+	return _ConfigDrainFullSave(_CFGFS_Writer, _CFGFS_Timer, 0, _CFGFS_Collect)
+}
+
+_CFGFS_StartupObserver(Kind) {
+	global _CFGFS_WriterResult, _CFGFS_WriterCalls, _CFGFS_CollectCalls
+	Runtime := _CFGFS_CaptureRuntime(), SavedCoordinator := _ConfigFullSaveCoordinator()
+	Path := A_Temp . "\ergopti_startup_save_observer_" . A_ScriptHwnd . ".toml"
+	Bundle := false
+	_CFGFS_Prepare(Path)
+	try {
+		AssertEqual(1, _ConfigFullSaveRequest(false))
+		if Kind == "writer-refused"
+			_CFGFS_WriterResult := false
+		if Kind == "optional-abandoned" {
+			Bundle := _ConfigWriteTerminalTryAcquire([Path])
+			Assert(Bundle is Object)
+			AssertTrue(_ConfigFullSaveSettleTerminal(Bundle, _CFGFS_Writer, _CFGFS_Timer, _CFGFS_Collect))
+			_ConfigWriteTerminalRelease(Bundle)
+			Bundle := false
+			AssertFalse(_ConfigFullSaveHasPending())
+		}
+		if Kind == "complete" {
+			AssertTrue(_StartupSmokeRequireFullSaveAcknowledged(_CFGFS_StartupObserverDrain))
+			AssertEqual(1, _CFGFS_WriterCalls)
+			AssertEqual(1, _CFGFS_CollectCalls)
+			AssertFalse(_ConfigFullSaveHasPending())
+		} else {
+			Refusal := false
+			try _StartupSmokeRequireFullSaveAcknowledged(_CFGFS_StartupObserverDrain)
+			catch as Err {
+				Expected := Kind == "writer-refused"
+					? "The startup smoke full-save drain did not acknowledge its existing generation."
+					: "The startup smoke boot full-save generation is not committed."
+				if Type(Err) != "Error" || !(Err.Message == Expected)
+					throw Err
+				Refusal := true
+			}
+			AssertTrue(Refusal, "startup readiness must refuse without an actual committed generation")
+			AssertEqual(Kind == "writer-refused" ? 1 : 0, _CFGFS_WriterCalls, "no rejected writer is retried")
+		}
+		State := _ConfigFullSaveCoordinator()
+		AssertEqual(1, State.requested_generation, "the observer must not create another request")
+		AssertEqual(Kind == "complete" ? 1 : 0, State.committed_generation)
+		AssertEqual(Kind == "writer-refused" ? 0 : 1, State.settled_generation)
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+		_ConfigFullSaveCoordinator(SavedCoordinator)
+	}
+}
+
+Test("startup full-save acknowledgment: pending boot generation drains exactly once", _CFGFS_StartupObserver.Bind("complete"))
+Test("startup full-save acknowledgment: actual writer refusal cannot publish ready", _CFGFS_StartupObserver.Bind("writer-refused"))
+Test("startup full-save acknowledgment: dropped optional boot generation cannot publish ready", _CFGFS_StartupObserver.Bind("optional-abandoned"))

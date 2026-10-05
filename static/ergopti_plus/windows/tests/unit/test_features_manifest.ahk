@@ -2013,3 +2013,22 @@ _FMS_RemovedCapsDoNotAcquireKnownOwnership() {
 }
 Test("configuration snapshot: removed caps stays runtime unread and is preserved until explicit cleanup (config-current-feature-owner)",
 	_FMS_RemovedCapsDoNotAcquireKnownOwnership)
+
+; Retired family source remains readable without becoming a current feature.
+_FMS_RetiredCorrectionFamily(Path) {
+	Original := FSRead(Path)
+	Target := ManifestBuildFeaturesMap()
+	Assert(ManifestFindEntryByPath("hotstrings.autocorrection.names") is Map,
+		"the replacement fixture must exercise a current canonical feature")
+	AssertFalse(ManifestFindEntryByPath("hotstrings.autocorrection.caps"))
+	AssertEqual(true, IniCacheGet(ParseConfigTomlFile(Path), "hotstrings.autocorrection.caps", "enabled"))
+	AssertEqual(0, ApplyConfigToml(Target, Path), "a retired family cannot apply as a current feature")
+	AssertFalse(Target["hotstrings"]["autocorrection"].Has("caps"))
+	AssertEqual(Original, FSRead(Path), "loading must preserve the retired user source bytes")
+}
+_FMS_RetiredCorrectionFamilyRemainsSourceOnly() {
+	_FMS_WithSource("retired_correction", "[hotstrings.autocorrection.caps]`nenabled = true`n",
+		_FMS_RetiredCorrectionFamily)
+}
+Test("configuration snapshot: retired correction family stays source-only (config-semantic-snapshot)",
+	_FMS_RetiredCorrectionFamilyRemainsSourceOnly)

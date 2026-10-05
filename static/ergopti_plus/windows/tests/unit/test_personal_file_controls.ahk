@@ -195,11 +195,11 @@ _PFC_CollidingLegacyNamesAndPhysicalAliases() {
 Test("personal-file-controls: flattened names retain distinct package owners and real primary aliases refuse", _PFC_CollidingLegacyNamesAndPhysicalAliases)
 
 _PFC_NeutralProjectionIsNotAdmission() {
-	Group := "hotstrings.groups.personal-file:632e746f6d6c"
+	Group := 'hotstrings.groups."personal-file:632e746f6d6c"'
 	Section := 'hotstrings.modules."personal-file:632e746f6d6c"."é.foo"'
 	AssertEqual(true, ManifestDefaultFor(Group))
 	AssertEqual(true, ManifestDefaultFor(Section))
-	AssertEqual("", PersonalFilePreferenceDefault("hotstrings.groups.personal-file:632e746F6d6c"))
+	AssertEqual("", PersonalFilePreferenceDefault('hotstrings.groups."personal-file:632e746F6d6c"'))
 	AssertEqual("", PersonalFilePreferenceDefault("hotstrings.modules.personal-file:632e746f6d6c.é.foo"))
 	AssertEqual("", PersonalFilePreferenceDefault('hotstrings.modules."personal-file:632e746f6d6c".""'))
 	AssertEqual(false, ManifestDefaultFor("hotstrings.groups.foreign"), "unrelated dynamic groups keep their neutral baseline")
@@ -297,9 +297,12 @@ Test("personal-file-controls: opaque or malformed physical records remain read-o
 
 _PFC_DirectoryCycleAndDepthRefuse() {
 	global _HS_PreScanPersonalCacheLoaded, _PersonalExtTree, _ExtTotalPersonalCounterGlobal
+	global _ParseExtTomlSectionsCache
 	Fixture := _PFC_Fixture(), Cycle := Fixture.root . "\cycle"
 	SavedLoaded := _HS_PreScanPersonalCacheLoaded, SavedTree := _PersonalExtTree
 	SavedCount := _ExtTotalPersonalCounterGlobal.value
+	HadSectionsCache := IsSet(_ParseExtTomlSectionsCache)
+	SavedSectionsCache := HadSectionsCache ? _ParseExtTomlSectionsCache : 0
 	try {
 		AssertEqual(16, PersonalFileScanMaxDepth())
 		Assert(HS_PersonalDirectoryAdmitted(Fixture.root, 1))
@@ -311,6 +314,8 @@ _PFC_DirectoryCycleAndDepthRefuse() {
 		AssertEqual(1, Packs.Length, "the native registration/recheck walk terminates without cycle aliases")
 		PersonalFileControls.Refresh()
 		Assert(PersonalFileControls.ForPath(Fixture.file) is PersonalFileAdoptedOwner)
+		; The tray owns this cache at boot; the headless fixture owns its snapshot.
+		_ParseExtTomlSectionsCache := Map()
 		_HS_PreScanPersonalCacheLoaded := false
 		_HS_PreScanPersonal()
 		Assert(_PersonalExtTree["cycle"]["unavailable"], "the real menu retains a read-only reason for a skipped directory")
@@ -319,6 +324,10 @@ _PFC_DirectoryCycleAndDepthRefuse() {
 			DirDelete(Cycle)
 		_HS_PreScanPersonalCacheLoaded := SavedLoaded, _PersonalExtTree := SavedTree
 		_ExtTotalPersonalCounterGlobal.value := SavedCount
+		if HadSectionsCache
+			_ParseExtTomlSectionsCache := SavedSectionsCache
+		else
+			_ParseExtTomlSectionsCache := unset
 		_PFC_Cleanup(Fixture)
 	}
 }
@@ -429,3 +438,21 @@ _PFC_BomFirstMetadataEditAndRollback() {
 	}
 }
 Test("personal-file-controls: first BOM metadata header remains owned through real edit and exact rollback", _PFC_BomFirstMetadataEditAndRollback)
+
+/** The strict adapter preserves BOM-aware text and the real handle identity. */
+_PFC_StrictReadAdapter() {
+	Fixture := _PFC_Fixture()
+	File := 0
+	try {
+		File := FSOpenReadStrict(Fixture.file)
+		AssertTrue(IsObject(File), "the existing source acquires a real read handle")
+		Snapshot := FSHandleSnapshot(File.Handle)
+		AssertTrue(Snapshot.Get("ok", false), "the adapter exposes the original physical identity handle")
+		AssertEqual(FSReadStrict(Fixture.file), File.Read(), "streamed UTF-8 keeps the same BOM-aware content")
+	} finally {
+		if IsObject(File)
+			File.Close()
+		_PFC_Cleanup(Fixture)
+	}
+}
+Test("personal-file-controls: strict reader preserves source bytes and physical handle identity", _PFC_StrictReadAdapter)

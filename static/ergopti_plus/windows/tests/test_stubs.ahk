@@ -1027,3 +1027,11 @@ KL_WriteAtomic(path, content) {
     try FileDelete(path)
     FileAppend(content, path, "UTF-8")
 }
+
+; Launch and cleanup fixtures still cross the real proxy continuation. Record
+; explicit direct admission so they never borrow the host's asynchronous PAC.
+_Stub_CurlResolveProxyDirect(State, Url, Callback) {
+	State["proxy_resolutions"] := State.Get("proxy_resolutions", 0) + 1
+	Callback.Call(Map("ok", true, "inherit", false, "proxy", ""))
+	return true
+}
