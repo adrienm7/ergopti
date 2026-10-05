@@ -54,7 +54,7 @@ const HEADER = {
 		"'feature' = manifest-path toggle, " +
 		"'action' = stateless button, 'dynamic' = rendered by platform code, " +
 		"'group' = named submenu, 'include' = reused child-template section, " +
-		"'label' = inert provider-template caption, 'section_header' = disabled header, '---' = separator, " +
+		"'section_header' = disabled label, '---' = separator, " +
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +
 		'the A-Z chooser. The last two were in use and undocumented here, which matters ' +
 		"because 'list' is the ONLY type that moves a row from the driver into the " +
@@ -137,20 +137,6 @@ function validateChildTemplates(menu) {
 				if (Object.keys(row).some((field) => !['type', 'section'].includes(field)))
 					throw new Error(`${where}: include only composes an existing section`);
 			}
-			if (
-				row.type === 'label' &&
-				(typeof row.id !== 'string' ||
-					row.id === '' ||
-					typeof row.i18n !== 'string' ||
-					row.i18n === '' ||
-					(row.unavailable !== undefined && row.unavailable !== 'hide') ||
-					Object.keys(row).some(
-						(field) => !['type', 'id', 'i18n', 'platforms', 'unavailable'].includes(field)
-					))
-			)
-				throw new Error(
-					`${where}: inert label needs an identity and caption without behavior metadata`
-				);
 			if (
 				row.caption_getter !== undefined &&
 				(!['command', 'group'].includes(row.type) ||

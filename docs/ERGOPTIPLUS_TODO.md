@@ -2597,29 +2597,12 @@ assertion across curl versions. Independent old/new native replays pass; hosted
 final-source qualification remains pending. These are fixture prerequisites,
 not completion of the remaining configuration policy or physical acceptance.
 
-Linux native fixture prerequisites now qualify the real GTK launcher in the
-same private X11/D-Bus session before starting each unchanged application-action
-deadline. Application-catalogue isolation retains actual compiled GSettings
-schemas; setup and functional receipts have distinct identities. Independent
-actual launches pass 4/4; a simulated native cold-start delay is explicitly
-separate from the unproven hosted timeout cause. The failed-HTTP ETag control
-now compares exact bytes from an independent direct same-binary curl oracle,
-retaining all seven functional cache/conditional-request/recovery cases across
-curl versions. Hosted Linux E2E, packaging and installation must still finish.
-
 The macOS qualification fixtures now restore the transitive strict UTF-8 owner
 and decode the standard JSON backspace/form-feed escapes in their independent
 Hammerspoon stub. The original twelve hosted failures are reproduced and
 corrected without changing production, corpus expectations or assertions.
 Full selected verification and hosted qualification are recorded separately;
 these fixture repairs do not complete TODO33 or device acceptance.
-
-The Hammerspoon JSON fixture now admits LuaJIT's single numeric model without
-calling absent Lua 5.3 numeric-kind APIs. Independent number, exponent and
-array/object interning controls retain the native LuaSkin value contract and
-all prior assertions. Both focused runtimes pass; the complete portable macOS
-suite passes 14,667 cases. This is test-runtime qualification; actual hosted
-Hammerspoon and installed-device behavior remain separately required.
 
 Windows configuration qualification now seeds the four actual section metadata
 values before testing their preservation, refusing missing seed anchors. The
@@ -3205,9 +3188,8 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   ordinary save must refuse a colliding new subtree without replacing them.
   The shared macOS/Linux decoder now resolves hand-written dotted assignments
   (`a.b = 1`) as semantic nested keys while quoted dots remain literal keys.
-  Windows now reads typed document dotted keys and supports targeted semantic
-  configuration saves; full-state publication remains a separate follow-up.
-  Its inline-table reader also replays the common corpus.
+  Windows document/config dotted assignments remain unsupported; its existing
+  inline-table reader already resolves them and replays the common corpus.
   Linux now delegates whole custom-delimiter lists to the shared TOML writer,
   including `[[hotstrings.terminators]]` and quoted table-array headers. The
   obsolete local refusal and its unsupported-format warning are removed.
@@ -3221,17 +3203,6 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   E2E, packaging and installation gates with release skipped. The scalar
   preservation policy is settled; Windows document dotted-key reader remains
   open.
-
-The Windows configuration gateway and detached scope builder now use the
-configuration-only semantic document transformation through the existing atomic
-writer. Dotted/quoted paths, inline descendants, typed Boolean intent, array
-owner generations and no-op comments retain their semantic/source identities.
-Scalar/array collisions, duplicates and changed sources refuse publication;
-ordinary writes never replace an outdated scalar with a new subtree. All prior
-native assertions remain, with independently authored complete-image controls.
-Local format, encoding and 359 JavaScript checks pass; actual AutoHotkey unit,
-compile, E2E, packaging/installation and installed restart remain pending CI.
-Full-state/onboarding/LLM publication stays explicit implementation work.
 
 The shared dotted-key reader now uses the existing strict key-path owner for
 root, section-relative, multiline and inline assignments, including independent
@@ -3679,23 +3650,13 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 95, macOS 152, Linux 94, each
+  drivers still build (current baseline: Windows 95, macOS 152, Linux 96, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
-
-Linux Metrics unavailable/idle migration readouts now consume shared inert label
-templates. Running progress and cancellation retain their native owners. The
-composition graph credits executable template publication per platform and keeps
-clicked-submenu action requirements intact; independent malformed-row and native
-state cases retain the original assertions. The census retires exactly two Linux
-fixed-caption sites. Source-selected local gates pass 359 JavaScript checks,
-14,667 portable macOS and 7,860 Linux unit cases, plus 101/189 portable E2E
-checks (one macOS host-specific skip). Items 54/81 stay partial; native Windows,
-three-OS packaging/installation and installed-device acceptance remain required.
 
 The fixed per-key native/no-action command now consumes one shared command
 declaration on all three drivers, with the existing Windows/Linux and macOS
@@ -4256,7 +4217,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 95, macOS 152 and Linux 94 rows are still built by the
+  Windows 95, macOS 152 and Linux 96 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:

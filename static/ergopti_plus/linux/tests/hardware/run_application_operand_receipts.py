@@ -33,48 +33,8 @@ error("the selected desktop entry did not launch: " .. id)
 """
 
 
-SESSION_WORKER = r"""
-import os
-import pathlib
-import subprocess
-import sys
-import time
-
-# Xvfb's displayfd proves X11 startup, but not GTK's first-launch services.
-# Qualify the actual launcher in this same private bus/display before starting
-# the unchanged functional receipt deadline. This receipt belongs to setup;
-# every action case must still produce its own independently checked receipt.
-ready = pathlib.Path(os.environ["ERGOPTI_NATIVE_APPLICATION_READY"])
-identity = "ergopti-native-launcher-ready"
-environment = dict(os.environ)
-environment["ERGOPTI_NATIVE_APPLICATION_RECEIPT"] = str(ready)
-started = time.monotonic()
-launcher = subprocess.run(
-    ["gtk-launch", "--", identity], env=environment,
-    capture_output=True, text=True, timeout=10,
-)
-assert launcher.returncode == 0, "native GTK prerequisite failed: " + launcher.stderr
-for _ in range(100):
-    if ready.exists() and ready.read_text() == identity:
-        break
-    time.sleep(0.02)
-else:
-    raise AssertionError("native GTK prerequisite did not produce its readiness receipt")
-print(f"OBS native GTK/D-Bus ready after {time.monotonic() - started:.3f}s", flush=True)
-child = subprocess.run(
-    ["luajit", "-e", sys.argv[1]], capture_output=True, text=True, timeout=10,
-)
-sys.stdout.write(child.stdout)
-sys.stderr.write(child.stderr)
-raise SystemExit(child.returncode)
-"""
-
-
 def main():
     checks, failures = 0, 0
-    # Catalogue isolation must not hide GLib's native schema prerequisites.
-    schemas = pathlib.Path(os.environ.get("GSETTINGS_SCHEMA_DIR", "/usr/share/glib-2.0/schemas"))
-    assert (schemas / "gschemas.compiled").is_file(), "native GTK schemas are unavailable"
     with tempfile.TemporaryDirectory(prefix="ergopti-app-operands-") as folder:
         root = pathlib.Path(folder)
         applications = root / "data" / "applications"
@@ -82,10 +42,6 @@ def main():
         launcher = root / "record-application"
         launcher.write_text('#!/bin/sh\nprintf %s "$1" > "$ERGOPTI_NATIVE_APPLICATION_RECEIPT"\n')
         launcher.chmod(0o700)
-        (applications / "ergopti-native-launcher-ready.desktop").write_text(
-            "[Desktop Entry]\nType=Application\nName=Native launcher readiness\n"
-            f'Exec={launcher} "ergopti-native-launcher-ready"\nTerminal=false\n'
-        )
         read_fd, write_fd = os.pipe()
         with (root / "display.log").open("w") as log:
             display = subprocess.Popen(
@@ -124,22 +80,18 @@ def main():
                             "XDG_DATA_HOME": str(root / "data"),
                             "XDG_DATA_DIRS": str(root / "empty"),
                             "XDG_CONFIG_HOME": str(root / "config"),
-                            "GSETTINGS_SCHEMA_DIR": str(schemas),
                             "ERGOPTI_NATIVE_APPLICATION_ENTRY": str(entry),
                             "ERGOPTI_NATIVE_APPLICATION_RECEIPT": str(receipt),
-                            "ERGOPTI_NATIVE_APPLICATION_READY": str(root / ("ready-" + str(index))),
                             "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
                         }
                     )
                     child = subprocess.run(
-                        ["dbus-run-session", "--", "python3", "-c", SESSION_WORKER, WORKER],
+                        ["dbus-run-session", "--", "luajit", "-e", WORKER],
                         env=env,
                         capture_output=True,
                         text=True,
                         timeout=10,
                     )
-                    if child.stdout.strip():
-                        print(child.stdout.strip())
                     if child.returncode:
                         failures += 1
                         print(

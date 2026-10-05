@@ -2738,13 +2738,11 @@ end
 --- @return table One provider row.
 local function _migration_row(k)
 	if type(k.get_migration_progress) ~= "function" then
-		local rows = ManifestMenu.template_rows("metrics_migration_unavailable_rows")
-		return rows and rows[1] or nil
+		return { label = i18n_safe("menu.metrics.migration_unavailable"), disabled = true }
 	end
 	local progress = k.get_migration_progress()
 	if not progress.running then
-		local rows = ManifestMenu.template_rows("metrics_migration_idle_rows")
-		return rows and rows[1] or nil
+		return { label = i18n_safe("menu.metrics.migration_idle"), disabled = true }
 	end
 	return {
 		label = string.format(i18n_safe("menu.metrics.migration_progress"),
