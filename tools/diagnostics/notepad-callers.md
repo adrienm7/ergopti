@@ -29,7 +29,7 @@ foreground window, control, PID and deleted suffix.
 
 The six cases independently compare the full literal document and full DWORD
 caret. They cover insertion, the reported 16-to-50-character prediction correction,
-a supplementary Unicode suffix, `ctâ˜… â†’ câ€™Ã©tait`, uppercase conformity, and a
+a supplementary Unicode suffix, `ct★ → c’était`, uppercase conformity, and a
 consumed delimiter. Actual canonical HSE/LLM mirror and completion assertions
 run alongside the receiving checks. Scheduling and presentation admission are
 controlled test ports; this does not exercise a physical/default InputHook trigger.
