@@ -446,6 +446,21 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
         timeout-minutes: 1
 
+      - name: Retain canonical backspace unigrams through native SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -o pipefail
+          export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+          for ERGOPTI_BACKSPACE_RUNTIME in luajit lua5.4; do
+            ERGOPTI_BACKSPACE_LOG=$(mktemp)
+            "$ERGOPTI_BACKSPACE_RUNTIME" tests/hardware/run_sqlite_backspace_unigrams.lua | tee "$ERGOPTI_BACKSPACE_LOG"
+            ERGOPTI_BACKSPACE_PROFILE=$(sed -n 's/^PROFILE //p' "$ERGOPTI_BACKSPACE_LOG")
+            test -n "$ERGOPTI_BACKSPACE_PROFILE"
+            python3 tests/hardware/run_sqlite_backspace_unigrams.py "$ERGOPTI_BACKSPACE_PROFILE"
+          done
+        timeout-minutes: 1
+
       - name: Preserve canonical Unicode character classes through native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

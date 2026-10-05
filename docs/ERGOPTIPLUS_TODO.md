@@ -2326,6 +2326,28 @@ These are software implementations; final hardware verification remains below.
   collector, Reader, count policy, schema, raw timing, session cursor, menu,
   configuration, foreign driver or reserved implementation change.
 
+- [~] **L143.** Linux canonical backspace unigrams: retain each correction
+  marker through the existing Walker accumulator, with its actual delay and
+  manual, hotstring or LLM source. The common metrics UI and both foreign
+  drivers already retain this token; this slice covers unigrams only. Preserve
+  correction errors, cascades, recovery, sequence breaks, raw events and scalar
+  character totals. Actual public software events, native clocks and SQLite
+  reproduce five failures among fourteen checks before, then all pass after on
+  LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. Independent
+  readonly Python checks reproduce two failures among eight, then all pass.
+  Four additive registered units reproduce three failures before and pass
+  after; preserve the complete old Walker owner and its45 subjects. All49 owner
+  subjects pass on every profile. Controls cover source attribution, an actual
+  forty-millisecond manual delay, literal four-codepoint "[BS]" text, dashboard
+  and filtered Reader projection, unchanged scalar counts and idempotent flush.
+  Unit events are modeled; production collector, clocks and storage are native.
+  No physical keyboard or foreign native runtime validation is claimed. Broader
+  backspace bigrams/trigrams and existing corpus differences remain outside this
+  slice. Register future Linux CI commands without launching workflows. Preserve
+  both language packs and principal notification/HTTP assertions. No input hook,
+  schema, source-count policy, configuration, menu or reserved implementation
+  change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
