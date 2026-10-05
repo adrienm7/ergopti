@@ -1756,6 +1756,26 @@ These are software implementations; final hardware verification remains below.
   angle-name lexical gaps remain separate. No display, device, physical magic
   selection, repeat, recovery or reserved shortcut change.
 
+- [~] **L119.** Linux XKB quoted key definitions: iterate real declarations
+  outside quoted metadata and reuse the existing quote-aware block owner to
+  return exact complete definitions. Per-key type names containing braces could
+  truncate definitions; quoted phantom declarations also created false parser
+  entries. Preserve every earlier scanner, list/group/keycode/keysym expression
+  and fallback priority. Seventy-two native checks over eight genuinely compiled
+  canonical maps have nine original failures and pass under current libraries
+  and signed Ubuntu 22.04 luv/libuv dependencies; native libxkbcommon remains the
+  container library in that mix. Retained hostile literals, independent native
+  a/q/2, public checked-file refresh/base labels and phantom-entry refusal remain
+  checked. The phantom-only case repairs a parser contract, without claiming a
+  previously wrong public label. Sixteen additive pure cases have eight original
+  failures and pass under LuaJIT and Lua 5.4; all preceding fifty-two assertions
+  and the earlier sixty-four native checks remain green. Register future Linux CI
+  without launching it. Stock Lua 5.4 native FFI is unexecuted; Windows/macOS have
+  different native layout owners and foreign runtime behavior is untested. Quoted
+  symbols-looking lists and angle-name lexical gaps remain separate. No display,
+  physical device, magic selection/repeat/recovery, reserved shortcut, comment
+  grammar, normalization or group policy change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

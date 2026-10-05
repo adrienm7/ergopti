@@ -376,6 +376,13 @@ jobs:
           done
         timeout-minutes: 1
 
+      - name: Parse actual canonical XKB keys without quoted declaration collisions
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_key_definitions.lua
+        timeout-minutes: 1
+
       - name: Parse actual canonical XKB blocks without quoted metadata collisions
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

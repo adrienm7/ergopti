@@ -192,6 +192,36 @@ local function split_levels(list)
 	return levels
 end
 
+--- Iterates complete real key definitions without reading quoted declarations.
+--- @param body string Symbols block body.
+--- @return function Iterator yielding the key name and exact braced definition.
+local function key_definitions(body)
+	local i = 1
+	return function()
+		while i <= #body do
+			local c = body:sub(i, i)
+			if c == '"' then
+				i = skip_quoted_string(body, i)
+				if not i then return nil end
+			else
+				local name, open
+				if c == "k" and (i == 1 or not body:sub(i - 1, i - 1):match("[%w_]")) then
+					name, open = body:match("^key%s+<([%w_+%-]+)>%s*()", i)
+				end
+				if name and body:sub(open, open) == "{" then
+					local inner = M.block(body:sub(i), "key")
+					if not inner then return nil end
+					local close = open + #inner + 1
+					i = close + 1
+					return name, body:sub(open, close)
+				end
+				i = i + 1
+			end
+		end
+		return nil
+	end
+end
+
 --- Reads the group-1 keysym list for every key in the symbols block.
 ---
 --- Two spellings occur in the same dump. The short form is
@@ -209,7 +239,7 @@ function M.parse_symbols(text)
 		return keys
 	end
 
-	for name, definition in body:gmatch("key%s+<([%w_+%-]+)>%s*(%b{})") do
+	for name, definition in key_definitions(body) do
 		-- Group 2 and beyond are a user who switches layouts with a hotkey.
 		-- Injecting into a group that is not active types the wrong characters,
 		-- so only the first group is kept and the active-group question is the
