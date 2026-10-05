@@ -471,3 +471,58 @@ helpers.describe("keyboard_layout: planning a string", function()
 	end)
 
 end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 5/ Quoted block metadata ==============================
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("xkb_keymap: quoted block metadata", function()
+	local plain = "\n\tkey <AC01> { [ a, A ] };\n"
+	local function dump(body, header, prefix)
+		return (prefix or "") .. 'xkb_symbols "' .. (header or "healthy") .. '" {' .. body .. '};\nxkb_types "next" { type "T" { modifiers=Shift; }; };'
+	end
+	local escaped_quote = [[name="Readback \" } metadata"; key <AC01> { [ a, A ] };]]
+	local even_backslashes = [[name="Readback \\"; key <AC01> { [ a, A ] };]]
+	local odd_backslashes = [[name="Readback \\\" } metadata"; key <AC01> { [ a, A ] };]]
+	local cases = {
+		{ name = "preserves the exact nested body", text = dump(plain), body = plain },
+		{ name = "ignores a closing brace in metadata", body = [[name="Readback } metadata";]] .. plain },
+		{ name = "ignores an opening brace in metadata", body = [[name="Readback { metadata";]] .. plain },
+		{ name = "ignores balanced braces in metadata", body = [[name="Readback {balanced} metadata";]] .. plain },
+		{ name = "ignores inverted braces in metadata", body = [[name="Readback }{ metadata";]] .. plain },
+		{ name = "ignores a quoted keyword before the actual block", text = dump(plain, nil, 'xkb_types "t" { type "xkb_symbols" { modifiers=Shift; }; };'), body = plain },
+		{ name = "ignores repeated quoted keywords", text = dump(plain, nil, 'xkb_types "xkb_symbols" { name="xkb_symbols"; };'), body = plain },
+		{ name = "ignores an escaped quote before the actual block", text = dump(plain, nil, [[name="before \" xkb_symbols } metadata";]]), body = plain },
+		{ name = "finds the opener after a quoted opening brace", text = dump(plain, "Readback { header"), body = plain },
+		{ name = "finds the opener after a quoted closing brace", text = dump(plain, "Readback } header"), body = plain },
+		{ name = "ignores escaped quotes inside the body", body = escaped_quote },
+		{ name = "closes a string after an even backslash run", body = even_backslashes },
+		{ name = "retains a string after an odd backslash run", body = odd_backslashes },
+		{ name = "preserves Unicode metadata bytes", body = [[name="é }{ 😀";]] .. plain },
+		{ name = "preserves an empty body", text = dump(""), body = "" },
+		{ name = "refuses a missing block", text = 'xkb_types "t" { type "T" { modifiers=Shift; }; };' },
+		{ name = "refuses a keyword found only inside a string", text = 'name="xkb_symbols"; unrelated { raw };' },
+		{ name = "refuses a missing structural opener", text = 'xkb_symbols "Readback { header";' },
+		{ name = "refuses an unclosed header string", text = 'xkb_symbols "Readback { header;' },
+		{ name = "refuses an unclosed body string", text = [[xkb_symbols "h" { name="unfinished } ; };]] },
+		{ name = "refuses an escaped terminal quote", text = [[xkb_symbols "h" { name="unfinished \" } ; };]] },
+		{ name = "refuses a terminal string backslash", text = [[xkb_symbols "h" { name="unfinished \]] },
+		{ name = "refuses an unfinished structural block", text = 'xkb_symbols "h" { key <AC01> { [ a, A ] };' },
+		{ name = "refuses empty input", text = "" },
+		{ name = "refuses nonstring input", text = false },
+	}
+	for _, spec in ipairs(cases) do
+		if spec.text == nil then spec.text = dump(spec.body) end
+		helpers.it("(xkb-block-strings) " .. spec.name, function()
+			local parser = helpers.load_module("infra.xkb_keymap")
+			helpers.assert_eq(parser.block(spec.text, "xkb_symbols"), spec.body,
+				"quoted bytes do not choose a structural block or change its exact body")
+		end)
+	end
+end)

@@ -1734,6 +1734,28 @@ These are software implementations; final hardware verification remains below.
   its own native proof. No foreign source/runtime, decoder policy, transport,
   menu, persistence, physical input or character-budget expansion.
 
+- [~] **L118.** Linux XKB outer-block quoted metadata: locate block keywords and
+  structural openers outside quoted strings, then balance only unquoted braces.
+  Quoted type/level names could select a false symbols block, and group metadata
+  braces truncated its body. Preserve exact raw body bytes and refuse unfinished
+  strings; no comment/angle grammar, normalization, group or shortcut policy.
+  Sixty-four native checks over eight genuinely compiled and canonically retained
+  maps have twenty-five original failures and pass after under current libraries
+  and signed Ubuntu 22.04 luv/libuv dependencies. libxkbcommon remains the
+  container library in that mix. Native a/q/2 oracles, checked files, complete
+  entry floors and public layout refresh/base labels remain checked. Twenty-five
+  additive pure cases have twelve original failures and pass under LuaJIT and
+  Lua 5.4, including escaped-byte parity and unfinished input. Preserve all
+  earlier assertions and helpers after the block reader; register future Linux
+  CI without launching it. Native fixtures require LuaJIT FFI, so stock Lua 5.4
+  validates only the pure matrix. Initial dispatcher setup failures are retained
+  separately; corrected native baseline loads the exact saved HEAD parser source
+  without replacing production files. Windows/macOS use different native layout
+  owners, with no equivalent text parser by source inspection; foreign native
+  behavior is untested. Per-key definitions, symbols-looking quoted lists and
+  angle-name lexical gaps remain separate. No display, device, physical magic
+  selection, repeat, recovery or reserved shortcut change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
