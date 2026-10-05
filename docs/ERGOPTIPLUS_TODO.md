@@ -2187,6 +2187,28 @@ These are software implementations; final hardware verification remains below.
   and principal notification/HTTP assertions. No shared helper, foreign driver,
   input hook, configuration, menu or reserved change.
 
+- [~] **L137.** Linux Unicode character classes: replace the private multibyte
+  shortcut with the existing shared coarse classifier, preserving codepoint
+  lengths, source counters and manual/synthetic separation. Actual public
+  software ingestion and native SQLite reproduce three failures among fourteen
+  independent Python-oracle controls before and pass after on current LuaJIT,
+  Lua 5.4 and the signed Jammy luv/libuv mixed profile. Han and emoji belong to
+  other; NBSP and NNBSP belong to space. ASCII, accented letters, combining
+  codepoints and synthetic output retain their literal counts. This existing
+  coarse policy does not implement Unicode general categories or graphemes.
+  Nine registered unit controls reproduce four failures and pass after on all
+  three profiles; the supplemental CR/VT/FF control checks other while tab/LF
+  stay space. That supplemental control is a Walker unit, not native hardware
+  coverage; the fourteen native controls remain unchanged. Preserve the entire
+  original eight-case unit prefix and all forty-five previous Walker controls.
+  macOS already delegates to the same shared classifier. Windows agrees on the
+  concrete Han, emoji, NBSP/NNBSP and accent cases; broader letter ranges and
+  combining behavior differ, so this is not full foreign taxonomy parity.
+  Foreign native validation remains principal-owned. Register future Linux CI
+  without launching it. Preserve both language packs and principal notification
+  and HTTP assertions. No input hook, shared policy, schema, source counters,
+  normalization, menu, configuration or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

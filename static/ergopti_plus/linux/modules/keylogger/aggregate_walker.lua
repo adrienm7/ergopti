@@ -49,6 +49,7 @@ local M = {}
 
 local Helpers = require("keylogger.aggregator_helpers")
 local Timings = require("infra.timings")
+local Utils = require("keylogger.utils")
 
 -- Beyond this gap two keystrokes are not a sequence. Shared with the other two
 -- drivers through the timing canon rather than restated here.
@@ -161,22 +162,13 @@ local function synthetic_of(event)
 	return is_synthetic, (is_synthetic and type(meta.st) == "string") and meta.st or "none"
 end
 
---- Which class a character belongs to in the composition breakdown.
----
---- Byte patterns, not a Unicode table: accented letters arrive as multi-byte
---- sequences that `%a` does not match, so anything outside ASCII is classified
---- as a letter rather than as "other". A French corpus is mostly accented text,
---- and filing it under "other" would make the breakdown say nothing at all.
+--- Uses the shared coarse character policy for the composition breakdown.
+--- Keeping Unicode spaces and non-letter codepoints in their canonical buckets
+--- makes Linux agree with the shared metrics classifier used by macOS.
 --- @param char string
 --- @return string One of "letter", "digit", "punct", "space", "other".
 local function class_of(char)
-	if char == "" then return "other" end
-	if #char > 1 then return "letter" end
-	if char:match("^%s$") then return "space" end
-	if char:match("^%d$") then return "digit" end
-	if char:match("^%a$") then return "letter" end
-	if char:match("^%p$") then return "punct" end
-	return "other"
+	return Utils.char_class(char)
 end
 
 --- Replays one application's buffered stream into the derived batch.
