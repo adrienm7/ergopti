@@ -36,10 +36,18 @@ module.exports = function checkNativeMenuLifecycle(ahk) {
 			}
 		);
 		assert.ifError(result.error);
+		const transcript = fs.existsSync(resultsFile)
+			? fs.readFileSync(resultsFile, 'utf8')
+			: 'No native result transcript was produced.';
+		const failures = transcript.split(/\r?\n/).filter((line) => line.startsWith('not ok '));
+		const diagnostic =
+			`exit=${result.status}; signal=${result.signal}; native failures=${failures.length}\n` +
+			(failures.length ? failures.join('\n').slice(0, 1600) : transcript.slice(-800)) +
+			`\nstderr tail: ${String(result.stderr).slice(-900)}\nstdout tail: ${String(result.stdout).slice(-900)}`;
 		assert.equal(
 			result.status,
 			0,
-			`personal-menu assertions and native teardown must succeed: ${result.stdout}\n${result.stderr}`
+			`personal-menu assertions and native teardown must succeed: ${diagnostic}`
 		);
 		const manifest = validateAhkSuiteManifest(fs.readFileSync(resultsFile, 'utf8'));
 		assert.equal(manifest.complete, true, manifest.errors.join('\n'));
