@@ -1022,16 +1022,176 @@ if (macosSmokeStep !== null) {
 	}
 }
 
-// The preferred archive is smoked, then the historical ZIP is signed; the
+// NATIVE_SPARKLE_FIXTURE_BEGIN
+/** The real keyless CI tool owner must be available before native XCTest. */
+function nativeSparkleFixtureProblems(steps, fixture) {
+	const problems = [];
+	const install = steps.filter((step) => step.name === 'Install Sparkle signing tool');
+	const tests = steps.filter((step) => step.name === 'Run Swift launcher tests');
+	if (
+		install.length !== 1 ||
+		tests.length !== 1 ||
+		steps.indexOf(install[0]) >= steps.indexOf(tests[0])
+	)
+		problems.push('The native Sparkle fixture needs exactly one installer before XCTest.');
+	if (install.length === 1) {
+		if (
+			pipeline.stepField(install[0].body, 'if') !== null ||
+			pipeline.stepField(install[0].body, 'continue-on-error') !== null
+		)
+			problems.push(
+				'The public native signing tool must be installed unconditionally and strictly.'
+			);
+		for (const token of [
+			"SPARKLE_VERSION: '2.9.2'",
+			'curl -fsSLo /tmp/Sparkle.tar.xz',
+			'tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist',
+			'SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update'
+		]) {
+			if (!install[0].body.includes(token))
+				problems.push('The pinned native signing tool owner changed.');
+		}
+	}
+	if (!fixture.includes('import Security'))
+		problems.push('The native seed requires the actual Security owner.');
+	const ownedFixture = fixture.slice(fixture.indexOf('private func privateSparkleChild('));
+	for (const token of [
+		'SecRandomCopyBytes(kSecRandomDefault, bytes.count, bytes.baseAddress!)',
+		'[UInt8](repeating: 0, count: 32)',
+		'attributes: [.posixPermissions: 0o600]',
+		'.posixPermissions: 0o700',
+		'try child(executable, arguments, root: root)',
+		'guard fixtureCanRetire else',
+		'guard testRun?.failureCount == failuresBefore else',
+		'["node", owner.path, "sign", directory.path, signer, key.path]',
+		'["--verify", "-f", key.path, payload.path, signature]',
+		'["--verify", "-f", key.path, payload.path, signatures[1 - index]]',
+		'["--verify", "-f", key.path, modified.path, signatures[index]]',
+		'changed[changed.startIndex] ^= 1',
+		'XCTAssertEqual(crossed.status, 1',
+		'XCTAssertEqual(refused.status, 1',
+		'Error: failed to pass signing verification.',
+		'XCTAssertEqual(stillOwned.status, 0',
+		'XCTAssertEqual(decoded.count, 64)',
+		'XCTAssertEqual(signatures[0].count, signatures[1].count)',
+		'XCTAssertEqual(try Data(contentsOf: payload), before[index])'
+	]) {
+		if (!ownedFixture.includes(token))
+			problems.push('The actual private native signing fixture lost an owned control.');
+	}
+	return problems;
+}
+const nativeSparkleFixturePath = path.join(
+	root,
+	'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift'
+);
+const nativeSparkleFixture = fs.readFileSync(nativeSparkleFixturePath, 'utf8');
+const nativeSparkleSteps = pipeline.steps(pipeline.job(PACKAGE_JOB[MACOS_BOX]));
+errors.push(...nativeSparkleFixtureProblems(nativeSparkleSteps, nativeSparkleFixture));
+// Portable controls prove the actual CI prerequisite and control guards only;
+// actual Sparkle cryptography and child retirement remain macOS XCTest work.
+const nativeSparkleControls = [
+	['installed prerequisite', nativeSparkleSteps, nativeSparkleFixture, false],
+	[
+		'release-only installer',
+		nativeSparkleSteps.map((step) =>
+			step.name === 'Install Sparkle signing tool'
+				? {
+						...step,
+						body: step.body.replace(/^ {8}if:.*\n/gm, '') + '\n        if: inputs.release\n'
+					}
+				: step
+		),
+		nativeSparkleFixture,
+		true
+	],
+	[
+		'missing installer',
+		nativeSparkleSteps.filter((step) => step.name !== 'Install Sparkle signing tool'),
+		nativeSparkleFixture,
+		true
+	],
+	[
+		'late installer',
+		[
+			...nativeSparkleSteps.filter((step) => step.name !== 'Install Sparkle signing tool'),
+			...nativeSparkleSteps.filter((step) => step.name === 'Install Sparkle signing tool')
+		],
+		nativeSparkleFixture,
+		true
+	],
+	[
+		'duplicate installer',
+		[
+			...nativeSparkleSteps,
+			...nativeSparkleSteps.filter((step) => step.name === 'Install Sparkle signing tool')
+		],
+		nativeSparkleFixture,
+		true
+	],
+	[
+		'unpinned tool',
+		nativeSparkleSteps.map((step) => ({
+			...step,
+			body: step.body.replace("SPARKLE_VERSION: '2.9.2'", "SPARKLE_VERSION: 'unqualified'")
+		})),
+		nativeSparkleFixture,
+		true
+	],
+	[
+		'crossed signature removed',
+		nativeSparkleSteps,
+		nativeSparkleFixture.replace(
+			'payload.path, signatures[1 - index]',
+			'payload.path, signatures[index]'
+		),
+		true
+	],
+	[
+		'private key flag removed',
+		nativeSparkleSteps,
+		nativeSparkleFixture.replace(
+			'["--verify", "-f", key.path, payload.path, signature]',
+			'["--verify", key.path, payload.path, signature]'
+		),
+		true
+	],
+	[
+		'byte mutation removed',
+		nativeSparkleSteps,
+		nativeSparkleFixture.replace(
+			'changed[changed.startIndex] ^= 1',
+			'changed[changed.startIndex] ^= 0'
+		),
+		true
+	],
+	[
+		'retirement debt bypassed',
+		nativeSparkleSteps,
+		nativeSparkleFixture.replace(
+			'private func privateSparkleRetire(_ root: URL) {\n\t\tguard fixtureCanRetire else',
+			'private func privateSparkleRetire(_ root: URL) {\n\t\tguard true else'
+		),
+		true
+	]
+];
+for (const [name, steps, fixture, refuses] of nativeSparkleControls) {
+	if (nativeSparkleFixtureProblems(steps, fixture).length > 0 !== refuses)
+		errors.push(`Native Sparkle fixture prerequisite control failed: ${name}`);
+}
+// NATIVE_SPARKLE_FIXTURE_END
+
+// The preferred archive is smoked, then declared archives are signed; the
 // upload must follow every file it carries. A signature or keylayout step
 // moved past the upload leaves its file out, and the release preflight then
 // stops the whole release after every box has run.
 const MACOS_ORDER = [
+	'Install Sparkle signing tool',
+	'Run Swift launcher tests',
 	'Build ErgoptiPlus.app',
 	'Record signed CI archive source',
 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
-	'Install Sparkle signing tool',
-	'Sign zip with Sparkle EdDSA key',
+	'Sign declared archives with Sparkle EdDSA key',
 	'Generate Sparkle appcast',
 	'Upload the independent CI archive source',
 	'Upload the package'
@@ -1064,8 +1224,8 @@ if (
 for (const [name, condition] of [
 	['Smoke test built ErgoptiPlus.app (crash-on-launch guard)', 'inputs.release'],
 	['Retain packaged application startup evidence', 'always() && inputs.release'],
-	['Install Sparkle signing tool', 'inputs.release'],
-	['Sign zip with Sparkle EdDSA key', 'inputs.release'],
+	['Install Sparkle signing tool', null],
+	['Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	['Generate Sparkle appcast', 'inputs.release'],
 	['Package latest keylayout bundle', 'inputs.release']
 ]) {
@@ -1804,6 +1964,80 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 	console.log(`CI archive native-owner portable cases: ${cases}`);
 }
 // CI_ARCHIVE_OWNED_TESTS_END
+
+// PUBLIC_MACOS_PUBLICATION_WIRING_BEGIN
+// Fresh signing/feed/cask consumers all invoke the one canonical publication owner.
+{
+	const publication = require('../build/macos-release-publication.cjs');
+	const job = pipeline.job('package-macos');
+	const signer = pipeline
+		.runOf(pipeline.step(job, 'Sign declared archives with Sparkle EdDSA key'))
+		.join('\n');
+	if (
+		!signer.includes('node tools/build/macos-release-publication.cjs sign') ||
+		!signer.includes('build/macos "$SIGN_UPDATE" /tmp/sparkle_priv.key')
+	)
+		errors.push(
+			'the release signer must invoke the actual declared-archive owner with an explicit key file'
+		);
+	const appcast = pipeline.step(job, 'Generate Sparkle appcast');
+	if (!appcast.includes('ARCHIVE_DIR: build/macos') || appcast.includes('ZIP_PATH:'))
+		errors.push('fresh appcasts must consume the actual publication signing receipt');
+	const upload = pipeline.step(job, 'Upload the package');
+	if (
+		!upload.includes(`build/macos/${publication.RECEIPT}`) ||
+		!upload.includes('build/macos/_*.sig')
+	)
+		errors.push('the exact signing receipt and declared fragments must reach release preflight');
+	const cask = pipeline.step(pipeline.job('release'), 'Publish Homebrew cask');
+	if (
+		!cask.includes('node tools/build/macos-release-publication.cjs download') ||
+		!cask.includes('"$tap" "$archive"')
+	)
+		errors.push('the cask must receive the actual admitted published archive name and hash');
+}
+// PUBLIC_MACOS_PUBLICATION_WIRING_END
+
+// PUBLISHED_ARCHIVE_POLICY_TESTS_BEGIN
+// The published diagnostic consumes the producer's canonical archive bindings.
+// Its current-build and retained-helper branches remain independent ZIP users.
+function publishedArchiveWorkflowProblems(source) {
+	const failures = [];
+	const jobs = pipeline.jobsOfText(source, '.github/workflows/macos-release-launch.yml');
+	const observe = jobs.find((job) => job.id === 'observe');
+	if (!observe) return ['the published archive diagnostic must retain its observe job'];
+	const download = pipeline.step(observe.body, 'Download and verify the published application');
+	if (
+		pipeline.stepField(download, 'if') !==
+		"inputs.scenario == 'published' || inputs.scenario == 'published_with_dependency'"
+	)
+		failures.push('the published archive preference must remain scoped to published scenarios');
+	const commands = pipeline.runOf(download)?.filter((line) => line.trim() !== '') ?? [];
+	if (
+		commands.length !== 2 ||
+		commands[0] !== 'python3 tools/diagnostics/macos_release_launch_test.py' ||
+		commands[1] !== 'python3 tools/diagnostics/macos-release-launch.py --install-published'
+	)
+		failures.push('the published download must qualify and invoke its actual archive helper');
+	const observeLaunch = pipeline.step(
+		observe.body,
+		'Observe the installed release without a waiting open helper'
+	);
+	const launch = pipeline.runOf(observeLaunch) ?? [];
+	if (
+		!launch.includes(
+			'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"'
+		)
+	)
+		failures.push('the installed published archive must retain the actual strict launch observer');
+	return failures;
+}
+errors.push(
+	...publishedArchiveWorkflowProblems(
+		fs.readFileSync(path.join(root, '.github/workflows/macos-release-launch.yml'), 'utf8')
+	)
+);
+// PUBLISHED_ARCHIVE_POLICY_TESTS_END
 
 if (errors.length > 0) {
 	console.error('[ERROR] Release packaging workflow is unsafe:');

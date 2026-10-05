@@ -1,0 +1,58 @@
+[
+	{
+		"path": "static/ergopti_plus/_shared/lua/updater/release_install.lua",
+		"sha256": "d35452ae5a5595b5dbb32975f11d4617bf76f32d55b14e6c827f8f02446e120d"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/ui/changelog/script.js",
+		"sha256": "a72e37984e7378529b5b82ea375152951a445f258d4b13d0cc57ec2354af4477"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/ui/changelog/index.html",
+		"sha256": "ae45f7451b709bab484ac1fd4f86daabe783a0183b7143c4ad8a112dfcdc9a5b"
+	},
+	{
+		"path": "static/ergopti_plus/linux/ui/changelog/bridge.lua",
+		"sha256": "5b1ce90b51e1c4f4327d0213ebffa6e2ae1417f706ba34a7db5c62612e7be5ad"
+	},
+	{
+		"path": "static/ergopti_plus/macos/ui/changelog/init.lua",
+		"sha256": "a1e37a59e52984d8369a909b0711d7cd6a4cad7cdc280250d2d754493402bc4b"
+	},
+	{
+		"path": "static/ergopti_plus/windows/modules/updater/release_install.ahk",
+		"sha256": "d56a742370ac305ce039cf65b43ef4019086a9077d8830f26e41e7719bcf89c8"
+	},
+	{
+		"path": "static/ergopti_plus/windows/ui/changelog/init.ahk",
+		"sha256": "479b9cf49d24dfa4a59cfeebb392324d79dcd887c5935d301608199c5e81c09c"
+	},
+	{
+		"path": "static/ergopti_plus/linux/tests/unit/meta/test_release_install_contract.lua",
+		"sha256": "fa6b9f67dda3ea1e1ed817d8dd580bc82dc642eb4c036dcbe4884ee97766a061"
+	},
+	{
+		"path": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_install_contract.lua",
+		"sha256": "6c77f0240c09cdf5e32a88ea6c625e917b5a0dd020cf265f1affbd533249505b"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/lua/test/release_install_network_contract.lua",
+		"preimage_absent": true
+	},
+	{
+		"path": "tools/test/test-changelog-managed-failure.cjs",
+		"preimage_absent": true
+	},
+	{
+		"path": "static/ergopti_plus/windows/tests/unit/test_release_install.ahk",
+		"sha256": "1477e0a0d6b442135a9a53c698f7fbf15ef72563407c0b71135310f47537402b"
+	},
+	{
+		"path": "tools/test/browser/changelog-release-install.playwright.cjs",
+		"sha256": "1331c0ddab2af034fc1268a902c3cc550c547b096ebc560e0e410f8a49a5cde9"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/ui/changelog/style.css",
+		"sha256": "a2040172a42dd9fad7f8d8c9a0db37963957ddb5b8bafdc7ee201cb015588d2d"
+	}
+]

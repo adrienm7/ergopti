@@ -1,0 +1,448 @@
+﻿; static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk
+
+; ==============================================================================
+; MODULE: Managed Remote Transport Acceptance Tests
+; DESCRIPTION:
+; Real production curl generation and readiness through an owned CONNECT relay.
+; One warm PowerShell fixture provides TLS, a signed CRL and per-destination PAC.
+; Only the user-settings reader is substituted; no transport method is replaced.
+; ==============================================================================
+
+global _ManagedRemoteFixtureCleanupDebt := Map()
+global _ManagedRemoteFixtureCleanupExitRegistered := false
+
+_ManagedRemoteFixtureGuid() {
+	Guid := Buffer(16, 0)
+	if DllCall("Ole32\CoCreateGuid", "Ptr", Guid, "Int") != 0
+		throw Error("Native managed-network fixture identity allocation failed.")
+	Identity := ""
+	Loop 16
+		Identity .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+	return Identity
+}
+
+_ManagedRemoteFixtureRetryCleanup(*) {
+	global _ManagedRemoteFixtureCleanupDebt
+	for Identity, Fixture in _ManagedRemoteFixtureCleanupDebt.Clone() {
+		if Fixture.Close()
+			_ManagedRemoteFixtureCleanupDebt.Delete(Identity)
+	}
+	if _ManagedRemoteFixtureCleanupDebt.Count == 0
+		SetTimer(_ManagedRemoteFixtureRetryCleanup, 0)
+}
+
+_ManagedRemoteFixtureExitCleanup(*) {
+	_ManagedRemoteFixtureRetryCleanup()
+}
+
+class _ManagedRemoteFixtureOwner {
+	__New() {
+		global _DriverDir, _ManagedRemoteFixtureCleanupExitRegistered
+		this.Identity := _ManagedRemoteFixtureGuid()
+		this.Prefix := "Local\ErgoptiPlus.ManagedNetworkFixture." . this.Identity
+		this.Script := _DriverDir . "\tests\fixtures\managed_remote_transport.ps1"
+		this.Events := Map()
+		this.Handle := 0
+		this.NativeState := 0
+		this.Completions := []
+		this.CleanupHandle := 0
+		this.CleanupCompletions := []
+		this.RootThumbprint := ""
+		this.RootSubject := ""
+		this.RootRemovalVerified := false
+		this.GracefulReceiptVerified := false
+		this.Closing := false
+		this.Closed := false
+		this.Requests := Map()
+		this.ReadyOwners := []
+		this.ReadyCancels := []
+		this.ProxyRuns := []
+		this.Reader := ObjBindMethod(this, "ReadConfig")
+		this.GenerationCount := 0
+		this.Mode := "fixed"
+		this.Capture := 0
+		this.State := Map()
+		if !_ManagedRemoteFixtureCleanupExitRegistered {
+			OnExit(_ManagedRemoteFixtureExitCleanup)
+			_ManagedRemoteFixtureCleanupExitRegistered := true
+		}
+	}
+
+	Start() {
+		Directory := _SR_AcquireCaptureDirectory()
+		this.Capture := Map("TmpFile", Directory . "output.tmp", "CaptureDir", Directory)
+		for Name in ["InstallRoot", "RemoveRoot", "Observe", "Shutdown"] {
+			Event := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", false,
+				"Int", false, "WStr", this.Prefix . "." . Name, "Ptr")
+			NativeError := A_LastError
+			if !Event
+				throw Error("Owned managed-network event allocation failed (Win32 " . NativeError . ").")
+			this.Events[Name] := Event
+			if NativeError == 183
+				throw Error("Unique managed-network fixture event already exists.")
+		}
+		this.Handle := ShellRunner_SpawnTreeOwned("powershell.exe",
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+				this.Script, "-StatePath", this.Capture["TmpFile"], "-EventPrefix", this.Prefix],
+			ObjBindMethod(this, "OnServerDone"), , ObjBindMethod(this, "OnNativeAdopt"), 8192)
+		if !this.Handle.start()
+			throw Error("Actual managed-network native fixture did not start.")
+		this.WaitState("ready", "untrusted", 20000)
+		AssertTrue(this.State.Get("curl_schannel", false), "the actual shipped curl backend must be Schannel")
+		this.RootThumbprint := this.State.Get("root_thumbprint", "")
+		this.RootSubject := this.State.Get("root_subject", "")
+		AssertTrue(RegExMatch(this.RootThumbprint, "^[0-9A-F]{40}$") > 0, "owned root thumbprint is required before any store change")
+		AssertEqual("CN=ErgoptiPlus managed-network fixture " . this.Identity, this.RootSubject,
+			"only the unique fixture root may enter CurrentUser/Root")
+		for Key in ["tls_port", "proxy_port", "http_port"]
+			AssertTrue(this.State.Get(Key, 0) > 0 && this.State.Get(Key, 0) <= 65535,
+				"actual native listener port must be acknowledged")
+		this.BaseUrl := "https://managed-fixture.invalid:" . this.State["tls_port"] . "/v1"
+		this.Port := Map("resolve_proxy", ObjBindMethod(this, "ResolveProxy"))
+	}
+
+	OnNativeAdopt(State) {
+		this.NativeState := State
+	}
+
+	OnServerDone(Code, Out, Err) {
+		this.Completions.Push(Map("exit", Code, "stdout", Out, "stderr", Err))
+	}
+
+	OnCleanupDone(Code, Out, Err) {
+		this.CleanupCompletions.Push(Map("exit", Code, "stdout", Out, "stderr", Err))
+	}
+
+	ReadState() {
+		try {
+			State := JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8"))
+		} catch as ReadError {
+			; The owned producer updates one file; a partial write is retried within
+			; the enclosing budget, while terminal failure is checked separately.
+			this.LastStateReadError := Type(ReadError)
+			return false
+		}
+		if !(State is Map) || State.Get("version", 0) != 1
+			throw Error("Actual fixture published an unsupported state receipt.")
+		if State.Get("state", "") == "failed"
+			throw Error("Actual managed-network fixture reported native failure.")
+		this.State := State
+		return true
+	}
+
+	WaitState(ExpectedState, ExpectedPhase, BudgetMs, PreviousSequence := -1) {
+		Started := A_TickCount
+		while !TickExpired64(Started, BudgetMs) {
+			_SR_TreePoll()
+			if this.ReadState() && this.State.Get("state", "") == ExpectedState
+					&& this.State.Get("phase", "") == ExpectedPhase
+					&& this.State.Get("sequence", -1) > PreviousSequence
+				return true
+			if this.Completions.Length > 0
+				throw Error("Owned fixture settled before its required state acknowledgment.")
+			Sleep(10)
+		}
+		throw Error("Owned managed-network fixture state budget expired.")
+	}
+
+	Signal(Name) {
+		if !this.Events.Has(Name) || !DllCall("Kernel32\SetEvent", "Ptr", this.Events[Name], "Int")
+			throw Error("Owned managed-network fixture event was not acknowledged.")
+	}
+
+	ChangeTrust(Installed) {
+		Sequence := this.State["sequence"]
+		this.Signal(Installed ? "InstallRoot" : "RemoveRoot")
+		this.WaitState("ready", Installed ? "trusted" : "removed", 10000, Sequence)
+		if !Installed
+			AssertTrue(this.State.Get("root_removed", false), "exact current-user root removal must be acknowledged")
+	}
+
+	Observe() {
+		Sequence := this.State["sequence"]
+		Phase := this.State["phase"]
+		this.Signal("Observe")
+		this.WaitState("ready", Phase, 5000, Sequence)
+		AssertEqual(0, this.State.Get("ServiceFailures", -1), "owned fixture must expose unexpected native service failures")
+	}
+
+	ReadConfig() {
+		return Map("auto_detect", false,
+			"pac_url", this.Mode == "pac" ? "http://127.0.0.1:" . this.State["http_port"] . "/proxy.pac" : "",
+			"proxy", this.Mode == "fixed" ? "127.0.0.1:" . this.State["proxy_port"] : "", "bypass", "")
+	}
+
+	ResolveProxy(Url, Callback) {
+		; Only replace the native user-settings read. The actual resolver worker,
+		; native PAC engine, native trust and inherited explicit env remain live.
+		global _SYSTEM_PROXY_PAC_PENDING
+		Accepted := SystemProxy_ResolveCurlAsync(Url, Callback, this.Reader, 0, EnvGet)
+		if IsObject(_SYSTEM_PROXY_PAC_PENDING) && _SYSTEM_PROXY_PAC_PENDING.Reader == this.Reader
+			this.ProxyRuns.Push(_SYSTEM_PROXY_PAC_PENDING)
+		return Accepted
+	}
+
+	GenerationSucceeded(Result, Text, Usage) {
+		Result["success"].Push(Map("text", Text, "usage", Usage))
+	}
+
+	GenerationFailed(Result, Info := "") {
+		Result["failure"].Push(Info)
+	}
+
+	CheckGeneration(ExpectedSuccess) {
+		global _LLM_Remote_Async
+		this.GenerationCount += 1
+		ReqId := "managed_network_" . this.Identity . "_" . this.GenerationCount
+		Result := Map("success", [], "failure", [])
+		Resolved := Map("Format", "openai", "Token", "managed-network-fixture-token", "Model", "fixture")
+		SuccessFn := ObjBindMethod(this, "GenerationSucceeded", Result)
+		FailureFn := ObjBindMethod(this, "GenerationFailed", Result)
+		Reservation := _LLMRemote_ReserveRequest(ReqId, SuccessFn, FailureFn, 15000, A_TickCount, Resolved)
+		this.Requests[ReqId] := Reservation
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved,
+			this.BaseUrl . "/chat/completions?marker=managed-network-fixture",
+			'{"messages":[],"stream":false}',
+			SuccessFn, FailureFn, 15000, this.Port, Reservation),
+			"the actual production generation entrypoint must own its request")
+		Started := A_TickCount
+		while Result["success"].Length + Result["failure"].Length == 0 && !TickExpired64(Started, 18000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Result["success"].Length + Result["failure"].Length,
+			"actual generation must settle once within the native acceptance budget")
+		AssertEqual(ExpectedSuccess ? 1 : 0, Result["success"].Length,
+			"generation must obey actual system-root admission")
+		AssertEqual(ExpectedSuccess ? 0 : 1, Result["failure"].Length)
+		if ExpectedSuccess
+			AssertEqual("managed-network-ok", Result["success"][1]["text"], "actual production parser must consume the TLS response")
+		else {
+			AssertTrue(Result["failure"][1] is Map, "TLS refusal must expose a real failure receipt")
+			AssertEqual("transport", Result["failure"][1].Get("reason", ""), "an untrusted root may not be disguised as proxy admission failure")
+		}
+		AssertFalse(_LLM_Remote_Async.Has(ReqId), "settled generation must retire its own registry entry")
+	}
+
+	ReadyCompleted(Result, Owner, Ready) {
+		CancelFn := Owner.Get("cancel", 0)
+		if HasMethod(CancelFn, "Call")
+			this.ReadyCancels.Push(CancelFn)
+		Result.Push(Ready)
+	}
+
+	CheckReadiness(ExpectedSuccess) {
+		global LLM_API_PROVIDERS
+		ProviderId := "managed_network_" . this.Identity
+		AssertFalse(LLM_API_PROVIDERS.Has(ProviderId), "owned acceptance provider identity must be unique")
+		Result := []
+		Owner := LLM_AuxBegin(ProviderId, Map("backend", "api", "endpoint", this.BaseUrl, "identity", ProviderId))
+		this.ReadyOwners.Push(Owner)
+		LLM_API_PROVIDERS[ProviderId] := Map("Format", "openai", "BaseUrl", this.BaseUrl)
+		try {
+			LLM_RemoteIsReady_Async(Map("Provider", ProviderId, "Token", "managed-network-fixture-token"),
+				ObjBindMethod(this, "ReadyCompleted", Result, Owner), Owner, this.Port)
+			Started := A_TickCount
+			while Result.Length == 0 && !TickExpired64(Started, 18000) {
+				_SR_TreePoll()
+				Sleep(10)
+			}
+			AssertEqual(1, Result.Length, "actual readiness must settle once within its native budget")
+			AssertEqual(ExpectedSuccess, Result[1], "readiness must obey the actual system root and selected relay")
+		} finally {
+			CancelFn := Owner.Get("cancel", 0)
+			if HasMethod(CancelFn, "Call")
+				this.ReadyCancels.Push(CancelFn)
+			_LLM_AuxRetireOwner(Owner)
+			LLM_API_PROVIDERS.Delete(ProviderId)
+		}
+	}
+
+	RetireRequests() {
+		global _LLM_Remote_Async, _HTTP_CURL_CLEANUP_DEBTS, _HTTP_CURL_ABORT_DEBTS
+		for ReqId, Entry in this.Requests {
+			if _LLM_Remote_Async.Has(ReqId) && _LLM_Remote_Async[ReqId] == Entry {
+				LLM_RemoteCancelAsync(ReqId)
+				if !Entry.Has("tmp_status") {
+					if Entry.Has("proxy_deadline")
+						SetTimer(Entry["proxy_deadline"], 0)
+					_LLMRemote_DeleteOwned(ReqId, Entry)
+				}
+			}
+		}
+		for Owner in this.ReadyOwners
+			_LLM_AuxRetireOwner(Owner)
+		Started := A_TickCount
+		while !TickExpired64(Started, 5000) {
+			Complete := true
+			for CancelFn in this.ReadyCancels {
+				if CancelFn.Call() != true
+					Complete := false
+			}
+			for Debts in [_HTTP_CURL_CLEANUP_DEBTS, _HTTP_CURL_ABORT_DEBTS] {
+				for Id, Request in Debts.Clone() {
+					if this.HasOwnProp("BaseUrl") && InStr(Request.Url, this.BaseUrl . "/") == 1 {
+						Request.Abort()
+						Request._Cleanup()
+						Complete := false
+					}
+				}
+			}
+			for Run in this.ProxyRuns {
+				if IsObject(Run.Handle) && !Run.Handle.terminate() {
+					Complete := false
+					continue
+				}
+				if !Run.Done
+					_SystemProxy_FinishPac(Run, -1, "", "fixture cancellation")
+				if Run.Capture is Map && _SR_CaptureRemove(Run.Capture) != 0
+					Complete := false
+			}
+			for ReqId, Entry in this.Requests {
+				if !_LLM_CurlReleaseEntryProcess(Entry, true)
+					Complete := false
+				for Key in ["tmp_payload", "tmp_stdout", "tmp_config", "tmp_status", "tmp_exit"] {
+					if Entry.Has(Key) && FileExist(Entry[Key])
+						Complete := false
+				}
+				if _LLM_Remote_Async.Has(ReqId) && _LLM_Remote_Async[ReqId] == Entry {
+					_LLMRemote_PollCurl(ReqId)
+					Complete := false
+				}
+			}
+			if Complete
+				return true
+			Sleep(10)
+		}
+		return false
+	}
+
+	Close() {
+		if this.Closed
+			return true
+		if this.Closing
+			return false
+		this.Closing := true
+		try {
+			if !this.RetireRequests()
+				return false
+			if IsObject(this.Handle) {
+				if this.Completions.Length == 0 && this.Events.Has("Shutdown") {
+					this.Signal("Shutdown")
+					Started := A_TickCount
+					while this.Completions.Length == 0 && !TickExpired64(Started, 8000) {
+						_SR_TreePoll()
+						Sleep(10)
+					}
+				}
+				if !this.Handle.terminate()
+					return false
+				if this.NativeState is Map && !this.NativeState.Get("TreeQuiesced", false)
+					return false
+			}
+			if this.Completions.Length == 1 && this.Completions[1]["exit"] == 0
+					&& Trim(this.Completions[1]["stdout"], "`r`n ") == "OWNED_FIXTURE_STOPPED_ROOT_REMOVED"
+					&& this.Completions[1]["stderr"] == "" {
+				try {
+					FinalState := JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8"))
+					this.GracefulReceiptVerified := FinalState is Map && FinalState.Get("state", "") == "stopped"
+						&& FinalState.Get("root_removed", false) && FinalState.Get("service_stopped", false)
+				} catch as FinalReceiptError {
+					this.LastFinalReceiptError := Type(FinalReceiptError)
+				}
+			}
+			; A separate bounded cleanup process verifies exact-thumbprint absence
+			; after every server descendant is gone, including failed shutdowns.
+			if this.RootThumbprint != "" && !this.RootRemovalVerified {
+				if !IsObject(this.CleanupHandle) {
+					this.CleanupHandle := ShellRunner_SpawnTreeOwned("powershell.exe",
+						["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+							this.Script, "-StatePath", this.Capture["TmpFile"], "-EventPrefix", this.Prefix,
+							"-Mode", "Cleanup", "-OwnedRootThumbprint", this.RootThumbprint,
+							"-OwnedRootSubject", this.RootSubject], ObjBindMethod(this, "OnCleanupDone"), , , 8192)
+					if !this.CleanupHandle.start()
+						return false
+				}
+				Started := A_TickCount
+				while this.CleanupCompletions.Length == 0 && !TickExpired64(Started, 15000) {
+					_SR_TreePoll()
+					Sleep(10)
+				}
+				if !this.CleanupHandle.terminate()
+					return false
+				if this.CleanupCompletions.Length != 1 || this.CleanupCompletions[1]["exit"] != 0
+						|| Trim(this.CleanupCompletions[1]["stdout"], "`r`n ") != "OWNED_ROOT_REMOVED"
+						|| this.CleanupCompletions[1]["stderr"] != "" {
+					this.CleanupHandle := 0
+					this.CleanupCompletions := []
+					return false
+				}
+				this.RootRemovalVerified := true
+			}
+			if this.Capture is Map && _SR_CaptureRemove(this.Capture) != 0
+				return false
+			for Name, Event in this.Events.Clone() {
+				if !DllCall("Kernel32\CloseHandle", "Ptr", Event, "Int")
+					return false
+				this.Events.Delete(Name)
+			}
+			this.Closed := true
+			return true
+		} catch as CleanupError {
+			this.LastCleanupError := Type(CleanupError)
+			return false
+		} finally this.Closing := false
+	}
+
+	RetainCleanup() {
+		global _ManagedRemoteFixtureCleanupDebt
+		_ManagedRemoteFixtureCleanupDebt[this.Identity] := this
+		SetTimer(_ManagedRemoteFixtureRetryCleanup, 250)
+	}
+}
+
+_ManagedRemote_ActualSystemTrustAndSelectedTransport() {
+	Fixture := _ManagedRemoteFixtureOwner()
+	try {
+		for Name in ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY", "no_proxy", "NO_PROXY"]
+			AssertEqual("", EnvGet(Name), "explicit inherited proxy/bypass overrides make this controlled native qualification unavailable")
+		Fixture.Start()
+		Fixture.CheckGeneration(false)
+		Fixture.CheckReadiness(false)
+		Fixture.Observe()
+		AssertEqual(0, Fixture.State["Requests"], "an untrusted certificate must reach no authenticated HTTP handler")
+		AssertTrue(Fixture.State["ProxyConnects"] >= 2, "untrusted attempts must still use the real selected relay")
+		Fixture.ChangeTrust(true)
+		Fixture.CheckGeneration(true)
+		Fixture.CheckReadiness(true)
+		Fixture.Mode := "pac"
+		Fixture.CheckGeneration(true)
+		Fixture.CheckReadiness(true)
+		Fixture.Observe()
+		AssertEqual(4, Fixture.State["Requests"], "both actual entrypoints must reach TLS through static and PAC admission")
+		AssertEqual(2, Fixture.State["Generations"])
+		AssertEqual(2, Fixture.State["ReadyRequests"])
+		AssertTrue(Fixture.State["PacRequests"] >= 1, "the actual WinHTTP PAC engine must fetch the owned script")
+		AssertTrue(Fixture.State["CrlRequests"] >= 1, "strict generation must retain actual native revocation verification")
+		Fixture.ChangeTrust(false)
+		Fixture.Mode := "fixed"
+		Fixture.CheckGeneration(false)
+		Fixture.CheckReadiness(false)
+		Fixture.Observe()
+		AssertEqual(4, Fixture.State["Requests"], "removing the exact root must restore authenticated transport refusal")
+		AssertTrue(Fixture.State["ProxyConnects"] >= 8, "all eight production transports must pass through the owned relay")
+		AssertTrue(Fixture.State["FailedTls"] >= 4, "actual untrusted handshakes must fail before and after system trust admission")
+	} finally {
+		Closed := Fixture.Close()
+		if !Closed
+			Fixture.RetainCleanup()
+		AssertTrue(Closed, "owned fixture/curl trees, exact root thumbprint and private state must be fully retired")
+		if Fixture.RootThumbprint != "" {
+			AssertTrue(Fixture.RootRemovalVerified, "independent cleanup must acknowledge exact-thumbprint absence")
+			AssertTrue(Fixture.GracefulReceiptVerified, "native service or graceful cleanup failures must remain red after independent root removal")
+		}
+		AssertEqual(0, Fixture.Events.Count, "every owned native event handle must close")
+	}
+}
+Test("managed remote native: actual system CA and static/PAC transport preserve strict TLS and exact cleanup",
+	_ManagedRemote_ActualSystemTrustAndSelectedTransport)

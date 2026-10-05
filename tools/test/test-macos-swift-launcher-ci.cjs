@@ -292,8 +292,17 @@ check(
 check(
 	testStep.includes('swift_pipeline_status=("${PIPESTATUS[@]}")') &&
 		/set \+e\s*\n\s*script -q/.test(testStep) &&
-		/swift_pipeline_status=\([^\n]+\)\s*\n\s*set -e\s*\n\s*node tools\/diagnostics\/swift_xctest_evidence\.cjs/.test(
+		/swift_pipeline_status=\([^\n]+\)\s*\n\s*node tools\/diagnostics\/swift_xctest_evidence\.cjs/.test(
 			testStep
+		) &&
+		/xctest_evidence_status=\$\?\s*\n\s*node tools\/diagnostics\/tis_evidence_transport\.cjs[^\n]+\n\s*tis_evidence_status=\$\?\s*\n\s*set -e/.test(
+			testStep
+		) &&
+		testStep.includes(
+			'if [ "$xctest_evidence_status" -ne 0 ]; then exit "$xctest_evidence_status"; fi'
+		) &&
+		testStep.includes(
+			'if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi'
 		) &&
 		testStep.includes('"${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}"') &&
 		!/trap[^\n]*rm[^\n]*xctest_log/.test(testStep),
@@ -567,9 +576,9 @@ const privateKeyReads =
 check(
 	privateKeyReads.length === 1 &&
 		/secrets\.SPARKLE_ED_PRIVATE_KEY\b/.test(
-			pipeline.step(packageJob, 'Sign zip with Sparkle EdDSA key')
+			pipeline.step(packageJob, 'Sign declared archives with Sparkle EdDSA key')
 		),
-	`only "Sign zip with Sparkle EdDSA key" may read secrets.SPARKLE_ED_PRIVATE_KEY in ${MACOS_BOX}, found ${privateKeyReads.length} read(s)`
+	`only "Sign declared archives with Sparkle EdDSA key" may read secrets.SPARKLE_ED_PRIVATE_KEY in ${MACOS_BOX}, found ${privateKeyReads.length} read(s)`
 );
 // The code-signing .p12 and its password reach the one step that signs the
 // bundle: the build. An ad hoc release must say so on the run, because every
