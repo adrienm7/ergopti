@@ -16,6 +16,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const Pipeline = require('./ci-pipeline.cjs');
 const { run } = require('./run-linux-runtime-native.cjs');
 const ROOT = path.resolve(__dirname, '../..');
@@ -113,10 +114,65 @@ function validateManual(root) {
 		'explicit XDG/model profile seams preserve inherited HOME'
 	);
 	assert.match(py, /return owner\.main\(args\.child_command, deadline_seconds=930\)/);
+	assert.match(py, /closure\s*=\s*physical_receipt\(text\)/);
+	assert.match(py, /physical_zero\s*=\s*closure\s+is\s+not\s+None/);
+	assert.match(py, /physical_closure\s*=\s*closure/);
 	assert.match(py, /before == after/);
 	assert.match(py, /result\.returncode == 0 and stable and physical_zero/);
 	assert.match(py, /return 0 if accepted else 1/);
 	assert.match(py, /document\.update\(\s*passed\s*=\s*False\s*,\s*status\s*=\s*"failed"\s*,/);
+}
+
+/** Exercises the actual pure parser without importing the external installer. */
+function validatePhysicalReceipt(root) {
+	const control = String.raw`
+import ast, json, pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+tree = ast.parse(source)
+nodes = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'physical_receipt']
+assert len(nodes) == 1, 'one actual native receipt parser must exist'
+namespace = {'json': json, 're': re}
+exec(compile(ast.Module(body=nodes, type_ignores=[]), '<native physical receipt parser>', 'exec'), namespace)
+parse = namespace['physical_receipt']
+prefix = 'Native subreaper closure: '
+def old(adopted):
+    return f'Native subreaper: {adopted} adopted descendants physically reaped\n'
+def receipt(value, adopted=0):
+    return old(adopted) + prefix + json.dumps(value) + '\n'
+for adopted in (0, 2):
+    value = {'pending': 0, 'rescue': 0, 'adopted': adopted}
+    assert parse(receipt(value, adopted)) == value, 'reaped adoption is separate from outstanding ownership'
+valid = receipt({'pending': 0, 'rescue': 0, 'adopted': 0})
+invalid = [
+    '', old(0), prefix + json.dumps({'pending': 0, 'rescue': 0, 'adopted': 0}) + '\n',
+    valid + prefix + json.dumps({'pending': 0, 'rescue': 0, 'adopted': 0}) + '\n',
+    old(0) + valid, old(0) + prefix + '{broken}\n',
+    old(0) + prefix + '[]\n', old(0) + prefix + 'null\n',
+    receipt({'pending': 1, 'rescue': 0, 'adopted': 0}),
+    receipt({'pending': 0, 'rescue': 1, 'adopted': 0}),
+    receipt({'pending': 0, 'rescue': 0, 'adopted': 2}),
+    receipt({'pending': 0, 'rescue': 0}),
+    receipt({'pending': 0, 'rescue': 0, 'adopted': 0, 'extra': 0}),
+    old(0) + prefix + '{"pending":1,"pending":0,"rescue":0,"adopted":0}\n',
+    'extra ' + valid.replace(old(0), ''),
+]
+for key in ('pending', 'rescue', 'adopted'):
+    for bad in (True, False, -1, 0.0, '0', None):
+        value = {'pending': 0, 'rescue': 0, 'adopted': 0}
+        value[key] = bad
+        invalid.append(receipt(value))
+for value in invalid:
+    assert parse(value) is None, 'malformed, duplicate or outstanding physical receipt must be refused'
+print(f'Native physical receipt parser: 2 admitted, {len(invalid)} refused')
+`;
+	const result = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		['-c', control, path.join(root, MANUAL_FIXTURES[1])],
+		{ encoding: 'utf8', timeout: 30000 }
+	);
+	assert.ifError(result.error);
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(result.stdout.trim(), 'Native physical receipt parser: 2 admitted, 33 refused');
 }
 
 /** Reads the actual declarations, with no implementation-generated expectations. */
@@ -214,8 +270,32 @@ function fakeRun({ platform = 'linux', change = (result) => result } = {}) {
 	return { status, calls, lines, errors };
 }
 
+/** Runs the materialized controlled manual diagnostics on their Linux host contract. */
+function validateDiagnosticProjection(root) {
+	if (process.platform !== 'linux') {
+		console.log('[DEFERRED] Controlled manual Linux diagnostics require the Linux preflight host.');
+		return;
+	}
+	const fixture = path.join(root, 'tools/test/test-linux-runtime-acceptance-diagnostics.py');
+	assert(fs.existsSync(fixture), 'the controlled diagnostics must be a durable repository fixture');
+	const result = spawnSync(
+		'python3',
+		['--', fixture, '--source', path.join(root, MANUAL_FIXTURES[1]), '--repository', root],
+		{ encoding: 'utf8', timeout: 30000 }
+	);
+	assert.ifError(result.error);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	const receipt = result.stderr || '';
+	assert.equal((receipt.match(/^Ran 14 tests in /gm) || []).length, 1);
+	assert.equal((receipt.match(/^OK$/gm) || []).length, 1);
+	assert.doesNotMatch(receipt, /(?:skipped=|\bSKIP\b)/i);
+	console.log('PASS: Controlled manual Linux diagnostics: 14 tests.');
+}
+
 function main() {
 	validate(ROOT);
+	validatePhysicalReceipt(ROOT);
+	validateDiagnosticProjection(ROOT);
 	for (const platform of ['darwin', 'win32']) {
 		const result = fakeRun({ platform });
 		assert.equal(result.status, 0);
@@ -487,6 +567,24 @@ function main() {
 			assert.throws(
 				() => validateManual(scratch),
 				'qualification exceptions must retain a literal failed receipt'
+			);
+		}
+		fs.writeFileSync(pyPath, pySource);
+		for (const [from, to] of [
+			['closure = physical_receipt(text)', 'closure = {}'],
+			['physical_zero = closure is not None', 'physical_zero = True'],
+			['physical_closure=closure', 'physical_closure=None']
+		]) {
+			const changed = pySource.replace(from, to);
+			assert.notEqual(
+				changed,
+				pySource,
+				'physical closure control must replace its actual admission'
+			);
+			fs.writeFileSync(pyPath, changed);
+			assert.throws(
+				() => validateManual(scratch),
+				'native acceptance must consume and retain the measured physical closure'
 			);
 		}
 		fs.writeFileSync(pyPath, pySource);

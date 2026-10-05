@@ -3326,7 +3326,11 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   Direct-source manual run37306690694 attempted actual HTTPS/model validation.
   Its native child exited0 with inference6 bytes, but the supervisor rejected
   its physical-reaping counter; this remains a failed whole acceptance until
-  explicit pending-zero/no-rescue proof qualifies. Items16/38 remain.
+  explicit pending-zero/no-rescue proof qualifies. The corrected physical
+  consumer passes35 parser controls and three refusal controls;14 durable
+  diagnostics and actual native82 checks pass. Real adoption, rescue and timeout
+  controls preserve their physical outcomes. Fresh hosted acceptance is pending.
+  Items16/38 remain.
 
 - [~] **47.** **Partial: authenticated local-server discovery and menus.** The
   shared catalogue owns optional empty authentication only for declared local
@@ -3398,6 +3402,9 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   assertions; current native three-OS CI and physical acceptance remain pending.
   Portable manual HTTPS/model CI ran and failed its outer physical receipt
   classification after native child exit0; no complete acceptance is claimed.
+  The strict pending-zero/no-rescue receipt is adopted without relaxing any
+  archive/model/chat/source assertions; final local Linux8338/0, native82/0
+  and E2E189/0 pass. Fresh official HTTPS/model CI remains pending.
   Actual local official HTTPS installation reached typed readiness and durable
   enable, then failed the model pull with exact child cleanup. Registry CONNECT403
   persists in this container; saved network configuration is not applied.
