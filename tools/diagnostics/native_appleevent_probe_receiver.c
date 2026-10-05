@@ -79,7 +79,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Owned AppleEvent recipient registration failed: phase=get-current-process, osstatus=%d\n", (int)status);
         return 65;
     }
-    status = TransformProcessType(&serial, kProcessTransformToUIElementApplication);
+    // The documented UIElement/background to foreground transition does not
+    // bring this private receiver to the front or request a window.
+    status = TransformProcessType(&serial, kProcessTransformToForegroundApplication);
     if (status != noErr) {
         fprintf(stderr, "Owned AppleEvent recipient registration failed: phase=transform-process-type, osstatus=%d\n", (int)status);
         return 65;

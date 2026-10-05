@@ -371,6 +371,33 @@ check('owned registration diagnosis projects only a closed bounded native failur
 	assert.equal((registration.match(/return 65;/g) || []).length, 2);
 });
 
+check(
+	'owned receiver uses the documented self foreground transition without front activation',
+	() => {
+		const receiver = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_receiver.c'),
+			'utf8'
+		);
+		assert.match(
+			receiver,
+			/TransformProcessType\(&serial, kProcessTransformToForegroundApplication\)/
+		);
+		assert.doesNotMatch(receiver, /kProcessTransformToUIElementApplication/);
+		assert.doesNotMatch(
+			receiver,
+			/SetFrontProcess\s*\(|ShowHideProcess\s*\(|NSApplicationLoad\s*\(/
+		);
+		const registration = receiver.slice(
+			receiver.indexOf('OSStatus status = GetCurrentProcess'),
+			receiver.indexOf('const AEEventHandlerUPP')
+		);
+		assert.equal((registration.match(/if \(status != noErr\)/g) || []).length, 2);
+		assert.equal((registration.match(/return 65;/g) || []).length, 2);
+		assert.match(registration, /phase=get-current-process, osstatus=%d/);
+		assert.match(registration, /phase=transform-process-type, osstatus=%d/);
+	}
+);
+
 check('native XCTest invokes actual Brew acceptance and requires its complete receipt', () => {
 	const fixture = fs.readFileSync(
 		path.join(
