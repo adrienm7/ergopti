@@ -4386,15 +4386,18 @@ Detailed commands, test owners and the inactive prepared packet are in
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
 This deferral does not complete this item or the cross-cutting items16/38.
 
-- [ ] **93.** Linux: the key combinations of item 91. The tap-hold engine
-      binds no combination (`platform/remap/tap_hold_engine.lua` only cancels
-      taps when a second tap-hold key goes down) and the Shortcuts menu draws
-      no `key_combinations` group. Port the pair model of item 91 (same pair
-      ids, slots and config sections as Windows), decide the chord inside
-      `M:process` / `M:tick`, and widen the manifest group to `linux`.
-      `caps_word` and `one_shot_shift` are `ahk`-only catalogue actions
-      today. Left out of the 2026-10-01 session on purpose (the maintainer:
-      « fais seulement pour Windows »).
+- [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
+  model now runs through the actual tap-hold engine, keyboard hook and
+  native configuration owner, using the same pair IDs, slots and sections.
+  Controlled fixtures pass 43 new cases and 99 unchanged engine/hook cases
+  on both Lua ABIs; eight independent behavioral omissions turn controls
+  red. Eight added terminal route/pause reentry controls fail on the old
+  owner and pass after final private currency checks. This first tranche supports ordered tap and hold pairs on one exact
+  keyboard, with modifier restoration and source/retirement fences.
+  Simultaneous chords, cross-device pairs, native-only caps_word and
+  one_shot_shift actions remain unavailable. Source publication, menu and
+  manifest admission are separate pending tranches. Native hosted input,
+  packaging, installation and physical acceptance remain unqualified.
 
 Windows continuation for item93 (explicitly deferred to the maintainer's PC):
 

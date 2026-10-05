@@ -11,6 +11,7 @@
 return {
 	"tests.unit.modules.test_native_worker_owner",
 	"tests.unit.modules.test_window_switch_owner",
+	"tests.unit.modules.test_key_combinations",
 	"tests.unit.adapters.test_user_hotstring_destination",
 	"tests.unit.infra.test_user_hotstring_runtime",
 	"tests.unit.ui.test_ergopti_extension_selection",
