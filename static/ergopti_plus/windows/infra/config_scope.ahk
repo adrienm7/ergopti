@@ -112,7 +112,7 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 	}
 	Build() {
 		Rows := _ConfigPrepareTypedUpdates(OperationsFn.Call())
-		Image := TOML_BuildUpdatedContent(Path, Rows)
+		Image := TOML_BuildConfigUpdatedContent(Path, Rows)
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			throw Error("The scoped configuration image could not be rendered.")
 		Expected := ConfigTransitionExpectedOld(Image["source_present"], Image["source_content"], Port)
