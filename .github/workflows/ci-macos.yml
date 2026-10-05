@@ -158,6 +158,9 @@ jobs:
       - name: Run reporter lifecycle self-tests
         run: node tools/test/test-report.cjs
 
+      - name: Run owned program XCTest notice constructed-policy controls
+        run: node tools/test/test-owned-program-xctest-notice.cjs
+
       # CPython intentionally omitted Darwin os.waitid until Python 3.13.
       - name: Prepare Python for native nonreaping waits
         uses: actions/setup-python@v5
@@ -249,11 +252,14 @@ jobs:
           swift_pipeline_status=("${PIPESTATUS[@]}")
           node tools/diagnostics/swift_xctest_evidence.cjs "$xctest_log" "${swift_pipeline_status[0]}" "${swift_pipeline_status[1]}" "$RUNNER_TEMP/swift-launcher-evidence/verdict.json"
           xctest_evidence_status=$?
+          node tools/diagnostics/owned_program_xctest_notice.cjs "$RUNNER_TEMP/swift-launcher-evidence/verdict.json" "$xctest_log" "$(git rev-parse HEAD)"
+          owned_program_evidence_status=$?
           node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"
           tis_evidence_status=$?
           set -e
           if [ "$xctest_evidence_status" -ne 0 ]; then exit "$xctest_evidence_status"; fi
           if [ "$tis_evidence_status" -ne 0 ]; then exit "$tis_evidence_status"; fi
+          if [ "$owned_program_evidence_status" -ne 0 ]; then exit "$owned_program_evidence_status"; fi
           if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
               echo "::error::the XCTest process ended without its successful suite summary"
               exit 1
