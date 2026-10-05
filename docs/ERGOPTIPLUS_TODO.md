@@ -3324,6 +3324,11 @@ The shared TOML leaf writer preserves authenticated same-source array,
 object and scalar kinds. Stale and forged kind hints refuse. Portable
 real-file fixtures pass; complete unused-key projections remain open.
 
+New Windows sections publish native-readable headers only after semantic
+admission against surviving physical source. First publication and
+explicit replacement pass in targeted Windows CI; the composed native
+suite, E2E, packaging and installation remain separately required.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical

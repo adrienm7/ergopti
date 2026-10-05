@@ -607,20 +607,32 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 
 	; Find the deepest surviving explicit table for each newly introduced leaf.
 	; Appending a root dotted row after a header would silently change its owner.
-	Headers := [], RecordIndex := 0
+	Headers := [], RecordIndex := 0, HeaderSource := ""
 	for PhysicalRecord in Physical {
 		if PhysicalRecord.Kind == "opaque"
 			throw ValueError("Cannot retain an unclassified configuration source record")
 		if PhysicalRecord.Kind == "header" {
 			Parts := _TOML_ConfigPath(PhysicalRecord.Section)
-			if !_TOML_ConfigPathDropped(Parts, Dropped)
-					&& SubStr(Trim(PhysicalRecord.Text), 1, 2) != "[["
+			if _TOML_ConfigPathDropped(Parts, Dropped)
+				continue
+			if SubStr(Trim(PhysicalRecord.Text), 1, 2) != "[["
 					&& !_ConfigTomlArrayMember(Document, Parts)
 				Headers.Push(Parts)
+		} else if PhysicalRecord.Kind == "assignment" {
+			RecordIndex += 1
+			if _TOML_ConfigPathDropped(Records[RecordIndex].Path, Dropped)
+				continue
 		}
+		if HeaderSource != "" && !RegExMatch(HeaderSource, "[\r\n]$")
+			HeaderSource .= "`n"
+		HeaderSource .= PhysicalRecord.Text
 	}
 	Pending := Map()
 	Pending.CaseSense := "On"
+	NewTables := Map()
+	NewTables.CaseSense := "On"
+	HeaderAdmission := Map()
+	HeaderAdmission.CaseSense := "On"
 	for Name, Parts in Owned {
 		Desired := _TOML_DocumentLookup(Expected, Parts)
 		if !Desired["found"]
@@ -635,6 +647,30 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		}
 		if Covered
 			continue
+		SectionParts := []
+		loop Parts.Length - 1
+			SectionParts.Push(Parts[A_Index])
+		Identity := _TOML_ConfigPathName(SectionParts)
+		; New sections need explicit headers for the still-live native flat reader.
+		; The semantic parser decides whether that declaration is legal: existing
+		; dotted or inline namespaces may already have closed the requested table.
+		; Explicit replacements first release only their classified physical owners.
+		if SectionParts.Length && !HeaderAdmission.Has(Identity) {
+			HeaderAdmission[Identity] := false
+			try {
+				TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+				HeaderAdmission[Identity] := true
+			} catch ValueError {
+				; Existing physical ownership remains the only legal insertion route.
+			}
+		}
+		if SectionParts.Length && HeaderAdmission[Identity] {
+			if !NewTables.Has(Identity)
+				NewTables[Identity] := []
+			NewTables[Identity].Push(TOML_RenderKey(Parts[Parts.Length]) . " = "
+				. TOML_RenderValue(Desired["value"]) . "`n")
+			continue
+		}
 		Owner := []
 		for Header in Headers {
 			if Header.Length < Parts.Length && Header.Length > Owner.Length
@@ -697,6 +733,11 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		}
 	}
 	Flush(Current)
+	for Identity, Entries in NewTables {
+		Append("[" . Identity . "]`n")
+		for Text in Entries
+			Append(Text)
+	}
 	if Pending.Count
 		throw ValueError("A configuration update lost its physical table owner")
 	Candidate := Chr(0xFEFF) . Content
