@@ -682,7 +682,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 
 	-- Serialise a Lua value to a TOML literal
 	local function to_toml_value(row)
-		return row.source_literal or Codec.encode_value(row.value)
+		return row.source_literal or row.precise_literal or Codec.encode_value(row.value)
 	end
 
 	-- Read existing lines (empty table only when absence is proven).
@@ -725,6 +725,19 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if #seeds > 0 then
 			for _, u in ipairs(updates) do seeds[#seeds + 1] = u end
 			updates = seeds
+		end
+	end
+	-- Finite scalar publication must retain the requested native numeric value.
+	-- Reuse the optional codec; authentic source literals retain precedence and
+	-- default encoding of every other value remains unchanged.
+	local finite_owned = {}
+	for _, row in ipairs(updates) do
+		local value = row.value
+		if not row.delete and type(value) == "number" and value == value and math.abs(value) ~= math.huge then
+			local called, literal = pcall(require("toml_codec.leaf_rows").value_literal, value)
+			if not called or type(literal) ~= "string" then return false, "the numeric scalar cannot be encoded exactly" end
+			row.precise_literal = literal
+			finite_owned[#finite_owned + 1] = { path = row_path(row), value = value }
 		end
 	end
 	local scanned, scan_error = RecordScanner.scan_records(source, { quoted_headers = true })
@@ -804,7 +817,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 					if u.delete and prefix ~= "" then replacements[record.first] = prefix end
 					if not u.delete then
 						-- This new scalar capability uses the existing optional precise codec;
-						-- default/header publication keeps its established encoder.
+						-- default encoding of other value kinds remains unchanged.
 						local literal_ok, literal = pcall(function()
 							return u.source_literal or require("toml_codec.leaf_rows").value_literal(u.value)
 						end)
@@ -937,6 +950,17 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			and type(actual) == type(wanted) and actual == wanted
 			and (type(wanted) ~= "number" or wanted ~= 0 or 1 / actual == 1 / wanted)
 		if not exact then return false, "the root scalar candidate differs from the requested value" end
+	end
+	for _, owned in ipairs(finite_owned) do
+		local actual = content_value
+		for _, segment in ipairs(owned.path) do
+			if type(actual) ~= "table" then actual = nil; break end
+			actual = actual[segment]
+		end
+		if type(actual) ~= "number" or actual ~= owned.value
+			or owned.value == 0 and 1 / actual ~= 1 / owned.value then
+			return false, "the numeric scalar candidate differs from the requested value"
+		end
 	end
 	return true, nil, content, {
 		status = read_status,
