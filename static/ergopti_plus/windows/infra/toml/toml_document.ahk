@@ -623,6 +623,8 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	Pending.CaseSense := "On"
 	NewTables := Map()
 	NewTables.CaseSense := "On"
+	HeaderAdmission := Map()
+	HeaderAdmission.CaseSense := "On"
 	for Name, Parts in Owned {
 		Desired := _TOML_DocumentLookup(Expected, Parts)
 		if !Desired["found"]
@@ -637,26 +639,23 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		}
 		if Covered
 			continue
-		SectionParts := [], ParentParts := []
+		SectionParts := []
 		loop Parts.Length - 1
 			SectionParts.Push(Parts[A_Index])
-		loop Max(SectionParts.Length - 1, 0)
-			ParentParts.Push(SectionParts[A_Index])
-		; A new dynamic section follows its explicit sibling headers. Existing
-		; native flat readers must see it immediately, before replacement boot;
-		; a root dotted insertion is semantically valid but invisible to them.
-		NewSibling := false
-		if ParentParts.Length && !_TOML_DocumentLookup(Document, SectionParts)["found"] {
-			for Header in Headers {
-				if Header.Length == SectionParts.Length
-						&& _TOML_ConfigPathUnder(Header, ParentParts) {
-					NewSibling := true
-					break
-				}
+		Identity := _TOML_ConfigPathName(SectionParts)
+		; New sections need explicit headers for the still-live native flat reader.
+		; The semantic parser decides whether that declaration is legal: existing
+		; dotted or inline namespaces may already have closed the requested table.
+		if SectionParts.Length && !HeaderAdmission.Has(Identity) {
+			HeaderAdmission[Identity] := false
+			try {
+				TOML_ParseDocument(Source . "`n[" . Identity . "]`n")
+				HeaderAdmission[Identity] := true
+			} catch ValueError {
+				; Existing physical ownership remains the only legal insertion route.
 			}
 		}
-		if NewSibling {
-			Identity := _TOML_ConfigPathName(SectionParts)
+		if SectionParts.Length && HeaderAdmission[Identity] {
 			if !NewTables.Has(Identity)
 				NewTables[Identity] := []
 			NewTables[Identity].Push(TOML_RenderKey(Parts[Parts.Length]) . " = "

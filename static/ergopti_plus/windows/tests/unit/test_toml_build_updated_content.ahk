@@ -497,9 +497,9 @@ _TBUI_ConfigDocumentVectors() {
 		{ Id: "literal versus nested dots", Source: 'layout.ergopti_base = true`n["layout.extra"]`n"literal.dot" = "001" # exact literal`n',
 			Updates: [{ Section: '"layout.extra"', Key: "literal.dot", Value: "002" }],
 			Expected: 'layout.ergopti_base = true`n["layout.extra"]`n"literal.dot" = "002"`n' },
-		{ Id: "new root before header", Source: 'layout.ergopti_base = true`n[future]`nold = "001" # retained`n',
+		{ Id: "new namespace with native-readable header", Source: 'layout.ergopti_base = true`n[future]`nold = "001" # retained`n',
 			Updates: [{ Section: "script", Key: "locale", Value: "fr" }],
-			Expected: 'layout.ergopti_base = true`nscript.locale = "fr"`n[future]`nold = "001" # retained`n' },
+			Expected: 'layout.ergopti_base = true`n[future]`nold = "001" # retained`n[script]`nlocale = "fr"`n' },
 		{ Id: "new leaf in explicit owner", Source: 'future.version = "001"`n[layout]`nergopti_base = true`n[future.other]`nkeep = false # retained`n',
 			Updates: [{ Section: "layout", Key: "ergopti_altgr", Value: TOML_Bool(false) }],
 			Expected: 'future.version = "001"`n[layout]`nergopti_base = true`nergopti_altgr = false`n[future.other]`nkeep = false # retained`n' },
@@ -658,7 +658,7 @@ _TBUI_ConfigInlineFullSaveAdmission(Path) {
 	Target := ManifestBuildFeaturesMap()
 	Collect() {
 		Updates := []
-		_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.caps", Target["hotstrings"]["autocorrection"]["caps"])
+		_CollectFeatureUpdates(Updates, "hotstrings.autocorrection.names", Target["hotstrings"]["autocorrection"]["names"])
 		return Updates
 	}
 	Writer(TargetPath, Rows) {
@@ -673,12 +673,12 @@ _TBUI_ConfigInlineFullSaveAdmission(Path) {
 		_ConfigBootOutdatedEntries := Map()
 		ParseConfigTomlFile(Path)
 		AssertEqual(1, ApplyBootConfigToml(Target, Path))
-		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.caps`nenabled"))
+		AssertTrue(_ConfigBootOutdatedEntries.Has("hotstrings.autocorrection.names`nenabled"))
 		AssertEqual(CONFIG_SAVE_FAILED, SaveFullConfig(Writer, (*) => true, true, 0, Collect),
 			"the full-state publication owner retains its current strict admission")
 		AssertEqual(1, Probe.calls, "the actual full-save writer port observes one filtered batch")
 		AssertEqual(1, Probe.rows.Length)
-		AssertEqual("hotstrings.autocorrection.caps", Probe.rows[1].Section)
+		AssertEqual("hotstrings.autocorrection.names", Probe.rows[1].Section)
 		AssertEqual("time_activation_seconds", Probe.rows[1].Key)
 		AssertEqual(0.25, Probe.rows[1].Value)
 		AssertFalse(Probe.rows[1].HasOwnProp("Delete"))
@@ -691,7 +691,7 @@ _TBUI_ConfigInlineFullSaveAdmission(Path) {
 	}
 }
 _TBUI_ConfigInlineFullSaveAdmissionProbe() {
-	_FMS_WithSource("config_writer_inline_admission", '[hotstrings]`nautocorrection = { caps = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
+	_FMS_WithSource("config_writer_inline_admission", '[hotstrings]`nautocorrection = { names = { enabled = "true", time_activation_seconds = 0.25, future = "retain" } } # preserve`n',
 		_TBUI_ConfigInlineFullSaveAdmission)
 }
 Test("toml config document writer: native full-save probe retains strict refusal and observes exact semantic no-op", _TBUI_ConfigInlineFullSaveAdmissionProbe)
@@ -727,3 +727,30 @@ _TBUI_ConfigNewSiblingRetainsNativeReadability() {
 }
 Test("toml config document writer: new dynamic peer headers retain native readback (config-semantic-native-readback)",
 	_TBUI_ConfigNewSiblingRetainsNativeReadability)
+
+; Independent complete images cover first publication without a sibling header.
+; Both the semantic document and the native flat reader must observe the value.
+_TBUI_ConfigNewNamespaceRetainsNativeReadability() {
+	for Section in ["script", "shortcuts.script_control", "hotstrings.personal.first"] {
+		for Prefix in ["", '[private]`nfuture = "keep" # retained`n'] {
+			Path := _TBUI_NewPath(), Source := Chr(0xFEFF) . Prefix
+			Expected := Source . "[" . Section . "]`nenabled = false`n"
+			try {
+				AssertTrue(FSWriteCreateDurable(Path, Source) == 1)
+				Updates := [{ Section: Section, Key: "enabled", Value: TOML_Bool(false) }]
+				Candidate := TOML_BuildConfigUpdatedContent(Path, Updates)
+				AssertEqual("ok", Candidate["status"])
+				AssertEqual(Expected, Candidate["content"], "first publication uses the independently specified native section")
+				AssertTrue(FSUtf8ExactMatches(Path, Source), "preparation preserves exact physical source")
+				AssertTrue(TOML_ConfigBatchWrite(Path, Updates))
+				AssertTrue(FSUtf8ExactMatches(Path, Expected))
+				AssertEqual(0, TOML_Read(Path, Section, "enabled", "missing"),
+					"the real fresh flat reader must distinguish false from a missing new namespace")
+				AssertTrue(TOML_SameValue(TOML_ParseDocument(Expected), TOML_ParseDocument(FSReadUtf8Exact(Path))))
+				AssertEqual(Expected, TOML_BuildConfigUpdatedContent(Path, Updates)["content"])
+			} finally FSDelete(Path)
+		}
+	}
+}
+Test("toml config document writer: first namespace publication retains native readback (config-semantic-native-readback)",
+	_TBUI_ConfigNewNamespaceRetainsNativeReadability)
