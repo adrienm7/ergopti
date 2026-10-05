@@ -50,6 +50,95 @@ local function with_writer_read_receipts(body, status, test)
 	if not ok then error(err, 0) end
 end
 
+--- Models CLI exit receipts while retaining the production builder and writer.
+local function with_category_commands(refusal, test)
+	local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+	local previous_execute, previous_popen = os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	assert(file:write("existing native database fixture") and file:close())
+	local commands = {}
+	os.execute = function() return 0 end
+	io.popen = function(command)
+		local content, status = "", 0
+		if command:find("SELECT sql FROM sqlite_master", 1, true) then
+			content = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n"
+		else
+			commands[#commands + 1] = command
+			if refusal == "score" and command:find("INSERT OR REPLACE INTO meta", 1, true) then status = 7 end
+			if refusal == "category" and command:find("UPDATE agg_app_day", 1, true) then status = 7 end
+		end
+		return {
+			read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+			close = function() return true end,
+		}
+	end
+	local ok, reason = xpcall(function()
+		helpers.assert_true(writer.open_db(path))
+		test(writer, commands)
+	end, debug.traceback)
+	os.execute, io.popen = previous_execute, previous_popen
+	writer.close_db()
+	os.remove(path)
+	if not ok then error(reason, 0) end
+end
+
+helpers.describe("linux-sqlite-category-transaction", function()
+	it("linux-sqlite-category-transaction: score receipt refusal cannot acknowledge an edit", function()
+		with_category_commands("score", function(writer)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), false)
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: category and score use one checked native transaction", function()
+		with_category_commands(nil, function(writer, commands)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), true)
+			helpers.assert_eq(#commands, 1)
+			helpers.assert_contains(commands[1], "BEGIN;")
+			helpers.assert_contains(commands[1], "UPDATE agg_app_day")
+			helpers.assert_contains(commands[1], "INSERT OR REPLACE INTO meta")
+			helpers.assert_contains(commands[1], "COMMIT;")
+			helpers.assert_contains(commands[1], "'-bail'")
+			helpers.assert_contains(commands[1], "ERGOPTI_SQL_EXIT_STATUS=")
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: UTF-8 and quote bytes retain canonical SQL escaping", function()
+		with_category_commands(nil, function(writer, commands)
+			helpers.assert_eq(writer.set_app_category("owned '", "été ' app", "Updated ' été", 1), true)
+			local all = table.concat(commands, "\n")
+			helpers.assert_contains(all, "device_id = 'owned '''")
+			helpers.assert_contains(all, "app = 'été '' app'")
+			helpers.assert_contains(all, "category = 'Updated '' été'")
+			helpers.assert_contains(all, "'app_score.été '' app'")
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: absent and fractional scores preserve their existing defaults and floors", function()
+		for _, case in ipairs({ { false, "0" }, { -0.25, "-1" }, { "1.9", "1" } }) do
+			with_category_commands(nil, function(writer, commands)
+				local score = case[1] ~= false and case[1] or nil
+				helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", score), true)
+				helpers.assert_contains(table.concat(commands, "\n"), "'app_score.owned-app', '" .. case[2] .. "'")
+			end)
+		end
+	end)
+
+	it("linux-sqlite-category-transaction: category receipt refusal remains a failed edit", function()
+		with_category_commands("category", function(writer)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), false)
+		end)
+	end)
+
+	it("linux-sqlite-category-transaction: invalid labels refuse before any native command", function()
+		with_category_commands(nil, function(writer, commands)
+			helpers.assert_eq(writer.set_app_category("owned", "", "Updated", 1), false)
+			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "", 1), false)
+			helpers.assert_eq(#commands, 0)
+		end)
+	end)
+end)
+
 helpers.describe("linux-sqlite-read-receipts", function()
 	for _, status in ipairs({ 1, 7, 127, 137, 255, "missing" }) do
 		it("linux-sqlite-read-receipts: migration rows reject receipt " .. status, function()
