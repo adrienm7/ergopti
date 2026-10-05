@@ -2978,11 +2978,22 @@ The unintegrated Linux HTTP producer is preserved in the
 [Linux continuation](handovers/2026-10-04-group6-linux/README.md), with exact
 sources, preimages, independent controls and patches. Actual diagnostic privacy
 controls pass 12/12 after six causal failures, with eight bounded-diagnostic
-controls passing. Independent review still blocks integration on public owned
+controls passing. Independent review identified defects in public owned
 cancellation/activity, admission behind cleanup debt, supported resolver failure
-fallback and total-deadline publication/admission. These preparations do not
-complete Linux enterprise-network coverage; preserve the original assertions,
-refresh native-core ownership and qualify the final composition before delivery.
+fallback and total-deadline publication/admission. A separate corrected
+six-blocker continuation now preserves these corrections and four additional
+timer/reentrancy review controls without weakening original assertions.
+Its 101 model/native-port controls and four actual LuaJIT/luv timer controls
+pass without skips; the unchanged producer fails eleven of thirteen public
+cases. The native timer cases restore their initial handle inventory and spawn
+no child. These results do not qualify the final GIO/curl/PAC/CONNECT producer.
+The generated archive binds exact sources, preimages, review and typed receipts;
+its older extracted engine is retained only for causal replay and must never
+replace the newer fix/linux core. Native-owner composition, final network and
+privacy controls, E2E, packaging and installation remain unexecuted for this
+packet. Per-hop PAC, retry leases, installer/pull and enterprise CA/auth/WPAD
+remain pending. Refresh ownership and qualify the final composition before
+delivery; item 62 and transversal requirements 16/38 stay open.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
