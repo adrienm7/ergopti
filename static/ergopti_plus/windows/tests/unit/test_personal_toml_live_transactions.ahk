@@ -745,9 +745,12 @@ _PT102_WithCase(Mode, Body) {
 		if Mode == "metadata" {
 			RawSeed := Chr(0xFEFF) . FSReadUtf8Exact(Path)
 			RawSeed := StrReplace(RawSeed, "[_meta]`r`n",
-				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , , 1)
-			RawSeed := StrReplace(RawSeed, "[_meta.sections.alpha]`r`n",
-				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n', , , 1)
+				'[_meta]`r`ndelay = 0.125`r`ncolor = "#123456"`r`npriority = 23`r`nshow_tooltip = false`r`n', , &FileMatches, 1)
+			; The initial writer emits no section-override table without existing overrides.
+			RawSeed := StrReplace(RawSeed, "[[alpha]]`r`n",
+				'[_meta.sections.alpha]`r`ndelay = 0.75`r`ncolor = "#ABCDEF"`r`npriority = 42`r`nshow_tooltip = true`r`n[[alpha]]`r`n', , &SectionMatches, 1)
+			if FileMatches != 1 || SectionMatches != 1
+				throw Error("opening-source fixture metadata anchors must each occur once")
 			if !FSWriteDurable(Path, RawSeed)
 				throw Error("opening-source fixture metadata publication refused")
 		}
