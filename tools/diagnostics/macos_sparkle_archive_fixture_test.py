@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
 import struct
 import subprocess
 import sys
@@ -758,6 +759,123 @@ class NativeDirectoryReasonControls(unittest.TestCase):
                 "stage": "library",
             },
         )
+
+
+@unittest.skipUnless(os.name == "posix", "Graceful native SIGTERM requires POSIX")
+class NativeIdleConnectionRetirementControls(unittest.TestCase):
+    """Real accepted sockets must not hold TERM retirement before do_GET."""
+
+    # Instrument only entry into the actual native accepted-socket handler.
+    # The original handler, socket operations, timeouts and server stay real.
+    OBSERVED_SERVER = """
+import http.server, importlib.util, os, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("observed_sparkle", sys.argv[1])
+helper = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(helper)
+root, nonce = Path(sys.argv[2]), sys.argv[3]
+original = http.server.HTTPServer.finish_request
+def witnessed(server, request, address):
+    helper.publish(root / "accepted.json", {"nonce": nonce, "pid": os.getpid()})
+    return original(server, request, address)
+http.server.HTTPServer.finish_request = witnessed
+sys.exit(helper.entrypoint(["serve", str(root), nonce]))
+"""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="sparkle-idle-retirement-")).resolve()
+        self.child = None
+        self.connection = None
+        self.passed = False
+
+    def tearDown(self):
+        # Every acquired owner receives retirement even if another close fails.
+        client_closed = self.connection is None
+        if self.connection is not None:
+            try:
+                self.connection.close()
+                client_closed = self.connection.fileno() == -1
+            except OSError:
+                client_closed = False
+        child_closed = self.child is None
+        forced = False
+        if self.child is not None:
+            if self.child.poll() is None:
+                self.child.terminate()
+            try:
+                self.child.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                forced = True
+                self.child.kill()
+                self.child.communicate(timeout=5)
+            child_closed = (
+                self.child.returncode is not None
+                and self.child.stdout.closed
+                and self.child.stderr.closed
+            )
+        owner = {
+            "pid": self.child.pid if self.child is not None else None,
+            "child_closed": child_closed,
+            "client_closed": client_closed,
+            "forced": forced,
+            "exit_status": self.child.returncode if self.child is not None else None,
+        }
+        (self.root / "control-retirement.json").write_text(json.dumps(owner, sort_keys=True) + "\n")
+        if client_closed and child_closed and not forced and self.passed:
+            shutil.rmtree(self.root)
+        else:
+            print(
+                "Failed idle-server control inputs retained at " + str(self.root), file=sys.stderr
+            )
+        self.assertTrue(
+            client_closed and child_closed and not forced,
+            "Owned idle-server retirement debt; inputs retained",
+        )
+
+    def receipt(self, name):
+        path = self.root / (name + ".json")
+        deadline = time.monotonic() + 5
+        while not path.exists() and self.child.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertTrue(path.exists(), "Actual native socket receipt must exist: " + name)
+        packet = json.loads(path.read_bytes())
+        self.assertEqual(packet["nonce"], NONCE)
+        self.assertEqual(packet["pid"], self.child.pid)
+        return packet
+
+    def retire_accepted_connection(self, initial_bytes):
+        (self.root / "feed.xml").write_bytes(b"independent bounded feed\n")
+        self.child = subprocess.Popen(
+            [sys.executable, "-c", self.OBSERVED_SERVER, str(HELPER), str(self.root), NONCE],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        started = self.receipt("server-start")
+        self.connection = socket.create_connection(("127.0.0.1", started["port"]), timeout=5)
+        if initial_bytes:
+            self.connection.sendall(initial_bytes)
+        # This is actual accept ownership before the original handler blocks.
+        self.receipt("accepted")
+        self.child.terminate()
+        try:
+            stdout, stderr = self.child.communicate(timeout=7)
+        except subprocess.TimeoutExpired:
+            self.fail("An accepted pre-request socket exceeded the original TERM retirement budget")
+        self.assertEqual((self.child.returncode, stdout, stderr), (0, b"", b""))
+        terminal = self.receipt("server-retired")
+        self.assertEqual(terminal, {"nonce": NONCE, "pid": self.child.pid, "requests": 0})
+        self.assertEqual(
+            self.connection.recv(1), b"", "The server must physically close its accepted socket"
+        )
+        self.connection.close()
+        self.connection = None
+        self.passed = True
+
+    def testActualIdleAcceptedSocketCannotBlockTERMExitAndTerminalAcknowledgement(self):
+        self.retire_accepted_connection(b"")
+
+    def testActualPartialHeadersCannotBlockTERMExitAndTerminalAcknowledgement(self):
+        self.retire_accepted_connection(b"GET /feed.xml HTTP/1.1\r\nHost: localhost\r\n")
 
 
 if __name__ == "__main__":

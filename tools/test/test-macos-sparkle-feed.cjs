@@ -927,7 +927,7 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 23 tests in /);
+	assert.match(result.stderr, /Ran 25 tests in /);
 	const skipped = process.platform === 'win32' ? 5 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,

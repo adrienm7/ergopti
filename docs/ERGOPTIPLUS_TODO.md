@@ -2026,6 +2026,19 @@ unchanged Python admission, then requires replacements to fail. All existing
 Swift assertions and executable-path comparisons remain intact. Swift
 compilation, real census and complete update/install acceptance remain pending.
 
+Native run 37263453529 passes shared checks and the macOS unit/stubbed E2E
+prerequisites but fails Swift acceptance. Brew reaches the deny-removal positive
+control: send status is zero but the unchanged reply oracle fails; the reply
+read/length/nonce cause remains unknown. Sparkle reports server retirement
+refusals; the runner's accepted-socket state and functional receipt are unknown.
+The server now applies its existing five-second I/O timeout before the first
+request/header read. Two independent real idle/partial-header cases exceed the
+old seven-second retirement budget and pass with exact terminal/exit/socket
+receipts after correction. All twenty-three original Python tests remain intact;
+the candidate passes twenty-five with no skips. This proves the source bug, not
+the unseen runner socket state. Complete native acceptance and downstream
+packaging/install remain pending; no item is closed.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
