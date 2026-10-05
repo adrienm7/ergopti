@@ -2461,7 +2461,14 @@
 			"platforms": [
 				"ahk"
 			],
-			"reason_key": "platform_reason.touchpad_stack_is_per_driver"
+			"reason_key": "platform_reason.touchpad_stack_is_per_driver",
+			"status_rows": {
+				"tap_group_boundary": [
+					{
+						"type": "---"
+					}
+				]
+			}
 		},
 		{
 			"type": "list",

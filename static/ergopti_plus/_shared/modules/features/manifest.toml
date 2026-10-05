@@ -5829,6 +5829,7 @@ type = "list"
 id = "gesture_slots_ahk"
 platforms = ["ahk"]
 reason_key = "platform_reason.touchpad_stack_is_per_driver"
+status_rows.tap_group_boundary = [{ type = "---" }]
 
 # One flat list rather than the per-finger-count groups macOS uses. The slots come
 # from gestures.DEFAULT_GESTURES, which is keyed by slot name and not by finger
