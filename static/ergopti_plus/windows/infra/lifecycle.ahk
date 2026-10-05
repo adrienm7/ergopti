@@ -470,6 +470,8 @@ Ergopti_OnSuspendEnter() {
 	Transition := LifecycleTransitionBegin("suspend")
 	if IsSet(ProgramActions_Stop)
 		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
+	if IsSet(UserHotstringsInvalidate)
+		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"))
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
@@ -904,6 +906,8 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return _LifecycleRefuseShutdown("a synthetic mouse button release remains pending")
 		}
+		if IsSet(UserHotstringsInvalidate) && !UserHotstringsInvalidate("shutdown-preflight")
+			return _LifecycleRefuseShutdown("a programmable hotstring process or stage remains owned")
 		NavOwnerReady := false
 		try NavOwnerReady := LLM_NavEventOwner_PrepareShutdown()
 		catch as Err

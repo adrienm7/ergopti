@@ -35,6 +35,7 @@ local HoldOptions = require("tap_hold.hold_options")
 local KeyCatalog = require("tap_hold.key_catalog")
 local Manifest = require("infra.manifest_reader")
 local Outdated = require("config_outdated")
+local Shapes = require("platform.remap.tap_hold_shapes")
 
 local LOG = "platform.remap.tap_hold_loader"
 
@@ -58,14 +59,21 @@ local USER_FILE_NAME = "tap_hold.toml"
 --- Reads and decodes one TOML file.
 --- @param path string
 --- @return table|nil parsed, string|nil err ("absent" when the file does not exist)
-local function read_toml(path)
+local function read_toml(path, with_shapes)
 	local fh = io.open(path, "r")
 	if not fh then return nil, "absent" end
 	local text = fh:read("*a")
 	fh:close()
-	local parsed = TomlCodec.decode(text)
+	local parsed, shapes
+	if with_shapes then
+		parsed, shapes = TomlCodec.decode_with_shapes(text)
+	else
+		-- Shipped data retains the established codec model; only user source
+		-- needs the optional namespace identity receipt.
+		parsed = TomlCodec.decode(text)
+	end
 	if type(parsed) ~= "table" then return nil, "malformed" end
-	return parsed
+	return parsed, nil, shapes
 end
 
 -- The hold fields and how each one is canonicalised.
@@ -167,13 +175,13 @@ end
 ---   hold_picker = table|nil, catalog = table } `catalog` is this driver's column
 ---   of the shared key catalogue: the keys the tray lists, in order, with hands.
 function M.load(defaults_path, user_path)
-	local user, user_err = nil, nil
+	local user, user_err, shapes = nil, nil, nil
 	if user_path then
-		user, user_err = read_toml(user_path)
+		user, user_err, shapes = read_toml(user_path, true)
 		if user_err == "absent" then user_err = nil end
 		if user_err then Logger.error(LOG, "User tap_hold.toml '%s' is %s — tap-holds remain neutral.", user_path, user_err) end
 	end
-	return M.load_document(defaults_path, user, user_err, user_path)
+	return M.load_document(defaults_path, user, user_err, user_path, shapes)
 end
 
 --- Builds the effective configuration from an already decoded user document,
@@ -184,22 +192,39 @@ end
 --- @param user table|nil Decoded user document; nil means no user file.
 --- @param user_err string|nil Why the user file could not be read.
 --- @param user_path string|nil Where the user document lives, named by warnings.
+--- @param shapes table|nil Canonical receipt bound to this decoded document.
 --- @return table Same shape as M.load(), plus `user_fields`: key id -> the
 ---   fields the user file sets.
-function M.load_document(defaults_path, user, user_err, user_path)
+function M.load_document(defaults_path, user, user_err, user_path, shapes)
+	assert(shapes == nil or (type(shapes) == "table" and type(shapes.arrays) == "table"
+		and shapes.document == user), "tap-hold shape receipt belongs to another document")
 	local defaults = read_defaults(defaults_path)
 	local base = type(defaults.tap_hold) == "table" and type(defaults.tap_hold.keys) == "table"
 		and defaults.tap_hold.keys or {}
-	local section = user and type(user.tap_hold) == "table" and user.tap_hold or {}
-	local overrides = type(section.keys) == "table" and section.keys or {}
+	local user_file = user_path or USER_FILE_NAME
+	local function table_or_absent(value, path)
+		if value == nil then return {} end
+		if Shapes.is_table(value, shapes) then return value end
+		Outdated.report_in_file(user_file, path, "it must be a table, not a scalar or array; repair the stored entry by hand")
+		return {}
+	end
+	local section = table_or_absent(user and user.tap_hold, { "tap_hold" })
+	local overrides = table_or_absent(section.keys, { "tap_hold", "keys" })
+	local global = {}
+	for _, field in ipairs({ "enabled", "inherit_defaults" }) do
+		local value = section[field]
+		if value ~= nil and type(value) ~= "boolean" then
+			Outdated.report_in_file(user_file, { "tap_hold", field }, "it must be true or false; the stored value is ignored")
+		else
+			global[field] = value
+		end
+	end
 	-- Shipped data like the hold picker: a user file cannot move a key.
 	local catalog = KeyCatalog.for_platform(defaults, "linux")
 	local remappable = {}
 	for _, entry in ipairs(catalog) do remappable[entry.id] = true end
-	local user_file = user_path or USER_FILE_NAME
-
 	local keys = {}
-	if section.inherit_defaults == true then
+	if global.inherit_defaults == true then
 		for key_id, fields in pairs(base) do
 			if type(fields) == "table" then
 				keys[key_id] = {}
@@ -212,7 +237,7 @@ function M.load_document(defaults_path, user, user_err, user_path)
 		if not remappable[key_id] then
 			Outdated.report_in_file(user_file, { "tap_hold", "keys", tostring(key_id) },
 				"the Linux engine has no such tap-hold key")
-		elseif type(override) == "table" then
+		elseif Shapes.is_table(override, shapes) then
 			local merged = keys[key_id] or {}
 			user_fields[key_id] = {}
 			-- A modifier hold and a layer hold exclude each other: the user's
@@ -229,6 +254,9 @@ function M.load_document(defaults_path, user, user_err, user_path)
 				end
 			end
 			keys[key_id] = merged
+		else
+			Outdated.report_in_file(user_file, { "tap_hold", "keys", key_id },
+				"it must be a table, not a scalar or array; repair the stored entry by hand")
 		end
 	end
 	-- The hold picker's catalogue is the shipped one: a user file changes what a
@@ -250,7 +278,7 @@ function M.load_document(defaults_path, user, user_err, user_path)
 	end
 
 	return {
-		enabled = section.enabled == true or (section.enabled == nil and Manifest.default_for("tap_holds.enabled")),
+		enabled = global.enabled == true or (global.enabled == nil and Manifest.default_for("tap_holds.enabled")),
 		keys = keys,
 		user_error = user_err,
 		user_path = user_file,
@@ -285,10 +313,10 @@ end
 --- @return table|nil report `{ enabled = boolean, keys = { [id] = "recommended"|"customised" } }`
 --- @return string|nil err Why the file could not be read.
 function M.key_report(defaults_path, user_path)
-	local user, user_err = read_toml(user_path)
+	local user, user_err, shapes = read_toml(user_path, true)
 	if user_err == "absent" then user, user_err = nil, nil end
 	if user_err then return nil, "'" .. tostring(user_path) .. "' is " .. user_err end
-	local loaded = M.load_document(defaults_path, user, nil)
+	local loaded = M.load_document(defaults_path, user, nil, user_path, shapes)
 	local recommended = M.load_document(defaults_path,
 		{ tap_hold = { keys = M.preset_keys(defaults_path) } }, nil).keys
 	local keys = {}

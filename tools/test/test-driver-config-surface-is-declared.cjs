@@ -72,8 +72,15 @@ const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
  * plus the set of declared section names.
  * @returns {{keys: Map<string, Set<string>>, sections: Map<string, Set<string>>}}
  */
-function parseManifest() {
-	const lines = fs.readFileSync(MANIFEST, 'utf8').split(/\r?\n/);
+function parseManifest(source = fs.readFileSync(MANIFEST, 'utf8')) {
+	const lines = source.split(/\r?\n/);
+	const records =
+		parseToml(
+			source.replace(
+				/^\[\[features\.([^\]]+)\]\]$/gm,
+				(_header, section) => `[[declarations]]\nsection_path = "${section}"`
+			)
+		).declarations || [];
 	const sectionPlatforms = new Map();
 	const keys = new Map();
 
@@ -129,7 +136,18 @@ function parseManifest() {
 		for (const e of entries) {
 			if (!e.id) continue;
 			const eff = e.platforms || sectionPlatforms.get(section) || new Set();
-			for (const p of eff) declared.get(p)?.add(`${section}.${e.id}`);
+			const record = records.find((value) => value.section_path === section && value.id === e.id);
+			const fields =
+				record?.type === 'feature'
+					? new Set([
+							...Object.keys(record.default || {}),
+							...Object.keys(record.recommended || {})
+						])
+					: new Set();
+			for (const p of eff) {
+				declared.get(p)?.add(`${section}.${e.id}`);
+				for (const field of fields) declared.get(p)?.add(`${section}.${e.id}.${field}`);
+			}
 		}
 	}
 	return declared;
@@ -189,6 +207,33 @@ function isDeclaredSurface(surface, known, dynamic = []) {
 
 // Regression oracles: concatenation is a namespace, but a literal trailing dot,
 // unknown child, similarly named section or wrong platform is never exempted.
+const compositeProbe = parseManifest(`
+[sections.hotstrings.dynamic]
+platforms = ["hs"]
+[[features.hotstrings.dynamic]]
+id = "user_code"
+type = "feature"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+`);
+for (const field of ['enabled', 'time_activation_seconds']) {
+	assert.equal(
+		isDeclaredSurface(`hotstrings.dynamic.user_code.${field}`, compositeProbe.get('hs')),
+		true
+	);
+	assert.equal(
+		isDeclaredSurface(`hotstrings.dynamic.user_code.${field}`, compositeProbe.get('linux')),
+		false
+	);
+}
+assert.equal(
+	isDeclaredSurface('hotstrings.dynamic.user_code.arbitrary', compositeProbe.get('hs')),
+	false
+);
+assert.equal(
+	isDeclaredSurface('hotstrings.dynamic.other.enabled', compositeProbe.get('hs')),
+	false
+);
 assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys." .. name)'), [
 	'shortcuts.keys.*'
 ]);
@@ -334,6 +379,49 @@ function isCanonicalParameterWrite(
 		/for action_name in pairs\(M\.ACTION_PARAMETER_SPECS\)/.test(storageOwner) &&
 		/for action_name, meta in pairs\(Catalogue\.actions\)/.test(storageOwner) &&
 		/M\.ACTION_PARAMETER_SPECS\[action_name\] = meta\.parameter/.test(storageOwner)
+	);
+}
+
+/**
+ * Verifies the shared recovery owner's actual conditional-writer argument route.
+ * Only the internal mutation proofs inject another source root; production always
+ * reads the helper shipped beside the driver, and missing source grants no claim.
+ * @param {string} sourceRoot ErgoptiPlus source directory.
+ * @returns {boolean} Whether the exact helper retains the publication route.
+ */
+function hasSecondaryRecoveryTransport(sourceRoot) {
+	const helperPath = path.join(sourceRoot, '_shared/lua/hotstrings/publication_recovery.lua');
+	if (!fs.existsSync(helperPath)) return false;
+	const helper = fs.readFileSync(helperPath, 'utf8');
+	const constructor = /^function M\.new\(options\)\r?\n[\s\S]*?^end\b/m.exec(helper);
+	if (!constructor) return false;
+	const body = constructor[0];
+	const publish =
+		/^\tlocal function publish\(path, candidate, adapter, expected, on_error, publisher\)\r?\n[\s\S]*?^\tend\b/m.exec(
+			body
+		);
+	const inverse = /^\tlocal function settle_pending\(\)\r?\n[\s\S]*?^\tend\b/m.exec(body);
+	if (!publish || !inverse) return false;
+	return (
+		/^local function copy_source\(source\)\r?\n\s*return \{ status = source\.status, content = source\.content \}\s*\r?\nend\b/m.test(
+			helper
+		) &&
+		/^\tlocal files = options\.files\s*$/m.test(body) &&
+		/^\tlocal writer = options\.writer or require\("toml_codec\.writer"\)\s*$/m.test(body) &&
+		/adapter ~= files/.test(publish[0]) &&
+		/local record = \{ path = path, candidate = candidate, expected = copy_source\(expected\),\s+on_error = on_error, attempt = attempt, publisher = publisher or writer\.publish_if_unchanged \}/.test(
+			publish[0]
+		) &&
+		/^\t\tlocal called, acknowledged, detail, native = pcall\(record\.publisher,\s+path, candidate, files, record\.expected, on_error\)/m.test(
+			publish[0]
+		) &&
+		/inverse = \{ path = record\.path, expected = copy_source\(view\.source\),\s+candidate = record\.expected\.content, on_error = record\.on_error, attempt = record\.attempt \}/.test(
+			inverse[0]
+		) &&
+		/^\t\tlocal called, acknowledged, detail, native = pcall\(record\.publisher,\s+inverse\.path, inverse\.candidate, files, inverse\.expected, inverse\.on_error\)/m.test(
+			inverse[0]
+		) &&
+		/return \{ begin = begin, finish = finish, publish = publish, retry = retry,/.test(body)
 	);
 }
 

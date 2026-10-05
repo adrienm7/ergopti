@@ -3,6 +3,8 @@
 --- Pure manifest projections shared by configuration readers and transactions.
 --- Neutral absence, explicit recommendations and scope ownership are separate.
 local M = {}
+local PersonalFiles = require("hotstrings.personal_files")
+local KeyPath = require("toml_codec.key_path")
 
 local function clone(value)
 	if type(value) ~= "table" then return value end
@@ -24,10 +26,13 @@ local function belongs(path, prefix)
 end
 
 local function row(path, value, remove)
-	local section, key = path:match("^(.*)%.([^%.]+)$")
-	assert(section and key, "configuration paths require a section and key")
-	if remove then return { section = section, key = key, delete = true } end
-	return { section = section, key = key, value = clone(value) }
+	local segments = KeyPath.parse(path, true)
+	assert(segments and #segments > 1, "configuration paths require a section and key")
+	local key = table.remove(segments)
+	local section = KeyPath.render(segments)
+	local literal = key:find(".", 1, true) and PersonalFiles.preference_default(path) ~= nil and true or nil
+	if remove then return { section = section, key = key, delete = true, literal_key = literal } end
+	return { section = section, key = key, value = clone(value), literal_key = literal }
 end
 
 --- Builds a pure contract from one platform's generated manifest.
@@ -71,6 +76,10 @@ function M.new(manifest)
 			if index[parent] then return nil end
 			parent = parent:match("^(.*)%.[^%.]+$")
 		end
+		-- Personal source identities have a narrower neutral posture than generic
+		-- dynamic groups. Native admission still owns whether a source can run.
+		local personal = PersonalFiles.preference_default(path)
+		if personal ~= nil then return { default = personal, recommended = personal } end
 		for _, scope in pairs(manifest.scopes) do
 			for _, definition in ipairs(scope.dynamic_defaults or {}) do
 				if path:sub(1, #definition.prefix + 1) == definition.prefix .. "." then

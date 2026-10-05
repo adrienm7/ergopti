@@ -296,6 +296,15 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. _ActPickWeb_Kv("platform", "ahk") . ","
 		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
+		. '"programProviders":{"unavailable":true},'
+		. '"programProviderStrings":{'
+		. _ActPickWeb_Kv("label", t("dialog.action_picker.program_provider_label")) . ","
+		. _ActPickWeb_Kv("manual", t("dialog.action_picker.program_provider_manual")) . ","
+		. _ActPickWeb_Kv("hint", t("dialog.action_picker.program_provider_hint")) . ","
+		. _ActPickWeb_Kv("unavailable", t("dialog.action_picker.program_provider_unavailable")) . ","
+		. _ActPickWeb_Kv("changed", t("dialog.action_picker.program_provider_changed")) . ","
+		. _ActPickWeb_Kv("empty", t("dialog.action_picker.program_provider_empty")) . ","
+		. _ActPickWeb_Kv("truncated", t("dialog.action_picker.program_provider_truncated")) . "},"
 		. '"promptChoices":' . _ActPickWeb_PromptChoicesJson() . ","
 		. '"visionChoices":' . _ActPickWeb_VisionChoicesJson() . ","
 		. '"languageChoices":' . _ActPickWeb_LanguageChoicesJson() . ","

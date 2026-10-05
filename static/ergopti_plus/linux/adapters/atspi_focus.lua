@@ -15,6 +15,7 @@ local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
 local Timings = require("infra.timings")
 local Interpreter = require("process.interpreter")
+local NativeIdentity = require("adapters.atspi_native_identity")
 
 local LOG = "adapters.atspi_focus"
 local STATE_ACTIVE = 1
@@ -26,6 +27,7 @@ local _backend_for_test = nil
 local _native_backend = nil
 local _native_attempted = false
 local _command_runner_for_test = nil
+local _last_snapshot = nil
 
 
 
@@ -111,6 +113,11 @@ local function load_native_backend()
 	end
 	function backend.identity(node)
 		local identity = { name = "", attributes = {} }
+		local native = NativeIdentity.capture and NativeIdentity.capture(node)
+		if native then
+			identity.native_bus_name = native.native_bus_name
+			identity.native_object_path = native.native_object_path
+		end
 		local name_error = ffi.new("void *[1]")
 		local name = atspi.atspi_accessible_get_name(node, name_error)
 		if release_error(name_error) then return nil end
@@ -245,6 +252,7 @@ local function traverse(backend)
 		return nil, false
 	end
 	if failed or focused_count ~= 1 then return nil, false, nil end
+	focused_identity.active_scope = #scoped > 0
 	return focused_role, true, focused_identity
 end
 
@@ -267,6 +275,9 @@ function M._get_native_snapshot()
 		role = role,
 		name = type(identity) == "table" and identity.name or "",
 		attributes = type(identity) == "table" and identity.attributes or {},
+		active_scope = type(identity) == "table" and identity.active_scope == true,
+		native_bus_name = type(identity) == "table" and identity.native_bus_name or nil,
+		native_object_path = type(identity) == "table" and identity.native_object_path or nil,
 	}, true
 end
 
@@ -285,7 +296,7 @@ end
 --- The native call is isolated behind the same hard deadline as get_role().
 --- @return table|nil snapshot { role, name, attributes }
 --- @return boolean conclusive
-function M.get_snapshot()
+local function read_snapshot()
 	if _backend_for_test then
 		local role, conclusive, identity = traverse(_backend_for_test)
 		if not conclusive then return nil, false end
@@ -293,6 +304,9 @@ function M.get_snapshot()
 			role = role,
 			name = type(identity) == "table" and identity.name or "",
 			attributes = type(identity) == "table" and identity.attributes or {},
+		active_scope = type(identity) == "table" and identity.active_scope == true,
+		native_bus_name = type(identity) == "table" and identity.native_bus_name or nil,
+		native_object_path = type(identity) == "table" and identity.native_object_path or nil,
 		}, true
 	end
 
@@ -317,6 +331,38 @@ function M.get_snapshot()
 		return nil, false
 	end
 	return snapshot, true
+end
+
+
+--- Copies admitted scalar identity fields without sharing caller-owned tables.
+--- @param snapshot table Bounded helper result.
+--- @return table copy Detached receipt.
+local function copy_snapshot(snapshot)
+	local attributes = {}
+	for key, value in pairs(snapshot.attributes or {}) do
+		if type(key) == "string" and type(value) == "string" then attributes[key] = value end
+	end
+	return { role = snapshot.role, name = snapshot.name, attributes = attributes,
+		active_scope = snapshot.active_scope == true,
+		native_bus_name = type(snapshot.native_bus_name) == "string" and snapshot.native_bus_name or nil,
+		native_object_path = type(snapshot.native_object_path) == "string" and snapshot.native_object_path or nil }
+end
+
+--- Rechecks focus in the isolated helper, invalidating old receipts on failure.
+--- @return table|nil snapshot
+--- @return boolean conclusive
+function M.get_snapshot()
+	_last_snapshot = nil
+	local snapshot, conclusive = read_snapshot()
+	if conclusive ~= true then return nil, false end
+	_last_snapshot = copy_snapshot(snapshot)
+	return copy_snapshot(_last_snapshot), true
+end
+
+--- Reads only the receipt already obtained by the daemon's privacy probe.
+--- @return table|nil snapshot Detached cached native focus identity.
+function M.cached_snapshot()
+	return _last_snapshot and copy_snapshot(_last_snapshot) or nil
 end
 
 --- Installs an ownership-compatible tree backend for tests.

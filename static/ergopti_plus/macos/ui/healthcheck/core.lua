@@ -226,6 +226,11 @@ end
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
 	{
+		id       = "adapters.program_providers",
+		contract = { "create" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.owned_program_runner",
 		contract = { "available", "spawn" },
 		wired    = true,

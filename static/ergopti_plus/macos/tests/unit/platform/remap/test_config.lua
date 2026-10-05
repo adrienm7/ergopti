@@ -141,12 +141,24 @@ local function encoded_document(state, merge_existing)
 	local codec = package.loaded["infra.toml.codec"]
 	local encoded = nil
 	local original_encode = codec.encode
+	local original_decode_shapes, original_encode_shapes = codec.decode_with_shapes, codec.encode_with_shapes
+	-- Keep this model-only capture seam on the fake APIs its caller controls.
+	-- Actual receipt authority is tested through the real codec and private files.
+	codec.decode_with_shapes = function(source)
+		local document = codec.decode(source)
+		return document, { document = document, arrays = {}, numbers = {}, strings = {} }
+	end
+	codec.encode_with_shapes = function(document, receipt)
+		assert(receipt.document == document, "fixture receipt must own this document")
+		return codec.encode(document)
+	end
 	codec.encode = function(value)
 		encoded = value
 		error("stop before the disk write")
 	end
 	pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", merge_existing ~= true)
 	codec.encode = original_encode
+	codec.decode_with_shapes, codec.encode_with_shapes = original_decode_shapes, original_encode_shapes
 	return encoded
 end
 
@@ -204,7 +216,7 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 		end
 	end)
 
-	helpers.it("drops the legacy enabled key and keeps the rest of the file on save", function()
+	helpers.it("preserves the retired enabled key and the rest of the file until explicit cleanup", function()
 		local file_system = package.loaded["adapters.file_system"]
 		local codec = package.loaded["infra.toml.codec"]
 		local original_read, original_decode = file_system.read_with_status, codec.decode
@@ -218,8 +230,11 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 				state.enabled = switch
 				local encoded = encoded_document(state, true)
 				helpers.assert_true(type(encoded) == "table")
-				helpers.assert_true(encoded.karabiner == nil or encoded.karabiner.enabled == nil,
-					"a save must retire the key older builds wrote")
+				helpers.assert_eq(encoded.karabiner.enabled, false,
+					"a retired key remains until explicit cleanup")
+				helpers.assert_eq(encoded, {
+					karabiner = { enabled = false, integration_enabled = switch }, personal = { kept = true },
+				}, "the complete independently specified source model survives the ordinary save")
 				helpers.assert_eq(encoded.personal and encoded.personal.kept, true)
 			end
 		end)

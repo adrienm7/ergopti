@@ -879,7 +879,8 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 			local config = fake_config({})
 			local asked, toggles, redraws = {}, 0, 0
 			config.toggle_group = function() toggles = toggles + 1; return true end
-			if outcome ~= "missing" then config.set_category_gates_enabled = function(ids, enabled)
+			if outcome ~= "missing" then config.set_extension_sections_enabled = function(ids, bound, enabled)
+				helpers.assert_eq(bound, {}, "the gate-only fixture has no bound sections")
 				asked[#asked + 1] = { ids = ids, enabled = enabled }
 				if outcome == "throw" then error("inert batch owner refusal") end
 				if outcome == "nil" then return nil end

@@ -9,6 +9,12 @@ local SEPARATOR = ":"
 local LABEL_SEPARATOR = " / "
 local EXTENSION = ".toml"
 
+-- Adoption policy is separate from the exact three-field provenance descriptor.
+M.additional_default_enabled = true
+M.additional_priority_tier = "package"
+M.additional_default_delay_seconds = 0
+M.additional_scan_max_depth = 16
+
 --- Preserve actual filename components, independent of labels or activation groups.
 --- @param components table Dense relative filename components, including .toml.
 --- @return table descriptor Fresh id, components and label fields.
@@ -66,6 +72,22 @@ function M.is_descriptor(descriptor)
 	if count ~= 3 then return false end
 	local ok, expected = pcall(M.describe, descriptor.components)
 	return ok and expected.id == descriptor.id and expected.label == descriptor.label
+end
+
+--- Neutral activation policy for exact canonical file/section preference paths.
+--- Classification is not admission to a native capability or source mutation.
+--- @param path any Semantic path, with quoted dotted section components.
+--- @return boolean|nil
+function M.preference_default(path)
+	local parts = require("toml_codec.key_path").parse(path, true)
+	if not parts or parts[1] ~= "hotstrings" then return nil end
+	if #parts == 3 and parts[2] == "groups" and M.components(parts[3]) then
+		return M.additional_default_enabled
+	end
+	if #parts == 4 and parts[2] == "modules" and M.components(parts[3]) and parts[4] ~= "" then
+		return M.additional_default_enabled
+	end
+	return nil
 end
 
 --- Own the snapshot so callers cannot mutate another source's provenance.

@@ -120,7 +120,7 @@ helpers.describe("Registry section-delay ownership", function()
 end)
 
 helpers.describe("canonical hotstring override delays reach the real runtime", function()
-	local function fixture(source, callback)
+	local function fixture(source, callback, expected_init_admission)
 		local owned = {}
 		for _, name in ipairs(OWNED_MODULES) do owned[#owned + 1] = name end
 		owned[#owned + 1] = "adapters.file_system"
@@ -154,11 +154,20 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { group_a = 0.4, group_b = 0.4 })
 			helpers.assert_true(Registry.init(state))
 			local Config = require("modules.hotstrings.hotstrings_config")
-			helpers.assert_true(Config.init({
+			local initialized = Config.init({
 				override_path = "overrides",
 				toml_resolver = function(category) return "/virtual/" .. category .. ".toml" end,
 				delay_transaction = Registry.with_hotstring_delays,
-			}))
+			})
+			if expected_init_admission == false then
+				helpers.assert_eq(initialized, false, "an open physical record cannot establish safe override admission")
+				helpers.assert_eq(Config.common_autocorrection_admitted(), false)
+				helpers.assert_eq(Config.reload(), false, "a repeated classified read never silently admits unsafe bytes")
+				helpers.assert_eq(control.writes, 0)
+				helpers.assert_eq(files.overrides, source)
+			else
+				helpers.assert_true(initialized)
+			end
 			helpers.assert_true(Registry.load_toml("group_a", "/virtual/group_a.toml"))
 			helpers.assert_true(Registry.load_toml("group_b", "/virtual/group_b.toml"))
 			callback(state, Registry, Config, files, control)
@@ -287,7 +296,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 	end)
 
 	for _, example in ipairs({
-		{ name = "unterminated neighbor", source = "[group_a.rolls]\ndelay = 2\nfuture = [1,\n" },
+		{ name = "unterminated neighbor", source = "[group_a.rolls]\ndelay = 2\nfuture = [1,\n", init_admitted = false },
 		{ name = "inline ancestor", source = "[group_a]\nrolls = { delay = 2, future = true }\n" },
 		{ name = "table-valued leaf", source = "[group_a.rolls.delay]\nfuture = true\n" },
 		{ name = "duplicate header", source = "[group_a.rolls]\ndelay = 2\n[group_a.rolls]\nfuture = true\n" },
@@ -296,11 +305,27 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 		{ name = "case-normalized header", source = "[GROUP_A.rolls]\ndelay = 2\n" },
 	}) do
 		helpers.it("refuses a conflicting source without publication: " .. example.name, function()
-			fixture(example.source, function(_, _, Config, files, control)
+			fixture(example.source, function(state, _, Config, files, control)
+				local before, delays = {}, {}
+				for index, mapping in ipairs(state.mappings) do
+					before[index] = {}
+					for field, value in pairs(mapping) do
+						helpers.assert_true(type(value) ~= "table", "the independent fixture snapshots every mapping scalar")
+						before[index][field] = value
+					end
+					delays[index] = state.resolve_mapping_delay(mapping)
+				end
+				local sequence, timeout = state.seq_counter, state.WORD_TIMEOUT_SEC
 				helpers.assert_eq(Config.set_override("group_a", "rolls", "delay", 6), false)
 				helpers.assert_eq(control.writes, 0)
 				helpers.assert_eq(files.overrides, example.source)
-			end)
+				helpers.assert_eq(state.mappings, before, "refusal retains every unrelated native mapping field")
+				helpers.assert_eq(state.seq_counter, sequence)
+				helpers.assert_eq(state.WORD_TIMEOUT_SEC, timeout)
+				for index, mapping in ipairs(state.mappings) do
+					helpers.assert_eq(state.resolve_mapping_delay(mapping), delays[index])
+				end
+			end, example.init_admitted)
 		end)
 	end
 

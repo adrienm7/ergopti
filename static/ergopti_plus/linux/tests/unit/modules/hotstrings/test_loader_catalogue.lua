@@ -290,8 +290,8 @@ helpers.describe("personal-file transport through the real loader and compiled e
 end)
 
 
-helpers.describe("personal-file discovery: preserve the existing root overlay and choices", function()
-	helpers.it("retains every recursive source descriptor while only old overlay winners become live", function()
+helpers.describe("personal-file discovery: exact owners preserve source and choice intent", function()
+	helpers.it("retains recursive provenance, refuses ambiguous legacy choices and publishes independent exact owners", function()
 		local root = os.tmpname(); os.remove(root)
 		local Shell = require("adapters.shell_runner")
 		assert(Shell.run("mkdir -p " .. Shell.quote(root .. "/a") .. " " .. Shell.quote(root .. "/work")
@@ -299,34 +299,43 @@ helpers.describe("personal-file discovery: preserve the existing root overlay an
 		local files = { ["a__b.toml"] = "flatx", ["a/b.toml"] = "nestedx", ["words.old.toml"] = "dottedx",
 			["work/team.toml"] = "workx", ["home/team.toml"] = "homex", ["Équipe/mémoire.toml"] = "memoryx",
 			["rolls.toml"] = "userrollx" }
+		local source_bytes = {}
 		local ok, err = pcall(function()
 			for relative, trigger in pairs(files) do
+				local content = '[probe]\n"' .. trigger .. '" = { output = "' .. trigger
+					.. '-result", auto_expand = true, is_case_sensitive_strict = true }\n'
 				local handle = assert(io.open(root .. "/" .. relative, "w"))
-				assert(handle:write('[probe]\n"' .. trigger .. '" = { output = "' .. trigger
-					.. '-result", auto_expand = true, is_case_sensitive_strict = true }\n'))
-				assert(handle:close())
+				assert(handle:write(content)); assert(handle:close())
+				source_bytes[relative] = content
 			end
 			local discovered = require("modules.hotstrings.loader").find_toml_files(root)
-			local team_winner
+			local team_discovered = 0
 			for _, path in ipairs(discovered) do
-				if path:match("/team%.toml$") then team_winner = path:sub(#root + 2) end
+				if path:match("/team%.toml$") then team_discovered = team_discovered + 1 end
 			end
-			helpers.assert_not_nil(team_winner, "actual discovery must admit both same-stem files")
+			helpers.assert_eq(team_discovered, 2, "actual discovery must retain both same-stem physical files")
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 			local engine = require("hotstring_engine").new()
 			Config._set_override_config_dir_for_test(root)
-			require("tests.support.hotstring_choices").with_file(Config,
+			local Choices = require("tests.support.hotstring_choices")
+			Choices.with_file(Config,
 				'[hotstrings]\ngroups = { a__b = true, b = true, "words.old" = true, team = true, "mémoire" = true, rolls = true }\n'
 				.. '[hotstrings.modules]\na__b = { probe = true }\nb = { probe = true }\n"words.old" = { probe = true }\n'
 				.. 'team = { probe = true }\n"mémoire" = { probe = true }\nrolls = { probe = true }\n', function(choice_path)
-				local before = require("tests.support.hotstring_choices").read(choice_path)
+				local before = Choices.read(choice_path)
 				helpers.assert_true(Config.init(engine, root, nil))
 				local count, published = Config.load_all()
-				helpers.assert_eq(published, true); helpers.assert_eq(count, 5, "legacy same-stem overlays and dotted-name gate remain unchanged")
+				helpers.assert_eq(published, true)
+				helpers.assert_eq(count, 5, "two ambiguous legacy sources stay closed; the exact dotted owner is addressable")
 				local discovery = Config.personal_file_sources()
-				helpers.assert_eq(#discovery, 7, "overlay losers are discovered explicitly, never claimed as live mappings")
-				local sources = {}
-				for _, source in ipairs(discovery) do sources[source.path:sub(#root + 2)] = source.descriptor.id end
+				helpers.assert_eq(#discovery, 7, "discovery preserves provenance independently of activation")
+				local sources, descriptors, records = {}, {}, {}
+				for _, item in ipairs(discovery) do
+					local relative = item.path:sub(#root + 2)
+					sources[relative], descriptors[relative] = item.descriptor.id, require("hotstrings.personal_files").copy(item.descriptor)
+					records[#records + 1] = { source = require("hotstrings.personal_files").copy(item.descriptor), path = item.path,
+						legacy_name = relative:match("([^/]+)%.toml$") }
+				end
 				helpers.assert_eq(sources, {
 					["a__b.toml"] = "personal-file:615f5f622e746f6d6c", ["a/b.toml"] = "personal-file:61:622e746f6d6c",
 					["words.old.toml"] = "personal-file:776f7264732e6f6c642e746f6d6c",
@@ -340,29 +349,12 @@ helpers.describe("personal-file discovery: preserve the existing root overlay an
 					for char in text:gmatch(".") do result = engine:on_char(char) end
 					return result
 				end
-				local team_loser = team_winner == "home/team.toml" and "work/team.toml" or "home/team.toml"
-				local Policy = require("hotstrings.personal_scope")
-				local evidence, selected = {}, {}
-				for _, item in ipairs(Config.personal_file_sources()) do
-					local relative = item.path:sub(#root + 2)
-					if relative == team_winner or relative == team_loser then
-						local live = match(files[relative])
-						evidence[#evidence + 1] = { source = item.descriptor, owner = "team", path = item.path,
-							admitted = live ~= nil and live.personal_source_id == item.descriptor.id, exclusive = true }
-						selected[relative] = { source = item.descriptor, owner = "team", path = item.path }
-					end
-				end
-				helpers.assert_eq(#evidence, 2, "both actual sources provide independent admission evidence")
-				local denied, reason = Policy.admit(evidence, selected[team_loser])
-				helpers.assert_nil(denied); helpers.assert_eq(reason, "unadmitted-source")
-				local accepted, refusal = Policy.admit(evidence, selected[team_winner])
-				helpers.assert_nil(refusal); helpers.assert_eq(accepted.source.id, sources[team_winner])
-				helpers.assert_nil(match(files[team_loser]), "the old last same-stem winner remains the only live team source")
-				helpers.assert_nil(match("dottedx"), "this transport prerequisite does not silently change persisted gate addressability")
-				for _, relative in ipairs({ "a__b.toml", "a/b.toml", team_winner, "Équipe/mémoire.toml", "rolls.toml" }) do
+				local function proves_live(relative, group)
 					local result = match(files[relative])
-					helpers.assert_not_nil(result); helpers.assert_eq(result.replacement, files[relative] .. "-result")
-					helpers.assert_eq(result.personal_source_id, sources[relative], "real compiled matches retain their source identity")
+					helpers.assert_not_nil(result)
+					helpers.assert_eq(result.replacement, files[relative] .. "-result")
+					helpers.assert_eq(result.group, group or sources[relative])
+					helpers.assert_eq(result.personal_source_id, sources[relative], "real compiled matches retain source identity")
 					local preview
 					for _, row in ipairs(engine:candidates()) do
 						if row.trigger == files[relative] then preview = row end
@@ -371,7 +363,97 @@ helpers.describe("personal-file discovery: preserve the existing root overlay an
 					helpers.assert_eq(preview.personal_source_id, sources[relative], "the actual preview agrees")
 					helpers.assert_eq(preview.fires, true)
 				end
-				helpers.assert_eq(require("tests.support.hotstring_choices").read(choice_path), before, "metadata transport never rewrites choices")
+				local Codec = require("toml_codec")
+				local inventory = assert(require("infra.personal_file_adoption").stage(records,
+					Codec.decode(before).hotstrings, root .. "/personal_hotstrings.toml"))
+				local evidence = {}
+				for _, item in ipairs(inventory) do evidence[item.source.id] = item end
+				local Policy = require("hotstrings.personal_scope")
+				for _, relative in ipairs({ "home/team.toml", "work/team.toml" }) do
+					local id, record = sources[relative], evidence[sources[relative]]
+					helpers.assert_eq(record.owner, id)
+					helpers.assert_eq(record.reason, "ambiguous-legacy-owner")
+					helpers.assert_eq(record.admitted, false); helpers.assert_eq(record.exclusive, false)
+					helpers.assert_type(record.physical, "string", "the refusal is semantic, not missing native identity")
+					local accepted, refusal = Policy.admit(inventory, { source = descriptors[relative], owner = id, path = root .. "/" .. relative })
+					helpers.assert_nil(accepted); helpers.assert_eq(refusal, "unadmitted-source")
+					helpers.assert_nil(Config.personal_file_scope_binding(id))
+					helpers.assert_eq(Config.enable_group(id), false, "an ambiguous historical choice cannot grant either native owner")
+					helpers.assert_nil(match(files[relative]))
+				end
+				helpers.assert_true(evidence[sources["home/team.toml"]].physical ~= evidence[sources["work/team.toml"]].physical)
+				for _, relative in ipairs({ "a__b.toml", "a/b.toml", "words.old.toml", "Équipe/mémoire.toml" }) do proves_live(relative) end
+				proves_live("rolls.toml", "rolls")
+				helpers.assert_nil(Config.personal_file_scope_binding(sources["rolls.toml"]), "a bound historical category carries provenance without a second descriptor capability")
+				helpers.assert_eq(Choices.read(choice_path), before, "discovery and refused adoption never rewrite historical choices")
+
+				-- Deliberately retire only the ambiguous historical team leaves. Exact
+				-- native owners begin closed, so no old true choice transfers to either.
+				local home, work = sources["home/team.toml"], sources["work/team.toml"]
+				local operations = {
+					{ path = { "hotstrings", "groups", "team" }, delete = true },
+					{ path = { "hotstrings", "modules", "team" }, delete = true },
+					{ path = { "hotstrings", "groups", home }, value = false },
+					{ path = { "hotstrings", "groups", work }, value = false },
+				}
+				local rows = require("toml_codec.leaf_rows").prepare(before, operations)
+				helpers.assert_eq(require("toml_codec.writer").batch_write(choice_path, rows, nil,
+					{ status = "ok", content = before .. "\n# stale source receipt\n" }), false, "stale publication cannot retire another owner's legacy choices")
+				helpers.assert_eq(Choices.read(choice_path), before)
+				helpers.assert_eq(engine:mapping_state().mappings, 5)
+				helpers.assert_eq(require("toml_codec.writer").batch_write(choice_path, rows, nil,
+					{ status = "ok", content = before }), true, "explicit repair needs actual conditional publication")
+				local repaired = Choices.read(choice_path)
+				local choices = Codec.decode(repaired).hotstrings
+				helpers.assert_nil(choices.groups.team); helpers.assert_nil(choices.modules.team)
+				helpers.assert_eq(choices.groups[home], false); helpers.assert_eq(choices.groups[work], false)
+				local original = Codec.decode(before).hotstrings
+				for key, value in pairs(original.groups) do if key ~= "team" then helpers.assert_eq(choices.groups[key], value) end end
+				for key, value in pairs(original.modules) do if key ~= "team" then helpers.assert_eq(choices.modules[key], value) end end
+				helpers.assert_eq(Config.refresh_choices(), true)
+				helpers.assert_eq(engine:mapping_state().mappings, 5)
+				local home_binding, work_binding = Config.personal_file_scope_binding(home), Config.personal_file_scope_binding(work)
+				helpers.assert_not_nil(home_binding); helpers.assert_not_nil(work_binding)
+				helpers.assert_eq(home_binding.current(), true); helpers.assert_eq(work_binding.current(), true)
+				helpers.assert_eq(home_binding.source.id, home); helpers.assert_eq(work_binding.source.id, work)
+				helpers.assert_eq(home_binding.path, root .. "/home/team.toml")
+				helpers.assert_eq(work_binding.path, root .. "/work/team.toml")
+				helpers.assert_nil(match("homex")); helpers.assert_nil(match("workx"))
+				helpers.assert_eq(Choices.read(choice_path), repaired, "native adoption itself stays read-only")
+				helpers.assert_eq(Config.enable_group(home), true)
+				helpers.assert_eq(Config.refresh_choices(), true, "the acknowledged home choice survives a disk reload")
+				helpers.assert_eq(engine:mapping_state().mappings, 6)
+				proves_live("home/team.toml"); helpers.assert_nil(match("workx"))
+				helpers.assert_eq(Codec.decode(Choices.read(choice_path)).hotstrings.groups[work], false)
+				helpers.assert_eq(home_binding.current(), false, "a captured binding cannot follow a later catalogue generation")
+				local lease = {}
+				helpers.assert_eq(Config.acquire(lease), true)
+				local held = Choices.read(choice_path)
+				local generation = engine:mapping_state()
+				helpers.assert_eq(Config.enable_group(work), false, "another native scope cannot publish into the held owner")
+				helpers.assert_eq(Config.release({}), false, "a foreign receipt cannot release the original native owner")
+				helpers.assert_eq(Choices.read(choice_path), held); helpers.assert_eq(engine:mapping_state(), generation)
+				helpers.assert_eq(Config.release(lease), true)
+				helpers.assert_eq(Config.enable_group(work), true)
+				helpers.assert_eq(Config.refresh_choices(), true)
+				helpers.assert_eq(engine:mapping_state().mappings, 7)
+				proves_live("home/team.toml"); proves_live("work/team.toml")
+				helpers.assert_eq(Config.disable_group(home), true)
+				helpers.assert_eq(Config.refresh_choices(), true)
+				helpers.assert_eq(engine:mapping_state().mappings, 6)
+				helpers.assert_nil(match("homex")); proves_live("work/team.toml")
+				helpers.assert_eq(Codec.decode(Choices.read(choice_path)).hotstrings.groups[home], false)
+				helpers.assert_eq(Config.enable_group(home), true)
+				helpers.assert_eq(Config.refresh_choices(), true)
+				helpers.assert_eq(engine:mapping_state().mappings, 7)
+				for relative in pairs(files) do proves_live(relative, relative == "rolls.toml" and "rolls" or nil) end
+				for relative, content in pairs(source_bytes) do
+					helpers.assert_eq(Choices.read(root .. "/" .. relative), content, "choice publication never mutates source bytes")
+				end
+				local final = Codec.decode(Choices.read(choice_path)).hotstrings
+				helpers.assert_nil(final.groups.team); helpers.assert_nil(final.modules.team)
+				for key, value in pairs(original.groups) do if key ~= "team" then helpers.assert_eq(final.groups[key], value) end end
+				for key, value in pairs(original.modules) do if key ~= "team" then helpers.assert_eq(final.modules[key], value) end end
 			end)
 		end)
 		for relative in pairs(files) do os.remove(root .. "/" .. relative) end

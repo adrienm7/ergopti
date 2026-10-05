@@ -66,7 +66,7 @@ jobs:
         # back to io.popen("find") when lfs is unavailable — no luarocks needed.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit lua-luv sqlite3
+          sudo apt-get install -y luajit lua-luv lua-filesystem sqlite3
           luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
 
       - name: Verify native metrics aggregation equivalence
@@ -109,15 +109,19 @@ jobs:
     name: 'E2E tests'
     needs: [test-linux]
     runs-on: ubuntu-latest
+    env:
+      # Python-owned native children also resolve the production shared modules.
+      LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
     steps:
       - uses: actions/checkout@v4
 
       - name: Install LuaJIT
-        # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
-        # back to io.popen("find") when lfs is unavailable — no luarocks needed.
+        # Bound extension sections require actual no-follow source identity.
+        # Test discovery alone does not prove their filesystem admission.
+        # Canonical XKB controls below require xkbcli before their first use.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit sqlite3
+          sudo apt-get install -y luajit lua-filesystem sqlite3 libxkbcommon-tools xkb-data
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool
@@ -180,11 +184,48 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_openssl_exit_receipts.lua
         timeout-minutes: 2
 
+      - name: Reject unsuccessful native process supervision receipts
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_supervision_receipts.lua
+        timeout-minutes: 1
+
+      - name: Refuse incomplete native diagnostics exports
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_diagnostics_save_receipts.py
+        timeout-minutes: 1
+
       - name: Preserve current SQLite device schema and its native readers
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_schema_receipts.lua
+        timeout-minutes: 1
+
+      - name: Preserve native SQLite device registration and refused transactions
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_registration_receipts.lua
+        timeout-minutes: 1
+
+      - name: Preserve SQLite event IDs across native collectors and invalid cursors
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_cursor_receipts.lua
+        timeout-minutes: 2
+
+      - name: Preserve literal SQLite filesystem paths through native CLI arguments
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_filesystem_paths.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_filesystem_paths.lua
         timeout-minutes: 1
 
       - name: Reject silent SQLite failures without staging typed SQL
@@ -303,6 +344,135 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_event_loop_stop_receipts.lua
         timeout-minutes: 1
 
+      - name: Retain native event-loop ownership during callback reentry
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_reentry.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_reentry.lua"
+        timeout-minutes: 1
+
+      - name: Refuse non-finite native timer and deferred durations
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_timer_finite_admission.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_timer_finite_admission.lua"
+        timeout-minutes: 1
+
+      - name: Refuse non-finite native event-loop periods before allocation
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
+        timeout-minutes: 1
+
+      - name: Isolate actual callback error objects without invoking their formatters
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          for callback_source in after every idle periodic "registered idle" deferred; do
+            for callback_failure in object string; do
+              env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
+              env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
+            done
+          done
+        timeout-minutes: 1
+
+      - name: Project native modifier-hold statistics into actual dashboard consumers
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" node tests/hardware/run_sqlite_kc_hold_consumers.cjs
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_READER_TEST_LUA=lua5.4 node tests/hardware/run_sqlite_kc_hold_consumers.cjs
+        timeout-minutes: 1
+
+      - name: Refuse malformed release pages through existing strict JSON admission
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_updater_release_json_admission.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_json_admission.py
+        timeout-minutes: 1
+
+      - name: Preserve supplied histogram key bytes in real SQLite
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_burst_histogram_keys.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_burst_histogram_keys.lua
+        timeout-minutes: 1
+
+      - name: Roll back native category and score edits after SQLite refusal
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_category_edit_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_category_edit_receipts.lua
+        timeout-minutes: 1
+
+      - name: Read actual canonical XKB symbol lists outside quoted metadata
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_symbol_lists.lua
+        timeout-minutes: 1
+
+      - name: Parse actual canonical XKB keys without quoted declaration collisions
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_key_definitions.lua
+        timeout-minutes: 1
+
+      - name: Parse actual canonical XKB blocks without quoted metadata collisions
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_blocks.lua
+        timeout-minutes: 1
+
+      - name: Preserve UTF-8 boundaries in native provider error diagnostics
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_server_message_utf8.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_server_message_utf8.py
+        timeout-minutes: 1
+
+      - name: Refuse malformed structured provider completions through strict JSON
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_response_syntax.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_response_syntax.py
+        timeout-minutes: 1
+
+      - name: Refuse provider error envelopes before publishing completion text
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_response_errors.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_response_errors.py
+        timeout-minutes: 1
+
+      - name: Preserve complete native SQLite metadata scalar values
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_meta_values.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_meta_values.lua
+        timeout-minutes: 1
+
+      - name: Dispatch provider requests through verified IPv4 and IPv6 TLS
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_llm_ipv6_endpoints.py
+          ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_ipv6_endpoints.py
+        timeout-minutes: 1
+
       - name: Admit file watches only after native activation succeeds
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
@@ -331,6 +501,77 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_crypto_cli_receipts.lua
         timeout-minutes: 1
 
+      - name: Split native SQLite history at calendar-day boundaries
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_calendar_split.lua
+        timeout-minutes: 1
+
+      - name: Preserve empty native HTTP fields and existing metadata validation
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_http_empty_headers.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_http_empty_headers.py
+        timeout-minutes: 1
+
+      - name: Preserve asset identity in native release metadata
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_asset_metadata.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_asset_metadata.py
+        timeout-minutes: 1
+
+      - name: Decode native release notes exactly once
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_notes.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_notes.py
+        timeout-minutes: 1
+
+      - name: Decode native release tags from the selected JSON object
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
+        timeout-minutes: 1
+
+      - name: Decode native release publication times at their JSON field
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
+        timeout-minutes: 1
+
+      - name: Decode the selected release object's own prerelease Boolean
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
+        timeout-minutes: 1
+
+      - name: Reject nested arrays instead of offering their release objects
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
+        timeout-minutes: 1
+
+      - name: Reject interrupted conditional release responses before cache reuse
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_conditional_receipts.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_conditional_receipts.py
+        timeout-minutes: 1
+
       - name: Refuse truncated native curl config URLs
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
@@ -343,6 +584,13 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_redirect_receipts.lua
+        timeout-minutes: 1
+
+      - name: Preserve native POST redirect method and body semantics
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_http_redirect_method_receipts.py
         timeout-minutes: 1
 
       - name: Preserve TLS on native HTTP redirect hops
@@ -371,6 +619,29 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_header_receipts.lua
+        timeout-minutes: 1
+
+      - name: Deliver large literal POST bodies through native anonymous pipes
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_http_body_pipe_receipts.py
+        timeout-minutes: 2
+
+      - name: Admit regular write destinations before truncation or append
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          python3 tests/hardware/run_file_write_special_receipts.py
+          ERGOPTI_WRITE_BACKEND=luv python3 tests/hardware/run_file_write_special_receipts.py
+          ERGOPTI_FILE_WRITE_TEST_LUA=lua5.4 ERGOPTI_WRITE_BACKEND=luv python3 tests/hardware/run_file_write_special_receipts.py
+        timeout-minutes: 2
+
+      - name: Retain native POST resources after simulated cleanup refusal
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_body_cleanup_receipts.lua
         timeout-minutes: 1
 
       - name: Send literal at-prefixed HTTP bodies without native file loading
@@ -443,7 +714,8 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
-          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales
+          # Ubuntu ships PulseAudio gettext catalogs in language packs.
+          sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de
           sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8
           python3 tests/hardware/run_system_audio_locale_receipts.py
           ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py
@@ -503,6 +775,22 @@ jobs:
         run: |
           python3 tests/hardware/run_restart_zombie_receipts.py
           ERGOPTI_RESTART_TEST_LUA=lua5.4 python3 tests/hardware/run_restart_zombie_receipts.py
+        timeout-minutes: 1
+
+      - name: Enforce exact native buffered HTTP body limits
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        env:
+          LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+        run: |
+          luajit tests/hardware/run_http_body_limit_receipts.lua
+        timeout-minutes: 1
+
+      - name: Preserve literal HTTP targets through every native curl method
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_literal_url_receipts.lua
         timeout-minutes: 1
 
       - name: Retire native HTTP and digest process owners
@@ -580,6 +868,21 @@ jobs:
           sudo apt-get install -y --no-install-recommends libxkbcommon-tools xkb-data
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
         timeout-minutes: 3
+
+      - name: Preserve native localectl layout and variant alignment
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_localectl_variants.lua
+        timeout-minutes: 1
+
+      - name: Refuse malformed UTF-8 inverse plans before and after layout load
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8_missing_map.lua
+        timeout-minutes: 1
 
       # This fixture owns its Xvfb PID and reads actual native XKB group/map
       # receipts. It does not claim physical keyboard or native Wayland input.

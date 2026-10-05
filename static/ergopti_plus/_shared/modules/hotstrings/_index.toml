@@ -28,7 +28,7 @@ order = ["french"]
 
 [languages.french]
 locale = "fr"
-categories_order = ["distancesreduction", "autocorrection", "magickey"]
+categories_order = ["autocorrection", "magickey"]
 
 
 

@@ -67,7 +67,7 @@ if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
 	}
 }
 Total += PersonalActiveCount
-Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
+Total += PersonalFileControls.ActiveCount()
 Total += HotstringExtensions_Count(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings"))
 GrandTotal := _HS_GatedCount(IsCategoryGated("Hotstrings"), Total)
 _HS_GrandTotalCache := GrandTotal
@@ -635,7 +635,7 @@ global _HS_ExtensionsCache := []
 ; so that ends in a fatal stack-overflow-class error that takes down the (often
 ; deferred, Critical) menu build. 16 levels is far deeper than any real personal
 ; hotstrings layout; past it we stop descending and warn.
-global _HS_SCAN_MAX_DEPTH := 16
+global _HS_SCAN_MAX_DEPTH := PersonalFileScanMaxDepth()
 
 ; Pre-scans the personal hotstrings directory to build the tree and sum counts
 ; so they are available for menu labels and the grand total at build time.
@@ -675,6 +675,10 @@ _HS_PreScanPersonal() {
 			if (A_LoopFileAttrib ~= "D") {
 				NewParts := PathParts.Clone()
 				NewParts.Push(A_LoopFileName)
+				if !HS_PersonalDirectoryAdmitted(A_LoopFileFullPath, Depth + 1) {
+					_HS_GetOrCreateNode(_PersonalExtTree, NewParts)["unavailable"] := true
+					continue
+				}
 				_HS_ScanExt(A_LoopFileFullPath, NewParts, Depth + 1, Visited)
 			} else if (A_LoopFileName ~= "i)\.toml$") {
 				if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
@@ -908,7 +912,7 @@ _HS_PersonalRows(Options := unset) {
 }
 
 ; One TOML file of the personal-extensions tree, as a row whose submenu holds
-; « ouvrir le fichier » and one inert line per section.
+; independent admitted controls, or a read-only unavailable section inventory.
 ;
 ; Its own Menu, filled by the renderer from row data: a folder tree follows the
 ; USER's directories, so each level builds a menu and hands the level below it
@@ -918,24 +922,100 @@ _HS_PersonalRows(Options := unset) {
 _HS_TomlFileRow(TF) {
 	TFMenu := Menu()
 	FileRows := [Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path))]
-	if (TF.sections.Length > 0) {
+	Owner := PersonalFileControls.ForPath(TF.path)
+	if Owner is PersonalFileAdoptedOwner {
 		FileRows.Push(Map("separator", true))
-		for _, ES in TF.sections {
-			; Label only: these state what the file contains, they toggle nothing.
-			FileRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))
+		for Row in _HS_PersonalFileControlRows(Owner, "")
+			FileRows.Push(Row)
+		for Section in Owner.sectionNames {
+			FileRows.Push(Map("label", Section . " (" . FmtCount(Owner.counts[Section]) . ")",
+				"items", _HS_PersonalFileControlRows(Owner, Section), "checked", Owner.Selected(Section)))
 		}
+	} else {
+		Unavailable := _HS_PersonalUnavailableRow("file")
+		if Unavailable is Map
+			FileRows.Push(Unavailable)
+		for _, ES in TF.sections
+			FileRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))
 	}
 	MenuRenderer_AppendRows(TFMenu, "hotstrings_menu", "hotstring_personal_ext", FileRows)
 	return Map(
-		"label",   TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
+		"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",
 		"submenu", TFMenu)
+}
+
+; Shared declarations own fixed labels, check/command kinds, order and reasons.
+; Native callbacks operate only on the captured adopted owner and its exact scope.
+_HS_PersonalFileControlRows(Owner, Section, Options := unset) {
+	OwnedOptions := IsSet(Options) ? Options : Map()
+	Resolved := Owner.Resolve(Section)
+	Commands := Map(
+		"personal_file_enabled", (*) => Owner.Commit(Section, "enabled", !Owner.Selected(Section), OwnedOptions),
+		"personal_file_delay", (*) => _HS_PromptPersonalFileField(Owner, Section, "delay"),
+		"personal_file_priority", (*) => _HS_PromptPersonalFileField(Owner, Section, "priority"),
+		"personal_file_color", (*) => _HS_PromptPersonalFileField(Owner, Section, "color"),
+		"personal_file_tooltip", (*) => Owner.Commit(Section, "show_tooltip", !Owner.Resolve(Section).ShowTooltip, OwnedOptions))
+	Getters := Map(
+		"personal_file_owner_ready", (*) => PersonalFileControls.IsCurrent(Owner),
+		"personal_file_enabled", (*) => Owner.Selected(Section),
+		"personal_file_tooltip", (*) => Owner.Resolve(Section).ShowTooltip)
+	Values := Map("personal_file_delay", Round(Resolved.Delay * 1000),
+		"personal_file_priority", Resolved.Priority, "personal_file_color", Resolved.Color)
+	Rows := [], Definition := _MR_GetMenuDef("personal_file_controls")
+	if !(Definition is Array)
+		return Rows
+	for Item in Definition {
+		Id := _MR_Get(Item, "id")
+		Row := _MR_Get(Item, "type") == "check"
+			? MenuRenderer_CheckRow("personal_file_controls", Id, Commands, Getters)
+			: MenuRenderer_CommandRow("personal_file_controls", Id, Commands, Getters)
+		if !(Row is Map)
+			continue
+		if Values.Has(Id)
+			Row["label"] .= " : " . Values[Id]
+		Rows.Push(Row)
+	}
+	return Rows
+}
+
+; Refused native source inventories retain a declared translated reason and no action.
+_HS_PersonalUnavailableRow(Kind, Prefix := "") {
+	Id := Kind == "directory" ? "personal_directory_unavailable" : "personal_file_unavailable"
+	Getter := Kind == "directory" ? "personal_directory_ready" : "personal_file_owner_ready"
+	Row := MenuRenderer_CommandRow(Id, Id,
+		Map(Id, (*) => false), Map(Getter, (*) => false))
+	if Row is Map && Prefix != ""
+		Row["label"] := Prefix . " — " . Row["label"]
+	return Row
+}
+
+; Validate native prompt values before the exclusive owner admits a publication.
+_HS_PromptPersonalFileField(Owner, Section, Field) {
+	Resolved := Owner.Resolve(Section)
+	Current := Field == "delay" ? Round(Resolved.Delay * 1000)
+		: (Field == "priority" ? Resolved.Priority : Resolved.Color)
+	Prompt := Ui_InputBox(t("hs_config.label_" . Field), Owner.source["label"], "w340 h140", Current)
+	if Prompt.Result != "OK"
+		return
+	Value := Trim(Prompt.Value)
+	if Field == "delay" || Field == "priority" {
+		if !RegExMatch(Value, "^\d+$")
+			return false
+		Value := Integer(Value)
+		if Field == "delay"
+			Value /= 1000
+	} else if !RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$")
+		return false
+	return Owner.Commit(Section, Field, Value)
 }
 
 ; Sum all hotstring counts inside a node and its sub-nodes recursively.
 _HS_NodeTotal(Node) {
 	Total := 0
-	for _, TF in Node["tomls"]
-		Total += TF.count
+	for _, TF in Node["tomls"] {
+		Owner := PersonalFileControls.ForPath(TF.path)
+		Total += Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count
+	}
 	for _, Sub in Node["subfolders"]
 		Total += _HS_NodeTotal(Sub)
 	return Total
@@ -978,6 +1058,12 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	FolderRows := (Rows is Array) ? Rows : []
 	for _, FolderName in FolderNames {
 		Node := Tree[FolderName]
+		if Node.Get("unavailable", false) {
+			Unavailable := _HS_PersonalUnavailableRow("directory", FolderName)
+			if Unavailable is Map
+				FolderRows.Push(Unavailable)
+			continue
+		}
 		FolderMenu := Menu()
 		FileNodeList := Node["tomls"]
 		loop FileNodeList.Length {
@@ -1057,6 +1143,10 @@ _HS_ExtensionRows(Options := unset) {
 						(Targets, Enabled) => HotstringExtensions_SetCategoryEnabled(Targets[1], Enabled, Options))))
 			}
 		}
+		if Ext.toml_files.Length || (Ext.HasOwnProp("bound_files") && Ext.bound_files.Length) {
+			for Command in _HS_ExtensionScopeCommandRows(Ext.id, Options)
+				ExtRows.Push(Command)
+		}
 		Rows.Push(Map(
 			"label", StrReplace(t("menu.extensions.hotstrings_of"), "%s", Ext.name)
 				. " (" . FmtCount(ExtTotalForExt) . ")",
@@ -1065,7 +1155,46 @@ _HS_ExtensionRows(Options := unset) {
 	return Rows
 }
 
+; Reuse the shared explicit command declarations; the atomic owner resolves
+; current whole groups and bound leaves again when a retained row is clicked.
+_HS_ExtensionScopeCommandRows(ExtensionId, Options) {
+	Commands := Map(
+		"hotstring_category_enable_all", (*) => HotstringsExtensionScopeApply(ExtensionId, true, Options),
+		"hotstring_category_disable_all", (*) => HotstringsExtensionScopeApply(ExtensionId, false, Options))
+	Rows := []
+	for Id in ["hotstring_category_enable_all", "hotstring_category_disable_all"] {
+		Row := MenuRenderer_CommandRow("hotstring_category_menu", Id, Commands)
+		if Row is Map {
+			Row["disabled"] := A_IsSuspended
+			Rows.Push(Row)
+		}
+	}
+	return Rows
+}
+
 ; Read intent on the click, so an older menu never inverts a masked runtime flag.
+_HS_ProgrammableHotstringRows() {
+	Commands := Map("open_user_hotstring_source", UserHotstringsOpenSource,
+		"reload_user_hotstring_source", UserHotstringsReload,
+		"create_user_hotstring_example", UserHotstringsCreateExample)
+	Rows := []
+	for Declaration in _MR_GetMenuDef("programmable_hotstrings") {
+		if !(Declaration is Map)
+			continue
+		if Declaration.Get("type", "") == "feature" {
+			Label := _ApplyMenuLabelDynamicSubstitutions(t(Declaration["i18n"]), Declaration["path"])
+			Row := MenuRowWithLabel(Declaration["path"], Label, "DynamicHotstrings")
+		} else if Declaration.Get("type", "") == "command" {
+			Row := MenuRenderer_CommandRow("programmable_hotstrings", Declaration["id"], Commands)
+		} else {
+			continue
+		}
+		if Row is Map
+			Rows.Push(Row)
+	}
+	return Rows
+}
+
 _HS_ExtensionToggle(Path, Options, *) {
 	return HotstringExtensions_SetEnabled(Path, !ReadFeatureStateV2(Path)["enabled"], Options)
 }

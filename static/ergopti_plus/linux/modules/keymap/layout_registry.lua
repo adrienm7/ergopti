@@ -44,6 +44,7 @@ local Extension     = require("layouts.extension")
 local M = {}
 
 local LOG = "layout_registry"
+local REQUEST_OWNER = "layout_registry"
 
 
 
@@ -217,7 +218,7 @@ local function file_sha256(dir, timeout_ms)
 			callback(nil, "cannot stage " .. path)
 			return
 		end
-		FileDigest.sha256(path, { timeout_ms = timeout_ms }, function(digest, err)
+		FileDigest.sha256(path, { timeout_ms = timeout_ms, owner = REQUEST_OWNER }, function(digest, err)
 			FileSystem.delete(path)
 			callback(digest, err)
 		end)
@@ -242,7 +243,7 @@ local function default_deps(settings)
 				local options = {
 					timeout_ms = timeout_ms,
 					max_body_bytes = settings.max_file_bytes,
-					owner = "layout_registry",
+					owner = REQUEST_OWNER,
 					https_only = true,
 					follow_redirects = true,
 				}
@@ -339,10 +340,10 @@ end
 --- @return string|nil error
 local function read_installed(deps)
 	local path = deps.local_dir .. deps.settings.installed_file
-	if not deps.exists(path) then return Catalogue.decode_installed(nil, deps.decode_json) end
+	if not deps.exists(path) then return Catalogue.decode_installed(nil, deps.decode_installed_json or Json.decode_lossless) end
 	local text = deps.read(path)
 	if type(text) ~= "string" then return nil, "cannot read " .. path end
-	local record, err = Catalogue.decode_installed(text, deps.decode_json)
+	local record, err = Catalogue.decode_installed(text, deps.decode_installed_json or Json.decode_lossless)
 	for id, item in pairs(record and record.outdated or {}) do
 		Outdated.report_in_file(path, { "layouts", id }, item.detail)
 	end
@@ -827,8 +828,19 @@ end
 --- @param deps table|nil Optional filesystem collaborators.
 --- @return table|nil { pack = dir } scanner root; nil when the registry is not shipped.
 function M.shipped_extension_root(deps)
-	local resolved, reason = resolve_deps(deps)
-	if not resolved then error(reason, 0) end
+	local resolved = deps
+	if resolved == nil then
+		-- Offline shipped data belongs to the local registry. Its source path
+		-- never needs the updater's initialized transport or installed channel.
+		local layouts, layouts_error = read_shared_json("modules/layouts/defaults.json")
+		if not layouts then error(layouts_error, 0) end
+		local updater, updater_error = read_shared_json("modules/updater/defaults.json")
+		if not updater then error(updater_error, 0) end
+		local settings, settings_error = Registry.resolve(layouts, updater)
+		if not settings then error(settings_error, 0) end
+		resolved = { settings = settings, exists = FileSystem.exists,
+			bundled_dir = M.bundled_dir(Paths.driver_root(), settings, FileSystem.exists) }
+	end
 	local root = Extension.shipped_root(resolved.bundled_dir, resolved.settings, resolved.exists)
 	if root == nil then
 		Logger.warn(LOG, "No shipped Ergopti extension: the driver ships no layout registry.")
