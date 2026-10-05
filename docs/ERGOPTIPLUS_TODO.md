@@ -3308,6 +3308,15 @@ The new models transport was added afterward and still requires native
 qualification. The separate shared-CI native-read dependency failure also
 prevents treating this checkpoint as complete qualification.
 
+The private-publication fixture now keeps its committed model callback free of
+private-file I/O, matching the actual producer's pure final-claim contract. The
+old-source observation moves to the real committed-new writer boundary; every
+original assertion remains. One additional registered control requires unchanged
+read counts on accepted and refused committed callbacks. Closed native ownership
+diagnostics are retained. The earlier config-scope fixture's retained rollback
+marker remains a separately coordinated blocker; this test correction and full
+native Windows qualification still require replay.
+
 Windows private local-server publication now retains exact configuration/API
 images and their decoded native authority through the existing joint WAL.
 Ordinary source receipts never gain permission from newly committed files;
