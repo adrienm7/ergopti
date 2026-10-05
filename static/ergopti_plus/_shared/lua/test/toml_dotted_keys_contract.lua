@@ -96,4 +96,128 @@ return function(helpers)
 			helpers.assert_eq(writes, 0)
 		end)
 	end)
+
+	helpers.describe("shared root dotted scalar publication", function()
+		local function root_prepare(source, row, expected)
+			local writes = 0
+			local okay, detail, content = Writer.prepare_batch("/controlled/root-dotted-scalar.toml", { row }, {
+				read_with_status = function() return source, "ok" end,
+				write = function() writes = writes + 1; return false end,
+			}, expected)
+			helpers.assert_eq(writes, 0, "preparation never publishes")
+			return okay, detail, content
+		end
+		local vectors = {
+			{ name = "bare", key = "llm.agent_mode", section = "llm" },
+			{ name = "quoted leaf", key = 'llm."agent_mode"', section = "llm" },
+			{ name = "quoted parent", key = '"team.name".agent_mode', section = '"team.name"' },
+			{ name = "literal parent", key = "'team=name'.agent_mode", section = '"team=name"' },
+			{ name = "Unicode escaped parent", key = '"\\u00C9quipe".agent_mode', section = '"Équipe"' },
+		}
+		for _, vector in ipairs(vectors) do
+			local source = '# exact before\n' .. vector.key .. ' = "auto" # owned comment\n'
+				.. 'future.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n'
+			helpers.it("updates only the authentic " .. vector.name .. " root scalar record", function()
+				local okay, detail, content = root_prepare(source, { section = vector.section, key = "agent_mode", value = "action" })
+				helpers.assert_eq(okay, true, detail)
+				helpers.assert_eq(content, '# exact before\n' .. vector.key .. ' = "action"\n'
+					.. 'future.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n')
+			end)
+			helpers.it("removes only the authentic " .. vector.name .. " root scalar record", function()
+				local okay, detail, content = root_prepare(source, { section = vector.section, key = "agent_mode", delete = true })
+				helpers.assert_eq(okay, true, detail)
+				helpers.assert_eq(content, '# exact before\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n')
+			end)
+			helpers.it("retains every byte of an unchanged " .. vector.name .. " root scalar", function()
+				local okay, detail, content = root_prepare(source, { section = vector.section, key = "agent_mode", value = "auto" })
+				helpers.assert_eq(okay, true, detail)
+				helpers.assert_eq(content, source)
+			end)
+		end
+		helpers.it("retains case-distinct root neighbors and replaces a multiline scalar through its complete physical range", function()
+			local source = 'a.text = """before\n[looks.like.a.header]\nafter"""\nA.text = "untouched" # case owner\n'
+			local okay, detail, content = root_prepare(source, { section = "a", key = "text", value = "changed" })
+			helpers.assert_eq(okay, true, detail)
+			helpers.assert_eq(content, 'a.text = "changed"\nA.text = "untouched" # case owner\n')
+		end)
+		helpers.it("preserves stream BOM and final newline ownership while updating or deleting a first root leaf", function()
+			local bom = string.char(239, 187, 191)
+			local source = bom .. 'a.setting=false\nfuture.keep=0.1'
+			local okay, detail, content = root_prepare(source, { section = "a", key = "setting", value = true })
+			helpers.assert_eq(okay, true, detail)
+			helpers.assert_eq(content, bom .. 'a.setting = true\nfuture.keep=0.1')
+			local removed, why, survivor = root_prepare(source, { section = "a", key = "setting", delete = true })
+			helpers.assert_eq(removed, true, why)
+			helpers.assert_eq(survivor, bom .. 'future.keep=0.1')
+			local last, last_detail, last_content = root_prepare('future.keep=0.1\na.setting=0.25', { section = "a", key = "setting", value = 0.75 })
+			helpers.assert_eq(last, true, last_detail)
+			helpers.assert_eq(last_content, 'future.keep=0.1\na.setting = 0.75')
+		end)
+		helpers.it("refuses root container mutation and subtree collisions without manufacturing authority", function()
+			for _, source in ipairs({ 'llm={agent_mode="auto"}\n', 'llm="obsolete"\n', 'llm=[]\n',
+				'[[llm]]\nagent_mode="auto"\n', 'llm.agent_mode=["auto"]\n', 'llm.agent_mode={value="auto"}\n' }) do
+				local okay, _, content = root_prepare(source, { section = "llm", key = "agent_mode", value = "action" })
+				helpers.assert_eq(okay, false, source)
+				helpers.assert_nil(content, "a refused candidate cannot reach publication")
+			end
+		end)
+		helpers.it("refuses replacing a root scalar while publishing a descendant in the same batch", function()
+			local writes = 0
+			local okay, detail, content = Writer.prepare_batch("/controlled/root-collision.toml", {
+				{ section = "a", key = "setting", delete = true },
+				{ section = "a.setting", key = "child", value = true },
+			}, { read_with_status = function() return 'a.setting="obsolete"\nfuture.keep=0.1\n', "ok" end,
+				write = function() writes = writes + 1; return false end })
+			helpers.assert_eq(okay, false)
+			helpers.assert_contains(detail, "a.setting")
+			helpers.assert_nil(content)
+			helpers.assert_eq(writes, 0)
+		end)
+		helpers.it("retains root scalar refusal for nonfinite requested values", function()
+			for _, value in ipairs({ math.huge, -math.huge, 0 / 0 }) do
+				local okay, _, content = root_prepare('a.setting=0.25\nfuture.keep=0.1\n', { section = "a", key = "setting", value = value })
+				helpers.assert_eq(okay, false)
+				helpers.assert_nil(content)
+			end
+		end)
+		helpers.it("refuses duplicate aliases, stale source and a changed root scalar into a dictionary", function()
+			local row = { section = "llm", key = "agent_mode", value = "action" }
+			helpers.assert_eq(root_prepare('llm.agent_mode="auto"\nllm."agent_mode"="other"\n', row), false)
+			helpers.assert_eq(root_prepare('llm.agent_mode="auto"\n', row, { status = "ok", content = 'llm.agent_mode="foreign"\n' }), false)
+			helpers.assert_eq(root_prepare('llm.agent_mode="auto"\n', { section = "llm", key = "agent_mode", value = { child = true } }), false)
+		end)
+
+		helpers.it("preserves precise requested root numbers and signed zero through the optional scalar encoder", function()
+			local vectors = {
+				{ value = 0.12345678901234567, literal = "0.12345678901234566" },
+				{ value = 9007199254740992, literal = "9007199254740992" },
+				{ value = -0.0, literal = "-0.0" },
+			}
+			for _, vector in ipairs(vectors) do
+				local okay, detail, content = root_prepare('a.setting=0.25\nfuture.precise=0.1\nfuture.integer=9007199254740993\n',
+					{ section = "a", key = "setting", value = vector.value })
+				helpers.assert_eq(okay, true, detail)
+				helpers.assert_eq(content, 'a.setting = ' .. vector.literal .. '\nfuture.precise=0.1\nfuture.integer=9007199254740993\n')
+				local actual = Codec.decode(content).a.setting
+				helpers.assert_eq(actual, vector.value)
+				if vector.value == 0 then helpers.assert_eq(1 / actual, -math.huge) end
+			end
+		end)
+		helpers.it("refuses an encodable but wrong owned scalar before publication", function()
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			local called, detail = pcall(function()
+				for _, replacement in ipairs({ "0.12345678901235", '"wrong kind"', "0.0" }) do
+					LeafRows.value_literal = function() return replacement end
+					local value = replacement == "0.0" and -0.0 or 0.12345678901234567
+					local okay, reason, content = root_prepare('a.setting=0.25\nfuture.keep=0.1\n', { section = "a", key = "setting", value = value })
+					helpers.assert_eq(okay, false, "valid syntax alone cannot acknowledge a wrong scalar")
+					helpers.assert_contains(reason, "differs from the requested value")
+					helpers.assert_nil(content)
+				end
+			end)
+			LeafRows.value_literal = original
+			if not called then error(detail, 0) end
+		end)
+	end)
 end
