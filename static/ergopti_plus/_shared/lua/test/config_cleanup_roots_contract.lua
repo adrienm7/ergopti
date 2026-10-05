@@ -123,12 +123,19 @@ function M.register(h, ports)
 		local scan=Engine.find_in_source(source,function() end)
 		h.assert_eq(scan.keys,{})
 	end)
-	h.it('whole unread root: unproven physical root identity is never guessed',function()
+	h.it('whole unread root: proven quoted equals identity permits exact unrelated root cleanup',function()
 		local source='"other=x"=1\nahk={flag=true}\n'
 		local path=(os.getenv('TMPDIR') or '/tmp')..'/ergopti_root_ambiguous_'..ports.driver..'.toml';write(path,source)
+		local backup
 		local ok,detail=pcall(function()
-			h.assert_eq(#only_root(ports.find(path),'ahk'),0);h.assert_eq(read(path),source)
-		end);os.remove(path);if not ok then error(detail,0) end
+			local rows=only_root(ports.find(path),'ahk')
+			h.assert_eq(#rows,1);h.assert_eq(read(path),source)
+			if #rows~=1 then return end
+			h.assert_eq(rows[1].path,{'ahk'})
+			local result=Engine.remove({path=path,keys=rows,file_adapter=ports.file_adapter,stamp='20991005-666666'})
+			backup=result.backup;h.assert_eq(result.status,'removed');h.assert_eq(result.removed,1)
+			h.assert_eq(read(backup),source);h.assert_eq(read(path),'"other=x"=1\n')
+		end);os.remove(path);if backup then os.remove(backup) end;if not ok then error(detail,0) end
 	end)
 	h.it('whole unread root: a current marked descendant refuses a forged whole root before backup',function()
 		local source='hotstrings={trigger_char="@",future=1}\n'
@@ -195,5 +202,82 @@ function M.register(h, ports)
 		end)
 	end
 
+
+	-- New independent complete images exercise physical key/value boundaries;
+	-- source tokens and survivor bytes are authored here, never serialized.
+	local equal_vectors = {
+		{ id = "basic neighbor", source = '"other=x"=1\nahk={flag=true}\n', expected = '"other=x"=1\n' },
+		{ id = "literal neighbor", source = "'other=x'=false\nahk={flag=true}\n", expected = "'other=x'=false\n" },
+		{ id = "escaped quote", source = '"other\\\"=x"={empty=[],kind={}}\nahk={flag=true}\n', expected = '"other\\\"=x"={empty=[],kind={}}\n' },
+		{ id = "escaped equals", source = '"other\\u003dx"=[0.1,9223372036854775807]\nahk={flag=true}\n', expected = '"other\\u003dx"=[0.1,9223372036854775807]\n' },
+		{ id = "dotted quoted parent", source = '"other=x".value=[\n  "[ahk.not-a-header]",\n]\nahk={flag=true}\n', expected = '"other=x".value=[\n  "[ahk.not-a-header]",\n]\n' },
+		{ id = "multiline value", source = '"other=x"="""line\n[ahk.not-a-header]\nvalue=inside\n"""\nahk={flag=true}\n', expected = '"other=x"="""line\n[ahk.not-a-header]\nvalue=inside\n"""\n' },
+		{ id = "quoted retired child", source = 'ahk."legacy=x"=[\n {flag=false},\n]\n"other=x"={empty=[],kind={}}\n', expected = '"other=x"={empty=[],kind={}}\n' },
+		{ id = "header child and case sibling", source = '"other=x"={keep=true}\nahk.flag=true\n[ahk.child]\n"legacy=x"={flag=true}\n[AHK]\n"legacy=x"=false\n', expected = '"other=x"={keep=true}\n[AHK]\n"legacy=x"=false\n' },
+	}
+	for _, vector in ipairs(equal_vectors) do
+		h.it("physical equals boundary: native cleanup and backup " .. vector.id, function()
+			sequence = sequence + 1
+			local path = (os.getenv('TMPDIR') or '/tmp') .. '/ergopti_root_equals_' .. ports.driver .. '_' .. sequence .. '.toml'
+			write(path, vector.source)
+			local backup
+			local okay, detail = pcall(function()
+				local rows = only_root(ports.find(path), 'ahk')
+				h.assert_eq(#rows, 1); h.assert_eq(read(path), vector.source)
+				if #rows ~= 1 then return end
+				local result = Engine.remove({ path = path, keys = rows, file_adapter = ports.file_adapter, stamp = '20991005-555555' })
+				backup = result.backup
+				h.assert_eq(result.status, 'removed'); h.assert_eq(result.removed, 1)
+				h.assert_eq(read(backup), vector.source); h.assert_eq(read(path), vector.expected)
+				local after, shapes = Codec.decode_with_shapes(read(path))
+				h.assert_nil(after.ahk)
+				if vector.id == 'escaped quote' then
+					h.assert_eq(shapes.arrays[after['other"=x'].empty], true)
+					h.assert_eq(shapes.arrays[after['other"=x'].kind], nil)
+				end
+			end)
+			os.remove(path); if backup then os.remove(backup) end
+			if not okay then error(detail, 0) end
+		end)
+	end
+	h.it('physical equals boundary: changed source refuses before backup and a fresh preview preserves the successor', function()
+		local source = '"other=x"=0.1\nahk={flag=true}\n'
+		local path = (os.getenv('TMPDIR') or '/tmp') .. '/ergopti_root_equals_changed_' .. ports.driver .. '.toml'
+		local successor = '"other=x"=0.10000000000000000001\nahk={flag=true}\n'
+		write(path, source)
+		local backup
+		local okay, detail = pcall(function()
+			local rows = only_root(ports.find(path), 'ahk'); h.assert_eq(#rows, 1)
+			if #rows ~= 1 then return end
+			write(path, successor)
+			local result = Engine.remove({ path = path, keys = rows, file_adapter = ports.file_adapter, stamp = '20991005-444444' })
+			backup = result.backup; h.assert_eq(result.status, 'write_failed'); h.assert_eq(result.removed, 0)
+			h.assert_nil(io.open(backup, 'rb')); h.assert_eq(read(path), successor)
+			rows = only_root(ports.find(path), 'ahk'); h.assert_eq(#rows, 1)
+			result = Engine.remove({ path = path, keys = rows, file_adapter = ports.file_adapter, stamp = '20991005-444444' })
+			backup = result.backup; h.assert_eq(result.status, 'removed')
+			h.assert_eq(read(backup), successor); h.assert_eq(read(path), '"other=x"=0.10000000000000000001\n')
+		end)
+		os.remove(path); if backup then os.remove(backup) end
+		if not okay then error(detail, 0) end
+	end)
+	for _, source in ipairs({ '"other=x"=1\n\'other=x\'=2\nahk={flag=true}\n', '"open=x=1\nahk={flag=true}\n' }) do
+		h.it('physical equals boundary: malformed or duplicate key still refuses actual native scan', function()
+			sequence = sequence + 1
+			local path = (os.getenv('TMPDIR') or '/tmp') .. '/ergopti_root_equals_invalid_' .. ports.driver .. '_' .. sequence .. '.toml'
+			write(path, source)
+			local okay, detail = pcall(function()
+				local scan = ports.find(path)
+				if source:sub(1, 6) == '"open=' then
+					-- The existing decoder ignores a line with no external separator;
+					-- physical root admission still refuses its unproven record.
+					h.assert_eq(scan.status, 'ok')
+				else h.assert_eq(scan.status, 'malformed') end
+				h.assert_eq(scan.keys, {})
+				h.assert_eq(read(path), source)
+			end)
+			os.remove(path); if not okay then error(detail, 0) end
+		end)
+	end
 end
 return M
