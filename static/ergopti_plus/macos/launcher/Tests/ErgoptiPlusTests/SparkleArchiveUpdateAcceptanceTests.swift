@@ -230,29 +230,40 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				XCTFail("Private Sparkle child compilation refused: "
 					+ String(reflecting: String((receipt.stdout + receipt.stderr).prefix(6000))))
 			}
-			if phase == .nativeProcessCensus { annotateCensusRefusal(receipt.stdout) }
+			if phase == .nativeProcessCensus, !annotateCensusRefusal(receipt.stdout) {
+				XCTFail("Native Sparkle census refusal: code=diagnostic-unavailable")
+			}
 			throw Failure.command(phase, receipt.status)
 		}
 		return receipt
 	}
 
 	/// Admit only fixed native facts, never arbitrary child diagnostics or paths.
-	private func annotateCensusRefusal(_ stdout: String) {
+	private func annotateCensusRefusal(_ stdout: String) -> Bool {
 		guard stdout.utf8.count <= 512,
-			let packet = try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any],
-			packet["code"] as? String == "path-unavailable" else { return }
+			let packet = try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any] else { return false }
 		func integer(_ key: String, maximum: Int64) -> Int64? {
 			guard let value = packet[key] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
 				value.doubleValue >= 0, value.doubleValue <= Double(maximum),
 				value.doubleValue == Double(value.int64Value) else { return nil }
 			return value.int64Value
 		}
+		if packet["code"] as? String == "stage-refused" {
+			let stages: Set<String> = ["private-root", "library", "inventory", "unexpected"]
+			guard integer("schema", maximum: 3) == 3,
+				Set(packet.keys) == Set(["schema", "code", "helper_pid", "stage"]),
+				let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
+				let stage = packet["stage"] as? String, stages.contains(stage) else { return false }
+			XCTFail("Native Sparkle census refusal: code=stage-refused helper_pid=\(helperPID) stage=\(stage)")
+			return true
+		}
+		guard packet["code"] as? String == "path-unavailable" else { return false }
 		guard let schema = integer("schema", maximum: 2), schema == 1 || schema == 2,
 			let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
-			let pathErrno = integer("path_errno", maximum: 4095) else { return }
+			let pathErrno = integer("path_errno", maximum: 4095) else { return false }
 		var summary = "Native Sparkle census refusal: code=path-unavailable helper_pid=\(helperPID) path_errno=\(pathErrno)"
 		if schema == 1 {
-			guard Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno"]) else { return }
+			guard Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno"]) else { return false }
 		} else {
 			let states: Set<String> = ["creating", "runnable", "sleeping", "stopped", "zombie",
 				"unavailable", "identity-refused", "state-refused", "abi-refused", "diagnostic-refused"]
@@ -260,15 +271,16 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				"bsd_bytes", "bsd_errno", "bsd_state"]),
 				let bytes = integer("bsd_bytes", maximum: 4095),
 				let nativeErrno = integer("bsd_errno", maximum: 4095),
-				let state = packet["bsd_state"] as? String, states.contains(state) else { return }
+				let state = packet["bsd_state"] as? String, states.contains(state) else { return false }
 			if ["creating", "runnable", "sleeping", "stopped", "zombie"].contains(state) {
-				guard bytes == 136, nativeErrno == 0 else { return }
+				guard bytes == 136, nativeErrno == 0 else { return false }
 			}
 			summary += " bsd_bytes=\(bytes) bsd_errno=\(nativeErrno) bsd_state=\(state)"
 		}
 		// These are snapshot facts, never an ownership-closure ACK or PID skip.
 		// XCTest evidence must carry them even when raw CI logs are unavailable.
 		XCTFail(summary)
+		return true
 	}
 
 	private func privateDirectory(_ url: URL) throws {

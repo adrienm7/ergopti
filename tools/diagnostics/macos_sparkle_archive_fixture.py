@@ -248,39 +248,55 @@ def census(roots):
     """Read kernel executable paths, never process arguments or foreign secrets."""
     if sys.platform != "darwin":
         raise RuntimeError("Native Sparkle process observation requires macOS")
-    admitted = [private_directory(root) for root in roots]
-    library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
-    library.proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
-    library.proc_pidpath.restype = ctypes.c_int
-    inventory = subprocess.run(
-        ["/bin/ps", "-axo", "pid=,uid="],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=5,
-    )
-    result = []
-    for line in inventory.stdout.splitlines():
-        fields = line.split()
-        if len(fields) != 2 or any(not field.isdecimal() for field in fields):
-            raise RuntimeError("Native Sparkle process inventory refused")
-        pid, owner = map(int, fields)
-        if owner != os.geteuid():
-            continue
-        buffer = ctypes.create_string_buffer(4096)
-        ctypes.set_errno(0)
-        length = library.proc_pidpath(pid, buffer, len(buffer))
-        path_errno = ctypes.get_errno()
-        if length <= 0:
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
+    stage = "private-root"
+    try:
+        admitted = [private_directory(root) for root in roots]
+        stage = "library"
+        library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+        library.proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+        library.proc_pidpath.restype = ctypes.c_int
+        stage = "inventory"
+        inventory = subprocess.run(
+            ["/bin/ps", "-axo", "pid=,uid="],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        result = []
+        for line in inventory.stdout.splitlines():
+            stage = "inventory"
+            fields = line.split()
+            if len(fields) != 2 or any(not field.isdecimal() for field in fields):
+                raise RuntimeError("Native Sparkle process inventory refused")
+            pid, owner = map(int, fields)
+            if owner != os.geteuid():
                 continue
-            raise NativeCensusRefusal(path_errno, bsd_diagnostic(library, pid, owner))
-        executable = os.fsdecode(buffer.value)
-        if any(executable.startswith(str(root) + "/") for root in admitted):
-            result.append({"pid": pid, "executable": executable})
-    return sorted(result, key=lambda entry: entry["pid"])
+            stage = "unexpected"
+            buffer = ctypes.create_string_buffer(4096)
+            ctypes.set_errno(0)
+            length = library.proc_pidpath(pid, buffer, len(buffer))
+            path_errno = ctypes.get_errno()
+            if length <= 0:
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    continue
+                raise NativeCensusRefusal(path_errno, bsd_diagnostic(library, pid, owner))
+            executable = os.fsdecode(buffer.value)
+            if any(executable.startswith(str(root) + "/") for root in admitted):
+                result.append({"pid": pid, "executable": executable})
+        return sorted(result, key=lambda entry: entry["pid"])
+    except NativeCensusRefusal:
+        raise
+    except Exception as failure:
+        # Retain the original exception type/errno and strict failure semantics.
+        # Only this closed stage can cross the diagnostic boundary.
+        try:
+            failure._sparkle_census_stage = stage
+        except Exception:
+            pass
+        raise
 
 
 def main(arguments):
@@ -293,6 +309,26 @@ def main(arguments):
         raise RuntimeError("Private Sparkle operation refused")
 
 
+CENSUS_FAILURE_STAGES = frozenset({"private-root", "library", "inventory", "unexpected"})
+
+
+def census_stage_packet(failure):
+    """Admit only a closed census stage, never an exception string or path."""
+    try:
+        stage = getattr(failure, "_sparkle_census_stage", None)
+        helper_pid = os.getpid()
+    except Exception:
+        return None
+    if (
+        type(stage) is not str
+        or stage not in CENSUS_FAILURE_STAGES
+        or type(helper_pid) is not int
+        or not 0 < helper_pid <= 2147483647
+    ):
+        return None
+    return {"schema": 3, "code": "stage-refused", "helper_pid": helper_pid, "stage": stage}
+
+
 def entrypoint(arguments):
     """Export fixed refusal facts without changing strict native admission."""
     try:
@@ -301,7 +337,10 @@ def entrypoint(arguments):
         print(json.dumps(failure.packet, sort_keys=True))
         print("Private Sparkle fixture refused.", file=sys.stderr)
         return 1
-    except Exception:
+    except Exception as failure:
+        packet = census_stage_packet(failure)
+        if packet is not None:
+            print(json.dumps(packet, sort_keys=True))
         print("Private Sparkle fixture refused.", file=sys.stderr)
         return 1
     return 0
