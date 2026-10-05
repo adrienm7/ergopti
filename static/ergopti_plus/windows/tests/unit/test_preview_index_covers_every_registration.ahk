@@ -501,9 +501,18 @@ _PICR_DistinctDiscoveredSources(RootSpelling := "temp") {
 		AssertEqual(8, Packs.Length, "neither colliding labels, repeated basenames nor the historical empty stem may disappear from actual discovery")
 		SeenSources := Map()
 		for Pack in Packs {
-			Assert(SubStr(Pack["Path"], 1, StrLen(LongRoot) + 1) == LongRoot . "\", "the canonical discovered file must remain inside the exact owned native root")
-			RelativeFile := SubStr(Pack["Path"], StrLen(LongRoot) + 2)
+			Assert(SubStr(Pack["Path"], 1, StrLen(InputRoot) + 1) == InputRoot . "\",
+				"the discovered route must retain the caller-owned root spelling")
+			RelativeFile := SubStr(Pack["Path"], StrLen(InputRoot) + 2)
 			AssertTrue(SourceFiles.Has(RelativeFile), "only actual fixture-owned source paths are admitted")
+			DiscoveredLongBuffer := Buffer(32768 * 2, 0)
+			DiscoveredLongLength := DllCall("GetLongPathNameW", "Str", Pack["Path"],
+				"Ptr", DiscoveredLongBuffer, "UInt", 32768, "UInt")
+			AssertTrue(DiscoveredLongLength > 0 && DiscoveredLongLength < 32768,
+				"independent Win32 resolution must not truncate the discovered physical path")
+			AssertEqual(LongRoot . "\" . RelativeFile,
+				StrGet(DiscoveredLongBuffer, DiscoveredLongLength, "UTF-16"),
+				"the returned route must resolve to the complete independently created native source")
 			AssertTrue(PersonalFileDescriptorValid(Pack["PersonalSource"]))
 			AssertEqual(SourceFiles[RelativeFile], Pack["PersonalSource"]["id"])
 			AssertFalse(SeenSources.Has(Pack["PersonalSource"]["id"]), "each exact relative file has its own descriptor")
