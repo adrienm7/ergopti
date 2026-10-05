@@ -2038,6 +2038,13 @@ leaving included scopes to their native owners. Existing recursive APIs
 retain exclusions and dynamic policies. Script runtime participation and
 physical acceptance remain separate prerequisites.
 
+Linux and macOS global composition now includes direct Script settings,
+using actual logger, locale, error and native settings owners with verified
+backups, exact inverse receipts and raw successor fences. Hammerspoon void
+setter completion requires matching whole-cohort readback; clear retains
+its native Boolean contract. Portable validation and native qualification
+are recorded separately; installed and device acceptance remain open.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -2871,6 +2878,11 @@ Typed macOS section-order projection warns and preserves malformed rows
 and source-proven empty arrays, refusing requested replacement until
 explicit repair. Its optional native data namespace is declared in the
 shared manifest and schema without adding an enable flag or defaults.
+
+Linux settings source whose current JSON codec cannot preserve exact
+number semantics refuses before publication and keeps the original bytes.
+Some valid fractions and large integers remain unsupported source; this
+conservative boundary does not complete future-data compatibility.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.

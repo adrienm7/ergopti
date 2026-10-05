@@ -242,17 +242,147 @@ function M.storage(opts)
 	local fake = { values = {} }
 	for k, v in pairs(opts.initial or {}) do fake.values[k] = v end
 
+	-- This is an in-memory ownership model, never a native persistence receipt.
+	local gates, aliases, generations, receipts, epoch = {}, {}, {}, setmetatable({}, { __mode = "k" }), 0
+	local json = require("json")
+	local function copy(value)
+		if value == nil then return nil end
+		local bytes = assert(json.encode(value))
+		local cloned = json.decode_lossless(bytes)
+		assert(cloned ~= nil and type(cloned) == type(value), "unsupported model value")
+		return cloned
+	end
+	local function equal(a, b)
+		return type(a) == type(b) and json.encode(a) == json.encode(b)
+	end
+	local function cell(key)
+		return { present = fake.values[key] ~= nil, value = copy(fake.values[key]) }
+	end
+	local function cells_equal(a, b)
+		return a.present == b.present and (not a.present or equal(a.value, b.value))
+	end
+	local function current(record)
+		for _, key in ipairs(record.keys) do
+			if not cells_equal(cell(key), record.expected[key]) or (generations[key] or 0) ~= record.generations[key] then return false end
+		end
+		return true
+	end
+	local function authority(owner, receipt)
+		local gate, record = gates[owner], receipts[receipt]
+		if not gate or gate.busy or not record or not rawequal(record.owner, owner) or not equal(gate.keys, record.keys) then return nil end
+		return gate, record
+	end
+	local function primary_settled(owner)
+		if owner.pending == nil then return true end
+		if type(owner.pending) ~= "function" then return false end
+		local okay, result = pcall(owner.pending)
+		return okay and result == false
+	end
+	function fake.acquire_owned(owner, keys)
+		if type(owner) ~= "table" or gates[owner] or type(keys) ~= "table" then return false end
+		local count, seen, ordered = 0, {}, {}
+		for index in pairs(keys) do if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then return false end; count = count + 1 end
+		if count == 0 then return false end
+		for index = 1, count do
+			local key = keys[index]
+			if type(key) ~= "string" or key == "" or key:find("\0", 1, true) or seen[key] or aliases[key] then return false end
+			seen[key], ordered[index] = true, key
+		end
+		table.sort(ordered); epoch = epoch + 1
+		gates[owner] = { keys = ordered, epoch = epoch, sequence = 0 }
+		for _, key in ipairs(ordered) do aliases[key] = owner end
+		return true
+	end
+	function fake.release_owned(owner)
+		local gate = gates[owner]
+		if not gate or gate.busy or gate.debt ~= nil then return false end
+		gate.busy = true; local settled = primary_settled(owner); gate.busy = false
+		if not settled then return false end
+		for _, key in ipairs(gate.keys) do aliases[key] = nil end
+		gates[owner] = nil; return true
+	end
+	function fake.capture_owned(owner)
+		local gate = gates[owner]
+		if not gate or gate.busy or gate.debt ~= nil then return nil end
+		local okay, snapshot, observed = pcall(function()
+			local values, versions = {}, {}
+			for _, key in ipairs(gate.keys) do values[key], versions[key] = cell(key), generations[key] or 0 end
+			return values, versions
+		end)
+		if not okay then return nil end
+		gate.sequence = gate.sequence + 1; local token = {}
+		receipts[token] = { owner = owner, keys = copy(gate.keys), snapshot = snapshot, expected = copy(snapshot),
+			generations = observed, epoch = gate.epoch, sequence = gate.sequence }
+		return token, copy(snapshot)
+	end
+	function fake.publish_owned(owner, receipt, updates, backup_path, files)
+		local gate, record = authority(owner, receipt)
+		if not gate or record.used or record.epoch ~= gate.epoch or record.sequence ~= gate.sequence
+			or opts.writes_fail or type(updates) ~= "table" or type(backup_path) ~= "string" or backup_path == ""
+			or type(files) ~= "table" or type(files.read_with_status) ~= "function" or type(files.write_if_unchanged) ~= "function" then return false end
+		gate.busy = true
+		local okay, result = pcall(function()
+			local detached = {}
+			for key, value in pairs(updates) do
+				assert(rawequal(aliases[key], owner) and type(value) == "table" and type(value.present) == "boolean", "invalid owned update")
+				assert((value.present and value.value ~= nil) or (not value.present and value.value == nil), "invalid cell")
+				detached[key] = copy(value)
+			end
+			if not current(record) then return false end
+			record.used = true
+			local bytes = assert(json.encode({ format = "ergopti-owned-storage-model-v1", cells = record.snapshot }))
+			if files.write_if_unchanged(backup_path, bytes, { status = "absent" }) ~= true then return false end
+			local observed_bytes, status = files.read_with_status(backup_path)
+			if status ~= "ok" or observed_bytes ~= bytes or not current(record) then return false end
+			for key, value in pairs(detached) do
+				if value.present then fake.values[key] = copy(value.value) else fake.values[key] = nil end
+				generations[key] = (generations[key] or 0) + 1
+				record.generations[key], record.expected[key] = generations[key], cell(key)
+			end
+			record.updates, record.committed = detached, true; return true
+		end)
+		gate.busy = false; return okay and result == true
+	end
+	function fake.restore_owned(owner, receipt)
+		local gate, record = authority(owner, receipt)
+		if not gate then return false end
+		if record.restored or not record.committed then record.restored = true; return true end
+		record.pending, gate.debt = true, record
+		if opts.writes_fail or not current(record) then return false end
+		for key in pairs(record.updates) do
+			local before = record.snapshot[key]
+			if before.present then fake.values[key] = copy(before.value) else fake.values[key] = nil end
+			generations[key] = (generations[key] or 0) + 1
+		end
+		record.restored, record.pending, gate.debt = true, false, nil; return true
+	end
+	function fake.pending_owned(owner, receipt)
+		local record = receipts[receipt]
+		return record ~= nil and rawequal(record.owner, owner) and record.pending == true
+	end
+	function fake.forget_owned(owner, receipt)
+		if type(owner) ~= "table" then return false end
+		local record = receipts[receipt]
+		if not record then return false end
+		if record.forgotten then return rawequal(record.owner_box[1], owner) end
+		local gate = gates[owner]
+		if not rawequal(record.owner, owner) or record.pending or gate ~= nil or not primary_settled(owner) then return false end
+		receipts[receipt] = { forgotten = true, owner_box = setmetatable({ owner }, { __mode = "v" }) }; return true
+	end
+
 	-- The store's file, which the configuration backup copies.
 	function fake.path() return opts.path or "/fake/ergopti_plus/storage.json" end
 
 	function fake.set(key, value)
-		if opts.writes_fail then return false end
+		if opts.writes_fail or aliases[key] ~= nil then return false end
 		fake.values[key] = value
+		generations[key] = (generations[key] or 0) + 1
 		return true
 	end
 	function fake.set_many(values)
 		if opts.writes_fail or type(values) ~= "table" then return false end
-		for key, value in pairs(values) do fake.values[key] = value end
+		for key in pairs(values) do if aliases[key] ~= nil then return false end end
+		for key, value in pairs(values) do fake.values[key] = value; generations[key] = (generations[key] or 0) + 1 end
 		return true
 	end
 
@@ -265,8 +395,9 @@ function M.storage(opts)
 		return stored
 	end
 	function fake.delete(key)
-		if opts.writes_fail then return false end
+		if opts.writes_fail or aliases[key] ~= nil then return false end
 		fake.values[key] = nil
+		generations[key] = (generations[key] or 0) + 1
 		return true
 	end
 	function fake.has(key) return fake.values[key] ~= nil end
@@ -277,7 +408,7 @@ function M.storage(opts)
 		return out
 	end
 	function fake.clear()
-		if opts.writes_fail then return false end
+		if opts.writes_fail or next(aliases) ~= nil then return false end
 		fake.values = {}
 		return true
 	end
