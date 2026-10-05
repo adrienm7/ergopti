@@ -96,7 +96,7 @@ assert.ok(retain.includes('${{ runner.temp }}/tooltip-provisioning'));
 const root = path.resolve(__dirname, '..', '..');
 const calls = [];
 const silent = { log: () => {}, error: () => {} };
-const completed = { status: 0, stdout: '', stderr: 'Ran 38 tests in 0.01s\n\nOK\n' };
+const completed = { status: 0, stdout: '', stderr: 'Ran 48 tests in 0.01s\n\nOK\n' };
 assert.equal(
 	run({
 		...silent,
@@ -126,6 +126,12 @@ for (const receipt of [
 	{ ...completed, error: new Error('Python unavailable') },
 	{ ...completed, stderr: 'Ran 0 tests in 0.01s\n\nOK\n' },
 	{ ...completed, stderr: 'Ran 37 tests in 0.01s\n\nOK\n' },
+	{ ...completed, stderr: 'Ran 38 tests in 0.01s\n\nOK\n' },
+	{ ...completed, stderr: 'Ran 44 tests in 0.01s\n\nOK\n' },
+	{ ...completed, stderr: 'Ran 45 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...completed, stderr: 'Ran 45 tests in 0.01s\n\nOK\n' },
+	{ ...completed, stderr: 'Ran 47 tests in 0.01s\n\nOK\n' },
+	{ ...completed, stderr: 'Ran 48 tests in 0.01s\n\nOK (skipped=1)\n' },
 	{ ...completed, stderr: 'Ran 38 tests in 0.01s\n\nOK (skipped=1)\n' }
 ])
 	assert.equal(run({ ...silent, spawn: () => receipt }), 1);

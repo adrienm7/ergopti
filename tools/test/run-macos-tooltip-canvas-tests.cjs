@@ -50,8 +50,8 @@ function run({
 	}
 	const output = `${result.stdout || ''}\n${result.stderr || ''}`;
 	const count = /^Ran (\d+) tests? in .+$/m.exec(output);
-	if (!count || Number(count[1]) < 38 || !/^OK$/m.test(output)) {
-		error('macOS tooltip pure controls did not complete all 38 cases without skips');
+	if (!count || Number(count[1]) < 48 || !/^OK$/m.test(output)) {
+		error('macOS tooltip pure controls did not complete all 48 cases without skips');
 		return 1;
 	}
 	log(`macOS tooltip pure controls: ${count[1]} passed; native canvas execution remains separate`);
