@@ -62,6 +62,86 @@
 			"expected": ""
 		},
 		{
+			"id": "notes_empty_string_with_following_metadata",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"\",\"assets\":[]}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "notes_literal_backslash_n",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Literal \\\\n example\",\"assets\":[]}"
+			},
+			"expected": "Literal \\n example"
+		},
+		{
+			"id": "notes_literal_backslash_r",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Literal \\\\r example\",\"assets\":[]}"
+			},
+			"expected": "Literal \\r example"
+		},
+		{
+			"id": "notes_literal_backslash_t",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Literal \\\\t example\",\"assets\":[]}"
+			},
+			"expected": "Literal \\t example"
+		},
+		{
+			"id": "notes_trailing_backslash",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Trailing \\\\\",\"assets\":[]}"
+			},
+			"expected": "Trailing \\"
+		},
+		{
+			"id": "notes_escaped_delimiter_and_backslash",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Quoted \\\"} ]\\\" \\\\\",\"assets\":[]}"
+			},
+			"expected": "Quoted \"} ]\" \\"
+		},
+		{
+			"id": "notes_tab",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Tab\\tseparated\",\"assets\":[]}"
+			},
+			"expected": "Tab\tseparated"
+		},
+		{
+			"id": "notes_control_escapes",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Back\\bform\\f\",\"assets\":[]}"
+			},
+			"expected": "Back\bform\f"
+		},
+		{
+			"id": "notes_unicode",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Unicode \\u03b1 \\ud83d\\ude00\",\"assets\":[]}"
+			},
+			"expected": "Unicode α 😀"
+		},
+		{
+			"id": "notes_escaped_slash",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"https:\\/\\/example.invalid\\/notes\",\"assets\":[]}"
+			},
+			"expected": "https://example.invalid/notes"
+		},
+		{
 			"id": "asset_found",
 			"category": "parse_asset_url",
 			"input": {

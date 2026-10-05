@@ -1420,6 +1420,27 @@ These are software implementations; final hardware verification remains below.
   Other parser helpers, URL admission, update policy and reserved surfaces
   are unchanged; no duplicate Linux selector is introduced.
 
+- [~] **L102.** Shared release-notes JSON decoding: read the selected release
+  object's string body with the existing common decoder. Sequential manual
+  substitutions had corrupted literal backslash examples, left tab/Unicode
+  escapes encoded and captured extra metadata after empty/trailing-backslash
+  notes. Nested body/null fields could hide the real description. Decode once,
+  preserve the established Lua carriage-return removal and single return
+  value, and retain every prior assertion. Ten universal common vectors and
+  an explicit shared Lua contract cover twenty-one new registered checks;
+  all seventy-three focused checks pass after sixteen original failures.
+  Twelve real verified-TLS/public updater cases have eight original failures
+  and pass after on current curl/LuaJIT, signed Ubuntu 22.04 dependencies and
+  actual stock Lua 5.4. Preserve exact independently authored text, canonical
+  assets, complete responses, callback count and native handle settlement;
+  no archive is fetched or installed. Register both native interpreters for
+  future Linux CI without launching workflows. Windows already decodes the
+  universal escapes by source but retains distinct legacy wrapper, textual
+  field and CR behavior; those differences remain documented, unmodified and
+  unexecuted. macOS displays notes through the shared JSON.parse frontend.
+  This fix depends on L101's shared decoder import. Other parser helpers,
+  Markdown policy, native transports and reserved surfaces are unchanged.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
