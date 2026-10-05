@@ -1375,6 +1375,16 @@ jobs:
           xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
         timeout-minutes: 5
 
+      - name: Typing NONE clears actual WebKit rows and retains ALL controls
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          timeout 180s dbus-run-session -- xvfb-run -a luajit tests/hardware/run_typing_none_webkit.lua
+        timeout-minutes: 5
+
       # The release list a user opens from the tray, opened: real WebKit, the
       # Linux bridge fetching GitHub's releases through its curl adapter. It
       # opened on the stable channel, which hides prereleases, and every
