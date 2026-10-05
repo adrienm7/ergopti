@@ -1,0 +1,98 @@
+{
+	"baseline_sha": "88909124461a3dbdfe5b745453fe50333eb64adc",
+	"scope": "retired Linux API provider publication",
+	"todo_removed": [],
+	"passed": {
+		"format": true,
+		"js_checks": 359,
+		"portable_macos_unit": {
+			"passed": 14662,
+			"failed": 0,
+			"modules": 1505
+		},
+		"portable_macos_e2e": {
+			"passed": 101,
+			"failed": 0,
+			"skipped": 1
+		},
+		"linux_e2e": {
+			"passed": 189,
+			"failed": 0
+		},
+		"linux_http_stream_receipts": "passed using actual curl/libuv",
+		"linux_unit_corrected": {
+			"passed": 7841,
+			"failed": 0,
+			"modules": 381
+		},
+		"independent_focused_luajit": 168,
+		"independent_focused_lua54": 140
+	},
+	"initial_failed": {
+		"gate": "Linux units",
+		"passed": 7839,
+		"failed": 2,
+		"cause": "two existing private-removal fixture cases omitted new publication metadata port",
+		"correction": "add known Cerebras unpublished receipt; all original assertions unchanged",
+		"regression_control": {
+			"old_passed": 38,
+			"old_failed": 2,
+			"new_passed": 40,
+			"new_failed": 0
+		}
+	},
+	"not_executed": [
+		"hosted native qualification for this SHA",
+		"physical devices/wizard/input/restart"
+	],
+	"evidence": [
+		{
+			"path": "full-group1-api-verify.log",
+			"bytes": 4459312,
+			"sha256": "ef86847142d2071330fba4751f4f7bf82476c92f691527a703fbed6ad9ed0ea2"
+		},
+		{
+			"path": "full-group1-api-verify.exit",
+			"bytes": 2,
+			"sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+		},
+		{
+			"path": "full-group1-api-linux-rerun.log",
+			"bytes": 1636077,
+			"sha256": "34b98680422253bf1896f0f1831b58236bee55c18199668cb63811d860ebda29"
+		},
+		{
+			"path": "full-group1-api-linux-rerun.exit",
+			"bytes": 2,
+			"sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+		},
+		{
+			"path": "api-partial-format.log",
+			"bytes": 104,
+			"sha256": "3fe2f34fc057e4c23b37efcd70c1deadccd084dee8d7c5cc2cc3af804d69cb18"
+		},
+		{
+			"path": "api-partial-format.exit",
+			"bytes": 2,
+			"sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+		},
+		{
+			"path": "full-group1-review/retired-api-current-focused-results.json",
+			"bytes": 3533,
+			"sha256": "bb1e0099809bde8e9fecc67a2d80532ef0d240438cee679c904d3aa519b4da0e"
+		},
+		{
+			"path": "full-group1-review/api-fixture-independent-review.json",
+			"bytes": 677,
+			"sha256": "5a03de05d8fce8cbdc336111600d91808523dc4cd0a56f89e28815563411c7c2"
+		}
+	],
+	"feature_commit": "49ec6ee20cc504dccb09aabb1b918036f2195e08",
+	"integrated_merge": "e253e0a904bd34a3be13b3fbec67fca56d633778",
+	"exact_final_document_js_rerun": {
+		"passed": 359,
+		"failed": 0,
+		"exit_code": 0,
+		"log": "api-partial-js.log"
+	}
+}

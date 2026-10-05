@@ -1033,10 +1033,22 @@ const CHECKS = [
 		repro: 'npm run test:linux-http-stream-registration'
 	},
 	{
+		name: 'Linux native runtime prerequisite gate retains both ABIs and mandatory receipts',
+		cmd: 'node',
+		args: ['tools/test/test-linux-runtime-native-registration.cjs'],
+		repro: 'npm run test:linux-runtime-native-registration'
+	},
+	{
 		name: 'Desktop verdicts and parallel shared-core gates',
 		cmd: 'node',
 		args: ['tools/test/test-desktop-ci-evidence.cjs'],
 		repro: 'npm run test:desktop-ci-evidence'
+	},
+	{
+		name: 'macOS canvas job admission and pure Python ownership remain mandatory',
+		cmd: 'node',
+		args: ['tools/test/test-macos-tooltip-canvas-admission.cjs'],
+		repro: 'npm run test:macos-tooltip-canvas-admission'
 	},
 	{
 		name: 'Linux WebViews use pinned offline code and one bridge per page',
