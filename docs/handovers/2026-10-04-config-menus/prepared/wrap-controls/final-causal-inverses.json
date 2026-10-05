@@ -1,0 +1,20 @@
+{
+	"original-native-provider": {
+		"exit_status": 1,
+		"passed": 27,
+		"failed": 13
+	},
+	"original-menu-child-field": {
+		"exit_status": 1,
+		"passed": 33,
+		"failed": 7
+	},
+	"source-census-inverse": {
+		"counts": {
+			"windows": 95,
+			"macos": 150,
+			"linux": 93
+		}
+	},
+	"TODO_scope_actual_comparison": "Only54/81blocks differ; entire outside byte content identical."
+}

@@ -67,6 +67,67 @@ JsonParse(text) {
 }
 
 /**
+ * Returns original JSON member spans for an object selected by decoded key parts.
+ * Validates the complete document first and retains the parser's last-member-wins
+ * identity. Offsets are one-based UTF-16 positions for SubStr, not byte offsets.
+ * @param {string} text Complete JSON source.
+ * @param {Array} pathParts Decoded object keys, or omitted for the root object.
+ * @returns {Map} Decoded key -> value/member start, length and exact source text.
+ * @throws {Error} Invalid JSON, a missing key or a selected non-object value.
+ */
+JsonObjectMemberSpans(text, pathParts := unset) {
+	JsonParse(text)
+	parts := IsSet(pathParts) ? pathParts : []
+	if !(parts is Array)
+		throw TypeError("JSON member paths require an array of decoded string keys.")
+	position := 1
+	for part in parts {
+		if !(part is String)
+			throw TypeError("JSON member paths require decoded string keys.")
+		; Native Map keys stop at NUL; reject the complete decoded part before lookup.
+		loop StrLen(part)
+			if NumGet(StrPtr(part), (A_Index - 1) * 2, "UShort") = 0
+				throw ValueError("JSON member paths cannot contain NUL code units.")
+		members := _JsonObjectMemberSpansAt(&text, position)
+		if !members.Has(part)
+			throw ValueError("JSON object has no selected member.", -1, part)
+		position := members[part]["start"]
+	}
+	return _JsonObjectMemberSpansAt(&text, position)
+}
+
+; The public span owner validates the whole source before walking selected objects.
+; Reuse the codec's own token progress rather than a second JSON scanner.
+_JsonObjectMemberSpansAt(&text, position) {
+	_JsonSkipWs(&text, &position)
+	if (SubStr(text, position, 1) != "{")
+		throw TypeError("Selected JSON member is not an object.")
+	position++
+	members := Map()
+	_JsonSkipWs(&text, &position)
+	if (SubStr(text, position, 1) == "}")
+		return members
+	loop {
+		_JsonSkipWs(&text, &position)
+		memberStart := position
+		key := _JsonParseString(&text, &position, true)
+		_JsonSkipWs(&text, &position)
+		position++
+		_JsonSkipWs(&text, &position)
+		valueStart := position
+		_JsonParseValue(&text, &position, 1)
+		members[key] := Map("start", valueStart, "length", position - valueStart,
+			"text", SubStr(text, valueStart, position - valueStart),
+			"member_start", memberStart, "member_length", position - memberStart,
+			"member_text", SubStr(text, memberStart, position - memberStart))
+		_JsonSkipWs(&text, &position)
+		if (SubStr(text, position, 1) == "}")
+			return members
+		position++
+	}
+}
+
+/**
  * Encodes one value as a complete JSON string literal.
  * @param value Value converted to String before encoding.
  * @param {boolean} escapeHtml Also neutralise HTML parser delimiters when the

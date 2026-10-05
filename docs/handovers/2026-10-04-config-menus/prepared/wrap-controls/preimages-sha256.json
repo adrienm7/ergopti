@@ -1,0 +1,91 @@
+{
+	"prerequisite": {
+		"tap_delay_prerequisite_patch_sha256": "b5b892d8e9c333a33b57acd23075d6a0fb4c69e7a152915f08a6a69968b8f712",
+		"parity_prerequisite_postimage_sha256": "5dec06318bfa448565c6f3006696359742ded84338006b5d925727692da2ac65",
+		"inherited_renderer_compiler_native_owner_bytes_unchanged": {
+			"static/ergopti_plus/_shared/lua/menu/renderer.lua": "2e31d51b7a241d0cbe3c45d8315c78055e75b79478352dc30e24d559b4b1c4e8",
+			"static/ergopti_plus/windows/infra/manifest_menu.ahk": "1e10a67880ecc998807e088025056463f8d3a70ee36bfc58126713f8f88c61d1",
+			"tools/build/build-menu-manifest.js": "291be363d85123635352054a8d55cf74b44314f856572848f9195d1afc293b21",
+			"static/ergopti_plus/windows/ui/menu/menu_taphold.ahk": "e5f650201029549e66fb6401001484b10ffbaf559226f313376b47e61c6b017e",
+			"static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua": "d59554403181029920b703f50049997ef7c0a1cc3d41c42b9731b336d21d3707",
+			"static/ergopti_plus/linux/ui/menu/menu_builder.lua": "c121e9ae307370f442a4c0a8035431d9d1fbde2ec8b47627baa837fbb544fdff"
+		}
+	},
+	"paths": {
+		"docs/ERGOPTIPLUS_TODO.md": {
+			"preimage_sha256": "ada55a83d08b03d0398b781cbecb5fa7c522d0c640ca7059515c80738afae704",
+			"postimage_sha256": "d450b753ee701b7dab04e4d79c3394fc28059ab514d440e903d09ea2d306392f",
+			"bytes": 348546
+		},
+		"static/ergopti_plus/_shared/modules/features/manifest.toml": {
+			"preimage_sha256": "a07a92aea87e020aac8218c1a3ec5fbdc080210a767a46d2824b752d2786bdcb",
+			"postimage_sha256": "dfb119b81faf75a06114ef697dd4e9605825308f76fd0b59b2ebd52b9c330b2f",
+			"bytes": 205036
+		},
+		"static/ergopti_plus/_shared/modules/menu/menu_manifest.json": {
+			"preimage_sha256": "ffccb27ed23556b5317ad27b62347915e659bd50a0e6a30b4daaac6a8c0c9143",
+			"postimage_sha256": "c420182380295d5f724c5f373cb82bf2416aae4ec152c74f8ead395050e99e4e",
+			"bytes": 50459
+		},
+		"static/ergopti_plus/_shared/tests/corpus/menus/wrap_symbol_controls.json": {
+			"preimage_sha256": null,
+			"postimage_sha256": "3bbdac1308427ccec2e4c7ecfe99a27c85adec08fcada21f0395ef340fd46b52",
+			"bytes": 3070
+		},
+		"static/ergopti_plus/macos/tests/unit/ui/menu/test_menu_shortcuts_wrap_groups_populated.lua": {
+			"preimage_sha256": "4272d057c28b0ac804dacfb08d4bab3188e2eb0586e185147564b50c2b4b1e63",
+			"postimage_sha256": "2f55d4539d90bdcb131485dee0570cb239bb57077d02ee28d200001aa14dce42",
+			"bytes": 19189
+		},
+		"static/ergopti_plus/macos/tests/unit/ui/menu/test_wrap_symbol_utf8_validation.lua": {
+			"preimage_sha256": "bb9e5ed8b99f52f34af2cfbe378322c980320229ea6ca3fc05c4571b42b27df7",
+			"postimage_sha256": "4d91367b84e46cdeeeb60a5b422e3a735296cde8b2f9fb0bb0de862666a4b82f",
+			"bytes": 6173
+		},
+		"static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua": {
+			"preimage_sha256": "c276af8a4bb164ac8d3f33ac34cd4e4c2032c9498e2890a61912469a4f21392c",
+			"postimage_sha256": "c61f826c99d736e1fb20ed55df927f53821956646a0d961eaa678a5a58c5bed2",
+			"bytes": 35983
+		},
+		"static/ergopti_plus/windows/tests/unit/test_wrap_symbols_global_transaction_20260813.ahk": {
+			"preimage_sha256": "65cdcc3c19d07bd65533d880c955385b3d32aedda8d98a1b2e0e136aa3921799",
+			"postimage_sha256": "90a2bc014d498fa40c2b7efd110b3891256dbd67962a4185823e35092ca2e203",
+			"bytes": 27592
+		},
+		"static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk": {
+			"preimage_sha256": "5c043f5cb6df1c3d9e6c718098bfa9a945166b0b739365ed6edb8732c793e2ef",
+			"postimage_sha256": "efe907ebc220059cf6cede790bed4cbc65dbe76e1729d853dc20a07c3738c2fd",
+			"bytes": 18101
+		},
+		"tools/test/native-menu-rows-baseline.json": {
+			"preimage_sha256": "c68c4afaaf0c4147ed55a10b0e26a24e0c26001bfa51f084c6ba887a4b2b2390",
+			"postimage_sha256": "3a6faea17cf824b27be026445375f125094e47283ee3fd6e2112362126aecf99",
+			"bytes": 17333
+		},
+		"tools/test/test-menu-manifest.cjs": {
+			"preimage_sha256": "7edff59d2fc427696eeed1f117905cecaf3a5ea439c8f96ca5bba420fb601c96",
+			"postimage_sha256": "8c97ce31e2cb6b6e8124b7cd4004c9c634c6a12f0b76864dfcd6a473545429fa",
+			"bytes": 86924
+		},
+		"tools/test/test-menu-parity.cjs": {
+			"preimage_sha256": "5dec06318bfa448565c6f3006696359742ded84338006b5d925727692da2ac65",
+			"postimage_sha256": "7e7ee01704b17d21b61b99c085bd21819c6a284df40bac70196ddb25602fe180",
+			"bytes": 45335
+		}
+	},
+	"patch_sha256": "b4b837767a9d7b4f725173e23c14c8592681b31168fb485c49ecb40b37ef6771",
+	"owned_paths": 12,
+	"existing_registered_test_prefixes_preserved": true,
+	"original_unicode_fixture_exact_except_actual_template_delegation": true,
+	"every_previous_shared_corpus_byte_identical": true,
+	"all_original_CJS_assertion_lines_exact_and_ordered": true,
+	"only_TODO54_and_81_blocks_changed": true,
+	"generator_repeat_identical": true,
+	"windows_native_execution": "Unexecuted; five appended registered owning cases require actual Windows qualification.",
+	"native_source_census": {
+		"before": [95, 150, 93],
+		"after": [84, 139, 93],
+		"removed_fixed_sites": [11, 11, 0],
+		"added_sites": [0, 0, 0]
+	}
+}

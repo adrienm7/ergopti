@@ -5,4 +5,5 @@ schema_version = 10
 
 [llm.trigger]
 debounce_ms = 200
+shortcut = false
 url_bar_filter_enabled = false

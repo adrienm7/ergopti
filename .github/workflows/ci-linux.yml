@@ -250,7 +250,8 @@ jobs:
         run: |
           set -euo pipefail
           profile_user="ergopti_sqlite_${RANDOM}"
-          profile_home=$(mktemp -d "$RUNNER_TEMP/ergopti-sqlite-profile-XXXXXX")
+          # A new account cannot traverse the runner's private temporary parent.
+          profile_home=$(mktemp -d /tmp/ergopti-sqlite-profile-XXXXXX)
           sudo useradd --user-group --no-create-home --home-dir "$profile_home" --shell /bin/sh "$profile_user"
           cleanup() {
             sudo userdel "$profile_user"
@@ -265,7 +266,7 @@ jobs:
           sudo install -m 600 tests/hardware/fixtures/sqlite_profile.conf "$profile_home/.sqliterc"
           sudo chown -R "$profile_user:$profile_user" "$profile_home"
           sudo chmod -R u+rwX,go-rwx "$profile_home"
-          sudo runuser -u "$profile_user" -- sh -c 'cd "$1"; exec env TMPDIR="$2" LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_init_receipts.lua' sh "$profile_home/source/linux" "$profile_home"
+          sudo runuser -u "$profile_user" -- sh -ec 'cd "$1"; exec env TMPDIR="$2" LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_init_receipts.lua' sh "$profile_home/source/linux" "$profile_home"
         timeout-minutes: 1
 
       - name: Keep native shell capture failures free of caller text
@@ -814,7 +815,9 @@ jobs:
       - name: Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
-        run: python3 tests/hardware/run_atspi_interpreter_receipts.py
+        run: |
+          sudo apt-get install -y --no-install-recommends xdotool
+          python3 tests/hardware/run_atspi_interpreter_receipts.py
         timeout-minutes: 1
 
       # The program a user starts, started: the real daemon with --tray on a
