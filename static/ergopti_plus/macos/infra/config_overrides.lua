@@ -22,6 +22,9 @@ local Logger    = require("infra.logger")
 local Storage   = require("adapters.storage")
 local TomlCodec = require("infra.toml.codec")
 local Projection = require("config_override_projection")
+local Manifest = require("infra.manifest_reader")
+local ConfigOutdated = require("config_outdated")
+local FileSystem = require("adapters.file_system")
 local LOG       = "config_overrides"
 
 
@@ -66,15 +69,64 @@ end
 -- ==================================
 
 local function read_committed(path)
-	local open_ok, file_or_err = pcall(io.open, path, "r")
-	if not open_ok or not file_or_err then return nil, "absent" end
-	local file = file_or_err
-	local read_ok, content = pcall(file.read, file, "*a")
-	local close_ok, closed, close_err = pcall(file.close, file)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
-		return nil, tostring(read_ok and (close_err or closed) or content)
+	local category
+	local called, content, status = pcall(FileSystem.read_with_status, path, function(reason)
+		category = type(reason) == "string" and reason or "invalid diagnostic receipt"
+	end)
+	if not called then return nil, "classified reader raised" end
+	if category then return nil, "classified " .. category .. " failure" end
+	if status == "absent" and content == nil then return nil, "absent" end
+	if status == "ok" and type(content) == "string" then return content, nil end
+	return nil, "classified read did not commit"
+end
+
+--- Checks only settings whose native owner has published a value catalogue.
+--- Arbitrary legacy expert scalar keys retain their existing settings contract.
+--- @param row table Exact source identity and projected native setting.
+--- @param decoded table Admitted source document.
+--- @return boolean fits
+--- @return string|nil detail Why the native owner ignores this value.
+local function known_value_fits(row, decoded)
+	local function threshold(value)
+		if type(Logger.LEVELS) ~= "table" or next(Logger.LEVELS) == nil then return true end
+		if type(value) == "string" and Logger.LEVELS[value:upper()] ~= nil then return true end
+		return false, "the value is not a published log threshold"
 	end
-	return content, nil
+	if row.section == "script" and type(row.key) == "string" then
+		local lower = row.key:lower()
+		if lower == "log_level" or lower == "loglevel" then
+			local fits, detail = threshold(row.value)
+			return fits, detail, row.path
+		end
+	elseif row.section == "features" then
+		local path, node = {}, decoded.features
+		for _, segment in ipairs(row.path) do
+			path[#path + 1] = segment
+			if type(node) == "table" then node = node[segment] else node = nil end
+			local setting = table.concat(path, ".")
+			local fits, detail = true, nil
+			local entry = Manifest.find_declared_entry_by_path(setting)
+			if entry then fits, detail = ConfigOutdated.manifest_value_fits(entry, node, "hs") end
+			-- Projection expands dictionaries. A wrong-shaped declared scalar
+			-- must not escape its owner as arbitrary descendant settings.
+			if not fits then return false, detail, path end
+		end
+	end
+	return true
+end
+
+--- Shares the exact rejected source identity between boot publication and cleanup.
+--- @param row table Original override candidate.
+--- @param decoded table Admitted source document.
+--- @return boolean fits
+local function admit_known_value(row, decoded)
+	local fits, detail, path = known_value_fits(row, decoded)
+	if not fits then
+		local segments = { row.section }
+		for _, segment in ipairs(path) do segments[#segments + 1] = segment end
+		ConfigOutdated.report(segments, detail, Logger)
+	end
+	return fits
 end
 
 --- Marks each original source path the legacy setting projection consumes.
@@ -84,7 +136,8 @@ function M.mark_config_reads(decoded, mark)
 	local rows = Projection.prepare(decoded)
 	if not rows then return end
 	for _, row in ipairs(rows) do
-		if row.accepted then mark(row.section, table.unpack(row.path)) end
+		local fits = admit_known_value(row, decoded)
+		if row.accepted and fits then mark(row.section, table.unpack(row.path)) end
 	end
 end
 
@@ -120,6 +173,7 @@ function M.apply(file_path)
 	local applied = 0
 	for _, row in ipairs(candidates) do
 		local section_name, key, value, accepted = row.section, row.key, row.value, row.accepted
+		if not admit_known_value(row, decoded) then goto continue_override end
 		if not accepted then
 			Logger.warn(LOG, "Ignoring non-scalar override in [%s].", section_name)
 			goto continue_override
