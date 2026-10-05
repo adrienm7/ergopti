@@ -5373,6 +5373,20 @@ Partial: the existing macOS native install diagnostic now owns a bounded sampler
 
 TODO 109 remains partial. The managed macOS bootstrap now records the public hs.allowAppleScript() getter, a validated in-process PID and the callable Lua bridge through the existing synchronous boot journal before onboarding can defer boot. Getter observation uses no setter argument and preserves bridge identity; malformed, thrown or missing getters remain unknown. Exact Boolean publication ACK is required, and refusal cannot gain boot authority. Portable registered journal/lifecycle tests pass 16/0 and 9/0; original-source and five behavioral mutations fail. Actual managed macOS observations are pending CI. Callable Lua bridge state does not prove native AppleEvent handler registration or entry, and the existing strict send/timeout/cleanup assertions remain unchanged. The previously observed clean/Karabiner no-prompt -1712 boundary is still unresolved.
 
+Application notifications now use the same generated caption policy through a
+shared wrapper and native macOS/Linux facades. Generic Notifier defaults, custom
+titles and the independent port corpus retain their original contracts. Native
+urgency decorations follow the product prefix; payloads, options, click handlers
+and native return values retain their existing ownership. Two bare labels are
+translated in all21 languages. Independent empty/custom/Unicode policy controls
+pass108 assertions and reject all six generic-bypass controls. Focused macOS
+fixtures pass82 cases on Lua5.4; Linux fixtures pass101 cases on each Lua ABI.
+The new Linux test is explicitly registered. These are controlled fixtures,
+not actual AppKit/D-Bus delivery or packaged acceptance. The Linux LLM enable
+refusal caption remains deferred until the AI owner publishes its active runtime
+projection; its unchanged fixture passes10 cases on each ABI. Native Windows
+console identity, native delivery, packaging and installation remain unfinished.
+
 Windows continuation for item109 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate

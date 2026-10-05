@@ -41,7 +41,7 @@ helpers.describe("notifications.notify", function()
 		end
 		local dispatched, detail = notifications.notify("hello")
 		helpers.assert_true(dispatched, tostring(detail))
-		helpers.assert_eq(captured.title, "Ergopti+")
+		helpers.assert_eq(captured.title, "ErgoptiPlus")
 		helpers.assert_eq(captured.informativeText, "hello")
 	end)
 
@@ -55,7 +55,7 @@ helpers.describe("notifications.notify", function()
 		end
 		local dispatched, detail = notifications.notify("My title", "My body")
 		helpers.assert_true(dispatched, tostring(detail))
-		helpers.assert_eq(captured.title, "My title")
+		helpers.assert_eq(captured.title, "ErgoptiPlus — My title")
 		helpers.assert_eq(captured.informativeText, "My body")
 	end)
 

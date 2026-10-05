@@ -123,7 +123,7 @@ local wpm_tray_readout = RuntimeGuard.optional_require("ui.wpm.tray_readout")
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
 -- a reason to refuse to start.
-local notifier = RuntimeGuard.optional_require("adapters.notifier")
+local notifier = RuntimeGuard.optional_require("adapters.application_notifier")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
@@ -1818,13 +1818,13 @@ local function main()
 						body = i18n_mod.get("updater.up_to_date")
 							:gsub("{1}", (tostring(updater.current_version()):gsub("%%", "%%%%")))
 					end
-					notifier.send(body, { title = i18n_mod.get("updater.title_update"), level = "info" })
+					notifier.send(body, { title = i18n_mod.get("updater.window_title"), level = "info" })
 				end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			-- An update downloaded and installed: the daemon restarts on it.
 			on_update_finished = function(installed, tag, stage)
-				local title = ok_i18n and i18n_mod and i18n_mod.get("updater.title_update") or nil
+				local title = ok_i18n and i18n_mod and i18n_mod.get("updater.window_title") or nil
 				if not installed then
 					if notifier and title then
 						notifier.send(i18n_mod.get(stage == "download" and "updater.install_error_download"
@@ -2098,7 +2098,7 @@ local function main()
 			notify_error = function(key)
 				if notifier and ok_i18n and i18n_mod then
 					notifier.send(i18n_mod.get(key), {
-						title = i18n_mod.get("onboarding.error.title"), level = "error",
+						title = i18n_mod.get("common.error_title"), level = "error",
 					})
 				end
 			end,
@@ -2116,7 +2116,7 @@ local function main()
 			Logger.error(LOG, "%s.", reason)
 			if notifier and ok_i18n and i18n_mod then
 				notifier.send(i18n_mod.get("onboarding.error.open_failed"), {
-					title = i18n_mod.get("onboarding.error.title"), level = "error",
+					title = i18n_mod.get("common.error_title"), level = "error",
 				})
 			end
 		end,
@@ -2139,7 +2139,7 @@ local function main()
 				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
 				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
 				accepted = notifier.send(body, {
-					title = i18n_mod.get("updater.tray_new_version_title"),
+					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",
 				})
 			end

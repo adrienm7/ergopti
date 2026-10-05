@@ -525,7 +525,7 @@ local function _build_layouts(ctx)
 			return {}
 		end
 		local function notify(key, level)
-			local ok_notifier, Notifier = pcall(require, "adapters.notifier")
+			local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
 			if ok_notifier then
 				Notifier.send(i18n_safe(key), { title = i18n_safe("dialog.magic_key_source.title"), level = level })
 			else

@@ -175,6 +175,7 @@ return {
 	"tests.unit.meta.test_metrics_persist_before_shutdown",
 	"tests.unit.meta.test_monotonic",
 	"tests.unit.meta.test_no_method_call_on_plain_function",
+	"tests.unit.meta.test_application_notifier",
 	"tests.unit.meta.test_notifier_adapter",
 	"tests.unit.meta.test_numeric_prompt",
 	"tests.unit.meta.test_parse_coverage",
