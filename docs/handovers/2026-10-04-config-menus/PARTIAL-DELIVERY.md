@@ -27,6 +27,26 @@ evidence; they do not qualify later sources.
   preconditions/contracts. Production parsing and independent corpora remain
   unchanged. Exact source commits and native outcomes are recorded separately.
 
+## Native fixture qualification checkpoint
+
+Manual [run37282444315](https://github.com/adrienm7/ergopti/actions/runs/37282444315)
+completed with failure. It tests CI `c895ae17a809c89f7ac98ba7970da5cb8a23460c`,
+tree-identical to source `709dc545e902682e8d4e287b8a3ce56000a7d6ec`, with
+`os_lanes=windows+macos`. Later documentation is not part of that tree.
+
+- Passed: shared JS/properties, macOS unit/E2E, and all eleven corrected Windows
+  configuration/menu subjects. Windows units improve from 9,164/25 to
+  9,175/14 with the same 9,189-case census.
+- Failed: fourteen Windows AI/local-server/proxy/timer subjects, plus actual
+  Sparkle process-census and Homebrew owned AppleEvent receiver acceptance in
+  macOS packaging. [Exact subjects](evidence/fixture-native-failure-boundary.json)
+  are retained; equal source alone does not establish their cause.
+- Skipped: Windows engine E2E/package/install, macOS installation, the
+  deliberately unselected Linux lane, and Release / Publish.
+- Not executed: installed-device wizard/tray/input/restart acceptance.
+
+This source checkpoint does not replace qualification after final integration.
+
 ## Remaining implementation
 
 1. Complete the global recommended/neutral scope composition and its rollback,
