@@ -407,4 +407,69 @@ return function(helpers)
 		end)
 	end)
 
+	helpers.describe("scope conditional unlink cleanup debt", function()
+		for _, unlinked in ipairs({ true, false }) do
+			for _, refusal in ipairs({ "false", "truthy", "throw" }) do
+				helpers.it("retains " .. tostring(unlinked) .. " unlink debt across " .. refusal .. " release", function()
+					local options, files, _, _, controls = preset_fixture(nil)
+					local owner = require("config_scope_transaction").new(options)
+					local cleanup_calls, removals, restores = 0, 0, 0
+					local restore = options.restore
+					options.restore = function(snapshot) restores = restores + 1; return restore(snapshot) end
+					helpers.assert_eq(owner.apply("tap_holds", "recommended"), true)
+					local candidate = files.taps
+					local release_allowed = false
+					options.files.remove_if_unchanged = function(path, expected)
+						helpers.assert_eq(path, "taps"); helpers.assert_eq(expected.content, candidate)
+						removals = removals + 1
+						if removals > 1 then files.taps = nil; return true end
+						if unlinked then files.taps = nil end
+						return false, "release retained", function()
+							cleanup_calls = cleanup_calls + 1
+							if release_allowed then return true, nil, unlinked end
+							if refusal == "throw" then error("release threw") end
+							return refusal == "truthy" and "true" or false
+						end
+					end
+					helpers.assert_eq(owner.revert(), false)
+					helpers.assert_eq(owner.pending(), true)
+					helpers.assert_eq(owner.retry_restore(), false, "only literal release acknowledgement settles debt")
+					helpers.assert_eq(owner.apply("tap_holds", "clear"), false)
+					if unlinked then files.taps = "later foreign record" end
+					release_allowed = true
+					helpers.assert_eq(owner.retry_restore(), true)
+					helpers.assert_eq(owner.pending(), false)
+					helpers.assert_eq(cleanup_calls, 2)
+					helpers.assert_eq(restores, 1, "the runtime inverse must settle once")
+					helpers.assert_eq(removals, unlinked and 1 or 2)
+					if unlinked then helpers.assert_eq(files.taps, "later foreign record") end
+				end)
+			end
+		end
+	end)
+
+	helpers.describe("scope refused partial unlink", function()
+		helpers.it("proves absence only after the retained removal lease releases", function()
+			local options, files = preset_fixture(nil)
+			local owner = require("config_scope_transaction").new(options)
+			helpers.assert_eq(owner.apply("tap_holds", "recommended"), true)
+			local release_allowed, cleanup_calls, removals = false, 0, 0
+			options.files.remove_if_unchanged = function(path)
+				removals = removals + 1; files[path] = nil
+				return false, "unlink refused after effect", function()
+					cleanup_calls = cleanup_calls + 1
+					return release_allowed, nil, false
+				end
+			end
+			helpers.assert_eq(owner.revert(), false)
+			helpers.assert_eq(owner.pending(), true)
+			helpers.assert_eq(owner.retry_restore(), false)
+			release_allowed = true
+			helpers.assert_eq(owner.retry_restore(), true)
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_eq(cleanup_calls, 2)
+			helpers.assert_eq(removals, 1)
+		end)
+	end)
+
 end

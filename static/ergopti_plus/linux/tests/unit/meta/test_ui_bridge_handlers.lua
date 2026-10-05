@@ -1127,9 +1127,10 @@ helpers.describe("ui.bridge_handlers", function()
 			}, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
 			helpers.assert_eq(values, {
 				["gestures.enabled"] = false, ["hotstrings.modules.distancesreduction.qu"] = true,
-			}, "an explicit false is a configured value, not an absent one")
+				["hotstrings.trigger_char"] = ";",
+			}, "explicit false and the preserved raw trigger are configured values, not absent ones")
 			table.sort(marked)
-			helpers.assert_eq(marked, { "gestures.enabled", "hotstrings.modules.distancesreduction.qu" },
+			helpers.assert_eq(marked, { "gestures.enabled", "hotstrings.modules.distancesreduction.qu", "hotstrings.trigger_char" },
 				"the unused-key cleanup must never offer a key the wizard reads, and only those")
 		end)
 
@@ -1374,6 +1375,214 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(folder_at_write, target, "the folder switches before any choice is written")
 			helpers.assert_eq(captured.writes[1].path, target .. "/config.toml")
 		end)
+
+		-- The page exposes Linux trigger selection, but forged common characters
+		-- must not turn an ordinary word into a destructive hotstring trigger.
+		for _, case in ipairs({
+			{ ";", "dialog.magic_key.error_common" }, { "ù", "dialog.magic_key.error_common" },
+			{ "e", "dialog.magic_key.error_common" }, { "א", "dialog.magic_key.error_common" },
+			{ "ab", "dialog.magic_key.error_length" }, { "\255", "dialog.magic_key.error_length" },
+			{ "\192\175", "dialog.magic_key.error_length" }, { "", "dialog.magic_key.error_empty" },
+		}) do
+			helpers.it("(onboarding-linux-trigger) refuses unsafe answer " .. case[2] .. " " .. string.format("%q", case[1]), function()
+				local state, values, captured = onboarding_state()
+				local previous = values.config_dir
+				local changes = 0
+				state.i18n.persist_locale = function() changes = changes + 1; return true end
+				state.config_paths.set_config_dir = function() changes = changes + 1; return true end
+				local result = finish(state, { locale = "fr", config_dir = scratch_dir(), operations = {
+					{ path = "gestures.enabled", value = true },
+					{ path = "hotstrings.trigger_char", value = case[1] },
+				} })
+				helpers.assert_eq(result, { done = false })
+				helpers.assert_eq(changes, 0, "the whole payload is refused before changing either preference")
+				helpers.assert_eq(values, { locale = "en", config_dir = previous })
+				helpers.assert_eq(captured.writes, {})
+				helpers.assert_eq(captured.prepared, {})
+				helpers.assert_eq(captured.hidden, 0, "the wizard remains available for retry")
+				helpers.assert_eq(captured.restarts, {})
+				helpers.assert_eq(captured.errors, { case[2] }, "the existing translated reason reaches the user")
+				-- Retrying the same wizard needs no new state or reinitialization.
+				captured.errors = {}
+				state.i18n.persist_locale = function(value) values.locale = value; return true end
+				state.config_paths.set_config_dir = function(value) values.config_dir = value; return true end
+				local retried = finish(state, { locale = "en", config_dir = "", operations = {
+					{ path = "hotstrings.trigger_char", value = "§" },
+				} })
+				helpers.assert_true(retried.done)
+				helpers.assert_eq(captured.errors, {})
+				helpers.assert_eq(captured.writes[1].updates, { { section = "hotstrings", key = "trigger_char", value = "§" } })
+			end)
+		end
+
+		for _, stale in ipairs({ ";", "ù" }) do
+			helpers.it("(onboarding-linux-trigger) preserves an existing outdated trigger until explicit replacement " .. stale, function()
+				local state, _, captured = onboarding_state()
+				local target = scratch_dir()
+				local path = target .. "/config.toml"
+				local raw = '[_meta]\nschema_version = 7\n[hotstrings]\ntrigger_char = "' .. stale
+					.. '"\n[future]\nkeep = "independent"\n'
+				local ok, err = pcall(function()
+					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+					write_file(path, raw)
+					state.writer = require("toml_codec.writer")
+					local ready = handler.on_message({ action = "loadExistingConfig", config_dir = target, request = 17 }, state)
+					helpers.assert_true(ready.loaded)
+					helpers.assert_eq(ready.values["hotstrings.trigger_char"], stale)
+					helpers.assert_contains(captured.pushes[#captured.pushes].code, '"request":17', "the selected folder keeps its request identity")
+					local retained = finish(state, { locale = "en", config_dir = target, operations = {} })
+					helpers.assert_true(retained.done)
+					local fh = assert(io.open(path, "r")); local kept = fh:read("*a"); fh:close()
+					helpers.assert_eq(kept, raw, "an untouched outdated trigger and future neighbor remain byte-exact")
+					local replaced = finish(state, { locale = "en", config_dir = target, operations = {
+						{ path = "hotstrings.trigger_char", value = "§" },
+					} })
+					helpers.assert_true(replaced.done)
+					helpers.assert_eq(captured.errors, {})
+					fh = assert(io.open(path, "r"))
+					local decoded = require("toml_codec").decode(fh:read("*a")); fh:close()
+					helpers.assert_eq(decoded.hotstrings.trigger_char, "§", "the explicit accepted choice replaces only its leaf")
+					helpers.assert_eq(decoded.future.keep, "independent")
+				end)
+				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				if not ok then error(err, 0) end
+			end)
+		end
+
+		for _, fixture in ipairs({
+			{ name = "number", value = 7, toml = "trigger_char = 7\n" },
+			{ name = "false", value = false, toml = "trigger_char = false\n" },
+			{ name = "empty", value = "", toml = 'trigger_char = ""\n' },
+			{ name = "inline table", value = { retained = "independent" }, toml = 'trigger_char = { retained = "independent" }\n' },
+			{ name = "table header", value = { retained = "independent" }, toml = '[hotstrings.trigger_char]\nretained = "independent"\n' },
+		}) do
+			helpers.it("(onboarding-linux-trigger) retains untouched outdated " .. fixture.name .. " and accepts an explicit leaf replacement", function()
+				local state, _, captured = onboarding_state()
+				local target = scratch_dir()
+				local path = target .. "/config.toml"
+				local raw = '[_meta]\nschema_version = 7\n[hotstrings]\n' .. fixture.toml
+					.. '[future]\nkeep = "independent"\n'
+				local ok, err = pcall(function()
+					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+					write_file(path, raw)
+					state.writer = require("toml_codec.writer")
+					local ready = handler.on_message({ action = "loadExistingConfig", config_dir = target, request = 23 }, state)
+					helpers.assert_true(ready.loaded)
+					helpers.assert_eq(ready.values["hotstrings.trigger_char"], fixture.value)
+					local retained = finish(state, { locale = "en", config_dir = target, operations = {} })
+					helpers.assert_true(retained.done)
+					local fh = assert(io.open(path, "r")); local bytes = fh:read("*a"); fh:close()
+					helpers.assert_eq(bytes, raw, "without explicit trigger intent the complete source is byte-exact")
+					local changed = finish(state, { locale = "en", config_dir = target, operations = {
+						{ path = "hotstrings.trigger_char", value = "§" },
+					} })
+					helpers.assert_true(changed.done)
+					helpers.assert_eq(captured.errors, {})
+					fh = assert(io.open(path, "r"))
+					local document = require("toml_codec").decode(fh:read("*a")); fh:close()
+					helpers.assert_eq(document, { _meta = { schema_version = 7 },
+						hotstrings = { trigger_char = "§" }, future = { keep = "independent" } },
+						"explicit replacement changes only the owned leaf, preserving the complete neighbor document")
+				end)
+				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				if not ok then error(err, 0) end
+			end)
+		end
+
+		helpers.it("(onboarding-linux-trigger) retains a concurrent source change and retries after writer publication refusal", function()
+			local state, values, captured = onboarding_state()
+			local previous_dir = values.config_dir
+			local target = scratch_dir()
+			local path = target .. "/config.toml"
+			local raw = '[_meta]\nschema_version = 7\n[hotstrings]\ntrigger_char = false\n[future]\nkeep = "independent"\n'
+			local concurrent = raw .. '# concurrent edit during candidate staging\n'
+			local original_open, staged = io.open, 0
+			local ok, err = pcall(function()
+				helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+				write_file(path, raw)
+				state.writer = require("toml_codec.writer")
+				io.open = function(open_path, mode)
+					local fh, why, code = original_open(open_path, mode)
+					if fh and open_path == path .. ".tmp" and mode == "w" then
+						return {
+							write = function(_, content) return fh:write(content) end,
+							close = function()
+								local closed = fh:close()
+								staged = staged + 1
+								local source = assert(original_open(path, "w"))
+								assert(source:write(concurrent)); assert(source:close())
+								return closed
+							end,
+						}
+					end
+					return fh, why, code
+				end
+				local refused = finish(state, { locale = "fr", config_dir = target, operations = {
+					{ path = "hotstrings.trigger_char", value = "§" },
+				} })
+				io.open = original_open
+				helpers.assert_eq(staged, 1, "the actual writer reaches the concurrent staging boundary")
+				helpers.assert_eq(refused, { done = false })
+				helpers.assert_eq(values, { locale = "en", config_dir = previous_dir }, "the failed commit restores preferences")
+				helpers.assert_eq(captured.errors, { "onboarding.error.write_failed" })
+				helpers.assert_eq(captured.hidden, 0)
+				helpers.assert_eq(captured.restarts, {})
+				local fh = assert(original_open(path, "r")); local bytes = fh:read("*a"); fh:close()
+				helpers.assert_eq(bytes, concurrent, "the real exact-source fence preserves the external edit")
+				helpers.assert_nil(original_open(path .. ".tmp", "r"), "no rejected staging file remains")
+				captured.errors = {}
+				local retried = finish(state, { locale = "en", config_dir = target, operations = {
+					{ path = "hotstrings.trigger_char", value = "§" },
+				} })
+				helpers.assert_true(retried.done)
+				helpers.assert_eq(captured.errors, {})
+				fh = assert(original_open(path, "r")); bytes = fh:read("*a"); fh:close()
+				helpers.assert_true(bytes:find('# concurrent edit during candidate staging', 1, true) ~= nil)
+				helpers.assert_eq(require("toml_codec").decode(bytes).hotstrings.trigger_char, "§")
+			end)
+			io.open = original_open
+			os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+			if not ok then error(err, 0) end
+		end)
+
+		for _, candidate in ipairs({ "§", "★", "→", "😀" }) do
+			helpers.it("(onboarding-linux-trigger) persists and re-reads safe symbol " .. candidate, function()
+				local state, values, captured = onboarding_state()
+				local target = scratch_dir()
+				local path = target .. "/config.toml"
+				local stored = nil
+				if candidate ~= "★" then stored = candidate end
+				local saved_preferences = package.loaded["infra.hotstring_preferences"]
+				local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+				local ok, err = pcall(function()
+					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
+					write_file(path, '[_meta]\nschema_version = 7\n[future]\nkeep = "independent"\n')
+					state.writer = require("toml_codec.writer")
+					local result = finish(state, { locale = "en", config_dir = target, operations = {
+						{ path = "hotstrings.trigger_char", value = candidate },
+					} })
+					helpers.assert_true(result.done)
+					helpers.assert_eq(captured.errors, {})
+					local fh = assert(io.open(path, "r"))
+					local decoded = require("toml_codec").decode(fh:read("*a")); fh:close()
+					helpers.assert_eq(decoded.future.keep, "independent", "a future neighbor is preserved")
+					helpers.assert_eq(decoded._meta.schema_version, 7)
+					helpers.assert_eq((decoded.hotstrings or {}).trigger_char, stored)
+					local preferences = helpers.load_module("infra.hotstring_preferences")
+					preferences._set_file_for_test(path)
+					helpers.assert_true(preferences.refresh())
+					local magic = helpers.load_module("modules.hotstrings.magic_key")
+					helpers.assert_eq(magic.get(), candidate, "a fresh runtime owner reads the wizard's choice")
+					local ready = handler.on_message({ action = "ready" }, state)
+					helpers.assert_eq(ready.data.current["hotstrings.trigger_char"], stored,
+						"a re-run shows the persisted custom value and leaves the default sparse")
+				end)
+				package.loaded["infra.hotstring_preferences"] = saved_preferences
+				package.loaded["modules.hotstrings.magic_key"] = saved_magic
+				os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
+				if not ok then error(err, 0) end
+			end)
+		end
 
 		helpers.it("rejects malformed finish data without writing or closing", function()
 			for label, answers in pairs({
@@ -1792,11 +2001,19 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(handler.update(session_id, 42, "pulling manifest", "line"))
       helpers.assert_true(evaluated[#evaluated].code:find("update(42", 1, true) ~= nil)
 
-      local cancel = handler.on_message("cancel")
+      local cancel = handler.on_message({ action = "cancel", session = session_id })
       helpers.assert_true(cancel.cancelled)
       helpers.assert_eq(cancelled, 1)
       helpers.assert_true(evaluated[#evaluated].code:find("done(false", 1, true) ~= nil)
-      local retry = handler.on_message("retry")
+      helpers.assert_eq(handler.on_message("retry").retried, false, "an unbound retained string cannot retry cancellation")
+      -- A new explicit request owns a failed retry fixture; cancellation itself
+      -- does not keep authorization to restart the retired native operation.
+      local retry_id = handler.show({ kind = "ollama_model", label = "Owned retry fixture",
+        on_retry = function() retried = retried + 1; return true end })
+      helpers.assert_true(handler.complete(retry_id, false, "Independent download failure"))
+      local failure_epoch = handler.on_message("ready").failure_epoch
+      local retry = handler.on_message({ action = "failure_action", id = "retry",
+        session = retry_id, epoch = failure_epoch })
       helpers.assert_true(retry.retried)
       helpers.assert_eq(retried, 1)
       package.loaded["ui.webview_manager"] = previous_manager

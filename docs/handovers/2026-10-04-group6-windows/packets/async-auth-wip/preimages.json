@@ -1,0 +1,6 @@
+{
+	"static/ergopti_plus/windows/adapters/http_client.ahk": "ff5f3584461e46b3bfd114372ea7751cadb2946995d22b88fb37d745a217b62b",
+	"static/ergopti_plus/windows/modules/llm/api_remote.ahk": "72761bb37f4f8dc624129ef09b8fa02e0a6fbb01c00b3d2770768224834b1483",
+	"static/ergopti_plus/windows/tests/unit/test_changelog_network_resilience.ahk": "514b73a2a78715a7ca5603efe2067124487a8bded2163ed213333bbac0c64de9",
+	"static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk": "bb32f8cbcb6280478e6badb7116490de4b67afc2347ba9f4397a90a8c8cdc817"
+}

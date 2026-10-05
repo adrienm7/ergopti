@@ -1591,6 +1591,7 @@ end
 --- @return boolean removed Whether unlink and native release both committed.
 --- @return string|nil detail
 --- @return table|nil receipt Retained physical inverse and release owner.
+--- @return function|nil retry_cleanup Exact release-only owner; never retries unlink.
 function M.remove_if_unchanged(path, expected_source, on_error)
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" or type(expected_source) ~= "table"
@@ -1599,9 +1600,9 @@ function M.remove_if_unchanged(path, expected_source, on_error)
 	end
 	local pending = _conditional_remove_debt
 	if pending then
-		if pending.path ~= path or pending.expected.content ~= expected_source.content then return false, "conditional removal owner changed", pending end
+		if pending.path ~= path or pending.expected.content ~= expected_source.content then return false, "conditional removal owner changed" end
 		local settled, detail = pending.retry()
-		if not settled or pending.removed then return settled, detail, pending end
+		if not settled or pending.removed then return settled, detail, pending, pending.retry_cleanup end
 	end
 	local final, inspect_err = inspect_path(path)
 	if inspect_err ~= nil or final == nil or final.mode ~= "file" then
@@ -1615,32 +1616,42 @@ function M.remove_if_unchanged(path, expected_source, on_error)
 		return false, lock_err
 	end
 	local receipt = { path = path, expected = { status = "ok", content = expected_source.content }, removed = false }
-	local settled = false
+	local settled, removed_by_owner = false, false
 	local function exact_route_and_source()
 		local unchanged, detail = revalidate_write_path(path, resolved, chain)
 		if not unchanged then return false, detail end
 		local entry, entry_err = inspect_path(path)
 		if entry_err ~= nil or (entry ~= nil and entry.mode ~= "file") then return false, "conditional removal final entry changed" end
-		local bytes, status = M.read_with_status(path, on_error)
+		local bytes, status, read_err = M.read_with_status(path, on_error)
 		local same_route, route_detail = revalidate_write_path(path, resolved, chain)
 		if not same_route then return false, route_detail end
 		if receipt.removed then return status == "absent", "conditional removal source was recreated" end
+		if status ~= "ok" and type(on_error) ~= "function" then
+			return false, "source changed before removal: " .. tostring(read_err or status)
+		end
 		return status == "ok" and bytes == receipt.expected.content, "conditional removal source changed"
 	end
 	function receipt.matches_source() return exact_route_and_source() end
 	function receipt.is_settled() return settled end
-	function receipt.retry()
-		if settled then return true end
-		local exact, detail = exact_route_and_source()
-		if not exact then return false, detail end
+	local function retry_cleanup()
+		if settled then return true, nil, removed_by_owner end
 		local released, release_err = release_cooperative_write_lock(lock)
 		if not released then
 			report("cleanup", "error", "Conditional removal release remains pending: %s.", tostring(release_err))
-			return false, release_err
+			return false, release_err, removed_by_owner
 		end
 		settled = true
-		_conditional_remove_debt = nil
+		if _conditional_remove_debt == receipt then _conditional_remove_debt = nil end
 		if release_err ~= nil then report("cleanup", "warn", "Conditional removal release was partial: %s.", tostring(release_err)) end
+		return true, release_err, removed_by_owner
+	end
+	receipt.retry_cleanup = retry_cleanup
+	function receipt.retry()
+		local exact, detail = exact_route_and_source()
+		if not exact then return false, detail end
+		if settled then return true end
+		local released, release_err = retry_cleanup()
+		if not released then return false, release_err end
 		return true
 	end
 	local called, removed, detail = pcall(function()
@@ -1648,7 +1659,7 @@ function M.remove_if_unchanged(path, expected_source, on_error)
 		if not exact then return false, reason end
 		local unlinked, unlink_err = M.remove_exact(resolved)
 		if unlinked ~= true then return false, unlink_err end
-		receipt.removed = true
+		removed_by_owner, receipt.removed = true, true
 		return exact_route_and_source()
 	end)
 	-- The exact native lock remains discoverable even when unlink already ran.
@@ -1659,9 +1670,9 @@ function M.remove_if_unchanged(path, expected_source, on_error)
 	end
 	if not called or removed ~= true then
 		report("removal", "error", "Conditional removal refused: %s.", tostring(called and detail or removed))
-		return false, called and detail or tostring(removed), receipt
+		return false, called and detail or tostring(removed), receipt, retry_cleanup
 	end
-	return released == true, release_err, receipt
+	return released == true, release_err, receipt, retry_cleanup
 end
 
 --- Issues an opaque capability for one actual private native writer owner.

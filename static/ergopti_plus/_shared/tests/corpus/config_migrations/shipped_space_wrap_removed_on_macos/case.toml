@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_space_wrap_removed_on_macos/case.toml
 
 [case]
-description = "The shipped steps delete gestures.space_wrap from an unstamped macOS file and stamp it current."
+description = "Shipped migrations preserve the retired gestures.space_wrap for explicit cleanup and advance an unstamped macOS file."
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 2

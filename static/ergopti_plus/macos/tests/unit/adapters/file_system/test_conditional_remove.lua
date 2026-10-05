@@ -615,3 +615,122 @@ helpers.describe("FileSystem unavailable initial staging identity", function()
 		end)
 	end
 end)
+
+--- Tests the real native remover and both retained inverse contracts.
+local helpers = require("tests.helpers")
+local with_fixture = require("tests.support.file_system_transaction_fixture").with_fixture
+local Writer = require("toml_codec.writer")
+local function seed(path, content)
+	local file = assert(io.open(path, "w")); assert(file:write(content)); assert(file:close())
+end
+
+helpers.describe("conditional removal cleanup bridge", function()
+	helpers.it("keeps the native rich third return and exposes exact release-only fourth return", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			seed(path, "owned")
+			local refused, unlinks = true, 0
+			local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, function() return not refused end)
+			local original_open, original_remove = io.open, os.remove
+			local ok, err = xpcall(function()
+				io.open = function(target, mode)
+					local opened, detail = original_open(target, mode)
+					if target ~= path .. fixture.WRITE_LOCK_SUFFIX or mode ~= "a+" then return opened, detail end
+					return { close = function() if refused then return false end; return opened:close() end }
+				end
+				os.remove = function(target) if target == path then unlinks = unlinks + 1 end; return original_remove(target) end
+				local removed, _, receipt, cleanup = adapter.remove_if_unchanged(path, { status = "ok", content = "owned" })
+				helpers.assert_eq(removed, false)
+				helpers.assert_eq(type(receipt), "table")
+				helpers.assert_eq(type(cleanup), "function")
+				helpers.assert_eq(cleanup, receipt.retry_cleanup)
+				helpers.assert_eq(receipt.removed, true)
+				helpers.assert_eq(receipt.is_settled(), false)
+				seed(path, "foreign")
+				refused = false
+				helpers.assert_eq(receipt.retry(), false)
+				local settled, _, actual_unlink = cleanup()
+				helpers.assert_eq(settled, true)
+				helpers.assert_eq(actual_unlink, true)
+				helpers.assert_eq(receipt.is_settled(), true)
+				helpers.assert_eq(receipt.retry(), false, "guarded acknowledgement remains source-bound after release")
+				helpers.assert_eq(adapter.read(path), "foreign")
+				helpers.assert_eq(unlinks, 1)
+				helpers.assert_eq(cleanup(), true)
+				helpers.assert_eq(unlinks, 1)
+				-- A settled old closure cannot clear a new retained same-path owner.
+				refused = true
+				local removed_again, _, successor, successor_cleanup = adapter.remove_if_unchanged(path, { status = "ok", content = "foreign" })
+				helpers.assert_eq(removed_again, false)
+				helpers.assert_eq(successor.is_settled(), false)
+				helpers.assert_eq(cleanup(), true)
+				helpers.assert_eq(successor.is_settled(), false)
+				helpers.assert_eq(adapter.write(path, "successor bypass"), false)
+				refused = false
+				helpers.assert_eq(successor_cleanup(), true)
+				helpers.assert_eq(successor.is_settled(), true)
+				helpers.assert_eq(unlinks, 2)
+			end, debug.traceback)
+			io.open, os.remove = original_open, original_remove
+			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("default Writer returns matching cleanup while private inverse retains rich receipt", function()
+		local cleanup = function() return true, nil, true end
+		local receipt = { path = "owned", expected = { status = "ok", content = "bytes" } }
+		local files = { remove_if_unchanged = function() return false, "release pending", receipt, cleanup end }
+		local _, _, ordinary = Writer.remove_if_unchanged("owned", files, receipt.expected)
+		local _, _, private = Writer.remove_if_unchanged("owned", files, receipt.expected, { require_conditional = true })
+		helpers.assert_eq(ordinary, cleanup)
+		helpers.assert_eq(private, receipt)
+	end)
+
+	helpers.it("retains legacy native cleanup identity and ordinary success arity", function()
+		local cleanup = function() return false end
+		local files = { remove_if_unchanged = function() return false, "legacy", cleanup end }
+		local _, _, observed = Writer.remove_if_unchanged("owned", files, { status = "ok", content = "bytes" })
+		helpers.assert_eq(observed, cleanup)
+		files.remove_if_unchanged = function() return true, "unused", {}, cleanup end
+		helpers.assert_eq(select("#", Writer.remove_if_unchanged("owned", files, { status = "ok", content = "bytes" })), 1)
+	end)
+
+	helpers.it("does not expose a foreign path or source cleanup to an ordinary inverse", function()
+		for _, receipt in ipairs({
+			{ path = "foreign", expected = { status = "ok", content = "bytes" } },
+			{ path = "owned", expected = { status = "ok", content = "foreign" } }
+		}) do
+			local calls = 0
+			local cleanup = function() calls = calls + 1; return true end
+			local files = { remove_if_unchanged = function() return false, "foreign", receipt, cleanup end }
+			local removed, _, observed = Writer.remove_if_unchanged("owned", files, { status = "ok", content = "bytes" })
+			helpers.assert_eq(removed, false)
+			helpers.assert_eq(observed, nil)
+			helpers.assert_eq(calls, 0)
+		end
+	end)
+
+	helpers.it("retains ordinary concrete read refusal and fixed private diagnostic detail", function()
+		with_fixture(function(fixture)
+			local path = os.tmpname():gsub("\\", "/")
+			seed(path, "owned")
+			local adapter = fixture.make_adapter()
+			local original_read = adapter.read_with_status
+			adapter.read_with_status = function() return nil, "error", "PRIVATE scalar path argv" end
+			local removed, ordinary = adapter.remove_if_unchanged(path, { status = "ok", content = "owned" })
+			helpers.assert_eq(removed, false)
+			helpers.assert_contains(ordinary, "PRIVATE scalar path argv")
+			local categories = {}
+			local private_removed, private_detail = adapter.remove_if_unchanged(path, { status = "ok", content = "owned" }, function(category)
+				categories[#categories + 1] = category
+			end)
+			helpers.assert_eq(private_removed, false)
+			helpers.assert_eq(private_detail, "conditional removal source changed")
+			helpers.assert_eq(categories, { "removal" })
+			adapter.read_with_status = original_read
+			helpers.assert_eq(adapter.read(path), "owned")
+			assert(os.remove(path)); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+		end)
+	end)
+end)
