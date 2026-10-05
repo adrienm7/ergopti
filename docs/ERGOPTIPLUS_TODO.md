@@ -3364,6 +3364,21 @@ Actual curl streaming passes 262 checks per ABI; authenticated discovery passes
 FFI. Hosted qualification and runtime installation/start remain separate; item
 47 stays partial.
 
+The optional owned Linux HTTP authorizer is captured once and reserves its exact
+operation before source/credential callbacks. It requires literal true before
+native dispatch and again after every physical cleanup acknowledgement before
+delivery. Revocation withholds the response while retaining group/handle cleanup;
+metadata exceptions release only the originating reserved owner. Legacy requests
+retain their existing ABI. Twenty-four added independent cases preserve all 645
+old assertion lines: 424/0 on LuaJIT and 421/0 on Lua 5.4. Original-source causal
+rejections and actual detached-group/source-withdrawal probes qualify both ABIs;
+unchanged real curl checks pass 262/0 each, and production LuaJIT authentication
+passes 48/0. The identical 17 Lua 5.4 authentication baseline failures remain
+explicitly unqualified. Callback assertions now run outside protected product
+callbacks, with independent mutants rejecting the previously masked defects.
+Archive installation, runtime activation and desktop acceptance remain separate;
+item 47 stays partial.
+
 Actual root integration command for the extended mandatory native fixture, after activation and in the Linux driver directory:
 
 ```sh
