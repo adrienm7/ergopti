@@ -163,7 +163,7 @@ local CONFIG_INTERVAL_KEY = "check_interval_seconds"
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
-local HTTP_OWNER = "updater"
+local REQUEST_OWNER = "updater"
 local RELEASE_TIMEOUT_MS = 15000
 local MAX_RELEASE_BODY_BYTES = 2 * 1024 * 1024
 -- Transport pages fit the existing 2 MiB ceiling; the canonical URL still
@@ -469,7 +469,7 @@ local function _build_fetch_request(channel, page)
 	local etag_file = etag_cache_path(cache_key)
 	local parent = etag_file:match("^(.*)/[^/]+$")
 	local options = {
-		owner = HTTP_OWNER,
+		owner = REQUEST_OWNER,
 		timeout_ms = RELEASE_TIMEOUT_MS,
 		max_body_bytes = MAX_RELEASE_BODY_BYTES,
 		follow_redirects = true,
@@ -533,6 +533,12 @@ local function _fetch_releases(channel, callback)
 			local status = tonumber(result and result.status) or 0
 			local body = result and result.body
 			if status == 304 then
+				-- Curl retains 304 on a failed transfer; only a completed response
+				-- carries error_body and can validate the cached page's ETag.
+				if type(result.error_body) ~= "string" then
+					finish(nil, status, "incomplete conditional response", "no_connection")
+					return
+				end
 				body = _list_cache[key]
 				if not body then
 					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
@@ -547,7 +553,7 @@ local function _fetch_releases(channel, callback)
 			else
 				all_unchanged = false
 			end
-			local valid, decoded = pcall(Json.decode, body)
+			local valid, decoded = pcall(Json.decode_lossless, body)
 			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
 				or type(decoded) ~= "table" then
 				finish(nil, status, "invalid release page JSON", "parse_failed")
@@ -1090,7 +1096,7 @@ local function start_download(release, download_url, callback, failure_state)
 	local checksum_dispatched = M._http_client.get(release.checksum_url, {
 		["User-Agent"] = USER_AGENT,
 	}, {
-		owner = HTTP_OWNER,
+		owner = REQUEST_OWNER,
 		timeout_ms = RELEASE_TIMEOUT_MS,
 		max_body_bytes = MAX_CHECKSUM_BODY_BYTES,
 		follow_redirects = true,
@@ -1106,7 +1112,7 @@ local function start_download(release, download_url, callback, failure_state)
 
 		Logger.info(LOG, "Downloading authenticated update to %s.", _download_part)
 		M._http_client.download(download_url, { ["User-Agent"] = USER_AGENT }, _download_part, {
-			owner = HTTP_OWNER,
+			owner = REQUEST_OWNER,
 			timeout_ms = DOWNLOAD_TIMEOUT_MS,
 			max_download_bytes = MAX_DOWNLOAD_BYTES,
 			https_only = true,
@@ -1121,7 +1127,7 @@ local function start_download(release, download_url, callback, failure_state)
 				fail("downloaded archive has an invalid size", "verify")
 				return
 			end
-			M._file_digest.sha256(_download_part, { timeout_ms = RELEASE_TIMEOUT_MS },
+			M._file_digest.sha256(_download_part, { timeout_ms = RELEASE_TIMEOUT_MS, owner = REQUEST_OWNER },
 				function(actual, digest_error)
 					if not actual then fail(digest_error or "archive digest failed", "verify"); return end
 					if actual ~= expected then fail("SHA-256 checksum mismatch", "verify"); return end
@@ -1196,9 +1202,9 @@ end
 --- must not pull either out from under it.
 --- @return boolean
 function M.cancel_update()
-	local http_cancelled = M._http_client.cancel(HTTP_OWNER)
+	local http_cancelled = M._http_client.cancel(REQUEST_OWNER)
 	if http_cancelled and _release_fetch_cancel then _release_fetch_cancel() end
-	local digest_cancelled = M._file_digest.cancel()
+	local digest_cancelled = M._file_digest.cancel(REQUEST_OWNER)
 	if not http_cancelled or not digest_cancelled then return false end
 	if _state == "installing" then return true end
 	remove_partial_download()
