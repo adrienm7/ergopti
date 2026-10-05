@@ -21,7 +21,7 @@
 ; ===========================================
 
 /** Owns provider-scoped models GET requests without replacing the HTTP adapter. */
-class LocalServerModelsOwner {
+class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 
 	/**
 	 * @param {Map} Options Catalogue servers, timeout_ms and poll_ms are required.
@@ -333,17 +333,7 @@ class LocalServerModelsOwner {
 		return CurlAsyncRequest()
 	}
 
-	_NativeTimer(Callback, Period) {
-		; This owner only cancels or rearms one exact record's one-shot. An
-		; opaque positive interval must never become an idle repeating poller.
-		if !(Period is Integer) || Period > 0
-			throw TypeError("Models timers require cancellation or a negative one-shot period.")
-		if Period == 0
-			SetTimer(Callback, 0)
-		else
-			SetTimer(Callback, -Abs(Period))
-		return true
-	}
+
 
 	_NativeClock() {
 		return A_TickCount
