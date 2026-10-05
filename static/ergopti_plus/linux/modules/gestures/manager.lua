@@ -39,6 +39,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
+local BindingIdentity = require("config_binding_identity")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
@@ -92,6 +93,28 @@ if not _ok_catalogue or type(Catalogue) ~= "table" or type(Catalogue.actions) ~=
 	or type(Catalogue.sg_items) ~= "table" or type(Catalogue.slots) ~= "table" then
 	error("_generated/action_catalogue.lua is missing or invalid — run `npm run gen`: "
 		.. tostring(Catalogue))
+end
+
+-- Publish binding identity only from both complete generated inventories.
+-- Runtime assignments and manifest defaults cannot prove a retired slot.
+local parameter_binding_catalogue = { prefix = "", slots = {} }
+for _, family in ipairs({ "single", "axis" }) do
+	local slots = Catalogue.slots[family]
+	assert(type(slots) == "table" and next(slots) ~= nil,
+		"generated gesture " .. family .. " slots must be a nonempty dense string array")
+	local count = 0
+	for index, slot in pairs(slots) do
+		assert(type(index) == "number" and index >= 1 and index % 1 == 0
+			and type(slot) == "string" and slot ~= "" and not slot:find("__", 1, true),
+			"generated gesture " .. family .. " slots must be a nonempty dense string array")
+		assert(parameter_binding_catalogue.slots[slot] == nil,
+			"generated gesture slot occurs more than once: " .. slot)
+		parameter_binding_catalogue.slots[slot] = true
+		count = count + 1
+	end
+	for index = 1, count do
+		assert(slots[index] ~= nil, "generated gesture " .. family .. " slots must be dense")
+	end
 end
 
 -- A confirmation is chained in front of a shell command (system_actions), so
@@ -1297,6 +1320,7 @@ end
 
 function M.set_action_parameter(binding, action_name, value)
 	if not admit_mutation() then return false end
+	if BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue) == false then return false end
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)
 	local staged = copy_state(_action_params)
@@ -1749,7 +1773,10 @@ local function walk_user_config(config, visit)
 		if type(section) ~= "table" or not visit.param then return end
 		for key, value in pairs(section) do
 			local binding, action = M.split_action_parameter_key(key)
-			if binding and action and M.validate_action_parameter(action, value) then
+			if binding and action
+				and BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue) == false then
+				ConfigOutdated.report(entry_path(section_name, key), BindingIdentity.RETIRED_GESTURE, Logger)
+			elseif binding and action and M.validate_action_parameter(action, value) then
 				visit.param(section_name, key, value)
 			else
 				-- Outdated configuration, named once and offered by the cleanup.

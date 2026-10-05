@@ -1224,3 +1224,136 @@ Test("config cleanup: root capability retains the native exact-source and lease 
 
 Test("config cleanup: selecting the same whole-root receipt twice refuses before backup (config-retired-root)",
 	_CUK_RetiredRootRefusesBorrowedRecord.Bind("duplicate"))
+
+
+_CUK_RetiredGestureBindingOwnership() {
+	Target := ManifestBuildFeaturesMap()
+	Owner := ""
+	AssertEqual("section", TomlConfigUnknownKind(Target, "action_parameters", "gesture__removed_gesture_slot__open_url", &Owner))
+	AssertEqual("", Owner, "retirement never gets a foreign ownership exemption")
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("gesture__removed_gesture_slot__open_url"))
+	for Slot in GestureSlotIds() {
+		Key := GestureBindingId("gesture", Slot) . "__open_url"
+		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Key, &Owner), Slot)
+		AssertEqual("Gestures", Owner, Slot)
+	}
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("gesture__TAP_3__open_url"))
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Gesture__tap_3__open_url"))
+}
+Test("config: retired native gesture parameters share boot and cleanup ownership (gesture-binding-identity-ownership)",
+	_CUK_RetiredGestureBindingOwnership)
+
+_CUK_RetiredGestureWarningOwnership() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Key := "gesture__removed_gesture_slot__open_url"
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, Key), "first report uses the config.toml owner")
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Key), "duplicate boot/reload report is suppressed")
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, "gesture__another_removed_slot__open_url"), "another retired row is independently named")
+	} finally DirDelete(Dir, true)
+}
+Test("config: retired gesture warnings deduplicate in the config.toml owner (gesture-binding-identity-warning)",
+	_CUK_RetiredGestureWarningOwnership)
+
+_CUK_RetiredGestureBindingsPreserveWholeSource() {
+	global ConfigurationFile, GestureActionParameters, GestureAssignments, _IniCache, _ConfigBootRejectedOverrides
+	Runtime := _CFGFS_CaptureRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	PreviousParameters := GestureActionParameters
+	PreviousAssignments := GestureAssignments.Clone()
+	PreviousCache := _IniCache
+	PreviousRejected := _ConfigBootRejectedOverrides
+	Dir := _CUK_NewDir()
+	Known := "gesture__tap_3__open_url"
+	Twin := "Gesture__tap_3__open_url"
+	Retired := "gesture__removed_gesture_slot__open_url"
+	ParameterSource := "[action_parameters]`n"
+		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
+		. Known . ' = "https://known.example"' . "`n"
+		. Twin . ' = "https://unjudged.example"' . "`n"
+		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+	Source := "# independent user comment`n" . ParameterSource
+		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
+		. "`n[layout]`nergopti_base = true`n"
+	try {
+		Path := Dir . "\config.toml"
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		AssertTrue(FSWriteDurable(Path, Source))
+		Target := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Target, Path, &Rejected)
+		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertFalse(GestureActionParameters.Has(Retired))
+		AssertEqual("https://known.example", GestureGetActionParameter("gesture__tap_3", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual(3, GestureActionParameters.Count, "both case twins and the other owner remain independent")
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Retired), "actual boot and direct reload share one report identity")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "admission does not rewrite the source")
+		Scan := ConfigUnusedKeysFind(Path)
+		RetiredRows := []
+		for Entry in Scan["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				RetiredRows.Push(Entry)
+		}
+		AssertEqual(1, RetiredRows.Length, "the ignored known-retired row is offered exactly once")
+
+		; The preserved unjudged prefix cannot activate a canonical gesture.
+		OtherPath := Dir . "\unjudged-only.toml"
+		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
+		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		ConfigurationFile := OtherPath
+		_IniCache := ParseConfigTomlFile(OtherPath)
+		GesturesReadConfig()
+		AssertEqual("", GestureGetActionParameter("gesture__tap_3", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual("On", GestureActionParameters.Clone().CaseSense)
+		AssertEqual(UpperOnlySource, FSReadUtf8Exact(OtherPath))
+		ConfigurationFile := Path
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertTrue(GestureSetActionParameter("gesture__tap_3", "open_url", "https://changed.example"))
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertEqual("https://changed.example", GestureActionParameters[Known])
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		BeforeRefusal := FSReadUtf8Exact(Path)
+		AssertFalse(GestureSetActionParameter("gesture__removed_gesture_slot", "open_url", "https://must-not-publish.example"))
+		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0,
+			() => [{ Section: "layout", Key: "ergopti_base", Value: false }]))
+		Saved := FSReadUtf8Exact(Path)
+		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
+		AssertContains(Saved, "# independent user comment")
+		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
+		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
+		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("independent", Parsed["future"]["keep"])
+
+		FreshRows := []
+		for Entry in ConfigUnusedKeysFind(Path)["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				FreshRows.Push(Entry)
+		}
+		AssertEqual("removed", ConfigUnusedKeysRemove(Path, FreshRows, "20990101-000176")["status"])
+		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
+		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
+		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+	} finally {
+		_ConfigBootRejectedOverrides := PreviousRejected
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		GestureActionParameters := PreviousParameters
+		GestureAssignments := PreviousAssignments
+		_IniCache := PreviousCache
+		DirDelete(Dir, true)
+	}
+}
+Test("config: retired gesture source survives native reload, ordinary edit and full save until explicit cleanup (gesture-binding-identity-preservation)",
+	_CUK_RetiredGestureBindingsPreserveWholeSource)
