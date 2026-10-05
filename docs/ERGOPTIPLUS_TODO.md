@@ -3195,8 +3195,9 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   ordinary save must refuse a colliding new subtree without replacing them.
   The shared macOS/Linux decoder now resolves hand-written dotted assignments
   (`a.b = 1`) as semantic nested keys while quoted dots remain literal keys.
-  Windows document/config dotted assignments remain unsupported; its existing
-  inline-table reader already resolves them and replays the common corpus.
+  Windows now reads typed document dotted keys and supports targeted semantic
+  configuration saves; full-state publication remains a separate follow-up.
+  Its inline-table reader also replays the common corpus.
   Linux now delegates whole custom-delimiter lists to the shared TOML writer,
   including `[[hotstrings.terminators]]` and quoted table-array headers. The
   obsolete local refusal and its unsupported-format warning are removed.
@@ -3210,6 +3211,17 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   E2E, packaging and installation gates with release skipped. The scalar
   preservation policy is settled; Windows document dotted-key reader remains
   open.
+
+The Windows configuration gateway and detached scope builder now use the
+configuration-only semantic document transformation through the existing atomic
+writer. Dotted/quoted paths, inline descendants, typed Boolean intent, array
+owner generations and no-op comments retain their semantic/source identities.
+Scalar/array collisions, duplicates and changed sources refuse publication;
+ordinary writes never replace an outdated scalar with a new subtree. All prior
+native assertions remain, with independently authored complete-image controls.
+Local format, encoding and 359 JavaScript checks pass; actual AutoHotkey unit,
+compile, E2E, packaging/installation and installed restart remain pending CI.
+Full-state/onboarding/LLM publication stays explicit implementation work.
 
 The shared dotted-key reader now uses the existing strict key-path owner for
 root, section-relative, multiline and inline assignments, including independent
