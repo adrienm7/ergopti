@@ -63,7 +63,7 @@ IFS=$old_ifs
 printf 'end_snapshot\n']=]
 
 local function query()
-	local accepted, packet = Shell.exec_checked("timeout 1 sh -c " .. Shell.quote(SNAPSHOT) .. " 2>/dev/null")
+	local accepted, packet = Shell.exec_checked("timeout --foreground 1 sh -c " .. Shell.quote(SNAPSHOT) .. " 2>/dev/null")
 	if accepted ~= true or #packet > LIMIT then return nil end
 	local parsed = Policy.parse_snapshot(packet)
 	if not parsed or not parsed.root then return nil end
@@ -137,7 +137,7 @@ end
 
 local function canonical_digest(path)
 	if path == "" then return "NONE\n" end
-	local accepted, packet = Shell.exec_checked("timeout 1 sh -c " .. Shell.quote('sha256sum < "$1"')
+	local accepted, packet = Shell.exec_checked("timeout --foreground 1 sh -c " .. Shell.quote('sha256sum < "$1"')
 		.. " sh " .. Shell.quote(path) .. " 2>/dev/null")
 	local digest = accepted == true and packet:match("^([%da-f]+)  %-\n$") or nil
 	return digest and #digest == 64 and digest .. "\n" or nil
@@ -183,7 +183,7 @@ local function run()
 	-- Filesystem, evdev and X11 offer no joint atomic transaction. These fresh
 	-- receipts authorize this dispatch; pause/revocation kills the exact group
 	-- and withdraws the permit. Independent final input-focus ACK is still required.
-	local accepted = Shell.exec_checked("timeout 1 xdotool windowactivate --sync " .. tostring(target) .. " >/dev/null 2>&1")
+	local accepted = Shell.exec_checked("timeout --foreground 1 xdotool windowactivate --sync " .. tostring(target) .. " >/dev/null 2>&1")
 	if accepted ~= true then return false end
 	local final, packet = query()
 	return os.getenv("DISPLAY") == source and Policy.acknowledged(first, final, target) and write(output, packet)

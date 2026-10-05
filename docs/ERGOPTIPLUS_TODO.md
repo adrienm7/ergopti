@@ -4172,6 +4172,24 @@ owns the real Magic dependency left cached by an earlier missing-default test;
 the independent two-failure causal prefix remains preserved. Source-port controls
 and virtual X11 checks do not establish physical tap-hold/display behavior.
 
+Manual run37266564575 at e816189be1293cf3650c9d7c5696fd2201a6a6b6 now
+qualifies all five native fixture-supervision cases, the additional external-owner
+recovery case and all34 actual X11 window cases, with zero failures or skips.
+The earlier run37262044694 failed paused-snapshot retirement despite a refused
+Lua operation and zero handles: GNU timeout had detached its helper group.
+All three native timeout calls now use `--foreground`, preserving the worker's
+existing whole-group retirement authority. The actual picker requires a literal
+GNU capability acknowledgement and keeps unsupported implementations greyed
+with the existing translated reason. Six adapter and six actual-manager controls
+preserve the original assertions and own their captured module dependencies.
+The mandatory native gate retains exact READY/SETTLED, EOF, process-close and
+kernel-family receipts; five supervision cases, external recovery and all34
+independently authored window cases cannot be replaced by portable doubles.
+The hosted source/test postimages are imported unchanged. The complete Linux
+run still fails the updater validator, locale-audio and notification scenarios,
+so packaging and installation remain unexecuted. Virtual RandR regions do not
+qualify physical input or genuine dual displays; item111 remains partial.
+
 Windows continuation for item111 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate

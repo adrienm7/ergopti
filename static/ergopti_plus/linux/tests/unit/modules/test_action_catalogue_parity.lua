@@ -386,3 +386,50 @@ helpers.describe("gesture assignment validation (Linux)", function()
 	end)
 
 end)
+
+helpers.describe("Cursor-window native picker admission", function()
+	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
+		helpers.it("uses actual GNU timeout admission in the picker: " .. receipt, function()
+			local Display = require("infra.display_server")
+			local Runner = require("adapters.program_runner")
+			local Shell = require("adapters.shell_runner")
+			local previous = Display.kind()
+			local cached_switch = package.loaded["adapters.window_switch"]
+			local supported, has_command, exec_checked = Runner.supported, Shell.has_command, Shell.exec_checked
+			local probes = 0
+			Display._set_for_test(Display.X11, "native picker fixture")
+			Runner.supported = function() return true end
+			Shell.has_command = function() return true end
+			Shell.exec_checked = function(command)
+				probes = probes + 1
+				helpers.assert_eq(command, "timeout --foreground 1 sh -c ':' 2>/dev/null")
+				if receipt == "throw" then error("controlled native capability refusal") end
+				if receipt == "supported" then return true, "" end
+				if receipt == "refused" then return false, "" end
+				if receipt == "numeric" then return 0, "" end
+				if receipt == "text" then return "true", "" end
+				return nil
+			end
+			local ok, err = pcall(function()
+				-- Earlier fixtures may replace the dependency tables captured by the adapter.
+				helpers.load_module("adapters.window_switch")
+				local manager = recording_manager()
+				local window
+				for _, item in ipairs(manager.get_picker_items()) do
+					if item.type == "action" and item.id == "alt_tab_monitor" then window = item end
+				end
+				helpers.assert_true(window ~= nil)
+				helpers.assert_eq(window.disabled == true, receipt ~= "supported")
+				helpers.assert_eq(probes, 1)
+				if receipt ~= "supported" then
+					local hint = require("infra.i18n").get("dialog.action_picker.requires_tool")
+					helpers.assert_eq(window.hint, (hint:gsub("{1}", "GNU timeout")))
+				end
+			end)
+			package.loaded["adapters.window_switch"] = cached_switch
+			Runner.supported, Shell.has_command, Shell.exec_checked = supported, has_command, exec_checked
+			Display._set_for_test(previous, "restored")
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
