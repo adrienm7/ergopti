@@ -815,7 +815,7 @@ _KLSCR_ShutdownCloseNativeChain() {
 				"each native-chain class must come from actual production source")
 			Source .= NativeClass[0] . "`n"
 		}
-		for Name in ["KL_AppendLog", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop",
+		for Name in ["KL_AppendLog", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
 			"KL_CommitPwCache", "KL_TryGetPwCachedVerdict", "KL_PasswordFocusSnapshot",
 			"KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback", "KL_IsFocusedFieldPassword",
 			"MF_ShouldFilter", "MF_ShouldFilterFor", "KL_AssignStableEventId", "KL_AllocEventId",
@@ -864,7 +864,7 @@ _KLF_WithState(Body) {
 	Fields := [["initialized", "_shutting_down", "lifecycle_generation", "buffer_events", "buffer_text",
 		"synth_active", "synth_type", "synth_private", "health_privacy_hits"],
 		["last_tick", "last_vk", "last_sc", "capture_queue", "capture_owner", "capture_generation", "capture_stopping"],
-		["is_session_active", "session_started_at", "last_authorized_tick", "is_idle", "idle_started_at",
+		["is_session_active", "session_started_at", "session_generation", "last_authorized_tick", "is_idle", "idle_started_at", "idle_generation",
 		"privacy_interrupted", "privacy_started_at", "session_close", "session_close_draining", "idle_close", "system_events", "system_failure_reported"],
 		["generation", "focus_generation"], ["generation", "state"],
 		["disabled_apps", "private_browsing", "secure_field", "system_auth"]]
