@@ -2963,5 +2963,10 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"about_version_separator": [
+		{
+			"type": "---"
+		}
 	]
 }

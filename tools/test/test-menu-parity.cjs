@@ -366,7 +366,21 @@ const OPENS_SUBMENU = {
 	// rows: Linux folded its top-level Updates submenu into it in 2026-09.
 	about: 'about_menu',
 	// The About updater provider renders the registry-backed channel choice.
-	about_updates: ['about_update_channel_menu', 'about_update_frequency_menu', 'about_source_menu'],
+	about_updates: [
+		'about_update_channel_menu',
+		'about_update_frequency_menu',
+		'about_source_menu',
+		{
+			menu: 'about_version_separator',
+			platforms: ['ahk', 'hs', 'linux'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_init.ahk',
+				hs: 'macos/ui/menu/menu_about.lua',
+				linux: 'linux/ui/menu/menu_builder.lua'
+			}
+		}
+	],
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six

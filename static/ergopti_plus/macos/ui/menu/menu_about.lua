@@ -179,7 +179,9 @@ function M.build(ctx, actions)
 	-- in the About submenu until 2026-08-07.
 	table.insert(menu_items, { label = ver_display, disabled = true })
 
-	table.insert(menu_items, { separator = true })
+	local separator_rows = ManifestMenu.template_rows("about_version_separator")
+	if not separator_rows then return nil end
+	for _, row in ipairs(separator_rows) do table.insert(menu_items, row) end
 
 	-- The channel picker, right before the check row. Without an owner nothing
 	-- could persist a choice, so the picker is left out rather than drawn dead.

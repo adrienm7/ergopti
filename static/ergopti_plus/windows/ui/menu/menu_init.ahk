@@ -510,7 +510,11 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	} else {
 		Rows.Push(Map("label", VerLabel, "action", Updater_OpenCurrentRelease))
 	}
-	Rows.Push(Map("separator", true))
+	SeparatorRows := MenuRenderer_TemplateRows("about_version_separator", Map(), Map(), Map())
+	if !(SeparatorRows is Array)
+		return []
+	for Row in SeparatorRows
+		Rows.Push(Row)
 
 	Rows.Push(_MI_ChannelPickerRow(SetChannelFn))
 

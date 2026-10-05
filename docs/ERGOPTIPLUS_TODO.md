@@ -4153,7 +4153,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 95, macOS 152, Linux 94, each
+  drivers still build (current baseline: Windows 82, macOS 124, Linux 92, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4535,7 +4535,7 @@ partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
-- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 95). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
+- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
 Partial dev handoff (2026-10-05): Metrics V3 is reviewed but unapplied.
@@ -4562,6 +4562,8 @@ The 2026-10-05 Swipe continuation declares its fixed action separator, mode grou
 Native Linux metrics equivalence now retains the established JSON-quoted token column in its independent raw-row SQL transport. All twenty-one assertions, aggregation rules and date/application filters remain unchanged. Real SQLite compares 648 grouped rows with 2808 raw rows; this repairs a validation prerequisite and changes no production metrics policy.
 
 The native Windows DelayRows provider now supplies all four required renderer arguments. The previous candidate failed loading before any native unit case; all eight production call sites retain the unchanged four-argument API. Two actual-provider regression cases cover complete physical rows, caption propagation, missing commands and withdrawn callback ownership. Native Windows qualification remains required on this successor.
+
+The fixed separator after the native About build/version row now comes from one shared fragment on all three drivers. Existing update/channel/cadence callbacks and shared version wording remain unchanged. Independent actual rendered/provider mutation, platform-hide and missing-declaration controls preserve every original registered assertion. Focused macOS20/0 and Linux29/0 pass on both Lua5.4 and LuaJIT; identical old-source controls fail two cases per driver. The actual scanner measures83/125/93 to82/124/92 (Windows/macOS/Linux). Windows cases are registered but unexecuted locally; final native CI and installed-device acceptance remain required. Items54/81 remain partial for other fixed presentation/data families.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
@@ -4748,7 +4750,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 95, macOS 152 and Linux 94 rows are still built by the
+  Windows 82, macOS 124 and Linux 92 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -4813,6 +4815,8 @@ real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
 fix as explicit code work rather than unsupported-platform exceptions.
 
 The composed 2026-10-05 source census is Windows 83, macOS 126 and Linux 93 after the additional three macOS Swipe sites are migrated. The canonical generator owns the 76 menu sections and the baseline generator owns this lower ceiling. Clicked mode children and the composed sensitivity heading are distinct proof edges; the latter does not claim the eighteen numeric native choices. Other fixed/native provider controls remain source work, so this item stays partial.
+
+The About build/version separator now consumes the same shared fragment on all three drivers. Independent actual provider and mutation controls retain all earlier assertions; the unchanged source scanner measures Windows82/macOS124/Linux92 fixed sites. Native Windows and final three-OS qualification remain required. Other fixed provider families stay open.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
