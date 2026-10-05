@@ -220,4 +220,66 @@ return function(helpers)
 			if not called then error(detail, 0) end
 		end)
 	end)
+
+	helpers.describe("shared finite header scalar publication", function()
+		local function header_prepare(source, rows)
+			local writes = 0
+			local okay, detail, content = Writer.prepare_batch("/controlled/header-finite-scalar.toml", rows, {
+				read_with_status = function() return source, "ok" end,
+				write = function() writes = writes + 1; return false end,
+			})
+			helpers.assert_eq(writes, 0, "numeric candidate admission never publishes")
+			return okay, detail, content
+		end
+		local vectors = {
+			{ name = "precise decimal", value = 0.12345678901234567, literal = "0.12345678901234566" },
+			{ name = "representable large integer", value = 9007199254740992, literal = "9007199254740992" },
+			{ name = "negative zero", value = -0.0, literal = "-0.0" },
+		}
+		for _, vector in ipairs(vectors) do
+			helpers.it("publishes exact " .. vector.name .. " under an existing header", function()
+				local source = '# before\n[a]\nsetting=0.25 # owned\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n'
+				local okay, detail, content = header_prepare(source, { { section = "a", key = "setting", value = vector.value } })
+				helpers.assert_eq(okay, true, detail)
+				helpers.assert_eq(content, '# before\n[a]\nsetting = ' .. vector.literal .. '\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n')
+				local actual = Codec.decode(content).a.setting
+				helpers.assert_eq(actual, vector.value)
+				if vector.value == 0 then helpers.assert_eq(1 / actual, -math.huge) end
+			end)
+		end
+		helpers.it("uses the same precise numeric capability for a new key under its existing header", function()
+			local okay, detail, content = header_prepare('[a]\nfuture=0.1\n', { { section = "a", key = "setting", value = 0.12345678901234567 } })
+			helpers.assert_eq(okay, true, detail)
+			helpers.assert_eq(content, '[a]\nsetting = 0.12345678901234566\nfuture=0.1\n')
+		end)
+		helpers.it("refuses a valid wrong numeric literal, keeps source and permits an explicit repaired retry", function()
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			local source = '[a]\nsetting=0.25\nfuture=0.1\n'
+			local row = { section = "a", key = "setting", value = 0.12345678901234567 }
+			local called, detail = pcall(function()
+				LeafRows.value_literal = function() return "0.12345678901235" end
+				local okay, reason, content = header_prepare(source, { row })
+				helpers.assert_eq(okay, false)
+				helpers.assert_contains(reason, "differs from the requested value")
+				helpers.assert_nil(content)
+			end)
+			LeafRows.value_literal = original
+			if not called then error(detail, 0) end
+			local okay, reason, content = header_prepare(source, { row })
+			helpers.assert_eq(okay, true, reason)
+			helpers.assert_eq(content, '[a]\nsetting = 0.12345678901234566\nfuture=0.1\n')
+		end)
+		helpers.it("refuses an optional numeric encoder exception before candidate admission", function()
+			local LeafRows = require("toml_codec.leaf_rows")
+			local original = LeafRows.value_literal
+			LeafRows.value_literal = function() error("controlled optional encoder failure") end
+			local called, okay, reason, content = pcall(header_prepare, '[a]\nsetting=0.25\n', { { section = "a", key = "setting", value = 0.12345678901234567 } })
+			LeafRows.value_literal = original
+			helpers.assert_eq(called, true, "the optional encoder exception is a typed refusal")
+			helpers.assert_eq(okay, false)
+			helpers.assert_nil(content)
+			helpers.assert_contains(reason, "cannot be encoded exactly")
+		end)
+	end)
 end
