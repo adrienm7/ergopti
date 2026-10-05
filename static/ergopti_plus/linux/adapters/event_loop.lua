@@ -28,6 +28,7 @@ local M = {}
 local Logger = require("logger.shim")
 local NativeTimer = require("infra.native_timer")
 local NumberPolicy = require("number_policy")
+local ErrorDescription = require("error_description")
 local LOG = "adapters.event_loop"
 
 
@@ -122,7 +123,7 @@ local function _safe_idle(onIdle)
 	if type(onIdle) ~= "function" then return end
 	local ok, err = pcall(onIdle)
 	if not ok then
-		Logger.error(LOG, "onIdle callback raised: %s", tostring(err))
+		Logger.error(LOG, "onIdle callback raised: %s", ErrorDescription.describe(err))
 	end
 end
 
@@ -133,7 +134,7 @@ local function _run_idle_handlers()
 	for i = 1, #_idle_handlers do
 		local ok, err = pcall(_idle_handlers[i])
 		if not ok then
-			Logger.error(LOG, "Idle handler #%d raised: %s", i, tostring(err))
+			Logger.error(LOG, "Idle handler #%d raised: %s", i, ErrorDescription.describe(err))
 		end
 	end
 	if #_deferred == 0 then return end
@@ -148,7 +149,7 @@ local function _run_idle_handlers()
 	for _, entry in ipairs(due) do
 		local ok, err = pcall(entry.fn)
 		if not ok then
-			Logger.error(LOG, "Deferred callback raised: %s", tostring(err))
+			Logger.error(LOG, "Deferred callback raised: %s", ErrorDescription.describe(err))
 		end
 	end
 end
@@ -159,7 +160,7 @@ local function _safe_periodic(onPeriodic)
 	if type(onPeriodic) ~= "function" then return end
 	local ok, err = pcall(onPeriodic)
 	if not ok then
-		Logger.error(LOG, "onPeriodic callback raised: %s", tostring(err))
+		Logger.error(LOG, "onPeriodic callback raised: %s", ErrorDescription.describe(err))
 	end
 end
 

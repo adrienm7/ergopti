@@ -364,6 +364,18 @@ jobs:
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
         timeout-minutes: 1
 
+      - name: Isolate actual callback error objects without invoking their formatters
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          for callback_source in after every idle periodic "registered idle" deferred; do
+            for callback_failure in object string; do
+              env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
+              env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
+            done
+          done
+        timeout-minutes: 1
+
       - name: Admit file watches only after native activation succeeds
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux

@@ -1616,6 +1616,27 @@ These are software implementations; final hardware verification remains below.
   not inherit this filesystem-only encoding. No physical input, foreign runtime,
   TOML/configuration or reserved change.
 
+- [~] **L112.** Linux timer callback error isolation: use one pure shared error
+  description owner at the six callback reporting boundaries. Unprotected
+  `tostring` of an error table with a throwing formatter escaped `pcall` and
+  libuv's callback guard, terminating the interpreter with exit 255. Preserve
+  primitive diagnostic text and describe object types without running foreign
+  formatting code; no logger, callback execution or lifecycle refactor. Twelve
+  genuine native cases have six fatal object failures before and pass after on
+  current LuaJIT, stock Lua 5.4 and signed Ubuntu 22.04 luv/libuv dependencies.
+  Each after/every/idle/periodic/registered-idle/deferred path retains an ordinary
+  string control, real 5 ms successor and 30 ms foreign watchdog; after correction
+  the formatter is never called, the watchdog survives owner cleanup and no
+  native handles remain. Fatal baseline processes never reach cleanup assertions;
+  do not certify their post-exit resources. Twenty-three registered tests have
+  six native failures and pass under LuaJIT and Lua 5.4; eleven pure helper cases
+  already pass before caller integration. Register the exact manual test manifest
+  and future native Linux CI without launching it. Existing finite/periodic,
+  reentry/stop and every other adapter body remain byte-identical. macOS has a
+  similar source-only error-formatting gap; Windows uses a different exception
+  reporting contract. Foreign runtime gates remain deferred, and no reserved
+  dynamic-hotstring owner, physical input or foreign source is changed.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
