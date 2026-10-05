@@ -3716,10 +3716,14 @@ The macOS stubbed E2E lane now installs LuaFileSystem for real directory and
 payload identity observations. Removing that prerequisite reproduces the exact
 34 hosted failures; restoring it passes101 cases with one existing skip.
 Manual run37259060275 at78c33cd851be187221dcd6ab5f2b2668928b0dc8 confirms
-stubbed units and E2E pass. Native Swift compilation then fails because the
-owned-program C header is absent from the umbrella export. The native14 cases,
-package completion and installation remain unexecuted; this prerequisite fix
-does not qualify those surfaces or finish the item.
+stubbed units and E2E pass. That run's native Swift compilation fails because
+the owned-program C header is absent from the umbrella export. The umbrella
+now includes that header, preserving the existing POSIX declarations. An
+independent declaration/signature probe fails against the original umbrella
+and passes against the corrected source; this is portable C evidence, without
+macOS SDK qualification. The native14 cases, package completion and installation
+remain unexecuted pending the corrected hosted run. These bounded fixes do not
+qualify those surfaces or finish the item.
 
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
