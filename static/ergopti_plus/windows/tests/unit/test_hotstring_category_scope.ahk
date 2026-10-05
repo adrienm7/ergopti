@@ -646,6 +646,8 @@ _HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
 		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
 		Suspend(Paused)
 		RuntimeBefore := KL_JsonEncode(Features)
+		; Semantic feature loading does not populate the separate live-text cache.
+		AssertEqual(Source, ReadTomlFile(Fixture.path), "fixture primes the live text cache before publication")
 		Cached := ParseTomlFile(Fixture.path)
 		Built := _BuildDynamicHotstringsSubmenu(Fixture.options)
 		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven families and their editor")

@@ -1,0 +1,39 @@
+{
+	"patch_sha256": "6ddf9980736c14495640c66ca1803d12d5bf72e11f4d3c2db35db025d1a3b9bd",
+	"verdict": "source-clear; prepared followup remains pending full qualification and integration",
+	"exact_manifest_pre_postimages_verified": 6,
+	"saved_application_postimages_match": true,
+	"new_dev_dependency_hashes_verified": 2,
+	"independent_focused_runs": {
+		"luajit": {
+			"passed": 36,
+			"failed": 0,
+			"exit_code": 0
+		},
+		"lua54": {
+			"passed": 36,
+			"failed": 0,
+			"exit_code": 0
+		}
+	},
+	"source_review": [
+		"Retirement requires both native cloud/local publication flags and a nonempty detached identity map; each cloud projection/local projection must be nonempty and its actual read/close acknowledgement literal true.",
+		"Identity classifier is consumed only for existing source rows. A stored row cannot register a provider or grant auth/transport capability; explicit mutations retain their existing AuthPolicy owner.",
+		"Caught native catalogue failure latches configuration authority unavailable for the generation and suppresses retirement from its partial cache. Incomplete cache publication flags cannot prove retirement.",
+		"Snapshot identities are copied away from the private native inventory. The new shared policy does not recreate native descriptor validation or catalogue semantics.",
+		"Ignored rows use the existing raw-row publication path, including nested JSON array/null identity, row order and future fields. Dangling active source references remain until a successful explicit selection.",
+		"All remote transport/auth implementation changes in this diff are metadata-only catalogue admission/receipt plumbing. Existing HTTP/UTF8/error-envelope and private publication owners remain unmodified.",
+		"New tests use independent handwritten complete source models, actual private file publication on LuaJIT, and explicit real libuv private syscalls on stock Lua. Fault wrappers delegate actual IO before controlled receipt refusal; no native/hardware result is inferred."
+	],
+	"limitations": [
+		"Both publication flags describe the existing cached catalogue generation; this does not introduce an atomic multi-file snapshot or cross-process locking guarantee.",
+		"Unavailable catalogue choices remain runtime-carried until native publication can prove retirement; this is preservation of source choices, not provider capability registration.",
+		"One explicit Linux test-manifest insertion must be composed with newer dev inventory rather than replacing its manifest.",
+		"Full suites, E2E, packaging/install, native CI and actual remote services were not run by this reviewer. Author old-source causal results were inspected but not reexecuted."
+	],
+	"logs": [
+		"/tmp/ergopti-retired-api-provider-peer-luajit.log",
+		"/tmp/ergopti-retired-api-provider-peer-lua54.log"
+	],
+	"source_or_checkout_mutations": false
+}
