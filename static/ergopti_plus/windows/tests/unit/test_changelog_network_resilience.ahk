@@ -492,10 +492,12 @@ _CNR_PacRejectsPartialAnswers() {
 	}
 	First := "https://one.invalid/one"
 	Second := "https://two.invalid/two"
+	InvalidEndpoint := "http://valid.corp:invalid"
+	AssertFalse(SystemProxy_IsValidProxyUrl(InvalidEndpoint), "the malformed fixture endpoint is independently rejected")
 	try {
 		SystemProxy_ResolveAsync([First, Second], (R) => Results.Push(R),
 			() => _CNR_Config("fallback.corp:80", "", "http://wpad.corp/proxy.pac"), Spawn)
-		Done[1].Call(0, "http://valid.corp:80`nnot-a-valid-answer", "")
+		Done[1].Call(0, "http://valid.corp:80`n" . InvalidEndpoint, "")
 		AssertEqual(0, _SYSTEM_PROXY_PAC_CACHE.Count, "one malformed answer must reject the whole receipt")
 		AssertEqual("http://fallback.corp:80", Results[1][First])
 		AssertEqual("http://fallback.corp:80", Results[1][Second])
