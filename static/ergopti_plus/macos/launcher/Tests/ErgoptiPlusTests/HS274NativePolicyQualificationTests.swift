@@ -21,6 +21,13 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		let stderr: String
 	}
 
+	private enum ChildBudget: Equatable {
+		case sdk, sourceCalibration
+
+		var worker: String { self == .sdk ? "30" : "300" }
+		var observation: Double { self == .sdk ? 35 : 305 }
+	}
+
 	/// The unchanged guardian reserves its worker through inherited-PGID census
 	/// and reaps last. This invoker owns only that direct guardian and captures.
 	private final class GuardianChild {
@@ -34,8 +41,10 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		private var launched = false
 		private var observedExit = false
 		private var cached: Receipt?
+		private let budget: ChildBudget
 
-		init(executable: URL, arguments: [String], repository: URL, root: URL) throws {
+		init(executable: URL, arguments: [String], repository: URL, root: URL, budget: ChildBudget = .sdk) throws {
+			self.budget = budget
 			let identity = UUID().uuidString
 			output = root.appendingPathComponent(identity + ".stdout")
 			errors = root.appendingPathComponent(identity + ".stderr")
@@ -50,7 +59,7 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 			catch { try? out.close(); throw error }
 			process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
 			process.arguments = ["python3", repository.appendingPathComponent("tools/diagnostics/macos_owned_process.py").path,
-				"run", terminal.path, "30", "--", executable.path] + arguments
+				"run", terminal.path, budget.worker, "--", executable.path] + arguments
 			process.environment = NativeFixtureChildEnvironment.make()
 			process.standardOutput = streams[0]
 			process.standardError = streams[1]
@@ -118,7 +127,7 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		func finish() throws -> Receipt {
 			if let cached { return cached }
 			guard launched else { throw FixtureError.launch }
-			guard observeExit(35) else {
+			guard observeExit(budget.observation) else {
 				try? retire()
 				throw FixtureError.deadline
 			}
@@ -225,9 +234,9 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		return true
 	}
 
-	func fixture(_ body: (URL) throws -> Void) throws {
+	func fixture(parent: URL? = nil, _ body: (URL) throws -> Void) throws {
 		guard children.isEmpty else { throw FixtureError.ownership }
-		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
+		let root = (parent ?? manager.temporaryDirectory.resolvingSymlinksInPath())
 			.appendingPathComponent("ErgoptiHS274NativePolicy-" + UUID().uuidString)
 		try manager.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
 		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
@@ -252,6 +261,37 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		children.append(child)
 		try child.start()
 		return try child.finish()
+	}
+
+	/// Full native compilation owns a separate finite calibration; SDK cases keep
+	/// their original 30/35/10-second worker, observation, and retirement budgets.
+	func runSourceCompilation(_ arguments: [String], root: URL) throws -> Receipt {
+		let child = try GuardianChild(executable: URL(fileURLWithPath: "/usr/bin/env"),
+			arguments: ["python3", source("hs274_native_build.py").path] + arguments,
+			repository: Self.repository, root: root, budget: .sourceCalibration)
+		children.append(child)
+		try child.start()
+		return try child.finish()
+	}
+
+	/// CI already archives this parent. Admit its canonical ordinary owner before
+	/// creating a unique private child, so failures retain useful phase evidence.
+	func compilationEvidenceParent() throws -> URL {
+		let temporary = try XCTUnwrap(ProcessInfo.processInfo.environment["RUNNER_TEMP"],
+			"Full source calibration requires the runner evidence directory")
+		guard temporary.hasPrefix("/") else { throw FixtureError.source }
+		let parent = URL(fileURLWithPath: temporary).resolvingSymlinksInPath()
+			.appendingPathComponent("swift-launcher-evidence")
+		guard parent.resolvingSymlinksInPath() == parent else { throw FixtureError.ownership }
+		let descriptor = open(parent.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+		guard descriptor >= 0 else { throw FixtureError.ownership }
+		defer { close(descriptor) }
+		var info = stat()
+		guard fstat(descriptor, &info) == 0,
+			info.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), info.st_uid == geteuid() else {
+			throw FixtureError.ownership
+		}
+		return parent
 	}
 
 	func compile(_ source: URL, standard: String, root: URL, frameworks: Bool = false) throws -> URL {

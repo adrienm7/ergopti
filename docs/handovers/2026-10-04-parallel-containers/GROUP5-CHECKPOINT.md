@@ -315,6 +315,23 @@ A real work Mac is available only as a last resort. Maximize meaningful CI;
 collect the remaining physical checks together after CI has resolved everything
 it can prove. Hardware double results cannot close these acceptance requirements.
 
+## Owned native compilation prerequisite
+
+The owned native compilation prerequisite now has a normally discovered Swift
+case for actual unsigned pinned Core-Service and CLI builds. It applies a strict
+25-file sealed complete producer candidate only inside its owned temporary tree;
+live Source/CLI baseline1 and the independent runtime corpora remain unchanged.
+A second Swift case invokes the actual29-test Python controller suite. Independent
+review preserves all29 control bodies, five supporting methods, six original SDK
+cases, strict terminal parsers and process retirement. Both original FIFO and
+late-success receipt defects are reproduced before correction; final discovery,
+direct invocation and independent execution pass29/29 with no errors or skips.
+SDK budgets remain30/35/10 seconds. The new source-build calibration uses
+300/305/10 within the existing ten-minute XCTest step and retains failed inputs.
+Actual Darwin SDK/full source compilation and this calibration remain unexecuted
+until targeted manual CI; compilation alone cannot establish native capture,
+installation or physical accounting authority. TODO31 stays open.
+
 ## Native CI status
 
 Most recent exact-source manual run37255224392 at pushedb1c0864dc selects

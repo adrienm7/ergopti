@@ -3291,6 +3291,21 @@ unexecuted on this Linux host. The full Core-Service build, native acquisition,
 namespace/authentication, coverage, installation and default activation remain
 separate requirements. Source/CLI baseline1 stays unchanged; TODO31 stays open.
 
+The owned native compilation prerequisite now has a normally discovered Swift
+case for actual unsigned pinned Core-Service and CLI builds. It applies a strict
+25-file sealed complete producer candidate only inside its owned temporary tree;
+live Source/CLI baseline1 and the independent runtime corpora remain unchanged.
+A second Swift case invokes the actual29-test Python controller suite. Independent
+review preserves all29 control bodies, five supporting methods, six original SDK
+cases, strict terminal parsers and process retirement. Both original FIFO and
+late-success receipt defects are reproduced before correction; final discovery,
+direct invocation and independent execution pass29/29 with no errors or skips.
+SDK budgets remain30/35/10 seconds. The new source-build calibration uses
+300/305/10 within the existing ten-minute XCTest step and retains failed inputs.
+Actual Darwin SDK/full source compilation and this calibration remain unexecuted
+until targeted manual CI; compilation alone cannot establish native capture,
+installation or physical accounting authority. TODO31 stays open.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
