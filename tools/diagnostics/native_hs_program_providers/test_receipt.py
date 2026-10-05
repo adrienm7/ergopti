@@ -5,6 +5,7 @@ import copy
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest import mock
 import run_native as subject
@@ -69,6 +70,42 @@ def packet():
         "scope": dict(EXPECTED_SCOPE),
         "cases": [{"id": name, "status": "passed"} for name in EXPECTED_FULL],
         "counts": {"passed": 16, "failed": 0, "skipped": 0},
+    }
+
+
+DIAGNOSTIC_FILES = (
+    "tools/diagnostics/native_hs_program_providers/fixture.lua",
+    "tools/diagnostics/native_hs_program_providers/fixture_shim.lua",
+    "tools/diagnostics/native_hs_program_providers/run_native.py",
+)
+DIAGNOSTIC_HASHES = {path: "d" * 64 for path in DIAGNOSTIC_FILES}
+
+
+def facts():
+    return {
+        "schema": 1,
+        "contract": "macos-native-hs-program-provider-diagnostic-facts",
+        "source_sha": SHA,
+        "nonce": NONCE,
+        "pid": 123,
+        "scenario": "full",
+        "source_hashes": dict(DIAGNOSTIC_HASHES),
+        "case_facts": [{"case": name, "kind": "none", "ordinal": 0} for name in EXPECTED_FULL],
+        "runtime": {
+            "lua_version": "Lua 5.4",
+            "dir": "C",
+            "attributes": "C",
+            "symlink_attributes": "Lua",
+            "path_to_absolute": "C",
+            "file_open": "C",
+        },
+        "interpreter": {
+            "resolved_scalar_observed": True,
+            "interpreter_equal": False,
+            "argv_count_equal": True,
+            "script_argument_equal": True,
+        },
+        "expected_path_equal": True,
     }
 
 
@@ -173,8 +210,16 @@ class ReceiptControls(unittest.TestCase):
         owner = type("OwnershipPort", (), {"acquire_owned": staticmethod(acquire)})()
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
-            with mock.patch.object(
-                subject, "prepare", return_value={"receipt": str(output / "missing")}
+
+            def prepare_owned_link(base, *arguments):
+                (base / "bin").mkdir()
+                (base / "bin/python3").symlink_to(Path(sys.executable).resolve())
+                return {"receipt": str(output / "missing")}
+
+            with (
+                mock.patch.object(subject, "prepare", side_effect=prepare_owned_link),
+                # This control exercises native acquisition handoff, not bundle admission.
+                mock.patch.object(subject, "runtime_origin", return_value={}),
             ):
                 with self.assertRaises(KeyboardInterrupt):
                     subject.run_case(
@@ -206,6 +251,168 @@ class ReceiptControls(unittest.TestCase):
             group.observe_exit = lambda: object()
             with self.assertRaisesRegex(ValueError, "native_runtime_exited_without_receipt"):
                 subject.await_packet(missing, group)
+
+
+class DiagnosticFactControls(unittest.TestCase):
+    def validate(self, value, primary=None):
+        return subject.validate_diagnostic_facts(
+            value,
+            packet() if primary is None else primary,
+            "full",
+            SHA,
+            NONCE,
+            123,
+            DIAGNOSTIC_HASHES,
+        )
+
+    def test_closed_diagnostic_facts_have_no_native_verdict(self):
+        self.assertIsNone(self.validate(facts()))
+        self.assertNotIn("native_pass", facts())
+        self.assertEqual(subject.validate_receipt(packet(), "full", SHA, NONCE, 123, HASHES), 16)
+        # A primary all-pass packet is insufficient when auxiliary publication refused.
+        retained = type(
+            "ClosedOwner",
+            (),
+            {
+                "process": type("ControlledProcess", (), {"pid": 123, "returncode": 0})(),
+                "settle": mock.Mock(return_value=True),
+                "receipt": lambda self: {"controlled_parser_fixture_only": True},
+                "wait_for_exit": mock.Mock(),
+            },
+        )()
+
+        def acquire(arguments, native, register, **options):
+            register(retained)
+            return retained
+
+        owner = type("OwnershipPort", (), {"acquire_owned": staticmethod(acquire)})()
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            primary = output / "primary.json"
+            primary.write_text(json.dumps(packet()))
+
+            def prepare_owned_link(base, *arguments):
+                (base / "bin").mkdir()
+                (base / "bin/python3").symlink_to(Path(sys.executable).resolve())
+                return {"receipt": str(primary)}
+
+            with (
+                mock.patch.object(subject, "prepare", side_effect=prepare_owned_link),
+                # Bundle admission is separate from the missing-facts retirement control.
+                mock.patch.object(subject, "runtime_origin", return_value={}),
+                mock.patch.object(subject.secrets, "token_hex", return_value=NONCE),
+                mock.patch("builtins.print"),
+            ):
+                with self.assertRaises(FileNotFoundError):
+                    subject.run_case(
+                        "full",
+                        Path("application"),
+                        Path("source"),
+                        SHA,
+                        output,
+                        HASHES,
+                        object(),
+                        owner,
+                        DIAGNOSTIC_HASHES,
+                    )
+            self.assertEqual(len(list(output.glob("*/physical-group.json"))), 1)
+        retained.settle.assert_called_once()
+        retained.wait_for_exit.assert_not_called()
+
+    def test_valid_failure_facts_never_promote_primary_failure(self):
+        primary = packet()
+        primary["cases"][0]["status"] = "failed"
+        primary["cases"][4]["status"] = "failed"
+        primary["counts"] = {"passed": 14, "failed": 2, "skipped": 0}
+        value = facts()
+        value["case_facts"][0].update(kind="check", ordinal=4)
+        value["case_facts"][4].update(kind="check", ordinal=1)
+        self.assertIsNone(self.validate(value, primary))
+        with self.assertRaisesRegex(ValueError, "native_case_failed"):
+            subject.validate_receipt(primary, "full", SHA, NONCE, 123, HASHES)
+        value["case_facts"][4].update(kind="raised", ordinal=0)
+        self.assertIsNone(self.validate(value, primary))
+        with self.assertRaisesRegex(ValueError, "native_case_failed"):
+            subject.validate_receipt(primary, "full", SHA, NONCE, 123, HASHES)
+
+    def test_stale_fact_owner_and_source_pins_refused(self):
+        for key, replacement in (
+            ("source_sha", "e" * 40),
+            ("nonce", "f" * 32),
+            ("pid", 124),
+            ("source_hashes", {}),
+            ("scenario", "shim"),
+            ("pid", True),
+        ):
+            with self.subTest(key=key, replacement=replacement):
+                value = facts()
+                value[key] = replacement
+                with self.assertRaises(ValueError):
+                    self.validate(value)
+
+    def test_extra_private_fields_and_unbounded_values_refused(self):
+        for action in (
+            lambda v: v.update(raw_error="private scalar"),
+            lambda v: v["runtime"].update(path="private scalar"),
+            lambda v: v["runtime"].update(symlink_attributes="private scalar"),
+            lambda v: v["runtime"].update(lua_version="private scalar"),
+            lambda v: v["interpreter"].update(interpreter_equal="private scalar"),
+            lambda v: v.update(expected_path_equal="private scalar"),
+            lambda v: v["case_facts"][0].update(error="private scalar"),
+        ):
+            value = facts()
+            action(value)
+            with self.assertRaises(ValueError):
+                self.validate(value)
+
+    def test_case_census_and_original_failure_kind_refused(self):
+        for action in (
+            lambda v: v.update(case_facts=[]),
+            lambda v: v["case_facts"].pop(),
+            lambda v: v["case_facts"].__setitem__(1, copy.deepcopy(v["case_facts"][0])),
+            lambda v: v["case_facts"][0].update(kind="check", ordinal=4),
+            lambda v: v["case_facts"][0].update(ordinal=True),
+        ):
+            value = facts()
+            action(value)
+            with self.assertRaises(ValueError):
+                self.validate(value)
+        primary = packet()
+        primary["cases"][0]["status"] = "failed"
+        for kind, ordinal in (
+            ("none", 0),
+            ("check", 0),
+            ("raised", 4),
+            ("check", 1 << 53),
+            ("private scalar", 1),
+        ):
+            value = facts()
+            value["case_facts"][0].update(kind=kind, ordinal=ordinal)
+            with self.assertRaises(ValueError):
+                self.validate(value, primary)
+
+    def test_diagnostic_template_pins_are_verified_against_commit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for path in DIAGNOSTIC_FILES:
+                destination = root / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(b"independent committed bytes")
+            with mock.patch.object(
+                subject.subprocess, "check_output", return_value=b"independent committed bytes"
+            ) as read:
+                observed = subject.source_hashes(root, SHA, DIAGNOSTIC_FILES)
+                self.assertEqual(set(observed), set(DIAGNOSTIC_FILES))
+                self.assertEqual(read.call_count, 3)
+                self.assertEqual(
+                    read.call_args_list[0].args[0], ["git", "show", SHA + ":" + DIAGNOSTIC_FILES[0]]
+                )
+            (root / DIAGNOSTIC_FILES[0]).write_bytes(b"foreign bytes")
+            with mock.patch.object(
+                subject.subprocess, "check_output", return_value=b"independent committed bytes"
+            ):
+                with self.assertRaisesRegex(ValueError, "source_worktree_drift"):
+                    subject.source_hashes(root, SHA, DIAGNOSTIC_FILES)
 
 
 if __name__ == "__main__":

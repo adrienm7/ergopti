@@ -358,6 +358,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.application_notifier",
+		contract = { "send", "new" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.notifier",
 		contract = { "send" },
 		wired    = true,

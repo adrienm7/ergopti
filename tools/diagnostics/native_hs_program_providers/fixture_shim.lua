@@ -15,11 +15,51 @@ package.loaded["infra.paths"] = { shared = function(relative)
 end }
 local Adapter = require("adapters.program_providers")
 local Directories = require("infra.fs_dir")
-local cases = {}
-local function check(condition) if condition ~= true then error("case_refused", 0) end end
+local cases, case_facts = {}, {}
+local active_case, check_ordinal, check_failure
+local interpreter_facts = {
+    resolved_scalar_observed = false, interpreter_equal = false,
+    argv_count_equal = false, script_argument_equal = false,
+}
+local function check(condition)
+    if active_case then check_ordinal = check_ordinal + 1 end
+    if condition ~= true then
+        if active_case then check_failure = check_ordinal end
+        error("case_refused", 0)
+    end
+end
 local function case(id, callback)
+    active_case, check_ordinal, check_failure = id, 0, nil
     local ok = pcall(callback)
     cases[#cases + 1] = { id = id, status = ok and "passed" or "failed" }
+    case_facts[#case_facts + 1] = {
+        case = id, kind = ok and "none" or (check_failure and "check" or "raised"),
+        ordinal = not ok and check_failure or 0,
+    }
+    active_case = nil
+end
+local function debug_kind(value)
+    if type(value) ~= "function" then return "missing" end
+    local ok, info = pcall(debug.getinfo, value, "S")
+    local kind = ok and type(info) == "table" and info.what or nil
+    if kind == "C" or kind == "Lua" or kind == "main" then return kind end
+    return "unknown"
+end
+local function runtime_facts()
+    local version = _VERSION
+    if version ~= "Lua 5.1" and version ~= "Lua 5.2" and version ~= "Lua 5.3"
+        and version ~= "Lua 5.4" and version ~= "Lua 5.5" then version = "other" end
+    return {
+        lua_version = version, dir = debug_kind(native_fs.dir),
+        attributes = debug_kind(native_fs.attributes),
+        symlink_attributes = debug_kind(native_fs.symlinkAttributes),
+        path_to_absolute = debug_kind(native_fs.pathToAbsolute),
+        file_open = debug_kind(native_open),
+    }
+end
+local function observe_scalar(...)
+    interpreter_facts.resolved_scalar_observed = type((...)) == "string"
+    return ...
 end
 local function source_pins()
     for path, digest in pairs(input.source_hashes) do
@@ -71,6 +111,19 @@ local packet = {
     scope = { inventory = true, program_execution = false, effective_acl_verified = false,
         closedir_errno_observed = false, atomic_execution_lease = false },
 }
+local facts = {
+    schema = 1, contract = "macos-native-hs-program-provider-diagnostic-facts",
+    source_sha = input.source_sha, nonce = input.nonce, pid = hs.processInfo.processID,
+    scenario = input.scenario, source_hashes = input.diagnostic_source_hashes,
+    case_facts = case_facts, runtime = runtime_facts(), interpreter = interpreter_facts,
+    expected_path_equal = os.getenv("PATH") == input.expected_path,
+}
+-- Auxiliary IO must not suppress the original primary failure receipt.
+pcall(function()
+    local diagnostic = assert(native_open(input.diagnostic_facts .. ".partial", "wb"))
+    check(diagnostic:write(hs.json.encode(facts)) ~= nil); check(diagnostic:close() == true)
+    check(os.rename(input.diagnostic_facts .. ".partial", input.diagnostic_facts) == true)
+end)
 local output = assert(native_open(input.receipt .. ".partial", "wb"))
 check(output:write(hs.json.encode(packet)) ~= nil); check(output:close() == true)
 check(os.rename(input.receipt .. ".partial", input.receipt) == true)

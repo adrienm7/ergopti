@@ -1,0 +1,26 @@
+{
+	"incoming_dev_source": "6e6111741b9c71d768cb8ced55911ffd73c0e225",
+	"incoming_dev_tested_ci_sha": "bfe6133ecd379b06ea71ce07380dca3c4d53354e",
+	"incoming_dev_manual_run": "https://github.com/adrienm7/ergopti/actions/runs/37283538700",
+	"incoming_dev_same_source_tree": true,
+	"incoming_windows_units": {
+		"passed": 9213,
+		"failed": 55,
+		"total": 9268
+	},
+	"integrated_source": "c8e4434a0a1f0e321897621621d8024f27558431",
+	"integrated_ci_sha": "8221ec5ff188705b61d5ecb1c7998c5f5b1c5520",
+	"integrated_manual_run": "https://github.com/adrienm7/ergopti/actions/runs/37287365425",
+	"integrated_windows_units": {
+		"passed": 9218,
+		"failed": 50,
+		"total": 9268
+	},
+	"same_native_census": true,
+	"visible_complete_integrated_failure_details": 21,
+	"exact_common_failure_details": 20,
+	"visible_complete_failures_already_observed_on_incoming_dev": false,
+	"limits": "The all-failure annotation is truncated during case22 in both runs. It exposes21 complete integrated cases, not all50. Counts alone do not identify five resolved cases or explain failure causes. Full redirected Azure job logs remain unavailable in this environment.",
+	"baseline_annotations": "incoming-dev-windows-annotations.json",
+	"integrated_annotations": "final-windows-annotations.json"
+}

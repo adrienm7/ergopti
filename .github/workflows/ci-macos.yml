@@ -316,7 +316,65 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-hs-program-providers-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/native-hs-program-providers
+          # Retain closed evidence only; fixture paths intentionally include newlines.
+          path: |
+            ${{ runner.temp }}/native-hs-program-providers/summary.json
+            ${{ runner.temp }}/native-hs-program-providers/*/receipt.json
+            ${{ runner.temp }}/native-hs-program-providers/*/physical-group.json
+            ${{ runner.temp }}/native-hs-program-providers/*/diagnostic-facts.json
+          if-no-files-found: error
+
+      # Observe genuine constructor userdata without delivering notifications.
+      - name: Observe native notification constructors
+        if: ${{ always() }}
+        run: |
+          python3 -m unittest discover -s tools/diagnostics/native_notification_constructors -p test_receipt.py -v
+          python3 tools/diagnostics/native_notification_constructors/run_native.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/native-notification-constructors" \
+            --download
+        timeout-minutes: 5
+
+      - name: Retain native notification constructor observations
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-notification-constructors-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-notification-constructors/receipt.json
+            ${{ runner.temp }}/native-notification-constructors/physical-group.json
+            ${{ runner.temp }}/native-notification-constructors/summary.json
+            ${{ runner.temp }}/native-notification-constructors/failure.json
+            ${{ runner.temp }}/native-notification-constructors/pending-retirement.json
+          if-no-files-found: error
+
+      # Qualify the isolated OS switcher; prerequisite refusal remains a failure.
+      - name: Observe native global application switcher
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/diagnostics/native_global_switcher -p 'test_*.py' -v
+          brew install lua@5.4
+          global_switcher_lua54="$(brew --prefix lua@5.4)/bin/lua"
+          test -x "$global_switcher_lua54"
+          python3 tools/diagnostics/native_global_switcher/run_owner_controls.py --lua "$global_switcher_lua54"
+          python3 tools/diagnostics/native_global_switcher/run_ci_probe.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/native-global-switcher" \
+            2>&1 | tee "$RUNNER_TEMP/native-global-switcher-ci.log"
+        timeout-minutes: 5
+
+      - name: Retain native global application switcher observations
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-global-switcher-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/native-global-switcher/report.json
+            ${{ runner.temp }}/native-global-switcher/native-result.json
+            ${{ runner.temp }}/native-global-switcher-ci.log
           if-no-files-found: error
 
       # Observe the native structured API without invoking or importing automations.

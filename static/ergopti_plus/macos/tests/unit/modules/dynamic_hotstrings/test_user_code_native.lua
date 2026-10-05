@@ -16,7 +16,7 @@ local OWNED = {
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
 	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "adapters.shell_runner",
 	"infra.preferences",
-	"adapters.notifier", "adapters.file_system", "infra.config_paths", "infra.i18n",
+	"adapters.application_notifier", "adapters.file_system", "infra.config_paths", "infra.i18n",
 	"adapters.secure_field_detector",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
@@ -150,7 +150,7 @@ local function with_native(body)
 			return fixture.content, "ok"
 		end
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/owned" end }
-		package.loaded["adapters.notifier"] = { send = function() fixture.notified = true; return true end }
+		package.loaded["adapters.application_notifier"] = { send = function() fixture.notified = true; return true end }
 		fixture.content = [[return function()
 			__USER_HOTSTRING_FIXTURE.factory_calls = __USER_HOTSTRING_FIXTURE.factory_calls + 1
 			if __USER_HOTSTRING_FIXTURE.factory_mutate then __USER_HOTSTRING_FIXTURE.factory_mutate() end

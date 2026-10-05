@@ -212,7 +212,21 @@ const STEP_CONDITIONS = [
 		'${{ always() }}'
 	],
 	[MACOS_BOX, 'package-macos', 'Retain native Hammerspoon provider inventory', '${{ always() }}'],
+	[MACOS_BOX, 'package-macos', 'Observe native notification constructors', '${{ always() }}'],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Retain native notification constructor observations',
+		'${{ always() }}'
+	],
 	[MACOS_BOX, 'package-macos', 'Observe native Apple Shortcuts discovery', '${{ always() }}'],
+	[MACOS_BOX, 'package-macos', 'Observe native global application switcher', '${{ always() }}'],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Retain native global application switcher observations',
+		'${{ always() }}'
+	],
 	[MACOS_BOX, 'package-macos', 'Retain native Apple Shortcuts observation', '${{ always() }}'],
 	[MACOS_BOX, 'package-macos', 'Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
@@ -1251,10 +1265,223 @@ function stepProblems(files) {
 	return problems;
 }
 
+// Upload only closed receipts: the owned script corpus contains newline names,
+// and recursively uploading its private fixture tree also exposes unnecessary data.
+const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';
+const NATIVE_INVENTORY_PATHS = [
+	'${{ runner.temp }}/native-hs-program-providers/summary.json',
+	'${{ runner.temp }}/native-hs-program-providers/*/receipt.json',
+	'${{ runner.temp }}/native-hs-program-providers/*/physical-group.json',
+	'${{ runner.temp }}/native-hs-program-providers/*/diagnostic-facts.json'
+];
+
+/** Rejects missing failure receipts and recursive private-fixture uploads. */
+function nativeInventoryArtifactProblems(files) {
+	const found = files
+		.filter((entry) => entry.rel === MACOS_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'package-macos')
+		.flatMap((job) => pipeline.steps(job.body))
+		.filter((step) => step.name === NATIVE_INVENTORY_ARTIFACT);
+	if (found.length !== 1) return ['native inventory artifact step must exist exactly once'];
+	const body = found[0].body;
+	const lines = body.split('\n');
+	const pathAt = lines.indexOf('          path: |');
+	const paths = [];
+	if (pathAt >= 0) {
+		for (const line of lines.slice(pathAt + 1)) {
+			if (line.trim() === '') continue;
+			if (!/^ {12}\S/.test(line)) break;
+			paths.push(line.trim());
+		}
+	}
+	const problems = [];
+	if (JSON.stringify(paths) !== JSON.stringify(NATIVE_INVENTORY_PATHS))
+		problems.push(
+			'native inventory artifact must whitelist only summary and per-scenario closed receipts'
+		);
+	if (
+		pipeline.stepField(body, 'if') !== '${{ always() }}' ||
+		pipeline.stepField(body, 'uses') !== 'actions/upload-artifact@v4' ||
+		!/^ {10}if-no-files-found: error$/m.test(body)
+	)
+		problems.push(
+			'native inventory failure evidence must upload with always() and fail on missing files'
+		);
+	return problems;
+}
+
+errors.push(...nativeInventoryArtifactProblems(pipeline.files()));
+const nativeInventoryPathBlock =
+	'          path: |\n' + NATIVE_INVENTORY_PATHS.map((item) => `            ${item}\n`).join('');
+for (const replacement of [
+	'          path: ${{ runner.temp }}/native-hs-program-providers\n',
+	'          path: ${{ runner.temp }}/native-hs-program-providers/**\n',
+	nativeInventoryPathBlock +
+		'            ${{ runner.temp }}/native-hs-program-providers/*/configuration/**\n',
+	...NATIVE_INVENTORY_PATHS.map((item) =>
+		nativeInventoryPathBlock.replace(`            ${item}\n`, '')
+	)
+]) {
+	mustCatch(
+		'native inventory closed evidence whitelist',
+		MACOS_BOX,
+		nativeInventoryPathBlock,
+		replacement,
+		nativeInventoryArtifactProblems
+	);
+}
+for (const replacement of ['', '          if-no-files-found: warn\n']) {
+	mustCatch(
+		'native inventory missing-file refusal',
+		MACOS_BOX,
+		nativeInventoryPathBlock + '          if-no-files-found: error\n',
+		nativeInventoryPathBlock + replacement,
+		nativeInventoryArtifactProblems
+	);
+}
+
+const NATIVE_ACTION_PROBES = [
+	{
+		run: 'Observe native notification constructors',
+		retain: 'Retain native notification constructor observations',
+		folder: 'native-notification-constructors',
+		commands: [
+			'python3 -m unittest discover -s tools/diagnostics/native_notification_constructors -p test_receipt.py -v',
+			'python3 tools/diagnostics/native_notification_constructors/run_native.py',
+			'--source-root "$GITHUB_WORKSPACE"',
+			'--source-sha "$GITHUB_SHA"',
+			'--output "$RUNNER_TEMP/native-notification-constructors"',
+			'--download'
+		],
+		files: [
+			'receipt.json',
+			'physical-group.json',
+			'summary.json',
+			'failure.json',
+			'pending-retirement.json'
+		]
+	},
+	{
+		run: 'Observe native global application switcher',
+		retain: 'Retain native global application switcher observations',
+		folder: 'native-global-switcher',
+		commands: [
+			"python3 -m unittest discover -s tools/diagnostics/native_global_switcher -p 'test_*.py' -v",
+			'brew install lua@5.4',
+			'test -x "$global_switcher_lua54"',
+			'python3 tools/diagnostics/native_global_switcher/run_owner_controls.py --lua "$global_switcher_lua54"',
+			'python3 tools/diagnostics/native_global_switcher/run_ci_probe.py',
+			'--source-root "$GITHUB_WORKSPACE"',
+			'--output "$RUNNER_TEMP/native-global-switcher"',
+			'2>&1 | tee "$RUNNER_TEMP/native-global-switcher-ci.log"'
+		],
+		files: ['report.json', 'native-result.json'],
+		extraPaths: ['${{ runner.temp }}/native-global-switcher-ci.log']
+	}
+];
+
+/** Keeps native action probes mandatory and their artifacts limited to receipts. */
+function nativeActionProbeProblems(files) {
+	const steps = files
+		.filter((entry) => entry.rel === MACOS_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'package-macos')
+		.flatMap((job) => pipeline.steps(job.body));
+	const problems = [];
+	for (const spec of NATIVE_ACTION_PROBES) {
+		const runs = steps.filter((step) => step.name === spec.run);
+		const artifacts = steps.filter((step) => step.name === spec.retain);
+		if (runs.length !== 1 || artifacts.length !== 1) {
+			problems.push(`${spec.run} needs exactly one execution and evidence step`);
+			continue;
+		}
+		const body = runs[0].body;
+		if (
+			pipeline.stepField(body, 'if') !== '${{ always() }}' ||
+			pipeline.stepField(body, 'timeout-minutes') !== '5' ||
+			!spec.commands.every((command) => (pipeline.runOf(body) ?? []).join('\n').includes(command))
+		)
+			problems.push(`${spec.run} must run its controls and exact native command independently`);
+		const artifact = artifacts[0].body;
+		const lines = artifact.split('\n');
+		const at = lines.indexOf('          path: |');
+		const paths = [];
+		if (at >= 0) {
+			for (const line of lines.slice(at + 1)) {
+				if (!line.trim()) continue;
+				if (!/^ {12}\S/.test(line)) break;
+				paths.push(line.trim());
+			}
+		}
+		const expected = spec.files.map((file) => '${{ runner.temp }}/' + spec.folder + '/' + file);
+		expected.push(...(spec.extraPaths ?? []));
+		if (
+			JSON.stringify(paths) !== JSON.stringify(expected) ||
+			pipeline.stepField(artifact, 'if') !== '${{ always() }}' ||
+			pipeline.stepField(artifact, 'uses') !== 'actions/upload-artifact@v4' ||
+			!/^ {10}if-no-files-found: error$/m.test(artifact)
+		)
+			problems.push(`${spec.retain} must retain only closed receipts and refuse absent evidence`);
+	}
+	return problems;
+}
+
+errors.push(...nativeActionProbeProblems(pipeline.files()));
+for (const spec of NATIVE_ACTION_PROBES) {
+	const steps = pipeline
+		.jobsOfText(pipeline.file(MACOS_BOX), MACOS_BOX)
+		.filter((job) => job.id === 'package-macos')
+		.flatMap((job) => pipeline.steps(job.body));
+	const run = steps.find((step) => step.name === spec.run);
+	const artifact = steps.find((step) => step.name === spec.retain);
+	if (!run || !artifact) continue;
+	for (const command of spec.commands) {
+		mustCatch(
+			`omitted native action command ${command}`,
+			MACOS_BOX,
+			run.body,
+			run.body.replace(command, '# omitted native command'),
+			nativeActionProbeProblems
+		);
+	}
+	for (const file of spec.files) {
+		const path = '            ${{ runner.temp }}/' + spec.folder + '/' + file + '\n';
+		mustCatch(
+			`omitted native action receipt ${file}`,
+			MACOS_BOX,
+			artifact.body,
+			artifact.body.replace(path, ''),
+			nativeActionProbeProblems
+		);
+	}
+	mustCatch(
+		'recursive native action fixture upload',
+		MACOS_BOX,
+		artifact.body,
+		artifact.body.replace(
+			'          path: |\n',
+			'          path: |\n            ${{ runner.temp }}/' + spec.folder + '/**\n'
+		),
+		nativeActionProbeProblems
+	);
+	mustCatch(
+		'native action missing-file refusal',
+		MACOS_BOX,
+		artifact.body,
+		artifact.body.replace('if-no-files-found: error', 'if-no-files-found: warn'),
+		nativeActionProbeProblems
+	);
+}
+
 errors.push(...stepProblems(pipeline.files()));
 for (const name of [
 	'Run signed Hammerspoon program provider inventory',
 	'Retain native Hammerspoon provider inventory',
+	'Observe native notification constructors',
+	'Retain native notification constructor observations',
+	'Observe native global application switcher',
+	'Retain native global application switcher observations',
 	'Observe native Apple Shortcuts discovery',
 	'Retain native Apple Shortcuts observation'
 ]) {

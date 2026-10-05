@@ -1,0 +1,148 @@
+{
+	"source_sha": "c8e4434a0a1f0e321897621621d8024f27558431",
+	"tested_ci_sha": "8221ec5ff188705b61d5ecb1c7998c5f5b1c5520",
+	"previous_ci_sha": "bfe6133ecd379b06ea71ce07380dca3c4d53354e",
+	"tree": "b027bce06ef601951f3560ff223aeedf92eaffab",
+	"same_source_tree": true,
+	"os_lanes": "windows",
+	"release": "workflow_dispatch emits release=false",
+	"status": "completed",
+	"conclusion": "failure",
+	"databaseId": 37287365425,
+	"headSha": "8221ec5ff188705b61d5ecb1c7998c5f5b1c5520",
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/37287365425",
+	"completed_at": "2026-10-05T09:15:53Z",
+	"jobs": [
+		{
+			"name": "Validate / Checks and plan",
+			"id": 111689350366,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / properties",
+			"id": 111689625585,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Core / js",
+			"id": 111689625673,
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"name": "Windows / Unit tests",
+			"id": 111689625795,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "macOS",
+			"id": 111689627181,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Linux",
+			"id": 111689627193,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Windows / E2E tests (engine)",
+			"id": 111694071546,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Windows / Package",
+			"id": 111694072194,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Windows / Verdict",
+			"id": 111694072337,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Windows / Install and launch",
+			"id": 111694073474,
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"name": "Validate / Selected OS verdict",
+			"id": 111694175899,
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"name": "Release / Publish",
+			"id": 111694177507,
+			"status": "completed",
+			"conclusion": "skipped"
+		}
+	],
+	"release_conclusion": "skipped",
+	"windows_units": {
+		"passed": 9218,
+		"failed": 50
+	},
+	"failed_windows_annotations": [
+		{
+			"title": "windows-ahk test failed",
+			"message": "personal-file-controls: canonical sparse neutral paths preserve Boolean false and quoted sections \u2014 values differ - expected: <1>, actual: <0> [test_personal_file_controls.ahk:200]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "personal-file-controls: flattened names retain distinct package owners and real primary aliases refuse \u2014 refusing an unrelated alias retains the uniquely owned nested source [test_personal_file_controls.ahk:191]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "personal-file-controls: real runtime and preview share independent gates metadata and native IDs \u2014 The explicit personal-file activation owner is unavailable. [toml_loader.ahk:518]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "configuration snapshot: exact inline child spellings retain legacy Boolean admission (config-semantic-snapshot) \u2014 values differ - expected: <3>, actual: <2> [test_features_manifest.ahk:1839]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "configuration snapshot: inline child policy and actual full-save fences retain obsolete data (config-semantic-snapshot) \u2014 only the valid timing child applies - expected: <1>, actual: <0> [test_features_manifest.ahk:1617]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "configuration snapshot: inline owned namespaces retain record identity and defaults (config-semantic-snapshot) \u2014 two owned primitive leaves and one successfully merged feature record apply - expected: <3>, actual: <2> [test_features_manifest.ahk:1563]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "configuration snapshot: literal dots never alias nested settings (config-semantic-snapshot) \u2014 Item has no value. [test_features_manifest.ahk:1225]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "configuration snapshot: root and dotted settings reach cache and features (config-semantic-snapshot) \u2014 Item has no value. [test_features_manifest.ahk:1204]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "ApplyConfigToml: legacy 0/1 booleans migrate with user intent (llm-toggle-deadlock) \u2014 only the boolean-for-number confusion is left unapplied as outdated - expected: <1>, actual: <0> [test_features_manifest.ahk:525]"
+		},
+		{
+			"title": "windows-ahk test failed",
+			"message": "preview index: the engine and the index share one pack enumeration (preview-index-covers-every-registration) \u2014 the index rebuild must enumerate the extension packs. Without it the index covers only the six bundled categories and every pack expands with no tooltip \u2014 the defect this test exists for [test_preview_index_covers_every_registration.ahk:229]"
+		},
+		{
+			"title": "",
+			"message": "Process completed with exit code 1."
+		},
+		{
+			"title": "",
+			"message": "AHK native process failed (exit 1)."
+		}
+	],
+	"physical_acceptance": "not executed",
+	"failure_details_limit": "All-failures annotation is truncated during case22; 21 complete details are visible, not all50.",
+	"incoming_native_baseline": "final-native-baseline-comparison.json",
+	"windows_failure_summary_annotation": "50 failure details:\n1. preview index: the engine and the index share one pack enumeration (preview-index-covers-every-registration) \u2014 the index rebuild must enumerate the extension packs. Without it the index covers only the six bundled categories and every pack expands with no tooltip \u2014 the defect this test exists for [test_preview_index_covers_every_registration.ahk:229]\n2. ApplyConfigToml: legacy 0/1 booleans migrate with user intent (llm-toggle-deadlock) \u2014 only the boolean-for-number confusion is left unapplied as outdated - expected: <1>, actual: <0> [test_features_manifest.ahk:525]\n3. configuration snapshot: root and dotted settings reach cache and features (config-semantic-snapshot) \u2014 Item has no value. [test_features_manifest.ahk:1204]\n4. configuration snapshot: literal dots never alias nested settings (config-semantic-snapshot) \u2014 Item has no value. [test_features_manifest.ahk:1225]\n5. configuration snapshot: inline owned namespaces retain record identity and defaults (config-semantic-snapshot) \u2014 two owned primitive leaves and one successfully merged feature record apply - expected: <3>, actual: <2> [test_features_manifest.ahk:1563]\n6. configuration snapshot: inline child policy and actual full-save fences retain obsolete data (config-semantic-snapshot) \u2014 only the valid timing child applies - expected: <1>, actual: <0> [test_features_manifest.ahk:1617]\n7. configuration snapshot: exact inline child spellings retain legacy Boolean admission (config-semantic-snapshot) \u2014 values differ - expected: <3>, actual: <2> [test_features_manifest.ahk:1839]\n8. personal-file-controls: real runtime and preview share independent gates metadata and native IDs \u2014 The explicit personal-file activation owner is unavailable. [toml_loader.ahk:518]\n9. personal-file-controls: flattened names retain distinct package owners and real primary aliases refuse \u2014 refusing an unrelated alias retains the uniquely owned nested source [test_personal_file_controls.ahk:191]\n10. personal-file-controls: canonical sparse neutral paths preserve Boolean false and quoted sections \u2014 values differ - expected: <1>, actual: <0> [test_personal_file_controls.ahk:200]\n11. personal-file-controls: BOM first section loads and exact metadata rollback preserves BOM bytes \u2014 assertion failed [test_personal_file_controls.ahk:261]\n12. personal-file-controls: real junction cycles are bounded and represented as unavailable menu folders \u2014 assertion failed [test_personal_file_controls.ahk:313]\n13. personal-file-controls: unreadable primary reservation refuses without partial capability publication \u2014 the closed failed identity handle does not poison the next actual admission [test_personal_file_controls.ahk:344]\n14. personal-file-controls: first BOM metadata header remains owned through real edit and exact rollback \u2014 assertion failed [test_personal_file_controls.ahk:410]\n15. hotstring-extension-menu-owner: real shipped command 1 rollback 1 \u2014 This global variable has not been assigned a value. [menu_submenus.ahk:238]\n16. hotstring-extension-menu-owner: real shipped command 1 rollback 0 \u2014 This global variable has not been assigned a value. [menu_submenus.ahk:238]\n17. hotstring-extension-menu-owner: real shipped command 0 rollback 1 \u2014 This global variable has not been assigned a value. [menu_submenus.ahk:238]\n18. hotstring-extension-menu-owner: real shipped command 0 rollback 0 \u2014 This global variable has not been assigned a value. [menu_submenus.ahk:238]\n19. hotstring-extension-menu-owner: retained native command refuses after pause \u2014 This global variable has not been assigned a value. [menu_submenus.ahk:238]\n20. hotstring-extension-scope: pack-owned staged cohort 0 \u2014 Item has no value. [test_hotstring_category_scope.ahk:261]\n21. hotstring-dynamic-menu-owner: command 1 keeps the master and handles late_refusal \u2014 every current dynamic family belongs to the canonical inventory - expected: <7>, actual: <8> [test_hotstring_category_scope.ahk:692]\n22. hotstring-dynamic-menu-owner: command 1 keeps the master and handles committed \u2014 every curre"
+}

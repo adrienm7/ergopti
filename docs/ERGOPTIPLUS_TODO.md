@@ -2023,6 +2023,11 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] On Windows, replay the registered neutral/recommended/clear scope and global composition cases with the pinned native runtime. Check verified backups, exact runtime acknowledgement, stale-source refusal and retryable rollback.
 - [ ] On a disposable Windows profile, exercise category/global Clear and Restore, restart, preserve unknown/outdated entries and verify the effective recommended delays. Record physical keyboard results separately from unit/E2E results.
 
+Partial dev handoff (2026-10-05): complete the remaining global cohort and
+publication/rollback owners in code before device acceptance. On Windows,
+replay fresh/existing/moved folder recommendation and clear with exact backups,
+strict external-write refusal, restart and actual input; retain items 16/38.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -2082,6 +2087,11 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] On Windows, exercise all seven wizard pages, cancellation, Finish/restart/rerun, changed-folder reads, delayed/stale responses and explicit trigger choices on a disposable profile. Preserve untouched obsolete trigger values.
 - [ ] Check actual WebView/native bridge rendering and persistence; report the exact tested SHA and pass/fail/not-executed cases. Native CI alone does not complete physical acceptance.
+
+Partial dev handoff (2026-10-05): actual virtual X11 wizard probes are
+qualified separately. Installed Windows and macOS wizard reruns, restart and
+physical input remain device acceptance; work-machine logs/screenshots need
+not be exported. Follow PARTIAL-DELIVERY.md and record the exact artifact.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
@@ -2587,6 +2597,22 @@ assertion across curl versions. Independent old/new native replays pass; hosted
 final-source qualification remains pending. These are fixture prerequisites,
 not completion of the remaining configuration policy or physical acceptance.
 
+The macOS qualification fixtures now restore the transitive strict UTF-8 owner
+and decode the standard JSON backspace/form-feed escapes in their independent
+Hammerspoon stub. The original twelve hosted failures are reproduced and
+corrected without changing production, corpus expectations or assertions.
+Full selected verification and hosted qualification are recorded separately;
+these fixture repairs do not complete TODO33 or device acceptance.
+
+Windows configuration qualification now seeds the four actual section metadata
+values before testing their preservation, refusing missing seed anchors. The
+semantic snapshot loader no longer incidentally primes the separate raw cache;
+the dynamic publication fixture now establishes that cache precondition
+explicitly. All 151/203 original assertions remain, including pending source,
+refusal, pause and master-state checks. Both are fixture-only changes; native
+Windows CI and conflict-preserving composition with current Hotstrings remain
+required, without expanding group1 into Hotstrings feature implementation.
+
 Linux ordinary TapHold saves and recommended imports now use the existing shared classified reader: only native ENOENT permits an absent document; access, other open, read and close failures refuse before mutation, backup/staging/publication or reload. Malformed-source behavior and unknown fields remain unchanged. The registered real-writer module retains all 26 original cases and adds 13 controls: the original writer gives 28 passes / 11 failures, the corrected writer 39 / 0. macOS and Windows already refuse classified unreadable sources through their existing owners. Full selected verification and hosted native CI remain pending; TODO33 stays partial.
 
 The Linux TapHold owner now ignores and reports obsolete scalar/array parents and
@@ -2769,6 +2795,33 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] Run the native installed-record/member-span cases in test_layout_catalogue.ahk and test_json_object_key_nul.ahk: usable neighbors, warning-once, exact obsolete/future preservation, case identity, native NUL-path refusal, stale-source refusal and install/uninstall.
 - [ ] Replay retired-key and invalid-schema cases in test_config_migrate.ahk and boot/write-fence tests; retain retired keys until explicit cleanup and keep invalid-stamp session refusal strict.
 - [ ] Audit the remaining Windows configuration-reader domains already listed above; add causal regressions before changing them. Do not repeat completed features without evidence.
+
+Completion continuation (2026-10-05): the reviewed retired API-provider
+publication candidate is applied after all five source preimages match current
+dev. Its single Linux test registration preserves every newer inventory entry.
+Stored provider rows consume detached cloud/local publication receipts; missing,
+empty or unacknowledged catalogues cannot prove retirement. Ordinary neighbor
+writes preserve obsolete rows and future values, while explicit candidate
+authentication retains its existing owner. Independent current-source focused
+checks pass 168 LuaJIT and 140 Lua 5.4 cases, including 36 new cases per runtime
+and both catalogue/store initialization orders. Selected local gates pass:
+format, 359 JS checks, portable macOS unit/E2E, Linux E2E and actual Linux
+HTTP-stream receipts. The first Linux unit run exposed two incomplete provider
+receipt stubs; their assertions remain unchanged and the corrected unit rerun
+passes all 7,841 tests. Native runner packaging/installation qualification remains
+pending. Windows sites and remaining catalogues above still need implementation
+and qualification, not only device UI; TODO33 remains partial.
+
+Final partial integration `c8e4434a0` is tested by manual Windows run37287365425:
+9,218 passed and 50 failed; incoming dev's native run37283538700 has 9,213/55
+on the same 9,268-case census. Both failure sets include the six configuration
+snapshot subjects and legacy Boolean admission. On Windows capture the complete
+native result/execution manifest, reproduce these subjects with the explicit
+personal-file activation owner, and coordinate the configuration/hotstrings
+fixture and production boundaries with group2. Keep strict source fences and
+obsolete-value preservation; do not remove assertions. Full failure annotations
+are truncated; the exact known subjects and limits are in the current partial
+delivery evidence. E2E/package/install remain skipped, not passed.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -3224,6 +3277,11 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 - [ ] Replay the 30 new native semantic-snapshot cases through the real registered runners, including the unchanged dotted corpus, typed inline/default merges, exact quoted/empty identities, bootstrap, cache generation, source locks, stale-source/full-save behavior and invalid stamps.
 - [ ] Compile the complete ErgoptiPlus.ahk include graph, then run Windows E2E, packaging and installation on the exact source SHA. Check real menu/full-save comment preservation; ordinary saves must refuse obsolete-scalar/new-subtree collisions until explicit cleanup.
 
+Partial dev handoff (2026-10-05): implement and qualify Windows
+document/config dotted assignments with independent expected models. Preserve
+retired scalar collisions until explicit cleanup; ordinary saves must refuse
+them. Installed-driver restart and actual menu persistence remain acceptance.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
@@ -3620,6 +3678,13 @@ Items 54/81 remain partial for delay, picker children and other menu families.
 Full selected verification and three-OS native CI are tracked separately;
 physical tray and input acceptance remain required on installed devices.
 
+Windows fixture qualification preserves the sparse disabled-field contract and
+the renderer receipt for three labelled rows, while independently requiring
+four actual Win32 menu positions and their original captions/separator. The
+HIGH07 dispatch guard follows the real shared template/action/registration
+chain and now uses effective regex word boundaries. Every behavioral predicate
+remains; hosted Windows execution is required before native acceptance.
+
 The fixed AI-agent Mode submenu now belongs to the shared `llm.agent_mode`
 enum and `agent_menu` choice declaration on Windows, macOS and Linux. The
 shared renderers own its labels, order, checked state and selected-value
@@ -3957,8 +4022,15 @@ partial.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
-- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 96). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
+- [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 95). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
+
+Partial dev handoff (2026-10-05): Metrics V3 is reviewed but unapplied.
+Delay needs the existing Windows timing setter exposed honestly; Wrap needs
+macOS refused-deletion durability before integration. Guidance is reviewed but
+blocked by those predecessors; Gesture mode has no complete test/generation
+qualification. Continue remaining families to the actual zero-site ratchet.
+These are implementation tasks; separate installed tray/input acceptance.
 
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
@@ -4212,6 +4284,11 @@ This deferral does not complete this item or the cross-cutting items16/38.
   sites): they follow (b), as part of the template;
   (d) the tray root bootstrap (Windows `tray_bootstrap.ahk`,
   `menu_init.ahk`).
+
+  The Windows qualification successor for the shared Tap-Hold head retains its
+  real four-row Win32 and refusal assertions; item 54 records the precise
+  sparse-field/renderer/dispatch contract corrections. Native CI is pending.
+
   Metrics widget rows are now shared `check` declarations on all three
   drivers. Native getters retain stored colors/graph checks while disabled;
   Windows commands rebuild through the normal tray owner after durable
@@ -4246,6 +4323,12 @@ Windows workstation handoff (maintainer instruction, 2026-10-04):
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.
+
+Partial dev handoff (2026-10-05): use the immutable resumed menu archive
+and its independent reviews; no saved packet qualifies an integrated feature.
+Complete the source steps under item 54, then native E2E/package/install and
+real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
+fix as explicit code work rather than unsupported-platform exceptions.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and
@@ -4324,15 +4407,18 @@ Detailed commands, test owners and the inactive prepared packet are in
 [group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
 This deferral does not complete this item or the cross-cutting items16/38.
 
-- [ ] **93.** Linux: the key combinations of item 91. The tap-hold engine
-      binds no combination (`platform/remap/tap_hold_engine.lua` only cancels
-      taps when a second tap-hold key goes down) and the Shortcuts menu draws
-      no `key_combinations` group. Port the pair model of item 91 (same pair
-      ids, slots and config sections as Windows), decide the chord inside
-      `M:process` / `M:tick`, and widen the manifest group to `linux`.
-      `caps_word` and `one_shot_shift` are `ahk`-only catalogue actions
-      today. Left out of the 2026-10-01 session on purpose (the maintainer:
-      « fais seulement pour Windows »).
+- [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
+  model now runs through the actual tap-hold engine, keyboard hook and
+  native configuration owner, using the same pair IDs, slots and sections.
+  Controlled fixtures pass 43 new cases and 99 unchanged engine/hook cases
+  on both Lua ABIs; eight independent behavioral omissions turn controls
+  red. Eight added terminal route/pause reentry controls fail on the old
+  owner and pass after final private currency checks. This first tranche supports ordered tap and hold pairs on one exact
+  keyboard, with modifier restoration and source/retirement fences.
+  Simultaneous chords, cross-device pairs, native-only caps_word and
+  one_shot_shift actions remain unavailable. Source publication, menu and
+  manifest admission are separate pending tranches. Native hosted input,
+  packaging, installation and physical acceptance remain unqualified.
 
 Windows continuation for item93 (explicitly deferred to the maintainer's PC):
 
@@ -4928,6 +5014,26 @@ Native catalogue retrieval itself is unbounded; empty discovery does not qualify
 invocation. No automation is imported or executed, and service cancellation,
 chosen-ID revalidation and a safe native invocation fixture remain unfinished.
 
+Hosted native run 37288850992 retains 14 passing owned-program Swift XCTest
+cases, but its complete native suite fails and packaging/installation do not
+execute. The signed Hammerspoon provider inventory records 14/16 passes; both
+`actual_native_runtime` and `real_interpreter_symlink` fail and the five shim
+cases do not execute. Artifact retention now whitelists closed receipts rather
+than recursively collecting the deliberately newline-named private scripts.
+Closed diagnostics preserve every case and verdict. Official Hammerspoon 1.1.1
+implements public `symlinkAttributes` as a Lua wrapper: its incorrect public-C
+premise is replaced by stricter verified script/native bytes, wrapper bytecode,
+captured C upvalue, loader identities and real lstat/stat witness checks. All
+other original conditions and the primary receipt schema remain unchanged.
+Portable Python diagnostics pass 17/0, and nine controlled origin cases plus
+four independent omission controls pass; final native macOS qualification is
+still required. The independent interpreter-equality failure remains unresolved.
+Read-only Apple Shortcuts catalogue retrieval timed out after 20 seconds; CLI
+identifier help passed, permission was not determined, and invocation was not
+qualified. The Windows handoff now records nine actual program-action failures,
+two missing lifecycle/timer inventories and two unchanged OS-purity ratchets.
+These are explicit repair steps for the maintainer's PC, not completed scope.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
@@ -5311,6 +5417,31 @@ Partial: the existing macOS native install diagnostic now owns a bounded sampler
 
 TODO 109 remains partial. The managed macOS bootstrap now records the public hs.allowAppleScript() getter, a validated in-process PID and the callable Lua bridge through the existing synchronous boot journal before onboarding can defer boot. Getter observation uses no setter argument and preserves bridge identity; malformed, thrown or missing getters remain unknown. Exact Boolean publication ACK is required, and refusal cannot gain boot authority. Portable registered journal/lifecycle tests pass 16/0 and 9/0; original-source and five behavioral mutations fail. Actual managed macOS observations are pending CI. Callable Lua bridge state does not prove native AppleEvent handler registration or entry, and the existing strict send/timeout/cleanup assertions remain unchanged. The previously observed clean/Karabiner no-prompt -1712 boundary is still unresolved.
 
+Application notifications now use the same generated caption policy through a
+shared wrapper and native macOS/Linux facades. Generic Notifier defaults, custom
+titles and the independent port corpus retain their original contracts. Native
+urgency decorations follow the product prefix; payloads, options, click handlers
+and native return values retain their existing ownership. Two bare labels are
+translated in all21 languages. Independent empty/custom/Unicode policy controls
+pass108 assertions and reject all six generic-bypass controls. Focused macOS
+fixtures pass82 cases on Lua5.4; Linux fixtures pass101 cases on each Lua ABI.
+The new Linux test is explicitly registered. These are controlled fixtures,
+not actual AppKit/D-Bus delivery or packaged acceptance. The Linux LLM enable
+refusal caption remains deferred until the AI owner publishes its active runtime
+projection; its unchanged fixture passes10 cases on each ABI. Native Windows
+console identity, native delivery, packaging and installation remain unfinished.
+
+A separate native macOS constructor-only probe is now registered in CI with
+independent failure evidence. It retains genuine Hammerspoon notification
+userdata, reads caption/body/options through native getters, checks the exact
+callback registry and unregisters owned tags without invoking callbacks. It
+never sends, schedules or withdraws a notification; the private runtime's exact
+native retirement owns the final object boundary. Thirteen portable Python
+controls and both Lua ABI safety profiles pass, including independent rejected
+delivery-guard omissions. All nine genuine native cases still require hosted
+execution on the final committed SHA. Constructor qualification does not prove
+user delivery/clicks or complete the remaining native panel-title boundaries.
+
 Windows continuation for item109 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
@@ -5386,6 +5517,20 @@ The hosted source/test postimages are imported unchanged. The complete Linux
 run still fails the updater validator, locale-audio and notification scenarios,
 so packaging and installation remain unexecuted. Virtual RandR regions do not
 qualify physical input or genuine dual displays; item111 remains partial.
+
+A separate native macOS global-switcher probe is registered in CI. It verifies
+an official signed Hammerspoon 1.1.1 instance, independently owned fixture apps,
+exact tagged Command/Tab event observations and an independent frontmost change.
+Hardware-only samples and posted combined-session release receipts remain
+separate requirements; posting success cannot acknowledge Dock consumption or
+modifier retirement. The controller retains exact process/input/tap/timer
+capabilities through source revocation and cleanup refusal. It requests no TCC
+grant; missing native permission is an unqualified CI failure rather than a skip.
+Twenty-six portable Python controls and forty Lua 5.4 cases pass on the actual
+committed-candidate sources. CI owns a fresh temporary-fixture control runner;
+genuine native execution and product SyntheticInput broker integration remain
+unfinished. This probe does not implement the product global action or complete
+physical dual-display acceptance.
 
 Windows continuation for item111 (explicitly deferred to the maintainer's PC):
 

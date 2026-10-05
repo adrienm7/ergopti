@@ -11,6 +11,7 @@
 return {
 	"tests.unit.modules.test_native_worker_owner",
 	"tests.unit.modules.test_window_switch_owner",
+	"tests.unit.modules.test_key_combinations",
 	"tests.unit.adapters.test_user_hotstring_destination",
 	"tests.unit.infra.test_user_hotstring_runtime",
 	"tests.unit.ui.test_ergopti_extension_selection",
@@ -175,6 +176,7 @@ return {
 	"tests.unit.meta.test_metrics_persist_before_shutdown",
 	"tests.unit.meta.test_monotonic",
 	"tests.unit.meta.test_no_method_call_on_plain_function",
+	"tests.unit.meta.test_application_notifier",
 	"tests.unit.meta.test_notifier_adapter",
 	"tests.unit.meta.test_numeric_prompt",
 	"tests.unit.meta.test_parse_coverage",
@@ -280,6 +282,7 @@ return {
 	"tests.unit.modules.llm.test_api_remote",
 	"tests.unit.modules.llm.test_api_remote_server_message",
 	"tests.unit.modules.llm.test_api_entries",
+	"tests.unit.modules.llm.test_api_entries_retired_provider",
 	"tests.unit.modules.llm.test_local_server_auth_policy",
 	"tests.unit.modules.llm.test_prediction_backend",
 	"tests.unit.modules.llm.test_model_download",
