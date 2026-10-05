@@ -207,6 +207,14 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 	private var commands: [OwnedProcess] = []
 	private var retirementDebt = false
 
+	private struct OwnedCensusDirectory {
+		let originalSpelling: String
+		let physicalSpelling: String
+		let device: dev_t
+		let inode: ino_t
+	}
+	private var censusDirectories: [String: OwnedCensusDirectory] = [:]
+
 	private var repository: URL {
 		var result = URL(fileURLWithPath: #filePath)
 		for _ in 0..<7 { result.deleteLastPathComponent() }
@@ -294,8 +302,44 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 	private func privateDirectory(_ url: URL) throws {
 		guard !manager.fileExists(atPath: url.path) else { throw Failure.prerequisite("private-directory-already-exists") }
+		let spelling = url.path
+		guard censusDirectories[spelling] == nil else { throw Failure.evidence("owned-census-directory-already-acquired") }
 		try manager.createDirectory(at: url, withIntermediateDirectories: false,
 			attributes: [.posixPermissions: 0o700])
+		var original = stat()
+		guard Darwin.lstat(spelling, &original) == 0, original.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+			let resolved = Darwin.realpath(spelling, nil) else { throw Failure.evidence("owned-census-directory-acquisition") }
+		defer { free(resolved) }
+		// Foundation can return an alias spelling after resolving a file URL.
+		// Keep POSIX bytes as a String, never normalize them through URL.path.
+		let physical = String(cString: resolved)
+		var target = stat()
+		guard Darwin.lstat(physical, &target) == 0, target.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+			target.st_dev == original.st_dev, target.st_ino == original.st_ino else {
+			throw Failure.evidence("owned-census-directory-acquisition")
+		}
+		censusDirectories[spelling] = OwnedCensusDirectory(originalSpelling: spelling, physicalSpelling: physical,
+			device: original.st_dev, inode: original.st_ino)
+	}
+
+	/// Preserve the acquired directory; a later lookup never adopts a replacement.
+	private func ownedCensusPath(_ url: URL) throws -> String {
+		guard let owned = censusDirectories[url.path] else { throw Failure.evidence("owned-census-directory-unacquired") }
+		for spelling in [owned.originalSpelling, owned.physicalSpelling] {
+			var metadata = stat()
+			guard Darwin.lstat(spelling, &metadata) == 0, metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+				metadata.st_dev == owned.device, metadata.st_ino == owned.inode else {
+				throw Failure.evidence("owned-census-directory-identity")
+			}
+		}
+		guard let resolved = Darwin.realpath(owned.physicalSpelling, nil) else {
+			throw Failure.evidence("owned-census-directory-canonical")
+		}
+		defer { free(resolved) }
+		guard String(cString: resolved) == owned.physicalSpelling else {
+			throw Failure.evidence("owned-census-directory-canonical")
+		}
+		return owned.physicalSpelling
 	}
 
 	private func waitFor(_ name: String, root: URL, seconds: Double = 45) throws -> [String: Any] {
@@ -457,7 +501,8 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 	private func census(_ roots: [URL], root: URL) throws -> [[String: Any]] {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
-		let response = try run("/usr/bin/env", ["python3", helper.path, "census"] + roots.map(\.path), root: root, phase: .nativeProcessCensus)
+		let paths = try roots.map { try ownedCensusPath($0) }
+		let response = try run("/usr/bin/env", ["python3", helper.path, "census"] + paths, root: root, phase: .nativeProcessCensus)
 		guard let records = try JSONSerialization.jsonObject(with: Data(response.stdout.utf8)) as? [[String: Any]] else {
 			throw Failure.evidence("native-process-census")
 		}
@@ -513,6 +558,52 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		XCTAssertFalse(owner.process.isRunning)
 		try owner.retire()
 		try owner.retire()
+		passed = testRun?.failureCount == failuresBefore
+	}
+
+	func testOwnedCensusPathAdmitsParentAliasWithoutAdoptingDirectoryReplacement() throws {
+		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
+			.appendingPathComponent("ErgoptiSparkleDirectoryACK-" + UUID().uuidString)
+		try privateDirectory(root)
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		var passed = false
+		defer {
+			var closed = true
+			for command in commands {
+				do { try command.retire() }
+				catch { closed = false; XCTFail("Owned directory control child retirement refused; inputs retained") }
+			}
+			if closed, passed, testRun?.failureCount == failuresBefore {
+				do {
+					_ = try ownedCensusPath(root)
+					try manager.removeItem(at: root)
+				} catch { XCTFail("Owned directory control input retirement refused; inputs retained") }
+			} else { XCTFail("Owned directory control retained after refusal") }
+		}
+		let physicalParent = root.appendingPathComponent("physical-parent")
+		try privateDirectory(physicalParent)
+		let alias = root.appendingPathComponent("parent-alias")
+		try manager.createSymbolicLink(at: alias, withDestinationURL: physicalParent)
+		let child = alias.appendingPathComponent("child")
+		try privateDirectory(child)
+		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
+		let admission = "import importlib.util,sys; s=importlib.util.spec_from_file_location('owned_directory',sys.argv[1]); "
+			+ "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.private_directory(sys.argv[2]); print('admitted')"
+		// This independent parent alias reproduces the old real protocol refusal.
+		let refused = try run("/usr/bin/env", ["python3", "-c", admission, helper.path, child.path], root: root, expecting: 1)
+		XCTAssertTrue(refused.stdout.isEmpty)
+		XCTAssertTrue(refused.stderr.contains("Private Sparkle directory refused"))
+		let physical = try ownedCensusPath(child)
+		XCTAssertFalse(physical.contains("/parent-alias/"))
+		let accepted = try run("/usr/bin/env", ["python3", "-c", admission, helper.path, physical], root: root)
+		XCTAssertEqual(accepted.stdout, "admitted\n")
+		XCTAssertTrue(accepted.stderr.isEmpty)
+		try manager.moveItem(at: child, to: physicalParent.appendingPathComponent("retired-child"))
+		try manager.createDirectory(at: child, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+		XCTAssertThrowsError(try ownedCensusPath(child))
+		try manager.moveItem(at: child, to: physicalParent.appendingPathComponent("replacement-child"))
+		try manager.createSymbolicLink(at: child, withDestinationURL: physicalParent.appendingPathComponent("retired-child"))
+		XCTAssertThrowsError(try ownedCensusPath(child), "A symlink cannot adopt the original inode under another path")
 		passed = testRun?.failureCount == failuresBefore
 	}
 
