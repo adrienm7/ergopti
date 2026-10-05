@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: GitHub Release JSON Parser (Shared)
 --- DESCRIPTION:
---- Pure functions for parsing GitHub Releases API JSON payloads without a
---- full JSON decoder. Extracted from macos/infra/updater.lua (parse_tag,
+--- Pure functions for parsing GitHub Releases API JSON payloads. Asset lookup
+--- uses the shared JSON decoder to preserve metadata boundaries. Extracted
+--- from macos/infra/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
 --- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
 --- _Updater_SplitReleasesArray, _Updater_ParsePrerelease) so both drivers
@@ -17,6 +18,7 @@
 --- This module is PURE Lua — no driver imports, no io/network, no OS calls.
 --- ==============================================================================
 
+local Json = require("json")
 local M = {}
 
 
@@ -54,25 +56,19 @@ end
 
 
 --- Extracts the browser_download_url for a named asset from a GitHub release
---- JSON string. Walks the "assets" array looking for a matching "name" field.
---- @param body string Raw JSON
+--- JSON object. Decoding keeps delimiters and nested metadata inside their
+--- own fields; a label cannot terminate an asset or supply its name or URL.
+--- @param body string Raw single-release JSON object.
 --- @param asset_name string The asset filename to find (e.g. "ErgoptiPlus.app.zip")
 --- @return string url or ""
 function M.parse_asset_url(body, asset_name)
-	if not body or body == "" then return "" end
-	if not asset_name or asset_name == "" then return "" end
-	-- Isolate the "assets" array BEFORE iterating objects. On a real single-
-	-- release payload the outermost %b{} spans the ENTIRE release object, so
-	-- iterating `body` directly yields one chunk and `"name"` then matches the
-	-- release title, not any asset — the wanted asset is never found. Scoping to
-	-- the assets array makes each %b{} an individual asset, so its name and
-	-- browser_download_url come from the SAME object.
-	local assets = body:match('"assets"%s*:%s*(%b[])')
-	if not assets then return "" end
-	for obj in assets:gmatch("%b{}") do
-		local name = obj:match('"name"%s*:%s*"([^"]+)"')
-		if name == asset_name then
-			return obj:match('"browser_download_url"%s*:%s*"([^"]+)"') or ""
+	if type(body) ~= "string" or body == "" then return "" end
+	if type(asset_name) ~= "string" or asset_name == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" or type(release.assets) ~= "table" then return "" end
+	for _, asset in ipairs(release.assets) do
+		if type(asset) == "table" and asset.name == asset_name then
+			return type(asset.browser_download_url) == "string" and asset.browser_download_url or ""
 		end
 	end
 	return ""

@@ -1402,6 +1402,24 @@ These are software implementations; final hardware verification remains below.
   identifiers, so neither parses Linux variant lists; foreign runtime gates
   remain deferred. Multi-group recovery and reserved input paths are unchanged.
 
+- [~] **L101.** Shared release asset JSON boundaries: use the existing pure
+  JSON decoder at the common asset selector instead of scanning balanced text.
+  Valid labels containing closing braces or brackets had hidden canonical
+  assets; nested uploader fields could supply a different identity or URL, and
+  escaped URLs retained raw JSON escapes. Preserve exact first matching asset
+  names and the existing string URL/empty refusal contract. Twenty new common
+  corpus vectors and a registered direct-type case retain every original
+  assertion: fifty-two focused checks have twelve failures before and pass
+  after. Eight real verified-TLS/public updater cases have six failures before
+  and pass after on current curl/LuaJIT, the signed Ubuntu 22.04 dependency mix,
+  and actual stock Lua 5.4. Each checks complete response bytes, one callback,
+  exact canonical URLs and native handle settlement; no archive is requested
+  or installed. Register both interpreters for future Linux CI without
+  launching workflows. Windows and macOS actual asset owners already inspect
+  decoded object fields by source; foreign runtime gates remain deferred.
+  Other parser helpers, URL admission, update policy and reserved surfaces
+  are unchanged; no duplicate Linux selector is introduced.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

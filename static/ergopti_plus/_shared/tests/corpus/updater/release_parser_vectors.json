@@ -95,6 +95,186 @@
 			"expected": "https://github.com/x/y/releases/download/v2.1.0/ErgoptiPlus.app.zip"
 		},
 		{
+			"id": "asset_label_closing_object",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"label\":\"} x64\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_preceding_label_closing_array",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"notes.txt\",\"label\":\"] metadata\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_label_escaped_delimiters",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\",\"label\":\"quoted \\\" ] } \\\\ metadata\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_nested_uploader_name_not_asset",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"uploader\":{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/wrong\"},\"name\":\"other.zip\",\"browser_download_url\":\"https://example.invalid/other\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_nested_uploader_url_not_asset",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"uploader\":{\"browser_download_url\":\"https://example.invalid/wrong\"},\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_escaped_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https:\\/\\/example.invalid\\/releases\\/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_escaped_name",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.\\u007aip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.\\u007aip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_null_release",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "null",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_string_release",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "\"not a release\"",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_array_wrapper",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "[{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}]",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_nested_release",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"release\":{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_malformed_json",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]} trailing",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_null_assets",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":null}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_object_assets",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":{\"asset\":{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}}}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_null_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":null}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_number_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":123}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_nonstring_name",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":123,\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_first_matching_missing_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_missing_own_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"uploader\":{\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_first_exact_match_preserved",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/second\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
 			"id": "prerelease_true",
 			"category": "parse_prerelease_flag",
 			"input": { "body": "{\"tag_name\":\"v2.0.0-dev.1\",\"prerelease\":true}" },
