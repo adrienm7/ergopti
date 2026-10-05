@@ -2587,6 +2587,8 @@ Root dotted scalar settings now retain their exact requested finite value throug
 
 The first owned Linux storage publication now prepares the configuration directory through the existing quoted shell owner. Fresh user homes reproduce and fix the two actual configuration restore failures. Directory acknowledgement, source bytes and producer/file callbacks are revalidated before spending the write receipt or staging a backup; reread-time callback withdrawals refuse without publication and remain retryable. Native real-file regressions pass on LuaJIT and Lua 5.4. Packaging, installation and installed-device acceptance remain separate checks.
 
+The Windows fresh-bootstrap control now reads the real autocorrection names record at its parent section and asserts its complete three-child shape, refusing the unrelated flattened-section lookup. Float timing, obsolete scalar, future data and read-only assertions are retained. This repairs the fixture consumer; native snapshot publication and fresh process qualification still require Windows CI.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
@@ -2658,6 +2660,8 @@ U+10FFFF refuse before writes on macOS, while valid BMP/non-BMP symbols and the
 existing Linux rare-symbol policy retain their previous behavior. Independent
 actual-catalogue controls pass on both Lua runtimes; this source qualification
 does not establish native WebView transport or installed-device acceptance.
+
+The wizard WAL control now observes the current terminal-bundle token that owns the actual candidate path during hand-off, with exact token identity and unrelated-path refusal checks. It retains the ordinary Busy=false contract for an active terminal bundle and all original wizard assertions. Native Windows execution and real first-run device acceptance remain pending.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
@@ -3431,6 +3435,10 @@ Persisted macOS llm.enabled now uses the actual published feature value validato
 
 Parameter-bearing gesture bindings now use a shared current/retired/unjudged identity policy against each actual complete native gesture catalogue. Windows, macOS and Linux loaders preserve but do not activate proven retired entries, warn once, and ordinary setters refuse them before publication; explicit cleanup remains the removal owner. Windows keeps case-distinct parameter Maps, including unjudged qualified identities. The independent29-case corpus and registered native regressions are retained; Windows native execution is still pending. Other keyboard, tap-hold, script and combination identity owners remain unjudged by this bounded cohort, so site76 and the whole item stay open. The actual gesture fixture now restores its new shared dependency through the existing exact owner scope. All old isolation assertions remain; original2/9 and corrected11/0 independently reproduce the prerequisite, including absent/false/existing owners and construction/callback failure.
 
+The Windows finite-number gate now delegates its unchanged CRT ABI to a native adapter. The existing OS-call purity bound remains 252; the actual source census returns to 252 without raising it. The architecture graph was regenerated through its owner. AHK encoding and private-source JS checks pass; native Windows execution remains pending.
+
+The Windows legacy gesture-snapshot fixture explicitly establishes its case-insensitive map before population and verifies that precondition. Its original final source-policy assertion and all independent case-twin/clone checks remain intact. No native gesture implementation or parameter retirement policy changes; native fixture execution remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -3933,6 +3941,8 @@ Windows inline descendant updates now preserve source-owned order and trivia ins
 Both Lua drivers can now replace or explicitly remove an existing root dotted scalar through the shared strict source writer, preserving untouched bytes, comments and fresh-reload semantics. Native preference tests cover 17-digit precision and signed zero; nonfinite requests and inexact owned candidates refuse. Root inline tables, section-relative dotted writes and unrelated closed-shape literal-dot destinations remain explicit implementation gaps. This slice does not relax preservation of obsolete scalar parents or alter the default document encoder.
 
 The actual Lua preference writer now preserves requested finite numeric header leaves with the existing optional precise-literal owner and rejects inexact owned readback before native publication. Authentic source literals retain precedence; nonnumeric/container handling, the default codec, backups and source/CAS permissions are unchanged. Native-file setter, full-image and fresh-reload controls cover 17-digit values and signed zero on both Lua drivers. Root inline-table and section-relative dotted write support remain implementation work; packaging and installed-device acceptance remain separate qualifications.
+
+Two Windows cleanup controls now compare their complete handwritten case-sensitive identity sets independently of unspecified native Map enumeration order. Exact cardinality, duplicate refusal and unique semantic section markers strengthen the checks; all original key identities, backup, unknown-data and case-twin assertions remain. Production discovery and cleanup policies are unchanged. Actual Windows execution remains pending CI.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
