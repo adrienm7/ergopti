@@ -1658,8 +1658,12 @@ the independent-process launcher-log assertions retained under item40. Current
 dev02ad69e adds acknowledged diagnostic transport. Its merge preserves the
 74 closed phase witnesses and admits real keyboard fixtures before native reads;
 all seven pure diagnostic controls explicitly opt out of session enrollment.
-The combined native Swift/package/install verdict remains unexecuted until the
-next exact-source manual CI. No physical magic-key acceptance is inferred.
+Exact-source manual run37249787981 at6e87ae1aa compiles the release launcher
+and executes311 native XCTest cases. All keyboard/probe/diagnostic cases and
+the nine logger cases pass; two Brew/Sparkle archive cases fail with seven
+assertion failures, two unexpected. Packaging and installation remain
+unqualified. A passing logger rerun does not resolve its earlier intermittent
+lock refusal. No physical magic-key acceptance is inferred.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
   background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
@@ -1769,6 +1773,18 @@ and exit3. Aligned controls pass, while duplicate or missing declarations fail
 closed. The current producer, CLI and Python reader remain v1, and the consumer
 remains v2: native consumer admission is still deliberately refused. Independent
 native JSON corpora and all live wire versions are unchanged.
+
+The dormant capture stop port now retains one optional exact-session observer
+until native verifier/clock/capture retirement and accounting release commit.
+Conflicting observers are refused without replacing pending debt. Acquisition,
+selection, clock-publication and accounting fences remain authoritative; callback
+failure or reentry cannot replay notification or replace a successor. Eighteen
+independently authored cases fail against the original source; the focused
+candidate passes55 cases including37 existing controls. This prepares awaitable
+shutdown without wiring the production termination coordinator, enabling capture
+or completing WP3. Full selected gates pass formatting,357 JS checks,14,147
+portable macOS unit cases in1,490 modules and101 stubbed E2E checks with one
+explicit skip. Real native task/shutdown acceptance remains required.
 
 ## Remaining work after the 2026-09-30 releases
 

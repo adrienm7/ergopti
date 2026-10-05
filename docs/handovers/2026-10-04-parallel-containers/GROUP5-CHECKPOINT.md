@@ -35,13 +35,37 @@ files, preserving both owners' assertions. Real keyboard fixtures enroll in the
 acknowledged transport before native calls; seven pure controls opt out. The
 bounded keyboard witnesses, logger frames and original status verdicts remain.
 Group6's transport/census controls, native source and CI workflows are preserved.
-Its frozen Windows/Linux preparation packets remain inactive. This254-file
-composition needs new source-selected gates and exact-source native CI; earlier
-receipts do not qualify its native package or installation.
+Its frozen Windows/Linux preparation packets remain inactive. Pushed254-file
+composition6e87ae1aa passes formatting,357 JS checks, UTF-8 BOM/LF for1,823
+AHK files,14,129 portable macOS units in1,489 modules,101 stubbed macOS E2E
+checks with one explicit skip,6,691 Linux units in362 modules and188 Linux E2E
+checks. Native Swift is deferred locally. Exact-source manual run37249787981
+on macos+linux is terminal failure: native release compilation succeeds, but
+two macOS archive/Brew/Sparkle subjects and three Linux native E2E subjects
+fail. The same macOS subjects fail in Group6's preceding dev validation. The
+downloaded raw artifact11320192924 now confirms311 native XCTest cases:
+309 pass and those two cases fail with seven assertions, two unexpected.
+All keyboard/probe/diagnostic cases and the nine logger cases pass on this
+candidate; the earlier intermittent logger lock refusal is not proved fixed.
+Packaging and installation are not qualified; Windows is unselected and Release
+is skipped. Actual artifact access succeeds after the results-host policy update;
+this does not prove a fresh environment restore or native acceptance.
 No old handover patch belongs to this group. This clone tracks main only:
 fetch dev with `git fetch origin refs/heads/dev:refs/remotes/origin/dev` and
 compare `git ls-remote --heads origin dev` with the tracking ref. A plain
 `git fetch origin dev` can refresh only FETCH_HEAD and leave origin/dev stale.
+
+The next reviewed WP3 prerequisite adds one optional exact-session stop
+notification to the dormant capture port. It notifies only after exact native
+retirement and accounting release; callback conflict, reentry and throw preserve
+the committed retirement and successor fences. Eighteen independently authored
+new cases fail against unchanged production; the private candidate passes55
+focused cases including37 existing controls. Independent review is clear. The
+final selected gate passes formatting,357 JS checks,14,147 portable macOS units
+in1,490 modules and101 stubbed E2E checks with one explicit skip. No source
+expectation, native assertion or corpus was weakened. These faithful native
+doubles do not qualify actual task/shutdown acceptance. The runtime, production
+termination coordinator and remaining WP3/WP4 work stay unactivated.
 
 ## Pushed changes
 
@@ -244,13 +268,14 @@ end after the outer restore call and its diagnostic observation have returned.
 That observation does not explain the earlier native termination.
 
 Native package construction, installation and launch are skipped. Release/Publish
-is skipped. Artifact11318359681 is retained by GitHub but redirects to
-productionresultssa6.blob.core.windows.net; the actual download fails at the
-proxy tunnel with403. That exact hostname is saved additively in the existing
-environment draft; runtime propagation and publication are unproved. The helper
-already emits its failed append stage/errno on stderr. Group5 is preparing a
-bounded failure-only annotation without changing native logger assertions,
-ownership, source checks or the250ms deadline. No dev integration has occurred.
+is skipped. Artifact11318359681 initially refused proxy access through
+productionresultssa6.blob.core.windows.net. Its later actual download succeeds
+after the additive network policy update. The raw transcript records writer2,
+entry75, lock-file errno35 at the bounded250ms lock-retry deadline; helperexit73.
+This identifies the refused boundary, not the cause. The helper already emits
+that failure on stderr; the following reader exposes it without changing native
+logger assertions, ownership, source checks or the250ms deadline. No dev
+integration has occurred.
 
 The bounded logger callback reader is independently reviewed and pushed at
 `cd6a9f9c07217471a11d878ad4e104fe62800dc6`. It validates the complete canonical

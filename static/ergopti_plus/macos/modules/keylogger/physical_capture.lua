@@ -47,6 +47,17 @@ local function revoke(candidate)
 	return true
 end
 
+--- Completes the one retained notification after this exact session retires.
+--- Detach before external dispatch so callback reentry cannot replay the receipt.
+---@param candidate table Captured session identity whose stop is committed.
+local function notify_stop(candidate)
+	local observer = candidate.stop_observer
+	if not observer then return end
+	candidate.stop_observer = nil
+	local ok, failure = xpcall(function() observer(true) end, debug.traceback)
+	if not ok then Logger.error(LOG, "Physical capture stop observer failed: %s.", tostring(failure)) end
+end
+
 --- Retires accounting only when every exact native child has settled.
 ---@param candidate table Captured session identity.
 ---@return boolean settled
@@ -63,6 +74,7 @@ local function finish_stop(candidate)
 	end
 	candidate.state = "stopped"
 	Logger.success(LOG, "Physical capture session stopped.")
+	notify_stop(candidate)
 	return true
 end
 
@@ -324,7 +336,15 @@ function M.start(options)
 	local selected, accepted = pcall(accounting_transition, candidate, Accounting.select_stream, OWNER)
 	if not selected or accepted ~= true then
 		candidate.receiver.stop()
+		candidate.acquiring = false
 		session = previous
+		-- A stop latched inside refused selection still owns its notification,
+		-- but no accounting source or native child was acquired to release.
+		if candidate.stop_requested then
+			candidate.state = "stopped"
+			Logger.success(LOG, "Physical capture session stopped.")
+			notify_stop(candidate)
+		end
 		if not selected then error(accepted, 0) end
 		return false
 	end
@@ -377,11 +397,20 @@ end
 
 --- Revokes delivery immediately; accepted termination alone cannot release ownership.
 --- Repeated calls retry only the same retained child, never start a replacement.
+--- One optional observer is retained per actual session; retries may reuse it.
+--- Absence or an already-stopped session returns true without retaining or calling
+--- the observer. An actual session may notify synchronously during cancellation.
+---@param on_stopped function|nil Called once with true after exact retirement and accounting release.
 ---@return boolean settled True only after exact native settlement and accounting release.
 ---@return string|nil status Pending while an exact child or settlement refusal remains.
-function M.stop()
+function M.stop(on_stopped)
+	assert(on_stopped == nil or type(on_stopped) == "function", "Invalid physical stop observer")
 	if not session or session.state == "stopped" then return true end
 	local candidate = session
+	if on_stopped then
+		if candidate.stop_observer and candidate.stop_observer ~= on_stopped then return false, "observer_conflict" end
+		candidate.stop_observer = on_stopped
+	end
 	if not candidate.stop_requested then
 		candidate.stop_requested, candidate.state = true, "stopping"
 		Logger.start(LOG, "Stopping physical capture session…")
