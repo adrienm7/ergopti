@@ -595,6 +595,17 @@ pass on both Lua ABIs. Native adapter fixtures use actual Lua54 math.type and
 are not credited as native LuaJIT execution. Refusal revokes before notification
 and keeps actual terminal frame debt; no permission or capture is activated.
 
+Official XcodeGen acquisition now retains bounded typed failure diagnostics for
+metadata versus archive transport, without exposing exception text, URLs, headers
+or trust configuration. Certificate, TLS, timeout, DNS, connection, public HTTP
+status and strict integer errno remain distinct; verified HTTPS, pinned metadata
+and ZIP admission, ownership and existing budgets are unchanged. The original53
+controls stay byte-identical; independent53/29/48/discovery82 and frozen errno4
+controls pass without skips. The rejected predecessor's malformed-errno evidence
+is retained, and its exact correction is independently reviewed. Actual hosted
+transport cause remains unknown; native Swift and full producer compilation
+must be rerun. This diagnostic does not activate capture or complete TODO31.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native

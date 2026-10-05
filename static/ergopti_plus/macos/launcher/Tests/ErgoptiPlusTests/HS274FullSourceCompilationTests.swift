@@ -20,6 +20,18 @@ extension HS274NativePolicyQualificationTests {
 		}
 	}
 
+	func testActualPythonTransportDiagnosticsPreserveTypedRefusalsAndPrivacy() throws {
+		try fixture { root in
+			let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+				["python3", source("hs274_native_build_transport_test.py").path], root: root)
+			XCTAssertEqual(receipt.status, 0)
+			XCTAssertEqual(receipt.stdout,
+				"PASS independent native transport diagnostics tests=29 failures=0 errors=0 skipped=0\n")
+			XCTAssertTrue(receipt.stderr.contains("Ran 29 tests in "))
+			XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+		}
+	}
+
 	func testActualPinnedCoreServiceAndCLICompileWithinOwnedCalibration() throws {
 		let parent = try compilationEvidenceParent()
 		try fixture(parent: parent) { root in

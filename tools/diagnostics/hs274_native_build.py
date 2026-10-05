@@ -2,6 +2,7 @@
 """Compile an owned pinned source tree without signing, installing or activating it."""
 
 import argparse
+import errno
 import hashlib
 import http.client
 import io
@@ -11,6 +12,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import socket
 import stat
 import ssl
 import subprocess
@@ -328,6 +330,58 @@ def _tool_https_url(url):
     return target
 
 
+def _tool_http_failure(status):
+    """Export only a typed public HTTP status, never response content or headers."""
+    diagnostic = {"kind": "http_status"}
+    if type(status) is int and 100 <= status <= 599:
+        diagnostic["http_status"] = status
+    return diagnostic
+
+
+def _tool_transport_failure(error):
+    """Classify bounded typed failures without formatting untrusted exception data."""
+    # HTTPError also inherits URLError; preserve its public status before unwrapping.
+    for _ in range(4):
+        if isinstance(error, urllib.error.HTTPError):
+            return _tool_http_failure(error.code)
+        if not isinstance(error, urllib.error.URLError):
+            break
+        reason = error.reason
+        if not isinstance(reason, BaseException) or reason is error:
+            return {"kind": "other_transport"}
+        error = reason
+    if isinstance(error, ssl.SSLCertVerificationError):
+        diagnostic = {"kind": "tls_certificate_verification"}
+        code = getattr(error, "verify_code", None)
+        if type(code) is int and 0 <= code <= 2**31 - 1:
+            diagnostic["verify_code"] = code
+        return diagnostic
+    if isinstance(error, ssl.SSLError):
+        return {"kind": "tls_error"}
+    if isinstance(error, TimeoutError):
+        return {"kind": "timeout"}
+    if isinstance(error, socket.gaierror):
+        return {"kind": "dns_resolution"}
+    if isinstance(error, ConnectionRefusedError):
+        return {"kind": "connection_refused"}
+    if isinstance(error, ConnectionResetError):
+        return {"kind": "connection_reset"}
+    if isinstance(error, ConnectionError) or (
+        isinstance(error, OSError)
+        and type(error.errno) is int
+        and error.errno in {errno.ENETUNREACH, errno.EHOSTUNREACH}
+    ):
+        return {"kind": "connection_error"}
+    if isinstance(error, OSError):
+        diagnostic = {"kind": "os_error"}
+        if type(error.errno) is int and 0 < error.errno < 4096:
+            diagnostic["errno"] = error.errno
+        return diagnostic
+    if isinstance(error, http.client.HTTPException):
+        return {"kind": "protocol_error"}
+    return {"kind": "other_transport"}
+
+
 def _download_tool_input(url, maximum, deadline, metadata=False):
     """Acquire bounded complete bytes through the default verified TLS context."""
     _tool_https_url(url)
@@ -341,22 +395,27 @@ def _download_tool_input(url, maximum, deadline, metadata=False):
         headers.update(
             {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
         )
-    opener = urllib.request.build_opener(
-        _PinnedToolRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context())
-    )
-    # TLS context/opener acquisition can consume the remaining absolute budget.
-    # Admit its freshly measured remainder before passing any timeout to urllib.
-    remaining = deadline - time.monotonic()
-    require(remaining > 0, "phase_deadline", "Tool TLS preparation exceeded calibration deadline")
     try:
+        opener = urllib.request.build_opener(
+            _PinnedToolRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context())
+        )
+        # TLS context/opener acquisition can consume the remaining absolute budget.
+        # Admit its freshly measured remainder before passing any timeout to urllib.
+        remaining = deadline - time.monotonic()
+        require(
+            remaining > 0, "phase_deadline", "Tool TLS preparation exceeded calibration deadline"
+        )
         with opener.open(
             urllib.request.Request(url, headers=headers),
             timeout=min(30, remaining),
         ) as response:
             final = _tool_https_url(response.geturl())
-            require(
-                response.status == 200, "xcodegen_transport", "Official tool HTTP status is not 200"
-            )
+            if response.status != 200:
+                failure = NativeBuildError(
+                    "xcodegen_transport", "Official tool HTTP status is not 200"
+                )
+                failure.transport_diagnostic = _tool_http_failure(response.status)
+                raise failure
             advertised = response.headers.get("Content-Length")
             require(
                 advertised is None or (advertised.isdecimal() and int(advertised) <= maximum),
@@ -397,9 +456,9 @@ def _download_tool_input(url, maximum, deadline, metadata=False):
                 "bytes": size,
             }
     except (OSError, urllib.error.URLError, http.client.HTTPException) as error:
-        raise NativeBuildError(
-            "xcodegen_transport", "Official tool HTTPS acquisition failed"
-        ) from error
+        failure = NativeBuildError("xcodegen_transport", "Official tool HTTPS acquisition failed")
+        failure.transport_diagnostic = _tool_transport_failure(error)
+        raise failure from error
 
 
 def acquire_xcodegen(owner, deadline):
@@ -407,6 +466,7 @@ def acquire_xcodegen(owner, deadline):
     owner = validate_owner_root(owner)
     started = time.monotonic()
     name = "xcodegen_acquisition"
+    stage = "metadata"
     write_json(owner / (name + ".begin.json"), {"schema": 1, "phase": name, "status": "pending"})
     try:
         raw, metadata_transport = _download_tool_input(
@@ -430,6 +490,7 @@ def acquire_xcodegen(owner, deadline):
             raise NativeBuildError(
                 "xcodegen_metadata", "Official tool metadata is not complete JSON"
             ) from error
+        stage = "archive"
         archive, transport = _download_tool_input(XCODEGEN_URL, XCODEGEN_ARCHIVE_BYTES, deadline)
         identity = verify_xcodegen_archive(archive)
         require(
@@ -476,16 +537,19 @@ def acquire_xcodegen(owner, deadline):
             "Tool identity evidence exceeded calibration deadline",
         )
     except NativeBuildError as error:
-        write_json(
-            owner / (name + ".receipt.json"),
-            {
-                "schema": 1,
-                "phase": name,
-                "status": "refused",
-                "code": error.code,
-                "elapsed_seconds": time.monotonic() - started,
-            },
-        )
+        record = {
+            "schema": 1,
+            "phase": name,
+            "status": "refused",
+            "code": error.code,
+            "elapsed_seconds": time.monotonic() - started,
+            "acquisition_stage": stage,
+        }
+        if error.code == "phase_deadline":
+            record["transport_diagnostic"] = {"kind": "deadline"}
+        elif hasattr(error, "transport_diagnostic"):
+            record["transport_diagnostic"] = error.transport_diagnostic
+        write_json(owner / (name + ".receipt.json"), record)
         raise
     record = {
         "schema": 1,
