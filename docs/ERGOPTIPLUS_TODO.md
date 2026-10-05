@@ -2585,6 +2585,8 @@ The Windows semantic builder now retains unowned inline member order, raw tokens
 
 Root dotted scalar settings now retain their exact requested finite value through the actual shared writer and native preference publication. Independent full-image and restart checks cover precision and source preservation. Header numeric publication remains a separate corrective slice; broader scope/catalogue and installed-device acceptance are still open.
 
+The first owned Linux storage publication now prepares the configuration directory through the existing quoted shell owner. Fresh user homes reproduce and fix the two actual configuration restore failures. Directory acknowledgement, source bytes and producer/file callbacks are revalidated before spending the write receipt or staging a backup; reread-time callback withdrawals refuse without publication and remain retryable. Native real-file regressions pass on LuaJIT and Lua 5.4. Packaging, installation and installed-device acceptance remain separate checks.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. The tap-holds page lists each engine's recommended keys from the
