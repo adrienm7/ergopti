@@ -1074,12 +1074,12 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 	; Publish only through the same-volume write-through adapter. The WAL may
 	; promote immediately after this return, so a merely visible rename is not a
 	; sufficient durability boundary.
-	Moved := FSAtomicMoveReplace(tmp, Path)
+	Moved := FSAtomicMoveReplace(tmp, Path, &MoveError)
 	if !((Moved is Integer) && Moved == 1) {
 		global _ParseTomlCache
 		if _ParseTomlCache.Has(Path)
 			_ParseTomlCache.Delete(Path)
-		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted.", Path)
+		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted (native error {2}).", Path, MoveError)
 		_TOML_RemoveOwnedStage(tmp)
 		return false
 	}
