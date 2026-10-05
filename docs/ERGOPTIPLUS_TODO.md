@@ -4547,6 +4547,8 @@ required; the remaining fixed native families and physical acceptance are open.
 
 The 2026-10-05 Swipe continuation declares its fixed action separator, mode group and sensitivity group once in the shared manifest. Native selection, eighteen numeric sensitivity choices and acknowledged compensation remain their existing owners. Two captions use genuine translated prefixes in all 21 locales. Source/graph/callback controls and the old-producer inverse pass; final composed native and physical UI qualification remain pending. This does not complete the remaining fixed provider controls.
 
+Native Linux metrics equivalence now retains the established JSON-quoted token column in its independent raw-row SQL transport. All twenty-one assertions, aggregation rules and date/application filters remain unchanged. Real SQLite compares 648 grouped rows with 2808 raw rows; this repairs a validation prerequisite and changes no production metrics policy.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
