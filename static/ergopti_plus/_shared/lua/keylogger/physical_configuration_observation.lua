@@ -84,23 +84,26 @@ end
 ---@param clock function Raw native nanosecond reader, never a rebased or wall clock.
 ---@param receive function Receives one copied record; exact true acknowledges it.
 ---@param on_refused function Receives one terminal reason after authority is revoked.
+---@param identity table|nil Exact subscriber owner/token and its actual source detach port.
 ---@return table channel publish and close ports for this exact subscription.
-function M.new(capacity, clock, receive, on_refused)
+function M.new(capacity, clock, receive, on_refused, identity)
 	assert(integral(capacity) and capacity > 0, "Invalid physical observation budget")
 	assert(type(clock) == "function" and type(receive) == "function" and type(on_refused) == "function",
 		"Missing physical configuration observation ports")
+	identity = identity or { owner = {}, token = {} }
+	local lifetime = require("keylogger.physical_subscription_lifetime").new(identity.owner, identity.token)
 	local active, publishing, revision, previous = true, false, 0, nil
 	local channel = {}
 	local function refuse(reason)
 		if active then
-			active = false
+			active = false; lifetime.revoke()
 			pcall(on_refused, reason)
 		end
 		return false, reason
 	end
 
 	--- Revokes callbacks before the exact caller detaches the subscription.
-	function channel.close() active = false; return true end
+	function channel.close() active = false; lifetime.detach(); return true end
 
 	--- Publishes a copied complete filter transaction after its writer commits.
 	---@param configuration table Native filter values, without permission authority.
@@ -129,6 +132,20 @@ function M.new(capacity, clock, receive, on_refused)
 		revision, previous = revision + 1, observed_ns
 		return true
 	end
+
+	--- Exposes exact callback ownership and post-frame retirement, without native stop.
+	---@return table capability Stable current(owner, token) and retired(owner, token) ports.
+	function channel.subscription() return lifetime.capability() end
+
+	--- Retains this subscription through its actual native writer's complete stack.
+	---@param writer function Existing bound writer, without new native work.
+	---@param ... any Original writer arguments.
+	---@return any results Original writer outcome, including raised errors.
+	function channel.run_writer(writer, ...) return lifetime.run(writer, ...) end
+
+	local publish_configuration = channel.publish
+	function channel.publish(...) return lifetime.run(publish_configuration, ...) end
+	lifetime.bind_detach(identity.detach or channel.close)
 	return channel
 end
 

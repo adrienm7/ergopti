@@ -515,6 +515,27 @@ source passes formatter and all 356 JS checks; native Swift is explicitly
 deferred on Linux. Independent final five-file review found no blocking issue.
 This diagnostic evidence cannot identify a cause or qualify completion by itself.
 
+Exact subscription capabilities now retain source callback frames before foreign
+operations and report retirement only after actual exact-owner detach and every
+held frame unwinds. They preserve original lifecycle/configuration/context writer
+bodies and result tuples, without stopping borrowed global watchers or granting
+permission. Independent composition review passes457 focused cases, including
+48 retirement cases. The original37 cases remain byte-preserved; eleven appended
+checks assert facts outside protected callbacks and reject premature-retirement
+mutants. Two original callback-contained assertions remain documented as unable
+to discriminate that mutant. Forty-one portable cases pass on both Lua ABIs;
+seven adapter cases require the normal Mac stub runner.
+
+The Mac clock adapter additionally captures the exact Hammerspoon root, timer
+and getter for one owned binding. It fences replacement and reentry, retains
+actual getter frames through detach, preserves native error objects and keeps
+unbound strict reads unchanged. Independent review passes24 new,39 unchanged
+and nine additional controls. Five semantic mutations are rejected: three exact
+source mutations and two equivalent independent recipes, distinguished in the
+review. This binding token is not a qualified native clock domain. Loaded-host
+execution, Mach timebase comparison, permission normalization, pause integration,
+production recovery and capture activation remain outstanding; TODO31 stays open.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native

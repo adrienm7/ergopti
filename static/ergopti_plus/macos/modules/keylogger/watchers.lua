@@ -754,10 +754,13 @@ end
 ---@param owner table Exact observer owner.
 ---@param capacity integer Positive native receipt budget.
 ---@param receive function Literal-true receipt acknowledger.
+---@param on_refused function|nil Receives terminal reason and the exact source token.
 ---@return table|nil token Exact observer token.
-function M.bind_physical_lifecycle_observer(owner, capacity, receive)
+---@return string|nil reason Explicit binding refusal.
+---@return table|nil scope Exact callback current, detach and post-frame retirement ports.
+function M.bind_physical_lifecycle_observer(owner, capacity, receive, on_refused)
 	if math.type(capacity) ~= "integer" then return nil, "Invalid native lifecycle receipt budget" end
-	return _physical_lifecycle.bind(owner, capacity, receive)
+	return _physical_lifecycle.bind(owner, capacity, receive, on_refused)
 end
 
 --- Detaches only the exact lifecycle owner and token.

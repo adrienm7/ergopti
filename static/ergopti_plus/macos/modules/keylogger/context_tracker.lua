@@ -149,7 +149,7 @@ local function invoke_context_writer(writer, ...)
 end
 
 --- Runs an observed transaction only for an explicitly bound trusted owner.
-local function run_context_write(source, writer, ...)
+local function complete_context_write(source, writer, ...)
 	local expected = _expected_context_transaction
 	_expected_context_transaction = nil
 	local binding = _physical_context_binding
@@ -172,6 +172,13 @@ local function run_context_write(source, writer, ...)
 	return table.unpack(results, 2, results.n)
 end
 
+
+local function run_context_write(source, writer, ...)
+	local binding = _physical_context_binding
+	if binding then return binding.channel.run_writer(complete_context_write, source, writer, ...) end
+	return complete_context_write(source, writer, ...)
+end
+
 local function bind_context_observer(owner, capacity, receive, on_refused, may_persist, correlated)
 	assert(type(owner) == "table" and type(receive) == "function" and type(on_refused) == "function"
 		and type(may_persist) == "function", "Invalid physical context subscriber")
@@ -179,19 +186,22 @@ local function bind_context_observer(owner, capacity, receive, on_refused, may_p
 	if not require_state("bind_physical_context_observer") then return false, "Context tracker is not initialized" end
 	if _physical_context_binding then return false, "Physical context subscriber already bound" end
 	local binding = { owner = owner, token = {}, may_persist = may_persist, correlated = correlated }
+	binding.detach = function(exact_owner, exact_token)
+		return M.unbind_physical_context_observer(exact_owner, exact_token)
+	end
 	binding.channel = require("keylogger.physical_context_observation").new(capacity,
 		require("adapters.physical_observation_clock").now,
 		function(record) return receive(record, binding.token) end,
-		function(reason) Logger.callback(LOG, "Physical context refusal observer", on_refused, reason) end, correlated)
+		function(reason) Logger.callback(LOG, "Physical context refusal observer", on_refused, reason) end, correlated, binding)
 	_physical_context_binding = binding
 	local accepted, reason = binding.channel.seed()
 	if accepted ~= true then
 		if rawequal(_physical_context_binding, binding) then
 			_physical_context_binding = nil; binding.channel.close()
 		end
-		return false, reason
+		return false, reason, binding.channel.subscription()
 	end
-	return true, binding.token
+	return true, binding.token, binding.channel.subscription()
 end
 
 --- Binds dormant native-writer receipts; retained permission history is separate.
@@ -202,6 +212,7 @@ end
 ---@param may_persist function Existing authoritative persistence decision, accepting true.
 ---@return boolean bound False if initial denied observation is refused.
 ---@return table|string token Exact detach token or refusal reason.
+---@return table|nil scope Exact callback ownership and post-frame retirement, also on acquired bootstrap failure.
 function M.bind_physical_context_observer(owner, capacity, receive, on_refused, may_persist)
 	return bind_context_observer(owner, capacity, receive, on_refused, may_persist)
 end
@@ -215,6 +226,7 @@ end
 ---@param may_persist function Existing authoritative persistence decision, accepting true.
 ---@return boolean bound False if the initial denied observation is refused.
 ---@return table|string token Exact detach token or refusal reason.
+---@return table|nil scope Exact callback ownership and post-frame retirement, also on acquired bootstrap failure.
 function M.bind_physical_correlated_context_observer(owner, capacity, receive, on_refused, may_persist)
 	return bind_context_observer(owner, capacity, receive, on_refused, may_persist, true)
 end

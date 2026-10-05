@@ -1078,6 +1078,7 @@ end
 ---@param on_refused function Called once after this subscription is revoked.
 ---@return boolean bound False if acquisition or the initial receipt is refused.
 ---@return table|string token Exact detach token on success, otherwise a refusal reason.
+---@return table|nil scope Exact callback ownership and post-frame retirement, also on acquired bootstrap failure.
 function M.bind_physical_configuration_observer(owner, capacity, receive, on_refused)
 	assert(type(owner) == "table" and type(receive) == "function" and type(on_refused) == "function",
 		"Invalid physical configuration subscriber")
@@ -1090,10 +1091,13 @@ function M.bind_physical_configuration_observer(owner, capacity, receive, on_ref
 		system_auth_filter_enabled = CoreState.system_auth_filter_enabled })
 	assert(math.type(capacity) == "integer" and capacity > 0, "Invalid physical observation budget")
 	local binding = { owner = owner, token = {} }
+	binding.detach = function(exact_owner, exact_token)
+		return M.unbind_physical_configuration_observer(exact_owner, exact_token)
+	end
 	binding.channel = Observation.new(capacity, require("adapters.physical_observation_clock").now,
 		function(record) return receive(record, binding.token) end, function(reason)
 			Logger.callback(LOG, "Physical configuration refusal observer", on_refused, reason)
-		end)
+		end, binding)
 	local prior_apps = CoreState.disabled_apps
 	local owned_apps = Observation.own_apps(prior_apps)
 	CoreState.disabled_apps = owned_apps
@@ -1110,9 +1114,9 @@ function M.bind_physical_configuration_observer(owner, capacity, receive, on_ref
 		if _physical_configuration_binding == nil and rawequal(CoreState.disabled_apps, owned_apps) then
 			CoreState.disabled_apps = prior_apps
 		end
-		return false, reason
+		return false, reason, binding.channel.subscription()
 	end
-	return true, binding.token
+	return true, binding.token, binding.channel.subscription()
 end
 
 --- Detaches only the exact bound caller and token, including a retired channel.
@@ -2262,10 +2266,13 @@ end
 ---@param owner table Exact observer owner.
 ---@param capacity integer Positive native receipt budget.
 ---@param receive function Literal-true receipt acknowledger.
+---@param on_refused function|nil Receives terminal reason and the exact source token.
 ---@return table|nil token Exact observer token.
-function M.bind_physical_lifecycle_observer(owner, capacity, receive)
+---@return string|nil reason Explicit binding refusal.
+---@return table|nil scope Exact callback current, detach and post-frame retirement ports.
+function M.bind_physical_lifecycle_observer(owner, capacity, receive, on_refused)
 	if math.type(capacity) ~= "integer" then return nil, "Invalid native lifecycle receipt budget" end
-	return _physical_lifecycle.bind(owner, capacity, receive)
+	return _physical_lifecycle.bind(owner, capacity, receive, on_refused)
 end
 
 --- Detaches only the exact engine lifecycle owner and token.
@@ -2273,5 +2280,18 @@ end
 ---@param token table Exact observer token.
 ---@return boolean detached Whether the owned observer was detached.
 function M.unbind_physical_lifecycle_observer(owner, token) return _physical_lifecycle.unbind(owner, token) end
+
+
+--- Keeps existing policy writers owned until their actual source frames unwind.
+local function run_physical_configuration_writer(writer, ...)
+	local binding = _physical_configuration_binding
+	if binding then return binding.channel.run_writer(writer, ...) end
+	return writer(...)
+end
+for _, name in ipairs({ "apply_configuration", "set_disabled_apps", "set_private_filter_enabled",
+	"set_secure_field_filter_enabled", "set_system_auth_filter_enabled" }) do
+	local writer = M[name]
+	M[name] = function(...) return run_physical_configuration_writer(writer, ...) end
+end
 
 return M

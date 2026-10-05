@@ -48,7 +48,10 @@ function M.new(domain, clock, on_refused)
 	end
 	local function refuse(candidate, reason)
 		if current(candidate) then
-			candidate.active = false
+			candidate.active = false; candidate.lifetime.revoke()
+			if candidate.on_refused then
+				candidate.lifetime.run(function() pcall(candidate.on_refused, reason, candidate.token) end)
+			end
 			pcall(on_refused, reason)
 		end
 		return false, reason
@@ -114,20 +117,27 @@ function M.new(domain, clock, on_refused)
 	---@param owner table Exact owner capability.
 	---@param capacity number Positive finite integral receipt budget.
 	---@param receive function Receives copied records and exact binding token.
+	---@param refusal_observer function|nil Exact callback receiving terminal reason and source token.
 	---@return table|nil token Owned detach capability, or nil on refusal.
-	function actor.bind(owner, capacity, receive)
-		if type(owner) ~= "table" or not integral(capacity) or capacity < 1 or type(receive) ~= "function" then
+	---@return string|nil reason Explicit refusal reason when binding fails.
+	---@return table|nil scope Exact callback ownership, detach and post-frame retirement.
+	function actor.bind(owner, capacity, receive, refusal_observer)
+		if type(owner) ~= "table" or not integral(capacity) or capacity < 1 or type(receive) ~= "function"
+			or (refusal_observer ~= nil and type(refusal_observer) ~= "function") then
 			return nil, "Invalid lifecycle subscription"
 		end
 		if binding ~= nil then return nil, "Lifecycle observer already owned" end
 		local candidate = { owner = owner, token = {}, active = true, dispatching = false,
-			capacity = capacity, receive = receive, revision = 0 }
+			capacity = capacity, receive = receive, revision = 0, on_refused = refusal_observer }
+		candidate.lifetime = require("keylogger.physical_subscription_lifetime").new(owner, candidate.token)
+		candidate.lifetime.bind_detach(function(exact_owner, exact_token) return actor.unbind(exact_owner, exact_token) end)
 		binding = candidate
-		if publish(candidate, { source = "binding" }) ~= true then
+		if candidate.lifetime.run(publish, candidate, { source = "binding" }) ~= true then
 			if rawequal(binding, candidate) then binding = nil end
-			return nil, "Lifecycle bootstrap refused"
+			candidate.active = false; candidate.lifetime.detach()
+			return nil, "Lifecycle bootstrap refused", candidate.lifetime.capability()
 		end
-		return candidate.token
+		return candidate.token, nil, candidate.lifetime.capability()
 	end
 
 	--- Releases only the actual owner and token; equality hooks are never invoked.
@@ -136,7 +146,7 @@ function M.new(domain, clock, on_refused)
 	---@return boolean released Whether the exact subscription was detached.
 	function actor.unbind(owner, token)
 		if binding == nil or not rawequal(binding.owner, owner) or not rawequal(binding.token, token) then return false end
-		binding.active = false; binding = nil
+		binding.active = false; binding.lifetime.detach(); binding = nil
 		return true
 	end
 
@@ -193,7 +203,11 @@ function M.new(domain, clock, on_refused)
 	---@param snapshot function Copied scalar state, read only while still owned.
 	---@param ... any Original writer arguments.
 	---@return any result Original writer result tuple.
-	function actor.run(source, writer, snapshot, ...) return execute(source, writer, snapshot, false, ...) end
+	function actor.run(source, writer, snapshot, ...)
+		local candidate = binding
+		if candidate then return candidate.lifetime.run(execute, source, writer, snapshot, false, ...) end
+		return execute(source, writer, snapshot, false, ...)
+	end
 
 	--- Denies before legacy callback admission and accepts only its actual child.
 	---@param source table Normalized native event.
@@ -201,7 +215,11 @@ function M.new(domain, clock, on_refused)
 	---@param snapshot function Copied scalar state after the actual child returns.
 	---@param ... any Original callback arguments.
 	---@return any result Original callback result tuple.
-	function actor.bridge(source, writer, snapshot, ...) return execute(source, writer, snapshot, true, ...) end
+	function actor.bridge(source, writer, snapshot, ...)
+		local candidate = binding
+		if candidate then return candidate.lifetime.run(execute, source, writer, snapshot, true, ...) end
+		return execute(source, writer, snapshot, true, ...)
+	end
 	return actor
 end
 

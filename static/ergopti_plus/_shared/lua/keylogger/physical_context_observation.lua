@@ -14,12 +14,15 @@ end
 ---@param receive function Copied receipt consumer, acknowledging literal true.
 ---@param on_refused function Once-only notification after publication is revoked.
 ---@param correlated boolean|nil Literal true requests native window/app identity evidence.
+---@param identity table|nil Exact subscriber owner/token and its actual source detach port.
 ---@return table channel Exact transaction begin, mark, finish and close ports.
-function M.new(capacity, clock, receive, on_refused, correlated)
+function M.new(capacity, clock, receive, on_refused, correlated, identity)
 	assert(integral(capacity) and capacity > 0, "Invalid physical context receipt budget")
 	assert(type(clock) == "function" and type(receive) == "function" and type(on_refused) == "function",
 		"Missing physical context observation ports")
 	assert(correlated == nil or correlated == true, "Invalid physical correlation mode")
+	identity = identity or { owner = {}, token = {} }
+	local lifetime = require("keylogger.physical_subscription_lifetime").new(identity.owner, identity.token)
 	local app_pid, window_pid
 	local active, dispatching, pending, previous, revision = true, false, nil, nil, 0
 	local known = { app = false, window = false, secure = false }
@@ -27,12 +30,12 @@ function M.new(capacity, clock, receive, on_refused, correlated)
 
 	--- Revokes authority before invoking any foreign refusal observer.
 	function channel.refuse(reason)
-		if active then active = false; pcall(on_refused, reason) end
+		if active then active = false; lifetime.revoke(); pcall(on_refused, reason) end
 		return false, reason
 	end
 
 	--- Closes only this channel; caller identity remains with its native owner.
-	function channel.close() active = false; return true end
+	function channel.close() active = false; lifetime.detach(); return true end
 
 	local function publish(source, stage, decision)
 		if not active then return false, "Physical context subscription is retired" end
@@ -133,6 +136,24 @@ function M.new(capacity, clock, receive, on_refused, correlated)
 		if rawequal(pending, ticket) then pending = nil end
 		return accepted
 	end
+
+	--- Exposes exact callback ownership and post-frame retirement, without native stop.
+	---@return table capability Stable current(owner, token) and retired(owner, token) ports.
+	function channel.subscription() return lifetime.capability() end
+
+	--- Retains this subscription through its actual native writer's complete stack.
+	---@param writer function Existing bound writer, without new native work.
+	---@param ... any Original writer arguments.
+	---@return any results Original writer outcome, including raised errors.
+	function channel.run_writer(writer, ...) return lifetime.run(writer, ...) end
+
+	local publish_seed, publish_boundary, publish_completion, refuse_observation =
+		channel.seed, channel.begin, channel.finish, channel.refuse
+	function channel.seed(...) return lifetime.run(publish_seed, ...) end
+	function channel.begin(...) return lifetime.run(publish_boundary, ...) end
+	function channel.finish(...) return lifetime.run(publish_completion, ...) end
+	function channel.refuse(...) return lifetime.run(refuse_observation, ...) end
+	lifetime.bind_detach(identity.detach or channel.close)
 	return channel
 end
 
