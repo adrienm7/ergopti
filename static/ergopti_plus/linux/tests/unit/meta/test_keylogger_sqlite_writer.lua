@@ -566,3 +566,67 @@ helpers.describe("linux-sqlite-meta-framing", function()
 		end)
 	end
 end)
+
+
+--- Captures the production histogram statement while modeling only CLI receipts.
+--- The shared decoder independently checks the key bytes supplied to SQLite.
+local function with_burst_histogram_statement(row, test)
+	local command = require("modules.keylogger.sqlite_command")
+	local previous_build = command.build
+	local statement
+	command.build = function(path, sql, options)
+		if sql:find("INSERT INTO agg_app_day_burst", 1, true) then statement = sql end
+		return previous_build(path, sql, options)
+	end
+	local ok, reason = xpcall(function()
+		with_writer_read_receipts("", 0, function(writer)
+			helpers.assert_true(writer.upsert_burst("owned-device", row))
+			helpers.assert_eq(type(statement), "string")
+			local encoded = statement:match("VALUES %('owned%-device','2000%-01%-01','owned%-app',0,0%.000000,0,'(.-)',0,0,0%)")
+			helpers.assert_eq(type(encoded), "string", "existing counter defaults remain zero")
+			local decoded = require("json").decode((encoded:gsub("''", "'")))
+			helpers.assert_eq(type(decoded), "table", "SQLite receives a JSON object")
+			test(decoded)
+		end)
+	end, debug.traceback)
+	command.build = previous_build
+	if not ok then error(reason, 0) end
+end
+
+helpers.describe("linux-sqlite-burst-histogram-keys", function()
+	for _, key in ipairs({ "owned\\bucket", "owned\\literal", 'quoted" clé', "LF\nCR\rtab\tcontrol\1\31", "apostrophe's" }) do
+		it("linux-sqlite-burst-histogram-keys: supplied key retains " .. require("json").encode(key), function()
+			local row = { date = "2000-01-01", app = "owned-app", length_buckets = { [key] = 2.9 } }
+			with_burst_histogram_statement(row, function(decoded)
+				helpers.assert_eq(decoded[key], 2, "positive counts retain their existing floor")
+				local seen = 0
+				for stored in pairs(decoded) do
+					seen = seen + 1
+					helpers.assert_eq(stored, key, "the decoded key retains the supplied bytes")
+				end
+				helpers.assert_eq(seen, 1)
+				helpers.assert_eq(row.length_buckets[key], 2.9, "caller counts remain unchanged")
+			end)
+		end)
+	end
+
+	it("linux-sqlite-burst-histogram-keys: filtering, numeric labels and floors remain unchanged", function()
+		with_burst_histogram_statement({ date = "2000-01-01", app = "owned-app",
+			length_buckets = { [10] = 2.9, ["500+"] = 1, small = 0.9, zero = 0,
+				negative = -2, numeric_text = "3", boolean = true } }, function(decoded)
+			helpers.assert_eq(decoded, { ["10"] = 2, ["500+"] = 1, small = 0 })
+		end)
+	end)
+
+	it("linux-sqlite-burst-histogram-keys: missing histogram keeps the empty-object default", function()
+		with_burst_histogram_statement({ date = "2000-01-01", app = "owned-app" }, function(decoded)
+			helpers.assert_eq(next(decoded), nil)
+		end)
+	end)
+
+	it("linux-sqlite-burst-histogram-keys: empty histogram keeps the empty-object default", function()
+		with_burst_histogram_statement({ date = "2000-01-01", app = "owned-app", length_buckets = {} }, function(decoded)
+			helpers.assert_eq(next(decoded), nil)
+		end)
+	end)
+end)

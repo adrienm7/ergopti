@@ -701,8 +701,8 @@ function M.upsert_burst(device_id, row)
 	local parts = {}
 	for label, count in pairs(row.length_buckets or {}) do
 		if type(count) == "number" and count > 0 then
-			parts[#parts + 1] = string.format('"%s":%d',
-				tostring(label):gsub('"', '\\"'), math.floor(count))
+			parts[#parts + 1] = string.format('%s:%d',
+				Json.encode(tostring(label)), math.floor(count))
 		end
 	end
 	local buckets_json = "{" .. table.concat(parts, ",") .. "}"
