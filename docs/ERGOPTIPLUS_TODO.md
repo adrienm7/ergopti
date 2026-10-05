@@ -3287,7 +3287,19 @@ The Windows models timer producer now explicitly accepts exact cancellation or a
 negative native one-shot and refuses positive/untyped periods. This addresses
 the strict repeating-timer inventory failure without changing that inventory.
 Two additional registered native controls require real one-shot expiry and
-exact cancellation; hosted Windows qualification remains pending.
+exact cancellation. Diagnostic Windows checkpoint 37274855827 passed those
+two controls, the original twenty models-owner controls and the strict timer
+inventory; its complete unit result was 9163 passed and 24 failed. E2E, packaging
+and installation were skipped, so full Windows qualification remains pending.
+
+The Windows orchestration prerequisite now composes the shared discovery owner,
+exact native models slots, queued logical one-shots and private-source write
+admission. The unchanged 37 independent controls are registered with two real
+queue-timer controls and nine actual private-file/DPAPI/full-collector/WAL join
+controls. Source review passed; all 48 newly registered native cases still await
+Windows execution. The production discovery panel, actual HTTP/UI/application
+acceptance and complete packaging/install qualification remain unfinished.
+This prerequisite does not complete item 47.
 
 Windows checkpoint 37227446912 at 02ddf2e18 actually passed all 17 discovery
 policy cases. The full unit result was 9053 passed and one pre-existing personal
