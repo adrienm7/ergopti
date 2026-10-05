@@ -630,3 +630,45 @@ helpers.describe("linux-sqlite-null-boundary", function()
 	end)
 
 end)
+
+helpers.describe("linux-manifest-completion", function()
+	for _, body in ipairs({ "", "[]", '[{"date":"2026-10-03","app":"owned","llm_chars":3}]' }) do
+		helpers.it("linux-manifest-completion: successful CLI body " .. body .. " acknowledges every projection pass", function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM agg_app_day ", 1, true) then return body end
+				return "[]"
+			end, function(reader)
+				local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+				helpers.assert_type(manifest, "table")
+				helpers.assert_eq(complete, true)
+			end)
+		end)
+	end
+	for _, table_name in ipairs({ "agg_app_day", "agg_app_day_errors", "agg_app_day_session" }) do
+		helpers.it("linux-manifest-completion: refusal in " .. table_name .. " cannot acknowledge a partial projection", function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM " .. table_name .. "[%s;]") then return { body = "[]", status = 1 } end
+				if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2026-10-03","app":"owned","llm_chars":3}]' end
+				return "[]"
+			end, function(reader)
+				local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+				helpers.assert_eq(complete, false)
+				if table_name ~= "agg_app_day" then helpers.assert_eq(manifest["2026-10-03"].owned.llm_chars, 3) end
+			end)
+		end)
+	end
+	helpers.it("linux-manifest-completion: malformed native JSON refuses completion", function()
+		with_stubbed_sqlite(function() return "[invalid JSON" end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_nil(next(manifest))
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+	helpers.it("linux-manifest-completion: invalid path keeps the empty first return and refuses completion", function()
+		with_stubbed_sqlite(function() error("invalid path must not spawn") end, function(reader)
+			local manifest, complete = reader.read_manifest("")
+			helpers.assert_nil(next(manifest))
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)

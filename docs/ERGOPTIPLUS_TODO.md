@@ -2034,6 +2034,36 @@ These are software implementations; final hardware verification remains below.
   Preserve both PulseAudio language packs and principal notification/HTTP fixtures.
   No schema, Reader, menu, configuration, foreign driver or reserved change.
 
+- [~] **L131.** Linux native manifest completion: retain the useful partial first
+  result after a refused SQLite query, but cache a revision only when every
+  projection query completed. Otherwise a temporary failure in the base, error
+  or session query remained cached after native recovery at the same revision.
+  Preserve successful empty reads, accepted cache reuse and explicit cache clear;
+  malformed native JSON and invalid paths refuse completion. Ten actual public
+  collector/SQLite/Reader checks reproduce seven failures and pass after on
+  current LuaJIT, Lua 5.4 and the signed Jammy luv/libuv mixed profile. A separate
+  three-check public cache regression independently reproduces three failures
+  and passes after on each profile: literal native SQL proves accepted chars3,
+  errors7 and sessions2 while the recovered public payload previously retained
+  an omitted field. This supplemental oracle does not depend on the new completion
+  flag; preserve its entire original body and exact three-check floor. The primary
+  fixture enforces ten checks. Eight registered CLI-response unit cases reproduce
+  eight failures and pass after on all three profiles; all fifty-five checks in
+  the three existing Reader owners remain green, with every old assertion and
+  complete unit prefix preserved. Select only the first return in the existing
+  NULL and two filesystem fixture calls to next, preserving their assertions and
+  eight/thirty-five floors. The two additional calls failed with invalid keys
+  after the API change; all thirty-five native path checks pass after the caller
+  adaptation on each profile. macOS source likewise has no manifest completion
+  result, but this alone does not reproduce a macOS revision-cache defect.
+  Windows has separate candidate/last-good refresh guards; neither foreign
+  runtime is executed or modified here. Completion acceptance belongs to the
+  native Reader/cache adapter, with no shared SQL or numeric policy change.
+  Register future Linux CI without launching it. Software events and schema
+  obstructions exercise real native software/database paths, not physical input.
+  Preserve both language packs and principal notification/HTTP fixtures. No
+  Writer, schema, menus, configuration, foreign driver or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

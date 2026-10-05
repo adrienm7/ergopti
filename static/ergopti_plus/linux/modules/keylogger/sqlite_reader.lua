@@ -47,27 +47,27 @@ end
 
 --- Executes a read-only JSON query through sqlite3.
 local function read_rows(sqlite_path, sql)
-	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {} end
+	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {}, false end
 	-- Same rule as the writer: the script goes on stdin, never through a file in
 	-- a world-writable directory.
 	-- Readonly is an open-time property: SELECT alone still creates a missing
 	-- database (or a dangling alias target) under SQLite's default create mode.
 	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-readonly", "-json" }, capture_exit = true })
-	if not cmd then return {} end
+	if not cmd then return {}, false end
 	local pipe = io.popen(cmd, "r")
-	if not pipe then return {} end
+	if not pipe then return {}, false end
 	local output = pipe:read("*a")
 	pipe:close()
 	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
 	if not accepted then
 		Logger.warn(LOG, "SQLite read refused: %s.", reason)
-		return {}
+		return {}, false
 	end
-	if body == "" then return {} end
+	if body == "" then return {}, true end
 	local ok, rows = pcall(Json.decode_lossless, body)
 	if not ok or type(rows) ~= "table" then
 		Logger.warn(LOG, "SQLite read returned invalid JSON; dashboard projection skipped.")
-		return {}
+		return {}, false
 	end
 	-- SQLite emits scalar object fields, with null for absent SQL values. The
 	-- legacy decoder represents null as an ordinary empty table, which defeats
@@ -78,7 +78,7 @@ local function read_rows(sqlite_path, sql)
 			if Json.is_null(value) then row[column] = nil end
 		end
 	end
-	return rows
+	return rows, true
 end
 
 local function filters(start_date, end_date, apps)
@@ -124,9 +124,19 @@ local function merge_error_buckets(target, row)
 end
 
 --- Builds the shared date/app manifest from persisted aggregates.
+--- @return table manifest Partial or complete dashboard projection.
+--- @return boolean complete Whether every native query was accepted.
 function M.read_manifest(sqlite_path, start_date, end_date, apps)
 	local manifest = {}
-	local rows = read_rows(sqlite_path, string.format([[
+	local complete = true
+	-- A partial projection remains a useful first return, but must never become
+	-- a successful revision cache entry. Track every CLI pass independently.
+	local function query(sql)
+		local rows, accepted = read_rows(sqlite_path, sql)
+		if not accepted then complete = false end
+		return rows
+	end
+	local rows = query(string.format([[
 SELECT date, app, SUM(chars) AS chars, SUM(pauses) AS pauses,
        SUM(time_ms) AS time_ms, SUM(think_time_ms) AS think_time_ms,
        SUM(hs_chars) AS hs_chars, SUM(llm_chars) AS llm_chars,
@@ -158,7 +168,7 @@ FROM agg_app_day%s GROUP BY date, app;
 	-- because the dashboard that reads them is the same one.
 	local where = filters(start_date, end_date, apps)
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
        SUM(space) AS space, SUM(other) AS other,
        MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min
@@ -177,7 +187,7 @@ FROM agg_app_day_chars_class%s GROUP BY date, app;
 		entry.last_typed_min = row.last_min
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,
        MAX(cascade_max_len) AS cascade_max_len,
        SUM(recovery_sum_ms) AS recovery_sum, SUM(recovery_count) AS recovery_count
@@ -191,7 +201,7 @@ FROM agg_app_day_errors%s GROUP BY date, app;
 		entry.recovery_time_count = row.recovery_count or 0
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, MAX(same_finger_streak_max) AS f_max,
        MAX(same_hand_streak_max) AS h_max, SUM(auto_repeat_count) AS ar_count,
        SUM(focus_to_first_key_sum_ms) AS focus_sum,
@@ -208,7 +218,7 @@ FROM agg_app_day_ergo%s GROUP BY date, app;
 		entry.focus_to_first_key_count = row.focus_count or 0
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, keycode, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
        MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count,
        SUM(hold_count) AS hold_count
@@ -224,7 +234,7 @@ FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
 		}
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, layout, SUM(count) AS count
 FROM agg_app_day_layouts%s GROUP BY date, app, layout;
 ]], where))) do
@@ -233,7 +243,7 @@ FROM agg_app_day_layouts%s GROUP BY date, app, layout;
 		entry.layouts[row.layout] = (entry.layouts[row.layout] or 0) + (row.count or 0)
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
 FROM agg_app_day_titles%s GROUP BY date, app, title;
 ]], where))) do
@@ -242,7 +252,7 @@ FROM agg_app_day_titles%s GROUP BY date, app, title;
 		entry.titles[row.title] = { c = row.c or 0, ms = row.ms or 0 }
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
        e_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
@@ -256,7 +266,7 @@ FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
 		merge_error_buckets(bucket.e_buckets, row)
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
        e_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
@@ -270,7 +280,7 @@ FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
 		merge_error_buckets(bucket.e_buckets, row)
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, bucket_ms, SUM(time_sum) AS time_sum, SUM(credited) AS credited,
        SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,
        SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c
@@ -289,7 +299,7 @@ FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
 	-- Grouped by the histogram blob as well as by app-day, so two devices'
 	-- distinct blobs each come back as their own row and are merged below.
 	-- Count identical blobs too: grouping must not deduplicate their buckets.
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
        MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
        SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
@@ -315,7 +325,7 @@ FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 		end
 	end
 
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+	for _, row in ipairs(query(string.format([[
 SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json
 FROM agg_app_day_session%s;
 ]], where))) do
@@ -341,7 +351,7 @@ FROM agg_app_day_session%s;
 		end
 	end
 
-	return manifest
+	return manifest, complete
 end
 
 --- Reads the machine's own state for a range.
