@@ -937,3 +937,90 @@ helpers.describe("linux-sqlite-ngram-source-encoding", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("linux-system-day-owned-read", function()
+	local complete = '{"date":"2026-10-05","wifi_changes":4,"space_switches":0,"battery_sum":150,"battery_count":2,"battery_min":70,"battery_max":80,"audio_muted_ms":1000,"locked_ms":2000,"sleep_ms":3000,"awake_ms":4000,"passive_count":0,"night_wake_count":0}'
+
+	it("linux-system-day-owned-read: accepts the complete typed native row", function()
+		with_writer_read_receipts(complete, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(row.awake_ms, 4000)
+			helpers.assert_eq(row.wifi_changes, 4)
+			helpers.assert_eq(row.battery_min, 70)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: distinguishes accepted absence", function()
+		with_writer_read_receipts("", 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_nil(row)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: preserves absent battery bounds", function()
+		local body = complete:gsub('"battery_min":70', '"battery_min":null')
+			:gsub('"battery_max":80', '"battery_max":null')
+			:gsub('"battery_sum":150', '"battery_sum":null')
+			:gsub('"battery_count":2', '"battery_count":null')
+		with_writer_read_receipts(body, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_nil(row.battery_min)
+			helpers.assert_nil(row.battery_max)
+			helpers.assert_eq(row.battery_sum, 0)
+			helpers.assert_eq(row.battery_count, 0)
+		end)
+	end)
+
+	for _, status in ipairs({ 1, "missing" }) do
+		it("linux-system-day-owned-read: refuses unacknowledged native row " .. status, function()
+			with_writer_read_receipts(complete, status, function(writer)
+				local row, accepted = writer.read_system_day("owned", "2026-10-05")
+				helpers.assert_eq(accepted, false)
+				helpers.assert_nil(row)
+			end)
+		end)
+	end
+
+	for _, body in ipairs({ "not-json", "[" .. complete .. "]" }) do
+		it("linux-system-day-owned-read: refuses malformed or array-shaped row " .. body, function()
+			with_writer_read_receipts(body, 0, function(writer)
+				local row, accepted = writer.read_system_day("owned", "2026-10-05")
+				helpers.assert_eq(accepted, false)
+				helpers.assert_nil(row)
+			end)
+		end)
+	end
+
+	it("linux-system-day-owned-read: refuses another day in the returned row", function()
+		with_writer_read_receipts(complete, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-06")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_nil(row)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: refuses a typed string counter", function()
+		with_writer_read_receipts(complete:gsub('"awake_ms":4000', '"awake_ms":"4000"'), 0, function(writer)
+			local row, accepted = writer.read_system_day("owned", "2026-10-05")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_nil(row)
+		end)
+	end)
+
+	it("linux-system-day-owned-read: query names only the exact escaped device and date", function()
+		local captured
+		with_writer_read_receipts(function(command)
+			if command:find("FROM agg_system_day", 1, true) then captured = command end
+			return complete
+		end, 0, function(writer)
+			local row, accepted = writer.read_system_day("owned' a", "2026-10-05")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(row.awake_ms, 4000)
+			helpers.assert_contains(captured, "WHERE device_id='owned'' a' AND date='2026-10-05'")
+		end)
+	end)
+end)

@@ -817,6 +817,44 @@ function M.upsert_title(device_id, row)
 	return _exec(sql)
 end
 
+--- Reads the exact collector device/day baseline without aggregating devices.
+--- @param device_id string Collector identity.
+--- @param date string Calendar day.
+--- @return table|nil row Persisted cumulative row, or nil when absent.
+--- @return boolean accepted False when the native read or row is refused.
+function M.read_system_day(device_id, date)
+	if not M.is_available() or type(device_id) ~= "string" or device_id == ""
+		or type(date) ~= "string" or date == "" then return nil, false end
+	local fields = {
+		"wifi_changes", "space_switches", "battery_sum", "battery_count", "battery_min",
+		"battery_max", "audio_muted_ms", "locked_ms", "sleep_ms", "awake_ms",
+		"passive_count", "night_wake_count",
+	}
+	local pairs = { "'date',date" }
+	for _, field in ipairs(fields) do pairs[#pairs + 1] = "'" .. field .. "'," .. field end
+	local body = _query_output("SELECT json_object(" .. table.concat(pairs, ",")
+		.. ") FROM agg_system_day WHERE device_id='" .. _sql_escape(device_id)
+		.. "' AND date='" .. _sql_escape(date) .. "';")
+	if body == nil then return nil, false end
+	if body == "" then return nil, true end
+	local ok, row = pcall(Json.decode_lossless, body)
+	if not ok or type(row) ~= "table" or Json.is_array(row) or Json.is_null(row)
+		or row.date ~= date then return nil, false end
+	for _, field in ipairs(fields) do
+		local value = row[field]
+		if Json.is_null(value) then value = nil end
+		if value == nil and (field == "battery_sum" or field == "battery_count") then value = 0 end
+		if value == nil and (field == "battery_min" or field == "battery_max") then
+			row[field] = nil
+		elseif type(value) == "number" then
+			row[field] = value
+		else
+			return nil, false
+		end
+	end
+	return row, true
+end
+
 --- Upserts the machine's own state for a day.
 ---
 --- Every duration sums; the battery bounds are a MIN and a MAX. Sent as the
