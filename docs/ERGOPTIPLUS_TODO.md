@@ -2098,6 +2098,10 @@ qualified separately. Installed Windows and macOS wizard reruns, restart and
 physical input remain device acceptance; work-machine logs/screenshots need
 not be exported. Follow PARTIAL-DELIVERY.md and record the exact artifact.
 
+The Lua wizard character planner rejects malformed UTF-8 before native
+writes through the shared decoder. Both portable runtimes pass; genuine
+WebView transport, installed wizard and device acceptance remain open.
+
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
   registry values through one owner. Remaining: turning the switch off or «
