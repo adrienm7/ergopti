@@ -529,7 +529,8 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	end
 	app.last_key_at = timestamp_ms
 
-	app.keystroke_count = app.keystroke_count + 1
+	-- A correction remains an input event, but contributes no typed character.
+	if ch ~= "[BS]" then app.keystroke_count = app.keystroke_count + 1 end
 	-- Against the window it was typed into, not the application. Both are useful
 	-- and only one of them was recorded.
 	if _current_title then
