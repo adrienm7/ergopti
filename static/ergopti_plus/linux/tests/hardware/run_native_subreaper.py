@@ -1,6 +1,7 @@
 """Reap actual orphaned process-group fixtures without writing artifacts."""
 
 import ctypes
+import json
 import os
 import signal
 import subprocess
@@ -92,6 +93,12 @@ def main(argv=None, deadline_seconds=40):
             "the native probe leaked children; independent teardown killed and physically reaped them"
         )
     print(f"Native subreaper: {len(state['adopted'])} adopted descendants physically reaped")
+    # retire_remaining observed no owned children; the refusal paths above
+    # prohibit this receipt after rescue or unknown physical retirement.
+    print(
+        "Native subreaper closure: "
+        + json.dumps({"pending": 0, "rescue": 0, "adopted": len(state["adopted"])}, sort_keys=True)
+    )
     return state["main"]
 
 

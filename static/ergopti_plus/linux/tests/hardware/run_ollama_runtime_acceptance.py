@@ -14,6 +14,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import stat
 import subprocess
@@ -24,6 +25,132 @@ import tempfile
 MODEL = "granite4:350m-h"
 ARCHIVE_BYTES = 1198635318
 ARCHIVE_SHA256 = "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb"
+
+
+WORK_PHASES = frozenset(
+    {
+        "official-https-install",
+        "missing-model-preflight",
+        "explicit-model-pull",
+        "real-model-chat",
+    }
+)
+CLEANUP_PHASE = "terminal-physical-shutdown"
+FAILURE_REASONS = {
+    "failed": frozenset(
+        {"native_receipt_or_source_qualification_failed", "qualification_exception"}
+    ),
+    "refused": frozenset({"manual_workflow_dispatch_required"}),
+}
+EXCEPTION_TYPES = frozenset(
+    {
+        "AssertionError",
+        "AttributeError",
+        "CalledProcessError",
+        "FileExistsError",
+        "FileNotFoundError",
+        "ImportError",
+        "IndexError",
+        "IsADirectoryError",
+        "JSONDecodeError",
+        "KeyError",
+        "ModuleNotFoundError",
+        "NotADirectoryError",
+        "OSError",
+        "OverflowError",
+        "PermissionError",
+        "RuntimeError",
+        "TimeoutError",
+        "TimeoutExpired",
+        "TypeError",
+        "UnicodeDecodeError",
+        "UnicodeEncodeError",
+        "UnicodeError",
+        "ValueError",
+    }
+)
+
+
+def acceptance_phases(text):
+    """Retain literal work markers separately from the terminal cleanup marker.
+
+    Unknown log content has no diagnostic authority. Once cleanup starts, later
+    work markers cannot replace the operation that preceded cleanup.
+    """
+    if type(text) is not str:
+        return None
+    result = {"phase": "preflight", "work_phase": "preflight", "cleanup_phase": None}
+    for line in text.splitlines():
+        if not line.startswith("ACCEPTANCE_PHASE "):
+            continue
+        phase = line[len("ACCEPTANCE_PHASE ") :]
+        if phase == CLEANUP_PHASE:
+            result["phase"] = phase
+            result["cleanup_phase"] = phase
+        elif phase in WORK_PHASES and result["cleanup_phase"] is None:
+            result["phase"] = phase
+            result["work_phase"] = phase
+    return result
+
+
+def safe_failure_metadata(document):
+    """Project only exact, bounded public failure values; refuse malformed input.
+
+    Private paths, errors, receipts and source inventories are never selected or
+    coerced. Booleans are not native exit statuses. Unknown exception names and
+    diagnostic tokens cannot enter a workflow command.
+    """
+    if type(document) is not dict or document.get("passed") is not False:
+        return None
+    status = document.get("status")
+    reason = document.get("reason")
+    if type(status) is not str or status not in FAILURE_REASONS:
+        return None
+    if type(reason) is not str or reason not in FAILURE_REASONS[status]:
+        return None
+    phase = document.get("work_phase")
+    if type(phase) is not str or (phase != "preflight" and phase not in WORK_PHASES):
+        return None
+    cleanup = document.get("cleanup_phase")
+    if cleanup is not None and (type(cleanup) is not str or cleanup != CLEANUP_PHASE):
+        return None
+    child_status = document.get("child_status")
+    if child_status is not None and (
+        type(child_status) is not int or not -64 <= child_status <= 255
+    ):
+        return None
+    zero = document.get("zero_descendants")
+    stable = document.get("sources_unchanged")
+    if (zero is not None and type(zero) is not bool) or (
+        stable is not None and type(stable) is not bool
+    ):
+        return None
+    exception = document.get("exception_type")
+    if exception is not None and (type(exception) is not str or exception not in EXCEPTION_TYPES):
+        return None
+    if reason == "qualification_exception" and exception is None:
+        return None
+    if reason != "qualification_exception" and exception is not None:
+        return None
+    return {
+        "phase": phase,
+        "cleanup_phase": cleanup or "none",
+        "status": status,
+        "reason": reason,
+        "child_status": "unknown" if child_status is None else child_status,
+        "zero_descendants": "unknown" if zero is None else str(zero).lower(),
+        "sources_unchanged": "unknown" if stable is None else str(stable).lower(),
+        "exception_type": exception or "none",
+    }
+
+
+def failure_annotation(document):
+    """Build one closed GitHub error command without reflecting private text."""
+    metadata = safe_failure_metadata(document)
+    if metadata is None:
+        return None
+    fields = " ".join(f"{key}={value}" for key, value in metadata.items())
+    return "::error title=Ollama native acceptance::" + fields
 
 
 def digest(path):
@@ -50,6 +177,45 @@ def canonical_model(node):
 def write_evidence(path, document):
     """Retain a bounded safe result even when native admission fails."""
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def physical_receipt(text):
+    """Require measured empty ownership, independently of reaped adoption count."""
+    prefix = "Native subreaper closure: "
+    markers = [line[len(prefix) :] for line in text.splitlines() if line.startswith(prefix)]
+    if len(markers) != 1:
+        return None
+
+    def distinct_object(pairs):
+        values = {}
+        for key, value in pairs:
+            if key in values:
+                raise ValueError("duplicate physical receipt field")
+            values[key] = value
+        return values
+
+    try:
+        receipt = json.loads(markers[0], object_pairs_hook=distinct_object)
+    except (TypeError, ValueError):
+        return None
+    if type(receipt) is not dict or set(receipt) != {"pending", "rescue", "adopted"}:
+        return None
+    if any(type(value) is not int or value < 0 for value in receipt.values()):
+        return None
+    if receipt["pending"] != 0 or receipt["rescue"] != 0:
+        return None
+    reaped = [
+        int(match.group(1))
+        for line in text.splitlines()
+        if (
+            match := re.fullmatch(
+                r"Native subreaper: (\d+) adopted descendants physically reaped", line
+            )
+        )
+    ]
+    if len(reaped) != 1 or reaped[0] != receipt["adopted"]:
+        return None
+    return receipt
 
 
 def main():
@@ -83,6 +249,8 @@ def main():
         "sha": os.getenv("GITHUB_SHA"),
         "interpreter": args.lua,
         "phase": "preflight",
+        "work_phase": "preflight",
+        "cleanup_phase": None,
         "native_executed": False,
         "scope": "actual Engine/Coordinator/EventLoop; daemon entrypoint and physical GUI excluded",
         "profile_scope": "private Ergopti XDG/config/data/models; inherited HOME retained; Ollama may create its ordinary ~/.ollama key",
@@ -181,20 +349,11 @@ def main():
                 command, env=environment, cwd=repository, stdout=raw, stderr=subprocess.STDOUT
             )
         text = (root / "native.private.log").read_text(errors="replace")
+        document.update(acceptance_phases(text))
         after = sources()
         receipts = []
         for line in text.splitlines():
-            if line.startswith("ACCEPTANCE_PHASE "):
-                phase = line[len("ACCEPTANCE_PHASE ") :]
-                if phase in {
-                    "official-https-install",
-                    "missing-model-preflight",
-                    "explicit-model-pull",
-                    "real-model-chat",
-                    "terminal-physical-shutdown",
-                }:
-                    document["phase"] = phase
-            elif line.startswith("{"):
+            if line.startswith("{"):
                 try:
                     item = json.loads(line)
                 except json.JSONDecodeError:
@@ -205,10 +364,8 @@ def main():
                     and item.get("model") == MODEL
                 ):
                     receipts.append(item)
-        physical_zero = (
-            text.splitlines().count("Native subreaper: 0 adopted descendants physically reaped")
-            == 1
-        )
+        closure = physical_receipt(text)
+        physical_zero = closure is not None
         stable = before == after
         accepted = result.returncode == 0 and stable and physical_zero and len(receipts) == 1
         if accepted:
@@ -245,6 +402,7 @@ def main():
             sources_after=after,
             sources_unchanged=stable,
             zero_descendants=physical_zero,
+            physical_closure=closure,
             private_log_sha256=digest(root / "native.private.log"),
         )
         if accepted:
@@ -283,6 +441,9 @@ def main():
         )
         return 1
     finally:
+        annotation = failure_annotation(document)
+        if annotation is not None:
+            print(annotation)
         document["finished_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         write_evidence(public, document)
         print(
@@ -292,6 +453,8 @@ def main():
                     "status": document["status"],
                     "reason": document["reason"],
                     "phase": document["phase"],
+                    "work_phase": document["work_phase"],
+                    "cleanup_phase": document["cleanup_phase"],
                     "evidence": str(public),
                 }
             )
