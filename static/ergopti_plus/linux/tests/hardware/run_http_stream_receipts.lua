@@ -128,6 +128,13 @@ check(Offer.handle(missing, { automatic = true }) == true and #notices == 1,
 	"the actual automatic offer accepts the native missing-model receipt once")
 
 local missing_json = require("json").encode({ error = 'model "' .. MODEL .. '" not found' })
+response = { status = 404, body = missing_json, incomplete = true }
+local _, partial_failure = request_chat()
+check(not Policy.is_missing(partial_failure) and partial_failure == "HTTP 404",
+	"a truncated small 404 cannot become a model-missing receipt")
+check(Offer.handle(partial_failure, { automatic = true }) == false and #notices == 1,
+	"a truncated small 404 cannot offer a model download")
+
 response = { status = 404, body = missing_json .. string.rep(" ", 65536) .. "trailing invalid JSON" }
 check(require("json").decode(response.body) == nil, "the entire oversized error body is independently invalid JSON")
 local _, overflow_failure = request_chat()
@@ -164,7 +171,7 @@ check(recovered == "ready 😀" and recovered_error == nil, "a following genuine
 -- Buffered GET, POST and file downloads share one receipt decoder. Curl reports
 -- both HTTP 200 and exit 18 when the peer closes before Content-Length bytes.
 local destination = assert(os.tmpname())
-for _, method in ipairs({ "get", "post", "download" }) do
+for _, method in ipairs({ "get", "post", "download", "get_owned" }) do
 	for _, case in ipairs({
 		{ status = 200, body = "partial", incomplete = true },
 		{ status = 299, body = "complete" },
@@ -175,7 +182,10 @@ for _, method in ipairs({ "get", "post", "download" }) do
 		local owner = "native-buffered-" .. method
 		local options = { owner = owner, timeout_ms = 2000 }
 		local function done(value) answer = value; terminals = terminals + 1 end
-		if method == "get" then
+		if method == "get_owned" then
+			local operation = Http.get_owned(base_url .. "/api/chat", {}, options, done)
+			assert(operation.started)
+		elseif method == "get" then
 			Http.get(base_url .. "/api/chat", {}, options, done)
 		elseif method == "post" then
 			Http.post(base_url .. "/api/chat", {}, "{}", done, options)
@@ -202,6 +212,36 @@ for _, method in ipairs({ "get", "post", "download" }) do
 		check(correct, method .. " validates buffered HTTP " .. tostring(case.status)
 			.. (case.incomplete and " with native curl transfer failure" or " with completed native curl"))
 		check(terminals == 1 and not Http.isActive(owner), method .. " buffered owner settles exactly once")
+	end
+end
+
+for _, method in ipairs({ "get", "post", "download", "postStream", "get_owned" }) do
+	for _, status in ipairs({ 401, 404, 503 }) do
+		for _, incomplete in ipairs({ false, true }) do
+			response = { status = status, body = missing_json, incomplete = incomplete }
+			local answer, terminals = nil, 0
+			local owner = "native-error-body-" .. method
+			local options = { owner = owner, timeout_ms = 2000 }
+			local function done(value) answer = value; terminals = terminals + 1 end
+			if method == "get_owned" then
+				local operation = Http.get_owned(base_url .. "/api/chat", {}, options, done)
+				assert(operation.started)
+			elseif method == "get" then Http.get(base_url .. "/api/chat", {}, options, done)
+			elseif method == "post" then Http.post(base_url .. "/api/chat", {}, "{}", done, options)
+			elseif method == "download" then Http.download(base_url .. "/api/chat", {}, destination, options, done)
+			else Http.postStream(base_url .. "/api/chat", {}, "{}", options, function() end, done) end
+			local name = method .. " HTTP " .. status .. (incomplete and " incomplete" or " complete")
+			check(run_until(function() return answer ~= nil end), name .. " native receipt settles")
+			check(answer and not answer.ok and answer.status == status and answer.error == "HTTP " .. status,
+				name .. " retains its original HTTP refusal")
+			local expected = not incomplete and (method == "download" and "" or missing_json) or nil
+			check(answer and answer.body == "" and answer.error_body == expected,
+				name .. " only publishes error bytes after a complete transfer")
+			local failure = Policy.response_failure(answer, base_url)
+			check(Policy.is_missing(failure) == (not incomplete and status == 404 and method ~= "download"),
+				name .. " cannot mistake a transport prefix for missing-model evidence")
+			check(terminals == 1 and not Http.isActive(owner), name .. " owner settles exactly once")
+		end
 	end
 end
 assert(os.remove(destination))

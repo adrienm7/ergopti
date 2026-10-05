@@ -9,6 +9,7 @@
 -- runner for exactly that reason while working from the daemon and the unit
 -- runner, both of which install one.
 local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+local strict_utf8_lib = require("compat.utf8")
 
 
 -- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
@@ -132,6 +133,28 @@ function M.utf8_sub(s, i, j)
 	end
 
 	return s:sub(start_byte, end_byte)
+end
+
+--- Returns the longest complete UTF-8 prefix within a byte budget.
+--- Malformed source text keeps its legacy raw byte prefix: boundary repair does
+--- not introduce a new source admission or replacement-character policy.
+--- @param s string Source text.
+--- @param max_bytes number Nonnegative integer byte budget.
+--- @return string Bounded prefix, preserving malformed-source behavior.
+function M.utf8_byte_prefix(s, max_bytes)
+	assert(type(s) == "string", "UTF-8 byte prefix requires a string")
+	assert(type(max_bytes) == "number" and max_bytes >= 0 and max_bytes % 1 == 0,
+		"UTF-8 byte prefix requires a nonnegative integer budget")
+	local prefix = s:sub(1, math.min(#s, max_bytes))
+	if strict_utf8_lib.len(prefix) ~= nil then return prefix end
+	if strict_utf8_lib.len(s) == nil then return prefix end
+	local cut = #prefix
+	while cut > 0 do
+		local following = s:byte(cut + 1)
+		if not following or following < 0x80 or following > 0xBF then break end
+		cut = cut - 1
+	end
+	return s:sub(1, cut)
 end
 
 --- Safely measures the length of a UTF-8 string.
