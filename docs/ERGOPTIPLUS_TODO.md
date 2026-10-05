@@ -3433,6 +3433,8 @@ Parameter-bearing gesture bindings now use a shared current/retired/unjudged ide
 
 The Windows finite-number gate now delegates its unchanged CRT ABI to a native adapter. The existing OS-call purity bound remains 252; the actual source census returns to 252 without raising it. The architecture graph was regenerated through its owner. AHK encoding and private-source JS checks pass; native Windows execution remains pending.
 
+The Windows legacy gesture-snapshot fixture explicitly establishes its case-insensitive map before population and verifies that precondition. Its original final source-policy assertion and all independent case-twin/clone checks remain intact. No native gesture implementation or parameter retirement policy changes; native fixture execution remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

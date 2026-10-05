@@ -909,7 +909,10 @@ TestGestures_ParameterSnapshotsKeepCaseTwins() {
 	AssertEqual(2, Revert.Count)
 	AssertEqual("https://known.example", Revert[Known])
 	AssertEqual("https://unjudged.example", Revert[Twin])
-	Legacy := Map(Known, "https://legacy.example")
+	Legacy := Map()
+	Legacy.CaseSense := "Off"
+	Legacy[Known] := "https://legacy.example"
+	AssertEqual("Off", Legacy.CaseSense, "the fixture supplies a populated case-insensitive legacy Map")
 	Upgraded := _GestureCloneActionParameters(Legacy)
 	AssertEqual("On", Upgraded.CaseSense)
 	AssertEqual("https://legacy.example", Upgraded[Known])
