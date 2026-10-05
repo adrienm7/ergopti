@@ -2062,6 +2062,17 @@ unknown from the available annotations: the typed artifact download is refused,
 and absence of an annotation cannot prove success. macOS install/launch and
 Release are skipped. Item 36 and transversal requirements 16/38 remain open.
 
+Versions installation now captures its original native recipient before
+admission. macOS reads the actual script pause and pending-transition owners
+again before installation or retry; a reentrant probe cannot borrow a successor.
+Accepted installation still completes after later pause or window retirement.
+Phase reports retain their original private recipient through JSON encoding and
+queued publication. Twenty-one controlled native-port regressions pass while
+the unchanged predecessor fails nineteen; all thirty-six original install,
+delivery and retirement controls pass. The complete Linux-hosted Hammerspoon
+suite passes 14,129 tests in 1,487 modules, and its E2E suite passes. These
+controlled ports do not qualify physical macOS installation or close item 36.
+
 - [ ] **37.** Ergopti-extension decisions: whether « Hotstrings Ergopti »
       should appear only when the layout is really installed (today: always,
       shipped copy), and whether to move French `suffixes_a` and the magickey
@@ -3076,6 +3087,20 @@ unintegrated preparation. Exact descriptor identity, installed dependency
 closure, native document actions, per-hop PAC, updater retry ownership,
 installer/server/pull and enterprise CA/auth/WPAD still require qualification.
 The twelve Windows PC steps remain deferred; item 62 stays open.
+
+Linux Versions and download actions now require the original native view,
+document generation, independent page nonce and acknowledged initialization.
+Retired API fetches cannot admit a successor Atom transport, and managed retry
+recaptures actual capabilities without borrowing the reopened window. Failed
+initialization uses the existing translated native error presentation. Shared
+failure reports expose translated actions and operation epochs, while private
+transport receipts remain native. Ninety-one focused shared/JS/Linux document
+controls pass; causal predecessors remain retained. The complete Linux suite
+passes 6,781 tests in 365 modules, and its E2E suite passes. Existing fixture
+assertions retain genuine managed initialization and protected module cleanup.
+The Versions browser scenario now runs mandatorily in shared CI on Chromium
+and WebKit; execution of that new browser step and physical GTK/WebKit,
+packaging and installation qualification remain pending. Item 62 stays partial.
 
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard

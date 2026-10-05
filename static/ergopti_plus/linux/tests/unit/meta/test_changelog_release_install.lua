@@ -135,6 +135,7 @@ local function harness(opts)
 	}
 	ctx.bridge = bridge
 	function ctx.restore_modules()
+		if ctx.document_fixture then ctx.document_fixture.close() end
 		Installer.install = ctx.real_install
 		Installation.is_source_run = real_is_source_run
 		for name, value in pairs(saved) do package.loaded[name] = value end
@@ -152,7 +153,9 @@ local function harness(opts)
 			end
 		end
 	end
-	ctx.initial = bridge.on_message("ready", ctx.state)
+	ctx.document_fixture = require("tests.support.document_fixture").new("changelog", bridge, ctx.state)
+	ctx.bridge = ctx.document_fixture.proxy()
+	ctx.initial = ctx.document_fixture.handshake()
 	return ctx
 end
 

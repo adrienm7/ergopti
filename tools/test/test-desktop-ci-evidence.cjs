@@ -418,7 +418,8 @@ function checkCore(body) {
 	assert.match(body, /sudo apt-get install -y lua5\.4 lua-luv libxml2-utils/);
 	for (const [name, command] of [
 		['Install shared UI browsers', 'npx playwright install --with-deps chromium webkit'],
-		['Test shared layer editor rendering', 'npm run test:browser:layer-editor']
+		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
+		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
 	]) {
 		const step = pipeline.step(body, name);
 		assert.equal(pipeline.stepField(step, 'if'), "matrix.suite == 'js'");
@@ -437,6 +438,11 @@ for (const [from, to] of [
 	['needs: [validate]', 'needs: [macos]'],
 	['run: npm run test:${{ matrix.suite }}', 'run: npm run test:${{ matrix.suite }} -- --only lint'],
 	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
+	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
+	[
+		'run: npm run test:browser:changelog-install',
+		'continue-on-error: true\n        run: npm run test:browser:changelog-install'
+	],
 	['npx playwright install --with-deps chromium webkit', 'npx playwright install chromium'],
 	["if: matrix.suite == 'js'", "if: matrix.suite == 'never'"],
 	[

@@ -332,6 +332,7 @@ body {
 	white-space: pre-line;
 }
 
+#install-failure-actions button,
 #btn-install-retry,
 #btn-restore {
 	background: rgba(10, 132, 255, 0.18);
@@ -345,6 +346,7 @@ body {
 	white-space: nowrap;
 }
 
+#install-failure-actions button:hover,
 #btn-install-retry:hover,
 #btn-restore:hover {
 	background: rgba(10, 132, 255, 0.28);
@@ -653,4 +655,10 @@ body {
 #btn-retry:hover,
 #btn-releases-page:hover {
 	background: rgba(10, 132, 255, 0.22);
+}
+
+#install-failure-actions {
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
 }

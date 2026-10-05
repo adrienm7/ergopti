@@ -1950,6 +1950,21 @@ const CHECKS = [
 		repro: 'npm run test:changelog-channel-sync'
 	},
 	{
+		name: 'Versions managed failures retain safe report and exact action ownership',
+		cmd: 'node',
+		args: ['tools/test/test-changelog-managed-failure.cjs'],
+		repro: 'npm run test:changelog-managed-failure'
+	},
+	{
+		name: 'Linux document bridge challenges retain intrinsic page nonce and exact lease',
+		cmd: 'node',
+		args: [
+			'tools/test/test-linux-document-lease.cjs',
+			'static/ergopti_plus/_shared/ui/host_bridge.js'
+		],
+		repro: 'npm run test:linux-document-lease'
+	},
+	{
 		name: 'Versions page: one click installs a chosen release through the host, restore banner',
 		cmd: 'node',
 		args: ['tools/test/test-changelog-release-install.cjs'],
