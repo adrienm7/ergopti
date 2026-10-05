@@ -1931,6 +1931,17 @@ key, path or URL is published by this diagnostic. Census admission and every
 existing native assertion and cleanup requirement are unchanged. The first
 failed native operation and its actual cause still require the next macOS run.
 
+Native run 37245029288 passes shared checks, macOS Lua units and stubbed E2E,
+then refuses the actual Sparkle process census. Archive signing is not that
+failed operation. The helper now adds bounded BSD snapshot facts using the
+existing exact native layout; schema, byte count, PID/UID identity and errno
+are checked before naming a state. A zombie snapshot is not retirement proof.
+The validated summary reaches XCTest annotations instead of plain print-only
+logs. All earlier controls and native ownership assertions remain intact;
+actual Darwin ABI/permission observations and the update lifecycle remain
+unqualified. Seventeen portable helper controls and six evidence-owner
+assertions pass; they are not native Sparkle acceptance.
+
 The same run passes Brew sandbox grammar, then refuses the AppleEvent probe's
 compilation: RunApplicationEventLoop is a 32-bit-only Carbon API, and xcrun
 attempts writes outside the already private TMPDIR. The C probe now uses the

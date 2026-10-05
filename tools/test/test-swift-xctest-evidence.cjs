@@ -107,6 +107,56 @@ assert.ok(
 			failure.message.includes('Échec % native')
 	)
 );
+// A bounded census diagnostic must survive the actual XCTest evidence owner.
+// Plain helper prints are deliberately absent from its failure annotations.
+const censusFile = path.join(
+	repository,
+	'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+);
+const censusFacts =
+	'Native Sparkle census refusal: code=path-unavailable helper_pid=9123 path_errno=3 bsd_bytes=136 bsd_errno=0 bsd_state=zombie';
+const onlyPrintedCensus = evaluate(passed + '\n' + censusFacts, 1, 0);
+assert.equal(
+	onlyPrintedCensus.failures.some((failure) => failure.message.includes('bsd_state=zombie')),
+	false,
+	'a plain print cannot be mistaken for an available XCTest diagnostic'
+);
+const annotatedCensus = evaluate(
+	failed +
+		`\n${censusFile}:274: error: SparkleArchiveUpdateAcceptanceTests : failed - ${censusFacts}\n`,
+	1,
+	0
+);
+const censusFailure = annotatedCensus.failures.find((failure) =>
+	failure.message.endsWith(censusFacts)
+);
+assert.notEqual(censusFailure, undefined, 'the native snapshot is visible without raw CI logs');
+assert.equal(
+	annotation(censusFailure),
+	'::error title=Swift XCTest failure,file=static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift,line=274::SparkleArchiveUpdateAcceptanceTests : failed - ' +
+		censusFacts
+);
+assert.equal(
+	annotatedCensus.exit_status,
+	1,
+	'diagnosis must never turn census refusal into success'
+);
+const censusHostSource = fs.readFileSync(censusFile, 'utf8');
+const censusAnnotation = censusHostSource.slice(
+	censusHostSource.indexOf('private func annotateCensusRefusal('),
+	censusHostSource.indexOf('private func privateDirectory(')
+);
+assert.match(
+	censusAnnotation,
+	/XCTFail\(summary\)/,
+	'the actual host publishes validated facts as XCTest failure'
+);
+assert.doesNotMatch(
+	censusAnnotation,
+	/(?:print|XCTFail)\(stdout/,
+	'raw helper output stays private'
+);
+
 const compile = evaluate(`${file}:12:9: error: cannot find 'WindowTitles' in scope\n`, 42, 0);
 assert.equal(compile.exit_status, 42, 'the actual native process failure is retained');
 assert.ok(

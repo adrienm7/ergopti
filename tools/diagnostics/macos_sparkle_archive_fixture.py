@@ -6,6 +6,7 @@
 import ctypes
 import hashlib
 import http.server
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -19,7 +20,7 @@ import uuid
 class NativeCensusRefusal(RuntimeError):
     """Bounded facts about this helper, never a process path or exception text."""
 
-    def __init__(self, path_errno):
+    def __init__(self, path_errno, bsd=None):
         helper_pid = os.getpid()
         if (
             type(path_errno) is not int
@@ -34,6 +35,95 @@ class NativeCensusRefusal(RuntimeError):
             "helper_pid": helper_pid,
             "path_errno": path_errno,
         }
+        if bsd is not None:
+            if (
+                type(bsd) is not dict
+                or set(bsd) != {"bsd_bytes", "bsd_errno", "bsd_state"}
+                or any(
+                    type(bsd[key]) is not int or not 0 <= bsd[key] <= 4095
+                    for key in ("bsd_bytes", "bsd_errno")
+                )
+                or type(bsd["bsd_state"]) is not str
+                or bsd["bsd_state"] not in BSD_DIAGNOSTIC_STATES
+                or (
+                    bsd["bsd_state"] in BSD_PROCESS_STATES.values()
+                    and (bsd["bsd_bytes"] != 136 or bsd["bsd_errno"] != 0)
+                )
+            ):
+                raise RuntimeError("Native Sparkle diagnostic refused")
+            self.packet["schema"] = 2
+            self.packet.update(bsd)
+
+
+BSD_PROCESS_STATES = {1: "creating", 2: "runnable", 3: "sleeping", 4: "stopped", 5: "zombie"}
+BSD_DIAGNOSTIC_STATES = frozenset(BSD_PROCESS_STATES.values()) | {
+    "unavailable",
+    "identity-refused",
+    "state-refused",
+    "abi-refused",
+    "diagnostic-refused",
+}
+
+
+def bsd_diagnostic(library, pid, owner):
+    """Observe a bounded BSD snapshot; it never admits, skips or retires a PID.
+
+    Official XNU proc_info.h defines PROC_PIDTBSDINFO=3. A nonzero argument
+    admits a zombie reference, unlike proc_pidpath. State5 describes only the
+    metadata snapshot; it is not proof of earlier PID identity or retirement.
+    """
+    facts = {"bsd_bytes": 0, "bsd_errno": 0, "bsd_state": "diagnostic-refused"}
+    try:
+        # Reuse the trusted sibling declaration rather than a second ABI layout.
+        source = Path(__file__).with_name("macos_owned_process.py")
+        spec = importlib.util.spec_from_file_location("sparkle_bsd_layout", source)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        record_type = module.ProcBSDInfo
+        offsets = {
+            "status": 4,
+            "pid": 12,
+            "uid": 20,
+            "pgid": 100,
+            "start_sec": 120,
+            "start_usec": 128,
+        }
+        if ctypes.sizeof(record_type) != 136 or any(
+            getattr(record_type, key).offset != offset for key, offset in offsets.items()
+        ):
+            facts["bsd_state"] = "abi-refused"
+            return facts
+        library.proc_pidinfo.argtypes = [
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_uint64,
+            ctypes.c_void_p,
+            ctypes.c_int,
+        ]
+        library.proc_pidinfo.restype = ctypes.c_int
+        record = record_type()
+        ctypes.set_errno(0)
+        returned = library.proc_pidinfo(pid, 3, 1, ctypes.byref(record), 136)
+        native_errno = ctypes.get_errno()
+        if (
+            type(returned) is not int
+            or not 0 <= returned <= 4095
+            or type(native_errno) is not int
+            or not 0 <= native_errno <= 4095
+        ):
+            return facts
+        facts.update(bsd_bytes=returned, bsd_errno=native_errno, bsd_state="unavailable")
+        if returned != 136 or native_errno != 0:
+            return facts
+        if record.pid != pid or record.uid != owner:
+            facts["bsd_state"] = "identity-refused"
+            return facts
+        facts["bsd_state"] = BSD_PROCESS_STATES.get(record.status, "state-refused")
+        return facts
+    except Exception:
+        # Diagnostic failure cannot replace the original path refusal or expose
+        # names, argv, native buffers, paths or exception text.
+        return facts
 
 
 def publish(path, value):
@@ -186,7 +276,7 @@ def census(roots):
                 os.kill(pid, 0)
             except ProcessLookupError:
                 continue
-            raise NativeCensusRefusal(path_errno)
+            raise NativeCensusRefusal(path_errno, bsd_diagnostic(library, pid, owner))
         executable = os.fsdecode(buffer.value)
         if any(executable.startswith(str(root) + "/") for root in admitted):
             result.append({"pid": pid, "executable": executable})
