@@ -103,6 +103,8 @@ local _paste_saved_original = nil
 local _paste_pending_timer = nil
 local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
+local _publication_clipboards = setmetatable({}, { __mode = "k" })
+local _paste_publication_lease = nil
 local _paste_recovery_only = false
 local _paste_generation = 0
 -- A sealed retained synthetic transaction makes clipboard restoration part of
@@ -154,10 +156,41 @@ local function release_paste_debt()
 	return true
 end
 
+--- Releases the guarded producer reservation only after its exact cleanup.
+local function clear_settled_publication_lease(lease)
+	if not lease or lease.debt.completed ~= true then return false end
+	for handle in pairs(lease.timers) do if handle.timer ~= nil then return false end end
+	if _paste_publication_lease == lease then _paste_publication_lease = nil end
+	return true
+end
+
+--- Retains each native timer on the exact guarded clipboard debt.
+--- @param handle table Scheduler handle, including refused native stop debt.
+local function track_publication_timer(handle)
+	local lease = _paste_publication_lease
+	if not lease or not handle or lease.timers[handle] then return end
+	lease.timers[handle] = true
+	local ok, registered = pcall(TimerScheduler.onSettled, handle, function()
+		clear_settled_publication_lease(lease)
+		for _, callback in ipairs(lease.observers) do callback() end
+	end)
+	if not ok or registered ~= true then lease.observer_refused = true end
+end
+
+--- Reads the native monotonic clipboard ownership receipt.
+--- @return number|nil count
+local function clipboard_change_count()
+	if type(hs.pasteboard.changeCount) ~= "function" then return nil end
+	local ok, count = pcall(hs.pasteboard.changeCount)
+	if not ok or type(count) ~= "number" or count < 0 or count % 1 ~= 0 then return nil end
+	return count
+end
+
 --- Cancels one exact scheduler handle without discarding stop-failure debt.
 --- @param timer table TimerScheduler handle.
 --- @return boolean settled
 local function cancel_paste_timer(timer)
+	track_publication_timer(timer)
 	local ok_cancel, settled_or_error = pcall(TimerScheduler.cancel, timer)
 	if ok_cancel and settled_or_error == true then return true end
 	if _paste_timer_cleanup == nil or _paste_timer_cleanup == timer then
@@ -188,12 +221,15 @@ local function stop_paste_restore_timer()
 end
 
 local function release_paste_ownership()
+	local lease = _paste_publication_lease
+	if lease then lease.restored = true end
 	stop_paste_restore_timer()
 	_paste_saved_original = nil
 	_paste_owns_clipboard = false
 	_paste_recovery_only = false
 	_paste_generation = _paste_generation + 1
 	release_paste_debt()
+	if lease then clear_settled_publication_lease(lease) end
 end
 
 --- Restores the retained all-type snapshot without releasing it on refusal.
@@ -203,6 +239,10 @@ end
 --- @return any error_detail
 local function restore_owned_clipboard()
 	if not _paste_owns_clipboard then return true, nil end
+	local lease = _paste_publication_lease
+	if lease and (lease.count == nil or clipboard_change_count() ~= lease.count) then
+		return false, "guarded clipboard ownership changed"
+	end
 	local saved = _paste_saved_original
 	local ok_restore, restore_result
 	if type(saved) == "table" and next(saved) ~= nil then
@@ -252,6 +292,7 @@ local function schedule_paste_restore(delay)
 			queue_paste_restore_retry("native restore refusal")
 	end)
 	timer_handle = timer_or_error
+	if type(timer_handle) == "table" then track_publication_timer(timer_handle) end
 	installing = false
 	if not ok_timer or timer_committed ~= true
 		or type(timer_or_error) ~= "table" or timer_or_error.timer == nil or callback_ran then
@@ -321,6 +362,21 @@ end
 --- @return boolean True only after the payload and Cmd+V were both accepted.
 local function perform_paste(value)
 	local transaction = SyntheticInput.current_transaction()
+	if _paste_publication_lease and _paste_publication_lease.producer ~= transaction then
+		Logger.error(LOG, "Clipboard paste refused while another programmable producer retains ownership.")
+		return false
+	end
+	local guarded_count = nil
+	if transaction and transaction.publication then
+		guarded_count = clipboard_change_count()
+		if guarded_count == nil then return false end
+		local ok, current = pcall(transaction.publication.current)
+		if not ok or current ~= true or clipboard_change_count() ~= guarded_count then return false end
+		if _paste_owns_clipboard and _paste_publication_lease == nil then
+			Logger.error(LOG, "Programmable paste refused while a builtin clipboard producer retains ownership.")
+			return false
+		end
+	end
 	-- A previous failed restore owns the clipboard but has no valid user output
 	-- to extend. Recover it first; if the native pasteboard still refuses, fail
 	-- closed and preserve the original snapshot for the autonomous retry.
@@ -355,6 +411,7 @@ local function perform_paste(value)
 			Logger.error(LOG, "Clipboard paste snapshot failed: %s.", tostring(snapshot_or_error))
 			return false
 		end
+		if guarded_count ~= nil and clipboard_change_count() ~= guarded_count then return false end
 		_paste_saved_original = snapshot_or_error
 		local debt_acquired, debt_error = acquire_paste_debt()
 		if not debt_acquired then
@@ -365,12 +422,44 @@ local function perform_paste(value)
 		end
 	end
 
+	if transaction and transaction.publication then
+		local lease = { debt = _paste_debt_transaction, producer = transaction,
+			count = guarded_count, timers = {}, observers = {}, observer_refused = false, mutated = false }
+		_paste_publication_lease = lease
+		_publication_clipboards[transaction] = lease
+	end
+	if guarded_count ~= nil and clipboard_change_count() ~= guarded_count then
+		if not _paste_owns_clipboard and release_paste_debt() == true then
+			_paste_saved_original = nil
+			_paste_publication_lease = nil
+		end
+		return false
+	end
 	_paste_generation = _paste_generation + 1
 	-- Conservative ordering: a native method may mutate the pasteboard and only
 	-- then return false or throw. Ownership must exist before entering it.
 	_paste_owns_clipboard = true
 	_paste_recovery_only = true
+	if _paste_publication_lease then _paste_publication_lease.mutated = true end
 	local ok_write, write_result = pcall(hs.pasteboard.setContents, value)
+	local lease = _paste_publication_lease
+	if lease then
+		local after = clipboard_change_count()
+		-- A single acknowledged native clear/write must have one monotonic change.
+		-- Unexpected transitions (including mutation followed by false/throw) are
+		-- unprovable ownership: retain the original without overwriting any copy.
+		if ok_write and write_result == true and after == guarded_count + 1 then
+			lease.count = after
+		elseif after == guarded_count then
+			lease.count = guarded_count
+		else
+			lease.count = nil
+		end
+		if not ok_write or write_result ~= true or lease.count == nil
+			or after ~= guarded_count + 1 then
+			ok_write, write_result = false, "guarded clipboard write ownership unproven"
+		end
+	end
 	if not ok_write or write_result ~= true then
 		local restored, restore_error = restore_owned_clipboard()
 		if not restored then queue_paste_restore_retry("payload write refusal") end
@@ -689,6 +778,53 @@ function M.emit_tokens(tokens)
 	return count, emitted_str, logical_text, order_delay
 end
 
+--- Returns strict cleanup posture for one programmable clipboard publication.
+--- @param transaction table Exact synthetic producer.
+--- @return boolean settled
+function M.publication_clipboard_settled(transaction)
+	local owned = _publication_clipboards[transaction]
+	if owned == nil then return true end
+	if owned.debt.completed ~= true then return false end
+	for handle in pairs(owned.timers) do if handle.timer ~= nil then return false end end
+	clear_settled_publication_lease(owned)
+	return true
+end
+
+--- Observes only the retained clipboard debt and exact refused timer handles.
+--- @param transaction table Exact synthetic producer.
+--- @param callback function Cleanup observer; callers recheck strict posture.
+--- @return boolean registered
+function M.observe_publication_clipboard(transaction, callback)
+	local owned = _publication_clipboards[transaction]
+	if not owned then return true end
+	owned.observers[#owned.observers + 1] = callback
+	local ok = pcall(SyntheticInput.on_complete, owned.debt, callback)
+	return ok and owned.observer_refused ~= true
+end
+
+--- Restores only the clipboard snapshot retained by this exact publication.
+--- @param transaction table Exact synthetic producer.
+--- @return boolean settled
+function M.cancel_publication_clipboard(transaction)
+	local owned = _publication_clipboards[transaction]
+	if not owned then return true end
+	if owned.restored == true and _paste_publication_lease == owned then
+		retry_paste_timer_cleanup()
+		clear_settled_publication_lease(owned)
+	end
+	if owned.debt.completed ~= true and _paste_debt_transaction == owned.debt then
+		if owned.mutated == false or owned.restored == true then
+			retry_paste_timer_cleanup()
+			if release_paste_debt() == true then _paste_saved_original = nil end
+			clear_settled_publication_lease(owned)
+			return M.publication_clipboard_settled(transaction)
+		end
+		local restored = restore_owned_clipboard()
+		if not restored then queue_paste_restore_retry("programmable publication cancellation") end
+	end
+	return M.publication_clipboard_settled(transaction)
+end
+
 --- Emits a raw string directly, choosing between keystrokes and clipboard-paste.
 --- @param text string The text to emit.
 --- @return number, string, string Characters emitted, legacy physical_echo
@@ -768,6 +904,7 @@ local _ignored_win_context_generation = 0
 local _ignored_win_stopped = true
 local _ignored_win_last_identity = nil
 local _secure_field_cache_value = nil
+local _text_destination = nil
 local schedule_ignored_win_refresh
 local arm_ignored_win_ttl_refresh
 
@@ -803,6 +940,7 @@ local function invalidate_ignored_win_cache()
 	_ignored_win_cache_dirty = true
 	_ignored_win_cache_value = nil
 	_secure_field_cache_value = nil
+	_text_destination = nil
 	_ignored_win_context_generation = _ignored_win_context_generation + 1
 	-- Every scheduled refresh carries this epoch. If native timer cancellation
 	-- fails, the old callback can still run but may not publish its stale probe.
@@ -1047,6 +1185,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
 	_secure_field_cache_value = nil
+	_text_destination = nil
 	if not ensure_ignored_win_watchers() then return mark_ignored_win_unknown() end
 
 	-- Use the focused window directly rather than frontmostApplication() so that
@@ -1085,6 +1224,17 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 		or SecureFieldDetector.inspectFocusedElement(app)
 	if type(secure) ~= "boolean" then return mark_ignored_win_unknown() end
 	_secure_field_cache_value = secure
+	-- Retain an exact native destination off the HID path. Application names and
+	-- titles alone cannot distinguish two editor controls or a reused window.
+	local captured, destination = pcall(function()
+		local pid = app:pid()
+		local application_element = hs.axuielement.applicationElementForPID(pid)
+		local element = application_element:attributeValue("AXFocusedUIElement")
+		if not element then return nil end
+		return { pid = pid, app = app, window_id = win:id(), element = element,
+			generation = _ignored_win_context_generation }
+	end)
+	if captured then _text_destination = destination end
 
 	-- Exact-title match.
 	if type(ignored_titles) == "table" and ignored_titles[title] then
@@ -1243,6 +1393,26 @@ function M.is_secure_field(now)
 		return nil, _ignored_win_context_generation
 	end
 	return _secure_field_cache_value, _ignored_win_context_generation
+end
+
+--- Captures a classified destination without native calls on the input thread.
+--- @return table|nil destination Opaque retained native receipt.
+function M.capture_text_destination()
+	if M.is_secure_field() ~= false or _ignored_win_cache_value ~= false then return nil end
+	return _text_destination
+end
+
+--- Rechecks actual AX focus outside the input callback before deferred output.
+--- @param receipt table Opaque destination from capture_text_destination().
+--- @return boolean current
+function M.owns_text_destination(receipt)
+	if type(receipt) ~= "table" or _ignored_win_stopped then return false end
+	if probe_ignored_window(_ignored_win_titles_ref, _ignored_win_patterns_ref) ~= false
+		or _secure_field_cache_value ~= false then return false end
+	local current = _text_destination
+	return current ~= nil and current.generation == receipt.generation
+		and current.pid == receipt.pid and current.window_id == receipt.window_id
+		and current.element == receipt.element
 end
 
 --- Reopens ignored-window tracking before the keymap taps start.

@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local M = {}
+local PersonalFiles = require("hotstrings.personal_files")
 local Logger = require("infra.logger")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
@@ -142,6 +143,7 @@ function M.count_all(ctx, ergopti_groups)
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			-- Extension packs are counted apart, under their extension, below.
 			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
+				and not PersonalFiles.components(name)
 				and not Extensions.parse_category_key(name) then
 				local secs = ctx.keymap.get_sections(name)
 				-- A gated-off group contributes 0 (the menu shows active hotstrings,
@@ -186,7 +188,7 @@ function M.count_all(ctx, ergopti_groups)
 		if ctx.hotfiles then
 			for _, f in ipairs(ctx.hotfiles) do
 				local n = ctx.get_group_name and ctx.get_group_name(f) or f
-				if n:sub(1, 13) == "personal_ext_" then
+				if n:sub(1, 13) == "personal_ext_" or PersonalFiles.components(n) then
 					table.insert(personal_group_names, n)
 				end
 			end

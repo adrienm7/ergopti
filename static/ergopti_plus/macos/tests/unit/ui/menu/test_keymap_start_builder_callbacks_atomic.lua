@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Menu Builder Keymap-Start Transactions
 --- DESCRIPTION:
---- Drives the real callbacks returned by the custom-hotstring and keyboard-layout
+--- Drives the real callbacks returned by the custom-hotstring and extension-hotstring
 --- builders. A refused keymap start must end the user action before any feature
 --- state, engine setting, persistence, notification, menu refresh, or reload is
 --- published. Testing the callbacks matters: a source scan can see a lifecycle
@@ -153,79 +153,54 @@ local function custom_fixture(outcome, action_kind)
 end
 
 
---- Builds the real layout provider and selects the magic-key replacement action.
+--- Builds the real extension provider and selects its bound replacement action.
 --- @param outcome string false|nil|throw.
 --- @return table fixture
-local function layout_fixture(outcome)
-	local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
-		-- Building this menu opportunistically refreshes its input-source cache.
-		-- Keep that unrelated subprocess fully in memory so the Windows harness
-		-- emits no shell-path noise after the assertions have completed.
-		task = {
-			new = function(_command, callback)
-				return {
-					start = function(self)
-						if callback then callback(0, "[]", "") end
-						return self
-					end,
-					terminate = function() end,
-				}
-			end,
-		},
-		fs = {
-			attributes = function() return nil end,
-			dir = function() return function() return nil end end,
-		},
-	})
-	-- Serve a settled empty input-source cache so this regression remains about
-	-- callback commitment, not the asynchronous layout-discovery machinery.
-	Layout._set_active_layouts_cache({})
-
+local function extension_fixture(outcome)
+	local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
 	local calls = {
-		starts = 0,
-		keymap_mutations = 0,
-		saves = 0,
-		notifications = 0,
-		updates = 0,
-		reloads = 0,
+		starts = 0, keymap_mutations = 0, saves = 0,
+		notifications = 0, updates = 0, reloads = 0,
 	}
 	local state = {
-		keymap = false,
-		layout_pause_switch_enabled = false,
-		layout_on_pause = false,
-		layout_on_resume = false,
+		keymap = false, hotstrings = { magickey = true },
+		layout_pause_switch_enabled = false, layout_on_pause = false, layout_on_resume = false,
 	}
 	local function keymap_mutation()
 		calls.keymap_mutations = calls.keymap_mutations + 1
+		return true
 	end
 	local ctx = {
-		base_dir = "",
-		paused = false,
-		state = state,
+		paused = false, state = state, hotfiles = { "magickey" },
+		get_group_name = function(name) return name end,
+		applyTriggerChar = function(text) return text end,
+		extension_packs = { { id = "ergopti", bound_files = {
+			{ binding = { category = "magickey", sections = { "replace" } } },
+		} } },
 		keymap = {
 			start = failing_start(outcome, calls),
-			is_group_enabled = function(group) return group == "magic_key" end,
+			is_group_enabled = function(group) return group == "magickey" end,
 			is_section_enabled = function() return false end,
 			get_sections = function(group)
-				if group == "magic_key" then
+				if group == "magickey" then
 					return { { name = "replace", description = "TARGET_REPLACE_SECTION" } }
 				end
 				return nil
 			end,
-			enable_section = keymap_mutation,
-			disable_section = keymap_mutation,
+			enable_section = keymap_mutation, disable_section = keymap_mutation,
+			set_groups_sections_enabled = keymap_mutation,
 		},
-		save_prefs = function() calls.saves = calls.saves + 1 end,
+		save_prefs = function() calls.saves = calls.saves + 1; return true end,
 		notify_feature = function() calls.notifications = calls.notifications + 1 end,
 		updateMenu = function() calls.updates = calls.updates + 1 end,
 		do_reload = function() calls.reloads = calls.reloads + 1 end,
 	}
-
-	local built = Layout.build(ctx)
-	helpers.assert_type(built, "table", "the real layout builder must return provider rows")
-	local action = find_action(built.submenu, "TARGET_REPLACE_SECTION")
+	local bound = Hotstrings.bound_sections(ctx)
+	local rows = Hotstrings.build_bound_section_rows(ctx, bound.ergopti)
+	helpers.assert_type(rows, "table", "the real extension provider returns bound section rows")
+	local action = find_action(rows, "TARGET_REPLACE_SECTION")
 	helpers.assert_type(action, "function",
-		"the real layout builder must expose the replacement-section callback")
+		"the real extension provider exposes its replacement-section callback")
 
 	return {
 		action = action,
@@ -270,11 +245,11 @@ helpers.describe("menu builder callbacks: capture and desired selection stay ind
 		end)
 	end
 
-	helpers.it("keeps the layout replacement callback inert", function()
+	helpers.it("keeps the extension replacement callback inert", function()
 		for _, outcome in ipairs(START_OUTCOMES) do
 			assert_refused_without_effects(
-				layout_fixture(outcome),
-				"layout replacement / " .. outcome)
+				extension_fixture(outcome),
+				"extension replacement / " .. outcome)
 		end
 	end)
 end)

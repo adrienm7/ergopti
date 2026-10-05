@@ -196,13 +196,79 @@ local function preset()
 	return text
 end
 
---- Lets the disk double remove a file, as the macOS adapter does.
+--- Owns conditional layer removal over the same classified in-memory disk.
 local function removable(disk)
-	require("adapters.file_system").remove_exact = function(path)
+	local files = require("adapters.file_system")
+	disk.removal_calls = {}
+	files.remove_exact = function() error("layer compensation must use conditional removal") end
+	files.remove_if_unchanged = function(path, expected, on_error)
+		disk.removal_calls[#disk.removal_calls + 1] = { path = path,
+			expected = { status = expected.status, content = expected.content }, on_error = on_error }
+		if path ~= LAYERS or expected.status ~= "ok" or type(expected.content) ~= "string"
+			or disk.files[path] ~= expected.content or disk.refuse_remove == true then
+			if on_error then on_error("removal") end
+			return false, "fixture conditional removal refused"
+		end
 		disk.files[path] = nil
 		return true
 	end
 end
+
+--- Pins the production inverse to one exact conditional source and route.
+local function assert_layer_removal(disk)
+	helpers.assert_eq(#disk.removal_calls, 1, "one conditional inverse removes the created layer")
+	helpers.assert_eq(disk.removal_calls[1].path, LAYERS)
+	helpers.assert_eq(disk.removal_calls[1].expected, { status = "ok", content = preset() })
+	helpers.assert_nil(disk.removal_calls[1].on_error, "ordinary compensation keeps its actual callback policy")
+end
+
+helpers.describe("remap layer fixture: conditional removal", function()
+	helpers.it("routes exact source removal through the classified native capability", function()
+		with_fixture(function(fixture)
+			local _, _, disk = scoped_remap(fixture)
+			removable(disk)
+			disk.files[LAYERS] = "# independently authored fixture source\n"
+			local callback_count = 0
+			local on_error = function() callback_count = callback_count + 1 end
+			local expected = { status = "ok", content = disk.files[LAYERS] }
+			helpers.assert_true(require("toml_codec.writer").remove_if_unchanged(LAYERS,
+				require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }))
+			helpers.assert_nil(disk.files[LAYERS])
+			helpers.assert_eq(#disk.removal_calls, 1)
+			helpers.assert_eq(disk.removal_calls[1].path, LAYERS)
+			helpers.assert_eq(disk.removal_calls[1].expected, expected)
+			helpers.assert_true(disk.removal_calls[1].on_error == on_error)
+			helpers.assert_eq(callback_count, 0, "acknowledged removal reports no failure")
+		end)
+	end)
+	helpers.it("refuses foreign routes, changed sources and explicit native refusal without deleting", function()
+		for _, cause in ipairs({ "route", "source", "refusal" }) do
+			with_fixture(function(fixture)
+				local _, _, disk = scoped_remap(fixture)
+				removable(disk)
+				local original, foreign = "# owned layer\n", "/foreign/layers.toml"
+				disk.files[LAYERS], disk.files[foreign] = original, original
+				local path = cause == "route" and foreign or LAYERS
+				local expected = { status = "ok", content = cause == "source" and "# stale source\n" or original }
+				disk.refuse_remove = cause == "refusal"
+				local callback_count = 0
+				local on_error = function(category)
+					helpers.assert_eq(category, "removal")
+					callback_count = callback_count + 1
+				end
+				helpers.assert_eq(require("toml_codec.writer").remove_if_unchanged(path,
+					require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }), false)
+				helpers.assert_eq(disk.files[LAYERS], original)
+				helpers.assert_eq(disk.files[foreign], original)
+				helpers.assert_eq(#disk.removal_calls, 1)
+				helpers.assert_eq(disk.removal_calls[1].path, path)
+				helpers.assert_eq(disk.removal_calls[1].expected, expected)
+				helpers.assert_true(disk.removal_calls[1].on_error == on_error)
+				helpers.assert_eq(callback_count, 1, "one refusal belongs to the exact callback")
+			end)
+		end
+	end)
+end)
 
 --- Runs a case with an observable owner of the layer's wheel bindings,
 --- which Hammerspoon runs (layer-wheel-slots).
@@ -255,6 +321,7 @@ helpers.describe("remap scope transaction: the recommended navigation layer", fu
 			disk.terminal(true, "ready")
 			helpers.assert_eq(settled[1].ok, false)
 			helpers.assert_nil(disk.files[LAYERS], "no layer file outlives a refused restore")
+			assert_layer_removal(disk)
 			helpers.assert_eq(wheel.reconciles, 0, "a refused restore leaves the wheel as it was")
 		end) end)
 	end)
@@ -324,6 +391,7 @@ helpers.describe("remap setters: a hold that enters the layer brings it along", 
 				calls.set_save_succeeds(false)
 				helpers.assert_eq(setter.set(remap, "layer"), false, setter.name)
 				helpers.assert_nil(disk.files[LAYERS], setter.name .. ": no layer file outlives a refused save")
+				assert_layer_removal(disk)
 				helpers.assert_eq(wheel.reconciles, 0, setter.name .. ": the wheel is left as it was")
 			end) end)
 		end

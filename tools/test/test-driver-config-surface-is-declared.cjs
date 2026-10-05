@@ -72,8 +72,15 @@ const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
  * plus the set of declared section names.
  * @returns {{keys: Map<string, Set<string>>, sections: Map<string, Set<string>>}}
  */
-function parseManifest() {
-	const lines = fs.readFileSync(MANIFEST, 'utf8').split(/\r?\n/);
+function parseManifest(source = fs.readFileSync(MANIFEST, 'utf8')) {
+	const lines = source.split(/\r?\n/);
+	const records =
+		parseToml(
+			source.replace(
+				/^\[\[features\.([^\]]+)\]\]$/gm,
+				(_header, section) => `[[declarations]]\nsection_path = "${section}"`
+			)
+		).declarations || [];
 	const sectionPlatforms = new Map();
 	const keys = new Map();
 
@@ -129,7 +136,18 @@ function parseManifest() {
 		for (const e of entries) {
 			if (!e.id) continue;
 			const eff = e.platforms || sectionPlatforms.get(section) || new Set();
-			for (const p of eff) declared.get(p)?.add(`${section}.${e.id}`);
+			const record = records.find((value) => value.section_path === section && value.id === e.id);
+			const fields =
+				record?.type === 'feature'
+					? new Set([
+							...Object.keys(record.default || {}),
+							...Object.keys(record.recommended || {})
+						])
+					: new Set();
+			for (const p of eff) {
+				declared.get(p)?.add(`${section}.${e.id}`);
+				for (const field of fields) declared.get(p)?.add(`${section}.${e.id}.${field}`);
+			}
 		}
 	}
 	return declared;
@@ -179,6 +197,33 @@ function isDeclaredSurface(surface, known, dynamic = []) {
 
 // Regression oracles: concatenation is a namespace, but a literal trailing dot,
 // unknown child, similarly named section or wrong platform is never exempted.
+const compositeProbe = parseManifest(`
+[sections.hotstrings.dynamic]
+platforms = ["hs"]
+[[features.hotstrings.dynamic]]
+id = "user_code"
+type = "feature"
+default = { enabled = false, time_activation_seconds = 0.5 }
+recommended = { enabled = false, time_activation_seconds = 0.5 }
+`);
+for (const field of ['enabled', 'time_activation_seconds']) {
+	assert.equal(
+		isDeclaredSurface(`hotstrings.dynamic.user_code.${field}`, compositeProbe.get('hs')),
+		true
+	);
+	assert.equal(
+		isDeclaredSurface(`hotstrings.dynamic.user_code.${field}`, compositeProbe.get('linux')),
+		false
+	);
+}
+assert.equal(
+	isDeclaredSurface('hotstrings.dynamic.user_code.arbitrary', compositeProbe.get('hs')),
+	false
+);
+assert.equal(
+	isDeclaredSurface('hotstrings.dynamic.other.enabled', compositeProbe.get('hs')),
+	false
+);
 assert.deepEqual(configReadSurfaces('Manifest.default_for("shortcuts.keys." .. name)'), [
 	'shortcuts.keys.*'
 ]);
@@ -214,6 +259,49 @@ assert.equal(
 );
 
 /**
+ * Verifies the shared recovery owner's actual conditional-writer argument route.
+ * Only the internal mutation proofs inject another source root; production always
+ * reads the helper shipped beside the driver, and missing source grants no claim.
+ * @param {string} sourceRoot ErgoptiPlus source directory.
+ * @returns {boolean} Whether the exact helper retains the publication route.
+ */
+function hasSecondaryRecoveryTransport(sourceRoot) {
+	const helperPath = path.join(sourceRoot, '_shared/lua/hotstrings/publication_recovery.lua');
+	if (!fs.existsSync(helperPath)) return false;
+	const helper = fs.readFileSync(helperPath, 'utf8');
+	const constructor = /^function M\.new\(options\)\r?\n[\s\S]*?^end\b/m.exec(helper);
+	if (!constructor) return false;
+	const body = constructor[0];
+	const publish =
+		/^\tlocal function publish\(path, candidate, adapter, expected, on_error, publisher\)\r?\n[\s\S]*?^\tend\b/m.exec(
+			body
+		);
+	const inverse = /^\tlocal function settle_pending\(\)\r?\n[\s\S]*?^\tend\b/m.exec(body);
+	if (!publish || !inverse) return false;
+	return (
+		/^local function copy_source\(source\)\r?\n\s*return \{ status = source\.status, content = source\.content \}\s*\r?\nend\b/m.test(
+			helper
+		) &&
+		/^\tlocal files = options\.files\s*$/m.test(body) &&
+		/^\tlocal writer = options\.writer or require\("toml_codec\.writer"\)\s*$/m.test(body) &&
+		/adapter ~= files/.test(publish[0]) &&
+		/local record = \{ path = path, candidate = candidate, expected = copy_source\(expected\),\s+on_error = on_error, attempt = attempt, publisher = publisher or writer\.publish_if_unchanged \}/.test(
+			publish[0]
+		) &&
+		/^\t\tlocal called, acknowledged, detail, native = pcall\(record\.publisher,\s+path, candidate, files, record\.expected, on_error\)/m.test(
+			publish[0]
+		) &&
+		/inverse = \{ path = record\.path, expected = copy_source\(view\.source\),\s+candidate = record\.expected\.content, on_error = record\.on_error, attempt = record\.attempt \}/.test(
+			inverse[0]
+		) &&
+		/^\t\tlocal called, acknowledged, detail, native = pcall\(record\.publisher,\s+inverse\.path, inverse\.candidate, files, inverse\.expected, inverse\.on_error\)/m.test(
+			inverse[0]
+		) &&
+		/return \{ begin = begin, finish = finish, publish = publish, retry = retry,/.test(body)
+	);
+}
+
+/**
  * Recognizes one exact secondary-file writer, not a globally exempt config key.
  * The row must belong to its preparation function and retain its override-path
  * publication chain. A different owner, function, key or destination is scanned.
@@ -222,9 +310,10 @@ assert.equal(
  * @param {string} source - Complete source text.
  * @param {string} surface - Literal section/key pair.
  * @param {number} offset - Row offset in the source.
+ * @param {string} sourceRoot - Actual helper source root; injected only by internal proofs.
  * @returns {boolean} Whether the secondary override owner handles this row.
  */
-function isSecondaryWrite(driver, relative, source, surface, offset) {
+function isSecondaryWrite(driver, relative, source, surface, offset, sourceRoot = DRIVERS_DIR) {
 	if (
 		driver !== 'macos' ||
 		relative !== 'modules/hotstrings/hotstrings_config.lua' ||
@@ -246,6 +335,29 @@ function isSecondaryWrite(driver, relative, source, surface, offset) {
 		offset >= prepare.index + prepare[0].length
 	)
 		return false;
+	const row = /section\s*=\s*"__global__"\s*,\s*key\s*=\s*"word_delimiters"/.exec(prepare[0]);
+	if (!row || prepare.index + row.index !== offset) return false;
+	const directPublication =
+		/^\tlocal function publish\(\)\r?\n\s*return FileSystem\.write_if_unchanged\(_state\.path, content, _state\.source_snapshot\) == true\s*\r?\n\tend\b/m.test(
+			save[0]
+		);
+	const recoveryPublication =
+		/^local FileSystem\s*= require\("adapters\.file_system"\)\s*$/m.test(source) &&
+		/^local PublicationRecovery = require\("hotstrings\.publication_recovery"\)\s*$/m.test(
+			source
+		) &&
+		/^local function publish_native_override\(path, content, files, expected, on_error\)\r?\n\s*return files\.write_if_unchanged\(path, content, expected, on_error\)\s*\r?\nend\b/m.test(
+			source
+		) &&
+		/^\tlocal function publish\(\)\r?\n\s*return _state\.recovery\.publish\(_state\.path, content, FileSystem,\s*_state\.source_snapshot, _state\.on_publication_error, publish_native_override\)\s*\r?\n\tend\b/m.test(
+			save[0]
+		) &&
+		/^\tlocal state = _state\s*$/m.test(init[0]) &&
+		/state\.recovery = PublicationRecovery\.new\(\{ files = FileSystem,\s*capture = function\(\) return capture_publication_owner\(state\) end,\s*current = publication_owner_current \}\)/.test(
+			init[0]
+		) &&
+		/_state\.source_snapshot = source_snapshot/.test(init[0]) &&
+		hasSecondaryRecoveryTransport(sourceRoot);
 	return (
 		/local snapshot = _state\.source_snapshot/.test(prepare[0]) &&
 		/TomlRecordEditor\.patch_table_field\(content,/.test(prepare[0]) &&
@@ -253,9 +365,7 @@ function isSecondaryWrite(driver, relative, source, surface, offset) {
 			save[0]
 		) &&
 		/content = prepared/.test(save[0]) &&
-		/FileSystem\.write_if_unchanged\(_state\.path, content, _state\.source_snapshot\)/.test(
-			save[0]
-		) &&
+		(directPublication || recoveryPublication) &&
 		/parse_overrides\(opts\.override_path\)/.test(init[0]) &&
 		/path\s*= opts\.override_path/.test(init[0])
 	);
@@ -326,23 +436,48 @@ assert.equal(
 	),
 	false
 );
-assert.equal(
-	isSecondaryWrite('macos', secondaryOwner, secondarySource, '__global__.word_delimiters', 0),
-	false
-);
-assert.equal(
-	isSecondaryWrite(
-		'macos',
-		secondaryOwner,
-		secondarySource.replace(
-			'FileSystem.write_if_unchanged(_state.path, content, _state.source_snapshot)',
-			'FileSystem.write_if_unchanged(config_path, content, _state.source_snapshot)'
+for (const offset of [0, secondaryRow.index + 1]) {
+	assert.equal(
+		isSecondaryWrite(
+			'macos',
+			secondaryOwner,
+			secondarySource,
+			'__global__.word_delimiters',
+			offset
 		),
-		'__global__.word_delimiters',
-		secondaryRow.index
-	),
-	false
-);
+		false,
+		'only the exact literal preparation row inherits secondary ownership'
+	);
+}
+const secondaryPublicationCall =
+	/(?:FileSystem\.write_if_unchanged\(_state\.path,\s*content,\s*_state\.source_snapshot\)|_state\.recovery\.publish\(_state\.path,\s*content,\s*FileSystem,\s*_state\.source_snapshot,\s*_state\.on_publication_error,\s*publish_native_override\))/.exec(
+		secondarySource
+	);
+assert.ok(secondaryPublicationCall, 'the actual secondary publication route must exist');
+for (const [before, after] of [
+	['_state.path', 'config_path'],
+	['_state.source_snapshot', 'other_source_snapshot']
+]) {
+	const changedCall = secondaryPublicationCall[0].replace(before, after);
+	const changedSource = secondarySource.replace(secondaryPublicationCall[0], changedCall);
+	assert.notEqual(
+		changedCall,
+		secondaryPublicationCall[0],
+		'publication mutation must change arguments'
+	);
+	assert.notEqual(changedSource, secondarySource, 'publication mutation must change actual source');
+	assert.equal(
+		isSecondaryWrite(
+			'macos',
+			secondaryOwner,
+			changedSource,
+			'__global__.word_delimiters',
+			secondaryRow.index
+		),
+		false,
+		'a different destination or expected source never inherits secondary ownership'
+	);
+}
 
 /**
  * Every "section.key" (or bare section) a driver's own source reads or writes.

@@ -182,7 +182,7 @@ end
 --- where a category is
 ---   { id, path, description = {locale → text}, delay, show_tooltip, color,
 ---     sections_order = array, sections = { [name] = { count } }, count }
-function M.load_catalogue(paths, options)
+function M.load_catalogue(paths, options, prepared_sources)
 	Logger.start(LOG, "Loading hotstrings from %d file(s)…", type(paths) == "table" and #paths or 0)
 	if type(paths) ~= "table" then
 		Logger.error(LOG, "load_catalogue(): expected table of paths, got %s.", type(paths))
@@ -214,7 +214,13 @@ function M.load_catalogue(paths, options)
 		local only_sections = section_set(type(source) == "table" and source.only_sections or nil)
 		local skip_sections = section_set(type(source) == "table" and source.skip_sections or nil)
 		local identity = source_identity(path, forced_group)
-		local ok, data, committed = pcall(Reader.parse, path)
+		local prepared = prepared_sources and prepared_sources[path]
+		local ok, data, committed
+		if prepared ~= nil then
+			ok, data, committed = pcall(Reader.parse_text, prepared)
+		else
+			ok, data, committed = pcall(Reader.parse, path)
+		end
 		if not ok or committed ~= true or type(data) ~= "table" then
 			errors = errors + 1
 			data = _source_snapshots[identity]
@@ -225,7 +231,7 @@ function M.load_catalogue(paths, options)
 				aggregate_committed = false
 				Logger.error(LOG, "Source '%s' did not commit and has no healthy snapshot.", tostring(path))
 			end
-		else
+		elseif prepared == nil then
 			_source_snapshots[identity] = data
 		end
 		if data then
@@ -327,10 +333,14 @@ function M.load_catalogue(paths, options)
 					-- and was dropped here, so rung 3 of the five-rung cascade — the
 					-- section's declared delay — resolved to nil on this driver and a
 					-- pack shipping per-section timings had them silently ignored.
+					local section_meta = (meta.sections or {})[sec_name] or {}
 					category.sections[sec_name] = {
 						count    = entry_count,
-						delay    = tonumber((meta.section_delays or {})[sec_name]),
-						priority = section_priorities[sec_name],
+						description = section.description,
+						delay    = tonumber(section_meta.delay) or tonumber((meta.section_delays or {})[sec_name]),
+						color = section_meta.color,
+						show_tooltip = section_meta.show_tooltip,
+						priority = section_meta.priority or section_priorities[sec_name],
 						-- The extension a bound section comes from (Ergopti's repeat
 						-- corrections): the menu lists it under that extension.
 						extension = only_sections and extension or nil,
@@ -378,7 +388,7 @@ end
 --- Useful for pointing the loader at ~/.config/ergopti/hotstrings/.
 --- @param dir string Absolute path to the root directory to scan.
 --- @return table  Array of absolute .toml file paths.
-function M.find_toml_files(dir)
+function M.find_toml_files(dir, max_directory_depth)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
 
@@ -386,8 +396,9 @@ function M.find_toml_files(dir)
 	-- path that can come from a config file, and quoting re-derived at a call
 	-- site is quoting that is eventually wrong.
 	local result = {}
+	local limit = max_directory_depth and (" -maxdepth " .. tostring(max_directory_depth)) or ""
 	local out = Shell.exec(string.format(
-		"find %s -type f -name '*.toml' 2>/dev/null", Shell.quote(dir)))
+		"find %s%s -type f -name '*.toml' 2>/dev/null", Shell.quote(dir), limit))
 	for line in out:gmatch("[^\r\n]+") do
 		local path = line:match("^%s*(.-)%s*$")
 		if M.is_pack_file(path) then result[#result + 1] = path end
@@ -395,6 +406,45 @@ function M.find_toml_files(dir)
 
 	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
 	return result
+end
+
+--- Projects no-follow links and depth-boundary directories as diagnostics only.
+--- This never loads files below a skipped entry or creates a publication owner.
+--- @param dir string Actual configured additional-personal directory.
+--- @param max_directory_depth number Existing native discovery boundary.
+--- @return table directories Blocked relative labels and exact paths.
+function M.unavailable_directories(dir, max_directory_depth)
+	if type(dir) ~= "string" or dir == "" or type(max_directory_depth) ~= "number" then return {} end
+	local available, native = pcall(require, "lfs")
+	local stat = available and native.symlinkattributes or nil
+	if type(stat) ~= "function" then
+		available, native = pcall(require, "luv")
+		stat = available and native.fs_lstat or nil
+	end
+	if type(stat) ~= "function" then return {} end
+	local observed, root_attributes = pcall(stat, dir)
+	local root_mode = observed and type(root_attributes) == "table" and (root_attributes.mode or root_attributes.type)
+	if root_mode == "link" then
+		return { { path = dir, label = dir:gsub("/+$", ""):match("([^/]+)$"), reason = "linked-directory" } }
+	end
+	local prefix = dir:gsub("/+$", "") .. "/"
+	local rows = {}
+	local out = Shell.exec(string.format("find %s -maxdepth %d \\( -type l -o -type d \\) -print 2>/dev/null",
+		Shell.quote(dir), max_directory_depth))
+	for path in out:gmatch("[^\r\n]+") do
+		if path:sub(1, #prefix) == prefix then
+			local relative = path:sub(#prefix + 1)
+			local depth = 0; for _ in relative:gmatch("[^/]+") do depth = depth + 1 end
+			local called, attributes = pcall(stat, path)
+			local mode = called and type(attributes) == "table" and (attributes.mode or attributes.type)
+			if (mode == "link" and not relative:match("%.toml$")) or mode == "directory" and depth == max_directory_depth then
+				rows[#rows + 1] = { path = path, label = relative,
+					reason = mode == "link" and "linked-directory" or "scan-depth" }
+			end
+		end
+	end
+	table.sort(rows, function(left, right) return left.label < right.label end)
+	return rows
 end
 
 --- Lists the immediate subdirectories of a directory.
@@ -415,6 +465,37 @@ function M.list_subdirs(dir)
 		if path ~= "" then result[#result + 1] = path end
 	end
 	return result
+end
+
+--- Proves two routes still name the same regular native source file.
+--- Logical shipped categories can use a relative path or physical alias; a
+--- same-named user copy has a different identity and grants no shipped binding.
+--- Missing or unstable native identity support refuses this distinction.
+--- @param left string Requested source path.
+--- @param right string Canonical shipped source path.
+--- @return boolean same Stable native device/inode identity agrees.
+function M.same_file(left, right)
+	if type(left) ~= "string" or left == "" or left:find("\0", 1, true)
+		or type(right) ~= "string" or right == "" or right:find("\0", 1, true) then return false end
+	local available, native = pcall(require, "lfs")
+	local stat = available and type(native) == "table" and native.attributes or nil
+	if type(stat) ~= "function" then
+		available, native = pcall(require, "luv")
+		stat = available and type(native) == "table" and native.fs_stat or nil
+	end
+	if type(stat) ~= "function" then return false end
+	local function identity(path)
+		local ok, attrs = pcall(stat, path)
+		if not ok or type(attrs) ~= "table" or (attrs.mode ~= "file" and attrs.type ~= "file") then return nil end
+		local device, inode = attrs.dev, attrs.ino
+		if type(device) ~= "number" or type(inode) ~= "number"
+			or device ~= device or inode ~= inode or device < 0 or inode <= 0
+			or device == math.huge or inode == math.huge
+			or device % 1 ~= 0 or inode % 1 ~= 0 then return nil end
+		return tostring(device) .. ":" .. tostring(inode)
+	end
+	local first, second = identity(left), identity(right)
+	return first ~= nil and first == second and identity(left) == first and identity(right) == second
 end
 
 --- Reads a whole file, or nil when it is absent.

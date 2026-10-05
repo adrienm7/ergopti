@@ -23,6 +23,9 @@
 ; This must stay in sync with the registration code whenever prefix rules change.
 ; Uses a global cache to avoid redundant calculations during menu build.
 CountDynamicSection(SectionName) {
+		; Loaded user metadata can change asynchronously; never freeze its count.
+		if SectionName == "user_code"
+			return UserHotstringsCount()
 		global PersonalInformation, _TomlCountCache
 		CacheKey := "dynamic|" . StrLower(SectionName)
 		if _TomlCountCache.Has(CacheKey)

@@ -19,7 +19,14 @@ local function with_fixture(collision, body)
 		"infra.preferences", "adapters.file_system", "adapters.storage", "infra.config_paths",
 		"infra.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
 		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
+		"infra.personal_hotstrings",
 	}, function()
+		-- These fixtures own registered sources, not the boot scanner catalogue.
+		-- Keep only its empty diagnostics port scoped; the real registry and
+		-- conditional preference publisher remain the owners exercised below.
+		package.loaded["infra.personal_hotstrings"] = {
+			unavailable_directories = function() return {} end,
+		}
 		local root = os.tmpname(); os.remove(root)
 		assert(os.execute("mkdir -p " .. TextUtils.shell_quote(root .. "/a")))
 		local definitions = collision and {
