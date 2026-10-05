@@ -1958,6 +1958,31 @@ These are software implementations; final hardware verification remains below.
   Linux CI without launching it. No migration of historical events, formula,
   schema, shared policy, physical-input, menu or reserved configuration change.
 
+- [~] **L128.** Linux n-gram text projection: preserve embedded NUL and distinct
+  admitted UTF-8 tokens through the SQLite CLI. Raw TEXT in its JSON mode truncates
+  at NUL, losing tokens or merging them with a prefix. Project json_quote(token)
+  and decode its string with the existing shared JSON codec at the native adapter
+  boundary; retain grouping, counts, delays, error/source totals and malformed
+  numeric fallback. Twenty-nine native checks across all nine character/word
+  families reproduce nineteen failures and pass after on current LuaJIT, Lua 5.4
+  and the signed Jammy luv/libuv mixed profile, all with actual SQLite 3.46.
+  Public synthetic output, flush, range and historical/today split APIs retain
+  exact NUL, quotes, whitespace and accented text. Independent durable hex(token)
+  and seven distinct token identities verify the original bytes and counters.
+  Empty-range and ordinary-text controls remain healthy. Use a fixed historical
+  fixture day with a distinct-day precondition rather than subtracting 24 hours,
+  which can still be today on a 25-hour calendar day. Preserve all original native
+  assertions and add an exact twenty-nine-check floor. The registered regression
+  fails before and passes after on all three profiles; forty-four Reader owner
+  checks, including canonical modifier-hold data, pass after. Their CLI adapters
+  are explicitly simulated; the native fixture runs real software/database paths
+  and does not validate physical input. macOS uses native binding rows in source;
+  Windows has a separate source analogue in SQLite_Utf8ToStr, which calls StrGet
+  without a byte length. Its direct text queries need native evidence and a
+  length-aware or JSON-framed read strategy from the principal agent. No foreign
+  driver changes or native gates here. Register future Linux CI without launching
+  it. No NULL policy, completion cache, schema, Writer, menu or reserved change.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime
