@@ -7,14 +7,25 @@
 ; launch alone is injected. Generic provenance-only loader assertions stay intact.
 ; ==============================================================================
 
-_PFC_Fixture() {
+_PFC_Fixture(FixtureRootSpelling := "temp") {
 	global ScriptInformation, ConfigurationFile, _HotstringRegistrar, CategoryEnabled
+	if FixtureRootSpelling != "temp" && FixtureRootSpelling != "long" && FixtureRootSpelling != "dot"
+		throw ValueError("Unknown fixture native root spelling")
 	Fixture := _ScopeOwnerFixture()
 	Fixture.savedInfo := ScriptInformation, Fixture.savedConfig := ConfigurationFile
 	Fixture.savedOwners := PersonalFileControls.owners, Fixture.savedInventory := PersonalFileControls.inventory
 	Fixture.savedRegistrar := _HotstringRegistrar, Fixture.savedGate := CategoryEnabled["Hotstrings"]
 	Fixture.root := Fixture.directory . "\hotstrings"
 	DirCreate(Fixture.root)
+	try {
+		if FixtureRootSpelling == "long"
+			Fixture.root := FSResolveDirectoryPath(Fixture.root)
+		else if FixtureRootSpelling == "dot"
+			Fixture.root := Fixture.directory . "\.\hotstrings"
+	} catch as RootResolutionError {
+		_ScopeOwnerCleanup(Fixture)
+		throw RootResolutionError
+	}
 	Fixture.file := Fixture.root . "\a__b.toml"
 	Fixture.descriptor := PersonalFileDescribe(["a__b.toml"])
 	Fixture.content := '[[live]]`n"abcd" = "first"`n[[quiet]]`n"qwer" = "second"`n'
@@ -456,3 +467,37 @@ _PFC_StrictReadAdapter() {
 	}
 }
 Test("personal-file-controls: strict reader preserves source bytes and physical handle identity", _PFC_StrictReadAdapter)
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 1/ Supplied native root route =======
+; =============================================
+; =============================================
+
+_PFC_SuppliedRootRoute(RouteMode) {
+	RouteFixture := _PFC_Fixture(RouteMode)
+	try {
+		RouteOwner := RouteFixture.owner
+		AssertEqual(RouteFixture.file, RouteOwner.path,
+			"native discovery must retain the caller-owned route spelling")
+		AssertTrue(RouteOwner.Authorize(RouteFixture.file, RouteFixture.descriptor),
+			"a discovered actual source must remain reachable through its original route")
+		AssertEqual(RouteOwner, PersonalFileControls.ForPath(RouteFixture.file))
+		RouteCanonicalFile := FSResolveDirectoryPath(RouteFixture.root) . "\a__b.toml"
+		AssertEqual(PersonalFileControls.Physical(RouteCanonicalFile), RouteOwner.physical,
+			"independent native long-path resolution must identify the same retained source")
+		AssertEqual(1, LoadExtTomlFile(RouteFixture.file, "a__b", "", RouteFixture.descriptor, RouteOwner))
+		AssertEqual(1, RouteOwner.ActiveCount())
+		if RouteMode == "dot"
+			AssertFalse(RouteCanonicalFile == RouteFixture.file,
+				"the physical dot-route control must differ from the native canonical spelling")
+	} finally _PFC_Cleanup(RouteFixture)
+}
+Test("personal-file-route: native long-root source retains exact loader and activation ownership",
+	_PFC_SuppliedRootRoute.Bind("long"))
+Test("personal-file-route: physically identical dot-root source retains its supplied logical route",
+	_PFC_SuppliedRootRoute.Bind("dot"))
