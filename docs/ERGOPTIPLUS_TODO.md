@@ -3431,6 +3431,8 @@ Persisted macOS llm.enabled now uses the actual published feature value validato
 
 Parameter-bearing gesture bindings now use a shared current/retired/unjudged identity policy against each actual complete native gesture catalogue. Windows, macOS and Linux loaders preserve but do not activate proven retired entries, warn once, and ordinary setters refuse them before publication; explicit cleanup remains the removal owner. Windows keeps case-distinct parameter Maps, including unjudged qualified identities. The independent29-case corpus and registered native regressions are retained; Windows native execution is still pending. Other keyboard, tap-hold, script and combination identity owners remain unjudged by this bounded cohort, so site76 and the whole item stay open. The actual gesture fixture now restores its new shared dependency through the existing exact owner scope. All old isolation assertions remain; original2/9 and corrected11/0 independently reproduce the prerequisite, including absent/false/existing owners and construction/callback failure.
 
+The Windows finite-number gate now delegates its unchanged CRT ABI to a native adapter. The existing OS-call purity bound remains 252; the actual source census returns to 252 without raising it. The architecture graph was regenerated through its owner. AHK encoding and private-source JS checks pass; native Windows execution remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

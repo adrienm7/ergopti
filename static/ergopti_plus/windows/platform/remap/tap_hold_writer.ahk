@@ -29,6 +29,8 @@
 
 
 
+#Include ../../adapters/native_number.ahk
+
 ; ===========================
 ; ===========================
 ; ======= 1/ Key defs =======
@@ -496,7 +498,7 @@ _TH_DurationValueValid(Seconds) {
 		return false
 	if Seconds is Float {
 		try {
-			if !DllCall("msvcrt\_finite", "double", Seconds, "cdecl int")
+			if !NativeNumberIsFinite(Seconds)
 				return false
 		} catch {
 			return false
