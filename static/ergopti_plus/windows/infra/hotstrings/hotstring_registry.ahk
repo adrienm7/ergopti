@@ -206,23 +206,26 @@ HS_EnumeratePersonalExtFiles() {
 		Dir := Node["Dir"]
 		Prefix := Node["Prefix"]
 		Loop Files Dir . "\*", "DF" {
+			; A_LoopFileFullPath expands 8.3 ancestors. Keep the supplied root
+			; route consistent with activation and write-lease ownership instead.
+			OwnedChildPath := Dir . "\" . A_LoopFileName
 			Child := (Prefix == "" ? "" : Prefix . " / ") . A_LoopFileName
 			Components := Node["Components"].Clone()
 			Components.Push(A_LoopFileName)
 			if (A_LoopFileAttrib ~= "D") {
-				if !HS_PersonalDirectoryAdmitted(A_LoopFileFullPath, Components.Length + 1) {
+				if !HS_PersonalDirectoryAdmitted(OwnedChildPath, Components.Length + 1) {
 					try LoggerWarn("Hotstrings", "Personal pack directory is unavailable or exceeds the admitted depth — skipped.")
 					continue
 				}
-				Pending.Push(Map("Dir", A_LoopFileFullPath, "Prefix", Child, "Components", Components))
+				Pending.Push(Map("Dir", OwnedChildPath, "Prefix", Child, "Components", Components))
 				continue
 			}
 			if !(A_LoopFileName ~= "i)\.toml$")
 				continue
 			if (Prefix == "" and A_LoopFileName == "personal_hotstrings.toml")
 				continue
-			SplitPath A_LoopFileFullPath, , , , &Stem
-			Found.Push(Map("Path", A_LoopFileFullPath,
+			SplitPath OwnedChildPath, , , , &Stem
+			Found.Push(Map("Path", OwnedChildPath,
 				"Label", (Prefix == "" ? "" : Prefix . " / ") . Stem,
 				"PersonalSource", PersonalFileDescribe(Components)))
 		}
