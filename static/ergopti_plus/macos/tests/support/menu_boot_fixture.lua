@@ -240,6 +240,7 @@ function M.boot(opts)
 		set_on_pause_change = noop,
 		set_shortcut_action = function() return true end,
 		set_extras = noop,
+		set_wrap_pairs_getter = function(getter) fixture.wrap_pairs_getter = getter end,
 		set_chatgpt_url = noop,
 		list_shortcuts = function() return {} end,
 		pause_bindings = function() return true end,

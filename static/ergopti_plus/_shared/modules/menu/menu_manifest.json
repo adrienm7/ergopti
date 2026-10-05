@@ -1215,6 +1215,248 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_karabiner_off_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_karabiner_off",
+			"i18n": "menu.tapholds.karabiner_off_hint",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_guardian_approval_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_guardian_approval",
+			"i18n": "menu.tapholds.guardian_requires_approval",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "tap_hold_login_items_steps",
+			"i18n": "menu.tapholds.show_login_items_steps",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_guardian_unavailable_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_guardian_unavailable",
+			"i18n": "menu.tapholds.guardian_unavailable",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_login_items_open_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_login_items_open",
+			"i18n": "menu.tapholds.open_login_items",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_legacy_rules_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_legacy_rules_cleanup",
+			"i18n": "menu.tapholds.legacy_rules_pending",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_key_rows": [
+		{
+			"type": "include",
+			"section": "tap_hold_key_head"
+		},
+		{
+			"type": "include",
+			"section": "tap_hold_key_delay_tail"
+		}
+	],
+	"tap_hold_key_delay_tail": [
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "tap_hold_key_delay",
+			"i18n": "menu.tapholds.key_tap_delay",
+			"caption_getter": "tap_hold_key_delay_caption"
+		}
+	],
+	"tap_hold_key_delay_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_key_delay_set",
+			"i18n": "menu.tapholds.key_tap_delay_set"
+		},
+		{
+			"type": "check",
+			"id": "tap_hold_key_delay_use_global",
+			"i18n": "menu.tapholds.key_tap_delay_use_global",
+			"caption_getter": "tap_hold_key_global_delay_caption",
+			"checked_when": [
+				"tap_hold_key_delay_is_global"
+			],
+			"disabled_when": [
+				"tap_hold_key_delay_has_override"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"wrap_symbols_global_controls": [
+		{
+			"type": "command",
+			"id": "wrap_symbols_enable_all",
+			"i18n": "menu.shortcuts.wrap_symbols_check_all",
+			"disabled_when": [
+				"wrap_symbols_ready"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "wrap_symbols_disable_all",
+			"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
+			"disabled_when": [
+				"wrap_symbols_ready"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "wrap_symbols_restore",
+			"i18n": "common.restore_recommended",
+			"disabled_when": [
+				"wrap_symbols_ready"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"wrap_symbols_group_controls": [
+		{
+			"type": "command",
+			"id": "wrap_symbols_enable_group",
+			"i18n": "menu.shortcuts.wrap_symbols_check_all",
+			"disabled_when": [
+				"wrap_symbols_ready"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "wrap_symbols_disable_group",
+			"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
+			"disabled_when": [
+				"wrap_symbols_ready"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"wrap_symbols_custom_separator": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"wrap_symbols_custom_controls": [
+		{
+			"type": "command",
+			"id": "wrap_symbols_delete_custom",
+			"i18n": "button.delete",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"wrap_symbols_add_controls": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "wrap_symbols_add_custom",
+			"i18n": "menu.shortcuts.wrap_symbols_add_custom",
+			"disabled_when": [
+				"wrap_symbols_ready"
+			],
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"key_combinations_group": [
 		{
 			"type": "toggle",
@@ -2229,6 +2471,73 @@
 			"reason_key": "platform_reason.libinput_reader_is_linux_only"
 		}
 	],
+	"gesture_slot_mode_commands": [
+		{
+			"type": "check",
+			"id": "gesture_mode_single",
+			"i18n": "menu.gestures.mode_single",
+			"checked_when": [
+				"gesture_mode_is_single"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "check",
+			"id": "gesture_mode_incremental",
+			"i18n": "menu.gestures.mode_incremental",
+			"checked_when": [
+				"gesture_mode_is_incremental"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_sensitivity_head": [
+		{
+			"type": "section_header",
+			"id": "gesture_sensitivity_heading",
+			"i18n": "menu.gestures.sensitivity_label",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "label",
+			"id": "gesture_sensitivity_hint",
+			"i18n": "menu.gestures.sensitivity_hint",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_change_action": [
+		{
+			"type": "command",
+			"id": "gesture_slot_change_action",
+			"i18n": "menu.gestures.change_action",
+			"disabled_when": [
+				"gesture_slot_choice_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_holds_menu": [
 		{
 			"type": "toggle",
@@ -2579,6 +2888,65 @@
 					"i18n": "menu.layout.number_row_symbols"
 				}
 			]
+		}
+	],
+	"apps_empty_rows": [
+		{
+			"type": "label",
+			"id": "apps_empty",
+			"i18n": "menu.apps.no_apps",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_system_status_controls": [
+		{
+			"type": "command",
+			"id": "gesture_system_refresh",
+			"i18n": "ui_apps.btn_refresh",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_swipe_slot_menu": [
+		{
+			"type": "include",
+			"section": "gesture_change_action"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "gesture_mode_options",
+			"i18n": "menu.gestures.mode_current",
+			"caption_getter": "gesture_mode_current_label",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "gesture_sensitivity_options",
+			"i18n": "menu.gestures.sensitivity_current",
+			"caption_getter": "gesture_sensitivity_current_label",
+			"disabled_when": [
+				"gesture_mode_incremental_ready"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
 		}
 	]
 }

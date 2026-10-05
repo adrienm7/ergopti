@@ -601,3 +601,93 @@ TestGestures_AutoConfigureMarkerPreservesBooleanType() {
 }
 Test("Gestures: onboarding marker preserves TOML boolean type (AHK-102)",
     TestGestures_AutoConfigureMarkerPreservesBooleanType)
+
+
+; The actual cached provider must consume the shared fixed command declaration.
+; Its native registry refresh still runs only from the existing deferred timer.
+TestGestures_SharedSystemRefresh() {
+	global _SharedDir, GESTURE_SLOTS
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\gesture_system_refresh.json", "UTF-8"))
+	Root := _MR_GetManifestRoot()
+	Section := Corpus["section"]
+	Definition := Root[Section]
+	AssertEqual(1, Definition.Length, "one independently declared fixed control")
+	for Field, Expected in Corpus["rows"][1] {
+		if Expected is Array {
+			AssertEqual(Expected.Length, Definition[1][Field].Length, "exact platform count")
+			for Index, Platform in Expected
+				AssertEqual(Platform, Definition[1][Field][Index], "exact existing native platform")
+		} else
+			AssertEqual(Expected, Definition[1][Field], "independent field: " . Field)
+	}
+	ExpectedSlots := Corpus["cached_children"]["ahk"]
+	AssertEqual(GESTURE_SLOTS.Length + 1, ExpectedSlots.Length, "handwritten slot sequence includes only one trailing refresh")
+	for Index, Slot in GESTURE_SLOTS
+		AssertEqual(ExpectedSlots[Index], Slot, "cached native slot order")
+	State := GestureSystemState()
+	PreviousReady := State["ready"]
+	PreviousSlots := State["slots"]
+	Rendered := Menu()
+	try {
+		State["ready"] := false
+		Rows := GestureSystemRows()
+		AssertEqual(1, Rows.Length, "one cached system-status submenu")
+		Children := Rows[1]["items"]
+		AssertEqual(ExpectedSlots.Length, Children.Length, "all existing cached children precede the shared command")
+		AssertEqual(t("ui_apps.btn_refresh"), Children[Children.Length]["label"], "existing refresh translation")
+		AssertFalse(State["ready"], "building does not perform a registry read")
+		AssertEqual(Children.Length, _MR_RenderRows(Rendered, Children, "gesture_system_refresh_test", 1),
+			"actual native renderer consumes every cached child and command")
+		AssertEqual(Children.Length, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"actual Win32 menu has the same number of children")
+		Flags := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", Children.Length - 1, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && !(Flags & 0x3), "existing Refresh remains a clickable native command")
+		Children[Children.Length]["action"].Call()
+		Started := A_TickCount
+		while !State["ready"] && A_TickCount - Started < 2000
+			Sleep(10)
+		AssertTrue(State["ready"], "actual command schedules the original native complete-snapshot refresh")
+		for Slot in GESTURE_SLOTS
+			AssertTrue(State["slots"].Has(Slot), "actual timer publishes the full native snapshot: " . Slot)
+	} finally {
+		SetTimer(GestureSystemRefresh, 0)
+		State["ready"] := PreviousReady
+		State["slots"] := PreviousSlots
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+	}
+}
+Test("Gestures: shared system refresh consumes actual cached provider and native timer", TestGestures_SharedSystemRefresh)
+
+; Mutations prove declaration ownership, while restoring the exact original root.
+TestGestures_SharedSystemRefreshDeclaration() {
+	Root := _MR_GetManifestRoot()
+	Section := "gesture_system_status_controls"
+	Original := Root[Section]
+	Rendered := Menu()
+	try {
+		Changed := Original[1].Clone()
+		Changed["i18n"] := "menu.gestures.open_settings"
+		Root[Section] := [Map("type", "---", "platforms", ["ahk"], "unavailable", "hide"), Changed]
+		Rows := GestureSystemRows()
+		Children := Rows[1]["items"]
+		AssertTrue(Children[Children.Length - 1]["separator"], "actual provider follows declared separator order")
+		AssertEqual(t("menu.gestures.open_settings"), Children[Children.Length]["label"], "actual provider follows declared caption")
+		AssertEqual(Children.Length - 1, _MR_RenderRows(Rendered, Children, "gesture_system_order_test", 1),
+			"actual native renderer counts all labelled rows")
+		AssertEqual(Children.Length, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"actual native renderer retains the interior separator")
+		Changed["platforms"] := ["hs"]
+		Root[Section] := [Changed]
+		Hidden := GestureSystemRows()[1]["items"]
+		AssertEqual(Children.Length - 2, Hidden.Length, "platform hiding retains every existing cached Settings child")
+		Changed["platforms"] := ["ahk"]
+		Changed["id"] := "unknown_native_refresh_owner"
+		AssertEqual(0, GestureSystemRows().Length, "missing actual command refuses partial status publication")
+	} finally {
+		Root[Section] := Original
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+	}
+}
+Test("Gestures: actual system refresh provider follows declaration order caption and platform", TestGestures_SharedSystemRefreshDeclaration)

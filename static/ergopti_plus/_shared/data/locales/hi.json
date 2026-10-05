@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "Hold → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "इस कुंजी को थोड़ी / देर तक दबाने का विलंब, मिलीसेकंड में\n(वर्तमान: %d मिलीसेकंड)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -3213,5 +3214,7 @@
 	"menu.hotstrings.user_code.title": "प्रोग्राम योग्य पाठ शॉर्टकट",
 	"platform_reason.program_runner_unavailable": "अनुपलब्ध: मूल प्रोग्राम रनर या यह बाइंडिंग उपलब्ध नहीं है।",
 	"sg_actions.run_program": "▶️ प्रोग्राम चलाएँ [कॉन्फ़िगर करने योग्य]",
-	"menu.hotstrings.personal_metadata_unavailable": "यहाँ उपलब्ध नहीं है: इस फ़ील्ड को सीधे स्रोत फ़ाइल में संपादित करें।"
+	"menu.hotstrings.personal_metadata_unavailable": "यहाँ उपलब्ध नहीं है: इस फ़ील्ड को सीधे स्रोत फ़ाइल में संपादित करें।",
+	"menu.gestures.mode_current": "मोड: %s",
+	"menu.gestures.sensitivity_current": "संवेदनशीलता: %s"
 }

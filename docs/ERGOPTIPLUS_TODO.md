@@ -2867,6 +2867,11 @@ Windows known-feature fixtures use the current names declaration and
 retain strict publication generations, native restart timing and obsolete
 source preservation. Composed native Windows qualification remains open.
 
+Typed macOS section-order projection warns and preserves malformed rows
+and source-proven empty arrays, refusing requested replacement until
+explicit repair. Its optional native data namespace is declared in the
+shared manifest and schema without adding an enable flag or defaults.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -3352,6 +3357,11 @@ collected leaves through the semantic writer. Explicit retired physical
 section cleanup owns and verifies its exact backup source inside the
 existing transaction. Unsupported dotted, inline and table-array cleanup
 projections remain source work; final native acceptance is still required.
+
+Typed Wrap preferences and explicit cleanup share authenticated source
+kinds through native projection and conditional publication, including
+future custom-pair metadata. Native and installed acceptance remain
+separate requirements.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -4113,6 +4123,11 @@ blocked by those predecessors; Gesture mode has no complete test/generation
 qualification. Continue remaining families to the actual zero-site ratchet.
 These are implementation tasks; separate installed tray/input acceptance.
 
+The reviewed Wrap, Gesture and Tap-Hold fixed controls consume canonical
+shared templates, including translated captions and per-key duration
+prompts in all 21 locales. Dynamic native sensitivity choices and remaining
+fixed provider families remain implementation work.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4361,6 +4376,12 @@ and its independent reviews; no saved packet qualifies an integrated feature.
 Complete the source steps under item 54, then native E2E/package/install and
 real-device menu acceptance. Keep the Windows timing UI and macOS Wrap refusal
 fix as explicit code work rather than unsupported-platform exceptions.
+
+The owner-generated native-row ceiling is Windows83/macOS126/Linux93
+with 76 canonical menu sections. Each removed fixed site has actual native
+consumer and independent graph/order evidence. The eighteen numeric Swipe
+choices and remaining native providers are not claimed migrated; items
+54/81 and transverse16/38 remain open.
 
 - [~] **88.** AI prediction tooltip style (`llm-line-style`): the line rule
   is now `_shared/lua/tooltip/llm_line.lua`, read by macOS and Linux and

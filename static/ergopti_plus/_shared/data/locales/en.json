@@ -1664,6 +1664,7 @@
 	"menu.tapholds.hold_arrow": "Hold → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Tap / hold delay for this key, in milliseconds\n(current: %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -3213,5 +3214,7 @@
 	"menu.hotstrings.user_code.title": "Programmable hotstrings",
 	"platform_reason.program_runner_unavailable": "Unavailable: The native program runner or this binding is unavailable.",
 	"sg_actions.run_program": "▶️ Run a program [configurable]",
-	"menu.hotstrings.personal_metadata_unavailable": "Unavailable here: edit this field directly in the source file."
+	"menu.hotstrings.personal_metadata_unavailable": "Unavailable here: edit this field directly in the source file.",
+	"menu.gestures.mode_current": "Mode: %s",
+	"menu.gestures.sensitivity_current": "Sensitivity: %s"
 }

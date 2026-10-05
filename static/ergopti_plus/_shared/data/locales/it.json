@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "Hold → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Ritardo della pressione breve / prolungata di questo tasto, in millisecondi\n(attuale: %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -3213,5 +3214,7 @@
 	"menu.hotstrings.user_code.title": "Abbreviazioni programmabili",
 	"platform_reason.program_runner_unavailable": "Non disponibile: Il lanciatore nativo o questa associazione non è disponibile.",
 	"sg_actions.run_program": "▶️ Esegui un programma [configurabile]",
-	"menu.hotstrings.personal_metadata_unavailable": "Non disponibile qui: modifica questo campo direttamente nel file sorgente."
+	"menu.hotstrings.personal_metadata_unavailable": "Non disponibile qui: modifica questo campo direttamente nel file sorgente.",
+	"menu.gestures.mode_current": "Modalità: %s",
+	"menu.gestures.sensitivity_current": "Sensibilità: %s"
 }

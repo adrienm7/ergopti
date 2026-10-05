@@ -210,13 +210,13 @@ end
 
 --- Lists the unused keys of already-read content.
 --- @param source string Exact file content.
---- @param collect function `collect(decoded, mark)`: the driver's readers.
+--- @param collect function `collect(decoded, mark, shapes)`: the driver's readers; receipt is optional for old consumers.
 --- @return table scan `{ status = "ok"|"malformed", keys }`.
 function M.find_in_source(source, collect)
 	if type(collect) ~= "function" then
 		error("config_unused_keys: a collector of the driver's readers is required", 2)
 	end
-	local decoded_ok, decoded = pcall(TomlCodec.decode, source)
+	local decoded_ok, decoded, shapes = pcall(TomlCodec.decode_with_shapes, source)
 	if not decoded_ok or type(decoded) ~= "table" then
 		return { status = "malformed", keys = {} }
 	end
@@ -226,7 +226,7 @@ function M.find_in_source(source, collect)
 	local consumption = M.new_consumption()
 	-- An entry its owner reports as outdated is offered even when another
 	-- reader also reads it: warned and offered are one set.
-	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark) end)
+	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark, shapes) end)
 
 	local keys = {}
 	for _, record in ipairs(scan.records) do
@@ -371,7 +371,7 @@ function M.remove_from_source(source, keys)
 			touched[record.header] = true
 		elseif id and members[id] then
 			if decoded == nil then
-				local decoded_ok, value = pcall(TomlCodec.decode, source)
+				local decoded_ok, value = pcall(require("toml_codec.leaf_rows").decode_source, source)
 				if not decoded_ok or type(value) ~= "table" then return nil, "the source would not parse" end
 				decoded = value
 			end
@@ -385,7 +385,7 @@ function M.remove_from_source(source, keys)
 					local lead = text:sub(1, 3) == BOM and BOM or ""
 					local indent = text:sub(#lead + 1):match("^[ \t]*")
 					replaced[record.first] = {
-						text = lead .. indent .. record.key .. " = " .. TomlCodec.encode_value(reduced),
+						text = lead .. indent .. record.key .. " = " .. require("toml_codec.leaf_rows").value_literal(reduced),
 						eol = scan.lines[record.last].eol,
 					}
 				end
@@ -436,13 +436,7 @@ end
 --- @return table reduced
 --- @return number cut Members actually removed.
 function M.without_members(value, prefix, paths)
-	local function clone(node)
-		if type(node) ~= "table" then return node end
-		local copy = {}
-		for key, child in pairs(node) do copy[key] = clone(child) end
-		return copy
-	end
-	local reduced, cut = clone(value), 0
+	local reduced, cut = require("toml_codec.leaf_rows").clone_value(value), 0
 	for _, path in ipairs(paths) do
 		local parents, node = {}, reduced
 		for index = #prefix + 1, #path - 1 do

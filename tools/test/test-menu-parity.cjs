@@ -86,6 +86,21 @@ const SEPARATOR = '---';
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
 const OPENS_SUBMENU = {
+	apps_installed: {
+		menu: 'apps_empty_rows',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_apps.lua' }
+	},
+	system_gesture_status: {
+		menu: 'gesture_system_status_controls',
+		platforms: ['ahk', 'hs'],
+		kind: 'compose',
+		native_sources: {
+			ahk: 'windows/ui/gesture_conflicts.ahk',
+			hs: 'macos/ui/menu/menu_gestures.lua'
+		}
+	},
 	selection_operations: [
 		'selection_caps_word_control',
 		'selection_case_commands',
@@ -98,6 +113,54 @@ const OPENS_SUBMENU = {
 	configuration: 'configuration_menu',
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',
+	// Native wrap providers compose these fixed fragments into their existing picker.
+	wrap_symbols_menu: [
+		{
+			menu: 'wrap_symbols_global_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_group_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_custom_separator',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_custom_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		},
+		{
+			menu: 'wrap_symbols_add_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
+				hs: 'macos/ui/menu/menu_shortcuts.lua'
+			}
+		}
+	],
 	metrics: 'metrics_menu',
 	// Its native state branches compose readouts into the existing Metrics menu.
 	metrics_migration: ['metrics_migration_unavailable_rows', 'metrics_migration_idle_rows'].map(
@@ -127,10 +190,134 @@ const OPENS_SUBMENU = {
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
 	gestures: 'gestures_menu',
-	tap_holds: 'tap_holds_menu',
+	gesture_slots_2: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_slots_3: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_slots_4: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_slots_5: [
+		{
+			menu: 'gesture_swipe_slot_menu',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{ menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+		{
+			menu: 'gesture_sensitivity_head',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_change_action',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_mode_options: { menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+	gesture_sensitivity_options: {
+		menu: 'gesture_sensitivity_head',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+	},
+	tap_holds: [
+		'tap_holds_menu',
+		{
+			menu: 'tap_hold_karabiner_off_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_guardian_approval_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_guardian_unavailable_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_login_items_open_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_legacy_rules_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		}
+	],
 	// Both hand providers render this declared fixed command under every native key.
-	tap_hold_keys_left: 'tap_hold_key_head',
-	tap_hold_keys_right: 'tap_hold_key_head',
+	tap_hold_keys_left: 'tap_hold_key_rows',
+	tap_hold_keys_right: 'tap_hold_key_rows',
+	tap_hold_key_delay: 'tap_hold_key_delay_rows',
 	key_combinations: 'key_combinations_group',
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
@@ -310,8 +497,43 @@ function identityOf(row) {
  * @param {string} platform "ahk", "hs" or "linux".
  * @returns {object[]}
  */
-function project(menuKey, platform) {
-	return (manifest[menuKey] || []).filter((row) => visibleOn(row, platform));
+function project(menuKey, platform, visiting = new Set()) {
+	if (visiting.has(menuKey)) throw new Error(`cyclic menu include: ${menuKey}`);
+	if (!Array.isArray(manifest[menuKey])) throw new Error(`missing menu include: ${menuKey}`);
+	visiting.add(menuKey);
+	const rows = [];
+	for (const row of manifest[menuKey] || []) {
+		if (!visibleOn(row, platform)) continue;
+		if (row.type === 'include') rows.push(...project(row.section, platform, visiting));
+		else rows.push(row);
+	}
+	visiting.delete(menuKey);
+	return rows;
+}
+
+// Includes are transparent: hidden tails add no clickable row, while a
+// duplicated included command still has the same actionable identity.
+{
+	const assert = require('node:assert/strict');
+	const root = manifest.tap_hold_key_rows;
+	assert.equal(project('tap_hold_key_rows', 'ahk').length, 5);
+	assert.equal(project('tap_hold_key_rows', 'hs').length, 6);
+	assert.equal(project('tap_hold_key_rows', 'linux').length, 5);
+	const original = root.slice();
+	try {
+		root.push({ type: 'include', section: 'tap_hold_key_head' });
+		const identities = actionable('tap_hold_key_rows', 'ahk').map(identityOf);
+		assert(
+			identities.length > new Set(identities).size,
+			'nested duplicate commands remain detectable'
+		);
+		root.splice(0, root.length, { type: 'include', section: 'tap_hold_key_rows' });
+		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /cyclic menu include/);
+		root.splice(0, root.length, { type: 'include', section: 'absent_child_template' });
+		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /missing menu include/);
+	} finally {
+		root.splice(0, root.length, ...original);
+	}
 }
 
 /**
@@ -321,7 +543,9 @@ function project(menuKey, platform) {
  * @returns {object[]}
  */
 function actionable(menuKey, platform) {
-	return project(menuKey, platform).filter((row) => !isSeparator(row) && row.type !== 'label');
+	return project(menuKey, platform).filter(
+		(row) => !isSeparator(row) && !['label', 'section_header'].includes(row.type)
+	);
 }
 
 // ==================================================
@@ -345,7 +569,7 @@ function isComposedFragment(rows, kinds) {
 		if (row.type === SEPARATOR)
 			return Object.keys(row).every((key) => ['type', 'platforms', 'unavailable'].includes(key));
 		return (
-			row.type === 'label' &&
+			['label', 'section_header'].includes(row.type) &&
 			typeof row.id === 'string' &&
 			row.id !== '' &&
 			typeof row.i18n === 'string' &&
@@ -357,36 +581,20 @@ function isComposedFragment(rows, kinds) {
 	});
 }
 
-/** Credits executable template calls, never a comment, string or declaration. */
-function publishesTemplate(source, extension, section) {
-	const tokens = scriptTokens(source, extension);
-	return tokens.some((token, i) => {
-		if (token.kind !== 'identifier' || tokens[i - 1]?.value === 'function') return false;
-		const method =
-			extension === '.lua' &&
-			token.value === 'template_rows' &&
-			tokens[i - 1]?.value === '.' &&
-			tokens[i - 2]?.value === 'ManifestMenu' &&
-			!['function', '.', ':'].includes(tokens[i - 3]?.value);
-		const native =
-			extension === '.ahk' &&
-			token.value === 'MenuRenderer_TemplateRows' &&
-			!['.', ':'].includes(tokens[i - 1]?.value);
-		return (
-			(method || native) &&
-			tokens[i + 1]?.value === '(' &&
-			tokens[i + 2]?.kind === 'string' &&
-			tokens[i + 2]?.value === section &&
-			[',', ')'].includes(tokens[i + 3]?.value)
-		);
-	});
-}
+const { publishesMenuTemplate: publishesTemplate } = require('../lib/menu-shared-delegation.cjs');
 
 // An inert readout is admissible only through composition. A clicked parent,
 // including one sharing the same target, still owes a usable child on that OS.
 const readout = { type: 'label', id: 'readout', i18n: 'menu.metrics.status' };
 const separator = { type: SEPARATOR };
-for (const rows of [[readout], [separator], [readout, separator]]) {
+const header = { type: 'section_header', id: 'readout_header', i18n: 'menu.metrics.status' };
+for (const rows of [
+	[readout],
+	[separator],
+	[readout, separator],
+	[header],
+	[header, readout, separator]
+]) {
 	if (!isComposedFragment(rows, new Set(['compose'])))
 		throw new Error('Rejected a declared composed readout.');
 	for (const kinds of [new Set(), new Set(['submenu']), new Set(['compose', 'submenu'])]) {
@@ -400,6 +608,10 @@ for (const rows of [
 	[{ ...readout, i18n: '' }],
 	[{ type: 'check', id: 'readout', i18n: 'menu.metrics.status' }],
 	[{ ...separator, id: 'command' }],
+	[{ ...header, children: [] }],
+	[{ ...header, callback: 'invoke' }],
+	[{ ...header, caption_getter: 'read' }],
+	[{ ...header, id: '' }],
 	[readout, { type: 'section_header', i18n: 'menu.metrics.status' }]
 ]) {
 	if (isComposedFragment(rows, new Set(['compose'])))
@@ -452,7 +664,11 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 				const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
 				const kind = row.type === 'include' || opened.kind === 'compose' ? 'compose' : 'submenu';
 				const effective = PLATFORMS.filter(
-					(p) => visibleOn(row, p) && parentVisibility.includes(p) && only.includes(p)
+					(p) =>
+						visibleOn(row, p) &&
+						parentVisibility.includes(p) &&
+						only.includes(p) &&
+						(row.type !== 'include' || project(target, p).length > 0)
 				);
 				for (const platform of effective) {
 					if (!reachedByKinds[target]) reachedByKinds[target] = {};

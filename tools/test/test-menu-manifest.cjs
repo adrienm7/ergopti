@@ -297,6 +297,95 @@ function checkChoiceProjection() {
 		assert.equal(result.status, 0, result.stderr);
 		let menu = JSON.parse(fs.readFileSync(output, 'utf8'));
 		const acknowledgedTemplates = fs.readFileSync(output);
+		const legacyHeaders = [
+			'shortcuts_menu',
+			'metrics_menu',
+			'layout_menu',
+			'hotstrings_menu',
+			'tap_holds_menu'
+		].flatMap((key) => {
+			const rows = menu[key];
+			return Array.isArray(rows) ? rows.filter((row) => row.type === 'section_header') : [];
+		});
+		assert.equal(legacyHeaders.length, 12, 'all existing id-less headers survive compilation');
+		assert(
+			legacyHeaders.every((row) => !Object.hasOwn(row, 'id')),
+			'the header primitive cannot impose identities on existing records'
+		);
+		const headerSource =
+			'\n[[menu.fixture_header_template]]\ntype = "section_header"\ni18n = "menu.metrics.privacy_header"\n';
+		for (const fields of [
+			'',
+			'id = "named_header"\n',
+			'platforms = ["hs"]\nreason_key = "platform_reason.layout_bundle_and_menubar_are_macos"\n',
+			'platforms = ["hs"]\nunavailable = "grey"\nreason_key = "platform_reason.layout_bundle_and_menubar_are_macos"\n'
+		]) {
+			result = execute(original + headerSource + fields);
+			assert.equal(result.status, 0, result.stderr);
+			const declared = JSON.parse(fs.readFileSync(output, 'utf8')).fixture_header_template;
+			assert.equal(declared.length, 1, 'actual compiler projects one inert header');
+			assert.equal(declared[0].type, 'section_header');
+			assert.equal(declared[0].i18n, 'menu.metrics.privacy_header');
+			assert.equal(
+				Object.hasOwn(declared[0], 'command'),
+				false,
+				'compiler invents no native callback'
+			);
+		}
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			fs.readFileSync(output),
+			acknowledgedTemplates,
+			'positive fixture compilation preserves the original artifact after restoration'
+		);
+		for (const [name, fields, caption, reason] of [
+			['empty id', 'id = ""', 'menu.metrics.privacy_header', /section header needs/],
+			['numeric id', 'id = 7', 'menu.metrics.privacy_header', /section header needs/],
+			['empty caption', '', '', /section header needs/],
+			[
+				'empty unavailable',
+				'platforms = ["hs"]\nunavailable = ""',
+				'menu.metrics.privacy_header',
+				/unavailable must/
+			],
+			[
+				'grey header without reason',
+				'platforms = ["hs"]\nunavailable = "grey"',
+				'menu.metrics.privacy_header',
+				/greyed row needs/
+			],
+			['empty reason', 'reason_key = ""', 'menu.metrics.privacy_header', /section header needs/],
+			['numeric reason', 'reason_key = 7', 'menu.metrics.privacy_header', /section header needs/],
+			...[
+				'command',
+				'caption_getter',
+				'checked_when',
+				'disabled_when',
+				'disabled',
+				'action',
+				'items',
+				'foreign_field',
+				'I18N'
+			].map((field) => [
+				field,
+				`${field} = "unowned"`,
+				'menu.metrics.privacy_header',
+				/section header needs/
+			])
+		]) {
+			const source =
+				original + headerSource.replace('menu.metrics.privacy_header', caption) + fields + '\n';
+			result = execute(source);
+			assert.notEqual(result.status, 0, name + ': actual compiler refuses invalid header metadata');
+			assert.match(result.stderr, reason, name + ': header refusal is classified');
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedTemplates,
+				name + ': refusal cannot publish a partial artifact'
+			);
+		}
+
 		for (const [name, source, reason] of [
 			[
 				'missing include',
@@ -325,12 +414,28 @@ function checkChoiceProjection() {
 			[
 				'empty caption getter',
 				original.replace('caption_getter = "tap_hold_key_tap_caption"', 'caption_getter = ""'),
-				/caption_getter needs a labelled command or group/
+				/caption_getter needs a labelled command, check or group/
 			],
 			[
 				'numeric caption getter',
 				original.replace('caption_getter = "tap_hold_key_tap_caption"', 'caption_getter = 42'),
-				/caption_getter needs a labelled command or group/
+				/caption_getter needs a labelled command, check or group/
+			],
+			[
+				'empty checkbox caption getter',
+				original.replace(
+					'caption_getter = "tap_hold_key_global_delay_caption"',
+					'caption_getter = ""'
+				),
+				/caption_getter needs a labelled command, check or group/
+			],
+			[
+				'numeric checkbox caption getter',
+				original.replace(
+					'caption_getter = "tap_hold_key_global_delay_caption"',
+					'caption_getter = 42'
+				),
+				/caption_getter needs a labelled command, check or group/
 			],
 			[
 				'unsupported caption row',
@@ -338,7 +443,7 @@ function checkChoiceProjection() {
 					'[[menu.tap_hold_key_head]]\ntype = "command"',
 					'[[menu.tap_hold_key_head]]\ntype = "list"'
 				),
-				/caption_getter needs a labelled command or group/
+				/caption_getter needs a labelled command, check or group/
 			]
 		]) {
 			assert.notEqual(source, original, name + ': mutation targets a real declaration');
@@ -1913,8 +2018,16 @@ checkPrivacyTriggerControls();
 	assert.deepEqual(manifest[head.section], head.rows, 'independent full child-template order');
 	function assertWiring(source, consumer, nativeId, tapId, holdId, section, target) {
 		assert(
-			source.includes(consumer + '("' + section + '"'),
-			'actual provider consumes the declared template'
+			source.includes(consumer + '("tap_hold_key_rows"'),
+			'actual provider consumes the declared complete template'
+		);
+		assert.deepEqual(
+			target.tap_hold_key_rows,
+			[
+				{ type: 'include', section },
+				{ type: 'include', section: 'tap_hold_key_delay_tail' }
+			],
+			'complete root includes unchanged head before the delay tail'
 		);
 		assert.equal(target[section][0].type, 'include', 'head begins with a real declared include');
 		assert.equal(
@@ -1977,7 +2090,7 @@ checkPrivacyTriggerControls();
 		assert.throws(
 			() =>
 				assertWiring(
-					source.replace(consumer, 'WrongProvider'),
+					source.replaceAll(consumer, 'WrongProvider'),
 					consumer,
 					nativeId,
 					tapId,
@@ -1990,7 +2103,7 @@ checkPrivacyTriggerControls();
 		assert.throws(
 			() =>
 				assertWiring(
-					source.replace('"' + head.section + '"', '"wrong_template"'),
+					source.replace('"tap_hold_key_rows"', '"wrong_template"'),
 					consumer,
 					nativeId,
 					tapId,
@@ -2000,6 +2113,21 @@ checkPrivacyTriggerControls();
 				),
 			/actual provider/
 		);
+		for (const mutate of [
+			(target) => {
+				target.tap_hold_key_rows[0].section = 'wrong_head';
+			},
+			(target) => {
+				target.tap_hold_key_rows.reverse();
+			}
+		]) {
+			const wrongRoot = structuredClone(manifest);
+			mutate(wrongRoot);
+			assert.throws(
+				() => assertWiring(source, consumer, nativeId, tapId, holdId, head.section, wrongRoot),
+				/complete root/
+			);
+		}
 		const broken = structuredClone(manifest);
 		broken[head.section][0].section = 'wrong_head';
 		assert.throws(
@@ -2140,4 +2268,1181 @@ checkPrivacyTriggerControls();
 	console.log(
 		'Metrics migration labels: independent inert declarations, 21 translations and actual state-provider wiring.'
 	);
+}
+
+// Independent Mac swipe modes: presentation is shared, native mutation remains
+// the current per-slot owner. Never substitute source presence for actual edge wiring.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_slot_modes.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const expected = corpus.rows.map(({ value, ...row }) => row);
+	assert.deepEqual(
+		corpus.rows.map((row) => row.value),
+		['x1', 'incremental']
+	);
+	assert.deepEqual(declared[corpus.section], expected);
+	assert.deepEqual(generated[corpus.section], expected);
+	assert.deepEqual(corpus.platform_rows, {
+		ahk: [],
+		hs: ['gesture_mode_single', 'gesture_mode_incremental'],
+		linux: []
+	});
+	assert.deepEqual(corpus.states, [
+		{ mode: 'x1', checked: [true, false] },
+		{ mode: 'incremental', checked: [false, true] },
+		{ mode: 'future_mode', checked: [false, false] }
+	]);
+	const sourcePath = resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua');
+	const source = readFileSync(sourcePath, 'utf8');
+	const graph = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	function modeGraph(source) {
+		const start = source.indexOf('const OPENS_SUBMENU = {');
+		const end = source.indexOf('\n};', start);
+		assert(start >= 0 && end > start, 'actual graph registry is bounded');
+		return require('node:vm').runInNewContext(
+			source.slice(start, end + 3) + '; OPENS_SUBMENU',
+			{},
+			{ timeout: 1000 }
+		);
+	}
+	function assertModeWiring(owner, edges) {
+		const registry = modeGraph(edges);
+		assert.match(
+			owner,
+			/if slot:match\("swipe"\) then\s+modeSubmenu = ManifestMenu\.template_rows\("gesture_slot_mode_commands"/,
+			'actual swipe template'
+		);
+		for (const [id, value] of [
+			['gesture_mode_single', 'x1'],
+			['gesture_mode_incremental', 'incremental']
+		]) {
+			assert.ok(owner.includes('["' + id + '"] = function()'), 'literal mode owner');
+			assert.ok(
+				owner.includes(
+					'commit_gesture_row_value("get_mode", "set_mode", slot, "' + value + '", "mode")'
+				),
+				'actual mutation owner'
+			);
+		}
+		for (const [id, value] of [
+			['gesture_mode_is_single', 'x1'],
+			['gesture_mode_is_incremental', 'incremental']
+		])
+			assert.ok(
+				owner.includes('["' + id + '"] = function() return currentMode == "' + value + '" end'),
+				'literal checked getter'
+			);
+		const tokens = require('../lib/script-source.cjs').scriptTokens(owner, '.lua');
+		assert.ok(
+			tokens.some((_, i) =>
+				['[', 'gesture_mode_options', ']', '=', 'modeSubmenu'].every(
+					(v, n) => tokens[i + n]?.value === v
+				)
+			),
+			'actual rendered child'
+		);
+		for (const finger of [2, 3, 4, 5]) {
+			assert.ok(
+				owner.includes('["gesture_slots_' + finger + '"] = slots_provider(' + finger + ')'),
+				'actual slot provider'
+			);
+			const entries = registry['gesture_slots_' + finger];
+			const declared = Array.isArray(entries) ? entries : [entries];
+			assert.ok(
+				declared.some(
+					(entry) =>
+						entry &&
+						(typeof entry === 'string'
+							? entry === 'gesture_slot_mode_commands'
+							: entry.menu === 'gesture_slot_mode_commands' &&
+								entry.kind !== 'compose' &&
+								(!entry.platforms || entry.platforms.includes('hs')))
+				),
+				'actual provider edge'
+			);
+		}
+	}
+	assertModeWiring(source, graph);
+	for (const name of [
+		corpus.section,
+		'gesture_mode_single',
+		'gesture_mode_incremental',
+		'gesture_mode_is_single',
+		'gesture_mode_is_incremental',
+		'gesture_slots_2'
+	])
+		assert.throws(() =>
+			assertModeWiring(source.replaceAll('"' + name + '"', '"wrong_binding"'), graph)
+		);
+	assert.throws(() =>
+		assertModeWiring(
+			source.replace('["gesture_mode_options"] = modeSubmenu', '["gesture_mode_options"] = {}'),
+			graph
+		)
+	);
+	for (const finger of [2, 3, 4, 5])
+		assert.throws(() =>
+			assertModeWiring(source, graph.replace('gesture_slots_' + finger + ':', 'wrong_edge:'))
+		);
+	assert.throws(
+		() =>
+			assertModeWiring(
+				source,
+				graph.replaceAll(
+					"menu: 'gesture_slot_mode_commands', platforms: ['hs']",
+					"menu: 'gesture_slot_mode_commands', platforms: ['ahk']"
+				)
+			),
+		/actual provider edge/
+	);
+	assert.throws(
+		() =>
+			assertModeWiring(
+				source,
+				graph.replaceAll(
+					"menu: 'gesture_slot_mode_commands', platforms: ['hs']",
+					"menu: 'gesture_slot_mode_commands', platforms: ['hs'], kind: 'compose'"
+				)
+			),
+		/actual provider edge/
+	);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const code of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		assert.deepEqual(
+			expected.map((row) => strings[row.i18n]),
+			corpus.captions[code]
+		);
+	}
+	for (const relative of ['_shared/lua/menu/renderer.lua', 'windows/infra/manifest_menu.ahk']) {
+		const renderer = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', relative), 'utf8');
+		assert.match(
+			renderer,
+			relative.endsWith('.lua')
+				? /elseif item\.type == "check" then\s+row = R\.check_row\(key, item\.id, commands, getters\)/
+				: /else if ItemType == "check" \{\s+Row := MenuRenderer_CheckRow\(ManifestKey, Id, Commands, StateGetters\)/
+		);
+	}
+	console.log(
+		'Gesture modes: independent shared order/captions/platforms and actual native owner wiring.'
+	);
+}
+
+// Complete per-key delay metadata: independent declarations and actual owners.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/tap_hold_key_delay.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(manifest[corpus.complete_section], corpus.complete);
+	assert.deepEqual(manifest[corpus.tail_section], corpus.tail);
+	assert.deepEqual(manifest[corpus.children_section], corpus.children);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	for (const code of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const row of [...corpus.tail, ...corpus.children]) {
+			if (!row.i18n) continue;
+			assert.equal(typeof strings[row.i18n], 'string', code + ': ' + row.i18n);
+			assert.notEqual(strings[row.i18n], row.i18n, 'caption resolves to a translation');
+			if (row.caption_getter)
+				assert.equal(
+					(strings[row.i18n].match(/%s/g) || []).length,
+					1,
+					'one native value placeholder'
+				);
+		}
+	}
+	for (const [file, start, end, required] of [
+		[
+			'macos/ui/menu/menu_tap_holds.lua',
+			'local function build_one_tap_hold_item(',
+			'--- Builds the tap / hold rows of one hand',
+			[
+				'tap_hold_key_delay_set',
+				'tap_hold_key_delay_use_global',
+				'tap_hold_key_delay',
+				'tap_hold_key_delay_is_global',
+				'tap_hold_key_delay_has_override',
+				'tap_hold_key_delay_caption',
+				'tap_hold_key_global_delay_caption'
+			]
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'local function hand_rows(hand)',
+			'local providers = {',
+			['tap_hold_key_delay_set', 'tap_hold_key_delay', 'tap_hold_key_delay_caption']
+		]
+	]) {
+		const text = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		const begin = text.indexOf(start),
+			finish = text.indexOf(end, begin);
+		assert(begin >= 0 && finish > begin);
+		const source = text.slice(begin, finish);
+		function wiring(candidate) {
+			assert(
+				candidate.includes('ManifestMenu.template_rows("tap_hold_key_rows"'),
+				'actual complete provider'
+			);
+			assert(
+				candidate.includes('ManifestMenu.template_rows("tap_hold_key_delay_rows"'),
+				'actual declared delay children'
+			);
+			for (const id of required)
+				assert(
+					new RegExp('\\["' + id + '"\\]\\s*=\\s*(?:function|delay_rows)').test(candidate),
+					'actual delay binding: ' + id
+				);
+		}
+		wiring(source);
+		for (const id of ['tap_hold_key_rows', 'tap_hold_key_delay_rows', ...required])
+			assert.throws(() => wiring(source.replaceAll('"' + id + '"', '"missing_owner"')), /actual/);
+		for (const key of [
+			'menu.tapholds.key_tap_delay',
+			'menu.tapholds.key_tap_delay_set',
+			'menu.tapholds.key_tap_delay_use_global'
+		])
+			assert(!source.includes('"' + key + '"'), 'native providers retire caption metadata: ' + key);
+	}
+	const windows = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_taphold.ahk'),
+		'utf8'
+	);
+	assert(windows.includes('MenuRenderer_TemplateRows("tap_hold_key_rows"'));
+	for (const binding of [
+		'tap_hold_key_delay_rows',
+		'tap_hold_key_delay_set',
+		'tap_hold_key_delay',
+		'tap_hold_key_delay_caption'
+	])
+		assert(
+			windows.includes('"' + binding + '"'),
+			'Windows binds a genuine per-key timing owner: ' + binding
+		);
+	assert(
+		windows.includes('_TH_MakeDelayPickerFn(KeyId)'),
+		'Windows captures the physical key for its real prompt'
+	);
+	assert(
+		windows.includes('WriteTapHoldDuration(KeyId, Ms / 1000, 0, 0, 0, 0, SourceWitness)'),
+		'Windows persists through the existing native transaction owner'
+	);
+	console.log(
+		'Tap-Hold per-key delay: independent platform/state metadata, existing keys resolved in 21 locales and actual native owners.'
+	);
+}
+
+// Independent fixed wrap controls must reach the actual native providers.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/wrap_symbol_controls.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const section of corpus.sections) {
+		const expected = section.rows.map((row) => {
+			const declared = { type: row.separator ? '---' : 'command' };
+			if (row.id) Object.assign(declared, { id: row.id, i18n: row.i18n });
+			if (row.disabled_when) declared.disabled_when = row.disabled_when;
+			return { ...declared, platforms: corpus.platforms, unavailable: 'hide' };
+		});
+		assert.deepEqual(
+			menu[section.section],
+			expected,
+			'handwritten complete fixed control section: ' + section.section
+		);
+	}
+	const catalogue = JSON.parse(
+		readFileSync(resolve(SHARED, 'modules/wrap_symbols/wrap_symbols.json'), 'utf8')
+	);
+	assert.deepEqual(
+		catalogue.groups.map((group) => ({
+			i18n: group.i18n,
+			lefts: group.pairs.map((pair) => pair.left)
+		})),
+		corpus.catalogue_groups
+	);
+	const localeOrder = JSON.parse(
+		readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')
+	).order;
+	assert.deepEqual(
+		[...localeOrder].sort(),
+		[...corpus.locales].sort(),
+		'all 21 published locale identities'
+	);
+	for (const locale of corpus.locales) {
+		const strings = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8').replace(/^\uFEFF/, '')
+		);
+		for (const section of corpus.sections)
+			for (const row of section.rows)
+				if (row.i18n) {
+					assert.equal(typeof strings[row.i18n], 'string', locale + ': fixed wrap caption');
+					assert.notEqual(strings[row.i18n], '');
+					assert.notEqual(strings[row.i18n], row.i18n);
+				}
+	}
+	const sources = {
+		windows: readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk'),
+			'utf8'
+		),
+		macos: readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua'),
+			'utf8'
+		)
+	};
+	const helper = readFileSync(resolve(SHARED, 'lua/menu/wrap_mutation.lua'), 'utf8');
+	function tokens(source, extension = '.lua') {
+		return scriptTokens(source, extension).map((token) => token.kind + ':' + token.value);
+	}
+	function hasCode(source, snippet, extension = '.lua') {
+		const code = tokens(source, extension),
+			required = tokens(snippet, extension);
+		return code.some((_, at) => required.every((token, offset) => code[at + offset] === token));
+	}
+	function assertWrapMutation(candidate) {
+		for (const [snippet, purpose] of [
+			[
+				'local FIELDS = { "wrap_symbol_states", "custom_wrap_symbols" }',
+				'exact two-field ownership'
+			],
+			['function M.commit(state, mutate, save)', 'actual shared mutation owner'],
+			['if claims[state] then return false,', 'same-state reentrancy refusal'],
+			['claims[state] = { view = clone(prior) }', 'acknowledged pending input view'],
+			['local called, changed = pcall(mutate, candidate)', 'detached candidate transformation'],
+			['if not called or changed ~= true then', 'exact transform acknowledgement'],
+			['if rawget(state, field) ~= prior[field] then', 'construction successor refusal'],
+			['local saved, acknowledged = pcall(save)', 'existing native save authority'],
+			['if not saved or acknowledged ~= true then', 'native exact save receipt remains'],
+			[
+				'if rawget(state, field) == candidate[field] then rawset(state, field, prior[field]) end',
+				'conditional owned inverse'
+			],
+			[
+				'if rawget(state, field) ~= candidate[field] then owned = false end',
+				'publication successor refusal'
+			],
+			['function M.view(state)', 'actual input view owner'],
+			['return claim and claim.view or state', 'input retains acknowledged state'],
+			['function M.pending(state)', 'actual readiness owner'],
+			['return claims[state] ~= nil', 'pending claim predicate']
+		])
+			assert.ok(hasCode(candidate, snippet), purpose);
+	}
+	function assertWrapProvider(source, platform, mutationSource = helper) {
+		const begin =
+			platform === 'windows'
+				? source.indexOf('_WS_BuildSymbolRows() {')
+				: source.indexOf('local function build_wrap_symbols_submenu(');
+		const end =
+			platform === 'windows'
+				? source.indexOf('; Native callbacks capture payloads with Bind', begin)
+				: source.indexOf('\n\treturn sub\nend', begin);
+		assert.ok(begin >= 0 && end > begin, 'actual wrap provider body is bounded');
+		const body = source.slice(begin, end);
+		const api = platform === 'windows' ? 'MenuRenderer_TemplateRows' : 'ManifestMenu.template_rows';
+		for (const section of corpus.sections)
+			assert.ok(
+				body.includes(api + '("' + section.section + '"'),
+				'actual provider consumes each shared section: ' + section.section
+			);
+		for (const section of corpus.sections)
+			assert.ok(
+				hasCode(body, api + '("' + section.section + '"', platform === 'windows' ? '.ahk' : '.lua'),
+				'live provider consumes each shared section: ' + section.section
+			);
+		for (const section of corpus.sections)
+			for (const row of section.rows)
+				if (row.id) {
+					const binding = platform === 'windows' ? '"' + row.id + '",' : '["' + row.id + '"] =';
+					assert.ok(body.includes(binding), 'literal native command binding: ' + row.id);
+				}
+		if (platform === 'windows') {
+			assert.ok(
+				body.includes('Map("wrap_symbols_ready", (*) => true)'),
+				'existing native eligibility reader'
+			);
+			assert.ok(
+				body.includes('_WS_ControlSetGroup.Bind(GroupLefts, true)'),
+				'bound group enable payload'
+			);
+			assert.ok(
+				body.includes('_WS_ControlSetGroup.Bind(GroupLefts, false)'),
+				'bound group disable payload'
+			);
+			assert.ok(body.includes('_WS_ControlRemoveCustom.Bind(Idx)'), 'bound custom index payload');
+		} else {
+			assert.ok(
+				hasCode(
+					body,
+					'wrap_symbols_ready = function() return not paused and not WrapMutation.pending(state) end'
+				),
+				'existing native pause eligibility'
+			);
+			assert.ok(
+				body.includes('items = del_sub'),
+				'actual canonical custom child reaches the shared renderer'
+			);
+			assert.ok(
+				hasCode(
+					body,
+					'local committed, reason = WrapMutation.commit(state, mutate, ctx.save_prefs)'
+				),
+				'native exact save receipt remains'
+			);
+			assert.ok(
+				hasCode(source, 'local WrapMutation = require("menu.wrap_mutation")'),
+				'actual shared mutation dependency'
+			);
+			assert.ok(
+				hasCode(body, 'if committed ~= true then'),
+				'native callback refuses failed shared publication'
+			);
+			assert.ok(
+				hasCode(body, 'local view = WrapMutation.view(state)'),
+				'live native getter uses acknowledged input'
+			);
+			const call = tokens('return mutate_wrap(function(candidate)');
+			const code = tokens(body);
+			const count = code.filter((_, at) =>
+				call.every((value, offset) => code[at + offset] === value)
+			).length;
+			assert.equal(count, 8, 'all eight actual Wrap callback sites retain detached mutation');
+			assertWrapMutation(mutationSource);
+		}
+	}
+	for (const [platform, source] of Object.entries(sources)) {
+		assertWrapProvider(source, platform);
+		assert.throws(
+			() =>
+				assertWrapProvider(
+					source.replace('"wrap_symbols_global_controls"', '"wrap_symbols_add_controls"'),
+					platform
+				),
+			/consumes each shared section/
+		);
+		assert.throws(
+			() =>
+				assertWrapProvider(
+					source.replace('"wrap_symbols_enable_group"', '"unowned_wrap_group"'),
+					platform
+				),
+			/literal native command binding/
+		);
+	}
+	assert.throws(
+		() =>
+			assertWrapProvider(
+				sources.windows.replace(
+					'_WS_ControlSetGroup.Bind(GroupLefts, true)',
+					'_WS_ControlRemoveCustom.Bind(GroupLefts, true)'
+				),
+				'windows'
+			),
+		/bound group enable payload/
+	);
+	assert.throws(
+		() => assertWrapProvider(sources.macos.replace('items = del_sub', 'menu = del_sub'), 'macos'),
+		/canonical custom child/
+	);
+	for (const [before, after, reason] of [
+		[
+			'WrapMutation.commit(state, mutate, ctx.save_prefs)',
+			'OtherOwner.commit(state, mutate, ctx.save_prefs)',
+			/native exact save/
+		],
+		['WrapMutation.pending(state)', 'OtherOwner.pending(state)', /pause eligibility/],
+		['WrapMutation.view(state)', 'OtherOwner.view(state)', /acknowledged input/],
+		[
+			'return mutate_wrap(function(candidate)',
+			'return other_mutation(function(candidate)',
+			/eight actual Wrap/
+		]
+	])
+		assert.throws(() => assertWrapProvider(sources.macos.replace(before, after), 'macos'), reason);
+	for (const [before, after, reason] of [
+		['acknowledged ~= true', 'not acknowledged', /native exact save/],
+		[
+			'rawset(state, field, prior[field])',
+			'rawset(state, field, candidate[field])',
+			/owned inverse/
+		],
+		['if claims[state] then return false,', 'if false then return false,', /reentrancy refusal/],
+		['return claim and claim.view or state', 'return state', /acknowledged state/]
+	]) {
+		const malformed = helper.replace(before, after);
+		assert.notEqual(malformed, helper, 'real helper mutation was applied');
+		assert.throws(() => assertWrapMutation(malformed), reason);
+		assert.throws(
+			() => assertWrapMutation(malformed + '\n-- ' + before + '\nlocal fake = [[' + before + ']]'),
+			reason,
+			'comment or quoted source cannot manufacture a live shared owner'
+		);
+	}
+	console.log(
+		'Wrap controls: independent complete sections, 21 existing translations, actual provider graph and native payload bindings.'
+	);
+}
+
+// Append to tools/test/test-menu-manifest.cjs after actual root publication.
+// This complementary guard credits real tokens; native owner cases remain the oracle.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_slot_controls.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	for (const [section, rows] of Object.entries(corpus.sections)) {
+		assert.deepEqual(declared[section], rows, 'handwritten controls source: ' + section);
+		assert.deepEqual(generated[section], rows, 'actual generated controls: ' + section);
+	}
+	assert.deepEqual(
+		corpus.sensitivity_values,
+		[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30]
+	);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.caption_snapshots).sort(), [...locales].sort());
+	for (const code of locales) {
+		const actual = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const [key, expected] of Object.entries(corpus.caption_snapshots[code]))
+			assert.equal(actual[key], expected, code + ': unchanged existing caption ' + key);
+	}
+	const owner = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua'),
+		'utf8'
+	);
+	function hasTemplate(tokens, section) {
+		return tokens.some(
+			(token, i) =>
+				token.kind === 'identifier' &&
+				token.value === 'ManifestMenu' &&
+				tokens[i + 1]?.value === '.' &&
+				tokens[i + 2]?.value === 'template_rows' &&
+				tokens[i + 3]?.value === '(' &&
+				tokens[i + 4]?.kind === 'string' &&
+				tokens[i + 4]?.value === section &&
+				[',', ')'].includes(tokens[i + 5]?.value)
+		);
+	}
+	function hasBinding(tokens, id) {
+		return tokens.some(
+			(token, i) =>
+				token.value === '[' &&
+				tokens[i + 1]?.kind === 'string' &&
+				tokens[i + 1]?.value === id &&
+				tokens[i + 2]?.value === ']' &&
+				tokens[i + 3]?.value === '=' &&
+				tokens[i + 4]?.kind === 'identifier' &&
+				tokens[i + 4]?.value === 'function'
+		);
+	}
+	function assertControlWiring(candidate) {
+		const tokens = scriptTokens(candidate, '.lua');
+		for (const section of ['gesture_sensitivity_head', 'gesture_change_action'])
+			assert.ok(hasTemplate(tokens, section), 'actual controls template call: ' + section);
+		for (const id of ['gesture_slot_change_action', 'gesture_slot_choice_ready'])
+			assert.ok(hasBinding(tokens, id), 'actual native controls binding: ' + id);
+		assert.match(candidate, /table\.insert\(sensSubmenu,/, 'native numeric payload retained');
+		assert.ok(
+			tokens.some((_, i) =>
+				['[', 'gesture_sensitivity_options', ']', '=', 'sensSubmenu'].every(
+					(v, n) => tokens[i + n]?.value === v
+				)
+			),
+			'actual rendered sensitivity child'
+		);
+		assert.ok(hasTemplate(tokens, 'gesture_swipe_slot_menu'), 'actual swipe command payload');
+		assert.match(candidate, /items\s*=\s*swipeSubmenu/, 'actual full swipe materialization');
+		assert.match(candidate, /items\s*=\s*change_action_rows/, 'actual tap command payload');
+		for (const finger of [2, 3, 4, 5])
+			assert.ok(
+				candidate.includes('["gesture_slots_' + finger + '"] = slots_provider(' + finger + ')'),
+				'real native slot provider: ' + finger
+			);
+	}
+	assertControlWiring(owner);
+	for (const name of [
+		'gesture_sensitivity_head',
+		'gesture_change_action',
+		'gesture_slot_change_action',
+		'gesture_slot_choice_ready',
+		'gesture_slots_2'
+	])
+		assert.throws(() => assertControlWiring(owner.replaceAll('"' + name + '"', '"wrong_owner"')));
+	for (const section of ['gesture_sensitivity_head', 'gesture_change_action']) {
+		const renamed = owner.replaceAll('"' + section + '"', '"wrong_template"');
+		assert.throws(() =>
+			assertControlWiring(renamed + '\n-- ManifestMenu.template_rows("' + section + '")')
+		);
+		assert.throws(() =>
+			assertControlWiring(
+				renamed + '\nlocal decorative = [[ManifestMenu.template_rows("' + section + '")]]'
+			)
+		);
+	}
+	assert.throws(() =>
+		assertControlWiring(
+			owner.replace(
+				'["gesture_sensitivity_options"] = sensSubmenu',
+				'["gesture_sensitivity_options"] = {}'
+			)
+		)
+	);
+	assert.throws(() =>
+		assertControlWiring(owner.replace('items    = change_action_rows', 'items    = {}'))
+	);
+	console.log(
+		'Gesture controls: independently declared heading/choice, 21 existing captions and actual tokenized native owners.'
+	);
+}
+
+// Mac-only fixed Tap-Hold guidance delegates native status/actions unchanged.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/tap_hold_guidance.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [section, expected] of Object.entries(corpus.declarations))
+		assert.deepEqual(manifest[section], expected, 'handwritten guidance descriptor: ' + section);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua'),
+		'utf8'
+	);
+	function tokens(text) {
+		return scriptTokens(text, '.lua').map((token) => token.kind + ':' + token.value);
+	}
+	function contains(haystack, needle) {
+		return haystack.some((_, index) =>
+			needle.every((value, offset) => haystack[index + offset] === value)
+		);
+	}
+	function wiring(candidate) {
+		const code = tokens(candidate);
+		for (const section of Object.keys(corpus.declarations))
+			assert(
+				contains(code, [
+					'identifier:ManifestMenu',
+					'symbol:.',
+					'identifier:template_rows',
+					'symbol:(',
+					'string:' + section,
+					'symbol:,'
+				]),
+				'actual guidance template call: ' + section
+			);
+		for (const [id, owner] of [
+			['tap_hold_login_items_steps', 'login_items_steps_command'],
+			['tap_hold_login_items_open', 'function'],
+			['tap_hold_legacy_rules_cleanup', 'function']
+		])
+			assert(
+				contains(code, ['symbol:[', 'string:' + id, 'symbol:]', 'symbol:=', 'identifier:' + owner]),
+				'actual guidance native binding: ' + id
+			);
+	}
+	wiring(source);
+	for (const section of Object.keys(corpus.declarations)) {
+		const call = 'ManifestMenu.template_rows("' + section + '",';
+		for (const replacement of [
+			'WrongOwner.template_rows("' + section + '",',
+			'ManifestMenu.template_rows("unowned_guidance",'
+		])
+			assert.throws(() => wiring(source.replace(call, replacement)), /actual guidance template/);
+		const missing = source.replace(call, 'WrongOwner.template_rows("' + section + '",');
+		assert.throws(
+			() => wiring(missing + '\n-- ' + call + '\nlocal fake = [[' + call + ']]'),
+			/actual guidance template/,
+			'comment/quoted code cannot fake consumption'
+		);
+	}
+	for (const id of [
+		'tap_hold_login_items_steps',
+		'tap_hold_login_items_open',
+		'tap_hold_legacy_rules_cleanup'
+	])
+		assert.throws(
+			() => wiring(source.replaceAll('"' + id + '"', '"unowned_guidance"')),
+			/actual guidance native binding/
+		);
+	for (const [section, rows] of Object.entries(corpus.declarations))
+		for (const row of rows)
+			assert(
+				!source.includes('"' + row.i18n + '"'),
+				'fixed native caption retired: ' + section + '/' + row.id
+			);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	for (const code of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const rows of Object.values(corpus.declarations))
+			for (const row of rows) {
+				assert.equal(typeof strings[row.i18n], 'string');
+				assert(
+					strings[row.i18n].trim().length > 0 && strings[row.i18n] !== row.i18n,
+					code + ': translated caption'
+				);
+			}
+	}
+	console.log(
+		'Tap-Hold guidance: exact independent declarations, 21 existing translations and genuine native template/callback bindings.'
+	);
+}
+
+// The Apps provider consumes one inert shared caption; dynamic bundles stay native.
+{
+	const assertAppsEmpty = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const appsEmptyCorpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menu/apps_empty_caption.json'), 'utf8')
+	);
+	const appsEmptyManifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assertAppsEmpty.deepEqual(appsEmptyManifest[appsEmptyCorpus.section], [appsEmptyCorpus.row]);
+	assertAppsEmpty.deepEqual(appsEmptyCorpus.row, {
+		type: 'label',
+		id: 'apps_empty',
+		i18n: 'menu.apps.no_apps',
+		platforms: ['hs'],
+		unavailable: 'hide'
+	});
+	assertAppsEmpty.equal(Object.keys(appsEmptyCorpus.captions).length, 21);
+	for (const [locale, expected] of Object.entries(appsEmptyCorpus.captions)) {
+		const catalogue = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assertAppsEmpty.equal(
+			catalogue['menu.apps.no_apps'],
+			expected,
+			locale + ' independent Apps caption'
+		);
+	}
+	const appsEmptyNative = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_apps.lua'),
+		'utf8'
+	);
+	function appsEmptyOwns(source) {
+		const tokens = scriptTokens(source, '.lua').map((token) => ({
+			kind: token.kind,
+			value: token.value
+		}));
+		const has = (fragment) => {
+			const expected = scriptTokens(fragment, '.lua').map((token) => ({
+				kind: token.kind,
+				value: token.value
+			}));
+			return tokens.some((_, index) =>
+				expected.every(
+					(token, offset) =>
+						tokens[index + offset]?.kind === token.kind &&
+						tokens[index + offset]?.value === token.value
+				)
+			);
+		};
+		return (
+			has('local ManifestMenu = require("infra.manifest_menu")') &&
+			has(
+				'if #rows == 0 then rows = ManifestMenu.template_rows("apps_empty_rows") if not rows then return nil end end'
+			) &&
+			has(
+				'ManifestMenu.build("apps_menu", "Apps", nil, nil, ctx, { ["apps_installed"] = function() return rows end, })'
+			)
+		);
+	}
+	assertAppsEmpty.ok(
+		appsEmptyOwns(appsEmptyNative),
+		'actual shared binding, empty template and provider edge'
+	);
+	const appsEmptyNeedle = 'ManifestMenu.template_rows("apps_empty_rows")';
+	assertAppsEmpty.ok(appsEmptyNative.includes(appsEmptyNeedle), 'bounded causal mutation preimage');
+	for (const mutation of [
+		'ManifestMenu.template_rows("wrong_section")',
+		'Foreign.template_rows("apps_empty_rows")',
+		'{}'
+	]) {
+		assertAppsEmpty.equal(appsEmptyOwns(appsEmptyNative.replace(appsEmptyNeedle, mutation)), false);
+	}
+	const appsEmptyRemoved = appsEmptyNative.replace(appsEmptyNeedle, '{}');
+	assertAppsEmpty.equal(
+		appsEmptyOwns(appsEmptyRemoved + '\n-- ' + appsEmptyNeedle),
+		false,
+		'comment cannot satisfy ownership'
+	);
+	assertAppsEmpty.equal(
+		appsEmptyOwns(appsEmptyRemoved + "\nlocal inert = '" + appsEmptyNeedle + "'"),
+		false,
+		'quoted source cannot satisfy ownership'
+	);
+}
+
+// Append after root publishes the canonical record. Native owner tests remain
+// the behavior oracle; these tokens refuse comments, strings and wrong bindings.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_system_refresh.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const source = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	assert.deepEqual(source[corpus.section], corpus.rows, 'independent refresh source declaration');
+	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated refresh declaration');
+	assert.deepEqual(corpus.platform_rows, {
+		ahk: ['gesture_system_refresh'],
+		hs: ['gesture_system_refresh'],
+		linux: []
+	});
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const locale of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assert.equal(
+			strings['ui_apps.btn_refresh'],
+			corpus.captions[locale],
+			'unchanged existing refresh caption: ' + locale
+		);
+	}
+	function hasSequence(tokens, sequence) {
+		return tokens.some((_, index) =>
+			sequence.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	}
+	function assertRefreshWiring(owner, extension) {
+		const tokens = scriptTokens(owner, extension);
+		if (extension === '.lua') {
+			assert.ok(
+				hasSequence(tokens, ['ManifestMenu', '.', 'template_rows', '(', corpus.section, ',', '{'])
+			);
+			assert.ok(
+				hasSequence(tokens, ['[', 'gesture_system_refresh', ']', '=', 'function', '(', ')'])
+			);
+			assert.ok(
+				hasSequence(tokens, [
+					'return',
+					'gestures',
+					'.',
+					'refresh_system_gestures',
+					'(',
+					'ctx',
+					'.',
+					'updateMenu',
+					')'
+				])
+			);
+			assert.ok(
+				hasSequence(tokens, ['for', '_', ',', 'row', 'in', 'ipairs', '(', 'controls', ')'])
+			);
+			assert.ok(hasSequence(tokens, ['items', '=', 'rows']));
+		} else {
+			assert.ok(
+				hasSequence(tokens, [
+					'MenuRenderer_TemplateRows',
+					'(',
+					corpus.section,
+					',',
+					'Map',
+					'(',
+					'gesture_system_refresh',
+					',',
+					'GestureSystemRequestRefresh',
+					')'
+				])
+			);
+			assert.ok(hasSequence(tokens, ['for', 'Row', 'in', 'Controls']));
+			assert.ok(hasSequence(tokens, ['Children', '.', 'Push', '(', 'Row', ')']));
+			assert.ok(hasSequence(tokens, ['SetTimer', '(', 'GestureSystemRefresh', ',', '-', '1', ')']));
+		}
+	}
+	for (const [extension, nativePath] of [
+		['.lua', 'macos/ui/menu/menu_gestures.lua'],
+		['.ahk', 'windows/ui/gesture_conflicts.ahk']
+	]) {
+		const owner = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', nativePath), 'utf8');
+		assertRefreshWiring(owner, extension);
+		for (const id of [corpus.section, 'gesture_system_refresh'])
+			assert.throws(() =>
+				assertRefreshWiring(owner.replaceAll('"' + id + '"', '"unowned_refresh"'), extension)
+			);
+		const changed =
+			extension === '.lua'
+				? owner.replaceAll('gestures.refresh_system_gestures', 'gestures.unowned_refresh')
+				: owner.replaceAll('GestureSystemRequestRefresh)', 'UnownedRefresh)');
+		assert.throws(() => assertRefreshWiring(changed, extension));
+		const comment = extension === '.lua' ? '-- ' : '; ';
+		const erased = owner.replaceAll('"' + corpus.section + '"', '"unowned_refresh"');
+		const call =
+			extension === '.lua'
+				? `ManifestMenu.template_rows("${corpus.section}", {})`
+				: `MenuRenderer_TemplateRows("${corpus.section}", Map(), Map(), Map())`;
+		assert.throws(() => assertRefreshWiring(erased + '\n' + comment + call, extension));
+		assert.throws(() => assertRefreshWiring(erased + '\n' + JSON.stringify(call), extension));
+	}
+}
+
+// Complementary exact records and actual consumer/import wiring after root publication.
+// Replace only the older controls guard's obsolete ipairs(change_action_rows)
+// swipe assertion with this stronger whole-template/import/payload contract;
+// retain its original tap, numeric value, callback/getter and all locale assertions.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	assert.deepEqual(declared[corpus.section], corpus.rows, 'handwritten complete swipe source');
+	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated swipe template');
+	assert.deepEqual(corpus.child_sections, {
+		gesture_mode_options: 'gesture_slot_mode_commands',
+		gesture_sensitivity_options: 'gesture_sensitivity_head'
+	});
+	assert.deepEqual(corpus.platform_rows, {
+		ahk: [],
+		hs: [
+			'gesture_slot_change_action',
+			'separator',
+			'gesture_mode_options',
+			'gesture_sensitivity_options'
+		],
+		linux: []
+	});
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const locale of locales) {
+		const actual = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assert.equal(
+			actual['menu.gestures.mode_current'],
+			actual['menu.gestures.mode_prefix'] + '%s',
+			'exact existing translated mode prefix: ' + locale
+		);
+		assert.equal(
+			actual['menu.gestures.sensitivity_current'],
+			actual['menu.gestures.sensitivity_prefix'] + '%s',
+			'exact existing translated sensitivity prefix: ' + locale
+		);
+		assert.equal(
+			corpus.captions[locale].mode_x1,
+			actual['menu.gestures.mode_prefix'] + actual['menu.gestures.mode_single']
+		);
+		assert.equal(
+			corpus.captions[locale].mode_incremental,
+			actual['menu.gestures.mode_prefix'] + actual['menu.gestures.mode_incremental']
+		);
+		assert.equal(
+			corpus.captions[locale].sensitivity_3_5,
+			actual['menu.gestures.sensitivity_prefix'] + '3.5'
+		);
+	}
+	const owner = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua'),
+		'utf8'
+	);
+	function hasSequence(tokens, sequence) {
+		return tokens.some((_, index) =>
+			sequence.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	}
+	function assertSwipeWiring(source, records) {
+		assert.deepEqual(
+			records[0],
+			{ type: 'include', section: 'gesture_change_action' },
+			'real import of unchanged command declaration'
+		);
+		const tokens = scriptTokens(source, '.lua');
+		assert.ok(
+			hasSequence(tokens, [
+				'ManifestMenu',
+				'.',
+				'template_rows',
+				'(',
+				corpus.section,
+				',',
+				'slot_commands',
+				',',
+				'slot_getters',
+				',',
+				'{'
+			])
+		);
+		for (const [id, payload] of [
+			['gesture_mode_options', 'modeSubmenu'],
+			['gesture_sensitivity_options', 'sensSubmenu']
+		])
+			assert.ok(
+				hasSequence(tokens, ['[', id, ']', '=', payload]),
+				'actual native child payload: ' + id
+			);
+		for (const id of [
+			'gesture_slot_change_action',
+			'gesture_slot_choice_ready',
+			'gesture_mode_current_label',
+			'gesture_sensitivity_current_label',
+			'gesture_mode_incremental_ready'
+		])
+			assert.ok(
+				hasSequence(tokens, ['[', id, ']', '=', 'function', '(', ')']),
+				'actual native callback/getter: ' + id
+			);
+		assert.ok(
+			hasSequence(tokens, [
+				'ManifestMenu',
+				'.',
+				'template_rows',
+				'(',
+				'gesture_change_action',
+				',',
+				'slot_commands',
+				',',
+				'slot_getters',
+				')'
+			]),
+			'actual tap child retains existing command path'
+		);
+		assert.ok(
+			hasSequence(tokens, ['items', '=', 'swipeSubmenu']),
+			'actual whole swipe child materialization'
+		);
+		assert.ok(
+			hasSequence(tokens, ['items', '=', 'change_action_rows']),
+			'actual tap child materialization'
+		);
+		for (const section of Object.values(corpus.child_sections))
+			assert.ok(
+				hasSequence(tokens, ['ManifestMenu', '.', 'template_rows', '(', section]),
+				'actual unchanged native child declaration: ' + section
+			);
+	}
+	assertSwipeWiring(owner, declared[corpus.section]);
+	for (const id of [
+		corpus.section,
+		'gesture_mode_options',
+		'gesture_sensitivity_options',
+		'gesture_mode_current_label',
+		'gesture_sensitivity_current_label',
+		'gesture_mode_incremental_ready'
+	])
+		assert.throws(() =>
+			assertSwipeWiring(
+				owner.replaceAll('"' + id + '"', '"unowned_swipe"'),
+				declared[corpus.section]
+			)
+		);
+	const wrongImport = structuredClone(declared[corpus.section]);
+	wrongImport[0].section = 'gesture_slot_mode_commands';
+	assert.throws(() => assertSwipeWiring(owner, wrongImport));
+	const erased = owner.replaceAll('"' + corpus.section + '"', '"unowned_swipe"');
+	const falseCall =
+		'ManifestMenu.template_rows("' + corpus.section + '", slot_commands, slot_getters, {})';
+	assert.throws(() => assertSwipeWiring(erased + '\n-- ' + falseCall, declared[corpus.section]));
+	assert.throws(() =>
+		assertSwipeWiring(erased + '\n' + JSON.stringify(falseCall), declared[corpus.section])
+	);
+}
+
+// Shared full-slot composition is separate from genuine clickable mode payloads.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'), 'utf8')
+	);
+	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu[corpus.section];
+	function assertSwipeRecords(actual) {
+		assert.deepEqual(actual, corpus.rows, 'exact independently handwritten full-slot declaration');
+	}
+	assertSwipeRecords(records);
+	for (const changed of [
+		(rows) => {
+			rows[2].i18n = 'menu.gestures.sensitivity_current';
+		},
+		(rows) => {
+			rows[3].caption_getter = 'gesture_mode_current_label';
+		},
+		(rows) => {
+			rows[2].id = 'gesture_sensitivity_options';
+		},
+		(rows) => {
+			rows[3].disabled_when = ['gesture_slot_choice_ready'];
+		},
+		(rows) => {
+			rows[1].platforms = ['linux'];
+		}
+	]) {
+		const wrong = structuredClone(records);
+		changed(wrong);
+		assert.throws(() => assertSwipeRecords(wrong));
+	}
+	const source = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = source.indexOf('const OPENS_SUBMENU = {');
+	const end = source.indexOf('\n};', start);
+	assert(start >= 0 && end > start, 'bounded actual graph registry');
+	const graph = require('node:vm').runInNewContext(
+		source.slice(start, end + 3) + '; OPENS_SUBMENU',
+		{},
+		{ timeout: 1000 }
+	);
+	function assertSwipeGraph(actual) {
+		for (const finger of [2, 3, 4, 5]) {
+			const entries = actual['gesture_slots_' + finger];
+			assert(Array.isArray(entries));
+			const edge = entries.find((e) => e && e.menu === corpus.section);
+			assert(edge, 'actual full-slot edge');
+			assert.equal(edge.kind, 'compose');
+			assert.equal(edge.platforms.length, 1);
+			assert.equal(edge.platforms[0], 'hs');
+			assert.equal(edge.native_sources?.hs, 'macos/ui/menu/menu_gestures.lua');
+		}
+		const mode = actual.gesture_mode_options;
+		assert.equal(mode.menu, 'gesture_slot_mode_commands');
+		assert.notEqual(mode.kind, 'compose');
+		assert.equal(mode.platforms.length, 1);
+		assert.equal(mode.platforms[0], 'hs');
+		const sens = actual.gesture_sensitivity_options;
+		assert.equal(sens.menu, 'gesture_sensitivity_head');
+		assert.equal(sens.kind, 'compose');
+		assert.equal(sens.platforms.length, 1);
+		assert.equal(sens.platforms[0], 'hs');
+		assert.equal(sens.native_sources?.hs, 'macos/ui/menu/menu_gestures.lua');
+	}
+	assertSwipeGraph(graph);
+	for (const changed of [
+		(g) => {
+			g.gesture_slots_2.find((e) => e?.menu === corpus.section).menu = 'gesture_change_action';
+		},
+		(g) => {
+			g.gesture_slots_3.find((e) => e?.menu === corpus.section).native_sources.hs =
+				'macos/ui/menu/menu_shortcuts.lua';
+		},
+		(g) => {
+			g.gesture_slots_4.find((e) => e?.menu === corpus.section).platforms = ['linux'];
+		},
+		(g) => {
+			g.gesture_slots_5.find((e) => e?.menu === corpus.section).kind = 'clicked';
+		},
+		(g) => {
+			g.gesture_mode_options.kind = 'compose';
+		},
+		(g) => {
+			g.gesture_sensitivity_options.kind = 'clicked';
+		},
+		(g) => {
+			g.gesture_mode_options.menu = 'gesture_sensitivity_head';
+		}
+	]) {
+		const wrong = structuredClone(graph);
+		changed(wrong);
+		assert.throws(() => assertSwipeGraph(wrong));
+	}
 }

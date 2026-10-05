@@ -1647,6 +1647,7 @@
 	"menu.tapholds.hold_arrow": "Hold → %s",
 	"menu.tapholds.key_tap_delay": "Tap delay: %s",
 	"menu.tapholds.key_tap_delay_dialog_prompt": "Tap / hold delay for this key, in milliseconds\n(global: %d ms)",
+	"menu.tapholds.key_tap_delay_dialog_prompt_current": "Forsinkelse for kort / langt trykk på denne tasten i millisekunder\n(gjeldende: %d ms)",
 	"menu.tapholds.key_tap_delay_dialog_title": "Per-key tap delay",
 	"menu.tapholds.key_tap_delay_set": "Set a custom delay…",
 	"menu.tapholds.key_tap_delay_use_global": "Use global delay (%s)",
@@ -3213,5 +3214,7 @@
 	"menu.hotstrings.user_code.title": "Programmerbare tekstsnarveier",
 	"platform_reason.program_runner_unavailable": "Utilgjengelig: Den innebygde programstarteren eller denne tilordningen er utilgjengelig.",
 	"sg_actions.run_program": "▶️ Kjør et program [konfigurerbart]",
-	"menu.hotstrings.personal_metadata_unavailable": "Ikke tilgjengelig her: rediger dette feltet direkte i kildefilen."
+	"menu.hotstrings.personal_metadata_unavailable": "Ikke tilgjengelig her: rediger dette feltet direkte i kildefilen.",
+	"menu.gestures.mode_current": "Modus: %s",
+	"menu.gestures.sensitivity_current": "Følsomhet: %s"
 }

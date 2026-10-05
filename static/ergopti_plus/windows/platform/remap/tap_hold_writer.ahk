@@ -15,9 +15,9 @@
 ;    tuples — the user composes the pair themselves.
 ; 2. Single source of truth for key order, hold options, and i18n keys —
 ;    all defined here and consumed by the tray-menu builder.
-; 3. Preserves per-key ``time_activation_seconds`` already in TapHold —
-;    the tray menu does not expose this, but hand-editing tap_hold.toml is
-;    supported and survives writes.
+; 3. The per-key delay picker uses one typed physical TOML leaf owner inside
+;    the existing transaction. Existing Boolean spelling, future records and
+;    comments remain user data; hand-edited thresholds also survive writes.
 ; 4. The layer comes with its key: an absent layers.toml binds no key, so the
 ;    first-run wizard's import of a key whose recommended hold enters the
 ;    navigation layer, and the Tap-Holds « Restore recommended values », also
@@ -342,6 +342,36 @@ WriteTapHoldTap(KeyId, ActionId, WriterFn := 0, ReplaceFn := 0,
 		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
 }
 
+/**
+ * Persists a known physical key's threshold through the existing transaction owner.
+ * @param {String} KeyId Shared physical-key identifier.
+ * @param {Number} Seconds Positive finite threshold within the runtime limit.
+ * @returns {Integer|Boolean} Strict1 after publication, or false after refusal.
+ */
+WriteTapHoldDuration(KeyId, Seconds, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0, ExpectedSource := 0) {
+	global ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldDuration(KeyId, Seconds, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn, ExpectedSource)
+		finally Critical(InheritedCritical)
+	}
+	if !(KeyId is String) || !_TH_DurationValueValid(Seconds) {
+		try LoggerError("TapHoldWriter", "Refusing an invalid tap-hold duration update.")
+		return false
+	}
+	if !_TH_DurationKeyKnown(KeyId) {
+		try LoggerError("TapHoldWriter", "Refusing duration for unknown physical key '{1}'.", KeyId)
+		return false
+	}
+	return _TH_CommitTapHoldMutation("duration",
+		_TH_BuildDurationCandidate.Bind(KeyId, Seconds),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn,
+		_TH_BuildDurationContent.Bind(KeyId, Seconds, ExpectedSource, ConfigurationFile))
+}
+
 ; Apply a new hold option for a key directly to TapHold + tap_hold.toml.
 ; ``HoldOpt`` is one entry from ``_TH_HoldOptions``.
 WriteTapHoldHold(KeyId, HoldOpt, WriterFn := 0, ReplaceFn := 0,
@@ -460,6 +490,223 @@ _TH_BuildTapCandidate(KeyId, ActionId, Candidate) {
 	return 1
 }
 
+_TH_DurationValueValid(Seconds) {
+	global TAPHOLD_MAX_ACTIVATION_SECONDS
+	if !((Seconds is Integer) || (Seconds is Float))
+		return false
+	if Seconds is Float {
+		try {
+			if !DllCall("msvcrt\_finite", "double", Seconds, "cdecl int")
+				return false
+		} catch {
+			return false
+		}
+	}
+	return Seconds > 0 && Seconds <= TAPHOLD_MAX_ACTIVATION_SECONDS
+}
+
+_TH_DurationKeyKnown(KeyId) {
+	if !(KeyId is String)
+		return false
+	for KeyDef in TapHoldKeyDefs() {
+		if KeyDef["id"] == KeyId
+			return true
+	}
+	return false
+}
+
+; A duration edit owns one semantic leaf. Its physical source remains authority
+; for every other record, including Boolean spelling and future namespaces.
+_TH_CaptureDurationSource(Path) {
+	Present := FileExist(Path) ? 1 : 0
+	Source := Present ? FSReadUtf8Exact(Path) : ""
+	if !(Source is String)
+		return false
+	return Map("path", Path, "source_present", Present, "source_content", Source)
+}
+
+_TH_DurationSourceValid(Source, Path) {
+	return (Source is Map) && Source.Has("path") && (Source["path"] is String)
+		&& Source["path"] == Path && Source.Has("source_present")
+		&& (Source["source_present"] is Integer)
+		&& (Source["source_present"] == 0 || Source["source_present"] == 1)
+		&& Source.Has("source_content") && (Source["source_content"] is String)
+}
+
+_TH_DurationSourceMatches(Source, Path) {
+	return _TH_DurationSourceValid(Source, Path)
+		&& (!Source.Has("key") || _TH_DurationContextMatches(Source))
+		&& _TOML_WriteSourceMatches(Path, Source["source_present"], Source["source_content"])
+		&& (!Source.Has("key") || _TH_DurationContextMatches(Source))
+}
+
+_TH_CaptureDurationContext(Source, KeyId) {
+	global TapHold, ConfigurationFile
+	if !(Source is Map) || !(TapHold is Map)
+		return false
+	Desired := MasterGateDesiredTapHold(TapHold)
+	if !(Desired is Map) || !Desired.Has("keys") || !(Desired["keys"] is Map)
+		return false
+	Keys := Desired["keys"]
+	Entry := Keys.Get(KeyId, 0)
+	if Keys.Has(KeyId) && !(Entry is Map)
+		return false
+	Source["master_path"] := ConfigurationFile
+	Source["state"] := TapHold
+	Source["desired"] := Desired
+	Source["keys"] := Keys
+	Source["key"] := KeyId
+	Source["entry"] := Entry
+	Source["entry_snapshot"] := _TH_CloneData(Entry)
+	return Source
+}
+
+_TH_DurationContextMatches(Source) {
+	global TapHold, ConfigurationFile
+	try {
+		if !(ConfigurationFile == Source["master_path"])
+			return false
+		if !(TapHold is Map) || ObjPtr(TapHold) != ObjPtr(Source["state"])
+			return false
+		Desired := MasterGateDesiredTapHold(TapHold)
+		if !(Desired is Map) || ObjPtr(Desired) != ObjPtr(Source["desired"])
+				|| !Desired.Has("keys") || !(Desired["keys"] is Map)
+				|| ObjPtr(Desired["keys"]) != ObjPtr(Source["keys"])
+			return false
+		Entry := Desired["keys"].Get(Source["key"], 0)
+		if Source["entry"] is Map {
+			return (Entry is Map) && ObjPtr(Entry) == ObjPtr(Source["entry"])
+				&& TOML_SameValue(Entry, Source["entry_snapshot"])
+		}
+		return !Desired["keys"].Has(Source["key"])
+	} catch {
+		return false
+	}
+}
+
+; Called only while the existing commit owns the master and physical target.
+_TH_BuildDurationContent(KeyId, Seconds, ExpectedSource, ExpectedMasterPath, Path, Data) {
+	global ConfigurationFile
+	if !(ConfigurationFile == ExpectedMasterPath)
+		return false
+	if ExpectedSource is Map {
+		if !ExpectedSource.Has("key") || !(ExpectedSource["key"] == KeyId)
+				|| !_TH_DurationSourceMatches(ExpectedSource, Path)
+			return false
+		Source := ExpectedSource.Clone()
+		Source["receipt_target"] := ExpectedSource
+	} else {
+		if !(ExpectedSource is Integer) || ExpectedSource != 0
+			return false
+		Source := _TH_CaptureDurationContext(Map("path", Path), KeyId)
+		Physical := _TH_CaptureDurationSource(Path)
+		if !(Source is Map) || !(Physical is Map)
+			return false
+		Source["source_present"] := Physical["source_present"]
+		Source["source_content"] := Physical["source_content"]
+	}
+	if !(ConfigurationFile == ExpectedMasterPath)
+		return false
+	if !_TH_DurationSourceValid(Source, Path)
+		return false
+	if Source["source_present"] {
+		Source["content"] := _TH_DurationLeafImage(Source["source_content"], KeyId, Seconds)
+	} else {
+		; There is no physical file to retain. Preserve every modeled key so a
+		; first write cannot discard its taps/holds when the loader restarts.
+		Source["content"] := _TH_DurationInitialImage(Data)
+	}
+	return Source
+}
+
+_TH_DurationInitialImage(Data) {
+	if !(Data is Map) || !Data.Has("keys") || !(Data["keys"] is Map)
+		throw ValueError("Duration persistence needs a complete detached keys model")
+	Kinds := TapHoldFieldKinds()
+	InheritDefaults := Data.Get("inherit_defaults", false)
+	if !(InheritDefaults is Integer) || (InheritDefaults != 0 && InheritDefaults != 1)
+		throw ValueError("The inheritance flag needs strict Boolean intent")
+	Content := Chr(0xFEFF) . "[tap_hold]`n"
+	Content .= "inherit_defaults = " . TOML_RenderValue(TOML_Bool(InheritDefaults)) . "`n"
+	for KeyId, Entry in Data["keys"] {
+		if !(KeyId is String) || !(Entry is Map)
+			throw ValueError("Duration persistence cannot serialize an invalid key model")
+		Content .= "`n[tap_hold.keys." . TOML_RenderKey(KeyId) . "]`n"
+		for Field, Value in Entry {
+			if !(Field is String)
+				throw ValueError("Duration persistence cannot serialize a non-string field")
+			if Kinds.Get(Field, "") == "boolean" {
+				if !(Value is Integer) || (Value != 0 && Value != 1)
+					throw ValueError("A known Boolean field needs strict Boolean intent")
+				Value := TOML_Bool(Value)
+			}
+			Content .= TOML_RenderKey(Field) . " = " . TOML_RenderValue(Value) . "`n"
+		}
+	}
+	TOML_ParseDocument(Content)
+	return Content
+}
+
+_TH_DurationLeafImage(Source, KeyId, Seconds) {
+	Section := "tap_hold.keys." . TOML_RenderKey(KeyId)
+	Admitted := TOML_BuildConfigDocumentCandidate(Source,
+		[{ Section: Section, Key: "time_activation_seconds", Value: Seconds }], [])
+	if !(Admitted is Map) || !Admitted.Has("content") || !(Admitted["content"] is String)
+		throw ValueError("The semantic TOML owner refused the duration image")
+	return Admitted["content"]
+}
+
+_TH_DurationWasPublished(KeyId, Seconds) {
+	global TapHold
+	try {
+		Desired := MasterGateDesiredTapHold(TapHold)
+		return (TapHold is Map) && (Desired is Map) && Desired.Has("keys")
+			&& (Desired["keys"] is Map) && Desired["keys"].Has(KeyId)
+			&& (Desired["keys"][KeyId] is Map)
+			&& Desired["keys"][KeyId].Has("time_activation_seconds")
+			&& _TH_DurationValueValid(Desired["keys"][KeyId]["time_activation_seconds"])
+			&& Desired["keys"][KeyId]["time_activation_seconds"] == Seconds
+	} catch {
+		return false
+	}
+}
+
+_TH_DurationReceiptMatches(Source, Path, KeyId, Seconds, PhysicalMatchFn := 0) {
+	try {
+		if !((PhysicalMatchFn is Integer) && PhysicalMatchFn == 0)
+				&& !HasMethod(PhysicalMatchFn, "Call")
+			return false
+		if !(Source is Map) || !Source.Has("key") || !(Source["key"] == KeyId)
+				|| !Source.Has("path") || !(Source["path"] == Path)
+				|| !Source.Has("published_context") || !(Source["published_context"] is Map)
+			return false
+		Receipt := Source["published_context"]
+		if !_TH_DurationSourceValid(Receipt, Path) || !(Receipt["key"] == KeyId)
+				|| !_TH_DurationContextMatches(Receipt) || !_TH_DurationWasPublished(KeyId, Seconds)
+				|| !Receipt.Has("physical") || !(Receipt["physical"] is Integer)
+				|| (Receipt["physical"] != 0 && Receipt["physical"] != 1)
+			return false
+		if Receipt["physical"] {
+			PhysicalMatched := HasMethod(PhysicalMatchFn, "Call")
+				? PhysicalMatchFn.Call(Receipt, Path) : _TH_DurationSourceMatches(Receipt, Path)
+			if !(PhysicalMatched is Integer) || PhysicalMatched != 1
+				return false
+		}
+		; Physical admission may yield to another native thread. Repeat only the
+		; pure exact-publication checks after that I/O, before granting Reload.
+		return _TH_DurationContextMatches(Receipt) && _TH_DurationWasPublished(KeyId, Seconds)
+	} catch {
+		return false
+	}
+}
+
+_TH_BuildDurationCandidate(KeyId, Seconds, Candidate) {
+	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
+		return false
+	Entry["time_activation_seconds"] := Seconds
+	return 1
+}
+
 _TH_BuildHoldCandidate(KeyId, Kind, Id, Candidate) {
 	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
 		return false
@@ -550,20 +797,20 @@ _TH_PublishTapHoldCandidate(Candidate, RuntimeCandidate, EmptyKeys, OwnerToken, 
 ; terminal relocation/reload refuses this lease process-wide, and a re-entrant
 ; tap-hold writer on the same path cannot build from a stale snapshot.
 _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
-		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0) {
+		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0, ContentFn := 0) {
 	global TapHold, ConfigurationFile
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn,
-			ReplaceFn, DeleteFn, AuthorizeFn)
+			ReplaceFn, DeleteFn, AuthorizeFn, ContentFn)
 		finally Critical(InheritedCritical)
 	}
 	if !HasMethod(BuildFn, "Call") {
 		try LoggerError("TapHoldWriter", "Refusing a tap-hold update with no candidate builder.")
 		return false
 	}
-	for Adapter in [WriterFn, ReplaceFn, DeleteFn, AuthorizeFn] {
+	for Adapter in [WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, ContentFn] {
 		if !((Adapter is Integer) && Adapter == 0)
 				&& !HasMethod(Adapter, "Call") {
 			try LoggerError("TapHoldWriter", "Refusing a tap-hold update with an invalid transaction adapter.")
@@ -619,7 +866,7 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 			PersistError := ""
 			try Result := _TH_WriteTapHoldToml(Candidate, OwnerToken,
 				BoundPath, StartState, WriterFn, ReplaceFn, DeleteFn,
-				AuthorizeFn)
+				AuthorizeFn, ContentFn)
 			catch as Err {
 				Result := false
 				PersistError := Err.Message
@@ -645,12 +892,12 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 ; caller owns BoundPath from before the snapshot through durable replacement
 ; and the final memory-only publication.
 _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
-		WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0) {
+		WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0, ContentFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath,
-			StartState, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
+			StartState, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, ContentFn)
 		finally Critical(InheritedCritical)
 	}
 	if !(Data is Map) || !(BoundPath is String) || BoundPath == ""
@@ -680,37 +927,51 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 
 	RuntimeCandidate := _TH_CloneData(Data)
 	EmptyKeys := Map()
-	Lines := []
-	Lines.Push("# Auto-generated by Ergopti+ tray-menu writes: the whole file is rewritten")
-	Lines.Push("# from the in-memory tap-hold state on every toggle. What a held layer does")
-	Lines.Push("# is set in layers.toml, not here.")
-	Lines.Push("")
-
-	; Root [tap_hold] section — emit inherit_defaults when it is false so
-	; the loader does not re-merge shipped defaults on the next reload.
-        if Data.Has("inherit_defaults") and !Data["inherit_defaults"] {
-		Lines.Push("[tap_hold]")
-		Lines.Push("inherit_defaults = false")
+	SourceWitness := 0
+	if HasMethod(ContentFn, "Call") {
+		try SourceWitness := ContentFn.Call(BoundPath, Data)
+		catch as Err {
+			try LoggerError("TapHoldWriter", "Preparing the duration image failed: {1}.", Err.Message)
+			return false
+		}
+		if !_TH_DurationSourceValid(SourceWitness, BoundPath)
+				|| !SourceWitness.Has("content") || !(SourceWitness["content"] is String)
+				|| !_TH_DurationSourceMatches(SourceWitness, BoundPath)
+			return false
+		Content := SourceWitness["content"]
+	} else {
+		Lines := []
+		Lines.Push("# Auto-generated by Ergopti+ tray-menu writes: the whole file is rewritten")
+		Lines.Push("# from the in-memory tap-hold state on every toggle. What a held layer does")
+		Lines.Push("# is set in layers.toml, not here.")
 		Lines.Push("")
-	}
 
-	; Keys section.
-        if Data.Has("keys") {
-                for KeyId, Entry in Data["keys"] {
-			if !(IsObject(Entry) and Type(Entry) == "Map") {
-				continue
-			}
-			Lines.Push("[tap_hold.keys." . KeyId . "]")
-			for K, V in Entry {
-				Lines.Push(_TH_TomlFormatLine(K, V))
-			}
+		; Root [tap_hold] section — emit inherit_defaults when it is false so
+		; the loader does not re-merge shipped defaults on the next reload.
+	        if Data.Has("inherit_defaults") and !Data["inherit_defaults"] {
+			Lines.Push("[tap_hold]")
+			Lines.Push("inherit_defaults = false")
 			Lines.Push("")
 		}
-	}
 
-	Content := ""
-	for L in Lines {
-		Content .= L . "`r`n"
+		; Keys section.
+	        if Data.Has("keys") {
+	                for KeyId, Entry in Data["keys"] {
+				if !(IsObject(Entry) and Type(Entry) == "Map") {
+					continue
+				}
+				Lines.Push("[tap_hold.keys." . KeyId . "]")
+				for K, V in Entry {
+					Lines.Push(_TH_TomlFormatLine(K, V))
+				}
+				Lines.Push("")
+			}
+		}
+
+		Content := ""
+		for L in Lines {
+			Content .= L . "`r`n"
+		}
 	}
 
 	static WriteSequence := 0
@@ -769,6 +1030,14 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		return false
 	}
 
+	; The duration owner captured exact physical bytes before staging. A foreign
+	; writer, create or delete cannot turn that image into authority over a successor.
+	if SourceWitness is Map && !_TH_DurationSourceMatches(SourceWitness, BoundPath) {
+		try LoggerError("TapHoldWriter", "The tap-hold source changed before duration publication.")
+		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+		return false
+	}
+
 	Replaced := false
 	ReplaceError := ""
 	try Replaced := HasMethod(ReplaceFn, "Call")
@@ -804,6 +1073,25 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 			PublishError := Err.Message
 		}
 		Published := (Published is Integer) && Published == 1
+		if Published && (SourceWitness is Map) {
+			global _TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots
+			for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots] {
+				if Cache.Has(BoundPath)
+					Cache.Delete(BoundPath)
+			}
+		}
+		if Published && (SourceWitness is Map) && SourceWitness.Has("receipt_target") {
+			Receipt := _TH_CaptureDurationContext(Map("path", BoundPath), SourceWitness["key"])
+			if !(Receipt is Map) {
+				Published := false
+				PublishError := "The exact published duration owner could not be captured."
+			} else {
+				Receipt["physical"] := !HasMethod(WriterFn, "Call") && !HasMethod(ReplaceFn, "Call")
+				Receipt["source_present"] := 1
+				Receipt["source_content"] := Content
+				SourceWitness["receipt_target"]["published_context"] := Receipt
+			}
+		}
 	} finally Critical(PreviousCritical)
 	if !Published {
 		if (PublishError != "") {

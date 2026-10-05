@@ -190,52 +190,47 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 ; Existing entries are overwritten field-by-field so a user file that only
 ; specifies some fields of a key still inherits the rest from a prior pass.
 _TapHold_ParseFileInto(FilePath, Result) {
-	; Track the current section header path (e.g. "tap_hold.keys.caps_lock").
-	; Empty when outside any recognised section so unrelated TOML headers are
-	; skipped silently.
-	CurrentPath := ""
+	; Reuse the admitted semantic reader: root dotted assignments, quoted
+	; headers and inline key tables must reload the same values the writer owns.
+	try Document := TOML_ParseDocument(ReadTomlFile(FilePath), &Records)
+	catch as Err {
+		try LoggerError("TapHoldLoader", "Cannot read the tap-hold document '{1}': {2}.", FilePath, Err.Message)
+		return
+	}
+	if !Document.Has("tap_hold")
+		return
+	Root := Document["tap_hold"]
+	if !(Root is Map) {
+		try LoggerError("TapHoldLoader", "The tap_hold source namespace must be a table.")
+		return
+	}
+	if Root.Has("inherit_defaults") {
+		if Root["inherit_defaults"] is TOML_Bool
+			Result["inherit_defaults"] := !!Root["inherit_defaults"].Value
+		else
+			try LoggerError("TapHoldLoader", "Field '[tap_hold].inherit_defaults' must be a TOML boolean; value rejected.")
+	}
+	if !Root.Has("keys")
+		return
+	if !(Root["keys"] is Map) {
+		try LoggerError("TapHoldLoader", "The tap_hold.keys source namespace must be a table.")
+		return
+	}
 	InvalidKeys := Map()
-
-	loop parse, ReadTomlFile(FilePath), "`n", "`r" {
-		Line := Trim(TOML_StripInlineComment(A_LoopField), " `t")
-		if (Line == "" or SubStr(Line, 1, 1) == "#") {
+	for KeyId, Entry in Root["keys"] {
+		if !(KeyId is String) || !RegExMatch(KeyId, "^[A-Za-z0-9_]+$")
+			continue
+		CurrentPath := "tap_hold.keys." . KeyId
+		if !(Entry is Map) {
+			try LoggerError("TapHoldLoader", "Field '[{1}]' must be a key table; key disabled.", CurrentPath)
+			InvalidKeys[KeyId] := true
 			continue
 		}
-
-		if RegExMatch(Line, "^\[([^\[\]]+)\]$", &SecMatch) {
-			CurrentPath := Trim(SecMatch[1])
-			continue
-		}
-
-		if (CurrentPath == "") {
-			continue
-		}
-
-		if !RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &KvMatch) {
-			continue
-		}
-		Key := KvMatch[1]
-		RawValue := KvMatch[2]
-		LiteralKind := TOML_LiteralKind(RawValue)
-		Value := TomlCoerceValue(RawValue)
-
-		; [tap_hold] root metadata (e.g. inherit_defaults = false).
-		if (CurrentPath == "tap_hold") {
-			if (Key == "inherit_defaults") {
-				if (LiteralKind != "boolean") {
-					try LoggerError("TapHoldLoader",
-						"Field '[{1}].{2}' must be a TOML boolean; value rejected.",
-						CurrentPath, Key)
-					continue
-				}
-				Result["inherit_defaults"] := Value
-			}
-			continue
-		}
-
-		; tap_hold.keys.<id>
-		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {
-			KeyId := KeyMatch[1]
+		for Key, Typed in Entry {
+			LiteralKind := _TOML_ValueKind(Typed)
+			if LiteralKind == "string" && !_TapHold_FieldStringIsQuoted(Records, KeyId, Key)
+				LiteralKind := "unknown"
+			Value := _ConfigTomlNativeValue(Typed)
 			ExpectedKind := TapHoldFieldKinds().Get(Key, "")
 			; A field no tap-hold key has (an older build's, a hand edit's) is an
 			; outdated entry, not a schema violation of the key: warned, ignored,
@@ -300,6 +295,42 @@ _TapHold_ParseFileInto(FilePath, Result) {
 		Result["keys"][KeyId]["enabled"] := false
 	}
 }
+; The generic semantic reader preserves legacy bare strings for unowned data.
+; Known Tap-Hold strings retain their existing quoted-literal admission policy.
+_TapHold_FieldStringIsQuoted(Records, KeyId, Field) {
+	Parts := ["tap_hold", "keys", KeyId, Field]
+	try {
+		for Record in Records {
+			if Record.Path.Length > Parts.Length
+				continue
+			Matches := true
+			for Index, Part in Record.Path {
+				if !(Part == Parts[Index]) {
+					Matches := false
+					break
+				}
+			}
+			if !Matches
+				continue
+			Raw := Record.Value is Map ? _ConfigTomlRawTree(Record.Value, Record.Raw) : Record.Raw
+			loop Parts.Length - Record.Path.Length {
+				if !(Raw is Map) || !Raw.Has(Parts[Record.Path.Length + A_Index])
+					return false
+				Raw := Raw[Parts[Record.Path.Length + A_Index]]
+			}
+			if !(Raw is String)
+				return false
+			Raw := Trim(Raw, " " . Chr(9) . Chr(13) . Chr(10))
+			First := SubStr(Raw, 1, 1)
+			return StrLen(Raw) >= 2 && (First == Chr(34) || First == Chr(39))
+				&& SubStr(Raw, -1) == First
+		}
+	} catch {
+		return false
+	}
+	return false
+}
+
 
 
 
