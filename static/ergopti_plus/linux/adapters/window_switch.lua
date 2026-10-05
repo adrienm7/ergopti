@@ -24,6 +24,9 @@ function M.available()
 	for _, tool in ipairs(TOOLS) do
 		if Shell.has_command(tool) ~= true then return false, "dialog.action_picker.requires_tool", tool end
 	end
+	-- BusyBox timeout exists on Alpine but cannot preserve the owned worker group.
+	local checked, admitted = pcall(Shell.exec_checked, "timeout --foreground 1 sh -c ':' 2>/dev/null")
+	if not checked or admitted ~= true then return false, "dialog.action_picker.requires_tool", "GNU timeout" end
 	return true
 end
 

@@ -2,7 +2,17 @@
 
 """Own exact Xvfb, Openbox and client children; observe real EWMH focus."""
 
-import os, pathlib, select, signal, subprocess, tempfile, time, json, sys, re
+import os
+import pathlib
+import select
+import signal
+import subprocess
+import tempfile
+import time
+import json
+import sys
+import re
+from native_fixture_family import run as run_owned_family
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LUA = ROOT / "tests/hardware/run_window_switch_operation.lua"
@@ -151,7 +161,7 @@ def main():
 
             def run(name, expected, target=None, minimum=1, mode="normal"):
                 binding_config.write_text('[gestures]\nenabled = true\ntap_3 = "alt_tab_monitor"\n')
-                r = subprocess.run(
+                r = run_owned_family(
                     [
                         "luajit",
                         str(LUA),
