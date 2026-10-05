@@ -80,12 +80,13 @@ end
 
 --- Runs `body` with os.execute and io.popen recorded instead of run.
 --- @param body function
-local function with_recorded_shell(body)
+--- @param native_webview table|nil Controlled native show edge for this fixture.
+local function with_recorded_shell(body, native_webview)
 	local real_execute, real_popen = os.execute, io.popen
 	os.execute = function() return true end
 	io.popen = function() return nil end
 	local saved_webview = package.loaded["ui.webview_manager"]
-	package.loaded["ui.webview_manager"] = { show = function() return true end }
+	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end }
 	local ok, err = pcall(body)
 	os.execute, io.popen = real_execute, real_popen
 	package.loaded["ui.webview_manager"] = saved_webview
@@ -313,7 +314,13 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 		M._test_begin_reading({})
 		helpers.assert_true(M.enable(), "the test reader must permit enabling gestures")
 		local menu_builder = helpers.load_module("ui.menu.menu_builder")
-		local items = menu_builder.build({ _version = "3.0.0", gestures = M })
+		local items, opened = nil, 0
+		-- Building a tray does not open a GTK window. Use the same owned native
+		-- webview edge as the dispatcher cases, even when real lgi is installed.
+		with_recorded_shell(function()
+			items = menu_builder.build({ _version = "3.0.0", gestures = M })
+		end, {show = function() opened = opened + 1; return false end})
+		helpers.assert_eq(opened, 0, "menu construction must not open a native window")
 		M.disable()
 		M.stop_reading()
 

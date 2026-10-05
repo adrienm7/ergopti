@@ -498,3 +498,60 @@ helpers.describe("pair terminal native getter currency", function()
 		end)
 	end
 end)
+
+helpers.describe("exact staged pair delivery fence",function()
+	helpers.it("requires the exact configuration owner and rejects foreign editor and release tokens",function()
+		local state=make();local exact,foreign={},{}
+		assert_false(state.owner.acquire_delivery_fence(exact))
+		helpers.assert_true(state.owner.acquire_configuration(exact))
+		helpers.assert_true(state.owner.acquire_delivery_fence(exact))
+		assert_false(state.owner.acquire_delivery_fence(foreign));assert_false(state.owner.release_delivery_fence(exact))
+		helpers.assert_true(state.owner.release_configuration(exact))
+		helpers.assert_eq(state.owner.capture_runtime(),nil);helpers.assert_eq(state.owner.capture_action(binding,"run_program"),nil)
+		helpers.assert_eq(state.owner.capture_edit_source(),nil);helpers.assert_eq(state.owner.capture_edit_source(foreign),nil)
+		local receipt=state.owner.capture_edit_source(exact);helpers.assert_true(receipt.guard())
+		assert_false(state.owner.acquire_configuration(foreign));assert_false(state.owner.release_delivery_fence(foreign))
+		helpers.assert_true(state.owner.release_delivery_fence(exact));assert_false(state.owner.owns_delivery_fence(exact))
+		helpers.assert_true(state.owner.capture_runtime()() == true)
+	end)
+	helpers.it("opens delivery with a private-only ACK after staged installation",function()
+		local calls=0;local state=make(nil,nil,function() calls=calls+1;return true end);local exact={}
+		helpers.assert_true(state.owner.acquire_configuration(exact));helpers.assert_true(state.owner.acquire_delivery_fence(exact))
+		helpers.assert_true(state.owner.release_configuration(exact));helpers.assert_eq(calls,2)
+		helpers.assert_true(state.owner.release_delivery_fence(exact));helpers.assert_eq(calls,2,"opening delivery must not invoke native callbacks")
+		take(state)
+	end)
+	helpers.it("retains both exact capabilities when staged installation refuses",function()
+		local accepted=true;local state=make(nil,nil,function() return accepted end);local exact={}
+		helpers.assert_true(state.owner.acquire_configuration(exact));helpers.assert_true(state.owner.acquire_delivery_fence(exact))
+		accepted=false;assert_false(state.owner.release_configuration(exact))
+		helpers.assert_true(state.owner.owns_configuration(exact));helpers.assert_true(state.owner.owns_delivery_fence(exact))
+		assert_false(state.owner.release_delivery_fence(exact));helpers.assert_eq(state.owner.capture_runtime(),nil)
+		accepted=true;helpers.assert_true(state.owner.release_configuration(exact));helpers.assert_true(state.owner.release_delivery_fence(exact))
+		take(state)
+	end)
+end)
+
+helpers.describe("pair source receipt after final native pause callback",function()
+	for _,phase in ipairs({"editor","configuration","matches"}) do
+		helpers.it("refuses a same-byte canonical route handoff in final "..phase.." pause getter",function()
+			local route, armed, calls=path,false,0;local token={}
+			local owner=Owner.new({keys=catalog,hold_picker={modifiers={"shift","alt"},layers={"nav"}},
+				files={read_with_status=function() return base_text,"ok" end},route=function() return route end,
+				is_paused=function()
+					if armed then calls=calls+1;if calls==(phase=="editor" and 3 or 2) then route="/controlled/foreign.toml" end end
+					return false
+				end,changed=function() return true end,actions={is_assignable=function(action) return action=="run_program" end}})
+			helpers.assert_true(owner.acquire_configuration(token));helpers.assert_true(owner.acquire_delivery_fence(token))
+			if phase=="editor" then helpers.assert_true(owner.release_configuration(token)) end
+			armed=true
+			local receipt
+			if phase=="editor" then receipt=owner.capture_edit_source(token)
+			elseif phase=="configuration" then receipt=owner.configuration_source(token)
+			else receipt=owner.configuration_source_matches(token,{path=path,status="ok",content=base_text}) end
+			helpers.assert_eq(route,"/controlled/foreign.toml","The final native pause getter must cause the handoff")
+			if phase=="matches" then assert_false(receipt) else helpers.assert_eq(receipt,nil) end
+			helpers.assert_true(owner.owns_delivery_fence(token));helpers.assert_eq(owner.capture_runtime(),nil)
+		end)
+	end
+end)

@@ -333,23 +333,107 @@ if (
 	);
 }
 
-// Linux has no combination engine; preserve the declared reason instead of
-// inventing a provider that implies these physical bindings can be acquired.
-const manifest = TOML.parse(read(path.join(SP, '_shared/modules/features/manifest.toml')));
+// Linux owns ordered taps/holds. The native wrapper is source-fenced and
+// composed through the same tap-hold catalogue; simultaneous chords and native
+// state-only tap actions are not declared by this admission.
+const manifest = TOML.parse(
+	read(path.join(SP, '_shared/modules/features/manifest.toml')).replace(
+		/^\[\[features\.([^\]]+)\]\]$/gm,
+		(_header, section) => `[[feature_records]]\nsection_path = \"${section}\"`
+	)
+);
 const combinations = manifest.menu.shortcuts_menu.find((row) => row.id === 'key_combinations');
-if (
-	!combinations ||
-	combinations.platforms?.join(',') !== 'ahk,hs' ||
-	combinations.reason_key !== 'platform_reason.remap_engine_is_per_driver'
-) {
-	errors.push('Linux combination availability must remain truthful to its native engine');
+const linuxManager = stripLineComments(
+	read(path.join(SP, 'linux/platform/remap/tap_hold_manager.lua')),
+	'.lua'
+);
+const linuxPairs = stripLineComments(
+	read(path.join(SP, 'linux/platform/remap/key_combination_engine.lua')),
+	'.lua'
+);
+const linuxOwner = stripLineComments(
+	read(path.join(SP, 'linux/modules/shortcuts/key_combinations.lua')),
+	'.lua'
+);
+const linuxMenu = stripLineComments(
+	read(path.join(SP, 'linux/ui/menu/key_combinations.lua')),
+	'.lua'
+);
+
+/**
+ * Checks actual declaration and dispatch boundaries, including unavailable modes.
+ * @param {object} declaration Canonical shared manifest.
+ * @param {string[]} sources Manager, wrapper, owner and menu source bytes.
+ * @returns {boolean} Exact ordered Linux admission, never a chord claim.
+ */
+function orderedLinuxAdmission(declaration, sources) {
+	const [manager, wrapper, owner, menu] = sources;
+	const row = declaration.menu.shortcuts_menu.find((item) => item.id === 'key_combinations');
+	const taps = declaration.feature_records.filter(
+		(item) => item.section_path === 'shortcuts.key_combination_taps'
+	);
+	const capsWord = taps.find((item) => item.id === 'left_alt_then_caps_lock');
+	return (
+		row?.platforms?.join(',') === 'ahk,hs,linux' &&
+		row.reason_key === 'platform_reason.remap_engine_is_per_driver' &&
+		capsWord?.recommended_per_platform?.linux === 'none' &&
+		declaration.menu.key_combinations_group
+			.filter((item) => ['combo_symmetric', 'combo_timings', 'copy_tap_to_combo'].includes(item.id))
+			.every((item) => item.platforms?.join(',') === 'hs') &&
+		manager.includes('require("platform.remap.key_combination_engine")') &&
+		manager.includes('CombinationEngine.new(') &&
+		manager.includes('.engine_options(') &&
+		wrapper.includes('require("tap_hold.key_combinations")') &&
+		wrapper.includes('receipt.physical == true') &&
+		wrapper.includes('current.source == receipt.source') &&
+		wrapper.includes('function result.admit(') &&
+		wrapper.includes('function owner.begin_delivery(') &&
+		manager.includes('action ~= "one_shot_shift" and action ~= "caps_word"') &&
+		menu.includes('KeyCatalog.of_hand(keys,hand)') &&
+		menu.includes('Shared.pair(first.id,second.id)') &&
+		menu.includes('Scope.edit(rows,ctx.is_paused,source)')
+	);
 }
+const linuxSources = [linuxManager, linuxPairs, linuxOwner, linuxMenu];
+if (!orderedLinuxAdmission(manifest, linuxSources)) {
+	errors.push(
+		'Linux ordered combinations need their real shared/native source-fenced engine and truthful mode limits'
+	);
+}
+// Independently reject each lost native admission boundary instead of replacing
+// the previous unavailable-driver assertion with unconditional availability.
+for (const [index, token] of [
+	[0, 'require("platform.remap.key_combination_engine")'],
+	[1, 'receipt.physical == true'],
+	[1, 'current.source == receipt.source'],
+	[0, 'action ~= "one_shot_shift" and action ~= "caps_word"'],
+	[3, 'Scope.edit(rows,ctx.is_paused,source)']
+]) {
+	const changed = linuxSources.slice();
+	changed[index] = changed[index].replace(token, 'OMITTED_BOUNDARY');
+	if (orderedLinuxAdmission(manifest, changed))
+		errors.push('Linux ordered admission accepted a missing native/source boundary');
+}
+const unsupported = structuredClone(manifest);
+unsupported.menu.shortcuts_menu.find((row) => row.id === 'key_combinations').platforms = [
+	'ahk',
+	'hs'
+];
+if (orderedLinuxAdmission(unsupported, linuxSources))
+	errors.push('An unsupported Linux declaration must remain unavailable');
+const unavailableTap = structuredClone(manifest);
+unavailableTap.feature_records.find(
+	(row) =>
+		row.section_path === 'shortcuts.key_combination_taps' && row.id === 'left_alt_then_caps_lock'
+).recommended_per_platform.linux = 'caps_word';
+if (orderedLinuxAdmission(unavailableTap, linuxSources))
+	errors.push('Linux must not recommend an undispatched native-only pair tap');
 for (const locale of locales) {
 	if (
 		typeof locale.data[combinations?.reason_key] !== 'string' ||
 		locale.data[combinations?.reason_key] === ''
 	) {
-		errors.push(`${locale.name} lacks the Linux combination availability reason`);
+		errors.push(`${locale.name} lacks the combination mode availability reason`);
 	}
 }
 
