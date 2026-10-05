@@ -36,6 +36,7 @@ local PrivateWindow = require("keylogger.private_window")
 -- WPM ring cap single-sourced from the shared keylogger metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
 local SharedMetrics    = require("keylogger.metrics")
+local Utils            = require("keylogger.utils")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 -- The WPM readouts' live speed and last source, the same tracker macOS reads.
@@ -961,9 +962,13 @@ local function add_live_ngram_delta(today_payload)
 				local llm_delta = math.max(0,
 					((stats.ngram_sources[token] or {}).llm or 0)
 					- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
-				local other_delta = math.max(0,
-					((stats.ngram_sources[token] or {}).other or 0)
-					- (((_flushed_app_sources[app_id] or {})[token] or {}).other or 0))
+				local other_delta = 0
+				local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
+				for label, source_count in pairs(stats.ngram_sources[token] or {}) do
+					if Utils.is_other_synthetic_source(label) then
+						other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
+					end
+				end
 				item.hs = (item.hs or 0) + source_delta
 				item.llm = (item.llm or 0) + llm_delta
 				item.o = (item.o or 0) + other_delta
