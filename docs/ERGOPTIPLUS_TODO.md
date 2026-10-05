@@ -5052,6 +5052,15 @@ qualified. The Windows handoff now records nine actual program-action failures,
 two missing lifecycle/timer inventories and two unchanged OS-purity ratchets.
 These are explicit repair steps for the maintainer's PC, not completed scope.
 
+The Linux runner now admits each native close callback only after the same
+protected close attempt acknowledges submission. A rejected or raised attempt
+cannot borrow a callback from itself or a replacement attempt to retire the
+handle. All 36 prior lifecycle cases remain; 14 causal close-attempt controls
+pass on both Lua ABIs. Two actual POSIX/luv cases per ABI retain exit status 37,
+private discarded output, cancellation, absent original process group and exact
+callback/handle retirement. These controls qualify the Linux runner boundary,
+not automation discovery, native Windows behavior or installed application input.
+
 Windows continuation for item106 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate

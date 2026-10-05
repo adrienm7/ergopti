@@ -39,7 +39,7 @@ function M.spawn(executable, arguments, completed, admitted, native)
 	local process, pid = nil, nil
 	local state, cancelled = "prepared", false
 	local exited, code, group_absent, delivered = false, nil, false, false
-	local closing, retired, close_admitted = false, false, false
+	local closing, retired, close_attempt = false, false, nil
 	local observers = {}
 	local handle = {}
 	local function authorized()
@@ -64,16 +64,23 @@ function M.spawn(executable, arguments, completed, admitted, native)
 				if closing then return end
 				closing = true
 				local owned = process
-				local ok, result = pcall(owned.close, owned, function()
-					if process ~= owned then return end
+				-- Only this call can admit its callback, even when native close reenters.
+				local attempt = { admitted = false, callback_seen = false }
+				close_attempt = attempt
+				local ok, result, close_error = pcall(owned.close, owned, function()
+					if process ~= owned or close_attempt ~= attempt then return end
+					attempt.callback_seen = true
+					if not attempt.admitted then return end
 					retired = true
-					if close_admitted then refresh() end
+					refresh()
 				end)
-				if not ok or not (result == nil or result == 0 or result == true) then
+				if not ok or close_error ~= nil or not (result == nil or result == 0 or result == true) then
+					close_attempt = nil
 					closing, retired = false, false
 					return
 				end
-				close_admitted = true
+				attempt.admitted = true
+				retired = attempt.callback_seen
 				if not retired then return end
 			end
 			process = nil
