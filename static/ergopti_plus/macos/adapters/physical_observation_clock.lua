@@ -59,6 +59,7 @@ function M.bind_history_scope(owner)
 	local token = {}
 	local lifetime = Lifetime.new(owner, token)
 	local authority = lifetime.capability()
+	local register_hint = authority.on_retired
 	local capability = {}
 	local detached, reading = false, false
 	local function same_binding()
@@ -141,6 +142,10 @@ function M.bind_history_scope(owner)
 	---@return boolean retired Whether this subscription has no remaining getter debt.
 	function capability.retired(candidate_owner, candidate_token)
 		return authority.retired(candidate_owner, candidate_token)
+	end
+	--- Forwards only exact subscription completion, not host clock retirement.
+	function capability.on_retired(candidate_owner, candidate_token, callback)
+		return register_hint(candidate_owner, candidate_token, callback)
 	end
 	subscription = { owner = owner, token = token, read = capability.read,
 		retired = function() return authority.retired(owner, token) end }

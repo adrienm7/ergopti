@@ -703,6 +703,26 @@ has8,561 passing and1 failing native callback-idle case. Packaging and
 installation are skipped, as is Release. This checkpoint qualifies neither the
 new initial-observation slice nor complete installation.
 
+The dormant physical capture substrate now recognizes only exact native loss
+frames and retains one selected accounting gap across retired leases. Retry and
+rotation decisions live in one shared policy: three retries at1/2/4 seconds per
+explicit owner, and one600-second rotation after actual baseline admission.
+Malformed frames, mismatched identities and refused diagnostic delivery remain
+terminal. No session manager or default activation is introduced by this slice.
+
+Actual transport retirement now waits for both delivery and failure-observer
+frames, including synchronous task termination and a throwing failure observer.
+The final accounting release occurs only after retained native/callback debt is
+retired. Original controls reproduce the two callback-frame defects; independently
+removing either correction fails its corresponding frozen assertion.
+
+Independent review passes44 recovery cases and633 composed controls, plus20
+shared-policy controls on each Lua54/LuaJIT ABI. The original41-case prefix and
+exact independent controls remain unchanged. The root test prepends only its
+required file-path header. Full selected root gates and exact-source native
+qualification remain required. Recovery scheduling, managed session composition,
+controlled shutdown and WP4-WP10 are unfinished; TODO31 stays partial.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native

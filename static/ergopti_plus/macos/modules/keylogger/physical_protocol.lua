@@ -2,6 +2,10 @@
 
 --- Distinguishes unsupported producers from malformed physical input.
 local M = {}
+local Wire = require("modules.keylogger.physical_wire")
+local Loss = {}
+Loss.__index = Loss
+function Loss:__tostring() return "Physical stream lost: " .. self.reason end
 local Refusal = {}
 Refusal.__index = Refusal
 
@@ -39,5 +43,20 @@ end
 ---@param failure any Original protected-call failure.
 ---@return boolean unavailable
 function M.is_unavailable(failure) return getmetatable(failure) == Refusal end
+
+--- Accepts only the actual six-field envelope from the original opened producer.
+--- No error text, exit code or caller-created table is a retryable loss.
+function M.loss(frame, identity)
+	Wire.fields(frame, { "version", "kind", "coverage", "incarnation", "lease", "reason" })
+	M.require_version("loss", frame.version, M.OPENING_VERSION)
+	assert(frame.kind == "lost" and frame.coverage == identity.coverage
+		and frame.incarnation == identity.incarnation and frame.lease == identity.lease,
+		"Physical loss identity was refused")
+	assert(frame.reason == "overflow" or frame.reason == "sequence_exhausted"
+		or frame.reason == "interrupted", "Unknown physical loss reason")
+	error(setmetatable({ reason = frame.reason }, Loss), 0)
+end
+
+function M.is_loss(failure) return getmetatable(failure) == Loss end
 
 return M

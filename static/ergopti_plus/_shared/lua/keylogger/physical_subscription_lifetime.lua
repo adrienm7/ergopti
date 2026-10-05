@@ -13,6 +13,8 @@ function M.new(owner, token)
 	assert(type(owner) == "table" and type(token) == "table", "Missing subscription identities")
 	local active, detached, frames = true, false, 0
 	local detach_operation, detaching
+	local terminal_hint, hint_registered, hint_sent
+	local notify_retirement
 	local pending = {}
 	local lifetime, capability = {}, {}
 	local function exact(candidate_owner, candidate_token)
@@ -47,6 +49,18 @@ function M.new(owner, token)
 	end
 
 
+	--- Registers one completion hint, never a native retirement acknowledgement.
+	--- Its callback owns a terminal frame; retired remains false until it unwinds.
+	---@return boolean registered Whether this exact subscription accepted its one hint.
+	function capability.on_retired(candidate_owner, candidate_token, callback)
+		if not exact(candidate_owner, candidate_token) or type(callback) ~= "function"
+			or hint_registered then return false end
+		hint_registered, terminal_hint = true, callback
+		notify_retirement()
+		return true
+	end
+
+
 	--- Requests actual exact-owner detach without accepting a caller completion flag.
 	--- Completed old detach is retained independently of any successor subscription.
 	---@param candidate_owner table Exact original subscriber.
@@ -77,7 +91,10 @@ function M.new(owner, token)
 	function lifetime.revoke() active = false end
 
 	--- Commits exact source detach while retaining all actual unfinished frames.
-	function lifetime.detach() active, detached = false, true end
+	function lifetime.detach()
+		active, detached = false, true
+		notify_retirement()
+	end
 
 
 	--- Retains an exact source frame before any asynchronous foreign operation.
@@ -95,7 +112,20 @@ function M.new(owner, token)
 	function lifetime.leave(frame)
 		if pending[frame] ~= true then return false end
 		pending[frame], frames = nil, frames - 1
+		notify_retirement()
 		return true
+	end
+
+	-- Only genuine detach plus all original frames can publish this hint. Use the
+	-- same private frame ledger, including after detach; no callback result is ACK.
+	notify_retirement = function()
+		if not detached or frames ~= 0 or not hint_registered or hint_sent then return end
+		hint_sent = true
+		local callback, frame = terminal_hint, {}
+		terminal_hint = nil
+		pending[frame], frames = true, frames + 1
+		pcall(callback)
+		assert(lifetime.leave(frame), "Subscription hint frame was already released")
 	end
 
 	--- Tracks the exact synchronous source frame and preserves its complete outcome.

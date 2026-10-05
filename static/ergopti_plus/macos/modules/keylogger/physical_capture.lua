@@ -13,9 +13,11 @@ local Transport = require("modules.keylogger.physical_transport")
 local Protocol = require("modules.keylogger.physical_protocol")
 local Wire = require("modules.keylogger.physical_wire")
 local Clock = require("modules.keylogger.physical_clock")
+local Lifetime = require("keylogger.physical_subscription_lifetime")
 local LOG = "keylogger.physical_capture"
 local OWNER = "modules.keylogger.physical_capture"
-local dependencies, session
+local dependencies, session, managed_source
+local finish_source, stop_session
 
 --- Reports whether a native session still belongs to this singleton owner.
 ---@param candidate table Captured session identity.
@@ -54,7 +56,14 @@ local function notify_stop(candidate)
 	local observer = candidate.stop_observer
 	if not observer then return end
 	candidate.stop_observer = nil
-	local ok, failure = xpcall(function() observer(true) end, debug.traceback)
+	local dispatch = function() observer(true) end
+	local source = candidate.managed
+	local ok, failure
+	if source then
+		candidate.stop_publishing, source.publishing = true, true
+		ok, failure = xpcall(function() source.life.run(dispatch) end, debug.traceback)
+		candidate.stop_publishing, source.publishing = false, false
+	else ok, failure = xpcall(dispatch, debug.traceback) end
 	if not ok then Logger.error(LOG, "Physical capture stop observer failed: %s.", tostring(failure)) end
 end
 
@@ -64,18 +73,24 @@ end
 local function finish_stop(candidate)
 	if not current(candidate) or not candidate.stop_requested or candidate.acquiring
 		or candidate.accounting_transition or candidate.clock_starting or candidate.clock_publishing
-		or candidate.baseline_publishing or candidate.baseline_revocation_pending then return false end
+		or candidate.baseline_publishing or candidate.baseline_revocation_pending
+		or candidate.verdict_publishing or candidate.stop_publishing then return false end
 	if candidate.state == "stopped" then return true end
 	if candidate.verifier and not candidate.verifier_settled then return false end
 	if candidate.clock and not candidate.clock_settled then return false end
 	if candidate.transport and not candidate.transport.isSettled() then return false end
 	if candidate.accounting_owned then
-		if accounting_transition(candidate, Accounting.release, OWNER) ~= true then return false end
+		if candidate.managed then
+			if revoke(candidate) ~= true then return false end
+		else
+			if accounting_transition(candidate, Accounting.release, OWNER) ~= true then return false end
+		end
 		candidate.accounting_owned = false
 	end
 	candidate.state = "stopped"
 	Logger.success(LOG, "Physical capture session stopped.")
 	notify_stop(candidate)
+	if candidate.managed then finish_source(candidate.managed) end
 	return true
 end
 
@@ -86,11 +101,34 @@ end
 local function failed(candidate, message, failure)
 	if not current(candidate) or candidate.stop_requested or candidate.failure then return end
 	candidate.failure = message
-	local unavailable = Protocol.is_unavailable(failure)
-	candidate.state = unavailable and "unavailable" or "failed"
-	candidate.reason = unavailable and failure.code or "capture_failed"
+	local unavailable, loss = Protocol.is_unavailable(failure), Protocol.is_loss(failure)
+	candidate.state = unavailable and "unavailable" or (loss and
+		(failure.reason == "interrupted" and "interrupted" or "lost") or "failed")
+	candidate.reason = unavailable and failure.code or (loss and failure.reason or "capture_failed")
 	if not revoke(candidate) then
 		Logger.error(LOG, "Physical capture accounting settlement remains pending.")
+	end
+	local observer = dependencies.on_verdict
+	if observer then
+		candidate.verdict_publishing = true
+		local source = candidate.managed
+		if source then source.publishing = true end
+		local record = { state = candidate.state, reason = candidate.reason,
+			retryable = loss, lease_token = candidate.token }
+		local ok, accepted = pcall(function()
+			if source then return source.life.run(observer, record) end
+			return observer(record)
+		end)
+		candidate.verdict_publishing = false
+		if source then source.publishing = false end
+		if not ok or accepted ~= true then
+			candidate.verdict_refused = true
+			if source then source.verdict_refused = true end
+			if not unavailable and not candidate.stop_requested then
+				candidate.state, candidate.reason = "failed", "verdict_refused"
+			end
+		end
+		if candidate.stop_requested then finish_stop(candidate) end
 	end
 	if unavailable then
 		Logger.warn(LOG, "Physical capture unavailable (%s): %s.", candidate.reason, message)
@@ -302,6 +340,9 @@ function M.init(ports)
 	local baseline_ready = rawget(ports, "baseline_ready")
 	assert(baseline_ready == nil or type(baseline_ready) == "function", "Invalid physical baseline observer")
 	snapshot.baseline_ready = baseline_ready
+	local on_verdict = rawget(ports, "on_verdict")
+	assert(on_verdict == nil or type(on_verdict) == "function", "Invalid physical verdict observer")
+	snapshot.on_verdict = on_verdict
 	Logger.start(LOG, "Initializing dormant physical capture owner…")
 	dependencies = snapshot
 	Logger.success(LOG, "Dormant physical capture owner initialized.")
@@ -312,10 +353,13 @@ end
 --- The requirement must come from the trusted runtime artifact owner, not user input.
 ---@param options table Executable, arguments, requirement, batch_limit and frame_limit.
 ---@return boolean accepted False while an earlier owner or native task is retained.
-function M.start(options)
+local function start_session(options, source)
 	assert(dependencies, "Physical capture owner is not initialized")
-	if session and (session.state ~= "stopped" or session.history_binding ~= nil) then return false end
-	local candidate = { state = "verifying", options = snapshot_options(options), acquiring = true }
+	if session and (session.state ~= "stopped" or session.history_binding ~= nil
+		or session.verdict_publishing or session.stop_publishing) then return false end
+	local candidate = { state = "verifying", options = snapshot_options(options), acquiring = true,
+		token = {}, managed = source }
+	if source then source.last_session = candidate end
 	candidate.receiver = Delivery.new({ batch_limit = candidate.options.batch_limit,
 		admit = function(frame)
 			assert(current(candidate) and candidate.state == "opening", "Physical capture admission was revoked")
@@ -382,11 +426,14 @@ function M.start(options)
 	})
 	local previous = session
 	session = candidate
-	local selected, accepted = pcall(accounting_transition, candidate, Accounting.select_stream, OWNER)
+	local selected, accepted
+	if source and source.selected then selected, accepted = true, true
+	else selected, accepted = pcall(accounting_transition, candidate, Accounting.select_stream, OWNER) end
 	if not selected or accepted ~= true then
 		candidate.receiver.stop()
 		candidate.acquiring = false
 		session = previous
+		if source then candidate.state = "stopped" end
 		-- A stop latched inside refused selection still owns its notification,
 		-- but no accounting source or native child was acquired to release.
 		if candidate.stop_requested then
@@ -398,6 +445,7 @@ function M.start(options)
 		return false
 	end
 	candidate.accounting_owned = true
+	if source then source.selected = true end
 	if candidate.stop_requested then
 		candidate.acquiring = false
 		finish_stop(candidate)
@@ -452,7 +500,7 @@ end
 ---@param on_stopped function|nil Called once with true after exact retirement and accounting release.
 ---@return boolean settled True only after exact native settlement and accounting release.
 ---@return string|nil status Pending while an exact child or settlement refusal remains.
-function M.stop(on_stopped)
+stop_session = function(on_stopped)
 	assert(on_stopped == nil or type(on_stopped) == "function", "Invalid physical stop observer")
 	if not session or session.state == "stopped" then return true end
 	local candidate = session
@@ -466,7 +514,8 @@ function M.stop(on_stopped)
 	end
 	if candidate.receiver then candidate.receiver.stop() end
 	if candidate.accounting_transition or candidate.acquiring or candidate.clock_publishing
-		or candidate.baseline_publishing then return false, "pending" end
+		or candidate.baseline_publishing or candidate.verdict_publishing
+		or candidate.stop_publishing then return false, "pending" end
 	if revoke(candidate) ~= true then return false, "settlement_refused" end
 	candidate.baseline_revocation_pending = nil
 	local ok, failure = pcall(function()
@@ -485,6 +534,20 @@ function M.stop(on_stopped)
 	return false, "pending"
 end
 
+--- Starts only the legacy single-session contract while no managed source owns it.
+function M.start(options)
+	if managed_source then return false end
+	return start_session(options)
+end
+
+--- Existing stop remains final shutdown, including explicitly managed selection.
+function M.stop(on_stopped)
+	if managed_source then
+		return managed_source.shutdown(managed_source.owner, managed_source.token, on_stopped)
+	end
+	return stop_session(on_stopped)
+end
+
 --- Returns an independent diagnostic snapshot, never live native ownership tables.
 ---@return table status State, explicit reason and actual settlement verdict.
 function M.status()
@@ -492,6 +555,7 @@ function M.status()
 	local settled = not session.acquiring and not session.accounting_transition
 		and not session.clock_starting and not session.clock_publishing
 		and not session.baseline_publishing and not session.baseline_revocation_pending
+		and not session.verdict_publishing and not session.stop_publishing
 		and (not session.verifier or session.verifier_settled == true)
 		and (not session.clock or session.clock_settled == true)
 		and (not session.transport or session.transport.isSettled())
@@ -534,6 +598,7 @@ function M.bind_history_scope(owner)
 		return candidate.state == "stopped" and candidate.accounting_owned ~= true and candidate.capture == nil
 			and not candidate.acquiring and not candidate.accounting_transition and not candidate.clock_starting
 			and not candidate.clock_publishing and not candidate.baseline_publishing and not candidate.baseline_revocation_pending
+			and not candidate.verdict_publishing and not candidate.stop_publishing
 			and (not candidate.verifier or candidate.verifier_settled == true)
 			and (not candidate.clock or candidate.clock_settled == true)
 	end
@@ -628,9 +693,137 @@ function M.bind_history_scope(owner)
 		if not complete then return false end
 		binding.active, binding.released = false, true
 		candidate.history_binding = nil
+		if candidate.managed then finish_source(candidate.managed) end
 		return true
 	end
 	return true, scope
+end
+
+-- Global selection is distinct from exact per-lease native/admission retirement.
+-- Only final shutdown may return the accounting owner to legacy input.
+finish_source = function(source)
+	if not source.final_requested or source.closed or source.operation or source.publishing or source.releasing then
+		return source.closed == true
+	end
+	local candidate = source.last_session
+	if candidate and (candidate.state ~= "stopped" or candidate.history_binding ~= nil
+		or candidate.capture ~= nil or candidate.accounting_owned or candidate.verdict_publishing
+		or candidate.stop_publishing) then return false end
+	source.releasing = true
+	local ok, accepted = pcall(function()
+		if source.selected then return source.life.run(Accounting.release, OWNER) end
+		return true
+	end)
+	source.releasing = false
+	if not ok or accepted ~= true then return false end
+	source.selected, source.closed = false, true
+	local observer = source.stop_observer
+	source.stop_observer = nil
+	if observer then
+		source.publishing = true
+		local notified, failure = xpcall(function() source.life.run(observer, true) end, debug.traceback)
+		source.publishing = false
+		if not notified then Logger.error(LOG, "Physical source stop observer failed: %s.", tostring(failure)) end
+	end
+	source.life.detach()
+	return true
+end
+
+--- Binds one explicit selected-source owner; construction performs no native reads.
+--- Intermediate lease retirement preserves GAP, final shutdown alone releases it.
+function M.bind_managed_source(owner)
+	assert(type(owner) == "table", "Missing managed physical source owner")
+	if not dependencies then return nil, "source_uninitialized" end
+	if managed_source then
+		if not managed_source.closed or managed_source.operation or managed_source.publishing
+			or not managed_source.actual_retired(managed_source.owner, managed_source.token) then
+			return nil, "source_busy"
+		end
+	end
+	if session and (session.state ~= "stopped" or session.history_binding ~= nil) then return nil, "source_busy" end
+	local source = { owner = owner, token = {} }
+	source.life = Lifetime.new(owner, source.token)
+	local authority = source.life.capability()
+	local actual_current, actual_retired = authority.current, authority.retired
+	source.actual_retired = actual_retired
+	local capability = {}
+	local function exact(candidate_owner, candidate_token)
+		return rawequal(candidate_owner, owner) and rawequal(candidate_token, source.token)
+	end
+	local function active()
+		return rawequal(managed_source, source) and not source.final_requested and not source.closed
+			and not source.verdict_refused
+			and actual_current(owner, source.token)
+	end
+	local function run(operation)
+		if source.operation or source.publishing or source.releasing then return false, "source_pending" end
+		source.operation = true
+		local results = table.pack(pcall(source.life.run, operation))
+		source.operation = false
+		finish_source(source)
+		if not results[1] then error(results[2], 0) end
+		return table.unpack(results, 2, results.n)
+	end
+	function capability.identity(candidate_owner)
+		if rawequal(candidate_owner, owner) then return source.token end
+	end
+	function capability.current(candidate_owner, candidate_token)
+		return exact(candidate_owner, candidate_token) and active()
+	end
+	function capability.lease_identity(candidate_owner, candidate_token)
+		if exact(candidate_owner, candidate_token) and source.last_session then return source.last_session.token end
+	end
+	function capability.start(candidate_owner, candidate_token, options)
+		if not exact(candidate_owner, candidate_token) or not active() or source.operation
+			or source.publishing or source.releasing then return false end
+		return run(function()
+			local previous = source.last_session
+			local accepted = start_session(options, source)
+			local candidate = source.last_session
+			return accepted, candidate and not rawequal(candidate, previous) and candidate.token or nil
+		end)
+	end
+	function capability.stop_lease(candidate_owner, candidate_token, observer)
+		if not exact(candidate_owner, candidate_token) or source.closed then return false, "source_identity_refused" end
+		assert(observer == nil or type(observer) == "function", "Invalid physical stop observer")
+		return run(function() return stop_session(observer) end)
+	end
+	function capability.shutdown(candidate_owner, candidate_token, observer)
+		if not exact(candidate_owner, candidate_token) then return false, "source_identity_refused" end
+		assert(observer == nil or type(observer) == "function", "Invalid physical stop observer")
+		if source.closed then
+			if source.publishing or source.operation or source.releasing
+				or not actual_retired(owner, source.token) then return false, "pending" end
+			return true
+		end
+		if observer then
+			if source.stop_observer and not rawequal(source.stop_observer, observer) then return false, "observer_conflict" end
+			source.stop_observer = observer
+		end
+		source.final_requested = true
+		source.life.revoke()
+		if source.operation or source.publishing or source.releasing then
+			-- Latch denial now, but never settle through a foreign notification frame.
+			if source.last_session then stop_session() end
+			return false, "pending"
+		end
+		local stopped, reason = run(function() return stop_session() end)
+		if source.closed then return true end
+		if stopped and finish_source(source) then return true end
+		return false, reason or "pending"
+	end
+	function capability.retired(candidate_owner, candidate_token)
+		return exact(candidate_owner, candidate_token) and source.closed == true
+			and not source.operation and not source.publishing and not source.releasing
+			and actual_retired(owner, source.token)
+	end
+	source.life.bind_detach(function(candidate_owner, candidate_token)
+		if not exact(candidate_owner, candidate_token) then return false end
+		return capability.shutdown(candidate_owner, candidate_token)
+	end)
+	source.shutdown = capability.shutdown
+	managed_source = source
+	return capability
 end
 
 return M
