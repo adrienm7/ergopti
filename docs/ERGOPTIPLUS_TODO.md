@@ -5532,6 +5532,14 @@ genuine native execution and product SyntheticInput broker integration remain
 unfinished. This probe does not implement the product global action or complete
 physical dual-display acceptance.
 
+Native macOS CI 37304571728 did not execute this probe: two portable wrapper
+controls expected lexical library paths, whereas the controller correctly uses
+the canonical source root (`/var` resolves to `/private/var` on the runner).
+The fixture now checks canonical library identities while retaining the exact
+literal owned output argument; an independent source-alias case covers the
+same boundary on Linux. No native permission or switch result is inferred from
+this preparatory failure. Native execution and product integration remain open.
+
 Windows continuation for item111 (explicitly deferred to the maintainer's PC):
 
 1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
