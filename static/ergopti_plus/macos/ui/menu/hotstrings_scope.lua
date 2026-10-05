@@ -448,7 +448,7 @@ function M.new(options)
 		end,
 		restore = function(snapshot)
 			if Dynamic.user_code_scope_restore(snapshot.programmable) ~= true then return false end
-			if snapshot.adopted then
+			if snapshot.adopted or secondary.pending() then
 				if Config.adopt_scope_source(fence, snapshot.config.source, secondary.restore) ~= true then return false end
 				snapshot.adopted = false
 			end

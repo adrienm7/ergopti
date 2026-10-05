@@ -3715,34 +3715,31 @@ local function _build_tap_holds(ctx)
 				}
 			end
 
-			rows[#rows + 1] = {
-				label = _tap_hold_key_label(catalog_entry) .. "  :  "
-					.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
-				checked = configured or nil,
-				items = {
-					ManifestMenu.command_row("tap_hold_key_native_commands", "tap_hold_key_native", {
-						["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
-					}, { ["tap_hold_key_configured"] = function() return configured end }),
-					{ separator = true },
-					{
-						label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
-						action = function() pick_tap(catalog_entry, tap) end,
-					},
-					{
-						label = string.format(i18n_safe("tap_hold.picker.hold"), hold_label),
-						items = hold_rows,
-					},
-					{
-						label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
-						items = {
-							{
-								label = i18n_safe("menu.tapholds.key_tap_delay_set"),
-								action = function() ask_delay(key_id, ms) end,
-							},
+			local key_rows = ManifestMenu.template_rows("tap_hold_key_head", {
+				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
+				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
+			}, {
+				["tap_hold_key_configured"] = function() return configured end,
+				["tap_hold_key_tap_caption"] = function() return tap_label end,
+				["tap_hold_key_hold_caption"] = function() return hold_label end,
+			}, { ["tap_hold_key_hold"] = hold_rows })
+			if key_rows then
+				key_rows[#key_rows + 1] = {
+					label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
+					items = {
+						{
+							label = i18n_safe("menu.tapholds.key_tap_delay_set"),
+							action = function() ask_delay(key_id, ms) end,
 						},
 					},
-				},
-			}
+				}
+				rows[#rows + 1] = {
+					label = _tap_hold_key_label(catalog_entry) .. "  :  "
+						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
+					checked = configured or nil,
+					items = key_rows,
+				}
+			end
 		end
 		return rows
 	end

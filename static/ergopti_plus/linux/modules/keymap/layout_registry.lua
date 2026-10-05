@@ -340,10 +340,10 @@ end
 --- @return string|nil error
 local function read_installed(deps)
 	local path = deps.local_dir .. deps.settings.installed_file
-	if not deps.exists(path) then return Catalogue.decode_installed(nil, deps.decode_json) end
+	if not deps.exists(path) then return Catalogue.decode_installed(nil, deps.decode_installed_json or Json.decode_lossless) end
 	local text = deps.read(path)
 	if type(text) ~= "string" then return nil, "cannot read " .. path end
-	local record, err = Catalogue.decode_installed(text, deps.decode_json)
+	local record, err = Catalogue.decode_installed(text, deps.decode_installed_json or Json.decode_lossless)
 	for id, item in pairs(record and record.outdated or {}) do
 		Outdated.report_in_file(path, { "layouts", id }, item.detail)
 	end

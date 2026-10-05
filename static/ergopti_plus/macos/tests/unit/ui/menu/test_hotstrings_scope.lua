@@ -821,3 +821,37 @@ helpers.describe("hotstrings scope: delimiter parity (hotstrings-delimiter-scope
 		helpers.assert_eq(f.owner.apply("recommended"), true, "ordinary scopes resume after settlement")
 	end)
 end)
+
+helpers.describe("Hotstrings refused secondary publication receipt", function()
+	helpers.it("retains unadopted native debt and external conflicts until the exact inverse settles", function()
+		local f = fixture()
+		local fs = package.loaded["adapters.file_system"]
+		local original = fs.write_if_unchanged
+		local blocked, owed, releases = true, true, 0
+		fs.write_if_unchanged = function(path, content, source)
+			local written = original(path, content, source)
+			if path == "overrides" and owed and written == true then
+				owed = false
+				return false, "native publication release refused", function()
+					releases = releases + 1
+					return not blocked, "release remains pending", true
+				end
+			end
+			return written
+		end
+		helpers.assert_eq(f.owner.apply("recommended"), false)
+		helpers.assert_eq(f.owner.pending(), true, "unadopted partial publication retains the owning transaction")
+		helpers.assert_eq(f.owner.retry_restore(), false)
+		local candidate = f.files.overrides
+		f.files.overrides = "external successor"
+		blocked = false
+		helpers.assert_eq(f.owner.retry_restore(), false, "release alone cannot compensate changed bytes")
+		helpers.assert_eq(f.owner.retry_restore(), false, "secondary debt must outlive its settled release")
+		helpers.assert_eq(f.files.overrides, "external successor")
+		f.files.overrides = candidate
+		helpers.assert_eq(f.owner.retry_restore(), true)
+		helpers.assert_eq(f.files.overrides, ORIGINAL_OVERRIDES)
+		helpers.assert_eq(f.owner.pending(), false)
+		helpers.assert_true(releases >= 2)
+	end)
+end)
