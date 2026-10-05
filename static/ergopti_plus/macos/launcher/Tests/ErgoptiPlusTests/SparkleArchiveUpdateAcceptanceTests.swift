@@ -37,6 +37,12 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	private enum ObservedTermination {
+		case unavailable
+		case exit(Int32)
+		case signal(Int32)
+	}
+
 	private struct Receipt {
 		let status: Int32
 		let stdout: String
@@ -177,6 +183,18 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			try admitGuardRetirement()
 		}
 
+		/// Report only a native exit already acknowledged by this owner.
+		/// Diagnostics never acquire another wait or alter child retirement.
+		func observedTerminationFacts() -> ObservedTermination {
+			guard launched, observedExit, !process.isRunning else { return .unavailable }
+			let status = process.terminationStatus
+			switch process.terminationReason {
+			case .exit where (0...255).contains(status): return .exit(status)
+			case .uncaughtSignal where (1...64).contains(status): return .signal(status)
+			default: return .unavailable
+			}
+		}
+
 		/// Repeated observations reuse the physical exit ACK and immutable receipt;
 		/// consuming the semaphore once can never turn an exited child into a timeout.
 		func finish(_ seconds: Double) throws -> Receipt {
@@ -206,6 +224,32 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 	private let manager = FileManager.default
 	private var commands: [OwnedProcess] = []
 	private var retirementDebt = false
+
+	/// Only fixed failure classes and bounded already-observed facts cross XCTest.
+	private func serverExitRefusalMessage(_ error: Error, termination: ObservedTermination) -> String {
+		let code: String
+		switch error {
+		case Failure.deadline: code = "deadline"
+		case Failure.evidence(let fact):
+			switch fact {
+			case "server-retirement": code = "exit-status"
+			case "native-child-signal": code = "native-signal"
+			case "native-capture-retirement": code = "capture-retirement"
+			case "native-child-capture": code = "capture-admission"
+			case "unlaunched-native-child": code = "unlaunched"
+			default: code = "unavailable"
+			}
+		default: code = "unavailable"
+		}
+		let reason: String
+		let status: String
+		switch termination {
+		case .exit(let value) where (0...255).contains(value): reason = "exit"; status = String(value)
+		case .signal(let value) where (1...64).contains(value): reason = "signal"; status = String(value)
+		default: reason = "unavailable"; status = "unavailable"
+		}
+		return "Native Sparkle server retirement refusal: code=" + code + " native_reason=" + reason + " native_status=" + status
+	}
 
 	private struct OwnedCensusDirectory {
 		let originalSpelling: String
@@ -532,6 +576,29 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	func testServerExitRefusalMessageProjectsOnlyClosedFacts() {
+		XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: .unavailable),
+			"Native Sparkle server retirement refusal: code=deadline native_reason=unavailable native_status=unavailable")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("server-retirement"), termination: .exit(23)),
+			"Native Sparkle server retirement refusal: code=exit-status native_reason=exit native_status=23")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: .signal(9)),
+			"Native Sparkle server retirement refusal: code=deadline native_reason=signal native_status=9")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("private-input-never-exported"), termination: .exit(0)),
+			"Native Sparkle server retirement refusal: code=unavailable native_reason=exit native_status=0")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("native-child-signal"), termination: .signal(15)),
+			"Native Sparkle server retirement refusal: code=native-signal native_reason=signal native_status=15")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("native-capture-retirement"), termination: .exit(0)),
+			"Native Sparkle server retirement refusal: code=capture-retirement native_reason=exit native_status=0")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("native-child-capture"), termination: .exit(0)),
+			"Native Sparkle server retirement refusal: code=capture-admission native_reason=exit native_status=0")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("unlaunched-native-child"), termination: .unavailable),
+			"Native Sparkle server retirement refusal: code=unlaunched native_reason=unavailable native_status=unavailable")
+		for refused in [ObservedTermination.exit(-1), .exit(256), .signal(0), .signal(65)] {
+			XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: refused),
+				"Native Sparkle server retirement refusal: code=deadline native_reason=unavailable native_status=unavailable")
+		}
+	}
+
 	func testDirectNativeChildExitACKAndCaptureRetirementAreIdempotent() throws {
 		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
 			.appendingPathComponent("ErgoptiSparkleChildACK-" + UUID().uuidString)
@@ -650,9 +717,14 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			}
 			if let server, server.process.processIdentifier > 0 {
 				attempt("server-exit") {
-					if server.process.isRunning { server.process.terminate() }
-					let retired = try server.finish(10)
-					guard retired.status == 0 else { throw Failure.evidence("server-retirement") }
+					do {
+						if server.process.isRunning { server.process.terminate() }
+						let retired = try server.finish(10)
+						guard retired.status == 0 else { throw Failure.evidence("server-retirement") }
+					} catch {
+						XCTFail(serverExitRefusalMessage(error, termination: server.observedTerminationFacts()))
+						throw error
+					}
 				}
 				attempt("server-terminal") {
 					let terminal = try waitFor("server-retired", root: root.appendingPathComponent("www"), seconds: 2)

@@ -1092,6 +1092,132 @@ try {
 	errors.push(`Native generated appcast composition guard failed: ${error.message}`);
 }
 
+// Bounded server-exit facts must reuse the existing exit ACK and preserve failure.
+try {
+	const assert = require('node:assert/strict');
+	const { annotation, evaluate } = require('../diagnostics/swift_xctest_evidence.cjs');
+	const nativeFile = path.join(
+		root,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+	);
+	const fixture = fs.readFileSync(nativeFile, 'utf8');
+	function assertServerExitDiagnosticSource(source) {
+		const factsStart = source.indexOf('func observedTerminationFacts()');
+		const facts = source.slice(
+			factsStart,
+			source.indexOf('/// Repeated observations reuse', factsStart)
+		);
+		assert.match(
+			facts,
+			/guard launched, observedExit, !process\.isRunning else \{ return \.unavailable \}/
+		);
+		assert.match(
+			facts,
+			/case \.exit where \(0\.\.\.255\)\.contains\(status\): return \.exit\(status\)/
+		);
+		assert.match(
+			facts,
+			/case \.uncaughtSignal where \(1\.\.\.64\)\.contains\(status\): return \.signal\(status\)/
+		);
+		assert.doesNotMatch(
+			facts,
+			/observeExit\(|\.wait\(|\.terminate\(|kill\(|\.run\(|read|close|stdout|stderr/
+		);
+		const formatterStart = source.indexOf('private func serverExitRefusalMessage(');
+		const formatter = source.slice(
+			formatterStart,
+			source.indexOf('private struct OwnedCensusDirectory', formatterStart)
+		);
+		assert.match(formatter, /case Failure\.deadline: code = "deadline"/);
+		assert.match(formatter, /case "server-retirement": code = "exit-status"/);
+		assert.match(formatter, /case "native-child-signal": code = "native-signal"/);
+		assert.match(formatter, /default: code = "unavailable"/);
+		assert.match(formatter, /default: reason = "unavailable"; status = "unavailable"/);
+		assert.doesNotMatch(
+			formatter,
+			/localizedDescription|String\(describing:|stdout|stderr|\.path|nonce/
+		);
+		const cleanupStart = source.indexOf('attempt("server-exit")');
+		const cleanup = source.slice(
+			cleanupStart,
+			source.indexOf('attempt("server-terminal")', cleanupStart)
+		);
+		assert.match(cleanup, /if server\.process\.isRunning \{ server\.process\.terminate\(\) \}/);
+		assert.match(cleanup, /let retired = try server\.finish\(10\)/);
+		assert.match(
+			cleanup,
+			/guard retired.status == 0 else \{ throw Failure\.evidence\("server-retirement"\) \}/
+		);
+		assert.match(
+			cleanup,
+			/catch \{\s*XCTFail\(serverExitRefusalMessage\(error, termination: server\.observedTerminationFacts\(\)\)\)\s*throw error/
+		);
+		assert.match(source, /func testServerExitRefusalMessageProjectsOnlyClosedFacts\(\)/);
+	}
+	assertServerExitDiagnosticSource(fixture);
+	for (const [reason, mutated] of [
+		[
+			'unobserved child status',
+			fixture.replace(
+				'guard launched, observedExit, !process.isRunning',
+				'guard launched, !process.isRunning'
+			)
+		],
+		[
+			'diagnostic acquires another wait',
+			fixture.replace(
+				'let status = process.terminationStatus',
+				'let status = process.terminationStatus; _ = observeExit(0)'
+			)
+		],
+		[
+			'raw error export',
+			fixture.replace('default: code = "unavailable"', 'default: code = error.localizedDescription')
+		],
+		[
+			'primary failure swallowed',
+			fixture.replace(
+				'XCTFail(serverExitRefusalMessage(error, termination: server.observedTerminationFacts()))\n\t\t\t\t\t\tthrow error',
+				'XCTFail(serverExitRefusalMessage(error, termination: server.observedTerminationFacts()))'
+			)
+		]
+	])
+		assert.throws(() => assertServerExitDiagnosticSource(mutated), reason);
+	// This independent authentic XCTest fixture exercises the actual annotation owner.
+	const fixedFacts =
+		'Native Sparkle server retirement refusal: code=deadline native_reason=signal native_status=9';
+	const text = [
+		"Test Suite 'All tests' started at 2026-10-05 01:00:00.000.",
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' started.",
+		nativeFile + ':777: error: failed - ' + fixedFacts,
+		"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' failed (0.100 seconds).",
+		"Test Suite 'All tests' failed at 2026-10-05 01:00:01.000.",
+		'\t Executed 1 test, with 1 failure (0 unexpected) in 0.100 (0.110) seconds'
+	].join('\n');
+	const verdict = evaluate(text, 1, 0, root);
+	const diagnostic = verdict.failures.find((failure) => failure.message.endsWith(fixedFacts));
+	assert.notEqual(diagnostic, undefined, 'real XCTest failures expose only closed server facts');
+	assert.equal(
+		annotation(diagnostic),
+		'::error title=Swift XCTest failure,file=static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift,line=777::failed - ' +
+			fixedFacts
+	);
+	assert.equal(verdict.exit_status, 1);
+	assert.equal(verdict.complete, false, 'a observed exit signal is not retirement success');
+	assert.equal(
+		evaluate(fixedFacts, 1, 0, root).failures.some((failure) =>
+			failure.message.endsWith(fixedFacts)
+		),
+		false,
+		'a raw print cannot stand in for the native XCTest diagnostic'
+	);
+	console.log(
+		'Sparkle server-exit refusal uses bounded existing native exit facts without changing retirement.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle server-exit diagnostic guard failed: ${error.message}`);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
