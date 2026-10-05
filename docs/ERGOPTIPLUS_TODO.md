@@ -1352,6 +1352,25 @@ These are software implementations; final hardware verification remains below.
   Foreign runtime gates remain deferred. No shared contract, release/install
   behavior, reserved surface or native transport policy changed.
 
+- [~] **L98.** Linux native HTTP empty-field serialization: curl interprets
+  `Name:` as removal, silently omitting a caller's valid present-empty field.
+  Serialize empty or SP/HTAB-only values using curl's semicolon syntax after the
+  unchanged shared header validation. Preserve ordinary values, absent fields,
+  native default overrides and sensitive-header redirect policy across GET,
+  owned GET, POST and streaming POST. Fifty-six real native controls retain the original forty-four and add
+  twelve whitespace cases, passing after with current and verified Ubuntu
+  22.04 curl/libuv, plus stock Lua 5.4's actual native backend. Thirty-two wire
+  requests check field presence/defaults and redirect receipts; twenty-four
+  actual metadata refusals retain callback policy and never spawn curl. Sixteen
+  registered unit regressions preserve every previous HTTP assertion; exact
+  nonempty configuration bytes and narrow whitespace handling are checked. Register
+  both native interpreter runs for future Linux CI without launching workflows.
+  Windows's curl serializer has the same colon-only empty-value bug by source;
+  a matching native serialization proposal is documented without editing the
+  principal agent's driver. WinHttp and macOS consume native header maps;
+  foreign runtime qualification remains deferred. No common header policy,
+  duplicate-field rule, reserved surface or shared port changed.
+
 - [~] **5.** Complete W1 neutral configuration and recommended/clear scopes.
   Finish macOS Hotstrings and TapHold, Linux Hotstrings and TapHold, then global
   composition. Keep unknown fields, verified backups, exact runtime

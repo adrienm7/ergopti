@@ -329,7 +329,11 @@ local function curl_args(url, headers, body, options)
 		local header_name, header_value = tostring(name), tostring(headers[name])
 		local allowed, err = HeaderPolicy.validate(header_name, header_value)
 		if not allowed then error(err) end
-		lines[#lines + 1] = "header = " .. config_quote(header_name .. ": " .. header_value)
+		-- Curl's empty colon form removes a field; semicolon sends an empty
+		-- value, preserving the caller's distinction between present and absent.
+		local wire_header = header_value:match("^[ \t]*$") and header_name .. ";"
+			or header_name .. ": " .. header_value
+		lines[#lines + 1] = "header = " .. config_quote(wire_header)
 	end
 	-- Curl config lines are limited to 10 MB. A separate inherited pipe carries
 	-- admitted caller text without putting it in a config line, argv or a file.
