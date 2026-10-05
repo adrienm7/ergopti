@@ -1892,282 +1892,304 @@ local function teardown_runtime(opts)
 	return TeardownTransaction.run(_teardown_state, steps)
 end
 
+--- Engine observations are dormant; actual pause commits remain a separate writer.
+local _physical_lifecycle = require("keylogger.physical_lifecycle_observation").new("engine", function()
+	return require("adapters.physical_observation_clock").now()
+end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
+
+local function physical_lifecycle_snapshot()
+	local generation = _runtime_generation
+	local paused = _is_paused()
+	if generation ~= _runtime_generation then return {} end
+	return { enabled = CoreState.is_enabled, paused = paused, runtime_generation = generation }
+end
+
 --- Starts the keylogger engine and all background daemons.
 --- Idempotent: calling it a second time while running is a no-op.
 --- @param script_control table The module used to check expansion pauses.
 function M.start(script_control)
-	if CoreState.is_enabled then
-		Logger.warn(LOG, "M.start() called while already running — ignoring.")
-		return true
-	end
-	if not teardown_runtime() then
-		Logger.error(LOG, "Keylogger start refused: prior cleanup remains pending.")
-		return false
-	end
-	_teardown_state = TeardownTransaction.new_state()
-	Logger.start(LOG, "Starting keylogger engine…")
-	_script_control = script_control
-
-	-- Seed the layout cache and keep it current from the OS notification. The
-	-- per-word context snapshot used to call hs.keycodes.currentLayout() itself,
-	-- inside the eventtap callback; the layout only changes when the system says so,
-	-- so one read plus a listener replaces one read per word.
-	local ok_layout, layout = pcall(hs.keycodes.currentLayout)
-	_cached_layout = (ok_layout and type(layout) == "string") and layout or "Unknown"
-	local startup_prepared, startup_prepare_err = xpcall(function()
-	if type(InputSourceBroker.subscribe) ~= "function" then
-		error("input-source broker is unavailable")
-	end
-	_layout_listener = true
-	local subscribed = InputSourceBroker.subscribe(INPUT_SOURCE_SUBSCRIBER_ID,
-		function()
-			local ok_new, new_layout = pcall(hs.keycodes.currentLayout)
-			if ok_new and type(new_layout) == "string" then
-				_cached_layout = new_layout
-				Logger.debug(LOG, "Layout cache refreshed: %s.", new_layout)
-			end
-		end)
-	if subscribed ~= true then error("input-source subscription failed") end
-
-	-- Cache the keymap module reference once to avoid pcall(require, ...) per keystroke
-	local ok_km, km = pcall(require, "modules.keymap")
-	if ok_km and type(km) == "table" then
-		_keymap_mod = km
-		Logger.debug(LOG, "Keymap module cached for shift-side detection.")
-	else
-		Logger.debug(LOG, "Keymap module not available — shift side will be 'none'.")
-	end
-
-	-- Initialise sub-modules on first start (deferred from require-time
-	-- so metrics directories are only created when the feature is on)
-	if not _state then
-		_log_manager_cleanup_required = true
-		if LogManager.init(CoreState) ~= true then
-			error("log manager refused initialization")
+	return _physical_lifecycle.run("start", function()
+		if CoreState.is_enabled then
+			Logger.warn(LOG, "M.start() called while already running — ignoring.")
+			return true
 		end
-		-- The context tracker owns three OS watchers that pause does NOT tear down,
-		-- so it needs the same pause predicate as the watcher layer below.
-		if ContextTracker.init(CoreState, LogManager, _is_paused) ~= true then
-			error("keylogger context tracker initialization failed")
-		end
-		-- The watcher layer needs the shared state and the pause predicate; both
-		-- are stable for the process lifetime, so a one-shot init is sufficient.
-		if Watchers.init(CoreState, _is_paused) ~= true then
-			error("keylogger watcher initialization failed")
-		end
-		_state = true
-	end
-
-	-- Security-critical application lifecycle must commit before any keyboard
-	-- hook or persistence producer is enabled. A missing app watcher would leave
-	-- the secure-field context stale while the keylogger continued recording.
-	if not _process_lifecycle_registered then
-		ProcessLifecycle.onAppActivate(function(app_name, app_object)
-			local context_ok, context_err = xpcall(function()
-				ContextTracker.app_watcher_cb(app_name,
-					hs.application.watcher.activated, app_object)
-			end, debug.traceback)
-			if not context_ok then
-				CoreState.is_secure_field = true
-				Logger.error(LOG, "Application context refresh failed — logging disabled: %s.",
-					tostring(context_err))
-				return
-			end
-			if BROWSER_APP_SET[app_name] then
-				local filter_ok, filter_err = xpcall(ensure_browser_window_filter,
-					debug.traceback)
-				if not filter_ok then
-					Logger.error(LOG, "Optional browser window-filter setup failed: %s.",
-						tostring(filter_err))
-				end
-			end
-		end)
-		_process_lifecycle_registered = true
-	end
-	end, debug.traceback)
-	if not startup_prepared then
-		CoreState.is_secure_field = true
-		Logger.error(LOG, "Keylogger preparation failed: %s", tostring(startup_prepare_err))
 		if not teardown_runtime() then
-			Logger.error(LOG, "Keylogger preparation rollback remains incomplete.")
+			Logger.error(LOG, "Keylogger start refused: prior cleanup remains pending.")
+			return false
 		end
-		return false
-	end
-	local acquired, acquire_err = xpcall(function()
-		_runtime_generation = _runtime_generation + 1
-		local runtime_generation = _runtime_generation
-		_process_lifecycle_cleanup_required = true
-		if ProcessLifecycle.start() ~= true then
-			error("application lifecycle watcher is unavailable")
-		end
-		KcBridge.set_log_manager(LogManager)
-		if KcBridge.start() ~= true then error("KC bridge refused startup") end
-		_kc_bridge_shutdown_complete = false
-		-- A normal OFF stops LogManager but deliberately preserves its initialized
-		-- state. ensure_ingest_running() then reacquires the timer/database on ON;
-		-- publish that cleanup obligation before the call so a partial throw and the
-		-- next OFF both release the exact rearmed owner.
-		_log_manager_cleanup_required = true
-		if LogManager.ensure_ingest_running() ~= true then
-			error("log ingest refused startup")
-		end
-		if not _action_listener_registered then
-			reconcile_action_epoch(SyntheticInput.current_action_epoch())
-			if SyntheticInput.register_action_listener(ACTION_EPOCH_LISTENER_ID,
-				reconcile_action_epoch) == false then
-				error("action listener refused startup")
-			end
-			_action_listener_registered = true
-		end
+		_teardown_state = TeardownTransaction.new_state()
+		Logger.start(LOG, "Starting keylogger engine…")
+		_script_control = script_control
 
-		CoreState.is_secure_field = true
-		CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
-		CoreState.recent_typing_eff = {}
-		CoreState.recent_typing_phys = {}
-
-		local caffeinate_created, caffeinate_candidate = xpcall(function()
-			return hs.caffeinate.watcher.new(function(...)
-				invoke_runtime_callback(runtime_generation, "Caffeinate watcher",
-					Watchers.caffeinate_cb, ...)
-			end)
-		end, debug.traceback)
-		if not caffeinate_created or not caffeinate_candidate then
-			error("caffeinate watcher construction failed")
+		-- Seed the layout cache and keep it current from the OS notification. The
+		-- per-word context snapshot used to call hs.keycodes.currentLayout() itself,
+		-- inside the eventtap callback; the layout only changes when the system says so,
+		-- so one read plus a listener replaces one read per word.
+		local ok_layout, layout = pcall(hs.keycodes.currentLayout)
+		_cached_layout = (ok_layout and type(layout) == "string") and layout or "Unknown"
+		local startup_prepared, startup_prepare_err = xpcall(function()
+		if type(InputSourceBroker.subscribe) ~= "function" then
+			error("input-source broker is unavailable")
 		end
-		_caffeinate_watcher = caffeinate_candidate
-		local caffeinate_started, caffeinate_result = xpcall(function()
-			if type(caffeinate_candidate.start) ~= "function" then
-				error("caffeinate watcher has no start method")
-			end
-			return caffeinate_candidate:start()
-		end, debug.traceback)
-		if not caffeinate_started or caffeinate_result ~= caffeinate_candidate then
-			error("caffeinate watcher refused startup")
-		end
-		if Watchers.init_hardware_watchers() ~= true then
-			error("hardware watchers refused startup")
-		end
-
-		local keyboard_hook_options = {
-			eventTypes = {
-				hs.eventtap.event.types.keyDown,
-				hs.eventtap.event.types.flagsChanged,
-				hs.eventtap.event.types.leftMouseDown,
-				hs.eventtap.event.types.rightMouseDown,
-				hs.eventtap.event.types.scrollWheel,
-			},
-			onEvent = handle_key,
-		}
-		_keyboard_hook_cleanup_required = true
-		if KeyboardHook.start(keyboard_hook_options) ~= true
-			or KeyboardHook.isRunning() ~= true then
-			error("keyboard event tap is unavailable")
-		end
-		_event_tap = true
-
-		local watchdog_committed = acquire_recurring_timer(TAP_WATCHDOG_INTERVAL_SEC,
+		_layout_listener = true
+		local subscribed = InputSourceBroker.subscribe(INPUT_SOURCE_SUBSCRIBER_ID,
 			function()
-				invoke_runtime_callback(runtime_generation, "Event tap watchdog", function()
-				if not KeyboardHook.isRunning() then
-					CoreState.is_secure_field = true
-					Logger.warn(LOG, "Keylogger event tap found disabled — restarting.")
-					local restart_ok, restarted = Logger.pcall(LOG, KeyboardHook.start)
-					local state_ok, running = Logger.pcall(LOG, KeyboardHook.isRunning)
-					if restart_ok and restarted == true and state_ok and running == true then
-						local capture_ok, captured = Logger.pcall(LOG,
-							ContextTracker.capture_frontmost_app)
-						if not capture_ok or captured ~= true then
-							CoreState.is_secure_field = true
-							Logger.error(LOG,
-								"Keylogger event tap recovered without a trusted context.")
-						end
-					else
-						Logger.error(LOG,
-							"Keylogger event tap restart failed — persistence disabled until recovery.")
-					end
+				local ok_new, new_layout = pcall(hs.keycodes.currentLayout)
+				if ok_new and type(new_layout) == "string" then
+					_cached_layout = new_layout
+					Logger.debug(LOG, "Layout cache refreshed: %s.", new_layout)
 				end
-				end)
-			end, function(candidate) _tap_watchdog_timer = candidate end)
-		if not watchdog_committed then
-			error("event tap watchdog refused startup")
+			end)
+		if subscribed ~= true then error("input-source subscription failed") end
+
+		-- Cache the keymap module reference once to avoid pcall(require, ...) per keystroke
+		local ok_km, km = pcall(require, "modules.keymap")
+		if ok_km and type(km) == "table" then
+			_keymap_mod = km
+			Logger.debug(LOG, "Keymap module cached for shift-side detection.")
+		else
+			Logger.debug(LOG, "Keymap module not available — shift side will be 'none'.")
 		end
 
-		local idle_committed = acquire_recurring_timer(IDLE_CHECK_INTERVAL_SEC,
-			function()
-				invoke_runtime_callback(runtime_generation, "Idle timer", Watchers.check_idle)
-			end, function(candidate) _idle_timer = candidate end)
-		if not idle_committed then
-			error("idle timer refused startup")
-		end
-		local maintenance_committed = acquire_recurring_timer(MAINTENANCE_INTERVAL_SEC,
-			function()
-				invoke_runtime_callback(runtime_generation, "Maintenance timer",
-					Watchers.perform_maintenance)
-			end, function(candidate) _maintenance_timer = candidate end)
-		if not maintenance_committed then
-			error("maintenance timer refused startup")
-		end
-
-		local bootstrap_candidate
-		local bootstrap_activation_in_progress = true
-		local bootstrap_delivered_before_commit = false
-		local bootstrap_delivered = false
-		local bootstrap_committed = acquire_recurring_timer(0, function()
-			if bootstrap_activation_in_progress then
-				bootstrap_delivered_before_commit = true
-				return
+		-- Initialise sub-modules on first start (deferred from require-time
+		-- so metrics directories are only created when the feature is on)
+		if not _state then
+			_log_manager_cleanup_required = true
+			if LogManager.init(CoreState) ~= true then
+				error("log manager refused initialization")
 			end
-			invoke_runtime_callback(runtime_generation, "Foreground-context bootstrap", function()
-				if bootstrap_delivered then
-					if _foreground_bootstrap_timer == bootstrap_candidate then
-						stop_retained_timer(bootstrap_candidate, function()
-							_foreground_bootstrap_timer = nil
-						end)
-					end
+			-- The context tracker owns three OS watchers that pause does NOT tear down,
+			-- so it needs the same pause predicate as the watcher layer below.
+			if ContextTracker.init(CoreState, LogManager, _is_paused) ~= true then
+				error("keylogger context tracker initialization failed")
+			end
+			-- The watcher layer needs the shared state and the pause predicate; both
+			-- are stable for the process lifetime, so a one-shot init is sufficient.
+			if Watchers.init(CoreState, _is_paused) ~= true then
+				error("keylogger watcher initialization failed")
+			end
+			_state = true
+		end
+
+		-- Security-critical application lifecycle must commit before any keyboard
+		-- hook or persistence producer is enabled. A missing app watcher would leave
+		-- the secure-field context stale while the keylogger continued recording.
+		if not _process_lifecycle_registered then
+			ProcessLifecycle.onAppActivate(function(app_name, app_object)
+				local context_ok, context_err = xpcall(function()
+					ContextTracker.app_watcher_cb(app_name,
+						hs.application.watcher.activated, app_object)
+				end, debug.traceback)
+				if not context_ok then
+					CoreState.is_secure_field = true
+					Logger.error(LOG, "Application context refresh failed — logging disabled: %s.",
+						tostring(context_err))
 					return
 				end
-				bootstrap_delivered = true
-				if not stop_retained_timer(bootstrap_candidate, function()
-					_foreground_bootstrap_timer = nil
-				end) then
-					Logger.error(LOG,
-						"Foreground-context bootstrap cleanup remains pending.")
-				end
-				local ok_capture, captured = Logger.pcall(LOG,
-					ContextTracker.capture_frontmost_app)
-				if not ok_capture or captured ~= true then
-					CoreState.is_secure_field = true
-					Logger.error(LOG,
-						"Initial application context was unavailable — logging remains disabled.")
+				if BROWSER_APP_SET[app_name] then
+					local filter_ok, filter_err = xpcall(ensure_browser_window_filter,
+						debug.traceback)
+					if not filter_ok then
+						Logger.error(LOG, "Optional browser window-filter setup failed: %s.",
+							tostring(filter_err))
+					end
 				end
 			end)
-		end, function(candidate)
-			bootstrap_candidate = candidate
-			_foreground_bootstrap_timer = candidate
-		end)
-		bootstrap_activation_in_progress = false
-		if not bootstrap_committed or bootstrap_delivered_before_commit then
-			error("foreground-context bootstrap timer refused startup")
+			_process_lifecycle_registered = true
+		end
+		end, debug.traceback)
+		if not startup_prepared then
+			CoreState.is_secure_field = true
+			Logger.error(LOG, "Keylogger preparation failed: %s", tostring(startup_prepare_err))
+			if not teardown_runtime() then
+				Logger.error(LOG, "Keylogger preparation rollback remains incomplete.")
+			end
+			return false
+		end
+		local acquired, acquire_err = xpcall(function()
+			_runtime_generation = _runtime_generation + 1
+			local runtime_generation = _runtime_generation
+			_process_lifecycle_cleanup_required = true
+			if ProcessLifecycle.start() ~= true then
+				error("application lifecycle watcher is unavailable")
+			end
+			KcBridge.set_log_manager(LogManager)
+			if KcBridge.start() ~= true then error("KC bridge refused startup") end
+			_kc_bridge_shutdown_complete = false
+			-- A normal OFF stops LogManager but deliberately preserves its initialized
+			-- state. ensure_ingest_running() then reacquires the timer/database on ON;
+			-- publish that cleanup obligation before the call so a partial throw and the
+			-- next OFF both release the exact rearmed owner.
+			_log_manager_cleanup_required = true
+			if LogManager.ensure_ingest_running() ~= true then
+				error("log ingest refused startup")
+			end
+			if not _action_listener_registered then
+				reconcile_action_epoch(SyntheticInput.current_action_epoch())
+				if SyntheticInput.register_action_listener(ACTION_EPOCH_LISTENER_ID,
+					reconcile_action_epoch) == false then
+					error("action listener refused startup")
+				end
+				_action_listener_registered = true
+			end
+
+			CoreState.is_secure_field = true
+			CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+			CoreState.recent_typing_eff = {}
+			CoreState.recent_typing_phys = {}
+
+			local caffeinate_created, caffeinate_candidate = xpcall(function()
+				return hs.caffeinate.watcher.new(function(...)
+					if runtime_generation ~= _runtime_generation then return end
+					local function invoke(...)
+						invoke_runtime_callback(runtime_generation, "Caffeinate watcher", Watchers.caffeinate_cb, ...)
+					end
+					if type(Watchers.observe_caffeinate_callback) == "function" then
+						local args = table.pack(...)
+						return Watchers.observe_caffeinate_callback(args[1], invoke, table.unpack(args, 2, args.n))
+					end
+					invoke(...)
+				end)
+			end, debug.traceback)
+			if not caffeinate_created or not caffeinate_candidate then
+				error("caffeinate watcher construction failed")
+			end
+			_caffeinate_watcher = caffeinate_candidate
+			local caffeinate_started, caffeinate_result = xpcall(function()
+				if type(caffeinate_candidate.start) ~= "function" then
+					error("caffeinate watcher has no start method")
+				end
+				return caffeinate_candidate:start()
+			end, debug.traceback)
+			if not caffeinate_started or caffeinate_result ~= caffeinate_candidate then
+				error("caffeinate watcher refused startup")
+			end
+			if Watchers.init_hardware_watchers() ~= true then
+				error("hardware watchers refused startup")
+			end
+
+			local keyboard_hook_options = {
+				eventTypes = {
+					hs.eventtap.event.types.keyDown,
+					hs.eventtap.event.types.flagsChanged,
+					hs.eventtap.event.types.leftMouseDown,
+					hs.eventtap.event.types.rightMouseDown,
+					hs.eventtap.event.types.scrollWheel,
+				},
+				onEvent = handle_key,
+			}
+			_keyboard_hook_cleanup_required = true
+			if KeyboardHook.start(keyboard_hook_options) ~= true
+				or KeyboardHook.isRunning() ~= true then
+				error("keyboard event tap is unavailable")
+			end
+			_event_tap = true
+
+			local watchdog_committed = acquire_recurring_timer(TAP_WATCHDOG_INTERVAL_SEC,
+				function()
+					invoke_runtime_callback(runtime_generation, "Event tap watchdog", function()
+					if not KeyboardHook.isRunning() then
+						CoreState.is_secure_field = true
+						Logger.warn(LOG, "Keylogger event tap found disabled — restarting.")
+						local restart_ok, restarted = Logger.pcall(LOG, KeyboardHook.start)
+						local state_ok, running = Logger.pcall(LOG, KeyboardHook.isRunning)
+						if restart_ok and restarted == true and state_ok and running == true then
+							local capture_ok, captured = Logger.pcall(LOG,
+								ContextTracker.capture_frontmost_app)
+							if not capture_ok or captured ~= true then
+								CoreState.is_secure_field = true
+								Logger.error(LOG,
+									"Keylogger event tap recovered without a trusted context.")
+							end
+						else
+							Logger.error(LOG,
+								"Keylogger event tap restart failed — persistence disabled until recovery.")
+						end
+					end
+					end)
+				end, function(candidate) _tap_watchdog_timer = candidate end)
+			if not watchdog_committed then
+				error("event tap watchdog refused startup")
+			end
+
+			local idle_committed = acquire_recurring_timer(IDLE_CHECK_INTERVAL_SEC,
+				function()
+					invoke_runtime_callback(runtime_generation, "Idle timer", Watchers.check_idle)
+				end, function(candidate) _idle_timer = candidate end)
+			if not idle_committed then
+				error("idle timer refused startup")
+			end
+			local maintenance_committed = acquire_recurring_timer(MAINTENANCE_INTERVAL_SEC,
+				function()
+					invoke_runtime_callback(runtime_generation, "Maintenance timer",
+						Watchers.perform_maintenance)
+				end, function(candidate) _maintenance_timer = candidate end)
+			if not maintenance_committed then
+				error("maintenance timer refused startup")
+			end
+
+			local bootstrap_candidate
+			local bootstrap_activation_in_progress = true
+			local bootstrap_delivered_before_commit = false
+			local bootstrap_delivered = false
+			local bootstrap_committed = acquire_recurring_timer(0, function()
+				if bootstrap_activation_in_progress then
+					bootstrap_delivered_before_commit = true
+					return
+				end
+				invoke_runtime_callback(runtime_generation, "Foreground-context bootstrap", function()
+					if bootstrap_delivered then
+						if _foreground_bootstrap_timer == bootstrap_candidate then
+							stop_retained_timer(bootstrap_candidate, function()
+								_foreground_bootstrap_timer = nil
+							end)
+						end
+						return
+					end
+					bootstrap_delivered = true
+					if not stop_retained_timer(bootstrap_candidate, function()
+						_foreground_bootstrap_timer = nil
+					end) then
+						Logger.error(LOG,
+							"Foreground-context bootstrap cleanup remains pending.")
+					end
+					local ok_capture, captured = Logger.pcall(LOG,
+						ContextTracker.capture_frontmost_app)
+					if not ok_capture or captured ~= true then
+						CoreState.is_secure_field = true
+						Logger.error(LOG,
+							"Initial application context was unavailable — logging remains disabled.")
+					end
+				end)
+			end, function(candidate)
+				bootstrap_candidate = candidate
+				_foreground_bootstrap_timer = candidate
+			end)
+			bootstrap_activation_in_progress = false
+			if not bootstrap_committed or bootstrap_delivered_before_commit then
+				error("foreground-context bootstrap timer refused startup")
+			end
+
+			CoreState.is_enabled = true
+			Logger.success(LOG, "Keylogger engine started.")
+		end, debug.traceback)
+		if not acquired then
+			CoreState.is_secure_field = true
+			Logger.error(LOG, "Keylogger start aborted: %s", tostring(acquire_err))
+			if not teardown_runtime() then
+				Logger.error(LOG, "Keylogger startup rollback remains incomplete.")
+			end
+			return false
 		end
 
-		CoreState.is_enabled = true
-		Logger.success(LOG, "Keylogger engine started.")
-	end, debug.traceback)
-	if not acquired then
-		CoreState.is_secure_field = true
-		Logger.error(LOG, "Keylogger start aborted: %s", tostring(acquire_err))
-		if not teardown_runtime() then
-			Logger.error(LOG, "Keylogger startup rollback remains incomplete.")
-		end
-		return false
-	end
+		-- New persistence model: data.sql is the canonical source of truth and
+		-- the SQLite cache in tmpdir is reconstructed by log_manager.M.init().
+		-- No deferred rebuild dance is needed at boot — the ingest tick will
+		-- catch up on any today.log entries written by a previous keylogger
+		-- session that did not get flushed before exit.
+		return true
 
-	-- New persistence model: data.sql is the canonical source of truth and
-	-- the SQLite cache in tmpdir is reconstructed by log_manager.M.init().
-	-- No deferred rebuild dance is needed at boot — the ingest tick will
-	-- catch up on any today.log entries written by a previous keylogger
-	-- session that did not get flushed before exit.
-	return true
+	end, physical_lifecycle_snapshot)
 end
 
 --- Re-synchronises the cached app/secure-field context with reality.
@@ -2176,36 +2198,42 @@ end
 --- a pause never updated the cached context — and nothing else re-syncs it.
 --- @return boolean True when the context was re-synchronised.
 function M.resync_context()
-	-- A modifier held across the pause never received its release: handle_key returns
-	-- at the pause guard, so the keyUp that would clear modifier_down_at never ran.
-	-- The stale down-timestamp would then be misread as a fresh press on the next
-	-- flagsChanged, inverting press/release and logging a hold that never happened.
-	-- An unmatched down carries no usable duration, so discard it.
-	CoreState.modifier_down_at = {}
-	local ok, res = pcall(ContextTracker.resync_context)
-	if not ok then
-		Logger.error(LOG, "resync_context() failed: %s.", tostring(res))
-		return false
-	end
-	return res == true
+	return _physical_lifecycle.run("resync", function()
+		-- A modifier held across the pause never received its release: handle_key returns
+		-- at the pause guard, so the keyUp that would clear modifier_down_at never ran.
+		-- The stale down-timestamp would then be misread as a fresh press on the next
+		-- flagsChanged, inverting press/release and logging a hold that never happened.
+		-- An unmatched down carries no usable duration, so discard it.
+		CoreState.modifier_down_at = {}
+		local ok, res = pcall(ContextTracker.resync_context)
+		if not ok then
+			Logger.error(LOG, "resync_context() failed: %s.", tostring(res))
+			return false
+		end
+		return res == true
+
+	end, physical_lifecycle_snapshot)
 end
 
 --- Halts all tracking, stops all timers and watchers, and flushes the buffer.
 --- Idempotent: calling it while not running is a no-op.
 function M.stop()
-	local was_enabled = CoreState.is_enabled
-	if was_enabled then Logger.start(LOG, "Stopping keylogger engine…") end
-	local complete = teardown_runtime()
-	if complete then
-		if was_enabled then
-			Logger.success(LOG, "Keylogger engine stopped.")
+	return _physical_lifecycle.run("stop", function()
+		local was_enabled = CoreState.is_enabled
+		if was_enabled then Logger.start(LOG, "Stopping keylogger engine…") end
+		local complete = teardown_runtime()
+		if complete then
+			if was_enabled then
+				Logger.success(LOG, "Keylogger engine stopped.")
+			else
+				Logger.warn(LOG, "M.stop() called while not running — cleanup verified.")
+			end
 		else
-			Logger.warn(LOG, "M.stop() called while not running — cleanup verified.")
+			Logger.error(LOG, "Keylogger stopped fail-closed; cleanup remains pending.")
 		end
-	else
-		Logger.error(LOG, "Keylogger stopped fail-closed; cleanup remains pending.")
-	end
-	return complete
+		return complete
+
+	end, physical_lifecycle_snapshot)
 end
 
 --- Terminates feature resources and the always-on physical-key ledger drain.
@@ -2213,18 +2241,37 @@ end
 --- file cursor; only process teardown may call this terminal lifecycle method.
 --- @return boolean complete True only when feature and bridge cleanup both commit.
 function M.shutdown()
-	-- Process exit/reload: skip the heavy final ingest (see LogManager.stop)
-	local feature_complete = teardown_runtime({ process_exit = true })
-	if not _kc_bridge_shutdown_complete then
-		local stopped, result = xpcall(KcBridge.stop, debug.traceback)
-		if stopped and result == true then
-			_kc_bridge_shutdown_complete = true
-		else
-			Logger.error(LOG, "KC bridge terminal cleanup remains pending: %s.",
-				tostring(result))
+	return _physical_lifecycle.run("shutdown", function()
+		-- Process exit/reload: skip the heavy final ingest (see LogManager.stop)
+		local feature_complete = teardown_runtime({ process_exit = true })
+		if not _kc_bridge_shutdown_complete then
+			local stopped, result = xpcall(KcBridge.stop, debug.traceback)
+			if stopped and result == true then
+				_kc_bridge_shutdown_complete = true
+			else
+				Logger.error(LOG, "KC bridge terminal cleanup remains pending: %s.",
+					tostring(result))
+			end
 		end
-	end
-	return feature_complete and _kc_bridge_shutdown_complete
+		return feature_complete and _kc_bridge_shutdown_complete
+
+	end, physical_lifecycle_snapshot)
 end
+
+--- Binds copied lifecycle facts without enabling or starting the engine.
+---@param owner table Exact observer owner.
+---@param capacity integer Positive native receipt budget.
+---@param receive function Literal-true receipt acknowledger.
+---@return table|nil token Exact observer token.
+function M.bind_physical_lifecycle_observer(owner, capacity, receive)
+	if math.type(capacity) ~= "integer" then return nil, "Invalid native lifecycle receipt budget" end
+	return _physical_lifecycle.bind(owner, capacity, receive)
+end
+
+--- Detaches only the exact engine lifecycle owner and token.
+---@param owner table Exact observer owner.
+---@param token table Exact observer token.
+---@return boolean detached Whether the owned observer was detached.
+function M.unbind_physical_lifecycle_observer(owner, token) return _physical_lifecycle.unbind(owner, token) end
 
 return M

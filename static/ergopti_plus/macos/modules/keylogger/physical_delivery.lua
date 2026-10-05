@@ -57,6 +57,11 @@ function M.new(dependencies)
 	---@return boolean
 	function receiver.active() return state == "baselining" or state == "active" or state == "delivering" end
 
+	--- Reports completed initial-state admission, including an owned batch delivery.
+	--- Opening state alone cannot authorize a history adapter or physical credit.
+	---@return boolean ready Whether this exact receiver completed its baseline.
+	function receiver.ready() return state == "active" or state == "delivering" end
+
 	--- Revokes delivery before any successor capture can begin.
 	function receiver.stop() state, ownership, initial, held = "stopped", nil, nil, {} end
 

@@ -332,6 +332,54 @@ Actual Darwin SDK/full source compilation and this calibration remain unexecuted
 until targeted manual CI; compilation alone cannot establish native capture,
 installation or physical accounting authority. TODO31 stays open.
 
+## Exact retained history prerequisites
+
+The dormant lifecycle channel now observes real keylogger start/stop/shutdown,
+resync, hardware and sleep/wake writers under exact owner/generation fences.
+It records denied boundaries before foreign posture work and requires complete
+writer facts before recording completion; every receipt remains allowed=false.
+The actual pause writer is still unbound: resync cannot prove unpause. Independent
+review passes62 focused cases (41 new and21 unchanged), preserves171 grouped plus
+14 top-level original assertions, and passes40 shared assertions on both Lua
+ABIs; six semantic mutants are rejected. The one context dependency drift is
+exactly three documented formatting blank lines, with all other bytes preserved.
+
+A shared bounded permission-history prerequisite now requires five independently
+qualified source lanes, exact acknowledged configuration links and current
+capture checks around every foreign port. It copies retained facts, permanently
+denies unknown/gap/refusal/exhaustion and cancels an entire forbidden hold while
+preserving initial press attribution. Actual retirement needs six exact source
+owners and native settlement before erasing retained work. Independent review
+passes31 focused/discovered cases and19 extra controls on Lua54/LuaJIT, rejects
+eight semantic mutants and preserves all22 original bodies. This actor's original
+absence is not a previously integrated feature regression. The optional numeric API is now captured once and called only after a function
+type check; native64-bit integers and the bounded LuaJIT double path keep their
+existing semantics. Both interpreters pass nine independent representation and
+API-ownership controls, and the unchanged1015-source portability scan passes.
+Production native normalization, clock-domain/wall-epoch proof and retirement
+bindings stay open.
+
+The actual dormant capture owner additionally exposes an exact private-session
+scope, copied validated native timebase and revocable converter. Admission needs
+completed real Delivery baseline and actual Accounting ownership; diagnostic
+capturing/settled states grant no authority. Successors remain fenced until exact
+native retirement, accounting release and one owned scope release. Independent
+review passes20 focused controls and163 unchanged cases in13 modules on each
+tree, rejects nine mutants, and independently passes two successor/retirement
+controls. An accounting exception defect is reproduced at19/20 before correction;
+API-absence preimage failures are kept separate. Default startup is unchanged.
+The composed public engine writers retain their actual native bodies and real
+installed keyboard-handler identity. All four bodies are byte-conserved after
+removing the instrumentation indent. Independent review reproduces and corrects
+35 original accounting failures plus two security-delegation failures without
+changing those assertions, their fixture or their parser. The exact real-handler
+control fails before correction and passes afterward;110 focused and63 unchanged
+regression controls pass. No extra native query or pause authority is added.
+
+Full composed gates and native acceptance remain mandatory. No production history,
+pause admission, recovery, controlled shutdown or runtime is activated; TODO31
+stays open.
+
 ## Native CI status
 
 Most recent exact-source manual run37255224392 at pushedb1c0864dc selects

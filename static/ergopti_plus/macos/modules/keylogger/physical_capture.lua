@@ -162,6 +162,8 @@ local function publish_clock(candidate)
 	end
 	if candidate.stop_requested then finish_stop(candidate); return end
 	if not current(candidate) or candidate.failure then return end
+	local owned_information = { version = information.version, domain = information.domain,
+		numer = information.numer, denom = information.denom }
 	-- External context publication may request stop. Keep accounting ownership
 	-- until the callback unwinds, and revalidate before granting stream authority.
 	candidate.clock_publishing = true
@@ -173,7 +175,7 @@ local function publish_clock(candidate)
 		unavailable(candidate, "clock_context_refused", "Context owner refused the validated native clock")
 		return
 	end
-	candidate.clock_published, candidate.convert = true, convert
+	candidate.clock_published, candidate.convert, candidate.clock_information = true, convert, owned_information
 	start_stream(candidate)
 end
 
@@ -306,7 +308,7 @@ end
 ---@return boolean accepted False while an earlier owner or native task is retained.
 function M.start(options)
 	assert(dependencies, "Physical capture owner is not initialized")
-	if session and session.state ~= "stopped" then return false end
+	if session and (session.state ~= "stopped" or session.history_binding ~= nil) then return false end
 	local candidate = { state = "verifying", options = snapshot_options(options), acquiring = true }
 	candidate.receiver = Delivery.new({ batch_limit = candidate.options.batch_limit,
 		admit = function(frame)
@@ -460,6 +462,140 @@ function M.status()
 		and (not session.clock or session.clock_settled == true)
 		and (not session.transport or session.transport.isSettled())
 	return { state = session.state, reason = session.reason, settled = settled }
+end
+
+
+--- Binds one history capability to the actual existing native session owner.
+--- No task starts, clock samples, history, privacy decision or capture is admitted.
+--- Its opaque identity names only this Lua session, never a process incarnation.
+---@param owner table Exact trusted history adapter owner.
+---@return boolean bound False without an owned session or while another scope remains.
+---@return table|string scope Exact-session ports, or explicit refusal reason.
+function M.bind_history_scope(owner)
+	assert(type(owner) == "table", "Missing physical history scope owner")
+	local candidate = session
+	if not candidate or candidate.stop_requested or candidate.failure or candidate.state == "stopped"
+		or candidate.acquiring or candidate.accounting_transition then return false, "No available physical capture session" end
+	if candidate.history_binding ~= nil then return false, "Physical history scope already owned" end
+	local binding = { owner = owner, token = {}, active = true, busy = false, released = false }
+	candidate.history_binding = binding
+	local scope = {}
+
+	local function exact(token)
+		return not binding.released and rawequal(candidate.history_binding, binding) and rawequal(token, binding.token)
+	end
+	local function current_scope()
+		return binding.active and not binding.released and current(candidate)
+			and rawequal(candidate.history_binding, binding) and not candidate.stop_requested and not candidate.failure
+			and candidate.state ~= "stopped" and candidate.state ~= "stopping"
+	end
+	local function enter(token, retirement)
+		if not exact(token) then return false end
+		if binding.busy then binding.active = false; return false end
+		if not retirement and not current_scope() then return false end
+		binding.busy = true
+		return true
+	end
+	local function settled()
+		return candidate.state == "stopped" and candidate.accounting_owned ~= true and candidate.capture == nil
+			and not candidate.acquiring and not candidate.accounting_transition and not candidate.clock_starting
+			and not candidate.clock_publishing and (not candidate.verifier or candidate.verifier_settled == true)
+			and (not candidate.clock or candidate.clock_settled == true)
+	end
+	local scoped_convert = function(ticks)
+		assert(enter(binding.token), "Physical history clock scope is revoked")
+		if candidate.clock_published ~= true or type(candidate.convert) ~= "function" then
+			binding.busy = false; binding.active = false
+			error("Physical history native clock is unavailable", 2)
+		end
+		local original = candidate.convert
+		local ok, converted = pcall(original, ticks)
+		local accepted = ok and current_scope() and rawequal(candidate.convert, original)
+			and math.type(converted) == "integer" and converted >= 0
+		binding.busy = false
+		if not accepted then
+			binding.active = false
+			if not ok then error(converted, 0) end
+			error("Physical history clock conversion was revoked or invalid", 2)
+		end
+		return converted
+	end
+
+	--- Returns the exact owned session token, including while native retirement is pending.
+	---@return table token Opaque Lua session identity without a native incarnation claim.
+	function scope.identity() return binding.token end
+
+	--- Reports current session ownership; complete baseline admission is a separate port.
+	---@param token table Exact returned session token.
+	---@return boolean owned Whether this captured native session still owns authority.
+	function scope.current(token)
+		if not enter(token) then return false end
+		local owned = current_scope()
+		binding.busy = false
+		return owned
+	end
+
+	--- Reports only the original admitted stream after its actual baseline completes.
+	---@param token table Exact returned session token.
+	---@return string|nil capture Original validated producer incarnation/lease, without reconstruction.
+	function scope.admitted(token)
+		if not enter(token) then return nil end
+		local ok, admitted = pcall(function()
+			if candidate.state == "capturing" and candidate.receiver.ready() == true
+				and candidate.capture ~= nil and Accounting.admitted_capture() == candidate.capture then
+				return candidate.capture
+			end
+		end)
+		if not ok then binding.active = false end
+		if not ok or not current_scope() then admitted = nil end
+		binding.busy = false
+		return admitted
+	end
+
+	--- Returns detached verified timebase and one converter fenced to this exact session.
+	--- Native clock information is published only after its original context acknowledgement.
+	---@param token table Exact returned session token.
+	---@return table|nil information Copied validated native timebase, never a wall epoch.
+	---@return function|nil convert Original ticks to exact nanoseconds while still owned.
+	function scope.clock(token)
+		if not enter(token) then return nil end
+		local information
+		if candidate.clock_published == true and candidate.clock_information ~= nil then
+			local native = candidate.clock_information
+			information = { version = native.version, domain = native.domain, numer = native.numer, denom = native.denom }
+		end
+		if not current_scope() then information = nil end
+		binding.busy = false
+		if information then return information, scoped_convert end
+		return nil
+	end
+
+	--- Observes actual stop plus exact native child settlement and accounting release.
+	--- A diagnostic settled snapshot alone cannot satisfy this retirement obligation.
+	---@param token table Exact returned session token.
+	---@return boolean retired Whether the actual captured session committed native retirement.
+	function scope.settled(token)
+		if not enter(token, true) then return false end
+		local retired = settled()
+		binding.busy = false
+		return retired
+	end
+
+	--- Releases only exact scope ownership after the actual native session has retired.
+	--- Its history adapter must separately settle its other native observation owners.
+	---@param adapter_owner table Exact owner supplied at binding.
+	---@param token table Exact returned session token.
+	---@return boolean released Whether this exact native history scope was released.
+	function scope.release(adapter_owner, token)
+		if not rawequal(adapter_owner, binding.owner) or not enter(token, true) then return false end
+		local complete = settled()
+		binding.busy = false
+		if not complete then return false end
+		binding.active, binding.released = false, true
+		candidate.history_binding = nil
+		return true
+	end
+	return true, scope
 end
 
 return M

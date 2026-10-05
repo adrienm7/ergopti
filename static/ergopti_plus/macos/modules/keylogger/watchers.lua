@@ -732,4 +732,70 @@ function M.stop_hardware_watchers()
 	return settled
 end
 
+--- A bound actor observes existing writers; binding does not activate sensors.
+local PhysicalLifecycle = require("keylogger.physical_lifecycle_observation")
+local _physical_lifecycle = PhysicalLifecycle.new("system", function()
+	return require("adapters.physical_observation_clock").now()
+end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
+
+local function physical_lifecycle_snapshot()
+	local generation, refresh_generation = _hardware_generation, _context_refresh_generation
+	local paused = _is_paused and _is_paused()
+	if generation ~= _hardware_generation or refresh_generation ~= _context_refresh_generation then return {} end
+	return { enabled = _state and _state.is_enabled, paused = paused,
+		hardware_committed = _hardware_watchers_enabled, hardware_generation = generation,
+		context_refresh_generation = refresh_generation }
+end
+local function physical_system_source(event)
+	return PhysicalLifecycle.system_event(hs.caffeinate and hs.caffeinate.watcher, event)
+end
+
+--- Binds a dormant lifecycle consumer; no hardware handle or state is acquired.
+---@param owner table Exact observer owner.
+---@param capacity integer Positive native receipt budget.
+---@param receive function Literal-true receipt acknowledger.
+---@return table|nil token Exact observer token.
+function M.bind_physical_lifecycle_observer(owner, capacity, receive)
+	if math.type(capacity) ~= "integer" then return nil, "Invalid native lifecycle receipt budget" end
+	return _physical_lifecycle.bind(owner, capacity, receive)
+end
+
+--- Detaches only the exact lifecycle owner and token.
+---@param owner table Exact observer owner.
+---@param token table Exact observer token.
+---@return boolean detached Whether the owned observer was detached.
+function M.unbind_physical_lifecycle_observer(owner, token) return _physical_lifecycle.unbind(owner, token) end
+
+local original_init, original_start, original_stop, original_caffeinate =
+	M.init, M.init_hardware_watchers, M.stop_hardware_watchers, M.caffeinate_cb
+--- Observes the existing init writer only while explicitly bound.
+---@param state table Existing core state.
+---@param ... any Unchanged legacy arguments.
+---@return boolean initialized Unchanged legacy result.
+function M.init(...) return _physical_lifecycle.run("initialization", original_init, physical_lifecycle_snapshot, ...) end
+--- Observes the existing init hardware watchers writer only while explicitly bound.
+---@param ... any Unchanged legacy arguments.
+---@return boolean committed Unchanged legacy result.
+function M.init_hardware_watchers(...) return _physical_lifecycle.run("hardware_start", original_start, physical_lifecycle_snapshot, ...) end
+--- Observes the existing stop hardware watchers writer only while explicitly bound.
+---@param ... any Unchanged legacy arguments.
+---@return boolean settled Unchanged legacy result.
+function M.stop_hardware_watchers(...) return _physical_lifecycle.run("hardware_stop", original_stop, physical_lifecycle_snapshot, ...) end
+--- Observes the existing caffeinate cb writer only while explicitly bound.
+---@param event any Existing native event.
+---@param ... any Unchanged legacy arguments.
+---@return boolean handled Unchanged legacy result.
+function M.caffeinate_cb(event, ...)
+	return _physical_lifecycle.run(physical_system_source(event), original_caffeinate, physical_lifecycle_snapshot, event, ...)
+end
+
+--- Observes current-generation system boundaries before the root enabled guard.
+---@param event any Actual native callback event.
+---@param callback function Existing generation-qualified callback invocation.
+---@param ... any Original callback arguments.
+---@return any result Unchanged legacy invocation result tuple.
+function M.observe_caffeinate_callback(event, callback, ...)
+	return _physical_lifecycle.bridge(physical_system_source(event), callback, physical_lifecycle_snapshot, event, ...)
+end
+
 return M
