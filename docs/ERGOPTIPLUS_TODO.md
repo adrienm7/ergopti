@@ -4225,7 +4225,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 75, macOS 106, Linux 77, each
+  drivers still build (current baseline: Windows 74, macOS 105, Linux 76, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4656,6 +4656,8 @@ The actual Windows CI profile-heading failures were caused by an unset native LL
 
 Whole profile frames now consume shared child templates on all three drivers, preserving each native registry phase, platform-specific creation order, paused macOS presentation and lazy per-application reads. Executable owner guards reject decorative/comment/qualified decoys. Canonical generators retire eleven additional allocator sites: Windows75/macOS106/Linux77 at this slice. Other native menu families and physical-device acceptance remain open. The previously recorded macOS Wrap refusal defect and Windows timing prompt are already implemented by 9bae9a340, with the later arity and finite-adapter corrections; neither is reimplemented.
 
+The existing model-picker providers now obtain their inert tail separator from the shared provider status declaration. Native callback/browser phases and platform-specific conditional presence remain unchanged. Actual canonical generators retire exactly one more allocator per driver, giving the current baseline Windows74/macOS105/Linux76. Existing labels retain all21 translations; remaining native families and device qualification are still open.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4841,7 +4843,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 75, macOS 106 and Linux 77 rows are still built by the
+  Windows 74, macOS 105 and Linux 76 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -4922,6 +4924,8 @@ The custom-profile, saved-model and numeric-tail slices retire seven macOS and s
 The shared profile heading fragments retire three genuine allocator sites per driver, from81/113/84 to78/110/81. Portable actual provider cases and all original assertions/corpora are retained. This bounded source migration does not close the remaining full profile frame, other menu families or item38 device validation.
 
 The ordered profile frame retires three Windows, four macOS and four Linux native allocator sites through the actual shared renderer. All old provider callbacks, main/close/lifecycle boundaries and prior independent corpus files remain. This slice baseline is75/106/77; whole remaining families and item38 acceptance are not completed.
+
+The fixed model-picker tail presentation is shared on all three drivers, retiring one authentic native allocator per platform. Current remaining baseline: Windows74/macOS105/Linux76. This does not classify remaining dynamic native builders as shared or close item38.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey

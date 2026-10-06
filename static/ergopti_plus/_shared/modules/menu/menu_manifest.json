@@ -379,6 +379,13 @@
 		{
 			"type": "dynamic",
 			"id": "llm_model",
+			"status_rows": {
+				"model_picker_tail": [
+					{
+						"type": "---"
+					}
+				]
+			},
 			"i18n": "menu.llm.model_label",
 			"disabled_when_off": false,
 			"health_dot": true,
@@ -391,6 +398,13 @@
 		{
 			"type": "list",
 			"id": "llm_models",
+			"status_rows": {
+				"model_picker_tail": [
+					{
+						"type": "---"
+					}
+				]
+			},
 			"platforms": [
 				"linux"
 			],

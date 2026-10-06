@@ -2524,7 +2524,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		if #rows > 0 then rows[#rows + 1] = { separator = true } end
+		if #rows > 0 then
+			for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_models", "model_picker_tail") or {}) do
+				rows[#rows + 1] = row
+			end
+		end
 		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
 			["llm_browse_models"] = function()
 				return ctx.webview.show("model_browser") == true

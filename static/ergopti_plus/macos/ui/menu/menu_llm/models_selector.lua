@@ -826,7 +826,9 @@ function M.build(ctx)
 		end, "models_selector.open_browser")
 	end
 
-	table.insert(menu, { separator = true })
+	for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_model", "model_picker_tail") or {}) do
+		table.insert(menu, row)
+	end
 	local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
 		["llm_browse_models"] = open_model_browser,
 	}, { ["llm_model_browser_ready"] = model_browser_ready })

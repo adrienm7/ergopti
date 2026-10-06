@@ -195,3 +195,79 @@ _LBMD_ModelBrowserAbsentDefaultPort() {
 }
 Test("models browser: an absent default native port refuses without hiding supplied capability",
 	_LBMD_ModelBrowserAbsentDefaultPort)
+
+; The actual model-picker tail owns Add and browser; only its inert boundary is shared.
+_LBMD_ModelPickerBoundary(Mode) {
+	Owner := _MR_FindItemById("llm_menu", "llm_model")
+	Assert(Owner is Map && Owner.Has("status_rows"), "actual native model provider owns its status")
+	Statuses := Owner["status_rows"]
+	Assert(Statuses is Map && Statuses.Has("model_picker_tail"))
+	Saved := Statuses["model_picker_tail"]
+	SavedId := Owner["id"]
+	AssertEqual(1, Saved.Length, "one independent boundary declaration")
+	AssertEqual("---", Saved[1]["type"], "a separator, never a clicked row")
+	AssertEqual(1, Saved[1].Count, "no hidden native action is declared")
+	Effects := Map("calls", 0)
+	Native := 0
+	try {
+		if Mode == "missing"
+			Statuses.Delete("model_picker_tail")
+		else if Mode == "wrong_owner"
+			Owner["id"] := "foreign_model"
+		else if Mode == "label"
+			Statuses["model_picker_tail"] := [Map("type", "label", "i18n", "common.restore_recommended")]
+		else if Mode == "clicked"
+			Statuses["model_picker_tail"] := [Map("type", "command", "id", "unowned", "action", (*) => Effects["calls"] += 1)]
+		else if Mode == "extra_callback"
+			Statuses["model_picker_tail"] := [Map("type", "---", "action", (*) => Effects["calls"] += 1)]
+		Rows := _LLM_Menu_ModelTailRows()
+		Assert(Rows is Array, "the actual native tail provider survives refused inert presentation")
+		HasBoundary := Mode == "original" || Mode == "label"
+		AssertEqual(HasBoundary ? 3 : 2, Rows.Length)
+		AddAt := HasBoundary ? 2 : 1
+		AssertEqual(t("menu.llm.add_model_entry"), Rows[AddAt]["label"], "original Add remains before browser on Windows")
+		Assert(Rows[AddAt]["action"].HasMethod("Call"), "actual native Add callback remains callable")
+		AssertEqual(t("menu.llm.browse_models_entry"), Rows[AddAt + 1]["label"], "real shared browser is retained")
+		Assert(Rows[AddAt + 1]["action"].HasMethod("Call"))
+		if Mode == "original"
+			AssertEqual(true, Rows[1]["separator"])
+		else if Mode == "label" {
+			AssertEqual(t("common.restore_recommended"), Rows[1]["label"])
+			AssertEqual(true, Rows[1]["disabled"])
+			Assert(!Rows[1].Has("action"), "inert presentation cannot acquire a command")
+		}
+		AssertEqual(0, Effects["calls"], "refused metadata never executes its injected callback")
+		Native := Menu()
+		MenuRenderer_AppendRows(Native, "llm_menu", "llm_model", Rows)
+		AssertEqual(Rows.Length, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"), "actual Win32 tail contains every surviving sibling")
+		State := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(State != 0xFFFFFFFF, "native position must genuinely exist")
+		if Mode == "original"
+			Assert((State & 0x800) != 0, "actual Win32 separator is shared presentation")
+		else if Mode == "label"
+			Assert((State & 3) != 0 && (State & 0x800) == 0, "actual inert replacement is disabled text")
+		else
+			Assert((State & 0x800) == 0, "a refused boundary cannot be fabricated by a native wrapper")
+	} finally {
+		if Native is Menu
+			_CTC_ReleaseMenu(Native)
+		Statuses["model_picker_tail"] := Saved
+		Owner["id"] := SavedId
+	}
+}
+for Mode in ["original", "label", "missing", "wrong_owner", "clicked", "extra_callback"]
+	Test("models picker: actual shared tail boundary and real native siblings " . Mode,
+		_LBMD_ModelPickerBoundary.Bind(Mode))
+
+_LBMD_ModelPickerBoundaryConsumer() {
+	Body := _StripFullLineComments(_DriverFuncBody("LLM_Menu_BuildModelMenu"))
+	AssertContains(Body, 'MenuRenderer_AppendRows(m, "llm_menu", "llm_model", _LLM_Menu_ModelTailRows())',
+		"the actual native model-menu consumer must render the complete tail provider")
+	Tail := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ModelTailRows"))
+	AssertContains(Tail, 'MenuRenderer_StatusRows("llm_menu", "llm_model", "model_picker_tail")')
+	AssertContains(Tail, '"action", (*) => LLM_Menu_PromptAddModel()', "original Add dialog callback body remains native")
+	AssertContains(Tail, '_LLM_Menu_ModelBrowserRow()', "original browser admission owner remains native")
+	Assert(InStr(Tail, 'Map("separator", true)') == 0, "no native fallback separator may replace a refused declaration")
+}
+Test("models picker: actual model-menu consumer retains native owners and shared boundary",
+	_LBMD_ModelPickerBoundaryConsumer)
