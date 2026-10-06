@@ -101,6 +101,7 @@ local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = command_renderer.command_row,
+			template_rows = command_renderer.template_rows,
 			get_array = command_renderer.get_array,
 			render_rows = function(rows) return rows end,
 		}

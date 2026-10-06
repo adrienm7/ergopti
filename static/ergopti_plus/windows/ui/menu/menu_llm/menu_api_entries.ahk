@@ -69,10 +69,19 @@ _LLM_Menu_ApiEntriesRows() {
 	; Add sits before the separator so creating an entry is one glance
 	; away; the separator only appears with the management rows, never
 	; dangling when no entry exists.
-	Rows.Push(Map("label", t("menu.llm.api_add_entry"), "action", (*) => _LLM_Menu_PromptApiEntry("")))
+	AddRows := MenuRenderer_TemplateRows("llm_api_add_command",
+		Map("api_add_entry", (*) => _LLM_Menu_PromptApiEntry("")), Map(), Map())
+	if !(AddRows is Array)
+		return []
+	for Row in AddRows
+		Rows.Push(Row)
 	if (Type(entries) == "Array" and entries.Length > 0) {
 		; Management rows: most frequent first, destructive delete last.
-		Rows.Push(Map("separator", true))
+		Separators := MenuRenderer_TemplateRows("llm_api_add_separator", Map(), Map(), Map())
+		if !(Separators is Array)
+			return []
+		for Row in Separators
+			Rows.Push(Row)
 		Commands := Map("api_test_active", (*) => _LLM_Menu_TestActiveApiEntry(),
 			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
 		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)

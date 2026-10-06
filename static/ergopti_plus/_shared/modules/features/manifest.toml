@@ -6601,6 +6601,26 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# API creation uses the native dialog on Windows and provider children on Lua.
+# The fixed affordance and separator share captions; native order stays per driver.
+[[menu.llm_api_add_command]]
+type = "command"
+id = "api_add_entry"
+i18n = "menu.llm.api_add_entry"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_api_add_provider_group]]
+type = "group"
+id = "api_add_entry"
+i18n = "menu.llm.api_add_entry"
+disabled_when = ["llm_api_add_group_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.llm_api_add_separator]]
+type = "---"
+
 # The fixed active API-entry commands share captions, order and live readiness.
 # Native adapters keep the existing probe and acknowledged removal owners.
 [[menu.llm_api_active_commands]]

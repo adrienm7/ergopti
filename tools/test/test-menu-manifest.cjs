@@ -4518,3 +4518,81 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	console.log('Agent system Model: canonical two-row frame and three actual native owners.');
 }
+
+// API creation keeps its actual platform-specific dialog/provider owner.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/tests/corpus/menus/api_add_controls.json'),
+			'utf8'
+		)
+	);
+	assert.deepEqual(manifest[corpus.command_section], [corpus.command]);
+	assert.deepEqual(manifest[corpus.group_section], [corpus.group]);
+	assert.deepEqual(manifest[corpus.separator_section], [corpus.separator]);
+	for (const code of [
+		'ar',
+		'cs',
+		'da',
+		'de',
+		'en',
+		'es',
+		'fr',
+		'he',
+		'hi',
+		'it',
+		'ja',
+		'ko',
+		'no',
+		'nl',
+		'pl',
+		'pt',
+		'ru',
+		'sv',
+		'tr',
+		'uk',
+		'zh'
+	]) {
+		const strings = JSON.parse(
+			readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json'),
+				'utf8'
+			)
+		);
+		assert.equal(
+			typeof strings[corpus.label_key],
+			'string',
+			code + ' keeps the existing Add caption'
+		);
+		assert(strings[corpus.label_key].length > 0);
+		if (code === 'en') {
+			assert.equal(strings[corpus.label_key], corpus.label);
+			assert.equal(strings[corpus.mutated_key], corpus.mutated_label);
+		}
+	}
+	for (const [driver, relative, call, section] of [
+		[
+			'windows',
+			'ui/menu/menu_llm/menu_api_entries.ahk',
+			'MenuRenderer_TemplateRows',
+			corpus.command_section
+		],
+		['macos', 'ui/menu/menu_llm/api_panel.lua', 'ManifestMenu.template_rows', corpus.group_section],
+		['linux', 'ui/menu/llm_backend_rows.lua', 'ManifestMenu.template_rows', corpus.group_section]
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert(source.includes(call + '("' + section + '"'), driver + ' consumes the actual Add frame');
+		assert(
+			source.includes(call + '("' + corpus.separator_section + '"'),
+			driver + ' consumes the existing separator'
+		);
+	}
+	console.log(
+		'API Add: independent declarations, 21 existing captions, authentic native dialog/provider and separator owners.'
+	);
+}

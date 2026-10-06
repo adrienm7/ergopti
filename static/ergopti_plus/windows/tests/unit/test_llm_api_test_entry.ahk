@@ -507,3 +507,61 @@ for Origin in [100, 0x100000064]
 for Elapsed in [0x1000004D2, 0x2000004D2]
 	Test("llm api probe clock: long completion elapsed=" . Elapsed,
 		_LAT_ProbeClockCompletion.Bind(100, Elapsed))
+
+
+_LAT_AddFrameCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\api_add_controls.json", "UTF-8"))
+}
+
+_LAT_AddFrameCaption() {
+	global _LLM_Menu
+	Corpus := _LAT_AddFrameCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Declaration := _MR_GetMenuDef(Corpus["command_section"])[1]
+	Original := Declaration["i18n"]
+	try {
+		Declaration["i18n"] := Corpus["mutated_key"]
+		Found := 0
+		for Row in _LLM_Menu_ApiEntriesRows() {
+			if Row.Get("label", "") == t(Corpus["mutated_key"]) {
+				Found += 1
+				AssertTrue(HasMethod(Row.Get("action", 0), "Call"), "the genuine Add dialog owner remains callable")
+			}
+		}
+		AssertEqual(1, Found, "one native Add command reads the shared caption")
+	} finally {
+		Declaration["i18n"] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API Add frame uses the shared command caption (api-add-controls)", _LAT_AddFrameCaption)
+
+_LAT_AddFrameSeparator() {
+	global _LLM_Menu
+	Corpus := _LAT_AddFrameCorpus()
+	SavedMenu := _LAT_FixtureMenu()
+	Definition := _MR_GetMenuDef(Corpus["separator_section"])
+	Original := Definition[1]
+	try {
+		Definition[1] := Map("type", "label", "id", "api_add_marker", "i18n", Corpus["mutated_key"])
+		Rows := _LLM_Menu_ApiEntriesRows()
+		Position := 0
+		for Index, Row in Rows {
+			if Row.Get("label", "") == t(Corpus["label_key"])
+				Position := Index
+		}
+		AssertTrue(Position > 0, "the native Add command remains in its original position")
+		Marker := Rows[Position + 1]
+		AssertEqual(t(Corpus["mutated_key"]), Marker.Get("label", ""), "the existing post-Add separator belongs to its declaration")
+		AssertTrue(Marker.Get("disabled", false), "the marker is inert")
+		AssertFalse(Marker.Has("action"), "status data cannot acquire the Add callback")
+		_LLM_Menu["api_entries"] := []
+		for Row in _LLM_Menu_ApiEntriesRows()
+			AssertFalse(Row.Get("label", "") == t(Corpus["mutated_key"]), "empty entries retain the conditional absence")
+	} finally {
+		Definition[1] := Original
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("API Add frame retains its conditional shared separator (api-add-controls)", _LAT_AddFrameSeparator)
