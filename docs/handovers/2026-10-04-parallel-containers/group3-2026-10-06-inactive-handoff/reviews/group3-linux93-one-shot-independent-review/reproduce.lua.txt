@@ -1,0 +1,10 @@
+local root="/workspace/ergopti"
+local own=arg[1]
+package.path=own.."/static/ergopti_plus/linux/?.lua;"..own.."/static/ergopti_plus/linux/?/init.lua;"..root.."/static/ergopti_plus/linux/?.lua;"..root.."/static/ergopti_plus/linux/?/init.lua;"..root.."/static/ergopti_plus/_shared/lua/?.lua;"..root.."/static/ergopti_plus/_shared/lua/?/init.lua;"..package.path
+require("compat.utf8").install()
+require("luv")
+os.execute=function()error("No subprocesses in independent pure control")end;io.popen=os.execute
+require("tests.unit.modules.test_key_combination_native_actions")
+local results=require("tests.helpers").get_results()
+print("INDEPENDENT_ONE_SHOT",results.passed,results.failed)
+os.exit(results.failed==0 and 0 or 1)

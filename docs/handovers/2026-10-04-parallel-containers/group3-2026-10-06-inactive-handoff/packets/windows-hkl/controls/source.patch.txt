@@ -1,0 +1,239 @@
+--- a/static/ergopti_plus/windows/adapters/key_state.ahk
++++ b/static/ergopti_plus/windows/adapters/key_state.ahk
+@@ -505,3 +505,78 @@
+     "isDown", KS_IsDown,
+     "isUp",   KS_IsUp,
+ )
++
++
++/**
++ * Observes a native level without consuming or clearing Windows dead-key state.
++ * This descriptor is a preview, never a physical-input or output capability.
++ * Negative ToUnicodeEx counts remain dead levels; no KLE action/state is invented.
++ * @param Vk {Integer} Native virtual key resolved on Hkl.
++ * @param Scancode {Integer} Native physical scan code.
++ * @param Hkl {Integer} Explicit keyboard-layout handle; never inferred from text.
++ * @param Shift {Boolean} Explicit level selector.
++ * @param Caps {Boolean} Explicit hardware toggle snapshot.
++ * @param ReadFn {Function|Integer} Optional observation port, or exact zero.
++ * @return {Map|Integer} Detached Kind/Text/Count descriptor, or zero on refusal.
++ */
++KS_NativeKeyLevel(Vk, Scancode, Hkl, Shift, Caps, ReadFn := 0) {
++	if !(Vk is Integer) || Vk < 1 || Vk > 0xFF
++			|| !(Scancode is Integer) || Scancode < 1 || Scancode > 0x1FF
++			|| !(Hkl is Integer) || Hkl == 0
++			|| !(Shift is Integer) || (Shift != true && Shift != false)
++			|| !(Caps is Integer) || (Caps != true && Caps != false)
++			|| (!HasMethod(ReadFn, "Call") && !((ReadFn is Integer) && ReadFn == 0))
++		return 0
++	try {
++		Observed := HasMethod(ReadFn, "Call")
++			? ReadFn.Call(Vk, Scancode, Hkl, Shift, Caps)
++			: KS_KeyTextNoStateChange(Vk, Scancode, Hkl, Shift, Caps)
++		if !IsObject(Observed) || !Observed.HasOwnProp("Count") || !Observed.HasOwnProp("Text")
++				|| !(Observed.Count is Integer) || Abs(Observed.Count) > 16 || !(Observed.Text is String)
++				|| (Observed.Count == 0 && Observed.Text != "")
++				|| (Observed.Count != 0 && StrLen(Observed.Text) != Abs(Observed.Count))
++			return 0
++		Kind := Observed.Count < 0 ? "dead" : (Observed.Count > 0 ? "text" : "none")
++		return Map("Kind", Kind, "Text", Observed.Text, "Count", Observed.Count)
++	} catch {
++		; External ports and native read failures have no authority to expose their
++		; details or promote an incomplete observation into a usable source pair.
++		return 0
++	}
++}
++
++/**
++ * Reads both levels of the ten native physical number-row positions on one HKL.
++ * Reuses the native scan-code registry and probes each VK on that same HKL.
++ * Caps is explicit; inspection neither emits nor registers a hotkey and is not
++ * a source/currentness receipt. A delivery owner must independently join native
++ * input, source epoch, modifiers and output retirement before using these rows.
++ * @param Hkl {Integer} Explicit keyboard-layout handle.
++ * @param Caps {Boolean} Explicit CapsLock state.
++ * @param ReadFn {Function|Integer} Optional non-mutating level observation port.
++ * @param MapFn {Function|Integer} Optional scan-code-to-VK port.
++ * @return {Map|Integer} Detached hkl/caps/rows observation, or zero on refusal.
++ */
++KS_NativeNumberRowLevels(Hkl, Caps, ReadFn := 0, MapFn := 0) {
++	global KS_DIGIT_ROW_KEYS
++	if !(Hkl is Integer) || Hkl == 0
++			|| !(Caps is Integer) || (Caps != true && Caps != false)
++			|| (!HasMethod(ReadFn, "Call") && !((ReadFn is Integer) && ReadFn == 0))
++			|| (!HasMethod(MapFn, "Call") && !((MapFn is Integer) && MapFn == 0))
++		return 0
++	try {
++		Rows := Map()
++		for _, Key in KS_DIGIT_ROW_KEYS {
++			Scancode := Key[2]
++			Vk := HasMethod(MapFn, "Call") ? MapFn.Call(Scancode, Hkl) : KS_ScancodeToVk(Scancode, Hkl)
++			Plain := KS_NativeKeyLevel(Vk, Scancode, Hkl, false, Caps, ReadFn)
++			Shifted := KS_NativeKeyLevel(Vk, Scancode, Hkl, true, Caps, ReadFn)
++			if !(Plain is Map) || !(Shifted is Map)
++				return 0
++			Rows[Scancode] := Map("plain", Plain, "shift", Shifted)
++		}
++		return Map("hkl", Hkl, "caps", Caps, "rows", Rows)
++	} catch {
++		return 0
++	}
++}
+--- a/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk
+@@ -855,3 +855,155 @@
+ 	}
+ }
+ Test("number row: contained admission retains a genuine symbols capability", _KLT_WithEmulation.Bind(_NRP_AdmittedSymbolsBootMode))
++
++
++; Native-HKL observations are deliberately separate from the qualified KLE
++; output owner. The frozen ten-key corpus remains the independent native oracle.
++_NHKL_RealNumberRowDescriptors() {
++	global _SharedDir
++	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\number_row_levels.json", "UTF-8"))
++	Checked := 0
++	for Native in Corpus["native"] {
++		Hkl := _LDRP_Layout(Native["klid"])
++		if Hkl == 0
++			continue
++		Observed := KS_NativeNumberRowLevels(Hkl, false)
++		AssertTrue(Observed is Map, "the actual native source must supply a complete observation")
++		AssertEqual(Hkl, Observed["hkl"])
++		AssertEqual(false, Observed["caps"])
++		AssertEqual(10, Observed["rows"].Count)
++		for Index, Name in Corpus["scancodes"] {
++			Scancode := Integer("0x" . SubStr(Name, 3))
++			Row := Observed["rows"][Scancode]
++			for Level in ["plain", "shift"] {
++				AssertEqual("text", Row[Level]["Kind"], "the independent French/US vectors are genuine text")
++				AssertEqual(Native[Level][Index], Row[Level]["Text"], "native probe must match the frozen independent level")
++				AssertEqual(1, Row[Level]["Count"])
++			}
++			; Existing shared selection receives only native text previews, without
++			; claiming their observation is the physical-delivery/source receipt.
++			Selection := NumberRowPolicySymbolsShift(Corpus["digits"][Index], Row["plain"], Row["shift"])
++			AssertTrue(Selection["supported"])
++			AssertEqual(!Native["swapped"], Selection["shift"])
++		}
++		Checked += 1
++	}
++	AssertTrue(Checked > 0, "one real native layout is required")
++	if EnvGet("GITHUB_ACTIONS") == "true"
++		AssertEqual(2, Checked, "both independently specified HKLs must execute in native CI")
++}
++Test("native HKL number row: actual French/US descriptors match the frozen ten-key corpus", _NHKL_RealNumberRowDescriptors)
++
++_NHKL_RealCapsAndDeadDescriptors() {
++	global _SharedDir
++	Qwerty := _LDRP_Layout("00000409")
++	if Qwerty != 0 {
++		Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\number_row_levels.json", "UTF-8"))
++		Expected := Corpus["native"][2]
++		Observed := KS_NativeNumberRowLevels(Qwerty, true)
++		AssertTrue(Observed is Map)
++		AssertEqual(true, Observed["caps"])
++		for Index, Name in Corpus["scancodes"] {
++			Row := Observed["rows"][Integer("0x" . SubStr(Name, 3))]
++			AssertEqual(Expected["plain"][Index], Row["plain"]["Text"], "US CapsLock must preserve real digit output")
++			AssertEqual(Expected["shift"][Index], Row["shift"]["Text"], "US CapsLock must preserve real Shift symbols")
++		}
++	}
++	French := _LDRP_Layout("0000040C")
++	if French != 0 {
++		Dead := KS_NativeKeyLevel(KS_ScancodeToVk(0x1A, French), 0x1A, French, false, false)
++		AssertTrue(Dead is Map)
++		AssertEqual("dead", Dead["Kind"], "the real French circumflex key must retain negative native status")
++		AssertEqual(-1, Dead["Count"])
++		AssertEqual("^", Dead["Text"])
++		AssertFalse(Dead.Has("Action"), "native preview must not invent a KLE state-machine action")
++		AssertFalse(Dead.Has("State"), "native preview cannot impersonate a KLE dead state")
++		AssertFalse(NumberRowPolicySymbolsShift("1", Map("Kind", "text", "Text", "1"), Dead)["supported"],
++			"a native dead preview is not permission to flatten or deliver the dead key")
++	}
++	if EnvGet("GITHUB_ACTIONS") == "true"
++		AssertTrue(Qwerty != 0 && French != 0, "CI must execute CapsLock and native dead-key controls")
++}
++Test("native HKL number row: actual CapsLock and dead-key status remain native observations", _NHKL_RealCapsAndDeadDescriptors)
++
++_NHKL_RecordRead(Seen, Vk, Scancode, Hkl, Shift, Caps) {
++	Seen.Push([Vk, Scancode, Hkl, Shift, Caps])
++	return {Count: 1, Text: Shift ? "!" : "1"}
++}
++_NHKL_RecordMap(Seen, Scancode, Hkl) {
++	Seen.Push([Scancode, Hkl])
++	return 0x31
++}
++_NHKL_ExplicitInputs() {
++	global KS_DIGIT_ROW_KEYS
++	for Caps in [false, true] {
++		Reads := [], Mappings := []
++		Observed := KS_NativeNumberRowLevels(-268435447, Caps,
++			_NHKL_RecordRead.Bind(Reads), _NHKL_RecordMap.Bind(Mappings))
++		AssertTrue(Observed is Map)
++		AssertEqual(20, Reads.Length, "all ten positions need both original native levels")
++		AssertEqual(10, Mappings.Length)
++		for Index, Key in KS_DIGIT_ROW_KEYS {
++			AssertEqual(Key[2], Mappings[Index][1], "mapping must use the actual physical scan code")
++			AssertEqual(-268435447, Mappings[Index][2], "mapping must use the explicitly selected HKL")
++			for Offset, Shift in [false, true] {
++				Read := Reads[(Index - 1) * 2 + Offset]
++				AssertEqual(0x31, Read[1], "observation must use that HKL's mapped VK")
++				AssertEqual(Key[2], Read[2])
++				AssertEqual(-268435447, Read[3])
++				AssertEqual(Shift, Read[4])
++				AssertEqual(Caps, Read[5], "CapsLock is explicit for each level, not read from a later physical state")
++			}
++		}
++		AssertFalse(Observed.Has("owner"), "an observation cannot fabricate a source or native-output owner")
++		AssertFalse(NumberRowPolicyReady(Observed, "symbols"))
++	}
++}
++Test("native HKL number row: explicit source scan codes and CapsLock cross the actual adapter boundary", _NHKL_ExplicitInputs)
++
++_NHKL_ThrowRead(*) {
++	throw Error("private native observation detail must not leave the boundary")
++}
++_NHKL_ClosedRefusals() {
++	Reads := []
++	for Hkl in [0, "1", 1.0] {
++		AssertEqual(0, KS_NativeNumberRowLevels(Hkl, false, _NHKL_RecordRead.Bind(Reads), (*) => 0x31))
++	}
++	for Caps in ["0", "false", 2, 0.0] {
++		AssertEqual(0, KS_NativeNumberRowLevels(1, Caps, _NHKL_RecordRead.Bind(Reads), (*) => 0x31))
++	}
++	for Shift in ["0", "false", 2, 0.0] {
++		AssertEqual(0, KS_NativeKeyLevel(0x31, 0x02, 1, Shift, false, _NHKL_RecordRead.Bind(Reads)))
++	}
++	for Vk in [0, 0x100, "49", 49.0] {
++		AssertEqual(0, KS_NativeKeyLevel(Vk, 0x02, 1, false, false, _NHKL_RecordRead.Bind(Reads)))
++	}
++	for Scancode in [0, 0x200, "2", 2.0] {
++		AssertEqual(0, KS_NativeKeyLevel(0x31, Scancode, 1, false, false, _NHKL_RecordRead.Bind(Reads)))
++	}
++	AssertEqual(0, Reads.Length, "invalid source or toggle must refuse before observation")
++	AssertEqual(0, KS_NativeNumberRowLevels(1, false, "0", (*) => 0x31))
++	AssertEqual(0, KS_NativeNumberRowLevels(1, false, _NHKL_RecordRead.Bind(Reads), "0"))
++	AssertEqual(0, KS_NativeNumberRowLevels(1, false, _NHKL_RecordRead.Bind(Reads), (*) => 0))
++	AssertEqual(0, KS_NativeNumberRowLevels(1, false, _NHKL_ThrowRead, (*) => 0x31))
++	AssertEqual(0, KS_NativeNumberRowLevels(1, false, _NHKL_RecordRead.Bind(Reads), _NHKL_ThrowRead))
++	for Result in [{Count: "1", Text: "1"}, {Count: 1.0, Text: "1"}, {Count: 1, Text: ""},
++		{Count: 0, Text: "private"}, {Count: 17, Text: "1"}, {Count: 2, Text: "1"}, Map(), 0] {
++		AssertEqual(0, KS_NativeNumberRowLevels(1, false, (*) => Result, (*) => 0x31),
++			"an incomplete or malformed level cannot publish a partial source observation")
++	}
++}
++Test("native HKL number row: malformed inputs and native port refusals never publish partial observations", _NHKL_ClosedRefusals)
++
++_NHKL_DescriptorStatusAndDetachment() {
++	for Result in [{Count: -1, Text: "^"}, {Count: 0, Text: ""}, {Count: 2, Text: "ab"}] {
++		ExpectedText := Result.Text
++		Observed := KS_NativeKeyLevel(0x31, 0x02, 1, false, false, (*) => Result)
++		AssertTrue(Observed is Map)
++		AssertEqual(Result.Count, Observed["Count"])
++		AssertEqual(Result.Count < 0 ? "dead" : (Result.Count > 0 ? "text" : "none"), Observed["Kind"])
++		Result.Text := "private later mutation"
++		AssertEqual(ExpectedText, Observed["Text"], "only detached native scalars leave the observation")
++	}
++}
++Test("native HKL number row: negative, unmapped and multi-unit results stay typed and detached", _NHKL_DescriptorStatusAndDetachment)

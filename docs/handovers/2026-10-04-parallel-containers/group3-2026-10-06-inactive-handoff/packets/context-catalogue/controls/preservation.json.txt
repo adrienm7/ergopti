@@ -1,0 +1,20 @@
+[
+  {
+    "path": "static/ergopti_plus/linux/tests/unit/modules/test_action_catalogue_parity.lua",
+    "original_assertion_lines": 49,
+    "retained_ordered": true,
+    "original_prefix_byte_exact": true
+  },
+  {
+    "path": "static/ergopti_plus/linux/tests/unit/ui/test_key_combinations_menu.lua",
+    "original_assertion_lines": 7,
+    "retained_ordered": true,
+    "original_prefix_byte_exact": false
+  },
+  {
+    "path": "static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua",
+    "original_assertion_lines": 190,
+    "retained_ordered": true,
+    "original_prefix_byte_exact": false
+  }
+]

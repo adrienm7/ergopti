@@ -1,0 +1,87 @@
+--- _shared/lua/tap_hold/caps_word.lua
+
+--- ==============================================================================
+--- MODULE: Versioned Caps Word Casing Owner (shared)
+--- DESCRIPTION:
+--- One pure owner chooses title_words (legacy menu semantics) or upper_word
+--- (native pair context). Opaque probes never commit across mode/callback changes.
+--- ==============================================================================
+
+local UnicodeCase = require("unicode_case")
+local M = {}
+local STOP_CONTROL = {enter=true,tab=true,escape=true}
+
+--- Creates a pure casing owner. Native delivery remains the adapter's custody.
+--- @return table owner
+function M.new()
+	local owner, active, triggered, mode, revision, native = {}, false, false, "title_words", 0, nil
+	local probes = setmetatable({}, {__mode="k"})
+	local function changed()
+		revision=revision+1
+	end
+	function owner.active() return active end
+	function owner.mode() return mode end
+	function owner.triggered() return triggered end
+	function owner.current_native(claim)
+		return claim~=nil and rawequal(claim,native) and active and mode=="upper_word"
+	end
+	function owner.toggle_title()
+		active,triggered,mode,native=not active,false,"title_words",nil
+		changed();return true
+	end
+	function owner.toggle_native()
+		active,triggered,mode=not active,false,"upper_word"
+		native=active and {} or nil
+		changed();return true,native
+	end
+	function owner.retire_native(claim)
+		if claim~=nil and rawequal(claim,native) then active,triggered,native=false,false,nil;changed() end
+		return true
+	end
+	function owner.pointer_activity(claim)
+		return owner.retire_native(claim)
+	end
+	function owner.clear()
+		active,triggered,mode,native=false,false,"title_words",nil;changed();return true
+	end
+	function owner.restore_title(saved_active,saved_triggered)
+		if type(saved_active)~="boolean" or type(saved_triggered)~="boolean" then return false end
+		active,triggered,mode,native=saved_active,saved_triggered,"title_words",nil;changed();return true
+	end
+	function owner.title_snapshot()
+		if active and mode=="upper_word" then return nil end
+		return {active=active,triggered=triggered}
+	end
+	function owner.process_title(text)
+		if not active or mode~="title_words" or not UnicodeCase.is_single_character(text) then return nil end
+		if UnicodeCase.is_word_boundary(text) then triggered=false;changed();return nil end
+		if triggered then return nil end
+		triggered=true;changed()
+		local capital=UnicodeCase.upper(text)
+		return capital~=text and capital or nil
+	end
+	function owner.probe_native(claim,text,control)
+		if not owner.current_native(claim) then return nil end
+		local boundary=STOP_CONTROL[control]==true
+		if type(text)=="string" and text~="" then
+			boundary=boundary or not UnicodeCase.is_single_character(text) or UnicodeCase.is_word_boundary(text)
+		end
+		local capital
+		if not boundary and type(text)=="string" and text~="" then
+			local upper=UnicodeCase.upper(text)
+			if upper~=text or UnicodeCase.lower(text)~=text then capital=upper end
+		end
+		local receipt={};probes[receipt]={claim=claim,revision=revision,boundary=boundary,capital=capital}
+		return receipt,capital
+	end
+	function owner.commit_native(claim,receipt)
+		local probe=probes[receipt]
+		if not probe or not rawequal(probe.claim,claim) or probe.revision~=revision or not owner.current_native(claim) then return false end
+		probes[receipt]=nil
+		if probe.boundary then active,triggered,native=false,false,nil end
+		changed();return true
+	end
+	return owner
+end
+
+return M

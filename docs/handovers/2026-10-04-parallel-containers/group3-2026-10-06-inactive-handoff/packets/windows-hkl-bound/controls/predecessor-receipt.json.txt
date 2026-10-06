@@ -1,0 +1,138 @@
+{
+  "status": "PRIVATE_INACTIVE_ANY_REFUSAL_SUCCESSOR",
+  "dependency_scalar_receipt_sha256": "d7b5917c325c8de3a9c68c8f1ed7308843c19c5c82dc83b7a3595772cf9402da",
+  "source_paths": [
+    {
+      "path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+      "pre_sha256": "09b0beca31afc3f675fe331fdf8dbdd007102c22390814fdb74fd5a65f7753e0",
+      "post_sha256": "89ea17b3f40ba127414e3201a20a2b58cdb39a51dca60b908f31cf271e454df6",
+      "actual_root_pre_sha256": "969f960c2aebdc29a1078b655f017122ce1e46d00245cd488c485575be312dd3"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "pre_sha256": "47fa2b54a78c04457fdf5d0598e4a2fa976fecc68541acaef822470615803a3b",
+      "post_sha256": "4cb6dd6a18299da398d2736f1414fc1aeffe3bca9bde8f276eb76b76c618fabd",
+      "actual_root_pre_sha256": "e5059ddd532af8377d5e6e4fec5f454a3203456ef6d1cdcef6324d84baadf88a"
+    }
+  ],
+  "pins": [
+    {
+      "path": ".ruff_cache/.gitignore",
+      "sha256": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316"
+    },
+    {
+      "path": ".ruff_cache/0.15.8/7270815549104357691",
+      "sha256": "d82fccb562dc9ca7df0685bf9d50b7ff67ed0bed6e3a83a3e41326b5e1678ee1"
+    },
+    {
+      "path": ".ruff_cache/CACHEDIR.TAG",
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae"
+    },
+    {
+      "path": "README.md",
+      "sha256": "08a4d785a5cf7f8e02af1a19c8ad364c3d068039492f7bbca1ad0d9ff3fe0fc7"
+    },
+    {
+      "path": "candidate/.ruff_cache/.gitignore",
+      "sha256": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316"
+    },
+    {
+      "path": "candidate/.ruff_cache/CACHEDIR.TAG",
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae"
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "89ea17b3f40ba127414e3201a20a2b58cdb39a51dca60b908f31cf271e454df6"
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/tests/run_all.ahk",
+      "sha256": "df00800c67e84c01ce57272c8d85388d584c393c968fdbf6a3606da3521c6bf3"
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "sha256": "4cb6dd6a18299da398d2736f1414fc1aeffe3bca9bde8f276eb76b76c618fabd"
+    },
+    {
+      "path": "candidate/tools/test/test-ahk-v2-syntax-antipatterns.cjs",
+      "sha256": "71ccb10d9341a1c008884e7005a8da409f93bd3b3b1f392d920a652a1a67ba07"
+    },
+    {
+      "path": "check_any_contract.py",
+      "sha256": "b6ec3d93b890f2a2c67792749a9d0e19df73c93df5640cf74d9926a4872d1f4f"
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/_shared/modules/features/number_row_policy.ahk",
+      "sha256": "a7db4ff9d9cda10e1490b4bebdef88bf53335e98f29137798a623b83e468f092"
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/modules/keymap/layout/layout_shift_caps.ahk",
+      "sha256": "f77610e293ce62677f40d5ee71e753ec816335efbcbed4ae3bf0bc169eaa6c6e"
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/modules/keymap/layout.ahk",
+      "sha256": "cfdbfc389e740e90cca7ea4269154b2a2dbc127d60f3ca5cf3d08cbdcf433186"
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/tests/test_framework.ahk",
+      "sha256": "82d83e258dea19fbb9973fd4e477021348ace5d4a0eb29d2b74785e772f9d182"
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/tests/test_stubs.ahk",
+      "sha256": "9cddbc1cdca4f9b4c66b7c58b72e00b38a443eee345e298ded2c35710e33bb2d"
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/ui/menu/menu_layout.ahk",
+      "sha256": "10a72de230b0a7650571dc0ba2590b9448be7fb5a7df8b2b68ab56e23573208c"
+    },
+    {
+      "path": "joint-apply.log",
+      "sha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061"
+    },
+    {
+      "path": "joint.patch",
+      "sha256": "aef5330dc3e58a16a22dc4b9a194212649564ba50cc50390794c60a0c2eae640"
+    },
+    {
+      "path": "predecessor-receipt.json",
+      "sha256": "d7b5917c325c8de3a9c68c8f1ed7308843c19c5c82dc83b7a3595772cf9402da"
+    },
+    {
+      "path": "preimages/static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "09b0beca31afc3f675fe331fdf8dbdd007102c22390814fdb74fd5a65f7753e0"
+    },
+    {
+      "path": "preimages/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "sha256": "47fa2b54a78c04457fdf5d0598e4a2fa976fecc68541acaef822470615803a3b"
+    },
+    {
+      "path": "ruff.log",
+      "sha256": "0d5ae52662163149b74821a07fbdb57f34079135e72743eb08a732e31059edc5"
+    },
+    {
+      "path": "source-controls.json",
+      "sha256": "8f174d7a73ee707c3757bbbfd1b1383291d9eb23abe175b5d9be6e4743ae4923"
+    },
+    {
+      "path": "source-controls.log",
+      "sha256": "689f11717b90eff3b1d349854a65772e01800cc17adfce56ee1656124efe7619"
+    },
+    {
+      "path": "successor-apply.log",
+      "sha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061"
+    },
+    {
+      "path": "successor.patch",
+      "sha256": "20f699edcaf7ff83e2e79186c281e524b614061c7f845f1740ab57a43201e8cf"
+    },
+    {
+      "path": "syntax.log",
+      "sha256": "f310b137f60cce4858f843a54e9d57ffdfa2e3167421bf344b11b69dba7fdc72"
+    }
+  ],
+  "successor_patch_sha256": "20f699edcaf7ff83e2e79186c281e524b614061c7f845f1740ab57a43201e8cf",
+  "joint_patch_sha256": "aef5330dc3e58a16a22dc4b9a194212649564ba50cc50390794c60a0c2eae640",
+  "archive_sha256": "5855521fae4049bfac877b27192c23618c246013d62ba7ca046525ad1da01b8d",
+  "portable": "single-read+2catchAny source predicates pass; predecessor and2Any omission source controls red; oldtestlines all retained; syntax3+BOMLF+Ruff+privateapplychecks pass",
+  "native": "6registered cases UNEXECUTED; no actualWindows/private scalar fault runtime claimed",
+  "Root_modification": "none"
+}

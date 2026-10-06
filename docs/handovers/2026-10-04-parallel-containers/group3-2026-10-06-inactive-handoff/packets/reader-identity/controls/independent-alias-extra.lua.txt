@@ -1,0 +1,15 @@
+
+helpers.describe("independent exact native slot identity", function()
+ helpers.it("refuses metamethod-equal foreign slot aliases", function()
+  local mt = { __eq = function() return true end }
+  local owned, foreign = setmetatable({}, mt), setmetatable({}, mt)
+  controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
+   helpers.assert_eq(reader.open("/dev/input/event3", owned), true)
+   helpers.assert_eq(reader.grab(owned), true)
+   local event = assert(reader.read_event(owned))
+   local alias = reader.capture_event(event, foreign)
+   helpers.assert_eq(reader.close(owned), true)
+   helpers.assert_eq(alias, nil, "only the exact issuing slot may capture its native row")
+  end)
+ end)
+end)

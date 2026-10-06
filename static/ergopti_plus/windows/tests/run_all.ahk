@@ -268,6 +268,8 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
 #Include ../infra/program_parameter.ahk
+#Include ../adapters/program_providers.ahk
+#Include ../ui/action_picker_webview.ahk
 #Include ../infra/program_actions.ahk
 #Include ../../_shared/modules/network/failure.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls

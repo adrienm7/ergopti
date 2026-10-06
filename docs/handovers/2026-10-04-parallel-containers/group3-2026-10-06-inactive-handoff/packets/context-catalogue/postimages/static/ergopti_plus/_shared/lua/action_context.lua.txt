@@ -1,0 +1,29 @@
+--- _shared/lua/action_context.lua
+
+--- Pure eligibility for generated context-restricted action metadata.
+--- Availability of the native slot owner is a separate admission contract.
+local M = {}
+
+--- Tests the declared contexts without widening generic dispatch permission.
+--- @param metadata table Generated per-driver action metadata.
+--- @param context string|nil Exact native consumer context; nil is generic.
+--- @return boolean eligible
+function M.eligible(metadata, context)
+	if type(metadata) ~= "table" or getmetatable(metadata) ~= nil then return false end
+	local contexts = rawget(metadata, "contexts")
+	if contexts == nil then return true end
+	if type(contexts) ~= "table" or getmetatable(contexts) ~= nil
+		or type(context) ~= "string" then return false end
+	local count, matches, seen = 0, false, {}
+	for key, value in pairs(contexts) do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or type(value) ~= "string"
+			or value == "" or seen[value] then return false end
+		seen[value], count = true, count + 1
+		if value == context then matches = true end
+	end
+	if count == 0 then return false end
+	for index = 1, count do if rawget(contexts, index) == nil then return false end end
+	return matches
+end
+
+return M

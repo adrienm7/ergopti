@@ -1,0 +1,5 @@
+{
+  "original_test_file_reverse_byte_exact": true,
+  "original_assertions_removed": 0,
+  "added_cases": 6
+}

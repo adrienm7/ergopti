@@ -1,0 +1,86 @@
+[
+  {
+    "abi": "luajit",
+    "name": "controlled",
+    "exit": 0,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/controlled-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "legacy",
+    "exit": 0,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/legacy-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-probe-revision",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-probe-revision-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-native-publication-refusal",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-publication-refusal-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-casing-retirement-wave",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-casing-retirement-wave-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-private-resumption",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-private-resumption-luajit.log"
+  },
+  {
+    "abi": "luajit",
+    "name": "omit-native-output-refusal",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-output-refusal-luajit.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "controlled",
+    "exit": 0,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/controlled-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "legacy",
+    "exit": 0,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/legacy-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-probe-revision",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-probe-revision-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-native-publication-refusal",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-publication-refusal-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-casing-retirement-wave",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-casing-retirement-wave-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-private-resumption",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-private-resumption-lua5.4.log"
+  },
+  {
+    "abi": "lua5.4",
+    "name": "omit-native-output-refusal",
+    "exit": 1,
+    "log": "/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/omit-native-output-refusal-lua5.4.log"
+  }
+]

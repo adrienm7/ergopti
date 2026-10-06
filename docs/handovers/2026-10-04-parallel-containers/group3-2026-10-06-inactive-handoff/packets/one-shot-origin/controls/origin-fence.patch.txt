@@ -1,0 +1,73 @@
+--- a/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
++++ b/static/ergopti_plus/linux/platform/remap/key_combination_engine.lua
+@@ -87,17 +87,17 @@
+ 	end
+ 	function owner.has_combinations() return true end
+ 	function owner.activate()
+-		if retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
++		if native_state or retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
+ 		policy, generation, retirement, acknowledged, runtime_guard, disabled, epoch = nil, nil, nil, false, nil, false, epoch + 1
+ 		return true
+ 	end
+ 	function owner.configure(_, selected)
+-		if retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
++		if native_state or retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
+ 		if type(selected) ~= "table" or type(selected.capture) ~= "function" or type(selected.capture_action) ~= "function" then return false end
+ 		options = selected; epoch = epoch + 1; return true
+ 	end
+ 	function owner.set_tap_holds_enabled(_, enabled)
+-		if next(base.held) or next(base.key_refs) or acting or pending then return false end
++		if native_state or next(base.held) or next(base.key_refs) or acting or pending then return false end
+ 		base.by_code = enabled and original_by_code or {}; return true
+ 	end
+ 	function owner.begin_delivery(_, rows)
+@@ -126,7 +126,10 @@
+ 		if acting or delivery or pending then return owner:release_all(), nil, nil, retired_frame() end
+ 		if retirement then return {} end
+ 		if disabled then return base:process(code, value, at_ms) end
+-		if not physical(receipt) then return base:process(code, value, at_ms) end
++		if not physical(receipt) then
++			if native_state then return owner:release_all(), nil, nil, retired_frame(true) end
++			return base:process(code, value, at_ms)
++		end
+ 		if generation ~= nil and generation ~= receipt.generation then return revoke_event(code, receipt.source) end
+ 		local source = receipt.source
+ 		if value == 1 then
+--- a/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_native_actions.lua
++++ b/static/ergopti_plus/linux/tests/unit/modules/test_key_combination_native_actions.lua
+@@ -245,3 +245,35 @@
+ 		helpers.assert_eq(count(),before,"native loop resources are neither allocated nor dropped")
+ 	end)
+ end)
++
++helpers.describe("native arm physical-origin and reinstallation currency",function()
++	helpers.it("retires pair-armed casing instead of consuming an unqualified physical origin",function()
++		for _,receipt in ipairs({false,{ready=false,physical=true,source="owned-keyboard",generation=7},
++			{ready=true,physical=false,source="virtual-keyboard",generation=7},
++			{ready=true,physical=true,source="",generation=7}})do
++			local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
++			helpers.assert_eq(run(state,frame),true)
++			local restored,restore_frame=frame.restore(origin());helpers.assert_eq(restore_frame.ack(true),true)
++			local _,_,_,released=state.native:process(58,0,110,origin());helpers.assert_eq(released.ack(true),true)
++			local out,_,_,retired=state.native:process(30,1,120,receipt or nil)
++			helpers.assert_true(rows(out):find("42:1",1,true)==nil)
++			helpers.assert_true(retired and retired.owned==true and retired.replay==true)
++			helpers.assert_eq(state.base.one_shot_until,nil)
++			helpers.assert_eq(retired.ack(false),false);helpers.assert_eq(state.native:release_all(),out)
++			helpers.assert_eq(retired.ack(true),true)
++			helpers.assert_eq(rows(state.native:process(30,1,130,receipt or nil)),"")
++		end
++	end)
++	helpers.it("requires native mode retirement before reinstallation or configuration",function()
++		local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
++		helpers.assert_eq(run(state,frame),true)
++		local restored,restore_frame=frame.restore(origin());helpers.assert_eq(restore_frame.ack(true),true)
++		local _,_,_,released=state.native:process(58,0,110,origin());helpers.assert_eq(released.ack(true),true)
++		helpers.assert_eq(state.native:activate(),false)
++		helpers.assert_eq(state.native:configure(state.owner.engine_options({caps_lock=300,tab=300})),false)
++		helpers.assert_eq(state.native:set_tap_holds_enabled(false),false)
++		helpers.assert_eq(state.base.one_shot_until,1100)
++		state.native:release_all();helpers.assert_eq(state.native:ack_retirement(true),true)
++		helpers.assert_eq(state.native:activate(),true)
++	end)
++end)
