@@ -2,7 +2,7 @@
 // Bounded keyboard-leaf observations; readable does not mean an atomic snapshot.
 #pragma once
 
-#include "hs274-key-element.hpp"
+#include "hs274-stream-key-policy.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -34,18 +34,17 @@ public:
       readable_ = false;
       throw std::overflow_error("Keyboard inventory bound exceeded");
     }
-    bool valid = input.page == 7 && input.usage >= 1 && input.usage <= 255 && binary_key(input.element) &&
-                 input.status == 0 && input.returned_value && input.cookie == input.value_cookie &&
+    bool valid = hs274_key_policy::admit_button(input.page, input.usage, input.element, input.value) ==
+                 hs274_key_policy::button_admission::admitted && input.status == 0 && input.returned_value && input.cookie == input.value_cookie &&
                  (input.value == 0 || input.value == 1) && input.timestamp <= input.finished &&
                  previous_finish_ <= input.started && input.started <= input.finished;
-    if (input.usage <= 3 && input.value != 0) valid = false;
     for (std::size_t i = 0; i < count_; ++i) {
       if (entries_[i].cookie == input.cookie) valid = false;
     }
     entries_[count_++] = input;
     previous_finish_ = input.finished;
     readable_ = readable_ && valid;
-    found_key_ = found_key_ || (input.usage >= 4 && input.usage <= 255);
+    found_key_ = found_key_ || (input.page != 7 || input.usage >= 4);
   }
 
   bool finish(bool enumerated, bool exhausted) {

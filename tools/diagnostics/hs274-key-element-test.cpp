@@ -1,6 +1,6 @@
 // tools/diagnostics/hs274-key-element-test.cpp
 // Execute the emitted native inspection with controlled HID API results.
-#include "hs274-key-element.hpp"
+#include "hs274-stream-key-policy.hpp"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -105,7 +105,8 @@ int main() {
   }
   key.element.page = 12;
   key.integer = 42;
-  assert(inspect(key));
+  assert(!inspect(key));
+  assert(inspect(key, false));
   key.element.page = 7;
   key.element.usage = 0;
   assert(inspect(key));

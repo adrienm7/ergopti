@@ -723,6 +723,46 @@ required file-path header. Full selected root gates and exact-source native
 qualification remain required. Recovery scheduling, managed session composition,
 controlled shutdown and WP4-WP10 are unfinished; TODO31 stays partial.
 
+The reviewed baseline2 producer sources and matching Python readers are now
+promoted atomically with their real Swift native compilation invoker. The invoker
+compiles actual checked-in inputs with no archived candidate overlay; its source
+admission checks all25 staged ordinary-file bytes and preserves the19 phases,
+three products, both architectures and unchanged300/305/10 ownership bounds.
+The original archived candidate remains an immutable earlier-source witness and
+must never be reapplied over these promoted sources. Outer transport1, archived
+corpus expectations and dormant default capture remain unchanged.
+
+Repository-configured Ruff formatting changes only two generator layouts; their
+complete ASTs, constants and actual raw3/stream32 outputs remain identical. A
+narrow generator owns one promoted-source witness and its coherent empty-tree
+patch. It admits only the reviewed 25 inputs and two explicitly reviewed
+formatting hashes, preserving the original archive. Native compilation uses
+candidate:null and never applies that diagnostic patch. Swift qualifies the
+owning source contract before both source and staged-file checks.
+
+Thirteen lasting portable regressions cover eight independent source/staging
+controls and five public CLI check/refusal cases. Their fixed earlier fixture
+bytes and expected outcomes remain unchanged. The sole interpreter-path
+accommodation is reversible; four CLI assertions retain their exact expressions
+as unittest assertions that also execute under optimization. One discovered
+Swift case invokes the real 13-test suite. These controls do not replace native
+compilation, peer authentication, installation or physical acceptance.
+
+Promotion preflight verifies the original31 current preimages and6,935 sealed subjects,
+plus the reviewed formatting and lasting-test successors, with exact35 final
+source bytes and zero-fuzz/offset patch application. Independent source review
+passes18 normal/optimized controls;198 original Python cases plus13 new cases,
+direct53/29 controls and52
+portable C++ executions pass on the exact privately composed sources. The actual
+owner regenerates the template-based native outputs. The first full native
+calibration at835962e984 passes. Root verification now passes formatting, all361
+JS checks and15,249 Lua assertions across1,527 modules; all211 Python cases
+pass. Swift compilation is explicitly deferred on Linux. Actual compilation of
+this promoted source SHA and native Swift acceptance remain required. Native authentication, signed
+owned runtime, compatibility, installation and physical acceptance are separate
+unfinished requirements. This promotion does not activate capture or complete
+TODO31 and WP4-WP10.
+
 ## Coordination and setup
 
 Coordination is recorded in GitHub issue86. Group3 owns only its new native

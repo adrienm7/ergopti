@@ -17,7 +17,7 @@ void transfer_baseline(const json& opened, Request request, Publish publish, Ack
   static_assert(Limit > 0);
   const auto& descriptor = opened.at("baseline");
   if (!descriptor.is_object() || descriptor.size() != 3 ||
-      !descriptor.at("version").is_number_unsigned() || descriptor.at("version") != 1u ||
+      !descriptor.at("version").is_number_unsigned() || descriptor.at("version") != 2u ||
       !descriptor.at("rows").is_number_unsigned()) {
     throw std::invalid_argument("Invalid capture baseline descriptor");
   }

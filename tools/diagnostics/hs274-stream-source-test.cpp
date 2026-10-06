@@ -10,6 +10,7 @@
 #include <vector>
 
 using hs274_stream_protocol::json;
+using fixture_type = hs274_key_policy::keyboard_type;
 using source = hs274_stream_protocol::source<4, 2, 2>;
 std::uint64_t acquisition_time() { return 1000; }
 
@@ -61,7 +62,7 @@ json open_ready(source& owner, const json& opening) {
 
 void baseline_session_cases() {
   source owner("baseline-session", acquisition_time);
-  auto keyboard = owner.attach(41, true);
+  auto keyboard = owner.attach(41, true, fixture_type::ansi);
   require(start(keyboard));
   const auto opened = owner.request(7, prepare(owner));
   require(opened.at("baseline").at("boundary") == "1000");
@@ -95,7 +96,7 @@ void baseline_session_cases() {
 
   for (unsigned mode = 0; mode < 3; ++mode) {
     source failed("baseline-failure", acquisition_time);
-    auto monitor = failed.attach(41, true);
+    auto monitor = failed.attach(41, true, fixture_type::ansi);
     require(start(monitor));
     const auto lease = failed.request(7, prepare(failed));
     auto page = pull_request(lease);
@@ -123,7 +124,7 @@ void baseline_session_cases() {
 void baseline_client_cases() {
   for (unsigned mode = 0; mode < 5; ++mode) {
     source owner("baseline-client", acquisition_time);
-    auto keyboard = owner.attach(41, true);
+    auto keyboard = owner.attach(41, true, fixture_type::ansi);
     require(start(keyboard));
     const auto opened = owner.request(7, prepare(owner));
     std::vector<json> published, receipts;
@@ -163,9 +164,9 @@ void baseline_client_cases() {
 void baseline_page_cases() {
   source owner("baseline-pages", acquisition_time);
   rejects([&] { owner.freeze(100); });
-  auto keyboard = owner.attach(41, true);
+  auto keyboard = owner.attach(41, true, fixture_type::ansi);
   require(start(keyboard));
-  auto consumer = owner.attach(42, false);
+  auto consumer = owner.attach(42, false, fixture_type::none);
   rejects([&] { owner.freeze(100); });
   require(consumer.started(nullptr, 0, true, false));
   const auto frozen = owner.freeze(100);
@@ -173,7 +174,7 @@ void baseline_page_cases() {
   require(first.at("rows").size() == 2 && first.at("next") == 2 && first.at("total") == 4);
   require(first.at("rows").at(0).at("kind") == "device");
   require(first.at("rows").at(0).at("elements") == 2);
-  require(first.at("rows").at(1).size() == 6 && !first.at("rows").at(1).contains("page"));
+  require(first.at("rows").at(1).size() == 7 && first.at("rows").at(1).at("page") == 7);
   keyboard.append({41, 101, 1, true, true, 7, 44, 0, true, 44});
   const auto second = frozen.read(2);
   require(second.at("complete") == true && second.at("next") == 4);
@@ -195,7 +196,7 @@ void baseline_page_cases() {
   for (std::uint32_t cookie = 0; cookie < 1024; ++cookie) {
     keys.push_back({7, 255, UINT32_MAX - cookie, UINT64_MAX, true});
   }
-  const pages maximum(UINT64_MAX, {{UINT64_MAX, true, keys}, {UINT64_MAX - 1, true, keys}});
+  const pages maximum(UINT64_MAX, {{UINT64_MAX, true, keys, fixture_type::ansi}, {UINT64_MAX - 1, true, keys, fixture_type::ansi}});
   std::size_t offset = 0, count = 0;
   for (;;) {
     const auto page = maximum.read(offset);
@@ -211,15 +212,15 @@ void baseline_page_cases() {
   for (const auto page : {0u, 12u, 0xff01u}) {
     auto changed = keys[0];
     changed.page = page;
-    rejects([&] { pages invalid(UINT64_MAX, {{1, true, {changed}}}); });
+    rejects([&] { pages invalid(UINT64_MAX, {{1, true, {changed}, fixture_type::ansi}}); });
   }
   rejects([&] { pages invalid(100, {}); });
-  rejects([&] { pages invalid(UINT64_MAX, {{1, true, keys}, {1, true, keys}}); });
-  rejects([&] { pages invalid(UINT64_MAX, {{1, false, keys}}); });
-  rejects([&] { pages invalid(UINT64_MAX, {{1, true, {}}}); });
-  rejects([&] { pages invalid(100, {{1, true, keys}}); });
+  rejects([&] { pages invalid(UINT64_MAX, {{1, true, keys, fixture_type::ansi}, {1, true, keys, fixture_type::ansi}}); });
+  rejects([&] { pages invalid(UINT64_MAX, {{1, false, keys, fixture_type::none}}); });
+  rejects([&] { pages invalid(UINT64_MAX, {{1, true, {}, fixture_type::ansi}}); });
+  rejects([&] { pages invalid(100, {{1, true, keys, fixture_type::ansi}}); });
   keys[1].cookie = keys[0].cookie;
-  rejects([&] { pages invalid(UINT64_MAX, {{1, true, keys}}); });
+  rejects([&] { pages invalid(UINT64_MAX, {{1, true, keys, fixture_type::ansi}}); });
 }
 
 struct clock_fixture {
@@ -261,7 +262,7 @@ void readiness_cases() {
   rejects([&] { owner.request(0, status); });
   rejects([&] { owner.request(7, {{"version", true}, {"action", "status"}}); });
   rejects([&] { owner.request(7, {{"version", 1u}, {"action", "status"}, {"extra", true}}); });
-  auto monitor = owner.attach(41, true);
+  auto monitor = owner.attach(41, true, fixture_type::ansi);
   auto pending = owner.request(7, status);
   require(!pending.at("ready").get<bool>());
   start(monitor);
@@ -318,7 +319,7 @@ void readiness_cases() {
 
 void observation_policy_cases() {
   source owner("policy", acquisition_time);
-  auto monitor = owner.attach(41, true);
+  auto monitor = owner.attach(41, true, fixture_type::ansi);
   require(!owner.observes(41, false, false));
   auto opening = prepare(owner);
   // Pending monitors must be eligible before readiness can ever become true.
@@ -345,7 +346,7 @@ void observation_policy_cases() {
   require(owner.observes(41, false, false));
   monitor.retire();
   require(!owner.observes(41, false, false));
-  auto replacement = owner.attach(41, true);
+  auto replacement = owner.attach(41, true, fixture_type::ansi);
   require(owner.observes(41, false, false));
   auto cancel = opening;
   cancel["action"] = "cancel";
@@ -355,8 +356,8 @@ void observation_policy_cases() {
   owner.peer_closed(7);
   require(!owner.observes(41, false, false));
   prepare(owner);
-  auto second = owner.attach(42, true);
-  rejects([&] { owner.attach(43, true); });
+  auto second = owner.attach(42, true, fixture_type::ansi);
+  rejects([&] { owner.attach(43, true, fixture_type::ansi); });
   require(!owner.observes(41, false, false));
   require(!owner.observes(42, false, false));
 }
@@ -366,7 +367,7 @@ void preparation_cases() {
   const json status{{"version", 1u}, {"action", "status"}};
   owner.request(7, status);
   require(!owner.observing());
-  auto monitor = owner.attach(41, true);
+  auto monitor = owner.attach(41, true, fixture_type::ansi);
   start(monitor);
   rejects([&] { owner.request(7, {{"version", 1u}, {"action", "open"}}); });
   rejects([&] { owner.request(0, {{"version", 1u}, {"action", "prepare"}}); });
@@ -414,8 +415,8 @@ void preparation_cases() {
 
 void reference_routing_cases() {
   source owner("reference-routing", acquisition_time);
-  auto first = owner.attach(41, true);
-  auto second = owner.attach(42, true);
+  auto first = owner.attach(41, true, fixture_type::ansi);
+  auto second = owner.attach(42, true, fixture_type::ansi);
   start(first);
   start(second);
   auto opened = open_ready(owner, prepare(owner));
@@ -432,8 +433,8 @@ void reference_routing_cases() {
 
 void sampled_state_cases() {
   source owner("sampled-state", acquisition_time);
-  auto first = owner.attach(41, true);
-  auto second = owner.attach(42, true);
+  auto first = owner.attach(41, true, fixture_type::ansi);
+  auto second = owner.attach(42, true, fixture_type::ansi);
   const source::sample held{7, 44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 1, 0, 0, 0};
   require(first.started(&held, 1, true, false));
   require(first.key_down(44));
@@ -461,8 +462,8 @@ void sampled_state_cases() {
   require(owner.request(7, pull_request(opened)).at("reason") == "interrupted");
 
   source mixed("consumer-state", acquisition_time);
-  auto keyboard = mixed.attach(41, true);
-  auto consumer = mixed.attach(42, false);
+  auto keyboard = mixed.attach(41, true, fixture_type::ansi);
+  auto consumer = mixed.attach(42, false, fixture_type::none);
   require(!keyboard.started(nullptr, 0, true, false));
   require(start(keyboard));
   require(!consumer.started(nullptr, 0, false, false));
@@ -470,6 +471,12 @@ void sampled_state_cases() {
   require(!consumer.started(&held, 1, true, false));
   require(consumer.started(nullptr, 0, true, false));
   rejects([&] { consumer.key_down(44); });
+  // V2 still retains empty markers, but subsequent button observations require
+  // the corresponding inventoried cookie instead of appearing as auxiliary.
+  consumer.stopped();
+  const source::sample consumer_key{12, 205, 1, {true, false, true, 1, 1, 0, 1},
+      0, true, 1, 0, 0, 0, 0};
+  require(consumer.started(&consumer_key, 1, true, false));
   opened = open_ready(mixed, prepare(mixed));
   consumer.append({42, 1, 1, true, true, 12, 205, 0, true, 1});
   const auto records = mixed.request(7, pull_request(opened)).at("records");
@@ -480,7 +487,7 @@ void sampled_state_cases() {
 
 void changed_page_cases() {
   source owner("changed-page", acquisition_time);
-  auto monitor = owner.attach(41, true);
+  auto monitor = owner.attach(41, true, fixture_type::ansi);
   require(start(monitor));
   const auto opened = open_ready(owner, prepare(owner));
   monitor.append({41, 1001, 1, true, true, 12, 44, 0, true, 44});
@@ -501,13 +508,13 @@ int main() {
   source owner("first", acquisition_time);
   auto opening = prepare(owner);
   rejects([&] { owner.request(7, opening); });
-  rejects([&] { owner.attach(0, true); });
-  auto first = owner.attach(41, true);
-  rejects([&] { owner.attach(41, true); });
+  rejects([&] { owner.attach(0, true, fixture_type::ansi); });
+  auto first = owner.attach(41, true, fixture_type::ansi);
+  rejects([&] { owner.attach(41, true, fixture_type::ansi); });
   rejects([&] { owner.request(7, opening); });
   start(first);
   rejects([&] { start(first); });
-  auto second = owner.attach(44, true);
+  auto second = owner.attach(44, true, fixture_type::ansi);
   rejects([&] { owner.request(7, opening); });
   start(second);
   auto opened = open_ready(owner, opening);
@@ -542,7 +549,7 @@ int main() {
   owner.peer_closed(7);
   opening = prepare(owner);
   {
-    auto replacement = owner.attach(44, true);
+    auto replacement = owner.attach(44, true, fixture_type::ansi);
     rejects([&] { owner.request(7, opening); });
     start(replacement);
     opened = open_ready(owner, opening);
@@ -553,11 +560,11 @@ int main() {
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
   opening = prepare(owner);
-  auto extra = owner.attach(45, true);
+  auto extra = owner.attach(45, true, fixture_type::ansi);
   start(extra);
   opened = open_ready(owner, opening);
   pull = pull_request(opened);
-  rejects([&] { owner.attach(46, true); });
+  rejects([&] { owner.attach(46, true, fixture_type::ansi); });
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
   opening = prepare(owner);
@@ -567,12 +574,12 @@ int main() {
   std::optional<source::monitor> old;
   {
     source previous("previous", acquisition_time);
-    old.emplace(previous.attach(41, true));
+    old.emplace(previous.attach(41, true, fixture_type::ansi));
     start(*old);
     open_ready(previous, prepare(previous));
   }
   source next("next", acquisition_time);
-  auto current = next.attach(41, true);
+  auto current = next.attach(41, true, fixture_type::ansi);
   start(current);
   opened = open_ready(next, prepare(next));
   pull = pull_request(opened);

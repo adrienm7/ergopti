@@ -116,7 +116,7 @@ void page_identity_cases() {
   state owner(41);
   owner.initialize(&observed, 1, true, false);
   auto auxiliary = event(999, 1, 120, 205);
-  auxiliary.page = 12;
+  auxiliary.page = 8;
   require(owner.apply(auxiliary) == action::auxiliary && owner.healthy());
   require(owner.apply(event(109, 1, 130)) == action::pressed);
 }

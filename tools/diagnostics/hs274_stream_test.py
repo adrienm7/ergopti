@@ -36,6 +36,16 @@ from hs274_capture import MARKER as CAPTURE_MARKER
 from unittest.mock import patch
 
 
+# This module preserves independent historical version-1 native receipts. New
+# current producer admission is tested separately by hs274_baseline_v2_test.
+from functools import partial
+
+read_stream = partial(read_stream, historical_baseline=True)
+validate_stream = partial(validate_stream, historical_baseline=True)
+validate_successor = partial(validate_successor, historical_baseline=True)
+validate_interruption = partial(validate_interruption, historical_baseline=True)
+
+
 def baseline_fixture():
     probe = {
         "device": "41",
@@ -488,6 +498,8 @@ def remap_module():
     )
     remap = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(remap)
+    # These archived receiver transcripts are explicitly version-1 replay.
+    remap.read_stream = partial(remap.read_stream, historical_baseline=True)
     return remap
 
 

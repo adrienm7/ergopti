@@ -1,0 +1,3444 @@
+diff --git a/hs274-baseline-v2-test.cpp b/hs274-baseline-v2-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-baseline-v2-test.cpp
+@@ -0,0 +1,119 @@
++// tools/diagnostics/hs274-baseline-v2-test.cpp
++// Independent multi-page state, strict type and complete row schema controls.
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-baseline-client.hpp"
++#include <iostream>
++
++using hs274_stream_protocol::json;
++using state = hs274_stream_protocol::key_state<8>;
++using pages = hs274_stream_protocol::baseline_pages<2, 3, 8>;
++using source = hs274_stream_protocol::source<8, 2, 3>;
++using type = hs274_key_policy::keyboard_type;
++std::size_t assertions = 0;
++void require(bool condition) {
++  ++assertions;
++  if (!condition) throw std::runtime_error("Baseline-v2 independent assertion failed");
++}
++template <typename Callback> void rejects(Callback callback) {
++  bool refused = false;
++  try { callback(); } catch (const std::exception&) { refused = true; }
++  require(refused);
++}
++template <typename Sample = state::sample> Sample sample(std::uint32_t page, std::uint32_t usage, std::uint32_t cookie, bool down) {
++  return {page, usage, cookie, {true, false, true, 1, 32, 0, 1}, 0, true, cookie,
++          down ? 1 : 0, 90, 100, 100};
++}
++hs274_raw_capture::record event(std::uint32_t page, std::uint32_t usage, std::uint32_t cookie,
++                                 std::int64_t value, std::uint64_t timestamp) {
++  return {41, timestamp, value, true, true, static_cast<std::int32_t>(page),
++          static_cast<std::int32_t>(usage), 0, true, cookie};
++}
++void state_cases() {
++  const state::sample samples[] = {sample(7, 44, 1, true), sample(12, 3, 2, true),
++      sample(255, 3, 3, true), sample(65281, 3, 4, false), sample(7, 44, 5, false)};
++  state owner(41);
++  owner.initialize(samples, 5, true, false);
++  require(owner.healthy() && owner.down(1) && owner.down(2) && owner.down(3) && !owner.down(4));
++  require(owner.apply(event(12, 3, 2, 0, 80)) == state::action::covered_by_snapshot);
++  require(owner.down(2));
++  require(owner.apply(event(12, 3, 2, 0, 110)) == state::action::released);
++  require(owner.apply(event(255, 3, 3, 0, 111)) == state::action::released);
++  require(owner.apply(event(65281, 3, 4, 1, 112)) == state::action::pressed);
++  require(owner.apply(event(7, 44, 5, 1, 113)) == state::action::pressed);
++  require(owner.down(1) && owner.down(5));
++  const auto frozen = owner.snapshot(113);
++  require(frozen[1].page == 12 && frozen[1].timestamp == 110 && !frozen[1].down);
++  require(frozen[3].page == 65281 && frozen[3].timestamp == 112 && frozen[3].down);
++  require(owner.apply(event(12, 3, 2, 1, 109)) == state::action::invalid);
++  rejects([&] { owner.snapshot(120); });
++  for (const auto page : {7u, 12u, 255u, 65281u}) {
++    state changed(41);
++    const auto leaf = sample(page, page == 7 ? 44 : 3, 1, false);
++    changed.initialize(&leaf, 1, true, false);
++    auto value = event(page, page == 7 ? 44 : 3, 1, 1, 110);
++    value.page = page == 7 ? 12 : 7;
++    require(changed.apply(value) == state::action::invalid);
++    state unknown(41);
++    unknown.initialize(&leaf, 1, true, false);
++    require(unknown.apply(event(page, page == 7 ? 44 : 3, 999, 1, 110)) == state::action::invalid);
++  }
++  state error(41);
++  const auto invalid = sample(7, 3, 1, true);
++  rejects([&] { error.initialize(&invalid, 1, true, false); });
++}
++void page_cases() {
++  const std::vector<pages::element> keyboard{{7, 44, 1, 90, true}, {12, 3, 2, 95, true}};
++  const std::vector<pages::element> consumer{{255, 3, 1, 96, true}, {65281, 3, 2, 97, true}};
++  pages frozen(100, {{41, true, keyboard, type::iso}, {42, false, consumer, type::none}});
++  require(frozen.size() == 6);
++  const auto first = frozen.read(0);
++  require(first.at("rows").at(0) == json({{"kind", "device"}, {"device", "41"},
++      {"keyboard", true}, {"keyboard_type", "iso"}, {"elements", 2}}));
++  require(first.at("rows").at(1) == json({{"kind", "key"}, {"device", "41"},
++      {"page", 7}, {"usage", 44}, {"cookie", 1}, {"timestamp", "90"}, {"down", true}}));
++  require(frozen.read(2).at("rows").at(0).at("page") == 12);
++  require(frozen.read(2).at("rows").at(1).at("keyboard_type") == "none");
++  require(frozen.read(4).at("rows").at(1).at("page") == 65281);
++  for (const auto kind : {type::none, type::unavailable})
++    rejects([&] { pages invalid(100, {{41, true, keyboard, kind}}); });
++  rejects([&] { pages invalid(100, {{41, false, keyboard, type::none}}); });
++  rejects([&] { pages invalid(100, {{41, true, consumer, type::ansi}}); });
++  rejects([&] { pages invalid(100, {{41, false, consumer, type::ansi}}); });
++}
++void source_cases() {
++  source owner("baseline-v2-diagnostic", [] { return 100; });
++  rejects([&] { owner.attach(41, true); });
++  auto keyboard = owner.attach(41, true, type::jis);
++  const source::sample keys[] = {sample<source::sample>(7, 44, 1, true), sample<source::sample>(12, 3, 2, true)};
++  require(keyboard.started(keys, 2, true, false));
++  auto consumer = owner.attach(42, false, type::none);
++  const source::sample aux[] = {sample<source::sample>(255, 3, 1, true), sample<source::sample>(65281, 3, 2, true)};
++  require(consumer.started(aux, 2, true, false));
++  const auto prepared = owner.request(7, {{"version", 1u}, {"action", "prepare"}});
++  const auto opened = owner.request(7, {{"version", 1u}, {"action", "open"},
++      {"incarnation", prepared.at("incarnation")}, {"preparation", prepared.at("preparation")}});
++  require(opened.at("version") == 1u && opened.at("baseline").at("version") == 2u);
++  require(opened.at("coverage") == "fixture_only");
++  std::size_t cursor = 0, published = 0;
++  hs274_stream_protocol::transfer_baseline<2>(opened, [&](const json& request) {
++    return owner.request(7, request);
++  }, [&](const json& row) {
++    ++published;
++    if (row.at("kind") == "baseline") cursor = row.at("next").get<std::size_t>();
++  }, [&](const json& acknowledgement) {
++    require(acknowledgement.at("baseline_ack") == std::to_string(cursor));
++  });
++  require(cursor == 6 && published == 4);
++  auto old = opened;
++  old["baseline"]["version"] = 1u;
++  bool requested_old = false;
++  rejects([&] { hs274_stream_protocol::transfer_baseline<2>(old,
++      [&](const json&) -> json { requested_old = true; throw std::runtime_error("Must refuse before request"); },
++      [](const json&) { throw std::runtime_error("Must not publish"); },
++      [](const json&) { throw std::runtime_error("Must not acknowledge"); }); });
++  require(!requested_old);
++}
++int main() {
++  state_cases(); page_cases(); source_cases();
++  std::cout << assertions << " independent baseline-v2 assertions passed\n";
++}
+diff --git a/hs274-key-element-test.cpp b/hs274-key-element-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-key-element-test.cpp
+@@ -0,0 +1,113 @@
++// tools/diagnostics/hs274-key-element-test.cpp
++// Execute the emitted native inspection with controlled HID API results.
++#include "hs274-stream-key-policy.hpp"
++#include <cassert>
++#include <memory>
++#include <vector>
++
++struct Element {
++  unsigned page = 7, usage = 44, bits = 1, count = 1;
++  int type = 2, minimum = 0, maximum = 1;
++  bool relative = false;
++  bool array = false;
++};
++struct Value { Element element; int integer = 1; };
++constexpr int kIOHIDElementTypeInput_Misc = 1, kIOHIDElementTypeInput_ScanCodes = 4;
++const Element* IOHIDValueGetElement(const Value& value) { return &value.element; }
++int IOHIDValueGetIntegerValue(const Value& value) { return value.integer; }
++unsigned IOHIDElementGetUsagePage(const Element* e) { return e->page; }
++unsigned IOHIDElementGetUsage(const Element* e) { return e->usage; }
++int IOHIDElementGetType(const Element* e) { return e->type; }
++bool IOHIDElementIsRelative(const Element* e) { return e->relative; }
++bool IOHIDElementIsArray(const Element* e) { return e->array; }
++unsigned IOHIDElementGetReportSize(const Element* e) { return e->bits; }
++unsigned IOHIDElementGetReportCount(const Element* e) { return e->count; }
++int IOHIDElementGetLogicalMin(const Element* e) { return e->minimum; }
++int IOHIDElementGetLogicalMax(const Element* e) { return e->maximum; }
++
++struct Monitor {
++  bool ready = true;
++  void stopped() { ready = false; }
++};
++
++bool inspect(Value input, bool selected = true) {
++  const bool hs274_stream_selected_ = selected;
++  Monitor hs274_monitor_;
++  auto hid_values = std::make_shared<std::vector<Value>>();
++  const auto value = std::make_shared<Value>(input);
++        hid_values->emplace_back(*value);
++  // Revocation must preserve every native value for the existing remapper.
++  assert(hid_values->size() == 1);
++  assert(hid_values->front().integer == input.integer);
++  return hs274_monitor_.ready;
++}
++
++int main() {
++  Value key;
++  assert(inspect(key));
++  key.integer = 0;
++  assert(inspect(key));
++  key.integer = 1;
++  for (int type = 1; type <= 4; ++type) {
++    key.element.type = type;
++    assert(inspect(key));
++  }
++  key = {};
++  // IOHIDElementGetReportCount returns rawReportCount for array key leaves,
++  // even though their kernel reportCount and reportSize are both one.
++  Value array_key = key;
++  array_key.element.array = true;
++  array_key.element.count = 6;
++  assert(inspect(array_key));
++  array_key.integer = 0;
++  assert(inspect(array_key));
++  array_key.element.count = 0;
++  assert(!inspect(array_key));
++  array_key.element.count = 6;
++  array_key.element.bits = 8;
++  assert(!inspect(array_key));
++  // Native receipt 34711893766: each key transition includes array selectors
++  // and an inactive rollover indicator. Neither represents a physical press.
++  Value auxiliary = key;
++  auxiliary.element.usage = UINT32_MAX;
++  auxiliary.element.bits = 8;
++  auxiliary.element.count = 6;
++  auxiliary.element.maximum = 255;
++  auxiliary.integer = 41;
++  assert(inspect(auxiliary));
++  auxiliary.integer = 0;
++  assert(inspect(auxiliary));
++  for (unsigned usage = 1; usage <= 3; ++usage) {
++    auxiliary = key;
++    auxiliary.element.usage = usage;
++    auxiliary.integer = 0;
++    assert(inspect(auxiliary));
++    auxiliary.integer = 1;
++    assert(!inspect(auxiliary));
++  }
++  for (int variant = 0; variant < 11; ++variant) {
++    Value invalid = key;
++    switch (variant) {
++      case 0: invalid.element.relative = true; break;
++      case 1: invalid.element.bits = 8; break;
++      case 2: invalid.element.count = 6; break;
++      case 3: invalid.element.minimum = -1; break;
++      case 4: invalid.element.maximum = 255; break;
++      case 5: invalid.element.type = 129; break;
++      case 6: invalid.element.type = 0; break;
++      case 7: invalid.element.usage = 1; break;
++      case 8: invalid.element.usage = 256; break;
++      case 9: invalid.integer = 2; break;
++      case 10: invalid.integer = -1; break;
++    }
++    assert(!inspect(invalid));
++    assert(inspect(invalid, false));
++  }
++  key.element.page = 12;
++  key.integer = 42;
++  assert(!inspect(key));
++  assert(inspect(key, false));
++  key.element.page = 7;
++  key.element.usage = 0;
++  assert(inspect(key));
++}
+diff --git a/hs274-key-state-test.cpp b/hs274-key-state-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-key-state-test.cpp
+@@ -0,0 +1,227 @@
++// tools/diagnostics/hs274-key-state-test.cpp
++// Exercise sampled state, queued prefixes and genuine subsequent transitions.
++#include "hs274-key-state.hpp"
++#include "fixtures/hs274-inventory-sample.hpp"
++#include <fstream>
++#include <vector>
++
++using state = hs274_stream_protocol::key_state<4>;
++using action = state::action;
++using fault = state::fault;
++
++void require(bool value) {
++  if (!value) throw std::runtime_error("Keyboard state assertion failed");
++}
++
++template <typename Callback>
++void rejects(Callback callback) {
++  bool rejected = false;
++  try { callback(); } catch (const std::exception&) { rejected = true; }
++  require(rejected);
++}
++
++state::sample sample(std::uint32_t usage, std::uint32_t cookie, bool down = false) {
++  return {7, usage, cookie, {true, false, true, 1, 32, 0, 1}, 0, true, cookie,
++          down ? 1 : 0, 100, 100, 100};
++}
++
++hs274_raw_capture::record event(std::uint32_t cookie, std::int64_t value, std::uint64_t at,
++                               std::int32_t usage = 44, std::uint64_t device = 41) {
++  return {device, at, value, true, true, 7, usage, 0, true, cookie};
++}
++
++void replay_native(const char* path, bool held) {
++  std::ifstream input(path);
++  require(input.good());
++  nlohmann::json evidence;
++  input >> evidence;
++  std::vector<state::sample> samples;
++  // These fixtures retain the referenced leaves. Full enumeration is tested
++  // independently against the complete shared native inventory corpus.
++  if (held) {
++    samples.push_back(hs274_test::inventory_sample<state::sample>(evidence.at("held_inventory_element")));
++  } else {
++    for (const auto& row : evidence.at("referenced_keyboard_elements")) {
++      samples.push_back(hs274_test::inventory_sample<state::sample>(row));
++    }
++  }
++  const auto& rows = evidence.at("capture").at("records");
++  state owner(rows.at(0).at("device").get<std::uint64_t>());
++  owner.initialize(samples.data(), samples.size(), true, false);
++  require(owner.down(109) == held);
++  unsigned presses = 0, releases = 0;
++  for (const auto& row : rows) {
++    const auto usage = row.at("usage").get<std::int32_t>();
++    if (row.at("page") != 7 || usage < 4 || usage > 255) continue;
++    auto value = event(row.at("cookie").get<std::uint32_t>(), row.at("value").get<std::int64_t>(),
++                       row.at("timestamp").get<std::uint64_t>(), usage, row.at("device").get<std::uint64_t>());
++    value.has_cookie = row.at("has_cookie").get<bool>();
++    const auto result = owner.apply(value);
++    require(result == action::pressed || result == action::released);
++    if (result == action::pressed) ++presses;
++    if (result == action::released) ++releases;
++  }
++  require(owner.healthy() && !owner.down(109));
++  require(presses == (held ? 1u : 2u) && releases == 2);
++}
++
++void frozen_state_cases() {
++  state owner(41);
++  rejects([&] { owner.snapshot(100); });
++  state::sample samples[] = {sample(224, 24), sample(224, 289, true)};
++  samples[1].finished = 110;
++  owner.initialize(samples, 2, true, false);
++  rejects([&] { owner.snapshot(109); });
++  const auto initial = owner.snapshot(110);
++  require(initial.size() == 2);
++  require(initial[0].page == 7 && initial[1].page == 7);
++  require(initial[0].usage == 224 && initial[0].cookie == 24 && !initial[0].down);
++  require(initial[1].usage == 224 && initial[1].cookie == 289 && initial[1].down);
++  require(initial[0].timestamp == 100 && initial[1].timestamp == 100);
++  require(owner.apply(event(24, 1, 130, 224)) == action::pressed);
++  require(owner.apply(event(289, 0, 120, 224)) == action::released);
++  rejects([&] { owner.snapshot(129); });
++  const auto changed = owner.snapshot(130);
++  require(changed[0].page == 7 && changed[1].page == 7);
++  require(changed[0].timestamp == 130 && changed[0].down);
++  require(changed[1].timestamp == 120 && !changed[1].down);
++  require(!initial[0].down && initial[1].down);
++  require(owner.apply(event(24, 1, 140, 224)) == action::unchanged);
++  require(owner.snapshot(140)[0].timestamp == 140);
++  require(changed[0].timestamp == 130);
++  require(owner.apply(event(24, 0, 135, 224)) == action::invalid);
++  rejects([&] { owner.snapshot(150); });
++
++  state prefix(41);
++  const auto held = sample(44, 109, true);
++  prefix.initialize(&held, 1, true, false);
++  require(prefix.apply(event(109, 0, 90)) == action::covered_by_snapshot);
++  const auto covered = prefix.snapshot(100);
++  require(covered[0].timestamp == 100 && covered[0].down);
++}
++
++void page_identity_cases() {
++  const auto observed = sample(44, 109);
++  for (const auto page : {0, 12, 0xff01}) {
++    state owner(41);
++    owner.initialize(&observed, 1, true, false);
++    auto changed = event(109, 1, 120);
++    changed.page = page;
++    // A cookie identifies one exact HID element. A changed page cannot be
++    // dismissed as auxiliary input while that same element remains admitted.
++    require(owner.apply(changed) == action::invalid);
++    require(!owner.healthy() && owner.failure() == fault::element_identity);
++    rejects([&] { owner.snapshot(120); });
++  }
++  state owner(41);
++  owner.initialize(&observed, 1, true, false);
++  auto auxiliary = event(999, 1, 120, 205);
++  auxiliary.page = 8;
++  require(owner.apply(auxiliary) == action::auxiliary && owner.healthy());
++  require(owner.apply(event(109, 1, 130)) == action::pressed);
++}
++
++int main(int argc, char** argv) {
++  require(argc == 3);
++  page_identity_cases();
++  frozen_state_cases();
++  replay_native(argv[1], false);
++  replay_native(argv[2], true);
++  rejects([] { state invalid(0); });
++  const auto held = sample(44, 109, true);
++  state owner(41);
++  owner.initialize(&held, 1, true, false);
++  rejects([&] { owner.initialize(&held, 1, true, false); });
++  require(owner.down(109));
++  require(owner.apply(event(109, 1, 80)) == action::covered_by_snapshot);
++  require(owner.apply(event(109, 0, 90)) == action::covered_by_snapshot);
++  require(owner.apply(event(109, 1, 100)) == action::covered_by_snapshot);
++  require(owner.down(109));
++  require(owner.apply(event(109, 0, 120)) == action::released);
++  require(owner.apply(event(109, 1, 130)) == action::pressed);
++  require(owner.apply(event(109, 1, 130)) == action::unchanged);
++  require(owner.apply(event(109, 1, 140)) == action::unchanged);
++  require(owner.apply(event(109, 0, 150)) == action::released);
++  require(!owner.down(109));
++  rejects([&] { owner.down(999); });
++
++  const state::sample independent[] = {sample(224, 24), sample(224, 289)};
++  state elements(41);
++  elements.initialize(independent, 2, true, false);
++  require(elements.apply(event(24, 1, 200, 224)) == action::pressed);
++  // Device-wide timestamp order is not a per-element ordering guarantee.
++  require(elements.apply(event(289, 1, 190, 224)) == action::pressed);
++  require(elements.apply(event(24, 0, 210, 224)) == action::released);
++  require(!elements.down(24) && elements.down(289));
++  state other_device(42);
++  const auto released = sample(44, 109);
++  other_device.initialize(&released, 1, true, false);
++  require(other_device.apply(event(109, 1, 120, 44, 42)) == action::pressed);
++  require(other_device.down(109) && !owner.down(109));
++
++  for (unsigned variant = 0; variant < 10; ++variant) {
++    state invalid(41);
++    invalid.initialize(&held, 1, true, false);
++    auto value = event(109, 0, 120);
++    auto expected = fault::element_identity;
++    switch (variant) {
++      case 0: value.has_cookie = false; break;
++      case 1: value.cookie = 999; break;
++      case 2: value.usage = 41; break;
++      case 3: value.device = 42; expected = fault::device; break;
++      case 4: value.value = 2; expected = fault::value; break;
++      case 5: value.has_usage = false; break;
++      case 6: value.usage = 256; break;
++      case 7: value.timestamp = 100; expected = fault::chronology; break;
++      case 8:
++        require(invalid.apply(event(109, 0, 120)) == action::released);
++        value = event(109, 1, 110); expected = fault::chronology; break;
++      case 9:
++        require(invalid.apply(event(109, 0, 120)) == action::released);
++        value = event(109, 1, 120); expected = fault::chronology; break;
++    }
++    require(invalid.apply(value) == action::invalid && invalid.failure() == expected);
++    require(!invalid.healthy());
++    require(invalid.apply(event(109, 1, 200)) == action::invalid && invalid.failure() == expected);
++    rejects([&] { invalid.down(109); });
++    rejects([&] { invalid.initialize(&held, 1, true, false); });
++  }
++  state early(41);
++  require(early.apply(event(109, 1, 120)) == action::invalid);
++  rejects([&] { early.initialize(&held, 1, true, false); });
++  auto observed = sample(44, 109);
++  observed.started = 200;
++  observed.finished = 210;
++  for (const auto timestamp : {150u, 200u}) {
++    state contradicted(41);
++    contradicted.initialize(&observed, 1, true, false);
++    require(contradicted.apply(event(109, 1, timestamp)) == action::invalid);
++    require(contradicted.failure() == fault::chronology);
++  }
++  state during_query(41);
++  during_query.initialize(&observed, 1, true, false);
++  require(during_query.apply(event(109, 0, 100)) == action::covered_by_snapshot);
++  require(during_query.apply(event(109, 1, 205)) == action::pressed);
++  require(during_query.apply(event(109, 0, 220)) == action::released);
++  for (const auto count : {0u, 5u}) {
++    state invalid(41);
++    rejects([&] { invalid.initialize(&held, count, true, false); });
++    require(!invalid.healthy());
++  }
++  for (unsigned variant = 0; variant < 5; ++variant) {
++    state invalid(41);
++    auto value = held;
++    if (variant == 0) value.status = -1;
++    if (variant == 1) value.element.relative = true;
++    rejects([&] { invalid.initialize(variant == 2 ? nullptr : &value, 1, variant != 3, variant == 4); });
++    require(!invalid.healthy() && invalid.failure() == fault::initialization);
++  }
++  const state::sample error_keys[] = {sample(1, 66), sample(44, 109)};
++  state errors(41);
++  errors.initialize(error_keys, 2, true, false);
++  require(errors.apply(event(66, 0, 120, 1)) == action::unchanged);
++  require(errors.apply(event(0, 17, 130, -1)) == action::auxiliary);
++  require(errors.apply(event(66, 1, 140, 1)) == action::invalid);
++  require(errors.failure() == fault::hid_error);
++  std::puts("Native state replay, queued prefixes, distinct cookies and explicit faults passed");
++}
+diff --git a/hs274-key-state.hpp b/hs274-key-state.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-key-state.hpp
+@@ -0,0 +1,130 @@
++// tools/diagnostics/hs274-key-state.hpp
++// Qualified per-element reconciliation; native queue cutover remains external.
++#pragma once
++
++#include "hs274-stream-inventory.hpp"
++#include "hs274-raw-capture.hpp"
++#include <vector>
++
++namespace hs274_stream_protocol {
++template <std::size_t Limit>
++class key_state final {
++  static_assert(Limit > 0);
++  struct element {
++    std::uint32_t page = 0, usage = 0, cookie = 0;
++    std::uint64_t sampled_at = 0, query_started = 0, query_finished = 0, last_at = 0;
++    bool sampled_down = false, down = false, seen = false, last_down = false;
++  };
++
++public:
++  using sample = typename key_inventory<Limit>::sample;
++  enum class action { covered_by_snapshot, unchanged, pressed, released, auxiliary, invalid };
++  enum class fault { none, initialization, device, element_identity, value, chronology, hid_error };
++  struct frozen_element {
++    std::uint32_t page, usage, cookie;
++    std::uint64_t timestamp;
++    bool down;
++  };
++
++  explicit key_state(std::uint64_t device) : device_(device) {
++    if (!device) throw std::invalid_argument("Missing keyboard state device");
++  }
++  key_state(const key_state&) = delete;
++  key_state& operator=(const key_state&) = delete;
++
++  void initialize(const sample* samples, std::size_t count, bool enumerated, bool exhausted) {
++    if (initialized_ || failure_ != fault::none) throw std::logic_error("Keyboard state already initialized or failed");
++    initialized_ = true;
++    failure_ = fault::initialization;
++    if (!samples || count == 0 || count > Limit) throw std::invalid_argument("Invalid keyboard state inventory size");
++    key_inventory<Limit> qualified;
++    for (std::size_t i = 0; i < count; ++i) qualified.append(samples[i]);
++    if (!qualified.finish(enumerated, exhausted)) throw std::invalid_argument("Unreadable keyboard state inventory");
++    for (std::size_t i = 0; i < count; ++i) {
++      const auto& row = samples[i];
++      elements_[i] = {row.page, row.usage, row.cookie, row.timestamp, row.started, row.finished, 0,
++                      row.value == 1, row.value == 1, false, false};
++    }
++    count_ = count;
++    failure_ = fault::none;
++  }
++
++  bool healthy() const noexcept { return initialized_ && failure_ == fault::none; }
++  fault failure() const noexcept { return failure_; }
++
++  // Copy the observation frontier before paging it to a consumer. Later input
++  // must not change earlier pages, and no device-wide watermark replaces these
++  // per-element frontiers. This does not drain or fence the native input queue.
++  std::vector<frozen_element> snapshot(std::uint64_t boundary) const {
++    if (!healthy()) throw std::logic_error("Keyboard state is not healthy");
++    std::vector<frozen_element> result;
++    result.reserve(count_);
++    for (std::size_t i = 0; i < count_; ++i) {
++      const auto& row = elements_[i];
++      const auto frontier = row.seen && row.last_at > row.sampled_at ? row.last_at : row.sampled_at;
++      if (row.query_finished > boundary || frontier > boundary) {
++        throw std::invalid_argument("Keyboard observation exceeds capture boundary");
++      }
++      result.push_back({row.page, row.usage, row.cookie, frontier, row.down});
++    }
++    return result;
++  }
++
++  bool down(std::uint32_t cookie) const {
++    if (!healthy()) throw std::logic_error("Keyboard state is not healthy");
++    for (std::size_t i = 0; i < count_; ++i) if (elements_[i].cookie == cookie) return elements_[i].down;
++    throw std::invalid_argument("Unknown keyboard state cookie");
++  }
++
++  // The caller must preserve queue order. Ambiguous clocks invalidate state;
++  // this classification never deletes or rewrites the independent raw receipt.
++  action apply(const hs274_raw_capture::record& input) noexcept {
++    if (failure_ != fault::none) return action::invalid;
++    if (!initialized_) return fail(fault::initialization);
++    if (input.device != device_) return fail(fault::device);
++    element* current = nullptr;
++    if (input.has_cookie) {
++      for (std::size_t i = 0; i < count_; ++i) {
++        if (elements_[i].cookie == input.cookie) { current = &elements_[i]; break; }
++      }
++    }
++    // Auxiliary interfaces may emit other pages, but an admitted element's
++    // explicit page must match before an observation can be ignored.
++    if (current && input.has_page && input.page != static_cast<std::int32_t>(current->page)) {
++      return fail(fault::element_identity);
++    }
++    if (!input.has_page || !hs274_key_policy::is_button_page(static_cast<std::uint32_t>(input.page)))
++      return action::auxiliary;
++    if (!input.has_usage) return fail(fault::element_identity);
++    if (input.usage == 0 || input.usage == -1) return action::auxiliary;
++    const auto maximum = input.page == 7 ? 255 : 65535;
++    if (!input.has_cookie || input.usage < 1 || input.usage > maximum) return fail(fault::element_identity);
++    if (!current || current->usage != static_cast<std::uint32_t>(input.usage)) return fail(fault::element_identity);
++    if (input.value != 0 && input.value != 1) return fail(fault::value);
++    if (input.page == 7 && input.usage <= 3 && input.value != 0) return fail(fault::hid_error);
++    const bool pressed = input.value == 1;
++    if ((current->seen && (input.timestamp < current->last_at ||
++         (input.timestamp == current->last_at && pressed != current->last_down))) ||
++        (input.timestamp == current->sampled_at && pressed != current->sampled_down) ||
++        (input.timestamp > current->sampled_at && input.timestamp <= current->query_started)) {
++      return fail(fault::chronology);
++    }
++    current->seen = true;
++    current->last_at = input.timestamp;
++    current->last_down = pressed;
++    if (input.timestamp <= current->sampled_at) return action::covered_by_snapshot;
++    if (current->down == pressed) return action::unchanged;
++    current->down = pressed;
++    return pressed ? action::pressed : action::released;
++  }
++
++private:
++  action fail(fault reason) noexcept { failure_ = reason; return action::invalid; }
++
++  const std::uint64_t device_;
++  std::array<element, Limit> elements_{};
++  std::size_t count_ = 0;
++  bool initialized_ = false;
++  fault failure_ = fault::none;
++};
++} // namespace hs274_stream_protocol
+diff --git a/hs274-native-acquisition-test.cpp b/hs274-native-acquisition-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-native-acquisition-test.cpp
+@@ -0,0 +1,44 @@
++// tools/diagnostics/hs274-native-acquisition-test.cpp
++// Portable diagnostic containment never represents native device acquisition.
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-native-boundary.hpp"
++#include <cassert>
++#include <new>
++#include <stdexcept>
++using namespace hs274_stream_protocol;
++int main() {
++  using receiver_type = source<64, 8, 4>;
++  for (bool allocation : {false, true}) {
++    receiver_type receiver("acquisition", [] { return 100ULL; });
++    auto owner = receiver.native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    unsigned ordinary_started = 0, acquisitions = 0;
++    const bool observed = diagnostic_acquisition(owner,
++        [&](native_fault reason) { receiver.native_failure(reason); }, [&]() -> bool {
++      ++acquisitions;
++      if (allocation) throw std::bad_alloc();
++      throw native_acquisition_error(native_fault::inventory_receipt_write_failed);
++    });
++    ++ordinary_started; // This original callback remains outside diagnostic containment.
++    assert(!observed);
++    assert(ordinary_started == 1);
++    assert(acquisitions == 1);
++    assert(receiver.native_fault_reason() == (allocation ? native_fault::acquisition_resource_exhausted
++                                                        : native_fault::inventory_receipt_write_failed));
++    const auto status = receiver.request(1, {{"version", 1u}, {"action", "status"}});
++    assert(status.at("ready") == false);
++    assert(status.at("exhausted") == true);
++  }
++  receiver_type receiver("unexpected", [] { return 100ULL; });
++  auto owner = receiver.native_attach(1, false, hs274_key_policy::keyboard_type::none);
++  bool propagated = false;
++  try { diagnostic_acquisition(owner, [&](native_fault reason) { receiver.native_failure(reason); },
++      []() -> bool { throw std::logic_error("unexpected program defect"); }); }
++  catch (const std::logic_error&) { propagated = true; }
++  assert(propagated);
++  assert(receiver.native_fault_reason() == native_fault::none);
++  auto inactive = receiver.native_attach(0, false, hs274_key_policy::keyboard_type::none);
++  unsigned forbidden_queries = 0;
++  assert(!diagnostic_acquisition(inactive, [&](native_fault reason) { receiver.native_failure(reason); },
++      [&]() { ++forbidden_queries; return true; }));
++  assert(forbidden_queries == 0);
++}
+diff --git a/hs274-native-button-qualification-test.cpp b/hs274-native-button-qualification-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-native-button-qualification-test.cpp
+@@ -0,0 +1,78 @@
++// tools/diagnostics/hs274-key-element-test.cpp
++// Execute the emitted native inspection with controlled HID API results.
++#include "hs274-stream-key-policy.hpp"
++#include <cassert>
++#include <memory>
++#include <vector>
++
++struct Element {
++  unsigned page = 7, usage = 44, bits = 1, count = 1;
++  int type = 2, minimum = 0, maximum = 1;
++  bool relative = false;
++  bool array = false;
++};
++struct Value { Element element; int integer = 1; };
++constexpr int kIOHIDElementTypeInput_Misc = 1, kIOHIDElementTypeInput_ScanCodes = 4;
++const Element* IOHIDValueGetElement(const Value& value) { return &value.element; }
++int IOHIDValueGetIntegerValue(const Value& value) { return value.integer; }
++unsigned IOHIDElementGetUsagePage(const Element* e) { return e->page; }
++unsigned IOHIDElementGetUsage(const Element* e) { return e->usage; }
++int IOHIDElementGetType(const Element* e) { return e->type; }
++bool IOHIDElementIsRelative(const Element* e) { return e->relative; }
++bool IOHIDElementIsArray(const Element* e) { return e->array; }
++unsigned IOHIDElementGetReportSize(const Element* e) { return e->bits; }
++unsigned IOHIDElementGetReportCount(const Element* e) { return e->count; }
++int IOHIDElementGetLogicalMin(const Element* e) { return e->minimum; }
++int IOHIDElementGetLogicalMax(const Element* e) { return e->maximum; }
++
++struct Monitor {
++  bool ready = true;
++  void stopped() { ready = false; }
++};
++
++bool inspect(Value input, bool selected = true) {
++  const bool hs274_stream_selected_ = selected;
++  Monitor hs274_monitor_;
++  auto hid_values = std::make_shared<std::vector<Value>>();
++  const auto value = std::make_shared<Value>(input);
++        hid_values->emplace_back(*value);
++  // Revocation must preserve every native value for the existing remapper.
++  assert(hid_values->size() == 1);
++  assert(hid_values->front().integer == input.integer);
++  return hs274_monitor_.ready;
++}
++
++int main() {
++  unsigned assertions = 0;
++  for (unsigned page : {7U, 12U, 255U, 65281U}) {
++    for (unsigned usage : {4U, 44U}) {
++      Value value;
++      value.element.page = page;
++      value.element.usage = usage;
++      assert(inspect(value)); ++assertions;
++      value.integer = 0;
++      assert(inspect(value)); ++assertions;
++      value.integer = 2;
++      assert(!inspect(value)); ++assertions;
++      assert(inspect(value, false)); ++assertions;
++      value.integer = 1;
++      value.element.relative = true;
++      assert(!inspect(value)); ++assertions;
++    }
++  }
++  for (unsigned page : {12U, 255U, 65281U}) {
++    Value fn;
++    fn.element.page = page;
++    fn.element.usage = 3;
++    assert(inspect(fn)); ++assertions;
++    fn.element.usage = 65535;
++    assert(inspect(fn)); ++assertions;
++    fn.element.usage = 65536;
++    assert(!inspect(fn)); ++assertions;
++  }
++  Value auxiliary;
++  auxiliary.element.page = 8;
++  auxiliary.integer = 42;
++  assert(inspect(auxiliary)); ++assertions;
++  assert(assertions == 50);
++}
+diff --git a/hs274-native-capacity-test.cpp b/hs274-native-capacity-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-native-capacity-test.cpp
+@@ -0,0 +1,55 @@
++// tools/diagnostics/hs274-native-capacity-test.cpp
++// Portable registration fixtures prove diagnostic exhaustion preserves ordinary callbacks.
++#include "hs274-stream-source.hpp"
++#include <cassert>
++#include <cstdio>
++#include <vector>
++using namespace hs274_stream_protocol;
++using receiver_type = source<4096, 64, 64>;
++#ifdef HS274_TEST_ORIGINAL
++using handle_type = receiver_type::monitor;
++handle_type acquire(receiver_type& receiver, unsigned identity) {
++  return receiver.refuse(identity, native_refusal::keyboard_type_unavailable);
++}
++#else
++using handle_type = receiver_type::native_registration;
++handle_type acquire(receiver_type& receiver, unsigned identity) {
++  return receiver.native_attach(identity, false, hs274_key_policy::keyboard_type::none,
++                                native_refusal::keyboard_type_unavailable);
++}
++#endif
++int main() {
++  receiver_type receiver("capacity", [] { return 100ULL; });
++  std::vector<handle_type> owned;
++  unsigned ordinary_constructed = 0;
++  try {
++    for (unsigned i = 1; i <= 65; ++i) {
++      owned.push_back(acquire(receiver, i));
++      ++ordinary_constructed;
++    }
++  } catch (const std::overflow_error&) {
++    std::printf("FAIL ordinary monitor constructions=%u expected=65\n", ordinary_constructed);
++    return 1;
++  }
++  assert(ordinary_constructed == 65);
++  const auto status = receiver.request(1, {{"version", 1u}, {"action", "status"}});
++  assert(status.at("ready") == false);
++  assert(status.at("exhausted") == true);
++  assert(status.at("monitors").size() == 64);
++#ifndef HS274_TEST_ORIGINAL
++  assert(!owned.back().active());
++  assert(owned.back().reason() == native_fault::registration_capacity_exhausted);
++  assert(receiver.native_fault_reason() == native_fault::registration_capacity_exhausted);
++  assert(status.at("native_fault") == "registration_capacity_exhausted");
++  assert(!owned.back().started(nullptr, 0, true, false));
++  owned.back().retire();
++  owned.front().retire();
++  auto retry = acquire(receiver, 66);
++  assert(!retry.active());
++  assert(receiver.request(1, {{"version", 1u}, {"action", "status"}}).at("ready") == false);
++  bool denied = false;
++  try { receiver.freeze(100); } catch (const std::logic_error&) { denied = true; }
++  assert(denied);
++#endif
++  std::puts("PASS ordinary monitor constructions=65; capture remains exhausted and denied");
++}
+diff --git a/hs274-native-fence-test.cpp b/hs274-native-fence-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-native-fence-test.cpp
+@@ -0,0 +1,36 @@
++// tools/diagnostics/hs274-native-fence-test.cpp
++// Exact receiver selection fences detach and foreign selector reentry.
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-native-boundary.hpp"
++#include <cassert>
++#include <memory>
++using namespace hs274_stream_protocol;
++using receiver_type = source<64, 8, 4>;
++int main() {
++  {
++    receiver_type original("original", [] { return 100ULL; });
++    receiver_type successor("successor", [] { return 200ULL; });
++    auto owner = original.native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    auto* selected = &original;
++    unsigned faults = 0;
++    const auto current = [&](const auto& fence) { return selected && fence.belongs_to(*selected); };
++    const bool accepted = diagnostic_acquisition(owner, [&](native_fault) { ++faults; }, [&] {
++      selected = &successor;
++      return true;
++    }, current);
++    assert(!accepted && faults == 0 && owner.active());
++    assert(original.native_fault_reason() == native_fault::none);
++    assert(successor.native_fault_reason() == native_fault::none);
++    unsigned queries = 0;
++    assert(!diagnostic_acquisition(owner, [&](native_fault) { ++faults; }, [&] { ++queries; return true; }, current));
++    assert(queries == 0 && faults == 0);
++  }
++  {
++    auto original = std::make_unique<receiver_type>("selector", [] { return 100ULL; });
++    auto owner = original->native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    unsigned queries = 0;
++    const bool accepted = diagnostic_acquisition(owner, [](native_fault) {}, [&] { ++queries; return true; },
++        [&](const auto&) { original.reset(); return true; });
++    assert(!accepted && queries == 0 && !owner.active());
++  }
++}
+diff --git a/hs274-native-liveness-test.cpp b/hs274-native-liveness-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-native-liveness-test.cpp
+@@ -0,0 +1,79 @@
++// tools/diagnostics/hs274-native-liveness-test.cpp
++// Portable owner/token lifetime controls; no native registry or kernel evidence.
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-native-boundary.hpp"
++#include <cassert>
++#include <memory>
++#include <new>
++#include <cstdio>
++#include <string>
++using namespace hs274_stream_protocol;
++using receiver_type = source<64, 8, 4>;
++int main(int argc, char** argv) {
++  assert(argc == 2);
++  const std::string selected = argv[1];
++  if (selected == "expired") {
++    auto stale = [] {
++      receiver_type receiver("expired", [] { return 100ULL; });
++      return receiver.native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    }();
++    unsigned work = 0, faults = 0;
++    const bool accepted = diagnostic_acquisition(stale, [&](native_fault) { ++faults; }, [&] { ++work; return true; });
++    assert(!stale.active());
++    assert(work == 0 && faults == 0 && !accepted);
++  } else if (selected == "destroy-during-success" || selected == "destroy-during-failure") {
++    auto receiver = std::make_unique<receiver_type>("original", [] { return 100ULL; });
++    auto owner = receiver->native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    unsigned work = 0, faults = 0;
++    const bool accepted = diagnostic_acquisition(owner, [&](native_fault) { ++faults; }, [&]() -> bool {
++      ++work;
++      receiver.reset();
++      if (selected == "destroy-during-failure") throw native_acquisition_error(native_fault::inventory_receipt_write_failed);
++      return true;
++    });
++    assert(work == 1 && faults == 0 && !accepted && !owner.active());
++  } else if (selected == "retire-rebind") {
++    receiver_type receiver("rebind", [] { return 100ULL; });
++    auto owner = receiver.native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    unsigned faults = 0;
++    const bool accepted = diagnostic_acquisition(owner, [&](native_fault) { ++faults; }, [&] {
++      using handle_type = receiver_type::native_registration;
++      owner.~handle_type();
++      new (&owner) handle_type(receiver.native_attach(1, false, hs274_key_policy::keyboard_type::none));
++      return true;
++    });
++    assert(owner.active());
++    assert(!accepted && faults == 0);
++    assert(receiver.native_fault_reason() == native_fault::none);
++  } else if (selected == "receiver-address-aba") {
++    alignas(receiver_type) unsigned char storage[sizeof(receiver_type)];
++    auto receiver = new (storage) receiver_type("old-address", [] { return 100ULL; });
++    auto owner = receiver->native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    unsigned faults = 0;
++    const bool accepted = diagnostic_acquisition(owner, [&](native_fault reason) {
++      ++faults; receiver->native_failure(reason);
++    }, [&]() -> bool {
++      receiver->~receiver_type();
++      receiver = new (storage) receiver_type("successor-address", [] { return 200ULL; });
++      throw native_acquisition_error(native_fault::inventory_receipt_write_failed);
++    });
++    assert(!accepted && faults == 0 && !owner.active());
++    assert(receiver->native_fault_reason() == native_fault::none);
++    receiver->~receiver_type();
++  } else if (selected == "failure-reentry") {
++    auto receiver = std::make_unique<receiver_type>("fault-owner", [] { return 100ULL; });
++    auto owner = receiver->native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    unsigned faults = 0;
++    const bool accepted = diagnostic_acquisition(owner, [&](native_fault) {
++      ++faults; receiver.reset();
++    }, []() -> bool { throw native_acquisition_error(native_fault::inventory_receipt_write_failed); });
++    assert(!accepted && faults == 1 && !owner.active());
++  } else if (selected == "valid") {
++    receiver_type receiver("valid", [] { return 100ULL; });
++    auto owner = receiver.native_attach(1, false, hs274_key_policy::keyboard_type::none);
++    unsigned faults = 0, work = 0;
++    assert(diagnostic_acquisition(owner, [&](native_fault) { ++faults; }, [&] { ++work; return true; }));
++    assert(work == 1 && faults == 0 && owner.active());
++  } else return 2;
++  std::puts("PASS exact owner lifetime control");
++}
+diff --git a/hs274-native-refusal-test.cpp b/hs274-native-refusal-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-native-refusal-test.cpp
+@@ -0,0 +1,50 @@
++// tools/diagnostics/hs274-native-refusal-test.cpp
++// Refused native provenance remains an owned pending monitor, never an empty baseline.
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-readiness.hpp"
++#include <cassert>
++int main() {
++  using namespace hs274_stream_protocol;
++  source<64, 8, 4> receiver("refusal-fixture", [] { return 100ULL; });
++  auto ordinary = receiver.attach(1, false, hs274_key_policy::keyboard_type::none);
++  assert(ordinary.started(nullptr, 0, true, false));
++  auto refused = receiver.refuse(2, native_refusal::keyboard_type_unavailable);
++  assert(!refused.started(nullptr, 0, true, false));
++  refused.stopped();
++  assert(!refused.started(nullptr, 0, true, false));
++  const auto status = receiver.request(3, {{"version", 1u}, {"action", "status"}});
++  assert(status.at("ready") == false);
++  assert(status.at("monitors").size() == 2);
++  assert(status.at("monitors").at(1).at("refusal") == "keyboard_type_unavailable");
++  bool explained = false;
++  try { readiness{}.observe(status); }
++  catch (const std::runtime_error& error) { explained = std::string(error.what()) ==
++      "Capture native provenance refused: keyboard_type_unavailable"; }
++  assert(explained);
++  auto forged = status;
++  forged["monitors"][1]["refusal"] = "guessed_ansi";
++  bool malformed = false;
++  try { readiness{}.observe(forged); } catch (const std::invalid_argument&) { malformed = true; }
++  assert(malformed);
++  forged = status;
++  forged["monitors"][1]["started"] = true;
++  malformed = false;
++  try { readiness{}.observe(forged); } catch (const std::invalid_argument&) { malformed = true; }
++  assert(malformed);
++  bool rejected = false;
++  try { receiver.freeze(100); } catch (const std::logic_error&) { rejected = true; }
++  assert(rejected);
++  const auto prepared = receiver.request(3, {{"version", 1u}, {"action", "prepare"}});
++  rejected = false;
++  try { receiver.request(3, {{"version", 1u}, {"action", "open"},
++      {"incarnation", prepared.at("incarnation")}, {"preparation", prepared.at("preparation")}}); }
++  catch (const std::runtime_error&) { rejected = true; }
++  assert(rejected);
++  refused.retire();
++  assert(receiver.request(3, {{"version", 1u}, {"action", "status"}}).at("ready") == true);
++  auto retry = receiver.attach(2, false, hs274_key_policy::keyboard_type::none);
++  assert(retry.started(nullptr, 0, true, false));
++  retry.refuse(native_refusal::changed_native_provenance);
++  assert(!retry.started(nullptr, 0, true, false));
++  assert(receiver.request(3, {{"version", 1u}, {"action", "status"}}).at("ready") == false);
++}
+diff --git a/hs274-native-status-test.cpp b/hs274-native-status-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-native-status-test.cpp
+@@ -0,0 +1,37 @@
++// tools/diagnostics/hs274-native-status-test.cpp
++// Strict typed fault status excludes forged readiness and incomplete envelopes.
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-readiness.hpp"
++#include <cassert>
++using namespace hs274_stream_protocol;
++int main() {
++  source<64, 8, 4> receiver("status", [] { return 100ULL; });
++  const auto pending = receiver.request(1, {{"version", 1u}, {"action", "status"}});
++  assert(!readiness{}.observe(pending));
++  for (unsigned variation = 0; variation < 4; ++variation) {
++    auto forged = pending;
++    if (variation == 0) forged.erase("native_fault");
++    if (variation == 1) forged["native_fault"] = true;
++    if (variation == 2) forged["native_fault"] = "inactive";
++    if (variation == 3) forged["native_fault"] = "unknown";
++    bool refused = false;
++    try { readiness{}.observe(forged); } catch (const std::exception&) { refused = true; }
++    assert(refused);
++  }
++  receiver.native_failure(native_fault::inventory_receipt_write_failed);
++  const auto faulted = receiver.request(1, {{"version", 1u}, {"action", "status"}});
++  bool explained = false;
++  try { readiness{}.observe(faulted); } catch (const std::runtime_error& error) {
++    explained = std::string(error.what()) == "Capture native diagnostic refused: inventory_receipt_write_failed";
++  }
++  assert(explained);
++  for (const auto* field : {"exhausted", "ready"}) {
++    auto forged = faulted;
++    forged[field] = std::string(field) == "ready";
++    bool refused = false;
++    try { readiness{}.observe(forged); } catch (const std::invalid_argument&) { refused = true; }
++    assert(refused);
++  }
++  receiver.native_failure(native_fault::acquisition_resource_exhausted);
++  assert(receiver.native_fault_reason() == native_fault::inventory_receipt_write_failed);
++}
+diff --git a/hs274-stream-baseline-client.hpp b/hs274-stream-baseline-client.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-baseline-client.hpp
+@@ -0,0 +1,67 @@
++// tools/diagnostics/hs274-stream-baseline-client.hpp
++// Transfer baseline pages before raw input, with a distinct downstream receipt.
++#pragma once
++
++#include "hs274-stream-ack.hpp"
++
++namespace hs274_stream_protocol {
++inline json baseline_acknowledgement(const json& opened, std::size_t cursor) {
++  auto receipt = acknowledgement(opened, std::to_string(cursor));
++  receipt["baseline_ack"] = receipt.at("ack");
++  receipt.erase("ack");
++  return receipt;
++}
++
++template <std::size_t Limit, typename Request, typename Publish, typename Acknowledge>
++void transfer_baseline(const json& opened, Request request, Publish publish, Acknowledge acknowledge) {
++  static_assert(Limit > 0);
++  const auto& descriptor = opened.at("baseline");
++  if (!descriptor.is_object() || descriptor.size() != 3 ||
++      !descriptor.at("version").is_number_unsigned() || descriptor.at("version") != 2u ||
++      !descriptor.at("rows").is_number_unsigned()) {
++    throw std::invalid_argument("Invalid capture baseline descriptor");
++  }
++  decimal(descriptor.at("boundary"));
++  const auto total = descriptor.at("rows").get<std::size_t>();
++  if (!total) throw std::invalid_argument("Capture baseline is empty");
++  json query{{"version", 1u}, {"action", "baseline"}, {"incarnation", opened.at("incarnation")},
++             {"lease", opened.at("lease")}};
++  std::size_t cursor = 0;
++  for (;;) {
++    const json response = request(query);
++    for (const auto* field : {"version", "coverage", "incarnation", "lease"}) {
++      if (response.at(field).type() != opened.at(field).type() || response.at(field) != opened.at(field)) {
++        throw std::runtime_error("Baseline response changed session identity");
++      }
++    }
++    if (response.at("kind") == "lost") {
++      publish(response);
++      throw std::runtime_error("Physical capture coverage lost during baseline transfer");
++    }
++    if (response.at("kind") == "baseline_ready") {
++      if (response.size() != 5 || cursor != total) throw std::runtime_error("Premature baseline completion");
++      // Its preceding page was acknowledged already. Ordered output places this
++      // marker before any raw batch; a second identical receipt would be stale.
++      publish(response);
++      return;
++    }
++    if (response.at("kind") != "baseline" || response.size() != 11 ||
++        response.at("boundary") != descriptor.at("boundary") ||
++        !response.at("offset").is_number_unsigned() || response.at("offset") != cursor ||
++        !response.at("next").is_number_unsigned() ||
++        !response.at("total").is_number_unsigned() || response.at("total") != total ||
++        !response.at("complete").is_boolean() || !response.at("rows").is_array()) {
++      throw std::runtime_error("Invalid baseline page envelope");
++    }
++    const auto next = response.at("next").get<std::size_t>();
++    if (next <= cursor || next > total || next - cursor > Limit ||
++        response.at("rows").size() != next - cursor || response.at("complete") != (next == total)) {
++      throw std::runtime_error("Baseline page skipped or repeated rows");
++    }
++    publish(response);
++    acknowledge(baseline_acknowledgement(opened, next));
++    cursor = next;
++    query["baseline_ack"] = std::to_string(cursor);
++  }
++}
++} // namespace hs274_stream_protocol
+diff --git a/hs274-stream-baseline-pages.hpp b/hs274-stream-baseline-pages.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-baseline-pages.hpp
+@@ -0,0 +1,94 @@
++// tools/diagnostics/hs274-stream-baseline-pages.hpp
++// Immutable bounded baseline pages; session identity and acknowledgement belong to the caller.
++#pragma once
++
++#include "hs274-key-state.hpp"
++#include <nlohmann/json.hpp>
++#include <unordered_set>
++
++namespace hs274_stream_protocol {
++template <std::size_t PageSize, std::size_t Devices, std::size_t Elements>
++class baseline_pages final {
++  static_assert(PageSize > 0 && Devices > 0 && Elements > 0);
++public:
++  using element = typename key_state<Elements>::frozen_element;
++  struct device_state {
++    std::uint64_t device;
++    bool keyboard;
++    std::vector<element> keys;
++    hs274_key_policy::keyboard_type keyboard_type = hs274_key_policy::keyboard_type::unavailable;
++  };
++
++  baseline_pages(std::uint64_t boundary, std::vector<device_state> devices)
++      : boundary_(boundary), devices_(std::move(devices)) {
++    if (devices_.empty() || devices_.size() > Devices) {
++      throw std::invalid_argument("Invalid baseline device count");
++    }
++    std::unordered_set<std::uint64_t> identities;
++    for (const auto& device : devices_) {
++      if (!device.device || !identities.insert(device.device).second || device.keys.size() > Elements ||
++          !hs274_key_policy::admits_device_type(device.keyboard, device.keyboard_type)) {
++        throw std::invalid_argument("Invalid baseline device inventory");
++      }
++      std::unordered_set<std::uint32_t> cookies;
++      bool has_keyboard = false;
++      for (const auto& key : device.keys) {
++        const auto maximum = key.page == 7 ? 255u : 65535u;
++        if (!hs274_key_policy::is_button_page(key.page) || !key.usage || key.usage > maximum ||
++            (key.page == 7 && key.usage <= 3 && key.down) ||
++            key.timestamp > boundary_ || !cookies.insert(key.cookie).second) {
++          throw std::invalid_argument("Invalid baseline element");
++        }
++        has_keyboard = has_keyboard || key.page == 7;
++      }
++      if (has_keyboard != device.keyboard) throw std::invalid_argument("Baseline keyboard inventory differs");
++      total_ += 1 + device.keys.size();
++    }
++  }
++
++  std::size_t size() const noexcept { return total_; }
++
++  // Device markers preserve empty consumer interfaces. A page boundary may
++  // split a device's elements, so each key retains its exact device identity.
++  nlohmann::json read(std::size_t offset) const {
++    if (offset >= total_) throw std::out_of_range("Baseline cursor is outside the snapshot");
++    auto rows = nlohmann::json::array();
++    std::size_t index = 0;
++    for (const auto& device : devices_) {
++      if (index++ >= offset && rows.size() < PageSize) {
++        rows.push_back({{"kind", "device"}, {"device", std::to_string(device.device)},
++                        {"keyboard", device.keyboard}, {"keyboard_type", type_name(device.keyboard_type)},
++                        {"elements", device.keys.size()}});
++      }
++      const auto first = offset > index ? offset - index : 0;
++      for (auto i = first; i < device.keys.size() && rows.size() < PageSize; ++i) {
++        const auto& key = device.keys[i];
++        rows.push_back({{"kind", "key"}, {"device", std::to_string(device.device)},
++                        {"page", key.page}, {"usage", key.usage}, {"cookie", key.cookie},
++                        {"timestamp", std::to_string(key.timestamp)}, {"down", key.down}});
++      }
++      index += device.keys.size();
++      if (rows.size() == PageSize) break;
++    }
++    const auto next = offset + rows.size();
++    return {{"boundary", std::to_string(boundary_)}, {"offset", offset},
++            {"next", next}, {"total", total_}, {"complete", next == total_}, {"rows", std::move(rows)}};
++  }
++
++private:
++  static const char* type_name(hs274_key_policy::keyboard_type value) {
++    using type = hs274_key_policy::keyboard_type;
++    switch (value) {
++      case type::none: return "none";
++      case type::ansi: return "ansi";
++      case type::iso: return "iso";
++      case type::jis: return "jis";
++      case type::unavailable: break;
++    }
++    throw std::invalid_argument("Unavailable baseline keyboard type");
++  }
++  const std::uint64_t boundary_;
++  std::vector<device_state> devices_;
++  std::size_t total_ = 0;
++};
++} // namespace hs274_stream_protocol
+diff --git a/hs274-stream-baseline-probe.hpp b/hs274-stream-baseline-probe.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-baseline-probe.hpp
+@@ -0,0 +1,123 @@
++// tools/diagnostics/hs274-stream-baseline-probe.hpp
++// Disposable fixture acquisition probe, never a complete-coverage declaration.
++#pragma once
++
++#include "hs274-stream-inventory.hpp"
++#include "hs274-stream-native-fault.hpp"
++#include <IOKit/hid/IOHIDLib.h>
++#include <mach/mach_time.h>
++#include <nlohmann/json.hpp>
++#include <cstdint>
++#include <cstdio>
++#include <stdexcept>
++#include <string>
++#include <vector>
++
++namespace hs274_baseline_probe {
++using json = nlohmann::json;
++
++struct elements_owner {
++  CFArrayRef value;
++  ~elements_owner() { if (value) CFRelease(value); }
++};
++
++inline json read(IOHIDDeviceRef device, IOHIDElementRef element, std::uint32_t options) {
++  IOHIDValueRef value = nullptr;
++  const auto before = mach_absolute_time();
++  const auto status = IOHIDDeviceGetValueWithOptions(device, element, &value, options);
++  const auto after = mach_absolute_time();
++  json result{{"status", static_cast<std::int32_t>(status)}, {"returned_value", value != nullptr},
++              {"started", std::to_string(before)}, {"finished", std::to_string(after)}};
++  // A failed call may leave a cached value in the output parameter. Preserve the
++  // refusal instead of interpreting that pointer as a successful empty baseline.
++  if (status == kIOReturnSuccess && value) {
++    result["timestamp"] = std::to_string(IOHIDValueGetTimeStamp(value));
++    result["value"] = std::to_string(IOHIDValueGetIntegerValue(value));
++    result["value_cookie"] = static_cast<std::uint32_t>(IOHIDElementGetCookie(IOHIDValueGetElement(value)));
++  }
++  return result;
++}
++
++using inventory_type = hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity>;
++struct inventory_observation {
++  std::vector<inventory_type::sample> samples;
++  bool enumerated = false, exhausted = false;
++};
++
++inline inventory_observation capture_inventory(IOHIDDeviceRef device, std::uint64_t identity) {
++  // Preserve every element cookie, including separate scalar/array modifiers.
++  // Duplicate cookies and exhaustion revoke readability, never truncate it.
++  inventory_type inventory;
++  inventory_observation observation;
++  observation.samples.reserve(hs274_stream_protocol::keyboard_inventory_capacity);
++  elements_owner elements{IOHIDDeviceCopyMatchingElements(device, nullptr, kIOHIDOptionsTypeNone)};
++  json result{{"version", 2u}, {"device", std::to_string(identity)}, {"coverage", "fixture_only"},
++              {"capacity", hs274_stream_protocol::keyboard_inventory_capacity},
++              {"enumerated", elements.value != nullptr}, {"exhausted", false}, {"elements", json::array()}};
++  if (elements.value) {
++    for (CFIndex i = 0; i < CFArrayGetCount(elements.value); ++i) {
++      auto element = static_cast<IOHIDElementRef>(const_cast<void*>(CFArrayGetValueAtIndex(elements.value, i)));
++      const auto page = IOHIDElementGetUsagePage(element), usage = IOHIDElementGetUsage(element);
++      const auto type = IOHIDElementGetType(element);
++      if (!hs274_key_policy::is_button_page(page) || usage == 0 || usage == UINT32_MAX ||
++          type < kIOHIDElementTypeInput_Misc || type > kIOHIDElementTypeInput_ScanCodes) continue;
++      if (inventory.full()) { result["exhausted"] = true; break; }
++      const auto cookie = static_cast<std::uint32_t>(IOHIDElementGetCookie(element));
++      const hs274_stream_protocol::key_element descriptor{
++          true, static_cast<bool>(IOHIDElementIsRelative(element)), static_cast<bool>(IOHIDElementIsArray(element)),
++          IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
++          IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)};
++      const auto sample = read(device, element, kIOHIDDeviceGetValueWithoutUpdate);
++      const bool valid = sample.at("status") == 0 && sample.at("returned_value") == true;
++      const inventory_type::sample initial{page, usage, cookie, descriptor, sample.at("status").get<std::int32_t>(),
++          sample.at("returned_value").get<bool>(), valid ? sample.at("value_cookie").get<std::uint32_t>() : 0,
++          valid ? std::stoll(sample.at("value").get<std::string>()) : 0,
++          valid ? std::stoull(sample.at("timestamp").get<std::string>()) : 0,
++          std::stoull(sample.at("started").get<std::string>()), std::stoull(sample.at("finished").get<std::string>())};
++      inventory.append(initial);
++      observation.samples.push_back(initial);
++      result["elements"].push_back({{"page", page}, {"usage", usage}, {"cookie", cookie}, {"sample", sample},
++          {"relative", descriptor.relative}, {"array", descriptor.array}, {"bits", descriptor.bits},
++          {"count", descriptor.count}, {"minimum", descriptor.minimum}, {"maximum", descriptor.maximum}});
++    }
++  }
++  result["readable"] = inventory.finish(result.at("enumerated").get<bool>(), result.at("exhausted").get<bool>());
++  const auto encoded = result.dump();
++  if (std::fprintf(stderr, "HS274_KEY_INVENTORY %s\n", encoded.c_str()) < 0 || std::fflush(stderr) != 0) {
++    throw hs274_stream_protocol::native_acquisition_error(hs274_stream_protocol::native_fault::inventory_receipt_write_failed);
++  }
++  observation.enumerated = result.at("enumerated").get<bool>();
++  observation.exhausted = result.at("exhausted").get<bool>();
++  return observation;
++}
++
++inline void capture(IOHIDDeviceRef device, std::uint64_t identity) {
++  elements_owner elements{IOHIDDeviceCopyMatchingElements(device, nullptr, kIOHIDOptionsTypeNone)};
++  json result{{"device", std::to_string(identity)}, {"coverage", "fixture_only"},
++              {"enumerated", elements.value != nullptr}, {"exhausted", false}, {"elements", json::array()}};
++  if (elements.value) {
++    for (CFIndex i = 0; i < CFArrayGetCount(elements.value); ++i) {
++      auto element = static_cast<IOHIDElementRef>(const_cast<void*>(CFArrayGetValueAtIndex(elements.value, i)));
++      const auto page = IOHIDElementGetUsagePage(element);
++      const auto usage = IOHIDElementGetUsage(element);
++      const auto type = IOHIDElementGetType(element);
++      // The independent fixture uses Escape and Space. This deliberately does
++      // not pretend that two sampled usages inventory an arbitrary keyboard.
++      if (page != 7 || (usage != 41 && usage != 44) ||
++          type < kIOHIDElementTypeInput_Misc || type > kIOHIDElementTypeInput_ScanCodes) continue;
++      if (result["elements"].size() == 2) {
++        result["exhausted"] = true;
++        break;
++      }
++      result["elements"].push_back({
++          {"page", page}, {"usage", usage}, {"cookie", static_cast<std::uint32_t>(IOHIDElementGetCookie(element))},
++          {"cached", read(device, element, kIOHIDDeviceGetValueWithoutUpdate)},
++          {"updated", read(device, element, kIOHIDDeviceGetValueWithUpdate)}});
++    }
++  }
++  const auto encoded = result.dump();
++  if (std::fprintf(stderr, "HS274_BASELINE_PROBE %s\n", encoded.c_str()) < 0 || std::fflush(stderr) != 0) {
++    throw hs274_stream_protocol::native_acquisition_error(hs274_stream_protocol::native_fault::reference_receipt_write_failed);
++  }
++}
++} // namespace hs274_baseline_probe
+diff --git a/hs274-stream-inventory-test.cpp b/hs274-stream-inventory-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-inventory-test.cpp
+@@ -0,0 +1,150 @@
++// tools/diagnostics/hs274-stream-inventory-test.cpp
++// Reject incomplete, duplicated and failed initial key observations.
++#include "hs274-stream-inventory.hpp"
++#include "fixtures/hs274-inventory-sample.hpp"
++#include <fstream>
++#include <nlohmann/json.hpp>
++#include <stdexcept>
++
++using inventory = hs274_stream_protocol::key_inventory<256>;
++
++void require(bool value) {
++  if (!value) throw std::runtime_error("Keyboard inventory assertion failed");
++}
++
++inventory::sample key(std::uint32_t usage) {
++  return {7, usage, usage + 100, {true, false, true, 1, 6, 0, 1}, 0, true,
++          usage + 100, 0, 0, usage * 2, usage * 2 + 1};
++}
++
++void replay_native(const char* path) {
++  std::ifstream input(path);
++  require(input.good());
++  nlohmann::json evidence;
++  input >> evidence;
++  require(evidence.at("scenarios").size() == 2);
++  unsigned held_scenarios = 0, observations = 0;
++  for (const auto& scenario : evidence.at("scenarios")) {
++    const bool held = scenario.at("initial_space_held").get<bool>();
++    if (held) ++held_scenarios;
++    unsigned fixture_observations = 0;
++    for (const auto& row : scenario.at("inventories")) {
++      hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity> replay;
++      unsigned held_elements = 0;
++      const bool fixture = row.at("device") == scenario.at("fixture_device");
++      for (const auto& element : row.at("elements")) {
++        const auto sample = hs274_test::inventory_sample<decltype(replay)::sample>(element);
++        require(sample.page == 7);
++        replay.append(sample);
++        if (fixture && sample.value == 1) {
++          require(element.at("usage") == 44);
++          ++held_elements;
++        }
++      }
++      require(replay.finish(row.at("enumerated").get<bool>(), row.at("exhausted").get<bool>()));
++      ++observations;
++      if (fixture) {
++        require(row.at("elements").size() == 263 && held_elements == (held ? 1u : 0u));
++        ++fixture_observations;
++      }
++    }
++    require(fixture_observations == 1);
++  }
++  require(held_scenarios == 1 && observations == 4);
++}
++
++int main(int argc, char** argv) {
++  require(argc == 2);
++  replay_native(argv[1]);
++  // Native run 34762554442 enumerated modifier usage 224 twice: scalar cookie
++  // 24 and array cookie 289. Distinct elements must retain independent state.
++  inventory modifier_elements;
++  auto scalar = key(224);
++  scalar.cookie = scalar.value_cookie = 24;
++  scalar.element.array = false;
++  scalar.element.count = 1;
++  scalar.value = 1;
++  auto array = key(224);
++  array.cookie = array.value_cookie = 289;
++  array.element.count = 32;
++  array.started = scalar.finished + 1;
++  array.finished = array.started + 1;
++  modifier_elements.append(scalar);
++  modifier_elements.append(array);
++  require(modifier_elements.finish(true, false));
++  using expanded_inventory = hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity>;
++  expanded_inventory expanded;
++  std::uint64_t ordinal = 0;
++  auto append = [&](std::uint32_t usage, bool is_array) {
++    ++ordinal;
++    expanded.append({7, usage, static_cast<std::uint32_t>(ordinal),
++        {true, false, is_array, 1, is_array ? 32u : 1u, 0, 1}, 0, true,
++        static_cast<std::uint32_t>(ordinal), 0, 0, ordinal * 2, ordinal * 2 + 1});
++  };
++  for (std::uint32_t usage = 224; usage <= 231; ++usage) append(usage, false);
++  for (std::uint32_t usage = 1; usage <= 255; ++usage) append(usage, true);
++  require(ordinal == 263 && expanded.finish(true, false));
++  inventory all;
++  for (std::uint32_t usage = 1; usage <= 255; ++usage) all.append(key(usage));
++  require(all.finish(true, false));
++  bool duplicate_finish = false;
++  try { all.finish(true, false); } catch (const std::logic_error&) { duplicate_finish = true; }
++  require(duplicate_finish);
++  bool late_append = false;
++  try { all.append(key(44)); } catch (const std::logic_error&) { late_append = true; }
++  require(late_append);
++  for (int variant = 0; variant < 15; ++variant) {
++    inventory invalid;
++    auto sample = key(44);
++    switch (variant) {
++      case 0: sample.status = -536870165; break;
++      case 1: sample.returned_value = false; break;
++      case 2: sample.value_cookie++; break;
++      case 3: sample.value = 2; break;
++      case 4: sample.timestamp = sample.finished + 1; break;
++      case 5: sample.started = sample.finished + 1; break;
++      case 6: sample.element.relative = true; break;
++      case 7: sample.element.bits = 8; break;
++      case 8: sample.element.input = false; break;
++      case 9: sample.usage = 256; break;
++      case 10: sample.usage = 0; break;
++      case 11: sample.usage = 1; sample.value = 1; break;
++      case 12: invalid.append(sample); break;
++      case 13: invalid.append(key(45)); break;
++      case 14: invalid.append(key(41)); sample.cookie = 141; sample.value_cookie = 141; break;
++    }
++    invalid.append(sample);
++    require(!invalid.finish(true, false));
++  }
++  for (int variant = 0; variant < 3; ++variant) {
++    inventory incomplete;
++    if (variant != 0) incomplete.append(key(44));
++    require(!incomplete.finish(variant != 1, variant == 2));
++  }
++  for (const auto page : {0u, 8u, 0xffffu}) {
++    inventory invalid;
++    auto sample = key(44);
++    sample.page = page;
++    invalid.append(sample);
++    require(!invalid.finish(true, false));
++  }
++  inventory held;
++  auto space = key(44);
++  space.value = 1;
++  space.timestamp = 42;
++  held.append(space);
++  require(held.finish(true, false));
++  inventory bounded;
++  for (std::uint32_t usage = 1; usage <= 256; ++usage) bounded.append(key(usage));
++  require(bounded.full());
++  bool overflow = false;
++  try { bounded.append(key(44)); } catch (const std::overflow_error&) { overflow = true; }
++  require(overflow && !bounded.finish(true, true));
++  hs274_stream_protocol::key_inventory<1> limited;
++  const hs274_stream_protocol::key_inventory<1>::sample single{
++      7, 44, 144, {true, false, false, 1, 1, 0, 1}, 0, true, 144, 1, 42, 88, 89};
++  limited.append(single);
++  overflow = false;
++  try { limited.append(single); } catch (const std::overflow_error&) { overflow = true; }
++  require(overflow && !limited.finish(true, false));
++}
+diff --git a/hs274-stream-inventory.hpp b/hs274-stream-inventory.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-inventory.hpp
+@@ -0,0 +1,62 @@
++// tools/diagnostics/hs274-stream-inventory.hpp
++// Bounded keyboard-leaf observations; readable does not mean an atomic snapshot.
++#pragma once
++
++#include "hs274-stream-key-policy.hpp"
++#include <array>
++#include <cstddef>
++#include <cstdint>
++#include <stdexcept>
++
++namespace hs274_stream_protocol {
++// Bound diagnostic storage independently of usage numbers: a descriptor can
++// expose the same usage in several collections with distinct element cookies.
++inline constexpr std::size_t keyboard_inventory_capacity = 1024;
++template <std::size_t Limit>
++class key_inventory final {
++  static_assert(Limit > 0);
++public:
++  struct sample {
++    std::uint32_t page, usage, cookie;
++    key_element element;
++    std::int32_t status;
++    bool returned_value;
++    std::uint32_t value_cookie;
++    std::int64_t value;
++    std::uint64_t timestamp, started, finished;
++  };
++
++  bool full() const noexcept { return count_ == Limit; }
++
++  void append(const sample& input) {
++    if (finished_) throw std::logic_error("Keyboard inventory already finalized");
++    if (full()) {
++      readable_ = false;
++      throw std::overflow_error("Keyboard inventory bound exceeded");
++    }
++    bool valid = hs274_key_policy::admit_button(input.page, input.usage, input.element, input.value) ==
++                 hs274_key_policy::button_admission::admitted && input.status == 0 && input.returned_value && input.cookie == input.value_cookie &&
++                 (input.value == 0 || input.value == 1) && input.timestamp <= input.finished &&
++                 previous_finish_ <= input.started && input.started <= input.finished;
++    for (std::size_t i = 0; i < count_; ++i) {
++      if (entries_[i].cookie == input.cookie) valid = false;
++    }
++    entries_[count_++] = input;
++    previous_finish_ = input.finished;
++    readable_ = readable_ && valid;
++    found_key_ = found_key_ || (input.page != 7 || input.usage >= 4);
++  }
++
++  bool finish(bool enumerated, bool exhausted) {
++    if (finished_) throw std::logic_error("Keyboard inventory already finalized");
++    finished_ = true;
++    return enumerated && !exhausted && readable_ && found_key_;
++  }
++
++private:
++  std::array<sample, Limit> entries_{};
++  std::size_t count_ = 0;
++  std::uint64_t previous_finish_ = 0;
++  bool finished_ = false, readable_ = true, found_key_ = false;
++};
++} // namespace hs274_stream_protocol
+diff --git a/hs274-stream-native-boundary.hpp b/hs274-stream-native-boundary.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-native-boundary.hpp
+@@ -0,0 +1,42 @@
++// tools/diagnostics/hs274-stream-native-boundary.hpp
++// Exact weak-state/token fences contain only owned diagnostic acquisition failures.
++#pragma once
++#include "hs274-stream-native-fault.hpp"
++#include <new>
++namespace hs274_stream_protocol {
++template <typename Owner, typename Failure, typename Work, typename Current>
++bool diagnostic_acquisition(Owner& owner, Failure failure, Work work, Current current) {
++  if (!owner.active()) return false;
++  const auto fence = owner.capture_fence();
++  const auto owned = [&] {
++    if (!fence.live()) return false;
++    const bool selected = current(fence);
++    return fence.live() && selected;
++  };
++  if (!owned()) return false;
++  try {
++    const bool result = work();
++    return owned() && result;
++  } catch (const native_acquisition_error& error) {
++    if (owned()) {
++      fence.stopped();
++      fence.fail(error.reason());
++      if (owned()) failure(error.reason());
++    }
++    return false;
++  } catch (const std::bad_alloc&) {
++    if (owned()) {
++      fence.stopped();
++      fence.fail(native_fault::acquisition_resource_exhausted);
++      if (owned()) failure(native_fault::acquisition_resource_exhausted);
++    }
++    return false;
++  }
++}
++
++// Portable callers still require the exact captured owner/token fence.
++template <typename Owner, typename Failure, typename Work>
++bool diagnostic_acquisition(Owner& owner, Failure failure, Work work) {
++  return diagnostic_acquisition(owner, failure, work, [](const auto&) { return true; });
++}
++} // namespace hs274_stream_protocol
+diff --git a/hs274-stream-native-fault.hpp b/hs274-stream-native-fault.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-native-fault.hpp
+@@ -0,0 +1,34 @@
++// tools/diagnostics/hs274-stream-native-fault.hpp
++// Sticky diagnostic failures, distinct from ordinary native remapping state.
++#pragma once
++#include <cstdint>
++#include <stdexcept>
++namespace hs274_stream_protocol {
++enum class native_fault : std::uint8_t {
++  none, inactive, registration_capacity_exhausted, registration_serial_exhausted,
++  invalid_device_identity, duplicate_device_identity, invalid_device_type,
++  acquisition_resource_exhausted, inventory_receipt_write_failed, reference_receipt_write_failed
++};
++inline const char* native_fault_name(native_fault reason) noexcept {
++  switch (reason) {
++    case native_fault::none: return "none";
++    case native_fault::inactive: return "inactive";
++    case native_fault::registration_capacity_exhausted: return "registration_capacity_exhausted";
++    case native_fault::registration_serial_exhausted: return "registration_serial_exhausted";
++    case native_fault::invalid_device_identity: return "invalid_device_identity";
++    case native_fault::duplicate_device_identity: return "duplicate_device_identity";
++    case native_fault::invalid_device_type: return "invalid_device_type";
++    case native_fault::acquisition_resource_exhausted: return "acquisition_resource_exhausted";
++    case native_fault::inventory_receipt_write_failed: return "inventory_receipt_write_failed";
++    case native_fault::reference_receipt_write_failed: return "reference_receipt_write_failed";
++  }
++  return "invalid_native_fault";
++}
++class native_acquisition_error final : public std::runtime_error {
++public:
++  explicit native_acquisition_error(native_fault reason) : std::runtime_error(native_fault_name(reason)), reason_(reason) {}
++  native_fault reason() const noexcept { return reason_; }
++private:
++  const native_fault reason_;
++};
++} // namespace hs274_stream_protocol
+diff --git a/hs274-stream-readiness.hpp b/hs274-stream-readiness.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-readiness.hpp
+@@ -0,0 +1,80 @@
++// tools/diagnostics/hs274-stream-readiness.hpp
++// Strict startup observation under one deadline, without acquiring a lease.
++#pragma once
++
++#include "hs274-stream-protocol.hpp"
++#include "hs274-stream-native-control.hpp"
++#include "hs274-stream-native-fault.hpp"
++#include <algorithm>
++#include <chrono>
++#include <set>
++
++namespace hs274_stream_protocol {
++class readiness final {
++public:
++  bool observe(const json& response) {
++    if (!response.is_object() || response.size() != 8 ||
++        !response.at("version").is_number_unsigned() || response.at("version") != 1u ||
++        response.at("kind") != "status" || response.at("coverage") != "fixture_only" ||
++        !response.at("incarnation").is_string() || response.at("incarnation").get_ref<const std::string&>().empty() ||
++        !response.at("ready").is_boolean() || !response.at("exhausted").is_boolean() ||
++        !response.at("monitors").is_array() || !response.at("native_fault").is_string()) {
++      throw std::invalid_argument("Invalid capture readiness response");
++    }
++    const auto identity = response.at("incarnation").get<std::string>();
++    if (!incarnation_.empty() && incarnation_ != identity) throw std::runtime_error("Capture readiness changed producer");
++    incarnation_ = identity;
++    const auto fault = response.at("native_fault").get<std::string>();
++    bool known_fault = false;
++    for (auto candidate : {native_fault::none, native_fault::registration_capacity_exhausted,
++        native_fault::registration_serial_exhausted, native_fault::invalid_device_identity,
++        native_fault::duplicate_device_identity, native_fault::invalid_device_type,
++        native_fault::acquisition_resource_exhausted, native_fault::inventory_receipt_write_failed,
++        native_fault::reference_receipt_write_failed}) known_fault = known_fault || fault == native_fault_name(candidate);
++    if (!known_fault || (fault != "none" && (!response.at("exhausted").get<bool>() || response.at("ready").get<bool>())))
++      throw std::invalid_argument("Invalid capture native fault");
++    if (fault != "none") throw std::runtime_error("Capture native diagnostic refused: " + fault);
++    if (response.at("exhausted").get<bool>()) throw std::runtime_error("Capture monitor inventory exhausted");
++    std::set<std::uint64_t> devices;
++    bool expected = !response.at("monitors").empty();
++    for (const auto& monitor : response.at("monitors")) {
++      if (!monitor.is_object() || monitor.size() != 3 || !monitor.at("started").is_boolean() || !monitor.at("refusal").is_string()) {
++        throw std::invalid_argument("Invalid capture monitor readiness");
++      }
++      const auto device = decimal(monitor.at("device"));
++      if (!device || !devices.insert(device).second) throw std::invalid_argument("Invalid or duplicate capture device");
++      const auto reason = monitor.at("refusal").get<std::string>();
++      bool known = false;
++      for (auto candidate : {native_refusal::none, native_refusal::inventory_unavailable,
++          native_refusal::identity_unavailable, native_refusal::identity_mismatch,
++          native_refusal::keyboard_type_unavailable, native_refusal::changed_native_provenance})
++        known = known || reason == refusal_name(candidate);
++      if (!known || (reason != "none" && monitor.at("started").get<bool>()))
++        throw std::invalid_argument("Invalid capture native refusal");
++      if (reason != "none") throw std::runtime_error("Capture native provenance refused: " + reason);
++      expected = expected && monitor.at("started").get<bool>();
++    }
++    if (response.at("ready").get<bool>() != expected) throw std::invalid_argument("Capture readiness disagrees with inventory");
++    return expected;
++  }
++
++  const std::string& incarnation() const { return incarnation_; }
++
++private:
++  std::string incarnation_;
++};
++
++template <typename Clock = std::chrono::steady_clock, typename Client>
++std::string await_readiness(Client& client, std::chrono::milliseconds interval, typename Clock::time_point deadline) {
++  if (interval.count() <= 0) throw std::invalid_argument("Capture readiness interval must be positive");
++  readiness observation;
++  for (;;) {
++    if (Clock::now() >= deadline) throw std::runtime_error("Capture readiness timeout");
++    const auto response = client.request({{"version", 1u}, {"action", "status"}}, deadline);
++    const auto ready = observation.observe(response);
++    if (Clock::now() >= deadline) throw std::runtime_error("Capture readiness timeout");
++    if (ready) return observation.incarnation();
++    client.pause(std::min(interval, std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now())));
++  }
++}
++} // namespace hs274_stream_protocol
+diff --git a/hs274-stream-retry-test.cpp b/hs274-stream-retry-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-retry-test.cpp
+@@ -0,0 +1,91 @@
++// tools/diagnostics/hs274-stream-retry-test.cpp
++// Independent retry controls: readiness must have a usable, current baseline.
++#include "hs274-stream-source.hpp"
++#include <iostream>
++#include <string>
++
++using hs274_stream_protocol::json;
++using source = hs274_stream_protocol::source<8, 2, 2>;
++using type = hs274_key_policy::keyboard_type;
++std::size_t assertions = 0;
++void require(bool condition) {
++  ++assertions;
++  if (!condition) throw std::runtime_error("Independent retry assertion failed");
++}
++template <typename Callback> void rejects(Callback callback) {
++  bool refused = false;
++  try { callback(); } catch (const std::exception&) { refused = true; }
++  require(refused);
++}
++json status(source& owner) {
++  return owner.request(7, {{"version", 1u}, {"action", "status"}});
++}
++source::sample consumer_sample(std::int64_t value) {
++  return {12, 205, 17, {true, false, false, 1, 1, 0, 1},
++          0, true, 17, value, 90, 100, 100};
++}
++void expect_pending(source& owner) {
++  const auto observed = status(owner);
++  require(observed.at("ready") == false);
++  require(observed.at("monitors").at(0).at("started") == false);
++  rejects([&] { owner.freeze(100); });
++}
++void expect_empty(source& owner, source::monitor& monitor) {
++  const auto observed = status(owner);
++  require(observed.at("ready") == true);
++  require(observed.at("monitors").at(0).at("started") == true);
++  const auto frozen = owner.freeze(100);
++  require(frozen.size() == 1);
++  require(frozen.read(0).at("rows") == json::array({{
++      {"kind", "device"}, {"device", "42"}, {"keyboard", false},
++      {"keyboard_type", "none"}, {"elements", 0}}}));
++  rejects([&] { monitor.key_down(17); });
++  // Empty means no stale cookie is silently retained or can update state.
++  monitor.append({42, 110, 1, true, true, 12, 205, 0, true, 17});
++  expect_pending(owner);
++}
++void rejected_inventory() {
++  source owner("rejected-consumer", [] { return 100; });
++  auto monitor = owner.attach(42, false, type::none);
++  const auto invalid = consumer_sample(2);
++  require(!monitor.started(&invalid, 1, true, false));
++  expect_pending(owner);
++  require(monitor.started(nullptr, 0, true, false));
++  expect_empty(owner, monitor);
++}
++void invalidated_inventory() {
++  source owner("invalidated-consumer", [] { return 100; });
++  auto monitor = owner.attach(42, false, type::none);
++  const auto valid = consumer_sample(1);
++  require(monitor.started(&valid, 1, true, false));
++  require(status(owner).at("ready") == true);
++  require(monitor.key_down(17));
++  const auto initial = owner.freeze(100).read(0).at("rows").at(1);
++  require(initial.at("cookie") == 17 && initial.at("page") == 12 && initial.at("down") == true);
++  monitor.append({42, 110, 1, true, true, 12, 205, 0, true, 999});
++  expect_pending(owner);
++  require(monitor.started(nullptr, 0, true, false));
++  expect_empty(owner, monitor);
++}
++void healthy_empty() {
++  source owner("healthy-empty-consumer", [] { return 100; });
++  auto monitor = owner.attach(42, false, type::none);
++  expect_pending(owner);
++  require(monitor.started(nullptr, 0, true, false));
++  expect_empty(owner, monitor);
++}
++int main(int argc, char** argv) {
++  try {
++    if (argc != 2) throw std::invalid_argument("Select one independent retry case");
++    const std::string selected(argv[1]);
++    if (selected == "rejected") rejected_inventory();
++    else if (selected == "invalidated") invalidated_inventory();
++    else if (selected == "healthy") healthy_empty();
++    else throw std::invalid_argument("Unknown independent retry case");
++    std::cout << selected << ": " << assertions << " independent retry assertions passed\n";
++    return 0;
++  } catch (const std::exception& error) {
++    std::cerr << "Independent retry control failed after " << assertions << " assertions: " << error.what() << '\n';
++    return 1;
++  }
++}
+diff --git a/hs274-stream-runtime.hpp b/hs274-stream-runtime.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-runtime.hpp
+@@ -0,0 +1,96 @@
++// tools/diagnostics/hs274-stream-runtime.hpp
++// Disposable native bridge; all access belongs to the shared dispatcher.
++#pragma once
++
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-input.hpp"
++#include "hs274-stream-native-binding.hpp"
++#include "hs274-stream-baseline-probe.hpp"
++#include "hs274-stream-native-boundary.hpp"
++#include <uuid/uuid.h>
++#include <mach/mach_time.h>
++
++namespace hs274_stream_protocol {
++class runtime final {
++  // Bound observed keyboard interfaces; exhaustion explicitly invalidates coverage.
++  using source_type = source<4096, 64, 64>;
++public:
++  using monitor = source_type::native_registration;
++
++  runtime() : source_(make_incarnation(), [] { return mach_absolute_time(); }) {
++    if (active_) throw std::logic_error("Capture receiver already owns the native bridge");
++    active_ = this;
++  }
++  runtime(const runtime&) = delete;
++  runtime& operator=(const runtime&) = delete;
++  ~runtime() { active_ = nullptr; }
++
++  json request(std::uint64_t peer, const json& input) { return source_.request(peer, input); }
++  void peer_closed(std::uint64_t peer) { source_.peer_closed(peer); }
++  bool observing() const noexcept { return source_.observing(); }
++
++  static bool observes(std::uint64_t device, bool needs_seize, bool temporarily_ignored) {
++    if (!active_) throw std::logic_error("Capture policy has no receiver owner");
++    return active_->source_.observes(device, needs_seize, temporarily_ignored);
++  }
++
++  static monitor attach(const native_binding& binding) {
++    if (!active_) throw std::logic_error("Capture monitor has no receiver owner");
++    return active_->source_.native_attach(binding.device(), binding.keyboard(), binding.type(), binding.refusal());
++  }
++
++  static bool started(monitor& owner, const native_binding& binding, IOHIDDeviceRef device) {
++    const auto fence = owner.capture_fence();
++    if (!current(fence) || !owner.active()) return false;
++    if (fence.fault() != native_fault::none) { fence.stopped(); return false; }
++    const native_binding captured(binding);
++    return diagnostic_acquisition(owner, [fence](native_fault reason) { fence.fail(reason); }, [&] {
++      const auto inventory = hs274_baseline_probe::capture_inventory(device, captured.device());
++      if (!current(fence)) return false;
++      bool keyboard = false;
++      for (const auto& sample : inventory.samples) keyboard = keyboard || sample.page == 7;
++      const bool unchanged = captured.unchanged(device, keyboard);
++      if (!current(fence)) return false;
++      if (!unchanged) {
++        owner.refuse(captured.refusal() == native_refusal::none
++                         ? native_refusal::changed_native_provenance : captured.refusal());
++        return false;
++      }
++      return owner.started(inventory.samples.data(), inventory.samples.size(), inventory.enumerated, inventory.exhausted);
++    }, current);
++  }
++
++  static bool reference(monitor& owner, IOHIDDeviceRef device, std::uint64_t identity) {
++    const auto fence = owner.capture_fence();
++    if (!current(fence) || !owner.active()) return false;
++    if (fence.fault() != native_fault::none) { fence.stopped(); return false; }
++    return diagnostic_acquisition(owner, [fence](native_fault reason) { fence.fail(reason); }, [&] {
++      hs274_baseline_probe::capture(device, identity);
++      return current(fence);
++    }, current);
++  }
++
++  static void append(monitor& owner, bool is_reference, const value& input) noexcept {
++    // Retain the finite independent receipt during this fixture experiment.
++    append_input(owner, hs274_raw_capture::fixture, is_reference, input);
++  }
++
++private:
++  static bool current(const source_type::native_owner_fence& fence) noexcept {
++    return active_ && fence.belongs_to(active_->source_);
++  }
++
++  static std::string make_incarnation() {
++    uuid_t identifier;
++    char text[37];
++    uuid_generate(identifier);
++    uuid_unparse_lower(identifier, text);
++    return text;
++  }
++
++  // The finite fixture has 20 values. Bound both backlog and per-response work;
++  // actual wire size must additionally pass the receiver's message-size gate.
++  source_type source_;
++  inline static runtime* active_ = nullptr;
++};
++} // namespace hs274_stream_protocol
+diff --git a/hs274-stream-source-test.cpp b/hs274-stream-source-test.cpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-source-test.cpp
+@@ -0,0 +1,594 @@
++// tools/diagnostics/hs274-stream-source-test.cpp
++// Exercise actual acquisition ownership, protocol readiness and stale callbacks.
++#include "hs274-stream-source.hpp"
++#include "hs274-stream-input.hpp"
++#include "hs274-stream-readiness.hpp"
++#include "hs274-stream-baseline-client.hpp"
++#include <cstdio>
++#include <optional>
++#include <stdexcept>
++#include <vector>
++
++using hs274_stream_protocol::json;
++using fixture_type = hs274_key_policy::keyboard_type;
++using source = hs274_stream_protocol::source<4, 2, 2>;
++std::uint64_t acquisition_time() { return 1000; }
++
++bool start(source::monitor& monitor) {
++  const source::sample samples[] = {
++      {7, 41, 41, {true, false, true, 1, 32, 0, 1}, 0, true, 41, 0, 0, 0, 0},
++      {7, 44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 0, 0, 0, 0}};
++  return monitor.started(samples, 2, true, false);
++}
++
++void require(bool condition) {
++  if (!condition) throw std::runtime_error("Source assertion failed");
++}
++
++template <typename Callback>
++void rejects(Callback callback) {
++  bool failed = false;
++  try { callback(); } catch (const std::exception&) { failed = true; }
++  require(failed);
++}
++
++json prepare(source& owner) {
++  auto prepared = owner.request(7, {{"version", 1u}, {"action", "prepare"}});
++  return {{"version", 1u}, {"action", "open"}, {"incarnation", prepared.at("incarnation")},
++          {"preparation", prepared.at("preparation")}};
++}
++json pull_request(const json& opened) {
++  return {{"version", 1u}, {"action", "pull"},
++          {"incarnation", opened.at("incarnation")}, {"lease", opened.at("lease")}};
++}
++
++json open_ready(source& owner, const json& opening) {
++  auto opened = owner.request(7, opening);
++  auto request = pull_request(opened);
++  request["action"] = "baseline";
++  std::size_t cursor = 0;
++  for (;;) {
++    const auto response = owner.request(7, request);
++    if (response.at("kind") == "baseline_ready") break;
++    require(response.at("kind") == "baseline" && response.at("offset") == cursor);
++    const auto next = response.at("next").get<std::size_t>();
++    require(next > cursor && response.at("rows").size() == next - cursor);
++    cursor = next;
++    request["baseline_ack"] = std::to_string(cursor);
++  }
++  require(cursor == opened.at("baseline").at("rows"));
++  return opened;
++}
++
++void baseline_session_cases() {
++  source owner("baseline-session", acquisition_time);
++  auto keyboard = owner.attach(41, true, fixture_type::ansi);
++  require(start(keyboard));
++  const auto opened = owner.request(7, prepare(owner));
++  require(opened.at("baseline").at("boundary") == "1000");
++  auto request = pull_request(opened);
++  rejects([&] { owner.request(7, request); });
++  request["action"] = "baseline";
++  rejects([&] { owner.request(8, request); });
++  request["baseline_ack"] = "0";
++  rejects([&] { owner.request(7, request); });
++  request.erase("baseline_ack");
++  const auto first = owner.request(7, request);
++  require(first.at("next") == 2 && first.at("complete") == false);
++  rejects([&] { owner.request(7, request); });
++  keyboard.append({41, 1001, 1, true, true, 7, 44, 0, true, 44});
++  keyboard.append({41, 1002, 0, true, true, 7, 44, 0, true, 44});
++  request["baseline_ack"] = "1";
++  rejects([&] { owner.request(7, request); });
++  request["baseline_ack"] = "2";
++  const auto last = owner.request(7, request);
++  require(last.at("complete") == true && last.at("next") == 3);
++  require(last.at("rows").at(0).at("down") == false);
++  rejects([&] { owner.request(7, request); });
++  rejects([&] { owner.request(7, pull_request(opened)); });
++  request["baseline_ack"] = "3";
++  require(owner.request(7, request).at("kind") == "baseline_ready");
++  rejects([&] { owner.request(7, request); });
++  const auto raw = owner.request(7, pull_request(opened));
++  require(raw.at("records").size() == 2);
++  require(raw.at("records").at(0).at("sequence") == "1");
++  require(raw.at("records").at(1).at("value") == "0");
++
++  for (unsigned mode = 0; mode < 3; ++mode) {
++    source failed("baseline-failure", acquisition_time);
++    auto monitor = failed.attach(41, true, fixture_type::ansi);
++    require(start(monitor));
++    const auto lease = failed.request(7, prepare(failed));
++    auto page = pull_request(lease);
++    page["action"] = "baseline";
++    require(failed.request(7, page).at("next") == 2);
++    page["baseline_ack"] = "2";
++    if (mode == 0) monitor.stopped();
++    if (mode == 1) {
++      for (unsigned i = 0; i < 5; ++i) monitor.append({41, 1001 + i, i % 2,
++          true, true, 7, 44, 0, true, 44});
++    }
++    if (mode == 2) {
++      failed.peer_closed(7);
++      rejects([&] { failed.request(7, page); });
++      const auto successor = open_ready(failed, prepare(failed));
++      require(successor.at("lease") != lease.at("lease"));
++      rejects([&] { failed.request(7, page); });
++    } else {
++      require(failed.request(7, page).at("reason") == (mode == 0 ? "interrupted" : "overflow"));
++      require(failed.request(7, pull_request(lease)).at("kind") == "lost");
++    }
++  }
++}
++
++void baseline_client_cases() {
++  for (unsigned mode = 0; mode < 5; ++mode) {
++    source owner("baseline-client", acquisition_time);
++    auto keyboard = owner.attach(41, true, fixture_type::ansi);
++    require(start(keyboard));
++    const auto opened = owner.request(7, prepare(owner));
++    std::vector<json> published, receipts;
++    std::size_t requests = 0;
++    const auto transfer = [&] {
++      hs274_stream_protocol::transfer_baseline<2>(opened, [&](const json& request) {
++        ++requests;
++        if (requests > 1) require(receipts.size() == requests - 1);
++        json response = owner.request(7, request);
++        if (requests == 1) {
++          if (mode == 1) response["lease"] = "999";
++          if (mode == 2) response["next"] = 1u;
++        }
++        return response;
++      }, [&](const json& response) { published.push_back(response); }, [&](const json& receipt) {
++        require(receipt.contains("baseline_ack") && !receipt.contains("ack"));
++        require(published.size() == receipts.size() + 1);
++        if (mode == 3) throw std::runtime_error("Downstream refused baseline");
++        receipts.push_back(receipt);
++        if (mode == 4) keyboard.stopped();
++      });
++    };
++    if (mode == 0) {
++      transfer();
++      require(requests == 3 && receipts.size() == 2 && published.size() == 3);
++      require(published.back().at("kind") == "baseline_ready");
++      require(owner.request(7, pull_request(opened)).at("records").empty());
++    } else {
++      rejects(transfer);
++      if (mode <= 2) require(published.empty() && receipts.empty());
++      if (mode == 3) require(requests == 1 && receipts.empty());
++      if (mode == 4) require(requests == 2 && published.back().at("kind") == "lost");
++    }
++  }
++}
++
++void baseline_page_cases() {
++  source owner("baseline-pages", acquisition_time);
++  rejects([&] { owner.freeze(100); });
++  auto keyboard = owner.attach(41, true, fixture_type::ansi);
++  require(start(keyboard));
++  auto consumer = owner.attach(42, false, fixture_type::none);
++  rejects([&] { owner.freeze(100); });
++  require(consumer.started(nullptr, 0, true, false));
++  const auto frozen = owner.freeze(100);
++  const auto first = frozen.read(0);
++  require(first.at("rows").size() == 2 && first.at("next") == 2 && first.at("total") == 4);
++  require(first.at("rows").at(0).at("kind") == "device");
++  require(first.at("rows").at(0).at("elements") == 2);
++  require(first.at("rows").at(1).size() == 7 && first.at("rows").at(1).at("page") == 7);
++  keyboard.append({41, 101, 1, true, true, 7, 44, 0, true, 44});
++  const auto second = frozen.read(2);
++  require(second.at("complete") == true && second.at("next") == 4);
++  require(second.at("rows").at(0).at("cookie") == 44);
++  require(second.at("rows").at(0).at("down") == false);
++  require(second.at("rows").at(1).at("kind") == "device");
++  require(second.at("rows").at(1).at("keyboard") == false);
++  require(second.at("rows").at(1).at("elements") == 0);
++  require(frozen.read(0) == first);
++  require(owner.freeze(101).read(2).at("rows").at(0).at("down") == true);
++  rejects([&] { frozen.read(4); });
++  keyboard.stopped();
++  rejects([&] { owner.freeze(102); });
++  // The owning protocol must fence this retained copy after topology loss.
++  require(frozen.read(2) == second);
++
++  using pages = hs274_stream_protocol::baseline_pages<64, 2, 1024>;
++  std::vector<pages::element> keys;
++  for (std::uint32_t cookie = 0; cookie < 1024; ++cookie) {
++    keys.push_back({7, 255, UINT32_MAX - cookie, UINT64_MAX, true});
++  }
++  const pages maximum(UINT64_MAX, {{UINT64_MAX, true, keys, fixture_type::ansi}, {UINT64_MAX - 1, true, keys, fixture_type::ansi}});
++  std::size_t offset = 0, count = 0;
++  for (;;) {
++    const auto page = maximum.read(offset);
++    require(page.at("rows").size() <= 64 && !page.at("rows").empty());
++    require(page.dump().size() < 16 * 1024);
++    count += page.at("rows").size();
++    const auto next = page.at("next").get<std::size_t>();
++    require(next > offset && page.at("offset") == offset);
++    offset = next;
++    if (page.at("complete") == true) break;
++  }
++  require(count == 2050 && offset == count);
++  for (const auto page : {0u, 12u, 0xff01u}) {
++    auto changed = keys[0];
++    changed.page = page;
++    rejects([&] { pages invalid(UINT64_MAX, {{1, true, {changed}, fixture_type::ansi}}); });
++  }
++  rejects([&] { pages invalid(100, {}); });
++  rejects([&] { pages invalid(UINT64_MAX, {{1, true, keys, fixture_type::ansi}, {1, true, keys, fixture_type::ansi}}); });
++  rejects([&] { pages invalid(UINT64_MAX, {{1, false, keys, fixture_type::none}}); });
++  rejects([&] { pages invalid(UINT64_MAX, {{1, true, {}, fixture_type::ansi}}); });
++  rejects([&] { pages invalid(100, {{1, true, keys, fixture_type::ansi}}); });
++  keys[1].cookie = keys[0].cookie;
++  rejects([&] { pages invalid(UINT64_MAX, {{1, true, keys, fixture_type::ansi}}); });
++}
++
++struct clock_fixture {
++  using time_point = std::chrono::steady_clock::time_point;
++  inline static time_point current{};
++  static time_point now() { return current; }
++};
++
++struct client_fixture {
++  std::vector<json> responses;
++  clock_fixture::time_point deadline;
++  std::chrono::milliseconds response_time{2};
++  std::size_t requests = 0, pauses = 0;
++  std::string failure{};
++
++  json request(const json& input, clock_fixture::time_point received_deadline) {
++    require(input == json({{"version", 1u}, {"action", "status"}}));
++    require(received_deadline == deadline);
++    ++requests;
++    if (!failure.empty()) throw std::runtime_error(failure);
++    clock_fixture::current += response_time;
++    return responses.at(std::min(requests - 1, responses.size() - 1));
++  }
++
++  void pause(std::chrono::milliseconds interval) {
++    require(interval.count() >= 0 && clock_fixture::current + interval <= deadline);
++    ++pauses;
++    clock_fixture::current += interval;
++  }
++};
++
++void readiness_cases() {
++  using namespace std::chrono_literals;
++  source owner("readiness", acquisition_time);
++  auto opening = prepare(owner);
++  const json status{{"version", 1u}, {"action", "status"}};
++  auto empty = owner.request(7, status);
++  require(!empty.at("ready").get<bool>() && empty.at("monitors").empty());
++  rejects([&] { owner.request(0, status); });
++  rejects([&] { owner.request(7, {{"version", true}, {"action", "status"}}); });
++  rejects([&] { owner.request(7, {{"version", 1u}, {"action", "status"}, {"extra", true}}); });
++  auto monitor = owner.attach(41, true, fixture_type::ansi);
++  auto pending = owner.request(7, status);
++  require(!pending.at("ready").get<bool>());
++  start(monitor);
++  auto ready = owner.request(7, status);
++  require(ready.at("ready").get<bool>());
++  auto opened = open_ready(owner, opening);
++  require(opened.at("lease") == "1");
++  owner.request(8, status);
++  require(owner.request(7, pull_request(opened)).at("records").empty());
++  monitor.stopped();
++  require(!owner.request(7, status).at("ready").get<bool>());
++
++  clock_fixture::current = {};
++  client_fixture success{{empty, pending, ready}, clock_fixture::current + 30ms};
++  require(hs274_stream_protocol::await_readiness<clock_fixture>(success, 5ms, success.deadline) == "readiness");
++  require(success.requests == 3 && success.pauses == 2);
++  clock_fixture::current = {};
++  client_fixture timeout{{pending}, clock_fixture::current + 12ms};
++  bool expired = false;
++  try { hs274_stream_protocol::await_readiness<clock_fixture>(timeout, 5ms, timeout.deadline); }
++  catch (const std::runtime_error& error) { expired = std::string(error.what()) == "Capture readiness timeout"; }
++  require(expired && timeout.requests == 2 && clock_fixture::current == timeout.deadline);
++  clock_fixture::current = {};
++  client_fixture late{{ready}, clock_fixture::current + 12ms, 12ms};
++  rejects([&] { hs274_stream_protocol::await_readiness<clock_fixture>(late, 5ms, late.deadline); });
++  clock_fixture::current = {};
++  client_fixture disconnected{{pending}, clock_fixture::current + 12ms};
++  disconnected.failure = "transport closed";
++  bool propagated = false;
++  try { hs274_stream_protocol::await_readiness<clock_fixture>(disconnected, 5ms, disconnected.deadline); }
++  catch (const std::runtime_error& error) { propagated = std::string(error.what()) == "transport closed"; }
++  require(propagated && disconnected.requests == 1 && disconnected.pauses == 0);
++
++  for (const auto& field : {"version", "kind", "coverage", "incarnation", "ready", "exhausted", "monitors"}) {
++    auto malformed = ready;
++    malformed.erase(field);
++    rejects([&] { hs274_stream_protocol::readiness{}.observe(malformed); });
++  }
++  auto inconsistent = empty;
++  inconsistent["ready"] = true;
++  rejects([&] { hs274_stream_protocol::readiness{}.observe(inconsistent); });
++  auto duplicate = ready;
++  duplicate["monitors"].push_back(duplicate.at("monitors").at(0));
++  rejects([&] { hs274_stream_protocol::readiness{}.observe(duplicate); });
++  auto exhausted = ready;
++  exhausted["exhausted"] = true;
++  rejects([&] { hs274_stream_protocol::readiness{}.observe(exhausted); });
++  hs274_stream_protocol::readiness identity;
++  require(!identity.observe(pending));
++  auto replaced = ready;
++  replaced["incarnation"] = "other";
++  rejects([&] { identity.observe(replaced); });
++}
++
++void observation_policy_cases() {
++  source owner("policy", acquisition_time);
++  auto monitor = owner.attach(41, true, fixture_type::ansi);
++  require(!owner.observes(41, false, false));
++  auto opening = prepare(owner);
++  // Pending monitors must be eligible before readiness can ever become true.
++  require(owner.observes(41, false, false));
++  for (bool seize : {false, true}) {
++    for (bool temporary : {false, true}) {
++      require(owner.observes(41, seize, temporary) == (!seize && !temporary));
++      require(!owner.observes(0, seize, temporary));
++      require(!owner.observes(42, seize, temporary));
++    }
++  }
++  owner.peer_closed(8);
++  require(owner.observes(41, false, false));
++  start(monitor);
++  auto opened = open_ready(owner, opening);
++  require(owner.observes(41, false, false));
++  auto close = pull_request(opened);
++  close["action"] = "close";
++  owner.request(7, close);
++  require(!owner.observes(41, false, false));
++  opening = prepare(owner);
++  require(owner.observes(41, false, false));
++  monitor.stopped();
++  require(owner.observes(41, false, false));
++  monitor.retire();
++  require(!owner.observes(41, false, false));
++  auto replacement = owner.attach(41, true, fixture_type::ansi);
++  require(owner.observes(41, false, false));
++  auto cancel = opening;
++  cancel["action"] = "cancel";
++  owner.request(7, cancel);
++  require(!owner.observes(41, false, false));
++  prepare(owner);
++  owner.peer_closed(7);
++  require(!owner.observes(41, false, false));
++  prepare(owner);
++  auto second = owner.attach(42, true, fixture_type::ansi);
++  rejects([&] { owner.attach(43, true, fixture_type::ansi); });
++  require(!owner.observes(41, false, false));
++  require(!owner.observes(42, false, false));
++}
++
++void preparation_cases() {
++  source owner("preparation", acquisition_time);
++  const json status{{"version", 1u}, {"action", "status"}};
++  owner.request(7, status);
++  require(!owner.observing());
++  auto monitor = owner.attach(41, true, fixture_type::ansi);
++  start(monitor);
++  rejects([&] { owner.request(7, {{"version", 1u}, {"action", "open"}}); });
++  rejects([&] { owner.request(0, {{"version", 1u}, {"action", "prepare"}}); });
++  rejects([&] { owner.request(7, {{"version", true}, {"action", "prepare"}}); });
++  rejects([&] { owner.request(7, {{"version", 1u}, {"action", "prepare"}, {"extra", 0}}); });
++  require(!owner.observing());
++  auto opening = prepare(owner);
++  require(owner.observing());
++  rejects([&] { prepare(owner); });
++  rejects([&] { owner.request(8, {{"version", 1u}, {"action", "prepare"}}); });
++  rejects([&] { owner.request(8, opening); });
++  owner.peer_closed(8);
++  require(owner.observing());
++  monitor.append({41, 1, 1, true, true, 7, 41, 0, true, 41});
++  auto opened = open_ready(owner, opening);
++  require(owner.request(7, pull_request(opened)).at("records").empty());
++  monitor.append({41, 2, 1, true, true, 7, 41, 0, true, 41});
++  auto cancel = opening;
++  cancel["action"] = "cancel";
++  auto wrong = cancel;
++  wrong["incarnation"] = "other";
++  rejects([&] { owner.request(7, wrong); });
++  require(owner.observing());
++  require(owner.request(7, cancel).at("kind") == "cancelled");
++  require(!owner.observing());
++  rejects([&] { owner.request(7, pull_request(opened)); });
++  opening = prepare(owner);
++  require(opening.at("preparation") == "2");
++  rejects([&] { owner.request(7, cancel); });
++  require(owner.observing());
++  opened = open_ready(owner, opening);
++  auto pull = pull_request(opened);
++  require(owner.request(7, pull).at("records").empty());
++  auto close = pull;
++  close["action"] = "close";
++  owner.request(7, close);
++  require(!owner.observing());
++  prepare(owner);
++  owner.peer_closed(7);
++  require(!owner.observing());
++  prepare(owner);
++  rejects([&] { owner.request(7, close); });
++  require(owner.observing());
++}
++
++void reference_routing_cases() {
++  source owner("reference-routing", acquisition_time);
++  auto first = owner.attach(41, true, fixture_type::ansi);
++  auto second = owner.attach(42, true, fixture_type::ansi);
++  start(first);
++  start(second);
++  auto opened = open_ready(owner, prepare(owner));
++  hs274_raw_capture::capture<1> reference;
++  hs274_stream_protocol::append_input(second, reference, false, {42, 1, 1, true, true, 7, 44, 0, true, 44});
++  hs274_stream_protocol::append_input(first, reference, true, {41, 2, 1, true, true, 7, 41, 0, true, 41});
++  auto records = owner.request(7, pull_request(opened)).at("records");
++  require(records.size() == 2 && records[0].at("device") == "42" && records[1].at("device") == "41");
++  require(records[0].at("sequence") == "1" && records[1].at("sequence") == "2");
++  auto captured = reference.read();
++  require(captured.seen == 1 && captured.count == 1 && captured.overflow == 0);
++  require(captured.records[0].device == 41 && captured.records[0].timestamp == 2 && captured.records[0].sequence == 1);
++}
++
++void sampled_state_cases() {
++  source owner("sampled-state", acquisition_time);
++  auto first = owner.attach(41, true, fixture_type::ansi);
++  auto second = owner.attach(42, true, fixture_type::ansi);
++  const source::sample held{7, 44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 1, 0, 0, 0};
++  require(first.started(&held, 1, true, false));
++  require(first.key_down(44));
++  first.append({41, 1, 0, true, true, 7, 44, 0, true, 44});
++  require(!first.key_down(44));
++  first.append({41, 2, 1, true, true, 7, 44, 0, true, 44});
++  require(first.key_down(44));
++  require(start(second));
++  auto opened = open_ready(owner, prepare(owner));
++  require(owner.request(7, pull_request(opened)).at("records").empty());
++  // State classification must not remove unchanged raw observations.
++  first.append({41, 3, 1, true, true, 7, 44, 0, true, 44});
++  first.append({41, 4, 0, true, true, 7, 44, 0, true, 44});
++  require(owner.request(7, pull_request(opened)).at("records").size() == 2);
++  owner.peer_closed(7);
++  first.append({41, 5, 1, true, true, 7, 44, 0, true, 44});
++  require(first.key_down(44));
++  opened = open_ready(owner, prepare(owner));
++  require(owner.request(7, pull_request(opened)).at("records").empty());
++  first.append({41, 6, 0, true, true, 7, 44});
++  require(owner.request(7, pull_request(opened)).at("reason") == "interrupted");
++  rejects([&] { first.key_down(44); });
++  require(start(first));
++  require(!first.key_down(44));
++  require(owner.request(7, pull_request(opened)).at("reason") == "interrupted");
++
++  source mixed("consumer-state", acquisition_time);
++  auto keyboard = mixed.attach(41, true, fixture_type::ansi);
++  auto consumer = mixed.attach(42, false, fixture_type::none);
++  require(!keyboard.started(nullptr, 0, true, false));
++  require(start(keyboard));
++  require(!consumer.started(nullptr, 0, false, false));
++  require(!consumer.started(nullptr, 0, true, true));
++  require(!consumer.started(&held, 1, true, false));
++  require(consumer.started(nullptr, 0, true, false));
++  rejects([&] { consumer.key_down(44); });
++  // V2 still retains empty markers, but subsequent button observations require
++  // the corresponding inventoried cookie instead of appearing as auxiliary.
++  consumer.stopped();
++  const source::sample consumer_key{12, 205, 1, {true, false, true, 1, 1, 0, 1},
++      0, true, 1, 0, 0, 0, 0};
++  require(consumer.started(&consumer_key, 1, true, false));
++  opened = open_ready(mixed, prepare(mixed));
++  consumer.append({42, 1, 1, true, true, 12, 205, 0, true, 1});
++  const auto records = mixed.request(7, pull_request(opened)).at("records");
++  require(records.size() == 1 && records.at(0).at("page") == 12);
++  consumer.append({42, 2, 1, true, true, 7, 44, 0, true, 44});
++  require(mixed.request(7, pull_request(opened)).at("reason") == "interrupted");
++}
++
++void changed_page_cases() {
++  source owner("changed-page", acquisition_time);
++  auto monitor = owner.attach(41, true, fixture_type::ansi);
++  require(start(monitor));
++  const auto opened = open_ready(owner, prepare(owner));
++  monitor.append({41, 1001, 1, true, true, 12, 44, 0, true, 44});
++  require(owner.request(7, pull_request(opened)).at("reason") == "interrupted");
++  rejects([&] { monitor.key_down(44); });
++}
++
++int main() {
++  changed_page_cases();
++  baseline_client_cases();
++  baseline_session_cases();
++  baseline_page_cases();
++  sampled_state_cases();
++  reference_routing_cases();
++  observation_policy_cases();
++  preparation_cases();
++  readiness_cases();
++  source owner("first", acquisition_time);
++  auto opening = prepare(owner);
++  rejects([&] { owner.request(7, opening); });
++  rejects([&] { owner.attach(0, true, fixture_type::ansi); });
++  auto first = owner.attach(41, true, fixture_type::ansi);
++  rejects([&] { owner.attach(41, true, fixture_type::ansi); });
++  rejects([&] { owner.request(7, opening); });
++  start(first);
++  rejects([&] { start(first); });
++  auto second = owner.attach(44, true, fixture_type::ansi);
++  rejects([&] { owner.request(7, opening); });
++  start(second);
++  auto opened = open_ready(owner, opening);
++  auto pull = pull_request(opened);
++  first.append({41, 1, 1, true, true, 7, 41, 0, true, 41});
++  second.append({44, 2, 1, true, true, 7, 44, 0, true, 44});
++  auto pending = owner.request(7, pull);
++  require(pending.at("records").size() == 2);
++  second.stopped();
++  pull["ack"] = "2";
++  require(owner.request(7, pull).at("reason") == "interrupted");
++  owner.peer_closed(7);
++  opening = prepare(owner);
++  rejects([&] { owner.request(7, opening); });
++  start(second);
++  auto successor = open_ready(owner, opening);
++  rejects([&] { owner.request(7, pull); });
++  pull = pull_request(successor);
++  require(owner.request(7, pull).at("records").empty());
++  first.append({44, 3, 1, true, true, 7, 44, 0, true, 44});
++  require(owner.request(7, pull).at("reason") == "interrupted");
++  owner.peer_closed(7);
++  opening = prepare(owner);
++  rejects([&] { owner.request(7, opening); });
++  start(first);
++  successor = open_ready(owner, opening);
++  pull = pull_request(successor);
++  second.retire();
++  start(second);
++  second.append({44, 4, 1, true, true, 7, 44, 0, true, 44});
++  require(owner.request(7, pull).at("reason") == "interrupted");
++  owner.peer_closed(7);
++  opening = prepare(owner);
++  {
++    auto replacement = owner.attach(44, true, fixture_type::ansi);
++    rejects([&] { owner.request(7, opening); });
++    start(replacement);
++    opened = open_ready(owner, opening);
++    pull = pull_request(opened);
++    second.stopped();
++    require(owner.request(7, pull).at("records").empty());
++  }
++  require(owner.request(7, pull).at("reason") == "interrupted");
++  owner.peer_closed(7);
++  opening = prepare(owner);
++  auto extra = owner.attach(45, true, fixture_type::ansi);
++  start(extra);
++  opened = open_ready(owner, opening);
++  pull = pull_request(opened);
++  rejects([&] { owner.attach(46, true, fixture_type::ansi); });
++  require(owner.request(7, pull).at("reason") == "interrupted");
++  owner.peer_closed(7);
++  opening = prepare(owner);
++  extra.retire();
++  rejects([&] { owner.request(7, opening); });
++
++  std::optional<source::monitor> old;
++  {
++    source previous("previous", acquisition_time);
++    old.emplace(previous.attach(41, true, fixture_type::ansi));
++    start(*old);
++    open_ready(previous, prepare(previous));
++  }
++  source next("next", acquisition_time);
++  auto current = next.attach(41, true, fixture_type::ansi);
++  start(current);
++  opened = open_ready(next, prepare(next));
++  pull = pull_request(opened);
++  old->stopped();
++  start(*old);
++  old->append({41, 5, 1, true, true, 7, 41, 0, true, 41});
++  old.reset();
++  require(next.request(7, pull).at("records").empty());
++  current.append({41, 6, 1, true, true, 7, 41, 0, true, 41});
++  require(next.request(7, pull).at("records").size() == 1);
++  std::puts("Source readiness, multi-device interruption, bounded inventory and stale callbacks passed");
++}
+diff --git a/hs274-stream-source.hpp b/hs274-stream-source.hpp
+new file mode 100644
+--- /dev/null
++++ b/hs274-stream-source.hpp
+@@ -0,0 +1,443 @@
++// tools/diagnostics/hs274-stream-source.hpp
++// Dispatcher-owned monitor lifetimes and explicit fixture acquisition readiness.
++#pragma once
++
++#include "hs274-stream-protocol.hpp"
++#include "hs274-stream-native-control.hpp"
++#include "hs274-stream-native-fault.hpp"
++#include "hs274-key-state.hpp"
++#include "hs274-stream-baseline-pages.hpp"
++#include <array>
++#include <functional>
++#include <memory>
++#include <utility>
++
++namespace hs274_stream_protocol {
++template <std::size_t Capacity, std::size_t Limit, std::size_t Devices>
++class source final {
++  static_assert(Devices > 0);
++  using keyboard_state = key_state<keyboard_inventory_capacity>;
++  struct slot {
++    std::uint64_t device = 0, token = 0;
++    bool ready = false;
++    bool keyboard = false;
++    hs274_key_policy::keyboard_type keyboard_type = hs274_key_policy::keyboard_type::unavailable;
++    std::unique_ptr<keyboard_state> keys;
++    native_refusal refusal = native_refusal::none;
++  };
++  struct state {
++    explicit state(std::string identity) : incarnation(std::move(identity)), protocol(incarnation) {}
++    const std::string incarnation;
++    controller<Capacity, Limit> protocol;
++    std::array<slot, Devices> monitors{};
++    std::uint64_t serial = 0;
++    bool exhausted = false;
++    native_fault native_failure = native_fault::none;
++
++    slot* find(std::uint64_t token) {
++      for (auto& monitor : monitors) if (monitor.token == token) return &monitor;
++      return nullptr;
++    }
++
++    void native_fail(native_fault reason) noexcept {
++      if (native_failure == native_fault::none) native_failure = reason == native_fault::none || reason == native_fault::inactive
++          ? native_fault::invalid_device_type : reason;
++      exhausted = true;
++      protocol.interrupt();
++    }
++
++    bool ready() const {
++      bool found = false;
++      if (exhausted) return false;
++      for (const auto& monitor : monitors) {
++        if (!monitor.token) continue;
++        found = true;
++        if (!monitor.ready) return false;
++      }
++      return found;
++    }
++  };
++
++public:
++  using sample = typename keyboard_state::sample;
++  using baseline = baseline_pages<Limit, Devices, keyboard_inventory_capacity>;
++
++  baseline freeze(std::uint64_t boundary) const {
++    if (!state_->ready()) throw std::logic_error("Capture monitors are not ready for a baseline");
++    std::vector<typename baseline::device_state> devices;
++    for (const auto& current : state_->monitors) {
++      if (!current.token) continue;
++      devices.push_back({current.device, current.keyboard,
++                         current.keys ? current.keys->snapshot(boundary)
++                                      : std::vector<typename baseline::element>{}, current.keyboard_type});
++    }
++    return baseline(boundary, std::move(devices));
++  }
++
++  class native_owner_fence final {
++  public:
++    native_owner_fence() = default;
++    bool live() const noexcept {
++      if (!token_) return false;
++      if (auto owner = owner_.lock()) return owner->find(token_) != nullptr;
++      return false;
++    }
++    bool belongs_to(const source& receiver) const noexcept {
++      return live() && !owner_.owner_before(receiver.state_) && !receiver.state_.owner_before(owner_);
++    }
++    native_fault fault() const noexcept {
++      if (auto owner = owner_.lock()) {
++        if (token_ && owner->find(token_)) return owner->native_failure;
++      }
++      return native_fault::inactive;
++    }
++    void stopped() const noexcept {
++      if (auto owner = owner_.lock()) {
++        if (token_) if (auto current = owner->find(token_)) {
++          current->ready = false;
++          current->keys.reset();
++          owner->protocol.interrupt();
++        }
++      }
++    }
++    void fail(native_fault reason) const noexcept {
++      if (auto owner = owner_.lock()) {
++        if (token_ && owner->find(token_)) owner->native_fail(reason);
++      }
++    }
++  private:
++    friend class source;
++    native_owner_fence(const std::weak_ptr<state>& owner, std::uint64_t token) : owner_(owner), token_(token) {}
++    std::weak_ptr<state> owner_;
++    std::uint64_t token_ = 0;
++  };
++
++  class monitor final {
++  public:
++    monitor() = default;
++    monitor(const monitor&) = delete;
++    monitor& operator=(const monitor&) = delete;
++    monitor(monitor&& other) noexcept : owner_(std::move(other.owner_)), token_(std::exchange(other.token_, 0)) {}
++    monitor& operator=(monitor&&) = delete;
++    ~monitor() { retire(); }
++
++    native_owner_fence capture_fence() const noexcept { return native_owner_fence(owner_, token_); }
++    bool active() const noexcept { return capture_fence().live(); }
++
++    void retire() noexcept {
++      if (auto owner = owner_.lock()) {
++        if (auto current = owner->find(token_)) {
++          owner->protocol.interrupt();
++          *current = {};
++        }
++      }
++      owner_.reset();
++      token_ = 0;
++    }
++
++    bool started(const sample* samples, std::size_t count, bool enumerated, bool exhausted) {
++      if (auto owner = owner_.lock()) {
++        auto current = owner->find(token_);
++        if (!current || current->ready) throw std::logic_error("Capture monitor started without pending ownership");
++        if (current->refusal != native_refusal::none) { owner->protocol.interrupt(); return false; }
++        if (count > keyboard_inventory_capacity || (count && !samples)) { owner->protocol.interrupt(); return false; }
++        bool has_keyboard = false;
++        for (std::size_t i = 0; i < count; ++i) has_keyboard = has_keyboard || samples[i].page == 7;
++        if (has_keyboard != current->keyboard || !enumerated || exhausted) {
++          owner->protocol.interrupt();
++          return false;
++        }
++        // A successful start replaces the whole inventory, including an empty
++        // one. Failed qualification must not publish a partial replacement.
++        std::unique_ptr<keyboard_state> keys;
++        if (count) {
++          keys = std::make_unique<keyboard_state>(current->device);
++          try {
++            keys->initialize(samples, count, enumerated, exhausted);
++          } catch (const std::invalid_argument&) {
++            owner->protocol.interrupt();
++            return false;
++          }
++        }
++        current->keys = std::move(keys);
++        current->ready = true;
++        return true;
++      }
++      return false;
++    }
++
++    void refuse(native_refusal reason) noexcept {
++      if (auto owner = owner_.lock()) {
++        if (auto current = owner->find(token_)) {
++          current->ready = false;
++          current->keys.reset();
++          current->refusal = reason == native_refusal::none ? native_refusal::changed_native_provenance : reason;
++          owner->protocol.interrupt();
++        }
++      }
++    }
++
++    bool key_down(std::uint32_t cookie) const {
++      if (auto owner = owner_.lock()) {
++        const auto current = owner->find(token_);
++        if (current && current->ready && current->keys) return current->keys->down(cookie);
++      }
++      throw std::logic_error("Capture monitor has no qualified keyboard state");
++    }
++
++    void stopped() noexcept {
++      if (auto owner = owner_.lock()) {
++        if (auto current = owner->find(token_)) {
++          current->ready = false;
++          current->keys.reset();
++          owner->protocol.interrupt();
++        }
++      }
++    }
++
++    void append(const value& input) noexcept {
++      if (auto owner = owner_.lock()) {
++        auto current = owner->find(token_);
++        if (current && current->device != input.device) current->ready = false;
++        if (!current || !current->ready || current->device != input.device) {
++          owner->protocol.interrupt();
++          return;
++        }
++        // State must advance even before a lease or while another monitor starts.
++        // This does not claim an atomic queue cutover or suppress any raw value.
++        if ((current->keys && current->keys->apply(input) == keyboard_state::action::invalid) ||
++            (!current->keys && input.has_page &&
++             hs274_key_policy::is_button_page(static_cast<std::uint32_t>(input.page)))) {
++          current->ready = false;
++          owner->protocol.interrupt();
++          return;
++        }
++        if (!owner->ready()) { owner->protocol.interrupt(); return; }
++        owner->protocol.append(input);
++      }
++    }
++
++  private:
++    friend class source;
++    monitor(const std::shared_ptr<state>& owner, std::uint64_t token) : owner_(owner), token_(token) {}
++    std::weak_ptr<state> owner_;
++    std::uint64_t token_ = 0;
++  };
++
++  class native_registration final {
++  public:
++    native_registration() = default;
++    native_registration(const native_registration&) = delete;
++    native_registration& operator=(const native_registration&) = delete;
++    native_registration(native_registration&& other) noexcept
++        : owner_(std::move(other.owner_)), reason_(std::exchange(other.reason_, native_fault::inactive)) {}
++    native_registration& operator=(native_registration&&) = delete;
++    // An owned registration permits qualification work, never capture readiness.
++    bool active() const noexcept { return reason_ == native_fault::none && owner_.active(); }
++    native_owner_fence capture_fence() const noexcept {
++      return reason_ == native_fault::none ? owner_.capture_fence() : native_owner_fence{};
++    }
++    native_fault reason() const noexcept { return reason_; }
++    bool started(const sample* samples, std::size_t count, bool enumerated, bool exhausted) {
++      return active() && owner_.started(samples, count, enumerated, exhausted);
++    }
++    void append(const value& input) noexcept { if (active()) owner_.append(input); }
++    void stopped() noexcept { if (active()) owner_.stopped(); }
++    void refuse(native_refusal reason) noexcept { if (active()) owner_.refuse(reason); }
++    void retire() noexcept { owner_.retire(); reason_ = native_fault::inactive; }
++  private:
++    friend class source;
++    explicit native_registration(native_fault reason) : reason_(reason) {}
++    explicit native_registration(monitor&& owner) : owner_(std::move(owner)), reason_(native_fault::none) {}
++    monitor owner_;
++    native_fault reason_ = native_fault::inactive;
++  };
++
++  source(std::string incarnation, std::function<std::uint64_t()> clock)
++      : state_(std::make_shared<state>(std::move(incarnation))), clock_(std::move(clock)) {
++    if (!clock_) throw std::invalid_argument("Capture has no native clock");
++  }
++  source(const source&) = delete;
++  source& operator=(const source&) = delete;
++
++  bool observing() const noexcept { return preparation_.has_value(); }
++
++  bool observes(std::uint64_t device, bool needs_seize, bool temporarily_ignored) const noexcept {
++    // Observation bypasses virtual-output readiness, so it must never authorize seizure.
++    if (!observing() || needs_seize || temporarily_ignored || state_->exhausted) return false;
++    for (const auto& current : state_->monitors) {
++      if (current.token && current.device == device) return true;
++    }
++    return false;
++  }
++
++  // Explicit diagnostic type is not evidence of native property correlation.
++  // Old native callers supply no type and remain refused until independently
++  // qualified observation is wired; no guessed type may advertise readiness.
++  monitor attach(std::uint64_t device, bool keyboard,
++                 hs274_key_policy::keyboard_type keyboard_type = hs274_key_policy::keyboard_type::unavailable) {
++    if (!hs274_key_policy::admits_device_type(keyboard, keyboard_type))
++      throw std::invalid_argument("Missing qualified capture keyboard type");
++    if (!device) throw std::invalid_argument("Capture device identity is missing");
++    for (const auto& current : state_->monitors) {
++      if (current.device == device) throw std::logic_error("Capture device already registered");
++    }
++    slot* available = nullptr;
++    for (auto& current : state_->monitors) if (!current.token) { available = &current; break; }
++    if (!available || state_->serial == UINT64_MAX || state_->exhausted) {
++      state_->exhausted = true;
++      state_->protocol.interrupt();
++      throw std::overflow_error("Capture monitor inventory exhausted");
++    }
++    state_->protocol.interrupt();
++    *available = {device, ++state_->serial, false, keyboard, keyboard_type, nullptr};
++    return monitor(state_, available->token);
++  }
++
++  monitor refuse(std::uint64_t device, native_refusal reason) {
++    if (reason == native_refusal::none) throw std::invalid_argument("Missing native refusal reason");
++    auto result = attach(device, false, hs274_key_policy::keyboard_type::none);
++    result.refuse(reason);
++    return result;
++  }
++
++  native_fault native_fault_reason() const noexcept { return state_->native_failure; }
++
++  void native_failure(native_fault reason) noexcept { state_->native_fail(reason); }
++
++  // Native diagnostic registration contains known refusals without throwing
++  // through ordinary monitor construction. Strict attach() remains unchanged.
++  native_registration native_attach(std::uint64_t device, bool keyboard,
++      hs274_key_policy::keyboard_type type, native_refusal refusal = native_refusal::none) {
++    const auto refused = [this](native_fault reason) {
++      native_failure(reason);
++      return native_registration(state_->native_failure);
++    };
++    if (state_->native_failure != native_fault::none) return native_registration(state_->native_failure);
++    if (!device) return refused(native_fault::invalid_device_identity);
++    for (const auto& current : state_->monitors)
++      if (current.token && current.device == device) return refused(native_fault::duplicate_device_identity);
++    if (refusal == native_refusal::none && !hs274_key_policy::admits_device_type(keyboard, type))
++      return refused(native_fault::invalid_device_type);
++    if (state_->serial == UINT64_MAX) return refused(native_fault::registration_serial_exhausted);
++    bool available = false;
++    for (const auto& current : state_->monitors) available = available || !current.token;
++    if (!available || state_->exhausted) return refused(native_fault::registration_capacity_exhausted);
++    return native_registration(refusal == native_refusal::none ? attach(device, keyboard, type)
++                                                              : refuse(device, refusal));
++  }
++
++  json request(std::uint64_t peer, const json& input) {
++    if (!peer || !input.is_object() || !input.at("version").is_number_unsigned() || input.at("version") != 1u) {
++      throw std::invalid_argument("Invalid observation request");
++    }
++    const auto action = input.at("action").get<std::string>();
++    if (action == "prepare") {
++      if (input.size() != 2 || preparation_) throw std::invalid_argument("Observation already owned or malformed");
++      if (preparation_serial_ == UINT64_MAX) throw std::overflow_error("Observation identity exhausted");
++      preparation_ = preparation{peer, ++preparation_serial_};
++      return {{"version", 1u}, {"kind", "prepared"}, {"coverage", "fixture_only"},
++              {"incarnation", state_->incarnation}, {"preparation", std::to_string(preparation_->serial)}};
++    }
++    if (input.at("action") == "status") {
++      if (!peer || input.size() != 2 || !input.at("version").is_number_unsigned() || input.at("version") != 1u) {
++        throw std::invalid_argument("Invalid capture status request");
++      }
++      json monitors = json::array();
++      for (const auto& current : state_->monitors) {
++        if (current.token) monitors.push_back({{"device", std::to_string(current.device)}, {"started", current.ready},
++                                               {"refusal", refusal_name(current.refusal)}});
++      }
++      return {{"version", 1u}, {"kind", "status"}, {"coverage", "fixture_only"},
++              {"incarnation", state_->incarnation}, {"ready", state_->ready()},
++              {"exhausted", state_->exhausted}, {"native_fault", native_fault_name(state_->native_failure)},
++              {"monitors", std::move(monitors)}};
++    }
++    if (action == "open" || action == "cancel") {
++      if (input.size() != 4 || !preparation_ || preparation_->peer != peer ||
++          input.at("incarnation") != state_->incarnation || decimal(input.at("preparation")) != preparation_->serial) {
++        throw std::invalid_argument("Observation belongs to another preparation");
++      }
++      if (action == "cancel") {
++        auto response = input;
++        response.erase("action");
++        response["kind"] = "cancelled";
++        peer_closed(peer);
++        return response;
++      }
++      if (!state_->ready()) throw std::runtime_error("Capture monitors are not ready");
++      const auto boundary = clock_();
++      auto frozen = freeze(boundary);
++      auto opened = state_->protocol.request(peer, {{"version", 1u}, {"action", "open"}});
++      try {
++        opened["baseline"] = {{"version", 2u}, {"boundary", std::to_string(boundary)}, {"rows", frozen.size()}};
++        transfer_.emplace(transfer{std::move(frozen), opened, 0, std::nullopt, false});
++      } catch (...) {
++        state_->protocol.peer_closed(peer);
++        throw;
++      }
++      return opened;
++    }
++    if (!preparation_ || preparation_->peer != peer) throw std::invalid_argument("Capture has no observation owner");
++    if (action == "baseline") {
++      if (input.size() != (input.contains("baseline_ack") ? 5u : 4u)) {
++        throw std::invalid_argument("Invalid baseline request fields");
++      }
++      if (auto failure = state_->protocol.loss(peer, input)) return *failure;
++      if (!transfer_) throw std::logic_error("Capture baseline is not pending");
++      auto& current = *transfer_;
++      if (current.pending) {
++        if (!input.contains("baseline_ack") || decimal(input.at("baseline_ack")) != *current.pending) {
++          throw std::invalid_argument("Baseline acknowledgement does not match its pending page");
++        }
++        current.cursor = *current.pending;
++        current.pending.reset();
++        if (current.complete) {
++          auto ready = current.opened;
++          ready.erase("baseline");
++          ready["kind"] = "baseline_ready";
++          transfer_.reset();
++          return ready;
++        }
++      } else if (input.contains("baseline_ack")) {
++        throw std::invalid_argument("Baseline has no page to acknowledge");
++      }
++      json page = current.pages.read(current.cursor);
++      auto response = current.opened;
++      response.erase("baseline");
++      response["kind"] = "baseline";
++      response.update(page);
++      current.pending = page.at("next").get<std::size_t>();
++      current.complete = page.at("complete").get<bool>();
++      return response;
++    }
++    if (action == "pull" && transfer_) {
++      if (auto failure = state_->protocol.loss(peer, input)) return *failure;
++      throw std::logic_error("Capture baseline has not been acknowledged");
++    }
++    auto response = state_->protocol.request(peer, input);
++    if (action == "close") { preparation_.reset(); transfer_.reset(); }
++    return response;
++  }
++
++  void peer_closed(std::uint64_t peer) {
++    state_->protocol.peer_closed(peer);
++    if (preparation_ && preparation_->peer == peer) { preparation_.reset(); transfer_.reset(); }
++  }
++
++private:
++  struct preparation { std::uint64_t peer, serial; };
++  struct transfer {
++    baseline pages;
++    json opened;
++    std::size_t cursor;
++    std::optional<std::size_t> pending;
++    bool complete;
++  };
++  std::shared_ptr<state> state_;
++  const std::function<std::uint64_t()> clock_;
++  std::optional<preparation> preparation_;
++  std::optional<transfer> transfer_;
++  std::uint64_t preparation_serial_ = 0;
++};
++} // namespace hs274_stream_protocol
+diff --git a/hs274_raw_patch.py b/hs274_raw_patch.py
+new file mode 100644
+--- /dev/null
++++ b/hs274_raw_patch.py
+@@ -0,0 +1,167 @@
++# tools/diagnostics/hs274_raw_patch.py
++"""Instrument only the pinned disposable Karabiner checkout for a finite capture."""
++
++from pathlib import Path
++import argparse
++import subprocess
++
++REVISION = "9312593e1a3bf72b94c63c524ebabe2637442e8a"
++
++
++def replace_once(source, before, after):
++    """Refuse upstream drift or duplicate anchors before producing a patch."""
++    if source.count(before) != 1:
++        raise RuntimeError(f"Expected one upstream anchor: {before!r}")
++    return source.replace(before, after, 1)
++
++
++def instrument_monitor(source):
++    """Capture only the renamed owned device before timestamp normalization."""
++    source = replace_once(
++        source, "#pragma once\n", '#pragma once\n\n#include "hs274-raw-capture.hpp"\n'
++    )
++    source = replace_once(
++        source,
++        "        last_time_stamp_(0) {",
++        """        hs274_probe_device_id_(type_safe::get(device_properties.get_device_id())),
++        hs274_probe_owned_(type_safe::get(device_properties.get_product()) == "HS274 CI Keyboard"),
++        last_time_stamp_(0) {""",
++    )
++    source = replace_once(
++        source,
++        "      input_values_arrived(hid_values);\n    });",
++        """      if (hs274_probe_owned_) {
++        for (std::size_t index = 0; index < hid_values->size(); ++index) {
++          const auto& value = hid_values->at(index);
++          // The wrapper drops element identity; use the corresponding native value.
++          const auto cookie = IOHIDElementGetCookie(IOHIDValueGetElement(*values->at(index)));
++          const auto page = value.get_usage_page();
++          const auto usage = value.get_usage();
++          hs274_raw_capture::fixture.append({
++              hs274_probe_device_id_, type_safe::get(value.get_time_stamp()),
++              value.get_integer_value(), page.has_value(), usage.has_value(),
++              page ? static_cast<std::int32_t>(type_safe::get(*page)) : 0,
++              usage ? static_cast<std::int32_t>(type_safe::get(*usage)) : 0,
++              0, true, static_cast<std::uint32_t>(cookie)});
++        }
++      }
++      input_values_arrived(hid_values);
++    });""",
++    )
++    return replace_once(
++        source,
++        "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
++        """  std::uint64_t hs274_probe_device_id_;
++  bool hs274_probe_owned_;
++  pqrs::osx::chrono::absolute_time_point last_time_stamp_;""",
++    )
++
++
++def instrument_shutdown(source):
++    """Publish a finite committed-prefix snapshot outside input callbacks."""
++    source = replace_once(
++        source, "#pragma once\n", '#pragma once\n\n#include "hs274-raw-capture.hpp"\n'
++    )
++    return replace_once(source, "  return 0;", "  return hs274_raw_capture::finish() ? 0 : 1;")
++
++
++def main(root, stream=False):
++    """Preflight every owned target before writing any instrumentation."""
++    root = root.resolve()
++    revision = subprocess.check_output(
++        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
++    ).strip()
++    if revision != REVISION:
++        raise RuntimeError("Raw capture requires the inspected upstream revision")
++    headers = ["hs274-raw-capture.hpp"]
++    transforms = [
++        ("src/share/hid_device_events_monitor.hpp", instrument_monitor),
++        (
++            "src/apps/CoreService/include/core_service/main/daemon.hpp",
++            instrument_shutdown,
++        ),
++    ]
++    if stream:
++        from hs274_stream_patch import (
++            stream_monitor,
++            stream_operations,
++            stream_receiver,
++            stream_client,
++            stream_cli,
++            stream_server,
++            stream_entry,
++            stream_socket_ops,
++        )
++
++        headers += [
++            "hs274-stream-clock.hpp",
++            "hs274-stream-session.hpp",
++            "hs274-stream-protocol.hpp",
++            "hs274-stream-ack.hpp",
++            "hs274-stream-baseline-probe.hpp",
++            "hs274-key-element.hpp",
++            "hs274-stream-key-policy.hpp",
++            "hs274-stream-native-control.hpp",
++            "hs274-stream-native-fault.hpp",
++            "hs274-stream-native-boundary.hpp",
++            "hs274-stream-native-binding.hpp",
++            "hs274-keyboard-type-observation.hpp",
++            "hs274-observation-control.hpp",
++            "hs274-stream-inventory.hpp",
++            "hs274-key-state.hpp",
++            "hs274-stream-baseline-pages.hpp",
++            "hs274-stream-baseline-client.hpp",
++            "hs274-stream-source.hpp",
++            "hs274-stream-input.hpp",
++            "hs274-stream-readiness.hpp",
++            "hs274-stream-runtime.hpp",
++            "hs274-stream-cli.hpp",
++        ]
++        transforms[0] = ("src/share/hid_device_events_monitor.hpp", stream_monitor)
++        transforms += [
++            (
++                "vendor/vendor/include/asio/detail/impl/socket_ops.ipp",
++                stream_socket_ops,
++            ),
++            ("vendor/vendor/include/pqrs/unix_domain_stream/server.hpp", stream_server),
++            ("src/share/types/operation_type.hpp", stream_operations),
++            (
++                "src/apps/CoreService/include/core_service/daemon/receiver.hpp",
++                stream_receiver,
++            ),
++            (
++                "src/apps/CoreService/include/core_service/daemon/device_grabber_details/entry.hpp",
++                stream_entry,
++            ),
++            ("src/share/core_service_daemon_client.hpp", stream_client),
++            ("src/bin/cli/src/main.cpp", stream_cli),
++        ]
++    prepared_headers = []
++    for name in headers:
++        header = root / "src/share" / name
++        if header.exists() or header.is_symlink() or header.resolve() != header:
++            raise RuntimeError("Refusing to replace or redirect a capture header")
++        prepared_headers.append((header, Path(__file__).with_name(name).read_bytes()))
++    prepared = []
++    for relative, transform in transforms:
++        target = root / relative
++        if target.resolve() != target:
++            raise RuntimeError("Refusing a redirected upstream source")
++        baseline = subprocess.check_output(["git", "-C", str(root), "show", "HEAD:" + relative])
++        if target.read_bytes() != baseline:
++            raise RuntimeError("Refusing to overwrite modified upstream source")
++        prepared.append((target, transform(baseline.decode("utf-8")).encode("utf-8")))
++    for header, contents in prepared_headers:
++        with header.open("xb") as handle:
++            handle.write(contents)
++    for target, contents in prepared:
++        target.write_bytes(contents)
++    print("Applied fixture-only capture before normalization; stream=" + str(stream))
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("root", type=Path)
++    parser.add_argument("--stream", action="store_true")
++    arguments = parser.parse_args()
++    main(arguments.root, arguments.stream)
+diff --git a/hs274_stream_patch.py b/hs274_stream_patch.py
+new file mode 100644
+--- /dev/null
++++ b/hs274_stream_patch.py
+@@ -0,0 +1,308 @@
++# tools/diagnostics/hs274_stream_patch.py
++"""Prepare exact-source experimental stream hooks; not a standalone installer."""
++
++from hs274_raw_patch import instrument_monitor, replace_once
++
++
++def require_pristine(source):
++    """Reject an already instrumented source before any anchor replacements."""
++    if "hs274_" in source:
++        raise RuntimeError("Source already contains HS274 instrumentation")
++
++
++def stream_socket_ops(source):
++    """Keep Darwin accepted-peer shutdown from being reported as listener failure."""
++    require_pristine(source)
++    return replace_once(
++        source,
++        """  int result = ::setsockopt(new_s, SOL_SOCKET,
++      SO_NOSIGPIPE, &optval, sizeof(optval));
++  get_last_error(ec, result != 0);
++  if (result != 0)
++  {
++    ::close(new_s);
++    return invalid_socket;
++  }""",
++        """  int result = ::setsockopt(new_s, SOL_SOCKET,
++      SO_NOSIGPIPE, &optval, sizeof(optval));
++  get_last_error(ec, result != 0);
++  if (result != 0)
++  {
++    ::close(new_s);
++#if defined(__MACH__) && defined(__APPLE__)
++    // hs274_accepted_peer: Darwin rejects options on a fully shut-down peer.
++    // Preserve real accept errors; only this already accepted socket aborted.
++    if (ec == asio::error::invalid_argument)
++      ec = asio::error::connection_aborted;
++#endif
++    return invalid_socket;
++  }""",
++    )
++
++
++def stream_server(source):
++    """Expose listener failure causes without changing transport recovery."""
++    require_pristine(source)
++    source = replace_once(source, "#pragma once\n", "#pragma once\n\n#include <cstdio>\n")
++    source = replace_once(
++        source,
++        "              self->close_acceptor();",
++        """              std::fprintf(stderr, "hs274_transport_failure phase=accept code=%d category=%s\\n",
++                           error_code.value(), error_code.category().name());
++              self->close_acceptor();""",
++    )
++    source = replace_once(
++        source,
++        "void handle_socket_path_health_check_failed(const asio::error_code&,",
++        "void handle_socket_path_health_check_failed(const asio::error_code& error_code,",
++    )
++    return replace_once(
++        source,
++        "    close_socket_path_health_check_peer();\n\n    close_acceptor();",
++        """    std::fprintf(stderr, "hs274_transport_failure phase=health code=%d category=%s\\n",
++                 error_code.value(), error_code.category().name());
++    close_socket_path_health_check_peer();
++
++    close_acceptor();""",
++    )
++
++
++def qualify_native_keys(source):
++    """Revoke capture readiness on unsupported keyboard values without changing output."""
++    return replace_once(
++        source,
++        "        hid_values->emplace_back(*value);",
++        """        // Inspect native metadata before the portable wrapper discards it.
++        const auto element = IOHIDValueGetElement(*value);
++        const auto usage = IOHIDElementGetUsage(element);
++        const auto page = IOHIDElementGetUsagePage(element);
++        // Array handlers accompany qualified individual leaves, never keys.
++        if (hs274_stream_selected_ && hs274_key_policy::is_button_page(page) &&
++            usage != 0 && usage != UINT32_MAX) {
++          const auto type = IOHIDElementGetType(element);
++          const auto integer = IOHIDValueGetIntegerValue(*value);
++          const hs274_stream_protocol::key_element descriptor{
++              type >= kIOHIDElementTypeInput_Misc && type <= kIOHIDElementTypeInput_ScanCodes,
++              static_cast<bool>(IOHIDElementIsRelative(element)),
++              static_cast<bool>(IOHIDElementIsArray(element)),
++              IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
++              IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)};
++          if (!(page == 7 && usage <= 3 && integer == 0) &&
++              hs274_key_policy::admit_button(page, usage, descriptor, integer) !=
++              hs274_key_policy::button_admission::admitted) {
++            // Preserve remapping output, but revoke physical observation readiness.
++            hs274_monitor_.stopped();
++          }
++        }
++        hid_values->emplace_back(*value);""",
++    )
++
++
++def stream_monitor(source):
++    """Observe keyboard interfaces while retaining a separate owned fixture reference."""
++    require_pristine(source)
++    source = qualify_native_keys(instrument_monitor(source))
++    source = replace_once(
++        source,
++        '#include "hs274-raw-capture.hpp"',
++        '#include "hs274-stream-runtime.hpp"\n#include "hs274-stream-baseline-probe.hpp"\n#include "hs274-stream-key-policy.hpp"',
++    )
++    source = replace_once(
++        source,
++        "hs274_raw_capture::fixture.append({",
++        "hs274_stream_protocol::runtime::append(hs274_monitor_, hs274_probe_owned_, {",
++    )
++    source = replace_once(
++        source, "    if (hs274_probe_owned_) {", "    if (hs274_stream_selected_) {"
++    )
++    source = replace_once(
++        source,
++        "        last_time_stamp_(0) {",
++        """        hs274_stream_selected_(!device_properties.get_device_identifiers().get_is_virtual_device()),
++        hs274_native_binding_(hs274_stream_selected_ ? device : nullptr, hs274_probe_device_id_),
++        hs274_monitor_(hs274_stream_selected_ ? hs274_stream_protocol::runtime::attach(hs274_native_binding_)
++                                         : hs274_stream_protocol::runtime::monitor{}),
++        last_time_stamp_(0) {""",
++    )
++    source = replace_once(
++        source,
++        "device_events_monitor_->started.connect([this] {",
++        "device_events_monitor_->started.connect([this, device] {",
++    )
++    source = replace_once(
++        source,
++        "      started();",
++        "      if (hs274_stream_selected_) {\n"
++        "        hs274_stream_protocol::runtime::started(hs274_monitor_, hs274_native_binding_, device);\n"
++        "      }\n"
++        "      if (hs274_probe_owned_) hs274_stream_protocol::runtime::reference(hs274_monitor_, device, hs274_probe_device_id_);\n"
++        "      started();",
++    )
++    source = replace_once(
++        source, "      stopped();", "      hs274_monitor_.stopped();\n      stopped();"
++    )
++    source = replace_once(
++        source,
++        "      error_occurred(message, result);",
++        "      hs274_monitor_.stopped();\n      error_occurred(message, result);",
++    )
++    source = replace_once(
++        source,
++        "      device_events_monitor_ = nullptr;",
++        "      hs274_monitor_.retire();\n      device_events_monitor_ = nullptr;",
++    )
++    return replace_once(
++        source,
++        "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
++        "  bool hs274_stream_selected_;\n"
++        "  const hs274_stream_protocol::native_binding hs274_native_binding_;\n"
++        "  hs274_stream_protocol::runtime::monitor hs274_monitor_;\n"
++        "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
++    )
++
++
++def stream_operations(source):
++    """Append the experimental operation without renumbering existing operations."""
++    require_pristine(source)
++    source = replace_once(source, "  end_,", "  hs274_capture,\n  end_,")
++    return replace_once(
++        source,
++        '        {operation_type::end_, "end_"},',
++        '        {operation_type::hs274_capture, "hs274_capture"},\n'
++        '        {operation_type::end_, "end_"},',
++    )
++
++
++def stream_receiver(source):
++    """Own capture through the authenticated receiver and its peer lifecycle."""
++    require_pristine(source)
++    source = replace_once(
++        source,
++        "#pragma once\n",
++        '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n',
++    )
++    source = replace_once(
++        source,
++        "    connected_devices_observer_peer_ids_.erase(peer_id);",
++        "    const auto hs274_observing = hs274_capture_.observing();\n"
++        "    hs274_capture_.peer_closed(peer_id);\n"
++        "    hs274_refresh_observation(hs274_observing);\n"
++        "    connected_devices_observer_peer_ids_.erase(peer_id);",
++    )
++    source = replace_once(
++        source,
++        "        case operation_type::observe_connected_devices:",
++        """        case operation_type::hs274_capture: {
++          const auto hs274_observing = hs274_capture_.observing();
++          auto response = nlohmann::json{
++              {"operation_type", operation_type::hs274_capture},
++              {"capture", hs274_capture_.request(peer_id, json.at("capture"))},
++          };
++          hs274_refresh_observation(hs274_observing);
++          auto bytes = nlohmann::json::to_msgpack(response);
++          if (bytes.size() > constants::unix_domain_stream_max_message_size) {
++            throw std::runtime_error("Physical capture response exceeds the IPC limit");
++          }
++          server_->async_respond(peer_id, request_id, bytes);
++          break;
++        }
++
++        case operation_type::observe_connected_devices:""",
++    )
++    source = replace_once(
++        source,
++        "  std::optional<uid_t> current_console_user_id_;",
++        "  hs274_stream_protocol::runtime hs274_capture_;\n\n"
++        "  std::optional<uid_t> current_console_user_id_;",
++    )
++    return replace_once(
++        source,
++        "  void update_temporarily_ignored_device_ids() {",
++        """  void hs274_refresh_observation(bool previously_observing) {
++    if (device_grabber_ && previously_observing != hs274_capture_.observing()) {
++      // The queued grab reads current policy, including a successor preparation.
++      device_grabber_->async_grab_devices();
++    }
++  }
++
++  void update_temporarily_ignored_device_ids() {""",
++    )
++
++
++def stream_entry(source):
++    """Observe only reserved ignored fixtures without weakening seizure readiness."""
++    require_pristine(source)
++    source = replace_once(
++        source,
++        "#pragma once\n",
++        '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n',
++    )
++    return replace_once(
++        source,
++        """    return false;
++  }
++
++  // Return whether the device is a target for modifying input events.""",
++        """    return hs274_stream_protocol::runtime::observes(
++        type_safe::get(get_device_id()), needs_to_seize_device(), temporarily_ignore_);
++  }
++
++  // Return whether the device is a target for modifying input events.""",
++    )
++
++
++def stream_client(source):
++    """Serialize caller requests on the existing client dispatcher."""
++    require_pristine(source)
++    return replace_once(
++        source,
++        "  void async_stop() {",
++        """  void async_hs274_capture(nlohmann::json capture,
++                           std::function<void(const asio::error_code&)> completion) const {
++    enqueue_to_dispatcher([this, capture = std::move(capture), completion = std::move(completion)] {
++      async_request(nlohmann::json{
++          {"operation_type", operation_type::hs274_capture},
++          {"capture", capture},
++      }, completion);
++    });
++  }
++
++  void async_stop() {""",
++    )
++
++
++def stream_cli(source):
++    """Expose a dedicated mode whose output runs outside the IPC dispatcher."""
++    require_pristine(source)
++    source = replace_once(
++        source,
++        '#include "watch_multitouch_extension_variables.hpp"',
++        '#include "watch_multitouch_extension_variables.hpp"\n#include "hs274-stream-cli.hpp"\n#include "hs274-stream-clock.hpp"',
++    )
++    source = replace_once(
++        source,
++        '  options.add_options()("select-profile",',
++        '  options.add_options()("hs274-clock", "Describe the physical timestamp timebase");\n\n'
++        '  options.add_options()("hs274-capture",\n'
++        '                        "Observe the experimental physical fixture stream",\n'
++        '                        cxxopts::value<int>(), "polling-interval-in-milliseconds");\n\n'
++        '  options.add_options()("select-profile",',
++    )
++    return replace_once(
++        source,
++        '    bool silent = parse_result["silent"].as<bool>();',
++        '    bool silent = parse_result["silent"].as<bool>();\n\n'
++        '    if (parse_result.count("hs274-clock")) {\n'
++        "      try {\n"
++        "        std::cout << hs274_clock::information().dump() << std::endl;\n"
++        "      } catch (const std::exception& error) {\n"
++        "        std::cerr << error.what() << std::endl;\n"
++        "        exit_code = 1;\n"
++        "      }\n"
++        "      goto finish;\n"
++        "    }\n\n"
++        '    if (parse_result.count("hs274-capture")) {\n'
++        '      exit_code = krbn::cli::hs274_capture::run(parse_result["hs274-capture"].as<int>());\n'
++        "      goto finish;\n"
++        "    }",
++    )

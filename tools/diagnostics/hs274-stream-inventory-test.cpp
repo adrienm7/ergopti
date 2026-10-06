@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
     if (variant != 0) incomplete.append(key(44));
     require(!incomplete.finish(variant != 1, variant == 2));
   }
-  for (const auto page : {0u, 12u, 0xff01u}) {
+  for (const auto page : {0u, 8u, 0xffffu}) {
     inventory invalid;
     auto sample = key(44);
     sample.page = page;

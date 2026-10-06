@@ -93,13 +93,15 @@ public:
     if (current && input.has_page && input.page != static_cast<std::int32_t>(current->page)) {
       return fail(fault::element_identity);
     }
-    if (!input.has_page || input.page != 7) return action::auxiliary;
+    if (!input.has_page || !hs274_key_policy::is_button_page(static_cast<std::uint32_t>(input.page)))
+      return action::auxiliary;
     if (!input.has_usage) return fail(fault::element_identity);
     if (input.usage == 0 || input.usage == -1) return action::auxiliary;
-    if (!input.has_cookie || input.usage < 1 || input.usage > 255) return fail(fault::element_identity);
+    const auto maximum = input.page == 7 ? 255 : 65535;
+    if (!input.has_cookie || input.usage < 1 || input.usage > maximum) return fail(fault::element_identity);
     if (!current || current->usage != static_cast<std::uint32_t>(input.usage)) return fail(fault::element_identity);
     if (input.value != 0 && input.value != 1) return fail(fault::value);
-    if (input.usage <= 3 && input.value != 0) return fail(fault::hid_error);
+    if (input.page == 7 && input.usage <= 3 && input.value != 0) return fail(fault::hid_error);
     const bool pressed = input.value == 1;
     if ((current->seen && (input.timestamp < current->last_at ||
          (input.timestamp == current->last_at && pressed != current->last_down))) ||

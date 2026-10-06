@@ -3,6 +3,7 @@
 #pragma once
 
 #include "hs274-stream-inventory.hpp"
+#include "hs274-stream-native-fault.hpp"
 #include <IOKit/hid/IOHIDLib.h>
 #include <mach/mach_time.h>
 #include <nlohmann/json.hpp>
@@ -58,7 +59,7 @@ inline inventory_observation capture_inventory(IOHIDDeviceRef device, std::uint6
       auto element = static_cast<IOHIDElementRef>(const_cast<void*>(CFArrayGetValueAtIndex(elements.value, i)));
       const auto page = IOHIDElementGetUsagePage(element), usage = IOHIDElementGetUsage(element);
       const auto type = IOHIDElementGetType(element);
-      if (page != 7 || usage == 0 || usage == UINT32_MAX ||
+      if (!hs274_key_policy::is_button_page(page) || usage == 0 || usage == UINT32_MAX ||
           type < kIOHIDElementTypeInput_Misc || type > kIOHIDElementTypeInput_ScanCodes) continue;
       if (inventory.full()) { result["exhausted"] = true; break; }
       const auto cookie = static_cast<std::uint32_t>(IOHIDElementGetCookie(element));
@@ -75,7 +76,7 @@ inline inventory_observation capture_inventory(IOHIDDeviceRef device, std::uint6
           std::stoull(sample.at("started").get<std::string>()), std::stoull(sample.at("finished").get<std::string>())};
       inventory.append(initial);
       observation.samples.push_back(initial);
-      result["elements"].push_back({{"usage", usage}, {"cookie", cookie}, {"sample", sample},
+      result["elements"].push_back({{"page", page}, {"usage", usage}, {"cookie", cookie}, {"sample", sample},
           {"relative", descriptor.relative}, {"array", descriptor.array}, {"bits", descriptor.bits},
           {"count", descriptor.count}, {"minimum", descriptor.minimum}, {"maximum", descriptor.maximum}});
     }
@@ -83,7 +84,7 @@ inline inventory_observation capture_inventory(IOHIDDeviceRef device, std::uint6
   result["readable"] = inventory.finish(result.at("enumerated").get<bool>(), result.at("exhausted").get<bool>());
   const auto encoded = result.dump();
   if (std::fprintf(stderr, "HS274_KEY_INVENTORY %s\n", encoded.c_str()) < 0 || std::fflush(stderr) != 0) {
-    throw std::runtime_error("Could not retain the native keyboard inventory receipt");
+    throw hs274_stream_protocol::native_acquisition_error(hs274_stream_protocol::native_fault::inventory_receipt_write_failed);
   }
   observation.enumerated = result.at("enumerated").get<bool>();
   observation.exhausted = result.at("exhausted").get<bool>();
@@ -116,7 +117,7 @@ inline void capture(IOHIDDeviceRef device, std::uint64_t identity) {
   }
   const auto encoded = result.dump();
   if (std::fprintf(stderr, "HS274_BASELINE_PROBE %s\n", encoded.c_str()) < 0 || std::fflush(stderr) != 0) {
-    throw std::runtime_error("Could not retain the native baseline probe receipt");
+    throw hs274_stream_protocol::native_acquisition_error(hs274_stream_protocol::native_fault::reference_receipt_write_failed);
   }
 }
 } // namespace hs274_baseline_probe
