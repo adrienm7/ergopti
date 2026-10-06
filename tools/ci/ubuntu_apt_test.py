@@ -110,6 +110,94 @@ def origin_ports(model):
         yield model
 
 
+class PrivateAuthorityMetadata:
+    """Record the privileged owner while retaining actual file type and mode."""
+
+    def __init__(self, native, uid):
+        self.native = native
+        self.st_uid = uid
+
+    def __getattr__(self, name):
+        return getattr(self.native, name)
+
+
+@contextmanager
+def private_owner_ports(uid=0):
+    """Model only privileged UID for exact fixture-created private authorities.
+
+    File bytes, native kinds/modes and source/mirror ownership remain real. These
+    constructed ports are not proof of privileged creation or native APT.
+    """
+    native_temporary = owner.tempfile.TemporaryDirectory
+    native_open, native_lstat, native_fstat = Path.open, Path.lstat, owner.os.fstat
+    roots, files, created = {}, {}, []
+    private_names = {"ubuntu-archive-keyring.gpg", "apt-mirrors.txt", "ubuntu.sources"}
+
+    def identity(metadata):
+        return metadata.st_dev, metadata.st_ino, metadata.st_uid
+
+    def current_root(path):
+        expected = roots.get(path)
+        if expected is None:
+            return False
+        actual = native_lstat(path)
+        return stat.S_ISDIR(actual.st_mode) and identity(actual) == expected
+
+    def temporary(*args, **kwargs):
+        acquired = native_temporary(*args, **kwargs)
+        if kwargs.get("prefix") == "ergopti-ubuntu-apt-":
+            path = Path(acquired.name)
+            metadata = native_lstat(path)
+            native_uid = getattr(owner.os, "getuid", lambda: metadata.st_uid)()
+            if stat.S_ISDIR(metadata.st_mode) and metadata.st_uid == native_uid:
+                roots[path] = identity(metadata)
+                created.append(path)
+        return acquired
+
+    def open_private(path, mode="r", *args, **kwargs):
+        stream = native_open(path, mode, *args, **kwargs)
+        try:
+            if mode == "xb" and path.name in private_names and current_root(path.parent):
+                metadata = native_fstat(stream.fileno())
+                observed = native_lstat(path)
+                if (
+                    stat.S_ISREG(metadata.st_mode)
+                    and identity(metadata) == identity(observed)
+                    and metadata.st_uid == roots[path.parent][2]
+                ):
+                    files[path] = identity(metadata)
+        except BaseException:
+            stream.close()
+            raise
+        return stream
+
+    def lstat_private(path):
+        metadata = native_lstat(path)
+        owned_directory = path in roots and current_root(path)
+        owned_file = (
+            path in files
+            and current_root(path.parent)
+            and stat.S_ISREG(metadata.st_mode)
+            and identity(metadata) == files[path]
+        )
+        if owned_directory or owned_file:
+            return PrivateAuthorityMetadata(metadata, uid)
+        return metadata
+
+    with (
+        patch.object(owner.tempfile, "TemporaryDirectory", temporary),
+        patch.object(Path, "open", open_private),
+        patch.object(Path, "lstat", lstat_private),
+    ):
+        yield created
+
+
+def acquire_as_root(*args, **kwargs):
+    """Run the real acquisition body with an explicit private root-owner port."""
+    with private_owner_ports():
+        return owner.acquire(*args, **kwargs)
+
+
 class UbuntuArchiveControls(unittest.TestCase):
     def test_both_archive_and_security_stanzas_keep_their_original_signed_source_bytes(self):
         raw = VALID.replace(b"noble noble-updates", b"noble noble-updates noble-backports")
@@ -180,7 +268,7 @@ class UbuntuArchiveControls(unittest.TestCase):
             roots.append(root)
             calls.append(argv)
 
-        owner.acquire(
+        acquire_as_root(
             VALID,
             ["-y", "--no-install-recommends", "luajit", "./owned.deb"],
             execute,
@@ -213,7 +301,9 @@ class UbuntuArchiveControls(unittest.TestCase):
             VALID.replace(b"Types: deb", b"Types: deb\nTypes: deb"),
         ):
             with self.subTest(raw=raw), self.assertRaises(ValueError):
-                owner.acquire(raw, ["luajit"], lambda *a, **k: self.fail("Refused source executed"))
+                acquire_as_root(
+                    raw, ["luajit"], lambda *a, **k: self.fail("Refused source executed")
+                )
 
     def test_package_arguments_cannot_override_scoped_archive_or_signature_policy(self):
         for arguments in (
@@ -224,7 +314,7 @@ class UbuntuArchiveControls(unittest.TestCase):
             ["luajit\x00"],
         ):
             with self.subTest(arguments=arguments), self.assertRaises(ValueError):
-                owner.acquire(
+                acquire_as_root(
                     VALID, arguments, lambda *a, **k: self.fail("Refused policy executed")
                 )
 
@@ -243,7 +333,7 @@ class UbuntuArchiveControls(unittest.TestCase):
             raise failure
 
         with self.assertRaises(subprocess.CalledProcessError) as observed:
-            owner.acquire(VALID, ["luajit"], execute, keyring=CANONICAL)
+            acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL)
         self.assertIs(observed.exception, failure)
         self.assertEqual(len(calls), 1)
         self.assertFalse(roots[0].exists())
@@ -258,7 +348,7 @@ class UbuntuArchiveControls(unittest.TestCase):
                 raise failure
 
         with self.assertRaises(subprocess.CalledProcessError) as observed:
-            owner.acquire(VALID, ["luajit"], execute, keyring=CANONICAL)
+            acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL)
         self.assertIs(observed.exception, failure)
         self.assertEqual(len(calls), 2)
 
@@ -298,7 +388,7 @@ class PinnedUbuntuAuthorityControls(unittest.TestCase):
             patch.object(owner.subprocess, "run") as execute,
         ):
             with self.assertRaisesRegex(ValueError, "Pinned Ubuntu keyring bytes refused"):
-                owner.acquire(VALID, ["luajit"], execute, keyring=corrupted)
+                acquire_as_root(VALID, ["luajit"], execute, keyring=corrupted)
         namespace.assert_not_called()
         execute.assert_not_called()
 
@@ -331,7 +421,7 @@ class PinnedUbuntuAuthorityControls(unittest.TestCase):
             self.assertIn("Dir::Etc::SourceParts=-", argv)
             calls.append(argv)
 
-        owner.acquire(raw, ["-y", "luajit"], execute, keyring=CANONICAL, mirrors=MIRRORS)
+        acquire_as_root(raw, ["-y", "luajit"], execute, keyring=CANONICAL, mirrors=MIRRORS)
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0][:-1], calls[1][:-3])
         self.assertFalse(roots[0].exists())
@@ -357,7 +447,7 @@ class PinnedUbuntuAuthorityControls(unittest.TestCase):
                 ) as namespace,
             ):
                 with self.assertRaises(ValueError):
-                    owner.acquire(
+                    acquire_as_root(
                         raw,
                         ["luajit"],
                         lambda *a, **k: self.fail("Refused mirror executed"),
@@ -394,7 +484,7 @@ class PinnedUbuntuAuthorityControls(unittest.TestCase):
                 )
                 with fault, patch.object(owner.subprocess, "run") as execute:
                     with self.assertRaises(OSError if mode == "after-write" else RuntimeError):
-                        owner.acquire(VALID, ["luajit"], execute, keyring=CANONICAL)
+                        acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL)
                 execute.assert_not_called()
                 self.assertEqual(len(acquired), 1)
                 self.assertFalse(acquired[0].exists())
@@ -649,7 +739,7 @@ class ActiveOriginAndCleanupControls(unittest.TestCase):
             roots.append(directory)
             calls.append(argv)
 
-        owner.acquire(raw, ["luajit"], execute, keyring=CANONICAL)
+        acquire_as_root(raw, ["luajit"], execute, keyring=CANONICAL)
         self.assertEqual(len(calls), 2)
         self.assertFalse(roots[0].exists())
 
@@ -708,7 +798,7 @@ class ActiveOriginAndCleanupControls(unittest.TestCase):
                 else type(primary)
             )
             with self.assertRaises(expected) as caught:
-                owner.acquire(VALID, ["luajit"], execute, keyring=CANONICAL)
+                acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL)
         self.assertEqual(len(roots), 1)
         self.assertFalse(roots[0].exists())
         return primary, caught.exception
@@ -725,6 +815,160 @@ class ActiveOriginAndCleanupControls(unittest.TestCase):
             with self.subTest(kind=type(cancellation).__name__):
                 _, observed = self.cleanup_report_case(cancellation)
                 self.assertIs(observed, cancellation)
+
+
+class PrivateOwnerPortControls(unittest.TestCase):
+    def test_nonroot_runner_ownership_is_modeled_only_inside_the_exact_fixture(self):
+        native_lstat, native_fstat = Path.lstat, owner.os.fstat
+
+        def runner_fstat(descriptor):
+            return PrivateAuthorityMetadata(native_fstat(descriptor), 1001)
+
+        def runner_metadata(path, *args, **kwargs):
+            return PrivateAuthorityMetadata(native_lstat(path, *args, **kwargs), 1001)
+
+        with owner.tempfile.TemporaryDirectory(prefix="unowned-archive-control-") as sibling:
+            foreign = Path(sibling) / "foreign-keyring.gpg"
+            foreign.write_bytes(CANONICAL)
+            foreign.chmod(0o444)
+            with (
+                patch.object(Path, "lstat", runner_metadata),
+                patch.object(owner.os, "fstat", runner_fstat),
+                patch.object(owner.os, "getuid", return_value=1001, create=True),
+                private_owner_ports() as roots,
+            ):
+                with owner.tempfile.TemporaryDirectory(prefix="ergopti-ubuntu-apt-") as admitted:
+                    directory = Path(admitted)
+                    keyring = directory / "ubuntu-archive-keyring.gpg"
+                    with keyring.open("xb") as stream:
+                        if stream.write(CANONICAL) != len(CANONICAL):
+                            raise AssertionError("Constructed private keyring write refused")
+                    keyring.chmod(0o444)
+                    directory.chmod(0o555)
+                    self.assertEqual(roots, [directory])
+                    self.assertEqual(keyring.lstat().st_uid, 0)
+                    self.assertEqual(keyring.lstat().st_mode, native_lstat(keyring).st_mode)
+                    owner.require_owned(keyring.lstat(), "private-keyring")
+                    owner.require_owned(directory.lstat(), "private-namespace", directory=True)
+                    self.assertEqual(foreign.lstat().st_uid, 1001)
+                    with self.assertRaisesRegex(RuntimeError, '"uid": 1001'):
+                        owner.require_owned(foreign.lstat(), "private-keyring")
+                    keyring.chmod(0o666)
+                    with self.assertRaisesRegex(RuntimeError, "ownership refused"):
+                        owner.require_owned(keyring.lstat(), "private-keyring")
+                    with self.assertRaisesRegex(RuntimeError, "ownership refused"):
+                        owner.require_owned(directory.lstat(), "private-keyring")
+
+    def test_unowned_private_authority_still_refuses_before_dispatch_and_is_retired(self):
+        with private_owner_ports(uid=1001) as roots:
+            with self.assertRaisesRegex(RuntimeError, '"uid": 1001'):
+                owner.acquire(
+                    VALID,
+                    ["luajit"],
+                    lambda *a, **k: self.fail("Unowned private authority reached APT"),
+                    keyring=CANONICAL,
+                )
+        self.assertEqual(len(roots), 1)
+        self.assertFalse(roots[0].exists())
+
+    def test_private_owner_identity_does_not_promote_foreign_or_replaced_authorities(self):
+        native_temporary = owner.tempfile.TemporaryDirectory
+        native_lstat, native_fstat = Path.lstat, owner.os.fstat
+        observations = {}
+
+        def facts(metadata, **changes):
+            result = {
+                name: getattr(metadata, name) for name in dir(metadata) if name.startswith("st_")
+            }
+            result.update(changes)
+            return SimpleNamespace(**result)
+
+        def observed_lstat(path):
+            return facts(native_lstat(path), **{"st_uid": 1001, **observations.get(path, {})})
+
+        def observed_fstat(descriptor):
+            return facts(native_fstat(descriptor), st_uid=1001)
+
+        with native_temporary(prefix="foreign-archive-control-") as sibling:
+            sibling = Path(sibling)
+            foreign = sibling / "ubuntu-archive-keyring.gpg"
+            foreign.write_bytes(b"foreign original")
+            foreign.chmod(0o444)
+            with (
+                patch.object(Path, "lstat", observed_lstat),
+                patch.object(owner.os, "fstat", observed_fstat),
+                patch.object(owner.os, "getuid", return_value=1001, create=True),
+                private_owner_ports() as roots,
+            ):
+                with owner.tempfile.TemporaryDirectory(prefix="ergopti-ubuntu-apt-") as name:
+                    root = Path(name)
+                    root.chmod(0o755)
+                    self.assertEqual(roots, [root])
+                    self.assertEqual(root.lstat().st_uid, 0)
+                    self.assertEqual(foreign.lstat().st_uid, 1001)
+                    with self.assertRaises(RuntimeError):
+                        owner.require_owned(foreign.lstat(), "private-keyring")
+                    # Neither a source-shaped child nor a private-named non-exclusive write is owned.
+                    for leaf in ("source-control", "ubuntu.sources", "apt-mirrors.txt"):
+                        with self.subTest(kind="foreign-child", leaf=leaf):
+                            path = root / leaf
+                            path.write_bytes(b"foreign child")
+                            path.chmod(0o444)
+                            self.assertEqual(path.lstat().st_uid, 1001)
+                            with self.assertRaises(RuntimeError):
+                                owner.require_owned(path.lstat(), "private-source")
+                    keyring = root / "ubuntu-archive-keyring.gpg"
+                    with keyring.open("xb") as stream:
+                        stream.write(b"owned exclusive bytes")
+                    keyring.chmod(0o444)
+                    self.assertEqual(keyring.lstat().st_uid, 0)
+                    owner.require_owned(keyring.lstat(), "private-keyring")
+                    # Type and UID observations change without changing dev/ino.
+                    for changes in (
+                        {"st_mode": stat.S_IFLNK | 0o777},
+                        {"st_mode": stat.S_IFDIR | 0o555},
+                        {"st_uid": 1002},
+                    ):
+                        with self.subTest(kind="file-observation", changes=changes):
+                            observations[keyring] = changes
+                            self.assertEqual(keyring.lstat().st_uid, changes.get("st_uid", 1001))
+                            with self.assertRaises(RuntimeError):
+                                owner.require_owned(keyring.lstat(), "private-keyring")
+                    observations.clear()
+                    keyring.chmod(0o644)
+                    keyring.rename(root / "retained-keyring")
+                    keyring.write_bytes(b"foreign replacement")
+                    keyring.chmod(0o444)
+                    with self.subTest(kind="replaced-file"):
+                        self.assertEqual(keyring.lstat().st_uid, 1001)
+                        with self.assertRaises(RuntimeError):
+                            owner.require_owned(keyring.lstat(), "private-keyring")
+                    for changes in (
+                        {"st_mode": stat.S_IFREG | 0o444},
+                        {"st_mode": stat.S_IFLNK | 0o777},
+                        {"st_uid": 1002},
+                    ):
+                        with self.subTest(kind="root-observation", changes=changes):
+                            observations[root] = changes
+                            self.assertEqual(root.lstat().st_uid, changes.get("st_uid", 1001))
+                            with self.assertRaises(RuntimeError):
+                                owner.require_owned(
+                                    root.lstat(), "private-namespace", directory=True
+                                )
+                    observations.clear()
+                    root.rename(sibling / "retained-namespace")
+                    root.mkdir(mode=0o755)
+                    replacement = root / "ubuntu-archive-keyring.gpg"
+                    with replacement.open("xb") as stream:
+                        stream.write(b"foreign namespace replacement")
+                    replacement.chmod(0o444)
+                    with self.subTest(kind="replaced-root"):
+                        self.assertEqual(root.lstat().st_uid, 1001)
+                        self.assertEqual(replacement.lstat().st_uid, 1001)
+                        with self.assertRaises(RuntimeError):
+                            owner.require_owned(root.lstat(), "private-namespace", directory=True)
+                        with self.assertRaises(RuntimeError):
+                            owner.require_owned(replacement.lstat(), "private-keyring")
 
 
 if __name__ == "__main__":
