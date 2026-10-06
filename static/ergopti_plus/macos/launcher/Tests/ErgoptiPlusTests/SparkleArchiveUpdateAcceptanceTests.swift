@@ -1028,7 +1028,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let signature = String(fragment[try XCTUnwrap(Range(match.range(at: 1), in: fragment))])
 		let signatureBytes = try XCTUnwrap(Data(base64Encoded: signature))
 		XCTAssertEqual(Int(fragment[try XCTUnwrap(Range(match.range(at: 2), in: fragment))]), payload.count)
+		XCTAssertEqual(signatureBytes.count, 64, "The official installed signature has the exact Ed25519 length")
 		XCTAssertTrue(key.publicKey.isValidSignature(signatureBytes, for: payload), "The native signer and independent Ed25519 public key must agree")
+		XCTAssertFalse(foreignKey.publicKey.isValidSignature(signatureBytes, for: payload), "The foreign public key must refuse the actual installed-key signature")
 		let independentInstalledSignature = try? key.signature(for: payload)
 		let installedSignatureEqual = independentInstalledSignature.map { $0 == signatureBytes }
 		print("::notice title=Native Sparkle signature::" + signatureProbeMessage(.installedKey,
@@ -1065,7 +1067,14 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		XCTAssertTrue(officialForeignValid, "The independent foreign public key must validate the actual official signature")
 		XCTAssertFalse(officialInstalledValid, "The installed public key must refuse the actual official foreign signature")
 		XCTAssertTrue(foreignPayloadEqual, "The foreign signer must consume the same private archive bytes")
-		XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")
+		// Official and CryptoKit signatures can differ while independently authenticating the same bytes.
+		guard !copiedForeignPayload.isEmpty else { throw Failure.evidence("signature-payload-empty") }
+		var alteredPayload = copiedForeignPayload
+		alteredPayload[alteredPayload.startIndex] ^= 0x01
+		XCTAssertEqual(alteredPayload.count, payload.count, "The counterfactual changes content without changing archive length")
+		XCTAssertTrue(!foreignKey.publicKey.isValidSignature(officialForeignSignature, for: alteredPayload)
+			&& !key.publicKey.isValidSignature(signatureBytes, for: alteredPayload),
+			"Both official signatures must refuse a one-byte change to the independently authenticated archive")
 		XCTAssertEqual(Int(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 2), in: foreignFragment))]), payload.count)
 		try payload.write(to: www.appendingPathComponent("archive.tar.xz"), options: .withoutOverwriting)
 		let refusedFeed = try generatedFeed(foreignArchives, destination: www.appendingPathComponent("feed.xml"), root: root, identity: identity)
