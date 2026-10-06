@@ -215,7 +215,53 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 ConfigScopePreserveObsoleteSource(Source, Updates) {
 	if !(Source is String) || !(Updates is Array)
 		throw TypeError("Scoped source preparation requires an exact image and operation array.")
+	Obsolete := ConfigObsoleteSourceEntries(Source)
+	return ConfigObsoleteParentsPreserve(ConfigObsoleteSourceOperations(Updates), Obsolete)
+}
+
+; Whole-state producers intentionally repeat some paths: feature values precede
+; their dedicated runtime owners. Preserve that ordered contract, while checking
+; every occurrence against the same exact obsolete source. A later neutral row
+; cannot erase the refusal owed by an earlier nonneutral collision.
+ConfigFullSnapshotPreserveObsoleteSource(Obsolete, Updates) {
+	if !(Obsolete is Array) || !(Updates is Array)
+		throw TypeError("Full snapshot preparation requires captured obsolete paths and operation arrays.")
+	Rows := []
+	for Operation in ConfigObsoleteSourceOperations(Updates) {
+		for Row in ConfigObsoleteParentsPreserve([Operation], Obsolete)
+			Rows.Push(Row)
+	}
+	return Rows
+}
+
+; Native metadata admission is shared by scoped and full-state source owners.
+; It never reads a boot warning cache or grants unknown roots cleanup ownership.
+ConfigObsoleteSourceEntries(Source) {
+	return ConfigObsoleteSnapshotEntries(ConfigTomlDecodeSnapshot(Source))
+}
+
+; Capture full-state source admission before the collector can invoke callbacks.
+; Present stamps must already be current: ordinary snapshots do not perform
+; migrations or repair invalid/newer versions. Genuinely unstamped images keep
+; their existing first-save contract; the captured writer still fences absence.
+ConfigFullSnapshotCaptureObsoleteSource(Source) {
+	if !(Source is String)
+		throw TypeError("Full snapshot admission requires an exact source image.")
 	Snapshot := ConfigTomlDecodeSnapshot(Source)
+	if Snapshot.Document.Has("_meta") {
+		Meta := Snapshot.Document["_meta"]
+		if !(Meta is Map)
+			throw TypeError("The full configuration schema metadata is not a table.")
+		if Meta.Has("schema_version") {
+			Outcome := ConfigMigrateClassify(Snapshot.Document, ConfigMigrateShippedRegistry(), &Version)
+			if Outcome != "current"
+				throw Error("The full configuration schema stamp is not current: " . Outcome)
+		}
+	}
+	return ConfigObsoleteSnapshotEntries(Snapshot)
+}
+
+ConfigObsoleteSnapshotEntries(Snapshot) {
 	Seed := ManifestBuildFeaturesMap()
 	Obsolete := []
 	Classify(Parts, Typed, Raw) {
@@ -246,6 +292,11 @@ ConfigScopePreserveObsoleteSource(Source, Updates) {
 	}
 	for Row in Snapshot.Rows
 		Classify(_TOML_ConfigPath(Row.Section, Row.Key), Row.Typed, Row.ChildRaw is Map ? Row.ChildRaw : Row.Raw)
+	return Obsolete
+}
+
+; Prepare native semantic paths and neutrality without changing caller records.
+ConfigObsoleteSourceOperations(Updates) {
 	Operations := []
 	loop Updates.Length {
 		if !Updates.Has(A_Index) || !IsObject(Updates[A_Index])
@@ -254,7 +305,7 @@ ConfigScopePreserveObsoleteSource(Source, Updates) {
 		Operations.Push({ parts: _TOML_ConfigPath(Update.Section, Update.Key),
 			neutral: _ConfigUpdateIsNeutral(Update), row: Update })
 	}
-	return ConfigObsoleteParentsPreserve(Operations, Obsolete)
+	return Operations
 }
 
 ; The existing action owner validates grammar and catalogue parameter capability.

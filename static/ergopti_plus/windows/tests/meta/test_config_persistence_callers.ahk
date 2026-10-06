@@ -144,13 +144,13 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 		Assert(_CPC_LineConsumesResult(Lines, Index),
 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
 	}
-	; Historical 29 public calls map to 27 unchanged consumption sites, plus
-	; SaveFullConfig's semantic public gateway and cleanup's exact-source private
-	; gateway. The expanded 28 public + 9 internal inventory is 37. Build-mode
-	; results are qualified maps; write-mode results are native Boolean ACKs.
-	; Every private result is also checked by the independent 9-call guard below and captured scope-build audit.
-	; The exact 29 -> 27 mapping was audited against parent 681cbaf41^: only the
-	; two migrated gateways left the old regex, and no caller disappeared.
+	; The complete parent inventory is 37: 28 public and 9 internal calls.
+	; SaveFullConfig now consumes its retained-source private writer result;
+	; that same production site moves to 27 public + 10 internal calls, still 37.
+	; Build-mode results are qualified maps; write-mode results are native ACKs.
+	; The independent private-call guard and full-snapshot source audit below
+	; retain the exact source/presence and strict Integer-1 receipt boundaries.
+	; No production caller disappears when this source-bound gateway moves.
 	AssertEqual(37, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
@@ -217,7 +217,7 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; cleanup add three consumers, independently audited in the semantic cohort.
 	; Scoped build admission adds one qualified-map consumer, audited separately
 	; against its captured source, finalizer and status-before-target chain.
-	AssertEqual(9, Calls, "audit every internal publisher before changing its complete inventory")
+	AssertEqual(10, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
@@ -536,6 +536,7 @@ _CPC_SemanticCallerInventoryAndRootReceiptMutations() {
 		Lines := StrSplit(Body, "`n", "`r")
 		for Index, Line in Lines {
 			if !InStr(Line, "Written := TOML_ConfigBatchWrite(")
+					&& !InStr(Line, "Written := _TOML_BatchWriteImpl(")
 					&& !InStr(Line, "return _TOML_BatchWriteImpl(")
 				continue
 			Calls += 1
@@ -657,3 +658,84 @@ _CPC_ScopeBuildRejectsQuotedSourceAuthority() {
 }
 Test("AHK-15-persistence: copied quoted and commented scope calls cannot certify publication authority",
 	_CPC_ScopeBuildRejectsQuotedSourceAuthority)
+
+; A full-snapshot gateway may filter only actual neutral source collisions; its
+; admitted source/presence must remain the writer's publication precondition.
+_CPC_FullSnapshotSourceChain(Body) {
+	Patterns := [
+		'm)^[ \t]*SourceImage := 0',
+		'm)^[ \t]*if !HasMethod\(WriterFn, "Call"\) \{',
+		'm)^[ \t]*SourceImage := TOML_BuildConfigUpdatedContent\(BoundPath, \[\]\)',
+		'm)^[ \t]*if !\(SourceImage is Map\) \|\| SourceImage\.Get\("status", ""\) != "ok"[ \t]*\n[ \t]*\|\| SourceImage\.Get\("kind", ""\) != "rendered"',
+		'm)^[ \t]*ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource\(SourceImage\["source_content"\]\)',
+		'm)^[ \t]*Updates := HasMethod\(CollectFn, "Call"\)[ \t]*\n[ \t]*\? CollectFn\.Call\(\)',
+		'm)^[ \t]*Updates := _ConfigKeepOutdatedEntries\(Updates\)',
+		'm)^[ \t]*if SourceImage is Map[ \t]*\n[ \t]*Updates := ConfigFullSnapshotPreserveObsoleteSource\(ObsoleteSource, Updates\)',
+		'm)^[ \t]*Updates := _ConfigPrepareTypedUpdates\(Updates\)',
+		'm)^[ \t]*if HasMethod\(WriterFn, "Call"\)[ \t]*\n[ \t]*Written := WriterFn\.Call\(BoundPath, Updates\)',
+		'm)^[ \t]*Written := _TOML_BatchWriteImpl\(BoundPath, Updates, \[\], "write",[ \t]*\n[ \t]*SourceImage\["source_content"\], SourceImage\["source_present"\], true\)',
+		'm)^[ \t]*if \(\(Written is Integer\) && Written == 1\)',
+		'm)^[ \t]*_ConfigFullSaveAcknowledge\(TargetGeneration\)'
+	]
+	Tokens := ["SourceImage", "if", "SourceImage", "if", "ObsoleteSource", "Updates", "Updates", "if", "Updates", "if", "Written", "if", "_ConfigFullSaveAcknowledge"]
+	Code := _DriverMaskNonCode(&Body)
+	Cursor := 1
+	for Index, Pattern in Patterns {
+		Position := RegExMatch(Body, Pattern, &Matched, Cursor)
+		if !Position
+			return false
+		Offset := InStr(Matched[0], Tokens[Index], true)
+		if !Offset || SubStr(Code, Position + Offset - 1, StrLen(Tokens[Index])) != Tokens[Index]
+			return false
+		Cursor := Position + 1
+	}
+	return _CPC_CountOccurrences(Code, "_TOML_BatchWriteImpl(") == 1
+}
+
+_CPC_FullSnapshotRetainsSourcePolicyAndStrictAck() {
+	Full := _StripFullLineComments(_DriverFuncBody("SaveFullConfig"))
+	Policy := _StripFullLineComments(_DriverFuncBody("ConfigFullSnapshotPreserveObsoleteSource"))
+	Scope := _StripFullLineComments(_DriverFuncBody("ConfigScopePreserveObsoleteSource"))
+	Assert(Full != "" && Policy != "" && Scope != "", "the real full-state and scope source owners must exist")
+	Assert(_CPC_FullSnapshotSourceChain(Full), "current source admission, neutral filtering, exact-source publication and strict generation ACK remain one native chain")
+	Assert(InStr(Policy, "for Operation in ConfigObsoleteSourceOperations(Updates)") > 0
+		&& InStr(Policy, "ConfigObsoleteParentsPreserve([Operation], Obsolete)") > 0,
+		"every ordered snapshot occurrence uses the same unchanged shared policy and obsolete source")
+	Assert(InStr(Scope, "ConfigObsoleteParentsPreserve(ConfigObsoleteSourceOperations(Updates), Obsolete)") > 0,
+		"ordinary scope duplicate refusal remains the complete-batch shared contract")
+	Capture := _StripFullLineComments(_DriverFuncBody("ConfigFullSnapshotCaptureObsoleteSource"))
+	Classifier := _StripFullLineComments(_DriverFuncBody("ConfigObsoleteSnapshotEntries"))
+	Assert(Capture != "" && Classifier != "", "current typed source admission and native classification owners must exist")
+	AssertEqual(1, _CPC_CountOccurrences(Capture, "ConfigTomlDecodeSnapshot(Source)"), "fresh full-state admission decodes its captured source once")
+	Assert(InStr(Capture, "ConfigMigrateClassify(Snapshot.Document, ConfigMigrateShippedRegistry(), &Version)") > 0
+		&& InStr(Capture, 'if Outcome != "current"') > 0
+		&& InStr(Capture, "return ConfigObsoleteSnapshotEntries(Snapshot)") > 0,
+		"the typed semantic schema owner and obsolete classifier share the exact admitted generation")
+	Assert(InStr(Classifier, "TomlConfigOutdatedReason(") > 0 && InStr(Classifier, "for Row in Snapshot.Rows") > 0,
+		"native published metadata, rather than a boot warning cache, classifies the actual source rows")
+
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full,
+		'SourceImage["source_content"], SourceImage["source_present"], true)',
+		'SourceImage["content"], SourceImage["source_present"], true)')), "rendered candidate bytes cannot replace captured source authority")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full,
+		'Written := _TOML_BatchWriteImpl(BoundPath, Updates, [], "write",',
+		'TOML_ConfigBatchWrite(BoundPath, Updates)')), "rereading a later source cannot replace the admitted generation")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full,
+		"if ((Written is Integer) && Written == 1)", "if Written")), "truthy malformed writer receipts never authorize acknowledgment")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full,
+		"Updates := ConfigFullSnapshotPreserveObsoleteSource(", "Updates := IgnoreObsoleteSource(")), "missing neutral preservation invalidates the full-snapshot owner")
+	Call := 'Written := _TOML_BatchWriteImpl(BoundPath, Updates, [], "write",`n'
+		. '`t`t`t`t`t`tSourceImage["source_content"], SourceImage["source_present"], true)'
+	Assert(InStr(Full, Call, true) > 0, "the decoy must replace the actual native writer call")
+	Quoted := "AuditText := " . Chr(39) . "`n(`n`t`t" . Call . "`n)" . Chr(39)
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full, Call, Quoted, true)),
+		"a copied writer call in continuation data cannot authorize publication")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full, Call, "/*`n" . Call . "`n*/", true)),
+		"a copied writer call in a block comment cannot authorize publication")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full, "Written := _TOML_BatchWriteImpl(", "UnrelatedWritten := _TOML_BatchWriteImpl(")),
+		"a suffix-sharing output name cannot authorize the actual Written acknowledgment")
+	AssertFalse(_CPC_FullSnapshotSourceChain(StrReplace(Full, "SourceImage := TOML_BuildConfigUpdatedContent(", "UnrelatedSourceImage := TOML_BuildConfigUpdatedContent(")),
+		"a suffix-sharing source variable cannot lend its unrelated capture")
+
+}
+Test("AHK-15-persistence: actual full snapshot retains shared source policy and exact native ACK", _CPC_FullSnapshotRetainsSourcePolicyAndStrictAck)
