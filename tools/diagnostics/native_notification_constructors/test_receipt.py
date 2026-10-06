@@ -239,5 +239,87 @@ class PortableControls(unittest.TestCase):
             acquire.assert_not_called()
 
 
+class BootstrapCallerControls(unittest.TestCase):
+    def test_actual_pinned_inventory_accepts_only_current_verified_source(self):
+        path = Path(__file__).resolve().parents[1] / "native_hs_program_providers/run_native.py"
+        raw = path.read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), run_native.DEPENDENCIES["inventory"])
+        inventory = run_native.pinned_module(path, "inventory")
+        self.assertTrue(callable(inventory.bootstrap_response))
+        with mock.patch.object(Path, "read_bytes", return_value=raw + b"\nforeign = True\n"):
+            with self.assertRaises(ValueError):
+                run_native.pinned_module(path, "inventory")
+
+    def test_actual_archive_scope_logs_closed_failure_then_retains_original_cleanup_policy(self):
+        import contextlib
+        import io
+        import json
+        from urllib.error import HTTPError
+
+        path = Path(__file__).resolve().parents[1] / "native_hs_program_providers/run_native.py"
+        inventory = run_native.pinned_module(path, "inventory")
+        allocation = mock.Mock(
+            side_effect=AssertionError("native acquisition forbidden in portable control")
+        )
+        ownership = SimpleNamespace(NativeProcessGroups=lambda: object(), acquire_owned=allocation)
+        error = HTTPError(
+            "PRIVATE_URL", 503, "PRIVATE_MESSAGE", {"PRIVATE_HEADER": "PRIVATE_BODY"}, None
+        )
+        logged = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "scope"
+            with (
+                mock.patch.object(run_native.sys, "platform", "darwin"),
+                mock.patch.object(run_native.sys, "version_info", (3, 13)),
+                mock.patch.object(
+                    run_native,
+                    "pinned_module",
+                    side_effect=lambda _path, kind: ownership if kind == "ownership" else inventory,
+                ),
+                mock.patch.object(inventory, "source_hashes", return_value={}),
+                mock.patch.object(
+                    inventory,
+                    "trusted_asset",
+                    return_value={"browser_download_url": "PRIVATE_URL", "size": 1024},
+                ),
+                mock.patch.object(inventory, "urlopen", side_effect=error),
+                mock.patch.object(run_native, "urlopen", side_effect=error, create=True),
+                contextlib.redirect_stdout(logged),
+            ):
+                with self.assertRaisesRegex(ValueError, "^native_probe_failed$"):
+                    run_native.main(
+                        [
+                            "--source-root",
+                            directory,
+                            "--source-sha",
+                            SHA,
+                            "--output",
+                            str(output),
+                            "--download",
+                        ]
+                    )
+            failure = json.loads((output / "failure.json").read_text())
+            physical = json.loads((output / "physical-group.json").read_text())
+        self.assertEqual(failure["reason"], "native_probe_failed")
+        self.assertFalse(failure["native_pass"])
+        self.assertTrue(failure["native_processes_retired"])
+        self.assertEqual(physical["capabilities"], [])
+        self.assertTrue(physical["closed"])
+        allocation.assert_not_called()
+        self.assertEqual(
+            json.loads(logged.getvalue()),
+            {
+                "schema": 1,
+                "contract": "macos-native-bootstrap-failure",
+                "phase": "archive_download",
+                "family": "http_error",
+                "http_status": 503,
+                "native_pass": False,
+            },
+        )
+        for secret in ("PRIVATE_URL", "PRIVATE_MESSAGE", "PRIVATE_HEADER", "PRIVATE_BODY"):
+            self.assertNotIn(secret, logged.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
