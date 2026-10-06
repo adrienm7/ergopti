@@ -124,7 +124,7 @@ class MenuStartupCommands {
 			}
 			try LoggerInfo("MenuDispatcher", "Retained startup selection runs after {1} ms.",
 				TickElapsed(Entry.AcceptedAt))
-			MenuCommandRun(Entry.Callback, Entry.Args)
+			MenuCommandRun(Entry.Callback, Entry.Args, 0, 0, 0, Identity)
 		}
 		return true
 	}

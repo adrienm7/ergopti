@@ -177,7 +177,7 @@ _KL_Watchers_CommitIdleClose(Owner) {
 
 ; A short idle ends without ending its session. Retain its first resume time
 ; until publication, including when a later full session close adopts it.
-_KL_Watchers_EndIdle(EndTick, AppendFn := 0) {
+_KL_Watchers_EndIdle(EndTick, AppendFn := 0, PublishGuard := unset) {
 	PreviousCritical := Critical("On")
 	try {
 		if KLWatch.session_close_draining
@@ -189,7 +189,7 @@ _KL_Watchers_EndIdle(EndTick, AppendFn := 0) {
 			KLWatch.idle_close := Map("duration", TickElapsed64(KLWatch.idle_started_at, EndTick))
 		Owner := KLWatch.idle_close
 		return _KL_Watchers_Log(AppendFn, "idle_end", Owner["duration"],
-			_KL_Watchers_CommitIdleClose.Bind(Owner))
+			_KL_Watchers_CommitIdleClose.Bind(Owner), PublishGuard?)
 	} finally KLWatch.session_close_draining := false
 }
 
@@ -205,15 +205,17 @@ _KL_Watchers_CommitSessionEnd() {
 	KLWatch.is_session_active := false
 }
 
-_KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0, FrozenClose := unset) {
+_KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0, PublishGuard := unset, FrozenClose := unset) {
+	if IsSet(PublishGuard) && !PublishGuard.Call()
+		return false
 	if HasMethod(AppendFn, "Call") {
 		if IsSet(DurationMs)
 			return AppendFn.Call(Kind, DurationMs, CommitFn)
 		return AppendFn.Call(Kind, unset, CommitFn)
 	}
 	if IsSet(DurationMs)
-		return KL_LogSession(Kind, DurationMs, CommitFn, FrozenClose?)
-	return KL_LogSession(Kind, unset, CommitFn)
+		return KL_LogSession(Kind, DurationMs, CommitFn, FrozenClose?, PublishGuard?)
+	return KL_LogSession(Kind, unset, CommitFn, FrozenClose?, PublishGuard?)
 }
 
 _KL_Watchers_CommitClose(Owner, Kind) {
@@ -228,7 +230,7 @@ _KL_Watchers_CommitClose(Owner, Kind) {
 
 ; Freeze both durations before the first append. Accepted records leave this
 ; owner in their commit callback, so a partial close cannot restart idle time.
-_KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
+_KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0, PublishGuard := unset) {
 	PreviousCritical := Critical("On")
 	try {
 		if KLWatch.session_close_draining
@@ -260,7 +262,7 @@ _KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
 				FrozenClose := KLSessionClosePublication(Owner.CloseAuthority, Kind)
 				CommitFn := FrozenClose.CommitFn
 			}
-			if !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind], CommitFn, FrozenClose?) {
+			if !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind], CommitFn, PublishGuard?, FrozenClose?) {
 				try LoggerWarn("Keylogger", Format(
 					"Session close '{1}' retained after publication refusal (shutdown={2}, privacy_interrupted={3}).",
 					Kind, Keylogger._shutting_down ? 1 : 0, KLWatch.privacy_interrupted ? 1 : 0))
@@ -281,9 +283,11 @@ _KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
 ; A private key is physical activity, so the hook still advances KLHook.last_tick.
 ; It cannot own session state. The next accepted key closes the previous safe
 ; interval at its last authorized tick and starts a new one at the safe boundary.
-KL_Watchers_OnPrivateKeystroke(Now := unset) {
+KL_Watchers_OnPrivateKeystroke(Now := unset, GuardFn := unset) {
 	PreviousCritical := Critical("On")
 	try {
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
 		if !KLWatch.privacy_interrupted {
 			KLWatch.privacy_interrupted := true
 			KLWatch.privacy_started_at := IsSet(Now) ? Now : A_TickCount
@@ -296,29 +300,41 @@ KL_Watchers_OnPrivateKeystroke(Now := unset) {
 
 ; Preserve the first collection boundary without appending while paused.
 KL_Watchers_OnSuspend() {
+	KL_Hook_InvalidateCapture()
 	KL_Watchers_OnPrivateKeystroke()
 	return KL_Watchers_ResetSystemIntervals()
 }
 
 ; Active session/idle flags follow accepted appends. Authorized activity ticks
 ; and pending transition boundaries survive publication refusal independently.
-KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
+KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset, GuardFn := unset) {
+	if IsSet(GuardFn) && !GuardFn.Call()
+		return false
 	if KLWatch.session_close_draining
 		return false
 	if !Keylogger.initialized && !HasMethod(AppendFn, "Call")
 		return false
 	last := KLWatch.last_authorized_tick
 	now := IsSet(Now) ? Now : A_TickCount
-	if IsObject(KLWatch.session_close) && !_KL_Watchers_CloseSession(0, 0, AppendFn)
+	if IsObject(KLWatch.session_close) && !_KL_Watchers_CloseSession(0, 0, AppendFn, GuardFn?)
 		return false
 
+	if IsSet(GuardFn) && !GuardFn.Call()
+		return false
 	if KLWatch.privacy_interrupted {
 		PrivacyBoundary := KLWatch.privacy_started_at
-		if !_KL_Watchers_CloseSession(PrivacyBoundary, PrivacyBoundary, AppendFn)
+		if !_KL_Watchers_CloseSession(PrivacyBoundary, PrivacyBoundary, AppendFn, GuardFn?)
 			return false
-		KLWatch.privacy_interrupted := false
-		KLWatch.privacy_started_at := 0
-		last := 0
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
+		PrivacyCritical := Critical("On")
+		try {
+			if IsSet(GuardFn) && !GuardFn.Call()
+				return false
+			KLWatch.privacy_interrupted := false
+			KLWatch.privacy_started_at := 0
+			last := 0
+		} finally Critical(PrivacyCritical)
 	}
 
 	; Accepted session ownership also initializes a valid zero-valued tick.
@@ -327,22 +343,33 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
 			KL_Hook_AdvanceContextWatermarks(gap)
 		if KLWatch.is_session_active && gap >= KLWatchConst.SESSION_TIMEOUT_MS {
-			if !_KL_Watchers_CloseSession(last, now, AppendFn)
+			if !_KL_Watchers_CloseSession(last, now, AppendFn, GuardFn?)
 				return false
 		} else if KLWatch.is_idle {
 			; The key is authorized activity even if its idle-close append fails.
-			KLWatch.last_authorized_tick := now
-			if !_KL_Watchers_EndIdle(now, AppendFn)
+			ActivityCritical := Critical("On")
+			try {
+				if IsSet(GuardFn) && !GuardFn.Call()
+					return false
+				KLWatch.last_authorized_tick := now
+			} finally Critical(ActivityCritical)
+			if !_KL_Watchers_EndIdle(now, AppendFn, GuardFn?)
 				return false
 		}
 	}
+	if IsSet(GuardFn) && !GuardFn.Call()
+		return false
 	if !KLWatch.is_session_active {
 		if !_KL_Watchers_Log(AppendFn, "session_start", unset,
-			_KL_Watchers_CommitSessionStart.Bind(now))
+			_KL_Watchers_CommitSessionStart.Bind(now), GuardFn?)
 			return false
 	}
 	PreviousCritical := Critical("On")
-	try KLWatch.last_authorized_tick := now
+	try {
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
+		KLWatch.last_authorized_tick := now
+	}
 	finally Critical(PreviousCritical)
 	return true
 }
@@ -359,6 +386,8 @@ KL_Watchers_IdleTick(Now := unset) {
 				return
 		if KLWatch.session_close_draining
 				return false
+		if KL_Hook_HasPendingInput()
+			return false
 		_KL_Watchers_SystemDrain()
 		if !KLHook.HasOwnProp("last_tick")
 				return

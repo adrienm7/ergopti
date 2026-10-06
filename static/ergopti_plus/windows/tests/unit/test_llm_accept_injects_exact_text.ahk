@@ -199,94 +199,224 @@ _LAIET_ThrowSendFailure() {
 	throw Error("simulated SendInput failure")
 }
 
-; Regression for llm-accept-notepad-paste. Windows 11's Notepad loses the
-; characters of a text typed in one burst and types the last one in their
-; place: « général de l’histoire militaire » accepted there came out as its
-; final « e » 32 times (2026-10-01). The hotstring engine already pastes its
-; replacement in that application; the accepted prediction typed it as text.
-; The clipboard worker is stopped before it runs, so the test never touches
-; the real clipboard: it takes the queued request and sends the paste the
-; worker sends once the clipboard holds the text.
-_LAIET_NotepadReceivesThePredictionByPaste() {
-	global _TEXT_CLIPBOARD_QUEUE
-	SavedQueue := _TEXT_CLIPBOARD_QUEUE
-	SimulateNotepadActive()
+; Notepad uses the native editor owner rather than a keyboard paste batch. The
+; controlled port advances its real asynchronous state machine; admission,
+; journal preparation, atomic settlement and offer completion remain production.
+_LAIET_NativeFixture() {
+	global LAIET_HWND, LAIET_CONTROL
+	State := { Trace: [], Phase: 1, Scheduled: 0, ScheduleCalls: 0, Owner: 0,
+		Begins: 0, Decisions: 0, Closed: 0 }
+	State.Port := Map(
+		"focus", () => Map("hwnd", LAIET_HWND, "control", LAIET_CONTROL, "pid", 77),
+		"begin", (Owner) => (State.Owner := Owner, State.Begins += 1,
+			State.Trace.Push("begin"), 0),
+		"poll", (Token) => Map("phase", State.Phase, "os_error", 0),
+		"decide", (Token, Commit) => (State.Decisions += 1,
+			State.Trace.Push("decide:" . Commit), 0),
+		"close", (Token) => (State.Closed += 1, State.Trace.Push("close"), 0),
+		"schedule", (Fn) => (State.ScheduleCalls += 1, State.Scheduled := Fn)
+	)
+	return State
+}
+
+_LAIET_WithNativePort(Body) {
+	global _TextSenderNativeTestPort, _TEXT_NATIVE_OWNER, _TEXT_NATIVE_SERIAL
+	global _TEXT_CLIPBOARD_QUEUE, _Stub_OutputHostExe, _Stub_OutputHostTitle
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE, _OUTPUT_HOST_METADATA_PROBE
+	global _OUTPUT_HOST_TITLE_PROBE, _OUTPUT_HOST_RESOLVE_SERIAL
+	AssertFalse(_TEXT_NATIVE_OWNER, "the native fixture cannot adopt another output owner")
+	Saved := { Port: _TextSenderNativeTestPort, Owner: _TEXT_NATIVE_OWNER,
+		Serial: _TEXT_NATIVE_SERIAL, Queue: _TEXT_CLIPBOARD_QUEUE,
+		QueueLength: _TEXT_CLIPBOARD_QUEUE.Length, App: KLHook.prev_app,
+		Title: KLHook.prev_title, Exe: _Stub_OutputHostExe, StubTitle: _Stub_OutputHostTitle,
+		Cache: _OUTPUT_HOST_CACHE, Identity: _OUTPUT_HOST_IDENTITY_PROBE,
+		Metadata: _OUTPUT_HOST_METADATA_PROBE, TitleProbe: _OUTPUT_HOST_TITLE_PROBE,
+		HostSerial: _OUTPUT_HOST_RESOLVE_SERIAL }
+	State := _LAIET_NativeFixture()
 	try {
-		_TEXT_CLIPBOARD_QUEUE := []
-		_LAIET_Run(_Body)
+		_TextSenderNativeTestPort := State.Port
+		SimulateNotepadActive()
+		_LAIET_Run(Body.Bind(State))
+		AssertEqual(Saved.QueueLength, _TEXT_CLIPBOARD_QUEUE.Length,
+			"native acceptance must not publish a clipboard request")
+		AssertTrue(_TEXT_CLIPBOARD_QUEUE == Saved.Queue,
+			"the native fixture must preserve the existing clipboard FIFO")
 	} finally {
-		SetTimer(_TextSenderStartClipboard, 0)
-		_TEXT_CLIPBOARD_QUEUE := SavedQueue
-		SimulateRegularApp()
+		_TextSenderNativeTestPort := Saved.Port
+		_TEXT_NATIVE_OWNER := Saved.Owner
+		_TEXT_NATIVE_SERIAL := Saved.Serial
+		KLHook.prev_app := Saved.App
+		KLHook.prev_title := Saved.Title
+		_Stub_OutputHostExe := Saved.Exe
+		_Stub_OutputHostTitle := Saved.StubTitle
+		_OUTPUT_HOST_CACHE := Saved.Cache
+		_OUTPUT_HOST_IDENTITY_PROBE := Saved.Identity
+		_OUTPUT_HOST_METADATA_PROBE := Saved.Metadata
+		_OUTPUT_HOST_TITLE_PROBE := Saved.TitleProbe
+		_OUTPUT_HOST_RESOLVE_SERIAL := Saved.HostSerial
 	}
-	_Body(Sent, Record) {
+}
+
+_LAIET_CompleteNative(State, Sent, Record, Text, Count, Deleted, ExpectedBuffer) {
+	global _TEXT_NATIVE_OWNER, _LLM_Bridge_Buffer
+	Owner := _TEXT_NATIVE_OWNER
+	AssertTrue(IsObject(Owner), "the real TextSender must own the deferred replacement")
+	AssertEqual(0, Sent.Length, "native replacement must not emit keyboard text or paste")
+	AssertEqual(0, State.Begins, "dispatch must return before starting the native worker")
+	AssertEqual(Text, Owner.Text, "the exact accepted prediction belongs to the native request")
+	AssertEqual(Count, Owner.Opts.Get("erase_before", 0), "the slot's codepoint count is retained")
+	AssertEqual(Deleted, Owner.Opts.Get("deleted_text", ""), "the native request owns the exact UTF-16 tail")
+	AssertTrue(_TextSenderHasAtomicHooks(Owner.Opts), "real admission and journal/commit hooks must remain attached")
+	Before := _LLM_Bridge_Buffer
+	State.Scheduled.Call()
+	AssertEqual(1, State.Begins, "the first scheduler step starts exactly one native request")
+	AssertTrue(State.Owner == Owner, "the native port receives the actual queued owner")
+	AssertTrue(Owner.Prepared is Map, "the actual journal preparation returns its token")
+	AssertEqual(Before, _LLM_Bridge_Buffer, "preparation cannot publish the mirror")
+	AssertEqual("claimed", Record.Lifecycle.Outcome, "preparation cannot retire the offer")
+	State.Phase := 2
+	State.Scheduled.Call()
+	AssertEqual("begin|decide:1", _TSCS_Join(State.Trace), "ready admission authorizes one mutation")
+	AssertEqual(Before, _LLM_Bridge_Buffer, "mutation authorization is not verified output")
+	AssertEqual("claimed", Record.Lifecycle.Outcome, "ready is not completion")
+	State.Phase := 4
+	State.Scheduled.Call()
+	AssertEqual("begin|decide:1|close", _TSCS_Join(State.Trace), "verified output is retired before settlement")
+	AssertEqual(1, State.Closed, "the native request closes exactly once")
+	AssertEqual(0, Sent.Length, "settlement must not fall back to a keyboard batch")
+	AssertEqual(ExpectedBuffer, _LLM_Bridge_Buffer, "the canonical mirror applies deletion and replacement once")
+	AssertEqual("accepted", Record.Lifecycle.Outcome, "only verified retired output accepts the offer")
+	AssertFalse(_TEXT_NATIVE_OWNER, "the verified native request releases its AHK owner")
+	_TextSenderPollNative(Owner)
+	AssertEqual(1, State.Begins, "duplicate polling must not execute the editor again")
+	AssertEqual(1, State.Decisions, "duplicate polling must not authorize another mutation")
+	AssertEqual(1, State.Closed, "duplicate polling must not retire the worker again")
+	AssertEqual(ExpectedBuffer, _LLM_Bridge_Buffer, "duplicate completion cannot apply the mirror twice")
+	AssertEqual(2, A_SendLevel, "native completion preserves the accepting thread's SendLevel")
+}
+
+_LAIET_NotepadReceivesThePredictionByNativeOwner() {
+	_LAIET_WithNativePort(_Body)
+	_Body(State, Sent, Record) {
 		global LAIET_TYPED, LAIET_PREDICTION, _LLM_Bridge_Buffer
-		global _TEXT_CLIPBOARD_QUEUE, _AHK_SendInput, TEXT_SENDER_SEND_LEVEL
 		SendLevel(2)
 		AssertTrue(_LLM_Accept_ClaimAndDispatch(LLM_Tooltip_GetAcceptSnapshot()),
 			"the shown prediction must be claimed and dispatched")
-		SetTimer(_TextSenderStartClipboard, 0)
-		AssertEqual(0, Sent.Length,
-			"in Notepad the prediction must not be typed as text, which Notepad garbles (llm-accept-notepad-paste)")
-		AssertEqual(1, _TEXT_CLIPBOARD_QUEUE.Length,
-			"in Notepad the prediction must be queued for exactly one paste")
-		Request := _TEXT_CLIPBOARD_QUEUE.RemoveAt(1)
-		AssertEqual(LAIET_PREDICTION, Request.Text,
-			"the pasted text must be the exact accented prediction")
-		Result := _TextSenderRunAtomicOutput(
-			_AHK_SendInput.Bind(_TextSenderErasePrefix(Request.Opts) . "^v"),
-			Request.Opts, "clipboard paste")
-		Request.Callback.Call(Result.Ok, Result.ErrorMessage)
-		AssertEqual(1, Sent.Length, "the paste is one keystroke batch")
-		AssertEqual("^v", Sent[1].Keys, "an insertion erases nothing before its paste")
-		AssertEqual(TEXT_SENDER_SEND_LEVEL, Sent[1].Level,
-			"the paste must leave at TextSender's SendLevel")
-		AssertEqual(LAIET_TYPED . LAIET_PREDICTION, _LLM_Bridge_Buffer,
-			"the bridge buffer mirrors the pasted prediction exactly once")
-		AssertEqual("accepted", Record.Lifecycle.Outcome,
-			"the presented offer is retired as accepted")
+		AssertEqual(LAIET_TYPED, _LLM_Bridge_Buffer, "queued insertion cannot update the mirror")
+		_LAIET_CompleteNative(State, Sent, Record, LAIET_PREDICTION, 0, "",
+			LAIET_TYPED . LAIET_PREDICTION)
 	}
 }
-Test("LLM accept: Notepad receives the prediction by paste, never as typed text (llm-accept-notepad-paste)",
-	_LAIET_NotepadReceivesThePredictionByPaste)
+Test("LLM accept: Notepad receives the exact prediction through its native owner (llm-accept-notepad-paste)",
+	_LAIET_NotepadReceivesThePredictionByNativeOwner)
 
-; The choice belongs to TextSend's "auto" mode, so every caller that leaves the
-; strategy to the adapter gets it: a short text is typed everywhere but in
-; Notepad, where it is queued for a paste.
-_LAIET_AutoModePastesInNotepadOnly() {
-	global _TEXT_CLIPBOARD_QUEUE, _AHK_SendText
-	SavedQueue := _TEXT_CLIPBOARD_QUEUE
-	SavedSendText := _AHK_SendText
-	Typed := []
-	try {
-		_TEXT_CLIPBOARD_QUEUE := []
-		_AHK_SendText := (Text) => Typed.Push(Text)
-		SimulateRegularApp()
-		TextSend("court", Map("mode", "auto"), 0)
-		SetTimer(_TextSenderStartClipboard, 0)
-		AssertEqual(1, Typed.Length, "a short text is typed in an ordinary application")
-		AssertEqual(0, _TEXT_CLIPBOARD_QUEUE.Length,
-			"a short text is not pasted in an ordinary application")
-		SimulateNotepadActive()
-		TextSend("court", Map("mode", "auto"), 0)
-		SetTimer(_TextSenderStartClipboard, 0)
-		AssertEqual(1, Typed.Length,
-			"in Notepad a text left to the adapter must not be typed (llm-accept-notepad-paste)")
-		AssertEqual(1, _TEXT_CLIPBOARD_QUEUE.Length,
-			"in Notepad a text left to the adapter is queued for a paste")
-		AssertTrue(OutputHostTakesTextByPaste(OutputHostResolve()),
-			"Notepad is the host that takes text by paste")
-		SimulateRegularApp()
-		AssertFalse(OutputHostTakesTextByPaste(OutputHostResolve()),
-			"an ordinary application takes typed text")
-		AssertFalse(OutputHostTakesTextByPaste(_OutputHostInvalidReceipt("identity_unavailable")),
-			"an unknown host keeps the typed text")
-	} finally {
-		SetTimer(_TextSenderStartClipboard, 0)
-		_TEXT_CLIPBOARD_QUEUE := SavedQueue
-		_AHK_SendText := SavedSendText
-		SimulateRegularApp()
+_LAIET_AutoModeUsesNativeInNotepadOnly() {
+	_LAIET_WithNativePort(_Body)
+	_Body(State, Sent, Record) {
+		global _AHK_SendText, _TEXT_NATIVE_OWNER, _TEXT_CLIPBOARD_QUEUE
+		SavedSend := _AHK_SendText
+		Typed := []
+		QueueLength := _TEXT_CLIPBOARD_QUEUE.Length
+		try {
+			_AHK_SendText := (Text) => Typed.Push(Text)
+			SimulateRegularApp()
+			TextSend("court", Map("mode", "auto"), 0)
+			AssertEqual(1, Typed.Length, "a short text is typed in an ordinary application")
+			AssertFalse(_TEXT_NATIVE_OWNER, "an ordinary short insertion starts no native job")
+			SimulateNotepadActive()
+			TextSend("court", Map("mode", "auto"), 0)
+			AssertEqual(1, Typed.Length, "Notepad must not receive keyboard text")
+			AssertEqual("court", _TEXT_NATIVE_OWNER.Text, "auto mode queues the exact native literal")
+			State.Scheduled.Call()
+			State.Phase := 2
+			State.Scheduled.Call()
+			State.Phase := 4
+			State.Scheduled.Call()
+			AssertEqual("begin|decide:1|close", _TSCS_Join(State.Trace), "auto mode runs the real native owner once")
+			AssertFalse(_TEXT_NATIVE_OWNER, "auto mode retires its completed native request")
+			AssertEqual(QueueLength, _TEXT_CLIPBOARD_QUEUE.Length, "neither short insertion uses the clipboard")
+			AssertTrue(OutputHostTakesTextByPaste(OutputHostResolve()), "Notepad retains its host strategy classification")
+			SimulateRegularApp()
+			AssertFalse(OutputHostTakesTextByPaste(OutputHostResolve()), "ordinary applications retain direct output")
+			AssertFalse(OutputHostTakesTextByPaste(_OutputHostInvalidReceipt("identity_unavailable")),
+				"an unknown host is not classified as Notepad")
+		} finally _AHK_SendText := SavedSend
 	}
 }
-Test("TextSender: auto mode pastes in Notepad and types elsewhere (llm-accept-notepad-paste)",
-	_LAIET_AutoModePastesInNotepadOnly)
+Test("TextSender: auto mode uses native Notepad output and types elsewhere (llm-accept-notepad-paste)",
+	_LAIET_AutoModeUsesNativeInNotepadOnly)
+
+_LAIET_ConfigureRewrite(Record, Text, DeletedText, Span, Count) {
+	Slot := { Text: Text, Deletes: Count, DeletedText: DeletedText, RewriteSpan: Span }
+	Record.Slots := ["unused first slot", "unused second slot", Slot]
+	Record.ActiveIdx := 3
+	Record.Lifecycle.Slots := Record.Slots.Clone()
+}
+
+_LAIET_NotepadIncidentCorrectionByNativeOwner() {
+	_LAIET_WithNativePort(_Body)
+	_Body(State, Sent, Record) {
+		global _LLM_Bridge_Buffer
+		Typed := "napéoléon is the"
+		Correction := "Napoleon is the greatest emperor in French history"
+		AssertEqual(16, StrLen(Typed), "the reported deletion has sixteen UTF-16 units and codepoints")
+		AssertEqual(50, StrLen(Correction), "the reported third slot contains fifty characters")
+		_LLM_Bridge_Buffer := Typed
+		_LAIET_ConfigureRewrite(Record, Correction, Typed, Typed, 16)
+		SendLevel(2)
+		AssertTrue(_LLM_Accept_ClaimAndDispatch(LLM_Tooltip_GetAcceptSnapshot()), "the third rewrite slot is dispatched")
+		_LAIET_CompleteNative(State, Sent, Record, Correction, 16, Typed, Correction)
+	}
+}
+Test("LLM accept: the Notepad incident's third correction owns the exact native tail (llm-rewrite-paste-recording)",
+	_LAIET_NotepadIncidentCorrectionByNativeOwner)
+
+_LAIET_NotepadScalarErasureByNativeOwner() {
+	_LAIET_WithNativePort(_Body)
+	_Body(State, Sent, Record) {
+		global _LLM_Bridge_Buffer
+		Deleted := "i" . Chr(0x1F600)
+		Span := "Je sui" . Chr(0x1F600)
+		Correction := "is déjà allé."
+		AssertEqual(3, StrLen(Deleted), "the deleted suffix occupies three UTF-16 units")
+		_LLM_Bridge_Buffer := "Avant. " . Span
+		_LAIET_ConfigureRewrite(Record, Correction, Deleted, Span, 2)
+		SendLevel(2)
+		AssertTrue(_LLM_Accept_ClaimAndDispatch(LLM_Tooltip_GetAcceptSnapshot()), "the supplementary-character rewrite is dispatched")
+		_LAIET_CompleteNative(State, Sent, Record, Correction, 2, Deleted, "Avant. Je suis déjà allé.")
+	}
+}
+Test("LLM accept: native Notepad rewrite preserves codepoints and the exact UTF-16 tail (llm-rewrite-paste-recording)",
+	_LAIET_NotepadScalarErasureByNativeOwner)
+
+_LAIET_NotepadStaleRewriteNeverStartsNative() {
+	_LAIET_WithNativePort(_Body)
+	_Body(State, Sent, Record) {
+		global _LLM_Bridge_Buffer, _TEXT_NATIVE_OWNER
+		Typed := "napéoléon is the"
+		_LLM_Bridge_Buffer := Typed . " changed"
+		_LAIET_ConfigureRewrite(Record,
+			"Napoleon is the greatest emperor in French history", Typed, Typed, 16)
+		SendLevel(2)
+		AssertTrue(_LLM_Accept_ClaimAndDispatch(LLM_Tooltip_GetAcceptSnapshot()), "dispatch is distinct from successful output")
+		AssertEqual(0, Sent.Length, "a stale rewrite must emit no keyboard batch")
+		AssertFalse(_TEXT_NATIVE_OWNER, "a changed rewrite span cannot acquire a native output owner")
+		AssertEqual(0, State.ScheduleCalls, "a refused correction cannot schedule native work")
+		AssertEqual(0, State.Begins, "a refused correction cannot start an editor worker")
+		AssertEqual(Typed . " changed", _LLM_Bridge_Buffer, "refusal preserves the changed text")
+		AssertEqual("dismissed", Record.Lifecycle.Outcome, "refusal cannot retire the offer as accepted")
+	}
+}
+Test("LLM accept: stale Notepad correction refuses before native acquisition (llm-rewrite-paste-recording)",
+	_LAIET_NotepadStaleRewriteNeverStartsNative)
+_LAIET_OptionsKeepExactDeletedText() {
+	Deleted := "Ab" . Chr(0xA0) . Chr(0x1F600)
+	Transaction := {Deletes: 4, DeletedText: Deleted, Admission: () => true}
+	Opts := _LLM_Bridge_InjectionOptions(Transaction)
+	AssertTrue(Opts.Has("deleted_text"), "the native sender requires exact deletion text")
+	AssertEqual(Deleted, Opts["deleted_text"], "case, NBSP and surrogate units are copied unchanged")
+	AssertEqual(4, Opts["erase_before"], "the legacy codepoint count remains independently unchanged")
+	AssertEqual(5, StrLen(Opts["deleted_text"]), "the native deletion text uses its actual UTF-16 length")
+}
+Test("LLM accept: native options preserve the exact deleted tail (notepad-pending)",
+	_LAIET_OptionsKeepExactDeletedText)

@@ -16,6 +16,7 @@ endif()
 
 add_library(ergopti_nav_owner SHARED
 	nav_event_owner.c
+	editor_replace.c
 	nav_event_owner.def
 )
 
@@ -24,7 +25,9 @@ target_link_libraries(ergopti_nav_owner PRIVATE user32)
 
 add_executable(ergopti_nav_event_owner_test
 	nav_event_owner_test.c
+	editor_replace_test.c
 	nav_event_owner.c
+	editor_replace.c
 )
 
 target_compile_features(ergopti_nav_event_owner_test PRIVATE c_std_11)

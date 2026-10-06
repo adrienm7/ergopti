@@ -146,10 +146,10 @@ _SFPF_VerdictCacheIsKeyedOnTheFocusedElement() {
 		"a failed native unhook must retain the callback thunk and ownership fields for a safe retry")
 
 	KeyBody := _DriverFuncBody("KL_Hook_OnKeyDown")
-	KeyInvalidatePos := InStr(KeyBody, "KL_InvalidatePasswordFocus()")
-	KeyFilterPos := InStr(KeyBody, "MF_ShouldFilter()")
-	Assert(KeyFilterPos > 0 and KeyInvalidatePos > KeyFilterPos,
-		"Tab must retire the source-field verdict after its own filter and before the destination field's first character")
+	TabBody := _DriverFuncBody("_KL_Hook_InvalidateTabInput")
+	Assert(KeyBody != "" and TabBody != "",
+		"the actual Tab callback and focused-element invalidation owner must exist")
+	_SFPF_TabSourceOrder(KeyBody, TabBody)
 	for HandlerName in ["KL_Mouse_OnLDown", "KL_Mouse_OnRDown", "KL_Mouse_OnMDown"]
 		Assert(InStr(_DriverFuncBody(HandlerName), "KL_InvalidatePasswordFocus()") > 0,
 			HandlerName . " must invalidate a same-HWND focused element before reuse")
@@ -157,3 +157,91 @@ _SFPF_VerdictCacheIsKeyedOnTheFocusedElement() {
 
 Test("privacy: the keylogger password verdict cache is focused-element scoped (audit-ahk-003-element-cache-key)",
 	_SFPF_VerdictCacheIsKeyedOnTheFocusedElement)
+
+; FIFO admission classifies the source field before its finally block invalidates
+; Tab. The callee renews only the current receipt, so deferred commit can retain
+; this key's source verdict while destination-field input requires a fresh probe.
+_SFPF_TabSourceOrder(KeyBody, TabBody) {
+	Assert(KeyBody != "" and TabBody != "", "both actual Tab owners are required")
+	KeyCode := _DriverMaskNonCode(&KeyBody)
+	TabCode := _DriverMaskNonCode(&TabBody)
+	Positions := []
+	for Name in ["MF_ShouldFilter", "_KL_Hook_PrepareInput",
+			"_KL_Hook_InvalidateTabInput", "_KL_Hook_CompleteInput"] {
+		Pattern := 'i)\b' . Name . '\s*\('
+		Count := 0
+		Offset := 1
+		while Pos := RegExMatch(KeyCode, Pattern, &Call, Offset) {
+			Count += 1
+			Offset := Pos + StrLen(Call[0])
+		}
+		AssertEqual(1, Count, "the actual Tab call must be unique: " . Name)
+		Arguments := Name = "MF_ShouldFilter" ? "" : "Intent"
+		Position := RegExMatch(KeyCode, 'i)\b' . Name
+			. '\s*\(\s*' . Arguments . '\s*\)')
+		Assert(Position > 0, "the actual Tab call must carry its admitted receipt: " . Name)
+		Positions.Push(Position)
+	}
+	Assert(Positions[1] < Positions[2] and Positions[2] < Positions[3]
+		and Positions[3] < Positions[4],
+		"source classification and preparation must precede Tab invalidation and FIFO completion")
+	Assert(RegExMatch(KeyCode, 'i)\bPotentialFocusMove\s*:=\s*vk\s*=\s*0x09\b')
+		and RegExMatch(KeyCode,
+			'i)\bfinally\s*\{\s*try\s*\{\s*if\s+PotentialFocusMove\s+_KL_Hook_InvalidateTabInput\s*\(\s*Intent\s*\)'),
+		"Tab alone must invalidate in callback finalization, including classification failures")
+	Assert(RegExMatch(TabCode,
+		'i)\bCurrent\s*:=\s*IsObject\s*\(\s*Intent\s*\)\s*&&\s*_KL_Hook_InputCurrent\s*\(\s*Intent\s*\)\s+KL_InvalidatePasswordFocus\s*\(\s*\)\s+if\s+Current\s+Intent\.privacy\[\s*\]\s*:=\s*KLPasswordCache\.generation'),
+		"the invalidation owner must renew only a previously current receipt after retiring the source field")
+	Assignment := RegExMatch(TabCode,
+		'i)\bIntent\.privacy\[\s*\]\s*:=\s*KLPasswordCache\.generation', &Token)
+	Assert(Assignment > 0 and RegExMatch(SubStr(TabBody, Assignment, StrLen(Token[0])),
+		'i)^Intent\.privacy\["password_generation"\]\s*:=\s*KLPasswordCache\.generation$'),
+		"the renewed field must be the actual password publication token")
+}
+
+_SFPF_TabSourcePolicyControls() {
+	KeyBody := _DriverFuncBody("KL_Hook_OnKeyDown")
+	TabBody := _DriverFuncBody("_KL_Hook_InvalidateTabInput")
+	Assert(KeyBody != "" and TabBody != "", "source controls require both actual Tab owners")
+	_SFPF_TabSourceOrder(KeyBody, TabBody)
+	_SFPF_TabSourceOrder(StrReplace(KeyBody, "_KL_Hook_InvalidateTabInput",
+		"_kl_hook_invalidatetabinput"), TabBody)
+	for Name in ["MF_ShouldFilter", "_KL_Hook_PrepareInput",
+			"_KL_Hook_InvalidateTabInput", "_KL_Hook_CompleteInput"] {
+		for Spoof in ["'" . Name . "()'", "; " . Name . "()"] {
+			Changed := RegExReplace(KeyBody, 'i)\b' . Name . '\s*\(', Spoof . "(", &Count)
+			AssertEqual(1, Count, "each real callback call must be mutated exactly once")
+			_SFPF_TabExpectPolicyRefusal(Changed, TabBody)
+		}
+	}
+	_SFPF_TabExpectPolicyRefusal(KeyBody, "")
+	_SFPF_TabExpectPolicyRefusal(KeyBody
+		. "`n_KL_HOOK_INVALIDATETABINPUT(Intent)", TabBody)
+	_SFPF_TabExpectPolicyRefusal(KeyBody,
+		StrReplace(TabBody, "if Current", "if true"))
+	_SFPF_TabExpectPolicyRefusal(KeyBody,
+		StrReplace(TabBody, '"password_generation"', '"focus_generation"'))
+	_SFPF_TabExpectPolicyRefusal(KeyBody,
+		StrReplace(TabBody, "KL_InvalidatePasswordFocus()", ""))
+	_SFPF_TabExpectPolicyRefusal(
+		StrReplace(KeyBody, "_KL_Hook_InvalidateTabInput(Intent)",
+			"_KL_Hook_InvalidateTabInput(false)"), TabBody)
+	Changed := StrReplace(KeyBody, "_KL_Hook_PrepareInput(Intent)", "")
+	Changed := StrReplace(Changed, "_KL_Hook_CompleteInput(Intent)",
+		"_KL_Hook_PrepareInput(Intent)`n`t`t`t_KL_Hook_CompleteInput(Intent)")
+	_SFPF_TabExpectPolicyRefusal(Changed, TabBody)
+}
+
+_SFPF_TabExpectPolicyRefusal(KeyBody, TabBody) {
+	Refused := false
+	try _SFPF_TabSourceOrder(KeyBody, TabBody)
+	catch Error as Err {
+		if Type(Err) != "Error"
+			throw Err
+		Refused := true
+	}
+	AssertTrue(Refused, "an absent, spoofed or reordered Tab owner must fail the actual source policy")
+}
+
+Test("privacy: Tab source-field invalidation follows actual FIFO owners and rejects source spoofs",
+	_SFPF_TabSourcePolicyControls)

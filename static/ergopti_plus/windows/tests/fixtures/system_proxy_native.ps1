@@ -61,12 +61,12 @@ public sealed class ErgoptiPacFixture : IDisposable
                     bool absent = line.Contains("/missing.pac");
                     string script = bad ? "function FindProxyForURL(url,host) { this is not javascript" :
                         "function FindProxyForURL(url,host) {" +
-                        "if (url == 'https://destination.invalid:8443/private?key=fixture-secret') return 'PROXY exact.invalid:3128';" +
+                        "if (url == 'https://destination.invalid:8443/') return 'PROXY exact.invalid:3128';" +
                         "if (url == 'http://destination.invalid:8443/private?key=fixture-secret') return 'PROXY scheme.invalid:8080';" +
-                        "if (url == 'https://destination.invalid:9443/private?key=fixture-secret') return 'PROXY port.invalid:8090';" +
-                        "if (url == 'https://destination.invalid:8443/other?key=fixture-secret') return 'PROXY path.invalid:8091';" +
-                        "if (url == 'https://destination.invalid:8443/private?key=other-secret') return 'PROXY query.invalid:8092';" +
-                        "if (url == 'https://destination.invalid/failover') return 'PROXY first.invalid:80; PROXY second.invalid:80; DIRECT';" +
+                        "if (url == 'https://destination.invalid:9443/') return 'PROXY port.invalid:8090';" +
+                        "if (url == 'http://destination.invalid:8443/other?key=fixture-secret') return 'PROXY path.invalid:8091';" +
+                        "if (url == 'http://destination.invalid:8443/private?key=other-secret') return 'PROXY query.invalid:8092';" +
+                        "if (url == 'http://destination.invalid/failover') return 'PROXY first.invalid:80; PROXY second.invalid:80; DIRECT';" +
                         "return 'DIRECT';}";
                     byte[] body = Encoding.UTF8.GetBytes(absent ? "not found" : script);
                     string headers = "HTTP/1.1 " + (absent ? "404 Not Found" : "200 OK") +
@@ -107,15 +107,25 @@ try {
         @{ url = 'https://destination.invalid:8443/private?key=fixture-secret'; proxy = 'exact.invalid:3128' },
         @{ url = 'http://destination.invalid:8443/private?key=fixture-secret'; proxy = 'scheme.invalid:8080' },
         @{ url = 'https://destination.invalid:9443/private?key=fixture-secret'; proxy = 'port.invalid:8090' },
-        @{ url = 'https://destination.invalid:8443/other?key=fixture-secret'; proxy = 'path.invalid:8091' },
-        @{ url = 'https://destination.invalid:8443/private?key=other-secret'; proxy = 'query.invalid:8092' }
+        @{ url = 'http://destination.invalid:8443/other?key=fixture-secret'; proxy = 'path.invalid:8091' },
+        @{ url = 'http://destination.invalid:8443/private?key=other-secret'; proxy = 'query.invalid:8092' }
     )
     foreach ($Probe in $Cases) {
         $Result = [ErgoptiNativeProxy]::Resolve($Probe.url, $Server.Url, $false)
         Require ($Result.Ok -and $Result.Kind -ceq 'named_proxy' -and $Result.AccessType -eq 3 -and
-            $Result.Proxy -ceq $Probe.proxy -and $Result.NativeError -eq 0) 'Native exact-destination PAC fixture failed.'
+            $Result.Proxy -ceq $Probe.proxy -and $Result.NativeError -eq 0) 'Native scheme/port or HTTP full-destination PAC fixture failed.'
         $Passed++
     }
+    # Real Windows WinHTTP passes HTTPS scheme/host/port plus root to the PAC;
+    # HTTP retains path/query. Preserve both independent native policy controls.
+    foreach ($PrivateHttps in @('https://destination.invalid:8443/other?key=fixture-secret',
+        'https://destination.invalid:8443/private?key=other-secret')) {
+        $HttpsReceipt = [ErgoptiNativeProxy]::Resolve($PrivateHttps, $Server.Url, $false)
+        Require ($HttpsReceipt.Ok -and $HttpsReceipt.Kind -ceq 'named_proxy' -and
+            $HttpsReceipt.AccessType -eq 3 -and $HttpsReceipt.Proxy -ceq 'exact.invalid:3128' -and
+            $HttpsReceipt.NativeError -eq 0) 'Native HTTPS privacy scope changed.'
+    }
+    $Passed++
     $Direct = [ErgoptiNativeProxy]::Resolve('https://destination.invalid/direct', $Server.Url, $false)
     Require ($Direct.Ok -and $Direct.Kind -ceq 'no_proxy' -and $Direct.AccessType -eq 1 -and
         $Direct.Proxy -ceq '' -and $Direct.NativeError -eq 0) 'PAC DIRECT lacks native acknowledgment.'
@@ -126,7 +136,7 @@ try {
     $Missing = [ErgoptiNativeProxy]::Resolve('https://destination.invalid/private', $Server.Url.Replace('fixture.pac', 'missing.pac'), $false)
     Require (-not $Missing.Ok -and $Missing.Kind -ceq 'refused' -and $Missing.NativeError -ne 0) 'Unavailable configured PAC cannot become direct.'
     $Passed++
-    $Failover = [ErgoptiNativeProxy]::Resolve('https://destination.invalid/failover', $Server.Url, $false)
+    $Failover = [ErgoptiNativeProxy]::Resolve('http://destination.invalid/failover', $Server.Url, $false)
     Require ($Failover.Ok -and $Failover.Kind -ceq 'named_proxy' -and $Failover.AccessType -eq 3 -and $Failover.NativeError -eq 0) 'Valid multi-proxy PAC did not produce a native named-proxy receipt.'
     if ($Failover.Proxy -ceq 'first.invalid:80') {
         $FailoverRepresentation = 'first_only'
@@ -176,5 +186,6 @@ try {
 } finally {
     $Server.Dispose()
 }
+[Console]::Out.WriteLine("[OBSERVED] native_https_scope=scheme_host_port_root;http_destination=full_url")
 [Console]::Out.WriteLine("[OBSERVED] native_failover=$FailoverRepresentation")
 [Console]::Out.WriteLine("[OK] $Passed controlled native WinHTTP PAC fixtures and $([IntPtr]::Size * 8)-bit ABI assertions.")
