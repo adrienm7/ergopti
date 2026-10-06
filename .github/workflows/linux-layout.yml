@@ -85,7 +85,7 @@ jobs:
       # give the legacy-tree compilation tests a real system tree to work on;
       # the clean-method compilation tests need >= 1.13 and run in the matrix.
       - name: Install the XKB compilers of this runner
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxkbcommon-tools x11-xkb-utils xkb-data
+        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-tools x11-xkb-utils xkb-data
 
       - name: Run installer test suites (unit, consistency, sandbox, real compilers where present)
         run: python static/ergopti/linux/xkb_installation/tests/run_all_tests.py
@@ -123,7 +123,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y shellcheck
 
       - name: shellcheck (installer entry points and test drivers)
         run: |

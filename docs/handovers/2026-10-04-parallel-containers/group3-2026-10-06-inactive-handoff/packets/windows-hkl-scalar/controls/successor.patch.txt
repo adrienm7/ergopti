@@ -1,0 +1,61 @@
+--- a/static/ergopti_plus/windows/adapters/key_state.ahk
++++ b/static/ergopti_plus/windows/adapters/key_state.ahk
+@@ -532,12 +532,17 @@
+ 			? ReadFn.Call(Vk, Scancode, Hkl, Shift, Caps)
+ 			: KS_KeyTextNoStateChange(Vk, Scancode, Hkl, Shift, Caps)
+ 		if !IsObject(Observed) || !Observed.HasOwnProp("Count") || !Observed.HasOwnProp("Text")
+-				|| !(Observed.Count is Integer) || Abs(Observed.Count) > 16 || !(Observed.Text is String)
+-				|| (Observed.Count == 0 && Observed.Text != "")
+-				|| (Observed.Count != 0 && StrLen(Observed.Text) != Abs(Observed.Count))
+ 			return 0
+-		Kind := Observed.Count < 0 ? "dead" : (Observed.Count > 0 ? "text" : "none")
+-		return Map("Kind", Kind, "Text", Observed.Text, "Count", Observed.Count)
++		; Own properties may be stateful getters. Capture each external scalar once,
++		; then validate and publish only those detached values, including on reentry.
++		Count := Observed.Count
++		Text := Observed.Text
++		if !(Count is Integer) || Abs(Count) > 16 || !(Text is String)
++				|| (Count == 0 && Text != "")
++				|| (Count != 0 && StrLen(Text) != Abs(Count))
++			return 0
++		Kind := Count < 0 ? "dead" : (Count > 0 ? "text" : "none")
++		return Map("Kind", Kind, "Text", Text, "Count", Count)
+ 	} catch {
+ 		; External ports and native read failures have no authority to expose their
+ 		; details or promote an incomplete observation into a usable source pair.
+--- a/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk
+@@ -1007,3 +1007,33 @@
+ 	}
+ }
+ Test("native HKL number row: negative, unmapped and multi-unit results stay typed and detached", _NHKL_DescriptorStatusAndDetachment)
++
++
++_NHKL_ChangingCount(Seen, *) {
++	Seen.Count += 1
++	return Seen.Count <= 7 ? 1 : 999
++}
++_NHKL_ChangingText(Seen, *) {
++	Seen.Text += 1
++	return Seen.Text <= 2 ? "1" : "private unchecked descriptor text"
++}
++_NHKL_ExternalGetterSnapshot() {
++	Seen := {Count: 0, Text: 0}
++	Source := {}
++	Source.DefineProp("Count", {Get: _NHKL_ChangingCount.Bind(Seen)})
++	Source.DefineProp("Text", {Get: _NHKL_ChangingText.Bind(Seen)})
++	Observed := KS_NativeKeyLevel(0x31, 0x02, 1, false, false, (*) => Source)
++	AssertTrue(Observed is Map)
++	AssertEqual(1, Observed["Count"], "the validated count must be the exact published scalar")
++	AssertEqual("1", Observed["Text"], "a later getter result must never replace the validated text")
++	AssertEqual("text", Observed["Kind"])
++	AssertEqual(1, Seen.Count, "capture the external count getter exactly once")
++	AssertEqual(1, Seen.Text, "capture the external text getter exactly once")
++	for Name in ["Count", "Text"] {
++		Refused := {Count: 1, Text: "1"}
++		Refused.DefineProp(Name, {Get: _NHKL_ThrowRead})
++		AssertEqual(0, KS_NativeKeyLevel(0x31, 0x02, 1, false, false, (*) => Refused),
++			"a throwing getter must remain a closed observation refusal")
++	}
++}
++Test("native HKL number row: external descriptor getters are captured once before validation", _NHKL_ExternalGetterSnapshot)

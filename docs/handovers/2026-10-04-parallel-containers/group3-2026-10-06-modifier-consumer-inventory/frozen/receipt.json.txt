@@ -1,0 +1,178 @@
+{
+  "status": "INACTIVE_REGRESSION_INVENTORY_AND_COHERENT_BROKER_DESIGN",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "3b3fce7502218ba8177bcd8f5463f4ecff61200b099d353c17104c1fc0f76316",
+      "bytes": 7876
+    },
+    {
+      "path": "controls.lua",
+      "sha256": "2ee2f7c54fa8c7aa5f3b2eae04f158dc8cca54d3aeae5677b3d6e6746dd6a85d",
+      "bytes": 10275
+    },
+    {
+      "path": "evidence-pins.json",
+      "sha256": "95b764ffec5c1970efe5d73d64a7c46d1dc1998eb8492475a3ee8c11a54e42c6",
+      "bytes": 4141
+    },
+    {
+      "path": "facts.json",
+      "sha256": "c7a265335c6ab6c1bdbb68739922b1f03665b02f3fd7c5fe0c19cf5d7715064e",
+      "bytes": 439
+    },
+    {
+      "path": "replay.py",
+      "sha256": "47cbd7bd7482644ab5f9797a5ab5d19f696a549a763ed2c84d79c3aec10bdada",
+      "bytes": 3725
+    },
+    {
+      "path": "results.json",
+      "sha256": "2890fc7946f2c95f38621bd4232a546eef4a7e206696369c6df56569ebc4a415",
+      "bytes": 1745
+    },
+    {
+      "path": "run.lua",
+      "sha256": "672586a8f0f860299ebc4f5ca06fd0c6f1381711a7c9475802c73257c4564467",
+      "bytes": 1610
+    },
+    {
+      "path": "source-pins.json",
+      "sha256": "1fe97f1355fd1158782740daa5cb008150703399c4d8b2455b168fe478e58c9f",
+      "bytes": 397045
+    }
+  ],
+  "original_watchdog_cases": 14,
+  "watchdog_prefix_sha256": "a24127014db0ee5318e11059aca9692b958bbcee873ecd904e264deb9a92a8fb",
+  "original_overlap_control_sha256": "7657524e5f5ef74c8005ebd3293aa997e21150b3e33ab9fd4a0c7717f5d6c9e0",
+  "qualified_outcomes": {
+    "both_abis": {
+      "current": {
+        "passed": 17,
+        "failed": 8
+      },
+      "skip_only_up": {
+        "passed": 19,
+        "failed": 6
+      },
+      "weaken_baseline": {
+        "passed": 16,
+        "failed": 9
+      },
+      "legacy_tap_hold": {
+        "passed": 26,
+        "failed": 0
+      },
+      "forbid_reentrant_retirement": {
+        "passed": 25,
+        "failed": 1
+      }
+    }
+  },
+  "local_raw_evidence_pins": [
+    {
+      "abi": "luajit",
+      "source": "current",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 17 8",
+      "log": "luajit-current.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-current.log",
+      "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f",
+      "bytes": 3712
+    },
+    {
+      "abi": "luajit",
+      "source": "skip-only-up",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 19 6",
+      "log": "luajit-skip-only-up.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-skip-only-up.log",
+      "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0",
+      "bytes": 3420
+    },
+    {
+      "abi": "luajit",
+      "source": "weaken-baseline",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 16 9",
+      "log": "luajit-weaken-baseline.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-weaken-baseline.log",
+      "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e",
+      "bytes": 3806
+    },
+    {
+      "abi": "luajit",
+      "source": "legacy-retirement",
+      "exit_code": 0,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 26 0",
+      "log": "luajit-legacy-retirement.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-legacy-retirement.log",
+      "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538",
+      "bytes": 2676
+    },
+    {
+      "abi": "luajit",
+      "source": "forbid-retirement",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 25 1",
+      "log": "luajit-forbid-retirement.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/luajit-forbid-retirement.log",
+      "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73",
+      "bytes": 2839
+    },
+    {
+      "abi": "lua5.4",
+      "source": "current",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 17 8",
+      "log": "lua5.4-current.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-current.log",
+      "sha256": "b783c7de65250b52cde2aff56e46f87dccebd751b04a9d25f6566e1ccc36814f",
+      "bytes": 3712
+    },
+    {
+      "abi": "lua5.4",
+      "source": "skip-only-up",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 19 6",
+      "log": "lua5.4-skip-only-up.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-skip-only-up.log",
+      "sha256": "caf71ebf1b953e736cbeb983ea202ef61487307220863d7c85d683472a8b2dd0",
+      "bytes": 3420
+    },
+    {
+      "abi": "lua5.4",
+      "source": "weaken-baseline",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 16 9",
+      "log": "lua5.4-weaken-baseline.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-weaken-baseline.log",
+      "sha256": "e2e749295733a29ffac1a77da8c44d27e13cef09c2df52a474abf820c6baa67e",
+      "bytes": 3806
+    },
+    {
+      "abi": "lua5.4",
+      "source": "legacy-retirement",
+      "exit_code": 0,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 26 0",
+      "log": "lua5.4-legacy-retirement.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-legacy-retirement.log",
+      "sha256": "08a6e0f2147532ff7d0ca8b0446e0cc05d03d9cfbb0097fbe8750b53865cf538",
+      "bytes": 2676
+    },
+    {
+      "abi": "lua5.4",
+      "source": "forbid-retirement",
+      "exit_code": 1,
+      "last_line": "AGGREGATE_CONSUMER_INVENTORY 25 1",
+      "log": "lua5.4-forbid-retirement.log",
+      "local_path": "/workspace/.ergopti-cloud/preparations/group3-linux-modifier-aggregation-consumer-inventory/lua5.4-forbid-retirement.log",
+      "sha256": "f4a7ce56f545abe29d9df1a55617d5742e9fc056cb3ea2703a454f9fb7f1ee73",
+      "bytes": 2839
+    }
+  ],
+  "copied_snapshot_archived": false,
+  "production_source_fix": false,
+  "physical_delivery_available": false,
+  "native_kernel_execution": "NOT_RUN"
+}

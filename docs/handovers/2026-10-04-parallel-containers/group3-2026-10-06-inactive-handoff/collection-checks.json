@@ -1,0 +1,112 @@
+{
+	"checks": [
+		{
+			"exit": 0,
+			"expected_exit": 0,
+			"name": "original_export_bytes",
+			"stderr_empty": true,
+			"stdout": {
+				"errors": [],
+				"frozen_files": 359,
+				"packets": 17
+			},
+			"verdict": "PASS"
+		},
+		{
+			"exit": 0,
+			"expected_exit": 0,
+			"name": "current_one_shot_preimages_readonly",
+			"stderr_empty": true,
+			"stdout": {
+				"current_repository": "/workspace/ergopti",
+				"errors": [],
+				"frozen_files": 359,
+				"packets": 17,
+				"preimage_states": [
+					{
+						"actual_sha256": "20d9e79c74d1e9457df7c03073190602d3fe418b650928add009b9699662454e",
+						"path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+						"state": "PREIMAGE_MATCH"
+					},
+					{
+						"actual_sha256": "4f4d7c4d796f8529ad9e8e89826969ecba2777375bbeadc4d6cbb572d4a5b96d",
+						"path": "static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+						"state": "PREIMAGE_MATCH"
+					},
+					{
+						"actual_sha256": "1b5f4ba8c13d80376d166e719620f5a3defda76b33f7358be3cae7565e360de2",
+						"path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+						"state": "PREIMAGE_MATCH"
+					},
+					{
+						"actual_sha256": "b2e8983f1e58879e5bde2f89b74bed4798fa426840185b5063f53dd87d18757c",
+						"path": "static/ergopti_plus/linux/tests/unit/modules/test_key_combinations.lua",
+						"state": "PREIMAGE_MATCH"
+					},
+					{
+						"actual_sha256": null,
+						"path": "static/ergopti_plus/linux/tests/unit/modules/test_key_combination_native_actions.lua",
+						"state": "EXPECTED_ABSENCE"
+					}
+				],
+				"selected_packet": "one-shot"
+			},
+			"verdict": "PASS"
+		},
+		{
+			"exit": 1,
+			"expected_exit": 1,
+			"name": "changed_frozen_bytes_refused",
+			"stderr_empty": true,
+			"stdout": {
+				"errors": [
+					"Frozen bytes differ: dependencies/4bcde1859108/static/ergopti_plus/_shared/lua/unicode_case/init.lua.txt"
+				],
+				"frozen_files": 359,
+				"packets": 17
+			},
+			"verdict": "PASS"
+		},
+		{
+			"exit": 1,
+			"expected_exit": 1,
+			"name": "physical_capability_claim_refused",
+			"stderr_empty": true,
+			"stdout": {
+				"errors": ["Archive must not claim physical delivery availability"],
+				"frozen_files": 359,
+				"packets": 17
+			},
+			"verdict": "PASS"
+		},
+		{
+			"exit": 1,
+			"expected_exit": 1,
+			"name": "successor_before_predecessor_refused",
+			"stderr_empty": true,
+			"stdout": {
+				"errors": ["Predecessor ordering is invalid: one-shot-origin"],
+				"frozen_files": 359,
+				"packets": 17
+			},
+			"verdict": "PASS"
+		},
+		{
+			"exit": 1,
+			"expected_exit": 1,
+			"name": "missing_ahk_bom_refused_even_with_adjusted_digest",
+			"stderr_empty": true,
+			"stdout": {
+				"errors": [
+					"AHK source lacks its original UTF-8 BOM: packets/windows-hkl-any-refusal/controls/dependencies/static/ergopti_plus/_shared/modules/features/number_row_policy.ahk.txt"
+				],
+				"frozen_files": 359,
+				"packets": 17
+			},
+			"verdict": "PASS"
+		}
+	],
+	"native_allocations": false,
+	"source_tests_replayed": false,
+	"status": "ARCHIVAL_BYTE_CHECKS_ONLY"
+}

@@ -415,9 +415,12 @@ function checkCore(body) {
 		'npm run test:${{ matrix.suite }}'
 	);
 	assert.ok(steps.some((step) => pipeline.stepField(step.body, 'run') === 'npm ci'));
-	assert.match(body, /sudo apt-get install -y lua5\.4 lua-luv libxml2-utils/);
+	assert.match(
+		body,
+		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y lua5\.4 lua-luv libxml2-utils/
+	);
 	for (const [name, command] of [
-		['Install shared UI browsers', 'npx playwright install --with-deps chromium webkit'],
+		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor']
 	]) {
 		const step = pipeline.step(body, name);
@@ -437,14 +440,17 @@ for (const [from, to] of [
 	['needs: [validate]', 'needs: [macos]'],
 	['run: npm run test:${{ matrix.suite }}', 'run: npm run test:${{ matrix.suite }} -- --only lint'],
 	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
-	['npx playwright install --with-deps chromium webkit', 'npx playwright install chromium'],
+	['node tools/ci/install-playwright.cjs chromium webkit', 'npx playwright install chromium'],
 	["if: matrix.suite == 'js'", "if: matrix.suite == 'never'"],
 	[
 		'- uses: actions/checkout@v4',
 		'- uses: actions/checkout@v4\n        with:\n          fetch-depth: 0'
 	]
-])
-	assert.throws(() => checkCore(core.replace(from, to)), from);
+]) {
+	const changed = core.replace(from, to);
+	assert.notEqual(changed, core, from + ' must actually mutate the shared gate');
+	assert.throws(() => checkCore(changed), from);
+}
 
 for (const [job, platform] of [
 	['macos-ok', 'macos'],

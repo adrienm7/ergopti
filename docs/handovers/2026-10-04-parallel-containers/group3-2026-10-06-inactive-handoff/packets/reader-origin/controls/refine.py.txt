@@ -1,0 +1,70 @@
+from pathlib import Path
+p=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-receipts/candidate/static/ergopti_plus/linux/adapters/evdev_reader.lua')
+s=p.read_text()
+a=s.index('function M.read_event(slot)');b=s.index('\n--- Drains every event',a)
+s=s[:a]+'''function M.read_event(slot)
+	if _busy or _native_debt then return nil, "closed", "native operation is unavailable" end
+	local st = state(slot)
+	if st.fd == nil then return nil, "closed", "device is not open" end
+	local backend, fd, generation, path = _backend, st.fd, st.generation, st.path
+	st.read_epoch = st.read_epoch + 1
+	local read_epoch = st.read_epoch
+	_busy = true
+	local measured, size = pcall(_codec.native_size)
+	if not measured or type(size) ~= "number" then
+		_busy = false
+		M.close(slot)
+		return nil, "fatal", "input_event size is unavailable"
+	end
+	local ok, data, status, reason = pcall(rawget(backend, "read"), fd, size)
+	if not ok then
+		_busy = false
+		local failure = "read raised: " .. tostring(data)
+		M.close(slot)
+		return nil, "fatal", failure
+	end
+	if type(data) ~= "string" then
+		_busy = false
+		if status == "fatal" then
+			M.close(slot)
+			return nil, "fatal", tostring(reason or "device read failed")
+		end
+		return nil, "would_block", reason
+	end
+	if #data ~= size then
+		_busy = false
+		local failure = string.format("input_event size mismatch (%d/%d bytes)", #data, size)
+		M.close(slot)
+		return nil, "fatal", failure
+	end
+	local decoded, event = pcall(_codec.decode, data, size)
+	if not decoded or type(event) ~= "table" then
+		_busy = false
+		M.close(slot)
+		return nil, "fatal", "input_event decode failed"
+	end
+	-- Independent pinned primitives bind provenance to the actual wire bytes,
+	-- even if a public codec export was replaced during a callback and restored.
+	local long_width, at = (size - 8) / 2, size - 7
+	local row = { type = _codec.unpack_u16_le(data, at), code = _codec.unpack_u16_le(data, at + 2),
+		value = _codec.unpack_i32_le(data, at + 4), seconds = _codec.unpack_uint_le(data, 1, long_width),
+		microseconds = _codec.unpack_uint_le(data, long_width + 1, long_width) }
+	row.timestamp_us = row.seconds * 1000000 + row.microseconds
+	if row.type == InputEvent.EV_SYN and row.code == SYN_DROPPED then
+		st.synchronized = false
+		_generation = _generation + 1
+		st.generation = _generation
+	end
+	_busy = false
+	if row.type == InputEvent.EV_KEY and row.code >= 1 and row.code <= 0x2ff
+		and (row.value == 0 or row.value == 1 or row.value == 2) then
+		local record = { event = event, row = row, state = st, slot = slot or M.KEYBOARD,
+			backend = backend, fd = fd, generation = generation, read_epoch = read_epoch, path = path }
+		if native_session_current(record) and original_row(record) then _events[event] = record end
+	end
+	return event, "event", nil
+end
+'''+s[b:]
+# Preserve the original custom-backend detail and error contract.
+s=s.replace('st.close_error = "native retirement was not acknowledged"','st.close_error = tostring(not called and acknowledged or detail or "backend did not acknowledge close")',1)
+p.write_text(s)

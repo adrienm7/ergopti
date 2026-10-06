@@ -51,6 +51,11 @@ def receipt_snapshot(path):
     return {"present": True, **result}
 
 
+def phase_timestamp(value):
+    """Expose only a native nonnegative signed-64-bit integer, otherwise unknown."""
+    return value if type(value) is int and 0 <= value <= (1 << 63) - 1 else None
+
+
 def run_wrapper(context, arguments, *, spawn=subprocess.Popen, clock=time.monotonic_ns):
     """Wait the one actual child before closing captures or publishing terminal facts."""
     root = Path(context["directory"])
@@ -59,6 +64,8 @@ def run_wrapper(context, arguments, *, spawn=subprocess.Popen, clock=time.monoto
     child = None
     primary = None
     native_exit = None
+    spawned = None
+    started_published = None
     with output.open("xb") as out, errors.open("xb") as err:
         try:
             child = spawn(
@@ -67,6 +74,7 @@ def run_wrapper(context, arguments, *, spawn=subprocess.Popen, clock=time.monoto
                 stdout=out,
                 stderr=err,
             )
+            spawned = clock()
             publish(
                 root / "gtk-started.json",
                 {
@@ -76,9 +84,10 @@ def run_wrapper(context, arguments, *, spawn=subprocess.Popen, clock=time.monoto
                     "wrapper_pid": os.getpid(),
                     "gtk_pid": child.pid,
                     "before_spawn_ns": started,
-                    "after_spawn_ns": clock(),
+                    "after_spawn_ns": spawned,
                 },
             )
+            started_published = clock()
             native_exit = child.wait()
         except BaseException as failure:
             primary = failure
@@ -100,6 +109,8 @@ def run_wrapper(context, arguments, *, spawn=subprocess.Popen, clock=time.monoto
         "native_exit": native_exit,
         "native_terminal_observed": native_exit is not None,
         "before_spawn_ns": started,
+        "after_spawn_ns": phase_timestamp(spawned),
+        "started_published_ns": phase_timestamp(started_published),
         "terminal_observed_ns": terminal,
         "observer_failure": type(primary).__name__ if primary is not None else "",
         "spawn_errno": primary.errno if child is None and isinstance(primary, OSError) else None,
@@ -130,6 +141,40 @@ def native_launch_complete(packet):
         and packet.get("observer_failure") == ""
         and type(packet.get("native_exit")) is int
         and packet["native_exit"] == 0
+    )
+
+
+def application_receive_complete(facts, nonce, identity):
+    """Admit only exact reception after the existing owned native settlement."""
+    if (
+        type(facts) is not dict
+        or facts.get("nonce") != nonce
+        or facts.get("identity") != identity
+        or type(facts.get("worker_exit")) is not int
+        or facts["worker_exit"] != 0
+        or facts.get("observer_timed_out") is not False
+    ):
+        return False
+    native = facts.get("gtk")
+    if (
+        not native_launch_complete(native)
+        or native.get("nonce") != nonce
+        or native.get("identity") != identity
+    ):
+        return False
+    expected = identity.encode("utf-8")
+    receipt = facts.get("receipt_after_worker")
+    return (
+        len(expected) <= CAPTURE_LIMIT
+        and type(receipt) is dict
+        and receipt.get("present") is True
+        and receipt.get("truncated") is False
+        and type(receipt.get("bytes_total")) is int
+        and receipt["bytes_total"] == len(expected)
+        and type(receipt.get("captured_bytes")) is int
+        and receipt["captured_bytes"] == len(expected)
+        and receipt.get("text") == identity
+        and receipt.get("prefix_sha256") == hashlib.sha256(expected).hexdigest()
     )
 
 

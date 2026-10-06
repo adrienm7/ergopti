@@ -1,0 +1,34 @@
+from pathlib import Path
+import subprocess,json
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-origin-receipts')
+rel='static/ergopti_plus/linux/adapters/evdev_reader.lua';source=(root/'candidate'/rel).read_text()
+row_start=source.index('local function original_row(record)');row_end=source.index('\nend',row_start)+4
+variants={
+ 'omit_native_provider':source.replace(' or not rawequal(_backend, _native_backend)', '',1).replace('or st.native ~= true or st.native_grab ~= true or st.grabbed ~= true', 'or st.grabbed ~= true',1),
+ 'omit_original_row':source[:row_start]+'local function original_row(record) return true end'+source[row_end:],
+ 'omit_session_generation':source.replace('or st.fd ~= record.fd or st.generation ~= record.generation','or st.fd ~= record.fd',1),
+ 'omit_queue_loss_fence':source.replace('''if row.type == _codec.EV_SYN and row.code == SYN_DROPPED then
+		st.synchronized = false
+		_generation = _generation + 1
+		st.generation = _generation
+	end''','-- Counterfactual: queue-loss custody was omitted.',1),
+ 'omit_native_close_debt':source.replace('if native then _native_debt = true end','if native then _native_debt = false end',1),
+ 'omit_lazy_binding_reservation':source.replace('_busy = true\n\tlocal called, backend, err = pcall(build_ffi_backend)','_busy = false\n\tlocal called, backend, err = pcall(build_ffi_backend)',1),
+}
+reports=[]
+for name,mutated in variants.items():
+ assert mutated!=source,name
+ p=root/name/rel;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(mutated)
+ for abi in ['luajit','lua5.4']:
+  result=subprocess.run(['/workspace/.ergopti-cloud/runtime/usr/bin/'+abi,str(root/'run.lua'),str(root),name,'/workspace/ergopti'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,env={'LD_LIBRARY_PATH':'/workspace/.ergopti-cloud/runtime/usr/lib/x86_64-linux-gnu'},timeout=30)
+  log=root/(abi+'-'+name+'.log');log.write_bytes(result.stdout)
+  assert result.returncode!=0,(name,abi)
+  reports.append({'abi':abi,'case':name,'exit':result.returncode,'summary':result.stdout.decode().strip().splitlines()[-1]})
+(root/'causal-results.json').write_text(json.dumps(reports,indent=2)+'\n')
+base=Path('/workspace/.ergopti-cloud/preparations/group3-linux-output-transaction')
+s=(base/'check_owned_conventions.cjs').read_text().replace('uinput_writer.lua','evdev_reader.lua').replace('test_uinput_writer.lua','test_evdev_reader.lua')
+(root/'check_owned_conventions.cjs').write_text(s)
+r=subprocess.run(['node',str(root/'check_owned_conventions.cjs')],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+(root/'conventions.log').write_bytes(r.stdout)
+assert r.returncode==0,r.stdout
+print(json.dumps(reports,indent=2))

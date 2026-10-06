@@ -1,0 +1,13 @@
+from pathlib import Path
+p=Path('/workspace/.ergopti-cloud/preparations/group3-linux-evdev-held-receipts')
+rel='static/ergopti_plus/linux/adapters/evdev_reader.lua'
+s=(p/'candidate'/rel).read_text()
+changes={
+ 'omit-copy-ack':('if copied ~= count then return nil, "pressed-key ioctl did not acknowledge the full bitset" end','if copied == nil then return nil, "pressed-key ioctl did not acknowledge the full bitset" end'),
+ 'omit-query-currency':('and record.query_epoch == record.state.key_query_epoch and native_session_current(record)','and native_session_current(record)'),
+ 'omit-read-currency':('return record ~= nil and record.read_epoch == record.state.read_epoch\n\t\tand record.query_epoch','return record ~= nil\n\t\tand record.query_epoch'),
+ 'omit-terminal-provider':('or record.read_epoch ~= st.read_epoch or record.query_epoch ~= st.key_query_epoch\n\t\tor not native_session_current(record) then return nil end','or record.read_epoch ~= st.read_epoch or record.query_epoch ~= st.key_query_epoch then return nil end'),
+}
+for name,(old,new) in changes.items():
+ assert s.count(old)==1,(name,s.count(old))
+ f=p/name/rel;f.parent.mkdir(parents=True,exist_ok=True);f.write_text(s.replace(old,new,1))

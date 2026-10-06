@@ -1,0 +1,105 @@
+diff --git a/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua b/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua
+--- a/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua
++++ b/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua
+@@ -88,9 +88,16 @@
+ 		if entry.timer and not entry.timer_retired then
+ 			entry.timer_retired = literal("cancel_timer", entry.timer)
+ 		end
++		if entry.timer and not entry.timer_retired then entry.retiring = false; return false end
++		if not owned(entry) then entry.retiring = false; return false end
++		-- Cleanup crossed native callbacks after the visible-effect observation.
++		-- Keep publication reserved while the full source/provider check runs;
++		-- its final cached seal is pure, with no later native calls before publish.
++		if entry.result == "switched" and not source(entry) and not entry.cancelled then
++			entry.result = "refused"
++		end
++		if not owned(entry) then entry.retiring = false; return false end
+ 		entry.retiring = false
+-		if entry.timer and not entry.timer_retired then return false end
+-		if not owned(entry) then return false end
+ 		entry.finished = true
+ 		states[entry.cap] = entry.result
+ 		active = nil
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua
+--- a/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua
++++ b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua
+@@ -54,6 +54,7 @@
+ 		cancel_timer = function(handle)
+ 			eq(rawequal(handle, f.handle), true)
+ 			f.timer_cancelled = f.timer_cancelled + 1
++			if f.timer_cancel_hook then f.timer_cancel_hook() end
+ 			return f.timer_ack
+ 		end,
+ 		now = function() return f.time end,
+@@ -290,4 +291,71 @@
+ 	end)
+ end)
+ 
++helpers.describe("native switcher terminal publication source", function()
++	for _, boundary in ipairs({ "input", "timer" }) do
++		helpers.it("refuses success after source revocation by cleanup: " .. boundary, function()
++			local f = fixture(function(x)
++				if boundary == "input" then x.retire_hook = function() x.source = false end
++				else x.timer_cancel_hook = function() x.source = false end end
++			end)
++			local cap = f:start()
++			eq(f:advance(), true)
++			eq(f.owner.status(cap), "refused"); eq(f.owner.has_pending(), false)
++			eq(#f.completed, 1); eq(f.completed[1].status, "refused")
++			eq(f.retired, 1); eq(f.timer_cancelled, 1)
++		end)
++	end
++
++	helpers.it("retains false cleanup ACK debt before checking the final source seal", function()
++		local f = fixture(function(x)
++			x.input_ack = false
++			x.retire_hook = function() x.source = false end
++		end)
++		local cap = f:start()
++		eq(f:advance(), false); eq(f.owner.status(cap), nil)
++		eq(f.owner.has_pending(), true); eq(f.timer_cancelled, 0)
++		eq(f.owner.request(f.publication), nil); eq(#f.completed, 0)
++		f.input_ack = true
++		eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "refused")
++		eq(f.timer_cancelled, 1); eq(#f.completed, 1)
++	end)
++
++	helpers.it("retains exact timer ACK debt after cleanup revoked the source", function()
++		local f = fixture(function(x)
++			x.timer_ack = false
++			x.timer_cancel_hook = function() x.source = false end
++		end)
++		local cap = f:start()
++		eq(f:advance(), false); eq(f.owner.status(cap), nil)
++		eq(f.owner.has_pending(), true); eq(f.retired, 1); eq(#f.completed, 0)
++		f.timer_ack = true
++		eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "refused")
++		eq(f.retired, 1); eq(#f.completed, 1)
++	end)
++
++	helpers.it("holds the publication reservation through final current callback cancellation", function()
++		local f = fixture()
++		local cap = f:start()
++		for _ = 1, 4 do f.owner.tick() end
++		f.current_hook = function()
++			if f.timer_cancelled > 0 then
++				eq(f.owner.request(f.publication), nil)
++				eq(f.owner.cancel(cap), false)
++			end
++		end
++		f.front = 101
++		eq(f.owner.tick(), true); eq(f.owner.status(cap), "cancelled")
++		eq(#f.completed, 1); eq(f.completed[1].status, "cancelled")
++		eq(f.owner.has_pending(), false); eq(f.retired, 1); eq(f.timer_cancelled, 1)
++	end)
++
++	helpers.it("seals source currency after the final native provider callback", function()
++		local f = fixture()
++		local cap = f:start()
++		f.provider_hook = function() if f.timer_cancelled > 0 then f.source = false end end
++		eq(f:advance(), true); eq(f.owner.status(cap), "refused")
++		eq(#f.completed, 1); eq(f.completed[1].status, "refused")
++	end)
++end)
++
+ return helpers

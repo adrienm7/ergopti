@@ -1,0 +1,92 @@
+"""Run only controlled switcher modules and deliberate causal source omissions."""
+
+from pathlib import Path
+import os
+import subprocess
+
+HERE = Path(__file__).resolve().parent
+ROOT = Path("/workspace/ergopti/static/ergopti_plus")
+SUBJECT = HERE / "candidate/static/ergopti_plus"
+ENV = dict(os.environ)
+ENV["LUA_PATH"] = (
+    ";".join(
+        str(p / pattern)
+        for p in (SUBJECT / "macos", SUBJECT / "_shared/lua", ROOT / "macos", ROOT / "_shared/lua")
+        for pattern in ("?.lua", "?/init.lua")
+    )
+    + ";;"
+)
+BODY = """local helpers = require('tests.helpers')
+helpers.reset_results()
+%s
+require('tests.unit.modules.gestures.test_native_app_switcher_owner')
+%s
+local result = helpers.get_results()
+print('SWITCHER_CONTROLLED',result.passed,result.failed)
+if result.failed ~= 0 then os.exit(1) end
+"""
+SOURCE = (SUBJECT / "_shared/lua/native_app_switcher_owner.lua").read_text()
+
+
+def run(label, executable, replacement=None, facade=True):
+    prelude = ""
+    if replacement is not None:
+        path = HERE / f"{label}-control.lua"
+        path.write_text(replacement)
+        prelude = 'package.loaded["native_app_switcher_owner"] = dofile(' + repr(str(path)) + ")"
+    body = BODY % (
+        prelude,
+        "require('tests.unit.modules.gestures.test_native_app_switcher')" if facade else "",
+    )
+    result = subprocess.run(
+        [executable, "-"],
+        input=body.encode(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        cwd=ROOT / "macos",
+        env=ENV,
+        timeout=30,
+    )
+    (HERE / f"{label}.log").write_bytes(result.stdout)
+    receipt = next(
+        (
+            line
+            for line in result.stdout.decode().splitlines()
+            if line.startswith("SWITCHER_CONTROLLED")
+        ),
+        "NO_RECEIPT",
+    )
+    print(label, "exit", result.returncode, receipt)
+    return result.returncode
+
+
+assert run("final-lua54", "lua5.4") == 0
+assert run("final-core-luajit", "luajit", facade=False) == 0
+FROZEN_BEFORE = Path(
+    "/workspace/.ergopti-cloud/preparations/group3-macos-product-global-switcher/candidate/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua"
+).read_text()
+assert run("actual-frozen-b88-before-lua54", "lua5.4", FROZEN_BEFORE) == 1
+assert run("actual-frozen-b88-before-luajit", "luajit", FROZEN_BEFORE, facade=False) == 1
+old_seal = SOURCE.replace(
+    'if not literal("provider_current") or not owned(entry) or entry.cancelled then return false end',
+    "if false then return false end",
+    1,
+).replace(
+    "and getmetatable(entry.publication) == nil and references()",
+    'and getmetatable(entry.publication) == nil and references() and literal("provider_current")',
+    1,
+)
+assert old_seal != SOURCE
+assert run("omit-terminal-source-seal", "lua5.4", old_seal) == 1
+old_retirement = SOURCE.replace(
+    "if entry.input_reserved and not entry.input_retired then\n\t\t\tentry.retiring = false",
+    "if false then\n\t\t\tentry.retiring = false",
+    1,
+)
+assert old_retirement != SOURCE
+assert run("omit-input-retirement-ack", "lua5.4", old_retirement) == 1
+old_observation = SOURCE.replace(
+    "if not entry.received then return leave(false) end", "if false then return leave(false) end", 1
+)
+assert old_observation != SOURCE
+assert run("omit-tagged-arrival-admission", "lua5.4", old_observation) == 1

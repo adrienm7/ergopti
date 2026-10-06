@@ -1,0 +1,66 @@
+"""Private source-before controls; no checkout or generator outputs are mutated."""
+
+import os
+from pathlib import Path
+import subprocess
+
+HERE = Path(__file__).resolve().parent
+LINUX = HERE / "snapshot/static/ergopti_plus/linux"
+ENV = dict(os.environ)
+ENV["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+REAPER = "/workspace/.ergopti-cloud/reap_validation.py"
+BODY = """require('compat.utf8').install()
+%s
+local h=require('tests.helpers')
+require('tests.unit.modules.test_action_catalogue_parity')
+require('tests.unit.ui.test_key_combinations_menu')
+require('tests.unit.infra.test_key_combinations_scope')
+require('tests.unit.modules.test_key_combination_native_actions')
+local r=h.get_results(); print('CONTEXT_COMPOSED',r.passed,r.failed)
+assert(r.failed==0)
+"""
+
+for abi in ["luajit", "lua5.4"]:
+    result = subprocess.run(
+        ["python3", REAPER, abi, "-"],
+        input=(BODY % "").encode(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=ENV,
+        cwd=LINUX,
+        timeout=45,
+    )
+    (HERE / ("final-" + abi + ".log")).write_bytes(result.stdout)
+    summary = [s for s in result.stdout.decode().splitlines() if s.startswith("CONTEXT_COMPOSED")]
+    print(abi, result.returncode, summary)
+    assert result.returncode == 0 and summary, "final actual contextual/native cohort must pass"
+
+for label, module, rel in [
+    (
+        "actual-old-manager",
+        "modules.gestures.manager",
+        "static/ergopti_plus/linux/modules/gestures/manager.lua",
+    ),
+    (
+        "actual-old-picker",
+        "ui.menu.key_combinations",
+        "static/ergopti_plus/linux/ui/menu/key_combinations.lua",
+    ),
+]:
+    path = HERE / "preimages" / rel
+    preload = "package.preload[%r]=function() return dofile(%r) end" % (module, str(path))
+    result = subprocess.run(
+        ["python3", REAPER, "luajit", "-"],
+        input=(BODY % preload).encode(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=ENV,
+        cwd=LINUX,
+        timeout=45,
+    )
+    (HERE / (label + ".log")).write_bytes(result.stdout)
+    summary = [s for s in result.stdout.decode().splitlines() if s.startswith("CONTEXT_COMPOSED")]
+    print(label, result.returncode, summary)
+    assert result.returncode != 0 and summary, (
+        "old actual source must fail new behavioral admission controls"
+    )

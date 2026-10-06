@@ -1,0 +1,141 @@
+--- ui/menu/key_combinations.lua
+
+--- Renders shared ordered slots through the actual native picker and publisher.
+--- Chord buffering is not offered by this Linux owner.
+local Shared = require("tap_hold.key_combinations")
+local HoldOptions = require("tap_hold.hold_options")
+local KeyCatalog = require("tap_hold.key_catalog")
+local Features = require("infra.manifest_reader")
+local Codec = require("toml_codec")
+local M = {}
+
+--- Builds the manifest's ordered-pair group, using a native context's UI ports.
+--- @param ctx table Daemon context with tap-hold and action owners.
+--- @param ui table Shared renderer, translator, picker, prompt and feedback ports.
+--- @return table rows Native submenu rows.
+function M.build(ctx,ui)
+	local declaration = Features.find_entry_by_path("category_enabled.key_combinations")
+	if type(declaration) ~= "table" or declaration.type ~= "boolean" or declaration.default ~= true then return {} end
+	local th,actions = ctx.tap_holds,ctx.gestures
+	local pairs = require("modules.shortcuts.key_combinations")
+	local Scope = require("infra.key_combinations_scope")
+	local t,renderer = ui.get,ui.manifest
+	if type(th)~="table" or type(actions)~="table" or type(ctx.is_paused)~="function" then return {} end
+	local keys,holds = th.key_catalog(),th.hold_options()
+	local function feedback(accepted)
+		if accepted~=true then ui.error(t("dialog.bulk_toggle.save_failed"),t("common.error_title")) end
+		if accepted==true and type(ctx.on_menu_changed)=="function" then ctx.on_menu_changed() end
+		return accepted==true
+	end
+	local function snapshot()
+		local observed,paused=pcall(ctx.is_paused)
+		if ctx.paused==true or not observed or paused~=false then return nil end
+		local retried,settled=pcall(Scope.retry_restore)
+		if not retried or settled~=true then return nil end
+		local captured,receipt=pcall(pairs.capture_edit_source)
+		if not captured or type(receipt)~="table" then return nil end
+		local decoded,document=pcall(function() return receipt.status=="ok" and Codec.decode(receipt.content) or {} end)
+		if not decoded or type(document)~="table" then return nil end
+		local checked,parameter_guard=pcall(actions.capture_parameter_source_guard,document,function() return true end)
+		if not checked or type(parameter_guard)~="function" then return nil end
+		local source_guard=receipt.guard
+		receipt.guard=function()
+			local current,exact=pcall(source_guard)
+			return current and exact==true and parameter_guard()==true
+		end
+		if receipt.guard()~=true then return nil end
+		return receipt
+	end
+	local function edit(rows,source)
+		if not source then return feedback(false) end
+		return feedback(Scope.edit(rows,ctx.is_paused,source))
+	end
+	local editable = snapshot() ~= nil
+	local function action_label(action)
+		if action==Shared.NONE then return t("tap_hold.tap.none") end
+		return ui.action_label(action,actions)
+	end
+	local function hold_option(value)
+		for _,choice in ipairs(holds) do if (choice.kind=="none" and value==Shared.NONE) or choice.id==value then return choice end end
+	end
+	local function pick(pair,label,current)
+		local source=snapshot();if not source then return feedback(false) end
+		local binding=Shared.BINDING_SCOPE.."__"..pair
+		local items={}
+		for _,row in ipairs(actions.get_picker_items("key_combinations")) do
+			if row.type~="action" or pairs.validate_slot("tap",pair,row.id)==true then items[#items+1]=row end
+		end
+		return ui.open_picker(label,current,binding,function(action,picked)
+			local checked,current=pcall(source.guard)
+			if not checked or current~=true or pairs.validate_slot("tap",pair,action)~=true then return feedback(false) end
+			local rows={{section=Shared.TAP_SECTION,key=pair,value=action}}
+			local spec=actions.get_action_parameter_spec(action)
+			if spec then
+				local value=picked
+				if type(value)~="string" then value=ui.parameter(ctx,actions,binding,action,spec) end
+				if value==nil then return false end
+				if actions.validate_action_parameter(action,value)~=true then return feedback(false) end
+				local update=actions.action_parameter_update(binding,action,value)
+				if type(update)~="table" then return feedback(false) end
+				rows[#rows+1]=update
+			end
+			return edit(rows,source)
+		end,items)
+	end
+	local function pick_hold(pair,label,current)
+		local source=snapshot();if not source then return feedback(false) end
+		if type(ui.prompt_hold)~="function" then return feedback(false) end
+		local choices,values={},{}
+		for _,choice in ipairs(holds) do
+			local display=HoldOptions.label(choice,t)
+			-- A translated duplicate cannot authorize an ambiguous scalar.
+			if values[display]~=nil then return feedback(false) end
+			choices[#choices+1]=display
+			values[display]=choice.kind=="none" and Shared.NONE or choice.id
+		end
+		local selected=ui.prompt_hold(label,current,choices)
+		if selected==nil then return false end
+		local value=values[selected]
+		local checked,exact=pcall(source.guard)
+		if value==nil or not checked or exact~=true
+			or pairs.validate_slot("hold",pair,value)~=true then return feedback(false) end
+		return edit({{section=Shared.HOLD_SECTION,key=pair,value=value}},source)
+	end
+	local function hand_rows(hand)
+		local rows={}
+		for _,first in ipairs(KeyCatalog.of_hand(keys,hand)) do
+			for _,second in ipairs(keys) do
+				if first.id~=second.id then
+					local pair=Shared.pair(first.id,second.id)
+					local tap,hold=pairs.get_action(pair),pairs.get_hold(pair)
+					local label=ui.key_label(first).." → "..ui.key_label(second)
+					local tap_label=action_label(tap)
+					local chosen=hold_option(hold)
+					local hold_label=chosen and HoldOptions.label(chosen,t) or t("tap_hold.hold.none")
+					local assigned=tap~=Shared.NONE or hold~=Shared.NONE
+					local sub=renderer.build("key_combination_pair_menu","KeyCombinations",nil,nil,{
+						commands={["key_combination_clear"]=function()
+							return edit({{section=Shared.TAP_SECTION,key=pair,delete=true},{section=Shared.HOLD_SECTION,key=pair,delete=true}},snapshot())
+						end},state_getters={key_combination_pair_assigned=function() return assigned end}},
+						{["key_combination_slots"]=function() return {
+							{label=string.format(t("menu.shortcuts.key_combinations_hold_tap"),tap_label),disabled=not editable,
+								action=function() return pick(pair,label,tap) end},
+							{label=string.format(t("menu.shortcuts.key_combinations_hold_hold"),hold_label),disabled=not editable,action=function() return pick_hold(pair,label,hold_label) end},
+						} end})
+					rows[#rows+1]={label=label.."  :  "..tap_label.."  /  "..hold_label,checked=assigned or nil,submenu=sub}
+				end
+			end
+		end
+		return rows
+	end
+	local render={commands={},state_getters={key_combinations_enabled=function() return pairs.is_enabled()==true end}}
+	render.commands["key_combinations_toggle"]=function()
+		local source=snapshot();if not source then return feedback(false) end
+		return feedback(Scope.set_enabled(not pairs.is_enabled(),ctx.is_paused,source))
+	end
+	return renderer.build("key_combinations_group","KeyCombinations",nil,nil,render,{
+		["key_combination_rows_left"]=function() return hand_rows("left") end,
+		["key_combination_rows_right"]=function() return hand_rows("right") end,
+	})
+end
+return M

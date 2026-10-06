@@ -1,0 +1,11 @@
+# Exact evdev origin slot identity successor
+
+Immutable predecessor f69b51fd remains unchanged. This successor changes exactly one production comparison: `capture_event` now uses `rawequal(record.slot, supplied_slot)` instead of metamethod-capable equality. Existing opaque/table slots remain supported; no old native/ordinary API is narrowed.
+
+The whole preceding registered unit module is an exact byte prefix (27 original plus 20 producer cases). The three independent reviewer controls are appended with their exact assertions/logic retained (only indentation normalized and helper documentation added). They prove foreign equal-shaped/equal-metamethod slot refusal, no two-sided equality callback/native-close reentry, and no single-sided Lua54 callback/native-close reentry. A fourth positive case proves actual controlled native open/grab/read/capture/view/current/close still accepts the legitimate same opaque slot with a throwing equality handler, without executing it.
+
+On the predecessor, the complete strengthened module reports LuaJIT 49 PASS / 2 FAIL and Lua5.4 48 PASS / 3 FAIL. The difference is genuine Lua54 single-sided __eq behavior; that case already passes on LuaJIT while the two shared controls fail. Candidate reports 51 PASS / 0 FAIL on both. Reverting the sole production line exactly recovers the predecessor bytes and the red behavior. Finite authoritative convention checks on the two owned paths pass.
+
+All other new opaque identity comparisons were audited: receipt/backend/provider/state identities already use rawequal; table registries use raw key identity; native descriptors/session/read epochs and independent expected wire fields are private scalar values. The only metamethod-capable slot comparison in the added receipt API is corrected here. The predecessor's lifecycle/provider/debt/GC/source boundaries are unchanged.
+
+These are explicitly controlled FFI-provider cases, never native kernel calls. No Root/index/workflow/manifest/registry/generated changes or native allocation occurred. Kernel acceptance, full driver gates, Hook/output handoff and public ownership acknowledgement remain unqualified/pending. Physical delivery stays unavailable. Only candidate/ postimages plus candidate.patch are proposed; the predecessor is not final without this successor.

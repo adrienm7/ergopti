@@ -2747,7 +2747,7 @@ for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwr
 const LINUX_AUDIO_SETUP = 'Install native virtual audio locale prerequisites';
 const LINUX_AUDIO_NATIVE = 'Parse native virtual audio state independently of user locale';
 const LINUX_AUDIO_INSTALL =
-	'sudo apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de';
+	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de';
 const LINUX_AUDIO_LOCALES = 'sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8';
 const LINUX_AUDIO_COMMANDS = [
 	'python3 tests/hardware/run_system_audio_locale_receipts.py',
