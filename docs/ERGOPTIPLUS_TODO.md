@@ -3177,6 +3177,15 @@ receives target error -10004 through its acknowledged AppleEvent sender.
 Packaging and installation are skipped after the test failure. These facts
 do not establish the server exception or the AppleEvent policy cause.
 
+The Sparkle server now receives the same retained physical directory path
+as its census. Swift previously admitted a Foundation parent alias that
+the unchanged Python canonical-path guard refused. All 25 original Python
+control bodies remain intact; the additional actual alias-refusal and
+physical-path serving/retirement control passes with the 26-case portable
+transport suite. This corrects a proved composition gap without claiming
+it caused the hosted exit. Native macOS compilation and complete archive
+acceptance on this functional correction remain required.
+
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
   `replace` into that extension without a beta compatibility layer. The runtime
