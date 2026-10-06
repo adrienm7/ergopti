@@ -1,0 +1,18 @@
+{
+	"schema": 1,
+	"package": {
+		"name": "ubuntu-keyring",
+		"version": "2023.11.28.1",
+		"architecture": "all",
+		"bytes": 11124,
+		"sha256": "36de43b15853ccae0028e9a767613770c704833f82586f28eb262f0311adb8a8",
+		"metadata_url": "https://packages.ubuntu.com/noble/all/ubuntu-keyring/download",
+		"archive_url": "https://archive.ubuntu.com/ubuntu/pool/main/u/ubuntu-keyring/ubuntu-keyring_2023.11.28.1_all.deb",
+		"member": "./usr/share/keyrings/ubuntu-archive-keyring.gpg"
+	},
+	"keyring": {
+		"file": "ubuntu-archive-keyring.gpg",
+		"bytes": 3607,
+		"sha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31"
+	}
+}
