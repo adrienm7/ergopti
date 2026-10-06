@@ -437,6 +437,7 @@ InstallSendNoOps()
 #Include unit/test_menu_languages_and_global_separator.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
 #Include unit/test_user_hotstrings.ahk
+#Include unit/test_user_hotstrings_pid_publication.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk
 #Include unit/test_hotstring_override_global_transaction_20260813.ahk
