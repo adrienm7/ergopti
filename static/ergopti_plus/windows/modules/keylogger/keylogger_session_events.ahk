@@ -7,23 +7,36 @@
 
 #Requires AutoHotkey v2.0
 
-KL_LogSession(kind, duration_ms := unset, PublishCommit := 0, FrozenClose := unset) {
+KL_LogSession(kind, duration_ms := unset, PublishCommit := 0, FrozenClose := unset, PublishGuard := unset) {
 	if IsSet(FrozenClose) {
 		if !(Type(FrozenClose) == "KLSessionClosePublication") || !IsSet(duration_ms)
 				|| !(kind == FrozenClose.Kind) || duration_ms != FrozenClose.Duration
 				|| PublishCommit != FrozenClose.CommitFn
 			return false
 		RejectedBySuspend := false
-		return KL_AppendLog(FrozenClose.Entry, &RejectedBySuspend, , PublishCommit, FrozenClose)
+		return KL_AppendLog(FrozenClose.Entry, &RejectedBySuspend, PublishGuard?, PublishCommit, FrozenClose)
 	}
 	e := Map("type", kind)
 	if IsSet(duration_ms)
 		e["duration_ms"] := duration_ms
 	if HasMethod(PublishCommit, "Call") {
 		RejectedBySuspend := false
-		return KL_AppendLog(e, &RejectedBySuspend, , PublishCommit)
+		return KL_AppendLog(e, &RejectedBySuspend, PublishGuard?, PublishCommit)
 	}
-	return KL_AppendLog(e)
+	RejectedBySuspend := false
+	return KL_AppendLog(e, &RejectedBySuspend, PublishGuard?)
+}
+
+
+KL_LogShortcut(shortcut_key, app_name := "Unknown", PublishGuard := unset) {
+    if (shortcut_key = "")
+        return
+	RejectedBySuspend := false
+    return KL_AppendLog(Map(
+        "type", "shortcut",
+        "key",  shortcut_key,
+        "app",  app_name
+    ), &RejectedBySuspend, PublishGuard?)
 }
 
 

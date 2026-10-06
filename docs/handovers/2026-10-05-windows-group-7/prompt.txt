@@ -1,0 +1,133 @@
+```text
+Tu reprends le groupe 7 d’ErgoptiPlus dans adrienm7/ergopti sur un vrai poste Windows. Ne travaille pas sur le site.
+
+TRAVAILLE DIRECTEMENT SUR DEV.
+Ne crée ni ne recrée de branche feature. feat/windows-native a été supprimée après intégration complète de ses commits.
+
+Tu as mon autorisation pour travailler en autonomie, modifier le code, lancer les validations, commiter et pousser dev. Ne redemande pas cette autorisation. Les pushes dans dev et leur qualification finale doivent néanmoins être sérialisés avec les autres agents.
+
+PRÉPARATION
+
+Lis avant modification :
+- AGENTS.md ;
+- docs/memory/README.md et les mémoires pertinentes ;
+- les skills pertinents, notamment verify-change et commit-and-push ;
+- docs/ERGOPTIPLUS_TODO.md ;
+- docs/handovers/2026-10-04-parallel-containers/README.md ;
+- docs/handovers/2026-10-04-parallel-containers/PARALLEL-WORK.md.
+
+Mes instructions présentes remplacent les anciennes restrictions imposant une branche feature ou réservant les pushes dev à un coordinateur.
+
+Inspecte le working tree, l’index, les branches et les worktrees. Préserve les changements existants et coordonne-toi avec les agents actifs avant de reprendre leur checkout.
+Récupère le dernier origin/dev et adapte ton dev local sans écraser de travail. Ne pars pas d’un ancien SHA.
+
+PASSATION
+
+Les 12 commits précédents du groupe 7 sont intégrés dans dev par :
+460e984529c18d06dfca9672456f4aa67c7de31b
+
+Ce SHA est un checkpoint historique, pas une base imposée.
+
+Déjà livré :
+- propriétaire exclusif de la libération du replay natif ;
+- acknowledgement du seul préfixe FIFO effectivement accepté ;
+- conservation de la faute et de la dette lors d’un overflow concurrent ;
+- DLL et manifest régénérés par le générateur MSVC officiel ;
+- autorité de publication conservée pour les seules fermetures certifiées idle_end/session_end ;
+- getters gelés non variadiques et contrôles d’identité/lifecycle ;
+- confidentialité ordinaire toujours fail-closed ;
+- prérequis CI lua-luv.
+
+Ne refais pas ces corrections sans preuve de régression.
+
+Dernière qualification de ce checkpoint :
+https://github.com/adrienm7/ergopti/actions/runs/37240622535
+
+SHA réellement testé :
+a717704cdf660f9d759cd8da82217cda612b5269
+Son arbre est identique au checkpoint dev indiqué.
+
+Résultats :
+- 33/33 tests C réussis ;
+- 356 contrôles JS, 27 propriétés et 72 cas navigateur réussis ;
+- 9037/9038 tests AHK réussis, dont le nouveau test de fermeture.
+
+Le seul échec était préexistant et appartient à l’item 102 :
+test_personal_toml_live_transactions.ahk:948,
+« Item has no value », test des voisins de métadonnées.
+
+E2E, startup, packaging et installation ont été ignorés après cet échec. Aucune release.
+Vérifie si le groupe Hotstrings a depuis intégré sa correction. Coordonne avec son propriétaire si le blocage persiste ; ne reprends pas son item sans attribution.
+
+OBJECTIF : TERMINER UNIQUEMENT 19, 49, 50, 51 ET 101
+
+Les étapes détaillées sont déjà dans leurs blocs de docs/ERGOPTIPLUS_TODO.md.
+
+19 — Vérifier visuellement les tooltips sur Windows 10/11 : bordures, coins, DPI, placement, redraw et réutilisation. La correction est déjà intégrée ; ne la réimplémente pas sans régression observée.
+
+49 — Terminer l’audit ET l’implémentation restante pour les deux ordres réels de hooks, avant/après SendInput : KLE/layout/dead keys, capture/replay par événement, digits/profiles, tap-holds, combinaisons, modificateurs et releases équilibrées.
+Le correctif de libération livré n’achève pas cet item.
+Les critères AHK n’exposent pas les flags/extra-info de chaque événement : une garde globale ou exemption de replay ne suffit pas à distinguer une entrée physique simultanée.
+Conserve les acknowledgements exacts, retries de partial-send et dettes d’overflow.
+
+50 — Mesurer SendEvent/SendInput avec le véritable arbiter installé : expansions longues, pastes et prédictions, avec et sans frappe physique simultanée.
+Mesure latence, pertes, doublons et interleaving avant toute modification de politique.
+
+51 — Exécuter toute la matrice réelle décrite dans la TODO, après démarrage à froid et reload : navigation, modificateurs/tap-holds, expansions, prédictions, clipboard, menus, layers, rollback et modes installation/source.
+
+101 — Vérifier fermeture et retraite des watchers avec la vraie UIA, les changements de focus, reload/shutdown et les contextes privés.
+Capturer un nouveau diagnostic si la dette revient.
+Le diagnostic original watchers=0 est perdu : n’attribue pas sa cause historique. Distingue les stalls mesurés de leurs causes avant de modifier tooltip/hooks.
+Vérifie les fermetures certifiées, les refus conservant une dette retryable, l’absence de doublons et la confidentialité fail-closed.
+
+CONVENTIONS ET VALIDATION
+
+Utilise tools/rtk/rtk.sh et verify-change avant chaque commit.
+Code, documentation technique et commits en anglais ; labels traduits dans les 21 langues si modifiés.
+Sources AHK UTF-8 avec BOM ; tous les textes en LF.
+
+Centralise logique, données et politiques partagées ; les dossiers OS portent principalement les implémentations natives.
+Coordonne l’ownership avant de modifier manifests, schema, locales, générateurs ou workflows.
+Régénère les artefacts avec leurs générateurs. Ne dérive pas les attentes d’un corpus indépendant depuis la nouvelle implémentation.
+Ne supprime ni n’affaiblis des assertions pour obtenir du vert.
+Ne lance pas les suites JS en parallèle des suites natives dans un même checkout.
+
+N’utilise ni reset, clean, stash, force-push, ni branches backup/*. Stage uniquement les chemins possédés.
+Respecte les autres groupes, l’agent Windows existant et fix/linux.
+
+Fais un commit par correction ou tranche cohérente.
+Mets à jour uniquement tes cinq blocs TODO dans chaque commit de feature/fix.
+Supprime un item seulement lorsque tout son périmètre est réellement terminé et validé.
+Conserve les exigences transversales 16 et 38. Ne réimplémente pas l’item 22.
+
+CI ET PUSHES DEV
+
+Les validations préparatoires peuvent tourner sans verrou sur codex/ci-windows-native, après inspection de son propriétaire. Ne modifie aucune branche CI d’un autre groupe.
+
+Toutes les validations passent par workflow_dispatch sur ci.yml :
+- os_lanes=windows pour les changements Windows ;
+- les trois OS pour une modification partagée affectant les trois drivers ;
+- aucune validation native inutile pour un changement documentaire ;
+- aucune release.
+
+Pour chaque phase de publication et qualification dans dev :
+1. Réserve codex/ci-lock : commit vide depuis le dernier origin/dev, message indiquant groupe 7, branche dev et SHA candidat, puis push sans force.
+   Un verrou existant bloque la réservation : inspecte son propriétaire, ne le reprends pas.
+2. Sous ton verrou, récupère encore origin/dev et intègre ses nouveaux commits sans perdre les tiens ni ceux des autres agents. Résous les conflits et reprends les validations nécessaires.
+3. Pousse dev sans force. Après CHAQUE push, annule immédiatement tous les workflows automatiques du SHA exact, y compris les événements de branche ou de PR.
+4. Utilise exclusivement codex/ci-validation pour la qualification finale. Préserve son historique sans force-push ; consigne le SHA réellement testé et prouve l’identité des sources avec dev.
+5. Lance ci.yml manuellement avec les OS requis. Laisse toute validation manuelle aller jusqu’à son résultat final.
+6. Libère uniquement ton verrou après ce résultat. Ne supprime pas les branches CI ni les branches d’autres agents.
+
+Tu peux continuer le travail et les commits locaux sur dev pendant qu’un autre agent possède le verrou, mais tu attends ta réservation avant de pousser dev.
+
+ACCEPTANCE ET LIVRAISON
+
+Distingue tests réussis, échoués, ignorés et non exécutés.
+Les tests hook-free ou les entrées injectées ne remplacent pas les observations physiques.
+Une suite unitaire verte ne remplace pas E2E, packaging, startup et installation.
+
+Si une exigence reste bloquée ou qu’un système Windows requis n’est pas disponible, conserve l’item partiel et indique exactement ce qui manque. Ne prétends pas que le groupe est terminé.
+
+À la fin, donne les commits poussés dans dev, les items réellement supprimés, les validations exactes, les preuves physiques et les limitations restantes.
+```

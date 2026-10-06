@@ -29,6 +29,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ErrorDescription = require("error_description")
 local Json = require("json")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
@@ -521,7 +522,7 @@ local function open_exchange(on_done)
 		_active = nil
 		if type(on_done) == "function" then
 			local ok, callback_err = pcall(on_done, ...)
-			if not ok then Logger.error(LOG, "Terminal callback raised — %s", tostring(callback_err)) end
+			if not ok then Logger.error(LOG, "Terminal callback raised — %s", ErrorDescription.describe(callback_err)) end
 		end
 	end
 	return epoch, done
@@ -666,7 +667,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	end
 	local function fail(detail, receipt)
 		Logger.warn(LOG, "Remote request failed: %s.", detail)
-		done("", detail, receipt)
+		if receipt == nil then done("", detail) else done("", detail, receipt) end
 	end
 	local started = Monotonic.now_ms()
 	local function deliver(text)
@@ -729,7 +730,7 @@ function M.decide(entry, state, questions, on_done)
 	end
 	local function fail(detail, receipt)
 		Logger.warn(LOG, "Decision request failed: %s.", detail)
-		done(nil, detail, receipt)
+		if receipt == nil then done(nil, detail) else done(nil, detail, receipt) end
 	end
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
 	if not provider then return refuse("unknown provider " .. tostring(type(entry) == "table" and entry.provider)) end
@@ -809,7 +810,8 @@ function M.models(entry, on_done)
 				if entry[key] ~= captured[key] then done(nil, "identity_changed"); return end
 			end
 			local ids, refusal = AuthPolicy.models_receipt(result)
-			done(ids, refusal, failure_receipt(result))
+			local receipt = failure_receipt(result)
+			if receipt == nil then done(ids, refusal) else done(ids, refusal, receipt) end
 		end)
 	if dispatched ~= true then done(nil, "HTTP transport unavailable"); return false end
 	return true
@@ -832,7 +834,10 @@ function M.test(entry, on_done)
 			return false
 		end
 		return M.decide(entry, probe.state, probe.questions, function(answers, err, receipt)
-			on_done(err == nil, err or Json.encode(answers) or "", Monotonic.now_ms() - started, receipt)
+			local detail = err or Json.encode(answers) or ""
+			local elapsed = Monotonic.now_ms() - started
+			if receipt == nil then on_done(err == nil, detail, elapsed)
+			else on_done(err == nil, detail, elapsed, receipt) end
 		end)
 	end
 	local spec = M.test_request_spec()
@@ -844,7 +849,9 @@ function M.test(entry, on_done)
 		{ role = "system", content = spec.system_prompt },
 		{ role = "user", content = spec.user_text },
 	}, { temperature = spec.temperature, max_tokens = spec.max_tokens }, nil, function(text, err, receipt)
-		on_done(err == nil, err or text, Monotonic.now_ms() - started, receipt)
+		local elapsed = Monotonic.now_ms() - started
+		if receipt == nil then on_done(err == nil, err or text, elapsed)
+		else on_done(err == nil, err or text, elapsed, receipt) end
 	end)
 end
 

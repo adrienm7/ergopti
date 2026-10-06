@@ -33,12 +33,23 @@ of the batch in their place: « général de l’histoire militaire » arrives a
 « général eeee », or as 32 « e ». It is the application, not the driver: one
 raw `SendInput` from a separate process reproduces it, a classic Edit control
 receives every character, and `SendEvent` with no key delay or one character
-every 10 ms still drops some (20 ms passed once). Never send a text there as
-typed characters: paste it. `OutputHostTakesTextByPaste` is the one rule,
-read by the hotstring expansions and by `TextSend`'s "auto" mode, so a new
-sender leaves the strategy to "auto" instead of forcing "direct". A log shows
-nothing in that case (the send succeeds); the keylogger's `llm_accepted` row
-holds the text that should have been typed.
+every 10 ms still drops some (20 ms passed once). Backspace followed by Ctrl+V
+also produced `v` and incomplete replacements in the receiving Notepad. Primitive
+emission is not evidence that the editor consumed the intended replacement.
+
+The Notepad host rule now selects the native editor worker for `TextSend` auto
+mode and literal HSE output. Keep the exact deleted suffix and final admission;
+worker startup and READY cannot publish mirrors, accepted rows or fire logs.
+Only complete document/caret verification followed by native thread retirement
+permits completion. Uncertain effects invalidate mirrors without retrying.
+
+On the actual `RichEditD2DPT` receiver, WM_GETTEXT spells line breaks as CRLF
+while EM_GETSEL counts each break as one native coordinate. Normalize the read
+image and both replacement strings together; UTF-16 surrogate pairs still count
+as two units. Use pointer DWORD selection results past 65535. InputHook may see
+the completing character before the editor stores it; a visibility wait may
+accept only that independently predicted scalar with the rest of the document
+and original caret unchanged. It must never accept arbitrary later text.
 
 ### project-hotstring-engine-internals
 

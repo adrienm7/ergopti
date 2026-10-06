@@ -16,7 +16,12 @@ const {
 	cleanTranscript,
 	evaluate
 } = require('../diagnostics/swift_xctest_evidence.cjs');
-const { validate: validateTIS } = require('../diagnostics/tis_evidence_transport.cjs');
+const { validate: nativeValidateTIS } = require('../diagnostics/tis_evidence_transport.cjs');
+const { loadValidator, verifyPort } = require('./fixtures/tis_fixture_metadata_port.cjs');
+const validateTIS = (root, session) =>
+	process.platform === 'win32'
+		? loadValidator(root).validate(root, session)
+		: nativeValidateTIS(root, session);
 const pipeline = require('./ci-pipeline.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
@@ -324,8 +329,40 @@ function makeControlledSession(root, nonce) {
 	);
 }
 
+/** Resolve one actual CPython instead of the Microsoft Store launcher alias. */
+function fixturePython() {
+	for (const candidate of ['python3', 'python']) {
+		const result = spawnSync(
+			candidate,
+			[
+				'-c',
+				'import platform, sys; assert platform.python_implementation() == "CPython"; assert sys.version_info >= (3, 8); print(sys.executable)'
+			],
+			{ encoding: 'utf8' }
+		);
+		if (!result.error && result.status === 0) {
+			const executable = result.stdout.trim();
+			if (path.isAbsolute(executable) && fs.statSync(executable).isFile()) return executable;
+		}
+	}
+	throw new Error('The actual Swift shell pipeline fixture requires CPython 3.8 or later.');
+}
+
+/** Preserve actual YAML Python bytes while declaring the closed Windows syscall port. */
+function fixtureCheckpointHarness(commands, directory) {
+	const publishers = [...commands.matchAll(/python3 - <<'PY'\n([\s\S]*?)\nPY/g)];
+	assert.equal(publishers.length, 1, 'the actual workflow owns one literal checkpoint publisher');
+	fs.writeFileSync(path.join(directory, 'workflow-publisher.py'), publishers[0][1] + '\n');
+	return (
+		'node() { if [ "$SWIFT_FIXTURE_PLATFORM" = "win32" ] && [ "$1" = "tools/diagnostics/tis_evidence_transport.cjs" ]; then shift; "$SWIFT_FIXTURE_NODE" "$SWIFT_FIXTURE_TIS_PORT" "$@"; else "$SWIFT_FIXTURE_NODE" "$@"; fi; }\n' +
+		'python3() { if [ "$SWIFT_FIXTURE_PLATFORM" = "win32" ]; then "$SWIFT_FIXTURE_PYTHON" "$SWIFT_FIXTURE_PYTHON_PORT" "$@"; else "$SWIFT_FIXTURE_PYTHON" "$@"; fi; }\n'
+	);
+}
+
+const pythonExecutable = fixturePython();
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-swift-evidence-'));
 try {
+	if (process.platform === 'win32') verifyPort(root);
 	const log = path.join(root, 'native.log');
 	const json = path.join(root, 'verdict.json');
 	fs.writeFileSync(log, failed);
@@ -374,6 +411,7 @@ try {
 				')(process.env.ERGOPTI_TIS_EVIDENCE_DIR,process.env.ERGOPTI_TIS_EVIDENCE_SESSION);'
 		);
 		const harness =
+			fixtureCheckpointHarness(run, fixture) +
 			'script() { node "$SWIFT_FIXTURE_PUBLISHER" || return $?; cat "$SWIFT_FIXTURE_LOG"; return "$SWIFT_FIXTURE_SCRIPT_STATUS"; }\n' +
 			'tee() { command tee "$@"; return "$SWIFT_FIXTURE_TEE_STATUS"; }\n' +
 			run;
@@ -381,6 +419,18 @@ try {
 			cwd: repository,
 			env: {
 				...process.env,
+				SWIFT_FIXTURE_PLATFORM: process.platform,
+				SWIFT_FIXTURE_NODE: process.execPath.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_TIS_PORT: path
+					.join(__dirname, 'fixtures/tis_fixture_metadata_port.cjs')
+					.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_PYTHON_PORT: path
+					.join(__dirname, 'fixtures/swift_workflow_checkpoint_port.py')
+					.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_PYTHON_BODY: path
+					.join(fixture, 'workflow-publisher.py')
+					.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_PYTHON: pythonExecutable.replaceAll('\\', '/'),
 				RUNNER_TEMP: fixture.replaceAll('\\', '/'),
 				GITHUB_OUTPUT: path.join(fixture, 'step-outputs').replaceAll('\\', '/'),
 				SWIFT_FIXTURE_PUBLISHER: fixturePublisher.replaceAll('\\', '/'),
@@ -622,12 +672,23 @@ try {
 				'));'
 		);
 		const harness =
+			fixtureCheckpointHarness(commands, runner) +
 			'script() { node "$SWIFT_FIXTURE_PUBLISHER" || return $?; cat "$SWIFT_FIXTURE_LOG"; }\n' +
 			commands;
 		const result = spawnSync(bashExecutable(), ['-c', harness], {
 			cwd: repository,
 			env: {
 				...process.env,
+				SWIFT_FIXTURE_PLATFORM: process.platform,
+				SWIFT_FIXTURE_NODE: process.execPath.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_TIS_PORT: path
+					.join(__dirname, 'fixtures/tis_fixture_metadata_port.cjs')
+					.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_PYTHON_PORT: path
+					.join(__dirname, 'fixtures/swift_workflow_checkpoint_port.py')
+					.replaceAll('\\', '/'),
+				SWIFT_FIXTURE_PYTHON_BODY: path.join(runner, 'workflow-publisher.py').replaceAll('\\', '/'),
+				SWIFT_FIXTURE_PYTHON: pythonExecutable.replaceAll('\\', '/'),
 				RUNNER_TEMP: runner.replaceAll('\\', '/'),
 				GITHUB_OUTPUT: path.join(runner, 'outputs').replaceAll('\\', '/'),
 				SWIFT_FIXTURE_PUBLISHER: producer.replaceAll('\\', '/'),

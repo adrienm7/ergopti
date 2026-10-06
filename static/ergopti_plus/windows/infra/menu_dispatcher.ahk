@@ -443,21 +443,55 @@ _TrackedDispatch(TrackedObj, Args*) {
 ; @param Attempt {Integer} Looks made so far; 0 for the click itself.
 ; @param BusyFn {Func} Test seam: whether a configuration write is in progress.
 ; @param ArmFn {Func} Test seam for the one-shot timer, TimerArmOneShotMs by default.
-; @param Registration {Object|Integer} Optional native item identity for startup retirement checks.
-; @returns {Any} What the command returned, "" when it was deferred.
+; @param Registration {Object|Integer} Optional native item identity retained through startup and write deferral.
+; @returns {Any} What the command returned, "" when deferred, false when its registration retired.
+/** Freezes the accepted item/token without retaining a native Menu object. */
+_MenuCommandRegistrationSnapshot(Registration) {
+		if (Registration is Integer) && Registration == 0
+				return 0
+		if !(Registration is Object) || !Registration.HasOwnProp("ItemId")
+				|| !Registration.HasOwnProp("Token")
+				throw TypeError("A menu command registration requires an item and token.")
+		AcceptedItem := Registration.ItemId
+		AcceptedToken := Registration.Token
+		if !(AcceptedItem is Integer) || AcceptedItem <= 0
+				|| !(AcceptedToken is Integer) || AcceptedToken <= 0
+				throw TypeError("A menu command registration requires positive integer identity.")
+		return {ItemId: AcceptedItem, Token: AcceptedToken}
+}
+
+/** Checks the actual dispatcher token table; legacy commands explicitly pass zero. */
+_MenuCommandRegistrationCurrent(Registration) {
+		global _MenuDispatchTokens
+		if (Registration is Integer) && Registration == 0
+				return true
+		if !(Registration is Object)
+				return false
+		PreviousCritical := Critical("On")
+		try return _MenuDispatchTokens.Has(Registration.ItemId)
+				&& (_MenuDispatchTokens[Registration.ItemId] is Integer)
+				&& _MenuDispatchTokens[Registration.ItemId] == Registration.Token
+		finally Critical(PreviousCritical)
+}
+
 MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registration := 0) {
 		global MENU_COMMAND_DEFERRAL_RETRY_MS, MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS
 		if !HasMethod(Callback, "Call")
 				throw TypeError("A menu command must be callable.")
+		Registration := _MenuCommandRegistrationSnapshot(Registration)
+		if !_MenuCommandRegistrationCurrent(Registration) {
+				try LoggerWarn("MenuDispatcher", "Menu command refused because its native registration was retired.")
+				return false
+		}
 		if MenuStartupCommands_Defer(Callback, Args, Registration)
 			return ""
-		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigWriteLeaseBusy()
+		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigMutationBusy()
 		if (Busy and Attempt < MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS) {
 				if (Attempt == 0)
 						try LoggerInfo("MenuDispatcher", "Menu command deferred: a configuration write is in progress; it runs when that write ends.")
 				Arm := HasMethod(ArmFn, "Call") ? ArmFn : TimerArmOneShotMs
 				try {
-						Arm.Call(_MenuCommandRetry.Bind(Callback, Args, Attempt + 1, BusyFn, ArmFn), MENU_COMMAND_DEFERRAL_RETRY_MS)
+						Arm.Call(_MenuCommandRetry.Bind(Callback, Args, Attempt + 1, BusyFn, ArmFn, Registration), MENU_COMMAND_DEFERRAL_RETRY_MS)
 						return ""
 				} catch as Err {
 						; No timer, no later run: the command must not be lost.
@@ -469,12 +503,17 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 		} else if (Attempt > 0) {
 				try LoggerInfo("MenuDispatcher", "Deferred menu command runs after {1} ms.", Attempt * MENU_COMMAND_DEFERRAL_RETRY_MS)
 		}
+		; Readiness, scheduling and diagnostics may yield to a root replacement.
+		if !_MenuCommandRegistrationCurrent(Registration) {
+				try LoggerWarn("MenuDispatcher", "Menu command refused because its native registration retired before delivery.")
+				return false
+		}
 		return Callback.Call(Args*)
 }
 
 ; The one-shot timer's callback of a deferred menu command.
-_MenuCommandRetry(Callback, Args, Attempt, BusyFn, ArmFn, *) {
-		MenuCommandRun(Callback, Args, Attempt, BusyFn, ArmFn)
+_MenuCommandRetry(Callback, Args, Attempt, BusyFn, ArmFn, Registration := 0, *) {
+		MenuCommandRun(Callback, Args, Attempt, BusyFn, ArmFn, Registration)
 }
 
 ; Variant for items added via ``Menu.Insert(BeforeItem, ItemName, Callback)``.
