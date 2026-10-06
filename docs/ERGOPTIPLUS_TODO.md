@@ -5584,6 +5584,20 @@ new controls. Source review is clear and the unchanged601 native-call budget
 is met; native parser success, all14 tests and packaging remain unexecuted
 until the next hosted CI. The lexer change is an unproven diagnosis hypothesis.
 
+Native run37446596183 records9,690 Windows passes and11 failures. The original
+menu, logger, lifecycle and timer guards now pass, but valid program descriptors
+remain refused after successful string/cursor decoding. Fixed private parser
+stages and independent delimiter, numeric and empty-string controls now localize
+that refusal without changing its guards or logging input/exception messages.
+The isolated shutdown fixture loads the actual polling dependency graph and
+captured timing values, with strict per-mode callback and handle cleanup. All
+145 existing assertions remain; the candidate15 methods require native CI.
+The Linux GTK operand fixture adds only closed stage/case/exit annotations on
+its original failure branch. Actual unchanged current/dev13 and the candidate
+each pass4/4 locally, with12 descendants reaped and no pending debt. Its remote
+failure remains unexplained. Existing invocation/assertion/cleanup budgets are
+unchanged; this diagnostic slice does not qualify either refused boundary.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
