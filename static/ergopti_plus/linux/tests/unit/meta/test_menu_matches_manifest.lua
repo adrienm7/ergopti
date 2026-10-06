@@ -91,6 +91,86 @@ local function find_item(items, title)
 	return nil
 end
 
+-- The provider list is genuine, while its entries file belongs to this fixture.
+-- Fresh backend and builder modules must capture this exact private owner, not
+-- a prior module whose source path or cached entries belong to another test.
+local API_SOURCE_MODULES = {
+	"modules.llm.api_entries", "ui.menu.llm_backend_rows", "ui.menu.menu_builder",
+}
+
+--- Builds with a genuine private API source and restores the complete module cohort.
+--- @param scenario function Receives the actual builder, entries owner and source path.
+--- @return any
+local function with_api_source(scenario)
+	local path = os.tmpname()
+	local source = '{"version":1,"active_id":"","entries":[]}\n'
+	local previous = {}
+	for _, name in ipairs(API_SOURCE_MODULES) do previous[name] = rawget(package.loaded, name) end
+	local file
+	local ok, result = xpcall(function()
+		file = assert(io.open(path, "wb"))
+		assert(file:write(source)); assert(file:close()); file = nil
+		for _, name in ipairs(API_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
+		local entries = require("modules.llm.api_entries")
+		entries._set_path_for_test(path)
+		require("ui.menu.llm_backend_rows")
+		local builder = require("ui.menu.menu_builder")
+		return scenario(builder, entries, path)
+	end, debug.traceback)
+	local closed = true
+	if file then
+		local close_ok, close_receipt = pcall(file.close, file)
+		closed = close_ok and close_receipt == true
+	end
+	for _, name in ipairs(API_SOURCE_MODULES) do rawset(package.loaded, name, previous[name]) end
+	for _, owned_path in ipairs({ path, path .. ".corrupt" }) do
+		local owned = io.open(owned_path, "rb")
+		if owned then assert(owned:close()); assert(os.remove(owned_path)) end
+	end
+	for _, name in ipairs(API_SOURCE_MODULES) do
+		helpers.assert_true(rawequal(rawget(package.loaded, name), previous[name]), name)
+	end
+	helpers.assert_eq(closed, true, "the private seed descriptor closes on every exit")
+	if not ok then error(result, 0) end
+	return result
+end
+
+--- Builds the real tray with a scoped entries source, retaining native callbacks.
+--- @param context table
+--- @return table
+--- Builds with the actual ordered-pair owner over an owned neutral source.
+--- Native editing is not exercised by this menu-shape fixture.
+local function build_fixture_menu(context)
+	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations"}
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local ok, rows = pcall(function()
+		local Paths = require("infra.paths")
+		local file = assert(io.open(Paths.shared("tap_hold/defaults.toml"), "rb"))
+		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
+		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
+		context.is_paused = function() return false end
+		context.gestures.is_assignable = function() return false end
+		context.gestures.capture_parameter_source_guard = function() return function() return true end end
+		local owner = Pair.new({keys = context.tap_holds.key_catalog(), hold_picker = defaults.tap_hold.hold_picker,
+			route = function() return "/controlled/menu-certification.toml" end,
+			files = {read_with_status = function() return nil, "absent" end},
+			actions = context.gestures, is_paused = context.is_paused, changed = function() return true end})
+		helpers.assert_true(Pair.set_instance(owner))
+		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
+			edit = function() error("menu-shape fixture cannot publish") end}
+		package.loaded["ui.menu.key_combinations"] = nil
+		return with_api_source(function(builder) return builder.build(context) end)
+	end)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(rows, 0) end
+	return rows
+end
+
+--- Composes both genuine native source owners for the whole-tray fixture.
+local function build_full_menu(context)
+	return build_fixture_menu(context)
+end
+
 --- A menu context complete enough for every submenu to build.
 ---
 --- Stubs rather than real modules: this test asks whether the BUILDER renders
@@ -101,6 +181,15 @@ local function full_context()
 	local function noop() end
 	return {
 		_version = "9.9.9",
+		-- The API backend reaches the real provider-list builder. Without this
+		-- collaborator the whole-tray fixture takes the unavailable-LLM branch
+		-- before any declared API control can be rendered.
+		llm = {
+			is_enabled  = function() return true end,
+			toggle      = noop,
+			get_backend = function() return "api" end,
+			set_backend = noop,
+		},
 		config = {
 			get_groups         = function() return {} end,
 			is_group_enabled   = function() return true end,
@@ -181,34 +270,6 @@ end
 
 
 
---- Builds with the actual ordered-pair owner over an owned neutral source.
---- Native editing is not exercised by this menu-shape fixture.
-local function build_fixture_menu(context)
-	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations"}
-	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	local ok, rows = pcall(function()
-		local Paths = require("infra.paths")
-		local file = assert(io.open(Paths.shared("tap_hold/defaults.toml"), "rb"))
-		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
-		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
-		context.is_paused = function() return false end
-		context.gestures.is_assignable = function() return false end
-		context.gestures.capture_parameter_source_guard = function() return function() return true end end
-		local owner = Pair.new({keys = context.tap_holds.key_catalog(), hold_picker = defaults.tap_hold.hold_picker,
-			route = function() return "/controlled/menu-certification.toml" end,
-			files = {read_with_status = function() return nil, "absent" end},
-			actions = context.gestures, is_paused = context.is_paused, changed = function() return true end})
-		helpers.assert_true(Pair.set_instance(owner))
-		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
-			edit = function() error("menu-shape fixture cannot publish") end}
-		package.loaded["ui.menu.key_combinations"] = nil
-		return helpers.load_module("ui.menu.menu_builder").build(context)
-	end)
-	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	if not ok then error(rows, 0) end
-	return rows
-end
-
 -- =================================================================
 -- =================================================================
 -- ======= 1/ Every declared row is on screen ======================
@@ -222,8 +283,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 
 	helpers.before_each(function()
 		if built then return end
-		local mb = helpers.load_module("ui.menu.menu_builder")
-		built = build_fixture_menu(full_context())
+		built = build_full_menu(full_context())
 		titles = {}
 		for _, title in ipairs(all_titles(built)) do titles[title] = true end
 	end)
@@ -244,6 +304,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 		local fixture_captions = {
 			tap_hold_key_tap_caption = i18n.get("tap_hold.tap.none"),
 			tap_hold_key_hold_caption = i18n.get("tap_hold.hold.none"),
+			tap_hold_key_delay_caption = "0 ms",
 		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
@@ -303,8 +364,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 				return true
 			end,
 		}
-		local mb = helpers.load_module("ui.menu.menu_builder")
-		local row = find_item(build_fixture_menu(context), i18n.get("menu.shortcuts.edit_personal_info"))
+		local row = find_item(build_full_menu(context), i18n.get("menu.shortcuts.edit_personal_info"))
 		helpers.assert_not_nil(row, "the shared editor must have a production caller")
 		helpers.assert_true(type(row.fn) == "function")
 		row.fn()
@@ -325,7 +385,6 @@ end)
 helpers.describe("menu certification: no empty submenu", function()
 
 	helpers.it("gives every submenu at least one row", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
 		local empty = {}
 
 		local function walk(items, path)
@@ -337,7 +396,7 @@ helpers.describe("menu certification: no empty submenu", function()
 				end
 			end
 		end
-		walk(build_fixture_menu(full_context()), "")
+		walk(build_full_menu(full_context()), "")
 
 		helpers.assert_eq(#empty, 0,
 			"a submenu that opens onto nothing is worse than a missing one: the user "
@@ -346,3 +405,460 @@ helpers.describe("menu certification: no empty submenu", function()
 	end)
 
 end)
+
+
+helpers.describe("menu certification: actual API context reachability", function()
+
+	helpers.it("reaches the genuine provider children without running mutation callbacks", function()
+		local context = full_context()
+		local mutations = 0
+		context.llm.toggle = function() mutations = mutations + 1 end
+		context.llm.set_backend = function() mutations = mutations + 1 end
+		helpers.assert_eq(context.llm.get_backend(), "api")
+		with_api_source(function(mb)
+			local menu = mb.build(context)
+			local remote = require("modules.llm.api_remote")
+			local entries = require("modules.llm.api_entries")
+			local add = find_item(menu, i18n.get("menu.llm.api_add_entry"))
+			helpers.assert_not_nil(add, "the complete context must reach the real API provider group")
+			helpers.assert_type(add.menu, "table")
+			local providers = remote.providers()
+			helpers.assert_true(#providers >= 16, "the actual shipped cloud catalogue must be reached")
+			helpers.assert_eq(#add.menu, #providers)
+			for index, provider in ipairs(providers) do
+				helpers.assert_eq(add.menu[index].title, "➕ " .. provider.label)
+				helpers.assert_type(add.menu[index].fn, "function")
+			end
+			helpers.assert_eq(add.menu[1].title, "➕ OpenAI")
+			helpers.assert_eq(add.menu[2].title, "➕ Anthropic")
+			helpers.assert_eq(add.menu[3].title, "➕ Google Gemini")
+			helpers.assert_true(rawequal(remote, package.loaded["modules.llm.api_remote"]))
+			helpers.assert_true(rawequal(entries, package.loaded["modules.llm.api_entries"]))
+			helpers.assert_eq(mutations, 0, "building the whole tray must not change the runtime backend")
+		end)
+	end)
+
+	helpers.it("keeps the genuine unavailable branch separate from the complete API context", function()
+		local context = full_context()
+		context.llm = nil
+		local menu = build_full_menu(context)
+		helpers.assert_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")))
+		helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.unavailable")))
+		helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.ollama_start_hint")))
+	end)
+
+end)
+
+
+helpers.describe("menu certification: private API source lifecycle", function()
+
+	helpers.it("restores absent, false and genuine previous owners after successful and raised builds", function()
+		local original, actual = {}, {}
+		for _, name in ipairs(API_SOURCE_MODULES) do
+			original[name] = rawget(package.loaded, name)
+			actual[name] = require(name)
+		end
+		local ok, detail = pcall(function()
+			for _, mode in ipairs({ "absent", "false", "existing" }) do
+				local expected = {}
+				for _, name in ipairs(API_SOURCE_MODULES) do
+					if mode == "false" then expected[name] = false end
+					if mode == "existing" then expected[name] = actual[name] end
+					rawset(package.loaded, name, expected[name])
+				end
+				local menu = build_full_menu(full_context())
+				helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")))
+				local private_path
+				local succeeded, raised = pcall(function()
+					with_api_source(function(builder, entries, path)
+						private_path = path
+						helpers.assert_eq(entries.path(), path)
+						helpers.assert_eq(#entries.list(), 0)
+						helpers.assert_not_nil(find_item(builder.build(full_context()), i18n.get("menu.llm.api_add_entry")))
+						error("private API scope sentinel")
+					end)
+				end)
+				helpers.assert_eq(succeeded, false)
+				helpers.assert_contains(raised, "private API scope sentinel")
+				helpers.assert_not_nil(private_path)
+				helpers.assert_nil(io.open(private_path, "rb"))
+				helpers.assert_nil(io.open(private_path .. ".corrupt", "rb"))
+				for _, name in ipairs(API_SOURCE_MODULES) do
+					helpers.assert_true(rawequal(rawget(package.loaded, name), expected[name]), name .. "/" .. mode)
+				end
+			end
+		end)
+		for _, name in ipairs(API_SOURCE_MODULES) do rawset(package.loaded, name, original[name]) end
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("restores the genuine previous cohort after builder construction refuses", function()
+		local previous = {}
+		for _, name in ipairs(API_SOURCE_MODULES) do previous[name] = rawget(package.loaded, name) end
+		local name = "ui.menu.menu_builder"
+		local preload = rawget(package.preload, name)
+		local private_path
+		rawset(package.preload, name, function()
+			private_path = assert(rawget(package.loaded, "modules.llm.api_entries")).path()
+			error("private builder construction sentinel")
+		end)
+		local ok, detail = pcall(function() build_full_menu(full_context()) end)
+		rawset(package.preload, name, preload)
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(detail, "private builder construction sentinel")
+		helpers.assert_not_nil(private_path)
+		helpers.assert_nil(io.open(private_path, "rb"))
+		helpers.assert_nil(io.open(private_path .. ".corrupt", "rb"))
+		for _, module_name in ipairs(API_SOURCE_MODULES) do
+			helpers.assert_true(rawequal(rawget(package.loaded, module_name), previous[module_name]), module_name)
+		end
+	end)
+
+end)
+
+
+-- Actual inert absent-module projections, preserving the original whole-tray prefix.
+local function absent_module_corpus()
+	local path = require("infra.paths").shared("tests/corpus/menus/linux_absent_modules.json")
+	local file = assert(io.open(path, "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(require("json").decode(bytes))
+end
+
+local function with_absent_current(scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
+	local native = require("infra.i18n")
+	helpers.assert_true(rawequal(native, i18n), "the original caption reader is the genuine current cohort")
+	helpers.assert_true(rawequal(require("infra.manifest_menu"), ManifestMenu))
+	local before = native.get_locale()
+	local owner = { pending = function() return false end }
+	assert(native.scope_acquire(owner))
+	local receipt = assert(native.scope_capture(owner))
+	local ok, result = xpcall(function()
+		assert(native.scope_apply(owner, receipt, "en"))
+		return scenario()
+	end, debug.traceback)
+	assert(native.scope_restore(owner, receipt))
+	assert(native.scope_release(owner)); assert(native.scope_forget(owner, receipt))
+	helpers.assert_eq(native.get_locale(), before, "the genuine predecessor locale is restored")
+	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+	if not ok then error(result, 0) end
+	return result
+end
+
+
+-- Earlier suite cases can replace the backend under a cached caption reader.
+-- Own a fresh, initialized native cohort for these new projections, then restore
+-- the exact predecessor modules and file-local readers even if construction raises.
+local function with_absent_english(scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
+	local prior_i18n, prior_manifest = i18n, ManifestMenu
+	local ok, result = xpcall(function()
+		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
+		local native = require("infra.i18n")
+		native.init()
+		i18n = native
+		ManifestMenu = require("infra.manifest_menu")
+		return with_absent_current(scenario)
+	end, debug.traceback)
+	i18n, ManifestMenu = prior_i18n, prior_manifest
+	for _, name in ipairs(names) do rawset(package.loaded, name, prior[name]) end
+	helpers.assert_true(rawequal(i18n, prior_i18n), "the original caption reader is restored")
+	helpers.assert_true(rawequal(ManifestMenu, prior_manifest), "the original renderer is restored")
+	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+	if not ok then error(result, 0) end
+	return result
+end
+
+local function absent_context()
+	-- No data owner is constructed to manufacture absence. Native ctx fields are absent.
+	return { _version = "9.9.9", on_menu_changed = function() error("inert status must not mutate") end }
+end
+
+helpers.describe("linux-absent-module templates: actual native branches", function()
+	for _, vector in ipairs(absent_module_corpus().owners) do
+		local contract = vector
+		helpers.it(contract.owner .. " consumes its exact disabled declaration and refuses withdrawn status", function()
+			with_absent_english(function()
+				local root = ManifestMenu.get_root()
+				local original = root[contract.section]
+				helpers.assert_type(original, "table")
+				local function inspect()
+					return with_api_source(function(builder, entries, path)
+						local function physical_source()
+							local file = assert(io.open(path, "rb"))
+							local bytes = assert(file:read("*a")); assert(file:close())
+							return bytes
+						end
+						local before, changes = physical_source(), 0
+						local context = absent_context()
+						context.on_menu_changed = function() changes = changes + 1 end
+						local menu = builder.build(context)
+						helpers.assert_eq(changes, 0, "inert status construction cannot publish a native change")
+						helpers.assert_eq(physical_source(), before, "the genuine private source is byte-exact")
+						helpers.assert_nil(io.open(path .. ".corrupt", "rb"))
+						helpers.assert_eq(entries.path(), path)
+						return find_item(menu, i18n.get(contract.parent_key))
+					end)
+				end
+				local row = assert(inspect())
+				helpers.assert_eq(#row.menu, #contract.english)
+				for index, caption in ipairs(contract.english) do
+					helpers.assert_eq(row.menu[index].title, caption)
+					helpers.assert_eq(row.menu[index].disabled, true)
+					helpers.assert_nil(row.menu[index].fn)
+				end
+				local marker = { type = "label", id = "hand_absent_marker", i18n = "button.cancel", platforms = { "linux" }, unavailable = "hide" }
+				local ok, detail = xpcall(function()
+					root[contract.section] = { marker }
+					local changed = assert(inspect())
+					helpers.assert_eq(#changed.menu, 1)
+					helpers.assert_eq(changed.menu[1].title, "Cancel")
+					helpers.assert_eq(changed.menu[1].disabled, true)
+					helpers.assert_nil(changed.menu[1].fn)
+					root[contract.section] = nil
+					helpers.assert_nil(inspect(), "withdrawn status must not be silently rebuilt in native source")
+					root[contract.section] = { { type = "command", id = "hand_unbound_status", i18n = "button.cancel" } }
+					helpers.assert_nil(inspect(), "unbound command cannot replace inert unavailable status")
+				end, debug.traceback)
+				root[contract.section] = original
+				if not ok then error(detail, 0) end
+				local repaired = assert(inspect())
+				helpers.assert_eq(#repaired.menu, #contract.english)
+				for index, caption in ipairs(contract.english) do
+					helpers.assert_eq(repaired.menu[index].title, caption)
+					helpers.assert_eq(repaired.menu[index].disabled, true)
+					helpers.assert_nil(repaired.menu[index].fn)
+				end
+			end)
+		end)
+	end
+
+	helpers.it("projects exactly the true Linux-only status role through the genuine shared renderer", function()
+		with_absent_english(function()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({
+					platform = platform,
+					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("json").decode,
+					i18n = i18n,
+					logger = require("logger.shim"),
+				}))
+				for _, contract in ipairs(absent_module_corpus().owners) do
+					local rows = assert(renderer.template_rows(contract.section, {}, {}, {}))
+					helpers.assert_eq(#rows, platform == "linux" and #contract.english or 0)
+					for index, row in ipairs(rows) do
+						helpers.assert_eq(row.label, contract.english[index])
+						helpers.assert_eq(row.disabled, true)
+						helpers.assert_nil(row.action)
+					end
+				end
+			end
+		end)
+	end)
+
+	helpers.it("restores its genuine French/English caption cohort after an exception", function()
+		local before = i18n.get_locale()
+		local ok, detail = pcall(function()
+			with_absent_english(function() error("absent locale sentinel") end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(detail, "absent locale sentinel")
+		helpers.assert_eq(i18n.get_locale(), before)
+	end)
+
+	helpers.it("retains the empty whole-tray contract when the actual shared renderer cannot load", function()
+		with_api_source(function(_, entries, path)
+			-- The already constructed genuine backend retains its private source owner.
+			-- Only the new builder's optional renderer admission is withdrawn.
+			helpers.assert_eq(entries.path(), path)
+			local name, builder_name = "infra.manifest_menu", "ui.menu.menu_builder"
+			local prior, preload = rawget(package.loaded, name), rawget(package.preload, name)
+			local old_builder = rawget(package.loaded, builder_name)
+			local ok, detail = xpcall(function()
+				rawset(package.loaded, name, nil)
+				rawset(package.preload, name, function() error("genuine renderer unavailable sentinel") end)
+				rawset(package.loaded, builder_name, nil)
+				local actual_builder = require(builder_name)
+				helpers.assert_eq(#actual_builder.build(absent_context()), 0)
+			end, debug.traceback)
+			rawset(package.preload, name, preload); rawset(package.loaded, name, prior)
+			rawset(package.loaded, builder_name, old_builder)
+			helpers.assert_true(rawequal(rawget(package.loaded, name), prior))
+			helpers.assert_true(rawequal(rawget(package.preload, name), preload))
+			helpers.assert_true(rawequal(rawget(package.loaded, builder_name), old_builder))
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)
+
+
+local function control_boundary_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_control_boundaries.json"), "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(require("json").decode(bytes))
+end
+
+--- Reuses the existing physical-source sandbox with genuine native preference/settings owners.
+local function with_control_trigger_source(scenario)
+	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	Sandbox.with_config('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
+		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n', function(path)
+		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
+		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name); rawset(package.loaded, name, nil) end
+		local Paths = require("infra.config_paths")
+		local original = Paths.config
+		Paths.config = function(relative) helpers.assert_eq(relative, "config.toml"); return path end
+		local ok, detail = xpcall(function()
+			local settings = require("modules.llm.trigger_settings")
+			scenario(settings, path, Sandbox)
+		end, debug.traceback)
+		Paths.config = original
+		for _, name in ipairs(names) do rawset(package.loaded, name, prior[name]) end
+		helpers.assert_true(rawequal(Paths.config, original))
+		for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+		if not ok then error(detail, 0) end
+	end)
+end
+
+helpers.describe("llm-control-boundaries: actual Linux trigger provider", function()
+	helpers.it("retains the native debounce writer and shared privacy order around the boundary (llm-control-boundaries)", function()
+		with_absent_english(function()
+			with_control_trigger_source(function(settings, path, Sandbox)
+				local expected = control_boundary_corpus()
+				local boundary = expected.boundaries.trigger
+				local root, original = ManifestMenu.get_root(), ManifestMenu.get_array(boundary.section)
+				local context, changes = full_context(), 0
+				context.on_menu_changed = function() changes = changes + 1 end
+				local function build()
+					return with_api_source(function(builder, entries, api_path)
+						local source = Sandbox.read_bytes(api_path)
+						local rows = builder.build(context)
+						helpers.assert_eq(Sandbox.read_bytes(api_path), source)
+						helpers.assert_nil(io.open(api_path .. ".corrupt", "rb"))
+						helpers.assert_eq(entries.path(), api_path)
+						return find_item(rows, i18n.get("menu.llm.trigger_menu_title"))
+					end)
+				end
+				local row = assert(build())
+				helpers.assert_eq(row.menu[1].title, expected.trigger_debounce_english)
+				helpers.assert_eq(row.menu[2].title, "-")
+				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_url_bars")))
+				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_password_fields")))
+				local before = Sandbox.read_bytes(path)
+				local ok, detail = xpcall(function()
+					root[boundary.section] = { { type = "label", id = "hand_trigger_boundary", i18n = expected.marker_key,
+						platforms = { "ahk", "linux" }, unavailable = "hide" } }
+					row = assert(build()); helpers.assert_eq(row.menu[2].title, expected.marker_english)
+					helpers.assert_eq(row.menu[2].disabled, true); helpers.assert_nil(row.menu[2].fn)
+					helpers.assert_eq(changes, 0); helpers.assert_eq(Sandbox.read_bytes(path), before)
+					local preset = assert(find_item(row.menu[1].menu, "50 ms"))
+					helpers.assert_type(preset.fn, "function"); helpers.assert_nil(preset.fn())
+					helpers.assert_eq(settings.get("debounce_ms"), 50); helpers.assert_eq(changes, 1)
+					helpers.assert_eq(Sandbox.read_bytes(path), before:gsub("debounce_ms = 500", "debounce_ms = 50"))
+					root[boundary.section] = nil
+					helpers.assert_nil(build(), "withdrawn boundary refuses the genuine native trigger child")
+					root[boundary.section] = { { type = "command", id = "hand_unbound_trigger_boundary", i18n = expected.marker_key } }
+					helpers.assert_nil(build())
+					helpers.assert_eq(changes, 1)
+					helpers.assert_eq(Sandbox.read_bytes(path), before:gsub("debounce_ms = 500", "debounce_ms = 50"))
+				end, debug.traceback)
+				root[boundary.section] = original
+				if not ok then error(detail, 0) end
+				row = assert(build()); helpers.assert_eq(row.menu[2].title, "-")
+				helpers.assert_eq(changes, 1)
+			end)
+		end)
+	end)
+
+	helpers.it("projects independent platform boundaries using the actual initialized renderer (llm-control-boundaries)", function()
+		with_absent_english(function()
+			local expected = control_boundary_corpus()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({ platform = platform,
+					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("json").decode, i18n = i18n, logger = require("logger.shim") }))
+				for _, boundary in pairs(expected.boundaries) do
+					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
+				end
+			end
+		end)
+	end)
+
+	helpers.it("restores original source-routing and module identities after raised native construction (llm-control-boundaries)", function()
+		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
+		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
+		local Paths = require("infra.config_paths"); local original = Paths.config
+		local path
+		local ok, detail = pcall(function()
+			with_control_trigger_source(function(_, owned) path = owned; error("trigger boundary inverse sentinel") end)
+		end)
+		helpers.assert_eq(ok, false); helpers.assert_contains(detail, "trigger boundary inverse sentinel")
+		helpers.assert_true(rawequal(Paths.config, original))
+		for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), prior[name]), name) end
+		helpers.assert_nil(io.open(path, "rb"))
+	end)
+end)
+
+
+helpers.describe("selection boundary fragments in the complete native tray", function()
+	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
+	local file = assert(io.open(path, "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	local corpus = assert(require("json").decode(bytes))
+
+	helpers.it("keeps the independently declared nine-row selection order without invoking an action", function()
+		with_absent_english(function()
+			local context, changes = full_context(), 0
+			context.on_menu_changed = function() changes = changes + 1 end
+			local parent = assert(find_item(build_full_menu(context), i18n.get(corpus.parent_key)))
+			local first
+			for index, row in ipairs(parent.menu) do
+				if row.title == corpus.selection_child_order[1].english then first = index; break end
+			end
+			helpers.assert_type(first, "number")
+			for offset, expected in ipairs(corpus.selection_child_order) do
+				local row = parent.menu[first + offset - 1]
+				helpers.assert_type(row, "table")
+				helpers.assert_eq(row.title, expected.separator and "-" or expected.english)
+				if expected.separator then helpers.assert_nil(row.fn) end
+			end
+			helpers.assert_eq(changes, 0)
+		end)
+	end)
+
+	helpers.it("follows both actual fragment captions at their exact whole-tray positions", function()
+		with_absent_english(function()
+			local root = ManifestMenu.get_root()
+			local originals = { root.selection_case_boundary, root.selection_helper_boundary }
+			local sections = { "selection_case_boundary", "selection_helper_boundary" }
+			local ok, detail = xpcall(function()
+				for _, section in ipairs(sections) do
+					root[section] = { { type = "label", id = "selection_tray_marker",
+						i18n = corpus.marker_key, platforms = { "linux" }, unavailable = "hide" } }
+				end
+				local parent = assert(find_item(build_full_menu(full_context()), i18n.get(corpus.parent_key)))
+				local first
+				for index, row in ipairs(parent.menu) do
+					if row.title == corpus.selection_child_order[1].english then first = index; break end
+				end
+				helpers.assert_type(first, "number")
+				for offset, expected in ipairs(corpus.selection_child_order) do
+					local row = parent.menu[first + offset - 1]
+					helpers.assert_eq(row.title, expected.separator and corpus.marker_english or expected.english)
+					if expected.separator then
+						helpers.assert_eq(row.disabled, true)
+						helpers.assert_nil(row.fn)
+					end
+				end
+			end, debug.traceback)
+			for index, section in ipairs(sections) do root[section] = originals[index] end
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)
+
+
+require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))

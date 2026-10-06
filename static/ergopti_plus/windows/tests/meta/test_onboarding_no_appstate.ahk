@@ -75,7 +75,7 @@ Test("onboarding: _Onboarding_Commit does not access AppState (UnsetError crash 
 _ONA_CommitPublishesOnlyAfterPersistence() {
         Seg := _DriverFuncBody("_Onboarding_Commit")
         WebFinish := _DriverFuncBody("_OnbWeb_Finish")
-		BuildPos := InStr(Seg, "TOML_BuildUpdatedContent(")
+		BuildPos := InStr(Seg, "TOML_BuildConfigUpdatedContent(")
 		TargetsPos := InStr(Seg, "TargetSpecs := [ConfigTransitionPresentTarget(CandidateConfig")
 		LocatorPos := InStr(Seg,
 			"TargetSpecs.Push(ConfigTransitionPresentTarget(_PathsFile")

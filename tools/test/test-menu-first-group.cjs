@@ -67,6 +67,25 @@ const WORD_EXPANDER_CONTROLS = JSON.parse(
 	)
 ).rows;
 
+const WRAP_CONTROLS = JSON.parse(
+	fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'tests',
+			'corpus',
+			'menus',
+			'wrap_symbol_controls.json'
+		),
+		'utf8'
+	)
+);
+const WRAP_GLOBAL = WRAP_CONTROLS.sections.find(
+	(section) => section.section === 'wrap_symbols_global_controls'
+).rows;
+
 // Menus whose clear row the maintainer retired: the first group is the switch
 // and the restore alone, and a clear row there is a regression.
 const RESTORE_ONLY = {
@@ -170,6 +189,10 @@ function checkMenu(menu, rows, errors) {
 		checkWordExpanderMenu(rows, errors);
 		return 0;
 	}
+	if (menu === 'wrap_symbols_global_controls') {
+		checkWrapBulkHead(rows, errors);
+		return 0;
+	}
 	let checked = 0;
 	for (const row of rows) {
 		const kind = scopeKind(row);
@@ -261,6 +284,38 @@ function checkWordExpanderMenu(rows, errors) {
 		}
 		if (!shown[4] || shown[4].type !== 'list' || shown[4].id !== 'word_expander_entries') {
 			errors.push(`${where} must retain its native delimiter catalogue provider.`);
+		}
+	}
+}
+
+/** The existing native bulk head keeps its complete independent declaration. */
+function checkWrapBulkHead(rows, errors) {
+	for (const platform of PLATFORMS) {
+		// Its trailing separator separates the subsequent native catalogue;
+		// projection must retain that boundary within this composed fragment.
+		const shown = rows.filter((row) => shownOn(row, platform));
+		const expected = WRAP_CONTROLS.platforms.includes(platform) ? WRAP_GLOBAL : [];
+		if (shown.length !== expected.length)
+			errors.push(`wrap_symbols_global_controls (${platform}) lost its complete bulk head.`);
+		for (const [index, wanted] of expected.entries()) {
+			const row = shown[index];
+			const valid = wanted.separator
+				? row?.type === '---'
+				: row?.type === 'command' &&
+					row.id === wanted.id &&
+					row.i18n === wanted.i18n &&
+					(row.command === undefined || row.command === wanted.id) &&
+					JSON.stringify(row.disabled_when) === JSON.stringify(wanted.disabled_when);
+			if (!valid)
+				errors.push(`wrap_symbols_global_controls (${platform}) changed bulk row ${index + 1}.`);
+		}
+		for (const row of rows) {
+			if (
+				row.unavailable !== 'hide' ||
+				!Array.isArray(row.platforms) ||
+				JSON.stringify(row.platforms) !== JSON.stringify(WRAP_CONTROLS.platforms)
+			)
+				errors.push('Wrapping controls must keep their declared native capability boundary.');
 		}
 	}
 }
@@ -369,6 +424,39 @@ function describe(row) {
 	mutate((rows) => rows.push({ type: 'command', ...RESTORE }));
 }
 
+// The bulk-management fragment cannot be treated as an arbitrary scope exception.
+{
+	assert.equal(WRAP_GLOBAL.length, 4);
+	const valid = WRAP_GLOBAL.map((row) => ({
+		...(row.separator ? { type: '---' } : { type: 'command', ...row }),
+		platforms: ['ahk', 'hs'],
+		unavailable: 'hide'
+	}));
+	const run = (rows) => {
+		const errors = [];
+		checkMenu('wrap_symbols_global_controls', rows, errors);
+		return errors;
+	};
+	assert.deepEqual(run(valid), []);
+	for (const mutate of [
+		(rows) => rows.splice(0, 1),
+		(rows) => ([rows[0], rows[2]] = [rows[2], rows[0]]),
+		(rows) => (rows[2].i18n = 'wrong'),
+		(rows) => (rows[2].id = 'scope_restore'),
+		(rows) => (rows[0].type = 'toggle'),
+		(rows) => delete rows[0].disabled_when,
+		(rows) => (rows[0].platforms = ['ahk']),
+		(rows) => rows[0].platforms.push('linux'),
+		(rows) => delete rows[3].unavailable,
+		(rows) => (rows[3].type = 'command'),
+		(rows) => rows.push({ type: 'command', ...CLEAR })
+	]) {
+		const rows = JSON.parse(JSON.stringify(valid));
+		mutate(rows);
+		assert.ok(run(rows).length > 0);
+	}
+}
+
 // ==================================================
 // ==================================================
 // ======= 3/ The manifest ==========================
@@ -384,6 +472,9 @@ for (const [menu, rows] of Object.entries(manifest)) {
 	const checked = checkMenu(menu, rows, errors);
 	if (checked > 0) menusWithScopes.add(menu);
 	projections += checked;
+}
+if (!Array.isArray(manifest.wrap_symbols_global_controls)) {
+	errors.push('Wrapping-symbol bulk declaration is missing.');
 }
 if (!Array.isArray(manifest.word_expanders_menu)) {
 	errors.push('word_expanders_menu is missing: the shared bulk-head scan read nothing.');

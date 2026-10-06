@@ -179,7 +179,9 @@ function M.build(ctx, actions)
 	-- in the About submenu until 2026-08-07.
 	table.insert(menu_items, { label = ver_display, disabled = true })
 
-	table.insert(menu_items, { separator = true })
+	local separator_rows = ManifestMenu.template_rows("about_version_separator")
+	if not separator_rows then return nil end
+	for _, row in ipairs(separator_rows) do table.insert(menu_items, row) end
 
 	-- The channel picker, right before the check row. Without an owner nothing
 	-- could persist a choice, so the picker is left out rather than drawn dead.
@@ -193,23 +195,21 @@ function M.build(ctx, actions)
 		-- "Check for updates" asks the Lua driver and answers in the shared
 		-- update-check window; a row that already names a release is the user's
 		-- consent to install it, so it goes straight to Sparkle.
-		local check_row = {
-			label = i18n.get("menu.about.check_for_updates"),
-			action = function()
+		local check_action = function()
 				Logger.info(LOG, "User asked for an update check (channel: %s).", channel)
 				require("ui.update_check").open({
 					checks = checks,
 					channel_owner = owner,
 					on_change = type(ctx) == "table" and ctx.updateMenu or nil,
 				})
-			end,
-		}
+		end
+		local offered_label
 		if type(latest) == "table" and type(latest.tag) == "string" and latest.tag ~= ""
 			and type(latest.channel) == "string" and latest.channel ~= "" then
 			-- The label is consent to this offer, not to a later mutation of its table.
 			local offered_tag, offered_channel = latest.tag, latest.channel
-			check_row.label = update_now_label(offered_tag)
-			check_row.action = function()
+			offered_label = update_now_label(offered_tag)
+			check_action = function()
 				local ok, accepted = pcall(function()
 					if type(owner) ~= "table" or type(owner.get) ~= "function"
 						or type(checks) ~= "table" or type(checks.latest) ~= "function" then return false end
@@ -222,7 +222,13 @@ function M.build(ctx, actions)
 				return ok and accepted == true
 			end
 		end
-		table.insert(menu_items, check_row)
+		local check_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+			["about_source_check"] = check_action,
+		}, { ["about_source_release_ready"] = function() return not local_src end })
+		if check_row then
+			if offered_label then check_row.label = offered_label end
+			table.insert(menu_items, check_row)
+		end
 		if type(checks) == "table" then
 			table.insert(menu_items, frequency_picker(checks))
 		else

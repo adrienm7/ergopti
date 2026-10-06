@@ -1805,3 +1805,96 @@ _LAG_SystemOffOwnerRefusal() {
 	}
 }
 Test("LLM agent: shared system Off preserves transaction refusal and no-op (agent-system-off)", _LAG_SystemOffOwnerRefusal)
+
+
+; Independent model-control identity and caption; never emitted by the generator.
+_LAG_SystemModelCorpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\agent_system_model.json", "UTF-8"))
+}
+
+; Read the actual last native child and its dispatcher-owned callback.
+_LAG_NativeSystemModelRow(System, Owned) {
+	global _MenuDispatchCallbacks
+	Built := LLM_Agent_MenuBuild()
+	Owned.Push(Built)
+	Position := System == "system1" ? 2 : 3
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr")
+	Assert(Handle != 0, "the actual system owns its native submenu")
+	Sub := MenuFromHandle(Handle)
+	Count := DllCall("GetMenuItemCount", "ptr", Handle, "int")
+	Assert(Count >= 3, "the model row follows the backend choices")
+	Id := DllCall("GetMenuItemID", "ptr", Handle, "int", Count - 1, "uint")
+	Assert(_MenuDispatchCallbacks.Has(Id), "the model command keeps the real dispatcher")
+	return Map("label", _CTC_LabelAt(Sub, Count - 1), "action", _MenuDispatchCallbacks[Id])
+}
+
+_LAG_SystemModelSharedOwner() {
+	Corpus := _LAG_SystemModelCorpus()
+	_LAG_Run(_LAG_Menu("action", Corpus["spec"], Corpus["spec"]), _LTN_Screen(""), _Body.Bind(Corpus))
+	_Body(Corpus, Fx, Lines, Sent) {
+		global _LLM_Menu, _LLM_Agent_CommitFn
+		Declaration := _MR_GetManifestRoot()[Corpus["section"]][2]
+		Label := Declaration["i18n"]
+		Commit := _LLM_Agent_CommitFn
+		Owned := []
+		try {
+			for System in Corpus["systems"] {
+				Model := _LAG_NativeSystemModelRow(System, Owned)
+				AssertEqual(StrReplace(t(Corpus["label_key"]), "{1}", Corpus["model"]), Model["label"])
+			}
+			Declaration["i18n"] := Corpus["mutated_label_key"]
+			Model := _LAG_NativeSystemModelRow("system1", Owned)
+			AssertEqual(StrReplace(t(Corpus["mutated_label_key"]), "{1}", Corpus["model"]), Model["label"],
+				"the actual native child follows the shared label")
+			Fx.PromptAnswers.Push(Map("ok", true, "value", "changed-model"))
+			_LLM_Agent_CommitFn := (*) => false
+			AssertFalse(Model["action"].Call())
+			AssertEqual(Corpus["spec"], _LLM_Menu["agent_system1"])
+			AssertEqual(Corpus["spec"], _LLM_Menu["agent_system2"])
+			AssertEqual(0, Fx.Rebuilds)
+			AssertEqual(0, Fx.Commits.Length)
+			_LLM_Agent_CommitFn := Commit
+			Fx.PromptAnswers.Push(Map("ok", true, "value", "changed-model"))
+			AssertTrue(Model["action"].Call())
+			AssertEqual("cerebras|changed-model", _LLM_Menu["agent_system1"])
+			AssertEqual(Corpus["spec"], _LLM_Menu["agent_system2"])
+			AssertEqual(1, Fx.Rebuilds)
+		} finally {
+			Declaration["i18n"] := Label
+			_LLM_Agent_CommitFn := Commit
+			for Built in Owned
+				_CTC_ReleaseMenu(Built)
+		}
+	}
+}
+Test("LLM agent: shared Model caption keeps actual dispatcher and refusal (agent-system-model)", _LAG_SystemModelSharedOwner)
+
+_LAG_SystemModelSharedOrder() {
+	Corpus := _LAG_SystemModelCorpus()
+	_LAG_Run(_LAG_Menu("action", Corpus["spec"], Corpus["spec"]), _LTN_Screen(""), _Body.Bind(Corpus))
+	_Body(Corpus, Fx, Lines, Sent) {
+		global _LLM_Menu
+		Root := _MR_GetManifestRoot()
+		Original := Root[Corpus["section"]]
+		try {
+			Root[Corpus["section"]] := [Original[2], Original[1],
+				Map("type", "label", "id", "model_tail_marker", "i18n", "menu.agent.off")]
+			Row := _LLM_Agent_SystemRow("agent_system1")
+			Items := Row["items"]
+			AssertEqual(StrReplace(t(Corpus["label_key"]), "{1}", Corpus["model"]), Items[Items.Length - 2]["label"])
+			AssertTrue(Items[Items.Length - 1]["separator"])
+			AssertEqual(t("menu.agent.off"), Items[Items.Length]["label"])
+			Root[Corpus["section"]] := [Map("type", "---"),
+				Map("type", "command", "id", "unowned_agent_model", "i18n", Corpus["label_key"])]
+			AssertEqual(0, _LLM_Agent_SystemRow("agent_system1")["items"].Length,
+				"an unowned canonical command refuses the whole native provider")
+			AssertEqual(Corpus["spec"], _LLM_Menu["agent_system1"])
+			AssertEqual(0, Fx.Commits.Length)
+			AssertEqual(0, Fx.Rebuilds)
+		} finally {
+			Root[Corpus["section"]] := Original
+		}
+	}
+}
+Test("LLM agent: shared Model order and unowned-command refusal (agent-system-model)", _LAG_SystemModelSharedOrder)

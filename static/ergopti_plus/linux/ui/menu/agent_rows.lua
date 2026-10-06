@@ -106,13 +106,10 @@ local function system_rows(system, dialogs, changed)
 			action = function() store(value) end,
 		}
 	end
-	rows[#rows + 1] = { separator = true }
 	local resolved = AgentSettings.resolve(system)
 	local model = resolved and resolved.model or (parsed and parsed.model) or ""
-	rows[#rows + 1] = {
-		label = fill(tr("menu.agent.model"), { model }),
-		disabled = parsed == nil or nil,
-		action = function()
+	local model_rows = require("infra.manifest_menu").template_rows("agent_system_model_controls", {
+		["agent_system_model"] = function()
 			if not parsed then return end
 			local backend = parsed.backend
 			local answer = dialogs.prompt(tr("menu.agent.title"),
@@ -127,7 +124,14 @@ local function system_rows(system, dialogs, changed)
 			end
 			store(value)
 		end,
-	}
+	}, {
+		agent_system_model_ready = function() return parsed ~= nil end,
+	})
+	if not model_rows then return current_label, {} end
+	for _, row in ipairs(model_rows) do
+		if row.label then row.label = fill(row.label, { model }) end
+		rows[#rows + 1] = row
+	end
 	return current_label, rows
 end
 

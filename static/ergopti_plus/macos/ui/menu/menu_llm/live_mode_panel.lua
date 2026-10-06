@@ -97,8 +97,10 @@ function M.build(ctx)
 			{ llm_live_mode_off = function() return choose(nil) end },
 			{ llm_live_is_off = function() return keymap.get_live_prompt() == nil end,
 				llm_live_off_ready = function() return ctx.is_disabled ~= true end }),
-		{ separator = true },
 	}
+	local boundary_rows = ManifestMenu.template_rows("llm_live_off_boundary", {}, {}, {})
+	if not boundary_rows then return {} end
+	for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 	for _, prompt in ipairs(M.live_prompts(llm_mod, ctx.count)) do
 		local id = prompt.id
 		rows[#rows + 1] = {

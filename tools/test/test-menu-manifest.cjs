@@ -268,6 +268,7 @@ function checkChoiceProjection() {
 		for (const relativePath of [
 			'tools/build/build-menu-manifest.js',
 			'tools/lib/paths.cjs',
+			'tools/lib/menu-row-availability.cjs',
 			'static/ergopti_plus/_shared/modules/updater/channels.json',
 			'static/ergopti_plus/_shared/ui/update_channels.js',
 			'static/ergopti_plus/_shared/modules/updater/defaults.json',
@@ -306,6 +307,95 @@ function checkChoiceProjection() {
 		assert.equal(result.status, 0, result.stderr);
 		let menu = JSON.parse(fs.readFileSync(output, 'utf8'));
 		const acknowledgedTemplates = fs.readFileSync(output);
+		const legacyHeaders = [
+			'shortcuts_menu',
+			'metrics_menu',
+			'layout_menu',
+			'hotstrings_menu',
+			'tap_holds_menu'
+		].flatMap((key) => {
+			const rows = menu[key];
+			return Array.isArray(rows) ? rows.filter((row) => row.type === 'section_header') : [];
+		});
+		assert.equal(legacyHeaders.length, 12, 'all existing id-less headers survive compilation');
+		assert(
+			legacyHeaders.every((row) => !Object.hasOwn(row, 'id')),
+			'the header primitive cannot impose identities on existing records'
+		);
+		const headerSource =
+			'\n[[menu.fixture_header_template]]\ntype = "section_header"\ni18n = "menu.metrics.privacy_header"\n';
+		for (const fields of [
+			'',
+			'id = "named_header"\n',
+			'platforms = ["hs"]\nreason_key = "platform_reason.layout_bundle_and_menubar_are_macos"\n',
+			'platforms = ["hs"]\nunavailable = "grey"\nreason_key = "platform_reason.layout_bundle_and_menubar_are_macos"\n'
+		]) {
+			result = execute(original + headerSource + fields);
+			assert.equal(result.status, 0, result.stderr);
+			const declared = JSON.parse(fs.readFileSync(output, 'utf8')).fixture_header_template;
+			assert.equal(declared.length, 1, 'actual compiler projects one inert header');
+			assert.equal(declared[0].type, 'section_header');
+			assert.equal(declared[0].i18n, 'menu.metrics.privacy_header');
+			assert.equal(
+				Object.hasOwn(declared[0], 'command'),
+				false,
+				'compiler invents no native callback'
+			);
+		}
+		result = execute(original);
+		assert.equal(result.status, 0, result.stderr);
+		assert.deepEqual(
+			fs.readFileSync(output),
+			acknowledgedTemplates,
+			'positive fixture compilation preserves the original artifact after restoration'
+		);
+		for (const [name, fields, caption, reason] of [
+			['empty id', 'id = ""', 'menu.metrics.privacy_header', /section header needs/],
+			['numeric id', 'id = 7', 'menu.metrics.privacy_header', /section header needs/],
+			['empty caption', '', '', /section header needs/],
+			[
+				'empty unavailable',
+				'platforms = ["hs"]\nunavailable = ""',
+				'menu.metrics.privacy_header',
+				/unavailable must/
+			],
+			[
+				'grey header without reason',
+				'platforms = ["hs"]\nunavailable = "grey"',
+				'menu.metrics.privacy_header',
+				/greyed row needs/
+			],
+			['empty reason', 'reason_key = ""', 'menu.metrics.privacy_header', /section header needs/],
+			['numeric reason', 'reason_key = 7', 'menu.metrics.privacy_header', /section header needs/],
+			...[
+				'command',
+				'caption_getter',
+				'checked_when',
+				'disabled_when',
+				'disabled',
+				'action',
+				'items',
+				'foreign_field',
+				'I18N'
+			].map((field) => [
+				field,
+				`${field} = "unowned"`,
+				'menu.metrics.privacy_header',
+				/section header needs/
+			])
+		]) {
+			const source =
+				original + headerSource.replace('menu.metrics.privacy_header', caption) + fields + '\n';
+			result = execute(source);
+			assert.notEqual(result.status, 0, name + ': actual compiler refuses invalid header metadata');
+			assert.match(result.stderr, reason, name + ': header refusal is classified');
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedTemplates,
+				name + ': refusal cannot publish a partial artifact'
+			);
+		}
+
 		const backendStatus = menu.llm_menu.find((row) => row.id === 'llm_backend').status_rows;
 		assert.deepEqual(
 			backendStatus.unavailable,
@@ -386,12 +476,28 @@ function checkChoiceProjection() {
 			[
 				'empty caption getter',
 				original.replace('caption_getter = "tap_hold_key_tap_caption"', 'caption_getter = ""'),
-				/caption_getter needs a labelled command or group/
+				/caption_getter needs a labelled command, check or group/
 			],
 			[
 				'numeric caption getter',
 				original.replace('caption_getter = "tap_hold_key_tap_caption"', 'caption_getter = 42'),
-				/caption_getter needs a labelled command or group/
+				/caption_getter needs a labelled command, check or group/
+			],
+			[
+				'empty checkbox caption getter',
+				original.replace(
+					'caption_getter = "tap_hold_key_global_delay_caption"',
+					'caption_getter = ""'
+				),
+				/caption_getter needs a labelled command, check or group/
+			],
+			[
+				'numeric checkbox caption getter',
+				original.replace(
+					'caption_getter = "tap_hold_key_global_delay_caption"',
+					'caption_getter = 42'
+				),
+				/caption_getter needs a labelled command, check or group/
 			],
 			[
 				'unsupported caption row',
@@ -399,7 +505,7 @@ function checkChoiceProjection() {
 					'[[menu.tap_hold_key_head]]\ntype = "command"',
 					'[[menu.tap_hold_key_head]]\ntype = "list"'
 				),
-				/caption_getter needs a labelled command or group/
+				/caption_getter needs a labelled command, check or group/
 			]
 		]) {
 			assert.notEqual(source, original, name + ': mutation targets a real declaration');
@@ -410,6 +516,38 @@ function checkChoiceProjection() {
 				fs.readFileSync(output),
 				acknowledgedTemplates,
 				name + ': refusal cannot publish'
+			);
+		}
+		const statusHeader = '[[menu.metrics_migration_unavailable_rows]]\ntype = "label"\n';
+		for (const [name, mutated] of [
+			[
+				'missing identity',
+				original.replace(statusHeader + 'id = "metrics_migration_unavailable"\n', statusHeader)
+			],
+			[
+				'empty caption',
+				original.replace('i18n = "menu.metrics.migration_unavailable"', 'i18n = ""')
+			],
+			[
+				'numeric caption',
+				original.replace('i18n = "menu.metrics.migration_unavailable"', 'i18n = 42')
+			],
+			...['command', 'caption_getter', 'checked_when', 'disabled', 'I18N'].map((field) => [
+				field,
+				original.replace(statusHeader, statusHeader + field + ' = "foreign"\n')
+			])
+		]) {
+			assert.notEqual(mutated, original, name + ': label mutation must target the real source');
+			result = execute(mutated);
+			assert.notEqual(result.status, 0, name + ': the compiler rejects invalid inert labels');
+			assert.match(
+				result.stderr,
+				/inert label needs an identity and caption without behavior metadata/
+			);
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledgedTemplates,
+				name + ': rejected label cannot publish'
 			);
 		}
 		result = execute(original);
@@ -868,8 +1006,8 @@ function checkInfoBarControl() {
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
-			'dynamic_handlers["llm_display"] = function',
-			'dynamic_handlers["llm_navigation"] = function'
+			'group_builders["llm_display"] = function',
+			'group_builders["llm_navigation"] = function'
 		]
 	]) {
 		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
@@ -999,8 +1137,8 @@ function checkTokenStreamingControl() {
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
-			'dynamic_handlers["llm_display"] = function',
-			'dynamic_handlers["llm_navigation"] = function'
+			'group_builders["llm_display"] = function',
+			'group_builders["llm_navigation"] = function'
 		]
 	]) {
 		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
@@ -1058,8 +1196,8 @@ function checkShowAllControl() {
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
-			'dynamic_handlers["llm_display"] = function',
-			'dynamic_handlers["llm_navigation"] = function'
+			'group_builders["llm_display"] = function',
+			'group_builders["llm_navigation"] = function'
 		]
 	]) {
 		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
@@ -1167,7 +1305,7 @@ function checkAutomaticTriggerControls() {
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
-			'dynamic_handlers["llm_trigger"] = function',
+			'group_builders["llm_trigger"] = function',
 			'dynamic_handlers["llm_live_mode"] = function'
 		]
 	]) {
@@ -1396,7 +1534,7 @@ function checkPrivacyTriggerControls() {
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
-			'dynamic_handlers["llm_trigger"] = function',
+			'group_builders["llm_trigger"] = function',
 			'dynamic_handlers["llm_live_mode"] = function'
 		]
 	]) {
@@ -1526,6 +1664,105 @@ checkPrivacyTriggerControls();
 	);
 }
 
+// Limit structural proofs to the genuine native provider and its private data helpers.
+function profileFrameOwnerSource(source, platform) {
+	const tokens = require('../lib/script-source.cjs').scriptTokens(
+		source,
+		platform === 'ahk' ? '.ahk' : '.lua'
+	);
+	const [start, end] =
+		platform === 'ahk'
+			? [
+					['_LLM_Menu_ProfileRows', '(', ')', '{'],
+					['_LLM_Menu_PerAppProfileRows', '(', ')', '{']
+				]
+			: platform === 'hs'
+				? [
+						['local', 'function', 'build_profile_menu', '('],
+						['function', 'M', '.', 'new', '(']
+					]
+				: [
+						['dynamic_handlers', '[', 'llm_profile', ']', '=', 'function'],
+						['group_builders', '[', 'llm_display', ']', '=', 'function']
+					];
+	function matches(at, values) {
+		if (tokens[at - 1]?.kind === 'symbol' && ['.', ':'].includes(tokens[at - 1].value))
+			return false;
+		return values.every((value, offset) => {
+			const token = tokens[at + offset];
+			if (platform === 'ahk' && offset === 0 && token) {
+				const before = source.charCodeAt(token.start - 1);
+				if (before > 0x7f || /[A-Za-z0-9_]/.test(source[token.start - 1] || '')) return false;
+			}
+			const string = platform === 'linux' && offset === 2;
+			const kind = string ? 'string' : /^[A-Za-z_]\w*$/.test(value) ? 'identifier' : 'symbol';
+			return token?.kind === kind && token.value === value;
+		});
+	}
+	const starts = tokens.map((_, at) => at).filter((at) => matches(at, start));
+	if (starts.length !== 1) return '';
+	const at = starts[0];
+	const until = tokens.findIndex((_, index) => index > at && matches(index, end));
+	return until > at ? source.slice(tokens[at].start, tokens[until].start) : '';
+}
+
+// Actual provider -> ordered frame -> exact shared command import; never a vestigial direct call.
+function consumesProfileFrameCommand(source, file, menu, section, id) {
+	source = profileFrameOwnerSource(
+		source,
+		file.startsWith('windows/') ? 'ahk' : file.startsWith('macos/') ? 'hs' : 'linux'
+	);
+	const tokens = require('../lib/script-source.cjs').scriptTokens(
+		source,
+		file.endsWith('.ahk') ? '.ahk' : '.lua'
+	);
+	const has = (values) =>
+		tokens.some((_, index) =>
+			values.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	const windows = file.startsWith('windows/');
+	const frame = windows ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame';
+	if (
+		!has(
+			windows
+				? ['return', 'MenuRenderer_TemplateRows', '(', frame, ',']
+				: ['local', 'rows', '=', 'ManifestMenu', '.', 'template_rows', '(', frame, ',']
+		)
+	)
+		return false;
+	const native = windows
+		? id === 'llm_profile_create'
+			? 'LLM_Menu_PromptCreateProfile'
+			: 'LLM_Menu_CloneActiveBuiltinProfile'
+		: id === 'llm_profile_create'
+			? file.startsWith('macos/')
+				? 'create_profile'
+				: 'function'
+			: 'function';
+	if (!has(windows ? [id, ',', native] : ['[', id, ']', '=', native])) return false;
+	const ready =
+		id === 'llm_profile_create' ? 'llm_profile_create_ready' : 'llm_profile_clone_ready';
+	if (
+		!has(
+			windows
+				? [ready, ',', '_LLM_Menu_CreateProfileReady', '.', 'Bind', '(']
+				: ['[', ready, ']', '=', 'create_ready']
+		)
+	)
+		return false;
+	function imported(key, visiting = new Set()) {
+		if (visiting.has(key) || !Array.isArray(menu[key])) return false;
+		visiting.add(key);
+		for (const row of menu[key]) {
+			if (row.type !== 'include') continue;
+			if (row.section === section && row.row_id === id) return true;
+			if (row.row_id === undefined && imported(row.section, new Set(visiting))) return true;
+		}
+		return false;
+	}
+	return imported(frame);
+}
+
 // Profile creation is one ordinary command; native providers keep the editor owners.
 {
 	const assert = require('node:assert/strict');
@@ -1544,7 +1781,7 @@ checkPrivacyTriggerControls();
 	]) {
 		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
 		assert(
-			source.includes(`("${corpus.section}", "${corpus.id}"`),
+			consumesProfileFrameCommand(source, file, menu, corpus.section, corpus.id),
 			`${file}: the actual provider must consume the declared Create command`
 		);
 		assert(
@@ -1552,6 +1789,28 @@ checkPrivacyTriggerControls();
 				source
 			),
 			`${file}: a native provider cannot redeclare the fixed command label`
+		);
+		const frame = file.startsWith('windows/')
+			? 'llm_profile_windows_frame'
+			: 'llm_profile_lua_frame';
+		for (const changed of [
+			source.replaceAll('"' + frame + '"', '"wrong_frame"'),
+			source.replaceAll('"' + corpus.id + '"', '"wrong_callback"'),
+			source.replaceAll('"' + corpus.ready + '"', '"wrong_readiness"')
+		])
+			assert.equal(
+				consumesProfileFrameCommand(changed, file, menu, corpus.section, corpus.id),
+				false
+			);
+		const wrong = structuredClone(menu);
+		for (const rows of Object.values(wrong))
+			if (Array.isArray(rows))
+				for (const row of rows)
+					if (row.type === 'include' && row.section === corpus.section && row.row_id === corpus.id)
+						row.row_id = 'missing';
+		assert.equal(
+			consumesProfileFrameCommand(source, file, wrong, corpus.section, corpus.id),
+			false
 		);
 	}
 	console.log('Create Profile: one common declaration and three existing native editor owners.');
@@ -1580,7 +1839,7 @@ checkPrivacyTriggerControls();
 	]) {
 		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
 		assert(
-			source.includes(`("${corpus.section}", "${corpus.id}"`),
+			consumesProfileFrameCommand(source, file, menu, corpus.section, corpus.id),
 			`${file}: the actual Clone provider must consume the shared declaration`
 		);
 		assert(
@@ -1588,6 +1847,28 @@ checkPrivacyTriggerControls();
 				source
 			),
 			`${file}: native providers cannot redeclare the fixed Clone command label`
+		);
+		const frame = file.startsWith('windows/')
+			? 'llm_profile_windows_frame'
+			: 'llm_profile_lua_frame';
+		for (const changed of [
+			source.replaceAll('"' + frame + '"', '"wrong_frame"'),
+			source.replaceAll('"' + corpus.id + '"', '"wrong_callback"'),
+			source.replaceAll('"' + corpus.ready + '"', '"wrong_readiness"')
+		])
+			assert.equal(
+				consumesProfileFrameCommand(changed, file, menu, corpus.section, corpus.id),
+				false
+			);
+		const wrong = structuredClone(menu);
+		for (const rows of Object.values(wrong))
+			if (Array.isArray(rows))
+				for (const row of rows)
+					if (row.type === 'include' && row.section === corpus.section && row.row_id === corpus.id)
+						row.row_id = 'missing';
+		assert.equal(
+			consumesProfileFrameCommand(source, file, wrong, corpus.section, corpus.id),
+			false
 		);
 	}
 	console.log(
@@ -1942,8 +2223,16 @@ checkPrivacyTriggerControls();
 	assert.deepEqual(manifest[head.section], head.rows, 'independent full child-template order');
 	function assertWiring(source, consumer, nativeId, tapId, holdId, section, target) {
 		assert(
-			source.includes(consumer + '("' + section + '"'),
-			'actual provider consumes the declared template'
+			source.includes(consumer + '("tap_hold_key_rows"'),
+			'actual provider consumes the declared complete template'
+		);
+		assert.deepEqual(
+			target.tap_hold_key_rows,
+			[
+				{ type: 'include', section },
+				{ type: 'include', section: 'tap_hold_key_delay_tail' }
+			],
+			'complete root includes unchanged head before the delay tail'
 		);
 		assert.equal(target[section][0].type, 'include', 'head begins with a real declared include');
 		assert.equal(
@@ -2006,7 +2295,7 @@ checkPrivacyTriggerControls();
 		assert.throws(
 			() =>
 				assertWiring(
-					source.replace(consumer, 'WrongProvider'),
+					source.replaceAll(consumer, 'WrongProvider'),
 					consumer,
 					nativeId,
 					tapId,
@@ -2019,7 +2308,7 @@ checkPrivacyTriggerControls();
 		assert.throws(
 			() =>
 				assertWiring(
-					source.replace('"' + head.section + '"', '"wrong_template"'),
+					source.replace('"tap_hold_key_rows"', '"wrong_template"'),
 					consumer,
 					nativeId,
 					tapId,
@@ -2029,6 +2318,21 @@ checkPrivacyTriggerControls();
 				),
 			/actual provider/
 		);
+		for (const mutate of [
+			(target) => {
+				target.tap_hold_key_rows[0].section = 'wrong_head';
+			},
+			(target) => {
+				target.tap_hold_key_rows.reverse();
+			}
+		]) {
+			const wrongRoot = structuredClone(manifest);
+			mutate(wrongRoot);
+			assert.throws(
+				() => assertWiring(source, consumer, nativeId, tapId, holdId, head.section, wrongRoot),
+				/complete root/
+			);
+		}
 		const broken = structuredClone(manifest);
 		broken[head.section][0].section = 'wrong_head';
 		assert.throws(
@@ -2078,4 +2382,3332 @@ checkPrivacyTriggerControls();
 		}
 	}
 	console.log('Tap-Hold key clearing: declared platform captions and unchanged native owners.');
+}
+
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(
+				REPO_ROOT,
+				'static/ergopti_plus/_shared/tests/corpus/metrics/migration_status_menu.json'
+			),
+			'utf8'
+		)
+	);
+	assert.equal(corpus.statuses.length, 2, 'exactly the two existing fixed migration statuses');
+	for (const status of corpus.statuses)
+		assert.deepEqual(
+			manifest[status.section],
+			[status.row],
+			'handwritten inert-status declaration'
+		);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	const begin = source.indexOf('local function _migration_row(k)');
+	const end = source.indexOf('--- Renders the rows of the metrics submenu', begin);
+	assert(begin >= 0 && end > begin, 'actual native migration provider must exist');
+	const body = source.slice(begin, end);
+	function assertStatusWiring(text, statuses) {
+		for (const status of statuses)
+			assert(
+				text.includes('ManifestMenu.template_rows("' + status.section + '")'),
+				'actual native provider must consume each shared inert-status declaration'
+			);
+		assert.match(text, /if type\(k\.get_migration_progress\) ~= "function" then/);
+		assert.match(text, /if not progress\.running then/);
+		assert.match(
+			text,
+			/label = string\.format\(i18n_safe\("menu\.metrics\.migration_progress"\),\s*progress\.scanned, progress\.total\)/
+		);
+		assert.match(
+			text,
+			/if type\(k\.cancel_migration\) == "function" then k\.cancel_migration\(\) end/
+		);
+	}
+	assertStatusWiring(body, corpus.statuses);
+	assert.throws(
+		() =>
+			assertStatusWiring(
+				body.replaceAll('ManifestMenu.template_rows', 'WrongProvider'),
+				corpus.statuses
+			),
+		/consume each shared/
+	);
+	for (const status of corpus.statuses)
+		assert.throws(
+			() =>
+				assertStatusWiring(
+					body.replace('"' + status.section + '"', '"wrong_status"'),
+					corpus.statuses
+				),
+			/consume each shared/
+		);
+	const locales = JSON.parse(
+		readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locale_order.json'), 'utf8')
+	).order;
+	assert.equal(locales.length, 21);
+	for (const code of locales) {
+		const strings = JSON.parse(
+			readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json'),
+				'utf8'
+			)
+		);
+		for (const status of corpus.statuses) {
+			assert.equal(typeof strings[status.row.i18n], 'string', code + ': existing inert caption');
+			assert.notEqual(strings[status.row.i18n], '');
+			if (status.locales[code]) assert.equal(strings[status.row.i18n], status.locales[code]);
+		}
+		if (corpus.running.locales[code])
+			assert.equal(
+				strings['menu.metrics.migration_progress']
+					.replace('%d', corpus.running.scanned)
+					.replace('%d', corpus.running.total),
+				corpus.running.locales[code]
+			);
+	}
+	console.log(
+		'Metrics migration labels: independent inert declarations, 21 translations and actual state-provider wiring.'
+	);
+}
+
+// Independent Mac swipe modes: presentation is shared, native mutation remains
+// the current per-slot owner. Never substitute source presence for actual edge wiring.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_slot_modes.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const expected = corpus.rows.map(({ value, ...row }) => row);
+	assert.deepEqual(
+		corpus.rows.map((row) => row.value),
+		['x1', 'incremental']
+	);
+	assert.deepEqual(declared[corpus.section], expected);
+	assert.deepEqual(generated[corpus.section], expected);
+	assert.deepEqual(corpus.platform_rows, {
+		ahk: [],
+		hs: ['gesture_mode_single', 'gesture_mode_incremental'],
+		linux: []
+	});
+	assert.deepEqual(corpus.states, [
+		{ mode: 'x1', checked: [true, false] },
+		{ mode: 'incremental', checked: [false, true] },
+		{ mode: 'future_mode', checked: [false, false] }
+	]);
+	const sourcePath = resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua');
+	const source = readFileSync(sourcePath, 'utf8');
+	const graph = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	function modeGraph(source) {
+		const start = source.indexOf('const OPENS_SUBMENU = {');
+		const end = source.indexOf('\n};', start);
+		assert(start >= 0 && end > start, 'actual graph registry is bounded');
+		return require('node:vm').runInNewContext(
+			source.slice(start, end + 3) + '; OPENS_SUBMENU',
+			{},
+			{ timeout: 1000 }
+		);
+	}
+	function assertModeWiring(owner, edges) {
+		const registry = modeGraph(edges);
+		assert.match(
+			owner,
+			/if slot:match\("swipe"\) then\s+modeSubmenu = ManifestMenu\.template_rows\("gesture_slot_mode_commands"/,
+			'actual swipe template'
+		);
+		for (const [id, value] of [
+			['gesture_mode_single', 'x1'],
+			['gesture_mode_incremental', 'incremental']
+		]) {
+			assert.ok(owner.includes('["' + id + '"] = function()'), 'literal mode owner');
+			assert.ok(
+				owner.includes(
+					'commit_gesture_row_value("get_mode", "set_mode", slot, "' + value + '", "mode")'
+				),
+				'actual mutation owner'
+			);
+		}
+		for (const [id, value] of [
+			['gesture_mode_is_single', 'x1'],
+			['gesture_mode_is_incremental', 'incremental']
+		])
+			assert.ok(
+				owner.includes('["' + id + '"] = function() return currentMode == "' + value + '" end'),
+				'literal checked getter'
+			);
+		const tokens = require('../lib/script-source.cjs').scriptTokens(owner, '.lua');
+		assert.ok(
+			tokens.some((_, i) =>
+				['[', 'gesture_mode_options', ']', '=', 'modeSubmenu'].every(
+					(v, n) => tokens[i + n]?.value === v
+				)
+			),
+			'actual rendered child'
+		);
+		for (const finger of [2, 3, 4, 5]) {
+			assert.ok(
+				owner.includes('["gesture_slots_' + finger + '"] = slots_provider(' + finger + ')'),
+				'actual slot provider'
+			);
+			const entries = registry['gesture_slots_' + finger];
+			const declared = Array.isArray(entries) ? entries : [entries];
+			assert.ok(
+				declared.some(
+					(entry) =>
+						entry &&
+						(typeof entry === 'string'
+							? entry === 'gesture_slot_mode_commands'
+							: entry.menu === 'gesture_slot_mode_commands' &&
+								entry.kind !== 'compose' &&
+								(!entry.platforms || entry.platforms.includes('hs')))
+				),
+				'actual provider edge'
+			);
+		}
+	}
+	assertModeWiring(source, graph);
+	for (const name of [
+		corpus.section,
+		'gesture_mode_single',
+		'gesture_mode_incremental',
+		'gesture_mode_is_single',
+		'gesture_mode_is_incremental',
+		'gesture_slots_2'
+	])
+		assert.throws(() =>
+			assertModeWiring(source.replaceAll('"' + name + '"', '"wrong_binding"'), graph)
+		);
+	assert.throws(() =>
+		assertModeWiring(
+			source.replace('["gesture_mode_options"] = modeSubmenu', '["gesture_mode_options"] = {}'),
+			graph
+		)
+	);
+	for (const finger of [2, 3, 4, 5])
+		assert.throws(() =>
+			assertModeWiring(source, graph.replace('gesture_slots_' + finger + ':', 'wrong_edge:'))
+		);
+	assert.throws(
+		() =>
+			assertModeWiring(
+				source,
+				graph.replaceAll(
+					"menu: 'gesture_slot_mode_commands', platforms: ['hs']",
+					"menu: 'gesture_slot_mode_commands', platforms: ['ahk']"
+				)
+			),
+		/actual provider edge/
+	);
+	assert.throws(
+		() =>
+			assertModeWiring(
+				source,
+				graph.replaceAll(
+					"menu: 'gesture_slot_mode_commands', platforms: ['hs']",
+					"menu: 'gesture_slot_mode_commands', platforms: ['hs'], kind: 'compose'"
+				)
+			),
+		/actual provider edge/
+	);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const code of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		assert.deepEqual(
+			expected.map((row) => strings[row.i18n]),
+			corpus.captions[code]
+		);
+	}
+	for (const relative of ['_shared/lua/menu/renderer.lua', 'windows/infra/manifest_menu.ahk']) {
+		const renderer = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', relative), 'utf8');
+		assert.match(
+			renderer,
+			relative.endsWith('.lua')
+				? /elseif item\.type == "check" then\s+row = R\.check_row\(key, item\.id, commands, getters\)/
+				: /else if ItemType == "check" \{\s+Row := MenuRenderer_CheckRow\(ManifestKey, Id, Commands, StateGetters\)/
+		);
+	}
+	console.log(
+		'Gesture modes: independent shared order/captions/platforms and actual native owner wiring.'
+	);
+}
+
+// Complete per-key delay metadata: independent declarations and actual owners.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/tap_hold_key_delay.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(manifest[corpus.complete_section], corpus.complete);
+	assert.deepEqual(manifest[corpus.tail_section], corpus.tail);
+	assert.deepEqual(manifest[corpus.children_section], corpus.children);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	for (const code of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const row of [...corpus.tail, ...corpus.children]) {
+			if (!row.i18n) continue;
+			assert.equal(typeof strings[row.i18n], 'string', code + ': ' + row.i18n);
+			assert.notEqual(strings[row.i18n], row.i18n, 'caption resolves to a translation');
+			if (row.caption_getter)
+				assert.equal(
+					(strings[row.i18n].match(/%s/g) || []).length,
+					1,
+					'one native value placeholder'
+				);
+		}
+	}
+	for (const [file, start, end, required] of [
+		[
+			'macos/ui/menu/menu_tap_holds.lua',
+			'local function build_one_tap_hold_item(',
+			'--- Builds the tap / hold rows of one hand',
+			[
+				'tap_hold_key_delay_set',
+				'tap_hold_key_delay_use_global',
+				'tap_hold_key_delay',
+				'tap_hold_key_delay_is_global',
+				'tap_hold_key_delay_has_override',
+				'tap_hold_key_delay_caption',
+				'tap_hold_key_global_delay_caption'
+			]
+		],
+		[
+			'linux/ui/menu/menu_builder.lua',
+			'local function hand_rows(hand)',
+			'local providers = {',
+			['tap_hold_key_delay_set', 'tap_hold_key_delay', 'tap_hold_key_delay_caption']
+		]
+	]) {
+		const text = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		const begin = text.indexOf(start),
+			finish = text.indexOf(end, begin);
+		assert(begin >= 0 && finish > begin);
+		const source = text.slice(begin, finish);
+		function wiring(candidate) {
+			assert(
+				candidate.includes('ManifestMenu.template_rows("tap_hold_key_rows"'),
+				'actual complete provider'
+			);
+			assert(
+				candidate.includes('ManifestMenu.template_rows("tap_hold_key_delay_rows"'),
+				'actual declared delay children'
+			);
+			for (const id of required)
+				assert(
+					new RegExp('\\["' + id + '"\\]\\s*=\\s*(?:function|delay_rows)').test(candidate),
+					'actual delay binding: ' + id
+				);
+		}
+		wiring(source);
+		for (const id of ['tap_hold_key_rows', 'tap_hold_key_delay_rows', ...required])
+			assert.throws(() => wiring(source.replaceAll('"' + id + '"', '"missing_owner"')), /actual/);
+		for (const key of [
+			'menu.tapholds.key_tap_delay',
+			'menu.tapholds.key_tap_delay_set',
+			'menu.tapholds.key_tap_delay_use_global'
+		])
+			assert(!source.includes('"' + key + '"'), 'native providers retire caption metadata: ' + key);
+	}
+	const windows = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_taphold.ahk'),
+		'utf8'
+	);
+	assert(windows.includes('MenuRenderer_TemplateRows("tap_hold_key_rows"'));
+	for (const binding of [
+		'tap_hold_key_delay_rows',
+		'tap_hold_key_delay_set',
+		'tap_hold_key_delay',
+		'tap_hold_key_delay_caption'
+	])
+		assert(
+			windows.includes('"' + binding + '"'),
+			'Windows binds a genuine per-key timing owner: ' + binding
+		);
+	assert(
+		windows.includes('_TH_MakeDelayPickerFn(KeyId)'),
+		'Windows captures the physical key for its real prompt'
+	);
+	assert(
+		windows.includes('WriteTapHoldDuration(KeyId, Ms / 1000, 0, 0, 0, 0, SourceWitness)'),
+		'Windows persists through the existing native transaction owner'
+	);
+	console.log(
+		'Tap-Hold per-key delay: independent platform/state metadata, existing keys resolved in 21 locales and actual native owners.'
+	);
+}
+
+// Independent fixed wrap controls must reach the actual native providers.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/wrap_symbol_controls.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const section of corpus.sections) {
+		const expected = section.rows.map((row) => {
+			const declared = { type: row.separator ? '---' : 'command' };
+			if (row.id) Object.assign(declared, { id: row.id, i18n: row.i18n });
+			if (row.disabled_when) declared.disabled_when = row.disabled_when;
+			return { ...declared, platforms: corpus.platforms, unavailable: 'hide' };
+		});
+		assert.deepEqual(
+			menu[section.section],
+			expected,
+			'handwritten complete fixed control section: ' + section.section
+		);
+	}
+	const catalogue = JSON.parse(
+		readFileSync(resolve(SHARED, 'modules/wrap_symbols/wrap_symbols.json'), 'utf8')
+	);
+	assert.deepEqual(
+		catalogue.groups.map((group) => ({
+			i18n: group.i18n,
+			lefts: group.pairs.map((pair) => pair.left)
+		})),
+		corpus.catalogue_groups
+	);
+	const localeOrder = JSON.parse(
+		readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')
+	).order;
+	assert.deepEqual(
+		[...localeOrder].sort(),
+		[...corpus.locales].sort(),
+		'all 21 published locale identities'
+	);
+	for (const locale of corpus.locales) {
+		const strings = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8').replace(/^\uFEFF/, '')
+		);
+		for (const section of corpus.sections)
+			for (const row of section.rows)
+				if (row.i18n) {
+					assert.equal(typeof strings[row.i18n], 'string', locale + ': fixed wrap caption');
+					assert.notEqual(strings[row.i18n], '');
+					assert.notEqual(strings[row.i18n], row.i18n);
+				}
+	}
+	const sources = {
+		windows: readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk'),
+			'utf8'
+		),
+		macos: readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua'),
+			'utf8'
+		)
+	};
+	const helper = readFileSync(resolve(SHARED, 'lua/menu/wrap_mutation.lua'), 'utf8');
+	function tokens(source, extension = '.lua') {
+		return scriptTokens(source, extension).map((token) => token.kind + ':' + token.value);
+	}
+	function hasCode(source, snippet, extension = '.lua') {
+		const code = tokens(source, extension),
+			required = tokens(snippet, extension);
+		return code.some((_, at) => required.every((token, offset) => code[at + offset] === token));
+	}
+	function assertWrapMutation(candidate) {
+		for (const [snippet, purpose] of [
+			[
+				'local FIELDS = { "wrap_symbol_states", "custom_wrap_symbols" }',
+				'exact two-field ownership'
+			],
+			['function M.commit(state, mutate, save)', 'actual shared mutation owner'],
+			['if claims[state] then return false,', 'same-state reentrancy refusal'],
+			['claims[state] = { view = clone(prior) }', 'acknowledged pending input view'],
+			['local called, changed = pcall(mutate, candidate)', 'detached candidate transformation'],
+			['if not called or changed ~= true then', 'exact transform acknowledgement'],
+			['if rawget(state, field) ~= prior[field] then', 'construction successor refusal'],
+			['local saved, acknowledged = pcall(save)', 'existing native save authority'],
+			['if not saved or acknowledged ~= true then', 'native exact save receipt remains'],
+			[
+				'if rawget(state, field) == candidate[field] then rawset(state, field, prior[field]) end',
+				'conditional owned inverse'
+			],
+			[
+				'if rawget(state, field) ~= candidate[field] then owned = false end',
+				'publication successor refusal'
+			],
+			['function M.view(state)', 'actual input view owner'],
+			['return claim and claim.view or state', 'input retains acknowledged state'],
+			['function M.pending(state)', 'actual readiness owner'],
+			['return claims[state] ~= nil', 'pending claim predicate']
+		])
+			assert.ok(hasCode(candidate, snippet), purpose);
+	}
+	function assertWrapProvider(source, platform, mutationSource = helper) {
+		const begin =
+			platform === 'windows'
+				? source.indexOf('_WS_BuildSymbolRows() {')
+				: source.indexOf('local function build_wrap_symbols_submenu(');
+		const end =
+			platform === 'windows'
+				? source.indexOf('; Native callbacks capture payloads with Bind', begin)
+				: source.indexOf('\n\treturn sub\nend', begin);
+		assert.ok(begin >= 0 && end > begin, 'actual wrap provider body is bounded');
+		const body = source.slice(begin, end);
+		const api = platform === 'windows' ? 'MenuRenderer_TemplateRows' : 'ManifestMenu.template_rows';
+		for (const section of corpus.sections)
+			assert.ok(
+				body.includes(api + '("' + section.section + '"'),
+				'actual provider consumes each shared section: ' + section.section
+			);
+		for (const section of corpus.sections)
+			assert.ok(
+				hasCode(body, api + '("' + section.section + '"', platform === 'windows' ? '.ahk' : '.lua'),
+				'live provider consumes each shared section: ' + section.section
+			);
+		for (const section of corpus.sections)
+			for (const row of section.rows)
+				if (row.id) {
+					const binding = platform === 'windows' ? '"' + row.id + '",' : '["' + row.id + '"] =';
+					assert.ok(body.includes(binding), 'literal native command binding: ' + row.id);
+				}
+		if (platform === 'windows') {
+			assert.ok(
+				body.includes('Map("wrap_symbols_ready", (*) => true)'),
+				'existing native eligibility reader'
+			);
+			assert.ok(
+				body.includes('_WS_ControlSetGroup.Bind(GroupLefts, true)'),
+				'bound group enable payload'
+			);
+			assert.ok(
+				body.includes('_WS_ControlSetGroup.Bind(GroupLefts, false)'),
+				'bound group disable payload'
+			);
+			assert.ok(body.includes('_WS_ControlRemoveCustom.Bind(Idx)'), 'bound custom index payload');
+		} else {
+			assert.ok(
+				hasCode(
+					body,
+					'wrap_symbols_ready = function() return not paused and not WrapMutation.pending(state) end'
+				),
+				'existing native pause eligibility'
+			);
+			assert.ok(
+				body.includes('items = del_sub'),
+				'actual canonical custom child reaches the shared renderer'
+			);
+			assert.ok(
+				hasCode(
+					body,
+					'local committed, reason = WrapMutation.commit(state, mutate, ctx.save_prefs)'
+				),
+				'native exact save receipt remains'
+			);
+			assert.ok(
+				hasCode(source, 'local WrapMutation = require("menu.wrap_mutation")'),
+				'actual shared mutation dependency'
+			);
+			assert.ok(
+				hasCode(body, 'if committed ~= true then'),
+				'native callback refuses failed shared publication'
+			);
+			assert.ok(
+				hasCode(body, 'local view = WrapMutation.view(state)'),
+				'live native getter uses acknowledged input'
+			);
+			const call = tokens('return mutate_wrap(function(candidate)');
+			const code = tokens(body);
+			const count = code.filter((_, at) =>
+				call.every((value, offset) => code[at + offset] === value)
+			).length;
+			assert.equal(count, 8, 'all eight actual Wrap callback sites retain detached mutation');
+			assertWrapMutation(mutationSource);
+		}
+	}
+	for (const [platform, source] of Object.entries(sources)) {
+		assertWrapProvider(source, platform);
+		assert.throws(
+			() =>
+				assertWrapProvider(
+					source.replace('"wrap_symbols_global_controls"', '"wrap_symbols_add_controls"'),
+					platform
+				),
+			/consumes each shared section/
+		);
+		assert.throws(
+			() =>
+				assertWrapProvider(
+					source.replace('"wrap_symbols_enable_group"', '"unowned_wrap_group"'),
+					platform
+				),
+			/literal native command binding/
+		);
+	}
+	assert.throws(
+		() =>
+			assertWrapProvider(
+				sources.windows.replace(
+					'_WS_ControlSetGroup.Bind(GroupLefts, true)',
+					'_WS_ControlRemoveCustom.Bind(GroupLefts, true)'
+				),
+				'windows'
+			),
+		/bound group enable payload/
+	);
+	assert.throws(
+		() => assertWrapProvider(sources.macos.replace('items = del_sub', 'menu = del_sub'), 'macos'),
+		/canonical custom child/
+	);
+	for (const [before, after, reason] of [
+		[
+			'WrapMutation.commit(state, mutate, ctx.save_prefs)',
+			'OtherOwner.commit(state, mutate, ctx.save_prefs)',
+			/native exact save/
+		],
+		['WrapMutation.pending(state)', 'OtherOwner.pending(state)', /pause eligibility/],
+		['WrapMutation.view(state)', 'OtherOwner.view(state)', /acknowledged input/],
+		[
+			'return mutate_wrap(function(candidate)',
+			'return other_mutation(function(candidate)',
+			/eight actual Wrap/
+		]
+	])
+		assert.throws(() => assertWrapProvider(sources.macos.replace(before, after), 'macos'), reason);
+	for (const [before, after, reason] of [
+		['acknowledged ~= true', 'not acknowledged', /native exact save/],
+		[
+			'rawset(state, field, prior[field])',
+			'rawset(state, field, candidate[field])',
+			/owned inverse/
+		],
+		['if claims[state] then return false,', 'if false then return false,', /reentrancy refusal/],
+		['return claim and claim.view or state', 'return state', /acknowledged state/]
+	]) {
+		const malformed = helper.replace(before, after);
+		assert.notEqual(malformed, helper, 'real helper mutation was applied');
+		assert.throws(() => assertWrapMutation(malformed), reason);
+		assert.throws(
+			() => assertWrapMutation(malformed + '\n-- ' + before + '\nlocal fake = [[' + before + ']]'),
+			reason,
+			'comment or quoted source cannot manufacture a live shared owner'
+		);
+	}
+	console.log(
+		'Wrap controls: independent complete sections, 21 existing translations, actual provider graph and native payload bindings.'
+	);
+}
+
+// Append to tools/test/test-menu-manifest.cjs after actual root publication.
+// This complementary guard credits real tokens; native owner cases remain the oracle.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_slot_controls.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	for (const [section, rows] of Object.entries(corpus.sections)) {
+		assert.deepEqual(declared[section], rows, 'handwritten controls source: ' + section);
+		assert.deepEqual(generated[section], rows, 'actual generated controls: ' + section);
+	}
+	assert.deepEqual(
+		corpus.sensitivity_values,
+		[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30]
+	);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.caption_snapshots).sort(), [...locales].sort());
+	for (const code of locales) {
+		const actual = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const [key, expected] of Object.entries(corpus.caption_snapshots[code]))
+			assert.equal(actual[key], expected, code + ': unchanged existing caption ' + key);
+	}
+	const owner = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua'),
+		'utf8'
+	);
+	function hasTemplate(tokens, section) {
+		return tokens.some(
+			(token, i) =>
+				token.kind === 'identifier' &&
+				token.value === 'ManifestMenu' &&
+				tokens[i + 1]?.value === '.' &&
+				tokens[i + 2]?.value === 'template_rows' &&
+				tokens[i + 3]?.value === '(' &&
+				tokens[i + 4]?.kind === 'string' &&
+				tokens[i + 4]?.value === section &&
+				[',', ')'].includes(tokens[i + 5]?.value)
+		);
+	}
+	function hasBinding(tokens, id) {
+		return tokens.some(
+			(token, i) =>
+				token.value === '[' &&
+				tokens[i + 1]?.kind === 'string' &&
+				tokens[i + 1]?.value === id &&
+				tokens[i + 2]?.value === ']' &&
+				tokens[i + 3]?.value === '=' &&
+				tokens[i + 4]?.kind === 'identifier' &&
+				tokens[i + 4]?.value === 'function'
+		);
+	}
+	function assertControlWiring(candidate) {
+		const tokens = scriptTokens(candidate, '.lua');
+		for (const section of ['gesture_sensitivity_head', 'gesture_change_action'])
+			assert.ok(hasTemplate(tokens, section), 'actual controls template call: ' + section);
+		for (const id of ['gesture_slot_change_action', 'gesture_slot_choice_ready'])
+			assert.ok(hasBinding(tokens, id), 'actual native controls binding: ' + id);
+		assert.match(candidate, /table\.insert\(sensSubmenu,/, 'native numeric payload retained');
+		assert.ok(
+			tokens.some((_, i) =>
+				['[', 'gesture_sensitivity_options', ']', '=', 'sensSubmenu'].every(
+					(v, n) => tokens[i + n]?.value === v
+				)
+			),
+			'actual rendered sensitivity child'
+		);
+		assert.ok(hasTemplate(tokens, 'gesture_swipe_slot_menu'), 'actual swipe command payload');
+		assert.match(candidate, /items\s*=\s*swipeSubmenu/, 'actual full swipe materialization');
+		assert.match(candidate, /items\s*=\s*change_action_rows/, 'actual tap command payload');
+		for (const finger of [2, 3, 4, 5])
+			assert.ok(
+				candidate.includes('["gesture_slots_' + finger + '"] = slots_provider(' + finger + ')'),
+				'real native slot provider: ' + finger
+			);
+	}
+	assertControlWiring(owner);
+	for (const name of [
+		'gesture_sensitivity_head',
+		'gesture_change_action',
+		'gesture_slot_change_action',
+		'gesture_slot_choice_ready',
+		'gesture_slots_2'
+	])
+		assert.throws(() => assertControlWiring(owner.replaceAll('"' + name + '"', '"wrong_owner"')));
+	for (const section of ['gesture_sensitivity_head', 'gesture_change_action']) {
+		const renamed = owner.replaceAll('"' + section + '"', '"wrong_template"');
+		assert.throws(() =>
+			assertControlWiring(renamed + '\n-- ManifestMenu.template_rows("' + section + '")')
+		);
+		assert.throws(() =>
+			assertControlWiring(
+				renamed + '\nlocal decorative = [[ManifestMenu.template_rows("' + section + '")]]'
+			)
+		);
+	}
+	assert.throws(() =>
+		assertControlWiring(
+			owner.replace(
+				'["gesture_sensitivity_options"] = sensSubmenu',
+				'["gesture_sensitivity_options"] = {}'
+			)
+		)
+	);
+	assert.throws(() =>
+		assertControlWiring(owner.replace('items    = change_action_rows', 'items    = {}'))
+	);
+	console.log(
+		'Gesture controls: independently declared heading/choice, 21 existing captions and actual tokenized native owners.'
+	);
+}
+
+// Mac-only fixed Tap-Hold guidance delegates native status/actions unchanged.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/tap_hold_guidance.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [section, expected] of Object.entries(corpus.declarations))
+		assert.deepEqual(manifest[section], expected, 'handwritten guidance descriptor: ' + section);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua'),
+		'utf8'
+	);
+	function tokens(text) {
+		return scriptTokens(text, '.lua').map((token) => token.kind + ':' + token.value);
+	}
+	function contains(haystack, needle) {
+		return haystack.some((_, index) =>
+			needle.every((value, offset) => haystack[index + offset] === value)
+		);
+	}
+	function wiring(candidate) {
+		const code = tokens(candidate);
+		for (const section of Object.keys(corpus.declarations))
+			assert(
+				contains(code, [
+					'identifier:ManifestMenu',
+					'symbol:.',
+					'identifier:template_rows',
+					'symbol:(',
+					'string:' + section,
+					'symbol:,'
+				]),
+				'actual guidance template call: ' + section
+			);
+		for (const [id, owner] of [
+			['tap_hold_login_items_steps', 'login_items_steps_command'],
+			['tap_hold_login_items_open', 'function'],
+			['tap_hold_legacy_rules_cleanup', 'function']
+		])
+			assert(
+				contains(code, ['symbol:[', 'string:' + id, 'symbol:]', 'symbol:=', 'identifier:' + owner]),
+				'actual guidance native binding: ' + id
+			);
+	}
+	wiring(source);
+	for (const section of Object.keys(corpus.declarations)) {
+		const call = 'ManifestMenu.template_rows("' + section + '",';
+		for (const replacement of [
+			'WrongOwner.template_rows("' + section + '",',
+			'ManifestMenu.template_rows("unowned_guidance",'
+		])
+			assert.throws(() => wiring(source.replace(call, replacement)), /actual guidance template/);
+		const missing = source.replace(call, 'WrongOwner.template_rows("' + section + '",');
+		assert.throws(
+			() => wiring(missing + '\n-- ' + call + '\nlocal fake = [[' + call + ']]'),
+			/actual guidance template/,
+			'comment/quoted code cannot fake consumption'
+		);
+	}
+	for (const id of [
+		'tap_hold_login_items_steps',
+		'tap_hold_login_items_open',
+		'tap_hold_legacy_rules_cleanup'
+	])
+		assert.throws(
+			() => wiring(source.replaceAll('"' + id + '"', '"unowned_guidance"')),
+			/actual guidance native binding/
+		);
+	for (const [section, rows] of Object.entries(corpus.declarations))
+		for (const row of rows)
+			assert(
+				!source.includes('"' + row.i18n + '"'),
+				'fixed native caption retired: ' + section + '/' + row.id
+			);
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	for (const code of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const rows of Object.values(corpus.declarations))
+			for (const row of rows) {
+				assert.equal(typeof strings[row.i18n], 'string');
+				assert(
+					strings[row.i18n].trim().length > 0 && strings[row.i18n] !== row.i18n,
+					code + ': translated caption'
+				);
+			}
+	}
+	console.log(
+		'Tap-Hold guidance: exact independent declarations, 21 existing translations and genuine native template/callback bindings.'
+	);
+}
+
+// The Apps provider consumes one inert shared caption; dynamic bundles stay native.
+{
+	const assertAppsEmpty = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const appsEmptyCorpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menu/apps_empty_caption.json'), 'utf8')
+	);
+	const appsEmptyManifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assertAppsEmpty.deepEqual(appsEmptyManifest[appsEmptyCorpus.section], [appsEmptyCorpus.row]);
+	assertAppsEmpty.deepEqual(appsEmptyCorpus.row, {
+		type: 'label',
+		id: 'apps_empty',
+		i18n: 'menu.apps.no_apps',
+		platforms: ['hs'],
+		unavailable: 'hide'
+	});
+	assertAppsEmpty.equal(Object.keys(appsEmptyCorpus.captions).length, 21);
+	for (const [locale, expected] of Object.entries(appsEmptyCorpus.captions)) {
+		const catalogue = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assertAppsEmpty.equal(
+			catalogue['menu.apps.no_apps'],
+			expected,
+			locale + ' independent Apps caption'
+		);
+	}
+	const appsEmptyNative = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_apps.lua'),
+		'utf8'
+	);
+	function appsEmptyOwns(source) {
+		const tokens = scriptTokens(source, '.lua').map((token) => ({
+			kind: token.kind,
+			value: token.value
+		}));
+		const has = (fragment) => {
+			const expected = scriptTokens(fragment, '.lua').map((token) => ({
+				kind: token.kind,
+				value: token.value
+			}));
+			return tokens.some((_, index) =>
+				expected.every(
+					(token, offset) =>
+						tokens[index + offset]?.kind === token.kind &&
+						tokens[index + offset]?.value === token.value
+				)
+			);
+		};
+		return (
+			has('local ManifestMenu = require("infra.manifest_menu")') &&
+			has(
+				'if #rows == 0 then rows = ManifestMenu.template_rows("apps_empty_rows") if not rows then return nil end end'
+			) &&
+			has(
+				'ManifestMenu.build("apps_menu", "Apps", nil, nil, ctx, { ["apps_installed"] = function() return rows end, })'
+			)
+		);
+	}
+	assertAppsEmpty.ok(
+		appsEmptyOwns(appsEmptyNative),
+		'actual shared binding, empty template and provider edge'
+	);
+	const appsEmptyNeedle = 'ManifestMenu.template_rows("apps_empty_rows")';
+	assertAppsEmpty.ok(appsEmptyNative.includes(appsEmptyNeedle), 'bounded causal mutation preimage');
+	for (const mutation of [
+		'ManifestMenu.template_rows("wrong_section")',
+		'Foreign.template_rows("apps_empty_rows")',
+		'{}'
+	]) {
+		assertAppsEmpty.equal(appsEmptyOwns(appsEmptyNative.replace(appsEmptyNeedle, mutation)), false);
+	}
+	const appsEmptyRemoved = appsEmptyNative.replace(appsEmptyNeedle, '{}');
+	assertAppsEmpty.equal(
+		appsEmptyOwns(appsEmptyRemoved + '\n-- ' + appsEmptyNeedle),
+		false,
+		'comment cannot satisfy ownership'
+	);
+	assertAppsEmpty.equal(
+		appsEmptyOwns(appsEmptyRemoved + "\nlocal inert = '" + appsEmptyNeedle + "'"),
+		false,
+		'quoted source cannot satisfy ownership'
+	);
+}
+
+// Append after root publishes the canonical record. Native owner tests remain
+// the behavior oracle; these tokens refuse comments, strings and wrong bindings.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_system_refresh.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const source = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	assert.deepEqual(source[corpus.section], corpus.rows, 'independent refresh source declaration');
+	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated refresh declaration');
+	assert.deepEqual(corpus.platform_rows, {
+		ahk: ['gesture_system_refresh'],
+		hs: ['gesture_system_refresh'],
+		linux: []
+	});
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const locale of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assert.equal(
+			strings['ui_apps.btn_refresh'],
+			corpus.captions[locale],
+			'unchanged existing refresh caption: ' + locale
+		);
+	}
+	function hasSequence(tokens, sequence) {
+		return tokens.some((_, index) =>
+			sequence.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	}
+	function assertRefreshWiring(owner, extension) {
+		const tokens = scriptTokens(owner, extension);
+		if (extension === '.lua') {
+			assert.ok(
+				hasSequence(tokens, ['ManifestMenu', '.', 'template_rows', '(', corpus.section, ',', '{'])
+			);
+			assert.ok(
+				hasSequence(tokens, ['[', 'gesture_system_refresh', ']', '=', 'function', '(', ')'])
+			);
+			assert.ok(
+				hasSequence(tokens, [
+					'return',
+					'gestures',
+					'.',
+					'refresh_system_gestures',
+					'(',
+					'ctx',
+					'.',
+					'updateMenu',
+					')'
+				])
+			);
+			assert.ok(
+				hasSequence(tokens, ['for', '_', ',', 'row', 'in', 'ipairs', '(', 'controls', ')'])
+			);
+			assert.ok(hasSequence(tokens, ['items', '=', 'rows']));
+		} else {
+			assert.ok(
+				hasSequence(tokens, [
+					'MenuRenderer_TemplateRows',
+					'(',
+					corpus.section,
+					',',
+					'Map',
+					'(',
+					'gesture_system_refresh',
+					',',
+					'GestureSystemRequestRefresh',
+					')'
+				])
+			);
+			assert.ok(hasSequence(tokens, ['for', 'Row', 'in', 'Controls']));
+			assert.ok(hasSequence(tokens, ['Children', '.', 'Push', '(', 'Row', ')']));
+			assert.ok(hasSequence(tokens, ['SetTimer', '(', 'GestureSystemRefresh', ',', '-', '1', ')']));
+		}
+	}
+	for (const [extension, nativePath] of [
+		['.lua', 'macos/ui/menu/menu_gestures.lua'],
+		['.ahk', 'windows/ui/gesture_conflicts.ahk']
+	]) {
+		const owner = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', nativePath), 'utf8');
+		assertRefreshWiring(owner, extension);
+		for (const id of [corpus.section, 'gesture_system_refresh'])
+			assert.throws(() =>
+				assertRefreshWiring(owner.replaceAll('"' + id + '"', '"unowned_refresh"'), extension)
+			);
+		const changed =
+			extension === '.lua'
+				? owner.replaceAll('gestures.refresh_system_gestures', 'gestures.unowned_refresh')
+				: owner.replaceAll('GestureSystemRequestRefresh)', 'UnownedRefresh)');
+		assert.throws(() => assertRefreshWiring(changed, extension));
+		const comment = extension === '.lua' ? '-- ' : '; ';
+		const erased = owner.replaceAll('"' + corpus.section + '"', '"unowned_refresh"');
+		const call =
+			extension === '.lua'
+				? `ManifestMenu.template_rows("${corpus.section}", {})`
+				: `MenuRenderer_TemplateRows("${corpus.section}", Map(), Map(), Map())`;
+		assert.throws(() => assertRefreshWiring(erased + '\n' + comment + call, extension));
+		assert.throws(() => assertRefreshWiring(erased + '\n' + JSON.stringify(call), extension));
+	}
+}
+
+// Complementary exact records and actual consumer/import wiring after root publication.
+// Replace only the older controls guard's obsolete ipairs(change_action_rows)
+// swipe assertion with this stronger whole-template/import/payload contract;
+// retain its original tap, numeric value, callback/getter and all locale assertions.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'), 'utf8')
+	);
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	assert.deepEqual(declared[corpus.section], corpus.rows, 'handwritten complete swipe source');
+	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated swipe template');
+	assert.deepEqual(corpus.child_sections, {
+		gesture_mode_options: 'gesture_slot_mode_commands',
+		gesture_sensitivity_options: 'gesture_sensitivity_head'
+	});
+	assert.deepEqual(corpus.platform_rows, {
+		ahk: [],
+		hs: [
+			'gesture_slot_change_action',
+			'separator',
+			'gesture_mode_options',
+			'gesture_sensitivity_options'
+		],
+		linux: []
+	});
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const locale of locales) {
+		const actual = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assert.equal(
+			actual['menu.gestures.mode_current'],
+			actual['menu.gestures.mode_prefix'] + '%s',
+			'exact existing translated mode prefix: ' + locale
+		);
+		assert.equal(
+			actual['menu.gestures.sensitivity_current'],
+			actual['menu.gestures.sensitivity_prefix'] + '%s',
+			'exact existing translated sensitivity prefix: ' + locale
+		);
+		assert.equal(
+			corpus.captions[locale].mode_x1,
+			actual['menu.gestures.mode_prefix'] + actual['menu.gestures.mode_single']
+		);
+		assert.equal(
+			corpus.captions[locale].mode_incremental,
+			actual['menu.gestures.mode_prefix'] + actual['menu.gestures.mode_incremental']
+		);
+		assert.equal(
+			corpus.captions[locale].sensitivity_3_5,
+			actual['menu.gestures.sensitivity_prefix'] + '3.5'
+		);
+	}
+	const owner = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua'),
+		'utf8'
+	);
+	function hasSequence(tokens, sequence) {
+		return tokens.some((_, index) =>
+			sequence.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	}
+	function assertSwipeWiring(source, records) {
+		assert.deepEqual(
+			records[0],
+			{ type: 'include', section: 'gesture_change_action' },
+			'real import of unchanged command declaration'
+		);
+		const tokens = scriptTokens(source, '.lua');
+		assert.ok(
+			hasSequence(tokens, [
+				'ManifestMenu',
+				'.',
+				'template_rows',
+				'(',
+				corpus.section,
+				',',
+				'slot_commands',
+				',',
+				'slot_getters',
+				',',
+				'{'
+			])
+		);
+		for (const [id, payload] of [
+			['gesture_mode_options', 'modeSubmenu'],
+			['gesture_sensitivity_options', 'sensSubmenu']
+		])
+			assert.ok(
+				hasSequence(tokens, ['[', id, ']', '=', payload]),
+				'actual native child payload: ' + id
+			);
+		for (const id of [
+			'gesture_slot_change_action',
+			'gesture_slot_choice_ready',
+			'gesture_mode_current_label',
+			'gesture_sensitivity_current_label',
+			'gesture_mode_incremental_ready'
+		])
+			assert.ok(
+				hasSequence(tokens, ['[', id, ']', '=', 'function', '(', ')']),
+				'actual native callback/getter: ' + id
+			);
+		assert.ok(
+			hasSequence(tokens, [
+				'ManifestMenu',
+				'.',
+				'template_rows',
+				'(',
+				'gesture_change_action',
+				',',
+				'slot_commands',
+				',',
+				'slot_getters',
+				')'
+			]),
+			'actual tap child retains existing command path'
+		);
+		assert.ok(
+			hasSequence(tokens, ['items', '=', 'swipeSubmenu']),
+			'actual whole swipe child materialization'
+		);
+		assert.ok(
+			hasSequence(tokens, ['items', '=', 'change_action_rows']),
+			'actual tap child materialization'
+		);
+		for (const section of Object.values(corpus.child_sections))
+			assert.ok(
+				hasSequence(tokens, ['ManifestMenu', '.', 'template_rows', '(', section]),
+				'actual unchanged native child declaration: ' + section
+			);
+	}
+	assertSwipeWiring(owner, declared[corpus.section]);
+	for (const id of [
+		corpus.section,
+		'gesture_mode_options',
+		'gesture_sensitivity_options',
+		'gesture_mode_current_label',
+		'gesture_sensitivity_current_label',
+		'gesture_mode_incremental_ready'
+	])
+		assert.throws(() =>
+			assertSwipeWiring(
+				owner.replaceAll('"' + id + '"', '"unowned_swipe"'),
+				declared[corpus.section]
+			)
+		);
+	const wrongImport = structuredClone(declared[corpus.section]);
+	wrongImport[0].section = 'gesture_slot_mode_commands';
+	assert.throws(() => assertSwipeWiring(owner, wrongImport));
+	const erased = owner.replaceAll('"' + corpus.section + '"', '"unowned_swipe"');
+	const falseCall =
+		'ManifestMenu.template_rows("' + corpus.section + '", slot_commands, slot_getters, {})';
+	assert.throws(() => assertSwipeWiring(erased + '\n-- ' + falseCall, declared[corpus.section]));
+	assert.throws(() =>
+		assertSwipeWiring(erased + '\n' + JSON.stringify(falseCall), declared[corpus.section])
+	);
+}
+
+// Shared full-slot composition is separate from genuine clickable mode payloads.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_swipe_template.json'), 'utf8')
+	);
+	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu[corpus.section];
+	function assertSwipeRecords(actual) {
+		assert.deepEqual(actual, corpus.rows, 'exact independently handwritten full-slot declaration');
+	}
+	assertSwipeRecords(records);
+	for (const changed of [
+		(rows) => {
+			rows[2].i18n = 'menu.gestures.sensitivity_current';
+		},
+		(rows) => {
+			rows[3].caption_getter = 'gesture_mode_current_label';
+		},
+		(rows) => {
+			rows[2].id = 'gesture_sensitivity_options';
+		},
+		(rows) => {
+			rows[3].disabled_when = ['gesture_slot_choice_ready'];
+		},
+		(rows) => {
+			rows[1].platforms = ['linux'];
+		}
+	]) {
+		const wrong = structuredClone(records);
+		changed(wrong);
+		assert.throws(() => assertSwipeRecords(wrong));
+	}
+	const source = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = source.indexOf('const OPENS_SUBMENU = {');
+	const end = source.indexOf('\n};', start);
+	assert(start >= 0 && end > start, 'bounded actual graph registry');
+	const graph = require('node:vm').runInNewContext(
+		source.slice(start, end + 3) + '; OPENS_SUBMENU',
+		{},
+		{ timeout: 1000 }
+	);
+	function assertSwipeGraph(actual) {
+		for (const finger of [2, 3, 4, 5]) {
+			const entries = actual['gesture_slots_' + finger];
+			assert(Array.isArray(entries));
+			const edge = entries.find((e) => e && e.menu === corpus.section);
+			assert(edge, 'actual full-slot edge');
+			assert.equal(edge.kind, 'compose');
+			assert.equal(edge.platforms.length, 1);
+			assert.equal(edge.platforms[0], 'hs');
+			assert.equal(edge.native_sources?.hs, 'macos/ui/menu/menu_gestures.lua');
+		}
+		const mode = actual.gesture_mode_options;
+		assert.equal(mode.menu, 'gesture_slot_mode_commands');
+		assert.notEqual(mode.kind, 'compose');
+		assert.equal(mode.platforms.length, 1);
+		assert.equal(mode.platforms[0], 'hs');
+		const sens = actual.gesture_sensitivity_options;
+		assert.equal(sens.menu, 'gesture_sensitivity_head');
+		assert.equal(sens.kind, 'compose');
+		assert.equal(sens.platforms.length, 1);
+		assert.equal(sens.platforms[0], 'hs');
+		assert.equal(sens.native_sources?.hs, 'macos/ui/menu/menu_gestures.lua');
+	}
+	assertSwipeGraph(graph);
+	for (const changed of [
+		(g) => {
+			g.gesture_slots_2.find((e) => e?.menu === corpus.section).menu = 'gesture_change_action';
+		},
+		(g) => {
+			g.gesture_slots_3.find((e) => e?.menu === corpus.section).native_sources.hs =
+				'macos/ui/menu/menu_shortcuts.lua';
+		},
+		(g) => {
+			g.gesture_slots_4.find((e) => e?.menu === corpus.section).platforms = ['linux'];
+		},
+		(g) => {
+			g.gesture_slots_5.find((e) => e?.menu === corpus.section).kind = 'clicked';
+		},
+		(g) => {
+			g.gesture_mode_options.kind = 'compose';
+		},
+		(g) => {
+			g.gesture_sensitivity_options.kind = 'clicked';
+		},
+		(g) => {
+			g.gesture_mode_options.menu = 'gesture_sensitivity_head';
+		}
+	]) {
+		const wrong = structuredClone(graph);
+		changed(wrong);
+		assert.throws(() => assertSwipeGraph(wrong));
+	}
+}
+
+// About's dynamic build identity stays native/shared formatter data; its fixed tail is declared once.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/about_version_separator.json'), 'utf8')
+	);
+	assert.deepEqual(corpus.rows, [{ type: '---' }], 'handwritten original fixed separator');
+	assert.equal(corpus.version_index, 1);
+	assert.equal(corpus.separator_index, 2);
+	assert.equal(corpus.channel_index, 3);
+	const source = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	assert.deepEqual(source[corpus.section], corpus.rows);
+	assert.deepEqual(JSON.parse(readFileSync(MENU_PATH, 'utf8'))[corpus.section], corpus.rows);
+	function sequence(tokens, values) {
+		return tokens.some((_, i) => values.every((value, n) => tokens[i + n]?.value === value));
+	}
+	function wiring(text, driver) {
+		const tokens = scriptTokens(text, driver === 'ahk' ? '.ahk' : '.lua');
+		const call =
+			driver === 'ahk'
+				? [
+						'MenuRenderer_TemplateRows',
+						'(',
+						corpus.section,
+						',',
+						'Map',
+						'(',
+						')',
+						',',
+						'Map',
+						'(',
+						')',
+						',',
+						'Map',
+						'(',
+						')',
+						')'
+					]
+				: ['ManifestMenu', '.', 'template_rows', '(', corpus.section, ')'];
+		assert(sequence(tokens, call), 'actual fixed fragment call: ' + driver);
+		const append =
+			driver === 'ahk'
+				? ['Rows', '.', 'Push', '(', 'Row', ')']
+				: driver === 'hs'
+					? ['table', '.', 'insert', '(', 'menu_items', ',', 'row', ')']
+					: ['out', '[', '#', 'out', '+', '1', ']', '=', 'row'];
+		assert(sequence(tokens, append), 'actual provider materialization: ' + driver);
+	}
+	for (const [driver, file] of [
+		['ahk', 'windows/ui/menu/menu_init.ahk'],
+		['hs', 'macos/ui/menu/menu_about.lua'],
+		['linux', 'linux/ui/menu/menu_builder.lua']
+	]) {
+		const text = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		wiring(text, driver);
+		const wrong = text.replaceAll('"' + corpus.section + '"', '"wrong_fragment"');
+		assert.throws(() => wiring(wrong, driver));
+		const fake =
+			driver === 'ahk'
+				? 'MenuRenderer_TemplateRows("' + corpus.section + '", Map(), Map(), Map())'
+				: 'ManifestMenu.template_rows("' + corpus.section + '")';
+		assert.throws(() => wiring(wrong + '\n' + (driver === 'ahk' ? '; ' : '-- ') + fake, driver));
+		assert.throws(() => wiring(wrong + '\n' + JSON.stringify(fake), driver));
+	}
+	console.log(
+		'About version separator: independent fixed source, shared fragment and three genuine provider consumers.'
+	);
+}
+
+{
+	const assert = require('node:assert/strict');
+	const text = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = text.indexOf('const OPENS_SUBMENU = {');
+	const end = text.indexOf('\n};', start);
+	assert(start >= 0 && end > start);
+	const graph = require('node:vm').runInNewContext(
+		text.slice(start, end + 3) + '; OPENS_SUBMENU',
+		{},
+		{ timeout: 1000 }
+	);
+	function aboutEdges(g) {
+		const rows = g.about_updates;
+		assert(Array.isArray(rows));
+		for (const prior of [
+			'about_update_channel_menu',
+			'about_update_frequency_menu',
+			'about_source_menu'
+		])
+			assert(rows.includes(prior), 'original About edge retained: ' + prior);
+		const row = rows.find((e) => e?.menu === 'about_version_separator');
+		assert(row);
+		assert.equal(row.kind, 'compose');
+		for (const platform of ['ahk', 'hs', 'linux']) assert(row.platforms.includes(platform));
+		for (const [platform, path] of [
+			['ahk', 'windows/ui/menu/menu_init.ahk'],
+			['hs', 'macos/ui/menu/menu_about.lua'],
+			['linux', 'linux/ui/menu/menu_builder.lua']
+		])
+			assert.equal(row.native_sources[platform], path);
+	}
+	aboutEdges(graph);
+	for (const mutate of [
+		(g) => {
+			g.about_updates.find((e) => e?.menu === 'about_version_separator').menu = 'about_menu';
+		},
+		(g) => {
+			g.about_updates.find((e) => e?.menu === 'about_version_separator').kind = 'clicked';
+		},
+		(g) => {
+			g.about_updates.find((e) => e?.menu === 'about_version_separator').native_sources.linux =
+				'linux/ui/menu/agent_rows.lua';
+		},
+		(g) => {
+			g.about_updates = g.about_updates.filter((e) => e !== 'about_update_channel_menu');
+		}
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => aboutEdges(wrong));
+	}
+}
+
+// Custom-profile child callbacks stay native; their fixed presentation is shared.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/custom_profile_children.json'), 'utf8')
+	);
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(declared[expected.section], expected.declaration);
+	assert.deepEqual(generated[expected.section], expected.declaration);
+	const languages = JSON.parse(
+		readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')
+	).order;
+	assert.equal(languages.length, 21);
+	assert.deepEqual(Object.keys(expected.caption_snapshots).sort(), [...languages].sort());
+	for (const code of languages) {
+		const values = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		for (const [key, value] of Object.entries(expected.caption_snapshots[code]))
+			assert.equal(values[key], value, code + ': original native caption ' + key);
+	}
+	function wiring(source, platform) {
+		const tokens = scriptTokens(source, '.lua').map((token) => token.value);
+		function has(sequence) {
+			return tokens.some((_, i) => sequence.every((value, n) => tokens[i + n] === value));
+		}
+		assert(
+			has(['ManifestMenu', '.', 'template_rows', '(', expected.section, ',']),
+			'actual canonical renderer consumer'
+		);
+		for (const id of expected.platform_rows[platform]) {
+			if (id === '---') continue;
+			assert(has(['[', id, ']', '=', 'function']), 'actual native callback binding: ' + id);
+		}
+		assert(has(['[', 'llm_custom_profile_active', ']', '=', 'function']), 'native active getter');
+		assert(
+			has(['[', 'llm_custom_profile_ready', ']', '=', 'child_ready']),
+			'native current-owner admission'
+		);
+		assert(has(['local', 'function', 'child_ready', '(', ')']), 'actual readiness function');
+		assert(
+			platform === 'hs'
+				? has(['item', '.', 'items', '=', 'ManifestMenu', '.', 'template_rows'])
+				: has(['items', '=', 'ManifestMenu', '.', 'template_rows']),
+			'actual child payload materializes template'
+		);
+	}
+	for (const [platform, file] of [
+		['hs', 'macos/ui/menu/menu_llm/profiles_manager.lua'],
+		['linux', 'linux/ui/menu/menu_builder.lua']
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		wiring(source, platform);
+		for (const name of [
+			expected.section,
+			...expected.platform_rows[platform].filter((id) => id !== '---'),
+			'llm_custom_profile_active',
+			'llm_custom_profile_ready'
+		])
+			assert.throws(() => wiring(source.replaceAll('"' + name + '"', '"wrong_owner"'), platform));
+		const wrong = source.replace(
+			'ManifestMenu.template_rows("' + expected.section + '"',
+			'Foreign.template_rows("' + expected.section + '"'
+		);
+		assert.throws(() =>
+			wiring(wrong + '\n-- ManifestMenu.template_rows("' + expected.section + '")', platform)
+		);
+		assert.throws(() =>
+			wiring(
+				wrong + '\nlocal decorative = [[ManifestMenu.template_rows("' + expected.section + '")]]',
+				platform
+			)
+		);
+	}
+	const graphText = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphText.indexOf('const OPENS_SUBMENU = {');
+	const end = graphText.indexOf('\n};', start);
+	const graph = require('node:vm').runInNewContext(
+		graphText.slice(start, end + 3) + '; OPENS_SUBMENU'
+	);
+	function childEdges(candidate) {
+		assert(Array.isArray(candidate.llm_profile));
+		assert(
+			candidate.llm_profile.includes('llm_profile_commands'),
+			'original Create/Clone child retained'
+		);
+		const edge = candidate.llm_profile.find((row) => row?.menu === expected.section);
+		assert(edge);
+		assert.equal(edge.kind, undefined, 'ordinary clicked child retains actionable-row floor');
+		assert.deepEqual([...edge.platforms], ['hs', 'linux']);
+	}
+	childEdges(graph);
+	for (const mutate of [
+		(g) => {
+			g.llm_profile.find((e) => e?.menu === expected.section).menu = 'llm_menu';
+		},
+		(g) => {
+			g.llm_profile.find((e) => e?.menu === expected.section).kind = 'compose';
+		},
+		(g) => {
+			g.llm_profile.find((e) => e?.menu === expected.section).platforms = ['ahk'];
+		},
+		(g) => {
+			g.llm_profile = g.llm_profile.filter((e) => e !== 'llm_profile_commands');
+		}
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => childEdges(wrong));
+	}
+	console.log(
+		'Custom profile children: independent declared order, 21 existing captions, actual native bindings and clicked graph ownership.'
+	);
+}
+
+// Linux's five numeric preset pickers share the complete free-entry tail.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/linux_numeric_custom_tail.json'), 'utf8')
+	);
+	const section = 'llm_numeric_custom_rows';
+	const declared = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	function declaration(candidate) {
+		assert.deepEqual(candidate[section], expected.declaration);
+	}
+	declaration(declared);
+	declaration(generated);
+	for (const mutate of [
+		(m) => (m[section][1].i18n = 'button.cancel'),
+		(m) => m[section].reverse(),
+		(m) => (m[section][1].platforms = ['hs']),
+		(m) => (m[section][1].id = 'foreign_owner')
+	]) {
+		const wrong = structuredClone(generated);
+		mutate(wrong);
+		assert.throws(() => declaration(wrong));
+	}
+	const languages = JSON.parse(
+		readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')
+	).order;
+	assert.equal(languages.length, 21);
+	assert.deepEqual(Object.keys(expected.captions).sort(), [...languages].sort());
+	for (const code of languages) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
+		assert.equal(strings['menu.llm.generation.custom_value'], expected.captions[code]);
+	}
+	function wiring(source) {
+		for (const [owner, receiver] of [
+			['llm_trigger', 'delay_choices'],
+			['llm_generation', 'choices']
+		]) {
+			const registry = owner === 'llm_trigger' ? 'group_builders' : 'dynamic_handlers';
+			const parameters = owner === 'llm_trigger' ? '' : 'target';
+			const begin = source.indexOf(registry + '["' + owner + '"] = function(' + parameters + ')');
+			assert(begin >= 0, 'actual numeric provider ' + owner);
+			const rest = source.slice(begin + 1);
+			const end = rest.indexOf('dynamic_handlers[');
+			const body = source.slice(begin, end < 0 ? source.length : begin + 1 + end);
+			const tokens = scriptTokens(body, '.lua').map((t) => t.value);
+			function has(seq) {
+				return tokens.some((_, i) => seq.every((v, n) => tokens[i + n] === v));
+			}
+			assert(
+				has([
+					'local',
+					'custom_rows',
+					'=',
+					'ManifestMenu',
+					'.',
+					'template_rows',
+					'(',
+					section,
+					',',
+					'{',
+					'[',
+					'llm_numeric_custom_value',
+					']',
+					'=',
+					'function',
+					'(',
+					')'
+				]),
+				'actual native command binding in ' + owner
+			);
+			assert(
+				has([
+					'for',
+					'_',
+					',',
+					'row',
+					'in',
+					'ipairs',
+					'(',
+					'custom_rows',
+					'or',
+					'{',
+					'}',
+					')',
+					'do',
+					receiver,
+					'[',
+					'#',
+					receiver,
+					'+',
+					'1',
+					']',
+					'=',
+					'row',
+					'end'
+				]),
+				'actual numeric tail appended to preset owner ' + owner
+			);
+		}
+	}
+	const native = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	wiring(native);
+	for (const mutate of [
+		(s) =>
+			s.replace(
+				'ManifestMenu.template_rows("' + section + '"',
+				'Foreign.template_rows("' + section + '"'
+			),
+		(s) => s.replace('["llm_numeric_custom_value"] = function()', '["foreign_owner"] = function()'),
+		(s) => s.replace('do choices[#choices + 1] = row end', 'do unused[#unused + 1] = row end'),
+		(s) => s.replace('group_builders["llm_trigger"]', 'group_builders["unreachable"]')
+	])
+		assert.throws(() => wiring(mutate(native)));
+	const graphText = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphText.indexOf('const OPENS_SUBMENU = {');
+	const end = graphText.indexOf('\n};', start);
+	const graph = require('node:vm').runInNewContext(
+		graphText.slice(start, end + 3) + '; OPENS_SUBMENU'
+	);
+	function edges(g) {
+		for (const [provider, oldChild] of [
+			['llm_trigger', 'llm_trigger_menu'],
+			['llm_generation', 'llm_generation_menu']
+		]) {
+			assert(Array.isArray(g[provider]));
+			assert(g[provider].includes(oldChild), 'original clicked child retained');
+			const edge = g[provider].find((e) => e?.menu === section);
+			assert(edge);
+			assert.equal(edge.kind, 'compose');
+			assert.deepEqual([...edge.platforms], ['linux']);
+			assert.equal(edge.native_sources.linux, 'linux/ui/menu/menu_builder.lua');
+		}
+	}
+	edges(graph);
+	for (const mutate of [
+		(g) => (g.llm_trigger.find((e) => e?.menu === section).menu = 'llm_trigger_menu'),
+		(g) => (g.llm_generation.find((e) => e?.menu === section).kind = 'clicked'),
+		(g) => (g.llm_trigger.find((e) => e?.menu === section).platforms = ['hs']),
+		(g) =>
+			(g.llm_generation.find((e) => e?.menu === section).native_sources.linux =
+				'linux/ui/menu/agent_rows.lua'),
+		(g) => (g.llm_trigger = g.llm_trigger.filter((e) => e !== 'llm_trigger_menu'))
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => edges(wrong));
+	}
+	console.log(
+		'Linux numeric tails: independent shared declaration, 21 existing captions, real preset receivers and preserved clicked children.'
+	);
+}
+
+// Profile section headings are real inert fragments, never clicked children.
+{
+	const assert = require('node:assert/strict');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const vm = require('node:vm');
+	const shared = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
+	const declared = JSON.parse(
+		fs.readFileSync(path.join(shared, 'modules/menu/menu_manifest.json'), 'utf8')
+	);
+	const expected = JSON.parse(
+		fs.readFileSync(path.join(shared, 'tests/corpus/menus/profile_section_headings.json'), 'utf8')
+	);
+	const sections = ['llm_profile_builtin_heading', 'llm_profile_custom_heading'];
+	function declaration(document) {
+		for (const section of sections) assert.deepEqual(document[section], expected.sections[section]);
+	}
+	declaration(declared);
+	for (const mutate of [
+		(d) => delete d.llm_profile_builtin_heading,
+		(d) => d.llm_profile_custom_heading.reverse(),
+		(d) => (d.llm_profile_builtin_heading[0].i18n = 'button.cancel'),
+		(d) => (d.llm_profile_custom_heading[1].platforms = ['hs']),
+		(d) => (d.llm_profile_builtin_heading[1].type = 'label'),
+		(d) => (d.llm_profile_custom_heading[0].type = 'label')
+	]) {
+		const wrong = structuredClone(declared);
+		mutate(wrong);
+		assert.throws(() => declaration(wrong));
+	}
+	assert.equal(Object.keys(expected.captions).length, 21);
+	for (const [language, captions] of Object.entries(expected.captions)) {
+		const values = JSON.parse(
+			fs.readFileSync(path.join(shared, 'data/locales', language + '.json'), 'utf8')
+		);
+		assert.deepEqual(
+			expected.keys.map((key) => values[key]),
+			captions
+		);
+	}
+	const owners = {
+		ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
+		hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
+		linux: 'linux/ui/menu/menu_builder.lua'
+	};
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	function sequence(tokens, values) {
+		return tokens.some((_, index) =>
+			values.every((value, offset) => tokens[index + offset]?.value === value)
+		);
+	}
+	function wiring(source, platform, document = declared) {
+		source = profileFrameOwnerSource(source, platform);
+		const frame = platform === 'ahk' ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame';
+		const tokens = scriptTokens(source, platform === 'ahk' ? '.ahk' : '.lua');
+		const call =
+			platform === 'ahk'
+				? ['return', 'MenuRenderer_TemplateRows', '(', frame, ',']
+				: ['local', 'rows', '=', 'ManifestMenu', '.', 'template_rows', '(', frame, ','];
+		assert(sequence(tokens, call), 'actual provider consumes the complete declared frame');
+		const native =
+			platform === 'ahk'
+				? ['llm_profile_builtin_rows', 'llm_profile_custom_rows']
+				: ['llm_profile_builtin_rows', 'llm_profile_custom_rows'];
+		for (const id of native) {
+			const payload = id.includes('builtin')
+				? platform === 'ahk'
+					? '_LLM_Menu_ProfileBuiltinRows'
+					: 'builtin_rows'
+				: platform === 'ahk'
+					? '_LLM_Menu_ProfileCustomRows'
+					: 'custom_rows';
+			assert(
+				sequence(
+					tokens,
+					platform === 'ahk' ? [id, ',', payload, '.', 'Bind', '('] : ['[', id, ']', '=', payload]
+				),
+				'actual lazy native data binding: ' + id
+			);
+		}
+		const builtin = document[frame].filter(
+			(row) => row.type === 'include' && row.section === sections[0]
+		);
+		assert.equal(builtin.length, 1, 'exact frame import of original builtin presentation');
+		assert.equal(builtin[0].on_refusal, 'omit_presentation');
+		const custom = document[frame].filter(
+			(row) => row.type === 'include' && row.section === 'llm_profile_custom_section'
+		);
+		assert.equal(custom.length, 1);
+		assert.equal(
+			custom[0].present_when,
+			'llm_profile_custom_present',
+			'original registry predicate controls heading and data together'
+		);
+		assert.deepEqual(document.llm_profile_custom_section, [
+			{ type: 'include', section: sections[1], on_refusal: 'omit_presentation' },
+			{ type: 'list', id: 'llm_profile_custom_rows' }
+		]);
+		if (platform === 'ahk') {
+			assert(
+				sequence(tokens, [
+					'llm_profile_custom_present',
+					',',
+					'_LLM_Menu_ProfileCustomPresent',
+					'.',
+					'Bind',
+					'('
+				])
+			);
+			assert(sequence(tokens, ['return', 'user_profiles', '.', 'Length', '>', '0']));
+		} else {
+			assert(sequence(tokens, ['[', 'llm_profile_custom_present', ']', '=', 'custom_present']));
+			assert(
+				sequence(
+					tokens,
+					platform === 'hs'
+						? [
+								'return',
+								'type',
+								'(',
+								'user_profiles',
+								')',
+								'=',
+								'=',
+								'table',
+								'and',
+								'#',
+								'user_profiles',
+								'>',
+								'0'
+							]
+						: ['return', '#', 'user_profiles', '>', '0']
+				)
+			);
+			assert(
+				sequence(
+					tokens,
+					platform === 'hs'
+						? ['return', 'ManifestMenu', '.', 'render_rows', '(', 'rows', ',']
+						: ['items', '=', 'rows']
+				)
+			);
+		}
+		assert(
+			!/(?:t|i18n_safe|i18n\.section)\("menu\.profiles\.header_(?:default|custom)_profiles"\)/.test(
+				source
+			)
+		);
+	}
+	for (const [platform, owner] of Object.entries(owners)) {
+		const source = fs.readFileSync(path.resolve(shared, '..', owner), 'utf8');
+		wiring(source, platform);
+		for (const id of [
+			platform === 'ahk' ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame',
+			'llm_profile_builtin_rows',
+			'llm_profile_custom_rows',
+			'llm_profile_custom_present'
+		])
+			assert.throws(() => wiring(source.replaceAll('"' + id + '"', '"unowned_frame"'), platform));
+		for (const section of sections) {
+			const wrong = structuredClone(declared);
+			for (const rows of Object.values(wrong)) {
+				if (!Array.isArray(rows)) continue;
+				for (const row of rows)
+					if (row.type === 'include' && row.section === section)
+						row.section = 'llm_profile_commands';
+			}
+			assert.throws(() => wiring(source, platform, wrong));
+		}
+		const erased = source.replaceAll(
+			'"' + (platform === 'ahk' ? 'llm_profile_windows_frame' : 'llm_profile_lua_frame') + '"',
+			'"unowned_frame"'
+		);
+		const fake =
+			platform === 'ahk'
+				? 'return MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(), Map(), Map())'
+				: 'local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {}, {}, {})';
+		assert.throws(() => wiring(erased + (platform === 'ahk' ? '\n; ' : '\n-- ') + fake, platform));
+		assert.throws(() => wiring(erased + '\n' + JSON.stringify(fake), platform));
+		const ownerMarker =
+			platform === 'ahk'
+				? '_LLM_Menu_ProfileRows() {'
+				: platform === 'hs'
+					? 'local function build_profile_menu('
+					: 'dynamic_handlers["llm_profile"] = function';
+		const unrelatedOwner =
+			platform === 'ahk'
+				? '_LLM_Menu_UnrelatedRows() {'
+				: platform === 'hs'
+					? 'local function unrelated_build_profile_menu('
+					: 'dynamic_handlers["unrelated_profile"] = function';
+		const fakeOwner = source.replace(
+			ownerMarker,
+			(platform === 'ahk' ? '; ' : '-- ') + ownerMarker + '\n' + unrelatedOwner
+		);
+		assert.notEqual(fakeOwner, source, 'actual provider definition was renamed');
+		assert.throws(
+			() => wiring(fakeOwner, platform),
+			'a commented owner marker cannot authenticate a renamed native builder'
+		);
+		for (const id of ['llm_profile_create', 'llm_profile_clone'])
+			assert.equal(
+				consumesProfileFrameCommand(fakeOwner, owner, declared, 'llm_profile_commands', id),
+				false
+			);
+		if (platform === 'linux') {
+			const foreignHandler = source.replace(
+				ownerMarker,
+				'local decoy = {dynamic_handlers={}}; decoy.' + ownerMarker
+			);
+			assert.notEqual(foreignHandler, source);
+			assert.throws(
+				() => wiring(foreignHandler, platform),
+				'a foreign table receiver cannot authenticate the real dynamic provider'
+			);
+			for (const id of ['llm_profile_create', 'llm_profile_clone'])
+				assert.equal(
+					consumesProfileFrameCommand(foreignHandler, owner, declared, 'llm_profile_commands', id),
+					false
+				);
+		}
+		if (platform === 'ahk') {
+			const unicodeOwner = source.replace(ownerMarker, 'É' + ownerMarker);
+			assert.notEqual(unicodeOwner, source);
+			assert.throws(
+				() => wiring(unicodeOwner, platform),
+				'an ASCII suffix of a different Unicode AHK identifier is not the actual owner'
+			);
+			for (const id of ['llm_profile_create', 'llm_profile_clone'])
+				assert.equal(
+					consumesProfileFrameCommand(unicodeOwner, owner, declared, 'llm_profile_commands', id),
+					false
+				);
+		}
+		// An executable decoy outside the actual provider cannot repair withdrawn ownership.
+		assert.throws(() => wiring(erased + '\n' + fake, platform));
+		if (platform !== 'ahk') {
+			const discarded = profileFrameOwnerSource(source, platform).replace(
+				platform === 'hs'
+					? 'return ManifestMenu.render_rows(rows, "llm_profile")'
+					: 'items = rows,',
+				platform === 'hs' ? 'return {}' : 'items = discarded_rows,'
+			);
+			assert.throws(() => wiring(discarded, platform));
+		}
+	}
+	const graphSource = fs.readFileSync(path.resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphSource.indexOf('const OPENS_SUBMENU = {');
+	const end = graphSource.indexOf('\n};', start);
+	const graph = vm.runInNewContext(graphSource.slice(start, end + 3) + '; OPENS_SUBMENU');
+	function edges(value) {
+		assert(Array.isArray(value.llm_profile));
+		assert(
+			value.llm_profile.includes('llm_profile_commands'),
+			'the original clicked command child survives'
+		);
+		const original = value.llm_profile.find((edge) => edge?.menu === 'llm_custom_profile_controls');
+		assert(original);
+		assert.deepEqual([...original.platforms], ['hs', 'linux']);
+		for (const [frame, platforms] of [
+			['llm_profile_windows_frame', ['ahk']],
+			['llm_profile_lua_frame', ['hs', 'linux']]
+		]) {
+			const edge = value.llm_profile.find((item) => item?.menu === frame);
+			assert(edge);
+			assert.equal(edge.kind, 'compose');
+			assert.deepEqual([...edge.platforms], platforms);
+			for (const platform of platforms)
+				assert.equal(edge.native_sources[platform], owners[platform]);
+		}
+		// Include graph preserves both original inert descendants through the actual frame.
+		for (const section of sections) {
+			const target = section.includes('custom')
+				? declared.llm_profile_custom_section
+				: declared.llm_profile_windows_frame;
+			assert(target.some((row) => row.type === 'include' && row.section === section));
+		}
+	}
+	edges(graph);
+	for (const mutate of [
+		(g) =>
+			(g.llm_profile.find((e) => e?.menu === 'llm_profile_windows_frame').menu =
+				'llm_profile_commands'),
+		(g) => (g.llm_profile.find((e) => e?.menu === 'llm_profile_lua_frame').kind = 'submenu'),
+		(g) => (g.llm_profile.find((e) => e?.menu === 'llm_profile_windows_frame').platforms = ['hs']),
+		(g) =>
+			(g.llm_profile.find((e) => e?.menu === 'llm_profile_lua_frame').native_sources.linux =
+				owners.hs),
+		(g) => (g.llm_profile = g.llm_profile.filter((e) => e !== 'llm_profile_commands'))
+	]) {
+		const wrong = structuredClone(graph);
+		mutate(wrong);
+		assert.throws(() => edges(wrong));
+	}
+	console.log(
+		'Profile headings: independent declaration, original 21 captions, real three-driver fragment publication and clicked-child preservation.'
+	);
+}
+
+// Exact direct-row selectors reuse canonical commands without a second policy.
+{
+	const assertFrame = require('node:assert/strict');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const originalFrame = {
+		frame: [
+			{ type: 'list', id: 'native_data' },
+			{ type: 'include', section: 'commands', row_id: 'clone', present_when: 'clone_present' },
+			{ type: 'include', section: 'commands', row_id: 'create' }
+		],
+		commands: [
+			{ type: 'command', id: 'create', i18n: 'menu.profiles.create_profile' },
+			{ type: 'command', id: 'clone', i18n: 'menu.profiles.clone_builtin' }
+		]
+	};
+	assertFrame.doesNotThrow(() => validateChildTemplates(originalFrame));
+	const controls = [
+		['empty selector', (m) => (m.frame[1].row_id = '')],
+		['unknown selector', (m) => (m.frame[1].row_id = 'absent')],
+		['wrong-case selector', (m) => (m.frame[1].row_id = 'Clone')],
+		['nonstring selector', (m) => (m.frame[1].row_id = false)],
+		['duplicate selector', (m) => (m.commands[0].id = 'clone')],
+		[
+			'nested selector',
+			(m) => {
+				m.commands[1] = { type: 'include', section: 'nested' };
+				m.nested = [{ type: 'command', id: 'clone' }];
+			}
+		],
+		['empty presence', (m) => (m.frame[1].present_when = '')],
+		['nonstring presence', (m) => (m.frame[1].present_when = true)],
+		['absent section', (m) => (m.frame[1].section = 'missing')],
+		['competing caption', (m) => (m.frame[1].i18n = 'native caption')]
+	];
+	for (const [name, mutate] of controls) {
+		const m = structuredClone(originalFrame);
+		mutate(m);
+		assertFrame.throws(() => validateChildTemplates(m), undefined, name);
+	}
+	const legacyFrame = structuredClone(originalFrame);
+	delete legacyFrame.frame[1].row_id;
+	delete legacyFrame.frame[1].present_when;
+	assertFrame.doesNotThrow(() => validateChildTemplates(legacyFrame));
+}
+
+// Presentation omission is opt-in and compiler-proven inert throughout its target.
+{
+	const assertPresentation = require('node:assert/strict');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const original = {
+		frame: [
+			{ type: 'include', section: 'presentation', on_refusal: 'omit_presentation' },
+			{ type: 'list', id: 'native' }
+		],
+		presentation: [
+			{ type: 'section_header', i18n: 'menu.profiles.header_default_profiles' },
+			{ type: '---' },
+			{ type: 'include', section: 'nested' }
+		],
+		nested: [{ type: 'label', id: 'custom', i18n: 'menu.profiles.header_custom_profiles' }]
+	};
+	assertPresentation.doesNotThrow(() => validateChildTemplates(original));
+	const controls = [
+		['empty enum', (m) => (m.frame[0].on_refusal = '')],
+		['unknown enum', (m) => (m.frame[0].on_refusal = 'ignore')],
+		['wrong-case enum', (m) => (m.frame[0].on_refusal = 'OMIT_PRESENTATION')],
+		['false enum', (m) => (m.frame[0].on_refusal = false)],
+		['wrong owner', (m) => (m.frame[1].on_refusal = 'omit_presentation')],
+		['missing target', (m) => (m.frame[0].section = 'missing')],
+		['empty target', (m) => (m.presentation = [])],
+		['malformed header', (m) => (m.presentation[0].i18n = '')],
+		['header action', (m) => (m.presentation[0].action = 'native')],
+		['header getter', (m) => (m.presentation[0].caption_getter = 'read')],
+		['header children', (m) => (m.presentation[0].items = [])],
+		['nested presence', (m) => (m.presentation[2].present_when = 'read')],
+		['nested omission', (m) => (m.presentation[2].on_refusal = 'omit_presentation')],
+		['nested cycle', (m) => (m.presentation[2].section = 'presentation')],
+		['unknown row', (m) => (m.nested[0].type = 'unknown')],
+		['command', (m) => (m.nested[0].type = 'command')],
+		['check', (m) => (m.nested[0].type = 'check')],
+		['group', (m) => (m.nested[0].type = 'group')],
+		['list', (m) => (m.nested[0] = { type: 'list', id: 'native' })],
+		['feature', (m) => (m.nested[0].type = 'feature')],
+		[
+			'hidden clicked row',
+			(m) =>
+				(m.nested[0] = {
+					type: 'command',
+					id: 'native',
+					i18n: 'caption',
+					platforms: ['ahk'],
+					unavailable: 'hide'
+				})
+		],
+		[
+			'mixed target selected safe row',
+			(m) => {
+				m.frame[0].row_id = 'safe';
+				m.presentation[0].id = 'safe';
+				m.presentation.push({ type: 'command', id: 'unsafe', i18n: 'caption' });
+			}
+		],
+		['wrong platform shape', (m) => (m.presentation[0].platforms = 'hs')],
+		['unknown platform', (m) => (m.presentation[0].platforms = ['other'])],
+		['duplicate platform', (m) => (m.presentation[0].platforms = ['hs', 'hs'])]
+	];
+	for (const [name, mutate] of controls) {
+		const menu = structuredClone(original);
+		mutate(menu);
+		assertPresentation.throws(() => validateChildTemplates(menu), undefined, name);
+	}
+	const selected = structuredClone(original);
+	selected.presentation[0].id = 'safe';
+	selected.frame[0].row_id = 'safe';
+	assertPresentation.doesNotThrow(() => validateChildTemplates(selected));
+	const conditional = structuredClone(original);
+	conditional.frame[0].present_when = 'native_present';
+	assertPresentation.doesNotThrow(() => validateChildTemplates(conditional));
+	const ordinary = structuredClone(original);
+	delete ordinary.frame[0].on_refusal;
+	ordinary.nested[0].type = 'command';
+	assertPresentation.doesNotThrow(() => validateChildTemplates(ordinary));
+}
+
+// Both native Agent systems consume the independent fixed model-control frame.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/agent_system_model.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(corpus.systems, ['system1', 'system2']);
+	assert.deepEqual(
+		manifest[corpus.section],
+		corpus.rows,
+		'the complete two-row frame is independently pinned'
+	);
+	assert.equal(corpus.rows.length, 2);
+	assert.equal(corpus.row_id, 'agent_system_model');
+	assert.equal(corpus.model, 'hand/50%');
+	assert.equal(corpus.caption, 'Model… (hand/50%)');
+	assert.equal(corpus.variants.length, 2);
+	for (const variant of corpus.variants) {
+		assert.deepEqual(manifest[variant.section], [
+			{ type: '---' },
+			{
+				type: 'command',
+				id: 'agent_system_model',
+				i18n: variant.label_key,
+				disabled_when: ['agent_system_model_ready']
+			}
+		]);
+		const mac = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua'),
+			'utf8'
+		);
+		assert(mac.includes('ManifestMenu.template_rows("' + variant.section + '"'));
+	}
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_llm/menu_agent.ahk', 'MenuRenderer_TemplateRows'],
+		['macos', 'ui/menu/menu_llm/agent_panel.lua', 'ManifestMenu.template_rows'],
+		['linux', 'ui/menu/agent_rows.lua', 'require("infra.manifest_menu").template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert(
+			source.includes(call + '("agent_system_model_controls"'),
+			driver + ' consumes the real shared frame'
+		);
+	}
+	console.log('Agent system Model: canonical two-row frame and three actual native owners.');
+}
+
+// API creation keeps its actual platform-specific dialog/provider owner.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/tests/corpus/menus/api_add_controls.json'),
+			'utf8'
+		)
+	);
+	assert.deepEqual(manifest[corpus.command_section], [corpus.command]);
+	assert.deepEqual(manifest[corpus.group_section], [corpus.group]);
+	assert.deepEqual(manifest[corpus.separator_section], [corpus.separator]);
+	for (const code of [
+		'ar',
+		'cs',
+		'da',
+		'de',
+		'en',
+		'es',
+		'fr',
+		'he',
+		'hi',
+		'it',
+		'ja',
+		'ko',
+		'no',
+		'nl',
+		'pl',
+		'pt',
+		'ru',
+		'sv',
+		'tr',
+		'uk',
+		'zh'
+	]) {
+		const strings = JSON.parse(
+			readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json'),
+				'utf8'
+			)
+		);
+		assert.equal(
+			typeof strings[corpus.label_key],
+			'string',
+			code + ' keeps the existing Add caption'
+		);
+		assert(strings[corpus.label_key].length > 0);
+		if (code === 'en') {
+			assert.equal(strings[corpus.label_key], corpus.label);
+			assert.equal(strings[corpus.mutated_key], corpus.mutated_label);
+		}
+	}
+	for (const [driver, relative, call, section] of [
+		[
+			'windows',
+			'ui/menu/menu_llm/menu_api_entries.ahk',
+			'MenuRenderer_TemplateRows',
+			corpus.command_section
+		],
+		['macos', 'ui/menu/menu_llm/api_panel.lua', 'ManifestMenu.template_rows', corpus.group_section],
+		['linux', 'ui/menu/llm_backend_rows.lua', 'ManifestMenu.template_rows', corpus.group_section]
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert(source.includes(call + '("' + section + '"'), driver + ' consumes the actual Add frame');
+		assert(
+			source.includes(call + '("' + corpus.separator_section + '"'),
+			driver + ' consumes the existing separator'
+		);
+	}
+	console.log(
+		'API Add: independent declarations, 21 existing captions, authentic native dialog/provider and separator owners.'
+	);
+}
+
+// Backend choices retain their native controls; only two drivers allocate this boundary.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/backend_choice_boundary.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(manifest[corpus.section], corpus.rows);
+	assert.deepEqual(corpus.platform_rows, {
+		ahk: [{ separator: true }],
+		hs: [],
+		linux: [{ separator: true }]
+	});
+	for (const code of [
+		'ar',
+		'cs',
+		'da',
+		'de',
+		'en',
+		'es',
+		'fr',
+		'he',
+		'hi',
+		'it',
+		'ja',
+		'ko',
+		'no',
+		'nl',
+		'pl',
+		'pt',
+		'ru',
+		'sv',
+		'tr',
+		'uk',
+		'zh'
+	]) {
+		const labels = JSON.parse(
+			readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
+		);
+		for (const key of [corpus.marker_key, corpus.windows_next_key, ...corpus.linux_choice_keys]) {
+			assert.equal(typeof labels[key], 'string', code + ': existing control key ' + key);
+			assert(labels[key].trim().length > 0);
+		}
+		if (code === 'en') {
+			assert.equal(labels[corpus.marker_key], corpus.marker_english);
+			assert.equal(labels[corpus.windows_next_key], corpus.windows_next_english);
+			assert.deepEqual(
+				corpus.linux_choice_keys.map((key) => labels[key]),
+				corpus.linux_choice_english
+			);
+		}
+	}
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+		['linux', 'ui/menu/llm_backend_rows.lua', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert(source.includes(call + '("llm_backend_choice_boundary"'));
+	}
+	const mac = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_llm/backend_panel.lua'),
+		'utf8'
+	);
+	assert(!mac.includes('"llm_backend_choice_boundary"'));
+	assert(mac.includes('ctx.local_server_rows(activate_api)'));
+	console.log(
+		'Backend boundary: independent two-driver rows, genuine macOS absence and21 existing captions.'
+	);
+}
+
+// Independent per-model frame declarations retain bare Windows and decorated Mac headings.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_readout_frames.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const key of ['specs', 'caps']) {
+		const expected = corpus[key];
+		assert.deepEqual(manifest[expected.section], expected.rows);
+		assert.deepEqual(expected.platform_rows, {
+			ahk: [{ separator: true }, { label: expected.english, disabled: true }],
+			hs: [{ separator: true }, { label: '— ' + expected.english + ' —', disabled: true }],
+			linux: []
+		});
+		for (const code of [
+			'ar',
+			'cs',
+			'da',
+			'de',
+			'en',
+			'es',
+			'fr',
+			'he',
+			'hi',
+			'it',
+			'ja',
+			'ko',
+			'no',
+			'nl',
+			'pl',
+			'pt',
+			'ru',
+			'sv',
+			'tr',
+			'uk',
+			'zh'
+		]) {
+			const strings = JSON.parse(
+				readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
+			);
+			for (const caption of [expected.key, corpus.selection_key, corpus.marker_key]) {
+				assert.equal(typeof strings[caption], 'string', code + ': existing caption ' + caption);
+				assert(strings[caption].trim().length > 0);
+			}
+			if (code === 'en') {
+				assert.equal(strings[expected.key], expected.english);
+				assert.equal(strings[corpus.selection_key], corpus.selection_english);
+				assert.equal(strings[corpus.marker_key], corpus.marker_english);
+			}
+		}
+		for (const [driver, relative, call] of [
+			['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+			['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+		]) {
+			const source = readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+				'utf8'
+			);
+			assert(
+				source.includes(call + '("' + expected.section + '"'),
+				driver + ': genuine per-model frame owner'
+			);
+		}
+		const linux = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+			'utf8'
+		);
+		assert(
+			!linux.includes('"' + expected.section + '"'),
+			'Linux has no per-model detail sheet to populate'
+		);
+	}
+	const providers = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const actual = providers
+		.flatMap((p) => p.families.flatMap((f) => f.models))
+		.filter((m) => m.name === corpus.native_model);
+	assert.equal(
+		actual.length,
+		1,
+		'the hand-pinned native model must exist exactly once in the shipped catalogue'
+	);
+	assert.equal(typeof actual[0].urls.ollama, 'string');
+	assert.equal(typeof actual[0].capabilities, 'object');
+	console.log(
+		'Model readouts: authentic two-driver frames, genuine Linux absence and21 unchanged captions.'
+	);
+}
+
+// Actual numeric providers retain each driver's existing boundary and caption policy.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/generation_boundaries.json'), 'utf8')
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const key of ['count', 'context', 'words']) {
+		const expected = corpus.boundaries[key];
+		assert.deepEqual(manifest[expected.section], expected.rows);
+		assert.deepEqual(expected.projections.linux, [], 'Linux has no native numeric boundary');
+		if (key !== 'count')
+			assert.deepEqual(expected.projections.hs, [], 'macOS has no later numeric boundary');
+		for (const [driver, relative, call] of [
+			['windows', 'ui/menu/menu_llm/menu_settings.ahk', 'MenuRenderer_TemplateRows'],
+			['macos', 'ui/menu/menu_llm/init.lua', 'ManifestMenu.template_rows']
+		]) {
+			const source = readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+				'utf8'
+			);
+			assert.equal(
+				source.includes(call + '("' + expected.section + '"'),
+				driver === 'windows' || key === 'count'
+			);
+		}
+		const linux = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+			'utf8'
+		);
+		assert(!linux.includes('"' + expected.section + '"'));
+	}
+	for (const code of [
+		'ar',
+		'cs',
+		'da',
+		'de',
+		'en',
+		'es',
+		'fr',
+		'he',
+		'hi',
+		'it',
+		'ja',
+		'ko',
+		'no',
+		'nl',
+		'pl',
+		'pt',
+		'ru',
+		'sv',
+		'tr',
+		'uk',
+		'zh'
+	]) {
+		const strings = JSON.parse(
+			readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
+		);
+		for (const key of [...corpus.caption_keys, corpus.published_marker_key]) {
+			assert.equal(typeof strings[key], 'string', code + ': existing numeric caption ' + key);
+			assert(strings[key].trim().length > 0);
+		}
+	}
+	console.log(
+		'Generation boundaries: four actual constructors, authentic cross-platform absence and21 unchanged caption sets.'
+	);
+}
+
+// The extension-list boundary has two actual native owners, independent of its children.
+{
+	const assert = require('assert');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const contract = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/shortcut_extension_boundary.json'), 'utf8')
+	);
+	assert.deepStrictEqual(manifest[contract.section], contract.rows);
+	assert.deepStrictEqual(contract.projections.linux, []);
+	assert.deepStrictEqual(contract.nonempty_order, ['separator', 'heading', 'extension_group']);
+	for (const [driver, call] of [
+		['windows', 'MenuRenderer_TemplateRows'],
+		['macos', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(
+				REPO_ROOT,
+				'static/ergopti_plus',
+				driver,
+				'ui/menu/menu_shortcuts.' + (driver === 'windows' ? 'ahk' : 'lua')
+			),
+			'utf8'
+		);
+		assert.ok(
+			source.includes(call + '("' + contract.section + '"'),
+			driver + ': actual extension boundary owner'
+		);
+	}
+	for (const file of readdirSync(resolve(SHARED, 'data/locales')).filter((name) =>
+		name.endsWith('.json')
+	)) {
+		const locale = JSON.parse(readFileSync(resolve(SHARED, 'data/locales', file), 'utf8'));
+		assert.strictEqual(typeof locale[contract.caption_key], 'string');
+		assert.ok(locale[contract.caption_key].trim().length > 0);
+		assert.ok(locale[contract.caption_key] !== contract.caption_key);
+	}
+}
+
+// Independently pinned catalogue boundaries retain the real native family/sheet order.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_catalogue_boundaries.json'), 'utf8')
+	);
+	for (const key of ['family', 'origin']) {
+		const expected = corpus.boundaries[key];
+		assert.deepEqual(manifest[expected.section], expected.rows);
+		assert.deepEqual(expected.projections.linux, []);
+		for (const [driver, relative, call] of [
+			['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+			['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+		]) {
+			const source = readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+				'utf8'
+			);
+			assert.ok(
+				source.includes(call + '("' + expected.section + '"'),
+				driver + ': actual catalogue boundary owner'
+			);
+		}
+	}
+	const providers = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const provider = providers.filter((item) => item.label === corpus.provider_caption);
+	assert.equal(provider.length, 1);
+	for (const [index, name] of [corpus.first_family_model, corpus.second_family_model].entries()) {
+		const admitted = provider[0].families[index].models.filter(
+			(model) => typeof model.urls.ollama === 'string' && model.urls.ollama.length > 0
+		);
+		assert.equal(admitted.length, 1);
+		assert.equal(admitted[0].name, name);
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of corpus.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}
+
+// Independent absent-module messages are disabled presentation, with native ownership untouched.
+{
+	const assert = require('node:assert/strict');
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/linux_absent_modules.json'), 'utf8')
+	);
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	assert.equal(expected.owners.length, 5);
+	assert.equal(
+		expected.owners.reduce((count, owner) => count + owner.rows.length, 0),
+		6
+	);
+	for (const owner of expected.owners) {
+		assert.deepEqual(menu[owner.section], owner.rows);
+		assert.ok(source.includes('ManifestMenu.template_rows("' + owner.section + '"'));
+		assert.ok(
+			source.includes('if (' + owner.predicate + ')') ||
+				source.includes('if ' + owner.predicate + ' then')
+		);
+		for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+			const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+			for (const row of owner.rows) {
+				assert.equal(typeof locale[row.i18n], 'string');
+				assert.ok(locale[row.i18n].trim().length > 0 && locale[row.i18n] !== row.i18n);
+			}
+		}
+	}
+}
+
+// Actual hardware data and distinct native availability remain outside the inert boundary policy.
+{
+	const assert = require('node:assert/strict');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_hardware_boundary.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[expected.section], expected.rows);
+	assert.deepEqual(expected.projections.linux, []);
+	const catalogue = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const actual = catalogue
+		.flatMap((provider) => provider.families.flatMap((family) => family.models))
+		.filter((model) => model.name === expected.native_model);
+	assert.equal(actual.length, 1);
+	assert.deepEqual(actual[0].hardware_requirements.ollama, expected.hardware_ollama);
+	assert.equal(typeof actual[0].urls.ollama, 'string');
+	assert.ok(actual[0].urls.ollama.length > 0);
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+		['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert.ok(source.includes(call + '("' + expected.section + '"'));
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of expected.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}
+
+// Native trigger, display and live separators keep their true platform-specific roles.
+{
+	const assert = require('node:assert/strict');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_control_boundaries.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const boundary of Object.values(expected.boundaries))
+		assert.deepEqual(menu[boundary.section], boundary.rows);
+	for (const [driver, relative, call, keys] of [
+		[
+			'windows',
+			'ui/menu/menu_llm/menu_settings.ahk',
+			'MenuRenderer_TemplateRows',
+			['trigger', 'display']
+		],
+		['macos', 'ui/menu/menu_llm/live_mode_panel.lua', 'ManifestMenu.template_rows', ['live']],
+		['linux', 'ui/menu/menu_builder.lua', 'ManifestMenu.template_rows', ['trigger']]
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		for (const key of keys)
+			assert.ok(source.includes(call + '("' + expected.boundaries[key].section + '"'));
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of expected.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}
+
+// The Linux selection boundaries are inert fragments of the actual native provider.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/linux_selection_boundaries.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_builder.lua'),
+		'utf8'
+	);
+	const tokens = scriptTokens(source, '.lua');
+	const sections = ['selection_case_boundary', 'selection_helper_boundary'];
+	assert.equal(corpus.selection_child_order.length, 9);
+	assert.deepEqual(
+		corpus.selection_child_order.filter((row) => row.separator).map((row) => row.section),
+		sections
+	);
+	for (const section of sections) {
+		assert.deepEqual(menu[section], [corpus.fragment]);
+		assert.ok(publishesMenuTemplate(source, '.lua', section));
+	}
+	const methods = {
+		selection_caps_word_control: 'check_row',
+		selection_case_commands: 'get_array',
+		selection_helper_commands: 'get_array',
+		selection_case_boundary: 'template_rows',
+		selection_helper_boundary: 'template_rows'
+	};
+	const at = (value) =>
+		tokens.findIndex(
+			(token, index) =>
+				token.kind === 'string' &&
+				token.value === value &&
+				tokens[index - 1]?.value === '(' &&
+				tokens[index - 2]?.kind === 'identifier' &&
+				tokens[index - 2]?.value === methods[value] &&
+				tokens[index - 3]?.value === '.' &&
+				tokens[index - 4]?.kind === 'identifier' &&
+				tokens[index - 4]?.value === 'ManifestMenu' &&
+				!['function', '.', ':'].includes(tokens[index - 5]?.value)
+		);
+	const order = [
+		'selection_caps_word_control',
+		sections[0],
+		'selection_case_commands',
+		sections[1],
+		'selection_helper_commands'
+	].map(at);
+	assert.ok(order.every((position) => position >= 0));
+	assert.ok(order.every((position, index) => index === 0 || position > order[index - 1]));
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const row of corpus.selection_child_order.filter((row) => !row.separator)) {
+			assert.equal(typeof locale[row.key], 'string');
+			assert.ok(locale[row.key].trim().length > 0 && locale[row.key] !== row.key);
+		}
+	}
+}
+
+// Empty remote entries and server models are inert, distinct from NoModel commands.
+{
+	const assert = require('node:assert/strict');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_empty_status.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const status of [expected.api, expected.agent]) {
+		assert.deepEqual(menu[status.section], status.rows);
+		assert.equal(status.rows[0].type, 'label');
+		assert.equal(status.rows[0].i18n, status.key);
+	}
+	for (const [driver, path, call, section] of [
+		[
+			'windows',
+			'ui/menu/menu_llm/menu_api_entries.ahk',
+			'MenuRenderer_TemplateRows',
+			expected.api.section
+		],
+		[
+			'macos',
+			'ui/menu/menu_llm/agent_panel.lua',
+			'ManifestMenu.template_rows',
+			expected.agent.section
+		],
+		['linux', 'ui/menu/llm_backend_rows.lua', 'ManifestMenu.template_rows', expected.api.section]
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', driver, path), 'utf8');
+		assert.ok(source.includes(call + '("' + section + '"'));
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of expected.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}
+
+// Completed native children retain their owners; the canonical rows own the three parents.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_parent_groups.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(expected.parents, [
+		{ id: 'llm_trigger', i18n: 'menu.llm.trigger_menu_title', type: 'group' },
+		{ id: 'llm_display', i18n: 'menu.llm.display_menu_title', type: 'group' },
+		{ id: 'llm_navigation', i18n: 'menu.llm.nav_menu_title', type: 'group' }
+	]);
+	for (const row of expected.parents) {
+		const declared = menu.llm_menu.filter((item) => item.id === row.id);
+		assert.equal(declared.length, 1);
+		assert.equal(declared[0].type, row.type);
+		assert.equal(declared[0].i18n, row.i18n);
+		assert.equal(declared[0].disabled_when_off, true);
+		assert.equal(declared[0].health_dot, false);
+		assert.deepEqual(declared[0].platforms, ['ahk', 'hs', 'linux']);
+	}
+	for (const row of menu.llm_menu.filter((row) =>
+		[
+			'llm_backend',
+			'llm_model',
+			'llm_profile',
+			'llm_live_mode',
+			'llm_generation_settings'
+		].includes(row.id)
+	))
+		assert.equal(row.type, 'dynamic', 'other dynamic child families keep their existing API');
+	function hasSequence(source, extension, values) {
+		const tokens = scriptTokens(source, extension);
+		const kind = (value) =>
+			value === 'LLM' || value.startsWith('llm_')
+				? 'string'
+				: /^[A-Za-z_][A-Za-z_0-9]*$/.test(value)
+					? 'identifier'
+					: 'symbol';
+		return tokens.some((first, start) => {
+			if (first.kind === 'identifier') {
+				const previous = tokens[start - 1];
+				if (['.', ':', 'function'].includes(previous?.value)) return false;
+				const before = source[first.start - 1];
+				if (before && /[A-Za-z_0-9\u0080-\uffff]/.test(before)) return false;
+			}
+			return values.every(
+				(value, offset) =>
+					tokens[start + offset]?.value === value && tokens[start + offset]?.kind === kind(value)
+			);
+		});
+	}
+	function bareNativeHelperBody(source, name) {
+		const tokens = scriptTokens(source, '.ahk');
+		const bodies = [];
+		let level = 0;
+		for (let at = 0; at < tokens.length; at += 1) {
+			const token = tokens[at];
+			const linePrefix = source.slice(source.lastIndexOf('\n', token.start - 1) + 1, token.start);
+			if (
+				level === 0 &&
+				/^[\t ]*$/.test(linePrefix) &&
+				token.kind === 'identifier' &&
+				token.value === name &&
+				!['.', ':', 'function'].includes(tokens[at - 1]?.value) &&
+				!(source[token.start - 1] && /[A-Za-z_0-9\u0080-\uffff]/.test(source[token.start - 1])) &&
+				tokens[at + 1]?.kind === 'symbol' &&
+				tokens[at + 1]?.value === '(' &&
+				tokens[at + 2]?.kind === 'symbol' &&
+				tokens[at + 2]?.value === ')' &&
+				tokens[at + 3]?.kind === 'symbol' &&
+				tokens[at + 3]?.value === '{'
+			) {
+				let depth = 1,
+					end = at + 4;
+				for (; end < tokens.length && depth > 0; end += 1) {
+					if (tokens[end].kind !== 'symbol') continue;
+					if (tokens[end].value === '{') depth += 1;
+					if (tokens[end].value === '}') depth -= 1;
+				}
+				if (depth === 0) bodies.push(source.slice(tokens[at + 3].end, tokens[end - 1].start));
+			}
+			if (token.kind === 'symbol' && token.value === '{') level += 1;
+			if (token.kind === 'symbol' && token.value === '}') level -= 1;
+		}
+		return bodies.length === 1 ? bodies[0] : null;
+	}
+	function ownsParents(source, platform) {
+		const ext = platform === 'ahk' ? '.ahk' : '.lua';
+		const actualGroupBody =
+			platform === 'ahk' ? bareNativeHelperBody(source, '_LLM_Menu_GroupBuilders') : null;
+		if (platform === 'ahk') {
+			assert.ok(actualGroupBody, 'actual unique bare Windows group-builder owner');
+			const values = [
+				'return',
+				'Map',
+				'(',
+				'llm_trigger',
+				',',
+				'LLM_Menu_BuildTriggerMenu',
+				',',
+				'llm_display',
+				',',
+				'LLM_Menu_BuildDisplayMenu',
+				',',
+				'llm_navigation',
+				',',
+				'LLM_Menu_BuildNavMenu',
+				')'
+			];
+			assert.deepEqual(
+				scriptTokens(actualGroupBody, ext).map((token) => token.value),
+				values,
+				'actual returned group Map is the complete native three-child construction'
+			);
+			assert.ok(
+				hasSequence(actualGroupBody, ext, values),
+				'actual returned group Map has native identifier and literal key kinds'
+			);
+		}
+		for (const row of expected.parents) {
+			if (platform === 'hs') {
+				assert.ok(
+					hasSequence(source, ext, ['child_group_for', '(', row.id]),
+					'actual Mac child group binding'
+				);
+			} else if (platform === 'linux') {
+				assert.ok(
+					hasSequence(source, ext, ['group_builders', '[', row.id, ']', '=', 'function', '(', ')']),
+					'actual Linux child group binding'
+				);
+			} else {
+				const native = {
+					llm_trigger: 'LLM_Menu_BuildTriggerMenu',
+					llm_display: 'LLM_Menu_BuildDisplayMenu',
+					llm_navigation: 'LLM_Menu_BuildNavMenu'
+				}[row.id];
+				assert.ok(
+					hasSequence(actualGroupBody, ext, [row.id, ',', native]),
+					'actual native Windows child constructor'
+				);
+			}
+		}
+		if (platform === 'hs') {
+			assert.ok(
+				hasSequence(source, ext, ['ManifestMenu', '.', 'native_child_rows', '(', 'children', ')']),
+				'actual pure Mac child admission'
+			);
+			assert.ok(
+				hasSequence(source, ext, [
+					'ManifestMenu',
+					'.',
+					'build',
+					'(',
+					'llm_menu',
+					',',
+					'LLM',
+					',',
+					'handlers',
+					',',
+					'group_builders'
+				]),
+				'actual outer Mac group renderer'
+			);
+		} else if (platform === 'linux') {
+			assert.ok(
+				hasSequence(source, ext, [
+					'ManifestMenu',
+					'.',
+					'native_child_rows',
+					'(',
+					'display_rows',
+					')'
+				]),
+				'actual pure Linux child admission'
+			);
+			assert.ok(
+				hasSequence(source, ext, [
+					'ManifestMenu',
+					'.',
+					'build',
+					'(',
+					'llm_menu',
+					',',
+					'LLM',
+					',',
+					'dynamic_handlers',
+					',',
+					'group_builders'
+				]),
+				'actual outer Linux group renderer'
+			);
+		} else {
+			assert.ok(
+				hasSequence(actualGroupBody, ext, [
+					'Map',
+					'(',
+					'llm_trigger',
+					',',
+					'LLM_Menu_BuildTriggerMenu'
+				]),
+				'actual bare Windows group constructor'
+			);
+			assert.ok(
+				hasSequence(source, ext, [
+					'MenuRenderer_Build',
+					'(',
+					'llm_menu',
+					',',
+					'LLM',
+					',',
+					'DynamicHandlers',
+					',',
+					'_LLM_Menu_GroupBuilders',
+					'(',
+					')'
+				]),
+				'actual outer Windows canonical renderer'
+			);
+		}
+	}
+	for (const [platform, relative] of [
+		['hs', 'macos/ui/menu/menu_llm/init.lua'],
+		['linux', 'linux/ui/menu/menu_builder.lua'],
+		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk']
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', relative), 'utf8');
+		ownsParents(source, platform);
+		const badId = source.replaceAll('"llm_trigger"', '"missing_parent_owner"');
+		assert.notEqual(badId, source, 'the parent identity mutant reaches the native source');
+		assert.throws(() => ownsParents(badId, platform), /actual/);
+		const dataOnly =
+			platform === 'ahk'
+				? 'Value := \"\n(\n' + source + '\n)\"'
+				: '-- removed actual executable source\n[==[' + source + ']==]';
+		assert.throws(
+			() => ownsParents(dataOnly, platform),
+			/actual/,
+			'whole source stored as data cannot manufacture live parent ownership'
+		);
+	}
+	// These source-bound controls are lexical ownership checks, not a flow analyzer.
+	for (const [extension, root, call] of [
+		['.lua', 'child_group_for', ['child_group_for', '(', 'llm_trigger']],
+		['.lua', 'ManifestMenu', ['ManifestMenu', '.', 'native_child_rows', '(', 'children', ')']],
+		['.ahk', 'MenuRenderer_Build', ['MenuRenderer_Build', '(', 'llm_menu']]
+	]) {
+		const genuine =
+			root === 'ManifestMenu'
+				? 'ManifestMenu.native_child_rows(children)'
+				: root + '("' + (root === 'child_group_for' ? 'llm_trigger' : 'llm_menu') + '")';
+		assert.ok(hasSequence(genuine, extension, call), 'the actual lexical call control is nonempty');
+		for (const refused of [
+			'Foreign.' + genuine,
+			'Foreign:' + genuine,
+			'function ' + genuine,
+			'"' + root + '"' + genuine.slice(root.length),
+			'genuine_longer_' + genuine,
+			'\u0301' + genuine,
+			extension === '.lua' ? '-- ' + genuine : '; ' + genuine
+		])
+			assert.equal(
+				hasSequence(refused, extension, call),
+				false,
+				'foreign/data/declaration cannot borrow a canonical call'
+			);
+	}
+	for (const [platform, relative, root] of [
+		['hs', 'macos/ui/menu/menu_llm/init.lua', 'child_group_for("llm_'],
+		['linux', 'linux/ui/menu/menu_builder.lua', 'group_builders["llm_'],
+		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk', 'MenuRenderer_Build("llm_menu"']
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', relative), 'utf8');
+		const foreign = source.replaceAll(root, 'Foreign.' + root);
+		assert.notEqual(foreign, source, 'the genuine native receiver mutant reaches its call');
+		assert.throws(
+			() => ownsParents(foreign, platform),
+			/actual/,
+			'a foreign receiver is never the declared owner'
+		);
+	}
+	{
+		const bodySource = 'ActualOwner() {\n return Map("brace", "}") ; } comment\n}';
+		assert.ok(
+			bareNativeHelperBody(bodySource, 'ActualOwner'),
+			'real symbol braces delimit the actual complete helper'
+		);
+		for (const source of [
+			'Foreign.' + bodySource,
+			'function ' + bodySource,
+			'if ' + bodySource,
+			'while ' + bodySource,
+			'return ' + bodySource,
+			'Target := ' + bodySource,
+			'\u0301' + bodySource,
+			bodySource.replace('ActualOwner()', 'ActualOwner(supplied)'),
+			bodySource + '\n' + bodySource,
+			bodySource.slice(0, -1),
+			'Value := "\n(\n' + bodySource + '\n)"',
+			'; ActualOwner() {}'
+		])
+			assert.equal(
+				bareNativeHelperBody(source, 'ActualOwner'),
+				null,
+				'foreign, partial, data and duplicate helpers cannot publish a body'
+			);
+		const source = readFileSync(
+			resolve(SHARED, '..', 'windows/ui/menu/menu_llm/menu_main.ahk'),
+			'utf8'
+		);
+		const conditional = source.replace(
+			'_LLM_Menu_GroupBuilders() {',
+			'if _LLM_Menu_GroupBuilders() {'
+		);
+		assert.notEqual(
+			conditional,
+			source,
+			'the conditional-call control reaches the real declaration'
+		);
+		assert.throws(
+			() => ownsParents(conditional, 'ahk'),
+			/actual/,
+			'a conditional helper call cannot declare the actual group-builder owner'
+		);
+		const body = bareNativeHelperBody(source, '_LLM_Menu_GroupBuilders');
+		assert.ok(body && source.includes(body), 'the negative controls bind the real helper body');
+		for (const badBody of [
+			body.replace('LLM_Menu_BuildDisplayMenu', '"LLM_Menu_BuildDisplayMenu"'),
+			body.replace('return Map', 'return Foreign.Map'),
+			body.replace('llm_display', 'missing_parent_owner')
+		]) {
+			assert.notEqual(badBody, body);
+			assert.throws(
+				() => ownsParents(source.replace(body, badBody), 'ahk'),
+				/actual/,
+				'legacy fallback mappings cannot lend identity to a corrupt actual group factory'
+			);
+		}
+	}
+	for (const platform of ['macos', 'linux']) {
+		assert.equal(expected[platform].length, 3);
+		for (const row of expected[platform]) {
+			assert.equal(row.callback, false);
+			assert.ok(Array.isArray(row.children) && row.children.length > 0);
+		}
+	}
+}
+
+console.log(
+	'Fixed LLM parents: three canonical groups, actual three-driver child owners, complete hand hierarchies and thirteen source-identity refusals.'
+);
+
+// The selectable model header stays native; its inert boundary has one shared policy.
+{
+	const assert = require('node:assert/strict');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_header_boundary.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[expected.section], expected.rows);
+	assert.deepEqual(expected.platform_rows, {
+		ahk: [{ separator: true }],
+		hs: [{ separator: true }],
+		linux: []
+	});
+	assert.deepEqual(expected.header_controls, {
+		empty_default: ['no_model', 'boundary'],
+		populated_default: ['no_model', 'backend_default', 'boundary']
+	});
+	const catalogue = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	assert.ok(catalogue.length > 0);
+	assert.equal(
+		catalogue
+			.flatMap((provider) => provider.families.flatMap((family) => family.models))
+			.filter(
+				(model) =>
+					model.name === expected.default_name &&
+					typeof model.urls.ollama === 'string' &&
+					model.urls.ollama.length > 0
+			).length,
+		1
+	);
+	for (const [relative, extension, call] of [
+		['windows/ui/menu/menu_llm/menu_models.ahk', '.ahk', 'MenuRenderer_TemplateRows'],
+		['macos/ui/menu/menu_llm/models_selector.lua', '.lua', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', relative), 'utf8');
+		const needle = call + '("' + expected.section + '"';
+		assert.equal(
+			source.split(needle).length,
+			2,
+			'one genuine native constructor consumes the boundary'
+		);
+		assert.ok(publishesMenuTemplate(source, extension, expected.section));
+		for (const replacement of [
+			'Foreign.' + needle,
+			(extension === '.lua' ? '-- ' : '; ') + needle
+		]) {
+			const withdrawn = source.replace(needle, replacement);
+			assert.notEqual(withdrawn, source);
+			assert.equal(
+				publishesMenuTemplate(withdrawn, extension, expected.section),
+				false,
+				'comments and foreign receivers cannot publish this boundary'
+			);
+		}
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of expected.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+		if (file === 'en.json') {
+			assert.equal(locale['menu.llm.no_model'], expected.english_no_model);
+			assert.equal(
+				locale['menu.llm.backend_default_model'].replace('%s', expected.default_name),
+				expected.english_default
+			);
+		}
+		if (file === 'fr.json') assert.equal(locale['menu.llm.no_model'], expected.french_no_model);
+	}
+}
+
+// Personal shortcut descriptions and switches remain native data; their frame is shared.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/personal_shortcuts_frame.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[expected.section], expected.rows);
+	assert.deepEqual(expected.platform_rows, {
+		ahk: ['separator', 'personal_shortcuts_registered'],
+		hs: [],
+		linux: []
+	});
+	assert.deepEqual(expected.registered_names, ['frame first', 'frame second']);
+	assert.deepEqual(expected.registered_labels, ['Personal frame description', 'frame second']);
+	assert.equal(expected.absent_registry_count, 0);
+	assert.equal(expected.empty_registry_count, 0);
+	assert.equal(expected.populated_frame_count, 2);
+	const source = readFileSync(resolve(SHARED, '../windows/ui/menu/menu_init.ahk'), 'utf8');
+	function publishedPersonalFrame(text) {
+		const tokens = scriptTokens(text, '.ahk');
+		let level = 0;
+		const bodies = [];
+		for (let index = 0; index < tokens.length; index += 1) {
+			const token = tokens[index];
+			if (
+				level === 0 &&
+				text.slice(text.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
+				!(
+					tokens[index - 1]?.kind === 'identifier' &&
+					['if', 'else', 'while', 'for', 'catch', 'try'].includes(tokens[index - 1]?.value)
+				) &&
+				token.kind === 'identifier' &&
+				token.value === '_AppendPersonalShortcutsSubmenuIfAny' &&
+				tokens[index + 1]?.kind === 'symbol' &&
+				tokens[index + 1]?.value === '(' &&
+				tokens[index + 2]?.kind === 'identifier' &&
+				tokens[index + 2]?.value === 'ShortcutsMenu' &&
+				tokens[index + 3]?.kind === 'symbol' &&
+				tokens[index + 3]?.value === ')' &&
+				tokens[index + 4]?.kind === 'symbol' &&
+				tokens[index + 4]?.value === '{'
+			) {
+				let depth = 1,
+					end = index + 5;
+				for (; end < tokens.length && depth > 0; end += 1) {
+					if (tokens[end].kind === 'symbol' && tokens[end].value === '{') depth += 1;
+					if (tokens[end].kind === 'symbol' && tokens[end].value === '}') depth -= 1;
+				}
+				if (depth === 0) bodies.push(text.slice(tokens[index + 4].end, tokens[end - 1].start));
+			}
+			if (token.kind === 'symbol' && token.value === '{') level += 1;
+			if (token.kind === 'symbol' && token.value === '}') level -= 1;
+		}
+		assert.equal(bodies.length, 1, 'one actual top-level personal registry owner');
+		const body = bodies[0];
+		const actual = scriptTokens(body, '.ahk');
+		function exactSequence(fragment) {
+			const expected = scriptTokens(fragment, '.ahk');
+			return actual.some(
+				(token, start) =>
+					body.slice(body.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
+					!(
+						actual[start - 1]?.kind === 'symbol' && ['.', ':'].includes(actual[start - 1]?.value)
+					) &&
+					expected.every(
+						(token, offset) =>
+							actual[start + offset]?.kind === token.kind &&
+							actual[start + offset]?.value === token.value
+					)
+			);
+		}
+		assert.ok(
+			exactSequence(
+				'FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))'
+			),
+			'actual native child lexical kinds'
+		);
+		assert.ok(
+			exactSequence(
+				'if !(FrameRows is Array) return MenuRenderer_AppendRows(ShortcutsMenu, "shortcuts_menu", "personal_shortcuts", FrameRows)'
+			),
+			'actual refusal and publication lexical kinds'
+		);
+
+		assert.ok(
+			publishesMenuTemplate(body, '.ahk', expected.section),
+			'actual personal frame publication'
+		);
+		const sequence = scriptTokens(body, '.ahk')
+			.map((token) => token.value)
+			.join('|');
+		assert.ok(
+			sequence.includes(
+				'FrameRows|:=|MenuRenderer_TemplateRows|(|personal_shortcuts_frame|,|Map|(|)|,|Map|(|)|,|Map|(|personal_shortcuts_registered|,|PersonalRows|)|)'
+			),
+			'actual original native child array binding'
+		);
+		assert.ok(
+			sequence.includes(
+				'if|!|(|FrameRows|is|Array|)|return|MenuRenderer_AppendRows|(|ShortcutsMenu|,|shortcuts_menu|,|personal_shortcuts|,|FrameRows|)'
+			),
+			'refusal precedes actual publication'
+		);
+	}
+	publishedPersonalFrame(source);
+	const foreignAssignment = source.replace(
+		'FrameRows := MenuRenderer_TemplateRows',
+		'Foreign.FrameRows := MenuRenderer_TemplateRows'
+	);
+	assert.notEqual(foreignAssignment, source);
+	assert.throws(
+		() => publishedPersonalFrame(foreignAssignment),
+		/actual/,
+		'a receiver property cannot own the local frame array'
+	);
+
+	const conditional = source.replace(
+		'_AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {',
+		'if _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {'
+	);
+	assert.notEqual(conditional, source);
+	assert.throws(
+		() => publishedPersonalFrame(conditional),
+		/actual/,
+		'a conditional call is not the owning definition'
+	);
+	const quotedChild = source.replace(
+		'Map("personal_shortcuts_registered", PersonalRows)',
+		'Map("personal_shortcuts_registered", "PersonalRows")'
+	);
+	assert.notEqual(quotedChild, source);
+	assert.throws(
+		() => publishedPersonalFrame(quotedChild),
+		/actual/,
+		'a string cannot be the native child array'
+	);
+	const braceLiteral = source.replace(
+		'FrameRows := MenuRenderer_TemplateRows',
+		'BraceCaption := "{"\n\tFrameRows := MenuRenderer_TemplateRows'
+	);
+	assert.notEqual(braceLiteral, source);
+	publishedPersonalFrame(braceLiteral);
+
+	const needle = 'MenuRenderer_TemplateRows("' + expected.section + '"';
+	assert.equal(source.split(needle).length, 2);
+	for (const replacement of [
+		'Foreign.' + needle,
+		'; ' + needle,
+		needle.replace(expected.section, 'unowned_frame')
+	]) {
+		const withdrawn = source.replace(needle, replacement);
+		assert.notEqual(withdrawn, source);
+		assert.throws(() => publishedPersonalFrame(withdrawn), /actual/);
+	}
+	const dataOnly = '; no actual owner\nValue := "\n(\n' + source + '\n)"';
+	assert.throws(() => publishedPersonalFrame(dataOnly), /actual/);
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		assert.equal(typeof locale['menu.shortcuts.personal'], 'string');
+		assert.ok(locale['menu.shortcuts.personal'].trim().length > 0);
+		if (file === 'en.json')
+			assert.equal(locale['menu.shortcuts.personal'], expected.english_caption);
+		if (file === 'fr.json')
+			assert.equal(locale['menu.shortcuts.personal'], expected.french_caption);
+	}
 }

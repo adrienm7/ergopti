@@ -70,7 +70,7 @@ _OEC_EmptyChoiceRevertsToTheDefault() {
 _OEC_PublishStillFollowsPersistence() {
 	Body := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Body != "", "_Onboarding_Commit() must exist")
-	BuildPos := InStr(Body, "TOML_BuildUpdatedContent(")
+	BuildPos := InStr(Body, "TOML_BuildConfigUpdatedContent(")
 	CommitPos := InStr(Body, "ConfigTransitionCommitOwned(")
 	StrictPos := InStr(Body,
 		'ConfigTransitionResultIs(CommitResult, "committed_new")')

@@ -760,6 +760,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_onboarding_answers.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_config_keyboard_binding_identity.ahk
 #Include unit/test_virtual_desktops.ahk
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk

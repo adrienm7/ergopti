@@ -326,3 +326,170 @@ helpers.describe("declared head retains the macOS picker mutation owners", funct
 		end)
 	end
 end)
+
+--- Drives the actual provider with only native ports controlled. Each build
+--- rereads the native values; captured callbacks keep their original owners.
+local function with_delay_native(body)
+	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
+		"infra.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local native = remap_double()
+		local observed = { value = 1500, receipt = true, calls = {}, refreshes = 0, regenerations = 0,
+			dialog_ok = true, answer = { ["text returned"] = "375.8" } }
+		native.get_tap_timeout = function(kid) return kid == "left_shift" and observed.value or nil end
+		native.set_tap_timeout = function(kid, value)
+			observed.calls[#observed.calls + 1] = { kid = kid, value = value }
+			if observed.receipt == true then observed.value = value end
+			return observed.receipt
+		end
+		native.regenerate = function() observed.regenerations = observed.regenerations + 1; return true end
+		local original_dialog = hs.osascript.applescript
+		hs.osascript.applescript = function(script)
+			observed.script = script
+			return observed.dialog_ok, observed.answer
+		end
+		local function rows()
+			local built = menu.build({ karabiner = native,
+				updateMenu = function() observed.refreshes = observed.refreshes + 1 end }).submenu
+			local key = assert(built[key_index(built, "tap_hold.group.left_shift")])
+			return key.menu
+		end
+		local ok, err = pcall(body, rows, observed, require("infra.manifest_menu"), native)
+		hs.osascript.applescript = original_dialog
+		if not ok then error(err, 0) end
+	end)
+end
+
+helpers.describe("the complete macOS per-key delay declaration", function()
+	helpers.it("uses native effective and global values with inherited reset state (tap-hold-key-delay)", function()
+		with_delay_native(function(rows, observed)
+			local i18n = require("infra.i18n")
+			local original_get = i18n.get
+			i18n.get = function(key)
+				if key == "menu.tapholds.key_tap_delay" then return "Delay: %s" end
+				if key == "menu.tapholds.key_tap_delay_use_global" then return "Global: %s" end
+				return original_get(key)
+			end
+			local ok, err = pcall(function()
+				local children = rows()
+				helpers.assert_eq(#children, 6)
+				helpers.assert_eq(children[5].title, "-")
+				helpers.assert_eq(children[6].title, "Delay: 1,5 s", "existing native formatting survives")
+				local reset = children[6].menu[2]
+				helpers.assert_eq(reset.title, "Global: 200 ms")
+				helpers.assert_eq(reset.checked == true, false)
+				helpers.assert_eq(reset.disabled == true, false)
+				helpers.assert_eq(reset.fn(), true, "durable reset and native regeneration are acknowledged")
+				helpers.assert_eq(observed.calls, { { kid = "left_shift" } })
+				helpers.assert_eq(observed.refreshes, 1)
+				helpers.assert_eq(observed.regenerations, 1)
+				children = rows()
+				helpers.assert_eq(children[6].title, "Delay: 200 ms")
+				reset = children[6].menu[2]
+				helpers.assert_true(reset.checked)
+				helpers.assert_true(reset.disabled)
+				helpers.assert_eq(reset.fn(), false, "declared readiness refuses an inherited reset")
+				helpers.assert_eq(#observed.calls, 1)
+			end)
+			i18n.get = original_get
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("reads actual delay order/caption declarations without losing native child owners (tap-hold-key-delay)", function()
+		with_delay_native(function(rows, observed, manifest)
+			local delay = manifest.get_array("tap_hold_key_delay_rows")
+			local set, reset = delay[1], delay[2]
+			local original_caption = set.i18n
+			local ok, err = pcall(function()
+				set.i18n = "menu.shortcuts.title"
+				local children = rows()[6].menu
+				helpers.assert_eq(children[1].title, "menu.shortcuts.title")
+				helpers.assert_eq(children[1].fn(), true)
+				helpers.assert_eq(observed.calls[1], { kid = "left_shift", value = 375 })
+				delay[1], delay[2] = reset, set
+				children = rows()[6].menu
+				helpers.assert_eq(children[1].title, "menu.tapholds.key_tap_delay_use_global")
+				helpers.assert_eq(children[2].title, "menu.shortcuts.title")
+				helpers.assert_eq(children[1].fn(), true)
+				helpers.assert_eq(observed.calls[2], { kid = "left_shift" })
+			end)
+			set.i18n = original_caption; delay[1], delay[2] = set, reset
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" },
+		{ name = "truthy", value = "accepted" } }) do
+		helpers.it("retains actual delay " .. receipt.name .. " persistence refusal and retry (tap-hold-key-delay)", function()
+			with_delay_native(function(rows, observed)
+				local delay = rows()[6].menu
+				observed.receipt = receipt.value
+				helpers.assert_eq(delay[1].fn(), false)
+				helpers.assert_eq(delay[2].fn(), false)
+				helpers.assert_eq(observed.calls, { { kid = "left_shift", value = 375 }, { kid = "left_shift" } })
+				helpers.assert_eq(observed.value, 1500)
+				helpers.assert_eq(observed.regenerations, 0, "refused setter cannot regenerate")
+				helpers.assert_eq(observed.refreshes, 0, "refused setter cannot acknowledge refresh")
+				observed.receipt = true
+				helpers.assert_eq(delay[1].fn(), true)
+				helpers.assert_eq(observed.value, 375)
+				helpers.assert_eq(delay[2].fn(), true)
+				helpers.assert_nil(observed.value)
+				helpers.assert_eq(observed.regenerations, 2)
+				helpers.assert_eq(observed.refreshes, 2)
+			end)
+		end)
+	end
+
+	helpers.it("retains cancellation and invalid-value refusal before setters (tap-hold-key-delay)", function()
+		with_delay_native(function(rows, observed)
+			local callback = rows()[6].menu[1].fn
+			observed.dialog_ok = false; callback()
+			observed.dialog_ok, observed.answer = true, "bad native result"; callback()
+			observed.answer = { ["text returned"] = "-1" }; callback()
+			observed.answer = { ["text returned"] = "not a number" }; callback()
+			helpers.assert_eq(#observed.calls, 0)
+			helpers.assert_eq(observed.regenerations, 0)
+			helpers.assert_eq(observed.refreshes, 0)
+		end)
+	end)
+end)
+
+helpers.describe("native per-key delay prompt refusal", function()
+	for _, value in ipairs({ "0.25", "0", "-1", "1e309", "nan" }) do
+		helpers.it("refuses " .. value .. " before a native override can be cleared (tap-hold-key-delay)", function()
+			with_delay_native(function(rows, observed)
+				observed.answer = { ["text returned"] = value }
+				helpers.assert_eq(rows()[6].menu[1].fn(), false)
+				helpers.assert_eq(#observed.calls, 0)
+				helpers.assert_eq(observed.value, 1500)
+				helpers.assert_eq(observed.regenerations, 0)
+				helpers.assert_eq(observed.refreshes, 0)
+			end)
+		end)
+	end
+	helpers.it("refuses a throwing native dialog without publishing or regenerating (tap-hold-key-delay)", function()
+		with_delay_native(function(rows, observed)
+			hs.osascript.applescript = function() error("controlled native dialog refusal") end
+			helpers.assert_eq(rows()[6].menu[1].fn(), false)
+			helpers.assert_eq(#observed.calls, 0)
+			helpers.assert_eq(observed.value, 1500)
+			helpers.assert_eq(observed.regenerations, 0)
+		end)
+	end)
+	helpers.it("retained custom command refuses a withdrawn native setter (tap-hold-key-delay)", function()
+		with_delay_native(function(rows, observed, _, native)
+			local callback = rows()[6].menu[1].fn
+			local setter = native.set_tap_timeout
+			native.set_tap_timeout = nil
+			helpers.assert_eq(callback(), false)
+			helpers.assert_eq(observed.value, 1500)
+			helpers.assert_eq(observed.regenerations, 0)
+			native.set_tap_timeout = setter
+			helpers.assert_eq(callback(), true, "same retained command retries through the real setter")
+			helpers.assert_eq(observed.value, 375)
+			helpers.assert_eq(observed.regenerations, 1)
+		end)
+	end)
+end)

@@ -9,6 +9,9 @@
 --- ==============================================================================
 
 local M = {}
+local BindingIdentity = require("config_binding_identity")
+local constructor
+local source_methods
 
 local PREFIX = "physical_"
 local MODIFIER_ORDER = { "ctrl", "alt", "shift", "super" }
@@ -80,6 +83,7 @@ end
 --- Binds one immutable registry snapshot without creating any assignments.
 --- @param registry table Decoded canonical physical_keys.json.
 --- @return table owner Stateless slot and native-identity policy.
+--- @return function publication IO-free complete identity receipt for this exact owner.
 function M.new(registry)
 	assert(type(registry) == "table" and registry.schema_version == 1
 		and type(registry.keys) == "table" and type(registry.forms) == "table",
@@ -252,7 +256,38 @@ function M.new(registry)
 		return matched, matched == nil and "native_key_unavailable" or nil
 	end
 
-	return owner
+	-- Persisted ownership includes every registry position and exact modifier set;
+	-- native delivery availability never removes an otherwise valid stored key.
+	local ids, methods = {}, {}
+	local function project_modifiers(index, set)
+		if index > #MODIFIER_ORDER then
+			for _, code in ipairs(order) do ids[#ids + 1] = owner.encode(code, set) end
+			return
+		end
+		local modifier = MODIFIER_ORDER[index]
+		project_modifiers(index + 1, set)
+		set[modifier] = true
+		project_modifiers(index + 1, set)
+		set[modifier] = nil
+	end
+	project_modifiers(1, {})
+	BindingIdentity.keyboard_binding_catalogue(ids)
+	for name, method in next, owner do methods[name] = method end
+	local function publication(current)
+		if not rawequal(current, owner) or getmetatable(current) ~= nil
+			or not rawequal(rawget(package.loaded, "shortcuts.physical_slots"), M)
+			or getmetatable(M) ~= nil or not rawequal(rawget(M, "new"), constructor) then return nil end
+		for name, method in next, source_methods do
+			if not rawequal(rawget(M, name), method) then return nil end
+		end
+		for name, method in next, methods do
+			if not rawequal(rawget(current, name), method) then return nil end
+		end
+		return BindingIdentity.keyboard_binding_catalogue(ids)
+	end
+	return owner, publication
 end
 
+constructor = M.new
+source_methods = { new = constructor, modifiers = M.modifiers, is_namespace = M.is_namespace }
 return M

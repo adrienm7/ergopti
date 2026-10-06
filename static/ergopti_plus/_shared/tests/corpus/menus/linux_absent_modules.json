@@ -1,0 +1,105 @@
+{
+	"owners": [
+		{
+			"owner": "hotstrings",
+			"context": "config",
+			"section": "linux_hotstrings_absent_rows",
+			"parent_key": "menu.hotstrings.title",
+			"rows": [
+				{
+					"type": "label",
+					"id": "linux_hotstrings_unavailable",
+					"i18n": "menu.hotstrings.unavailable",
+					"platforms": ["linux"],
+					"unavailable": "hide"
+				}
+			],
+			"english": ["(hotstrings configuration unavailable)"],
+			"predicate": "type(config) ~= \"table\"",
+			"french": ["(configuration des hotstrings indisponible)"]
+		},
+		{
+			"owner": "llm",
+			"context": "llm",
+			"section": "linux_llm_absent_rows",
+			"parent_key": "menu.llm.title",
+			"rows": [
+				{
+					"type": "label",
+					"id": "linux_llm_unavailable",
+					"i18n": "menu.llm.unavailable",
+					"platforms": ["linux"],
+					"unavailable": "hide"
+				},
+				{
+					"type": "label",
+					"id": "linux_llm_start_hint",
+					"i18n": "menu.llm.ollama_start_hint",
+					"platforms": ["linux"],
+					"unavailable": "hide"
+				}
+			],
+			"english": ["AI unavailable", "(start Ollama on port 11434)"],
+			"predicate": "not llm",
+			"french": ["IA indisponible", "(démarrer Ollama sur le port 11434)"]
+		},
+		{
+			"owner": "metrics",
+			"context": "keylogger",
+			"section": "linux_metrics_absent_rows",
+			"parent_key": "menu.metrics.title",
+			"rows": [
+				{
+					"type": "label",
+					"id": "linux_metrics_unavailable",
+					"i18n": "menu.metrics.unavailable",
+					"platforms": ["linux"],
+					"unavailable": "hide"
+				}
+			],
+			"english": ["(metrics unavailable)"],
+			"predicate": "type(k) ~= \"table\"",
+			"french": ["(métriques non disponibles)"]
+		},
+		{
+			"owner": "shortcuts",
+			"context": "shortcuts",
+			"section": "linux_shortcuts_absent_rows",
+			"parent_key": "menu.shortcuts.title",
+			"rows": [
+				{
+					"type": "label",
+					"id": "linux_shortcuts_unavailable",
+					"i18n": "menu.shortcuts.unavailable",
+					"platforms": ["linux"],
+					"unavailable": "hide"
+				}
+			],
+			"english": ["(shortcuts unavailable)"],
+			"predicate": "not sc",
+			"french": ["(raccourcis indisponibles)"]
+		},
+		{
+			"owner": "gestures",
+			"context": "gestures",
+			"section": "linux_gestures_absent_rows",
+			"parent_key": "menu.gestures.title",
+			"rows": [
+				{
+					"type": "label",
+					"id": "linux_gestures_unavailable",
+					"i18n": "menu.gestures.unavailable",
+					"platforms": ["linux"],
+					"unavailable": "hide"
+				}
+			],
+			"english": ["(gestures unavailable)"],
+			"predicate": "not ge",
+			"french": ["(gestes indisponibles)"]
+		}
+	],
+	"published_marker_key": "button.cancel",
+	"marker_english": "Cancel",
+	"native_counts_before": [60, 93, 73],
+	"native_counts_after": [60, 93, 67]
+}

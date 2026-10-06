@@ -97,3 +97,5 @@ helpers.describe("JsonCodec.decode result contract", function()
 		helpers.assert_eq(#logs, 1)
 	end)
 end)
+
+require("test.json_root_source_contract")(helpers, require("json"))

@@ -453,7 +453,9 @@ function M.build(ctx)
 		})
 	end
 
-	table.insert(menu, { separator = true })
+	local header_rows = ManifestMenu.template_rows("llm_model_header_boundary", {}, {}, {})
+	if not header_rows then return {} end
+	for _, row in ipairs(header_rows) do table.insert(menu, row) end
 
 
 	-- =====================================================
@@ -468,16 +470,29 @@ function M.build(ctx)
 		for _, entry in ipairs(user_models_for_backend) do
 			local m_name = entry.name
 			local prefix = (state.llm_model == m_name) and "✓ " or "  "
-			local model_submenu = {}
-			table.insert(model_submenu, {
-				label    = i18n.get("menu.llm.select_model"),
-				checked  = (state.llm_model == m_name),
-				disabled = paused or nil,
-				action       = function() switch_model(m_name) end
-			})
-			table.insert(model_submenu, {
-				label = i18n.get("menu.llm.remove_user_model"),
-				action = function()
+			local function user_model_live()
+				if state.llm_backend ~= active_backend or type(state.llm_user_models) ~= "table" then
+					return false
+				end
+				for _, current in ipairs(state.llm_user_models) do
+					if type(current) == "table" and current.backend == active_backend and current.name == m_name then
+						return true
+					end
+				end
+				return false
+			end
+			local function user_model_selection_ready()
+				if paused then return false end
+				-- Legacy callers supply a pause snapshot; the real driver supplies
+				-- its live reader, whose exact Boolean evidence remains authoritative.
+				if ctx.is_paused == nil then return true end
+				if type(ctx.is_paused) ~= "function" then return false end
+				local ok, live_paused = xpcall(ctx.is_paused, debug.traceback)
+				return ok and live_paused == false
+			end
+			local model_submenu = ManifestMenu.template_rows("llm_user_model_controls", {
+				["llm_user_model_select"] = function() switch_model(m_name) end,
+				["llm_user_model_remove"] = function()
 					local ok, choice = pcall(dialog.block_alert,
 						i18n.get("menu.llm.remove_model_title"),
 						string.format(i18n.get("menu.llm.remove_model_body"), m_name),
@@ -502,14 +517,20 @@ function M.build(ctx)
 						end
 						update_menu()
 					end
-				end
-			})
+				end,
+			}, {
+				llm_user_model_selected = function() return state.llm_model == m_name end,
+				llm_user_model_selection_ready = user_model_selection_ready,
+				llm_user_model_live = user_model_live,
+			}, {})
+			if model_submenu then
 			table.insert(user_sub, {
 				label    = prefix .. m_name,
 				items    = model_submenu,
 				disabled = paused or nil,
 				action       = function() pcall(function() switch_model(m_name) end) end
 			})
+			end
 		end
 		table.insert(menu, { label = i18n.get("menu.llm.my_models"), items = user_sub })
 	end
@@ -574,7 +595,9 @@ function M.build(ctx)
 					})
 				end
 
-				table.insert(model_submenu, { separator = true })
+				local origin_rows = ManifestMenu.template_rows("llm_model_origin_boundary", {}, {}, {})
+				if not origin_rows then return {} end
+				for _, row in ipairs(origin_rows) do model_submenu[#model_submenu + 1] = row end
 				table.insert(model_submenu, {
 					label = string.format(i18n.get("menu.llm.model_backend"), display_backend),
 					action    = function() end
@@ -587,8 +610,9 @@ function M.build(ctx)
 					end
 				})
 
-				table.insert(model_submenu, { separator = true })
-				table.insert(model_submenu, { label = i18n.section("menu.llm.specs_header"), disabled = true })
+				local specs_rows = ManifestMenu.template_rows("llm_model_specs_frame", {}, {}, {})
+				if not specs_rows then return {} end
+				for _, row in ipairs(specs_rows) do model_submenu[#model_submenu + 1] = row end
 
 				local m_type    = m.type or info.type or "Inconnu"
 				local type_label = i18n.get((m_type == "completion")
@@ -624,8 +648,9 @@ function M.build(ctx)
 				end
 
 				if m.capabilities then
-					table.insert(model_submenu, { separator = true })
-					table.insert(model_submenu, { label = i18n.section("menu.llm.caps_header"), disabled = true })
+					local caps_rows = ManifestMenu.template_rows("llm_model_caps_frame", {}, {}, {})
+					if not caps_rows then return {} end
+					for _, row in ipairs(caps_rows) do model_submenu[#model_submenu + 1] = row end
 					if m.capabilities.speed_tok_s then
 						table.insert(model_submenu, {
 							label = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s),
@@ -642,7 +667,9 @@ function M.build(ctx)
 				end
 
 				if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
-					table.insert(model_submenu, { separator = true })
+					local hardware_rows = ManifestMenu.template_rows("llm_model_hardware_boundary", {}, {}, {})
+					if not hardware_rows then return {} end
+					for _, row in ipairs(hardware_rows) do model_submenu[#model_submenu + 1] = row end
 					table.insert(model_submenu, {
 						label    = i18n.decorate_section(string.format(i18n.get("menu.llm.hw_header"), display_backend)),
 						disabled = true
@@ -679,7 +706,11 @@ function M.build(ctx)
 			end
 
 			if #family_sub > 0 then
-				if #sub > 0 then table.insert(sub, { separator = true }) end
+				if #sub > 0 then
+					local family_rows = ManifestMenu.template_rows("llm_model_family_boundary", {}, {}, {})
+					if not family_rows then return {} end
+					for _, row in ipairs(family_rows) do sub[#sub + 1] = row end
+				end
 				for _, model_entry in ipairs(family_sub) do
 					table.insert(sub, model_entry)
 				end
@@ -807,7 +838,9 @@ function M.build(ctx)
 		end, "models_selector.open_browser")
 	end
 
-	table.insert(menu, { separator = true })
+	for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_model", "model_picker_tail") or {}) do
+		table.insert(menu, row)
+	end
 	local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
 		["llm_browse_models"] = open_model_browser,
 	}, { ["llm_model_browser_ready"] = model_browser_ready })

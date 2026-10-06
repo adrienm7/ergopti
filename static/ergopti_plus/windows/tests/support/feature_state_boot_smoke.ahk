@@ -35,16 +35,25 @@ global HSE_RepeatEnabled := true
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
 #Include ..\..\adapters\file_system.ahk
+#Include ..\..\adapters\key_state.ahk
 #Include ..\..\infra\toml\toml_helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk
 #Include ..\..\infra\feature_state.ahk
+; A second ordinary include must not reset the already published data owner.
+TapKeyAssignments["feature_state_include_once_probe"] := "none"
+#Include ..\..\infra\tap_keys.ahk
 #Include ..\..\infra\config_io.ahk
 #Include ..\..\infra\first_boot.ahk
 
 try {
-    if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate"))
+    if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
+			&& !(A_Args.Length == 2 && A_Args[1] == "persisted_semantic"))
         throw Error("expected exactly one startup fixture name")
     switch A_Args[1] {
+		case "tap_binding_publication":
+			_FeatureStateSmokeTapBindingPublication()
+		case "persisted_semantic":
+			_FeatureStateSmokePersistedSemantic(A_Args[2])
         case "distance_gate":
 			ReadCategoryEnabled(TOML_ParseFreshFile(A_Args[2]))
 			if CategoryEnabled["DistancesReduction"] != (A_Args[3] == "true")
@@ -65,6 +74,8 @@ try {
 			_FeatureStateSmokeNeutralFirstBoot()
 		case "script_none":
 			_FeatureStateSmokeScriptNone()
+		case "script_binding_publication":
+			_FeatureStateSmokeScriptBindingPublication()
 		case "manifest_defaults":
 			_FeatureStateSmokeManifestDefaults()
         case "malformed":
@@ -333,4 +344,68 @@ _FeatureStateSmokeSemanticConfig(Root) {
 	} finally {
 		try FileDelete(TempConfig)
 	}
+}
+
+
+; Reads the parent test's actual saved file without creating a replacement seed.
+_FeatureStateSmokePersistedSemantic(Path) {
+	global ScriptInformation, _ConfigBootReadFailed
+	if !FileExist(Path)
+		throw Error("The actual semantic publication is absent")
+	Before := FileRead(Path, "UTF-8")
+	Cache := ParseConfigTomlFile(Path)
+	if _ConfigBootReadFailed
+		throw Error("The actual saved semantic source was refused at boot")
+	ReadScriptConfig(Cache)
+	_FeatureStateSmokeAssert("@", ScriptInformation["MagicKey"], "durable dotted trigger")
+	Names := IniCacheGet(Cache, "hotstrings.autocorrection", "names")
+	if !(Names is Map) || Names.Count != 3
+		throw Error("The actual declared inline feature record must retain all three source children")
+	_FeatureStateSmokeAssert("_", IniCacheGet(Cache, "hotstrings.autocorrection.names", "time_activation_seconds"),
+		"a declared record is not a flattened child section")
+	Timing := Names["time_activation_seconds"]
+	if !(Timing is Float) || Timing != 0.75
+		throw Error("The durable inline timing must remain the exact native Float")
+	Value := Names["enabled"]
+	if !(Value is String) || StrCompare(Value, "true", true) != 0
+		throw Error("The obsolete inline scalar must remain text in the retained source")
+	_FeatureStateSmokeAssert("retain", Names["future"], "durable foreign child")
+	if StrCompare(Before, FileRead(Path, "UTF-8"), true) != 0
+		throw Error("A bootstrap read changed the actual durable source")
+}
+
+
+; This receipt is produced by the actual compiled feature-state declaration.
+_FeatureStateSmokeScriptBindingPublication() {
+	global SCRIPT_SHORTCUT_SLOTS, _ScriptShortcutBindingPublication
+	if _ScriptShortcutBindingPublication.Source != SCRIPT_SHORTCUT_SLOTS
+		throw Error("The compiled script publication lost its source declaration identity")
+	Catalogue := _ScriptShortcutBindingPublication.Catalogue
+	if Catalogue["prefix"] !== "script__" || Catalogue["slots"].Count != 4 || Catalogue["slots"].CaseSense != "On"
+		throw Error("The compiled script publication is not a complete case-exact domain")
+	for Slot in ["script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"] {
+		if ConfigBindingIdentityScriptStatus("script__" . Slot, Catalogue) != "current"
+			throw Error("The compiled publication lost the actual native slot " . Slot)
+	}
+	if ConfigBindingIdentityScriptStatus("script__removed_script_slot", Catalogue) != "retired"
+		throw Error("The compiled publication did not judge an obsolete native script identity")
+}
+
+; Actual feature-state publication precedes configuration readers in this child.
+_FeatureStateSmokeTapBindingPublication() {
+	global TAP_KEY_ORDER, TAP_KEY_SCANCODES, _TapKeyBindingPublication, TapKeyAssignments
+	if !TapKeyAssignments.Has("feature_state_include_once_probe")
+		throw Error("An ordinary repeated include reinitialized the data owner")
+	if _TapKeyBindingPublication.Source != TAP_KEY_ORDER || _TapKeyBindingPublication.ScanSource != TAP_KEY_SCANCODES
+		throw Error("The compiled tap publication lost its actual source identities")
+	Catalogue := _TapKeyBindingPublication.Catalogue
+	if Catalogue["prefix"] !== "tap_key__" || Catalogue["slots"].Count != TAP_KEY_ORDER.Length
+		|| Catalogue["slots"].CaseSense != "On"
+		throw Error("The compiled tap publication is not a complete case-exact domain")
+	for Slot in TAP_KEY_ORDER {
+		if !Catalogue["slots"].Has(Slot) || _TapKeyBindingPublication.Scans[Slot] != TAP_KEY_SCANCODES[Slot]
+			throw Error("The actual scan and order declaration diverged")
+	}
+	if ConfigBindingIdentityTapStatus("tap_key__removed_tap_key", Catalogue) != "retired"
+		throw Error("The actual startup publication cannot identify a retired tap key")
 }

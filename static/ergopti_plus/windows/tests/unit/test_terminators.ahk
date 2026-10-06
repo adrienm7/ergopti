@@ -474,4 +474,3 @@ _HTRI_ProtectedRefusal(InlineUpdates, InlinePrefixes := []) {
 Test("terminator-inline: the canonical writer cannot replace records with a collapsed flat leaf", _HTRI_ProtectedRefusal.Bind([{ Section: "hotstrings", Key: "terminators", Value: [] }]))
 Test("terminator-inline: a native case alias cannot acquire the closed parent", _HTRI_ProtectedRefusal.Bind([{ Section: "HOTSTRINGS", Key: "custom_pref", Value: "new" }]))
 Test("terminator-inline: namespace replacement cannot delete unknown parent members", _HTRI_ProtectedRefusal.Bind([], ["hotstrings"]))
-
