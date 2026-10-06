@@ -82,6 +82,28 @@ jobs:
         # summary on failure. report.cjs lives at the repo root tools/.
         run: node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua
 
+      # This external acceptance is deliberate manual validation, separate from
+      # the frozen prerequisite gate and every package/installed-driver subject.
+      - name: Run manual official runtime and model acceptance
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends curl zstd
+          python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \
+            --repository "$GITHUB_WORKSPACE" \
+            --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \
+            --lua luajit
+        timeout-minutes: 18
+
+      - name: Upload manual runtime acceptance evidence
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-runtime-acceptance-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/ollama-runtime-acceptance/ollama-runtime-acceptance.json
+          if-no-files-found: error
+
       - name: Record mandatory unit evidence
         run: |
           set -euo pipefail
@@ -1091,6 +1113,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
           npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"
         timeout-minutes: 3
+      # This prerequisite proof is independent of official runtime/model downloads.
+      - name: Qualify native runtime prerequisites
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends zstd
+          npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"
+        timeout-minutes: 5
 
       # The AI a user runs locally, run: the official Ollama serving a small
       # model, asked through the production modules and the real curl transport

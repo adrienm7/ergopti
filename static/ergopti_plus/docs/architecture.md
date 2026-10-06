@@ -50,6 +50,7 @@ graph TD
         LINUX_keyboard_hook["KeyboardHook.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
         LINUX_notifier["Notifier.lua"]
+        LINUX_owned_process["OwnedProcess.lua"]
         LINUX_process_lifecycle["ProcessLifecycle.lua"]
         LINUX_process_runner["ProcessRunner.lua"]
         LINUX_screen_capture["ScreenCapture.lua"]

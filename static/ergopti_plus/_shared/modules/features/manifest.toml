@@ -3958,6 +3958,13 @@ type = "---"
 [[menu.llm_menu]]
 type = "dynamic"
 id = "llm_backend"
+# Static provider status belongs to this live backend row, not another menu.
+# Inert labels are status text, not section headings or executable commands.
+status_rows.unavailable = [
+	{ type = "---" },
+	{ type = "label", i18n = "menu.llm.local_servers.header" },
+	{ type = "label", i18n = "menu.llm.unavailable" },
+]
 disabled_when_off = false
 health_dot = false
 platforms = ["ahk", "hs"]

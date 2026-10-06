@@ -1779,6 +1779,8 @@
 	"mlx.use_ollama": "Ollama'yı kullan",
 	"mlx.machine_intel": "Intel işlemci",
 	"mlx.machine_apple_silicon": "Apple Silicon",
+	"ollama.runtime_repair_failed": "Yerel Ollama hazırlanamadı. Günlüğü kontrol edip tekrar deneyin.",
+	"ollama.runtime_start": "Ollama’yı başlat",
 	"python.not_native_title": "Bu Mac için Python yok",
 	"python.not_native_body": "Bu işlem {1} için derlenmiş bir Python 3 gerektirir. Bu Mac'te yüklü Python sürümleri yalnızca başka bir işlemci için derlenmiş ve macOS bunları kullanımdan kaldırılmakta olan Rosetta ile çalıştırırdı:\n{2}",
 	"python.missing_title": "Python 3 eksik",

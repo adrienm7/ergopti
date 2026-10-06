@@ -202,6 +202,7 @@ end
 package.preload.luv = function() return uv end
 package.preload['logger.shim'] = function() return {
  debug = function() end,
+ info = function() end,
  error = function(_, format, detail)
   assert(not tostring(detail):find(os.getenv('GITHUB_TOKEN'), 1, true), 'native logger exposed CI authentication')
   if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end
@@ -456,6 +457,25 @@ end
 	// These additional controls load the actual managed public port. Native
 	// callbacks remain simulated libuv ports; this is not a native-wire proof.
 	const managedAuthenticationHarness = authenticationHarness
+		.replace(
+			"function uv.kill() error('completed receipt must not cancel a live successor') end",
+			`function uv.kill(pid, signal)
+ assert(pid == -native.group and signal == 0, 'managed group observation targeted another owner')
+ assert(native.absent_group == native.group, 'leader exit alone is not group retirement')
+ return nil, 'ESRCH', 'ESRCH'
+end`
+		)
+		.replace(
+			'native.requests = native.requests + 1',
+			`native.requests = native.requests + 1
+ native.group, native.absent_group = 4000 + native.requests, nil`
+		)
+		.replace(
+			'native.exit(http_status >= 400 and 22 or 0, 0)',
+			`-- Distinct exact-group model receipt, independent of leader/stream ACKs.
+ native.absent_group = native.group
+ native.exit(http_status >= 400 and 22 or 0, 0)`
+		)
 		.replace(
 			'local native = { requests = 0 }',
 			`local native = { requests = 0, acquired = 0, closed = 0 }
