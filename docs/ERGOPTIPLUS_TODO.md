@@ -3481,6 +3481,8 @@ Linux distribution qualification now retains the exact nonroot LuaJIT suite log 
 
 The personal-editor source guard now reads the complete actual keymap module through the strict canonical recursive helper, retaining the existing absence and behavior assertions and rejecting empty or unreadable source. Fifteen actual source files participate instead of a location-pinned layout file. The unchanged owning ratchet independently refuses381 paths before this migration and accepts380 afterward against the same380 bound. No native runtime policy, foreign Windows implementation or ratchet assertion is changed. Native Windows execution remains required.
 
+The actual Windows global-clear image from manual run37451318736 contains the five explicit off assignments required by shared policy, while retaining every obsolete/private source byte. Its handwritten full-image expectation now includes those assignments. All188 existing assertions, exact backup and inverse checks remain unchanged. Manual diagnostic run37456524038 passes this corrected native transaction and its retained subsequent assertions; final-source native qualification remains pending.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
