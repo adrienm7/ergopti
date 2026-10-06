@@ -7,8 +7,9 @@ All thirteen assigned items remain partial: 63, 71, 73, 91, 93, 96, 97, 98,
 validation requirements; item 22 remains withdrawn. This is a source and
 qualification checkpoint, not completion of the group.
 
-The previous 47 owned commits are already in current `origin/dev`
-`ad937abc84bbecc129f4bea8a42e8cd159fe409f`. The current feature adds:
+The previous 47 owned commits are already in the `origin/dev` ancestor
+`ad937abc84bbecc129f4bea8a42e8cd159fe409f`. Latest composed dev is
+`de4f253c1301399bba2eb13c4139d5f683ed2667`. The feature adds these code changes:
 
 - `9e237dc0bc84721d08054ddcf45de4d476d3e1e6`: separately measure GTK spawn,
   durable receipt publication and native waiting without changing the original
@@ -18,6 +19,11 @@ The previous 47 owned commits are already in current `origin/dev`
 - `7d3056220e42f6ed442c2eb91f3bdafaf1aab015`: shared program command metadata,
   owned native Windows discovery and assignment/confirmation cleanup, retaining
   literal arguments and all previous program cases.
+- `4f7ec70f8486d1f73cb82e64e4326e3047486419`: preserve the separately
+  published Ubuntu acquisition and Windows Ollama corrections.
+- `4e6b2c0b96443b235e27c86860c6f7974eda367e`: retain the published non-root
+  fixture correction and all thirty previous controls while constraining
+  modeled private authority to captured identities and exclusive creation.
 
 The provider source tree is `95770d66443288d13229f8126a5d925c55024172`.
 These feature commits must not be described as integrated until their ancestry
@@ -65,6 +71,29 @@ preserving its previous custom domains and presets. Saving that draft does not
 apply or publish network changes. No renewed download claim is made for the
 blocked artifact endpoint.
 
+The separately published Ubuntu acquisition repair `b70f98236` is now in dev.
+Actual dev `a576915cf` run
+[37533343559](https://github.com/adrienm7/ergopti/actions/runs/37533343559)
+passed all four Ubuntu acquisitions and the complete Windows and Linux lanes.
+It still failed the non-root APT fixtures and native macOS packaging. The
+fixture successor `509795692` is published separately and appears in dev as
+`de4f253c1`; production archive/root policy is unchanged. Its thirty controls
+retain all original twenty-eight methods and assertions. Independent review
+identified an overbroad pathname-only private-UID model, so the Group 3
+successor restricts modeled ownership to captured directory/file identity,
+original UID and exclusive creation. Thirty-one controls preserve all earlier
+assertions; the same added corpus has eleven failing subtests against the
+published pathname-only model. This is controlled ownership modeling, not
+privileged native acquisition. Selected formatting and all 364 JavaScript
+checks pass on the composed source under UID 1000. Final integrated native
+qualification still needs to run.
+
+The macOS package failure on `a576915cf` reports an expired owned Brew
+AppleEvent receiver and Sparkle server-retirement refusal. Its owned-program
+XCTest cohort completed fourteen cases, while the complete XCTest root failed.
+Those separately owned packaging failures and refused Shortcuts/switcher
+prerequisites remain explicit; they do not become device-only tasks.
+
 On the exact feature sources, selected local verification passed:
 
 - 364 JavaScript checks and formatting/encoding gates.
@@ -100,13 +129,31 @@ readonly Windows HKL descriptors and the Mac switcher terminal seal. It retains
 BLOCKED predecessors and expected-red causal controls. Ownership leases, native
 producer joins and final-source acceptance remain required before adoption.
 
-The separate actual Hook.start/pump witness remains **14 PASS / 1 FAIL on both
-Lua ABIs**. Two controlled sources press Shift, then the first releases it:
-Hook still reports Shift while the Writer acknowledged roster is empty. Product
-forwarding is unchanged. Aggregate XKB/output transitions and separate original
-versus remapped ownership require a coherent repair; a skip-only key-up change
-does not meet the existing native row acknowledgement contract. No kernel or
-hardware delivery is qualified by this witness.
+The [modifier-consumer inventory](group3-2026-10-06-modifier-consumer-inventory/README.md)
+extends the original Hook.start/pump witness without changing its fourteen
+watchdog cases or overlap assertion. Both Lua ABIs record **17 PASS / 8 FAIL**.
+Two controlled sources press Shift, then the first releases it: Hook still
+reports Shift while the Writer acknowledged roster is empty. A second actual
+consumer path holds synthetic Shift through Caps, observes physical Shift on
+that same source and removes the remapper. TapHold correctly retains the
+physical hold, but Hook classifies its eventual release as an orphan and
+swallows it, leaving the Writer roster held.
+
+The skip-only-UP counterfactual remains red at 19/6; weakened temporary
+restoration is 16/9. The complete original TapHold module remains 26/0, while
+blanket reentry refusal breaks its existing retirement assertion (25/1).
+Independent review is CLEAR for the frozen inventory only, not a repair.
+Its nine original inputs and two review receipts are preserved byte for byte;
+fourteen checksums and seven wrapper refusal controls pass. No kernel input,
+uinput descriptor, display or native child was allocated by these controls.
+
+A coherent single-channel broker must join Hook, Reader, Writer, TapHold,
+Injector, ComboEmitter, OutputTransaction and daemon initialization. It needs
+acknowledged zero-wire owner transitions, source-aware aggregation, current
+layout classification and explicit spent/restored ownership while preserving
+existing reentrant retirement. This is remaining software and coordinated
+source admission, rather than a device-only validation task. Product forwarding
+and native capability availability remain unchanged.
 
 ## Remaining implementation and device checks
 
