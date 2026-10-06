@@ -5598,6 +5598,15 @@ each pass4/4 locally, with12 descendants reaped and no pending debt. Its remote
 failure remains unexplained. Existing invocation/assertion/cleanup budgets are
 unchanged; this diagnostic slice does not qualify either refused boundary.
 
+Native run37451229133 passes the isolated shutdown envelope and brightness
+worker, but9 program cases still fail. Its closed decoder receipt localizes the
+valid descriptor refusal to object-trailing:ValueError: the whitespace owner
+called native InStr with an empty EOF needle before checking the cursor bound.
+The bound now short-circuits first. Independent actual native EOF/cursor,
+complete/trailing-whitespace, empty-argv and invalid-tail controls preserve all
+156 earlier assertions and15 methods. These corrected sources require fresh
+Windows CI; the previous brightness failure cause remains unknown.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice

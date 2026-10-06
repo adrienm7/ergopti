@@ -117,7 +117,7 @@ _ProgramParameterParseWithStage(Value, &Stage := unset) {
 }
 
 _ProgramParameterWs(Value, &Position) {
-	while InStr(" `t`r`n", SubStr(Value, Position, 1)) && Position <= StrLen(Value)
+	while Position <= StrLen(Value) && InStr(" `t`r`n", SubStr(Value, Position, 1))
 		Position++
 }
 
