@@ -1,7 +1,7 @@
 {
 	"_comment": "Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). Lower with --update-baseline as rows move to the shared manifest; never raise.",
 	"windows": {
-		"count": 55,
+		"count": 53,
 		"sites": [
 			"windows/infra/tray_bootstrap.ahk:54 add",
 			"windows/ui/editors.ahk:372 static",
@@ -31,10 +31,8 @@
 			"windows/ui/menu/menu_hotstrings.ahk:1109 static",
 			"windows/ui/menu/menu_hotstrings.ahk:1122 static",
 			"windows/ui/menu/menu_hotstrings.ahk:1128 static",
-			"windows/ui/menu/menu_init.ahk:45 append",
-			"windows/ui/menu/menu_init.ahk:46 separator",
-			"windows/ui/menu/menu_init.ahk:47 static",
-			"windows/ui/menu/menu_init.ahk:66 add",
+			"windows/ui/menu/menu_init.ahk:49 append",
+			"windows/ui/menu/menu_init.ahk:67 add",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
 			"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
 			"windows/ui/menu/menu_llm/menu_main.ahk:124 static",

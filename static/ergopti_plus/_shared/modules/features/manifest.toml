@@ -7270,3 +7270,17 @@ unavailable = "hide"
 type = "---"
 platforms = ["ahk", "hs"]
 unavailable = "hide"
+
+# Windows alone owns an ordered runtime registry of personal shortcut switches.
+# The other drivers keep their existing personal-file and general shortcut controls.
+[[menu.personal_shortcuts_frame]]
+type = "---"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.personal_shortcuts_frame]]
+type = "group"
+id = "personal_shortcuts_registered"
+i18n = "menu.shortcuts.personal"
+platforms = ["ahk"]
+unavailable = "hide"
