@@ -1938,3 +1938,159 @@ helpers.describe("first owned native storage publication", function()
 	end
 
 end)
+
+helpers.describe("storage released regular-file link admission", function()
+	local source = ' {"a":false,"foreign":[9007199254740993,{},[],null]} '
+	local function linked(body, dangling)
+		storage_cohort_fixture(nil, function(storage, files, path, target, write, read)
+			local Shell = require("adapters.shell_runner")
+			if not dangling then write(target, source) end
+			helpers.assert_true(Shell.run("ln -s -- " .. Shell.quote(target) .. " " .. Shell.quote(path)))
+			body(storage, files, path, target, write, read, Shell)
+		end)
+	end
+	for _, vector in ipairs({
+		{ name = "set", mutate = function(storage) return storage.set("a", true) end,
+			expected = ' {"a":true,"foreign":[9007199254740993,{},[],null]} ' },
+		{ name = "set_many", mutate = function(storage) return storage.set_many({ a = true }) end,
+			expected = ' {"a":true,"foreign":[9007199254740993,{},[],null]} ' },
+		{ name = "delete", mutate = function(storage) return storage.delete("a") end,
+			expected = ' {"foreign":[9007199254740993,{},[],null]} ' },
+		{ name = "clear", mutate = function(storage) return storage.clear() end, expected = ' {} ' },
+	}) do
+		helpers.it("released-link: " .. vector.name .. " replaces only the link and preserves foreign source tokens", function()
+			linked(function(storage, _, path, target, _, read, Shell)
+				helpers.assert_eq(storage.get("a"), false)
+				helpers.assert_true(vector.mutate(storage))
+				helpers.assert_eq(read(path), vector.expected); helpers.assert_eq(read(target), source)
+				helpers.assert_eq(Shell.run("test -L " .. Shell.quote(path)), false)
+				helpers.assert_nil(read(path .. ".tmp")); helpers.assert_nil(storage.recovery_status())
+				local restarted = helpers.load_module("adapters.storage")
+				helpers.assert_eq(restarted.get("a", "absent"), (vector.name == "delete" or vector.name == "clear") and "absent" or true)
+			end)
+		end)
+	end
+	helpers.it("released-link: owned capture and foreign cohort publication retain strict source-kind refusal", function()
+		linked(function(storage, _, path, target, _, read, Shell)
+			helpers.assert_eq(storage.get("a"), false)
+			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_nil(storage.capture_owned(owner))
+			helpers.assert_eq(storage.set("neighbor", true), false)
+			helpers.assert_eq(read(path), source); helpers.assert_eq(read(target), source)
+			helpers.assert_true(Shell.run("test -L " .. Shell.quote(path)))
+			helpers.assert_nil(read(path .. ".tmp")); helpers.assert_nil(storage.recovery_status())
+			helpers.assert_true(storage.release_owned(owner))
+			helpers.assert_true(storage.set("a", true)); helpers.assert_eq(read(target), source)
+		end)
+	end)
+	helpers.it("released-link: dangling source remains refused rather than treated as an absent regular file", function()
+		linked(function(storage, _, path, target, _, read, Shell)
+			helpers.assert_eq(storage.set("a", true), false)
+			helpers.assert_true(Shell.run("test -L " .. Shell.quote(path)))
+			helpers.assert_nil(read(target)); helpers.assert_nil(read(path .. ".tmp"))
+		end, true)
+	end)
+	for _, failure in ipairs({ "read", "close" }) do
+		helpers.it("released-link: actual descriptor " .. failure .. " refusal preserves the link and cache", function()
+			linked(function(storage, _, path, target, _, read, Shell)
+				helpers.assert_eq(storage.get("a"), false)
+				local reader = require("infra.regular_file_reader"); local open, calls = reader.open, 0
+				reader.open = function(name, ...)
+					local handle, detail, errno = open(name, ...)
+					if name ~= path or not handle then return handle, detail, errno end
+					calls = calls + 1
+					return {
+						read = function(_, ...) if failure == "read" then return nil, "controlled native read refusal" end; return handle:read(...) end,
+						close = function() local closed = handle:close(); if failure == "close" then return false end; return closed end,
+					}
+				end
+				local called, accepted = pcall(storage.set, "a", true)
+				reader.open = open
+				helpers.assert_true(called); helpers.assert_eq(accepted, false); helpers.assert_true(calls > 0)
+				helpers.assert_eq(storage.get("a"), false); helpers.assert_eq(read(target), source)
+				helpers.assert_true(Shell.run("test -L " .. Shell.quote(path))); helpers.assert_nil(read(path .. ".tmp"))
+				helpers.assert_true(storage.set("a", true)); helpers.assert_eq(read(target), source)
+			end)
+		end)
+	end
+	helpers.it("released-link: final source callback withdrawal refuses publication until exact capability repair", function()
+		linked(function(storage, _, path, target, _, read, Shell)
+			storage.get("a")
+			local reader = require("infra.regular_file_reader"); local open, samples, set = reader.open, 0, storage.set
+			reader.open = function(name, ...)
+				local handle, detail, errno = open(name, ...)
+				if name == path then samples = samples + 1; if samples == 2 then storage.set = function() return false end end end
+				return handle, detail, errno
+			end
+			local called, accepted = pcall(set, "a", true)
+			reader.open, storage.set = open, set
+			helpers.assert_true(called); helpers.assert_eq(accepted, false); helpers.assert_true(samples >= 2)
+			helpers.assert_eq(read(target), source); helpers.assert_eq(read(path), source)
+			helpers.assert_true(Shell.run("test -L " .. Shell.quote(path))); helpers.assert_nil(read(path .. ".tmp"))
+			helpers.assert_true(storage.set("a", true)); helpers.assert_eq(read(target), source)
+		end)
+	end)
+	helpers.it("released-link: source-read and native-rename reentry cannot mutate or acquire another alias", function()
+		linked(function(storage, _, path, target, _, read)
+			storage.get("a")
+			local reader = require("infra.regular_file_reader"); local open, rename, observed = reader.open, os.rename, {}
+			reader.open = function(name, ...)
+				if name == path and observed.read_set == nil then
+					observed.read_set = storage.set("neighbor", true); observed.read_claim = storage.acquire_owned({}, { "neighbor" })
+				end
+				return open(name, ...)
+			end
+			os.rename = function(from, to)
+				if to == path then observed.rename_set = storage.set("neighbor", true); observed.rename_claim = storage.acquire_owned({}, { "neighbor" }) end
+				return rename(from, to)
+			end
+			local called, accepted = pcall(storage.set, "a", true)
+			reader.open, os.rename = open, rename
+			helpers.assert_true(called); helpers.assert_true(accepted)
+			for _, name in ipairs({ "read_set", "read_claim", "rename_set", "rename_claim" }) do helpers.assert_eq(observed[name], false) end
+			helpers.assert_eq(read(target), source); helpers.assert_eq(read(path), ' {"a":true,"foreign":[9007199254740993,{},[],null]} ')
+		end)
+	end)
+	helpers.it("released-link: acknowledged rename retries only failed physical readback", function()
+		linked(function(storage, _, path, target, _, read)
+			storage.get("a")
+			local reader = require("infra.regular_file_reader"); local open, rename, effect, calls = reader.open, os.rename, false, 0
+			os.rename = function(from, to)
+				local accepted, detail, errno = rename(from, to)
+				if to == path and accepted == true then effect = true; calls = calls + 1 end
+				return accepted, detail, errno
+			end
+			reader.open = function(name, ...)
+				if name == path and effect then return nil, "controlled readback EACCES", 13 end
+				return open(name, ...)
+			end
+			local called, accepted = pcall(storage.set, "a", true)
+			reader.open = open
+			local cached, target_bytes = storage.get("a"), read(target)
+			local retry_called, retry = pcall(storage.set, "a", true)
+			os.rename = rename
+			helpers.assert_true(called); helpers.assert_eq(accepted, false); helpers.assert_eq(calls, 1)
+			helpers.assert_eq(target_bytes, source); helpers.assert_eq(cached, false)
+			helpers.assert_true(retry_called); helpers.assert_true(retry); helpers.assert_eq(calls, 1)
+			helpers.assert_eq(storage.get("a"), true); helpers.assert_nil(read(path .. ".tmp"))
+		end)
+	end)
+	helpers.it("released-link: a refused native rename retires no effect without replacing the link", function()
+		linked(function(storage, _, path, target, _, read, Shell)
+			storage.get("a")
+			local rename, calls = os.rename, 0
+			os.rename = function(from, to)
+				if to == path then calls = calls + 1; return false, "controlled refusal before native effect" end
+				return rename(from, to)
+			end
+			local called, accepted = pcall(storage.set, "a", true)
+			os.rename = rename
+			helpers.assert_true(called); helpers.assert_eq(accepted, false); helpers.assert_eq(calls, 1)
+			helpers.assert_true(Shell.run("test -L " .. Shell.quote(path)))
+			helpers.assert_eq(read(path), source); helpers.assert_eq(read(target), source)
+			helpers.assert_eq(storage.get("a"), false); helpers.assert_nil(read(path .. ".tmp"))
+			helpers.assert_true(storage.set("a", true)); helpers.assert_eq(read(target), source)
+			helpers.assert_eq(Shell.run("test -L " .. Shell.quote(path)), false)
+		end)
+	end)
+end)

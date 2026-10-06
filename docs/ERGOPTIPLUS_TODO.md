@@ -3439,6 +3439,8 @@ The Windows finite-number gate now delegates its unchanged CRT ABI to a native a
 
 The Windows legacy gesture-snapshot fixture explicitly establishes its case-insensitive map before population and verifies that precondition. Its original final source-policy assertion and all independent case-twin/clone checks remain intact. No native gesture implementation or parameter retirement policy changes; native fixture execution remains pending.
 
+Manual source54 CI exposed four genuine ordinary JSON Storage regressions on links to regular files. The released ordinary writer now uses its established qualified descriptor policy and replaces only the link inode, retaining exact target bytes. Private owned cohorts still refuse links. Each journal pins its own readback route; SourceV2 callback/source, reentry and pending-settlement fences remain intact. The unchanged native special-source fixture passes28/0 on both Lua engines, while the registered adapter module passes160/0 and independent read/close/rename refusal controls pass9/0. Actual final manual Linux CI and installed qualification remain separate; this correction does not close the remaining catalogue domains.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

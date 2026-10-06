@@ -536,8 +536,35 @@ local function _ensure_loaded(ordinary_init)
 	return true
 end
 
+--- Reads a pinned regular descriptor without choosing a source-kind policy.
+--- @param path string
+--- @return string|nil bytes
+--- @return string status
+local function regular_read_file(path)
+	if type(path) ~= "string" or path == "" or path:find("\0", 1, true) then return nil, "error" end
+	local called, handle, _, errno = pcall(require("infra.regular_file_reader").open, path)
+	if not called or not handle then return nil, called and errno == ENOENT and "absent" or "error" end
+	local read, bytes = pcall(handle.read, handle, "*a")
+	local closed = _close(handle)
+	if read and type(bytes) == "string" and closed then return bytes, "ok" end
+	return nil, "error"
+end
+
+--- Ordinary released mutations may replace a regular-file link's own inode.
+--- A dangling link is not an absent source and remains refused.
+--- @param path string
+--- @return string|nil bytes
+--- @return string status
+local function released_read_file(path)
+	local bytes, status = regular_read_file(path)
+	if status ~= "absent" then return bytes, status end
+	local queried, okay, kind = pcall(Shell.exec_checked,
+		"if test -L " .. Shell.quote(path) .. "; then printf link; else printf ordinary; fi")
+	return nil, queried and okay == true and kind == "ordinary" and "absent" or "error"
+end
+
 --- Reads only admitted regular native files, never recovering an invalid store.
---- Symlinks are refused here because publication cannot preserve their source kind.
+--- Symlinks remain refused for a private cohort's source/inverse-kind contract.
 --- @param path string
 --- @return string|nil bytes
 --- @return string status
@@ -546,12 +573,7 @@ local function owned_read_file(path)
 	local queried, okay, kind = pcall(Shell.exec_checked,
 		"if test -L " .. Shell.quote(path) .. "; then printf link; else printf ordinary; fi")
 	if not queried or okay ~= true or kind ~= "ordinary" then return nil, "error" end
-	local called, handle, _, errno = pcall(require("infra.regular_file_reader").open, path)
-	if not called or not handle then return nil, called and errno == ENOENT and "absent" or "error" end
-	local read, bytes = pcall(handle.read, handle, "*a")
-	local closed = _close(handle)
-	if read and type(bytes) == "string" and closed then return bytes, "ok" end
-	return nil, "error"
+	return regular_read_file(path)
 end
 
 --- Compares exact decimal values without delegating identity to binary rounding.
@@ -611,11 +633,12 @@ local function owned_numeric_source_safe(bytes)
 	return not quoted
 end
 
---- Reads the complete strict JSON object and keeps lossless future source kinds.
+--- Decodes one classified source without changing its admission policy.
+--- @param read_file function Native source reader for this route.
 --- @return table|nil source
 --- @return table|nil document
-local function owned_store_source()
-	local bytes, status = owned_read_file(_STORE_PATH)
+local function store_source_from_reader(read_file)
+	local bytes, status = read_file(_STORE_PATH)
 	if not owned_json_live() then return nil end
 	if status ~= "ok" and status ~= "absent" then return nil end
 	local okay, document, proof = pcall(json.decode_root_object_source, status == "absent" and "{}" or bytes)
@@ -623,16 +646,45 @@ local function owned_store_source()
 	return status == "absent" and { status = status } or { status = "ok", content = bytes }, document, proof
 end
 
---- Keeps terminal native readback inside the same backing-file reentry guard.
+--- Reads the strict non-link source owned by a private cohort.
 --- @return table|nil source
 --- @return table|nil document
-local function owned_store_readback()
+local function owned_store_source()
+	return store_source_from_reader(owned_read_file)
+end
+
+--- Reads ordinary source whose regular-file link inode may be replaced.
+--- @return table|nil source
+--- @return table|nil document
+local function released_store_source()
+	return store_source_from_reader(released_read_file)
+end
+
+--- Keeps terminal native readback inside the same backing-file reentry guard.
+--- @param read_source function Exact source reader captured by this route.
+--- @return table|nil source
+--- @return table|nil document
+local function guarded_store_readback(read_source)
 	if _owned_io_busy then return nil end
 	_owned_io_busy = true
-	local okay, source, document, proof = pcall(owned_store_source)
+	local okay, source, document, proof = pcall(read_source)
 	_owned_io_busy = false
 	if okay then return source, document, proof end
 	return nil
+end
+
+--- Keeps the private cohort's strict read policy through terminal readback.
+--- @return table|nil source
+--- @return table|nil document
+local function owned_store_readback()
+	return guarded_store_readback(owned_store_source)
+end
+
+--- Keeps ordinary link admission through refusal and post-rename readback.
+--- @return table|nil source
+--- @return table|nil document
+local function released_store_readback()
+	return guarded_store_readback(released_store_source)
 end
 
 --- Checks only cells whose original numeric values enter the owned inverse.
@@ -915,6 +967,7 @@ end
 local function ordinary_live(record)
 	if not owned_live(record) or not rawequal(package.loaded["adapters.file_system"], record.file_owner)
 		or not rawequal(package.loaded["toml_codec.writer"], record.writer_owner) then return false end
+	if not rawequal(record.readback, owned_store_readback) and not rawequal(record.readback, released_store_readback) then return false end
 	for name, callback in pairs(record.writer_methods) do
 		if not rawequal(record.writer_owner[name], callback) then return false end
 	end
@@ -949,7 +1002,7 @@ local function settle_ordinary_record(record)
 		local settled = record.writer_methods.retry_publication_cleanup(record)
 		if settled ~= true or not ordinary_live(record) or not rawequal(_ordinary_debt, record) then return false end
 	end
-	local source = owned_store_readback()
+	local source = record.readback()
 	if not source or not ordinary_live(record) or not rawequal(_ordinary_debt, record) then return false end
 	if source.status == "ok" and source.content == record.candidate then
 		if record.publication_effect ~= true then return false end
@@ -1023,7 +1076,7 @@ local function owned_foreign_commit(updates)
 		local record = { methods = identity.methods, file_owner = native, writer_owner = writer,
 			writer_methods = { publish_if_unchanged = writer.publish_if_unchanged, retry_publication_cleanup = writer.retry_publication_cleanup },
 			file_methods = { write_if_unchanged = native.write_if_unchanged, delete = native.delete },
-			before = source, proof = proof, candidate = payload, updates = {}, generations = {}, alias_owners = {} }
+			readback = owned_store_readback, before = source, proof = proof, candidate = payload, updates = {}, generations = {}, alias_owners = {} }
 		for key, cell in pairs(updates) do
 			if _owned_aliases[key] ~= nil then return false end
 			record.updates[key] = { present = cell.present }
@@ -1076,7 +1129,7 @@ local function released_source_commit(updates, clear_all)
 		if _ensure_loaded(true) ~= true then return false end -- Private unclaimed bootstrap; no held debt.
 		if _load_blocked then return false end
 		local identity = { methods = owned_methods() }
-		local source, document, proof = owned_store_source()
+		local source, document, proof = released_store_source()
 		if not source or not owned_live(identity) then return false end
 		if clear_all then
 			updates = {}
@@ -1088,7 +1141,7 @@ local function released_source_commit(updates, clear_all)
 		local record = { methods = identity.methods, file_owner = native, writer_owner = writer,
 			writer_methods = { publish_if_unchanged = writer.publish_if_unchanged, retry_publication_cleanup = writer.retry_publication_cleanup },
 			file_methods = { write_if_unchanged = native.write_if_unchanged, delete = native.delete },
-			before = source, proof = proof, candidate = payload, updates = {}, generations = {}, alias_owners = {}, clear_all = clear_all == true }
+			readback = released_store_readback, before = source, proof = proof, candidate = payload, updates = {}, generations = {}, alias_owners = {}, clear_all = clear_all == true }
 		for key, cell in pairs(updates) do
 			record.updates[key] = { present = cell.present }
 			if cell.present then record.updates[key].value = owned_copy(model[key]) end
@@ -1103,7 +1156,7 @@ local function released_source_commit(updates, clear_all)
 		_ordinary_debt = record
 		local function admit()
 			if not ordinary_live(record) or next(_owned_aliases) ~= nil then return false end
-			local current = owned_store_readback()
+			local current = record.readback()
 			return current ~= nil and ordinary_live(record) and next(_owned_aliases) == nil
 				and current.status == source.status and current.content == source.content
 		end
