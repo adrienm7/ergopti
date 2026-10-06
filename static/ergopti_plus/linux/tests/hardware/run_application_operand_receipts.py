@@ -13,11 +13,16 @@ import tempfile
 
 
 WORKER = r"""
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=load\n")
 local Chooser = require("ui.app_chooser")
 local Actions = require("modules.gestures.manager")
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=chooser\n")
 local id = assert(Chooser.desktop_id(os.getenv("ERGOPTI_NATIVE_APPLICATION_ENTRY")))
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=assignment\n")
 assert(Actions.set_action_parameter("tap_3", "open_app", id))
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=execution\n")
 assert(Actions.execute_action("open_app", "tap_3"))
+io.stderr:write("ERGOPTI_APPLICATION_STAGE=receipt\n")
 local receipt = os.getenv("ERGOPTI_NATIVE_APPLICATION_RECEIPT")
 for _ = 1, 100 do
 	local file = io.open(receipt, "r")
@@ -31,6 +36,18 @@ for _ = 1, 100 do
 end
 error("the selected desktop entry did not launch: " .. id)
 """
+
+
+def application_stage(stderr):
+    """Reduce owned worker diagnostics to one closed stage without payload text."""
+    prefix = "ERGOPTI_APPLICATION_STAGE="
+    allowed = {"load", "chooser", "assignment", "execution", "receipt"}
+    stage = "unknown"
+    for line in stderr.splitlines():
+        if line.startswith(prefix):
+            value = line[len(prefix) :]
+            stage = value if value in allowed else "unknown"
+    return stage
 
 
 def main():
@@ -94,6 +111,10 @@ def main():
                     )
                     if child.returncode:
                         failures += 1
+                        print(
+                            "::error title=Native application operand::"
+                            f"stage={application_stage(child.stderr)};case={index};native_exit={child.returncode}"
+                        )
                         print(
                             f"FAIL native application operand {identity!r}: {child.stderr.strip()}"
                         )
