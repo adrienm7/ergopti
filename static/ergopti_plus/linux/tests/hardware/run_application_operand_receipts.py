@@ -204,6 +204,7 @@ def main():
             try:
                 number = os.read(read_fd, 64).decode().strip()
                 assert number and display.poll() is None, "owned virtual display did not start"
+                diagnostic.require_x11_ready(":" + number, display)
                 for index, identity in enumerate(
                     ("ordinary-app", "--version", "-help", "app with ' quote")
                 ):
