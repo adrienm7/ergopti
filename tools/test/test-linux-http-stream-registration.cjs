@@ -73,7 +73,10 @@ function validate(root) {
 	);
 	const command = Pipeline.stepField(step, 'run');
 	assert.match(command, /set -euo pipefail/);
-	assert.match(command, /apt-get install[^\n]*curl lua-luv/);
+	assert.match(
+		command,
+		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y --no-install-recommends curl lua-luv/
+	);
 	assert.match(
 		command,
 		/npm run test:linux:http-stream \| tee "\$RUNNER_TEMP\/linux-http-stream\.log"/
