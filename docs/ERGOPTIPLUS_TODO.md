@@ -3862,6 +3862,18 @@ raw-evidence upload preserve every original workflow/guard byte by inverse;
 Actual macOS package grammar and upload remain unexecuted until the next
 exact-SHA manual run; protected provisioning and WP4-WP10 remain unfinished.
 
+Exact-source macOS run [37441382511](https://github.com/adrienm7/ergopti/actions/runs/37441382511)
+qualifies copied CPython execution and native process ownership. The35 interpreter,
+23 ACL and30 read-only collector controls pass in both modes; native ACL and
+package observations retain UNKNOWN classification/trust and authority false.
+The checked-in instrumented pinned Core-Service/CLI compilation passes in194.418s
+with19 printed phase durations; it does not qualify the privately prepared AUTH,
+canonical57-file projection or four owned targets. Full raw package transcripts
+and ancestry receipts remain unverified: fresh artifact downloads are refused by
+the running network policy despite successful uploads. Protected provisioning,
+WP4-WP10 and physical input remain unfinished. Whole CI fails the separate Brew
+and Sparkle acceptance methods; downstream packaging/install and Release skip.
+
 The registered Linux physical-hold dashboard harness now loads its actual
 shared selection enum and predicates before the unchanged Typing KPI consumer.
 The original assertion and independent hold/app/text expectations are preserved.
@@ -4673,6 +4685,19 @@ and shared fixture remain byte-exact. Genuine Foundation API source supports
 the directory-URL representation hypothesis; the correction still requires an
 exact-SHA native run. Core compilation and the separate release-group native
 failures also keep the full suite, packaging and installation unqualified.
+
+Subsequent exact-source macOS run [37441382511](https://github.com/adrienm7/ergopti/actions/runs/37441382511)
+passes all three corrected Foundation controls, including canonical preconditions,
+full Unicode bytes, sibling survival and no-overwrite/alias/name refusals. The
+reviewed source retains all35 original assertions and the unchanged strict helper,
+shared fixture and cleanup controller. Original native cleanup passes its six
+cases in9.208s; the bounded console reports a436080-byte sibling receipt and
+all357 XCTest completion markers survive. The suite has340 passed,2 failed and
+15 skipped cases, with7 assertion failures (2 unexpected). Remaining failures
+are the separate Brew/Sparkle methods; packaging/install remain skipped. Receipt
+upload succeeds, but actual sibling bytes are not independently downloadable.
+The exact historical25-rule backup, confirmation UI and physical acceptance
+remain unavailable or unqualified; this native correction does not complete43.
 
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
