@@ -220,6 +220,21 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Prepare private CPython for native fixture ownership
+        id: private-cpython
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/diagnostics/ci_private_cpython_test.py -v
+          PYTHONOPTIMIZE=1 PYTHONDONTWRITEBYTECODE=1 python3 tools/diagnostics/ci_private_cpython_test.py -v
+          private_parent="$(mktemp -d "${RUNNER_TEMP%/}/ergopti-cpython.XXXXXX")"
+          private_parent="$(cd "$private_parent" && pwd -P)"
+          private_bin="$(python3 tools/diagnostics/ci_private_cpython.py "$private_parent")"
+          cat "${private_bin%/venv/bin}/selection.json"
+          printf '%s\n' "$private_bin" >> "$GITHUB_PATH"
+          printf 'python-bin=%s\n' "$private_bin" >> "$GITHUB_OUTPUT"
+
       - name: Admit native nonreaping Python prerequisites
         run: |
           python3 - <<'PY'

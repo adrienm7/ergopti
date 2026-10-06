@@ -1370,6 +1370,137 @@ for (const [name, expected] of [
 }
 errors.push(...stepProblems(pipeline.files()));
 
+const PRIVATE_CPYTHON_STEP_ORDER = [
+	'Prepare Python for native nonreaping waits',
+	'Prepare private CPython for native fixture ownership',
+	'Admit native nonreaping Python prerequisites'
+];
+const PRIVATE_CPYTHON_STEP_TEXT = [
+	'      - name: Prepare private CPython for native fixture ownership',
+	'        id: private-cpython',
+	'        shell: bash',
+	'        timeout-minutes: 3',
+	'        run: |',
+	'          set -euo pipefail',
+	'          PYTHONDONTWRITEBYTECODE=1 python3 tools/diagnostics/ci_private_cpython_test.py -v',
+	'          PYTHONOPTIMIZE=1 PYTHONDONTWRITEBYTECODE=1 python3 tools/diagnostics/ci_private_cpython_test.py -v',
+	'          private_parent="$(mktemp -d "${RUNNER_TEMP%/}/ergopti-cpython.XXXXXX")"',
+	'          private_parent="$(cd "$private_parent" && pwd -P)"',
+	'          private_bin="$(python3 tools/diagnostics/ci_private_cpython.py "$private_parent")"',
+	'          cat "${private_bin%/venv/bin}/selection.json"',
+	'          printf \'%s\\n\' "$private_bin" >> "$GITHUB_PATH"',
+	'          printf \'python-bin=%s\\n\' "$private_bin" >> "$GITHUB_OUTPUT"'
+].join('\n');
+
+/** Require the private interpreter's completed smoke/readback before PATH selection. */
+function privateCpythonProblems(files) {
+	const problems = [];
+	const mac = files.find((entry) => entry.rel === MACOS_BOX);
+	const job =
+		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'package-macos');
+	const steps = job ? pipeline.steps(job.body) : [];
+	const indices = PRIVATE_CPYTHON_STEP_ORDER.map((name) =>
+		steps.findIndex((step) => step.name === name)
+	);
+	if (
+		PRIVATE_CPYTHON_STEP_ORDER.some(
+			(name) => steps.filter((step) => step.name === name).length !== 1
+		) ||
+		indices[0] < 0 ||
+		indices[1] !== indices[0] + 1 ||
+		indices[2] !== indices[1] + 1
+	) {
+		problems.push(
+			'native private CPython must occur exactly once between setup-python and the nonreaping preflight'
+		);
+	}
+	const selected = steps.filter((step) => step.name === PRIVATE_CPYTHON_STEP_ORDER[1]);
+	if (selected.length === 1 && codeOf(selected[0].body) !== PRIVATE_CPYTHON_STEP_TEXT) {
+		problems.push(
+			'native private CPython must finish its unconditional owned helper controls and selection receipt before publishing PATH'
+		);
+	}
+	return problems;
+}
+errors.push(...privateCpythonProblems(pipeline.files()));
+for (const [what, changed] of [
+	['missing setup', ''],
+	[
+		'conditional setup',
+		PRIVATE_CPYTHON_STEP_TEXT.replace(
+			'        id: private-cpython\n',
+			'        id: private-cpython\n        if: false\n'
+		)
+	],
+	[
+		'forgiven setup',
+		PRIVATE_CPYTHON_STEP_TEXT.replace(
+			'        id: private-cpython\n',
+			'        id: private-cpython\n        continue-on-error: true\n'
+		)
+	],
+	[
+		'secret-bearing setup',
+		PRIVATE_CPYTHON_STEP_TEXT.replace(
+			'        shell: bash\n',
+			'        shell: bash\n        env:\n          PRIVATE_TOKEN: ${{ secrets.PAT_ERGOPTI }}\n'
+		)
+	],
+	[
+		'missing optimized controls',
+		PRIVATE_CPYTHON_STEP_TEXT.replace(
+			'          PYTHONOPTIMIZE=1 PYTHONDONTWRITEBYTECODE=1 python3 tools/diagnostics/ci_private_cpython_test.py -v\n',
+			''
+		)
+	],
+	[
+		'missing selection readback',
+		PRIVATE_CPYTHON_STEP_TEXT.replace(
+			'          cat "${private_bin%/venv/bin}/selection.json"\n',
+			''
+		)
+	],
+	[
+		'selection before helper',
+		PRIVATE_CPYTHON_STEP_TEXT.replace(
+			'          private_bin="$(python3 tools/diagnostics/ci_private_cpython.py "$private_parent")"\n',
+			'          printf \'%s\\n\' "$private_bin" >> "$GITHUB_PATH"\n          private_bin="$(python3 tools/diagnostics/ci_private_cpython.py "$private_parent")"\n'
+		)
+	],
+	[
+		'unbounded setup',
+		PRIVATE_CPYTHON_STEP_TEXT.replace('        timeout-minutes: 3', '        timeout-minutes: 30')
+	]
+]) {
+	mustCatch(
+		'native private CPython ' + what,
+		MACOS_BOX,
+		PRIVATE_CPYTHON_STEP_TEXT + '\n',
+		changed ? changed + '\n' : '',
+		privateCpythonProblems
+	);
+}
+const privateCpythonWorkflow = pipeline.file(MACOS_BOX);
+const earlyPrivateCpython = privateCpythonWorkflow
+	.replace(PRIVATE_CPYTHON_STEP_TEXT + '\n\n', '')
+	.replace(
+		'      - name: Prepare Python for native nonreaping waits\n',
+		PRIVATE_CPYTHON_STEP_TEXT + '\n\n      - name: Prepare Python for native nonreaping waits\n'
+	);
+assert.notEqual(
+	earlyPrivateCpython,
+	privateCpythonWorkflow,
+	'the early private CPython fixture must change the actual workflow'
+);
+assert.ok(
+	privateCpythonProblems(
+		pipeline
+			.files()
+			.map((entry) => (entry.rel === MACOS_BOX ? { ...entry, text: earlyPrivateCpython } : entry))
+	).length > 0,
+	'private CPython cannot run before setup-python'
+);
+
 /** Pin the single narrow receipt upload immediately after its actual Swift owner. */
 function legacyReceiptProblems(files) {
 	const problems = [];

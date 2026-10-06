@@ -3825,8 +3825,29 @@ before this fix and passes afterward; only its Darwin host declaration is modele
 All20 previous test bodies/assertions and every pre-CLI production AST remain
 exact. A changing exception argument also proves the printed text is the same
 frozen text that was validated. The23 caller and22 worker controls pass normally
-and with inherited optimization. The runner metadata predicate remains UNOBSERVED until the next
-native invocation; no permission change, acquisition or native acceptance is inferred.
+and with inherited optimization. The next exact-SHA macOS run
+[37426781590](https://github.com/adrienm7/ergopti/actions/runs/37426781590)
+passes those23 caller controls in both modes and release compilation, then the
+actual CLI reports the unchanged refusal: its Python image is root-owned with
+mode0775 (UID0, effective UID501, one link,119232 bytes). Swift, native ACL
+sampling, packaging and installation did not execute; Release was skipped.
+
+The CI prerequisite now creates a standard private venv without pip and with
+real CPython copies. Original interpreter bytes, metadata and global permissions
+remain unchanged; only owned byte-identical copies lose group/other write bits.
+Exact executed version, base prefix, standard library, inventory, held sources,
+file/directory currentness and existing acquired-group closure are checked before
+logging the bounded readback receipt and selecting PATH. Setup-source aliases
+refuse before root creation; arbitrary exception payloads remain private. The
+standard Linux lib64 link is pinned metadata only, never an executable or input
+alias. All33 previous test bodies/assertions remain exact; the35 controls pass
+420 matrix executions with no failures, errors or skips. Independent replay
+passes105 controls and six frozen alias cases. Six ownership cases explicitly
+model Darwin; genuine copied Linux execution grants no Darwin acceptance.
+The additive workflow guard rejects10 causal mutations and preserves every
+previous guard byte/assertion by inverse. Actual macOS copied-Mach-O execution,
+nonreaping ownership, ACL sampling, Swift and package/install acceptance still
+require the next exact-SHA manual run. TODO31 stays partial.
 
 The registered Linux physical-hold dashboard harness now loads its actual
 shared selection enum and predicates before the unchanged Typing KPI consumer.
