@@ -13,8 +13,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 const assert = require('assert');
+const vm = require('vm');
 const root = path.resolve(__dirname, '../../../../../');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const os = require('os');
@@ -97,101 +97,14 @@ for (const [name, fn] of [
 }
 console.log(`Actual shared Apps consumer: ${checks} checks, ${failures} failures`);
 
-function extractFunction(source, name) {
-	const start = source.indexOf(`function ${name}(`);
-	assert.notStrictEqual(start, -1, `${name} must exist`);
-	const bodyStart = source.indexOf('{', start);
-	let depth = 0;
-	let quote = null;
-	let escaped = false;
-	let lineComment = false;
-	let blockComment = false;
-	for (let i = bodyStart; i < source.length; i++) {
-		const ch = source[i];
-		const next = source[i + 1];
-		if (lineComment) {
-			if (ch === '\n') lineComment = false;
-			continue;
-		}
-		if (blockComment) {
-			if (ch === '*' && next === '/') {
-				blockComment = false;
-				i++;
-			}
-			continue;
-		}
-		if (quote) {
-			if (escaped) escaped = false;
-			else if (ch === '\\') escaped = true;
-			else if (ch === quote) quote = null;
-			continue;
-		}
-		if (ch === '/' && next === '/') {
-			lineComment = true;
-			i++;
-			continue;
-		}
-		if (ch === '/' && next === '*') {
-			blockComment = true;
-			i++;
-			continue;
-		}
-		if (ch === "'" || ch === '"' || ch === '`') {
-			quote = ch;
-			continue;
-		}
-		if (ch === '{') depth++;
-		else if (ch === '}' && --depth === 0) return source.slice(start, i + 1);
-	}
-	assert.fail(`unterminated ${name} function`);
-}
+const { createTypingConsumer } = require('./lib/typing_kpi_consumer.cjs');
+const typingConsumer = createTypingConsumer(root, manifest);
+typingConsumer.renderEditor();
 
-const elements = new Map();
-const element = (id) => {
-	if (!elements.has(id)) elements.set(id, { value: '', style: {}, innerHTML: '' });
-	return elements.get(id);
-};
-element('date_start').value = '2026-10-03';
-element('date_end').value = '2026-10-03';
-const typingContext = vm.createContext({
-	window: { metrics_manifest: manifest },
-	app_state: {
-		manifest_dates_sorted: ['2026-10-03'],
-		selected_apps: new Set(['editor']),
-		today_live_data: null
-	},
-	document: { getElementById: element },
-	get_local_date_string: () => new Date().toISOString().slice(0, 10),
-	format_number: String,
-	escape_html: String,
-	render_apps_table: () => {},
-	INFO_SVG: '',
-	_t: (key) => key,
-	KEYCODE_NAMES: { 29: 'Left Ctrl' }
-});
-const typingSource = read('static/ergopti_plus/_shared/ui/metrics_typing/data.js');
-// Execute the real app-selection dependencies required by the extracted consumer.
-// Constants stay owned by production state instead of a fixture-specific policy.
-typingContext.APP_SELECTION_MODE = vm.runInNewContext(
-	read('static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js') +
-		'\n' +
-		read('static/ergopti_plus/_shared/ui/metrics_typing/state.js') +
-		'\nAPP_SELECTION_MODE;',
-	{ window: {} }
-);
-typingContext.app_state.app_selection_mode = typingContext.APP_SELECTION_MODE.SUBSET;
-for (const name of [
-	'has_typing_app_selection',
-	'matches_typing_app_selection',
-	'_foreach_filtered_app',
-	'render_apps_kpi'
-])
-	vm.runInContext(extractFunction(typingSource, name), typingContext, { filename: name + '.js' });
-typingContext.render_apps_kpi();
 checks++;
 try {
 	assert.strictEqual(
-		element('apps_top_mod_hold').innerHTML,
+		typingConsumer.element('apps_top_mod_hold').innerHTML,
 		'Left Ctrl <span style="color:var(--text-muted);font-weight:400;">300 ms (max 600)</span>'
 	);
 	console.log('PASS actual Typing consumer retains modifier hold mean and maximum');
