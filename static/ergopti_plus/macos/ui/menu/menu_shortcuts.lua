@@ -792,8 +792,9 @@ function M.build(ctx)
 		end
 
 		if #ext_menu_items > 0 then
-			table.insert(items, { separator = true })
-			table.insert(items, { label = i18n.section("menu.extensions.header"), disabled = true })
+			local boundary_rows = ManifestMenu.template_rows("shortcut_extension_boundary", {}, {}, {})
+			if not boundary_rows then return {} end
+			for _, row in ipairs(boundary_rows) do items[#items + 1] = row end
 			for _, it in ipairs(ext_menu_items) do
 				table.insert(items, MenuUtils.as_provider_row(it))
 			end

@@ -2777,6 +2777,26 @@
 			]
 		}
 	],
+	"shortcut_extension_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"id": "shortcut_extension_heading",
+			"i18n": "menu.extensions.header",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_generation_count_boundary": [
 		{
 			"type": "---",
