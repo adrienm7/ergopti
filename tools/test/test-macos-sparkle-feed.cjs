@@ -1005,14 +1005,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 26 tests in /);
-	const skipped = process.platform === 'win32' ? 6 : process.platform === 'darwin' ? 1 : 0;
+	assert.match(result.stderr, /Ran 34 tests in /);
+	const skipped = process.platform === 'win32' ? 10 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${26 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${34 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1332,6 +1332,132 @@ try {
 } catch (error) {
 	errors.push(`Native Sparkle physical helper input guard failed: ${error.message}`);
 }
+
+// SPARKLE_STARTUP_DIAGNOSTIC_CONTROLS_BEGIN
+// Fixed startup facts never substitute readiness, native exit or retirement.
+try {
+	const assert = require('node:assert/strict');
+	const fixture = fs.readFileSync(
+		path.join(
+			root,
+			'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+		),
+		'utf8'
+	);
+	const helper = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_fixture.py'),
+		'utf8'
+	);
+	function assertStartupProjection(source, python) {
+		assert.ok(python.indexOf('startup_phase("python-entry")') < python.indexOf('import ctypes'));
+		assert.match(python, /os\.environ\.get\("ERGOPTI_SPARKLE_STARTUP_DIAGNOSTICS"\) == "1"/);
+		assert.match(python, /len\(sys\.argv\) == 4[\s\S]*sys\.argv\[1\] == "serve"/);
+		assert.match(python, /type\(phase\) is not str or phase not in _STARTUP_PHASES/);
+		assert.match(python, /os\.write\(1, frame\) != len\(frame\)/);
+		assert.match(
+			python,
+			/except BaseException as failure:\n        [^\n]*\n        primary_failure = failure\n        raise/
+		);
+		assert.match(python, /finally:\n            server\.server_close\(\)/);
+		assert.match(
+			python,
+			/if primary_failure is None and trace_failure is not None:\n            raise trace_failure/
+		);
+		assert.match(
+			python,
+			/signal\.signal\(signal\.SIGTERM, lambda \*_args: state\.update\(stopping=True\)\)/
+		);
+		assert.match(source, /workerTimeout: Double = 60, startupDiagnostics: Bool = false/);
+		assert.match(
+			source,
+			/if readable \{ descriptor = open\(url.path, O_RDWR \| O_CREAT \| O_EXCL \| O_NOFOLLOW, 0o600\) \}/
+		);
+		assert.match(
+			source,
+			/else \{ descriptor = open\(url.path, O_WRONLY \| O_CREAT \| O_EXCL \| O_NOFOLLOW, 0o600\) \}/
+		);
+		assert.match(
+			source,
+			/"serve", try ownedCensusPath\(www\), nonce\], root: root, startupDiagnostics: true/
+		);
+		const capture = source.slice(
+			source.indexOf('private func observeStartupCapture()'),
+			source.indexOf('private func emitStartupNoticeOnce()')
+		);
+		assert.match(
+			capture,
+			/guard startupDiagnostics, launched, observedExit, !startupObserved, !closedStreams\.contains\(0\)/
+		);
+		assert.match(capture, /startupObserved = true/);
+		assert.match(capture, /fstat\(streams\[0\]\.fileDescriptor, &metadata\)/);
+		assert.match(capture, /metadata\.st_nlink == 1/);
+		assert.match(capture, /metadata\.st_size >= 0, metadata\.st_size <= 512/);
+		assert.match(capture, /read\(upToCount: 513\), bytes\.count == Int\(metadata\.st_size\)/);
+		assert.doesNotMatch(
+			capture,
+			/\bopen\(|Data\(contentsOf:|readToEnd|\.wait\(|\.terminate\(|kill\(|\.close\(/
+		);
+		const parser = source.slice(
+			source.indexOf('private static func parseStartupFrames('),
+			source.indexOf('private struct Receipt')
+		);
+		assert.match(parser, /bytes\.count <= 512/);
+		assert.match(parser, /bytes\.allSatisfy\(\{ \$0 < 128 \}\), bytes\.last == 10/);
+		assert.match(parser, /observed > index/);
+		assert.match(parser, /index != -1 \|\| phase == \.pythonEntry/);
+		assert.match(
+			source,
+			/guard process\.terminationReason == \.exit else \{ throw Failure\.evidence\("native-child-signal"\) \}/
+		);
+		assert.match(
+			source,
+			/guard retired\.status == 0 else \{ throw Failure\.evidence\("server-retirement"\) \}/
+		);
+		assert.match(source, /let listening = try waitFor\("server-start", root: www, seconds: 10\)/);
+		assert.match(source, /func testStartupFramesDistinguishActualPrefixEmptyAndRefusedCapture\(\)/);
+	}
+	assertStartupProjection(fixture, helper);
+	for (const [name, candidate, python] of [
+		[
+			'unobserved stdout capture',
+			fixture.replace(
+				'guard startupDiagnostics, launched, observedExit, !startupObserved',
+				'guard startupDiagnostics, launched, !startupObserved'
+			),
+			helper
+		],
+		['unbounded startup read', fixture.replace('read(upToCount: 513)', 'readToEnd()'), helper],
+		[
+			'foreign path reopened',
+			fixture.replace(
+				'try streams[0].seek(toOffset: 0)',
+				'let foreign = try Data(contentsOf: stdout); try streams[0].seek(toOffset: 0)'
+			),
+			helper
+		],
+		['duplicate stage admission', fixture.replace('observed > index', 'observed >= index'), helper],
+		[
+			'signal accepted as retirement',
+			fixture.replace('guard process.terminationReason == .exit else', 'guard true else'),
+			helper
+		],
+		[
+			'instrumentation masks primary',
+			fixture,
+			helper.replace(
+				'if primary_failure is None and trace_failure is not None:',
+				'if trace_failure is not None:'
+			)
+		]
+	])
+		assert.throws(() => assertStartupProjection(candidate, python), name);
+	console.log(
+		'Sparkle startup diagnostics reuse the exact post-exit capture; native signal/readiness/retirement remain strict.'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle startup diagnostic guard failed: ${error.message}`);
+}
+// SPARKLE_STARTUP_DIAGNOSTIC_CONTROLS_END
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
