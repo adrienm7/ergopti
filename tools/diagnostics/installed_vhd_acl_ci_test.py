@@ -343,6 +343,61 @@ class CallerControls(unittest.TestCase):
 
 
 class ClosedCLIControls(unittest.TestCase):
+    def test_actual_cli_retains_only_bounded_ordinary_image_refusal(self):
+        import subprocess
+        import sys
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
+            runtime = root / "modeled-runtime-image"
+            runtime.write_bytes(b"Actual refused file; never executed.\n")
+            runtime.chmod(0o720)
+            # Only the host declaration is modeled; the CLI and file guard execute.
+            script = (
+                "import runpy, sys; "
+                "caller, parent, runtime = sys.argv[1:]; "
+                "sys.argv = [caller, parent]; sys.executable = runtime; "
+                "sys.platform = 'darwin'; runpy.run_path(caller, run_name='__main__')"
+            )
+            result = subprocess.run(
+                [sys.executable, "-B", "-c", script, subject.__file__, str(root), str(runtime)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Caller ordinary input owner refused: regular=True", result.stderr)
+            self.assertIn("mode=0o100720", result.stderr)
+            self.assertIn("source=False", result.stderr)
+            self.assertNotIn(str(runtime), result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(list(root.iterdir()), [runtime])
+
+    def test_unrecognized_value_error_keeps_private_payload_out_of_cli(self):
+        import ast
+        import contextlib
+        import io
+
+        tree = ast.parse(Path(subject.__file__).read_bytes())
+        main = tree.body[-1]
+        captured = io.StringIO()
+        namespace = dict(subject.__dict__)
+        namespace.update(
+            __name__="__main__", run=mock.Mock(side_effect=ValueError("PRIVATE_EXCEPTION_PAYLOAD"))
+        )
+        with mock.patch.object(subject.sys, "argv", [subject.__file__, "/owned"]):
+            with contextlib.redirect_stderr(captured):
+                with self.assertRaises(SystemExit) as caught:
+                    exec(
+                        compile(ast.Module(body=[main], type_ignores=[]), subject.__file__, "exec"),
+                        namespace,
+                    )
+        self.assertEqual(caught.exception.code, 1)
+        self.assertEqual(captured.getvalue(), "Read-only ACL caller refused; evidence retained\n")
+        self.assertNotIn("PRIVATE_EXCEPTION_PAYLOAD", captured.getvalue())
+
     def test_native_wait_timeout_has_closed_cli_refusal(self):
         import ast
         import contextlib
@@ -365,6 +420,47 @@ class ClosedCLIControls(unittest.TestCase):
                     )
         self.assertEqual(caught.exception.code, 1)
         self.assertEqual(captured.getvalue(), "Read-only ACL caller refused; evidence retained\n")
+        self.assertNotIn("PRIVATE_EXCEPTION_PAYLOAD", captured.getvalue())
+
+    def test_cli_prints_the_same_frozen_value_error_text_it_validated(self):
+        import ast
+        import contextlib
+        import io
+
+        expected = (
+            "Caller ordinary input owner refused: regular=True size=1 maximum=2 "
+            "mode=0o100720 uid=1 euid=1 links=1 source=False"
+        )
+
+        class ChangingMessage:
+            calls = 0
+
+            def __str__(self):
+                self.calls += 1
+                return expected if self.calls == 1 else "PRIVATE_EXCEPTION_PAYLOAD"
+
+        payload = ChangingMessage()
+        tree = ast.parse(Path(subject.__file__).read_bytes())
+        captured = io.StringIO()
+        namespace = dict(subject.__dict__)
+        namespace.update(__name__="__main__", run=mock.Mock(side_effect=ValueError(payload)))
+        with mock.patch.object(subject.sys, "argv", [subject.__file__, "/owned"]):
+            with contextlib.redirect_stderr(captured):
+                with self.assertRaises(SystemExit) as caught:
+                    exec(
+                        compile(
+                            ast.Module(body=[tree.body[-1]], type_ignores=[]),
+                            subject.__file__,
+                            "exec",
+                        ),
+                        namespace,
+                    )
+        self.assertEqual(caught.exception.code, 1)
+        self.assertEqual(payload.calls, 1)
+        self.assertEqual(
+            captured.getvalue(),
+            "Read-only ACL caller refused; evidence retained\n" + expected + "\n",
+        )
         self.assertNotIn("PRIVATE_EXCEPTION_PAYLOAD", captured.getvalue())
 
 

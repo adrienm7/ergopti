@@ -360,8 +360,17 @@ if __name__ == "__main__":
     options = parser.parse_args()
     try:
         acquired_root, summary = run(options.parent)
-    except (ValueError, OSError, RuntimeError, subprocess.SubprocessError):
+    except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as error:
         print("Read-only ACL caller refused; evidence retained", file=sys.stderr)
+        # Only the same frozen, fixed numeric input facts may cross this boundary.
+        reason = str(error) if type(error) is ValueError else ""
+        if re.fullmatch(
+            r"Caller ordinary input owner refused: regular=(True|False) "
+            r"size=[0-9]{1,20} maximum=[0-9]{1,20} mode=0o[0-7]{1,12} "
+            r"uid=[0-9]{1,20} euid=[0-9]{1,20} links=[0-9]{1,20} source=(True|False)",
+            reason,
+        ):
+            print(reason, file=sys.stderr)
         raise SystemExit(1) from None
     print(
         json.dumps(

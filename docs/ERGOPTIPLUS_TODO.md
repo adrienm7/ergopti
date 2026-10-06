@@ -3785,8 +3785,8 @@ and adds three changed-condition and one missing-step refusal controls. Every
 previous guard and mutation assertion is preserved byte-exact by inverse removal.
 
 The first macOS run of this diagnostic, [37418772555](https://github.com/adrienm7/ergopti/actions/runs/37418772555),
-failed before Swift execution; the native failure cause remains unknown until its
-actual logs are available. Portable replays independently reproduce two fixture
+failed before Swift execution; its subsequently retrieved raw log identifies the
+same runtime-image refusal boundary described below. Portable replays independently reproduce two fixture
 preparation defects: group-writable copied inputs under umask002 and an aliased
 temporary root rejected before the intended JSON boundary. Fixture copies now
 have mode0600 and genuine temporary roots use their canonical spelling; explicit
@@ -3812,6 +3812,21 @@ CLI and Python promotion already exists in0761ae3f3. Its current preflight,
 67 Python controls per mode and six strict C++17/C++23 programs pass; all14
 historical native artifacts remain byte-exact. Owned runtime/native acceptance
 and TODO31 stay partial.
+
+The exact-SHA macOS run [37424488172](https://github.com/adrienm7/ergopti/actions/runs/37424488172)
+passes all20 caller controls in both modes and release compilation, then the
+actual CLI still refuses before native acquisition. The CLI previously discarded
+its detailed numeric refusal facts; only its original generic message survived.
+It now prints an additional strictly bounded, fully recognized ordinary-image
+ValueError containing only Boolean/numeric fields. Other errors retain the
+original generic message and expose no private exception payload. An actual CLI
+subprocess over a genuine group-writable file reproduces the missing diagnostic
+before this fix and passes afterward; only its Darwin host declaration is modeled.
+All20 previous test bodies/assertions and every pre-CLI production AST remain
+exact. A changing exception argument also proves the printed text is the same
+frozen text that was validated. The23 caller and22 worker controls pass normally
+and with inherited optimization. The runner metadata predicate remains UNOBSERVED until the next
+native invocation; no permission change, acquisition or native acceptance is inferred.
 
 The registered Linux physical-hold dashboard harness now loads its actual
 shared selection enum and predicates before the unchanged Typing KPI consumer.
