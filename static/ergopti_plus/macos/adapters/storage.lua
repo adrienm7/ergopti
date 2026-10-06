@@ -310,7 +310,11 @@ function M.forget_owned(owner, receipt)
 	end
 	_owned_finalizing[owner] = nil
 	if not okay or record.pending or not rawequal(_owned_receipts[receipt], record) then return false end
-	_owned_receipts[receipt] = { forgotten = true, owner_box = setmetatable({ owner }, { __mode = "v" }) }
+	-- A JIT-retained publication closure can still root this retired journal.
+	-- Detach its owner only after every finalization refusal has been checked.
+	local forgotten = { forgotten = true, owner_box = setmetatable({ owner }, { __mode = "v" }) }
+	record.owner = nil
+	_owned_receipts[receipt] = forgotten
 	return true
 end
 
