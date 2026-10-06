@@ -1879,5 +1879,138 @@ class FailedSenderReceiverObservationControls(unittest.TestCase):
         group.settle.assert_not_called()
 
 
+class AppKitRegistrationFactControls(unittest.TestCase):
+    """Closed native enum facts; actual AppKit capability remains unqualified."""
+
+    def capture(self, root, value):
+        return RegistrationFactControls.capture(self, root, value)
+
+    def line(self, reason):
+        return (
+            "Owned AppleEvent recipient AppKit admission refused (reason " + str(reason) + ").\n"
+        ).encode("ascii")
+
+    def test_three_actual_enum_values_project_names_without_osstatus(self):
+        for number, reason in (
+            (1, "application-missing"),
+            (2, "policy-refused"),
+            (3, "policy-unconfirmed"),
+        ):
+            with self.subTest(number=number), TemporaryDirectory() as directory:
+                children, receiver, _path = self.capture(Path(directory), self.line(number))
+                expected = {"phase": "appkit-admission", "appkit_reason": reason}
+                if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+                    expected = {}
+                fact = probe.appleevent_registration_fact(children, receiver)
+                self.assertEqual(fact, expected)
+                self.assertNotIn("osstatus", fact)
+                receiver.poll.assert_not_called()
+                receiver.wait.assert_not_called()
+
+    def test_unknown_admitted_noncanonical_noise_and_partial_frames_omit_reason(self):
+        valid = self.line(2)
+        for value in (
+            self.line(0),
+            self.line(4),
+            self.line(-1),
+            self.line("+2"),
+            self.line("02"),
+            valid.replace(b"reason 2", b"reason 2\0"),
+            valid + b"noise\n",
+            valid + valid,
+            valid[:-1],
+            b" " + valid,
+            valid.replace(b"refused", b"accepted"),
+            b"x" * 129,
+        ):
+            with self.subTest(value=value), TemporaryDirectory() as directory:
+                children, receiver, _path = self.capture(Path(directory), value)
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+
+    def test_symlink_hardlink_root_and_partial_read_refusals_do_not_publish_reason(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            children, receiver, path = self.capture(root, self.line(2))
+            original = root / "original.stderr"
+            path.rename(original)
+            path.symlink_to(original)
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            path.unlink()
+            os.link(original, path)
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            path.unlink()
+            original.rename(path)
+            root.chmod(0o755)
+            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            root.chmod(0o700)
+            with patch.object(probe.os, "read", return_value=self.line(2)[:-1]):
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            receiver.poll.assert_not_called()
+            receiver.wait.assert_not_called()
+
+    def test_only_existing_exit65_observation_publishes_reason_and_remains_refused(self):
+        boundary = AppleEventBoundaryControls()
+        for code, status, number, reason in (
+            (21, 65, 1, "application-missing"),
+            (21, 65, 2, "policy-refused"),
+            (21, 65, 3, "policy-unconfirmed"),
+            (21, 65, 0, None),
+            (21, 68, 2, None),
+            (22, 65, 2, None),
+        ):
+            with (
+                self.subTest(code=code, status=status, number=number),
+                TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                root.chmod(0o700)
+                (root / "sandbox.sb").write_text(boundary.policy)
+                children = boundary.model(root)
+                children.captures = {}
+                acquire = children.start
+                value = self.line(number)
+
+                def start(arguments):
+                    child = acquire(arguments)
+                    capture = root / "child-1.stderr"
+                    capture.write_bytes(value)
+                    children.captures[child] = (root / "child-1.stdout", capture)
+                    children.groups[child].observe_exit.return_value = Mock(
+                        si_pid=73136, si_code=code, si_status=status
+                    )
+                    return child
+
+                children.start = start
+                with (
+                    patch.object(probe.uuid, "uuid4", return_value=boundary.nonce),
+                    patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
+                    patch.multiple(
+                        probe.os, CLD_EXITED=21, CLD_KILLED=22, CLD_DUMPED=23, create=True
+                    ),
+                ):
+                    with self.assertRaises(probe.AppleEventBoundaryError) as failed:
+                        probe.admit_appleevent_boundary(children, root)
+                detail = str(failed.exception)
+                if reason is not None and hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY"):
+                    self.assertTrue(
+                        detail.endswith(
+                            ", registration_phase=appkit-admission, registration_appkit_reason="
+                            + reason
+                        )
+                    )
+                else:
+                    self.assertNotIn("registration_appkit_reason=", detail)
+                self.assertNotIn("registration_osstatus=", detail)
+                self.assertIn("checkpoint=readiness", detail)
+                self.assertIn("waitid_status=" + str(status), detail)
+                self.assertNotIn(directory, detail)
+                self.assertNotIn(boundary.nonce, detail)
+                self.assertEqual(children.sender_calls, [])
+                self.assertEqual(len(children.active), 1)
+                child = children.active[0]
+                self.assertEqual(children.groups[child].observe_exit.call_count, 1)
+                children.groups[child].settle.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

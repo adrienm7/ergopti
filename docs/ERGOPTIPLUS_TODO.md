@@ -3775,6 +3775,14 @@ receives target error -10004 through its acknowledged AppleEvent sender.
 Packaging and installation are skipped after the test failure. These facts
 do not establish the server exception or the AppleEvent policy cause.
 
+The existing Homebrew receiver readiness refusal now projects only the exact
+AppKit producer enum1/2/3 from its bounded owned capture, separately from
+Carbon OSStatus. Native run37540551778 at a5a07 observes CLD_EXITED/code1,
+status65 before the sender; its AppKit reason remains unknown until the new
+diagnostic is executed on macOS. All 59 portable control bodies remain intact
+and four closed enum/refusal controls are added. This does not admit AppleEvent
+delivery or qualify the native Brew archive lifecycle. Item36 remains open.
+
 The Sparkle child target-root guard now uses native POSIX realpath strings
 on both signed fixture admission and actual bundle comparison. Foundation URL
 projection no longer supplies the identity string. Strict root equality,
