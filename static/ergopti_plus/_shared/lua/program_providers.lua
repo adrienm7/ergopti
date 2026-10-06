@@ -57,7 +57,7 @@ function M.catalogue(raw, platform)
 			or type(source.commands) ~= "table" or Json.is_array(source.commands) then return nil, "invalid_catalogue" end
 		ids[source.id] = true
 		for name, commands in pairs(source.commands) do
-			if (name ~= "linux" and name ~= "hs") or not Json.is_array(commands)
+			if (name ~= "linux" and name ~= "hs" and name ~= "ahk") or not Json.is_array(commands)
 				or source.mode == "script" and #commands == 0 then return nil, "invalid_catalogue" end
 			for _, command in ipairs(commands) do
 				if not clean(command) or not command:match("^[%w_.%-]+$") then return nil, "invalid_catalogue" end

@@ -481,6 +481,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include modules/diagnostics/crash_reporter.ahk
 #Include infra/json.ahk
 #Include infra/program_parameter.ahk
+#Include adapters/program_providers.ahk
 #Include infra/program_actions.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
