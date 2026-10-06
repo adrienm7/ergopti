@@ -252,9 +252,27 @@ try {
         $handle = [SourceBootProcess]::OpenProcess(0x101001, $false, [uint32]$process.ProcessId)
         if ($handle -eq [IntPtr]::Zero) { continue }
         try {
-            if (![SourceBootProcess]::MatchesSnapshot($handle, $process.CreationDate.ToFileTimeUtc(), $Ahk)) {
-                continue
+            # A terminal candidate needs no cleanup authority. CIM may still
+            # return its earlier snapshot while the exact native handle exits.
+            $cleanupWait = [SourceBootProcess]::WaitForSingleObject($handle, 0)
+            if ($cleanupWait -eq 0) { continue } # WAIT_OBJECT_0
+            if ($cleanupWait -ne 0x102) { # WAIT_TIMEOUT is the only live result.
+                throw 'Could not observe the failed source candidate terminal state.'
             }
+            try {
+                $cleanupMatches = [SourceBootProcess]::MatchesSnapshot($handle,
+                    $process.CreationDate.ToFileTimeUtc(), $Ahk)
+            } catch {
+                # Image metadata can disappear after the first live check.
+                # Discard only a physically terminal handle; never admit it.
+                $cleanupWait = [SourceBootProcess]::WaitForSingleObject($handle, 0)
+                if ($cleanupWait -eq 0) { continue } # WAIT_OBJECT_0
+                if ($cleanupWait -ne 0x102) {
+                    throw 'Could not observe the failed source candidate terminal state.'
+                }
+                throw
+            }
+            if (!$cleanupMatches) { continue }
             if (![SourceBootProcess]::TerminateProcess($handle, 1)) {
                 Write-Warning 'An owned failed source reload could not be terminated.'
             }
