@@ -8,6 +8,7 @@
 
 import os
 import pathlib
+import shutil
 import subprocess
 import tempfile
 
@@ -66,6 +67,78 @@ def application_receipt_state(stderr):
     return state
 
 
+# Transparent observer: the real original PATH-selected gtk-launch receives
+# precisely the original "$@". No launcher result or application bytes are faked.
+GTK_TRACE_WRAPPER = '#!/bin/sh\nset +e\narity=other\nboundary=mismatched\noperand=mismatched\nif [ "$#" -eq 2 ]; then\n    arity=expected\n    if [ "$1" = "--" ]; then boundary=matched; fi\n    if [ "$2" = "$ERGOPTI_NATIVE_GTK_EXPECTED" ]; then operand=matched; fi\nfi\npublish() {\n    printf \'phase=%s;arity=%s;boundary=%s;operand=%s;native_exit=%s\\n\' "$1" "$arity" "$boundary" "$operand" "$2" > "${ERGOPTI_NATIVE_GTK_TRACE}.pending"\n    mv -- "${ERGOPTI_NATIVE_GTK_TRACE}.pending" "$ERGOPTI_NATIVE_GTK_TRACE"\n}\npublish entered pending\n"$ERGOPTI_NATIVE_GTK_COMMAND" "$@"\nstatus=$?\npublish returned "$status"\nexit "$status"\n'
+
+
+def native_gtk_observation(trace, entered):
+    """Only finite native-process observations may enter failure annotations."""
+    observation = {
+        "gtk_command": "not_observed",
+        "gtk_arity": "unknown",
+        "gtk_boundary": "unknown",
+        "gtk_operand": "unknown",
+        "gtk_exit": "unknown",
+        "launcher_enter": "not_observed",
+    }
+    try:
+        with trace.open("rb") as stream:
+            raw = stream.read(513)
+        if len(raw) > 512:
+            raise ValueError("closed native trace exceeded its bound")
+        fields = raw.decode("ascii").strip().split(";")
+        pairs = [field.split("=", 1) for field in fields]
+        if any(len(pair) != 2 for pair in pairs):
+            raise ValueError("invalid closed trace field")
+        values = dict(pairs)
+        if (
+            len(pairs) != 5
+            or len(values) != 5
+            or set(values) != {"phase", "arity", "boundary", "operand", "native_exit"}
+        ):
+            raise ValueError("invalid closed trace shape")
+        if values["phase"] not in {"entered", "returned"}:
+            raise ValueError("invalid closed trace phase")
+        if values["arity"] not in {"expected", "other"}:
+            raise ValueError("invalid closed trace arity")
+        if any(values[field] not in {"matched", "mismatched"} for field in ["boundary", "operand"]):
+            raise ValueError("invalid closed argument observation")
+        status = values["native_exit"]
+        if values["phase"] == "entered":
+            if status != "pending":
+                raise ValueError("entered native command has no terminal status")
+        elif (
+            not status.isdecimal()
+            or not status.isascii()
+            or str(int(status)) != status
+            or not 0 <= int(status) <= 255
+        ):
+            raise ValueError("invalid closed native status")
+        observation.update(
+            {
+                "gtk_command": values["phase"],
+                "gtk_arity": values["arity"],
+                "gtk_boundary": values["boundary"],
+                "gtk_operand": values["operand"],
+                "gtk_exit": status,
+            }
+        )
+    except FileNotFoundError:
+        pass
+    except (OSError, UnicodeError, ValueError):
+        observation["gtk_command"] = "unknown"
+    try:
+        with entered.open("rb") as stream:
+            entered_bytes = stream.read(2)
+        observation["launcher_enter"] = "observed" if entered_bytes == b"1" else "unknown"
+    except FileNotFoundError:
+        pass
+    except OSError:
+        observation["launcher_enter"] = "unknown"
+    return ";".join(f"{key}={value}" for key, value in observation.items())
+
+
 def main():
     checks, failures = 0, 0
     with tempfile.TemporaryDirectory(prefix="ergopti-app-operands-") as folder:
@@ -75,11 +148,19 @@ def main():
         launcher = root / "record-application"
         launcher.write_text(
             "#!/bin/sh\nset -eu\n"
+            'printf 1 > "$ERGOPTI_NATIVE_APPLICATION_ENTERED" || :\n'
             'pending="${ERGOPTI_NATIVE_APPLICATION_RECEIPT}.pending"\n'
             'printf %s "$1" > "$pending"\n'
             'mv -- "$pending" "$ERGOPTI_NATIVE_APPLICATION_RECEIPT"\n'
         )
         launcher.chmod(0o700)
+        genuine_gtk = shutil.which("gtk-launch")
+        trace_commands = root / "trace-commands"
+        trace_commands.mkdir()
+        if genuine_gtk is not None:
+            gtk_observer = trace_commands / "gtk-launch"
+            gtk_observer.write_text(GTK_TRACE_WRAPPER)
+            gtk_observer.chmod(0o700)
         read_fd, write_fd = os.pipe()
         with (root / "display.log").open("w") as log:
             display = subprocess.Popen(
@@ -111,7 +192,14 @@ def main():
                         f'Exec={launcher} "{identity}"\nTerminal=false\n'
                     )
                     receipt = root / ("receipt-" + str(index))
+                    gtk_trace = root / ("gtk-trace-" + str(index))
+                    entered = root / ("application-entered-" + str(index))
                     env = dict(os.environ)
+                    if genuine_gtk is not None:
+                        env["PATH"] = str(trace_commands) + os.pathsep + env.get("PATH", "")
+                        env["ERGOPTI_NATIVE_GTK_COMMAND"] = genuine_gtk
+                        env["ERGOPTI_NATIVE_GTK_EXPECTED"] = identity
+                        env["ERGOPTI_NATIVE_GTK_TRACE"] = str(gtk_trace)
                     env.update(
                         {
                             "DISPLAY": ":" + number,
@@ -120,6 +208,7 @@ def main():
                             "XDG_CONFIG_HOME": str(root / "config"),
                             "ERGOPTI_NATIVE_APPLICATION_ENTRY": str(entry),
                             "ERGOPTI_NATIVE_APPLICATION_RECEIPT": str(receipt),
+                            "ERGOPTI_NATIVE_APPLICATION_ENTERED": str(entered),
                             "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
                         }
                     )
@@ -141,7 +230,7 @@ def main():
                         print(
                             "::error title=Native application operand::"
                             f"stage={stage};case={index};native_exit={child.returncode}"
-                            f"{receipt_detail}"
+                            f"{receipt_detail};{native_gtk_observation(gtk_trace, entered)}"
                         )
                         print(
                             f"FAIL native application operand {identity!r}: {child.stderr.strip()}"
