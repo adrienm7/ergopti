@@ -206,8 +206,23 @@ _RPA_ForeignSource(Context) {
 	Snapshot := _ProgramActions_Snapshot("gesture__tap_3")
 	Assert(Snapshot is Map, "actual admitted source was captured")
 	Foreign := '[gestures]`ntap_3 = "none"`n'
+
+	; UTF-8 creation adds a physical BOM; exact source reads deliberately retain it.
+	Probe := Context["directory"] . "\native-utf8-bom.receipt"
+	AssertFalse(FileExist(Probe), "native BOM transport probe starts with its own absent file")
+	try {
+		FileAppend(Foreign, Probe, "UTF-8")
+		Bytes := FileRead(Probe, "RAW")
+		AssertEqual(StrPut(Foreign, "UTF-8") - 1 + 3, Bytes.Size, "native UTF-8 append has exact body bytes plus one BOM")
+		Assert(NumGet(Bytes, 0, "UChar") == 0xEF && NumGet(Bytes, 1, "UChar") == 0xBB
+			&& NumGet(Bytes, 2, "UChar") == 0xBF, "native UTF-8 append has the physical EF BB BF prefix")
+		Observed := FSReadUtf8Exact(Probe)
+		AssertEqual(Chr(0xFEFF) . Foreign, Observed, "native UTF-8 append adds exactly one physical BOM")
+		AssertFalse(Observed == Foreign, "default BOM transport differs from the authored BOM-less source")
+		AssertFalse(InStr(Observed, "`r"), "native UTF-8 append preserves authored LF without a newline option")
+	} finally FileDelete(Probe)
 	FileDelete(ConfigurationFile)
-	FileAppend(Foreign, ConfigurationFile, "UTF-8")
+	FileAppend(Foreign, ConfigurationFile, "UTF-8-RAW")
 	AssertThrows(_ProgramActions_BeforeAdopt.Bind(Snapshot), "foreign source cannot borrow a held native start")
 	AssertFalse(ProgramActions_Run("gesture__tap_3"), "fresh canonical assignment mismatch refuses")
 	AssertEqual(Foreign, FSReadUtf8Exact(ConfigurationFile), "program refusal preserves the foreign source")
@@ -592,8 +607,28 @@ _RPA_CompletionSuppression(Context) {
 		} finally {
 			_UserProgramPaused := false
 			if Mode == "source" {
+				; The captured exact image already contains its initial physical BOM.
+				Probe := Context["directory"] . "\native-utf8-restore.receipt"
+				AssertFalse(FileExist(Probe), "native restoration probe starts with its own absent file")
+				try {
+					Assert(SubStr(Snapshot["source"], 1, 1) == Chr(0xFEFF),
+						"the actual canonical snapshot retains its original physical BOM")
+					FileAppend(Snapshot["source"], Probe, "UTF-8")
+					Bytes := FileRead(Probe, "RAW")
+					AssertEqual(StrPut(Snapshot["source"], "UTF-8") - 1 + 3, Bytes.Size,
+						"default restoration adds three physical BOM bytes to the captured image")
+					for Offset in [0, 3]
+						Assert(NumGet(Bytes, Offset, "UChar") == 0xEF && NumGet(Bytes, Offset + 1, "UChar") == 0xBB
+							&& NumGet(Bytes, Offset + 2, "UChar") == 0xBF, "default restoration has two physical BOM prefixes")
+					AssertEqual(Chr(0xFEFF) . Snapshot["source"], FSReadUtf8Exact(Probe),
+						"default UTF-8 restoration duplicates the captured physical BOM")
+				} finally FileDelete(Probe)
 				FileDelete(Snapshot["path"])
-				FileAppend(Snapshot["source"], Snapshot["path"], "UTF-8")
+				FileAppend(Snapshot["source"], Snapshot["path"], "UTF-8-RAW")
+				AssertEqual(Snapshot["source"], FSReadUtf8Exact(Snapshot["path"]),
+					"completion restoration preserves the exact captured source bytes")
+				Assert(_ProgramActions_Snapshot(Binding) is Map,
+					"completion restoration preserves actual canonical admission for the next mode")
 			}
 			if _UserProgramEntries.Has(Binding) && (_UserProgramEntries[Binding] == Entry
 					|| _UserProgramEntries[Binding] == Replacement)
