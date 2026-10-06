@@ -4578,18 +4578,90 @@ shipped worker and its real provider behavior are unchanged.
       and debt polls expose the canonical shared 50 ms period to the strict fast-timer
       inventory. Hosted AHK validation of these owner and period cases remains pending.
 
-Windows continuation for item63 (explicitly deferred to the maintainer's PC):
+Group3 qualification checkpoint, 2026-10-06: run 37451229133 is terminal
+FAILED. Windows passes 9,693 cases with nine program/decoder EOF failures;
+brightness and shutdown pass. Linux units pass 9,126/0, and GTK operand,
+hold-consumer and native window gates succeed; Linux E2E fails only the
+separately owned updater ETag assertion. Windows downstream E2E/package/install,
+Linux package/install, unselected macOS and Release are skipped. The earlier
+GTK/brightness failure causes remain unknown; a successful later component
+run does not establish their cause.
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Run the real brightness worker/provider regressions, preserve nested LASTEXITCODE, then qualify WMI readback and exact Job/process retirement. Record supported hardware and unavailable providers; physical luminance remains a separate acceptance step.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+The basic-15 diagnostic run 37454415583 is terminal FAILED on CI commit
+17c2d4e0e526c97e6a33fdb30d63032873dc064b, feature
+9fcef640b8e55e96d645f6ab756f0e21e8f0448b and tree
+5870b02163302d71d7cde21687ff11bf20a8df79 records Windows 9,700 passes and two
+BOM-fixture failures. Linux E2E fails the GTK operand receipt (closed facts:
+stage=receipt, case=0, exit=1) and the separately owned updater ETag assertion.
+The GTK refusal remains unexplained; local four-case successes do not qualify
+that failed hosted boundary. The reviewed atomic pending-file rename and
+UTF-8-RAW fixture repairs now preserve the original assertions but still require
+fresh hosted execution. Core JS/properties, Linux units, hold-consumer and
+native cursor-window gates succeed. Windows downstream E2E/package/install,
+Linux package/install, unselected macOS and Release are skipped. Linux mandatory
+E2E evidence recording/upload are skipped; complete installed qualification is
+not claimed.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+The separate Windows-only private 27-case constructor run 37454501003 on CI
+commit 10882b95122a691f62bf9bf4633ccb2739aab044 and candidate
+43d8026cf97c9077c77762f9eb6b5f1f844ca86f, tree
+ae799563db349f7df9f8b1e93f96e12e8201f106 records 9,709 passes and five failures:
+two BOM-fixture and three brightness five-second failures. Its 12 native
+constructor cases pass, but the whole run fails and the constructor remains
+inactive/unadmitted to Root. Do not infer a brightness cause or whole product
+qualification from those partial results. Core JS/properties pass; Windows
+downstream E2E/package/install, unselected Linux/macOS and Release are skipped.
+
+Fresh qualification of the current EOF decoder and BOM/GTK fixture repairs is
+in progress on committed feature 089008a19f1aff8b63e8beb832fbae037f5311c5.
+Minimal run 37458316115 selects Windows/Linux on CI commit
+54b02cdb5bab61ec746fdf49bb87a63358314a80, tree
+87eba1ed8af60a07ecfe95dea57bc2ef293adbb3. The separate Windows-only private
+constructor run 37458344080 tests CI commit
+78781632bf098fb7c19ceaec35d29e12b61219b4, candidate
+9fa92730dba206e1e9bd97b7a5f61d8a9b0defd2 and tree
+81405a1af10e61234f94c24ff7086438e01ee9c0. Both runs are PENDING at this
+checkpoint; no successful or failed final result is claimed. The private
+constructor remains unadmitted, and no TODO item is completed by starting CI.
+
+Root merged dev b6fa826fb639f7f1a81cee5ebb99a3f1f5853fa5 while retaining both
+independent SQLite transport oracles. Actual LuaJIT fixed/restored projections
+pass 1,026 grouped/3,402 raw rows; both legacy column omissions are refused.
+The earlier smaller fixture passes 648/2,808. Lua 5.4 retains the unchanged
+numeric-comparison failure on previous, incoming and composed sources, with
+later alias checks unexecuted; it is not green. Root formatting, 362 JS checks
+and 1,855 encoding checks pass before these doc changes. All 13 items remain
+open. Complete feasible software/native unit/E2E/package/install work in CI;
+real-device tasks are separate. Older receipts remain historical evidence
+rather than qualification of final sources.
+
+Fresh minimal run37458316115 records9,700 Windows passes and two brightness
+worker five-second failures, with the owned root still running. All15 program
+cases now pass. The private constructor run37458344080 succeeds completely:
+9,714 Windows unit passes, E2E, compiled packaging, installation and startup;
+Release is skipped. This does not establish why the minimal brightness worker
+stalled. Its fixture now writes only eight closed phase markers, observed via
+a capped64-byte native reader at the unchanged failure deadline. All121
+existing assertions, five provider cases, actual WMI doubles, polling and
+exact tree termination remain unchanged. Marker cleanup requires termination
+acknowledgement; the shipped worker is untouched. Native marker/reader
+qualification and final integrated-source acceptance remain required.
+
+Remaining work for item63 (CI-feasible software first):
+
+- [ ] Software implementation/repair: Preserve the Windows brightness worker/provider and suspend owner; characterize the three private-run five-second failures, repair only demonstrated regressions and requalify final sources; preserve nested LASTEXITCODE, complete WMI readback, unavailable providers and exact Job/process retirement.
+- [ ] Hosted native qualification: Run real Windows worker/provider and ownership regressions, then all affected OS unit/E2E, compiled packaging, installation and isolated startup gates. Provider doubles do not measure light.
+- [ ] Separate device/evidence boundary: Measure physical display luminance on supported backlight hardware and confirm honest refusal on hardware without a provider.
+
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 63, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified brightness owner and finish required native package/install acceptance; investigate only demonstrated timeout regressions. Separate device/evidence boundary: Actual display luminance and retained evidence for historical timeouts.
 
 ## Maintainer requests on 2026-10-01
 
@@ -4618,18 +4690,21 @@ Checkpoint 37116696443 no longer reports the two real full-save retired-Metrics 
 
 The maintained AHK and Hammerspoon configuration-schema draft examples no longer recommend the retired dedicated Metrics-window shortcut table. The existing CJS retirement gate checks their actual semantic table headers, including quoted and array-table aliases, while literal-dot foreign table names remain distinct. All other draft consent, color and privacy records remain byte-identical, and the generator registry confirms the examples are separate from generated runtime templates. Whole-document draft schema validation remains separate; item71 still requires a complete native three-OS package/install/launch checkpoint.
 
-Windows continuation for item71 (explicitly deferred to the maintainer's PC):
+Remaining work for item71 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Run the actual Metrics retirement/full-save regressions and installed upgrade/startup. Preserve unknown retired values and comments, ordinary Metrics actions, consent and compensation; require complete unit/E2E/package/install receipts.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Keep the completed dedicated Metrics-shortcut retirement and ordinary Metrics actions; repair only demonstrated regressions in unknown retired values/comments, consent or compensation.
+- [ ] Hosted native qualification: Requalify native full-save, installed upgrade/startup and complete three-OS unit/E2E/package/install/launch gates on final sources.
+- [ ] Separate device/evidence boundary: No new device-only task is established for this retirement; item38 retains its independent physical requirements.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 71, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve completed Metrics retirement and unknown values/comments; finish full-save, upgrade and complete three-OS package/install/startup acceptance. Separate device/evidence boundary: No new device-only task is established for this retirement.
 
 - [ ] **73.** Partial: Windows combination families and pairs already use
       the canonical translated tap-hold key labels; macOS now resolves both
@@ -4661,18 +4736,21 @@ The physical-label contract is independent of the native matrix and stored actio
 IDs. Original provider cases fail before the fix; the qualified component suites
 pass with all 21 locale catalogues. Full native CI remains required.
 
-Windows continuation for item73 (explicitly deferred to the maintainer's PC):
+Remaining work for item73 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Run the complete 182-entry combination matrix and translated native menus in all21 locales. Historical French Magic disabling remains unattributed without contemporaneous private configuration/log evidence; never force-enable it or invent a cause.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Qualify the actual translated physical-key labels, complete 182-entry matrix, unchanged action IDs, hidden script-management pairs and all 21 locale menus. Change a writer only after a reproducible regression proves its cause.
+- [ ] Hosted native qualification: Run native provider/menu, unit/E2E/package/install cases on affected hosted OS runners; retain the independent physical-label contract.
+- [ ] Separate device/evidence boundary: September30 attribution still lacks contemporaneous before/after configuration/logs, and the maintainer cannot recall the operation. Clear, explicit disable and wizard writers are possibilities, not a proved cause; never force-enable the category or invent attribution.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve translated labels and the 182-entry matrix; qualify actual providers without guessing a configuration writer regression. Separate device/evidence boundary: Historical writer attribution requires retained evidence; one disabled gate and three boot sections do not prove three disabled categories.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
@@ -4799,18 +4877,21 @@ fix as explicit code work rather than unsupported-platform exceptions.
   a real-keyboard check of the order rule (a key held alone, then joined
   by another, must not fire the pair), which rests on AutoHotkey
   recording a key's physical state after its criteria have answered.
-  Windows continuation for item91 (explicitly deferred to the maintainer's PC):
+  Remaining work for item91 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Qualify symmetric chord delay, tap-to-chord copying, key-down hold, both key orders and synthetic AltGr LCtrl ordering with the native hook owner. Existing recommendation/clear semantics and future/unrelated parameters must remain intact.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Implement symmetric simultaneous chords, delay and tap-to-chord copying through the actual hook owner. Resolve key-down hold arbitration and synthetic AltGr LCtrl ordering; preserve recommendations, clear and unrelated/future parameters.
+- [ ] Hosted native qualification: Run native Windows hook/unit/E2E cases for both orders, delay boundaries and fake-LCtrl refusal, then compile/package/install/startup. Shared changes require all affected OS lanes.
+- [ ] Separate device/evidence boundary: Verify real keyboard ordering when a key held alone is joined and actual AltGr generation; injected events do not prove physical hook ordering.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 91, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Windows simultaneous chords, delay/copy, hold arbitration and fake-AltGr-LCtrl hook ownership, then native hook/compiled acceptance on the maintainer Windows workstation. Separate device/evidence boundary: Real key ordering and actual AltGr generation.
 
 - [~] **93.** Linux: the key combinations of item 91. The shared ordered-pair
   model now runs through the actual tap-hold engine, keyboard hook and
@@ -4857,18 +4938,19 @@ This deferral does not complete this item or the cross-cutting items16/38.
   and Unicode byte controls pass on both ABIs. The extra full Lua 5.4 run still
   fails its existing extreme-number comparison and is not claimed green.
 
-Windows continuation for item93 (explicitly deferred to the maintainer's PC):
+Remaining work for item93 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Run the current native shortcut/category/pause/reload and layout-source regressions on Windows; retain explicit-none, duplicate physical-source and held-input retirement fences. Any modifier-terminal or unavailable source must have an honest platform contract before equivalent mappings are claimed.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Preserve the admitted ordered Linux engine/delivery fence. Implement remaining simultaneous chords, cross-device ownership and native caps_word/one_shot_shift where supported, with explicit unavailable reasons and source/modifier/retirement currency.
+- [ ] Hosted native qualification: Qualify native Linux ownership and Windows/macOS parity, unit/E2E/package/install/startup. Requalify the reviewed GTK receipt-publication fixture repair without inventing its historical hosted failure cause; the separately owned updater ETag gate remains failed. Preserve closed evidence and explicit-none, duplicate-source, held-input and independent SQLite oracles.
+- [ ] Separate device/evidence boundary: Qualify genuine evdev grabs, supported X11/Wayland seats and multi-keyboard pairs. Xvfb and controlled hooks do not prove physical input delivery.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
 
 The native modifier-hold consumer fixture now loads its actual shared Typing
 selection helpers and production selection constants. The missing dependency
@@ -4878,6 +4960,18 @@ assertion, SQL query and independent expected number; actual LuaJIT and Lua5.4
 replays pass12/0 SQLite and5/0 consumers, with four omission controls rejected.
 Production readers, writers, schemas and consumers are unchanged. Hosted
 revalidation remains pending; these checks do not qualify physical input.
+
+Current Group 3 source checkpoint (item 93, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve ordered Linux pairs and historical fifth GTK 4/4; diagnose the current delayed-identity poll miss, then complete simultaneous chords, cross-device ownership, remaining native actions and physical-host/input/distribution acceptance. Separate device/evidence boundary: Genuine evdev/device/seat delivery and multi-keyboard acceptance.
+
+The existing GTK wrapper now retains its after-spawn timestamp and samples one
+additional timestamp after durable start-receipt publication. The terminal
+observation exposes only nonnegative signed-64-bit integer phase values or
+unknown, so hosted evidence can separate process creation, receipt publication
+and native wait. All 17 original diagnostic tests and their 71 assertions,
+native commands, ownership, polling and deadlines remain intact. Six new
+portable controls fail before the addition; the candidate passes all 23.
+This is diagnostic instrumentation, not a repair or native qualification; the
+observed hosted delay's cause and the original failed verdict remain unresolved.
 
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
@@ -4899,18 +4993,21 @@ keys. Occupied layout selections and absent, false or malformed values need
 independent migration vectors. No production switch or migration is retired
 until the actual selected-layout contract is qualified.
 
-Windows continuation for item96 (explicitly deferred to the maintainer's PC):
+Remaining work for item96 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Prove the real empty-emulated-layout picker handoff, six historical AltGr descriptors and eight independent SC012 roll cases before migration. Verify actual wrap/space/percent/whitespace output without regenerating historical expectations or changing unrelated keys.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Prove the actual empty-emulated-layout picker handoff and selected Ergopti+ behavior across drivers. Resolve or retain wrap/spacing/shift-percent/ligature differences, then retire only proven redundant switch/settings through acknowledged migration; preserve occupied and absent/false/malformed legacy records.
+- [ ] Hosted native qualification: Run six frozen historical AltGr descriptors and eight independent SC012 roll cases on native Windows, selected-layout parity and migration/unit/E2E/package/install gates. Never regenerate historical expectations from the new implementation.
+- [ ] Separate device/evidence boundary: Check real hotkey precedence, recent-chevron timing and emitted layout/dead-key behavior after software qualification.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 96, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Prove picker handoff and layout equivalence, resolve wrap/spacing/shift differences and acknowledge migration before retiring the separate switch. Separate device/evidence boundary: Real precedence, recent-chevron timing and layout/dead-key delivery.
 
 - [~] **97.** Replace the fixed accent/direct-symbol shortcut submenu with
   user-owned entries, empty by default and offering "+ Add". Let a user on
@@ -4941,22 +5038,25 @@ This deferral does not complete this item or the cross-cutting items16/38.
   Preparations stored only in /tmp before the cloud restart are unavailable
   and must be reconstructed and reviewed against current sources. No fixed accent menu/default is retired.
   Real physical capture, Unicode/dead-key delivery, collision refusal, native
-  GUI lifecycle, installation and Windows PC acceptance remain open.
+  GUI lifecycle, installation and Windows native acceptance remain open.
   The editor row retains an all-platform separator before the legacy modifier
   shortcut groups, preserving the existing native Windows menu assertion.
 
-Windows continuation for item97 (explicitly deferred to the maintainer's PC):
+Remaining work for item97 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Implement the agreed shared empty-by-default physical-key/modifier mapping model, then add/edit/remove and arbitrary Unicode/shared-action native owners. Coordinate shared data/menu/locales; qualify source identity, conflicts, unknown settings and physical-key delivery.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Complete the admitted empty-by-default editor with native capture, all-owner collision and joint input/source/modifier/output provenance on supported drivers. Implement genuine Unicode/dead-key delivery; reconstruct/review lost unintegrated preparations and qualify legacy accent migration before menu/default retirement.
+- [ ] Hosted native qualification: Run genuine GUI/bridge lifecycle, native assignment/delivery/refusal, renderer-only browser, unknown-source and unit/E2E/package/install cases. Linux/macOS delivery stays false until native authority is proved; GUI readiness cannot enable it.
+- [ ] Separate device/evidence boundary: Qualify actual keyboard positions/modifiers, arbitrary Unicode and dead-key composition across real layouts/devices; keep fixed menus reachable until the replacement is qualified.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 97, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete native capture, all-owner collisions, joint source/modifier/output custody, Unicode/dead-key delivery and accent migration; qualify actual GUI/bridge and retain legacy menus. Separate device/evidence boundary: Real physical positions/modifiers and output across layouts/devices.
 
 - [~] **98.** Replace the fixed "make J the star key" setting with a physical
   key and output chosen by the user: any keyboard position and arbitrary
@@ -4972,18 +5072,21 @@ This deferral does not complete this item or the cross-cutting items16/38.
   claimed. Qualify genuine physical source/output and acknowledged migration
   before replacing the old setting. See the item97 partial handover.
 
-Windows continuation for item98 (explicitly deferred to the maintainer's PC):
+Remaining work for item98 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Implement the shared mapping model for actual accented output and genuine dead-key composition; existing accented shortcut remaps are not Unicode output. Qualify arbitrary physical keys, modifiers and the star entry without overwriting the layout or fabricating composition.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Complete item 97 native source/output ownership for arbitrary physical key/output and explicit None. Prove star-setting migration without treating a logical character as physical J; preserve occupied/unknown records before retiring the old setting/default.
+- [ ] Hosted native qualification: Run shared model/native setter, collision, migration, persistence and delivery/refusal cases plus affected OS unit/E2E/package/install gates. Arbitrary text emission is not dead-key composition.
+- [ ] Separate device/evidence boundary: Verify real positions and chosen star/other output across layout changes, modifiers and repeats; None must produce no mapping.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 98, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete the same arbitrary physical key/output or None owner and star migration, preserving occupied/unknown records without inferring physical J from a logical character. Separate device/evidence boundary: Chosen output across actual layout changes, modifiers and repeats.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -5510,7 +5613,7 @@ Read-only Apple Shortcuts catalogue retrieval timed out after 20 seconds; CLI
 identifier help passed, permission was not determined, and invocation was not
 qualified. The Windows handoff now records nine actual program-action failures,
 two missing lifecycle/timer inventories and two unchanged OS-purity ratchets.
-These are explicit repair steps for the maintainer's PC, not completed scope.
+These are CI-feasible software repair steps, not completed scope.
 
 The Linux runner now admits each native close callback only after the same
 protected close attempt acknowledges submission. A rejected or raised attempt
@@ -5545,18 +5648,19 @@ Actual X11 source28, native HTTP48, Linux runtime82 and canvas pure48 controls
 pass. The cursor-window native supervisor refuses this container before any
 child/namespace allocation; mandatory hosted native qualification remains open.
 
-Windows continuation for item106 (explicitly deferred to the maintainer's PC):
+Remaining work for item106 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Qualify the registered basic program action/literal/status/shutdown tests first. Verify and review the inactive constructor-v3 packet against its complete producer preimage before applying; run all12 native HANDLE/Job fault cases and causal controls. Healthy concurrency parity and automation discovery remain separate unfinished scope.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Requalify the EOF-first Windows descriptor and UTF-8-RAW BOM fixture repairs with retained shutdown/HANDLE/Job ownership; fix only demonstrated failures. The reviewed constructor failure carrier has native basic/constructor qualification; preserve its lifecycle guards and requalify final integrated sources. Complete Windows discovery, installed automation/application providers and bounded Apple Shortcuts chosen-ID/invocation ownership; preserve literal argv, privacy and consumer concurrency.
+- [ ] Hosted native qualification: Run the actual basic 15 program cases, genuine script/Python/executable and lifecycle controls on affected hosted OS lanes; retain the admitted constructor's 12 native HANDLE/Job fault cases and their private Windows qualification; final integrated-source acceptance remains required. Requalify signed Hammerspoon provider/shim cases after scalar-arity fixture repair, native locking/symlinks and 14 owned-program XCTest cases; complete E2E/package/install/launch. Saved, unintegrated or lost preparations require preimage review/reconstruction, not a completion claim.
+- [ ] Separate device/evidence boundary: Only hardware/peripheral-dependent automation or actual user workflows require a device; basic execution, discovery, cancellation and packaging remain software work.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
 
 Native provider CI fixture correction on 2026-10-06: the real Hammerspoon
 JSON decoder accepts exactly one argument, while the shared resolver returns
@@ -5631,6 +5735,114 @@ fresh Windows execution. Production source admission and the independent
 corpus are unchanged. The native brightness budget and assertions remain
 unchanged; downstream E2E/package/install were skipped in both failed runs.
 
+The hosted successor run37458316115 passes Linux units and the native hold
+and cursor-window gates, but GTK operands and the separately owned ETag gate
+fail again. Atomic publication has not qualified the remote GTK boundary.
+The unchanged worker now reports only not_observed or identity_mismatch at
+its existing failure sites; all100 read/sleep attempts, exact identity
+assertions and native/cleanup deadlines remain unchanged. Independent
+portable controls preserve earlier-stage annotations and reject payload
+values. Actual local GTK still passes4/4 with12 reaped descendants and no
+pending/rescue debt; the diagnostic successor requires hosted execution.
+
+This slice admits the reviewed call-scoped native constructor failure carrier
+and all12 unchanged HANDLE/Job fault cases after private Windows run37458344080
+completed SUCCESS:9,714 unit passes, zero failures, E2E, compiled packaging,
+installation and startup successful; Release skipped. The complete15-method
+BOM-corrected prefix remains byte-exact, with all178 assertion lines retained.
+Native partial acquisitions are taken and zeroed before publication, adopted
+through the same exact retirement claim, and cancelled starts retain their
+pre-bind disposition. Legacy anonymous cleanup and completion policies remain
+unchanged. The old archived constructor preparation remains inactive and
+native-unexecuted; it is separate historical evidence. No raw per-method
+artifact-row or E2E case count is claimed. Final integrated three-OS
+qualification, discovery/automation completion and device acceptance remain
+open; this does not complete item106 or the other partial items.
+
+Integrated run37462985994 (CI036bbff29, exact Dev2dc6f9d6b tree) passed all
+9,715 Windows unit checks, E2E, packaging, compiled startup and crash smoke.
+The separate23-case compiled programmable-hotstring acceptance had22 passes
+and one failure before disable; its owner has the exact evidence. macOS passed
+all14 native owned-program cases and21 signed Hammerspoon inventory cases;
+this inventory does not prove program invocation, atomic leases or effective
+ACL behavior. Native Shortcuts discovery remained refused and invocation
+unqualified. Linux units passed9,126/0, while the original GTK identity cases
+passed3/4: the first ordinary-app receipt was not observed, with no precise
+launcher failure cause proved. Package and installation acceptance remains
+incomplete across the integrated OS lanes; Release was skipped.
+
+This slice adds a transparent observer around the actual PATH-selected GTK
+command, forwarding the exact original arguments and native status. Capped,
+closed command-entry, operand-boundary, terminal-status and launcher-entry
+facts diagnose failure without publishing paths or receipt payloads. Failed
+diagnostic writes preserve the genuine native outcome. The whole original
+worker, all assertions, four identities,100 reads,20ms sleeps and10s/5s native
+budgets remain unchanged. Local actual GTK passes4/4; four real marker-write
+refusals and two genuine CLI diagnostic-publication refusals preserve original
+receipts/status/stdout. All12 adopted descendants are physically reaped with
+zero pending/rescue debt;15 closed-parser controls pass. Hosted execution of
+this observer is still required, and its output cannot complete item106.
+
+After this prepared slice was pushed, upstream2afdf3039 introduced structured
+GTK command, native stderr and polling diagnostics. Its entire fixture and
+new diagnostic owner are preserved during the current Dev merge; the earlier
+58690cd9 observer is superseded rather than layered onto another wrapper.
+The old four-case/refusal controls qualify only that historical observer.
+Current GTK sources require fresh hosted qualification, with the original
+identity oracle and poll window retained. Upstream ETag, typing-consumer and
+macOS acceptance/diagnostic corrections are preserved; macOS also requires
+qualification on these new sources. The atomic PID publication correction
+remains active. No TODO item is completed by this diagnostic preparation.
+
+Bootstrap diagnostic follow-up (2026-10-06): the provider, notification and
+global-switcher probes now report closed release_metadata/archive_download
+phases, closed transport families and a finite numeric HTTP status when
+observed. They rethrow the identical ordinary failure; diagnostic write faults
+do not turn failure into success, and genuine interruption remains visible.
+No URL, headers, response body or arbitrary exception text enters these facts.
+Portable controls pass29/0,15/0,29/0 with every original20/13/27 control intact;
+the original metadata HTTP403 black-box control fails without these facts and
+passes with them. Both callers retain the formatted inventory source pin.
+Fresh native macOS qualification is pending; the prior HTTPError stage/status
+remains unknown. This is diagnostic evidence, not provider invocation.
+
+The owned GTK fixture now requires a real X11 protocol handshake before its
+original four application trials. A live process and published display number
+alone are insufficient: a genuine owned SIGSTOP trial passes that old predicate
+but refuses the five-second xdpyinfo handshake, retires its exact client and
+passes after the same server resumes. Seventeen diagnostic controls, four
+proof-cleanup controls and eight actual X11 observations pass with exact child
+reaping. Original workers, identities, receipt polling and observer deadlines
+remain unchanged. This strengthens setup admission; it does not establish the
+cause of the prior late GTK receipts or qualify physical application delivery.
+Final composed and hosted qualification remains required; item 106 stays partial.
+
+The three native Hammerspoon probes now consume the existing ephemeral CI
+metadata token before any Git or native child allocation. Only the fixed
+official release-metadata request receives Authorization; authenticated
+redirects and supplied-credential refusals fail closed without anonymous
+fallback. Archive requests, native child environments and closed diagnostics
+remain credential-free. CI portable controls, Brew and the log receiver exclude
+the dedicated key. Independent controls pass40/0,19/0,33/0 with every old
+assertion retained and the strict parser census updated only additively.
+The controlled old403/new authenticated asset result proves the request
+boundary, not the cause of the earlier hosted403. Actual hosted acquisition
+and native qualification remain pending; item106 stays partial.
+
+Linux qualification prerequisite follow-up (2026-10-06): exact integrated
+run37494746572 passed all four genuine GTK cases but timed out while APT
+was still downloading the audio prerequisites, before either native audio
+runner. The same surviving apt-get process held the dpkg frontend lock,
+so later physical-source/window commands and package/install matrices did
+not execute. The exact existing PulseAudio packages, both translated language
+packs and locale generation now have a separate bounded prerequisite step.
+The original native audio name, both interpreter commands and two-minute
+budget are unchanged; fifteen additive wiring controls refuse missing
+prerequisites, changed budgets and shared setup/native clocks. Fresh hosted
+qualification remains required; no native assertion or item is waived.
+
+Current Group 3 source checkpoint (item 106, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve the qualified 21-case inventory and owned-program provider; diagnose the current GTK delayed-identity observation with its original poll unchanged; record Windows discovery/invocation for the maintainer workstation, then complete Linux/macOS providers and real Shortcuts discovery/invocation. Separate device/evidence boundary: Only device-dependent automation workflows require external device acceptance.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -5665,18 +5877,21 @@ The unintegrated number-row runtime/provenance preparation stored only in
 /tmp is unavailable after the cloud restart and needs reconstruction and
 review. Linux/macOS forced native capabilities remain unavailable.
 
-Windows continuation for item107 (explicitly deferred to the maintainer's PC):
+Remaining work for item107 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Qualify actual HKL digit-row/symbol output against independent historical vectors, including Shift, AltGr, dead keys, Caps/Nav admission and repeats. Forced-symbol ownership and current-schema migration still require implementation/qualification where absent.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Implement native-HKL forced-symbol and Linux/macOS forced digit/symbol owners with joint input/source/modifier/output provenance; reconstruct/review the lost number-row runtime preparation. Preserve the acknowledged three-mode policy, schema migration and independent descriptor/dead-state semantics.
+- [ ] Hosted native qualification: Run native HKL/KLE/XKB source, migration and delivery/refusal cases for ten keys, Shift/AltGr/Caps/Nav/repeats and dead states, then unit/E2E/package/install. Read-only observations do not enable forced Lua output.
+- [ ] Separate device/evidence boundary: Verify physical number-row/repeat/Nav/AltGr/Caps and dead-key output on real layouts after native ownership is qualified.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 107, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Implement native-HKL and Linux/macOS forced symbol/digit owners with joint provenance, preserving admitted policy/migration and independent descriptor/dead-state expectations. Separate device/evidence boundary: Actual number-row/repeat/Nav/AltGr/Caps and dead-key output.
 
 - [~] **108.** Make the default hotstring-editor shortcut follow the effective
   physical key that directly types the selected magic character: Ctrl on
@@ -5734,18 +5949,21 @@ modifier/output custody. Existing conditional/native-owner requirements above
 remain open, including real layout changes, explicit-none precedence and
 physical acceptance; legacy menus remain reachable.
 
-Windows continuation for item108 (explicitly deferred to the maintainer's PC):
+Remaining work for item108 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Qualify the existing editable editor shortcut against actual HKL/effective physical Magic source: direct star/ù, missing source explicit none, personal override, chord edit, conflicts and pause/reload. Preserve existing behavior without a demonstrated regression.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Qualify existing conditional-editor policy without reimplementing completed work. Complete missing effective-source retargeting, all-owner collisions and modifier/output custody; preserve explicit None, personal overrides, migration and pause/reload fences. Keep unsupported seats honest and new physical delivery disabled until proved.
+- [ ] Hosted native qualification: Run actual HKL/TIS/XKB source, registrar and scoped publication/compensation cases for direct star/ù, missing/ambiguous/dead source and conflicts, then affected OS unit/E2E/package/install/startup.
+- [ ] Separate device/evidence boundary: Verify real layout changes and direct magic-key/editor delivery on supported keyboards/seats; source-only and controlled native owners do not prove physical delivery.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+Current Group 3 source checkpoint (item 108, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete effective-source retargeting, all-owner collisions and modifier/output transactions while preserving None, personal overrides and compensation. Separate device/evidence boundary: Actual layout changes and editor-key delivery on supported keyboards/seats.
 
 - [~] **109.** Give every application window the same "ErgoptiPlus — Title"
   format. GUI/WebView titles now use one prefix/separator policy in
@@ -6052,18 +6270,34 @@ only validated closed diagnostic facts; its dependent controller still passes
 13 portable controls. This does not qualify the deferred Windows console
 caption or the remaining application panels.
 
-Windows continuation for item109 (explicitly deferred to the maintainer's PC):
+Remaining work for item109 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Run all five real native dialog title/filter/selection/cancel policy families, strict UIA results, exact child status/stderr and physical HWND/Job retirement. Variables/KeyHistory still need an identity-safe owner; direct A_ScriptHwnd retitling is withdrawn.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Complete an identity-safe Windows Variables/KeyHistory caption owner and remaining application panel/file-picker/notification boundaries. Preserve shared composition, bodies/options, focus, cancellation and returns; do not revive withdrawn A_ScriptHwnd retitling or redo qualified constructor work.
+- [ ] Hosted native qualification: Run all five native Windows dialog title/filter/selection/cancel families with strict UIA, child status/stderr and HWND/Job retirement, actual Linux/macOS panel cases and unit/E2E/package/install. Preserve nine qualified Mac notification-constructor cases, which do not prove delivery/clicks.
+- [ ] Separate device/evidence boundary: Check delivered notifications/click callbacks and desktop focus where hosted automation cannot observe the actual user session; caption implementation is not deferred merely to a PC.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
+
+The constructor probe shares the closed bootstrap phase/status diagnostic
+without changing the existing lowercase native reason policy, source/digest/
+signature admission, nine-case contract, cleanup or failure status. Portable
+15/0 controls retain all13 original cases. Native requalification remains
+pending; first-checkpoint constructor successes do not replace the second
+checkpoint refusal, and no notification delivery/callback is claimed.
+
+The notification constructor probe shares the API-only metadata credential
+owner and removes the dedicated key before native allocation. All19 portable
+controls pass, including the15 prior controls; archive verification, the nine
+native constructor cases, cancellation and physical retirement are unchanged.
+Fresh hosted qualification and delivery/clicks remain separate; item109 is partial.
+
+Current Group 3 source checkpoint (item 109, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve genuine constructor captions/returns; establish supported fresh invisible Variables/KeyHistory capture before separate owned GUI/title qualification, retaining runtime HWND identity. Separate device/evidence boundary: Physical key history and notification/focus behavior outside observable hosted cases.
 
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
@@ -6150,18 +6384,19 @@ literal owned output argument; an independent source-alias case covers the
 same boundary on Linux. No native permission or switch result is inferred from
 this preparatory failure. Native execution and product integration remain open.
 
-Windows continuation for item111 (explicitly deferred to the maintainer's PC):
+Remaining work for item111 (CI-feasible software first):
 
-1. Fetch the current `origin/dev`, establish the native baseline, and coordinate
-   the affected Windows/input owners before changing sources.
-2. Qualify separate global and cursor-display switchers on two real displays: independent cursor/active-window movement, spanning/negative/minimized/closed windows and activation refusal. Retain window-centre membership, unavailable reasons and no global fallback.
-3. Run `verify-change` and the selected native unit/E2E, compiled packaging,
-   installation and isolated startup gates. Distinguish failures, skips and
-   nonexecution; retain physical acceptance where required.
+- [ ] Software implementation/repair: Integrate the macOS product SyntheticInput/global-switcher broker with retained input/tap/timer retirement and finite deadlines. Preserve distinct cursor-display behavior, Windows providers and Linux X11 source fences, unavailable reasons, no global fallback and no monitor setting.
+- [ ] Hosted native qualification: Run genuine signed-Hammerspoon switcher/ownership cases, all 34 existing native X11/window cases and supervisor receipts, Windows provider/UI tests and unit/E2E/package/install. Portable controller/RandR results cannot complete product broker integration or real displays.
+- [ ] Separate device/evidence boundary: Verify actual two-display cursor/active-window independence, moved cursors, spanning/negative/minimized/closed windows and activation refusal on supported OSes; retain current-pointer display and window-centre membership.
 
-Detailed commands, test owners and the inactive prepared packet are in
-[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md).
-This deferral does not complete this item or the cross-cutting items16/38.
+Fetch current `origin/dev`, establish the native baseline and coordinate affected
+owners before source changes. Use `verify-change` on final sources; distinguish
+successful, failed, skipped and
+unexecuted unit, E2E, package, installation and launch gates.
+[group3-windows-follow-up/README.md](handovers/2026-10-04-parallel-containers/group3-windows-follow-up/README.md)
+retains historical commands and packet ownership; the earlier PC-only software
+deferral is superseded. This item and items16/38 remain open.
 
 The shared worker timer retirement now separates each native close admission
 from its callback receipt. A synchronous callback waits for its own admission;
@@ -6170,6 +6405,100 @@ Four original controls and ten independent delayed/synchronous refusal controls
 pass on Lua5.4 and LuaJIT; seven of the new controls fail on the prior source.
 These injected callback cases do not qualify physical timer APIs or complete
 item111; finite default deadlines and the native display requirements remain.
+
+Integrated run37462985994 at CI036bbff29 (exact Dev2dc6f9d6b tree) passed the
+first five native supervision cases, then failed the external helper-loss
+case before all34 cursor-window cases could execute. The failure was the
+original five-unique-PID assertion, not a measured window operation failure.
+Generated child and parent PID receipts could be observed before their writers
+completed. This slice stages both receipts privately, closes the original
+writer and atomically publishes the completed bytes. All46 original assertion
+ASTs, cases, readers, native calls, cleanup and budgets remain unchanged.
+Two real direct-child fork barriers expose the old incomplete publications
+(expected red) and pass after the correction, with exact reaping, descriptor
+and namespace acknowledgement and zero debt. This proves the publication race,
+not the exact earlier hosted schedule or complete native family recovery.
+The container still refuses the full /proc child-census prerequisite; the
+unchanged five supervision cases, external recovery and all34 window cases
+require hosted qualification. This does not complete item111 or items16/38.
+
+Follow-up integrated run37470985920 at CIaea032f8 (exact Dev90076001 tree)
+passes all five native family controls, external recovery and all34 original
+cursor-window cases, with physical settlement acknowledged. GTK4/4, units9126/0,
+E2E and packaging pass; nine first-install scenarios and three package-format
+launches pass. Five distribution unit lanes each report8803 passes/78 failures:
+their setup installs only LuaJIT, lacks native luv/lfs and Python3, and runs
+permission-refusal fixtures as root. This slice supplies those test prerequisites
+after the unchanged ordinary-user --no-deps installation proof. It compiles the
+existing vendor versions from verified official Git commits and the pinned
+compatibility submodule against each distribution's own LuaJIT headers. The
+unchanged suite requires real native C entry points and a non-root UID before
+execution. Local native compilation/admission and the unchanged9126/0 unit suite pass
+with these pinned modules. Explicit CA bundles preserve HTTPS verification in
+fresh minimal distributions. Five-distribution hosted qualification remains
+pending. All original assertions, native windows and
+deadlines remain unchanged; macOS broker integration and real displays remain
+unfinished. The overall integrated run failed; Release was skipped.
+
+The global-switcher bootstrap reports the same closed transport diagnostic
+while retaining all source pins, native owners and retirement guards. Portable
+29/0 controls retain the original27; native broker qualification remains open.
+Subsequent Linux-only run37479728162 on CIa1e30e88 (exact Dev7bfd15ea tree)
+passes units9126/0, native supervision5+external1 and all34 window cases. GTK
+passes3/4: case0 misses its unchanged receipt poll, while real GTK exits0 after
+about2.3775seconds with the exact authored identity present. No argv refusal,
+specific cold-service cause or production regression is established. Package
+and all distribution lanes are skipped; the new native distro bootstrap has
+not executed on hosted distributions. Release is skipped. Preserve this failure
+and the earlier4/4 success separately; no assertion or deadline is weakened.
+
+The global-switcher probe consumes the metadata key at its actual same-process
+entry, before Git or native allocation. Its portable suite passes33/0 and retains
+all29 prior controls. Brew, independent owner controls and the log receiver
+exclude the key; archive/native ownership and refusal contracts remain intact.
+Fresh native acquisition, broker integration and actual switcher consumption
+remain unqualified. Linux window assertions and deadlines are unchanged.
+Item111 and cross-cutting requirements16/38 remain open.
+
+Distribution prerequisite follow-up (2026-10-06): independent native run
+37491630360 tested byte-identical helper sources and exposed three real
+ordinary-user fixture writes denied by the root-owned checkout directories.
+Alpine additionally lacked the actual curl executable; Debian could not
+link its native modules without C startup objects. The preparation now
+provisions curl and Debian libc6-dev, changes only the driver/tests directory
+owners and adds actual ordinary-user write receipts before the unchanged
+suite. The three prior preflights/suite calls, native module pins and all
+assertions remain intact. Genuine UID1000 private mode-only refusal/recovery
+reproduces all three failures and recoveries; the original full suite passes
+9,126/0 on 433 modules with a short owned TMPDIR. Its earlier long-TMPDIR
+Unix-socket harness failure is retained separately. Actual foreign-owner
+chown, all five corrected distributions and integrated package/install
+acceptance still require hosted qualification; item111 stays partial.
+
+Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Complete Mac broker/wiring and exact retirement qualification; preserve final Linux supervision five, external recovery one and window 34 successes without rebuilding the switcher. Separate device/evidence boundary: Genuine dual screens, independent cursor/focus and moved/closed windows.
+
+- [ ] **112.** Accept an AI prediction immediately with its configured
+      modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
+
+  Maintainer report on Windows AHK (2026-10-06): the shortcut currently only
+  highlights the corresponding prediction. Pressing the configured shortcut
+  must immediately insert that prediction through the normal acceptance owner,
+  including any correction of previously typed text.
+
+  Each prediction tooltip row must show its effective shortcut in a separate
+  right-aligned, muted gray column. Derive the displayed modifiers and digit
+  from the same current menu configuration that owns the binding. Use one
+  shared visual design on Windows, macOS and Linux, with the existing native
+  modifier labels, and refresh both bindings and hints after configuration
+  changes.
+
+  Regression coverage must distinguish insertion from highlighting, verify
+  every supported prediction index and modifier choice, preserve the existing
+  behavior when no prediction is mapped, and check hint/binding agreement.
+  Native acceptance must cover replacement/correction in Windows Notepad and
+  the supported macOS/Linux editors, plus tooltip alignment and appearance on
+  all three OSes. This is an unimplemented follow-up; it does not complete the
+  existing prediction-input or tooltip validation items.
 
 ## Time estimate
 
