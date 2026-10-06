@@ -3473,6 +3473,8 @@ The Windows persistence census now audits the actual added scope build-only cons
 
 The exact personal snapshot regression now selects its handwritten semantic fixture identity among the real initialized defaults. All original name/type/value/two-row assertions remain; genuine sibling, case-twin, descendant and literal-dot decoys are rejected. Actual Windows execution remains pending.
 
+The Windows global-clear source comparison now reports both complete physical images with the existing canonical JSON encoder. Its equality predicate and all other assertions remain unchanged. Manual run37438495454 passed9949 Windows unit/meta cases and failed2, including this comparison; the precise source difference still requires the next native receipt. This diagnostic does not repair or close the remaining global transaction work.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
