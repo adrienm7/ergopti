@@ -4692,6 +4692,17 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The reviewed redirect correction retains canonical sensitive-header no-follow
+admission by default; deliberate per-hop owned GETs select
+`managed_redirects=true`. Both actual Linux interpreters pass the 62 focused
+production controls. Identical receiving controls against the predecessor
+report 51 pass/11 fail on LuaJIT and 52 pass/10 fail on Lua 5.4; these include
+new API contracts as well as reproduced regressions. Original native wire
+fixtures pass: empty-header56 on each ABI, origin credentials40, TLS21 and
+personal curl-config5 (with their nested native controls). The complete normal
+Linux suite passes 10,121 tests in 495 modules. Final committed-source native
+qualification and the Windows/device work remain required; item 62 stays open.
+
 The current Linux working-source qualification passes 375 JavaScript checks,
 all 10,106 normal Linux tests in 495 modules, 124 focused updater controls
 under each Lua ABI, and the original uninstrumented 20 real body-pipe cases

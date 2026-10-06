@@ -149,6 +149,7 @@ local operation
 local argv_observations = 0
 local constructed = pcall(function()
 if input.method == "per_hop" then
+    options.managed_redirects = true -- Explicit owned per-hop contract; legacy GET semantics stay separate.
     options.follow_redirects = true
     operation = client.get_owned(input.url, input.headers or {}, options, complete)
     per_hop_operation = operation

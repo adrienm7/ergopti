@@ -160,9 +160,14 @@ function M.new(redirect_data, transport_data)
 		if not target then
 			return { action = "refuse", error = "HTTP redirect URL refused" }
 		end
-		if not protocols[target.scheme] or not protocols[current.scheme]
-			or (input.https_floor == true and target.scheme ~= "https") then
+		if not protocols[target.scheme] or not protocols[current.scheme] then
 			return { action = "refuse", error = "HTTP redirect protocol refused" }
+		end
+		if input.https_floor == true and target.scheme ~= "https" then
+			-- Only the validated zero-exit, same-origin native receipt above may
+			-- identify a real HTTPS downgrade. Missing/forged evidence has no reason.
+			local reason = current.scheme == "https" and target.scheme == "http" and "https_downgrade" or nil
+			return { action = "refuse", error = "HTTP redirect protocol refused", reason = reason }
 		end
 		if not integer(input.hops, 0, max_hops) then return { action = "refuse", error = "HTTP redirect limit reached" } end
 		if input.hops == max_hops then return { action = "refuse", error = "HTTP redirect limit reached" } end

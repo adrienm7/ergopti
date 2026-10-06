@@ -76,6 +76,26 @@ local function rejected(message, callback)
 	return operation
 end
 
+--- Validates deliberate managed-hop ownership without guessing caller intent.
+--- The scalar is captured only inside owned preparation; legacy ports never
+--- gain permission from header values, URLs, owner names or later mutation.
+local function redirect_option_error(request, owned_api)
+	local managed = request.managed_redirects
+	if managed ~= nil and type(managed) ~= "boolean" then return "HTTP managed redirect option is invalid" end
+	if managed == true and (owned_api ~= true or request.method ~= "GET" or request.buffered ~= true
+		or request.follow_redirects ~= true or request.output_path ~= nil or request.output_target ~= nil
+		or request.etag_compare ~= nil or request.etag_save ~= nil) then
+		return "HTTP managed redirect ownership is unavailable"
+	end
+end
+
+local function retain_redirect_permission(request, native_follow)
+	if request.managed_redirects ~= true and request.follow_redirects then
+		if type(native_follow) ~= "boolean" then return "HTTP redirect admission unavailable" end
+		request.follow_redirects = native_follow
+	end
+end
+
 --- Starts one fully preflighted actual public request.
 --- @param url string
 --- @param headers table
@@ -96,9 +116,13 @@ local function dispatch(url, headers, body, options, method, buffered, owned_api
 	request.timeout_ms = tonumber(request.timeout_ms) or Curl.default_timeout_ms()
 	if request.timeout_ms <= 0 or request.timeout_ms % 1 ~= 0 then return rejected("HTTP timeout is invalid", callback) end
 	request.method, request.buffered, request.owned_api = method, buffered, owned_api
-	local allowed, err, token, prepared = Curl.preflight(url, headers, body, request)
+	local redirect_refusal = redirect_option_error(request, owned_api)
+	if redirect_refusal then return rejected(redirect_refusal, callback) end
+	local allowed, err, token, prepared, native_follow = Curl.preflight(url, headers, body, request)
 	if not allowed then return rejected(err, callback) end
 	if type(token) ~= "table" or type(prepared) ~= "table" then return rejected("HTTP prepared headers unavailable", callback) end
+	local permission_refusal = retain_redirect_permission(request, native_follow)
+	if permission_refusal then return rejected(permission_refusal, callback) end
 	request.prepared_headers, headers = token, prepared
 	local active, initialization_refusal = initialize()
 	if not active then return rejected(initialization_refusal, callback) end
@@ -142,9 +166,13 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 			local override_refusal = native_override(captured)
 			if override_refusal then return nil, override_refusal end
 		end
-		local allowed, err, token, prepared = Curl.preflight(url, headers, body, captured)
+		local redirect_refusal = redirect_option_error(captured, true)
+		if redirect_refusal then return nil, redirect_refusal end
+		local allowed, err, token, prepared, native_follow = Curl.preflight(url, headers, body, captured)
 		if not allowed then return nil, err end
 		if type(token) ~= "table" or type(prepared) ~= "table" then return nil, "HTTP prepared headers unavailable" end
+		local permission_refusal = retain_redirect_permission(captured, native_follow)
+		if permission_refusal then return nil, permission_refusal end
 		captured.prepared_headers = token
 		return captured, nil, prepared
 	end
@@ -187,6 +215,8 @@ function M.get(url, headers, options, callback)
 end
 
 --- Sends a GET retaining actual lookup/curl/process/pipe settlement ownership.
+--- managed_redirects=true explicitly selects shared per-hop ownership; the
+--- default preserves historical sensitive-header no-follow and HTTP receipts.
 --- @param url string
 --- @param headers table
 --- @param options table|nil
