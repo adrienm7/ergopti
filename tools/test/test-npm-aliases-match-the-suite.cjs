@@ -68,6 +68,8 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Native output/public fixtures retain their own mandatory Linux ownership gate.
 	'tools/test/run-linux-managed-http-native.cjs',
 	// Actual archive and source controls have mandatory separate Linux planner/CI gates.
+	// Genuine temporary updater fixtures run both ABIs under the existing native owner.
+	'tools/test/run-linux-updater-temp-native.cjs',
 	'tools/test/run-linux-updater-archive-native.cjs',
 	'tools/test/run-linux-archive-source-controls.cjs',
 	// Actual owned X11/RandR focus and cleanup run under the native gate.

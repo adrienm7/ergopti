@@ -631,17 +631,24 @@ local function native_artifact_backend()
    int ergopti_archive_publication_commit(struct ergopti_archive_publication *);
    int ergopti_archive_publication_copy_display_path(const struct ergopti_archive_publication *, char *, size_t);
    int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *);
+   int ergopti_archive_publication_cleanup_with_disposition(struct ergopti_archive_publication *, int *);
    int ergopti_archive_publication_descriptors_closed(const struct ergopti_archive_publication *);
    int ergopti_archive_publication_named_remaining(const struct ergopti_archive_publication *);
    int ergopti_archive_publication_dispose_unpublished(struct ergopti_archive_publication *);
   ]])
   -- Exact installed native component only; no system/alternate binary fallback.
+  local null_pointer = ffi.cast("void *", 0)
   local library = ffi.load(Paths.driver_root() .. "/bin/libergopti_archive_publication.so")
   local symbols = {}
   for _, name in ipairs({ "abi_version", "clock_ms", "create_directory", "allocate_output", "allocate_reader", "stage", "commit",
    "copy_display_path", "cleanup", "descriptors_closed", "named_remaining", "dispose_unpublished" }) do
    symbols[name] = library["ergopti_archive_publication_" .. name]
   end
+  -- Old ABI1 backend remains usable with its original one-attempt cleanup law.
+  local optional, cleanup_with_disposition = pcall(function()
+   return library["ergopti_archive_publication_cleanup_with_disposition"]
+  end)
+  if optional and cleanup_with_disposition ~= nil then symbols.cleanup_with_disposition = cleanup_with_disposition end
   if symbols.abi_version() ~= 1 then return nil end
   local before = hrtime() / 1e6
   local native = symbols.clock_ms()
@@ -650,7 +657,8 @@ local function native_artifact_backend()
    or native < before or native > after then return nil end
   local parent = os.getenv("TMPDIR") or "/tmp"
   if parent:sub(1, 1) ~= "/" or parent:find("\0", 1, true) then return nil end
-  return { ffi = ffi, symbols = symbols, library = library, parent = parent, now_ms = function() return hrtime() / 1e6 end }
+  return { ffi = ffi, symbols = symbols, library = library, null_pointer = null_pointer,
+   parent = parent, now_ms = function() return hrtime() / 1e6 end }
  end)
  if not loaded or not backend then return nil end
  return backend
@@ -965,18 +973,47 @@ function M.native_artifact(basename)
   record.listeners = {}
   for _, listener in ipairs(listeners) do pcall(listener) end
  end
- local function cleanup(record)
+ local function cleanup(record, explicit_retry)
   if record.cleaning or record.constructing or record.unknown or not record.cancelled then return false end
   record.cleaning = true -- Reserve before every original lease/reader/native physical probe.
+  local pointer, transaction, lease, install = record.pointer, record.transaction, record.lease, record.install
+  local retry = record.cleanup_retry
   local checked, ready = pcall(function()
    if not lease_settled(record) or not install_readers_settled(record) or record.constructing or record.unknown then return false end
    if record.disposed then return true end
-   if record.cleanup_attempted or records[record.brand] ~= record or not record.cancelled then return false end
-   record.cleanup_attempted = true -- Native uncertainty cannot be retried by guessing closure.
-   if record.pointer ~= nil then
-    local pointer = record.pointer
-    local called, status = pcall(native.cleanup, pointer)
-    if not called or status ~= 0 or record.pointer ~= pointer then return false end
+   if records[record.brand] ~= record or not record.cancelled then return false end
+   if record.cleanup_attempted and (explicit_retry ~= true or not retry
+    or retry.record ~= record or retry.brand ~= record.brand or retry.pointer ~= pointer
+    or retry.transaction ~= transaction or retry.lease ~= lease or retry.install ~= install
+    or retry.attempt ~= record.cleanup_attempt) then return false end
+   -- Physical gates above reserve but do not spend the prior receipt. Repeat
+   -- identities after every foreign probe before a new native call is admitted.
+   if not lease_settled(record) or not install_readers_settled(record)
+    or records[record.brand] ~= record or record.pointer ~= pointer or record.transaction ~= transaction
+    or record.lease ~= lease or record.install ~= install or record.constructing or record.unknown
+    or not record.cancelled or record.cleanup_retry ~= retry then return false end
+   if pointer ~= nil then
+    local disposition
+    if native.cleanup_with_disposition ~= nil then disposition = ffi.new("int[1]", 0) end
+    if records[record.brand] ~= record or record.pointer ~= pointer or record.transaction ~= transaction
+     or record.lease ~= lease or record.install ~= install or record.constructing or record.unknown
+     or not record.cancelled or record.cleanup_retry ~= retry then return false end
+    local attempt = {}
+    record.cleanup_attempted, record.cleanup_retry, record.cleanup_attempt = true, nil, attempt
+    -- Spend ONLY immediately before the exact native attempt. Unknown native
+    -- errors permanently retain the original owner; no bare descriptor retry.
+    local called, status
+    if disposition then called, status = pcall(native.cleanup_with_disposition, pointer, disposition)
+    else called, status = pcall(native.cleanup, pointer) end
+    if records[record.brand] ~= record or record.pointer ~= pointer or record.transaction ~= transaction
+     or record.lease ~= lease or record.install ~= install or record.cleanup_attempt ~= attempt
+     or record.constructing or record.unknown or not record.cancelled then return false end
+    if called and status == -1 and disposition and disposition[0] == 1 then
+     record.cleanup_retry = { record = record, brand = record.brand, pointer = pointer, transaction = transaction,
+      lease = lease, install = install, attempt = attempt }
+     return false
+    end
+    if not called or status ~= 0 or (disposition and disposition[0] ~= 0) then return false end
     local closed, descriptors = pcall(native.descriptors_closed, pointer)
     local counted, names = pcall(native.named_remaining, pointer)
     if not closed or descriptors ~= 1 or not counted or names ~= 0 or record.pointer ~= pointer then return false end
@@ -1078,7 +1115,9 @@ function M.native_artifact(basename)
   record.constructing = true
   local owner = ffi.new("struct ergopti_archive_publication *[1]")
   local called, status = pcall(native.create_directory, backend.parent, deadline, owner)
-  record.pointer = owner[0] ~= nil and owner[0] or nil
+  local pointer = owner[0]
+  -- Native NULL stays cdata on reference Lua FFI providers; Lua receipts use nil.
+  record.pointer = pointer ~= nil and pointer ~= backend.null_pointer and pointer or nil
   record.constructing = false
   if not called then record.unknown = true end
   if not called or status ~= 0 or not record.pointer or not current(record, true) then
@@ -1180,6 +1219,13 @@ function M.native_artifact(basename)
   adopt_finished(record)
   return operation
  end
+ function factory.retry_transfer_cleanup(brand)
+  local record = records[brand]
+  if not record or not record.cancelled or not record.cleanup_retry or record.install ~= nil then return false end
+  local retired = cleanup(record, true)
+  adopt_finished(record)
+  return retired == true and records[brand] == record and record.transfer_ack == true
+ end
  function factory.cancel_transfer(brand)
   local record = records[brand]
   if not record then return false end
@@ -1200,7 +1246,12 @@ function M.native_artifact(basename)
  function factory.retire_artifact(brand)
   local record = records[brand]
   if not record or record.install ~= nil then return false end
+  local prior_retry = record.cleanup_retry
   cancel(record)
+  -- One explicit call cannot consume the conflict it just observed. Only its
+  -- entry receipt can authorize this later retirement attempt.
+  if not record.disposed and prior_retry ~= nil and record.cleanup_retry == prior_retry
+   and records[brand] == record then cleanup(record, true) end
   return record.disposed == true
  end
  function factory.artifact_settled(brand)

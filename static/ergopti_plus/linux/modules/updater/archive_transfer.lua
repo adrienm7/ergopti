@@ -23,6 +23,7 @@ function M.new(ports)
  local retire = method(ports.artifact, "cancel_transfer")
  local artifact_settled = method(ports.artifact, "transfer_settled")
  local artifact_observe = method(ports.artifact, "on_transfer_settled")
+ local artifact_retry = method(ports.artifact, "retry_transfer_cleanup")
  if type(get) ~= "function" or type(download) ~= "function" or type(reserve) ~= "function"
   or type(bind_checksum) ~= "function" or type(adopt) ~= "function" or type(retire) ~= "function"
   or type(artifact_settled) ~= "function" or type(artifact_observe) ~= "function" then return nil end
@@ -118,6 +119,17 @@ function M.new(ports)
    if txn.finished then pcall(listener)
    else txn.listeners[#txn.listeners + 1] = listener end
    return true
+  end
+  function operation:retry_cleanup()
+   if active ~= txn or txn.finished or txn.constructing ~= 0 or txn.unknown or not txn.cancelled
+    or txn.retrying or not txn.artifact or type(artifact_retry) ~= "function" then return false end
+   txn.retrying = true
+   local brand = txn.artifact
+   local checked, accepted = pcall(artifact_retry, brand)
+   txn.retrying = false
+   if active ~= txn or txn.artifact ~= brand or txn.unknown or txn.constructing ~= 0 then return txn.finished end
+   settle() -- Original settlement joins every original transport owner.
+   return checked and accepted == true and txn.finished == true
   end
   function operation:request_cancel()
    -- A completed transfer cannot revoke its later separately owned artifact.

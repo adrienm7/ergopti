@@ -20,6 +20,7 @@ enum publication_state { ACQUIRING, RESERVED, STAGING, STAGED, COMMITTED, REFUSE
 struct ergopti_archive_publication {
     int directory, next_directory, parent_directory, pending_fd, output_anchor, archive, proc_directory;
     int uncertain_close, named_remaining;
+    int capture_complete;
     int directory_name_remaining, output_attempted, allocation_busy;
     int scan_fd;
     DIR *scan_stream;
@@ -131,6 +132,7 @@ static int capture_path(const char *path, double deadline,
     if (fstat(owner->directory, &owner->directory_identity) != 0) goto failed;
     if (require_private && !private_directory(&owner->directory_identity)) { errno = EPERM; goto failed; }
     if (!before_deadline(deadline)) goto failed;
+    owner->capture_complete = 1; /* Final path identity/private/deadline admission completed. */
     owner->state = RESERVED;
     free(copy);
     return 0;
@@ -289,6 +291,7 @@ int ergopti_archive_publication_reserve(int owned_directory_fd,
         || !private_directory(&owner->directory_identity)) {
         owner->state = REFUSED; errno = EPERM; return -1;
     }
+    owner->capture_complete = 1; /* Original duplicate passed its exact private identity admission. */
     owner->state = RESERVED;
     return 0;
 }
@@ -396,7 +399,9 @@ int ergopti_archive_publication_copy_display_path(
 /* The exclusively created namespace may contain only this one captured name.
  * This is not a promise of isolation from a hostile same-UID process: wrapper
  * admits its private namespace/source owner and documents that exact premise. */
-static int scan_namespace(struct ergopti_archive_publication *owner, int allow_archive) {
+static int scan_namespace(struct ergopti_archive_publication *owner, int allow_archive,
+    int *known_conflict) {
+    if (known_conflict) *known_conflict = 0;
     if (owner->scan_fd >= 0 || owner->scan_stream != NULL || owner->uncertain_close) {
         errno = EBUSY; return -1; /* Never overwrite an unacknowledged scan owner. */
     }
@@ -411,32 +416,73 @@ static int scan_namespace(struct ergopti_archive_publication *owner, int allow_a
     }
     owner->scan_stream = fdopendir(owner->scan_fd);
     if (!owner->scan_stream) return -1; /* Exact scan_fd remains owned. */
-    int failure = 0;
+    int failure = 0, foreign_entry = 0;
     errno = 0;
     for (;;) {
         struct dirent *entry = readdir(owner->scan_stream);
         if (!entry) { failure = errno; break; }
         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
         if (!allow_archive || strcmp(entry->d_name, owner->archive_name)) {
-            failure = ENOTEMPTY; break;
+            foreign_entry = 1; failure = ENOTEMPTY; break;
         }
     }
     DIR *exact = owner->scan_stream;
     owner->scan_stream = NULL;
     owner->scan_fd = -1; /* closedir takes/closes this exact descriptor once. */
-    if (closedir(exact) != 0) {
+    int scan_closed = closedir(exact) == 0;
+    if (!scan_closed) {
         owner->uncertain_close = errno;
         if (!failure) failure = errno;
     }
+    if (foreign_entry && scan_closed && !owner->uncertain_close && known_conflict)
+        *known_conflict = 1; /* Only acknowledged closedir can mint this reason. */
     if (failure) { errno = failure; return -1; }
     return 0;
 }
 
-int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *owner) {
+/* Read-only native identity checks; no new owner, allocation, path reopen or
+ * mutation. Incomplete construction and close ambiguity never grant retry. */
+static int retained_cleanup_identity(struct ergopti_archive_publication *owner) {
+    if (!owner || owner->state != RETIRING || owner->uncertain_close
+        || owner->scan_fd >= 0 || owner->scan_stream || owner->next_directory >= 0
+        || owner->pending_fd >= 0 || owner->directory < 0) return 0;
+    struct stat directory, parent, entry, archive, anchor;
+    if (fstat(owner->directory, &directory) != 0
+        || !same_inode(&directory, &owner->directory_identity)
+        || !private_directory(&directory)) return 0;
+    if (owner->parent_directory >= 0) {
+        if (owner->directory_name_remaining != 1
+            || fstat(owner->parent_directory, &parent) != 0
+            || !same_inode(&parent, &owner->parent_identity)
+            || fstatat(owner->parent_directory, owner->directory_name, &entry,
+                AT_SYMLINK_NOFOLLOW) != 0
+            || !same_inode(&entry, &directory) || !private_directory(&entry)) return 0;
+    }
+    if (owner->archive >= 0 && (fstat(owner->archive, &archive) != 0
+        || !S_ISREG(archive.st_mode) || !same_inode(&archive, &owner->archive_identity)
+        || archive.st_size != owner->archive_length || archive.st_uid != geteuid()
+        || (archive.st_mode & 0077) != 0)) return 0;
+    if (owner->named_remaining && owner->archive < 0) return 0;
+    if (owner->output_anchor >= 0 && (fstat(owner->output_anchor, &anchor) != 0
+        || !S_ISREG(anchor.st_mode) || !same_inode(&anchor, &owner->output_identity)
+        || anchor.st_uid != geteuid() || (anchor.st_mode & 0077) != 0)) return 0;
+    return 1;
+}
+
+static int cleanup_implementation(struct ergopti_archive_publication *owner,
+    int *out_disposition) {
+    if (out_disposition) *out_disposition = 0;
     if (!owner || owner->state == ACQUIRING || owner->state == STAGING
         || owner->allocation_busy || owner->uncertain_close) { errno = EBUSY; return -1; }
     owner->allocation_busy = 1;
     owner->state = RETIRING; /* No new reader/output/publication after this point. */
+    if (!owner->capture_complete) {
+        /* A failed component walk owns only its original descriptor ledger,
+         * not an admitted final namespace. Never scan/unlink an intermediate. */
+        if (owner->named_remaining || owner->directory_name_remaining) { errno = ESTALE; goto refused_cleanup; }
+        owner->allocation_busy = 0;
+        return ergopti_archive_publication_retire(owner);
+    }
     if (owner->directory < 0) {
         if (owner->named_remaining || owner->directory_name_remaining) { errno = ESTALE; goto refused_cleanup; }
         owner->allocation_busy = 0;
@@ -447,7 +493,14 @@ int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *owne
     if (!same_inode(&directory, &owner->directory_identity) || !private_directory(&directory)) {
         errno = ESTALE; goto refused_cleanup;
     }
-    if (scan_namespace(owner, owner->named_remaining != 0) != 0) goto refused_cleanup;
+    int known_conflict = 0;
+    if (scan_namespace(owner, owner->named_remaining != 0, &known_conflict) != 0) {
+        int original_errno = errno;
+        if (out_disposition && known_conflict && retained_cleanup_identity(owner))
+            *out_disposition = 1;
+        errno = original_errno;
+        goto refused_cleanup;
+    }
     if (owner->named_remaining) {
         if (owner->archive < 0 || fstat(owner->archive, &inode) != 0) goto refused_cleanup;
         if (!same_inode(&inode, &owner->archive_identity) || inode.st_size != owner->archive_length) {
@@ -457,6 +510,7 @@ int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *owne
             if (errno != ENOENT) goto refused_cleanup;
         } else {
             if (!S_ISREG(entry.st_mode) || !same_inode(&entry, &inode)) {
+                if (out_disposition && retained_cleanup_identity(owner)) *out_disposition = 1;
                 errno = ESTALE; goto refused_cleanup;
             }
             /* No guessed path unlink: this exact entry belongs to the privately
@@ -468,7 +522,7 @@ int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *owne
         }
         owner->named_remaining = 0;
     }
-    if (scan_namespace(owner, 0) != 0) goto refused_cleanup;
+    if (scan_namespace(owner, 0, NULL) != 0) goto refused_cleanup;
     if (owner->directory_name_remaining) {
         if (owner->parent_directory < 0
             || fstat(owner->parent_directory, &parent) != 0
@@ -488,6 +542,16 @@ int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *owne
 refused_cleanup:
     owner->allocation_busy = 0;
     return -1;
+}
+
+int ergopti_archive_publication_cleanup(struct ergopti_archive_publication *owner) {
+    return cleanup_implementation(owner, NULL);
+}
+
+int ergopti_archive_publication_cleanup_with_disposition(
+    struct ergopti_archive_publication *owner, int *out_disposition) {
+    if (!out_disposition) { errno = EINVAL; return -1; }
+    return cleanup_implementation(owner, out_disposition);
 }
 
 int ergopti_archive_publication_retire(struct ergopti_archive_publication *owner) {

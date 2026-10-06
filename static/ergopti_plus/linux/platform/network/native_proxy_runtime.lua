@@ -31,13 +31,22 @@ function M.load()
 		void g_settings_schema_unref(void *schema);
 	]])
 	if not declared then return nil end
-	local ok, gio, gobject, glib = pcall(function()
+	local ok, gio, gobject, glib, null_pointer = pcall(function()
 		local catalogue = require("_generated.native_runtime")
 		local names = catalogue.network_runtime.libraries
-		return ffi.load(names.gio), ffi.load(names.gobject), ffi.load(names.glib)
+		return ffi.load(names.gio), ffi.load(names.gobject), ffi.load(names.glib), ffi.cast("void *", 0)
 	end)
 	if not ok then return nil end
-	return { ffi = ffi, gio = gio, gobject = gobject, glib = glib }
+	return { ffi = ffi, gio = gio, gobject = gobject, glib = glib, null_pointer = null_pointer }
+end
+
+--- Tests a native pointer without relying on LuaJIT's cross-type nil equality.
+--- Lua nil remains the absence value for Lua-owned receipts and native test ports.
+--- @param native table Loaded native ABI and its retained NULL pointer.
+--- @param pointer userdata|nil Actual native pointer value.
+--- @return boolean
+function M.is_null(native, pointer)
+	return pointer == nil or pointer == native.null_pointer
 end
 
 --- Returns the exact native borrowed resolver and observed implementation type.
@@ -51,11 +60,11 @@ function M.default_resolver(native)
 	end
 	local ffi = native.ffi
 	local resolver = native.gio.g_proxy_resolver_get_default()
-	if resolver == nil or native.gio.g_proxy_resolver_is_supported(resolver) ~= 1 then
+	if M.is_null(native, resolver) or native.gio.g_proxy_resolver_is_supported(resolver) ~= 1 then
 		return nil, nil, "proxy-backend-unavailable"
 	end
 	local type_name = native.gobject.g_type_name_from_instance(resolver)
-	local backend = type_name ~= nil and ffi.string(type_name) or "unknown"
+	local backend = not M.is_null(native, type_name) and ffi.string(type_name) or "unknown"
 	-- GDummyProxyResolver always returns DIRECT and is not desktop configuration.
 	if backend == "GDummyProxyResolver" then
 		return nil, backend, "proxy-backend-unavailable"
@@ -69,11 +78,11 @@ end
 --- @return boolean
 function M.proxy_schema_available(native)
 	local source = native.gio.g_settings_schema_source_get_default()
-	if source == nil then return false end
+	if M.is_null(native, source) then return false end
 	local catalogue = require("_generated.native_runtime")
 	local schema = native.gio.g_settings_schema_source_lookup(source,
 		catalogue.network_runtime.proxy_schema, 1)
-	if schema == nil then return false end
+	if M.is_null(native, schema) then return false end
 	native.gio.g_settings_schema_unref(schema)
 	return true
 end

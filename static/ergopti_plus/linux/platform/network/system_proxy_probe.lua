@@ -73,15 +73,15 @@ local function lookup(url, exclusions)
 	local proxies = native.gio.g_proxy_resolver_lookup(resolver, url, nil, error_slot)
 	local native_error = error_slot[0]
 	local receipt = { ok = false, error = "proxy-lookup-failed", backend = backend }
-	if native_error ~= nil then
+	if not NativeRuntime.is_null(native, native_error) then
 		receipt.native_error_code = tonumber(native_error.code)
 		native.glib.g_error_free(native_error)
 	end
-	if proxies ~= nil then
+	if not NativeRuntime.is_null(native, proxies) then
 		local values = {}
-		local valid = native_error == nil
+		local valid = NativeRuntime.is_null(native, native_error)
 		local index = 0
-		while proxies[index] ~= nil do
+		while not NativeRuntime.is_null(native, proxies[index]) do
 			local value = ffi.string(proxies[index])
 			if #values >= 128 or #value > 65536 or value:find("[%z\r\n]") then
 				valid = false

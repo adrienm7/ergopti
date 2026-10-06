@@ -4728,6 +4728,27 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+Current Linux checkpoint (2026-10-06, working sources over eeb6fd58f):
+retained temporary namespace conflicts now carry an explicit, pre-destructive
+retry disposition. Only the same owner can retry after the independently
+identified foreign entry has gone; ambiguous close debt still refuses retry.
+Incomplete native path acquisition closes its exact acquired descriptors without
+claiming a completed namespace. Genuine Lua 5.4 CFFI admission exposed native
+NULL representation and unsigned-byte SHA-256 input differences; the native
+adapters now preserve their declared pointer types and exact input bytes.
+
+All 63 mandatory native controls pass with physical closure: four partial-path
+controls, five original namespace conflicts, three fixed SHA-256 vectors per
+ABI, and the original twelve ownership plus twelve allocation controls per ABI.
+No product check is skipped. The pinned CFFI provider independently reports
+22 vendor passes and one originally optional union-by-value skip. The normal
+Linux suite passes 10,140 tests in 496 modules; all 379 JavaScript controls pass.
+Original independent expectations remain unchanged. Local window-supervisor
+and Nix-store prerequisites refuse before qualification; their native acceptance
+is unexecuted. Hosted E2E, packaging, installation and final integrated-source
+qualification remain required. The twelve Windows continuation steps and
+transversal items16/38 remain open; item62 is partial.
+
 Validation curl now prepares a private Debian archive keyring from the exact
 signed-distribution package and checks its complete aggregate hash. The original
 full InRelease verifier, successful gpgv command and required signer are unchanged.

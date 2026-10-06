@@ -233,6 +233,7 @@ function M.native()
 		int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *data, size_t count);
 		int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
 	]])
+	local null_pointer = ffi.cast("void *", 0)
 	local crypto = ffi.load(soname)
 	local Clock, Deadline = require("infra.monotonic"), require("infra.managed_http_deadline")
 	return M.new({
@@ -247,7 +248,7 @@ function M.native()
 		end,
 		digest_create = function()
 			local context = crypto.EVP_MD_CTX_new()
-			if context == nil then return nil end
+			if context == nil or context == null_pointer then return nil end
 			if crypto.EVP_DigestInit_ex(context, crypto.EVP_sha256(), nil) ~= 1 then
 				crypto.EVP_MD_CTX_free(context)
 				return nil

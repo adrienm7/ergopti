@@ -19,6 +19,7 @@ return {
 	"tests.unit.ui.test_changelog_accepted_async",
 	"tests.unit.modules.updater.test_install_owned_pre_reader_refusal",
 	"tests.unit.infra.test_native_artifact_registry",
+	"tests.unit.infra.test_native_artifact_cleanup_retry",
 	"tests.unit.infra.test_native_install_admission",
 	"tests.unit.infra.test_fd_crypto_projection",
 	"tests.unit.infra.test_global_shortcuts_pair_scope",

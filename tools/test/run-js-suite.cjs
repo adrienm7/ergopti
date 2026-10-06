@@ -1177,6 +1177,18 @@ const CHECKS = [
 		repro: 'npm run test:linux-managed-http-ci-registration'
 	},
 	{
+		name: 'test:linux-updater-temp-receipt',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-temp-native.cjs'],
+		repro: 'npm run test:linux-updater-temp-receipt'
+	},
+	{
+		name: 'test:linux-updater-temp-registration',
+		cmd: 'node',
+		args: ['tools/test/test-linux-updater-temp-registration.cjs'],
+		repro: 'npm run test:linux-updater-temp-registration'
+	},
+	{
 		name: 'test:linux-updater-archive-receipt',
 		cmd: 'node',
 		args: ['tools/test/test-linux-updater-archive-receipt.cjs'],

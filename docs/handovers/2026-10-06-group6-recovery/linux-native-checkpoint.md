@@ -108,3 +108,39 @@ signatures and identical copied payload while byte equality is false;
 Brew independently reports an unavailable unconfined AppleEvent boundary
 with send status -600 and exit66. These failures are not native passes.
 The final integrated SHA still requires its own terminal qualification.
+
+## Native temporary lifetime checkpoint, 2026-10-06
+
+Working sources over `eeb6fd58f772be70968e6438e23fe990909c820a` pass all
+63 mandatory controls in the original bounded native owner: capture4,
+namespace5, SHA-2563 per ABI, ownership12 per ABI and allocation12 per ABI.
+Every phase exits zero with physical closure and zero product skips. The root
+result `ergopti-group6-command-5e04sH/RESULT.json` records no retained debt.
+The private `ergopti-updater-temp-native-7VN9EM/QUALIFICATION.json` has SHA-256
+`42f77d98a2b73ead9619d6994c493f2dcefeb9cfece9977167614cab453bd2e8`
+and source inventory
+`9a61d7d65477c2f1fc0ce292e9a184c1bbef7880dd0e9193cc476f04a36e5e57`.
+The genuinely compiled pinned CFFI provider passes22 vendor controls; its
+original optional union-by-value control skips77 and contributes no product
+acceptance credit. The native C library hash is
+`8bbf342bc647fbf91054f01d6712860e4008fa965e2d5f0d049eaddd3083c9a4`.
+
+The preceding complete selected replay passes379 JavaScript controls,
+Linux E2E and10,140 Linux unit tests in496 modules, actual X11 keymap53,
+HTTP streaming262/API authentication48, installed updater3 cases/15 checks,
+managed output18/public30, GIO runtime4 groups and retained FD digest12.
+Window supervision refuses before child/namespace acquisition; Nix refuses
+at the local-store checkpoint. The stale C5 source identity then refused before
+its assertions; the independently reviewed one-literal rebind preserves the
+complete original five-case oracle and the subsequent63-control replay passes.
+The complete replay's outer result `ergopti-group6-command-Kvu4aq/RESULT.json`
+records exit1 and no retained debt. It must not be called a full green gate.
+
+The native path failure reproduces against the original C helper with the same
+four-case harness. The corrected helper retires only its acquired descriptors;
+completed namespace conflicts still refuse destructive cleanup. The exact
+SHA-256 abc, embedded-NUL and empty-input vectors pass on both actual ABIs.
+The original Lua5.4 unsigned-byte call fails conversion before hashing; the
+correction copies precisely the original bytes into the declared native input.
+These controls do not qualify enterprise authentication, real installed GUI
+input, Windows or macOS. Final committed/integrated CI remains required.

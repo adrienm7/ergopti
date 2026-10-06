@@ -213,8 +213,22 @@ for (const subject of Object.keys(SUBJECTS))
 		)
 	);
 function mutate(needle, replacement) {
+	if (needle === 'export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"') {
+		const jobs = Pipeline.jobsOfText(workflow, '.github/workflows/ci-linux.yml').filter(
+			(job) => job.id === 'e2e-linux'
+		);
+		assert.equal(jobs.length, 1, 'The archive mutation needs its actual E2E job');
+		const archive = Pipeline.step(jobs[0].body, ARCHIVE);
+		assert.equal(archive.split(needle).length - 1, 1, 'The archive step needs one source HEAD');
+		const changedArchive = archive.replace(needle, replacement);
+		assert.notEqual(changedArchive, archive, 'The archive source HEAD must actually change');
+		needle = archive;
+		replacement = changedArchive;
+	}
 	assert.equal(workflow.split(needle).length - 1, 1, 'Independent mutation needs one target');
-	assert.throws(() => validateWorkflow(workflow.replace(needle, replacement)));
+	const mutated = workflow.replace(needle, () => replacement);
+	assert.notEqual(mutated, workflow, 'The workflow mutation must actually change source');
+	assert.throws(() => validateWorkflow(mutated));
 }
 for (const [needle, replacement] of [
 	['- name: ' + ARCHIVE, '- name: Removed archive'],
