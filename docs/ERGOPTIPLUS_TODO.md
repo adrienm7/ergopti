@@ -4963,6 +4963,16 @@ revalidation remains pending; these checks do not qualify physical input.
 
 Current Group 3 source checkpoint (item 93, 2026-10-06): [Group 3 current checkpoint](handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md). All 46 owned commits are integrated; sixth Linux-only qualification ended in failure at GTK case 0. This item remains partial. Remaining software/hosted qualification: Preserve ordered Linux pairs and historical fifth GTK 4/4; diagnose the current delayed-identity poll miss, then complete simultaneous chords, cross-device ownership, remaining native actions and physical-host/input/distribution acceptance. Separate device/evidence boundary: Genuine evdev/device/seat delivery and multi-keyboard acceptance.
 
+The existing GTK wrapper now retains its after-spawn timestamp and samples one
+additional timestamp after durable start-receipt publication. The terminal
+observation exposes only nonnegative signed-64-bit integer phase values or
+unknown, so hosted evidence can separate process creation, receipt publication
+and native wait. All 17 original diagnostic tests and their 71 assertions,
+native commands, ownership, polling and deadlines remain intact. Six new
+portable controls fail before the addition; the candidate passes all 23.
+This is diagnostic instrumentation, not a repair or native qualification; the
+observed hosted delay's cause and the original failed verdict remain unresolved.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option from the
       Layout menu. Selecting the Ergopti+ keylayout in the emulation picker must
       suffice. Verify that the layout supplies every intended change, retire
