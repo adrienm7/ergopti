@@ -67,5 +67,17 @@
 		}
 	],
 	"failures": [],
+	"keyboard_phase_witnesses": {
+		"accepted": 0,
+		"refused": 0,
+		"count_saturated": false,
+		"last": []
+	},
+	"logger_callback_receipts": {
+		"accepted": 0,
+		"refused": 0,
+		"count_saturated": false,
+		"last": []
+	},
 	"exit_status": 0
 }

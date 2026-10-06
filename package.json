@@ -129,6 +129,7 @@
 		"test:macos-launcher-universal": "node ./tools/test/test-macos-launcher-universal.cjs",
 		"test:macos-swift-launcher-ci": "node ./tools/test/test-macos-swift-launcher-ci.cjs",
 		"test:swift-xctest-evidence": "node ./tools/test/test-swift-xctest-evidence.cjs",
+		"test:owned-program-xctest-notice": "node ./tools/test/test-owned-program-xctest-notice.cjs",
 		"test:macos-swift-launcher": "node ./tools/test/run-macos-swift-launcher.cjs",
 		"test:macos-remap-launchagent": "node ./tools/test/test-macos-remap-launchagent.cjs",
 		"test:macos-sparkle-feed": "node ./tools/test/test-macos-sparkle-feed.cjs",

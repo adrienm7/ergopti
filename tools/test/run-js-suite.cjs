@@ -1009,6 +1009,12 @@ const CHECKS = [
 		repro: 'npm run test:swift-xctest-evidence'
 	},
 	{
+		name: 'owned program XCTest notices preserve independent transcript and receipt controls',
+		cmd: process.execPath,
+		args: ['tools/test/test-owned-program-xctest-notice.cjs'],
+		repro: 'node tools/test/test-owned-program-xctest-notice.cjs'
+	},
+	{
 		name: 'macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)',
 		cmd: 'node',
 		args: ['tools/test/run-macos-swift-launcher.cjs'],

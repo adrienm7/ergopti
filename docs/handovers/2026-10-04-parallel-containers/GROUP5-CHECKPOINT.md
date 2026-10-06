@@ -1235,3 +1235,13 @@ Swift bytes restore exactly after removing the three additions. The observer
 does not change the native verdict, retry a phase or authorize compilation.
 Actual Swift admission and the next macOS run remain required. The earlier
 83c63b1c5 failure phase/cause and full artifact remain unqualified.
+
+The Group5 composition with the independent Group3 program-notice corpus now
+retains two hand-authored empty supplementary keyboard/logger observations.
+Every prior golden field, native method identity and assertion is unchanged;
+the frozen transcript contains no such diagnostic markers. The same constructed
+control is registered in the ordinary JS gate. Its original full-object failure
+is reproduced locally and in manual37472772448 before Swift. This repair changes
+neither the owning XCTest verdict nor native budgets. That run supplies no fresh
+Swift, baseline, source-control or owned-four-target execution; the next exact
+macOS qualification remains required. TODO31 and WP4-WP10 stay incomplete.
