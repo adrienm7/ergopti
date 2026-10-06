@@ -2185,6 +2185,14 @@ end
 --- @param binding any Native binding id.
 --- @return boolean|nil fits
 function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
+		local catalogue
+		if rawequal(package.loaded["infra.script_chord_catalogue"], ChordCatalogue)
+			and type(ChordCatalogue.published_binding_catalogue) == "function" then
+			catalogue = ChordCatalogue.published_binding_catalogue()
+		end
+		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
+	end
 	local gestures = package.loaded["modules.gestures"]
 	if type(gestures) ~= "table" or type(gestures.gesture_slot_catalogue) ~= "function" then return nil end
 	return BindingIdentity.gesture_binding_fits(binding, gestures.gesture_slot_catalogue())

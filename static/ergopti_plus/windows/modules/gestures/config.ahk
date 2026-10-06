@@ -93,7 +93,7 @@ _GestureCloneActionParameters(Parameters) {
 
 GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn := 0) {
 		global GestureActionParameters, ConfigurationFile
-		if ConfigBindingIdentityGestureStatus(BindingId, TomlConfigGestureSlotCatalogue()) == "retired"
+		if TomlConfigParameterBindingStatus(BindingId) == "retired"
 				return false
 		Key := GestureActionParameterKey(BindingId, ActionName)
 		; TOML identities are case-exact. A preserved, unjudged prefix must never

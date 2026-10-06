@@ -239,9 +239,9 @@ local function action_parameter_fits(key, value)
 		or type(catalogue.validate_action_parameter) ~= "function" then return true end
 	local binding, action = catalogue.split_action_parameter_key(key)
 	if not action then return false, "no action parameter of this build has this name" end
-	if type(catalogue.action_parameter_binding_fits) == "function"
-		and catalogue.action_parameter_binding_fits(binding) == false then
-		return false, BindingIdentity.RETIRED_GESTURE
+	if type(catalogue.action_parameter_binding_fits) == "function" then
+		local fits, detail = catalogue.action_parameter_binding_fits(binding)
+		if fits == false then return false, detail or BindingIdentity.RETIRED_GESTURE end
 	end
 	local judged, valid = pcall(catalogue.validate_action_parameter, action, value)
 	if judged and not valid then return false, "the value no longer fits its action's parameter" end

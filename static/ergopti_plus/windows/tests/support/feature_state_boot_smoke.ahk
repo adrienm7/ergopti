@@ -68,6 +68,8 @@ try {
 			_FeatureStateSmokeNeutralFirstBoot()
 		case "script_none":
 			_FeatureStateSmokeScriptNone()
+		case "script_binding_publication":
+			_FeatureStateSmokeScriptBindingPublication()
 		case "manifest_defaults":
 			_FeatureStateSmokeManifestDefaults()
         case "malformed":
@@ -364,4 +366,21 @@ _FeatureStateSmokePersistedSemantic(Path) {
 	_FeatureStateSmokeAssert("retain", Names["future"], "durable foreign child")
 	if StrCompare(Before, FileRead(Path, "UTF-8"), true) != 0
 		throw Error("A bootstrap read changed the actual durable source")
+}
+
+
+; This receipt is produced by the actual compiled feature-state declaration.
+_FeatureStateSmokeScriptBindingPublication() {
+	global SCRIPT_SHORTCUT_SLOTS, _ScriptShortcutBindingPublication
+	if _ScriptShortcutBindingPublication.Source != SCRIPT_SHORTCUT_SLOTS
+		throw Error("The compiled script publication lost its source declaration identity")
+	Catalogue := _ScriptShortcutBindingPublication.Catalogue
+	if Catalogue["prefix"] !== "script__" || Catalogue["slots"].Count != 4 || Catalogue["slots"].CaseSense != "On"
+		throw Error("The compiled script publication is not a complete case-exact domain")
+	for Slot in ["script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"] {
+		if ConfigBindingIdentityScriptStatus("script__" . Slot, Catalogue) != "current"
+			throw Error("The compiled publication lost the actual native slot " . Slot)
+	}
+	if ConfigBindingIdentityScriptStatus("script__removed_script_slot", Catalogue) != "retired"
+		throw Error("The compiled publication did not judge an obsolete native script identity")
 }

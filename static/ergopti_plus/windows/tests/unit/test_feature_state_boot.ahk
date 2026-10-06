@@ -124,3 +124,10 @@ TestFeatureStateBootSemanticSources() {
 }
 Test("feature-state startup: semantic root and section sources reach actual readers (config-semantic-snapshot)",
 	TestFeatureStateBootSemanticSources)
+
+
+TestFeatureStateBootScriptBindingPublication() {
+	_FeatureStateBootRun("script_binding_publication")
+}
+Test("feature-state startup: actual compiled script declaration publishes a complete binding receipt (script-binding-identity)",
+	TestFeatureStateBootScriptBindingPublication)

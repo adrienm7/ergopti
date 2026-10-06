@@ -1318,9 +1318,25 @@ function M.get_picker_parameter_fields(items, binding)
 	}
 end
 
+--- Judges only already-published native parameter domains; no catalogue IO occurs here.
+--- @param binding any Native binding identity.
+--- @return boolean|nil fits
+--- @return string detail
+function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
+		local chords = package.loaded["modules.shortcuts.script_chords"]
+		local catalogue
+		if type(chords) == "table" and type(chords.published_binding_catalogue) == "function" then
+			catalogue = chords.published_binding_catalogue()
+		end
+		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
+	end
+	return BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue), BindingIdentity.RETIRED_GESTURE
+end
+
 function M.set_action_parameter(binding, action_name, value)
 	if not admit_mutation() then return false end
-	if BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue) == false then return false end
+	if M.action_parameter_binding_fits(binding) == false then return false end
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)
 	local staged = copy_state(_action_params)
@@ -1773,9 +1789,9 @@ local function walk_user_config(config, visit)
 		if type(section) ~= "table" or not visit.param then return end
 		for key, value in pairs(section) do
 			local binding, action = M.split_action_parameter_key(key)
-			if binding and action
-				and BindingIdentity.gesture_binding_fits(binding, parameter_binding_catalogue) == false then
-				ConfigOutdated.report(entry_path(section_name, key), BindingIdentity.RETIRED_GESTURE, Logger)
+			local fits, detail = M.action_parameter_binding_fits(binding)
+			if binding and action and fits == false then
+				ConfigOutdated.report(entry_path(section_name, key), detail, Logger)
 			elseif binding and action and M.validate_action_parameter(action, value) then
 				visit.param(section_name, key, value)
 			else

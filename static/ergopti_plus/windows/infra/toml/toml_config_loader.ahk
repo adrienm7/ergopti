@@ -172,6 +172,43 @@ TomlConfigGestureSlotCatalogue() {
  * @param {Map} Catalogue Optional already-published native gesture domain.
  * @returns {String} Shared current/retired/unjudged identity decision.
  */
+; Returns a detached publication only while its actual compiled declaration lives.
+; Missing or replaced owners cannot prove retirement; no lazy reads occur here.
+TomlConfigScriptSlotCatalogue() {
+	global _ScriptShortcutBindingPublication, SCRIPT_SHORTCUT_SLOTS
+	if !IsSet(_ScriptShortcutBindingPublication) || !IsSet(SCRIPT_SHORTCUT_SLOTS)
+		return false
+	Publication := _ScriptShortcutBindingPublication
+	if !(Publication is Object) || !HasProp(Publication, "Source") || !HasProp(Publication, "Catalogue")
+		throw ValueError("script chords: invalid publication receipt")
+	if Publication.Source != SCRIPT_SHORTCUT_SLOTS
+		return false
+	Current := ConfigBindingIdentityScriptPublication(SCRIPT_SHORTCUT_SLOTS).Catalogue
+	Captured := Publication.Catalogue
+	if !(Captured is Map) || !Captured.Has("prefix") || Captured["prefix"] !== "script__"
+		|| !Captured.Has("slots") || !(Captured["slots"] is Map) || Captured["slots"].CaseSense != "On"
+		throw ValueError("script chords: invalid publication receipt")
+	ConfigBindingIdentityScriptStatus("script__", Captured)
+	if Captured["slots"].Count != Current["slots"].Count
+		return false
+	for Slot in Current["slots"] {
+		if !Captured["slots"].Has(Slot)
+			return false
+	}
+	return Map("prefix", "script__", "slots", Captured["slots"].Clone())
+}
+
+; Judges one native binding with the unchanged gesture owner and script publication.
+TomlConfigParameterBindingStatus(BindingId, Catalogue?) {
+	if Type(BindingId) == "String" && SubStr(BindingId, 1, 8) == "script__" {
+		ScriptCatalogue := TomlConfigScriptSlotCatalogue()
+		return ScriptCatalogue is Map ? ConfigBindingIdentityScriptStatus(BindingId, ScriptCatalogue) : "unjudged"
+	}
+	if !IsSet(Catalogue)
+		Catalogue := TomlConfigGestureSlotCatalogue()
+	return ConfigBindingIdentityGestureStatus(BindingId, Catalogue)
+}
+
 TomlConfigActionParameterBindingStatus(Key, Catalogue?) {
 	if Type(Key) != "String"
 		return "unjudged"
@@ -182,7 +219,7 @@ TomlConfigActionParameterBindingStatus(Key, Catalogue?) {
 			continue
 		Suffix := "__" . Action
 		if StrLen(Key) >= StrLen(Suffix) && SubStr(Key, -StrLen(Suffix)) == Suffix
-			return ConfigBindingIdentityGestureStatus(SubStr(Key, 1, StrLen(Key) - StrLen(Suffix)), Catalogue)
+			return TomlConfigParameterBindingStatus(SubStr(Key, 1, StrLen(Key) - StrLen(Suffix)), Catalogue)
 	}
 	return "unjudged"
 }
@@ -210,8 +247,10 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 			return false
 		Reported[FilePath][Key] := true
 	} finally Critical(PreviousCritical)
+	Reason := SubStr(Key, 1, 8) == "script__" ? ConfigBindingIdentityScriptRetiredReason()
+		: "no gesture slot of this build has this name"
 	try LoggerWarn("TomlConfigLoader", "Outdated configuration entry '[action_parameters].{1}' in '{2}' ignored "
-		. "(no gesture slot of this build has this name); it is offered for explicit cleanup.", TOML_RenderKey(Key), FilePath)
+		. "({3}); it is offered for explicit cleanup.", TOML_RenderKey(Key), FilePath, Reason)
 	return true
 }
 

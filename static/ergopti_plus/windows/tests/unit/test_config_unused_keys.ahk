@@ -1412,3 +1412,131 @@ _CUK_CanonicalIdentityControls() {
 }
 Test("config cleanup fixture: canonical identities keep case twins and reject missing or duplicate rows "
 	. "(config-unused-keys-identity-controls)", _CUK_CanonicalIdentityControls)
+
+
+_CUK_RetiredScriptBindingsPreserveWholeSource() {
+	_GSBP_WithPublication(_CUK_RetiredScriptBindingsPreserveWholeSourceBody)
+}
+_CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
+	global ConfigurationFile, GestureActionParameters, GestureAssignments, _IniCache, _ConfigBootRejectedOverrides
+	Runtime := _CFGFS_CaptureRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	PreviousParameters := GestureActionParameters
+	PreviousAssignments := GestureAssignments.Clone()
+	PreviousCache := _IniCache
+	PreviousRejected := _ConfigBootRejectedOverrides
+	Dir := _CUK_NewDir()
+	Known := "script__script_altgr_enter__open_url"
+	Twin := "Script__script_altgr_enter__open_url"
+	Retired := "script__removed_script_slot__open_url"
+	ParameterSource := "[action_parameters]`n"
+		. Retired . ' = "https://obsolete.example" # explicit cleanup owns this row' . "`n"
+		. Known . ' = "https://known.example"' . "`n"
+		. Twin . ' = "https://unjudged.example"' . "`n"
+		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
+	Source := "# independent user comment`n" . ParameterSource
+		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
+		. "`n[layout]`nergopti_base = true`n"
+	try {
+		Path := Dir . "\config.toml"
+		_CFGFS_Prepare(Path)
+		_ConfigBootRejectedOverrides := 0
+		AssertTrue(FSWriteDurable(Path, Source))
+		Target := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Target, Path, &Rejected)
+		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertFalse(GestureActionParameters.Has(Retired))
+		AssertEqual("https://known.example", GestureGetActionParameter("script__script_altgr_enter", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual(3, GestureActionParameters.Count, "both case twins and the other owner remain independent")
+		AssertFalse(TomlConfigReportRetiredGestureParameter(Path, Retired), "actual boot and direct reload share one report identity")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "admission does not rewrite the source")
+		AssertTrue(TomlConfigReportRetiredGestureParameter(Path, "script__another_retired_slot__open_url"), "each retired script key has a separate warning identity")
+		Scan := ConfigUnusedKeysFind(Path)
+		RetiredRows := []
+		for Entry in Scan["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				RetiredRows.Push(Entry)
+		}
+		AssertEqual(1, RetiredRows.Length, "the ignored known-retired row is offered exactly once")
+
+		; The preserved unjudged prefix cannot activate a canonical gesture.
+		OtherPath := Dir . "\unjudged-only.toml"
+		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
+		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		ConfigurationFile := OtherPath
+		_IniCache := ParseConfigTomlFile(OtherPath)
+		GesturesReadConfig()
+		AssertEqual("", GestureGetActionParameter("script__script_altgr_enter", "open_url"))
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		AssertEqual("On", GestureActionParameters.Clone().CaseSense)
+		AssertEqual(UpperOnlySource, FSReadUtf8Exact(OtherPath))
+		ConfigurationFile := Path
+		_IniCache := ParseConfigTomlFile(Path)
+		GesturesReadConfig()
+		AssertTrue(GestureSetActionParameter("script__script_altgr_enter", "open_url", "https://changed.example"))
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		AssertEqual("https://changed.example", GestureActionParameters[Known])
+		AssertEqual("https://unjudged.example", GestureActionParameters[Twin])
+		BeforeRefusal := FSReadUtf8Exact(Path)
+		AssertFalse(GestureSetActionParameter("script__removed_script_slot", "open_url", "https://must-not-publish.example"))
+		AssertEqual(BeforeRefusal, FSReadUtf8Exact(Path), "ordinary refusal preserves exact persisted bytes")
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0,
+			() => [{ Section: "layout", Key: "ergopti_base", Value: false }]))
+		Saved := FSReadUtf8Exact(Path)
+		AssertContains(Saved, Retired . ' = "https://obsolete.example" # explicit cleanup owns this row')
+		AssertContains(Saved, "# independent user comment")
+		Parsed := ConfigTomlDecodeSnapshot(Saved).Document
+		AssertEqual(4, Parsed["action_parameters"].Count, "complete handwritten preserved parameter model")
+		AssertEqual("https://obsolete.example", Parsed["action_parameters"][Retired])
+		AssertEqual("https://changed.example", Parsed["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", Parsed["action_parameters"][Twin])
+		AssertEqual("https://keyboard.example", Parsed["action_parameters"]["keyboard__ctrl_k__open_url"])
+		AssertEqual("independent", Parsed["future"]["keep"])
+
+		FreshRows := []
+		for Entry in ConfigUnusedKeysFind(Path)["keys"] {
+			if Entry["section"] == "action_parameters" && Entry["key"] == Retired
+				FreshRows.Push(Entry)
+		}
+		AssertEqual("removed", ConfigUnusedKeysRemove(Path, FreshRows, "20990101-000276")["status"])
+		AfterCleanup := ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Path)).Document
+		AssertFalse(AfterCleanup["action_parameters"].Has(Retired), "only explicit cleanup removes retirement")
+		AssertEqual("https://changed.example", AfterCleanup["action_parameters"][Known])
+		AssertEqual("https://unjudged.example", AfterCleanup["action_parameters"][Twin])
+	} finally {
+		_ConfigBootRejectedOverrides := PreviousRejected
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		GestureActionParameters := PreviousParameters
+		GestureAssignments := PreviousAssignments
+		_IniCache := PreviousCache
+		DirDelete(Dir, true)
+	}
+}
+Test("config: retired script parameters survive actual reload, edit and full save until cleanup (script-binding-identity)",
+	_CUK_RetiredScriptBindingsPreserveWholeSource)
+
+_CUK_RetiredScriptBindingOwnership() {
+	_GSBP_WithPublication(_CUK_RetiredScriptBindingOwnershipBody)
+}
+_CUK_RetiredScriptBindingOwnershipBody() {
+	Target := ManifestBuildFeaturesMap()
+	Owner := ""
+	AssertEqual("section", TomlConfigUnknownKind(Target, "action_parameters", "script__removed_script_slot__open_url", &Owner))
+	AssertEqual("", Owner, "obsolete script parameters stay unread")
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("script__removed_script_slot__open_url"))
+	for Slot in ["script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"] {
+		Key := GestureBindingId("script", Slot) . "__open_url"
+		AssertEqual("current", TomlConfigActionParameterBindingStatus(Key), Slot)
+		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Key, &Owner), Slot)
+		AssertEqual("Gestures", Owner, Slot)
+	}
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Script__script_altgr_enter__open_url"))
+	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("keyboard__removed_slot__open_url"))
+}
+Test("config: script boot and cleanup consume the same complete published domain (script-binding-identity)",
+	_CUK_RetiredScriptBindingOwnership)

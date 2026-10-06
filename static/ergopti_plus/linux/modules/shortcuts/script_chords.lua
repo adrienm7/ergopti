@@ -55,6 +55,7 @@ local BLOCKING_MODIFIERS = { "ctrl", "alt", "meta" }
 
 -- The validated catalogue; nil until read.
 local _catalogue = nil
+local _binding_catalogue = nil
 
 -- Slot id -> action id and the switch, read once from config.toml over the
 -- manifest defaults; nil until then.
@@ -106,8 +107,11 @@ function M.catalogue()
 	local path = Paths.shared(CATALOGUE_REL_PATH)
 	local handle = path and io.open(path, "r")
 	if not handle then error("script_chords: cannot read " .. tostring(path)) end
-	local body = handle:read("*a")
-	handle:close()
+	local read_ok, body = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+		error("script_chords: cannot complete read of " .. tostring(path))
+	end
 	local ok, parsed = pcall(require("json").decode, body)
 	if not ok or type(parsed) ~= "table" then
 		error("script_chords: " .. tostring(path) .. " is malformed")
@@ -117,8 +121,21 @@ function M.catalogue()
 			error("script_chords: a slot of " .. tostring(path) .. " lacks its evdev code")
 		end
 	end
-	_catalogue = ScriptChords.catalogue(parsed)
+	local catalogue = ScriptChords.catalogue(parsed)
+	local binding = { prefix = "script__", slots = {} }
+	for _, slot in ipairs(catalogue.slots) do binding.slots[slot.id] = true end
+	require("config_binding_identity").script_binding_fits("script__", binding)
+	_catalogue, _binding_catalogue = catalogue, binding
 	return _catalogue
+end
+
+--- Returns a detached complete publication without reading or initializing an owner.
+--- @return table|nil catalogue
+function M.published_binding_catalogue()
+	if _binding_catalogue == nil then return nil end
+	local publication = { prefix = _binding_catalogue.prefix, slots = {} }
+	for id in pairs(_binding_catalogue.slots) do publication.slots[id] = true end
+	return publication
 end
 
 --- The chord slots in menu order, as catalogue rows (id, linux...).
@@ -398,6 +415,7 @@ function M._reset()
 	_configuration_owner = nil
 	_dispatch_generation = _dispatch_generation + 1
 	_catalogue = nil
+	_binding_catalogue = nil
 	_assignments = nil
 	_chords_on = nil
 	_is_paused = NEVER_PAUSED

@@ -557,7 +557,7 @@ keyboard__cmd_k__open_url = "https://keyboard.example"
 removed_gesture_slot__open_url = "https://retired-canonical.example"
 tap_3__open_url = "https://canonical.example"
 swipe_3_horiz__open_url = "https://axis.example"
-script__reload__open_url = "https://script.example"
+script__script_altgr_enter__open_url = "https://script.example"
 ]]
 	helpers.it("binding-identity: real source ignores both retired leaves and preserves full source bytes", function()
 		binding_source_fixture(source, function(manager, path, read)
@@ -567,7 +567,7 @@ script__reload__open_url = "https://script.example"
 			helpers.assert_eq(manager.get_action_parameter("tap_3", "open_url"), "https://canonical.example")
 			helpers.assert_eq(manager.get_action_parameter("swipe_3_horiz", "open_url"), "https://axis.example")
 			helpers.assert_eq(manager.get_action_parameter("keyboard__cmd_k", "open_url"), "https://keyboard.example")
-			helpers.assert_eq(manager.get_action_parameter("script__reload", "open_url"), "https://script.example")
+			helpers.assert_eq(manager.get_action_parameter("script__script_altgr_enter", "open_url"), "https://script.example")
 			helpers.assert_eq(read(), source)
 		end)
 	end)
@@ -596,7 +596,7 @@ script__reload__open_url = "https://script.example"
 			["linux.action_parameters.keyboard__cmd_k__open_url"] = true,
 			["gesture_parameters.tap_3__open_url"] = true,
 			["gesture_parameters.swipe_3_horiz__open_url"] = true,
-			["gesture_parameters.script__reload__open_url"] = true,
+			["gesture_parameters.script__script_altgr_enter__open_url"] = true,
 		})
 		helpers.assert_eq(#messages, 2)
 		for _, message in ipairs(messages) do
@@ -634,7 +634,7 @@ script__reload__open_url = "https://script.example"
 	helpers.it("binding-identity: current and qualified domains retain ordinary setters and exact compensation", function()
 		local manager = helpers.load_module("modules.gestures.manager")
 		manager.init({ persist = false, enabled = false })
-		for _, binding in ipairs({ "tap_3", "swipe_3_horiz", "keyboard__cmd_k", "tap_hold__caps_lock", "script__reload" }) do
+		for _, binding in ipairs({ "tap_3", "swipe_3_horiz", "keyboard__cmd_k", "tap_hold__caps_lock", "script__script_altgr_enter" }) do
 			helpers.assert_true(manager.set_action_parameter(binding, "open_url", "https://valid.example"))
 		end
 		local owner = {}; helpers.assert_true(manager.acquire_parameter_configuration(owner))
@@ -716,3 +716,26 @@ do
 	local source = assert(handle:read("*a")); assert(handle:close())
 	require("test.config_binding_identity_contract").register(helpers, require("json").decode(source))
 end
+
+
+require("test.script_binding_publication_contract").register(require("tests.helpers"), "linux")
+
+helpers.describe("gesture parameter binding publication with the real script owner", function()
+	helpers.it("binding-identity: actual script publication distinguishes current and retired qualified domains", function()
+		local owner = require("modules.shortcuts.script_chords")
+		owner.catalogue()
+		local publication = owner.published_binding_catalogue()
+		helpers.assert_true(type(publication) == "table")
+		helpers.assert_eq(publication.slots.script_altgr_enter, true)
+		helpers.assert_nil(publication.slots.reload)
+		local manager = helpers.load_module("modules.gestures.manager")
+		helpers.assert_eq(manager.action_parameter_binding_fits("script__script_altgr_enter"), true)
+		helpers.assert_eq(manager.action_parameter_binding_fits("script__reload"), false)
+		helpers.assert_nil(manager.action_parameter_binding_fits("keyboard__future_unjudged"))
+		manager.init({ persist = false, enabled = false })
+		helpers.assert_true(manager.set_action_parameter("script__script_altgr_enter", "open_url", "https://current.example"))
+		helpers.assert_eq(manager.set_action_parameter("script__reload", "open_url", "https://must-not-activate.example"), false)
+		helpers.assert_eq(manager.get_action_parameter("script__script_altgr_enter", "open_url"), "https://current.example")
+		helpers.assert_eq(manager.get_action_parameter("script__reload", "open_url"), "")
+	end)
+end)
