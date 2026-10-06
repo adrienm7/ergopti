@@ -5780,6 +5780,29 @@ passes with them. Both callers retain the formatted inventory source pin.
 Fresh native macOS qualification is pending; the prior HTTPError stage/status
 remains unknown. This is diagnostic evidence, not provider invocation.
 
+The owned GTK fixture now requires a real X11 protocol handshake before its
+original four application trials. A live process and published display number
+alone are insufficient: a genuine owned SIGSTOP trial passes that old predicate
+but refuses the five-second xdpyinfo handshake, retires its exact client and
+passes after the same server resumes. Seventeen diagnostic controls, four
+proof-cleanup controls and eight actual X11 observations pass with exact child
+reaping. Original workers, identities, receipt polling and observer deadlines
+remain unchanged. This strengthens setup admission; it does not establish the
+cause of the prior late GTK receipts or qualify physical application delivery.
+Final composed and hosted qualification remains required; item 106 stays partial.
+
+The three native Hammerspoon probes now consume the existing ephemeral CI
+metadata token before any Git or native child allocation. Only the fixed
+official release-metadata request receives Authorization; authenticated
+redirects and supplied-credential refusals fail closed without anonymous
+fallback. Archive requests, native child environments and closed diagnostics
+remain credential-free. CI portable controls, Brew and the log receiver exclude
+the dedicated key. Independent controls pass40/0,19/0,33/0 with every old
+assertion retained and the strict parser census updated only additively.
+The controlled old403/new authenticated asset result proves the request
+boundary, not the cause of the earlier hosted403. Actual hosted acquisition
+and native qualification remain pending; item106 stays partial.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice
@@ -6224,6 +6247,12 @@ signature admission, nine-case contract, cleanup or failure status. Portable
 pending; first-checkpoint constructor successes do not replace the second
 checkpoint refusal, and no notification delivery/callback is claimed.
 
+The notification constructor probe shares the API-only metadata credential
+owner and removes the dedicated key before native allocation. All19 portable
+controls pass, including the15 prior controls; archive verification, the nine
+native constructor cases, cancellation and physical retirement are unchanged.
+Fresh hosted qualification and delivery/clicks remain separate; item109 is partial.
+
 - [~] **111.** Provide two distinct, explicitly labelled shared window-switching
   actions on Windows, macOS and Linux: the operating system's normal Alt+Tab switcher
   (the native equivalent on macOS), and switching only among windows on the display
@@ -6376,6 +6405,37 @@ specific cold-service cause or production regression is established. Package
 and all distribution lanes are skipped; the new native distro bootstrap has
 not executed on hosted distributions. Release is skipped. Preserve this failure
 and the earlier4/4 success separately; no assertion or deadline is weakened.
+
+The global-switcher probe consumes the metadata key at its actual same-process
+entry, before Git or native allocation. Its portable suite passes33/0 and retains
+all29 prior controls. Brew, independent owner controls and the log receiver
+exclude the key; archive/native ownership and refusal contracts remain intact.
+Fresh native acquisition, broker integration and actual switcher consumption
+remain unqualified. Linux window assertions and deadlines are unchanged.
+Item111 and cross-cutting requirements16/38 remain open.
+
+- [ ] **112.** Accept an AI prediction immediately with its configured
+      modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
+
+  Maintainer report on Windows AHK (2026-10-06): the shortcut currently only
+  highlights the corresponding prediction. Pressing the configured shortcut
+  must immediately insert that prediction through the normal acceptance owner,
+  including any correction of previously typed text.
+
+  Each prediction tooltip row must show its effective shortcut in a separate
+  right-aligned, muted gray column. Derive the displayed modifiers and digit
+  from the same current menu configuration that owns the binding. Use one
+  shared visual design on Windows, macOS and Linux, with the existing native
+  modifier labels, and refresh both bindings and hints after configuration
+  changes.
+
+  Regression coverage must distinguish insertion from highlighting, verify
+  every supported prediction index and modifier choice, preserve the existing
+  behavior when no prediction is mapped, and check hint/binding agreement.
+  Native acceptance must cover replacement/correction in Windows Notepad and
+  the supported macOS/Linux editors, plus tooltip alignment and appearance on
+  all three OSes. This is an unimplemented follow-up; it does not complete the
+  existing prediction-input or tooltip validation items.
 
 ## Time estimate
 
