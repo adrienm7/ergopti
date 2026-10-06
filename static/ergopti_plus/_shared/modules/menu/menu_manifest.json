@@ -2753,6 +2753,47 @@
 			]
 		}
 	],
+	"llm_backend_choice_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_api_add_command": [
+		{
+			"type": "command",
+			"id": "api_add_entry",
+			"i18n": "menu.llm.api_add_entry",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_api_add_provider_group": [
+		{
+			"type": "group",
+			"id": "api_add_entry",
+			"i18n": "menu.llm.api_add_entry",
+			"disabled_when": [
+				"llm_api_add_group_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_api_add_separator": [
+		{
+			"type": "---"
+		}
+	],
 	"llm_api_active_commands": [
 		{
 			"type": "command",

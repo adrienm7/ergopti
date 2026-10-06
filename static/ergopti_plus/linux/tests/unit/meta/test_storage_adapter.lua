@@ -2102,3 +2102,58 @@ helpers.describe("storage released regular-file link admission", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("script storage retired journal roots", function()
+	helpers.it("script-storage-cohort successful forget releases a retained authentic journal owner", function()
+		storage_cohort_fixture('{"a":1,"future":0.1}', function(storage, files, path, backup, _, read)
+			local owner = { pending = function() return false end }
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			local receipt = assert(storage.capture_owned(owner))
+			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = 2 } }, backup, files))
+			-- Retain the exact private journal that the native publication closure
+			-- keeps as a JIT constant; no synthetic journal is substituted.
+			local records, slot = nil, 1
+			while true do
+				local name, value = debug.getupvalue(storage.forget_owned, slot)
+				if name == nil then break end
+				if name == "_owned_receipts" then records = value; break end
+				slot = slot + 1
+			end
+			helpers.assert_type(records, "table", "the real native receipt map must be reachable")
+			local retained_journal = records[receipt]
+			helpers.assert_true(rawequal(retained_journal.owner, owner))
+			local source, snapshot = read(path), read(backup)
+			helpers.assert_eq(storage.forget_owned(owner, receipt), false)
+			helpers.assert_true(rawequal(retained_journal.owner, owner), "held refusal preserves inverse ownership")
+			helpers.assert_true(storage.release_owned(owner))
+			for _, pending in ipairs({ function() return true end, function() error("native pending refusal") end }) do
+				owner.pending = pending
+				helpers.assert_eq(storage.forget_owned(owner, receipt), false)
+				helpers.assert_true(rawequal(records[receipt], retained_journal))
+				helpers.assert_true(rawequal(retained_journal.owner, owner), "refused finalization must not detach the owner")
+			end
+			owner.pending = function() return false end
+			local native_setmetatable = setmetatable
+			setmetatable = function() error("native tombstone allocation refused") end
+			local completed = pcall(storage.forget_owned, owner, receipt)
+			setmetatable = native_setmetatable
+			helpers.assert_eq(completed, false, "tombstone construction must finish before retiring inverse ownership")
+			helpers.assert_true(rawequal(records[receipt], retained_journal))
+			helpers.assert_true(rawequal(retained_journal.owner, owner))
+			helpers.assert_eq(storage.forget_owned({}, receipt), false)
+			helpers.assert_true(rawequal(retained_journal.owner, owner))
+			helpers.assert_true(storage.forget_owned(owner, receipt))
+			helpers.assert_nil(retained_journal.owner, "successful finalization detaches even a rooted retired journal")
+			helpers.assert_true(storage.forget_owned(owner, receipt), "the weak tombstone keeps exact idempotence")
+			helpers.assert_eq(storage.forget_owned({}, receipt), false)
+			helpers.assert_eq(read(path), source); helpers.assert_eq(read(backup), snapshot)
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.restore_owned(owner, receipt), false, "a retained old closure cannot revive its forgotten receipt")
+			local fresh = assert(storage.capture_owned(owner))
+			helpers.assert_true(fresh ~= receipt)
+			helpers.assert_true(storage.release_owned(owner)); helpers.assert_true(storage.forget_owned(owner, fresh))
+			helpers.assert_eq(read(path), source); helpers.assert_eq(read(backup), snapshot)
+		end)
+	end)
+end)

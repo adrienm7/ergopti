@@ -214,8 +214,10 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 			checked = backend == "api",
 			action = function() llm.set_backend("api"); changed() end,
 		},
-		{ separator = true },
 	}
+	local boundary = ManifestMenu.template_rows("llm_backend_choice_boundary", {}, {}, {})
+	if not boundary then return {} end
+	for _, row in ipairs(boundary) do rows[#rows + 1] = row end
 	if type(context) == "table" and type(context.is_paused) == "function"
 		and type(llm.can_configure_local_servers) == "function" then
 		for _, row in ipairs(require("ui.menu.local_server_rows").rows(llm, dialogs, changed, context)) do
@@ -257,7 +259,9 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 			} }
 		end
 	end
-	rows[#rows + 1] = { separator = true }
+	local separators = ManifestMenu.template_rows("llm_api_add_separator", {}, {}, {})
+	if not separators then return {} end
+	for _, row in ipairs(separators) do rows[#rows + 1] = row end
 
 	local add_items = {}
 	for _, provider in ipairs(remote.providers()) do
@@ -269,7 +273,11 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 	if #add_items == 0 then
 		add_items[1] = { label = tr("menu.llm.api_providers_unavailable"), disabled = true }
 	end
-	rows[#rows + 1] = { label = tr("menu.llm.api_add_entry"), items = add_items }
+	local add_controls = ManifestMenu.template_rows("llm_api_add_provider_group", {}, {
+		llm_api_add_group_ready = function() return true end,
+	}, { api_add_entry = add_items })
+	if not add_controls then return {} end
+	for _, row in ipairs(add_controls) do rows[#rows + 1] = row end
 	local active_name = active and names[active.id] or nil
 	local function active_commands_ready()
 		local current = entries.active()

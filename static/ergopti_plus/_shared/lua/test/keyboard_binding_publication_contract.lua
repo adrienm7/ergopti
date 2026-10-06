@@ -101,7 +101,26 @@ function M.register(helpers, driver)
 		if driver == "macos" then return f.state.gesture_action_parameters end
 		return f.parameters.get_all_action_parameters()
 	end
+	local function shared_file(relative)
+		if driver == "macos" then return helpers.shared(relative) end
+		return require("infra.paths").shared(relative)
+	end
+	local vectors = assert(require("json").decode(bytes(shared_file("tests/corpus/config_binding_identity/keyboard_vectors.json"))))
 	helpers.describe("keyboard-binding: shared complete identity contract", function()
+		helpers.it("replays the independent handwritten keyboard identity vectors", function()
+			helpers.assert_eq(#vectors.vectors, 17)
+			local catalogue = policy.keyboard_binding_catalogue(vectors.ids)
+			vectors.ids[1] = "changed_after_capture"
+			helpers.assert_eq(catalogue.slots.ctrl_k, true)
+			helpers.assert_nil(catalogue.slots.changed_after_capture)
+			for _, vector in ipairs(vectors.vectors) do
+				local fits = policy.keyboard_binding_fits(vector.binding, catalogue)
+				local status = fits == nil and "unjudged" or (fits and "current" or "retired")
+				helpers.assert_eq(status, vector.expected, vector.name)
+				helpers.assert_nil(policy.keyboard_binding_fits(vector.binding), vector.name .. ": unavailable authority")
+			end
+			helpers.assert_eq(policy.RETIRED_KEYBOARD, "no keyboard shortcut slot of this build has this name")
+		end)
 		helpers.it("uses complete published exact identities and keeps other domains unjudged", function()
 			local ids = { "ctrl_k", "super_shift_k", "alt_shift_k", "future_literal" }
 			local catalogue = policy.keyboard_binding_catalogue(ids)

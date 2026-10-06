@@ -376,11 +376,63 @@ const OPENS_SUBMENU = {
 	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
 	word_expander_entries: 'word_expander_custom_menu',
 	// The model provider publishes its fixed browser command on every driver.
-	llm_models: 'llm_model_commands',
+	llm_models: [
+		'llm_model_commands',
+		{
+			menu: 'llm_api_add_provider_group',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
+			menu: 'llm_api_add_separator',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
+			menu: 'llm_backend_choice_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		}
+	],
 	// The backend/model providers render the active API-entry command head.
-	llm_backend: 'llm_api_active_commands',
+	llm_backend: [
+		'llm_api_active_commands',
+		{
+			menu: 'llm_api_add_provider_group',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+		},
+		{
+			menu: 'llm_api_add_separator',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+		},
+		{
+			menu: 'llm_backend_choice_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
+		}
+	],
 	llm_model: [
 		'llm_api_active_commands',
+		{
+			menu: 'llm_api_add_command',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+		},
+		{
+			menu: 'llm_api_add_separator',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_api_entries.ahk' }
+		},
 		{
 			menu: 'llm_user_model_controls',
 			platforms: ['hs'],
