@@ -1713,5 +1713,164 @@ class SenderOwnedMarkerSnapshotControls(unittest.TestCase):
             probe.run_appleevent_sender(owner, ["owned-sender"], "deny-removal-positive")
 
 
+class FailedSenderReceiverObservationControls(unittest.TestCase):
+    """Semantic one-observation controls; these do not qualify Darwin AppleEvents."""
+
+    def world(self):
+        receiver = Mock(pid=73136, returncode=None)
+        group = Mock(process=receiver, reaped=False, reservation_lost=False)
+        group.observe_exit.return_value = None
+        owner = SimpleNamespace(groups={receiver: group}, active=[receiver], debt=[])
+        return owner, receiver, group
+
+    def invoke(self, owner, receiver, group, control="unconfined-positive"):
+        return probe.run_appleevent_sender_observed(
+            owner, ["owned-sender"], control, receiver=receiver, group=group, confined=True
+        )
+
+    def test_success_returns_original_receipt_without_observation_or_optional_output(self):
+        owner, receiver, group = self.world()
+        result = subprocess.CompletedProcess([], 0, "native_appleevent_status=0\n", "")
+        with patch.object(probe, "run_appleevent_sender", return_value=result) as sender:
+            with patch("builtins.print") as output:
+                self.assertIs(self.invoke(owner, receiver, group), result)
+        sender.assert_called_once_with(
+            owner, ["owned-sender"], "unconfined-positive", confined=True
+        )
+        group.observe_exit.assert_not_called()
+        output.assert_not_called()
+
+    def test_failed_send_observes_target_once_and_preserves_identical_primary_and_owner(self):
+        for control in ("unconfined-positive", "deny-removal-positive", "full-policy-denial"):
+            with self.subTest(control=control):
+                owner, receiver, group = self.world()
+                primary = probe.AdmissionError("independent original sender refusal")
+                with patch.object(probe, "run_appleevent_sender", side_effect=primary):
+                    with patch("builtins.print") as output:
+                        with self.assertRaises(probe.AdmissionError) as raised:
+                            self.invoke(owner, receiver, group, control)
+                self.assertIs(raised.exception, primary)
+                group.observe_exit.assert_called_once_with()
+                expected = {"schema": 1, "control": control, "state": "no-terminal-observation"}
+                self.assertEqual(
+                    output.call_args.args[0],
+                    "Owned AppleEvent receiver after failed sender: "
+                    + json.dumps(expected, sort_keys=True),
+                )
+                self.assertEqual(owner.active, [receiver])
+                self.assertEqual(owner.debt, [])
+                self.assertFalse(group.reaped)
+                receiver.poll.assert_not_called()
+                receiver.wait.assert_not_called()
+                group.settle.assert_not_called()
+
+    def test_terminal_projection_reuses_same_single_observation_and_keeps_native_status(self):
+        with patch.multiple(probe.os, CLD_EXITED=1, CLD_KILLED=2, CLD_DUMPED=3, create=True):
+            for code, status in ((1, 68), (2, 15), (3, 6)):
+                with self.subTest(code=code):
+                    owner, receiver, group = self.world()
+                    observation = SimpleNamespace(si_pid=73136, si_code=code, si_status=status)
+                    group.observe_exit.return_value = observation
+                    primary = probe.AdmissionError("independent sender refused")
+                    with patch.object(probe, "run_appleevent_sender", side_effect=primary):
+                        with patch.object(
+                            probe,
+                            "_appleevent_capture",
+                            return_value=(b"", b"Owned AppleEvent receipt failed: -600\n"),
+                        ):
+                            with patch.object(
+                                probe,
+                                "_appleevent_terminal_packet",
+                                wraps=probe._appleevent_terminal_packet,
+                            ) as project:
+                                with patch("builtins.print") as output:
+                                    with self.assertRaises(probe.AdmissionError) as raised:
+                                        self.invoke(owner, receiver, group)
+                    self.assertIs(raised.exception, primary)
+                    group.observe_exit.assert_called_once_with()
+                    project.assert_called_once_with(owner, receiver, group, observation)
+                    expected = {
+                        "schema": 1,
+                        "control": "unconfined-positive",
+                        "state": "terminal",
+                        "si_code": code,
+                        "si_status": status,
+                        "stderr_phase": "receipt",
+                        "stderr_osstatus": -600,
+                    }
+                    self.assertEqual(
+                        output.call_args.args[0],
+                        "Owned AppleEvent receiver after failed sender: "
+                        + json.dumps(expected, sort_keys=True),
+                    )
+                    self.assertFalse(group.reaped)
+                    receiver.wait.assert_not_called()
+                    receiver.poll.assert_not_called()
+                    group.settle.assert_not_called()
+
+    def test_native_observation_refusal_preserves_reservation_loss_debt_and_primary(self):
+        for interrupted in (False, True):
+            with self.subTest(interrupted=interrupted):
+                owner, receiver, group = self.world()
+                primary = probe.AdmissionError("sender original")
+                debt = {"kind": "process-group", "pid": 73136}
+
+                def refused_observation():
+                    owner.debt.append(debt)
+                    group.reservation_lost = not interrupted
+                    if interrupted:
+                        raise probe.OwnedProcessInterrupted("private observation cancelled")
+                    raise RuntimeError("private capture/path must never export")
+
+                group.observe_exit.side_effect = refused_observation
+                with patch.object(probe, "run_appleevent_sender", side_effect=primary):
+                    with patch("builtins.print") as output:
+                        with self.assertRaises(probe.AdmissionError) as raised:
+                            self.invoke(owner, receiver, group)
+                self.assertIs(raised.exception, primary)
+                self.assertEqual(owner.debt, [debt])
+                self.assertEqual(group.reservation_lost, not interrupted)
+                group.observe_exit.assert_called_once_with()
+                self.assertIn('"state": "unavailable"', output.call_args.args[0])
+                self.assertNotIn("private", output.call_args.args[0])
+                self.assertFalse(group.reaped)
+
+    def test_foreign_receiver_or_terminal_projection_failure_is_never_reported_live(self):
+        for foreign in (False, True):
+            with self.subTest(foreign=foreign):
+                owner, receiver, group = self.world()
+                if foreign:
+                    owner.groups[receiver] = Mock()
+                else:
+                    group.observe_exit.return_value = SimpleNamespace(
+                        si_pid=99999, si_code=1, si_status=68
+                    )
+                primary = probe.AdmissionError("same sender original")
+                with patch.object(probe, "run_appleevent_sender", side_effect=primary):
+                    with patch("builtins.print") as output:
+                        with self.assertRaises(probe.AdmissionError) as raised:
+                            self.invoke(owner, receiver, group)
+                self.assertIs(raised.exception, primary)
+                self.assertIn('"state": "unavailable"', output.call_args.args[0])
+                self.assertNotIn('"state": "terminal"', output.call_args.args[0])
+                self.assertNotIn('"state": "no-terminal-observation"', output.call_args.args[0])
+                self.assertEqual(group.observe_exit.call_count, 0 if foreign else 1)
+                receiver.poll.assert_not_called()
+                receiver.wait.assert_not_called()
+
+    def test_optional_publication_failure_cannot_replace_original_sender_exception(self):
+        owner, receiver, group = self.world()
+        primary = probe.AdmissionError("original sender failure")
+        with patch.object(probe, "run_appleevent_sender", side_effect=primary):
+            with patch("builtins.print", side_effect=OSError("unavailable optional stream")):
+                with self.assertRaises(probe.AdmissionError) as raised:
+                    self.invoke(owner, receiver, group)
+        self.assertIs(raised.exception, primary)
+        group.observe_exit.assert_called_once_with()
+        self.assertEqual(owner.active, [receiver])
+        self.assertFalse(group.reaped)
+        group.settle.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
