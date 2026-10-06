@@ -147,9 +147,28 @@ Test("menu_profiles: declared frame binds one counter to both real profile provi
 ; Exercise actual provider data and Win32 row addition beyond the hotkey range.
 _LPUL_ActualFrameKeepsDuplicateBuiltinAndUserRows() {
 	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	global LLM_TONE_LADDER, LLM_PROFILE_LIVE_TRANSLATIONS
 	Previous := _LLM_Menu
+	SavedContext := Map("had_order", IsSet(LLM_PROFILE_BUILTIN_ORDER),
+		"had_limit", IsSet(LLM_PROFILE_HOTKEY_LIMIT),
+		"had_tone", IsSet(LLM_TONE_LADDER),
+		"had_live", IsSet(LLM_PROFILE_LIVE_TRANSLATIONS))
+	if IsSet(LLM_PROFILE_BUILTIN_ORDER)
+		SavedContext["order"] := LLM_PROFILE_BUILTIN_ORDER
+	if IsSet(LLM_PROFILE_HOTKEY_LIMIT)
+		SavedContext["limit"] := LLM_PROFILE_HOTKEY_LIMIT
+	if IsSet(LLM_TONE_LADDER)
+		SavedContext["tone"] := LLM_TONE_LADDER
+	if IsSet(LLM_PROFILE_LIVE_TRANSLATIONS)
+		SavedContext["live"] := LLM_PROFILE_LIVE_TRANSLATIONS
 	Built := false
 	try {
+		; The direct native fixture may start without its number-row context.
+		; Use the actual declarations, then restore exact absent/value identities.
+		LLM_PROFILE_BUILTIN_ORDER := _LPUL_NativeProfileArray("LLM_PROFILE_BUILTIN_ORDER")
+		LLM_TONE_LADDER := _LPUL_NativeProfileArray("LLM_TONE_LADDER")
+		LLM_PROFILE_LIVE_TRANSLATIONS := _LPUL_NativeProfileArray("LLM_PROFILE_LIVE_TRANSLATIONS")
+		LLM_PROFILE_HOTKEY_LIMIT := _LPUL_NativeProfileHotkeyLimit()
 		_LLM_Menu := _HSDeepCloneMap(Previous)
 		_LLM_Menu["user_profiles"] := []
 		BuiltinId := ""
@@ -200,9 +219,16 @@ _LPUL_ActualFrameKeepsDuplicateBuiltinAndUserRows() {
 			AssertEqual(1, Found, "each independently expected duplicate label exists exactly once in Win32")
 		}
 	} finally {
-		if Built is Menu
-			_CTC_ReleaseMenu(Built)
-		_LLM_Menu := Previous
+		try {
+			if Built is Menu
+				_CTC_ReleaseMenu(Built)
+		} finally {
+			_LLM_Menu := Previous
+			LLM_PROFILE_BUILTIN_ORDER := SavedContext["had_order"] ? SavedContext["order"] : unset
+			LLM_PROFILE_HOTKEY_LIMIT := SavedContext["had_limit"] ? SavedContext["limit"] : unset
+			LLM_TONE_LADDER := SavedContext["had_tone"] ? SavedContext["tone"] : unset
+			LLM_PROFILE_LIVE_TRANSLATIONS := SavedContext["had_live"] ? SavedContext["live"] : unset
+		}
 	}
 }
 Test("menu_profiles: actual Win32 frame preserves builtin and repeated user labels beyond hotkey hints",
@@ -225,3 +251,35 @@ _LPUL_FrameRejectsQuotedProviderAuthority() {
 }
 Test("menu_profiles: copied quoted and commented bindings cannot certify the native frame",
 	_LPUL_FrameRejectsQuotedProviderAuthority)
+
+
+; Read only the genuine executable module constants through the canonical
+; production census. This fixture never copies the native profile policies.
+_LPUL_NativeProfileConstant(Name, ArrayValue) {
+	Source := _DriverSourceNoComments()
+	Code := _DriverMaskNonCode(&Source)
+	Pattern := "m)^[ \t]*global[ \t]+" . Name . "[ \t]*:=[ \t]*"
+		. (ArrayValue ? "(\[[\s\S]*?\])" : "([0-9]+)[ \t]*$")
+	Position := RegExMatch(Source, Pattern, &Found)
+	AssertTrue(Position > 0, "the actual native profile constant must exist: " . Name)
+	AssertFalse(RegExMatch(Source, Pattern, , Position + StrLen(Found[0])) > 0,
+		"the native profile constant must have one genuine declaration: " . Name)
+	Offset := InStr(Found[0], Name, true)
+	AssertEqual(Name, SubStr(Code, Position + Offset - 1, StrLen(Name)),
+		"quoted or commented data cannot initialize a native constant")
+	return Found[1]
+}
+_LPUL_NativeProfileArray(Name) {
+	AssertTrue(Name == "LLM_PROFILE_BUILTIN_ORDER" || Name == "LLM_TONE_LADDER"
+		|| Name == "LLM_PROFILE_LIVE_TRANSLATIONS", "only actual native profile arrays are fixture dependencies")
+	Value := JsonParse(_LPUL_NativeProfileConstant(Name, true))
+	AssertTrue(Value is Array && Value.Length > 0, "the genuine native profile dependency is a nonempty array")
+	for Id in Value
+		AssertTrue(Id is String && Id != "", "the genuine native profile dependency contains actual ids")
+	return Value
+}
+_LPUL_NativeProfileHotkeyLimit() {
+	Value := Integer(_LPUL_NativeProfileConstant("LLM_PROFILE_HOTKEY_LIMIT", false))
+	AssertEqual(9, Value, "the actual native number-row protocol still owns nine hints")
+	return Value
+}
