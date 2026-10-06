@@ -5697,6 +5697,16 @@ fresh Windows execution. Production source admission and the independent
 corpus are unchanged. The native brightness budget and assertions remain
 unchanged; downstream E2E/package/install were skipped in both failed runs.
 
+The hosted successor run37458316115 passes Linux units and the native hold
+and cursor-window gates, but GTK operands and the separately owned ETag gate
+fail again. Atomic publication has not qualified the remote GTK boundary.
+The unchanged worker now reports only not_observed or identity_mismatch at
+its existing failure sites; all100 read/sleep attempts, exact identity
+assertions and native/cleanup deadlines remain unchanged. Independent
+portable controls preserve earlier-stage annotations and reject payload
+values. Actual local GTK still passes4/4 with12 reaped descendants and no
+pending/rescue debt; the diagnostic successor requires hosted execution.
+
 - [~] **107.** Make the number-row policy explicit: native behavior, digits
   directly or symbols directly, with an acknowledged migration of the old
   Windows Boolean and preserved unrelated settings. The earlier Boolean slice

@@ -29,11 +29,15 @@ for _ = 1, 100 do
 	if file then
 		local actual = file:read("*a")
 		file:close()
+		if actual ~= id then
+			io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=identity_mismatch\n")
+		end
 		assert(actual == id, "the selected application identity changed")
 		return
 	end
 	os.execute("sleep 0.02")
 end
+io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=not_observed\n")
 error("the selected desktop entry did not launch: " .. id)
 """
 
@@ -48,6 +52,18 @@ def application_stage(stderr):
             value = line[len(prefix) :]
             stage = value if value in allowed else "unknown"
     return stage
+
+
+def application_receipt_state(stderr):
+    """Report only closed reader observations, never receipt bytes or paths."""
+    prefix = "ERGOPTI_APPLICATION_RECEIPT="
+    allowed = {"not_observed", "identity_mismatch"}
+    state = "unknown"
+    for line in stderr.splitlines():
+        if line.startswith(prefix):
+            value = line[len(prefix) :]
+            state = value if value in allowed else "unknown"
+    return state
 
 
 def main():
@@ -116,9 +132,16 @@ def main():
                     )
                     if child.returncode:
                         failures += 1
+                        stage = application_stage(child.stderr)
+                        receipt_detail = (
+                            f";receipt_state={application_receipt_state(child.stderr)}"
+                            if stage == "receipt"
+                            else ""
+                        )
                         print(
                             "::error title=Native application operand::"
-                            f"stage={application_stage(child.stderr)};case={index};native_exit={child.returncode}"
+                            f"stage={stage};case={index};native_exit={child.returncode}"
+                            f"{receipt_detail}"
                         )
                         print(
                             f"FAIL native application operand {identity!r}: {child.stderr.strip()}"
