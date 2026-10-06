@@ -6629,6 +6629,17 @@ The unintegrated number-row runtime/provenance preparation stored only in
 /tmp is unavailable after the cloud restart and needs reconstruction and
 review. Linux/macOS forced native capabilities remain unavailable.
 
+The reviewed Windows observation precursor now exposes native key levels and
+number-row descriptors through two append-only native adapter APIs. Captured
+external scalar getters are read once before validation; returned observations
+never grant input, owner, forced-output or dead-state authority. The original
+ToUnicodeEx reader, no-state-change flag `0x4`, independent ten-key corpus and
+every old test assertion remain byte-identical. Six additional registered
+cases require both actual French and US HKLs on hosted Windows. Native replay
+is pending; readonly previews do not complete the forced-output policy or
+item107. The existing layout fixture is unchanged; no new explicit HKL unload
+qualification is claimed.
+
 Remaining work for item107 (CI-feasible software first):
 
 - [ ] Software implementation/repair: Implement native-HKL forced-symbol and Linux/macOS forced digit/symbol owners with joint input/source/modifier/output provenance; reconstruct/review the lost number-row runtime preparation. Preserve the acknowledged three-mode policy, schema migration and independent descriptor/dead-state semantics.

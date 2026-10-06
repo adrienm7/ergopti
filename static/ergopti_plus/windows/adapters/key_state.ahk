@@ -505,3 +505,83 @@ global ADAPTER_KEY_STATE := Map(
     "isDown", KS_IsDown,
     "isUp",   KS_IsUp,
 )
+
+
+/**
+ * Observes a native level without consuming or clearing Windows dead-key state.
+ * This descriptor is a preview, never a physical-input or output capability.
+ * Negative ToUnicodeEx counts remain dead levels; no KLE action/state is invented.
+ * @param Vk {Integer} Native virtual key resolved on Hkl.
+ * @param Scancode {Integer} Native physical scan code.
+ * @param Hkl {Integer} Explicit keyboard-layout handle; never inferred from text.
+ * @param Shift {Boolean} Explicit level selector.
+ * @param Caps {Boolean} Explicit hardware toggle snapshot.
+ * @param ReadFn {Function|Integer} Optional observation port, or exact zero.
+ * @return {Map|Integer} Detached Kind/Text/Count descriptor, or zero on refusal.
+ */
+KS_NativeKeyLevel(Vk, Scancode, Hkl, Shift, Caps, ReadFn := 0) {
+	if !(Vk is Integer) || Vk < 1 || Vk > 0xFF
+			|| !(Scancode is Integer) || Scancode < 1 || Scancode > 0x1FF
+			|| !(Hkl is Integer) || Hkl == 0
+			|| !(Shift is Integer) || (Shift != true && Shift != false)
+			|| !(Caps is Integer) || (Caps != true && Caps != false)
+			|| (!HasMethod(ReadFn, "Call") && !((ReadFn is Integer) && ReadFn == 0))
+		return 0
+	try {
+		Observed := HasMethod(ReadFn, "Call")
+			? ReadFn.Call(Vk, Scancode, Hkl, Shift, Caps)
+			: KS_KeyTextNoStateChange(Vk, Scancode, Hkl, Shift, Caps)
+		if !IsObject(Observed) || !Observed.HasOwnProp("Count") || !Observed.HasOwnProp("Text")
+			return 0
+		; Own properties may be stateful getters. Capture each external scalar once,
+		; then validate and publish only those detached values, including on reentry.
+		Count := Observed.Count
+		Text := Observed.Text
+		if !(Count is Integer) || Abs(Count) > 16 || !(Text is String)
+				|| (Count == 0 && Text != "")
+				|| (Count != 0 && StrLen(Text) != Abs(Count))
+			return 0
+		Kind := Count < 0 ? "dead" : (Count > 0 ? "text" : "none")
+		return Map("Kind", Kind, "Text", Text, "Count", Count)
+	} catch Any {
+		; External ports and native read failures have no authority to expose their
+		; details or promote an incomplete observation into a usable source pair.
+		return 0
+	}
+}
+
+/**
+ * Reads both levels of the ten native physical number-row positions on one HKL.
+ * Reuses the native scan-code registry and probes each VK on that same HKL.
+ * Caps is explicit; inspection neither emits nor registers a hotkey and is not
+ * a source/currentness receipt. A delivery owner must independently join native
+ * input, source epoch, modifiers and output retirement before using these rows.
+ * @param Hkl {Integer} Explicit keyboard-layout handle.
+ * @param Caps {Boolean} Explicit CapsLock state.
+ * @param ReadFn {Function|Integer} Optional non-mutating level observation port.
+ * @param MapFn {Function|Integer} Optional scan-code-to-VK port.
+ * @return {Map|Integer} Detached hkl/caps/rows observation, or zero on refusal.
+ */
+KS_NativeNumberRowLevels(Hkl, Caps, ReadFn := 0, MapFn := 0) {
+	global KS_DIGIT_ROW_KEYS
+	if !(Hkl is Integer) || Hkl == 0
+			|| !(Caps is Integer) || (Caps != true && Caps != false)
+			|| (!HasMethod(ReadFn, "Call") && !((ReadFn is Integer) && ReadFn == 0))
+			|| (!HasMethod(MapFn, "Call") && !((MapFn is Integer) && MapFn == 0))
+		return 0
+	try {
+		Rows := Map()
+		for _, Key in KS_DIGIT_ROW_KEYS {
+			Scancode := Key[2]
+			Vk := HasMethod(MapFn, "Call") ? MapFn.Call(Scancode, Hkl) : KS_ScancodeToVk(Scancode, Hkl)
+			Plain := KS_NativeKeyLevel(Vk, Scancode, Hkl, false, Caps, ReadFn)
+			Shifted := KS_NativeKeyLevel(Vk, Scancode, Hkl, true, Caps, ReadFn)
+			if !(Plain is Map) || !(Shifted is Map)
+				return 0
+			Rows[Scancode] := Map("plain", Plain, "shift", Shifted)
+		}
+		return Map("hkl", Hkl, "caps", Caps, "rows", Rows)
+	} catch Any {
+		return 0
+	}
+}
