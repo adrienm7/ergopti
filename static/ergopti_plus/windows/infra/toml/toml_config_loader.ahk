@@ -198,8 +198,38 @@ TomlConfigScriptSlotCatalogue() {
 	return Map("prefix", "script__", "slots", Captured["slots"].Clone())
 }
 
-; Judges one native binding with the unchanged gesture owner and script publication.
+; Returns only the identity projection of the same complete compiled declarations.
+TomlConfigTapSlotCatalogue() {
+	global _TapKeyBindingPublication, TAP_KEY_ORDER, TAP_KEY_SCANCODES
+	if !IsSet(_TapKeyBindingPublication) || !IsSet(TAP_KEY_ORDER) || !IsSet(TAP_KEY_SCANCODES)
+		return false
+	Publication := _TapKeyBindingPublication
+	if !(Publication is Object) || !HasProp(Publication, "Source") || !HasProp(Publication, "ScanSource")
+		|| !HasProp(Publication, "Catalogue") || !HasProp(Publication, "Scans")
+		throw ValueError("tap keys: invalid publication receipt")
+	if Publication.Source != TAP_KEY_ORDER || Publication.ScanSource != TAP_KEY_SCANCODES
+		return false
+	Current := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)
+	Captured := Publication.Catalogue
+	ConfigBindingIdentityTapStatus("tap_key__", Captured)
+	if Captured["slots"].CaseSense != "On" || !(Publication.Scans is Map) || Publication.Scans.CaseSense != "On"
+		throw ValueError("tap keys: invalid publication receipt")
+	if Captured["slots"].Count != Current.Catalogue["slots"].Count
+		|| Publication.Scans.Count != Current.Scans.Count
+		return false
+	for Slot, Scan in Current.Scans {
+		if !Captured["slots"].Has(Slot) || !Publication.Scans.Has(Slot) || Publication.Scans[Slot] != Scan
+			return false
+	}
+	return Map("prefix", "tap_key__", "slots", Captured["slots"].Clone())
+}
+
+; Judges native bindings only against their actual acknowledged publication.
 TomlConfigParameterBindingStatus(BindingId, Catalogue?) {
+	if Type(BindingId) == "String" && SubStr(BindingId, 1, 9) == "tap_key__" {
+		TapCatalogue := TomlConfigTapSlotCatalogue()
+		return TapCatalogue is Map ? ConfigBindingIdentityTapStatus(BindingId, TapCatalogue) : "unjudged"
+	}
 	if Type(BindingId) == "String" && SubStr(BindingId, 1, 8) == "script__" {
 		ScriptCatalogue := TomlConfigScriptSlotCatalogue()
 		return ScriptCatalogue is Map ? ConfigBindingIdentityScriptStatus(BindingId, ScriptCatalogue) : "unjudged"
@@ -248,6 +278,7 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 		Reported[FilePath][Key] := true
 	} finally Critical(PreviousCritical)
 	Reason := SubStr(Key, 1, 8) == "script__" ? ConfigBindingIdentityScriptRetiredReason()
+		: SubStr(Key, 1, 9) == "tap_key__" ? ConfigBindingIdentityTapRetiredReason()
 		: "no gesture slot of this build has this name"
 	try LoggerWarn("TomlConfigLoader", "Outdated configuration entry '[action_parameters].{1}' in '{2}' ignored "
 		. "({3}); it is offered for explicit cleanup.", TOML_RenderKey(Key), FilePath, Reason)

@@ -739,3 +739,5 @@ helpers.describe("gesture parameter binding publication with the real script own
 		helpers.assert_eq(manager.get_action_parameter("script__reload", "open_url"), "")
 	end)
 end)
+
+require("test.tap_binding_publication_contract").register(require("tests.helpers"), "linux")

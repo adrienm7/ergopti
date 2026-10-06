@@ -1262,6 +1262,13 @@ function M.split_action_parameter_key(key)
 end
 
 function M.get_action_parameter(binding, action_name)
+	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__"
+		and M.action_parameter_binding_fits(binding) == false then
+		if _action_params[parameter_key(binding, action_name)] ~= nil then
+			ConfigOutdated.report({ CONFIG_SECTION_PARAMS, parameter_key(binding, action_name) }, BindingIdentity.RETIRED_TAP, Logger)
+		end
+		return ""
+	end
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
@@ -1323,6 +1330,14 @@ end
 --- @return boolean|nil fits
 --- @return string detail
 function M.action_parameter_binding_fits(binding)
+	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
+		local taps = package.loaded["modules.shortcuts.tap_keys"]
+		local catalogue
+		if type(taps) == "table" and type(taps.published_binding_catalogue) == "function" then
+			catalogue = taps.published_binding_catalogue()
+		end
+		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
+	end
 	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
 		local chords = package.loaded["modules.shortcuts.script_chords"]
 		local catalogue

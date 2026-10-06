@@ -3449,6 +3449,8 @@ The failed native modifier-hold dashboard qualifier now loads canonical actual s
 
 macOS provider identities now require a complete same-read native publication and checked close/JSON shape. Malformed, unavailable, partial or changed sources stay unjudged; valid empty local publications remain distinct from unavailable providers. Existing cloud refusal and custom names retain their contracts. The final AI branch is already integrated; complete model-row/order ownership and installed Hammerspoon acceptance remain open.
 
+Tap binding identities now come from complete actual native producer publications on all three drivers, retaining detached identity sets and unchanged boot ordering. Changed or withdrawn owners stay unjudged, retired getters read neutral, unrelated source bytes remain, and replacement refuses before native effects. Existing native callbacks and hotkey activation are preserved. Final AHK/native acceptance is still required.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only

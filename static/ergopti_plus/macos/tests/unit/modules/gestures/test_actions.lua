@@ -633,3 +633,5 @@ require("test.config_binding_identity_contract").register(helpers, assert(requir
 
 
 require("test.script_binding_publication_contract").register(require("tests.helpers"), "macos")
+
+require("test.tap_binding_publication_contract").register(require("tests.helpers"), "macos")

@@ -83,3 +83,48 @@ ConfigBindingIdentityScriptPublication(Ids) {
 		throw ValueError("script chords: invalid published slot catalogue")
 	return { Source: Ids, Catalogue: Map("prefix", "script__", "slots", Slots) }
 }
+
+; Judges only the complete acknowledged tap-key domain.
+ConfigBindingIdentityTapStatus(BindingId, Catalogue?) {
+	if !IsSet(Catalogue)
+		return "unjudged"
+	if !(Catalogue is Map) || !Catalogue.Has("prefix") || Catalogue["prefix"] !== "tap_key__"
+		|| !Catalogue.Has("slots") || !(Catalogue["slots"] is Map) || Catalogue["slots"].Count == 0
+		throw ValueError("config_binding_identity: invalid published tap-key catalogue")
+	return ConfigBindingIdentityGestureStatus(BindingId, Catalogue)
+}
+
+; Actual compiled order and scan declarations jointly prove a complete domain.
+; No assignment, native input, file IO or copied ID list participates.
+ConfigBindingIdentityTapPublication(Ids, Scans) {
+	if !(Ids is Array) || Ids.Length == 0 || !(Scans is Map)
+		throw ValueError("tap keys: invalid published slot catalogue")
+	Slots := Map()
+	Slots.CaseSense := "On"
+	ScanSnapshot := Map()
+	ScanSnapshot.CaseSense := "On"
+	SeenScans := Map()
+	Count := 0
+	for Index, Slot in Ids {
+		if Type(Slot) != "String" || Slot == "" || InStr(Slot, "__", true) || Slots.Has(Slot)
+			throw ValueError("tap keys: invalid published slot catalogue")
+		Slots[Slot] := true
+		Count += 1
+	}
+	if Count != Ids.Length || Scans.Count != Count
+		throw ValueError("tap keys: incomplete published scan catalogue")
+	for Slot, Scan in Scans {
+		if Type(Slot) != "String" || !Slots.Has(Slot) || Type(Scan) != "Integer"
+			|| Scan <= 0 || SeenScans.Has(Scan)
+			throw ValueError("tap keys: invalid published scan catalogue")
+		ScanSnapshot[Slot] := Scan
+		SeenScans[Scan] := true
+	}
+	return { Source: Ids, ScanSource: Scans, Scans: ScanSnapshot,
+		Catalogue: Map("prefix", "tap_key__", "slots", Slots) }
+}
+
+; Shared warning detail for the published tap-key parameter owner.
+ConfigBindingIdentityTapRetiredReason() {
+	return "no number-row tap key of this build has this name"
+}

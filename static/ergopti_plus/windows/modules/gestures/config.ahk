@@ -73,8 +73,15 @@ GestureActionParameterKey(BindingId, ActionName) {
 }
 
 GestureGetActionParameter(BindingId, ActionName) {
-		global GestureActionParameters
+		global GestureActionParameters, ConfigurationFile
 		Key := GestureActionParameterKey(BindingId, ActionName)
+		if Type(BindingId) == "String" && SubStr(BindingId, 1, 9) == "tap_key__"
+				&& TomlConfigParameterBindingStatus(BindingId) == "retired" {
+				if GestureActionParameters.Has(Key) && IsSet(ConfigurationFile)
+						&& Type(ConfigurationFile) == "String" && ConfigurationFile != ""
+						TomlConfigReportRetiredGestureParameter(ConfigurationFile, Key)
+				return ""
+		}
 		return GestureActionParameters.Has(Key) ? GestureActionParameters[Key] : ""
 }
 
