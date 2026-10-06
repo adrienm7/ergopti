@@ -1428,3 +1428,17 @@ stay whole, plus one foreign/replacement boundary control. Hosted APT and
 macOS native jobs remain unexecuted on this composition until fresh CI. The
 previous37535674201 run remains failed before tests, without native credit.
 No group item is closed and no final integration lock is held.
+
+## Bounded native geometry failure observation
+
+The unchanged native Login Items geometry assertion now records one closed
+bounded dimension line on failure in existing launch.stderr. It uses existing
+creation/geometry/frame values and captures the original Boolean decision
+before encoding/writing callbacks. The first candidate is retained rejected:
+those callbacks could otherwise heal a559-to560 refusal. Twenty-one modeled
+controls pass; both original callback regressions and a guard-reread mutant
+fail causally. Original17 controller and16 diagnostic controls, receipt fields,
+messages, frame calls, timer/deadline and failure prefix remain conserved.
+Independent review clears the successor; publication corrects only its new
+test path comment. Actual native cause/geometry acceptance remains unknown.
+Item24 remains partial; no runtime, permission or signing authority is added.

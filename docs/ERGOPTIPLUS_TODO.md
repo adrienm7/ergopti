@@ -3016,6 +3016,16 @@ The original17 portable cases and16 new diagnostic controls pass normally and
 with inherited optimization. Nine Swift summary controls and actual WebKit/UI
 acceptance require native CI. This diagnostic does not complete item24.
 
+The native Login Items probe now emits one bounded failure-only dimension
+observation in its existing retained stderr, using already observed values.
+The complete original geometry predicate is evaluated once before diagnostic
+callbacks; the original refusal message, ten-case receipt and three-case
+failure prefix are unchanged. Twenty-one modeled controls and the original
+17 controller/16 diagnostic controls pass independently. Encoder and stderr
+mutation cases reject the predecessor and a narrow guard-reread mutant. This
+is observation only: actual native geometry cause and item24 acceptance remain
+unqualified pending fresh exact-source macOS CI.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

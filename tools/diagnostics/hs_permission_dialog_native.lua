@@ -46,10 +46,43 @@ return function(config)
 	local function record(id)
 		results[#results + 1] = { id = id, passed = true }
 	end
+	local creation_width, creation_height = "unavailable", "unavailable"
+	local function geometry_dimension(value)
+		if type(value) == "number" and value == value and value >= 0 and value <= 32768 then return value end
+		return "unavailable"
+	end
+	local function observe_geometry_failure(geometry, frame)
+		-- Best effort only: reuse existing values, never change the original assertion or receipt.
+		pcall(function()
+			local prefix = "ERGOPTI_PERMISSION_UI_GEOMETRY "
+			local encoded, err = Json.encode({
+				schema = 1, kind = "permission_ui_geometry_failure_observation",
+				authority = false, native_verdict = "unchanged",
+				expected_width = 560, expected_height = 520,
+				geometry_width = geometry_dimension(geometry.width), geometry_height = geometry_dimension(geometry.height),
+				creation_width = creation_width, creation_height = creation_height,
+				actual_width = geometry_dimension(frame.w), actual_height = geometry_dimension(frame.h),
+			})
+			if type(encoded) == "string" and err == nil and #prefix + #encoded + 1 <= 1024 then
+				io.stderr:write(prefix .. encoded .. "\n")
+			end
+		end)
+	end
 	-- Observe the real production result, preserving argument/return slots and errors.
 	local forwarder = function(...)
+		local opts = ...
+		local requested_width, requested_height = "unavailable", "unavailable"
+		pcall(function()
+			if type(opts) == "table" and type(opts.frame) == "table" then
+				requested_width = geometry_dimension(opts.frame.w)
+				requested_height = geometry_dimension(opts.frame.h)
+			end
+		end)
 		local returned = table.pack(original_show(...))
-		if returned[1] ~= nil then observations[#observations + 1] = returned[1] end
+		if returned[1] ~= nil then
+			observations[#observations + 1] = returned[1]
+			creation_width, creation_height = requested_width, requested_height
+		end
 		return table.unpack(returned, 1, returned.n)
 	end
 	UI.show_webview = forwarder
@@ -161,7 +194,11 @@ return function(config)
 					and value.lang == I18n.get_locale(), "Actual Login Items DOM incomplete")
 				local geometry = UI.get_app_geometry("permission_dialog")
 				local frame = current:frame()
-				check(geometry.width == 560 and geometry.height == 520 and frame.w == 560 and frame.h == 520,
+				local geometry_matches = geometry.width == 560 and geometry.height == 520 and frame.w == 560 and frame.h == 520
+				if not geometry_matches then
+					observe_geometry_failure(geometry, frame)
+				end
+				check(geometry_matches,
 					"Actual view did not consume shared geometry")
 				record("login_items_native_dom_and_window")
 				state = "unknown"; unknown_at = unknown_reads; stage = 6
