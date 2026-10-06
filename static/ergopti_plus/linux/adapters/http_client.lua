@@ -99,6 +99,41 @@ local function dispatch(url, headers, body, options, method, buffered, owned_api
 end
 
 
+--- Reserves the captured public owner before caller metadata or source callbacks.
+--- The lazy preparation port runs only under the coordinator's exact reservation.
+local function dispatch_owned(url, headers, body, options, method, buffered, on_chunk, callback)
+	local authorized
+	if type(options) == "table" then authorized = rawget(options, "authorized") end
+	if authorized ~= nil and type(authorized) ~= "function" then
+		return rejected("owned request authorization is invalid", nil)
+	end
+	local owner = owner_name(type(options) == "table" and rawget(options, "owner") or nil)
+	local timeout = tonumber(type(options) == "table" and rawget(options, "timeout_ms") or nil) or Curl.default_timeout_ms()
+	local timeout_valid = timeout > 0 and timeout % 1 == 0 and timeout ~= math.huge
+	if method == "POST" and authorized == nil then authorized = function() return true end end
+	local active, initialization_refusal = initialize()
+	-- Without a coordinator reservation no caller source can authorize delivery.
+	if not active then return rejected(initialization_refusal, nil) end
+	local request = { owner = owner, timeout_ms = timeout_valid and timeout or 0, method = method, buffered = buffered, owned_api = true }
+	local function prepare()
+		if not timeout_valid then return nil, "HTTP timeout is invalid" end
+		local captured = {}
+		if type(options) == "table" then
+			for key, value in next, options do captured[key] = value end
+		end
+		captured.owner, captured.timeout_ms = owner, timeout
+		captured.method, captured.buffered, captured.owned_api = method, buffered, true
+		captured.authorized = authorized
+		local allowed, err = Curl.preflight(url, headers, body, captured)
+		if not allowed then return nil, err end
+		return captured
+	end
+	return active.start(url, headers, body, request, on_chunk, callback,
+		{ authorized = authorized, prepare = prepare })
+end
+
+
+
 
 
 
@@ -138,8 +173,15 @@ end
 --- @param callback function
 --- @return table Operation with the existing colon cancellation/settlement API.
 function M.get_owned(url, headers, options, callback)
-	return dispatch(url, type(headers) == "table" and headers or {}, nil,
-		options, "GET", true, true, nil, callback)
+	return dispatch_owned(url, type(headers) == "table" and headers or {}, nil,
+		options, "GET", true, nil, callback)
+end
+
+--- Streams a POST under the same managed route and captured source reservation.
+--- @return table Retained colon-API operation; cancellation remains physical.
+function M.post_stream_owned(url, headers, body, options, on_chunk, on_done)
+	return dispatch_owned(url, type(headers) == "table" and headers or {}, type(body) == "string" and body or "",
+		options, "POST", false, on_chunk, on_done)
 end
 
 --- Downloads to a caller-owned native temporary destination.

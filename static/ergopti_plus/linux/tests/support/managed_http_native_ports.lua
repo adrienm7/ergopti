@@ -67,7 +67,15 @@ local function fake_luv(config)
 	end
 	function fake.kill(pid, signal)
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
-		if options.kill_missing then return nil, "ESRCH: no such process", "ESRCH" end
+		local captured
+		for _, request in ipairs(state.requests) do
+			if pid == -request.pid then captured = request; break end
+		end
+		if not captured then return nil, "EPERM: foreign fake group", "EPERM" end
+		-- Only an explicit exact-group fixture ACK proves absence. Neither a
+		-- successful signal nor the leader's exit callback establishes it.
+		if captured.group_absent or options.kill_missing then return nil, "ESRCH: no such process", "ESRCH" end
+		if options.kill_throw and not state.allow_kills then error("independent signal refusal") end
 		if options.kill_failure and not state.allow_kills then return nil, "EPERM: operation not permitted", "EPERM" end
 		return true
 	end
@@ -89,10 +97,17 @@ local function fake_luv(config)
 
 	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
 	function state.stderr(chunk) state.options.stdio[3].read_callback(nil, chunk) end
+	--- Supplies an independent native absence receipt for one captured group.
+	function state.ack_group_absent(index)
+		local request = assert(state.requests[index], "unknown fake request group")
+		request.group_absent = true
+	end
 	function state.exit(code, signal) state.exit_callback(code or 0, signal or 0) end
 	function state.complete(code)
 		state.stdout(nil)
 		state.stderr(nil)
+		-- Full completion supplies a separate absence ACK; bare exit stays leader-only.
+		if not options.hold_group_absence then state.ack_group_absent(#state.requests) end
 		state.exit(code or 0)
 	end
 	function state.complete_request(index, stdout_text, code)
@@ -100,6 +115,7 @@ local function fake_luv(config)
 		if stdout_text ~= nil then request.options.stdio[2].read_callback(nil, stdout_text) end
 		request.options.stdio[2].read_callback(nil, nil)
 		request.options.stdio[3].read_callback(nil, nil)
+		if not options.hold_group_absence then state.ack_group_absent(index) end
 		request.exit_callback(code or 0, 0)
 	end
 	return fake, state

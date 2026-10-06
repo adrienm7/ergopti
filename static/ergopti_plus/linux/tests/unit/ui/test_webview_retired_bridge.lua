@@ -74,3 +74,150 @@ helpers.describe("native bridge messages retain their page epoch", function()
 		end)
 	end)
 end)
+
+--- Uses actual page epochs, close routing and bridge session ownership.
+--- Only native creation, HTML loading and JavaScript presentation are controlled.
+--- @param run function Receives the actual bridge, manager and presentation receipts.
+local function with_download_page(run)
+	local names = { "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
+		"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
+		"ui.download_window.bridge", "infra.manifest_reader" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+	local document
+	local ok, detail = xpcall(function()
+		package.loaded["ui.download_window.bridge"] = nil
+		local bridge = require("ui.download_window.bridge")
+		document = require("tests.support.document_fixture").new("download_window", bridge, {})
+		local actual_manager = document.manager
+		local world = { evaluated = {}, cancellations = 0 }
+		document.on_effect = function(code) world.evaluated[#world.evaluated + 1] = code end
+		world.show = function(label)
+			return bridge.show({ kind = "ollama_model", label = label or "Owned page fixture",
+				on_cancel = function() world.cancellations = world.cancellations + 1; return true end })
+		end
+		world.ready = function()
+			if not actual_manager.capture_document_owner("download_window") then return document.handshake() end
+			return document.send("ready")
+		end
+		-- Adapt only the fixture's epoch-bearing native send to the real leased
+		-- document envelope; the actual manager still validates every token.
+		local manager = setmetatable({ route_message = function(app, handler, payload, epoch)
+			if app == "download_window" and handler == "dl_bridge" and epoch == document.view().epoch then
+				return document.send(payload)
+			end
+			return actual_manager.route_message(app, handler, payload, epoch)
+		end }, { __index = actual_manager })
+		run(bridge, manager, world)
+	end, debug.traceback)
+	if document then
+		local closed, failure = pcall(document.close)
+		if not closed and ok then ok, detail = false, failure end
+	end
+	for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("download progress native page closure", function()
+	helpers.it("linux-download-page-close: pre-ready close preserves background completion", function()
+		with_download_page(function(bridge, manager, world)
+			local id = world.show()
+			helpers.assert_true(type(id) == "number")
+			helpers.assert_true(manager.hide("download_window"))
+			helpers.assert_true(bridge.complete(id, true, "Installed after page close"))
+			helpers.assert_eq(bridge.session_id(), id)
+			helpers.assert_eq(#world.evaluated, 0)
+			helpers.assert_eq(world.cancellations, 0)
+		end)
+	end)
+	helpers.it("linux-download-page-close: ready close acknowledges complete without a stale push", function()
+		with_download_page(function(bridge, manager, world)
+			local id = world.show()
+			helpers.assert_true(world.ready().pushed)
+			local pushes = #world.evaluated
+			helpers.assert_true(manager.hide("download_window"))
+			helpers.assert_true(bridge.complete(id, true, "Installed after ready page close"))
+			helpers.assert_eq(#world.evaluated, pushes)
+			helpers.assert_eq(world.cancellations, 0)
+		end)
+	end)
+	helpers.it("linux-download-page-close: ready close permits exact operation retirement", function()
+		with_download_page(function(bridge, manager, world)
+			local id = world.show()
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_true(manager.hide("download_window"))
+			helpers.assert_true(bridge.complete(id, true, "Installed"))
+			helpers.assert_true(bridge.retire(id))
+			helpers.assert_nil(bridge.on_message("ready"))
+			helpers.assert_eq(world.cancellations, 0)
+		end)
+	end)
+	helpers.it("linux-download-page-close: focus reopens a fresh page with retained terminal data", function()
+		with_download_page(function(bridge, manager, world)
+			local id = world.show()
+			local first = manager.current_epoch("download_window")
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_true(manager.hide("download_window"))
+			helpers.assert_true(bridge.complete(id, true, "Installed in background"))
+			helpers.assert_true(bridge.focus(id))
+			helpers.assert_true(manager.current_epoch("download_window") > first)
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_true(world.evaluated[#world.evaluated]:find('done(true', 1, true) ~= nil)
+		end)
+	end)
+	helpers.it("linux-download-page-close: delayed old close cannot clear reopened readiness", function()
+		with_download_page(function(bridge, manager, world)
+			local id = world.show()
+			local first = manager.current_epoch("download_window")
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_true(manager.hide("download_window"))
+			helpers.assert_true(bridge.focus(id))
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_eq(bridge.on_window_closed(first), false)
+			local pushes = #world.evaluated
+			helpers.assert_true(bridge.update(id, 42, "Current reopened progress"))
+			helpers.assert_eq(#world.evaluated, pushes + 1)
+			helpers.assert_true(bridge.complete(id, true, "Installed"))
+		end)
+	end)
+	helpers.it("linux-download-page-close: delayed close cannot clear a foreign session page", function()
+		with_download_page(function(bridge, manager, world)
+			local old = world.show("First session")
+			local first = manager.current_epoch("download_window")
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_true(bridge.complete(old, true, "First installed"))
+			local current = world.show("Second session")
+			helpers.assert_true(type(current) == "number" and current ~= old)
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_eq(bridge.on_window_closed(first), false)
+			local pushes = #world.evaluated
+			helpers.assert_eq(bridge.complete(old, true, "Foreign completion"), false)
+			helpers.assert_true(bridge.update(current, 57, "Current session progress"))
+			helpers.assert_eq(#world.evaluated, pushes + 1)
+		end)
+	end)
+	helpers.it("linux-download-page-close: focusing a live page retains its exact close owner", function()
+		with_download_page(function(bridge, manager, world)
+			local id = world.show()
+			local epoch = manager.current_epoch("download_window")
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_true(bridge.focus(id))
+			helpers.assert_eq(manager.current_epoch("download_window"), epoch)
+			helpers.assert_true(manager.hide("download_window", epoch))
+			helpers.assert_true(bridge.complete(id, true, "Installed after focused page close"))
+		end)
+	end)
+	helpers.it("linux-download-page-close: closing a page does not infer explicit cancellation", function()
+		with_download_page(function(bridge, manager, world)
+			local id = world.show()
+			helpers.assert_true(world.ready().pushed)
+			helpers.assert_true(manager.hide("download_window"))
+			helpers.assert_true(bridge.focus(id))
+			helpers.assert_true(world.ready().pushed)
+			local result = manager.route_message("download_window", "dl_bridge",
+				{ action = "cancel", session = id }, manager.current_epoch("download_window"))
+			helpers.assert_true(result.cancelled)
+			helpers.assert_eq(world.cancellations, 1)
+		end)
+	end)
+end)

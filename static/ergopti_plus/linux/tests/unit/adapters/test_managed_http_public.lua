@@ -67,7 +67,15 @@ local function fake_luv(config)
 	end
 	function fake.kill(pid, signal)
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
-		if options.kill_missing then return nil, "ESRCH: no such process", "ESRCH" end
+		local captured
+		for _, request in ipairs(state.requests) do
+			if pid == -request.pid then captured = request; break end
+		end
+		if not captured then return nil, "EPERM: foreign fake group", "EPERM" end
+		-- Only an explicit exact-group fixture ACK proves absence. Neither a
+		-- successful signal nor the leader's exit callback establishes it.
+		if captured.group_absent or options.kill_missing then return nil, "ESRCH: no such process", "ESRCH" end
+		if options.kill_throw and not state.allow_kills then error("independent signal refusal") end
 		if options.kill_failure and not state.allow_kills then return nil, "EPERM: operation not permitted", "EPERM" end
 		return true
 	end
@@ -89,10 +97,17 @@ local function fake_luv(config)
 
 	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
 	function state.stderr(chunk) state.options.stdio[3].read_callback(nil, chunk) end
+	--- Supplies an independent native absence receipt for one captured group.
+	function state.ack_group_absent(index)
+		local request = assert(state.requests[index], "unknown fake request group")
+		request.group_absent = true
+	end
 	function state.exit(code, signal) state.exit_callback(code or 0, signal or 0) end
 	function state.complete(code)
 		state.stdout(nil)
 		state.stderr(nil)
+		-- Full completion supplies a separate absence ACK; bare exit stays leader-only.
+		if not options.hold_group_absence then state.ack_group_absent(#state.requests) end
 		state.exit(code or 0)
 	end
 	function state.complete_request(index, stdout_text, code)
@@ -100,6 +115,7 @@ local function fake_luv(config)
 		if stdout_text ~= nil then request.options.stdio[2].read_callback(nil, stdout_text) end
 		request.options.stdio[2].read_callback(nil, nil)
 		request.options.stdio[3].read_callback(nil, nil)
+		if not options.hold_group_absence then state.ack_group_absent(index) end
 		request.exit_callback(code or 0, 0)
 	end
 	return fake, state
@@ -201,6 +217,7 @@ helpers.describe("managed public API: original owned settlement assertions", fun
 		helpers.assert_eq(operation:is_settled(), false)
 		state.exit(0)
 		helpers.assert_eq(operation:is_settled(), false)
+		state.ack_group_absent(1)
 		state.ack_closes()
 		helpers.assert_true(operation:cancel())
 		helpers.assert_eq(terminals, 0, "late terminal events cannot publish after cancellation")
@@ -343,5 +360,36 @@ helpers.describe("managed public API: independent absolute deadline events", fun
   helpers.assert_true(not results[1].ok and results[1].error == "timeout")
   helpers.assert_true(operation:is_settled())
  end)
+end)
+
+helpers.describe("managed public API: independent exact group absence receipts", function()
+	for _, mode in ipairs({ "EPERM", "throw" }) do
+		local refusal_mode = mode
+		helpers.it("leader exit and close ACK cannot hide a retained group after " .. mode, function()
+			local client, state = fresh_client({ defer_close = true, hold_group_absence = true,
+				kill_failure = refusal_mode == "EPERM", kill_throw = refusal_mode == "throw" })
+			local callbacks = 0
+			local operation = client.get_owned("http://127.0.0.1:9000/models", {},
+				{ owner = "held-group" }, function() callbacks = callbacks + 1 end)
+			helpers.assert_eq(operation:cancel(), false)
+			state.complete_request(1, "held\nERGOPTI_HTTP_STATUS:200\n")
+			state.ack_closes()
+			helpers.assert_true(not operation:is_settled(), "leader exit and stream ACKs do not prove group absence")
+			local refused = client.get_owned("http://127.0.0.1:9000/models", {},
+				{ owner = "held-group" }, function() error("retained group successor published") end)
+			helpers.assert_true(refused:is_settled() and not refused.started)
+			helpers.assert_eq(#state.requests, 1)
+			helpers.assert_eq(callbacks, 0)
+			state.ack_group_absent(1)
+			operation:cancel()
+			helpers.assert_true(not operation:is_settled(), "the original native timer still needs its own close ACK")
+			state.ack_closes()
+			helpers.assert_true(operation:is_settled())
+			helpers.assert_eq(callbacks, 0)
+			for _, receipt in ipairs(state.kills) do
+				helpers.assert_eq(receipt.pid, -state.requests[1].pid, "only the captured exact group is probed or signalled")
+			end
+		end)
+	end
 end)
 return helpers
