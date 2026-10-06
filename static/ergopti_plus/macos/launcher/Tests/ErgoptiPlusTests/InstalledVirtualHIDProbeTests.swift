@@ -208,11 +208,11 @@ final class IndependentInstalledVHDControls: XCTestCase {
 
     func testAcquiredEmptyNativeACLIsExplicitlyEmpty() throws {
         let acl = try XCTUnwrap(acl_init(0))
-        defer { acl_free(acl) }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
         XCTAssertEqual(acl_valid(acl), 0)
         var entry: acl_entry_t?
         errno = 0
-        let raw = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry)
+        let raw = acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry)
         let actualError = errno
         XCTAssertEqual(raw, -1)
         XCTAssertEqual(actualError, EINVAL)
@@ -221,13 +221,13 @@ final class IndependentInstalledVHDControls: XCTestCase {
 
     func testNativeZeroReturnMeansAnEntryExistsAndMustRefuse() throws {
         var acl: acl_t? = try XCTUnwrap(acl_init(1))
-        defer { if let acl { acl_free(acl) } }
+        defer { if let acl { acl_free(UnsafeMutableRawPointer(acl)) } }
         var entry: acl_entry_t?
         XCTAssertEqual(acl_create_entry(&acl, &entry), 0)
         let owned = try XCTUnwrap(acl)
         XCTAssertEqual(acl_valid(owned), 0)
         var retrieved: acl_entry_t?
-        XCTAssertEqual(acl_get_entry(owned, ACL_FIRST_ENTRY, &retrieved), 0)
+        XCTAssertEqual(acl_get_entry(owned, Int32(ACL_FIRST_ENTRY.rawValue), &retrieved), 0)
         XCTAssertNotNil(retrieved)
         XCTAssertFalse(try InstalledVHDProbeNative.aclIsEmpty(owned))
     }

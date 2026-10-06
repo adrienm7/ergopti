@@ -67,7 +67,7 @@ enum InstalledVHDProbeNative {
 		guard acl_valid(value) == 0 else { throw InstalledVHDProbeFailure(status: "unverified", reason: "acl_unknown", domain: "posix", code: errno) }
 		var entry: acl_entry_t?
 		errno = 0
-		let outcome = acl_get_entry(value, ACL_FIRST_ENTRY, &entry)
+		let outcome = acl_get_entry(value, Int32(ACL_FIRST_ENTRY.rawValue), &entry)
 		let observedError = errno
 		if outcome == 0, entry != nil { return false }
 		if outcome == -1, observedError == EINVAL { return true }
@@ -79,7 +79,7 @@ enum InstalledVHDProbeNative {
 		}
 		let outcome: Result<Bool, Error>
 		do { outcome = .success(try aclIsEmpty(value)) } catch { outcome = .failure(error) }
-		guard acl_free(value) == 0 else { throw InstalledVHDProbeFailure(status: "refused", reason: "acl_release_failed", domain: "posix", code: errno) }
+		guard acl_free(UnsafeMutableRawPointer(value)) == 0 else { throw InstalledVHDProbeFailure(status: "refused", reason: "acl_release_failed", domain: "posix", code: errno) }
 		return try outcome.get()
 	}
 }

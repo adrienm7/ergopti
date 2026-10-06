@@ -931,3 +931,12 @@ missing-predicate error and pass the corrected real Writer/SQLite/Reader pipelin
 (12 checks) and dashboard consumers (5 checks). Native dependency-removal controls
 still fail at the intended boundary. Hosted Linux validation and physical input
 remain distinct; no production driver or shared dashboard behavior changed.
+
+The installed virtual-HID probe now converts the Darwin-imported ACL entry enum
+and opaque ACL pointers explicitly at the six existing Swift call sites. Manual
+CI37407973515 exposed two release compilation errors before any XCTest ran;
+the corrected sources preserve all22 methods and80 assertion/unwrap calls,
+ACL refusal and release checks, and existing budgets. Independent strict forward
+and reverse application restores both complete preimages exactly. Successor
+Darwin compilation and native tests remain UNEXECUTED pending the next macOS CI;
+no reference, capture or completed TODO31 authority is inferred.

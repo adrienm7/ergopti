@@ -3718,6 +3718,15 @@ Darwin compilation, protected fixtures, native ACLs and both signature slices
 remain UNEXECUTED until the exact-source macOS validation. This does not grant
 reference, broker, client, capture or history authority or complete TODO31.
 
+The installed virtual-HID probe now converts the Darwin-imported ACL entry enum
+and opaque ACL pointers explicitly at the six existing Swift call sites. Manual
+CI37407973515 exposed two release compilation errors before any XCTest ran;
+the corrected sources preserve all22 methods and80 assertion/unwrap calls,
+ACL refusal and release checks, and existing budgets. Independent strict forward
+and reverse application restores both complete preimages exactly. Successor
+Darwin compilation and native tests remain UNEXECUTED pending the next macOS CI;
+no reference, capture or completed TODO31 authority is inferred.
+
 The registered Linux physical-hold dashboard harness now loads its actual
 shared selection enum and predicates before the unchanged Typing KPI consumer.
 The original assertion and independent hold/app/text expectations are preserved.
