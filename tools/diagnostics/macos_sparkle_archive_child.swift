@@ -41,6 +41,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 			guard link(stage.path, target.path) == 0 else { throw Failure.refused }
 			guard unlink(stage.path) == 0 else { throw Failure.refused }
 		} catch {
+			fputs("SPARKLE_CHILD_REFUSAL/1 receipt-publication\n", stderr)
 			fputs("Private Sparkle receipt publication refused.\n", stderr)
 			exit(78)
 		}
@@ -87,6 +88,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		let stop = root.appendingPathComponent("retire")
 		if FileManager.default.fileExists(atPath: stop.path) {
 			guard (try? Data(contentsOf: stop)) == Data(nonce.utf8) else {
+				fputs("SPARKLE_CHILD_REFUSAL/1 control\n", stderr)
 				record("control-refused-" + version)
 				exit(78)
 			}
@@ -155,6 +157,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 			let port = transport.port, (1...65535).contains(port), transport.path == "/archive.tar.xz",
 			transport.user == nil, transport.password == nil, transport.query == nil, transport.fragment == nil,
 			Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String == "http://localhost:" + String(port) + "/feed.xml" else {
+			fputs("SPARKLE_CHILD_REFUSAL/1 transport\n", stderr)
 			record("transport-refused-" + String(phase))
 			exit(78) // The native downloader has not started, so no foreign origin is acquired.
 		}
@@ -210,12 +213,18 @@ guard let rootPath = Bundle.main.object(forInfoDictionaryKey: "FixtureRoot") as?
 	let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
 	["1", "2"].contains(version),
 	Bundle.main.bundleIdentifier == "org.ergoptiplus.archive-acceptance." + nonce else {
+	fputs("SPARKLE_CHILD_REFUSAL/1 configuration\n", stderr)
 	fputs("Private Sparkle child configuration refused.\n", stderr)
 	exit(78)
 }
 let root = URL(fileURLWithPath: rootPath).resolvingSymlinksInPath()
-guard root.path == rootPath,
-	Bundle.main.bundleURL.resolvingSymlinksInPath() == root.appendingPathComponent("installed/ErgoptiPlus.app") else {
+guard root.path == rootPath else {
+	fputs("SPARKLE_CHILD_REFUSAL/1 target-root\n", stderr)
+	fputs("Private Sparkle child target refused.\n", stderr)
+	exit(78)
+}
+guard Bundle.main.bundleURL.resolvingSymlinksInPath() == root.appendingPathComponent("installed/ErgoptiPlus.app") else {
+	fputs("SPARKLE_CHILD_REFUSAL/1 target-bundle\n", stderr)
 	fputs("Private Sparkle child target refused.\n", stderr)
 	exit(78)
 }

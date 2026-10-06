@@ -1667,6 +1667,114 @@ try {
 }
 // SPARKLE_SIGNATURE_APPLICATION_FACTS_END
 
+// SPARKLE_CHILD_REFUSAL_VISIBILITY_BEGIN
+// Closed child refusal facts reuse the original observed exit and cached capture.
+try {
+	const assert = require('node:assert/strict');
+	const { evaluate, annotation } = require('../diagnostics/swift_xctest_evidence.cjs');
+	const file = path.join(
+		root,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift'
+	);
+	const fixture = fs.readFileSync(file, 'utf8');
+	const child = fs.readFileSync(
+		path.join(root, 'tools/diagnostics/macos_sparkle_archive_child.swift'),
+		'utf8'
+	);
+	function assertClosedChildVisibility(source) {
+		const start = source.indexOf('func observedChildRefusalCode() -> String? {');
+		const end = source.indexOf('\n\t\t}', start);
+		assert.ok(start >= 0 && end > start, 'Actual cached native capture observer is present');
+		const observer = source.slice(start, end);
+		assert.match(observer, /guard launched, observedExit, !process\.isRunning, let cachedReceipt,/);
+		assert.match(observer, /cachedReceipt\.status == 78 else \{ return nil \}/);
+		assert.match(observer, /parseChildRefusalCode\(cachedReceipt\.stderr\)/);
+		assert.doesNotMatch(observer, /finish\(|wait|open\(|read|terminate\(|kill\(|close\(/);
+		assert.match(source, /frames\.count == 1, let frame = frames\.first/);
+		assert.match(
+			source,
+			/ChildRefusalCode\(rawValue: String\(frame\.dropFirst\(prefix\.count\)\)\)/
+		);
+		assert.match(source, /text\.utf8\.count <= 16_384, text\.hasSuffix\("\\n"\)/);
+		assert.match(
+			source,
+			/if let code = application\.observedChildRefusalCode\(\) \{\s*XCTFail\("Native Sparkle child refusal: category=" \+ code\)/
+		);
+	}
+	assertClosedChildVisibility(fixture);
+	for (const [before, after] of [
+		[
+			'cachedReceipt.status == 78 else { return nil }',
+			'cachedReceipt.status >= 0 else { return nil }'
+		],
+		['parseChildRefusalCode(cachedReceipt.stderr)', 'cachedReceipt.stderr'],
+		['frames.count == 1, let frame = frames.first', 'frames.count >= 1, let frame = frames.first']
+	]) {
+		assert.equal(fixture.split(before).length - 1, 1, 'One exact source mutation');
+		const mutated = fixture.replace(before, () => after);
+		assert.throws(() => assertClosedChildVisibility(mutated));
+	}
+	for (const code of [
+		'configuration',
+		'target-root',
+		'target-bundle',
+		'receipt-publication',
+		'control',
+		'transport'
+	]) {
+		assert.equal(
+			child.split('SPARKLE_CHILD_REFUSAL/1 ' + code + '\\n').length - 1,
+			1,
+			'One literal failed-branch category emission'
+		);
+	}
+	assert.match(child, /guard root\.path == rootPath else/);
+	assert.match(
+		child,
+		/guard Bundle\.main\.bundleURL\.resolvingSymlinksInPath\(\) == root\.appendingPathComponent\("installed\/ErgoptiPlus.app"\) else/
+	);
+	assert.match(child, /try stream\.close\(\)[\s\S]*guard link\(stage\.path, target\.path\) == 0/);
+	const fixed = 'Native Sparkle child refusal: category=target-root';
+	const makeTranscript = (message) =>
+		[
+			"Test Suite 'All tests' started at 2026-10-06 01:00:00.000.",
+			"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' started.",
+			file + ':777: error: failed - ' + message,
+			"Test Case '-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testArchive]' failed (0.100 seconds).",
+			"Test Suite 'All tests' failed at 2026-10-06 01:00:01.000.",
+			'\t Executed 1 test, with 1 failure (0 unexpected) in 0.100 (0.110) seconds'
+		].join('\n');
+	const old = evaluate(
+		makeTranscript(
+			'Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78'
+		),
+		1,
+		0,
+		root
+	);
+	assert.equal(
+		old.failures.some((failure) => failure.message.endsWith(fixed)),
+		false,
+		'Actual old exit annotation cannot expose the child branch'
+	);
+	const result = evaluate(makeTranscript(fixed), 1, 0, root);
+	const failure = result.failures.find((entry) => entry.message.endsWith(fixed));
+	assert.notEqual(failure, undefined);
+	assert.match(
+		annotation(failure),
+		/::failed - Native Sparkle child refusal: category=target-root$/
+	);
+	assert.equal(result.exit_status, 1, 'Diagnostic observation preserves failure');
+	assert.equal(
+		evaluate(fixed, 1, 0, root).failures.some((entry) => entry.message.endsWith(fixed)),
+		false,
+		'Raw print is not an annotated native failure'
+	);
+} catch (error) {
+	errors.push(`Native Sparkle child refusal visibility guard failed: ${error.message}`);
+}
+// SPARKLE_CHILD_REFUSAL_VISIBILITY_END
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
