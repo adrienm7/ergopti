@@ -65,6 +65,8 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/run-linux-network-runtime.cjs',
 	// Real process/file probes run under verify-change and mandatory Linux CI.
 	'tools/test/run-linux-runtime-native.cjs',
+	// Actual staged package/kernel admission is mandatory in its planner and CI lane.
+	'tools/test/run-linux-portable-network-native.cjs',
 	// Complete pure Python canvas controls have their own planner and Mac CI gate.
 	'tools/test/run-macos-tooltip-canvas-tests.cjs',
 	// Real-browser render runs separately from the Node-only suite;

@@ -1437,6 +1437,19 @@ jobs:
           ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
         timeout-minutes: 2
 
+      - name: Install portable network staging prerequisites
+        if: ${{ !cancelled() }}
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            luajit lua-luv curl binutils pkg-config libglib2.0-dev \
+            glib-networking dconf-gsettings-backend gsettings-desktop-schemas
+        timeout-minutes: 20
+
+      - name: Qualify actual staged portable network runtime and retirement
+        if: ${{ !cancelled() }}
+        run: npm run test:linux:portable-network-native
+        timeout-minutes: 10
+
       - name: The webview push reaches a real WebKit page
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
@@ -1664,7 +1677,9 @@ jobs:
         # already have), and the tarball smoke runs the installed tree with it.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit
+          sudo apt-get install -y luajit lua-luv curl binutils pkg-config \
+            libglib2.0-dev glib-networking dconf-gsettings-backend \
+            gsettings-desktop-schemas
 
       - name: Assemble the driver bundle
         shell: bash

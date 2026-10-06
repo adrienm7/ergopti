@@ -563,6 +563,23 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'linux-portable-network-native',
+		why: 'portable network packages require actual installed ELF, GIO, schema and owned timeout retirement',
+		match: (f) =>
+			[
+				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'tools/build/build-linux-appimage.sh',
+				'tools/build/build-linux-flatpak.sh',
+				'tools/build/stage-linux-network-runtime.py',
+				'tools/build/templates/linux-portable-runtime-env.sh',
+				'tools/codegen/codegen-linux-native-runtime.cjs',
+				'tools/test/test-linux-portable-network-runtime.cjs',
+				'tools/test/run-linux-portable-network-native.cjs',
+				'tools/test/test-linux-portable-network-registration.cjs',
+				'.github/workflows/ci-linux.yml'
+			].includes(f)
+	},
+	{
 		gate: 'linux-runtime-native',
 		why: 'runtime prerequisites require actual process/file receipts on both Linux ABIs and physical wrapper teardown',
 		match: (f) =>
@@ -664,6 +681,7 @@ const GATE_COMMANDS = {
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
 	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
 	'linux-runtime-native': { npm: 'test:linux:runtime-native' },
+	'linux-portable-network-native': { npm: 'test:linux:portable-network-native' },
 	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' }
