@@ -1,0 +1,205 @@
+{
+  "verdict": "BOUNDED_SOURCE_CLEAR",
+  "packet_receipt_sha256": "86515273aef7ee344f5524a10d0a07dfeb522fda412f83b8341f4452d36155bc",
+  "foundation_receipt_sha256": "0cb1e695ed3e8663047443eac365ab6581e5e0c9cb72dc0e6fe1157a427827dd",
+  "patch_sha256": "be0610a3c5b14ddca55b3c9dac9da973c7c28592f633839ab03549977e2a0b07",
+  "all_28_packet_artifact_pins": "verified",
+  "whole_previous_47_case_test_prefix": "byte exact36390bytes; current60 cases actual verified perABI",
+  "foundation_two_postimages_are_successor_preimages": "byte exact",
+  "source_review": [
+    "All writes after capture project only complete literaltrue KEY+SYN ACKs; unobserved/unmatched repeat forbids a known roster. Unknown attempt keeps exactchannel/debt and cannot resume or retrywire.",
+    "Private exact-token reservation blocks captured ordinary/owned emit, capture, close and backend replacement. Busy spans native callbacks; alltransactionports refuse reentry. Detached down/baseline views cannot change private state.",
+    "Transaction emission validates matching down/up/repeat transitions. Restoration emits only acknowledged differences under same captured channel and writeepoch; unchanged baseline rows untouched.",
+    "Release is a pure exact-token/privatecurrency/baselineequality boundary without external callbacktail. Exact retirement can settle reserved wiredebt; close uncertainty remains nonretryable and blocks successor.",
+    "No physical provenance/globalheld/nativeallowner/mask/output-admission is inferred from projected roster. No physical feature capability changed."
+  ],
+  "reviewer_replays": [
+    {
+      "abi": "luajit",
+      "source": "candidate",
+      "exit_code": 0,
+      "summary": "OUTPUT_OWNER 60 0",
+      "log": "luajit-candidate.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+    },
+    {
+      "abi": "luajit",
+      "source": "preimages",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 47 13",
+      "log": "luajit-preimages.log",
+      "sha256": "4a027fc10d174576cf85e012f78712bfaeff61f4546c9f3d52fb94bd251ab704"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_restoration",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 59 1",
+      "log": "luajit-omit_restoration.log",
+      "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_channel_reservation",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 58 2",
+      "log": "luajit-omit_channel_reservation.log",
+      "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396"
+    },
+    {
+      "abi": "luajit",
+      "source": "omit_known_repeat",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 59 1",
+      "log": "luajit-omit_known_repeat.log",
+      "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "candidate",
+      "exit_code": 0,
+      "summary": "OUTPUT_OWNER 60 0",
+      "log": "lua5.4-candidate.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "preimages",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 47 13",
+      "log": "lua5.4-preimages.log",
+      "sha256": "788759d7d7912f7e828b75e9c96b48ca2c98a544c7265136d27c8a4bc456e451"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_restoration",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 59 1",
+      "log": "lua5.4-omit_restoration.log",
+      "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_channel_reservation",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 58 2",
+      "log": "lua5.4-omit_channel_reservation.log",
+      "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396"
+    },
+    {
+      "abi": "lua5.4",
+      "source": "omit_known_repeat",
+      "exit_code": 1,
+      "summary": "OUTPUT_OWNER 59 1",
+      "log": "lua5.4-omit_known_repeat.log",
+      "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765"
+    }
+  ],
+  "native_kernel_execution": "UNEXECUTED: separatefoundation21kernel checks remain unrun; no native uinput/input handles allocated",
+  "full_hosted_packaging_installation": "UNEXECUTED by reviewer",
+  "initial_private_preparation_failure": "0/60 missing copied infra.device_names; preserved log; corrected complete dependency snapshot, not a productfailure",
+  "admission_constraints": [
+    "fix/linux source ownership lease and Root source admission remain pending.",
+    "Root must compose reviewedfoundation before exactsuccessorpatch; currentoriginDev sourcepreimages must be checked at admission.",
+    "Consumer source/input/mask/hotstring/injector authority join remains separate and unqualified."
+  ],
+  "evidence": [
+    {
+      "path": "candidate/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "fc77df761890ecdc725b2962a78bac7bad898bc989b568b074e6b5d3e788b84a"
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua",
+      "sha256": "66fcc86ee684623b311e404e13aca15ea8174af7b23d425f5672ab10d463b724"
+    },
+    {
+      "path": "lua5.4-candidate.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+    },
+    {
+      "path": "lua5.4-omit_channel_reservation.log",
+      "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396"
+    },
+    {
+      "path": "lua5.4-omit_known_repeat.log",
+      "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765"
+    },
+    {
+      "path": "lua5.4-omit_restoration.log",
+      "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e"
+    },
+    {
+      "path": "lua5.4-preimages.log",
+      "sha256": "788759d7d7912f7e828b75e9c96b48ca2c98a544c7265136d27c8a4bc456e451"
+    },
+    {
+      "path": "luajit-candidate.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+    },
+    {
+      "path": "luajit-omit_channel_reservation.log",
+      "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396"
+    },
+    {
+      "path": "luajit-omit_known_repeat.log",
+      "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765"
+    },
+    {
+      "path": "luajit-omit_restoration.log",
+      "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e"
+    },
+    {
+      "path": "luajit-preimages.log",
+      "sha256": "4a027fc10d174576cf85e012f78712bfaeff61f4546c9f3d52fb94bd251ab704"
+    },
+    {
+      "path": "omit_channel_reservation/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "721014971d07af8df0bd998e50abec68799386927e9e7a93912d217c79c4604b"
+    },
+    {
+      "path": "omit_known_repeat/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "14f328dbe35a88a47d9c0a1c91c2947d84b106b1f5faf96e3481a7401bf1b0e7"
+    },
+    {
+      "path": "omit_restoration/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "506609186a6da84e414883ff046e43f98be8c4fb4e1096c38e03a4d4dcf4168b"
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "56158cc41577b54344da9543c56337b98d37391caaee6f3906fd02353243099e"
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua",
+      "sha256": "a4960f0998d4ca611be7f943535a16de513e8b24afb40b8dc9b7481596e387aa"
+    },
+    {
+      "path": "preparation-missing-device-names.log",
+      "sha256": "049a5bdac292c5203b45fb17b8376c8c3bc72e70f74deb83a01835b8777b4d38"
+    },
+    {
+      "path": "replay.json",
+      "sha256": "92047c2bce8a9b5689db94f3844c99043700cc6e147363c38458ea5a0d937000"
+    },
+    {
+      "path": "run.lua",
+      "sha256": "cac40fb594efd0c42f7fc84dee94c03533134f9c3d5f5563ebc25d6e3cb84603"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/_shared/lua/test/assertions.lua",
+      "sha256": "d0a137008bed77c7129c94d0221801bea4851011a6626ce078a2f66cb4a2a1de"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/_shared/lua/test/format.lua",
+      "sha256": "5f435e974d232f59e3150967b0bfc93ad7174e665b4b0cbe0ac0b3a6cfa0d91a"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/linux/infra/device_names.lua",
+      "sha256": "b5d351328761cbc9309f003126aa42e82d47773d6872d6036d10795e79e863d6"
+    },
+    {
+      "path": "snapshot/static/ergopti_plus/linux/tests/helpers.lua",
+      "sha256": "c40df4005280f8c3a5671bad44b4b4d4811103c5332831c5b30fefc2eafb4765"
+    }
+  ],
+  "Root_mutation": false
+}

@@ -1,0 +1,8 @@
+{
+  "source_single_read": "passed",
+  "old_source_contract": "expected failure",
+  "publication_mutations": 2,
+  "previous_five_cases_whole_byte_prefix": "exact",
+  "registered_native_cases": 6,
+  "native_behavior": "unexecuted"
+}

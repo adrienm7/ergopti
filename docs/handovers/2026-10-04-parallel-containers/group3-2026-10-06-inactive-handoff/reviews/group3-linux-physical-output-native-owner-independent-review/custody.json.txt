@@ -1,0 +1,7 @@
+{
+  "all_pins": "exact",
+  "root_preimages": "exact",
+  "unit_whole_prefix": "exact",
+  "kernel_whole_inverse": "exact",
+  "status": "source review pending pure replay"
+}

@@ -1,0 +1,761 @@
+--- modules/shortcuts/manager.lua
+
+--- ==============================================================================
+--- MODULE: Shortcuts Manager (Linux)
+--- DESCRIPTION:
+--- Text-manipulation shortcuts for Linux: wrap symbols (brackets, quotes),
+--- CapsWord (auto-capitalize first letter of each word), and text transforms
+--- (uppercase, lowercase, title case) through the session clipboard and uinput.
+---
+--- Wrap and text transforms use the display-server-aware clipboard adapter and
+--- the daemon's owned uinput channel. CapsWord is hooked into the daemon's
+--- on_char callback and tracks keyboard state through the keyboard_hook adapter.
+---
+--- FEATURES & RATIONALE:
+--- 1. Wrap symbols: when the user types a bracket/quote while text is selected,
+---    the selection is wrapped (e.g. "hello" → "(hello)"). If nothing is
+---    selected, the symbol types normally. The decision lives in
+---    modules/shortcuts/wrap_on_type.lua, run from the keyboard hook's
+---    consumption callback; this module owns its switch
+---    (shortcuts.wrap_text_if_selected) and the wrap-pair catalogue.
+--- 2. CapsWord: toggled via menu or shortcut. When active, the next word's
+---    first letter is capitalized and CapsWord auto-disengages. Hooked into
+---    the daemon's on_char for per-keystroke processing.
+--- 3. Text transforms: clipboard-based transforms that copy the selection,
+---    apply a transform function, paste the result, and restore the clipboard.
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("logger.shim")
+local Paths  = require("infra.paths")
+local Manifest = require("infra.manifest_reader")
+local TextCase = require("unicode_case")
+local WrapPair = require("wrap_pair")
+local SendInput = require("send_input")
+local TomlCodec = require("toml_codec")
+local Clipboard = require("adapters.clipboard")
+local EventLoop = require("adapters.event_loop")
+local ComboEmitter = require("modules.gestures.combo_emitter")
+local Injector = require("modules.hotstrings.injector")
+local EvdevCodes = require("infra.evdev_codes")
+local LOG = "modules.shortcuts.manager"
+local _configuration_owner = nil
+local ENABLED_PATH = "shortcuts.enabled"
+
+-- The send_text / send_key / send_shortcut vocabulary, read on first use.
+local SEND_KEYS_REL_PATH = "modules/actions/send_keys.json"
+local _send_vocabulary = nil
+
+-- The keys that select the level keyboard_layout reports a character on, for a
+-- shortcut whose key is a character: Shift for level 2, AltGr for level 3.
+local LEVEL_MODIFIER_CODES = {
+	shift = EvdevCodes.KEY_LEFTSHIFT,
+	altgr = EvdevCodes.KEY_RIGHTALT,
+}
+local CONFIG_SECTION = "shortcuts"
+local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
+
+if type(DEFAULT_ENABLED) ~= "boolean" then
+	error("The manifest default for " .. ENABLED_PATH .. " must be a boolean.")
+end
+
+local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+if not _writer_ok then TomlWriter = nil end
+
+--- Records that the user fired a shortcut.
+---
+--- At ENTRY, not on success, and deliberately: the table stores what the user
+--- asked for, not whether it worked. macOS's events_shortcut carries a key name
+--- and nothing else for the same reason — "I pressed the uppercase shortcut and
+--- had nothing selected" is still a use of that shortcut, and a recorder that
+--- only fires on the happy path under-reports exactly the actions a user is
+--- struggling with.
+---
+--- pcall'd and lazily required: metrics are optional and must never be the
+--- reason a shortcut does not run.
+--- @param key string Stable action name; the dashboard groups by it.
+local function record(key)
+	local ok, keylogger = pcall(require, "modules.keylogger.keylogger")
+	if not ok or type(keylogger.record_shortcut) ~= "function" then return end
+	local app = "unknown"
+	local ok_win, WindowInfo = pcall(require, "adapters.window_info")
+	if ok_win and type(WindowInfo.focused_app_id) == "function" then
+		local ok_id, id = pcall(WindowInfo.focused_app_id)
+		if ok_id and type(id) == "string" and id ~= "" then app = id end
+	end
+	pcall(keylogger.record_shortcut, app, key)
+end
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Wrap Symbol Pairs ============
+-- =========================================
+-- =========================================
+
+-- Relative path (from static/ergopti_plus) to the shared wrap-symbol catalogue,
+-- the single source of truth shared with the AHK and macOS drivers — never
+-- hardcode the pair list here; edit the JSON so all 3 drivers stay in sync
+local WRAP_SYMBOLS_REL_PATH = "modules/wrap_symbols/wrap_symbols.json"
+
+-- Leading UTF-8 BOM bytes; the pure-Lua JSON decoder rejects a byte-order mark
+local UTF8_BOM = "\239\187\191"
+
+--- Resolves the absolute path to the shared wrap-symbols catalogue.
+---
+--- Through infra.paths. Stripping four path segments off this file's own
+--- location described one layout only: an installed package stages the driver
+--- flat under /usr/lib/ergopti, where four up leaves the install entirely and
+--- every wrap pair is silently lost.
+--- @return string Absolute catalogue path, or "" when the location is unresolvable.
+local function resolve_wrap_symbols_path()
+	return Paths.shared(WRAP_SYMBOLS_REL_PATH) or ""
+end
+
+--- Reads the shared wrap-symbols JSON and flattens its ordered groups into the
+--- { [char] = { left, right } } lookup used at wrap time, and the ordered pair
+--- list the wrap_selection parameter resolves against. Both the opening and
+--- the closing character of each pair are registered as lookup keys so typing
+--- either one wraps the selection (mirrors the macOS driver's build loop). Fails
+--- loud with an ERROR log and returns empty tables on any resolve/read/parse
+--- failure.
+--- @return table The flattened wrap-pair lookup.
+--- @return table The pairs in catalogue order, each { left, right }.
+local function load_wrap_pairs()
+	local lookup = {}
+	local ordered = {}
+
+	local ok_json, json = pcall(require, "json")
+	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
+		Logger.error(LOG, "JSON decoder unavailable — wrap-symbol catalogue not loaded.")
+		return lookup, ordered
+	end
+
+	local path = resolve_wrap_symbols_path()
+	if path == "" then
+		Logger.error(LOG, "Could not resolve the shared wrap-symbols path — catalogue not loaded.")
+		return lookup, ordered
+	end
+
+	local fh = io.open(path, "r")
+	if not fh then
+		Logger.error(LOG, "Shared wrap-symbols catalogue unreadable at '%s'.", path)
+		return lookup, ordered
+	end
+	local content = fh:read("*a")
+	fh:close()
+
+	if type(content) == "string" and content:sub(1, 3) == UTF8_BOM then
+		content = content:sub(4)
+	end
+
+	local ok, data = pcall(json.decode, content)
+	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then
+		Logger.error(LOG, "Shared wrap-symbols catalogue failed to parse — catalogue not loaded.")
+		return lookup, ordered
+	end
+
+	for _, group in ipairs(data.groups) do
+		for _, pair in ipairs(group.pairs or {}) do
+			if type(pair) == "table"
+					and type(pair.left) == "string" and pair.left ~= ""
+					and type(pair.right) == "string" and pair.right ~= "" then
+				ordered[#ordered + 1] = { left = pair.left, right = pair.right }
+				lookup[pair.left] = { left = pair.left, right = pair.right }
+				if pair.right ~= pair.left then
+					lookup[pair.right] = { left = pair.left, right = pair.right }
+				end
+			end
+		end
+	end
+
+	local count = 0
+	for _ in pairs(lookup) do count = count + 1 end
+	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", count)
+
+	return lookup, ordered
+end
+
+--- Canonical wrap-pair catalogue, derived at require-time from the shared JSON
+--- single source of truth (never hardcoded here). Each entry maps a trigger
+--- character to its { left, right } wrapping symbols; WRAP_PAIR_LIST keeps the
+--- catalogue order.
+local WRAP_PAIRS, WRAP_PAIR_LIST = load_wrap_pairs()
+
+--- Checks whether a character is a wrap-pair trigger.
+--- @param ch string Single character.
+--- @return table|nil { left, right } or nil if not a wrap character.
+function M.get_wrap_pair(ch)
+	-- One CHARACTER, not one byte: « », “ ” and the CJK brackets are pairs of
+	-- the catalogue too, and a byte test made every one of them unmatched.
+	if not TextCase.is_single_character(ch) then return nil end
+	return WRAP_PAIRS[ch]
+end
+
+--- Returns the full wrap-pairs catalogue.
+--- @return table
+function M.get_wrap_pairs()
+	return WRAP_PAIRS
+end
+
+--- The built-in pairs in catalogue order, as a copy.
+--- @return table Array of { left, right }.
+function M.get_wrap_pair_list()
+	local list = {}
+	for index, pair in ipairs(WRAP_PAIR_LIST) do
+		list[index] = { left = pair.left, right = pair.right }
+	end
+	return list
+end
+
+--- The left and right symbols a wrap_selection parameter names: a catalogue
+--- symbol or a custom left|right pair (_shared/lua/wrap_pair).
+--- @param value any The stored parameter.
+--- @return string|nil left
+--- @return string|nil right Both nil when the value names no pair.
+function M.resolve_wrap_pair(value)
+	return WrapPair.parse(value, WRAP_PAIR_LIST)
+end
+
+--- The vocabulary of the send_text, send_key and send_shortcut parameters,
+--- read once from _shared/modules/actions/send_keys.json. A missing or
+--- malformed file raises: every send_* binding would otherwise refuse its value
+--- with no explanation.
+--- @return table The decoded vocabulary.
+function M.send_vocabulary()
+	if _send_vocabulary then return _send_vocabulary end
+	local path = Paths.shared(SEND_KEYS_REL_PATH)
+	local handle = path and io.open(path, "r")
+	if not handle then error("shortcuts: cannot read " .. tostring(path)) end
+	local body = handle:read("*a")
+	handle:close()
+	local ok, parsed = pcall(require("json").decode, body)
+	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table"
+		or type(parsed.modifiers) ~= "table" or type(parsed.text_max_code_points) ~= "number" then
+		error("shortcuts: " .. tostring(path) .. " is not a send-input vocabulary")
+	end
+	_send_vocabulary = parsed
+	return parsed
+end
+
+--- Parses a send_* parameter (_shared/lua/send_input over the vocabulary).
+--- @param kind string "text", "key" or "shortcut".
+--- @param value any The stored parameter.
+--- @return table|nil The parse, or nil when the value is invalid.
+function M.parse_send_input(kind, value)
+	return SendInput.parse(kind, value, M.send_vocabulary())
+end
+
+--- Presses a parsed key or shortcut on the daemon's uinput device.
+---
+--- A named key is its evdev code. A character in a shortcut is the key the
+--- loaded keymap types it with, plus that key's level modifier: on AZERTY,
+--- Ctrl+A is Ctrl with the key the kernel calls KEY_Q. A character alone
+--- (send_key "é") is typed through the injector instead, which knows every
+--- level and falls back to the clipboard.
+--- @param kind string "key" or "shortcut".
+--- @param parsed table A parse from parse_send_input.
+--- @return boolean True when the input was sent.
+local function send_keystroke(kind, parsed)
+	local vocabulary = M.send_vocabulary()
+	local mod_codes, held = {}, {}
+	local function hold(code)
+		if not held[code] then
+			held[code] = true
+			mod_codes[#mod_codes + 1] = code
+		end
+	end
+	for _, id in ipairs(parsed.mods or {}) do
+		hold(SendInput.entry(vocabulary, "modifiers", id).linux)
+	end
+	if parsed.named then
+		return ComboEmitter.press_codes(mod_codes,
+			{ SendInput.entry(vocabulary, "keys", parsed.named).linux }, parsed.canonical)
+	end
+	if kind == "key" then
+		local result = Injector.inject(0, parsed.char, false)
+		return type(result) == "table" and result.ok == true
+	end
+	local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
+	local hit = ok_layout and type(Layout.resolve) == "function" and Layout.resolve(parsed.char) or nil
+	if type(hit) ~= "table" then
+		Logger.error(LOG, "send_shortcut: the loaded keymap has no key for '%s' — nothing pressed.",
+			parsed.char)
+		return false
+	end
+	for _, level_modifier in ipairs(hit.mods or {}) do
+		local code = LEVEL_MODIFIER_CODES[level_modifier]
+		if not code then
+			Logger.error(LOG, "send_shortcut: '%s' needs the modifier '%s', which cannot be pressed.",
+				parsed.char, tostring(level_modifier))
+			return false
+		end
+		hold(code)
+	end
+	return ComboEmitter.press_codes(mod_codes, { hit.keycode }, parsed.canonical)
+end
+
+--- Wraps the current selection with left/right symbols.
+--- @param left string Opening symbol.
+--- @param right string Closing symbol.
+function M.wrap_selection(left, right)
+	if _configuration_owner ~= nil then return false end
+	record("wrap_selection")
+	if type(left) ~= "string" or type(right) ~= "string" then return false end
+	local ok, reason = Clipboard.transform_selection(function(selected)
+		return left .. selected .. right
+	end, ComboEmitter.press, EventLoop.sleep_ms)
+	if ok then return true end
+	if reason == "no_selection" then
+		local result = Injector.inject(0, left .. right, false)
+		return type(result) == "table" and result.ok == true
+	end
+	Logger.error(LOG, "Selection wrapping failed: %s.", tostring(reason))
+	return false
+end
+
+-- =========================================
+-- =========================================
+-- ======= 2/ CapsWord =====================
+-- =========================================
+-- =========================================
+
+local _caps_word_active = false
+local _caps_word_triggered = false  -- true after first letter capitalized, waiting for word end
+
+--- Returns whether CapsWord is currently active.
+--- @return boolean
+function M.is_caps_word_active()
+	return _caps_word_active
+end
+
+--- Toggles CapsWord on/off via the menu.
+--- @return boolean True only after runtime state publication.
+function M.toggle_caps_word()
+	if _configuration_owner ~= nil then return false end
+	record("caps_word")
+	-- Metric delivery is protected external code and can reserve configuration.
+	if _configuration_owner ~= nil then return false end
+	_caps_word_active = not _caps_word_active
+	_caps_word_triggered = false
+	Logger.info(LOG, "CapsWord: %s", _caps_word_active and "ON" or "OFF")
+	return true
+end
+
+--- Processes a character for CapsWord.
+--- Called from the daemon's on_char hook.
+--- CapsWord logic: when active, capitalize the first letter of the next word,
+--- then disengage until the next word boundary.
+--- @param ch string The character just typed.
+--- @return string|nil Modified character (upper-cased), or nil to pass through.
+function M.process_caps_word(ch)
+	if _configuration_owner ~= nil then return nil end
+	if not _caps_word_active then return nil end
+	if not TextCase.is_single_character(ch) then return nil end
+
+	-- Word boundaries: Unicode whitespace and punctuation.
+	local is_boundary = TextCase.is_word_boundary(ch)
+
+	if is_boundary then
+		-- Word boundary reached — prepare for next word.
+		_caps_word_triggered = false
+		return nil
+	end
+
+	if not _caps_word_triggered then
+		-- First letter of new word — capitalize and disengage for this word.
+		_caps_word_triggered = true
+		local upper = TextCase.upper(ch)
+		if upper == ch then
+			return nil  -- already uppercase, no change needed
+		end
+		Logger.debug(LOG, "CapsWord: '%s' → '%s'.", ch, upper)
+		return upper
+	end
+
+	return nil
+end
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Text Manipulation ============
+-- =========================================
+-- =========================================
+
+local function transform_selection(action, transform)
+	if _configuration_owner ~= nil then return false end
+	record(action)
+	-- Metric delivery can reserve configuration before clipboard ownership begins.
+	if _configuration_owner ~= nil then return false end
+	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
+	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
+	return ok
+end
+
+--- Toggles the current selection between Unicode uppercase and lowercase.
+function M.transform_uppercase()
+	return transform_selection("to_uppercase", TextCase.toggle_upper)
+end
+
+--- Transforms the current selection to lowercase.
+function M.transform_lowercase()
+	return transform_selection("to_lowercase", TextCase.lower)
+end
+
+--- Toggles the current selection between Unicode title case and lowercase.
+function M.transform_titlecase()
+	return transform_selection("to_titlecase", TextCase.toggle_title)
+end
+
+--- Transforms the current selection to uppercase, whatever its current case.
+function M.transform_to_uppercase()
+	return transform_selection("selection_uppercase", TextCase.upper)
+end
+
+--- Transforms the current selection to title case, whatever its current case.
+function M.transform_to_titlecase()
+	return transform_selection("selection_titlecase", TextCase.title)
+end
+
+--- Selects the word under the cursor: Ctrl+Right moves to its end, then
+--- Ctrl+Shift+Left selects back to its start, as macOS does with Option. Only
+--- the second half used to be sent, which selected from the caret to the start
+--- of the word instead of the word.
+function M.select_word()
+	if _configuration_owner ~= nil then return false end
+	record("select_word")
+	if not ComboEmitter.press("ctrl+Right") then return false end
+	return ComboEmitter.press("ctrl+shift+Left")
+end
+
+--- Selects the entire current line (Home, Shift+End).
+function M.select_line()
+	if _configuration_owner ~= nil then return false end
+	record("select_line")
+	if not ComboEmitter.press("Home") then return false end
+	return ComboEmitter.press("shift+End")
+end
+
+--- Wraps the current line in parentheses: Home, "(", End, ")", Home, the
+--- sequence the Windows driver emits for the same action.
+--- @return boolean True when every step was emitted.
+function M.surround_line_with_parens()
+	if _configuration_owner ~= nil then return false end
+	record("surround_parens")
+	local function typed(text)
+		local result = Injector.inject(0, text, false)
+		return type(result) == "table" and result.ok == true
+	end
+	return ComboEmitter.press("Home") and typed("(")
+		and ComboEmitter.press("End") and typed(")")
+		and ComboEmitter.press("Home")
+end
+
+--- Pastes clipboard content as plain text (strips formatting).
+function M.paste_plain()
+	if _configuration_owner ~= nil then return false end
+	record("paste_plain")
+	local ok, text, reason = Clipboard.read_checked()
+	if not ok or text == "" then
+		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
+		return false
+	end
+	local result = Injector.inject(0, text, false)
+	return type(result) == "table" and result.ok == true
+end
+
+--- The catalogue actions this module performs, by action id, for the gesture
+--- executor. The daemon injects them through modules/shortcuts/action_handlers,
+--- so a gesture or a keyboard slot runs the same code as the tray row instead
+--- of a second copy in the gesture layer.
+--- @return table { [action_id] = function(binding, parameter): boolean }
+function M.action_handlers()
+	return {
+		["select_line"] = function() return M.select_line() end,
+		["select_word"] = function() return M.select_word() end,
+		["paste_plain"] = function() return M.paste_plain() end,
+		["surround_parens"] = function() return M.surround_line_with_parens() end,
+		["uppercase_selection"] = function() return M.transform_uppercase() end,
+		["titlecase_selection"] = function() return M.transform_titlecase() end,
+		["selection_uppercase"] = function() return M.transform_to_uppercase() end,
+		["selection_lowercase"] = function() return M.transform_lowercase() end,
+		["selection_titlecase"] = function() return M.transform_to_titlecase() end,
+		-- The value is the binding's own parameter, validated by the executor.
+		["send_text"] = function(_, parameter)
+			record("send_text")
+			local parsed = M.parse_send_input("text", parameter)
+			if not parsed then return false end
+			local result = Injector.inject(0, parsed.text, false)
+			return type(result) == "table" and result.ok == true
+		end,
+		["send_key"] = function(_, parameter)
+			record("send_key")
+			local parsed = M.parse_send_input("key", parameter)
+			return parsed ~= nil and send_keystroke("key", parsed)
+		end,
+		["send_shortcut"] = function(_, parameter)
+			record("send_shortcut")
+			local parsed = M.parse_send_input("shortcut", parameter)
+			return parsed ~= nil and send_keystroke("shortcut", parsed)
+		end,
+		-- The pair is the binding's own parameter, validated by the executor.
+		-- Nothing selected: nothing is typed, as on macOS and Windows.
+		["wrap_selection"] = function(_, parameter)
+			local left, right = M.resolve_wrap_pair(parameter)
+			if not left then
+				Logger.warn(LOG, "wrap_selection ignored: no valid pair ('%s').", tostring(parameter))
+				return false
+			end
+			return transform_selection("wrap_selection", function(selected)
+				return left .. selected .. right
+			end)
+		end,
+	}
+end
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Enable / Disable =============
+-- =========================================
+-- =========================================
+
+local _enabled = false
+local _config_path = nil
+local _persist = false
+
+--- Returns whether shortcuts are enabled.
+--- @return boolean
+function M.is_enabled()
+	return _enabled
+end
+
+--- Persists a master-state transition before publishing it.
+--- @param enabled boolean
+--- @return boolean True when the transition was committed.
+function M.set_enabled(enabled)
+	if _configuration_owner ~= nil then return false end
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Shortcut state must be a boolean — nothing changed.")
+		return false
+	end
+	if _persist then
+		if not TomlWriter or not _config_path then
+			Logger.error(LOG, "Shortcut state cannot be persisted — nothing changed.")
+			return false
+		end
+		local called, committed, err = pcall(TomlWriter.batch_write, _config_path, {
+			{ section = CONFIG_SECTION, key = "enabled", value = enabled },
+		})
+		if not called or committed ~= true then
+			Logger.error(LOG, "Could not persist shortcut state: %s.", tostring(called and err or committed))
+			return false
+		end
+	end
+
+	_enabled = enabled
+	if not enabled then
+		_caps_word_active = false
+		_caps_word_triggered = false
+	end
+	Logger.info(LOG, "Shortcuts %s.", enabled and "enabled" or "disabled")
+	return true
+end
+
+--- Enables shortcuts processing.
+--- @return boolean True when the transition was committed.
+function M.enable()
+	return M.set_enabled(true)
+end
+
+--- Disables shortcuts processing.
+--- @return boolean True when the transition was committed.
+function M.disable()
+	return M.set_enabled(false)
+end
+
+--- Toggles shortcuts on/off.
+function M.toggle()
+	M.set_enabled(not _enabled)
+	return _enabled
+end
+
+-- The wrap-on-type switch (shortcuts.wrap_text_if_selected).
+local WRAP_ON_TYPE_KEY = "wrap_text_if_selected"
+local DEFAULT_WRAP_ON_TYPE = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY)
+if type(DEFAULT_WRAP_ON_TYPE) ~= "boolean" then
+	error("The manifest default for shortcuts." .. WRAP_ON_TYPE_KEY .. " must be a boolean.")
+end
+local _wrap_on_type = DEFAULT_WRAP_ON_TYPE
+
+--- Whether typing a wrap symbol over a selection wraps it.
+--- @return boolean
+function M.is_wrap_on_type_enabled()
+	return _wrap_on_type
+end
+
+--- Persists and applies the wrap-on-type switch.
+--- @param enabled boolean
+--- @return boolean True when the state was committed.
+function M.set_wrap_on_type_enabled(enabled)
+	if _configuration_owner ~= nil then return false end
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Wrap-on-type state must be a boolean — nothing changed.")
+		return false
+	end
+	if _persist then
+		if not TomlWriter or not _config_path then
+			Logger.error(LOG, "Wrap-on-type state cannot be persisted — nothing changed.")
+			return false
+		end
+		local ok, err = TomlWriter.batch_write(_config_path, {
+			{ section = CONFIG_SECTION, key = WRAP_ON_TYPE_KEY, value = enabled },
+		})
+		if not ok then
+			Logger.error(LOG, "Could not persist the wrap-on-type state: %s.", tostring(err))
+			return false
+		end
+	end
+	_wrap_on_type = enabled
+	Logger.info(LOG, "Wrap selection on typed symbol %s.", enabled and "enabled" or "disabled")
+	return true
+end
+
+-- =========================================
+-- =========================================
+-- ======= 5/ Init =========================
+-- =========================================
+-- =========================================
+
+--- The master state init() reads from a decoded config.toml: any value, even
+--- a malformed one, because a malformed one fails closed.
+--- @param config table Decoded config.toml.
+--- @return any value `[shortcuts].enabled`, nil when absent.
+local function configured_enabled(config)
+	if type(config[CONFIG_SECTION]) ~= "table" then return nil end
+	return config[CONFIG_SECTION].enabled
+end
+
+--- Marks every config.toml path init() reads.
+--- @param config table Decoded config.toml.
+--- @param mark function mark(...segments) from config_unused_keys.
+function M.mark_config_reads(config, mark)
+	if configured_enabled(config) ~= nil then mark(CONFIG_SECTION, "enabled") end
+	if type(config[CONFIG_SECTION]) == "table" and config[CONFIG_SECTION][WRAP_ON_TYPE_KEY] ~= nil then
+		mark(CONFIG_SECTION, WRAP_ON_TYPE_KEY)
+	end
+end
+
+--- Initialises the shortcuts module.
+--- @param opts table|nil { enabled?, persist?, config_path? }
+function M.init(opts)
+	if _configuration_owner ~= nil then return false end
+	opts = type(opts) == "table" and opts or {}
+	if opts.enabled ~= nil and type(opts.enabled) ~= "boolean" then
+		error("shortcuts enabled override must be a boolean")
+	end
+	-- Reset CapsWord state so init() gives a clean slate for tests.
+	_caps_word_active = false
+	_caps_word_triggered = false
+	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_persist = opts.persist == true
+
+	local enabled = DEFAULT_ENABLED
+	local wrap_on_type = DEFAULT_WRAP_ON_TYPE
+	if _persist then
+		local fh = io.open(_config_path, "r")
+		if fh then
+			local content = fh:read("*a")
+			fh:close()
+			local ok, config = pcall(TomlCodec.decode, content)
+			if not ok or type(config) ~= "table" then
+				Logger.error(LOG, "Shortcut configuration is invalid — failing closed.")
+				enabled = false
+				wrap_on_type = false
+			else
+				local configured = configured_enabled(config)
+				if type(configured) == "boolean" then
+					enabled = configured
+				elseif configured ~= nil then
+					Logger.error(LOG, "Shortcut enabled state is invalid — failing closed.")
+					enabled = false
+				end
+				local section = type(config[CONFIG_SECTION]) == "table" and config[CONFIG_SECTION] or {}
+				local wrap = section[WRAP_ON_TYPE_KEY]
+				if type(wrap) == "boolean" then
+					wrap_on_type = wrap
+				elseif wrap ~= nil then
+					Logger.error(LOG, "Wrap-on-type state is invalid — failing closed.")
+					wrap_on_type = false
+				end
+			end
+		end
+	end
+	if type(opts.enabled) == "boolean" then enabled = opts.enabled end
+	_enabled = enabled
+	_wrap_on_type = wrap_on_type
+	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s, wrap_on_type=%s).",
+		tostring(_enabled), tostring(_wrap_on_type))
+end
+
+
+--- Acquires the initialized shortcut runtime before a scoped publication.
+--- @param owner table Exact transaction token.
+--- @return boolean acquired
+function M.acquire_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= nil or not _persist or not _config_path then return false end
+	_configuration_owner = owner
+	return true
+end
+
+--- Releases the same configuration owner after success or compensation.
+--- @param owner table Exact transaction token.
+--- @return boolean released
+function M.release_configuration(owner)
+	if type(owner) ~= "table" or _configuration_owner ~= owner then return false end
+	_configuration_owner = nil
+	return true
+end
+
+--- Keeps desired menu state separate from input admission during a transaction.
+--- @return boolean admitted
+function M.configuration_admitted()
+	return _configuration_owner == nil
+end
+
+--- Resolves the manager's actual two preferences from a detached source.
+--- @param document table Decoded configuration.
+--- @return table state
+function M.configuration_candidate(document)
+	assert(document.shortcuts == nil or type(document.shortcuts) == "table", "shortcut section is malformed")
+	local section = document.shortcuts or {}
+	local enabled, wrap = section.enabled, section[WRAP_ON_TYPE_KEY]
+	if enabled == nil then enabled = Manifest.default_for(ENABLED_PATH) end
+	if wrap == nil then wrap = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY) end
+	assert(type(enabled) == "boolean" and type(wrap) == "boolean", "shortcut switches must be boolean")
+	return { enabled = enabled, wrap = wrap, caps_word_active = false, caps_word_triggered = false }
+end
+
+--- Captures the exact manager state without touching clipboard or input devices.
+--- @param owner table Exact transaction token.
+--- @return table|nil state
+function M.configuration_snapshot(owner)
+	if _configuration_owner ~= owner then return nil end
+	return { enabled = _enabled, wrap = _wrap_on_type,
+		caps_word_active = _caps_word_active, caps_word_triggered = _caps_word_triggered }
+end
+
+--- Applies a validated runtime state without invoking independent setters.
+--- @param owner table Exact transaction token.
+--- @param state table Candidate or saved state.
+--- @return boolean acknowledged
+function M.apply_configuration(owner, state)
+	if _configuration_owner ~= owner or type(state) ~= "table" then return false end
+	for _, key in ipairs({ "enabled", "wrap", "caps_word_active", "caps_word_triggered" }) do
+		if type(state[key]) ~= "boolean" then return false end
+	end
+	_enabled, _wrap_on_type = state.enabled, state.wrap
+	_caps_word_active, _caps_word_triggered = state.caps_word_active, state.caps_word_triggered
+	return true
+end
+
+return M

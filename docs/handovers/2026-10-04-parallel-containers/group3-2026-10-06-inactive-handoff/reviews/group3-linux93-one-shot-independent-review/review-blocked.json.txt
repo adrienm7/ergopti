@@ -1,0 +1,32 @@
+{
+  "verdict": "BLOCKED",
+  "packet_receipt": "4efd7f0a523526140cafa438ac17b067607c028bd22999b512001f1bc4bffb99",
+  "all_frozen_pins_root_preimages_dependencies": "verified exact",
+  "issue": {
+    "path": "static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+    "boundary": "owner.process nonphysical receipt early return bypasses process_base",
+    "reproduction": "arm/ACK pair native OneShotShift; restore/ACK Ctrl; release/ACK first key; next physical=false/nil receipt letter enters base:process and emits Shift down without owned frame",
+    "observed_each_ABI": "original12PASS + independent1FAIL (untrusted event emits pair-owned Shift)",
+    "minimal_fix": "when pair native_state is armed, untrusted receipts retire the exact owner state/debt before ACK-gated baseline replay; preserve existing invalid-receipt baseline behavior without native state"
+  },
+  "native_io_hardware": "unexecuted",
+  "source_modified": "private copied oracle append only; frozen packet and Root unchanged",
+  "evidence": [
+    {
+      "path": "reproduce.lua",
+      "sha256": "9c1e9b06147b0c8adca0e027e4551bab252c8340a0808fd860166835b00f43ec"
+    },
+    {
+      "path": "reproduction-luajit.log",
+      "sha256": "5ef051006ee5b2b20c57ba69574d8471430cb6f082123fe785e5ab62af457fad"
+    },
+    {
+      "path": "reproduction-lua54.log",
+      "sha256": "5ef051006ee5b2b20c57ba69574d8471430cb6f082123fe785e5ab62af457fad"
+    },
+    {
+      "path": "test_key_combination_native_actions.lua",
+      "sha256": "29b90b9b22417a8318f1a3036bf6dea1890b883330cff865fb901d4d5c634a38"
+    }
+  ]
+}

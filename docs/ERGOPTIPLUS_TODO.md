@@ -5507,12 +5507,17 @@ path. Refused native cleanup remains reserved before assignment or confirmation
 callbacks. The shared reader preserves POSIX prefixes and rejects mismatched
 Windows provider metadata. Independent source review covers the native consumer,
 assignment/confirmation paths and retained-handle cleanup; all 27 previous
-program cases remain intact, with 34 composed registered cases. Those Windows
-cases, native discovery/invocation, compiled behavior, packaging and installation
-remain unexecuted for this tranche until exact-source Windows CI. macOS and
-Linux qualification is also required for the shared metadata. Real interpreter
-eligibility does not by itself qualify invocation or Apple Shortcuts, and this
-tranche does not complete item 106.
+program cases remain intact, with 34 composed registered cases. Exact-source
+manual run 37523199350 on CI `3cb5ff1f` / feature `7d305622` passes all 34
+program/provider records within 9,722 native units, 70 E2E cases, compilation,
+packaging, installation and launch. This includes actual AutoHotkey, Python
+and PowerShell script arguments and native retained-handle retirement. The run
+is globally FAILED: Core, Linux and the Ubuntu-hosted macOS portable job stop
+at `Ubuntu archive authority ownership refused`; Release is SKIPPED. The shared
+metadata still needs exact-source Linux/macOS hosted qualification after that
+separately owned prerequisite repair. Real interpreter invocation does not
+qualify broader automation inventory, Apple Shortcuts or physical keyboard
+acceptance, and this tranche does not complete item 106.
 
 Complete selected gates, hosted native execution, packaging and installation
 remain required. Automation-provider discovery and Apple Shortcuts are still

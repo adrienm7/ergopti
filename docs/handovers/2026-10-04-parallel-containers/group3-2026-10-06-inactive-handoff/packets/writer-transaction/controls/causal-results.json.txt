@@ -1,0 +1,38 @@
+[
+  {
+    "case": "omit_restoration",
+    "abi": "luajit",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 59 1"
+  },
+  {
+    "case": "omit_restoration",
+    "abi": "lua5.4",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 59 1"
+  },
+  {
+    "case": "omit_channel_reservation",
+    "abi": "luajit",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 58 2"
+  },
+  {
+    "case": "omit_channel_reservation",
+    "abi": "lua5.4",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 58 2"
+  },
+  {
+    "case": "omit_known_repeat",
+    "abi": "luajit",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 59 1"
+  },
+  {
+    "case": "omit_known_repeat",
+    "abi": "lua5.4",
+    "exit": 1,
+    "summary": "OUTPUT_OWNER 59 1"
+  }
+]

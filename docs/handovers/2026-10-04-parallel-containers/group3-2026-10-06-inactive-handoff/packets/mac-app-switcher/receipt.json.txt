@@ -1,0 +1,175 @@
+{
+  "status": "PRIVATE_UNINTEGRATED_NATIVE_UNQUALIFIED",
+  "root_head": "5e622935b7618bb9f8e3e1508141773046ed2134",
+  "paths": [
+    {
+      "path": "static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua",
+      "preimage": null,
+      "postimage": "d8643e455524da3d2b64db1300a9e691245d63d2f0e3bde18cae8426bf93ae98",
+      "root_exists": false
+    },
+    {
+      "path": "static/ergopti_plus/macos/modules/gestures/native_app_switcher.lua",
+      "preimage": null,
+      "postimage": "d61ab5137a01f313ce3aa94db07f1dfece32cf1ea06b444da89daf06f3bcca91",
+      "root_exists": false
+    },
+    {
+      "path": "static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher.lua",
+      "preimage": null,
+      "postimage": "84ef2517e805fae946f6a313076ddd644c5ebf2ba6294c7813036b4d31032b31",
+      "root_exists": false
+    },
+    {
+      "path": "static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua",
+      "preimage": null,
+      "postimage": "0fe9169faa202cf861326c60c906ae5a8933e0fdf50aaec0711df0aae8cf4f0d",
+      "root_exists": false
+    }
+  ],
+  "artifacts": {
+    "README.md": {
+      "sha256": "367c0e80d657617aed6943fea9523316829b21a0e6dc81e67ba9a0753f26eb9d",
+      "bytes": 5857
+    },
+    "candidate/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua": {
+      "sha256": "d8643e455524da3d2b64db1300a9e691245d63d2f0e3bde18cae8426bf93ae98",
+      "bytes": 10315
+    },
+    "candidate/static/ergopti_plus/macos/modules/gestures/native_app_switcher.lua": {
+      "sha256": "d61ab5137a01f313ce3aa94db07f1dfece32cf1ea06b444da89daf06f3bcca91",
+      "bytes": 5045
+    },
+    "candidate/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher.lua": {
+      "sha256": "84ef2517e805fae946f6a313076ddd644c5ebf2ba6294c7813036b4d31032b31",
+      "bytes": 8730
+    },
+    "candidate/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua": {
+      "sha256": "0fe9169faa202cf861326c60c906ae5a8933e0fdf50aaec0711df0aae8cf4f0d",
+      "bytes": 11533
+    },
+    "controlled-lua54.log": {
+      "sha256": "0c8d9104242c5567e4f5cccc2046d36de48fd4132465f1dbc295b00ba745e1f3",
+      "bytes": 4745
+    },
+    "final-core-luajit.log": {
+      "sha256": "aa41e6f3e7515bf9cbc91f40383597527c0d2aac7fbeb29a5caa67f1d4aa25b0",
+      "bytes": 1715
+    },
+    "final-lua54.log": {
+      "sha256": "fab9ffee918e61ddbe158d763775f9898b8a40f6cf1ff5ec4e86eb85c257cd50",
+      "bytes": 2575
+    },
+    "omit-input-retirement-ack-control.lua": {
+      "sha256": "d8d1f87d751475be46fdd1c3123481cd0bd595b62bd0c62dcf5fee3f8ffb4976",
+      "bytes": 10272
+    },
+    "omit-input-retirement-ack.log": {
+      "sha256": "f20f23886769ee92e8b4fd759c4356705bc9aca597b954e4354a87fa6e2d3693",
+      "bytes": 4185
+    },
+    "omit-tagged-arrival-admission-control.lua": {
+      "sha256": "147df59acdd4ea5395e00e5739458793cb58951711f94e382c16eef1065ba880",
+      "bytes": 10302
+    },
+    "omit-tagged-arrival-admission.log": {
+      "sha256": "dba15931207d614d710b0fe6b1db1b3a7fc06f0c45a779b37f7ff6b111a8f751",
+      "bytes": 2658
+    },
+    "omit-terminal-source-seal-control.lua": {
+      "sha256": "3ddbb1f6f2d8ce278e3b0266b241f455133f300f2557d83fafa6dcd331889952",
+      "bytes": 10282
+    },
+    "omit-terminal-source-seal.log": {
+      "sha256": "9f386ef61880595065bc80715db07715b4ad914115da44de6afb8e03d449bc37",
+      "bytes": 2664
+    },
+    "preimages/.agents/skills/hammerspoon-driver/SKILL.md": {
+      "sha256": "0a051706c88da6301e2aa7a562e79e0a614d05ef3fc90b30f5ce275f9a753c90",
+      "bytes": 10728
+    },
+    "preimages/.agents/skills/verify-change/SKILL.md": {
+      "sha256": "47b6fa014f939d5162e398529c8af91791808615cd221d4ecc8f260e38d5d9cf",
+      "bytes": 6554
+    },
+    "preimages/AGENTS.md": {
+      "sha256": "78b76196e3ab06d6cea4567769d834394132242b0a5f73e7f2f3932fc3701958",
+      "bytes": 3249
+    },
+    "preimages/docs/memory/macos-hammerspoon.md": {
+      "sha256": "1657a54105f02b576cba9298a5393871be6d035c11aea15a38dc19cd9b0400e3",
+      "bytes": 72658
+    },
+    "preimages/static/ergopti_plus/_shared/lua/native_worker_owner.lua": {
+      "sha256": "c6d8169f6f6fe0a2d3977a56708d2bf0104ed9d1369129a66a905a6415e6050f",
+      "bytes": 7754
+    },
+    "preimages/static/ergopti_plus/_shared/modules/timings/constants.toml": {
+      "sha256": "94f0a04ded780757ed8b08045150ddef079c4421d6ec864e9a425b2fe6e86997",
+      "bytes": 30221
+    },
+    "preimages/static/ergopti_plus/macos/adapters/synthetic_input.lua": {
+      "sha256": "44fb9852845d6099af93530771391632ed4a2ac470c562325e5a0cd2997ef8e3",
+      "bytes": 157155
+    },
+    "preimages/static/ergopti_plus/macos/adapters/timer_scheduler.lua": {
+      "sha256": "b2c47bb57a2a42af872135a468b49ea7320a7b822dc5807458673bee7e2a2d19",
+      "bytes": 17290
+    },
+    "preimages/static/ergopti_plus/macos/adapters/window_manager.lua": {
+      "sha256": "a6c18a07e99eaf9f270a39e3d956ee462c260d9360a218092ae17d2aa9f4da89",
+      "bytes": 10659
+    },
+    "preimages/static/ergopti_plus/macos/modules/gestures/actions.lua": {
+      "sha256": "22e20d24aa3a015618b9baa710cb7f44ae2c2fbbd3d97bd5f6ea17ea86e2c891",
+      "bytes": 123889
+    },
+    "preimages/static/ergopti_plus/macos/modules/gestures/actions_aux_owner.lua": {
+      "sha256": "eead2be145f34a4d3e20de9332e9e4bafdbf9073ff89b8d0173fc3e5d36b3175",
+      "bytes": 22117
+    },
+    "preimages/static/ergopti_plus/macos/tests/helpers/init.lua": {
+      "sha256": "c8255bc747f596ff7353e631baf7e57bd549148b93b960dd39763997648c5e89",
+      "bytes": 34300
+    },
+    "run_focused.py": {
+      "sha256": "345d07cc3cb805edf6bc224e2f27bb843fbc5bb403e557fa79e6a811d6fa94dd",
+      "bytes": 2973
+    }
+  },
+  "final": {
+    "lua54": {
+      "passed": 31,
+      "failed": 0
+    },
+    "shared_luajit": {
+      "passed": 21,
+      "failed": 0
+    }
+  },
+  "intentional_controls": {
+    "terminal_source_seal": {
+      "passed": 30,
+      "failed": 1
+    },
+    "input_retirement_ack": {
+      "passed": 27,
+      "failed": 4
+    },
+    "tagged_arrival_admission": {
+      "passed": 30,
+      "failed": 1
+    }
+  },
+  "native_allocations": 0,
+  "root_mutations": 0,
+  "actual_provider_exports": "missing; unavailable",
+  "timing_source_changes": 0,
+  "existing_assertions_modified": 0,
+  "limitations": [
+    "G5 exact native ports absent",
+    "canonical product timing binding absent",
+    "no product routing or feature availability enabled",
+    "no native Hammerspoon, Dock, HID, hardware, packaging or installation qualification"
+  ]
+}

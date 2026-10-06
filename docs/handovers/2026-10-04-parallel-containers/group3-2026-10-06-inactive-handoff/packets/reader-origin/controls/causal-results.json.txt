@@ -1,0 +1,74 @@
+[
+  {
+    "abi": "luajit",
+    "case": "omit_native_provider",
+    "exit": 1,
+    "summary": "READER_ORIGIN 46 1"
+  },
+  {
+    "abi": "lua5.4",
+    "case": "omit_native_provider",
+    "exit": 1,
+    "summary": "READER_ORIGIN 46 1"
+  },
+  {
+    "abi": "luajit",
+    "case": "omit_original_row",
+    "exit": 1,
+    "summary": "READER_ORIGIN 45 2"
+  },
+  {
+    "abi": "lua5.4",
+    "case": "omit_original_row",
+    "exit": 1,
+    "summary": "READER_ORIGIN 45 2"
+  },
+  {
+    "abi": "luajit",
+    "case": "omit_session_generation",
+    "exit": 1,
+    "summary": "READER_ORIGIN 45 2"
+  },
+  {
+    "abi": "lua5.4",
+    "case": "omit_session_generation",
+    "exit": 1,
+    "summary": "READER_ORIGIN 45 2"
+  },
+  {
+    "abi": "luajit",
+    "case": "omit_queue_loss_fence",
+    "exit": 1,
+    "summary": "READER_ORIGIN 46 1"
+  },
+  {
+    "abi": "lua5.4",
+    "case": "omit_queue_loss_fence",
+    "exit": 1,
+    "summary": "READER_ORIGIN 46 1"
+  },
+  {
+    "abi": "luajit",
+    "case": "omit_native_close_debt",
+    "exit": 1,
+    "summary": "READER_ORIGIN 45 2"
+  },
+  {
+    "abi": "lua5.4",
+    "case": "omit_native_close_debt",
+    "exit": 1,
+    "summary": "READER_ORIGIN 45 2"
+  },
+  {
+    "abi": "luajit",
+    "case": "omit_lazy_binding_reservation",
+    "exit": 1,
+    "summary": "READER_ORIGIN 46 1"
+  },
+  {
+    "abi": "lua5.4",
+    "case": "omit_lazy_binding_reservation",
+    "exit": 1,
+    "summary": "READER_ORIGIN 46 1"
+  }
+]

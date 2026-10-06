@@ -1,0 +1,977 @@
+diff --git a/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua b/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/_shared/lua/native_app_switcher_owner.lua
+@@ -0,0 +1,261 @@
++--- _shared/lua/native_app_switcher_owner.lua
++
++--- Retains one native switcher input session until exact input and timer retirement.
++--- Post admission, tagged event observation, session release and visible effect
++--- are distinct receipts. No window activation substitutes for native switching.
++local M = {}
++
++local REQUIRED = {
++	"ready", "prepare", "post", "observed", "released", "cancel_input",
++	"retire_input", "every", "cancel_timer", "now", "frontmost", "provider_current",
++}
++
++local function finite(value)
++	return type(value) == "number" and value == value
++		and value ~= math.huge and value ~= -math.huge
++end
++
++local function pid(value)
++	return finite(value) and value % 1 == 0 and value > 0 and value <= 2147483647
++end
++
++--- Constructs an owner with explicit policy, never an invented timing default.
++--- @param ports table Native input, source, clock, timer and window ports.
++--- @param policy table {deadline_sec=number, poll_sec=number}.
++--- @return table|nil owner
++function M.new(ports, policy)
++	if type(ports) ~= "table" or getmetatable(ports) ~= nil
++		or type(policy) ~= "table" or getmetatable(policy) ~= nil
++		or not finite(policy.deadline_sec) or policy.deadline_sec <= 0
++		or not finite(policy.poll_sec) or policy.poll_sec <= 0
++		or policy.poll_sec > policy.deadline_sec then return nil end
++	local calls = {}
++	for _, name in ipairs(REQUIRED) do
++		if type(rawget(ports, name)) ~= "function" then return nil end
++		calls[name] = rawget(ports, name)
++	end
++	local deadline_sec, poll_sec = policy.deadline_sec, policy.poll_sec
++	local active, checking = nil, false
++	local states = setmetatable({}, { __mode = "k" })
++	local owner = {}
++
++	local function invoke(name, ...)
++		return pcall(calls[name], ...)
++	end
++	local function literal(name, ...)
++		local ok, value = invoke(name, ...)
++		return ok and value == true
++	end
++	local function references()
++		if getmetatable(ports) ~= nil then return false end
++		for _, name in ipairs(REQUIRED) do
++			if not rawequal(rawget(ports, name), calls[name]) then return false end
++		end
++		return true
++	end
++	local function owned(entry)
++		return rawequal(active, entry) and entry.finished ~= true
++	end
++	local function source(entry)
++		if not owned(entry) or entry.cancelled then return false end
++		if getmetatable(entry.publication) ~= nil or not references()
++			or not rawequal(rawget(entry.publication, "current"), entry.current)
++			or not rawequal(rawget(entry.publication, "cached"), entry.cached) then return false end
++		local ok, current = pcall(entry.current)
++		if not ok or current ~= true or not owned(entry) or entry.cancelled then return false end
++		if not literal("provider_current") or not owned(entry) or entry.cancelled then return false end
++		-- The publication owner supplies this callback-free terminal seal. A native
++		-- observation callback may revoke its source after the full current check.
++		local sealed, cached = pcall(entry.cached)
++		return sealed and cached == true and owned(entry) and not entry.cancelled
++			and rawequal(rawget(entry.publication, "current"), entry.current)
++			and rawequal(rawget(entry.publication, "cached"), entry.cached)
++			and getmetatable(entry.publication) == nil and references()
++	end
++	local function finish(entry)
++		if not owned(entry) or entry.acquiring or entry.retiring then return false end
++		entry.retiring = true
++		if entry.input_reserved and not entry.input_retired then
++			entry.input_retired = literal("retire_input", entry.cap)
++		end
++		if entry.input_reserved and not entry.input_retired then
++			entry.retiring = false
++			return false
++		end
++		-- A throwing constructor has not provided a cleanup capability. Do not
++		-- manufacture physical retirement from the absence of a returned handle.
++		if entry.timer_unknown then entry.retiring = false; return false end
++		if entry.timer and not entry.timer_retired then
++			entry.timer_retired = literal("cancel_timer", entry.timer)
++		end
++		if entry.timer and not entry.timer_retired then entry.retiring = false; return false end
++		if not owned(entry) then entry.retiring = false; return false end
++		-- Cleanup crossed native callbacks after the visible-effect observation.
++		-- Keep publication reserved while the full source/provider check runs;
++		-- its final cached seal is pure, with no later native calls before publish.
++		if entry.result == "switched" and not source(entry) and not entry.cancelled then
++			entry.result = "refused"
++		end
++		if not owned(entry) then entry.retiring = false; return false end
++		entry.retiring = false
++		entry.finished = true
++		states[entry.cap] = entry.result
++		active = nil
++		local complete = entry.complete
++		entry.complete = nil
++		if complete then pcall(complete, entry.cap, entry.result) end
++		return true
++	end
++	local function cancel(entry, reason)
++		if not owned(entry) then return false end
++		if not entry.cancelled then entry.result = reason end
++		entry.cancelled = true
++		if entry.input_reserved and not entry.input_retired and not entry.cancel_requested then
++			entry.cancel_requested = true
++			literal("cancel_input", entry.cap)
++		end
++		return finish(entry)
++	end
++
++	--- Reports verified readiness without creating an input operation.
++	--- @return boolean ready
++	function owner.available()
++		if active or checking or not references() then return false end
++		checking = true
++		local ready = literal("ready") and literal("provider_current")
++		checking = false
++		return ready and active == nil and references()
++	end
++
++	--- Advances a single acknowledged edge outside the event-tap callback.
++	--- @return boolean settled
++	function owner.tick()
++		local entry = active
++		if not entry or entry.acquiring or entry.busy then return false end
++		if entry.cancelled or entry.result == "switched" then return finish(entry) end
++		entry.busy = true
++		local function leave(value) entry.busy = false; return value end
++		local clock_ok, now = invoke("now")
++		if not clock_ok or not finite(now) or now < entry.last_time then
++			return leave(cancel(entry, "refused"))
++		end
++		entry.last_time = now
++		if now >= entry.deadline then return leave(cancel(entry, "timeout")) end
++		if not source(entry) then return leave(cancel(entry, "refused")) end
++		if entry.waiting then
++			if not entry.received then return leave(false) end
++			if not literal("observed", entry.cap, entry.waiting) or not source(entry) then
++				return leave(cancel(entry, "refused"))
++			end
++			entry.next_edge = entry.waiting + 1
++			entry.waiting, entry.received = nil, nil
++		end
++		if entry.next_edge <= 4 then
++			entry.waiting = entry.next_edge
++			entry.received = false
++			local posted = literal("post", entry.cap, entry.waiting)
++			if not posted or not source(entry) then return leave(cancel(entry, "refused")) end
++			return leave(false)
++		end
++		local released = literal("released", entry.cap)
++		if not source(entry) then return leave(cancel(entry, "refused")) end
++		if not released then return leave(false) end
++		local observed, front = invoke("frontmost")
++		if not source(entry) then return leave(cancel(entry, "refused")) end
++		if observed and pid(front) and front ~= entry.before_pid then
++			entry.result = "switched"
++			return leave(finish(entry))
++		end
++		return leave(false)
++	end
++
++	--- Reserves before all acquisition callbacks and retains refused candidates.
++	--- @param publication table {current=function, cached=function}.
++	--- @param complete function|nil fn(capability, closed_status).
++	--- @return table|nil capability
++	--- @return boolean admitted
++	function owner.request(publication, complete)
++		if active or checking or type(publication) ~= "table"
++			or getmetatable(publication) ~= nil
++			or type(rawget(publication, "current")) ~= "function"
++			or type(rawget(publication, "cached")) ~= "function"
++			or (complete ~= nil and type(complete) ~= "function") then return nil, false end
++		local entry = {
++			cap = {}, publication = publication, current = rawget(publication, "current"),
++			cached = rawget(publication, "cached"), complete = complete,
++			acquiring = true, next_edge = 1, result = "refused",
++		}
++		active = entry
++		local clock_ok, now = invoke("now")
++		local front_ok, front = invoke("frontmost")
++		if not clock_ok or not finite(now) or not front_ok or not pid(front)
++			or not literal("ready") or not source(entry) then
++			entry.acquiring = false
++			cancel(entry, "refused")
++			return entry.cap, false
++		end
++		entry.before_pid, entry.last_time, entry.deadline = front, now, now + deadline_sec
++		if not finite(entry.deadline) then
++			entry.acquiring = false; cancel(entry, "refused"); return entry.cap, false
++		end
++		-- G5 reserves this exact attempt before acquisition. Even a thrown prepare
++		-- leaves its input/tap/task debt addressable by cancel/retire(attempt).
++		entry.input_reserved = true
++		local prepared = literal("prepare", entry.cap, function(cap, ordinal)
++			if not owned(entry) or not rawequal(cap, entry.cap) or entry.cancelled
++				or ordinal ~= entry.waiting or entry.waiting == nil then return false end
++			entry.received = true
++			return true
++		end, function() return source(entry) end)
++		if not prepared or not source(entry) then
++			entry.acquiring = false; cancel(entry, "refused"); return entry.cap, false
++		end
++		local timer_ok, timer, committed = invoke("every", poll_sec, owner.tick)
++		if timer_ok and (type(timer) == "table" or type(timer) == "userdata") then
++			entry.timer = timer
++		elseif not timer_ok or (timer ~= nil and timer ~= false) or committed == true then
++			entry.timer_unknown = true
++		end
++		entry.acquiring = false
++		if not timer_ok or entry.timer == nil or committed ~= true
++			or not source(entry) then
++			cancel(entry, "refused")
++			return entry.cap, false
++		end
++		return entry.cap, true
++	end
++
++	--- Revokes normal emission and retries only the exact retained capability.
++	--- @param cap table Operation capability.
++	--- @return boolean physically_settled
++	function owner.cancel(cap)
++		return active ~= nil and rawequal(active.cap, cap) and cancel(active, "cancelled")
++	end
++
++	--- Revokes the privately held operation during acquisition or shutdown.
++	--- @return boolean physically_settled
++	function owner.stop()
++		if not active then return true end
++		return cancel(active, "cancelled")
++	end
++
++	--- Retries retained compensation without admitting any successor output.
++	--- @param cap table Operation capability.
++	--- @return boolean physically_settled
++	function owner.retry(cap)
++		if not active or not rawequal(active.cap, cap) then return false end
++		if not active.cancelled and active.result ~= "switched" then return false end
++		return finish(active)
++	end
++
++	--- @return boolean pending Exact input/timer custody remains.
++	function owner.has_pending() return active ~= nil end
++
++	--- @param cap table Operation capability.
++	--- @return string|nil status Published only after physical retirement.
++	function owner.status(cap) return states[cap] end
++
++	return owner
++end
++
++return M
+diff --git a/static/ergopti_plus/macos/modules/gestures/native_app_switcher.lua b/static/ergopti_plus/macos/modules/gestures/native_app_switcher.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/macos/modules/gestures/native_app_switcher.lua
+@@ -0,0 +1,127 @@
++--- modules/gestures/native_app_switcher.lua
++
++--- Product broker facade. Structural reachability is not native readiness.
++--- Existing previous-window actions retain their direct activation semantics.
++local NativeOwner = require("native_app_switcher_owner")
++local SyntheticInput = require("adapters.synthetic_input")
++local Scheduler = require("adapters.timer_scheduler")
++local Windows = require("adapters.window_manager")
++local M = {}
++
++local INPUT_METHODS = {
++	ready = "system_switcher_available",
++	prepare = "prepare_system_switcher",
++	post = "post_system_switcher_edge",
++	observed = "system_switcher_observation_current",
++	released = "system_switcher_release_current",
++	cancel_input = "cancel_system_switcher",
++	retire_input = "retire_system_switcher",
++}
++local owner, captured, initialized = nil, nil, false
++local paused, generation = true, 0
++
++local function references()
++	if not captured then return false end
++	for _, name in pairs(INPUT_METHODS) do
++		if not rawequal(rawget(SyntheticInput, name), captured[name]) then return false end
++	end
++	return rawequal(rawget(Scheduler, "every"), captured.every)
++		and rawequal(rawget(Scheduler, "cancel"), captured.cancel)
++		and rawequal(rawget(Scheduler, "awake_time"), captured.awake_time)
++		and rawequal(rawget(Windows, "frontmost_pid"), captured.frontmost_pid)
++end
++
++--- Initializes only after the native input owner exports the complete contract.
++--- The policy must be admitted by the root's canonical timing owner; it is not
++--- borrowed from diagnostic polling or an unrelated product timeout.
++--- @param policy table {deadline_sec=number, poll_sec=number}.
++--- @return boolean initialized
++function M.init(policy)
++	if initialized then return false end
++	local input = {}
++	for _, name in pairs(INPUT_METHODS) do
++		local fn = rawget(SyntheticInput, name)
++		if type(fn) ~= "function" then return false end
++		input[name] = fn
++	end
++	for _, name in ipairs({ "every", "cancel", "awake_time" }) do
++		if type(rawget(Scheduler, name)) ~= "function" then return false end
++		input[name] = rawget(Scheduler, name)
++	end
++	if type(rawget(Windows, "frontmost_pid")) ~= "function" then return false end
++	input.frontmost_pid = rawget(Windows, "frontmost_pid")
++	local ports = {
++		every = input.every, cancel_timer = input.cancel,
++		now = input.awake_time, frontmost = input.frontmost_pid,
++		provider_current = function() return initialized and not paused and references() end,
++	}
++	for role, name in pairs(INPUT_METHODS) do ports[role] = input[name] end
++	local candidate = NativeOwner.new(ports, policy)
++	if not candidate then return false end
++	captured, owner, initialized = input, candidate, true
++	paused, generation = false, generation + 1
++	return true
++end
++
++--- @return boolean available Native readiness; never substitutes a window focus.
++function M.available()
++	return initialized and not paused and references() and owner.available()
++end
++
++--- Starts a source-bound operation, preserving the caller's terminal seal.
++--- @param publication table {current=function, cached=function}.
++--- @param complete function|nil fn(capability, closed_status).
++--- @return table|nil capability
++--- @return boolean admitted
++function M.request(publication, complete)
++	if not initialized or paused or not references() or type(publication) ~= "table"
++		or getmetatable(publication) ~= nil then return nil, false end
++	local current, cached = rawget(publication, "current"), rawget(publication, "cached")
++	if type(current) ~= "function" or type(cached) ~= "function" then return nil, false end
++	local epoch = generation
++	local function bound()
++		return initialized and not paused and generation == epoch and references()
++			and getmetatable(publication) == nil
++			and rawequal(rawget(publication, "current"), current)
++			and rawequal(rawget(publication, "cached"), cached)
++	end
++	return owner.request({
++		current = function()
++			if not bound() then return false end
++			local value = current()
++			return value == true and bound()
++		end,
++		cached = function()
++			if not bound() then return false end
++			local value = cached()
++			return value == true and bound()
++		end,
++	}, complete)
++end
++
++--- Revokes normal emission before retrying exact input and timer retirement.
++--- @return boolean physically_settled
++function M.pause()
++	if not initialized then return false end
++	paused, generation = true, generation + 1
++	return owner.stop()
++end
++
++--- @return boolean resumed A retained operation cannot be bypassed by resume.
++function M.resume()
++	if not initialized or owner.has_pending() or not references() then return false end
++	paused, generation = false, generation + 1
++	return true
++end
++
++--- @return boolean physically_settled
++function M.stop() return M.pause() end
++
++--- @return boolean pending Exact native input/timer retirement remains.
++function M.has_pending() return owner ~= nil and owner.has_pending() end
++
++--- @param capability table Exact request capability.
++--- @return string|nil status Closed result, published after physical retirement.
++function M.status(capability) return owner and owner.status(capability) or nil end
++
++return M
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher.lua b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher.lua
+@@ -0,0 +1,208 @@
++--- tests/unit/modules/gestures/test_native_app_switcher.lua
++
++--- Actual facade with controlled native-owner dependencies; no physical claim.
++local helpers = require("tests.helpers")
++local eq = helpers.assert_eq
++local METHODS = {
++	"system_switcher_available", "prepare_system_switcher", "post_system_switcher_edge",
++	"system_switcher_observation_current", "system_switcher_release_current",
++	"cancel_system_switcher", "retire_system_switcher",
++}
++
++local function with_facade(callback, configure)
++	local names = { "modules.gestures.native_app_switcher", "adapters.synthetic_input",
++		"adapters.timer_scheduler", "adapters.window_manager" }
++	local saved = {}
++	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
++	local f = { front = 100, time = 10, source = true, release = true,
++		input_ack = true, timer_ack = true, posts = {}, retired = 0, timer = {}, captures = 0 }
++	local input = {
++		system_switcher_available = function() return true end,
++		prepare_system_switcher = function(cap, observed, admission)
++			f.captures = f.captures + 1
++			f.cap, f.observed, f.admission = cap, observed, admission
++			if f.prepare_hook then f.prepare_hook() end
++			return true
++		end,
++		post_system_switcher_edge = function(cap, ordinal)
++			f.posts[#f.posts + 1] = ordinal
++			f.observed(cap, ordinal)
++			return true
++		end,
++		system_switcher_observation_current = function() return true end,
++		system_switcher_release_current = function() return f.release end,
++		cancel_system_switcher = function() return true end,
++		retire_system_switcher = function() f.retired = f.retired + 1; return f.input_ack end,
++		keyStroke = function() error("no paired-stroke fallback") end,
++	}
++	local scheduler = {
++		every = function(interval, fn) eq(interval, 0.05); f.tick = fn; return f.timer, true end,
++		cancel = function(cap) eq(rawequal(cap, f.timer), true); return f.timer_ack end,
++		awake_time = function() return f.time end,
++	}
++	local windows = {
++		frontmost_pid = function() return f.front end,
++		focus_window = function() error("no window-activation fallback") end,
++	}
++	f.input, f.scheduler, f.windows = input, scheduler, windows
++	f.publication = { current = function() return f.source end, cached = function() return f.source end }
++	if configure then configure(f) end
++	package.loaded["adapters.synthetic_input"] = input
++	package.loaded["adapters.timer_scheduler"] = f.scheduler
++	package.loaded["adapters.window_manager"] = windows
++	local ok, failure = xpcall(function()
++		f.facade = require("modules.gestures.native_app_switcher")
++		callback(f)
++	end, debug.traceback)
++	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
++	if not ok then error(failure, 0) end
++end
++
++helpers.describe("macOS product native switcher facade", function()
++	helpers.it("remains unavailable without the actual complete native input contract", function()
++		for _, method in ipairs(METHODS) do
++			with_facade(function(f)
++				eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), false)
++				eq(f.facade.available(), false)
++				eq(f.facade.request(f.publication), nil)
++				eq(f.captures, 0); eq(#f.posts, 0)
++			end, function(f) f.input[method] = nil end)
++		end
++	end)
++
++	helpers.it("rejects duplicate initialization and unowned timing defaults", function()
++		with_facade(function(f)
++			eq(f.facade.init(nil), false)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), false)
++			eq(f.facade.available(), true); eq(f.captures, 0)
++		end)
++	end)
++
++	helpers.it("calls the exact native edge owner and publishes after strict retirement", function()
++		with_facade(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			local complete = 0
++			local cap, admitted = f.facade.request(f.publication, function(receipt, status)
++				eq(rawequal(receipt, f.cap), true); eq(status, "switched")
++				eq(f.facade.has_pending(), false); complete = complete + 1
++			end)
++			eq(admitted, true); eq(f.facade.status(cap), nil)
++			for _ = 1, 4 do f.tick() end
++			f.front = 101
++			eq(f.tick(), true); eq(f.facade.status(cap), "switched")
++			eq(table.concat(f.posts, ","), "1,2,3,4"); eq(complete, 1)
++		end)
++	end)
++
++	helpers.it("pauses before acquisition callbacks can emit and cannot revive an old source", function()
++		with_facade(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			f.prepare_hook = function() eq(f.facade.pause(), false) end
++			local cap, admitted = f.facade.request(f.publication)
++			eq(admitted, false); eq(f.facade.status(cap), "cancelled")
++			eq(#f.posts, 0); eq(f.tick, nil); eq(f.facade.available(), false)
++			eq(f.facade.resume(), true); eq(f.admission(), false)
++		end)
++	end)
++
++	helpers.it("retains native input debt through pause and refuses resume until exact ACK", function()
++		with_facade(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			local cap = f.facade.request(f.publication)
++			f.input_ack = false
++			eq(f.facade.pause(), false); eq(f.facade.has_pending(), true)
++			eq(f.facade.resume(), false); eq(f.facade.request(f.publication), nil)
++			f.input_ack = true
++			eq(f.facade.stop(), true); eq(f.facade.status(cap), "cancelled")
++			eq(f.facade.resume(), true)
++		end)
++	end)
++
++	helpers.it("retains timer debt and does not advertise readiness from input-only cleanup", function()
++		with_facade(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			local cap = f.facade.request(f.publication)
++			f.timer_ack = false
++			eq(f.facade.stop(), false); eq(f.facade.status(cap), nil)
++			eq(f.facade.available(), false); eq(f.facade.resume(), false)
++			f.timer_ack = true
++			eq(f.facade.stop(), true); eq(f.facade.status(cap), "cancelled")
++		end)
++	end)
++
++	helpers.it("compensates with captured native ports after an owner-function replacement", function()
++		with_facade(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			local cap = f.facade.request(f.publication)
++			local foreign = 0
++			f.input.retire_system_switcher = function() foreign = foreign + 1; return true end
++			f.tick()
++			eq(f.facade.status(cap), "refused"); eq(f.retired, 1); eq(foreign, 0)
++			eq(f.facade.available(), false)
++		end)
++	end)
++
++	helpers.it("source callback refusal does not invoke direct activation or paired key strokes", function()
++		with_facade(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			f.source = false
++			local cap, admitted = f.facade.request(f.publication)
++			eq(admitted, false); eq(f.facade.status(cap), "refused")
++			eq(f.captures, 0); eq(#f.posts, 0)
++		end)
++	end)
++	local function with_real_scheduler(callback, options)
++		helpers.with_stub_scope({ "adapters.timer_scheduler", "infra.logger" }, function()
++			package.loaded["infra.logger"] = helpers.make_logger_stub()
++			with_facade(callback, function(f)
++				local native = { running_state = false, stop_calls = 0 }
++				function native:running() return self.running_state end
++				function native:start()
++					self.running_state = true
++					if options.early then self.callback() end
++					if options.start_throw then error("controlled startup failure") end
++					return self
++				end
++				function native:stop()
++					self.stop_calls = self.stop_calls + 1
++					if not f.timer_ack then return false end
++					self.running_state = false
++					return self
++				end
++				f.native_timer = native
++				f.timer_ack = options.stop_ack
++				f.scheduler = helpers.load_with_stubs("adapters.timer_scheduler", { timer = {
++					new = function(_, fn) native.callback = fn; return native end,
++					absoluteTime = function() return f.time * 1e9 end,
++				} })
++			end)
++		end)
++	end
++
++	helpers.it("uses the actual scheduler's retained uncommitted handle after startup throws", function()
++		with_real_scheduler(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			local cap, admitted = f.facade.request(f.publication)
++			eq(admitted, false); eq(f.facade.has_pending(), true)
++			eq(f.native_timer:running(), true); eq(#f.posts, 0)
++			eq(f.native_timer.stop_calls >= 2, true)
++			f.timer_ack = true
++			eq(f.facade.stop(), true); eq(f.facade.status(cap), "refused")
++			eq(f.native_timer:running(), false)
++		end, { start_throw = true, stop_ack = false })
++	end)
++
++	helpers.it("actual scheduler rejects synchronous precommit delivery without emitting an edge", function()
++		with_real_scheduler(function(f)
++			eq(f.facade.init({ deadline_sec = 2, poll_sec = 0.05 }), true)
++			local cap, admitted = f.facade.request(f.publication)
++			eq(admitted, false); eq(f.facade.has_pending(), false)
++			eq(f.native_timer:running(), false); eq(#f.posts, 0)
++			eq(f.facade.status(cap), "refused")
++		end, { early = true, stop_ack = true })
++	end)
++
++end)
++
++return helpers
+diff --git a/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/macos/tests/unit/modules/gestures/test_native_app_switcher_owner.lua
+@@ -0,0 +1,361 @@
++--- tests/unit/modules/gestures/test_native_app_switcher_owner.lua
++
++--- Controlled native ports qualify software custody, not Dock or physical input.
++local helpers = require("tests.helpers")
++local NativeOwner = require("native_app_switcher_owner")
++local eq = helpers.assert_eq
++
++local function fixture(configure)
++	local f = {
++		time = 10, front = 100, source = true, ready = true, provider = true,
++		post_ack = true, observe = true, release = true, input_ack = true,
++		timer_ack = true, committed = true, posts = {}, cancelled = 0,
++		retired = 0, timer_cancelled = 0, completed = {}, handle = {},
++	}
++	local ports = {
++		ready = function() if f.ready_hook then f.ready_hook() end; return f.ready end,
++		provider_current = function() if f.provider_hook then f.provider_hook() end; return f.provider end,
++		prepare = function(cap, observed, admission)
++			f.cap, f.observed, f.admission = cap, observed, admission
++			f.input_live = true
++			if f.prepare_hook then f.prepare_hook() end
++			return f.prepare_ack ~= false
++		end,
++		post = function(cap, ordinal)
++			eq(rawequal(cap, f.cap), true)
++			f.posts[#f.posts + 1] = ordinal
++			if f.post_hook then f.post_hook(cap, ordinal) end
++			if f.observe then f.observed(cap, ordinal) end
++			return f.post_ack
++		end,
++		observed = function(cap, ordinal)
++			eq(rawequal(cap, f.cap), true)
++			if f.observation_hook then f.observation_hook(ordinal) end
++			return f.observation_ack ~= false
++		end,
++		released = function() return f.release end,
++		cancel_input = function()
++			f.cancelled = f.cancelled + 1
++			if f.cancel_hook then f.cancel_hook() end
++			return true
++		end,
++		retire_input = function()
++			f.retired = f.retired + 1
++			if f.retire_hook then f.retire_hook() end
++			if f.input_ack == true then f.input_live = false end
++			return f.input_ack
++		end,
++		every = function(interval, callback)
++			eq(interval, 0.05)
++			f.timer_callback = callback
++			if f.timer_hook then f.timer_hook() end
++			return f.handle, f.committed
++		end,
++		cancel_timer = function(handle)
++			eq(rawequal(handle, f.handle), true)
++			f.timer_cancelled = f.timer_cancelled + 1
++			if f.timer_cancel_hook then f.timer_cancel_hook() end
++			return f.timer_ack
++		end,
++		now = function() return f.time end,
++		frontmost = function() return f.front end,
++	}
++	f.ports = ports
++	f.publication = {
++		current = function() if f.current_hook then f.current_hook() end; return f.source end,
++		cached = function() return f.source end,
++	}
++	if configure then configure(f, ports) end
++	f.owner = NativeOwner.new(ports, { deadline_sec = 2, poll_sec = 0.05 })
++	f.complete = function(cap, status)
++		eq(f.input_live ~= true, true)
++		f.completed[#f.completed + 1] = { cap = cap, status = status }
++		if f.complete_hook then f.complete_hook() end
++	end
++	function f:start() return self.owner.request(self.publication, self.complete) end
++	function f:advance()
++		for _ = 1, 4 do self.owner.tick() end
++		self.front = 101
++		return self.owner.tick()
++	end
++	return f
++end
++
++helpers.describe("native app switcher custody", function()
++	helpers.it("requires explicit finite timing and all literal native ports", function()
++		local f = fixture()
++		eq(NativeOwner.new(f.ports, nil), nil)
++		for _, value in ipairs({ 0, -1, math.huge, 0 / 0 }) do
++			eq(NativeOwner.new(f.ports, { deadline_sec = value, poll_sec = 0.05 }), nil)
++		end
++		eq(NativeOwner.new(f.ports, { deadline_sec = 1, poll_sec = 2 }), nil)
++		f.ports.observed = nil
++		eq(NativeOwner.new(f.ports, { deadline_sec = 1, poll_sec = 0.05 }), nil)
++	end)
++
++	helpers.it("posts four acknowledged edges and publishes only after both retirements", function()
++		local f = fixture()
++		local cap, admitted = f:start()
++		eq(admitted, true); eq(#f.posts, 0); eq(f.owner.status(cap), nil)
++		eq(f:advance(), true)
++		eq(table.concat(f.posts, ","), "1,2,3,4")
++		eq(f.owner.status(cap), "switched"); eq(#f.completed, 1)
++		eq(f.timer_cancelled, 1); eq(f.owner.has_pending(), false)
++		eq(f.owner.tick(), false); eq(f.owner.retry(cap), false)
++	end)
++
++	helpers.it("post admission and changed PID cannot substitute for tagged observation", function()
++		local f = fixture(function(x) x.observe = false end)
++		local cap = f:start()
++		f.front = 101
++		for _ = 1, 8 do f.owner.tick() end
++		eq(#f.posts, 1); eq(f.owner.status(cap), nil); eq(#f.completed, 0)
++		f.time = 12
++		f.owner.tick()
++		eq(f.owner.status(cap), "timeout"); eq(#f.completed, 1)
++	end)
++
++	helpers.it("requires combined-session and HID release before the visible effect", function()
++		local f = fixture(function(x) x.release = false end)
++		local cap = f:start()
++		eq(f:advance(), false); eq(f.owner.status(cap), nil)
++		f.release = true
++		eq(f.owner.tick(), true); eq(f.owner.status(cap), "switched")
++	end)
++
++	helpers.it("rejects foreign event capabilities without equality callbacks", function()
++		local f = fixture(function(x) x.observe = false end)
++		local cap = f:start()
++		f.owner.tick()
++		local equality = 0
++		local mt = { __eq = function() equality = equality + 1; return true end }
++		setmetatable(cap, mt)
++		local foreign = setmetatable({}, mt)
++		eq(f.observed(foreign, 1), false)
++		eq(f.owner.cancel(foreign), false); eq(f.owner.retry(foreign), false)
++		eq(equality, 0); eq(f.owner.has_pending(), true)
++		f.owner.cancel(cap)
++	end)
++
++	helpers.it("does not emit from a prepare callback or an early timer callback", function()
++		local f = fixture(function(x)
++			x.prepare_hook = function()
++				eq(x.owner.request(x.publication), nil)
++				eq(x.observed(x.cap, 1), false)
++				eq(x.owner.tick(), false)
++			end
++			x.timer_hook = function() eq(x.timer_callback(), false) end
++		end)
++		local cap, admitted = f:start()
++		eq(admitted, true); eq(#f.posts, 0)
++		f.owner.cancel(cap)
++	end)
++
++	helpers.it("retains exact input debt on refusal and retries before admitting a successor", function()
++		local f = fixture(function(x) x.input_ack = false end)
++		local cap = f:start()
++		eq(f.owner.cancel(cap), false)
++		eq(f.owner.has_pending(), true); eq(f.owner.status(cap), nil)
++		eq(f.owner.request(f.publication), nil); eq(f.timer_cancelled, 0)
++		f.input_ack = true
++		eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "cancelled")
++		eq(#f.completed, 1)
++		local next_cap, admitted = f:start()
++		eq(admitted, true); eq(rawequal(next_cap, cap), false)
++		f.owner.cancel(next_cap)
++	end)
++
++	helpers.it("retains exact timer debt after input retirement without repeating native cleanup", function()
++		local f = fixture(function(x) x.timer_ack = false end)
++		local cap = f:start()
++		eq(f.owner.cancel(cap), false); eq(f.retired, 1)
++		eq(f.owner.status(cap), nil); eq(f.owner.has_pending(), true)
++		f.timer_ack = true
++		eq(f.owner.retry(cap), true); eq(f.retired, 1); eq(f.timer_cancelled, 2)
++	end)
++
++	helpers.it("cancellation during prepare compensates the published attempt without starting a timer", function()
++		local f = fixture(function(x) x.prepare_hook = function() eq(x.owner.stop(), false) end end)
++		local cap, admitted = f:start()
++		eq(admitted, false); eq(#f.posts, 0); eq(f.timer_callback, nil)
++		eq(f.owner.status(cap), "cancelled"); eq(f.cancelled, 1)
++	end)
++
++	helpers.it("contains recursive input cancellation and delivers completion once", function()
++		local f = fixture(function(x) x.cancel_hook = function() eq(x.owner.stop(), true) end end)
++		local cap = f:start()
++		eq(f.owner.cancel(cap), false)
++		eq(f.cancelled, 1); eq(#f.completed, 1)
++		eq(f.owner.status(cap), "cancelled")
++	end)
++
++	helpers.it("retains a thrown prepare's exact native attempt and never logs its exception", function()
++		local f = fixture(function(x)
++			x.input_ack = false
++			x.prepare_hook = function() error("PRIVATE_APPLICATION_NAME") end
++		end)
++		local cap, admitted = f:start()
++		eq(admitted, false); eq(f.owner.has_pending(), true); eq(f.owner.status(cap), nil)
++		f.input_ack = true
++		eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "refused")
++	end)
++
++	helpers.it("retains a live uncommitted timer returned by the actual scheduler contract", function()
++		local f = fixture(function(x) x.committed = false; x.timer_ack = false end)
++		local cap, admitted = f:start()
++		eq(admitted, false); eq(f.owner.has_pending(), true); eq(f.input_live, false)
++		f.timer_ack = true
++		eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "refused")
++	end)
++
++	helpers.it("never turns a throwing timer constructor into an absent-handle retirement receipt", function()
++		local f = fixture(function(_, ports) ports.every = function() error("PRIVATE_TIMER_PAYLOAD") end end)
++		local cap, admitted = f:start()
++		eq(admitted, false); eq(f.owner.has_pending(), true)
++		eq(f.owner.retry(cap), false); eq(f.owner.status(cap), nil); eq(f.timer_cancelled, 0)
++	end)
++
++	helpers.it("refuses a source revoked by the native provider's last callback", function()
++		local f = fixture(function(x) x.provider_hook = function() x.source = false end end)
++		local cap, admitted = f:start()
++		eq(admitted, false); eq(#f.posts, 0); eq(f.input_live, nil)
++		eq(f.owner.status(cap), "refused")
++	end)
++
++	helpers.it("source revocation from observed callback prevents the next edge", function()
++		local f = fixture(function(x) x.observation_hook = function() x.source = false end end)
++		local cap = f:start()
++		f.owner.tick(); f.owner.tick()
++		eq(table.concat(f.posts, ","), "1"); eq(f.owner.status(cap), "refused")
++	end)
++
++	helpers.it("uses captured cleanup functions after a foreign provider replacement", function()
++		local f = fixture()
++		local cap = f:start()
++		local foreign = 0
++		f.ports.retire_input = function() foreign = foreign + 1; return true end
++		f.owner.tick()
++		eq(foreign, 0); eq(f.retired, 1); eq(f.owner.status(cap), "refused")
++	end)
++
++	helpers.it("refuses backward and malformed clocks without emitting a native edge", function()
++		for _, value in ipairs({ 9, math.huge, 0 / 0 }) do
++			local f = fixture()
++			local cap = f:start()
++			f.time = value
++			f.owner.tick()
++			eq(#f.posts, 0); eq(f.owner.status(cap), "refused")
++		end
++	end)
++
++	helpers.it("readiness callbacks cannot reenter and acquire an untracked operation", function()
++		local f = fixture(function(x) x.ready_hook = function() eq(x.owner.request(x.publication), nil) end end)
++		eq(f.owner.available(), true); eq(f.input_live, nil); eq(#f.posts, 0)
++	end)
++
++	helpers.it("completion may start a successor only after exact physical retirement", function()
++		local f = fixture()
++		local next_cap
++		f.complete_hook = function()
++			eq(f.owner.has_pending(), false)
++			next_cap = f.owner.request(f.publication)
++		end
++		local cap = f:start()
++		eq(f:advance(), true); eq(f.owner.status(cap), "switched")
++		eq(f.owner.has_pending(), true); eq(rawequal(next_cap, cap), false)
++		f.complete_hook = nil
++		f.owner.cancel(next_cap)
++	end)
++	helpers.it("refuses truthy readiness and edge receipts instead of native boolean admission", function()
++		for _, value in ipairs({ 1, "ready", {} }) do
++			local f = fixture(function(x) x.ready = value end)
++			local cap, admitted = f:start()
++			eq(admitted, false); eq(f.owner.status(cap), "refused"); eq(#f.posts, 0)
++			local edge = fixture(function(x) x.post_ack = value end)
++			local edge_cap = edge:start()
++			edge.owner.tick()
++			eq(edge.owner.status(edge_cap), "refused")
++			eq(table.concat(edge.posts, ","), "1")
++		end
++	end)
++
++	helpers.it("retains truthy retirement receipts and does not publish them as native ACK", function()
++		for _, value in ipairs({ 1, "retired", {} }) do
++			local f = fixture(function(x) x.input_ack = value end)
++			local cap = f:start()
++			eq(f.owner.cancel(cap), false); eq(f.owner.has_pending(), true)
++			eq(f.owner.status(cap), nil); eq(#f.completed, 0)
++			f.input_ack = true
++			eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "cancelled")
++		end
++	end)
++end)
++
++helpers.describe("native switcher terminal publication source", function()
++	for _, boundary in ipairs({ "input", "timer" }) do
++		helpers.it("refuses success after source revocation by cleanup: " .. boundary, function()
++			local f = fixture(function(x)
++				if boundary == "input" then x.retire_hook = function() x.source = false end
++				else x.timer_cancel_hook = function() x.source = false end end
++			end)
++			local cap = f:start()
++			eq(f:advance(), true)
++			eq(f.owner.status(cap), "refused"); eq(f.owner.has_pending(), false)
++			eq(#f.completed, 1); eq(f.completed[1].status, "refused")
++			eq(f.retired, 1); eq(f.timer_cancelled, 1)
++		end)
++	end
++
++	helpers.it("retains false cleanup ACK debt before checking the final source seal", function()
++		local f = fixture(function(x)
++			x.input_ack = false
++			x.retire_hook = function() x.source = false end
++		end)
++		local cap = f:start()
++		eq(f:advance(), false); eq(f.owner.status(cap), nil)
++		eq(f.owner.has_pending(), true); eq(f.timer_cancelled, 0)
++		eq(f.owner.request(f.publication), nil); eq(#f.completed, 0)
++		f.input_ack = true
++		eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "refused")
++		eq(f.timer_cancelled, 1); eq(#f.completed, 1)
++	end)
++
++	helpers.it("retains exact timer ACK debt after cleanup revoked the source", function()
++		local f = fixture(function(x)
++			x.timer_ack = false
++			x.timer_cancel_hook = function() x.source = false end
++		end)
++		local cap = f:start()
++		eq(f:advance(), false); eq(f.owner.status(cap), nil)
++		eq(f.owner.has_pending(), true); eq(f.retired, 1); eq(#f.completed, 0)
++		f.timer_ack = true
++		eq(f.owner.retry(cap), true); eq(f.owner.status(cap), "refused")
++		eq(f.retired, 1); eq(#f.completed, 1)
++	end)
++
++	helpers.it("holds the publication reservation through final current callback cancellation", function()
++		local f = fixture()
++		local cap = f:start()
++		for _ = 1, 4 do f.owner.tick() end
++		f.current_hook = function()
++			if f.timer_cancelled > 0 then
++				eq(f.owner.request(f.publication), nil)
++				eq(f.owner.cancel(cap), false)
++			end
++		end
++		f.front = 101
++		eq(f.owner.tick(), true); eq(f.owner.status(cap), "cancelled")
++		eq(#f.completed, 1); eq(f.completed[1].status, "cancelled")
++		eq(f.owner.has_pending(), false); eq(f.retired, 1); eq(f.timer_cancelled, 1)
++	end)
++
++	helpers.it("seals source currency after the final native provider callback", function()
++		local f = fixture()
++		local cap = f:start()
++		f.provider_hook = function() if f.timer_cancelled > 0 then f.source = false end end
++		eq(f:advance(), true); eq(f.owner.status(cap), "refused")
++		eq(#f.completed, 1); eq(f.completed[1].status, "refused")
++	end)
++end)
++
++return helpers

@@ -1,0 +1,1053 @@
+--- tests/unit/adapters/test_uinput_writer.lua
+
+--- ==============================================================================
+--- MODULE: uinput Writer Contract
+--- DESCRIPTION:
+--- Pins the non-forking emit channel: the exact bytes it puts on /dev/uinput,
+--- the order it configures the device in, and the fact that emitting does not
+--- spawn anything.
+---
+--- WHY BYTE-LEVEL:
+--- This adapter's entire job is to hand the kernel a correctly-shaped
+--- `struct input_event`. A wrong field offset does not raise — write() returns
+--- the byte count either way — it just produces a key nobody pressed, or
+--- nothing at all. There is no return value to assert and no exception to catch,
+--- so the bytes ARE the contract. Checking "open() returned true" would pass on
+--- an adapter that writes 24 zero bytes.
+---
+--- WHY IT NEEDS NO HARDWARE:
+--- All syscalls go through a swappable backend. These tests bind a recorder, so
+--- the encoding and the ioctl sequence are verified on any interpreter, with no
+--- /dev/uinput and no LuaJIT. What still needs real hardware is only the last
+--- link — that the kernel accepts the device — and that is precisely the part
+--- these assertions make safe to attempt.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+
+--- A recording backend: captures every syscall instead of performing one.
+--- @param opts table|nil { fail_on = "open"|"ioctl"|"write", fail_req = integer }
+local function recorder(opts)
+	opts = opts or {}
+	local rec = { opened = {}, open_flags = {}, ioctls = {}, writes = {}, closed = 0 }
+	rec.backend = {
+		open = function(path, flags)
+			rec.opened[#rec.opened + 1] = path
+			rec.open_flags[#rec.open_flags + 1] = flags
+			if opts.fail_on == "open" then return nil, "stubbed failure" end
+			return 42 -- a plausible fd
+		end,
+		ioctl = function(fd, request, arg)
+			rec.ioctls[#rec.ioctls + 1] = { fd = fd, request = request, arg = arg }
+			if opts.fail_on == "ioctl" and request == opts.fail_req then return false end
+			return true
+		end,
+		write = function(fd, bytes)
+			rec.writes[#rec.writes + 1] = bytes
+			if opts.fail_on == "write" then return false end
+			return true
+		end,
+		close = function() rec.closed = rec.closed + 1 end,
+	}
+	return rec
+end
+
+--- Reads `width` little-endian bytes back out of an encoded struct.
+local function le(str, offset, width)
+	local n, mul = 0, 1
+	for i = offset, offset + width - 1 do
+		n = n + str:byte(i) * mul
+		mul = mul * 256
+	end
+	return n
+end
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 1/ The wire format the kernel reads ========
+-- ====================================================
+-- ====================================================
+
+helpers.describe("uinput_writer: struct input_event encoding", function()
+
+	helpers.it("is exactly 24 bytes with the fields at the 64-bit offsets", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local ev = U.encode_event(U.EV_KEY, 30, 1)
+
+		helpers.assert_eq(#ev, U.INPUT_EVENT_SIZE,
+			"struct input_event is 24 bytes on 64-bit (timeval 16 + type 2 + code 2 + value 4); "
+			.. "a short struct makes the kernel read the next event's bytes as this one's fields")
+
+		-- timeval occupies bytes 1..16 and is left zero: the kernel stamps events
+		-- arriving from uinput itself.
+		helpers.assert_eq(le(ev, 1, 8), 0, "tv_sec must default to 0")
+		helpers.assert_eq(le(ev, 9, 8), 0, "tv_usec must default to 0")
+
+		helpers.assert_eq(le(ev, 17, 2), U.EV_KEY, "type must sit at offset 16 (1-based 17)")
+		helpers.assert_eq(le(ev, 19, 2), 30, "code must sit at offset 18 (1-based 19)")
+		helpers.assert_eq(le(ev, 21, 4), 1, "value must sit at offset 20 (1-based 21)")
+	end)
+
+	helpers.it("packs little-endian, so a multi-byte code is not byte-swapped", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		-- 0x0130 = KEY_MAX-ish territory; the two bytes must be 0x30, 0x01.
+		local ev = U.encode_event(U.EV_KEY, 0x0130, 1)
+		helpers.assert_eq(ev:byte(19), 0x30, "low byte of code first")
+		helpers.assert_eq(ev:byte(20), 0x01, "high byte of code second")
+	end)
+
+	helpers.it("encodes a negative value as two's complement", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local ev = U.encode_event(U.EV_KEY, 30, -1)
+		helpers.assert_eq(le(ev, 21, 4), 0xFFFFFFFF,
+			"value is __s32; -1 must be 0xFFFFFFFF, not a truncated 0")
+	end)
+
+	helpers.it("encodes uinput_setup as 92 bytes with a NUL-padded name", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local setup = U.encode_setup()
+		helpers.assert_eq(#setup, 92,
+			"struct uinput_setup is input_id (8) + name[80] + ff_effects_max (4); the ioctl "
+			.. "request number itself encodes that size, so a different length is rejected")
+		helpers.assert_eq(setup:sub(9, 16), "Ergopti ",
+			"the device name starts at offset 8, right after struct input_id")
+		helpers.assert_eq(setup:byte(88), 0, "name[] must be NUL-padded to its full 80 bytes")
+	end)
+
+end)
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 2/ Device creation order ===================
+-- ====================================================
+-- ====================================================
+
+helpers.describe("uinput_writer: device creation", function()
+
+	helpers.it("registers every capability BEFORE UI_DEV_CREATE", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+
+		helpers.assert_true(U.open(), "open() must succeed against a working backend")
+
+		local create_at = nil
+		local last_capability_at = 0
+		for i, call in ipairs(rec.ioctls) do
+			if call.request == U.UI_DEV_CREATE then create_at = i end
+			if call.request == U.UI_SET_EVBIT or call.request == U.UI_SET_KEYBIT then
+				last_capability_at = i
+			end
+		end
+
+		helpers.assert_true(create_at ~= nil, "UI_DEV_CREATE must be issued")
+		helpers.assert_true(last_capability_at < create_at,
+			"every UI_SET_EVBIT/UI_SET_KEYBIT must precede UI_DEV_CREATE: the kernel freezes the "
+			.. "capability bits at creation, and a key registered afterwards succeeds while doing "
+			.. "nothing — which surfaces only as one key silently not working")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("registers EV_KEY and the full keycode range it claims", function()		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		local keybits, saw_ev_key, saw_ev_syn = {}, false, false
+		for _, call in ipairs(rec.ioctls) do
+			if call.request == U.UI_SET_KEYBIT then keybits[call.arg] = true end
+			if call.request == U.UI_SET_EVBIT and call.arg == U.EV_KEY then saw_ev_key = true end
+			if call.request == U.UI_SET_EVBIT and call.arg == U.EV_SYN then saw_ev_syn = true end
+		end
+
+		helpers.assert_true(saw_ev_key, "EV_KEY must be enabled or the device reports no keys at all")
+		helpers.assert_true(saw_ev_syn, "EV_SYN must be enabled or no SYN_REPORT is ever delivered")
+		for code = 1, U.KEY_CODE_MAX do
+			helpers.assert_true(keybits[code] == true,
+				"keycode " .. code .. " was never registered — an unregistered code is dropped "
+				.. "silently by the kernel, so that one key would simply stop working under a grab")
+		end
+
+		U._reset_backend()
+	end)
+
+	helpers.it("key-range: covers the whole EV_KEY space up to KEY_MAX", function()
+		-- Regression: the device registered only 1..255, so any physical key
+		-- with a code above 255 (KEY_OK at 352 and the other extended keys a
+		-- keyboard reports) was swallowed by the grab and then "re-emitted"
+		-- to a device that cannot emit it — the write succeeds while the
+		-- application never sees the key. Looping to U.KEY_CODE_MAX cannot
+		-- catch a truncation, so the bound itself is pinned to the kernel's
+		-- KEY_MAX from linux/input-event-codes.h, the same 0x2FF the
+		-- keyboard hook forwards.
+		local U = helpers.load_module("adapters.uinput_writer")
+		helpers.assert_eq(U.KEY_CODE_MAX, 0x2FF,
+			"the virtual keyboard must span every evdev keycode the hook can forward, "
+			.. "not just the low 255: 512 ioctls saved once at startup cost every high key")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		local keybits = {}
+		for _, call in ipairs(rec.ioctls) do
+			if call.request == U.UI_SET_KEYBIT then keybits[call.arg] = true end
+		end
+		helpers.assert_true(keybits[352] == true,
+			"KEY_OK (352) must be registered: a grabbed extended key re-emitted to an "
+			.. "unregistered code is dropped silently after UI_DEV_CREATE freezes the bits")
+		helpers.assert_true(keybits[0x2FF] == true,
+			"KEY_MAX itself must be registered — the top of the range is the point of the range")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("passes the 92-byte setup struct to UI_DEV_SETUP, not an integer", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		local setup_arg = nil
+		for _, call in ipairs(rec.ioctls) do
+			if call.request == U.UI_DEV_SETUP then setup_arg = call.arg end
+		end
+		helpers.assert_eq(type(setup_arg), "string", "UI_DEV_SETUP takes a struct, not a scalar")
+		helpers.assert_eq(#setup_arg, 92, "the struct must be the size the ioctl number encodes")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("opens /dev/uinput write-only, non-blocking and close-on-exec (cloexec-grab-outlives-daemon)", function()
+		-- The virtual keyboard lives exactly as long as its descriptor. A child the
+		-- daemon starts (`xdg-open … &`, the update relay) inherits a descriptor
+		-- opened without O_CLOEXEC and keeps the device alive after the daemon
+		-- dies, with any key the daemon had forwarded still held down on it: the
+		-- kernel releases held keys only when the device is destroyed. Literals
+		-- from fcntl.h, so a constant compared with itself cannot pass for 0.
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+
+		helpers.assert_true(U.open(), "open() must succeed against a working backend")
+		helpers.assert_eq(#rec.opened, 1, "the device node is opened exactly once")
+		helpers.assert_eq(rec.opened[1], "/dev/uinput", "and it is the uinput node")
+		helpers.assert_eq(rec.open_flags[1], 0x80801,
+			"the flag word must be O_WRONLY (1) | O_NONBLOCK (0x800) | O_CLOEXEC (0x80000): "
+			.. "without O_CLOEXEC a child the daemon starts keeps the virtual keyboard alive "
+			.. "after the daemon dies")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("closes the descriptor and reports failure when an ioctl fails", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder({ fail_on = "ioctl", fail_req = 0x5501 }) -- UI_DEV_CREATE
+		U._set_backend(rec.backend)
+
+		helpers.assert_eq(U.open(), false, "a failed UI_DEV_CREATE must not report success")
+		helpers.assert_eq(U.is_open(), false, "a failed open must leave the channel closed")
+		helpers.assert_true(rec.closed >= 1,
+			"the descriptor must be closed on the failure path — leaking it holds /dev/uinput open "
+			.. "for the life of the daemon")
+
+		U._reset_backend()
+	end)
+
+end)
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 3/ Emission ================================
+-- ====================================================
+-- ====================================================
+
+helpers.describe("uinput_writer: emission", function()
+
+	helpers.it("writes the key event and then a SYN_REPORT", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		local before = #rec.writes
+		helpers.assert_true(U.emit(30, 1), "emit must report success against a working backend")
+		helpers.assert_eq(#rec.writes - before, 2,
+			"one key event plus one SYN_REPORT: without the SYN the kernel buffers the key and the "
+			.. "application sees nothing, while every write still returns success")
+
+		local key_ev = rec.writes[#rec.writes - 1]
+		local syn_ev = rec.writes[#rec.writes]
+		helpers.assert_eq(le(key_ev, 17, 2), U.EV_KEY, "the first write must be the EV_KEY event")
+		helpers.assert_eq(le(key_ev, 19, 2), 30, "…carrying the requested keycode")
+		helpers.assert_eq(le(syn_ev, 17, 2), U.EV_SYN, "the second write must be EV_SYN")
+		helpers.assert_eq(le(syn_ev, 19, 2), U.SYN_REPORT, "…with code SYN_REPORT")
+		helpers.assert_eq(le(syn_ev, 21, 4), 0, "…and value 0")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("passes the autorepeat value through unchanged", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		U.emit(30, 2)
+		local key_ev = rec.writes[#rec.writes - 1]
+		helpers.assert_eq(le(key_ev, 21, 4), 2,
+			"an autorepeat (value 2) must be re-emitted as 2. The ydotool wire format has no "
+			.. "representation for it and collapses it into a fresh press; this channel does not "
+			.. "have to, and a pass-through that rewrites what it passes is not a pass-through")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("refuses to emit when the device was never opened", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+
+		helpers.assert_eq(U.emit(30, 1), false, "emit must fail loudly before open()")
+		helpers.assert_eq(#rec.writes, 0, "…and must not write anything")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("reports failure when the SYN write fails", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local ok_rec = recorder()
+		U._set_backend(ok_rec.backend)
+		U.open()
+
+		-- Fail only the SYN by swapping the backend after the device is created.
+		local calls = 0
+		ok_rec.backend.write = function(_, bytes)
+			calls = calls + 1
+			return calls == 1 -- the key succeeds, the SYN does not
+		end
+		helpers.assert_eq(U.emit(30, 1), false,
+			"a key written without its SYN_REPORT is invisible to the application, so reporting "
+			.. "success there would hide a dead keystroke")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("reports failure when the EV_KEY write fails", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		local calls = 0
+		rec.backend.write = function()
+			calls = calls + 1
+			return false
+		end
+		helpers.assert_eq(U.emit(30, 1), false,
+			"an unwritten EV_KEY transition must reject the transaction")
+		helpers.assert_eq(calls, 1,
+			"SYN_REPORT must not be attempted after its key transition failed")
+
+		U._reset_backend()
+	end)
+
+end)
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 4/ Availability fails closed ===============
+-- ====================================================
+-- ====================================================
+
+helpers.describe("uinput_writer: availability", function()
+
+	helpers.it("is unavailable, rather than raising, without FFI or /dev/uinput", function()
+		-- This is the state of the machine running these tests: plain Lua, no
+		-- /dev/uinput. The module must still LOAD and answer honestly, because
+		-- the caller uses that answer to keep its existing channel.
+		local U = helpers.load_module("adapters.uinput_writer")
+		U._reset_backend()
+		-- Never the real node: a root test run probing it used to create it.
+		U._set_path_for_test(os.tmpname() .. ".absent-uinput")
+		local available = U.is_available()
+		U._set_path_for_test(nil)
+		helpers.assert_eq(type(available), "boolean",
+			"is_available() must answer with a boolean rather than raising — the daemon calls it "
+			.. "during startup to choose a channel")
+	end)
+
+	helpers.it("does not create a device merely by being asked whether it could", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+
+		U.is_available()
+		helpers.assert_eq(#rec.ioctls, 0,
+			"a probe must have no side effects: is_available() is called on every startup path, "
+			.. "and opening a device to answer it would leave a virtual keyboard behind each time")
+		helpers.assert_eq(U.is_open(), false, "the probe must not leave the channel open")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("never creates the node it probes for", function()
+		-- The failing shape: root, no uinput module loaded, so /dev/uinput is
+		-- absent and /dev is writable. A write-mode probe created a regular
+		-- file there, which then answered "available" to every later probe and
+		-- shadowed the character device the module creates when it loads.
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		local absent = os.tmpname()
+		os.remove(absent)
+		U._set_path_for_test(absent)
+
+		local available = U.is_available()
+		local leftover = io.open(absent, "r")
+		if leftover then leftover:close(); os.remove(absent) end
+		U._set_path_for_test(nil)
+		U._reset_backend()
+
+		helpers.assert_eq(leftover, nil,
+			"is_available() created " .. absent .. " — a probe must never create the node")
+		helpers.assert_eq(available, false, "an absent node is not an available channel")
+	end)
+
+	helpers.it("reports a present node as available", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		local present = os.tmpname()
+		U._set_path_for_test(present)
+
+		local available = U.is_available()
+		U._set_path_for_test(nil)
+		U._reset_backend()
+		os.remove(present)
+
+		helpers.assert_eq(available, true, "a node this user can open is available")
+	end)
+
+	helpers.it("opens the probed node, not a hardcoded one", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U._set_path_for_test("/tmp/ergopti-test-uinput")
+
+		U.open()
+		U.close()
+		U._set_path_for_test(nil)
+		U._reset_backend()
+
+		helpers.assert_eq(rec.opened[1], "/tmp/ergopti-test-uinput",
+			"open() must target the same node is_available() answered for")
+	end)
+
+end)
+
+
+
+
+
+-- ======================================================
+-- ======================================================
+-- ======= 5/ Exact owned output acknowledgements =======
+-- ======================================================
+-- ======================================================
+
+--- Opens a recorded native channel with literal retirement acknowledgement.
+--- @return table writer, table recorder, table capability
+local function owned_channel()
+	local writer = helpers.load_module("adapters.uinput_writer")
+	local recorded = recorder()
+	recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+	writer._set_backend(recorded.backend)
+	helpers.assert_eq(writer.open(), true)
+	return writer, recorded, writer.capture_output()
+end
+
+helpers.describe("uinput_writer: exact output custody", function()
+
+	helpers.it("mints one opaque capability before the first native wire attempt", function()
+		local writer, recorded, capability = owned_channel()
+		helpers.assert_true(type(capability) == "table")
+		helpers.assert_eq(next(capability), nil, "the capability must not expose a borrowed descriptor")
+		helpers.assert_true(rawequal(writer.capture_output(), capability))
+		helpers.assert_eq(writer.output_current(capability), true)
+		local view = writer.output_view(capability)
+		helpers.assert_eq(view.write_epoch, 0)
+		helpers.assert_eq(view.fd, nil)
+		helpers.assert_eq(view.backend, nil)
+		view.write_epoch = 99
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 0)
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+	helpers.it("refuses a forged capability even when __eq claims exact identity", function()
+		local writer, recorded, capability = owned_channel()
+		local equal = { __eq = function() return true end }
+		setmetatable(capability, equal)
+		local forged = setmetatable({}, equal)
+		helpers.assert_eq(writer.output_current(forged), false)
+		helpers.assert_eq(writer.output_view(forged), nil)
+		helpers.assert_eq(writer.emit_owned(forged, 30, 1), false)
+		helpers.assert_eq(writer.close_owned(forged), false)
+		helpers.assert_eq(#recorded.writes, 0)
+		helpers.assert_eq(writer.output_current(capability), true)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	helpers.it("acknowledges actual KEY then SYN bytes and advances one complete-attempt epoch", function()
+		local writer, recorded, capability = owned_channel()
+		local emit = writer.emit
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), true)
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 1)
+		helpers.assert_eq(#recorded.writes, 2)
+		helpers.assert_eq(le(recorded.writes[1], 17, 2), 1)
+		helpers.assert_eq(le(recorded.writes[1], 19, 2), 30)
+		helpers.assert_eq(le(recorded.writes[1], 21, 4), 1)
+		helpers.assert_eq(le(recorded.writes[2], 17, 2), 0)
+		helpers.assert_eq(le(recorded.writes[2], 19, 2), 0)
+		helpers.assert_eq(emit(30, 0), true, "already captured ordinary emitters use the same transport")
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 2)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	helpers.it("never mints ownership after an untracked legacy wire attempt", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		helpers.assert_eq(writer.emit(42, 1), true)
+		helpers.assert_eq(writer.capture_output(), nil,
+			"a held Shift may already be on this wire; no fresh neutral ledger can be inferred")
+		writer.close()
+		helpers.assert_eq(writer.open(), true)
+		local fresh = writer.capture_output()
+		helpers.assert_true(type(fresh) == "table")
+		helpers.assert_eq(writer.close_owned(fresh), true)
+	end)
+
+	for _, unknown in ipairs({ 1, "yes" }) do
+		helpers.it("does not mint a capability from truthy constructor acknowledgements " .. tostring(unknown), function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			recorded.backend.ioctl = function() return unknown end
+			writer._set_backend(recorded.backend)
+			helpers.assert_eq(writer.open(), true, "ordinary truthy constructor behavior is preserved")
+			helpers.assert_eq(writer.capture_output(), nil)
+			writer.close()
+		end)
+	end
+
+	helpers.it("refuses a constructor reservation reentry before a native handle can be lost", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local open = recorded.backend.open
+		local inside = false
+		recorded.backend.open = function(path, flags)
+			if inside then return open(path, flags) end
+			inside = true
+			helpers.assert_eq(writer.open(), false)
+			helpers.assert_eq(writer.capture_output(), nil)
+			helpers.assert_eq(writer._set_backend(recorder().backend), false)
+			helpers.assert_eq(writer._reset_backend(), false)
+			return open(path, flags)
+		end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		helpers.assert_eq(#recorded.opened, 1)
+		helpers.assert_eq(writer.close_owned(writer.capture_output()), true)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+	helpers.it("refuses constructor port substitution and retires the actual acquired descriptor", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		local ioctl = recorded.backend.ioctl
+		recorded.backend.ioctl = function(fd, request, argument)
+			recorded.backend.write = function() return true end
+			return ioctl(fd, request, argument)
+		end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), false)
+		helpers.assert_eq(writer.capture_output(), nil)
+		helpers.assert_eq(recorded.closed, 1)
+		helpers.assert_eq(writer.has_output_debt(), false)
+	end)
+
+	helpers.it("keeps opaque output observations pure even if the public current export is replaced", function()
+		local writer, _, capability = owned_channel()
+		writer.output_current = function() error("foreign exported callback must not run") end
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 0)
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(writer.output_view(capability), nil)
+	end)
+
+	helpers.it("blocks nested native writes, close and backend swaps inside a reserved KEY/SYN attempt", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local capability
+		local write = recorded.backend.write
+		recorded.backend.write = function(fd, bytes)
+			helpers.assert_eq(writer.output_current(capability), false)
+			helpers.assert_eq(writer.output_view(capability), nil)
+			helpers.assert_eq(writer.emit_owned(capability, 31, 1), false)
+			helpers.assert_eq(writer.emit(31, 1), false)
+			helpers.assert_eq(writer.close_owned(capability), false)
+			helpers.assert_eq(writer._set_backend(recorder().backend), false)
+			helpers.assert_eq(writer.use_ffi_backend(), false)
+			return write(fd, bytes)
+		end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		capability = writer.capture_output()
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), true)
+		helpers.assert_eq(#recorded.writes, 2)
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 1)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	for _, response in ipairs({ false, 1, "yes" }) do
+		helpers.it("retains actual wire debt when a native write does not acknowledge " .. tostring(response), function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			local calls = 0
+			recorded.backend.write = function() calls = calls + 1; return response end
+			recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+			writer._set_backend(recorded.backend)
+			helpers.assert_eq(writer.open(), true)
+			local capability = writer.capture_output()
+			helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+			helpers.assert_eq(calls, 1, "no SYN after an unacknowledged KEY")
+			helpers.assert_eq(writer.has_output_debt(), true)
+			helpers.assert_eq(writer.output_current(capability), false)
+			helpers.assert_eq(writer.capture_output(), nil)
+			helpers.assert_eq(writer.emit_owned(capability, 30, 0), false)
+			helpers.assert_eq(writer.close_owned(capability), true, "known exact open fd can be retired once")
+			helpers.assert_eq(writer.has_output_debt(), false)
+		end)
+	end
+
+	helpers.it("retains SYN debt and does not pretend that KEY alone reached the application", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local calls = 0
+		recorded.backend.write = function() calls = calls + 1; return calls == 1 end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local capability = writer.capture_output()
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+		helpers.assert_eq(calls, 2)
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	for _, response in ipairs({ false, 1, "yes" }) do
+		helpers.it("never retries a possibly recycled native fd after close refused " .. tostring(response), function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			recorded.backend.close = function() recorded.closed = recorded.closed + 1; return response end
+			writer._set_backend(recorded.backend)
+			helpers.assert_eq(writer.open(), true)
+			local capability = writer.capture_output()
+			helpers.assert_eq(writer.close_owned(capability), false)
+			helpers.assert_eq(writer.has_output_debt(), true)
+			helpers.assert_eq(writer.close_owned(capability), false)
+			helpers.assert_eq(writer._reset_backend(), false)
+			helpers.assert_eq(writer.open(), false)
+			helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+			helpers.assert_eq(recorded.closed, 1, "no retry on a descriptor the kernel may already have reused")
+		end)
+	end
+
+	helpers.it("invalidates retired capabilities even when the next native open reuses the same fd", function()
+		local writer, recorded, capability = owned_channel()
+		local old = writer.output_view(capability)
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(writer.open(), true)
+		local fresh = writer.capture_output()
+		helpers.assert_true(not rawequal(fresh, capability))
+		helpers.assert_true(writer.output_view(fresh).generation > old.generation)
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+		helpers.assert_eq(writer.close_owned(capability), false)
+		helpers.assert_eq(writer.close_owned(fresh), true)
+		helpers.assert_eq(recorded.closed, 2)
+	end)
+
+end)
+
+helpers.describe("uinput_writer: constructor and retirement refusal boundaries", function()
+
+	helpers.it("reserves both lazy FFI entry points before the module loader can acquire a nested channel", function()
+		for _, mode in ipairs({ "open", "bind" }) do
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local previous, preload = package.loaded.ffi, package.preload.ffi
+			local opened, closed = 0, 0
+			package.loaded.ffi = nil
+			package.preload.ffi = function()
+				helpers.assert_eq(writer.open(), false)
+				helpers.assert_eq(writer.use_ffi_backend(), false)
+				helpers.assert_eq(writer._set_backend(recorder().backend), false)
+				helpers.assert_eq(writer.capture_output(), nil)
+				return { cdef = function() end, cast = function(_, value) return value end,
+					C = { open = function() opened = opened + 1; return 42 end,
+						ioctl = function() return 0 end,
+						write = function(_, _, count) return count end,
+						close = function() closed = closed + 1; return 0 end } }
+			end
+			local ok, err = pcall(function()
+				if mode == "bind" then helpers.assert_eq(writer.use_ffi_backend(), true) end
+				helpers.assert_eq(writer.open(), true)
+				local capability = writer.capture_output()
+				helpers.assert_true(type(capability) == "table")
+				helpers.assert_eq(writer.emit_owned(capability, 30, 1), true)
+				helpers.assert_eq(writer.close_owned(capability), true)
+				helpers.assert_eq(opened, 1)
+				helpers.assert_eq(closed, 1)
+			end)
+			package.loaded.ffi, package.preload.ffi = previous, preload
+			if not ok then error(err, 0) end
+		end
+	end)
+
+	helpers.it("refuses a changed emission provider between constructor acknowledgement and capture", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		recorded.backend.write = function() return true end
+		helpers.assert_eq(writer.capture_output(), nil)
+		writer.close()
+	end)
+
+	helpers.it("records exact constructor-close debt and never retries its potentially reused native fd", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder({ fail_on = "ioctl", fail_req = writer.UI_DEV_SETUP })
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return false end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), false)
+		helpers.assert_eq(recorded.closed, 1)
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(writer.capture_output(), nil)
+		helpers.assert_eq(writer.open(), false)
+		helpers.assert_eq(writer._reset_backend(), false)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+	helpers.it("retains a throwing write while retiring its exact known open channel", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.write = function() error("native write refused") end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local capability = writer.capture_output()
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+	helpers.it("does not turn nil native close into success or a retry", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local capability = writer.capture_output()
+		helpers.assert_eq(writer.close_owned(capability), false)
+		helpers.assert_eq(recorded.closed, 1)
+		helpers.assert_eq(writer.close_owned(capability), false)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+	helpers.it("does not retry close after a native close exception", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; error("native close refused") end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local capability = writer.capture_output()
+		helpers.assert_eq(writer.close_owned(capability), false)
+		helpers.assert_eq(writer.close_owned(capability), false)
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+	helpers.it("refuses invalid native event scalars without issuing any wire attempt", function()
+		local writer, recorded, capability = owned_channel()
+		for _, event in ipairs({ { 0, 1 }, { -1, 1 }, { 1.5, 1 }, { 0x300, 1 }, { 30, 3 }, { "30", 1 } }) do
+			helpers.assert_eq(writer.emit_owned(capability, event[1], event[2]), false)
+		end
+		helpers.assert_eq(#recorded.writes, 0)
+		helpers.assert_eq(writer.output_view(capability).write_epoch, 0)
+		helpers.assert_eq(writer.close_owned(capability), true)
+	end)
+
+end)
+
+helpers.describe("uinput_writer: immutable native observation", function()
+
+	helpers.it("never invokes a backend metatable while observing a private capability", function()
+		local writer, recorded, capability = owned_channel()
+		local calls = 0
+		recorded.backend.write = nil
+		setmetatable(recorded.backend, { __index = function()
+			calls = calls + 1
+			error("a pure capability query may not invoke a native provider")
+		end })
+		helpers.assert_eq(writer.output_current(capability), false)
+		helpers.assert_eq(writer.output_view(capability), nil)
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(calls, 0)
+	end)
+
+	helpers.it("pins native syscall symbols before public ffi.C fields can change", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local previous, preload = package.loaded.ffi, package.preload.ffi
+		local writes, closes = 0, 0
+		local symbols = { open = function() return 42 end, ioctl = function() return 0 end,
+			write = function(_, _, count) writes = writes + 1; return count end,
+			close = function() closes = closes + 1; return 0 end }
+		package.loaded.ffi = nil
+		package.preload.ffi = function()
+			return { cdef = function() end, cast = function(_, value) return value end, C = symbols }
+		end
+		local ok, err = pcall(function()
+			helpers.assert_eq(writer.open(), true)
+			local capability = writer.capture_output()
+			symbols.write = function() error("foreign native write") end
+			symbols.close = function() error("foreign native close") end
+			helpers.assert_eq(writer.emit_owned(capability, 30, 1), true)
+			helpers.assert_eq(writer.close_owned(capability), true)
+			helpers.assert_eq(writes, 2)
+			helpers.assert_eq(closes, 1)
+		end)
+		package.loaded.ffi, package.preload.ffi = previous, preload
+		if not ok then error(err, 0) end
+	end)
+
+end)
+
+helpers.describe("uinput_writer: acknowledged transaction roster", function()
+
+	helpers.it("tracks every captured ordinary and owned write in one detached roster", function()
+		local writer, _, cap = owned_channel()
+		helpers.assert_eq(writer.emit(42, 1), true)
+		helpers.assert_eq(writer.emit_owned(cap, 29, 1), true)
+		helpers.assert_eq(writer.emit(42, 2), true)
+		local view = writer.output_view(cap)
+		helpers.assert_eq(table.concat(view.down, ","), "29,42")
+		helpers.assert_eq(view.write_epoch, 3)
+		helpers.assert_eq(view.roster_known, true)
+		view.down[1] = 100
+		helpers.assert_eq(table.concat(writer.output_view(cap).down, ","), "29,42")
+		helpers.assert_eq(writer.emit(42, 0), true)
+		helpers.assert_eq(table.concat(writer.output_view(cap).down, ","), "29")
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	helpers.it("does not infer a known down roster from an unmatched repeat", function()
+		local writer, _, cap = owned_channel()
+		helpers.assert_eq(writer.emit(42, 2), true)
+		helpers.assert_eq(writer.output_view(cap).roster_known, false)
+		helpers.assert_eq(writer.acquire_transaction(cap), nil)
+		helpers.assert_eq(writer.emit(42, 0), true)
+		helpers.assert_eq(writer.acquire_transaction(cap), nil)
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	helpers.it("reserves transport against all ordinary channel mutation and false aliases", function()
+		local writer, recorded, cap = owned_channel()
+		local token = writer.acquire_transaction(cap)
+		helpers.assert_eq(type(token), "table")
+		helpers.assert_eq(next(token), nil)
+		helpers.assert_eq(writer.output_current(cap), false)
+		helpers.assert_eq(writer.capture_output(), nil)
+		helpers.assert_eq(writer.acquire_transaction(cap), nil)
+		helpers.assert_eq(writer.emit(30, 1), false)
+		helpers.assert_eq(writer.emit_owned(cap, 30, 1), false)
+		helpers.assert_eq(writer.close_owned(cap), false)
+		helpers.assert_eq(writer.close(), false)
+		helpers.assert_eq(writer._reset_backend(), false)
+		helpers.assert_eq(writer._set_backend({}), false)
+		helpers.assert_eq(writer.transaction_current({}), false)
+		local alias = setmetatable({}, { __eq = function() return true end })
+		setmetatable(token, getmetatable(alias))
+		helpers.assert_eq(writer.transaction_emit(alias, 30, 1), false)
+		helpers.assert_eq(writer.release_transaction(alias), false)
+		helpers.assert_eq(writer.retire_transaction(alias), false)
+		helpers.assert_eq(#recorded.writes, 0)
+		helpers.assert_eq(writer.release_transaction(token), true)
+		helpers.assert_eq(writer.output_current(cap), true)
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	helpers.it("refuses premature publication and compensates only its acknowledged differences", function()
+		local writer, recorded, cap = owned_channel()
+		helpers.assert_eq(writer.emit(29, 1), true)
+		helpers.assert_eq(writer.emit(42, 1), true)
+		local token = writer.acquire_transaction(cap)
+		helpers.assert_eq(writer.transaction_emit(token, 42, 0), true)
+		helpers.assert_eq(writer.transaction_emit(token, 30, 1), true)
+		helpers.assert_eq(writer.release_transaction(token), false)
+		local view = writer.transaction_view(token)
+		helpers.assert_eq(table.concat(view.down, ","), "29,30")
+		helpers.assert_eq(table.concat(view.baseline, ","), "29,42")
+		helpers.assert_eq(view.restored, false)
+		view.baseline[1] = 30
+		helpers.assert_eq(writer.restore_transaction(token), true)
+		helpers.assert_eq(writer.transaction_view(token).restored, true)
+		helpers.assert_eq(writer.transaction_view(token).write_epoch, 6)
+		local events = {}
+		for i = 1, #recorded.writes, 2 do
+			local bytes = recorded.writes[i]
+			events[#events + 1] = le(bytes, 19, 2) .. ":" .. le(bytes, 21, 4)
+		end
+		helpers.assert_eq(table.concat(events, " "), "29:1 42:1 42:0 30:1 30:0 42:1")
+		helpers.assert_eq(writer.release_transaction(token), true)
+		helpers.assert_eq(writer.transaction_current(token), false)
+		helpers.assert_eq(table.concat(writer.output_view(cap).down, ","), "29,42")
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	helpers.it("rejects mismatched transaction rows before native IO", function()
+		local writer, recorded, cap = owned_channel()
+		local token = writer.acquire_transaction(cap)
+		helpers.assert_eq(writer.transaction_emit(token, 42, 0), false)
+		helpers.assert_eq(writer.transaction_emit(token, 42, 2), false)
+		helpers.assert_eq(writer.transaction_emit(token, 42, 1), true)
+		helpers.assert_eq(writer.transaction_emit(token, 42, 1), false)
+		helpers.assert_eq(writer.transaction_emit(token, 42, 2), true)
+		helpers.assert_eq(writer.transaction_emit(token, 42, 0), true)
+		helpers.assert_eq(#recorded.writes, 6)
+		helpers.assert_eq(writer.release_transaction(token), true)
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	helpers.it("never rewrites an unchanged baseline row during restoration", function()
+		local writer, recorded, cap = owned_channel()
+		helpers.assert_eq(writer.emit(29, 1), true)
+		local token = writer.acquire_transaction(cap)
+		helpers.assert_eq(writer.restore_transaction(token), true)
+		helpers.assert_eq(#recorded.writes, 2)
+		helpers.assert_eq(writer.release_transaction(token), true)
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	helpers.it("does not let a captured ordinary emitter interleave transaction output", function()
+		local writer, recorded, cap = owned_channel()
+		local ordinary = writer.emit
+		local token = writer.acquire_transaction(cap)
+		helpers.assert_eq(ordinary(29, 1), false)
+		helpers.assert_eq(writer.transaction_emit(token, 30, 1), true)
+		helpers.assert_eq(ordinary(30, 0), false)
+		helpers.assert_eq(writer.restore_transaction(token), true)
+		helpers.assert_eq(#recorded.writes, 4)
+		helpers.assert_eq(writer.release_transaction(token), true)
+		helpers.assert_eq(ordinary(29, 1), true)
+		helpers.assert_eq(writer.output_view(cap).write_epoch, 3)
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	helpers.it("refuses transaction reentry while a KEY or SYN callback owns native IO", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		local token, calls = nil, 0
+		recorded.backend.write = function(_, bytes)
+			calls = calls + 1
+			helpers.assert_eq(writer.transaction_current(token), false)
+			helpers.assert_eq(writer.transaction_emit(token, 31, 1), false)
+			helpers.assert_eq(writer.restore_transaction(token), false)
+			helpers.assert_eq(writer.release_transaction(token), false)
+			helpers.assert_eq(writer.retire_transaction(token), false)
+			recorded.writes[#recorded.writes + 1] = bytes
+			return true
+		end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local cap = writer.capture_output()
+		token = writer.acquire_transaction(cap)
+		helpers.assert_eq(writer.transaction_emit(token, 30, 1), true)
+		helpers.assert_eq(writer.restore_transaction(token), true)
+		helpers.assert_eq(calls, 4)
+		helpers.assert_eq(writer.release_transaction(token), true)
+		helpers.assert_eq(writer.close_owned(cap), true)
+	end)
+
+	for _, rejected in ipairs({ false, 1, "true", "throw" }) do
+		helpers.it("retains exact reservation after unacknowledged compensation: " .. tostring(rejected), function()
+			local writer = helpers.load_module("adapters.uinput_writer")
+			local recorded = recorder()
+			recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+			local refuse = false
+			recorded.backend.write = function(_, bytes)
+				recorded.writes[#recorded.writes + 1] = bytes
+				if refuse then
+					if rejected == "throw" then error("controlled refusal") end
+					return rejected
+				end
+				return true
+			end
+			writer._set_backend(recorded.backend)
+			helpers.assert_eq(writer.open(), true)
+			local cap = writer.capture_output()
+			local token = writer.acquire_transaction(cap)
+			helpers.assert_eq(writer.transaction_emit(token, 30, 1), true)
+			refuse = true
+			helpers.assert_eq(writer.restore_transaction(token), false)
+			helpers.assert_eq(writer.release_transaction(token), false)
+			helpers.assert_eq(writer.has_output_debt(), true)
+			helpers.assert_eq(writer.capture_output(), nil)
+			helpers.assert_eq(writer.transaction_current(token), false)
+			local attempts = #recorded.writes
+			refuse = false
+			helpers.assert_eq(writer.restore_transaction(token), false)
+			helpers.assert_eq(#recorded.writes, attempts)
+			helpers.assert_eq(writer.close_owned(cap), false)
+			helpers.assert_eq(writer.retire_transaction(token), true)
+			helpers.assert_eq(recorded.closed, 1)
+			helpers.assert_eq(writer.transaction_current(token), false)
+			helpers.assert_eq(writer.has_output_debt(), false)
+		end)
+	end
+
+	helpers.it("does not reopen delivery after uncertain retirement or retry a recycled fd", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return false end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local token = writer.acquire_transaction(writer.capture_output())
+		helpers.assert_eq(writer.retire_transaction(token), false)
+		helpers.assert_eq(writer.retire_transaction(token), false)
+		helpers.assert_eq(writer.release_transaction(token), false)
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(recorded.closed, 1)
+	end)
+
+end)

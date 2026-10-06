@@ -1,0 +1,190 @@
+{
+  "status": "PRIVATE_INACTIVE",
+  "anchor": "5e622935b7618bb9f8e3e1508141773046ed2134",
+  "scope": "two append-only native-HKL observation paths; no availability/output/input owner changes",
+  "sources": [
+    {
+      "path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+      "preimage": "969f960c2aebdc29a1078b655f017122ce1e46d00245cd488c485575be312dd3",
+      "postimage": "fec814344a74abae5c88d51566583e0d6a5614e2393a68292f9820c2e78ba00a",
+      "preservation": "whole predecessor byte prefix retained",
+      "added_bytes": 3563
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "preimage": "e5059ddd532af8377d5e6e4fec5f454a3203456ef6d1cdcef6324d84baadf88a",
+      "postimage": "1fda4818436bba15c87dc96ca8c7cc2a4812ed03a9eb7d04919374ead1fc252f",
+      "preservation": "whole predecessor byte prefix retained",
+      "added_bytes": 7472
+    }
+  ],
+  "pins": [
+    {
+      "path": ".ruff_cache/.gitignore",
+      "sha256": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316",
+      "bytes": 35
+    },
+    {
+      "path": ".ruff_cache/0.15.8/4255548920723731815",
+      "sha256": "7496b8b75e88af9bda5b47a2fc5aadd477c12a2ac69ef4d84aabdb0312e24235",
+      "bytes": 116
+    },
+    {
+      "path": ".ruff_cache/CACHEDIR.TAG",
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae",
+      "bytes": 43
+    },
+    {
+      "path": "README.md",
+      "sha256": "66e5084bd23f40ce438bd701145e92f78677e6a1b35b14df9008c6b826ca7785",
+      "bytes": 3614
+    },
+    {
+      "path": "apply-check.log",
+      "sha256": "19eaf43821a7660ec323a87c8457bf74823beb296c39f5e01aa8a683aa50f061",
+      "bytes": 7
+    },
+    {
+      "path": "candidate/.ruff_cache/.gitignore",
+      "sha256": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316",
+      "bytes": 35
+    },
+    {
+      "path": "candidate/.ruff_cache/CACHEDIR.TAG",
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae",
+      "bytes": 43
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "fec814344a74abae5c88d51566583e0d6a5614e2393a68292f9820c2e78ba00a",
+      "bytes": 26206
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/tests/run_all.ahk",
+      "sha256": "df00800c67e84c01ce57272c8d85388d584c393c968fdbf6a3606da3521c6bf3",
+      "bytes": 107245
+    },
+    {
+      "path": "candidate/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "sha256": "1fda4818436bba15c87dc96ca8c7cc2a4812ed03a9eb7d04919374ead1fc252f",
+      "bytes": 47177
+    },
+    {
+      "path": "candidate/tools/test/test-ahk-v2-syntax-antipatterns.cjs",
+      "sha256": "71ccb10d9341a1c008884e7005a8da409f93bd3b3b1f392d920a652a1a67ba07",
+      "bytes": 16067
+    },
+    {
+      "path": "check_contract.py",
+      "sha256": "2a1e4d3e903a32dace9139dec286254622ac348130a2f064fe14273782e0c11e",
+      "bytes": 5397
+    },
+    {
+      "path": "contract-controls.log",
+      "sha256": "92b5bfd77b2bfa0c70b4dcb6522481cfa38342ba0d01041697c3095c313ef4d1",
+      "bytes": 436
+    },
+    {
+      "path": "contract-results.json",
+      "sha256": "dd67579e5ff3259d723534c9228940cadb17816610ce76ee183d84b09766d124",
+      "bytes": 231
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/_shared/modules/features/number_row_policy.ahk",
+      "sha256": "a7db4ff9d9cda10e1490b4bebdef88bf53335e98f29137798a623b83e468f092",
+      "bytes": 3803
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/modules/keymap/layout/layout_shift_caps.ahk",
+      "sha256": "f77610e293ce62677f40d5ee71e753ec816335efbcbed4ae3bf0bc169eaa6c6e",
+      "bytes": 16401
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/modules/keymap/layout.ahk",
+      "sha256": "cfdbfc389e740e90cca7ea4269154b2a2dbc127d60f3ca5cf3d08cbdcf433186",
+      "bytes": 44218
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/tests/test_framework.ahk",
+      "sha256": "82d83e258dea19fbb9973fd4e477021348ace5d4a0eb29d2b74785e772f9d182",
+      "bytes": 31861
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/tests/test_stubs.ahk",
+      "sha256": "9cddbc1cdca4f9b4c66b7c58b72e00b38a443eee345e298ded2c35710e33bb2d",
+      "bytes": 42685
+    },
+    {
+      "path": "dependencies/static/ergopti_plus/windows/ui/menu/menu_layout.ahk",
+      "sha256": "10a72de230b0a7650571dc0ba2590b9448be7fb5a7df8b2b68ab56e23573208c",
+      "bytes": 9910
+    },
+    {
+      "path": "preimages/static/ergopti_plus/_shared/tests/corpus/layouts/number_row_levels.json",
+      "sha256": "cec09a9901f2b3b647af1bb46d51c3bccfed5e11c315b14115058db8b09e81b2",
+      "bytes": 1256
+    },
+    {
+      "path": "preimages/static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "969f960c2aebdc29a1078b655f017122ce1e46d00245cd488c485575be312dd3",
+      "bytes": 22643
+    },
+    {
+      "path": "preimages/static/ergopti_plus/windows/tests/run_all.ahk",
+      "sha256": "df00800c67e84c01ce57272c8d85388d584c393c968fdbf6a3606da3521c6bf3",
+      "bytes": 107245
+    },
+    {
+      "path": "preimages/static/ergopti_plus/windows/tests/unit/test_layout_digit_row_probe.ahk",
+      "sha256": "e5059ddd532af8377d5e6e4fec5f454a3203456ef6d1cdcef6324d84baadf88a",
+      "bytes": 39705
+    },
+    {
+      "path": "preimages/tools/test/test-ahk-v2-syntax-antipatterns.cjs",
+      "sha256": "71ccb10d9341a1c008884e7005a8da409f93bd3b3b1f392d920a652a1a67ba07",
+      "bytes": 16067
+    },
+    {
+      "path": "ruff.log",
+      "sha256": "0d5ae52662163149b74821a07fbdb57f34079135e72743eb08a732e31059edc5",
+      "bytes": 44
+    },
+    {
+      "path": "source-contract.json",
+      "sha256": "76c2650d7fce37df4663a61103e57e15ae7dcbaf644a5f9d1a68dc5fe0704f6b",
+      "bytes": 928
+    },
+    {
+      "path": "source.patch",
+      "sha256": "c59f4d134488bde6272eb0c67185e9bac2a099cadcf17513444ddf1eea66ff1d",
+      "bytes": 11766
+    },
+    {
+      "path": "syntax.log",
+      "sha256": "f310b137f60cce4858f843a54e9d57ffdfa2e3167421bf344b11b69dba7fdc72",
+      "bytes": 70
+    }
+  ],
+  "patch_sha256": "c59f4d134488bde6272eb0c67185e9bac2a099cadcf17513444ddf1eea66ff1d",
+  "archive_sha256": "0c083664f82d3998d888693ad8af6e402945ccdbe8ab871eb5d9e95fa414980d",
+  "portable": {
+    "source_contract": "passed",
+    "expected_red_predecessor": true,
+    "refused_source_omissions": 6,
+    "syntax": "passed (3 captured AHK files)",
+    "encoding": "BOM LF passed",
+    "ruff": "passed",
+    "apply_check": "passed"
+  },
+  "native": {
+    "registered_cases": 5,
+    "executed": false,
+    "two_actual_hkl_cases": "unexecuted",
+    "three_actual_adapter_controlled_port_cases": "unexecuted",
+    "existing_runner": "unexecuted",
+    "e2e": "unexecuted",
+    "packaging": "unexecuted",
+    "installation": "unexecuted"
+  },
+  "remaining_implementation": "exact physical source/modifier/output ownership and native VK/SC dead-state delivery; forced native modes remain unavailable"
+}
