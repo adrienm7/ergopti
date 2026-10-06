@@ -4692,6 +4692,14 @@ These are implementation tasks; separate installed tray/input acceptance.
       uncommitted in the local worktree of `fix/downloads-on-managed-networks`
       when the session stopped; redo it if that worktree is gone.
 
+The CLI orphan-retirement refusal is now reproduced and corrected without
+relaxing physical closure. Actual kernel observations showed the exact adopted
+child as a zombie in the retained group while curl waited for group absence.
+The fixture reaps only that identity during its original settlement loop and
+consumes the acknowledgement before any later numeric cleanup. Original
+50 native cases now pass with zero failures; all 56 assertion sites and the
+five-second settlement budget remain. This does not close item 62 or 16/38.
+
 The reviewed redirect correction retains canonical sensitive-header no-follow
 admission by default; deliberate per-hop owned GETs select
 `managed_redirects=true`. Both actual Linux interpreters pass the 62 focused
