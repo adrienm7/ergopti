@@ -434,3 +434,92 @@ helpers.describe("Model catalogue presentation boundaries", function()
 		end)
 	end)
 end)
+
+
+local function hardware_boundary_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/model_hardware_boundary.json"), "rb"))
+	local bytes = assert(file:read("*a")); assert(file:close())
+	return assert(require("adapters.json_codec").decode(bytes))
+end
+
+helpers.describe("Actual model hardware boundary (model-hardware-boundary)", function()
+	helpers.it("consumes shared presentation and retains authentic value-based hardware presence (model-hardware-boundary)", function()
+		with_model_readout_owner(function(selector, ctx, menu, _, calls)
+			local expected = hardware_boundary_corpus()
+			local actual
+			for _, provider in ipairs(ctx.models_mgr.get_presets()) do
+				for _, family in ipairs(provider.families or {}) do
+					for _, model in ipairs(family.models or {}) do
+						if model.name == expected.native_model then actual = model end
+					end
+				end
+			end
+			helpers.assert_not_nil(actual, "the hardware subject must come from the genuine current catalogue")
+			helpers.assert_eq(actual.hardware_requirements.ollama, expected.hardware_ollama)
+			local root, declaration = menu.get_root(), menu.get_array(expected.section)
+			local original, hardware = declaration[1], actual.hardware_requirements
+			local function hardware_sheet()
+				local rows = model_readout_sheet(selector.build(ctx), expected.native_model)
+				local position
+				for index, row in ipairs(rows) do if row.label == expected.header.hs then position = index end end
+				return rows, position
+			end
+			local ok, detail = xpcall(function()
+				local rows, position = hardware_sheet()
+				helpers.assert_type(position, "number")
+				helpers.assert_eq(rows[position - 1], { separator = true })
+				helpers.assert_eq(rows[position].disabled, true)
+				helpers.assert_nil(rows[position].action)
+				helpers.assert_eq(rows[position + 1].label, string.format("Download: %s GB", expected.hardware_ollama.download_gb))
+				helpers.assert_eq(rows[position + 2].label, string.format("Memory (RAM): %s GB", expected.hardware_ollama.ram_gb))
+				helpers.assert_type(rows[position + 1].action, "function")
+				helpers.assert_type(rows[position + 2].action, "function")
+				rows[position + 1].action(); rows[position + 2].action()
+				helpers.assert_eq(#calls, 0, "existing hardware noop readouts must not select/install a model")
+				declaration[1] = { type = "label", id = "hand_hardware_marker", i18n = expected.marker_key,
+					platforms = { "ahk", "hs" }, unavailable = "hide" }
+				rows, position = hardware_sheet()
+				helpers.assert_eq(rows[position - 1].label, expected.marker_english)
+				helpers.assert_eq(rows[position - 1].disabled, true)
+				helpers.assert_nil(rows[position - 1].action)
+				helpers.assert_eq(rows[position].label, expected.header.hs)
+				rows[1].action()
+				helpers.assert_eq(calls, { expected.native_model })
+				declaration[1] = { type = "command", id = "unbound_hardware_marker", i18n = expected.marker_key }
+				helpers.assert_eq(selector.build(ctx), {}, "unbound hardware presentation refuses the actual selector")
+				helpers.assert_eq(calls, { expected.native_model })
+				root[expected.section] = nil
+				helpers.assert_eq(selector.build(ctx), {}, "withdrawn hardware declaration has no native separator fallback")
+				root[expected.section] = declaration; declaration[1] = original
+				-- Withdrawal uses the genuine private record; no invented shipped missing record.
+				actual.hardware_requirements = { ollama = {} }
+				rows, position = hardware_sheet()
+				helpers.assert_eq(position ~= nil, expected.empty_ollama_map_header_visible.hs)
+				actual.hardware_requirements = nil
+				rows, position = hardware_sheet()
+				helpers.assert_eq(position ~= nil, expected.missing_hardware_header_visible.hs)
+				helpers.assert_eq(calls, { expected.native_model })
+			end, debug.traceback)
+			actual.hardware_requirements = hardware; root[expected.section] = declaration; declaration[1] = original
+			if not ok then error(detail, 0) end
+			local rows, position = hardware_sheet()
+			helpers.assert_type(position, "number")
+			helpers.assert_eq(rows[position - 1], { separator = true })
+			helpers.assert_true(rawequal(actual.hardware_requirements, hardware))
+			helpers.assert_eq(actual.hardware_requirements.ollama, expected.hardware_ollama)
+			helpers.assert_eq(calls, { expected.native_model })
+		end)
+	end)
+
+	helpers.it("projects the actual inert boundary and genuine Linux absence (model-hardware-boundary)", function()
+		with_model_readout_owner(function(_, _, _, native)
+			local expected = hardware_boundary_corpus()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({ platform = platform,
+					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
+				helpers.assert_eq(renderer.template_rows(expected.section, {}, {}, {}), expected.projections[platform])
+			end
+		end)
+	end)
+end)

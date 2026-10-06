@@ -6615,6 +6615,12 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# The actual per-model hardware owners retain their distinct availability predicates.
+[[menu.llm_model_hardware_boundary]]
+type = "---"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
 # Curated catalogue families and per-model origins retain their existing native boundaries.
 [[menu.llm_model_family_boundary]]
 type = "---"

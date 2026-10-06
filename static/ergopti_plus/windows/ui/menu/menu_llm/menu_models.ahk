@@ -528,7 +528,11 @@ _LLM_Menu_PerModelRows(name, model, ollama_url, active, deps_ready := true) {
 		hw_root := model["hardware_requirements"]
 		if (hw_root.Has("ollama") and Type(hw_root["ollama"]) == "Map") {
 			hw := hw_root["ollama"]
-			Rows.Push(Map("separator", true))
+			HardwareRows := MenuRenderer_TemplateRows("llm_model_hardware_boundary", Map(), Map(), Map())
+			if !(HardwareRows is Array)
+				return []
+			for Row in HardwareRows
+				Rows.Push(Row)
 			Rows.Push(Map("label", StrReplace(t("menu.llm.hw_header"), "%s", "Ollama")))
 			if (hw.Has("download_gb") and _LLM_Menu_IsNumber(hw["download_gb"]))
 				Rows.Push(Map("label", StrReplace(t("menu.llm.hw_download"), "%s", hw["download_gb"])))

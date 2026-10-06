@@ -4361,7 +4361,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 60, macOS 93, Linux 67, each
+  drivers still build (current baseline: Windows 59, macOS 92, Linux 67, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4373,6 +4373,22 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  The Windows/macOS separator before per-model hardware details now consumes
+  one shared inert fragment; Linux has no corresponding hardware block and
+  explicitly hides this boundary. Each native availability predicate remains
+  exact: Windows still shows its hardware heading for an empty Ollama Map,
+  while macOS requires download, disk or RAM values. Bare Windows Ollama and
+  decorated macOS Ollama headers, all values, order and native callbacks
+  remain unchanged. The unchanged scanner and two owner-generator fixed-point
+  runs establish 60/93/67 to 59/92/67, with all 467 predecessor corpora and 21
+  locale files exact. Actual portable macOS owning and French-warm controls
+  pass 13/0 and 2/0 on both Lua runtimes; genuine old native source gives 12/1
+  and 1/1. Unchanged Linux whole-tray controls pass 17/0 in English and French
+  on both runtimes. The new real Map/Win32 case is locally unexecuted; final
+  composed native CI, actual Hammerspoon/SDK and installed acceptance remain
+  pending. This source-qualified boundary does not complete either menu item
+  or any of the six group items.
 
   Linux's six existing absent-module status children now consume five shared
   inert fragments for Hotstrings, LLM, Metrics, Shortcuts and Gestures. The
@@ -5178,7 +5194,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 60, macOS 93 and Linux 67 rows are still built by the
+  Windows 59, macOS 92 and Linux 67 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
