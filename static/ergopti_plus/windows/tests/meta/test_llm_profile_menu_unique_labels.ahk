@@ -171,6 +171,8 @@ _LPUL_ActualFrameKeepsDuplicateBuiltinAndUserRows() {
 		LLM_PROFILE_HOTKEY_LIMIT := _LPUL_NativeProfileHotkeyLimit()
 		_LLM_Menu := _HSDeepCloneMap(Previous)
 		_LLM_Menu["user_profiles"] := []
+		; The complete native frame reaches the genuine empty per-app owner too.
+		_LLM_Menu["app_profile_overrides"] := Map()
 		BuiltinId := ""
 		for Id in LLM_PROFILE_BUILTIN_ORDER {
 			if LLM_Menu_GetProfileHotkeyHint(Id) == "" {
@@ -189,6 +191,8 @@ _LPUL_ActualFrameKeepsDuplicateBuiltinAndUserRows() {
 			AssertEqual("", LLM_Menu_GetProfileHotkeyHint("lpul_duplicate_" . Index),
 				"the duplicate cases must really be beyond all native hotkey hints")
 		Rows := _LLM_Menu_ProfileRows()
+		AssertTrue(Rows is Array && Rows.Length > 0,
+			"the genuine complete profile frame must be admitted before label enumeration")
 		Seen := Map(), Matches := []
 		for Row in Rows {
 			if !Row.Has("label")
