@@ -1134,6 +1134,16 @@ end
 --- Captures the exact source acknowledged by load or the last publication.
 --- @param path string Configuration path.
 --- @return table|nil snapshot Classified source snapshot.
+--- Captures exact private source ownership across native read callbacks.
+function M.capture_source_delivery_guard(path)
+	local source = _source_snapshots[path]
+	local status, content = source and source.status, source and source.content
+	return function()
+		return _source_snapshots[path] == source and source ~= nil
+			and source.status == status and source.content == content
+	end
+end
+
 function M.source_snapshot(path)
 	local source = _source_snapshots[path]
 	return source and { status = source.status, content = source.content } or nil

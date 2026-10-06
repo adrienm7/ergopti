@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Abbreviazioni programmabili",
 	"platform_reason.program_runner_unavailable": "Non disponibile: Il lanciatore nativo o questa associazione non è disponibile.",
 	"sg_actions.run_program": "▶️ Esegui un programma [configurabile]",
-	"menu.hotstrings.personal_metadata_unavailable": "Non disponibile qui: modifica questo campo direttamente nel file sorgente."
+	"menu.hotstrings.personal_metadata_unavailable": "Non disponibile qui: modifica questo campo direttamente nel file sorgente.",
+	"physical_shortcuts.window_title": "Scorciatoie fisiche",
+	"physical_shortcuts.position": "Posizione del tasto",
+	"physical_shortcuts.manual_hint": "Scegli una posizione del tasto, indipendentemente dal carattere digitato.",
+	"physical_shortcuts.capture": "Acquisisci un tasto",
+	"physical_shortcuts.capture_unavailable": "L’acquisizione non è disponibile. Scegli una posizione.",
+	"physical_shortcuts.empty": "Nessuna scorciatoia fisica aggiunta.",
+	"physical_shortcuts.edit": "Modifica",
+	"physical_shortcuts.source_changed": "La configurazione è cambiata. Chiudi e riapri questa finestra.",
+	"physical_shortcuts.save_failed": "Impossibile salvare questa scorciatoia. Riprova.",
+	"physical_shortcuts.saved_reopen": "Salvato. Riapri questa finestra per continuare.",
+	"physical_shortcuts.position_unavailable": "Questa posizione del tasto non è disponibile qui.",
+	"physical_shortcuts.windows_unavailable": "Non ancora su Windows: L’editor delle scorciatoie fisiche non è ancora disponibile su Windows.",
+	"physical_shortcuts.collision": "Questa combinazione di tasti è già in uso. Scegline un’altra.",
+	"physical_shortcuts.window_unavailable": "Questa finestra non è disponibile: Prova a riaprirla."
 }

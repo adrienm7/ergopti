@@ -92,7 +92,34 @@ const manager = fs.readFileSync(
 	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'webview_manager.lua'),
 	'utf8'
 );
-const registrations = manager.match(/register_script_message_handler\(/g) || [];
+// A native retirement must unregister its exact bridge. Count complete method
+// identifiers so that required inverse cannot masquerade as another acquisition.
+function registrationCalls(source) {
+	return source.match(/\bregister_script_message_handler\s*\(/g) || [];
+}
+
+const registrationFixtures = [
+	{
+		source:
+			'ucm:register_script_message_handler(name); ucm:unregister_script_message_handler(name)',
+		count: 1
+	},
+	{
+		source:
+			'first:register_script_message_handler(name); second:register_script_message_handler(name)',
+		count: 2
+	},
+	{ source: 'ucm:unregister_script_message_handler(name)', count: 0 },
+	{ source: 'ucm:register_script_message_handler \n(name)', count: 1 },
+	{ source: 'ucm:foreign_register_script_message_handler(name)', count: 0 }
+];
+for (const fixture of registrationFixtures) {
+	if (registrationCalls(fixture.source).length !== fixture.count) {
+		fail('native bridge registration must count complete acquisition identifiers');
+	}
+}
+
+const registrations = registrationCalls(manager);
 if (registrations.length !== 1 || manager.includes('for _, bridge_name in ipairs(bridge_names)')) {
 	fail('each Linux WebView must register only its page-owned bridge');
 }

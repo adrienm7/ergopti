@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "프로그래밍 가능한 텍스트 단축키",
 	"platform_reason.program_runner_unavailable": "사용 불가: 기본 프로그램 실행 기능 또는 이 할당을 사용할 수 없습니다.",
 	"sg_actions.run_program": "▶️ 프로그램 실행 [설정 가능]",
-	"menu.hotstrings.personal_metadata_unavailable": "여기에서는 사용할 수 없습니다. 원본 파일에서 이 항목을 직접 수정하세요."
+	"menu.hotstrings.personal_metadata_unavailable": "여기에서는 사용할 수 없습니다. 원본 파일에서 이 항목을 직접 수정하세요.",
+	"physical_shortcuts.window_title": "물리 키 단축키",
+	"physical_shortcuts.position": "키 위치",
+	"physical_shortcuts.manual_hint": "입력되는 문자와 관계없이 키 위치를 선택하세요.",
+	"physical_shortcuts.capture": "키 캡처",
+	"physical_shortcuts.capture_unavailable": "키 캡처를 사용할 수 없습니다. 위치를 선택하세요.",
+	"physical_shortcuts.empty": "아직 물리 키 단축키가 추가되지 않았습니다.",
+	"physical_shortcuts.edit": "편집",
+	"physical_shortcuts.source_changed": "설정이 변경되었습니다. 이 창을 닫고 다시 여세요.",
+	"physical_shortcuts.save_failed": "이 단축키를 저장하지 못했습니다. 다시 시도하세요.",
+	"physical_shortcuts.saved_reopen": "저장되었습니다. 계속하려면 이 창을 다시 여세요.",
+	"physical_shortcuts.position_unavailable": "이 키 위치는 여기서 사용할 수 없습니다.",
+	"physical_shortcuts.windows_unavailable": "아직 Windows에서 지원되지 않음: 물리 키 단축키 편집기는 아직 Windows에서 사용할 수 없습니다.",
+	"physical_shortcuts.collision": "이 키 조합은 이미 사용 중입니다. 다른 조합을 선택하세요.",
+	"physical_shortcuts.window_unavailable": "이 창을 사용할 수 없습니다: 다시 열어 보세요."
 }

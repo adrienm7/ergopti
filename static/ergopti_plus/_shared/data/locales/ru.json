@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Программируемые текстовые сокращения",
 	"platform_reason.program_runner_unavailable": "Недоступно: Нативный запуск программ или эта привязка недоступны.",
 	"sg_actions.run_program": "▶️ Запустить программу [настраиваемое]",
-	"menu.hotstrings.personal_metadata_unavailable": "Здесь недоступно: измените это поле непосредственно в исходном файле."
+	"menu.hotstrings.personal_metadata_unavailable": "Здесь недоступно: измените это поле непосредственно в исходном файле.",
+	"physical_shortcuts.window_title": "Физические сочетания клавиш",
+	"physical_shortcuts.position": "Положение клавиши",
+	"physical_shortcuts.manual_hint": "Выберите положение клавиши независимо от вводимого символа.",
+	"physical_shortcuts.capture": "Захватить клавишу",
+	"physical_shortcuts.capture_unavailable": "Захват недоступен. Выберите положение клавиши.",
+	"physical_shortcuts.empty": "Физические сочетания клавиш ещё не добавлены.",
+	"physical_shortcuts.edit": "Изменить",
+	"physical_shortcuts.source_changed": "Конфигурация изменилась. Закройте и снова откройте это окно.",
+	"physical_shortcuts.save_failed": "Не удалось сохранить сочетание клавиш. Повторите попытку.",
+	"physical_shortcuts.saved_reopen": "Сохранено. Откройте это окно снова, чтобы продолжить.",
+	"physical_shortcuts.position_unavailable": "Это положение клавиши здесь недоступно.",
+	"physical_shortcuts.windows_unavailable": "Пока недоступно в Windows: Редактор физических сочетаний клавиш пока недоступен в Windows.",
+	"physical_shortcuts.collision": "Это сочетание клавиш уже используется. Выберите другое.",
+	"physical_shortcuts.window_unavailable": "Это окно недоступно: Попробуйте открыть его снова."
 }

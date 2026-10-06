@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Programmerbare tekstsnarveier",
 	"platform_reason.program_runner_unavailable": "Utilgjengelig: Den innebygde programstarteren eller denne tilordningen er utilgjengelig.",
 	"sg_actions.run_program": "▶️ Kjør et program [konfigurerbart]",
-	"menu.hotstrings.personal_metadata_unavailable": "Ikke tilgjengelig her: rediger dette feltet direkte i kildefilen."
+	"menu.hotstrings.personal_metadata_unavailable": "Ikke tilgjengelig her: rediger dette feltet direkte i kildefilen.",
+	"physical_shortcuts.window_title": "Fysiske snarveier",
+	"physical_shortcuts.position": "Tastens posisjon",
+	"physical_shortcuts.manual_hint": "Velg en tastposisjon uavhengig av tegnet tasten skriver.",
+	"physical_shortcuts.capture": "Registrer en tast",
+	"physical_shortcuts.capture_unavailable": "Tastregistrering er ikke tilgjengelig. Velg en posisjon.",
+	"physical_shortcuts.empty": "Ingen fysiske snarveier er lagt til ennå.",
+	"physical_shortcuts.edit": "Rediger",
+	"physical_shortcuts.source_changed": "Konfigurasjonen er endret. Lukk og åpne dette vinduet på nytt.",
+	"physical_shortcuts.save_failed": "Snarveien kunne ikke lagres. Prøv igjen.",
+	"physical_shortcuts.saved_reopen": "Lagret. Åpne dette vinduet på nytt for å fortsette.",
+	"physical_shortcuts.position_unavailable": "Denne tastposisjonen er ikke tilgjengelig her.",
+	"physical_shortcuts.windows_unavailable": "Ikke tilgjengelig på Windows ennå: Redigereren for fysiske snarveier er ennå ikke tilgjengelig på Windows.",
+	"physical_shortcuts.collision": "Denne tastekombinasjonen er allerede i bruk. Velg en annen.",
+	"physical_shortcuts.window_unavailable": "Dette vinduet er ikke tilgjengelig: Prøv å åpne det igjen."
 }

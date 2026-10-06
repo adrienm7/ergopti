@@ -3224,5 +3224,19 @@
 	"menu.hotstrings.user_code.title": "Programowalne skróty tekstowe",
 	"platform_reason.program_runner_unavailable": "Niedostępne: Natywny mechanizm uruchamiania lub to przypisanie jest niedostępne.",
 	"sg_actions.run_program": "▶️ Uruchom program [konfigurowalne]",
-	"menu.hotstrings.personal_metadata_unavailable": "Tutaj niedostępne: edytuj to pole bezpośrednio w pliku źródłowym."
+	"menu.hotstrings.personal_metadata_unavailable": "Tutaj niedostępne: edytuj to pole bezpośrednio w pliku źródłowym.",
+	"physical_shortcuts.window_title": "Skróty fizyczne",
+	"physical_shortcuts.position": "Położenie klawisza",
+	"physical_shortcuts.manual_hint": "Wybierz położenie klawisza niezależnie od wpisywanego znaku.",
+	"physical_shortcuts.capture": "Przechwyć klawisz",
+	"physical_shortcuts.capture_unavailable": "Przechwytywanie jest niedostępne. Wybierz położenie.",
+	"physical_shortcuts.empty": "Nie dodano jeszcze skrótów fizycznych.",
+	"physical_shortcuts.edit": "Edytuj",
+	"physical_shortcuts.source_changed": "Konfiguracja się zmieniła. Zamknij i ponownie otwórz to okno.",
+	"physical_shortcuts.save_failed": "Nie udało się zapisać skrótu. Spróbuj ponownie.",
+	"physical_shortcuts.saved_reopen": "Zapisano. Otwórz ponownie to okno, aby kontynuować.",
+	"physical_shortcuts.position_unavailable": "To położenie klawisza jest tutaj niedostępne.",
+	"physical_shortcuts.windows_unavailable": "Jeszcze niedostępne w Windows: Edytor skrótów fizycznych nie jest jeszcze dostępny w systemie Windows.",
+	"physical_shortcuts.collision": "Ta kombinacja klawiszy jest już używana. Wybierz inną.",
+	"physical_shortcuts.window_unavailable": "To okno jest niedostępne: Spróbuj otworzyć je ponownie."
 }

@@ -9,9 +9,22 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.infra.test_global_shortcuts_pair_scope",
+	"tests.unit.infra.test_physical_shortcut_scope",
+	"tests.unit.modules.shortcuts.test_physical_editor_inventory",
+	"tests.unit.modules.shortcuts.test_physical_entries",
+	"tests.unit.modules.shortcuts.test_physical_slots",
+	"tests.unit.ui.test_physical_editor",
+	"tests.unit.ui.test_physical_editor_host",
+	"tests.unit.ui.test_physical_shortcut_native_ready",
+	"tests.unit.ui.test_webview_native_lifecycle",
 	"tests.unit.ui.test_key_combinations_menu",
 	"tests.unit.infra.test_key_combinations_scope",
 	"tests.unit.modules.test_native_worker_owner",
+	"tests.unit.adapters.test_physical_chord_source_currency",
+	"tests.unit.adapters.test_xkb_chord_numeric_symbols",
+	"tests.unit.adapters.test_number_row_native_levels",
+	"tests.unit.adapters.test_xkb_fixture_secondary_ownership",
 	"tests.unit.modules.test_window_switch_owner",
 	"tests.unit.modules.test_key_combinations",
 	"tests.unit.modules.test_native_worker_service",
