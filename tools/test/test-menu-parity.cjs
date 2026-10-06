@@ -492,7 +492,34 @@ const OPENS_SUBMENU = {
 			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
 		}
 	],
-	llm_generation_settings: 'llm_generation_menu',
+	llm_generation_settings: [
+		'llm_generation_menu',
+		{
+			menu: 'llm_generation_count_boundary',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+				hs: 'macos/ui/menu/menu_llm/init.lua'
+			}
+		},
+		{
+			menu: 'llm_generation_context_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk'
+			}
+		},
+		{
+			menu: 'llm_generation_words_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk'
+			}
+		}
+	],
 	// Linux uses the same generation child inline, through its dynamic handler.
 	llm_generation: [
 		'llm_generation_menu',

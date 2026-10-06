@@ -4319,7 +4319,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 66, macOS 98, Linux 73, each
+  drivers still build (current baseline: Windows 63, macOS 97, Linux 73, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4331,6 +4331,19 @@ integrated, then publish one grouped release.
   Native allocators and computed user-data captions alone do not prove missing
   shared policy. Final native binding/order/caption and installed acceptance
   remain required; source review and the local portable gates are insufficient.
+
+  Generation numeric boundaries now consume three shared inert fragments,
+  retiring the three actual Windows separators and one macOS separator. Later
+  macOS numeric boundaries and all Linux generation boundaries retain genuine
+  absence
+  through explicit `unavailable = "hide"`; no native callback, numeric/reset
+  selection, prompt, state or existing acknowledgement policy changes. The
+  canonical generators establish 66/98/73 to 63/97/73, with all 463 predecessor
+  corpora and 21 locale files byte-identical. Actual macOS owning tests pass
+  10/0 and French warm-owner controls 3/0 on both runtimes; genuine old native
+  source alone gives 8/2 and 1/2 respectively. Unchanged Linux whole-tray tests
+  pass 9/0 in English and French on both runtimes. Three new Windows Win32
+  cases, final composed native CI and installed-device acceptance remain open.
 
 Linux Metrics unavailable/idle migration readouts now consume shared inert label
 templates. Running progress and cancellation retain their native owners. The
@@ -5078,7 +5091,7 @@ deferral is superseded. This item and items16/38 remain open.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 66, macOS 98 and Linux 73 rows are still built by the
+  Windows 63, macOS 97 and Linux 73 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -5100,6 +5113,13 @@ deferral is superseded. This item and items16/38 remain open.
   presentation-refusal APIs are implemented. The historical classification
   above does not mean these APIs are absent; remaining provider families still
   need genuine shared data/order/policy consumption on the applicable drivers.
+
+  The generation numeric-boundary family consumes actual shared fragments at
+  its four former native constructor sites, preserving cross-driver order and
+  genuine hidden absence. Counts above are the owner-generated result, not a
+  raised ratchet or a claim that remaining provider families are complete.
+  Original corpus, locale, native callbacks and prior assertions stay intact;
+  final native three-OS qualification remains required.
 
   The Windows qualification successor for the shared Tap-Hold head retains its
   real four-row Win32 and refusal assertions; item 54 records the precise

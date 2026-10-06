@@ -1235,7 +1235,9 @@ local function create_menu(deps)
 								end,
 						})
 				end
-				table.insert(generation_rows, { separator = true })
+				local count_boundary_rows = ManifestMenu.template_rows("llm_generation_count_boundary", {}, {}, {})
+				if not count_boundary_rows then return {} end
+				for _, row in ipairs(count_boundary_rows) do generation_rows[#generation_rows + 1] = row end
 
 				table.insert(generation_rows, { label = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, action = settings_mgr.set_context_length })
 				if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then

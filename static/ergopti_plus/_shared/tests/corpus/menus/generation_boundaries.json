@@ -1,0 +1,109 @@
+{
+	"boundaries": {
+		"count": {
+			"section": "llm_generation_count_boundary",
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["ahk", "hs"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [
+					{
+						"separator": true
+					}
+				],
+				"hs": [
+					{
+						"separator": true
+					}
+				],
+				"linux": []
+			}
+		},
+		"context": {
+			"section": "llm_generation_context_boundary",
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["ahk"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [
+					{
+						"separator": true
+					}
+				],
+				"hs": [],
+				"linux": []
+			}
+		},
+		"words": {
+			"section": "llm_generation_words_boundary",
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["ahk"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [
+					{
+						"separator": true
+					}
+				],
+				"hs": [],
+				"linux": []
+			}
+		}
+	},
+	"caption_keys": [
+		"menu.llm.num_predictions_label",
+		"menu.llm.context_length_label",
+		"menu.llm.reset_on_nav",
+		"menu.llm.min_words_label",
+		"menu.llm.max_words_label",
+		"menu.llm.temperature_label",
+		"menu.llm.reset_label",
+		"menu.llm.unlimited",
+		"menu.llm.auto_raise_temp",
+		"menu.llm.generation.context_length",
+		"menu.llm.generation.temperature"
+	],
+	"platform_order_without_optional_resets": {
+		"ahk": [
+			"prediction_count",
+			"boundary.count",
+			"context_length",
+			"reset_on_nav",
+			"boundary.context",
+			"min_words",
+			"max_words",
+			"boundary.words",
+			"temperature"
+		],
+		"hs": [
+			"prediction_count",
+			"boundary.count",
+			"context_length",
+			"reset_on_nav",
+			"min_words",
+			"max_words",
+			"temperature"
+		],
+		"linux": ["prediction_count", "temperature", "context_length", "min_words", "max_words"]
+	},
+	"published_marker": {
+		"type": "section_header",
+		"id": "generation_boundary_marker",
+		"i18n": "button.cancel"
+	},
+	"published_marker_key": "button.cancel",
+	"native_counts_before": [66, 98, 73],
+	"native_counts_after": [63, 97, 73]
+}
