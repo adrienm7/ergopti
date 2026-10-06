@@ -389,6 +389,12 @@ const OPENS_SUBMENU = {
 			platforms: ['linux'],
 			kind: 'compose',
 			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
+		},
+		{
+			menu: 'llm_backend_choice_boundary',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/llm_backend_rows.lua' }
 		}
 	],
 	// The backend/model providers render the active API-entry command head.
@@ -405,6 +411,12 @@ const OPENS_SUBMENU = {
 			platforms: ['hs'],
 			kind: 'compose',
 			native_sources: { hs: 'macos/ui/menu/menu_llm/api_panel.lua' }
+		},
+		{
+			menu: 'llm_backend_choice_boundary',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
 		}
 	],
 	llm_model: [

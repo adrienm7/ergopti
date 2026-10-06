@@ -6601,6 +6601,13 @@ id = "hotstring_file_open"
 i18n = "menu.hotstrings.open_file"
 disabled_when = ["hotstring_file_ready"]
 
+# Windows/Linux allocate this boundary after their native backend choices.
+# macOS appends local-server rows directly and has no corresponding separator.
+[[menu.llm_backend_choice_boundary]]
+type = "---"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
 # API creation uses the native dialog on Windows and provider children on Lua.
 # The fixed affordance and separator share captions; native order stays per driver.
 [[menu.llm_api_add_command]]

@@ -566,3 +566,85 @@ helpers.describe("API Add locale scope failure inverse (api-add-controls)", func
 		for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
 	end)
 end)
+
+
+--- The backend boundary is a presentation row; macOS never allocates it.
+local function backend_boundary_corpus()
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/backend_choice_boundary.json"), "rb"))
+	local raw = file:read("*a"); assert(file:close())
+	return assert(require("json").decode(raw))
+end
+
+helpers.describe("Shared backend-choice boundary (backend-choice-boundary)", function()
+	helpers.it("uses the canonical boundary and retains the real backend callback (backend-choice-boundary)", function()
+		with_api_add_locale(function()
+			local corpus = backend_boundary_corpus()
+			local menu = require("infra.manifest_menu")
+			local frame = menu.get_array(corpus.section)
+			local original = frame[1]
+			local build, state, restore = setup("api")
+			local observed
+			local ok, err = pcall(function()
+				local rows = build()
+				helpers.assert_eq(rows[4], corpus.platform_rows.linux[1])
+				frame[1] = { type = "label", id = "backend_boundary_marker", i18n = corpus.marker_key,
+					platforms = { "ahk", "linux" }, unavailable = "hide" }
+				rows = build()
+				observed = rows[4]
+				helpers.assert_eq(rows[2].label, "Ollama 🦙 — " .. corpus.linux_choice_english[1])
+				helpers.assert_eq(rows[3].label, "API 🌐 — " .. corpus.linux_choice_english[2])
+				helpers.assert_eq(rows[3].checked, true)
+				helpers.assert_eq(state.backend, "api")
+				helpers.assert_eq(state.changed, nil)
+				rows[2].action()
+				helpers.assert_eq(state.backend, "ollama")
+				helpers.assert_eq(state.backend_sets, 1)
+				helpers.assert_eq(state.changed, 1)
+			end)
+			frame[1] = original
+			restore()
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(observed.label, corpus.marker_english)
+			helpers.assert_eq(observed.disabled, true)
+			helpers.assert_nil(observed.action)
+		end)
+	end)
+	helpers.it("refuses an unowned boundary before any native control effects (backend-choice-boundary)", function()
+		with_api_add_locale(function()
+			local corpus = backend_boundary_corpus()
+			local frame = require("infra.manifest_menu").get_array(corpus.section)
+			local original = frame[1]
+			local build, state, restore = setup("ollama")
+			local observed
+			local ok, err = pcall(function()
+				frame[1] = { type = "command", id = "unowned_backend_boundary", i18n = corpus.marker_key,
+					platforms = { "ahk", "linux" }, unavailable = "hide" }
+				observed = build()
+			end)
+			frame[1] = original
+			restore()
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(observed, {})
+			helpers.assert_eq(state.backend, "ollama")
+			helpers.assert_eq(state.backend_sets, nil)
+			helpers.assert_eq(state.changed, nil)
+			helpers.assert_eq(#state.prompts, 0)
+			helpers.assert_eq(#state.tests, 0)
+		end)
+	end)
+	helpers.it("projects the hand boundary on three platforms with genuine macOS absence (backend-choice-boundary)", function()
+		with_api_add_locale(function(native)
+			local corpus = backend_boundary_corpus()
+			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
+				local renderer = assert(require("menu.renderer").new({
+					platform = platform,
+					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("json").decode,
+					i18n = native,
+					logger = require("logger.shim"),
+				}))
+				helpers.assert_eq(renderer.template_rows(corpus.section, {}, {}, {}), corpus.platform_rows[platform])
+			end
+		end)
+	end)
+end)

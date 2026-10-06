@@ -214,8 +214,10 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 			checked = backend == "api",
 			action = function() llm.set_backend("api"); changed() end,
 		},
-		{ separator = true },
 	}
+	local boundary = ManifestMenu.template_rows("llm_backend_choice_boundary", {}, {}, {})
+	if not boundary then return {} end
+	for _, row in ipairs(boundary) do rows[#rows + 1] = row end
 	if type(context) == "table" and type(context.is_paused) == "function"
 		and type(llm.can_configure_local_servers) == "function" then
 		for _, row in ipairs(require("ui.menu.local_server_rows").rows(llm, dialogs, changed, context)) do

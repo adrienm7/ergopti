@@ -2753,6 +2753,16 @@
 			]
 		}
 	],
+	"llm_backend_choice_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_api_add_command": [
 		{
 			"type": "command",
