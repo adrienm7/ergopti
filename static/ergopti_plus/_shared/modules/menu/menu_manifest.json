@@ -3706,5 +3706,23 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"personal_shortcuts_frame": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "personal_shortcuts_registered",
+			"i18n": "menu.shortcuts.personal",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

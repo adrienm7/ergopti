@@ -190,6 +190,12 @@ const OPENS_SUBMENU = {
 			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
 		}
 	],
+	personal_shortcuts: {
+		menu: 'personal_shortcuts_frame',
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/menu/menu_init.ahk' }
+	},
 	extensions_shortcuts: {
 		menu: 'shortcut_extension_boundary',
 		platforms: ['ahk', 'hs'],

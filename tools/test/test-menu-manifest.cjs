@@ -5541,3 +5541,173 @@ console.log(
 		if (file === 'fr.json') assert.equal(locale['menu.llm.no_model'], expected.french_no_model);
 	}
 }
+
+// Personal shortcut descriptions and switches remain native data; their frame is shared.
+{
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/personal_shortcuts_frame.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[expected.section], expected.rows);
+	assert.deepEqual(expected.platform_rows, {
+		ahk: ['separator', 'personal_shortcuts_registered'],
+		hs: [],
+		linux: []
+	});
+	assert.deepEqual(expected.registered_names, ['frame first', 'frame second']);
+	assert.deepEqual(expected.registered_labels, ['Personal frame description', 'frame second']);
+	assert.equal(expected.absent_registry_count, 0);
+	assert.equal(expected.empty_registry_count, 0);
+	assert.equal(expected.populated_frame_count, 2);
+	const source = readFileSync(resolve(SHARED, '../windows/ui/menu/menu_init.ahk'), 'utf8');
+	function publishedPersonalFrame(text) {
+		const tokens = scriptTokens(text, '.ahk');
+		let level = 0;
+		const bodies = [];
+		for (let index = 0; index < tokens.length; index += 1) {
+			const token = tokens[index];
+			if (
+				level === 0 &&
+				text.slice(text.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
+				!(
+					tokens[index - 1]?.kind === 'identifier' &&
+					['if', 'else', 'while', 'for', 'catch', 'try'].includes(tokens[index - 1]?.value)
+				) &&
+				token.kind === 'identifier' &&
+				token.value === '_AppendPersonalShortcutsSubmenuIfAny' &&
+				tokens[index + 1]?.kind === 'symbol' &&
+				tokens[index + 1]?.value === '(' &&
+				tokens[index + 2]?.kind === 'identifier' &&
+				tokens[index + 2]?.value === 'ShortcutsMenu' &&
+				tokens[index + 3]?.kind === 'symbol' &&
+				tokens[index + 3]?.value === ')' &&
+				tokens[index + 4]?.kind === 'symbol' &&
+				tokens[index + 4]?.value === '{'
+			) {
+				let depth = 1,
+					end = index + 5;
+				for (; end < tokens.length && depth > 0; end += 1) {
+					if (tokens[end].kind === 'symbol' && tokens[end].value === '{') depth += 1;
+					if (tokens[end].kind === 'symbol' && tokens[end].value === '}') depth -= 1;
+				}
+				if (depth === 0) bodies.push(text.slice(tokens[index + 4].end, tokens[end - 1].start));
+			}
+			if (token.kind === 'symbol' && token.value === '{') level += 1;
+			if (token.kind === 'symbol' && token.value === '}') level -= 1;
+		}
+		assert.equal(bodies.length, 1, 'one actual top-level personal registry owner');
+		const body = bodies[0];
+		const actual = scriptTokens(body, '.ahk');
+		function exactSequence(fragment) {
+			const expected = scriptTokens(fragment, '.ahk');
+			return actual.some(
+				(token, start) =>
+					body.slice(body.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
+					!(
+						actual[start - 1]?.kind === 'symbol' && ['.', ':'].includes(actual[start - 1]?.value)
+					) &&
+					expected.every(
+						(token, offset) =>
+							actual[start + offset]?.kind === token.kind &&
+							actual[start + offset]?.value === token.value
+					)
+			);
+		}
+		assert.ok(
+			exactSequence(
+				'FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))'
+			),
+			'actual native child lexical kinds'
+		);
+		assert.ok(
+			exactSequence(
+				'if !(FrameRows is Array) return MenuRenderer_AppendRows(ShortcutsMenu, "shortcuts_menu", "personal_shortcuts", FrameRows)'
+			),
+			'actual refusal and publication lexical kinds'
+		);
+
+		assert.ok(
+			publishesMenuTemplate(body, '.ahk', expected.section),
+			'actual personal frame publication'
+		);
+		const sequence = scriptTokens(body, '.ahk')
+			.map((token) => token.value)
+			.join('|');
+		assert.ok(
+			sequence.includes(
+				'FrameRows|:=|MenuRenderer_TemplateRows|(|personal_shortcuts_frame|,|Map|(|)|,|Map|(|)|,|Map|(|personal_shortcuts_registered|,|PersonalRows|)|)'
+			),
+			'actual original native child array binding'
+		);
+		assert.ok(
+			sequence.includes(
+				'if|!|(|FrameRows|is|Array|)|return|MenuRenderer_AppendRows|(|ShortcutsMenu|,|shortcuts_menu|,|personal_shortcuts|,|FrameRows|)'
+			),
+			'refusal precedes actual publication'
+		);
+	}
+	publishedPersonalFrame(source);
+	const foreignAssignment = source.replace(
+		'FrameRows := MenuRenderer_TemplateRows',
+		'Foreign.FrameRows := MenuRenderer_TemplateRows'
+	);
+	assert.notEqual(foreignAssignment, source);
+	assert.throws(
+		() => publishedPersonalFrame(foreignAssignment),
+		/actual/,
+		'a receiver property cannot own the local frame array'
+	);
+
+	const conditional = source.replace(
+		'_AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {',
+		'if _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {'
+	);
+	assert.notEqual(conditional, source);
+	assert.throws(
+		() => publishedPersonalFrame(conditional),
+		/actual/,
+		'a conditional call is not the owning definition'
+	);
+	const quotedChild = source.replace(
+		'Map("personal_shortcuts_registered", PersonalRows)',
+		'Map("personal_shortcuts_registered", "PersonalRows")'
+	);
+	assert.notEqual(quotedChild, source);
+	assert.throws(
+		() => publishedPersonalFrame(quotedChild),
+		/actual/,
+		'a string cannot be the native child array'
+	);
+	const braceLiteral = source.replace(
+		'FrameRows := MenuRenderer_TemplateRows',
+		'BraceCaption := "{"\n\tFrameRows := MenuRenderer_TemplateRows'
+	);
+	assert.notEqual(braceLiteral, source);
+	publishedPersonalFrame(braceLiteral);
+
+	const needle = 'MenuRenderer_TemplateRows("' + expected.section + '"';
+	assert.equal(source.split(needle).length, 2);
+	for (const replacement of [
+		'Foreign.' + needle,
+		'; ' + needle,
+		needle.replace(expected.section, 'unowned_frame')
+	]) {
+		const withdrawn = source.replace(needle, replacement);
+		assert.notEqual(withdrawn, source);
+		assert.throws(() => publishedPersonalFrame(withdrawn), /actual/);
+	}
+	const dataOnly = '; no actual owner\nValue := "\n(\n' + source + '\n)"';
+	assert.throws(() => publishedPersonalFrame(dataOnly), /actual/);
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		assert.equal(typeof locale['menu.shortcuts.personal'], 'string');
+		assert.ok(locale['menu.shortcuts.personal'].trim().length > 0);
+		if (file === 'en.json')
+			assert.equal(locale['menu.shortcuts.personal'], expected.english_caption);
+		if (file === 'fr.json')
+			assert.equal(locale['menu.shortcuts.personal'], expected.french_caption);
+	}
+}

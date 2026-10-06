@@ -4361,7 +4361,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 55, macOS 86, Linux 61, each
+  drivers still build (current baseline: Windows 53, macOS 86, Linux 61, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4382,6 +4382,17 @@ integrated, then publish one grouped release.
   regenerated or changed. The component fixes are independently source-reviewed;
   actual AHK/Win32 execution remains unrun locally and requires fresh Windows
   CI. These fixture corrections leave all six group items partial.
+
+  The Windows personal-shortcuts separator and fixed submenu caption now
+  consume one shared frame. Its genuine ordered runtime registry remains
+  Windows-only; macOS keeps its arbitrary personal script and Linux its
+  existing shortcut controls, with this frame explicitly not applicable.
+  Registry predicates, descriptions, child order, switch callbacks and
+  native menu lifetimes remain unchanged. The unchanged owner scanner
+  measures 55/86/61 to 53/86/61. Shared renderer controls pass 12/0 on
+  Lua5.4 and LuaJIT; the two registered Windows native cases remain locally
+  unexecuted. Current hosted-native and installed qualification remain
+  required. All six group items stay partial.
 
   The Windows hardware-boundary fixture now uses the existing typed recursive
   \_LVS_DeepEqual comparator through AssertEqual with an empty mismatch result,
@@ -5329,7 +5340,7 @@ Current Group 3 source checkpoint (item 73, 2026-10-06): [Group 3 current checkp
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 55, macOS 86 and Linux 61 rows are still built by the
+  Windows 53, macOS 86 and Linux 61 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
