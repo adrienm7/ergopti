@@ -1,0 +1,279 @@
+--- tests/unit/modules/test_key_combination_native_actions.lua
+
+--- ==============================================================================
+--- MODULE: Ordered Pair Native State Actions
+--- DESCRIPTION:
+--- Exercises the actual pair owner and native engine with controlled input and
+--- output receipts. No physical evdev or uinput qualification is claimed.
+--- ==============================================================================
+
+local NativeLoop = require("luv") -- Pin the process-native issuer before cache snapshots.
+local helpers = require("tests.helpers")
+local Owner = require("modules.shortcuts.key_combinations")
+local Engine = require("platform.remap.tap_hold_engine")
+local Native = require("platform.remap.key_combination_engine")
+local function origin()
+	return { ready = true, physical = true, source = "owned-keyboard", generation = 7 }
+end
+local function rows(events)
+	local result = {}
+	for _, event in ipairs(events or {}) do result[#result + 1] = event.code .. ":" .. event.value end
+	return table.concat(result, " ")
+end
+local function make()
+	local state = { bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab="one_shot_shift"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab="shift"\n', paused = false }
+	state.owner = Owner.new({ keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} }, hold_picker = {modifiers={"ctrl","shift"},layers={}},
+		files = {read_with_status=function() return state.bytes,"ok" end},route=function() return "/controlled/config.toml" end,
+		is_paused=function() return state.paused end,changed=function() return true end,
+		actions={is_assignable=function(action) return action == "one_shot_shift" end} })
+	state.base = Engine.new({keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},
+		tap_min_ms=0,one_shot_timeout_ms=1000,key_text=function(code) return ({[30]="a",[57]=" "})[code] end,
+		one_shot_result=function(text) return text == " " and "-" or nil end,
+		plan_text=function(text) return ({A={{keycode=30,mods={"shift"}}},["-"]={{keycode=12,mods={}}}})[text] end })
+	state.native = Native.new(state.base,state.owner.engine_options({caps_lock=300,tab=300}))
+	return state
+end
+local function take(state)
+	state.native:process(58,1,0,origin())
+	local out,_,_,frame=state.native:process(15,1,10,origin())
+	helpers.assert_eq(rows(out),"42:1"); helpers.assert_eq(frame.ack(true),true)
+	local released,action,binding,ready=state.native:process(15,0,100,origin())
+	helpers.assert_eq(rows(released),"42:0 29:0");helpers.assert_eq(action,"one_shot_shift")
+	helpers.assert_eq(binding,"combination__caps_lock_then_tab")
+	return ready
+end
+local function run(state,frame)
+	local called=0
+	local accepted=frame.run(function() called=called+1 end,origin())
+	return accepted,called
+end
+helpers.describe("ordered pair native one-shot Shift",function()
+	helpers.it("arms the actual shared policy after exact release ACK without gesture dispatch",function()
+		local state=make();local frame=take(state)
+		helpers.assert_eq(frame.ack(true),true)
+		local accepted,called=run(state,frame)
+		helpers.assert_eq(accepted,true);helpers.assert_eq(called,0)
+		helpers.assert_eq(state.base.one_shot_until,1100)
+		local restored,receipt=frame.restore(origin());helpers.assert_eq(rows(restored),"29:1")
+		helpers.assert_eq(receipt.ack(true),true)
+		local _,_,_,first_release=state.native:process(58,0,110,origin())
+		if first_release then helpers.assert_eq(first_release.ack(true),true) end
+		local typed,_,_,typed_frame=state.native:process(30,1,120,origin())
+		helpers.assert_eq(rows(typed),"42:1 30:1");helpers.assert_eq(typed_frame.ack(true),true)
+		local released,_,_,release_frame=state.native:process(30,0,130,origin())
+		helpers.assert_eq(rows(released),"30:0 42:0");helpers.assert_eq(release_frame.ack(true),true)
+		helpers.assert_eq(rows(state.native:process(30,1,140,origin())),"")
+		helpers.assert_eq(state.base.one_shot_until,nil)
+	end)
+	helpers.it("retains original lift debt and never arms before literal true ACK",function()
+		local state=make();local frame=take(state)
+		helpers.assert_eq(frame.ack(false),false)
+		local accepted,called=run(state,frame);helpers.assert_eq(accepted,false);helpers.assert_eq(called,0)
+		helpers.assert_eq(state.base.one_shot_until,nil)
+		local exact=state.native:release_all();helpers.assert_eq(rows(exact),"42:0 29:0")
+		helpers.assert_eq(state.native:ack_retirement(false),false)
+		helpers.assert_eq(state.native:release_all(),exact)
+		helpers.assert_eq(state.native:ack_retirement(true),true)
+	end)
+	helpers.it("refuses source edits and pause after physical release ACK",function()
+		for _,change in ipairs({function(state) state.bytes=state.bytes.."\n# changed\n" end,
+			function(state) state.paused=true end}) do
+			local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true);change(state)
+			local accepted,called=run(state,frame);helpers.assert_eq(accepted,false);helpers.assert_eq(called,0)
+			helpers.assert_eq(state.base.one_shot_until,nil)
+		end
+	end)
+	helpers.it("uses shared special results and clears armed state on owner retirement",function()
+		local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
+		helpers.assert_eq(run(state,frame),true)
+		local restored,receipt=frame.restore(origin());helpers.assert_eq(receipt.ack(true),true)
+		local _,_,_,first_release=state.native:process(58,0,110,origin())
+		if first_release then helpers.assert_eq(first_release.ack(true),true) end
+		local typed,_,_,typed_frame=state.native:process(57,1,120,origin())
+		helpers.assert_eq(rows(typed),"12:1 12:0");helpers.assert_eq(typed_frame.ack(true),true)
+		local released,_,_,release_frame=state.native:process(57,0,130,origin())
+		helpers.assert_eq(rows(released),"");helpers.assert_eq(release_frame.ack(true),true)
+		local second=make();local ready=take(second);helpers.assert_eq(ready.ack(true),true)
+		helpers.assert_eq(run(second,ready),true)
+		second.native:release_all();helpers.assert_eq(second.base.one_shot_until,nil)
+	end)
+end)
+
+local function with_hook(callback)
+	local names = { "adapters.keyboard_hook", "modules.hotstrings.device_finder" }
+	local old = {}
+	for _, name in ipairs(names) do old[name] = package.loaded[name]; package.loaded[name] = nil end
+	package.loaded["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
+		local result = {}
+		for _, device in ipairs(devices) do
+			result[#result + 1] = {path=device,sysfs="/controlled/physical",name="controlled",physical=true}
+		end
+		return result
+	end }
+	local ok, err = pcall(callback, require("adapters.keyboard_hook"))
+	for _, name in ipairs(names) do package.loaded[name] = old[name] end
+	assert(package.loaded.luv == NativeLoop, "The exact process-native loop remains owned")
+	if not ok then error(err, 0) end
+end
+helpers.describe("actual keyboard hook native pair state delivery", function()
+	helpers.it("dispatches armed Shift through real hook after owned lift/restore", function()
+		local state = make()
+		with_hook(function(hook)
+			local emitted, callbacks = {}, 0
+			helpers.assert_eq(hook.set_remapper(state.native, function() callbacks=callbacks+1 end), true)
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
+				{type=1,code=15,value=0,at_ms=100},{type=1,code=58,value=0,at_ms=110},
+				{type=1,code=30,value=1,at_ms=120},{type=1,code=30,value=0,at_ms=130}},
+				{onEmitRaw=function(code,value) emitted[#emitted+1]=code..":"..value;return true end},true)
+			helpers.assert_eq(callbacks,0)
+			helpers.assert_eq(table.concat(emitted," "),"29:1 42:1 42:0 29:0 29:1 29:0 42:1 30:1 30:0 42:0")
+		end)
+	end)
+	helpers.it("refuses activation when actual hook cannot ACK the first owned lift", function()
+		local state = make()
+		with_hook(function(hook)
+			local callbacks = 0
+			helpers.assert_eq(hook.set_remapper(state.native,function() callbacks=callbacks+1 end),true)
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
+				{type=1,code=15,value=0,at_ms=100}},
+				{onEmitRaw=function(code,value) return not (code==29 and value==0) end},true)
+			helpers.assert_eq(callbacks,0);helpers.assert_eq(state.base.one_shot_until,nil)
+			helpers.assert_eq(hook.set_remapper(nil),false)
+		end)
+	end)
+end)
+
+helpers.describe("native state output admission",function()
+	helpers.it("does not deliver stale Shift after a live layout callback changes canonical source",function()
+		local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
+		helpers.assert_eq(run(state,frame),true)
+		local restored,receipt=frame.restore(origin());helpers.assert_eq(receipt.ack(true),true)
+		local _,_,_,first_release=state.native:process(58,0,110,origin())
+		if first_release then helpers.assert_eq(first_release.ack(true),true) end
+		state.base.key_text=function() state.bytes=state.bytes.."\n# revoked\n";return "a" end
+		local out,_,_,retired=state.native:process(30,1,120,origin())
+		helpers.assert_true(rows(out):find("42:1",1,true)==nil,"a stale read must not authorize Shift down")
+		helpers.assert_true(retired and retired.owned==true)
+		helpers.assert_eq(state.base.one_shot_until,nil)
+		helpers.assert_eq(retired.ack(false),false)
+		helpers.assert_eq(state.native:release_all(),out)
+		helpers.assert_eq(retired.ack(true),true)
+	end)
+	helpers.it("does not arm twice through the same acknowledged physical pair frame",function()
+		local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
+		helpers.assert_eq(run(state,frame),true);helpers.assert_eq(run(state,frame),false)
+	end)
+end)
+
+helpers.describe("actual manager native action admission",function()
+	helpers.it("builds a supported pair from actual loader state independently of the tap-hold master",function()
+		local state=make()
+		local Loader=require("platform.remap.tap_hold_loader")
+		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
+		local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local modules={
+			["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
+			["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function() return loaded end},
+			["platform.remap.nav_layer"]={load=function() return {} end},
+			["adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
+			["infra.config_paths"]={config=function() return "/controlled/config.toml" end},
+		}
+		local previous={}
+		for name,value in pairs(modules) do previous[name]=package.loaded[name];package.loaded[name]=value or nil end
+		local ok,err=pcall(function()
+			local manager=require("platform.remap.tap_hold_manager")
+			local hook={set_remapper=function(engine,callback) state.installed,state.callback=engine,callback;return true end,
+				key_text=state.base.key_text,held_modifiers=function()return {} end,
+				held_text_modifier_codes=function() return {} end,held_shortcut_modifier_codes=function() return {} end}
+			manager.init({keyboard_hook=hook,execute_action=function()error("Native state action must not use gestures")end,
+				action_names=function()return {} end,on_text_injected=function()end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"})
+			helpers.assert_eq(manager.is_active(),true)
+			helpers.assert_true(state.installed.has_combinations~=nil)
+			helpers.assert_eq(next(state.installed.by_code),nil)
+			state.installed:process(58,1,0,origin())
+			local _,_,_,first=state.installed:process(15,1,10,origin());helpers.assert_eq(first.ack(true),true)
+			local _,action,_,frame=state.installed:process(15,0,100,origin())
+			helpers.assert_eq(action,"one_shot_shift");helpers.assert_eq(frame.ack(true),true)
+			helpers.assert_eq(frame.run(state.callback,origin()),true)
+			helpers.assert_eq(state.installed.one_shot_until,100+state.installed.one_shot_timeout_ms)
+		end)
+		for name in pairs(modules) do package.loaded[name]=previous[name] end
+		if not ok then error(err,0) end
+	end)
+end)
+
+helpers.describe("native activation receipt and held modifier debt",function()
+	helpers.it("requires literal native activation ACK and contains native port throws",function()
+		for _,port in ipairs({function()return false end,function()return nil end,function()error("controlled refusal")end}) do
+			local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
+			state.base.combination_native_action=port
+			local accepted,called=run(state,frame)
+			helpers.assert_eq(accepted,false);helpers.assert_eq(called,0)
+			helpers.assert_eq(state.base.one_shot_until,nil)
+			local restored,receipt=frame.restore(origin());helpers.assert_eq(rows(restored),"29:1")
+			helpers.assert_eq(receipt.ack(true),true)
+		end
+	end)
+	helpers.it("retains exact held Shift release until physical retirement ACK",function()
+		local state=make();local ready=take(state);helpers.assert_eq(ready.ack(true),true)
+		helpers.assert_eq(run(state,ready),true)
+		local restored,restore_frame=ready.restore(origin());helpers.assert_eq(restore_frame.ack(true),true)
+		local _,_,_,up=state.native:process(58,0,110,origin());helpers.assert_eq(up.ack(true),true)
+		local shifted,_,_,frame=state.native:process(30,1,120,origin())
+		helpers.assert_eq(rows(shifted),"42:1 30:1");helpers.assert_eq(frame.ack(true),true)
+		local release=state.native:release_all()
+		local seen={};for _,row in ipairs(release)do seen[row.code..":"..row.value]=true end
+		helpers.assert_eq(seen["42:0"],true);helpers.assert_eq(seen["30:0"],true)
+		helpers.assert_eq(state.native:ack_retirement(false),false)
+		helpers.assert_eq(state.native:ack_retirement(nil),false)
+		helpers.assert_eq(state.native:release_all(),release)
+		helpers.assert_eq(state.base.one_shot_until,nil)
+		helpers.assert_eq(state.native:ack_retirement(true),true)
+		helpers.assert_eq(next(state.base.key_refs),nil)
+	end)
+	helpers.it("owns no new process-native handles during actual controlled hook delivery",function()
+		local function count()
+			local result=0;NativeLoop.walk(function()result=result+1 end);return result
+		end
+		local before=count();local state=make()
+		with_hook(function(hook)
+			helpers.assert_eq(hook.set_remapper(state.native,function()error("No generic dispatch")end),true)
+			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
+				{type=1,code=15,value=0,at_ms=100},{type=1,code=58,value=0,at_ms=110}},
+				{onEmitRaw=function()return true end},true)
+		end)
+		helpers.assert_eq(count(),before,"native loop resources are neither allocated nor dropped")
+	end)
+end)
+
+helpers.describe("native arm physical-origin and reinstallation currency",function()
+	helpers.it("retires pair-armed casing instead of consuming an unqualified physical origin",function()
+		for _,receipt in ipairs({false,{ready=false,physical=true,source="owned-keyboard",generation=7},
+			{ready=true,physical=false,source="virtual-keyboard",generation=7},
+			{ready=true,physical=true,source="",generation=7}})do
+			local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
+			helpers.assert_eq(run(state,frame),true)
+			local restored,restore_frame=frame.restore(origin());helpers.assert_eq(restore_frame.ack(true),true)
+			local _,_,_,released=state.native:process(58,0,110,origin());helpers.assert_eq(released.ack(true),true)
+			local out,_,_,retired=state.native:process(30,1,120,receipt or nil)
+			helpers.assert_true(rows(out):find("42:1",1,true)==nil)
+			helpers.assert_true(retired and retired.owned==true and retired.replay==true)
+			helpers.assert_eq(state.base.one_shot_until,nil)
+			helpers.assert_eq(retired.ack(false),false);helpers.assert_eq(state.native:release_all(),out)
+			helpers.assert_eq(retired.ack(true),true)
+			helpers.assert_eq(rows(state.native:process(30,1,130,receipt or nil)),"")
+		end
+	end)
+	helpers.it("requires native mode retirement before reinstallation or configuration",function()
+		local state=make();local frame=take(state);helpers.assert_eq(frame.ack(true),true)
+		helpers.assert_eq(run(state,frame),true)
+		local restored,restore_frame=frame.restore(origin());helpers.assert_eq(restore_frame.ack(true),true)
+		local _,_,_,released=state.native:process(58,0,110,origin());helpers.assert_eq(released.ack(true),true)
+		helpers.assert_eq(state.native:activate(),false)
+		helpers.assert_eq(state.native:configure(state.owner.engine_options({caps_lock=300,tab=300})),false)
+		helpers.assert_eq(state.native:set_tap_holds_enabled(false),false)
+		helpers.assert_eq(state.base.one_shot_until,1100)
+		state.native:release_all();helpers.assert_eq(state.native:ack_retirement(true),true)
+		helpers.assert_eq(state.native:activate(),true)
+	end)
+end)

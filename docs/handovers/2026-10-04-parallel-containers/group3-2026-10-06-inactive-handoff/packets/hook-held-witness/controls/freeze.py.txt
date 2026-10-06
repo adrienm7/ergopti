@@ -1,0 +1,35 @@
+from pathlib import Path
+import json,hashlib,re
+root=Path('/workspace/.ergopti-cloud/preparations/group3-linux-hook-held-proof');repo=Path('/workspace/ergopti')
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+paths=['static/ergopti_plus/linux/adapters/keyboard_hook.lua','static/ergopti_plus/linux/tests/unit/adapters/test_keyboard_hook_device_watchdog.lua']
+assert (root/'candidate'/paths[0]).read_bytes()==(root/'preimages'/paths[0]).read_bytes()==(repo/paths[0]).read_bytes()
+assert (root/'candidate'/paths[1]).read_bytes()==(root/'preimages'/paths[1]).read_bytes()+(root/'overlap_tests.lua').read_bytes()
+assert (root/'preimages'/paths[1]).read_bytes()==(repo/paths[1]).read_bytes()
+results=[]
+for abi in ['luajit','lua54']:
+ p=root/(abi+'-before.log');assert p.read_text().strip().splitlines()[-1]=='HOOK_SOURCES 14 1'
+ results.append({'abi':abi,'passed':14,'failed':1,'log':p.name,'sha256':sha(p)})
+(root/'results.json').write_text(json.dumps(results,indent=2)+'\n')
+(root/'README.md').write_text('''# Controlled Hook aggregate-source forwarding defect
+
+This is an immutable regression witness and contract inventory, NOT a proposed green feature patch. The actual current Root Hook is copied unchanged. The original watchdog unit module is an exact byte prefix followed by one meaningful actual consumer assertion. Production Reader bcfd7821 (reviewed f69b + mandatory 4cca identity) and Writer fc77df76 (reviewed 0cb foundation + 865 transaction) are copied and pinned as dependencies. Only controlled symbol/backends and private ordinary files stand in for source queues; no evdev/kernel/uinput/desktop/display/native subprocess/libuv handle is acquired.
+
+Actual Hook.start(intercept=true,onEmitRaw=Writer.emit) and timestamp-ordered Hook.pump receive source A Shift-down at1, source B Shift-down at2, then source A Shift-up at3. Hook's actual held_text_modifier_codes remains {42}, while the reviewed Writer's acknowledged output roster is {}. The final source B Shift-up correctly empties output, but the earlier first-source release has already lifted the virtual modifier still owed to B. All owned test files and controlled module channels are retired before assertions. Both ABIs produce original14 PASS plus appended1 FAIL with expected{42}/actual{}.
+
+Current _forwarded_down is indexed by source path plus output code. Ordinary _forward_raw emits every key-up, even when another exact source retains that output code. Unplug/reacquire retirement already coalesces other-source retained codes, so the ordinary event path differs from its cleanup ownership model. _physical_down is updated only after remapping and includes synthetic/remapped rows; it cannot serve as an original-native physical ledger. Original physical and remapper-produced same-code rows reuse one source identity, so even an aggregate count across source paths is not enough to compensate those independent producers.
+
+Do not apply a silent skipped-wire row as a native literal-true ACK: the existing owned-row frame counts one actual forwarded attempt. A coherent follow-up must distinguish original native source/session/key ownership from remapper delivery/engine ownership, project their retained global key bits, and acknowledge logical projection changes separately from native KEY+SYN writes. XKB state must agree with the aggregate delivered state while original-source metrics retain their actual edges; do not suppress user-facing text/modifier transitions through an unproven state shortcut. Foreign same-channel Writer emissions must be joined through an explicit epoch/cap handoff, rather than silently refreshing a Hook ledger after arbitrary writes.
+
+Required native delivery evidence remains: original Reader-issued event capability retained before remapping; fresh full per-source EVIOCGKEY receipts for every admitted/grabbed input source; exact original physical and remapped producer ledgers; actual Writer-owned cap/ACK roster/transaction compensation; acknowledged native XKB named modifier and source epochs with latched/foreign/unknown masks rejected before/after delivery. The readonly editor XKB capability requires zero depressed modifiers and cannot be reused to authorize held Ctrl/Shift/Super chords. The new separately frozen Reader held-query prerequisite provides only observed per-source key state, not a global mask or exclusion lease. Other keyboards outside discovery and nonzero same-bit external modifiers remain a distinct custody boundary; do not infer completeness from a detached held list or DeviceFinder metadata.
+
+Root/checkout/index/CI/registry/manifest/generated/UI availability are unchanged. Physical mode remains unavailable. No Hook repair, global native mask/provider admission, kernel roundtrip or physical hardware acceptance is claimed. Public source leases remain pending. The original failing evidence is retained so a later coherent producer/consumer change must make this actual assertion pass without deleting it.
+''')
+sources=[]
+for rel in paths:sources.append({'path':rel,'preimage':sha(root/'preimages'/rel),'witness_postimage':sha(root/'candidate'/rel)})
+deps=json.loads((root/'dependencies.json').read_text())
+artifacts=[{'path':str(p.relative_to(root)),'sha256':sha(p),'bytes':p.stat().st_size} for p in sorted(root.rglob('*')) if p.is_file() and p.name!='receipt.json']
+r={'status':'PRIVATE_CONFIRMED_CONTROLLED_REGRESSION_NOT_FOR_ADMISSION','source_paths':sources,'dependencies':deps,'results':results,'artifacts':artifacts,'product_hook_changed':False,'native_kernel_execution':'NOT_RUN','physical_delivery_available':False}
+(root/'receipt.json').write_text(json.dumps(r,indent=2)+'\n');print('receipt',sha(root/'receipt.json'))
+for p in root.rglob('*'):
+ if p.is_file():p.chmod(0o444)

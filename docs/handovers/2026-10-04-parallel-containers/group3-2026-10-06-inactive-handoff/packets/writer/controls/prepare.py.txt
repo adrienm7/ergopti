@@ -1,0 +1,200 @@
+from pathlib import Path
+P=Path(__file__).resolve().parent
+F=P/'candidate/static/ergopti_plus/linux/adapters/uinput_writer.lua'
+s=(P/'preimages/static/ergopti_plus/linux/adapters/uinput_writer.lua').read_text()
+state='''
+-- A constructor or wire operation owns the channel before calling any provider.
+-- The capability never exposes a descriptor: a recycled numeric fd is not an owner.
+local _busy = false
+local _output = nil
+local _debt = false
+local _generation = 0
+local _strict_constructor = false
+local _legacy_wire = false
+local encode_event = M.encode_event
+local encode_setup = M.encode_setup
+
+--- Checks only private observed currency; this is not a kernel state lease.
+--- @param output table Issued private record.
+--- @return boolean current
+local function output_identity(output)
+	return output ~= nil and rawequal(output, _output) and not output.retired
+		and rawequal(output.backend, _backend) and output.fd == _fd
+		and rawequal(output.write, output.backend.write)
+		and rawequal(output.ioctl, output.backend.ioctl)
+		and rawequal(output.close, output.backend.close)
+end
+
+--- Writes a complete KEY/SYN attempt through one captured native owner.
+--- @param capability table Opaque capability.
+--- @param code integer evdev keycode.
+--- @param value integer Native up/down/repeat value.
+--- @return boolean acknowledged
+local function emit_owned(capability, code, value)
+	local output = _output
+	if _busy or _debt or not output_identity(output)
+		or not rawequal(capability, output.capability) then return false end
+	if type(code) ~= "number" or code ~= math.floor(code) or code < 1 or code > KEY_CODE_MAX
+		or (value ~= 0 and value ~= 1 and value ~= 2) then return false end
+	_busy = true
+	output.write_epoch = output.write_epoch + 1
+	local called, acknowledged = pcall(function()
+		if output.write(output.fd, encode_event(EV_KEY, code, value)) ~= true then return false end
+		if not output_identity(output) then return false end
+		if output.write(output.fd, encode_event(EV_SYN, SYN_REPORT, 0)) ~= true then return false end
+		return output_identity(output)
+	end)
+	if not called or acknowledged ~= true then
+		_debt = true
+		output.write_debt = true
+	end
+	_busy = false
+	return called and acknowledged == true
+end
+
+--- Retires only the captured native descriptor, never a successor's descriptor.
+--- @param capability table Opaque capability.
+--- @return boolean retired
+local function close_owned(capability)
+	local output = _output
+	if _busy or not output_identity(output) or output.close_attempted
+		or not rawequal(capability, output.capability) then return false end
+	_busy = true
+	output.close_attempted = true
+	local destroyed, destroy_ack = pcall(output.ioctl, output.fd, UI_DEV_DESTROY, 0)
+	local closed, close_ack = pcall(output.close, output.fd)
+	local same = output_identity(output)
+	if closed and close_ack == true and same then
+		_fd = nil
+		output.retired = true
+	end
+	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true and same
+	if acknowledged then
+		_output = nil
+		_debt = false
+		_strict_constructor = false
+		_legacy_wire = false
+	else
+		-- A failed close may already have recycled its fd. It must never be retried.
+		_debt = true
+	end
+	_busy = false
+	return acknowledged
+end
+'''
+s=s.replace('local _fd = nil\n','local _fd = nil\n'+state,1)
+s=s.replace('function M._set_backend(backend)\n','function M._set_backend(backend)\n\tif _busy or _output ~= nil or _debt then return false end\n',1)
+s=s.replace('function M._reset_backend()\n','function M._reset_backend()\n\tif _busy or _debt then return false end\n\tif _output ~= nil and not close_owned(_output.capability) then return false end\n',1)
+s=s.replace('ffi.C.close(fd)\n','return ffi.C.close(fd) == 0\n',1)
+s=s.replace('function M.use_ffi_backend()\n','function M.use_ffi_backend()\n\tif _busy or _output ~= nil or _debt or _fd ~= nil then return false end\n',1)
+s=s.replace('function M._set_path_for_test(path)\n','function M._set_path_for_test(path)\n\tif _busy or _output ~= nil or _debt then return false end\n',1)
+a=s.index('function M.open()\n');b=s.index('\n--- Destroys the virtual keyboard',a)
+s=s[:a]+'''function M.open()
+	if _busy or _debt then return false end
+	if _fd then return true end
+	-- Reserve before lazy FFI loading: even require/cdef can reenter the writer.
+	_busy = true
+	local backend, descriptor = _backend, nil
+	local strict = true
+	local called, created = pcall(function()
+		if backend == nil then
+			backend = build_ffi_backend()
+			if backend == nil then return false end
+			_backend = backend
+		end
+		descriptor = backend.open(_uinput_path, OPEN_FLAGS)
+		if descriptor == nil or descriptor == false then return false end
+		local function admit(request, argument)
+			local result = backend.ioctl(descriptor, request, argument)
+			if result ~= true then strict = false end
+			return result
+		end
+		if not admit(UI_SET_EVBIT, EV_KEY) then return false end
+		for code = 1, KEY_CODE_MAX do
+			if not admit(UI_SET_KEYBIT, code) then return false end
+		end
+		if not admit(UI_SET_EVBIT, EV_SYN) then return false end
+		if not admit(UI_DEV_SETUP, encode_setup()) then return false end
+		if not admit(UI_DEV_CREATE, 0) then return false end
+		return true
+	end)
+	if not called or created ~= true then
+		if descriptor ~= nil and descriptor ~= false and backend ~= nil then
+			local closed, ack = pcall(backend.close, descriptor)
+			if not closed or ack ~= true then _debt = true end
+		end
+		_busy = false
+		return false
+	end
+	_fd = descriptor
+	_generation = _generation + 1
+	_strict_constructor = strict and type(descriptor) == "number"
+		and descriptor == math.floor(descriptor) and descriptor >= 0
+	_legacy_wire = false
+	Logger.success(LOG, "Virtual keyboard created on %s.", _uinput_path)
+	_busy = false
+	return true
+end
+'''+s[b:]
+s=s.replace('function M.close()\n','function M.close()\n\tif _busy or _debt then return false end\n\tif _output ~= nil then return close_owned(_output.capability) end\n',1)
+s=s.replace('\t_fd = nil\n\tLogger.success(LOG, "Virtual keyboard destroyed.")','\t_fd = nil\n\t_strict_constructor = false\n\t_legacy_wire = false\n\tLogger.success(LOG, "Virtual keyboard destroyed.")',1)
+s=s.replace('function M.emit(code, value)\n','function M.emit(code, value)\n\tif _busy or _debt then return false end\n\tif _output ~= nil then return emit_owned(_output.capability, code, value) end\n',1)
+s=s.replace('\tif not _backend.write(_fd, M.encode_event(EV_KEY, code, value)) then','\t_legacy_wire = true\n\tif not _backend.write(_fd, M.encode_event(EV_KEY, code, value)) then',1)
+marker='-- Exposed for the tests that pin the wire format and the ioctl order.'
+api='''--- Captures a fresh, strictly acknowledged channel before any untracked wire attempt.
+--- @return table|nil capability Opaque; carries no descriptor/backend.
+function M.capture_output()
+	if _busy or _debt or _fd == nil or not _strict_constructor or _legacy_wire then return nil end
+	if _output ~= nil then
+		return output_identity(_output) and _output.capability or nil
+	end
+	if type(_backend.write) ~= "function" or type(_backend.ioctl) ~= "function"
+		or type(_backend.close) ~= "function" then return nil end
+	local capability = {}
+	_output = { capability = capability, backend = _backend, fd = _fd,
+		write = _backend.write, ioctl = _backend.ioctl, close = _backend.close,
+		generation = _generation, write_epoch = 0 }
+	return capability
+end
+
+--- Pure observation of one exact issued capability; never reads native state.
+--- @param capability table Opaque capability.
+--- @return boolean current
+function M.output_current(capability)
+	return not _busy and not _debt and output_identity(_output)
+		and rawequal(capability, _output.capability)
+end
+
+--- Returns detached transport currency, never fd or backend authority.
+--- @param capability table Opaque capability.
+--- @return table|nil view
+function M.output_view(capability)
+	if not M.output_current(capability) then return nil end
+	return { generation = _output.generation, write_epoch = _output.write_epoch }
+end
+
+--- Emits one exact native key and its SYN through the captured channel.
+--- @param capability table Opaque capability.
+--- @param code integer evdev keycode.
+--- @param value integer Native up/down/repeat value.
+--- @return boolean acknowledged
+function M.emit_owned(capability, code, value)
+	return emit_owned(capability, code, value)
+end
+
+--- Requires exact destroy/close acknowledgements; unknown close is never retried.
+--- @param capability table Opaque capability.
+--- @return boolean retired
+function M.close_owned(capability)
+	return close_owned(capability)
+end
+
+--- Reports unresolved write/constructor/retirement custody.
+--- @return boolean pending
+function M.has_output_debt()
+	return _debt == true
+end
+
+'''
+s=s.replace(marker,api+marker)
+F.write_text(s)

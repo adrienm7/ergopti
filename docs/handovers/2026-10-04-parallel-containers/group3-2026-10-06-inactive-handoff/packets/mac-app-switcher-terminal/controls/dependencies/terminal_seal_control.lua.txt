@@ -1,0 +1,45 @@
+local NativeOwner = assert(loadfile(arg[1]))()
+local failures = 0
+for _, boundary in ipairs({"input", "timer"}) do
+    local current, front, arrival = true, 100, nil
+    local input_retired, timer_retired, terminal = false, false, nil
+    local owner = assert(NativeOwner.new({
+        ready = function() return true end,
+        provider_current = function() return true end,
+        prepare = function(_, observed) arrival = observed; return true end,
+        post = function(cap, ordinal) assert(arrival(cap, ordinal)); return true end,
+        observed = function() return true end,
+        released = function() return true end,
+        cancel_input = function() return true end,
+        retire_input = function()
+            input_retired = true
+            if boundary == "input" then current = false end
+            return true
+        end,
+        every = function() return {}, true end,
+        cancel_timer = function()
+            timer_retired = true
+            if boundary == "timer" then current = false end
+            return true
+        end,
+        now = function() return 10 end,
+        frontmost = function() return front end,
+    }, {deadline_sec = 2, poll_sec = 0.05}))
+    local cap, admitted = owner.request({
+        current = function() return current end,
+        cached = function() return current end,
+    }, function(_, status)
+        assert(input_retired and timer_retired)
+        terminal = status
+    end)
+    assert(admitted == true)
+    for _ = 1, 4 do owner.tick() end
+    front = 101
+    assert(owner.tick() == true)
+    assert(owner.status(cap) == terminal)
+    assert(owner.has_pending() == false)
+    if terminal ~= "refused" then failures = failures + 1 end
+    print("TERMINAL_SOURCE_SEAL", boundary, "expected=refused", "actual=" .. tostring(terminal))
+end
+print("CONTROL_RESULT", 2 - failures, failures)
+os.exit(failures == 0 and 0 or 1)

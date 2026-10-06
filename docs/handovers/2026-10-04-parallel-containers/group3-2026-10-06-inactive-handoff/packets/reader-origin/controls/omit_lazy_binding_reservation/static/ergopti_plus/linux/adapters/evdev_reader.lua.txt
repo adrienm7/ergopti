@@ -1,0 +1,739 @@
+--- adapters/evdev_reader.lua
+
+--- ==============================================================================
+--- MODULE: evdev Reader (Linux)
+--- DESCRIPTION:
+--- The input side of the keystroke path: opens /dev/input/eventN directly, takes
+--- EVIOCGRAB when the daemon needs to own the stream, and hands decoded events
+--- back one at a time without ever blocking.
+---
+--- WHY THIS REPLACES A SUBPROCESS:
+--- Capture used to scrape the TEXT output of `evtest --grab` (or `libinput
+--- debug-events`) through io.popen. That had four defects at once, and they were
+--- not independent:
+---   1. A blocking `pipe:read("*l")`. The tray, the periodic tick, the file
+---      watchers and the window cache advanced only when a key arrived — the
+---      exact opposite of what the daemon's own header promised.
+---   2. A binary dependency. `evtest` had to exist, and the daemon refused to
+---      start without it. `libinput debug-events` additionally masks keycodes
+---      unless it is given --show-keycodes, which it was not.
+---   3. Lossy parsing. Re-emission under a grab has to be exact, and a regex
+---      over prose loses whatever the prose does not spell out.
+---   4. No control. EVIOCGRAB belonged to a child process, so the daemon could
+---      not release it, could not re-take it after the device came back, and
+---      could not know whether it had ever been taken.
+--- Reading the fd ourselves removes all four, and it is what keyd, kanata, kmonad
+--- and xremap do for the same reasons.
+---
+--- FEATURES & RATIONALE:
+--- 1. O_NONBLOCK, always. read() returning "nothing right now" is what makes the
+---    event loop an event loop instead of a keystroke-driven one. poll() is
+---    offered for a caller that wants to sleep until input rather than spin.
+--- 2. Swappable syscall backend, same seam as the uinput writer. Production binds
+---    LuaJIT FFI; tests bind a recorder. Without it, "the grab is taken before
+---    the first read" could only ever be verified on hardware, and "the keyboard
+---    still works" is not an assertion.
+--- 3. The grab needs no unwind handler. EVIOCGRAB is bound to the open file,
+---    and the kernel drops it when the last descriptor on that file closes —
+---    including when the process dies, however it dies. That holds only while
+---    the daemon is the file's sole holder, so the device is opened O_CLOEXEC:
+---    otherwise every child the daemon starts (`xdg-open … &`, a gesture's
+---    application, the update relay) inherits a copy, and a daemon that dies
+---    while one runs leaves the keyboard grabbed by a process that never reads
+---    it. This module deliberately does not carry a signal-handler or __gc
+---    mechanism that would only pretend to add safety.
+--- 4. Decoding is not here. infra/input_event.lua owns the struct in both
+---    directions, so the size comes from ffi.sizeof rather than from a comment
+---    asserting 24 bytes.
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("logger.shim")
+local InputEvent = require("infra.input_event")
+
+local LOG = "adapters.evdev_reader"
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 1/ Kernel constants ===============
+-- ===========================================
+-- ===========================================
+
+-- open(2) flags, asm-generic values (x86_64 and arm64). O_RDONLY is 0.
+local O_NONBLOCK = 0x0800
+-- Closes the descriptor in every child at exec, so no child can keep the grab.
+local O_CLOEXEC  = 0x80000
+
+-- EVIOCGRAB = _IOW('E', 0x90, int)
+--   (1 << 30) | (sizeof(int) << 16) | ('E' << 8) | 0x90
+--   0x40000000 |     0x00040000     |   0x4500   |  0x90  = 0x40044590
+-- Argument: 1 takes the grab, 0 releases it.
+local EVIOCGRAB = 0x40044590
+local GRAB_ON   = 1
+local GRAB_OFF  = 0
+
+-- Variable-length _IOR requests used to rebuild kernel state after queue loss.
+local IOC_READ = 0x80000000
+local EVDEV_IOCTL_TYPE = 0x45
+local EVIOCGKEY_NR = 0x18
+local EVIOCGLED_NR = 0x19
+
+-- poll(2) event mask for "there is something to read".
+local POLLIN = 0x001
+
+-- How many struct reads one drain may perform before yielding to the caller.
+-- A bound rather than a limit: under autorepeat the kernel can hand back events
+-- faster than the loop consumes them, and an unbounded drain would starve the
+-- tray and the periodic tick — the very defect this module exists to remove.
+local MAX_EVENTS_PER_DRAIN = 256
+
+--- The device this daemon grabs: the keyboard, or the remap daemon's output.
+M.KEYBOARD = "keyboard"
+
+--- The device it only watches: a pointer, for the click that moves the caret.
+M.POINTER = "pointer"
+
+--- The touchpad, read for gestures and NEVER grabbed.
+---
+--- The grab is right for the keyboard, where every keystroke has to be swallowed
+--- and re-emitted. It would be wrong here: taking the touchpad from the
+--- compositor leaves the user with a dead cursor, and evdev is broadcast, so
+--- reading in parallel costs nothing. libinput never calls EVIOCGRAB for the same
+--- reason — the caller owns the fd.
+M.TOUCHPAD = "touchpad"
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 2/ Backend seam ===================
+-- ===========================================
+-- ===========================================
+
+-- The syscall surface, as a table so tests can replace it wholesale. nil until
+-- someone binds one.
+local _backend = nil
+local _native_backend, _native_ports = nil, nil
+local _busy, _native_debt = false, false
+local _generation = 0
+local _events = setmetatable({}, { __mode = "kv" })
+local _receipts = setmetatable({}, { __mode = "k" })
+local _codec = {}
+for _, name in ipairs({ "decode", "native_size", "unpack_u16_le", "unpack_i32_le", "unpack_uint_le", "EV_KEY", "EV_SYN" }) do
+	_codec[name] = rawget(InputEvent, name)
+end
+local EVENT_FIELDS = { "type", "code", "value", "seconds", "microseconds", "timestamp_us" }
+local EVENT_FIELD_SET = {}
+for _, field in ipairs(EVENT_FIELDS) do EVENT_FIELD_SET[field] = true end
+local SYN_DROPPED = 3
+
+-- Open descriptors, by caller-owned slot. A machine may expose several physical
+-- keyboards and pointers; slots keep their handles and grab state independent.
+-- One module rather than one per source because the syscall surface, struct and
+-- drain are identical; the hook decides which keyboard slots are grabbed and
+-- keeps pointer slots read-only.
+local _slots = {}
+
+--- The state for a slot, created on first use.
+--- @param slot string|nil Defaults to the keyboard.
+--- @return table { fd, grabbed, path, close_error }
+local function state(slot)
+	local key = slot or M.KEYBOARD
+	local entry = _slots[key]
+	if not entry then
+		entry = { fd = nil, grabbed = false, path = nil, generation = 0, read_epoch = 0, synchronized = false }
+		_slots[key] = entry
+	end
+	return entry
+end
+
+--- Replaces the syscall backend. Test seam.
+---
+--- A backend implements:
+---   open(path, flags)        → handle|nil, err
+---   ioctl(handle, req, arg)  → boolean
+---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
+---   poll(handle, timeout_ms) → boolean      (true when readable)
+---   close(handle)            → true|nil on completion, false, reason on failure
+--- A normally returning void backend acknowledges completion. Exceptions and
+--- explicit failures retire the handle and fence its slot until process restart;
+--- close(2) may have released it already, so retrying could close a reused fd.
+--- @param backend table|nil
+function M._set_backend(backend)
+	if _busy or _native_debt then return false end
+	if _native_backend ~= nil then
+		for _, entry in pairs(_slots) do if entry.fd ~= nil then return false end end
+	end
+	_backend = backend
+	_native_backend, _native_ports = nil, nil
+	_slots = {}
+	Logger.debug(LOG, "Backend replaced: %s.", backend and "custom" or "none")
+end
+
+--- Drops the backend after acknowledged native retirement. Test seam.
+function M._reset_backend()
+	if _busy or _native_debt then return false end
+	if _native_backend ~= nil then
+		for slot in pairs(_slots) do if M.close(slot) ~= true then return false end end
+	else
+		_busy = true
+		for _, entry in pairs(_slots) do
+			if entry.fd and _backend and _backend.close then pcall(_backend.close, entry.fd) end
+		end
+		_busy = false
+	end
+	_backend = nil
+	_native_backend, _native_ports = nil, nil
+	_slots = {}
+	Logger.debug(LOG, "Backend reset.")
+end
+
+--- Builds the LuaJIT FFI backend, or nil when FFI is unavailable.
+---
+--- Isolated so requiring this module never depends on the interpreter: plain Lua
+--- (what developers run) has no ffi, LuaJIT (what CI and the daemon run) does,
+--- and neither should fail to LOAD the module.
+--- @return table|nil backend, string|nil err
+local function build_ffi_backend()
+	local ok_ffi, ffi = pcall(require, "ffi")
+	if not ok_ffi or type(ffi) ~= "table" then
+		return nil, "LuaJIT FFI unavailable"
+	end
+
+	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
+		int open(const char *pathname, int flags);
+		int close(int fd);
+		int ioctl(int fd, unsigned long request, ...);
+		long read(int fd, void *buf, unsigned long count);
+		struct pollfd { int fd; short events; short revents; };
+		int poll(struct pollfd *fds, unsigned long nfds, int timeout);
+	]])
+	-- A second require would redefine the same symbols; that raises rather than
+	-- being a no-op, and it is not an error.
+	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then
+		return nil, "ffi.cdef failed: " .. tostring(cdef_err)
+	end
+
+	-- One buffer for the lifetime of the backend. Allocating per read would put
+	-- a GC allocation on the keystroke path for no benefit; the bytes are copied
+	-- into a Lua string before the next read can overwrite them.
+	local size = _codec.native_size()
+	local buf  = ffi.new("char[?]", size)
+	local pfd  = ffi.new("struct pollfd[1]")
+	local native_open, native_close, native_ioctl = ffi.C.open, ffi.C.close, ffi.C.ioctl
+	local native_read, native_poll = ffi.C.read, ffi.C.poll
+	local native_cast, native_new, native_string, native_errno = ffi.cast, ffi.new, ffi.string, ffi.errno
+
+	return {
+		open = function(path, flags)
+			local fd = native_open(path, flags)
+			if fd < 0 then return nil, "open failed" end
+			return fd
+		end,
+		ioctl = function(fd, request, arg)
+			return native_ioctl(fd, request, native_cast("int", arg or 0)) >= 0
+		end,
+		read_bits = function(fd, request, count)
+			local bits = native_new("uint8_t[?]", count)
+			if native_ioctl(fd, request, bits) < 0 then
+				return nil, "ioctl failed (errno=" .. tostring(native_errno()) .. ")"
+			end
+			return native_string(bits, count)
+		end,
+		read = function(fd, count)
+			local got = tonumber(native_read(fd, buf, count))
+			if not got then return nil, "fatal", "read returned no result" end
+			if got < 0 then
+				local errno = native_errno()
+				if errno == 11 or errno == 4 then
+					return nil, "would_block", errno == 11 and "EAGAIN" or "EINTR"
+				end
+				return nil, "fatal", "read failed (errno=" .. tostring(errno) .. ")"
+			end
+			if got == 0 then return nil, "fatal", "device returned EOF" end
+			if got < count then
+				return nil, "fatal", string.format("short input_event read (%d/%d bytes)", got, count)
+			end
+			return native_string(buf, got)
+		end,
+		poll = function(fd, timeout_ms)
+			pfd[0].fd = fd
+			pfd[0].events = POLLIN
+			pfd[0].revents = 0
+			local rc = tonumber(native_poll(pfd, 1, timeout_ms))
+			return rc ~= nil and rc > 0
+		end,
+		close = function(fd)
+			if native_close(fd) == 0 then return true end
+			return false, "close failed (errno=" .. tostring(native_errno()) .. ")"
+		end,
+	}
+end
+
+--- Binds the production FFI backend.
+--- @return boolean True when a backend is available.
+function M.use_ffi_backend()
+	if _busy or _native_debt then return false end
+	for _, entry in pairs(_slots) do if entry.fd ~= nil then return false end end
+	_busy = false
+	local called, backend, err = pcall(build_ffi_backend)
+	if not called or type(backend) ~= "table" then
+		pcall(Logger.debug, LOG, "FFI backend unavailable.")
+		_busy = false
+		return false
+	end
+	_backend, _native_backend = backend, backend
+	_native_ports = {}
+	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "poll", "close" }) do
+		_native_ports[name] = rawget(backend, name)
+	end
+	pcall(Logger.debug, LOG, "FFI backend bound.")
+	_busy = false
+	return true
+end
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 3/ Device lifecycle ===============
+-- ===========================================
+-- ===========================================
+
+--- True when this reader could plausibly open a device: a backend exists and the
+--- node is readable. Deliberately opens nothing — a probe with side effects on
+--- an input device is a grab nobody asked for.
+--- @param path string Device path, e.g. "/dev/input/event3".
+--- @return boolean available, string|nil reason
+function M.is_available(path)
+	if not _backend and not M.use_ffi_backend() then
+		return false, "no LuaJIT FFI on this runtime"
+	end
+	if type(path) ~= "string" or path == "" then
+		return false, "no device path"
+	end
+	local fh = io.open(path, "rb")
+	if not fh then
+		return false, path .. " is not readable (is this user in the input group?)"
+	end
+	fh:close()
+	return true
+end
+
+--- Opens the device for reading, non-blocking.
+--- @param path string Device path.
+--- @return boolean True when the descriptor is live.
+function M.open(path, slot)
+	if _busy or _native_debt then return false end
+	local st = state(slot)
+	if st.close_error then
+		Logger.error(LOG, "open(): previous close is not acknowledged: %s.", st.close_error)
+		return false, st.close_error
+	end
+	if st.fd ~= nil then
+		Logger.debug(LOG, "open(): already open on %s.", tostring(st.path))
+		return true
+	end
+	if type(path) ~= "string" or path == "" then
+		Logger.error(LOG, "open(): a device path is required.")
+		return false
+	end
+	if not _backend and not M.use_ffi_backend() then
+		Logger.error(LOG, "open(): no syscall backend — cannot read %s.", path)
+		return false
+	end
+	local backend, open_port = _backend, rawget(_backend, "open")
+	if type(open_port) ~= "function" then return false end
+	_busy = true
+	local called, fd, err = pcall(open_port, path, O_NONBLOCK + O_CLOEXEC)
+	if not called or fd == nil or fd == false then
+		pcall(Logger.error, LOG, "open(): cannot open %s — %s.", path, tostring(called and err or "backend raised"))
+		_busy = false
+		return false, called and err or nil
+	end
+	_generation = _generation + 1
+	st.fd, st.path, st.grabbed = fd, path, false
+	st.generation, st.read_epoch, st.synchronized = _generation, 0, true
+	st.native = rawequal(backend, _native_backend) and type(fd) == "number"
+		and fd >= 0 and fd <= 2147483647 and fd % 1 == 0
+	st.native_grab = false
+	st.native_close = st.native and _native_ports.close or nil
+	st.native_ioctl = st.native and _native_ports.ioctl or nil
+	pcall(Logger.success, LOG, "Reading %s (non-blocking).", path)
+	_busy = false
+	return true
+end
+
+--- Takes EVIOCGRAB, so the desktop stops receiving this device entirely.
+---
+--- The caller must already be able to put every consumed event back. This module
+--- cannot check that, so the guard lives at the keyboard hook, which owns both
+--- ends; taking the grab here without one leaves the user with a dead keyboard.
+--- @return boolean True when the grab is held.
+function M.grab(slot)
+	if _busy or _native_debt then return false end
+	local st = state(slot)
+	if st.fd == nil then
+		Logger.error(LOG, "grab(): no device open.")
+		return false
+	end
+	if st.grabbed then return true end
+	local port = rawget(_backend, "ioctl")
+	_busy = true
+	local called, acknowledged = pcall(port, st.fd, EVIOCGRAB, GRAB_ON)
+	if not called or not acknowledged then
+		pcall(Logger.error, LOG, "grab(): EVIOCGRAB failed on %s — another process may already hold it.", tostring(st.path))
+		_busy = false
+		return false
+	end
+	st.grabbed = true
+	st.native_grab = st.native and acknowledged == true
+	pcall(Logger.success, LOG, "Grabbed %s — the desktop no longer sees this device.", tostring(st.path))
+	_busy = false
+	return true
+end
+
+--- Releases EVIOCGRAB, returning the device to the desktop.
+--- @return boolean True when the device is no longer grabbed.
+function M.ungrab(slot)
+	if _busy then return false end
+	local st = state(slot)
+	if st.fd == nil or not st.grabbed then return true end
+	st.native_grab = false
+	_generation = _generation + 1
+	st.generation = _generation
+	_busy = true
+	local called, acknowledged = pcall(rawget(_backend, "ioctl"), st.fd, EVIOCGRAB, GRAB_OFF)
+	if not called or not acknowledged then
+		pcall(Logger.warn, LOG, "ungrab(): EVIOCGRAB(0) failed — closing the descriptor will release it.")
+		_busy = false
+		return false
+	end
+	st.grabbed = false
+	pcall(Logger.done, LOG, "Released %s.", tostring(st.path))
+	_busy = false
+	return true
+end
+
+--- Closes the device, releasing the grab on the way out.
+--- @return boolean acknowledged
+--- @return string|nil reason
+function M.close(slot)
+	if _busy then return false end
+	local st = state(slot)
+	if st.close_error then return false, st.close_error end
+	if st.fd == nil then return true end
+	_busy = true
+	local fd, path, backend = st.fd, st.path, _backend
+	local native = st.native == true
+	-- Revoke every receipt before callbacks, and retire this numeric fd once.
+	st.fd, st.path, st.native_grab, st.synchronized, st.pending_record = nil, nil, false, false, nil
+	_generation = _generation + 1
+	st.generation = _generation
+	if st.grabbed then pcall(st.native_ioctl or rawget(backend, "ioctl"), fd, EVIOCGRAB, GRAB_OFF) end
+	st.grabbed = false
+	local called, acknowledged, detail = pcall(st.native_close or rawget(backend, "close"), fd)
+	if not called or (native and acknowledged ~= true)
+		or (not native and acknowledged ~= nil and acknowledged ~= true) then
+		st.close_error = tostring(not called and acknowledged or detail or "backend did not acknowledge close")
+		if native then _native_debt = true end
+		pcall(Logger.error, LOG, "Close of %s is not acknowledged; restart is required.", tostring(path))
+		_busy = false
+		return false, st.close_error
+	end
+	pcall(Logger.info, LOG, "Closed %s.", tostring(path))
+	_busy = false
+	return true
+end
+
+--- @return boolean True when a device is open.
+function M.is_open(slot)
+	return state(slot).fd ~= nil
+end
+
+--- @return boolean True when EVIOCGRAB is currently held.
+function M.is_grabbed(slot)
+	return state(slot).grabbed
+end
+
+--- @return string|nil The open device path.
+function M.device_path(slot)
+	return state(slot).path
+end
+
+local function ioctl_read_request(number, count)
+	return IOC_READ + count * 0x10000 + EVDEV_IOCTL_TYPE * 0x100 + number
+end
+
+local function bit_snapshot(slot, number, max_code)
+	if _busy then return nil, "native operation is unavailable" end
+	local st = state(slot)
+	if not st.fd then return nil, "device is not open" end
+	if not _backend or type(_backend.read_bits) ~= "function" then
+		return nil, "backend cannot query evdev state"
+	end
+	local last = math.max(0, math.floor(tonumber(max_code) or 0))
+	local count = math.floor(last / 8) + 1
+	_busy = true
+	local ok, bytes, err = pcall(_backend.read_bits, st.fd,
+		ioctl_read_request(number, count), count)
+	_busy = false
+	if not ok or type(bytes) ~= "string" or #bytes ~= count then
+		return nil, ok and tostring(err or "invalid ioctl bitset") or tostring(bytes)
+	end
+	local active = {}
+	for code = 0, last do
+		local byte = bytes:byte(math.floor(code / 8) + 1) or 0
+		if math.floor(byte / (2 ^ (code % 8))) % 2 == 1 then active[code] = true end
+	end
+	return active
+end
+
+--- Returns the kernel's current pressed-key snapshot for one open source.
+--- @param slot string
+--- @param max_code integer
+--- @return table|nil, string|nil
+function M.pressed_keys(slot, max_code)
+	return bit_snapshot(slot, EVIOCGKEY_NR, max_code)
+end
+
+--- Returns the kernel's current LED snapshot (Caps/Num/Scroll lock).
+--- @param slot string
+--- @param max_code integer
+--- @return table|nil, string|nil
+function M.active_leds(slot, max_code)
+	return bit_snapshot(slot, EVIOCGLED_NR, max_code)
+end
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 4/ Reading ========================
+-- ===========================================
+-- ===========================================
+
+--- Blocks until the device has something to read, or the timeout expires.
+---
+--- Optional: a caller polling on its own schedule never needs it. It exists so an
+--- event loop can sleep on input instead of waking to find nothing, which is the
+--- difference between an idle daemon costing nothing and one costing a wakeup per
+--- tick.
+--- @param timeout_ms integer Milliseconds; 0 returns immediately, -1 waits forever.
+--- @return boolean True when a read would return data.
+function M.wait_readable(timeout_ms, slot)
+	if _busy then return false end
+	local st = state(slot)
+	if not st.fd then return false end
+	if type(_backend.poll) ~= "function" then return true end
+	_busy = true
+	local ok, readable = pcall(_backend.poll, st.fd, timeout_ms or 0)
+	_busy = false
+	return ok and readable == true
+end
+
+--- Checks private provider/session identity, not an unobserved kernel state lease.
+--- @param record table Private original event record.
+--- @return boolean current
+local function native_session_current(record)
+	local st = record.state
+	if _busy or _native_debt or not rawequal(_slots[record.slot], st)
+		or not rawequal(_backend, record.backend) or not rawequal(_backend, _native_backend)
+		or st.fd ~= record.fd or st.generation ~= record.generation
+		or st.native ~= true or st.native_grab ~= true or st.grabbed ~= true
+		or st.synchronized ~= true or st.close_error ~= nil then return false end
+	for name, port in pairs(_native_ports or {}) do
+		if not rawequal(rawget(record.backend, name), port) then return false end
+	end
+	for name, port in pairs(_codec) do
+		if not rawequal(rawget(InputEvent, name), port) then return false end
+	end
+	return true
+end
+
+--- Rejects replaced, remapped or mutated decoded objects without metatable callbacks.
+--- @param record table Private original event record.
+--- @return boolean original
+local function original_row(record)
+	local event = record.event
+	if getmetatable(event) ~= nil then return false end
+	for field in pairs(event) do if EVENT_FIELD_SET[field] ~= true then return false end end
+	for _, field in ipairs(EVENT_FIELDS) do
+		if rawget(event, field) ~= record.row[field] then return false end
+	end
+	return true
+end
+
+--- Reads one event and classifies the absence of one.
+--- @return table|nil event
+--- @return string status "event" | "would_block" | "fatal" | "closed"
+--- @return string|nil reason
+function M.read_event(slot)
+	if _busy then return nil, "closed", "native operation is unavailable" end
+	local st = state(slot)
+	if st.fd == nil then return nil, "closed", "device is not open" end
+	local backend, fd, generation, path = _backend, st.fd, st.generation, st.path
+	st.pending_record = nil
+	st.read_epoch = st.read_epoch + 1
+	local read_epoch = st.read_epoch
+	_busy = true
+	local measured, size = pcall(_codec.native_size)
+	if not measured or type(size) ~= "number" then
+		_busy = false
+		M.close(slot)
+		return nil, "fatal", "input_event size is unavailable"
+	end
+	local ok, data, status, reason = pcall(rawget(backend, "read"), fd, size)
+	if not ok then
+		_busy = false
+		local failure = "read raised: " .. tostring(data)
+		M.close(slot)
+		return nil, "fatal", failure
+	end
+	if type(data) ~= "string" then
+		_busy = false
+		if status == "fatal" then
+			M.close(slot)
+			return nil, "fatal", tostring(reason or "device read failed")
+		end
+		return nil, "would_block", reason
+	end
+	if #data ~= size then
+		_busy = false
+		local failure = string.format("input_event size mismatch (%d/%d bytes)", #data, size)
+		M.close(slot)
+		return nil, "fatal", failure
+	end
+	local decoded, event = pcall(_codec.decode, data, size)
+	if not decoded or type(event) ~= "table" then
+		_busy = false
+		M.close(slot)
+		return nil, "fatal", "input_event decode failed"
+	end
+	-- Independent pinned primitives bind provenance to the actual wire bytes,
+	-- even if a public codec export was replaced during a callback and restored.
+	local long_width, at = (size - 8) / 2, size - 7
+	local row = { type = _codec.unpack_u16_le(data, at), code = _codec.unpack_u16_le(data, at + 2),
+		value = _codec.unpack_i32_le(data, at + 4), seconds = _codec.unpack_uint_le(data, 1, long_width),
+		microseconds = _codec.unpack_uint_le(data, long_width + 1, long_width) }
+	row.timestamp_us = row.seconds * 1000000 + row.microseconds
+	if row.type == _codec.EV_SYN and row.code == SYN_DROPPED then
+		st.synchronized = false
+		_generation = _generation + 1
+		st.generation = _generation
+	end
+	_busy = false
+	if row.type == _codec.EV_KEY and row.code >= 1 and row.code <= 0x2ff
+		and (row.value == 0 or row.value == 1 or row.value == 2) then
+		local record = { event = event, row = row, state = st, slot = slot or M.KEYBOARD,
+			backend = backend, fd = fd, generation = generation, read_epoch = read_epoch, path = path }
+		if native_session_current(record) and original_row(record) then
+			st.pending_record = record
+			_events[event] = record
+		end
+	end
+	return event, "event", nil
+end
+
+--- Drains every event currently available, calling `handler` for each.
+---
+--- Bounded so one burst cannot monopolise the loop. The handler is called
+--- through pcall: an error in the domain callbacks must not abort the drain,
+--- because under a grab an aborted drain is input the user typed and never sees.
+--- @param handler function Called with (event_table).
+--- @return integer Number of events dispatched.
+--- @return string status Final read status.
+--- @return string|nil reason
+function M.drain(handler, slot)
+	local st = state(slot)
+	if not st.fd or type(handler) ~= "function" then return 0, "closed", "device is not open" end
+	local count = 0
+	for _ = 1, MAX_EVENTS_PER_DRAIN do
+		local ev, status, reason = M.read_event(slot)
+		if not ev then return count, status, reason end
+		count = count + 1
+		local ok, err = pcall(handler, ev)
+		if not ok then
+			Logger.error(LOG, "drain(): handler failed on type=%d code=%d value=%d — %s.",
+				ev.type, ev.code, ev.value, tostring(err))
+		end
+	end
+	return count, "bounded", nil
+end
+
+--- Captures only the exact current object issued by this native grabbed reader.
+--- Custom backends and caller-created decoded tables cannot acquire authority.
+--- @param event table Actual decoded event returned by read_event.
+--- @param slot string|nil Exact reader slot.
+--- @return table|nil capability Opaque native-origin receipt, not a hardware-class claim.
+function M.capture_event(event, slot)
+	local record = _events[event]
+	if not record or record.slot ~= (slot or M.KEYBOARD) or record.read_epoch ~= record.state.read_epoch
+		or not native_session_current(record) or not original_row(record) then return nil end
+	local capability = record.capability and record.capability[1] or nil
+	if capability == nil then
+		capability = {}
+		record.capability = setmetatable({ capability }, { __mode = "v" })
+		_receipts[capability] = record
+	end
+	return capability
+end
+
+--- Observes this exact event before the next read, without native callbacks.
+--- @param capability table Opaque native-origin receipt.
+--- @return boolean current
+function M.event_current(capability)
+	local record = _receipts[capability]
+	return record ~= nil and rawequal(capability, record.capability[1])
+		and record.read_epoch == record.state.read_epoch
+		and native_session_current(record) and original_row(record)
+end
+
+--- Returns detached original facts while the exact event/session is current.
+--- @param capability table Opaque native-origin receipt.
+--- @return table|nil view Never exposes the descriptor or backend.
+function M.event_view(capability)
+	local record = _receipts[capability]
+	if not record or not rawequal(capability, record.capability[1])
+		or record.read_epoch ~= record.state.read_epoch
+		or not native_session_current(record) or not original_row(record) then return nil end
+	local view = { source = record.path, slot = record.slot, generation = record.generation,
+		read_epoch = record.read_epoch, origin = "native-evdev" }
+	for _, field in ipairs(EVENT_FIELDS) do view[field] = record.row[field] end
+	return view
+end
+
+--- Preserves original event provenance across later reads in the same session.
+--- This proves session currency, not that the original key is still pressed.
+--- Revoked by queue loss, ungrab/close, rebind, codec/provider change or native debt.
+--- @param capability table Opaque native-origin receipt.
+--- @return boolean current
+function M.source_current(capability)
+	local record = _receipts[capability]
+	return record ~= nil and rawequal(capability, record.capability[1])
+		and native_session_current(record) and original_row(record)
+end
+
+--- Reports unknown native retirement without exposing a reusable numeric descriptor.
+--- @return boolean pending
+function M.has_native_origin_debt()
+	return _native_debt == true
+end
+
+-- Exposed for the tests that pin the ioctl request and the open flags.
+M.EVIOCGRAB  = EVIOCGRAB
+M.GRAB_ON    = GRAB_ON
+M.GRAB_OFF   = GRAB_OFF
+M.O_NONBLOCK = O_NONBLOCK
+M.MAX_EVENTS_PER_DRAIN = MAX_EVENTS_PER_DRAIN
+M.EVIOCGKEY_NR = EVIOCGKEY_NR
+M.EVIOCGLED_NR = EVIOCGLED_NR
+
+return M

@@ -1,0 +1,62 @@
+from pathlib import Path
+import json,difflib,hashlib,subprocess,tarfile,shutil
+root=Path(__file__).parent;snap=root/'snapshot/static/ergopti_plus';freeze=root/'prototype-freeze';freeze.mkdir(exist_ok=True)
+paths=['_shared/lua/tap_hold/caps_word.lua','linux/modules/shortcuts/manager.lua','linux/ergopti_hotstrings.lua','linux/platform/remap/tap_hold_engine.lua','linux/platform/remap/tap_hold_manager.lua','linux/platform/remap/key_combination_engine.lua','linux/tests/unit/modules/test_caps_word_policy.lua','linux/tests/unit/modules/test_key_combination_caps_word.lua']
+new={paths[0],*paths[-2:]};oneshot=Path('/workspace/.ergopti-cloud/preparations/group3-linux93-native-actions')
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+records=[];patch=[]
+for rel in paths:
+ gitrel='static/ergopti_plus/'+rel;post=freeze/'candidate'/gitrel;post.parent.mkdir(parents=True,exist_ok=True);post.write_bytes((snap/rel).read_bytes())
+ pre=freeze/'preimages'/gitrel
+ if rel not in new:
+  pre.parent.mkdir(parents=True,exist_ok=True)
+  if rel.startswith('linux/platform/remap/'):
+   layer='origin-fence-freeze' if rel.endswith('key_combination_engine.lua')else'one-shot-freeze'
+   data=(oneshot/layer/'candidate'/gitrel).read_bytes()
+  else:data=subprocess.check_output(['git','show','5e622935b7618bb9f8e3e1508141773046ed2134:'+gitrel],cwd='/workspace/ergopti')
+  pre.write_bytes(data);old=data.decode();prehash=sha(pre)
+ else:
+  if pre.exists():pre.unlink() # Only remove this builder's erroneous private preimage; the original new file is absent.
+  old='';prehash=None
+ patch.append('diff --git a/'+gitrel+' b/'+gitrel+'\n')
+ if prehash is None:patch.append('new file mode 100644\n')
+ patch.extend(difflib.unified_diff(old.splitlines(True),post.read_text().splitlines(True),fromfile='a/'+gitrel if prehash else '/dev/null',tofile='b/'+gitrel))
+ records.append({'path':gitrel,'pre_sha256':prehash,'post_sha256':sha(post)})
+pp=freeze/'caps-word-prototype.patch';pp.write_text(''.join(patch))
+check=freeze/'apply-check-v2';check.mkdir(exist_ok=True);shutil.copytree(freeze/'preimages',check,dirs_exist_ok=True)
+with(freeze/'apply-check.log').open('wb')as out:r=subprocess.run(['git','apply','--check',str(pp)],cwd=check,stdout=out,stderr=subprocess.STDOUT)
+assert r.returncode==0
+subprocess.run(['git','apply',str(pp)],cwd=check,check=True)
+assert all(sha(check/x['path'])==x['post_sha256']for x in records)
+readme=freeze/'README.md';readme.write_text('''# Inactive Linux Caps Word casing prototype
+
+Eight sources follow reviewed OneShotShift 4efd7f0a + ced31ae6. Not integrated, registered, advertised or physically qualified. Do not import wholesale: daemon owner injection would admit manual canonical Caps Word bindings.
+
+One versioned shared owner keeps existing title_words menu, snapshot and hotstring-observer semantics, and adds explicit upper_word for the pair context. Existing title_words tests remain byte-exact. An active upper-word claim cannot be represented or overwritten by legacy four-boolean snapshots. Logical retirement preserves newer title-word intent; physical output retirement requires the engine/hook's exact ACK.
+
+Only an uppercase native plan consisting of the original key under Shift is admitted by this prototype. AZERTY É on another chord, missing plans, and Unicode ß→SS multi-step plans retire the cohort and replay original input after ACK. No text-injector fallback or CapsLock writes. Pointer/boundary cancellation settles owned UP rows before replay and privately resets the configured policy; its next physical event captures a fresh source guard.
+
+Actual shared owner + PairOwner/Base/manager/Hook have controlled input/layout/output ports. Both ABIs: unchanged 122 Pair/Base + 14 one-shot + 27 new Caps Word controls = 163 passed / 0 failed. Unchanged title-word suite: 59/0 per ABI under the existing owned reaper. Five causal source omissions fail per ABI. Scoped original convention definitions: eight sources / zero violations.
+
+Still required: independent source review; startup/global-scope composition; contextual metadata and registration; joint native XKB source/output custody, modifier-held shortcut/pointer timing and actual evdev/uinput proof; unsupported-layout user experience. Generic gesture execution and native parity are unclaimed. Windows/macOS behavior is untouched. The later hotstring/injector trace of old title_words output is not characterized as broken.
+''')
+archive=freeze/'source-pair.tar'
+with tarfile.open(archive,'w')as tar:
+ for kind in ['preimages','candidate']:
+  for p in sorted((freeze/kind).rglob('*')):
+   if p.is_file():tar.add(p,arcname=str(p.relative_to(freeze)),recursive=False)
+deprels=['linux/modules/shortcuts/key_combinations.lua','linux/adapters/keyboard_hook.lua','linux/platform/remap/tap_hold_loader.lua','linux/adapters/keyboard_layout.lua','linux/platform/evdev/codes.lua','linux/tests/unit/meta/test_shortcuts_manager.lua','linux/tests/unit/meta/test_tap_hold_engine.lua','linux/tests/unit/modules/test_key_combinations.lua','linux/tests/unit/modules/test_key_combination_native_actions.lua','_shared/lua/tap_hold/key_combinations.lua','_shared/lua/tap_hold/one_shot_shift.lua','_shared/lua/unicode_case/init.lua']
+deps={str(snap/p):sha(snap/p)for p in deprels if(snap/p).exists()}
+base=oneshot/'snapshot/static/ergopti_plus';preserved={p:(snap/p).read_bytes()==(base/p).read_bytes()for p in ['linux/tests/unit/meta/test_shortcuts_manager.lua','linux/tests/unit/meta/test_tap_hold_engine.lua','linux/tests/unit/modules/test_key_combinations.lua','linux/tests/unit/modules/test_key_combination_native_actions.lua']};assert all(preserved.values())
+files={str(p):sha(p)for p in sorted((root/'evidence').glob('*.log'))}
+for p in [pp,archive,readme,freeze/'apply-check.log',Path(__file__),root/'qualify-all-controlled.lua',root/'qualify-owner.lua',root/'qualify-mutation.lua',root/'qualify-legacy-title-unblocked.lua',root/'mutation-results.json']:
+ files[str(p)]=sha(p)
+for folder in [root/'mutations',root/'lint-scope']:
+ for p in folder.rglob('*'):
+  if p.is_file():files[str(p)]=sha(p)
+for x in records:
+ for kind in ['candidate','preimages']:
+  p=freeze/kind/x['path']
+  if p.exists():files[str(p)]=sha(p)
+receipt={'status':'FROZEN_INACTIVE_SINGLE_SHARED_CASING_OWNER_PROTOTYPE','root_source_head':'5e622935b7618bb9f8e3e1508141773046ed2134','dependency_receipts':{str(oneshot/p):sha(oneshot/p)for p in ['one-shot-freeze/receipt.json','origin-fence-freeze/receipt.json']},'source_paths':records,'files':files,'source_dependencies':deps,'original_test_sources_byte_exact':preserved,'qualifications':{'controlled_combined':{'luajit':{'passed':163,'failed':0},'lua5.4':{'passed':163,'failed':0}},'unchanged_title_words':{'luajit':{'passed':59,'failed':0},'lua5.4':{'passed':59,'failed':0}},'causal_omissions_per_abi':5,'scoped_conventions':{'sources':8,'violations':0},'real_evdev_uinput':'UNEXECUTED','native_xkb_source_output_custody':'UNQUALIFIED','availability':'UNCHANGED_UNAVAILABLE'},'apply_check_exit':r.returncode,'patch_sha256':sha(pp),'archive_sha256':sha(archive),'warnings':['INACTIVE: owner injection would admit manual caps_word; native custody qualification required before import','Controlled Hook ports do not prove physical native input/output','No contextual metadata or generic gesture handler included']}
+p=freeze/'receipt.json';p.write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n');print('RECEIPT',str(p),sha(p));print('PATCH',sha(pp));print('PATHS',len(records))

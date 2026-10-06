@@ -1,0 +1,194 @@
+{
+  "status": "PRIVATE_NOT_ADMITTED",
+  "foundation_receipt": "0cb1e695ed3e8663047443eac365ab6581e5e0c9cb72dc0e6fe1157a427827dd",
+  "owned_paths": [
+    {
+      "path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "preimage": "56158cc41577b54344da9543c56337b98d37391caaee6f3906fd02353243099e",
+      "postimage": "fc77df761890ecdc725b2962a78bac7bad898bc989b568b074e6b5d3e788b84a"
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua",
+      "preimage": "a4960f0998d4ca611be7f943535a16de513e8b24afb40b8dc9b7481596e387aa",
+      "postimage": "66fcc86ee684623b311e404e13aca15ea8174af7b23d425f5672ab10d463b724"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "README.md",
+      "sha256": "a5d980ed7284ecba4949f097ed059e377efb1acf7df8112c13a9367f43d9c383",
+      "bytes": 3207
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "fc77df761890ecdc725b2962a78bac7bad898bc989b568b074e6b5d3e788b84a",
+      "bytes": 32087
+    },
+    {
+      "path": "candidate/static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua",
+      "sha256": "66fcc86ee684623b311e404e13aca15ea8174af7b23d425f5672ab10d463b724",
+      "bytes": 45842
+    },
+    {
+      "path": "candidate.patch",
+      "sha256": "be0610a3c5b14ddca55b3c9dac9da973c7c28592f633839ab03549977e2a0b07",
+      "bytes": 20176
+    },
+    {
+      "path": "causal-results.json",
+      "sha256": "036e71b55c0f0c3afbbe4a29b316844ed3b4d10869466c9aeca8af73a8b95b99",
+      "bytes": 693
+    },
+    {
+      "path": "check_owned_conventions.cjs",
+      "sha256": "324eb9c5cdb7a90d3a418d97728ddf339abeb40559b69c363227702a84b7b6b9",
+      "bytes": 1686
+    },
+    {
+      "path": "conventions.log",
+      "sha256": "2cee28fb8c7662a8abe3ed8798f33bbed48d06a5b7fd780534840135f8b3c2b4",
+      "bytes": 34
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "f91dc3618e08f207ed9209610e98cd71d3e46fbaf430743ff5711edfff82425e",
+      "bytes": 5207
+    },
+    {
+      "path": "lua5.4-omit_channel_reservation.log",
+      "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396",
+      "bytes": 4881
+    },
+    {
+      "path": "lua5.4-omit_known_repeat.log",
+      "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765",
+      "bytes": 4803
+    },
+    {
+      "path": "lua5.4-omit_restoration.log",
+      "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e",
+      "bytes": 4803
+    },
+    {
+      "path": "lua54-after.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7",
+      "bytes": 4725
+    },
+    {
+      "path": "lua54-before.log",
+      "sha256": "788759d7d7912f7e828b75e9c96b48ca2c98a544c7265136d27c8a4bc456e451",
+      "bytes": 6328
+    },
+    {
+      "path": "luajit-after.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7",
+      "bytes": 4725
+    },
+    {
+      "path": "luajit-before.log",
+      "sha256": "4a027fc10d174576cf85e012f78712bfaeff61f4546c9f3d52fb94bd251ab704",
+      "bytes": 6328
+    },
+    {
+      "path": "luajit-omit_channel_reservation.log",
+      "sha256": "fbf80ad5253afb492ca03240a1a5b5698b072ca01f1a427e6db026e7ad440396",
+      "bytes": 4881
+    },
+    {
+      "path": "luajit-omit_known_repeat.log",
+      "sha256": "cca4d0a0ef5bbee0d78d00d6ec55d9e95ad89186062c5ab3b3f63cb571570765",
+      "bytes": 4803
+    },
+    {
+      "path": "luajit-omit_restoration.log",
+      "sha256": "12f0ec59c59fcd40d083226de6ff2cd82259ea31fd3840bb7b1d8d7e660c9a7e",
+      "bytes": 4803
+    },
+    {
+      "path": "omit_channel_reservation/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "721014971d07af8df0bd998e50abec68799386927e9e7a93912d217c79c4604b",
+      "bytes": 31993
+    },
+    {
+      "path": "omit_known_repeat/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "14f328dbe35a88a47d9c0a1c91c2947d84b106b1f5faf96e3481a7401bf1b0e7",
+      "bytes": 32086
+    },
+    {
+      "path": "omit_restoration/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "506609186a6da84e414883ff046e43f98be8c4fb4e1096c38e03a4d4dcf4168b",
+      "bytes": 32045
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "56158cc41577b54344da9543c56337b98d37391caaee6f3906fd02353243099e",
+      "bytes": 26133
+    },
+    {
+      "path": "preimages/static/ergopti_plus/linux/tests/unit/adapters/test_uinput_writer.lua",
+      "sha256": "a4960f0998d4ca611be7f943535a16de513e8b24afb40b8dc9b7481596e387aa",
+      "bytes": 36390
+    },
+    {
+      "path": "prepare.py",
+      "sha256": "fb8a040d508ec870065845cc432d6e70cbff490e792a6a5a0575dd14bdc1f280",
+      "bytes": 8672
+    },
+    {
+      "path": "qualify.py",
+      "sha256": "65e7c2b68dbfff46040ffb07f229125fb29ce8a97452fcd9b21e873874d20e41",
+      "bytes": 2822
+    },
+    {
+      "path": "results.json",
+      "sha256": "b60f27dbcf736d36eec73486c5f28512eadb82c4f576b6cb1bd464a058c6f08e",
+      "bytes": 805
+    },
+    {
+      "path": "run.lua",
+      "sha256": "cac40fb594efd0c42f7fc84dee94c03533134f9c3d5f5563ebc25d6e3cb84603",
+      "bytes": 845
+    },
+    {
+      "path": "transaction_tests.lua",
+      "sha256": "8f44d9a84f16c5b7c11bd0ac3e3ccb929fcd77976ea4a2d4ea056206efb0dcc7",
+      "bytes": 9452
+    }
+  ],
+  "results": [
+    {
+      "abi": "luajit",
+      "source": "before",
+      "passed": 47,
+      "failed": 13,
+      "log": "luajit-before.log",
+      "sha256": "4a027fc10d174576cf85e012f78712bfaeff61f4546c9f3d52fb94bd251ab704"
+    },
+    {
+      "abi": "luajit",
+      "source": "after",
+      "passed": 60,
+      "failed": 0,
+      "log": "luajit-after.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+    },
+    {
+      "abi": "lua54",
+      "source": "before",
+      "passed": 47,
+      "failed": 13,
+      "log": "lua54-before.log",
+      "sha256": "788759d7d7912f7e828b75e9c96b48ca2c98a544c7265136d27c8a4bc456e451"
+    },
+    {
+      "abi": "lua54",
+      "source": "after",
+      "passed": 60,
+      "failed": 0,
+      "log": "lua54-after.log",
+      "sha256": "dd11741f14afe932777c2f460e6a12c3de5ff0bc06ab3bf37826a62d8877f8a7"
+    }
+  ],
+  "native_execution": "NOT_RUN",
+  "physical_delivery_available": false
+}

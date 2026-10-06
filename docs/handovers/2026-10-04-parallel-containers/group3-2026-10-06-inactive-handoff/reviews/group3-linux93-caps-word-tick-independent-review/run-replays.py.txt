@@ -1,0 +1,17 @@
+import json,subprocess
+from pathlib import Path
+p=Path(__file__).parent
+source=Path("/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-tick-successor")
+old=Path("/workspace/.ergopti-cloud/preparations/group3-linux93-caps-word-independent-review/snapshot")
+results=[]
+for abi in ["luajit","lua5.4"]:
+ jobs=[("independent-old",[str(p/"tick-reentry.lua"),str(old)]),("independent-new",[str(p/"tick-reentry.lua"),str(p/"snapshot")]),("controlled-new",[str(p/"qualify-all-controlled.lua"),str(p/"snapshot")]),("legacy-new",[str(p/"qualify-legacy-title-unblocked.lua"),str(p/"snapshot")])]
+ for role in ["original-frozen-tick","omit-post-source-guard","omit-post-casing-guard","omit-post-private-currency","omit-final-casing-order"]:
+  jobs.append((role,[str(p/"qualify-mutated-tick.lua"),str(p/"snapshot"),str(source/"mutations"/(role+".lua"))]))
+ for role,args in jobs:
+  log=p/(role+"-"+abi+".log")
+  with log.open("wb") as out:
+   r=subprocess.run(["python","/workspace/.ergopti-cloud/reap_validation.py",abi]+args,stdout=out,stderr=subprocess.STDOUT,timeout=45)
+  results.append({"abi":abi,"role":role,"exit":r.returncode,"log":str(log)})
+(p/"replay-results.json").write_text(json.dumps(results,indent=2)+"\n")
+for row in results:print(row["abi"],row["role"],row["exit"])
