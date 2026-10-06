@@ -4941,3 +4941,39 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 }
+
+// Actual hardware data and distinct native availability remain outside the inert boundary policy.
+{
+	const assert = require('node:assert/strict');
+	const expected = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/model_hardware_boundary.json'), 'utf8')
+	);
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(menu[expected.section], expected.rows);
+	assert.deepEqual(expected.projections.linux, []);
+	const catalogue = JSON.parse(readFileSync(resolve(SHARED, 'modules/llm/models.json'), 'utf8'));
+	const actual = catalogue
+		.flatMap((provider) => provider.families.flatMap((family) => family.models))
+		.filter((model) => model.name === expected.native_model);
+	assert.equal(actual.length, 1);
+	assert.deepEqual(actual[0].hardware_requirements.ollama, expected.hardware_ollama);
+	assert.equal(typeof actual[0].urls.ollama, 'string');
+	assert.ok(actual[0].urls.ollama.length > 0);
+	for (const [driver, relative, call] of [
+		['windows', 'ui/menu/menu_llm/menu_models.ahk', 'MenuRenderer_TemplateRows'],
+		['macos', 'ui/menu/menu_llm/models_selector.lua', 'ManifestMenu.template_rows']
+	]) {
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert.ok(source.includes(call + '("' + expected.section + '"'));
+	}
+	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
+		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
+		for (const key of expected.caption_keys) {
+			assert.equal(typeof locale[key], 'string');
+			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
+		}
+	}
+}

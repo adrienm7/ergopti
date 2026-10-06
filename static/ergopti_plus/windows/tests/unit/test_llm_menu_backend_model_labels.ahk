@@ -462,3 +462,70 @@ _LBMD_CatalogueBoundary(Key) {
 }
 for Key in ["family", "origin"]
 	Test("model catalogue boundaries: actual native owner " . Key, _LBMD_CatalogueBoundary.Bind(Key))
+
+
+/** The real Windows Map-presence contract remains distinct from the macOS value predicate. */
+_LBMD_HardwareBoundary() {
+	global _SharedDir
+	Expected := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\model_hardware_boundary.json", "UTF-8"))
+	Model := _LBMD_ReadoutCatalogueModel(Expected["native_model"])
+	Name := Model["name"], Url := Model["urls"]["ollama"]
+	Hardware := Model["hardware_requirements"]
+	AssertDeepEqual(Expected["hardware_ollama"], Hardware["ollama"])
+	Frame := _MR_GetMenuDef(Expected["section"]), Original := Frame[1]
+	Root := _MM_GetManifestRoot(), Native := 0
+	try {
+		Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+		Position := 0
+		for Index, Row in Rows
+			if Row.Get("label", "") == Expected["header"]["ahk"]
+				Position := Index
+		Assert(Position > 1, "actual hardware heading must be reached")
+		AssertTrue(Rows[Position - 1]["separator"])
+		AssertFalse(Rows[Position].Has("action"), "the original Windows hardware header remains inert")
+		AssertEqual(StrReplace(t("menu.llm.hw_download"), "%s", Expected["hardware_ollama"]["download_gb"]), Rows[Position + 1]["label"])
+		AssertEqual(StrReplace(t("menu.llm.hw_ram"), "%s", Expected["hardware_ollama"]["ram_gb"]), Rows[Position + 2]["label"])
+		AssertTrue(HasMethod(Rows[1]["action"], "Call"))
+		AssertTrue(HasMethod(Rows[2]["action"], "Call"), "original Download closure remains native")
+		Native := Menu()
+		MenuRenderer_AppendRows(Native, "llm_menu", "llm_model", Rows)
+		State := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 2, "uint", 0x400, "uint")
+		Assert(State != 0xFFFFFFFF && (State & 0x800) != 0, "genuine Win32 separator persists")
+		Frame[1] := Map("type", "label", "id", "hand_hardware_marker", "i18n", Expected["marker_key"],
+			"platforms", ["ahk", "hs"], "unavailable", "hide")
+		Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+		AssertEqual(t(Expected["marker_key"]), Rows[Position - 1]["label"])
+		AssertTrue(Rows[Position - 1]["disabled"])
+		AssertFalse(Rows[Position - 1].Has("action"))
+		AssertEqual(Expected["header"]["ahk"], Rows[Position]["label"])
+		Frame[1] := Map("type", "command", "id", "unbound_hardware_marker", "i18n", Expected["marker_key"])
+		AssertEqual(0, _LLM_Menu_PerModelRows(Name, Model, Url, Name, false).Length)
+		Root.Delete(Expected["section"])
+		AssertEqual(0, _LLM_Menu_PerModelRows(Name, Model, Url, Name, false).Length)
+		Root[Expected["section"]] := Frame, Frame[1] := Original
+		Model["hardware_requirements"] := Map("ollama", Map())
+		Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+		Seen := false
+		for Row in Rows
+			if Row.Get("label", "") == Expected["header"]["ahk"]
+				Seen := true
+		AssertEqual(Expected["empty_ollama_map_header_visible"]["ahk"], Seen, "an actual empty Map still satisfies original Windows presence")
+		Model.Delete("hardware_requirements")
+		Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+		Seen := false
+		for Row in Rows
+			if Row.Get("label", "") == Expected["header"]["ahk"]
+				Seen := true
+		AssertEqual(Expected["missing_hardware_header_visible"]["ahk"], Seen)
+	} finally {
+		Model["hardware_requirements"] := Hardware
+		Root[Expected["section"]] := Frame, Frame[1] := Original
+		if Native is Menu
+			_CTC_ReleaseMenu(Native)
+	}
+	Rows := _LLM_Menu_PerModelRows(Name, Model, Url, Name, false)
+	AssertTrue(Rows[Position - 1]["separator"], "actual repaired declaration and original data remain usable")
+	AssertDeepEqual(Expected["hardware_ollama"], Model["hardware_requirements"]["ollama"])
+}
+Test("per-model hardware: authentic shared boundary and original Map predicate (model-hardware-boundary)",
+	_LBMD_HardwareBoundary)

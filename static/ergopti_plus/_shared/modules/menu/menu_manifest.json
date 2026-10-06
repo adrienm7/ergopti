@@ -2777,6 +2777,16 @@
 			]
 		}
 	],
+	"llm_model_hardware_boundary": [
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_model_family_boundary": [
 		{
 			"type": "---",

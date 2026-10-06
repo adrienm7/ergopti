@@ -665,7 +665,9 @@ function M.build(ctx)
 				end
 
 				if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
-					table.insert(model_submenu, { separator = true })
+					local hardware_rows = ManifestMenu.template_rows("llm_model_hardware_boundary", {}, {}, {})
+					if not hardware_rows then return {} end
+					for _, row in ipairs(hardware_rows) do model_submenu[#model_submenu + 1] = row end
 					table.insert(model_submenu, {
 						label    = i18n.decorate_section(string.format(i18n.get("menu.llm.hw_header"), display_backend)),
 						disabled = true
