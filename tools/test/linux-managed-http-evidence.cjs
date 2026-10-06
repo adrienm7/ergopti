@@ -25,6 +25,73 @@ function keys(value, expected) {
 		Object.keys(value).sort().join(',') === [...expected].sort().join(',')
 	);
 }
+// Independent closed diagnostic protocol. No native success/closure credit.
+const SETUP_STAGES = new Set([
+	'arguments',
+	'pins-owner-admission',
+	'private-destination',
+	'bootstrap-client',
+	'modern-source-fetch',
+	'modern-source-extract',
+	'openssl-sdk',
+	'modern-configure',
+	'modern-build',
+	'modern-install',
+	'legacy-release-fetch',
+	'legacy-signature',
+	'legacy-release-policy',
+	'legacy-index-fetch',
+	'legacy-index-parse',
+	'legacy-package-identity',
+	'legacy-package-fetch',
+	'legacy-package-extract',
+	'legacy-library-admission',
+	'modern-runtime-admission',
+	'legacy-runtime-admission',
+	'receipt-publication',
+	'completion'
+]);
+const SETUP_ERROR_CLASSES = new Set([
+	'RuntimeError',
+	'FileNotFoundError',
+	'PermissionError',
+	'ValueError',
+	'TypeError',
+	'KeyError',
+	'OSError',
+	'JSONDecodeError',
+	'LZMAError',
+	'TarReadError',
+	'SystemExit',
+	'KeyboardInterrupt',
+	'NativeRefused',
+	'Other'
+]);
+function readSetupFailure(text) {
+	if (typeof text !== 'string' || Buffer.byteLength(text) > 512) refuse();
+	let value;
+	try {
+		value = JSON.parse(text);
+	} catch {
+		refuse();
+	}
+	if (
+		!keys(value, ['schema_version', 'state', 'stage', 'error_class']) ||
+		value.schema_version !== 1 ||
+		value.state !== 'setup_failed' ||
+		!SETUP_STAGES.has(value.stage) ||
+		!SETUP_ERROR_CLASSES.has(value.error_class) ||
+		JSON.stringify(value) + '\n' !== text
+	)
+		refuse();
+	return (
+		'::error::Authenticated managed HTTP validation setup failed: stage=' +
+		value.stage +
+		'; kind=' +
+		value.error_class +
+		'. Private diagnostics retained.\n'
+	);
+}
 function readNativeCounts(text, expectedSha, expectedNativeDigest) {
 	if (
 		typeof text !== 'string' ||
@@ -216,6 +283,8 @@ if (require.main === module) {
 				digest(readRegular(native, 8 * 1024 * 1024))
 			);
 			process.stdout.write(String(counts[args[0]]) + '\n');
+		} else if (mode === '--setup-diagnostic' && args.length === 1) {
+			process.stdout.write(readSetupFailure(readRegular(args[0], 512, true).toString('utf8')));
 		} else if (mode === '--tools-env' && args.length === 3) {
 			const env = toolsForCI(...args);
 			process.stdout.write(
@@ -229,4 +298,4 @@ if (require.main === module) {
 		process.exitCode = 1;
 	}
 }
-module.exports = { readNativeCounts, readToolEnvironment, toolsForCI };
+module.exports = { readNativeCounts, readToolEnvironment, toolsForCI, readSetupFailure };
