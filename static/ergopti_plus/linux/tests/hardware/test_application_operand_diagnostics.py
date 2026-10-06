@@ -25,7 +25,7 @@ class DiagnosticControls(unittest.TestCase):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             context = self.context(root)
-            ticks = iter((10, 20, 30))
+            ticks = iter((10, 20, 25, 30))
             calls = []
 
             def spawn(arguments, **ports):
@@ -303,6 +303,199 @@ class X11ReadinessControls(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "refused"):
             diagnostic.require_x11_ready(":87", self.server(), spawn=lambda *_a, **_p: child)
         self.assertEqual(events, [("wait", {"timeout": 5})])
+
+
+class PhaseObservationControls(unittest.TestCase):
+    def context(self, root):
+        return {
+            "directory": str(root),
+            "nonce": "independent-phase-owner",
+            "identity": "ordinary-app",
+            "receipt": str(root / "application-receipt"),
+        }
+
+    def test_native_observation_separates_spawn_durable_publication_and_wait(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            ticks = iter((100, 120, 500, 600))
+            events = []
+
+            class Child:
+                pid = 80173
+
+                def wait(self):
+                    events.append("actual-terminal-wait")
+                    self_case.assertTrue((root / "gtk-started.json").is_file())
+                    return 0
+
+            def spawn(arguments, **ports):
+                self.assertEqual(arguments, ["/usr/bin/gtk-launch", "--", "ordinary-app"])
+                events.append("exact-native-acquisition")
+                return Child()
+
+            self_case = self
+            self.assertEqual(
+                diagnostic.run_wrapper(
+                    self.context(root),
+                    ["--", "ordinary-app"],
+                    spawn=spawn,
+                    clock=lambda: next(ticks),
+                ),
+                0,
+            )
+            terminal = json.loads((root / "gtk-terminal.json").read_bytes())
+            started = json.loads((root / "gtk-started.json").read_bytes())
+            self.assertEqual(events, ["exact-native-acquisition", "actual-terminal-wait"])
+            self.assertEqual(started["before_spawn_ns"], 100)
+            self.assertEqual(started["after_spawn_ns"], 120)
+            self.assertEqual(terminal["before_spawn_ns"], 100)
+            self.assertEqual(terminal["after_spawn_ns"], 120)
+            self.assertEqual(terminal["started_published_ns"], 500)
+            self.assertEqual(terminal["terminal_observed_ns"], 600)
+            self.assertTrue(diagnostic.native_launch_complete(terminal))
+
+    def test_refused_started_publication_retains_owner_and_no_completed_phase(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            ticks = iter((100, 120, 600))
+            waits = []
+            publish = diagnostic.publish
+
+            class Child:
+                pid = 80173
+
+                def wait(self):
+                    waits.append("exact-native-wait")
+                    return 0
+
+            def refused(path, packet):
+                if Path(path).name == "gtk-started.json":
+                    raise OSError("independent diagnostic publication refusal")
+                return publish(path, packet)
+
+            with patch.object(diagnostic, "publish", side_effect=refused):
+                result = diagnostic.run_wrapper(
+                    self.context(root),
+                    ["--", "ordinary-app"],
+                    spawn=lambda *_args, **_ports: Child(),
+                    clock=lambda: next(ticks),
+                )
+            self.assertEqual(result, 1)
+            self.assertEqual(waits, ["exact-native-wait"])
+            terminal = json.loads((root / "gtk-terminal.json").read_bytes())
+            self.assertEqual(terminal["after_spawn_ns"], 120)
+            self.assertIsNone(terminal["started_published_ns"])
+            self.assertEqual(terminal["terminal_observed_ns"], 600)
+            self.assertEqual(terminal["native_exit"], 0)
+            self.assertEqual(terminal["observer_failure"], "OSError")
+            self.assertFalse(diagnostic.native_launch_complete(terminal))
+
+    def test_spawn_refusal_never_invents_phase_or_native_completion(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            ticks = iter((100, 600))
+
+            def refused(*_args, **_ports):
+                raise FileNotFoundError(2, "independent native acquisition refusal")
+
+            self.assertEqual(
+                diagnostic.run_wrapper(
+                    self.context(root),
+                    ["--", "ordinary-app"],
+                    spawn=refused,
+                    clock=lambda: next(ticks),
+                ),
+                1,
+            )
+            terminal = json.loads((root / "gtk-terminal.json").read_bytes())
+            self.assertIsNone(terminal["after_spawn_ns"])
+            self.assertIsNone(terminal["started_published_ns"])
+            self.assertFalse(terminal["native_terminal_observed"])
+            self.assertIsNone(terminal["native_exit"])
+            self.assertEqual(terminal["spawn_errno"], 2)
+            self.assertFalse(diagnostic.native_launch_complete(terminal))
+
+    def test_interrupted_wait_preserves_phases_and_refuses_after_exact_retirement(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            ticks = iter((100, 120, 500, 600))
+            waits = []
+
+            class Child:
+                pid = 80173
+
+                def wait(self):
+                    waits.append("owned-wait")
+                    if len(waits) == 1:
+                        raise KeyboardInterrupt("independent observer interruption")
+                    return 0
+
+            self.assertEqual(
+                diagnostic.run_wrapper(
+                    self.context(root),
+                    ["--", "ordinary-app"],
+                    spawn=lambda *_args, **_ports: Child(),
+                    clock=lambda: next(ticks),
+                ),
+                1,
+            )
+            terminal = json.loads((root / "gtk-terminal.json").read_bytes())
+            self.assertEqual(waits, ["owned-wait", "owned-wait"])
+            self.assertEqual(terminal["after_spawn_ns"], 120)
+            self.assertEqual(terminal["started_published_ns"], 500)
+            self.assertEqual(terminal["terminal_observed_ns"], 600)
+            self.assertEqual(terminal["native_exit"], 0)
+            self.assertEqual(terminal["observer_failure"], "KeyboardInterrupt")
+            self.assertFalse(diagnostic.native_launch_complete(terminal))
+
+
+class PhaseTimestampControls(unittest.TestCase):
+    def test_only_nonnegative_native_integer_phases_are_exposed(self):
+        self.assertEqual(diagnostic.phase_timestamp(0), 0)
+        self.assertEqual(diagnostic.phase_timestamp(120), 120)
+        self.assertEqual(diagnostic.phase_timestamp((1 << 63) - 1), (1 << 63) - 1)
+        for value in (
+            None,
+            True,
+            False,
+            -1,
+            1.5,
+            float("inf"),
+            1 << 63,
+            "private-phase-token",
+            {"private": "phase-token"},
+        ):
+            with self.subTest(kind=type(value).__name__):
+                self.assertIsNone(diagnostic.phase_timestamp(value))
+
+    def test_unknown_publication_phase_never_exports_a_private_callback_value(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            ticks = iter((100, 120, "private-phase-token", 600))
+
+            class Child:
+                pid = 80173
+
+                def wait(self):
+                    return 0
+
+            context = PhaseObservationControls().context(root)
+            self.assertEqual(
+                diagnostic.run_wrapper(
+                    context,
+                    ["--", "ordinary-app"],
+                    spawn=lambda *_args, **_ports: Child(),
+                    clock=lambda: next(ticks),
+                ),
+                0,
+            )
+            raw = (root / "gtk-terminal.json").read_bytes()
+            self.assertNotIn(b"private-phase-token", raw)
+            terminal = json.loads(raw)
+            self.assertEqual(terminal["after_spawn_ns"], 120)
+            self.assertIsNone(terminal["started_published_ns"])
+            self.assertEqual(terminal["terminal_observed_ns"], 600)
+            self.assertTrue(diagnostic.native_launch_complete(terminal))
 
 
 if __name__ == "__main__":
