@@ -3775,6 +3775,14 @@ receives target error -10004 through its acknowledged AppleEvent sender.
 Packaging and installation are skipped after the test failure. These facts
 do not establish the server exception or the AppleEvent policy cause.
 
+The Sparkle child target-root guard now uses native POSIX realpath strings
+on both signed fixture admission and actual bundle comparison. Foundation URL
+projection no longer supplies the identity string. Strict root equality,
+private directory ownership, all 117 native assertion/failure lines and
+resource retirement remain unchanged. Manual run37540551778 at a5a07
+identified target-root/exit78; the reviewed correction still requires actual
+macOS compilation and archive acceptance. Item36 stays partial.
+
 The Sparkle server now receives the same retained physical directory path
 as its census. Swift previously admitted a Foundation parent alias that
 the unchanged Python canonical-path guard refused. All 25 original Python
