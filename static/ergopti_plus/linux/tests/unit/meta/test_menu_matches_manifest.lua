@@ -91,6 +91,57 @@ local function find_item(items, title)
 	return nil
 end
 
+-- The provider list is genuine, while its entries file belongs to this fixture.
+-- Fresh backend and builder modules must capture this exact private owner, not
+-- a prior module whose source path or cached entries belong to another test.
+local API_SOURCE_MODULES = {
+	"modules.llm.api_entries", "ui.menu.llm_backend_rows", "ui.menu.menu_builder",
+}
+
+--- Builds with a genuine private API source and restores the complete module cohort.
+--- @param scenario function Receives the actual builder, entries owner and source path.
+--- @return any
+local function with_api_source(scenario)
+	local path = os.tmpname()
+	local source = '{"version":1,"active_id":"","entries":[]}\n'
+	local previous = {}
+	for _, name in ipairs(API_SOURCE_MODULES) do previous[name] = rawget(package.loaded, name) end
+	local file
+	local ok, result = xpcall(function()
+		file = assert(io.open(path, "wb"))
+		assert(file:write(source)); assert(file:close()); file = nil
+		for _, name in ipairs(API_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
+		local entries = require("modules.llm.api_entries")
+		entries._set_path_for_test(path)
+		require("ui.menu.llm_backend_rows")
+		local builder = require("ui.menu.menu_builder")
+		return scenario(builder, entries, path)
+	end, debug.traceback)
+	local closed = true
+	if file then
+		local close_ok, close_receipt = pcall(file.close, file)
+		closed = close_ok and close_receipt == true
+	end
+	for _, name in ipairs(API_SOURCE_MODULES) do rawset(package.loaded, name, previous[name]) end
+	for _, owned_path in ipairs({ path, path .. ".corrupt" }) do
+		local owned = io.open(owned_path, "rb")
+		if owned then assert(owned:close()); assert(os.remove(owned_path)) end
+	end
+	for _, name in ipairs(API_SOURCE_MODULES) do
+		helpers.assert_true(rawequal(rawget(package.loaded, name), previous[name]), name)
+	end
+	helpers.assert_eq(closed, true, "the private seed descriptor closes on every exit")
+	if not ok then error(result, 0) end
+	return result
+end
+
+--- Builds the real tray with a scoped entries source, retaining native callbacks.
+--- @param context table
+--- @return table
+local function build_full_menu(context)
+	return with_api_source(function(builder) return builder.build(context) end)
+end
+
 --- A menu context complete enough for every submenu to build.
 ---
 --- Stubs rather than real modules: this test asks whether the BUILDER renders
@@ -101,6 +152,15 @@ local function full_context()
 	local function noop() end
 	return {
 		_version = "9.9.9",
+		-- The API backend reaches the real provider-list builder. Without this
+		-- collaborator the whole-tray fixture takes the unavailable-LLM branch
+		-- before any declared API control can be rendered.
+		llm = {
+			is_enabled  = function() return true end,
+			toggle      = noop,
+			get_backend = function() return "api" end,
+			set_backend = noop,
+		},
 		config = {
 			get_groups         = function() return {} end,
 			is_group_enabled   = function() return true end,
@@ -194,8 +254,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 
 	helpers.before_each(function()
 		if built then return end
-		local mb = helpers.load_module("ui.menu.menu_builder")
-		built = mb.build(full_context())
+		built = build_full_menu(full_context())
 		titles = {}
 		for _, title in ipairs(all_titles(built)) do titles[title] = true end
 	end)
@@ -276,8 +335,7 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 				return true
 			end,
 		}
-		local mb = helpers.load_module("ui.menu.menu_builder")
-		local row = find_item(mb.build(context), i18n.get("menu.shortcuts.edit_personal_info"))
+		local row = find_item(build_full_menu(context), i18n.get("menu.shortcuts.edit_personal_info"))
 		helpers.assert_not_nil(row, "the shared editor must have a production caller")
 		helpers.assert_true(type(row.fn) == "function")
 		row.fn()
@@ -298,7 +356,6 @@ end)
 helpers.describe("menu certification: no empty submenu", function()
 
 	helpers.it("gives every submenu at least one row", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
 		local empty = {}
 
 		local function walk(items, path)
@@ -310,12 +367,122 @@ helpers.describe("menu certification: no empty submenu", function()
 				end
 			end
 		end
-		walk(mb.build(full_context()), "")
+		walk(build_full_menu(full_context()), "")
 
 		helpers.assert_eq(#empty, 0,
 			"a submenu that opens onto nothing is worse than a missing one: the user "
 				.. "cannot tell it apart from a feature that failed to load. "
 				.. table.concat(empty, ", "))
+	end)
+
+end)
+
+
+helpers.describe("menu certification: actual API context reachability", function()
+
+	helpers.it("reaches the genuine provider children without running mutation callbacks", function()
+		local context = full_context()
+		local mutations = 0
+		context.llm.toggle = function() mutations = mutations + 1 end
+		context.llm.set_backend = function() mutations = mutations + 1 end
+		helpers.assert_eq(context.llm.get_backend(), "api")
+		with_api_source(function(mb)
+			local menu = mb.build(context)
+			local remote = require("modules.llm.api_remote")
+			local entries = require("modules.llm.api_entries")
+			local add = find_item(menu, i18n.get("menu.llm.api_add_entry"))
+			helpers.assert_not_nil(add, "the complete context must reach the real API provider group")
+			helpers.assert_type(add.menu, "table")
+			local providers = remote.providers()
+			helpers.assert_true(#providers >= 16, "the actual shipped cloud catalogue must be reached")
+			helpers.assert_eq(#add.menu, #providers)
+			for index, provider in ipairs(providers) do
+				helpers.assert_eq(add.menu[index].title, "➕ " .. provider.label)
+				helpers.assert_type(add.menu[index].fn, "function")
+			end
+			helpers.assert_eq(add.menu[1].title, "➕ OpenAI")
+			helpers.assert_eq(add.menu[2].title, "➕ Anthropic")
+			helpers.assert_eq(add.menu[3].title, "➕ Google Gemini")
+			helpers.assert_true(rawequal(remote, package.loaded["modules.llm.api_remote"]))
+			helpers.assert_true(rawequal(entries, package.loaded["modules.llm.api_entries"]))
+			helpers.assert_eq(mutations, 0, "building the whole tray must not change the runtime backend")
+		end)
+	end)
+
+	helpers.it("keeps the genuine unavailable branch separate from the complete API context", function()
+		local context = full_context()
+		context.llm = nil
+		local menu = build_full_menu(context)
+		helpers.assert_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")))
+		helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.unavailable")))
+		helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.ollama_start_hint")))
+	end)
+
+end)
+
+
+helpers.describe("menu certification: private API source lifecycle", function()
+
+	helpers.it("restores absent, false and genuine previous owners after successful and raised builds", function()
+		local original, actual = {}, {}
+		for _, name in ipairs(API_SOURCE_MODULES) do
+			original[name] = rawget(package.loaded, name)
+			actual[name] = require(name)
+		end
+		local ok, detail = pcall(function()
+			for _, mode in ipairs({ "absent", "false", "existing" }) do
+				local expected = {}
+				for _, name in ipairs(API_SOURCE_MODULES) do
+					if mode == "false" then expected[name] = false end
+					if mode == "existing" then expected[name] = actual[name] end
+					rawset(package.loaded, name, expected[name])
+				end
+				local menu = build_full_menu(full_context())
+				helpers.assert_not_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")))
+				local private_path
+				local succeeded, raised = pcall(function()
+					with_api_source(function(builder, entries, path)
+						private_path = path
+						helpers.assert_eq(entries.path(), path)
+						helpers.assert_eq(#entries.list(), 0)
+						helpers.assert_not_nil(find_item(builder.build(full_context()), i18n.get("menu.llm.api_add_entry")))
+						error("private API scope sentinel")
+					end)
+				end)
+				helpers.assert_eq(succeeded, false)
+				helpers.assert_contains(raised, "private API scope sentinel")
+				helpers.assert_not_nil(private_path)
+				helpers.assert_nil(io.open(private_path, "rb"))
+				helpers.assert_nil(io.open(private_path .. ".corrupt", "rb"))
+				for _, name in ipairs(API_SOURCE_MODULES) do
+					helpers.assert_true(rawequal(rawget(package.loaded, name), expected[name]), name .. "/" .. mode)
+				end
+			end
+		end)
+		for _, name in ipairs(API_SOURCE_MODULES) do rawset(package.loaded, name, original[name]) end
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("restores the genuine previous cohort after builder construction refuses", function()
+		local previous = {}
+		for _, name in ipairs(API_SOURCE_MODULES) do previous[name] = rawget(package.loaded, name) end
+		local name = "ui.menu.menu_builder"
+		local preload = rawget(package.preload, name)
+		local private_path
+		rawset(package.preload, name, function()
+			private_path = assert(rawget(package.loaded, "modules.llm.api_entries")).path()
+			error("private builder construction sentinel")
+		end)
+		local ok, detail = pcall(function() build_full_menu(full_context()) end)
+		rawset(package.preload, name, preload)
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(detail, "private builder construction sentinel")
+		helpers.assert_not_nil(private_path)
+		helpers.assert_nil(io.open(private_path, "rb"))
+		helpers.assert_nil(io.open(private_path .. ".corrupt", "rb"))
+		for _, module_name in ipairs(API_SOURCE_MODULES) do
+			helpers.assert_true(rawequal(rawget(package.loaded, module_name), previous[module_name]), module_name)
+		end
 	end)
 
 end)

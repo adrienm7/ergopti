@@ -4257,7 +4257,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 74, macOS 105, Linux 76, each
+  drivers still build (current baseline: Windows 71, macOS 102, Linux 74, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4696,6 +4696,8 @@ The Agent per-system Model command and its preceding separator are now declared 
 
 The direct Windows profile-frame regression now initializes its four mandatory number-row dependencies from genuine executable native declarations and restores exact prior absent/value identities in nested finally. All28 prior assertions remain in order. The preceding native run37438495454 stopped this test at an uninitialized tone dependency;19 independent portable source controls pass, while real Win32 execution and restoration still require the next Windows run.
 
+The fixed API Add-entry affordance and its existing separator now consume canonical shared templates on all three drivers. Windows retains its dialog command; macOS/Linux retain their native provider children, callbacks, separator order and availability policy. Existing 21 translated captions are reused. Canonical generators reduce the actual remaining native-row census from73/104/75 to71/102/74. Independent owning portable probes pass Mac59/0 and Linux LuaJIT43/0; genuine French-warm controls pass3/0 on each driver and Lua runtime, while the original native producers fail1/2. Actual AutoHotkey/Hammerspoon/GTK, full final CI, packaging, installation and item38 device acceptance remain separate. Other native families and all six group items remain partial. The whole Linux tray fixture now owns the genuine API entries/backend/builder cohort and a private real JSON source. All old assertions remain; independent whole-tray replay passes9/0 on both Lua runtimes in English and French, preserves the malformed external API file byte-exact and restores module identities/private paths on success and refusal. The original incomplete fixture fails4/1; rejected V3 passes7/0 while quarantining that external file and is not adopted. Full Root and native final qualification remain pending.
+
 - [ ] **62.** Downloads on managed company networks, Windows and Linux:
       system trust store and system proxy for every download child (the Ollama
       installer and server for `ollama pull`, the updater and rollback, remote
@@ -4881,7 +4883,7 @@ pass with all 21 locale catalogues. Full native CI remains required.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 74, macOS 105 and Linux 76 rows are still built by the
+  Windows 71, macOS 102 and Linux 74 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). Read on
   2026-10-01, the sites are of four kinds, and three of them need the
   manifest to say more than it can today:
@@ -4966,6 +4968,8 @@ The ordered profile frame retires three Windows, four macOS and four Linux nativ
 The fixed model-picker tail presentation is shared on all three drivers, retiring one authentic native allocator per platform. Current remaining baseline: Windows74/macOS105/Linux76. This does not classify remaining dynamic native builders as shared or close item38.
 
 The Agent per-system Model command and its preceding separator are now declared as shared two-row templates on all three drivers. macOS observed installed/missing captions use the same declared command through separate templates and existing translations. Native callbacks, dialogs, validation and transaction/refusal behavior stay unchanged. This bounded source migration lowers the actual native-row census from Windows74/macOS105/Linux76 to73/104/75. Independently frozen owning probes pass Mac19/0 and Linux23/0 on both Lua runtimes, against genuine original-producer15/4 and21/2 controls. Actual Windows/Hammerspoon execution, CI, packaging, installation and device acceptance remain separately unqualified; the other native sites and all six global TODO items remain partial. The Linux regression uses genuine runtime translation scopes and restores exact prior module identities, including a warm French backend and a raised scenario. Independent warm controls pass5/0 on both Lua runtimes; the unchanged previous fixture reproduces1/2 French-caption failures. No persisted locale choice is changed.
+
+The fixed API Add-entry affordance and its existing separator now consume canonical shared templates on all three drivers. Windows retains its dialog command; macOS/Linux retain their native provider children, callbacks, separator order and availability policy. Existing 21 translated captions are reused. Canonical generators reduce the actual remaining native-row census from73/104/75 to71/102/74. Independent owning portable probes pass Mac59/0 and Linux LuaJIT43/0; genuine French-warm controls pass3/0 on each driver and Lua runtime, while the original native producers fail1/2. Actual AutoHotkey/Hammerspoon/GTK, full final CI, packaging, installation and item38 device acceptance remain separate. Other native families and all six group items remain partial. The whole Linux tray fixture now owns the genuine API entries/backend/builder cohort and a private real JSON source. All old assertions remain; independent whole-tray replay passes9/0 on both Lua runtimes in English and French, preserves the malformed external API file byte-exact and restores module identities/private paths on success and refusal. The original incomplete fixture fails4/1; rejected V3 passes7/0 while quarantining that external file and is not adopted. Full Root and native final qualification remain pending.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey

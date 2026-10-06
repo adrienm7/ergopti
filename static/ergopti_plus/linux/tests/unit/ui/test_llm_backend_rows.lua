@@ -452,3 +452,117 @@ helpers.describe("AI active API commands: shared captions and live selection", f
 		helpers.assert_eq(state.changed, nil)
 	end)
 end)
+
+
+--- Holds the genuine translator/backend/renderer cohort without persisting a locale.
+local function with_api_add_locale(scenario)
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+	local native, owner, receipt, acquired
+	local ok, err = pcall(function()
+		native = require("infra.i18n")
+		native.init()
+		owner = { pending = function() return false end }
+		acquired = native.scope_acquire(owner)
+		helpers.assert_eq(acquired, true)
+		receipt = native.scope_capture(owner)
+		helpers.assert_not_nil(receipt)
+		helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
+		helpers.assert_eq(native.get_locale(), "en")
+		helpers.assert_eq(require("infra.locale").current_locale(), "en")
+		scenario(native)
+	end)
+	local restored, released, forgotten = true, true, true
+	if receipt then restored = native.scope_restore(owner, receipt) == true end
+	if acquired then released = native.scope_release(owner) == true end
+	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
+	helpers.assert_eq(restored, true, "the genuine runtime inverse restores its previous locale")
+	helpers.assert_eq(released, true, "the temporary locale owner is released on every exit")
+	helpers.assert_eq(forgotten, true, "the temporary locale receipt is forgotten on every exit")
+	if not ok then error(err, 0) end
+end
+
+--- Exercises the real tray provider over the handwritten shared frame.
+local function with_api_add_frame(scenario)
+	local path = require("infra.paths").shared("tests/corpus/menus/api_add_controls.json")
+	local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
+	local corpus = assert(require("json").decode(raw))
+	with_api_add_locale(function()
+		local restore
+		local ok, err = pcall(function()
+			local menu = require("infra.manifest_menu")
+			local build, state, cleanup = setup("api"); restore = cleanup
+			scenario(corpus, menu, build, state)
+		end)
+		if restore then restore() end
+		if not ok then error(err, 0) end
+	end)
+end
+
+helpers.describe("Shared API Add frame (api-add-controls)", function()
+	helpers.it("uses the shared Add caption and preserves the native cancelled prompt (api-add-controls)", function()
+		with_api_add_frame(function(corpus, menu, build, state)
+			local declaration = menu.get_array(corpus.group_section)[1]
+			local original = declaration.i18n
+			local observations
+			local ok, err = pcall(function()
+				helpers.assert_not_nil(exact(build(), corpus.label))
+				declaration.i18n = corpus.mutated_key
+				local row = exact(build(), corpus.mutated_label)
+				helpers.assert_not_nil(row)
+				row.items[1].action()
+				observations = { entries = #state.entries, prompts = #state.prompts,
+					changed = state.changed or 0, probes = #state.tests }
+			end)
+			declaration.i18n = original
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(observations, { entries = 0, prompts = 1, changed = 0, probes = 0 })
+		end)
+	end)
+	helpers.it("uses the shared preceding separator and refuses an unowned Add group (api-add-controls)", function()
+		with_api_add_frame(function(corpus, menu, build, state)
+			local separator = menu.get_array(corpus.separator_section)
+			local group = menu.get_array(corpus.group_section)[1]
+			local original, identity = separator[1], group.id
+			local observations
+			local ok, err = pcall(function()
+				separator[1] = { type = "label", id = "api_add_marker", i18n = corpus.mutated_key }
+				local rows = build()
+				local position
+				for index, row in ipairs(rows) do if row.label == corpus.label then position = index end end
+				helpers.assert_type(position, "number")
+				observations = rows[position - 1]
+				group.id = "unowned_api_add"
+				helpers.assert_eq(#build(), 0, "shared missing child owner refuses before native effects")
+				helpers.assert_eq(#state.entries, 0)
+				helpers.assert_eq(#state.prompts, 0)
+			end)
+			separator[1], group.id = original, identity
+			helpers.assert_eq(ok, true, tostring(err))
+			helpers.assert_eq(observations.label, corpus.mutated_label)
+			helpers.assert_eq(observations.disabled, true)
+			helpers.assert_nil(observations.action)
+		end)
+	end)
+end)
+
+helpers.describe("API Add locale scope failure inverse (api-add-controls)", function()
+	helpers.it("restores the actual prior locale cohort after a raised case (api-add-controls)", function()
+		local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+		local previous = {}
+		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local raised = {}
+		local ok, err = pcall(function()
+			with_api_add_locale(function(native)
+				helpers.assert_eq(native.get("menu.llm.api_add_entry"), "+ Add an API")
+				error(raised, 0)
+			end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(rawequal(err, raised), true)
+		for _, name in ipairs(names) do helpers.assert_eq(rawequal(package.loaded[name], previous[name]), true, name) end
+	end)
+end)
