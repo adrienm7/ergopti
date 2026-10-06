@@ -133,6 +133,40 @@ def native_launch_complete(packet):
     )
 
 
+def application_receive_complete(facts, nonce, identity):
+    """Admit only exact reception after the existing owned native settlement."""
+    if (
+        type(facts) is not dict
+        or facts.get("nonce") != nonce
+        or facts.get("identity") != identity
+        or type(facts.get("worker_exit")) is not int
+        or facts["worker_exit"] != 0
+        or facts.get("observer_timed_out") is not False
+    ):
+        return False
+    native = facts.get("gtk")
+    if (
+        not native_launch_complete(native)
+        or native.get("nonce") != nonce
+        or native.get("identity") != identity
+    ):
+        return False
+    expected = identity.encode("utf-8")
+    receipt = facts.get("receipt_after_worker")
+    return (
+        len(expected) <= CAPTURE_LIMIT
+        and type(receipt) is dict
+        and receipt.get("present") is True
+        and receipt.get("truncated") is False
+        and type(receipt.get("bytes_total")) is int
+        and receipt["bytes_total"] == len(expected)
+        and type(receipt.get("captured_bytes")) is int
+        and receipt["captured_bytes"] == len(expected)
+        and receipt.get("text") == identity
+        and receipt.get("prefix_sha256") == hashlib.sha256(expected).hexdigest()
+    )
+
+
 def run_owned_case(arguments, environment):
     """Keep the acquired session process until actual completion, even on observer timeout."""
     child = subprocess.Popen(
@@ -161,3 +195,44 @@ def run_owned_case(arguments, environment):
     result = subprocess.CompletedProcess(arguments, child.returncode, output, errors)
     result.observer_timed_out = timed_out
     return result
+
+
+def require_x11_ready(display_name, owned_server, *, spawn=subprocess.Popen):
+    """Require one real X11 handshake, retaining its exact client through retirement."""
+    if (
+        not isinstance(display_name, str)
+        or not display_name.startswith(":")
+        or not display_name[1:].isascii()
+        or not display_name[1:].isdecimal()
+        or owned_server.poll() is not None
+    ):
+        raise RuntimeError("Owned virtual display is not available for a handshake")
+    child = spawn(
+        ["/usr/bin/xdpyinfo", "-display", display_name],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        status = child.wait(timeout=5)
+        if type(status) is not int or status != 0 or owned_server.poll() is not None:
+            raise RuntimeError("Owned virtual display refused the X11 handshake")
+    finally:
+        if child.returncode is None:
+            while True:
+                try:
+                    child.kill()
+                    break
+                except ProcessLookupError:
+                    # A native exit can race the signal; only wait can retire that owner.
+                    break
+                except BaseException:
+                    # Retry an interrupted signal before waiting on a live blocked client.
+                    continue
+            while child.returncode is None:
+                try:
+                    child.wait()
+                except BaseException:
+                    # An interrupted observer cannot abandon an acquired native client.
+                    continue
+    return True

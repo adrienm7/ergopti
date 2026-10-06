@@ -31,45 +31,8 @@ assert(Actions.set_action_parameter("tap_3", "open_app", id))
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=execution\n")
 assert(Actions.execute_action("open_app", "tap_3"))
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=receipt\n")
-local receipt = os.getenv("ERGOPTI_NATIVE_APPLICATION_RECEIPT")
-local Clock = require("infra.monotonic")
-local Json = require("json")
-local function snapshot()
-	local file = io.open(receipt, "r")
-	if not file then return { present = false, observed_bytes = 0, text_prefix = "" } end
-	local value = file:read(4097) or ""
-	file:close()
-	return { present = true, observed_bytes = #value, text_prefix = value:sub(1, 4096), truncated = #value > 4096 }
-end
-local before_ms, before_receipt = Clock.now_ms(), snapshot()
-local function trace(phase, after_receipt)
-	local packet = { schema = 1, nonce = os.getenv("ERGOPTI_APPLICATION_NONCE"), identity = id,
-		phase = phase, clock_backend = Clock.backend(), clock_resolution_ms = Clock.resolution_ms(),
-		before_ms = before_ms, after_ms = Clock.now_ms(), before_receipt = before_receipt, after_receipt = after_receipt }
-	local destination = os.getenv("ERGOPTI_APPLICATION_POLL_TRACE")
-	local stream = assert(io.open(destination .. ".stage", "w"))
-	assert(stream:write(assert(Json.encode(packet)) .. "\n"))
-	assert(stream:flush())
-	assert(stream:close())
-	assert(os.rename(destination .. ".stage", destination))
-end
-for _ = 1, 100 do
-	local file = io.open(receipt, "r")
-	if file then
-		local actual = file:read("*a")
-		file:close()
-		if actual ~= id then
-			io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=identity_mismatch\n")
-		end
-		trace("observed", snapshot())
-		assert(actual == id, "the selected application identity changed")
-		return
-	end
-	os.execute("sleep 0.02")
-end
-io.stderr:write("ERGOPTI_APPLICATION_RECEIPT=not_observed\n")
-trace("missing", snapshot())
-error("the selected desktop entry did not launch: " .. id)
+-- Production dispatch is asynchronous; the parent owns native settlement and reception.
+return
 """
 
 
@@ -163,6 +126,7 @@ def main():
             try:
                 number = os.read(read_fd, 64).decode().strip()
                 assert number and display.poll() is None, "owned virtual display did not start"
+                diagnostic.require_x11_ready(":" + number, display)
                 for index, identity in enumerate(
                     ("ordinary-app", "--version", "-help", "app with ' quote")
                 ):
@@ -232,7 +196,9 @@ def main():
                             ), "Diagnostic belongs to a different controlled trial"
                     diagnostic.publish(case_root / "case.json", facts)
                     print("APPLICATION_DIAGNOSTIC " + json.dumps(facts, sort_keys=True))
-                    diagnostic_complete = diagnostic.native_launch_complete(facts["gtk"])
+                    diagnostic_complete = diagnostic.application_receive_complete(
+                        facts, nonce, identity
+                    )
                     if child.returncode or child.observer_timed_out or not diagnostic_complete:
                         failures += 1
                         stage = application_stage(child.stderr)
