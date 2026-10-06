@@ -394,3 +394,347 @@ _ScopeExpectedOldHashRefusal(AdditionalFile := false) {
 }
 Test("scope-hash-precondition: config hash refusal never publishes a stale image", _ScopeExpectedOldHashRefusal)
 Test("scope-hash-precondition: extra file hash refusal never publishes a stale image", _ScopeExpectedOldHashRefusal.Bind(true))
+
+; Actual private source, real lifecycle lease/WAL/backup; only reload launch is
+; injected, exactly as the existing scope fixture. No boot warning is authority.
+_ScopeObsoleteSource(Literal, Parent := false) {
+	return Chr(0xFEFF) . (Parent
+		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`nergopti_altgr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
+		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_altgr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
+}
+
+_ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource(Literal)
+	Assert(FSWriteDurable(Fixture.path, Source))
+	Bundle := 0, Accepted := 0, Refusal := 0
+	Launch(Success, Borrowed, Refused) {
+		Bundle := Borrowed, Accepted := Success, Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Seed := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Seed, Fixture.path, &Rejected, , &Outdated)
+		AssertEqual(0, Rejected)
+		Assert(Outdated.Has("layout`nergopti_base"), "the actual native reader must classify the old value")
+		AssertEqual(false, Seed["layout"]["ergopti_base"], "outdated source leaves the runtime neutral")
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual("pending", Receipt["status"])
+		Expected := StrReplace(Source, "ergopti_altgr = true`n", "")
+		AssertEqual(Expected, FSReadUtf8Exact(Fixture.path), "clear preserves the complete obsolete/future image while applying a legitimate sibling effect")
+		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "the actual exclusive backup is exact")
+		Document := TOML_ParseDocument(Expected)
+		Assert(TOML_SameValue(Document["private"], Map("literal.dot", Map("keep", [1, "x"], "date", TOML_ParseDocument('date = 1979-05-27')["date"]))))
+		if Outcome == "refused" {
+			Refusal.Call("native replacement refused")
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "inverse restores the original complete source")
+		} else {
+			Accepted.Call()
+			AssertEqual("committed", Receipt["status"])
+			_ConfigWriteTerminalRelease(Bundle)
+			; New cache/source identity exercises the actual restart reader, without
+			; inventing a completed replacement process in this owner fixture.
+			Restart := Fixture.directory . "\restart.toml"
+			Assert(FSWriteDurable(Restart, Expected))
+			RestartSeed := ManifestBuildFeaturesMap()
+			ApplyConfigToml(RestartSeed, Restart, &RestartRejected, , &RestartOutdated)
+			AssertEqual(0, RestartRejected)
+			Assert(RestartOutdated.Has("layout`nergopti_base"))
+			AssertEqual(false, RestartSeed["layout"]["ergopti_base"])
+			AssertEqual(Expected, FSReadUtf8Exact(Restart))
+		}
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-obsolete-source: scalar leaf clear retains full source and reload neutrality", _ScopeObsoleteLeafClear.Bind('"old-shape"'))
+Test("scope-obsolete-source: array leaf clear retains full source", _ScopeObsoleteLeafClear.Bind('[false, 1]'))
+Test("scope-obsolete-source: map leaf clear retains full source", _ScopeObsoleteLeafClear.Bind('{ future = [1, "x"] }'))
+Test("scope-obsolete-source: float Boolean leaf clear retains full source", _ScopeObsoleteLeafClear.Bind('1.0'))
+Test("scope-obsolete-source: actual late refusal restores full obsolete source", _ScopeObsoleteLeafClear.Bind('"old-shape"', "refused"))
+
+_ScopeObsoleteConflict(Literal, Parent := false) {
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource(Literal, Parent)
+	Assert(FSWriteDurable(Fixture.path, Source))
+	Backups := 0, Launches := 0
+	Backup(*) {
+		Backups += 1
+		return false
+	}
+	Launch(*) {
+		Launches += 1
+		return false
+	}
+	Fixture.options["backup"] := Backup, Fixture.options["reload"] := Launch
+	try {
+		if Parent {
+			; Shipped autocorrection recommendations are neutral. Exercise a
+			; genuine explicit nonneutral descendant through the same public
+			; scoped commit owner, rather than inventing a recommendation.
+			Operations := (*) => [{ Section: "hotstrings.autocorrection.names", Key: "enabled", Value: true }]
+			Receipt := ConfigScopeCommitOperations("hotstrings", "recommended", Operations, Fixture.options)
+		} else
+			Receipt := ConfigScopeApply("keyboard_layout", "recommended", Map(), Fixture.options)
+		AssertEqual("refused", Receipt["status"], "recommendation cannot repair or replace an obsolete setting")
+		AssertEqual(0, Backups, "source policy refuses before creating a backup")
+		AssertEqual(0, Launches)
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
+		Assert(!FileExist(Receipt["backup"]))
+		Owner := _ConfigWriteLeaseTryAcquire(Fixture.path, "after-obsolete-refusal")
+		Assert(Owner is Object, "refusal retires its lifecycle lease")
+		_ConfigWriteLeaseRelease(Owner)
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("scope-obsolete-source: nonneutral leaf replacement refuses before backup", _ScopeObsoleteConflict.Bind('"old-shape"'))
+Test("scope-obsolete-source: scalar parent nonneutral descendant refuses before backup", _ScopeObsoleteConflict.Bind('false', true))
+Test("scope-obsolete-source: array parent nonneutral descendant refuses before backup", _ScopeObsoleteConflict.Bind('[1, "x"]', true))
+
+_ScopeObsoleteParentClear(Literal) {
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource(Literal, true)
+	Assert(FSWriteDurable(Fixture.path, Source))
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed, Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Seed := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Seed, Fixture.path, &Rejected, , &Outdated)
+		AssertEqual(0, Rejected)
+		Assert(Outdated.Has("hotstrings`nautocorrection"))
+		Receipt := ConfigScopeApply("hotstrings", "clear", Map(), Fixture.options)
+		AssertEqual("pending", Receipt["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "neutral descendants cannot replace an obsolete table parent")
+		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
+		Refusal.Call("native refusal")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-obsolete-source: scalar parent clear preserves genuine source", _ScopeObsoleteParentClear.Bind('false'))
+Test("scope-obsolete-source: array parent clear preserves genuine source", _ScopeObsoleteParentClear.Bind('[1, "x"]'))
+
+; Fresh admitted bytes supersede the unrelated boot warning cache. Repairing
+; the actual old leaf permits a subsequent ordinary clear through the same WAL.
+_ScopeObsoleteFreshRepair() {
+	global _ConfigBootOutdatedEntries
+	SavedOutdated := _ConfigBootOutdatedEntries
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource('"old-shape"')
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed, Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Assert(FSWriteDurable(Fixture.path, Source))
+		Seed := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Seed, Fixture.path, &Rejected, , &Outdated)
+		Assert(Outdated.Has("layout`nergopti_base"))
+		_ConfigBootOutdatedEntries := Outdated
+		Repaired := StrReplace(Source, '"old-shape"', "true")
+		Assert(FSWriteDurable(Fixture.path, Repaired))
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual("pending", Receipt["status"])
+		Expected := '[layout]`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
+		Actual := TOML_ParseDocument(FSReadUtf8Exact(Fixture.path))
+		Assert(Actual["layout"] is Map && Actual["layout"].Count == 0,
+			"fresh valid values clear despite stale boot warnings, retaining the existing explicit empty header")
+		Assert(TOML_SameValue(TOML_ParseDocument(Expected), Actual))
+		AssertEqual(Repaired, FSReadUtf8Exact(Receipt["backup"]))
+		Refusal.Call("native refusal")
+		AssertEqual(Repaired, FSReadUtf8Exact(Fixture.path))
+	} finally {
+		_ConfigBootOutdatedEntries := SavedOutdated
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-obsolete-source: actual manual repair retires stale boot warnings", _ScopeObsoleteFreshRepair)
+
+_ScopeObsoleteExternalEdit() {
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource('"old-shape"')
+	Assert(FSWriteDurable(Fixture.path, Source))
+	External := Source . "# external owner changed the exact generation`n", Launches := 0
+	Backup(Path, Content) {
+		Assert(FSWriteCreateDurable(Path, Content))
+		Assert(FSWriteDurable(Fixture.path, External))
+		return true
+	}
+	Launch(*) {
+		Launches += 1
+		return false
+	}
+	Fixture.options["backup"] := Backup, Fixture.options["reload"] := Launch
+	try {
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(0, Launches)
+		AssertEqual(External, FSReadUtf8Exact(Fixture.path), "existing whole-source CAS preserves the foreign successor")
+		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("scope-obsolete-source: external edit after backup preserves foreign generation", _ScopeObsoleteExternalEdit)
+
+_ScopeObsoletePureBoundaries() {
+	Delete := { Section: "hotstrings.autocorrection.names", Key: "enabled", Delete: 1 }
+	Entry := { parts: ["hotstrings", "autocorrection"], descendants: true }
+	Rows := ConfigObsoleteParentsPreserve([{ parts: ["hotstrings", "autocorrection", "names", "enabled"], neutral: true, row: Delete }], [Entry])
+	AssertEqual(0, Rows.Length)
+	AssertEqual(1, Delete.Delete, "pure policy never mutates original writer intent")
+	Ancestor := [{ parts: ["hotstrings"], neutral: true, row: Delete }]
+	AssertThrows(ConfigObsoleteParentsPreserve.Bind(Ancestor, [Entry]), "an ancestor delete cannot borrow obsolete cleanup authority")
+	MapDescendant := [{ parts: ["hotstrings", "autocorrection", "names"], neutral: true, row: Delete }]
+	AssertThrows(ConfigObsoleteParentsPreserve.Bind(MapDescendant, [{ parts: Entry.parts, descendants: false }]), "neutral map descendants do not gain scalar-parent preservation authority")
+	Duplicate := [{ parts: Entry.parts, neutral: true, row: Delete }, { parts: Entry.parts.Clone(), neutral: true, row: Delete }]
+	AssertThrows(ConfigObsoleteParentsPreserve.Bind(Duplicate, [Entry]), "filtering must not hide duplicate effects")
+	Sparse := [], Sparse.Length := 2, Sparse[2] := Duplicate[1]
+	AssertThrows(ConfigObsoleteParentsPreserve.Bind(Sparse, [Entry]))
+	Twin := { Section: "hotstrings.Autocorrection", Key: "names", Delete: 1 }
+	Kept := ConfigObsoleteParentsPreserve([{ parts: ["hotstrings", "Autocorrection", "names"], neutral: true, row: Twin }], [Entry])
+	AssertEqual(1, Kept.Length)
+	AssertEqual(ObjPtr(Twin), ObjPtr(Kept[1]), "case-twin and original writer identity remain exact")
+	Unknown := '[private]`nsetting = "keep"`n'
+	AssertEqual(1, ConfigScopePreserveObsoleteSource(Unknown, [{ Section: "private", Key: "setting", Delete: 1 }]).Length,
+		"the native classifier never invents obsolescence from unknown source")
+}
+Test("scope-obsolete-source: pure exact paths and collision boundaries remain strict", _ScopeObsoletePureBoundaries)
+
+_ScopeObsoleteGlobal(Mode) {
+	global _PersonalShortcutsRegistry, KeyboardShortcutAssignments, GestureActionParameters, _SharedDir
+	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
+	OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
+	Fixture := _HotstringsScopeFixture()
+	Source := _ScopeObsoleteSource('"old-shape"')
+	Source := StrReplace(Source, "[layout]`n", '[hotstrings]`nautocorrection = [1, "x"] # obsolete namespace`n[layout]`n')
+	Assert(FSWriteDurable(Fixture.path, Source))
+	TapPath := Fixture.directory . "\tap_hold.toml"
+	TapSource := '[tap_hold.keys.space]`ntap_action = "open_url"`n'
+	Assert(FSWriteDurable(TapPath, TapSource))
+	Fixture.options["tap_hold_path"] := TapPath
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Bundle := 0, Refusal := 0, Backups := 0, Launches := 0
+	Backup(Path, Content) {
+		Backups += 1
+		return FSWriteCreateDurable(Path, Content)
+	}
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed, Refusal := Refused, Launches += 1
+		return true
+	}
+	Fixture.options["backup"] := Backup, Fixture.options["reload"] := Launch
+	try {
+		_PersonalShortcutsRegistry := Map("__Order", [])
+		KeyboardShortcutAssignments := Map(), GestureActionParameters := Map()
+		Receipt := ConfigGlobalScopeApply(Mode, Fixture.options)
+		if Mode == "recommended" {
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(0, Backups, "global conflicting recommendation refuses before any cohort backup")
+			AssertEqual(0, Launches)
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Fixture.overrideSource, FSReadUtf8Exact(Fixture.overrides))
+			AssertEqual(TapSource, FSReadUtf8Exact(TapPath))
+		} else {
+			AssertEqual("pending", Receipt["status"])
+			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
+			AssertEqual(1, Launches)
+			AssertEqual(StrReplace(Source, "ergopti_altgr = true`n", ""), FSReadUtf8Exact(Fixture.path),
+				"global clear preserves obsolete leaf and array parent while applying its unrelated effect")
+			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
+			Refusal.Call("native global replacement refused")
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Fixture.overrideSource, FSReadUtf8Exact(Fixture.overrides))
+			AssertEqual(TapSource, FSReadUtf8Exact(TapPath))
+			AssertEqual(Fixture.personalSource, FSReadUtf8Exact(Fixture.personal[1]))
+		}
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_PersonalShortcutsRegistry := IsSet(OldRegistry) ? OldRegistry : unset
+		KeyboardShortcutAssignments := IsSet(OldKeyboard) ? OldKeyboard : unset
+		GestureActionParameters := IsSet(OldParameters) ? OldParameters : unset
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-obsolete-source: actual global clear retains obsolete source and exact inverse", _ScopeObsoleteGlobal.Bind("clear"))
+Test("scope-obsolete-source: actual global recommendation refuses before the cohort backup", _ScopeObsoleteGlobal.Bind("recommended"))
+
+_ScopeObsoleteSessionRefusal() {
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource('"old-shape"')
+	Assert(FSWriteDurable(Fixture.path, Source))
+	Backups := 0, Launches := 0
+	Backup(*) {
+		Backups += 1
+		return false
+	}
+	Launch(*) {
+		Launches += 1
+		return false
+	}
+	Fixture.options["backup"] := Backup, Fixture.options["reload"] := Launch
+	try {
+		TOML_RefuseWrites(Fixture.path, "invalid schema stamp")
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual("invalid schema stamp", TOML_WriteRefusal(Fixture.path), "source admission never clears the existing strict session fence")
+		AssertEqual(0, Backups)
+		AssertEqual(0, Launches)
+		AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
+	} finally {
+		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Fixture.path))
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-obsolete-source: strict schema session refusal survives source preparation", _ScopeObsoleteSessionRefusal)
+
+_ScopeObsoletePreparationRace(Scenario) {
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource('"old-shape"')
+	Assert(FSWriteDurable(Fixture.path, Source))
+	Foreign := Source . "# new external generation during inventory`n", Backups := 0, Launches := 0, Supplements := 0
+	Supplement(_Scope, _Mode) {
+		Supplements += 1
+		if Scenario == "source"
+			Assert(FSWriteDurable(Fixture.path, Foreign))
+		else
+			TOML_RefuseWrites(Fixture.path, "inventory refused the schema session")
+		return []
+	}
+	Backup(*) {
+		Backups += 1
+		return false
+	}
+	Launch(*) {
+		Launches += 1
+		return false
+	}
+	Fixture.options["supplement"] := Supplement
+	Fixture.options["backup"] := Backup, Fixture.options["reload"] := Launch
+	try {
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
+		AssertEqual(1, Supplements, "the genuine operation supplier runs after the initial source admission")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(0, Backups, "fresh native writer admission refuses before backup")
+		AssertEqual(0, Launches)
+		AssertEqual(Scenario == "source" ? Foreign : Source, FSReadUtf8Exact(Fixture.path))
+		if Scenario == "session"
+			AssertEqual("inventory refused the schema session", TOML_WriteRefusal(Fixture.path))
+	} finally {
+		Key := _TOML_WriteRefusalKey(Fixture.path)
+		if _TOML_WriteRefusals().Has(Key)
+			_TOML_WriteRefusals().Delete(Key)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("scope-obsolete-source: inventory source drift refuses before any backup", _ScopeObsoletePreparationRace.Bind("source"))
+Test("scope-obsolete-source: inventory schema refusal is rechecked before backup", _ScopeObsoletePreparationRace.Bind("session"))

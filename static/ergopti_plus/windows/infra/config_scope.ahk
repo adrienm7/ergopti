@@ -8,6 +8,8 @@
 ; until reload completion or verified rollback of the complete cohort.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_shared\ahk\config_obsolete_parents.ahk
+
 /**
  * Starts one scoped configuration transition without claiming reload completion.
  * @param {String} ScopeId Manifest scope identifier.
@@ -111,9 +113,19 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 		}
 	}
 	Build() {
-		Rows := _ConfigPrepareTypedUpdates(OperationsFn.Call())
-		Image := TOML_BuildConfigUpdatedContent(Path, Rows)
+		; Admit one fresh source generation before deriving any scope effect.
+		; Clear and recommendations do not own obsolete-entry cleanup.
+		Image := TOML_BuildConfigUpdatedContent(Path, [])
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
+			throw Error("The scoped configuration source could not be admitted.")
+		Rows := _ConfigPrepareTypedUpdates(ConfigScopePreserveObsoleteSource(
+			Image["source_content"], OperationsFn.Call()))
+		; Reuse the existing build-only writer admission with that same image.
+		; This also rechecks source drift and a refusal latched by inventory.
+		Rendered := _TOML_BatchWriteImpl(Path, Rows, [], "build",
+			Image["source_content"], Image["source_present"], true)
+		Image := _TOML_FinalizeBuildResult(Rendered, Image["source_present"], Image["source_content"])
+		if Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			throw Error("The scoped configuration image could not be rendered.")
 		Expected := ConfigTransitionExpectedOld(Image["source_present"], Image["source_content"], Port)
 		if !(Expected is Map)
@@ -189,6 +201,60 @@ ConfigScopeCommitOperations(ScopeId, Mode, OperationsFn, Options, FileOwner := 0
 		if !Transferred
 			_ConfigWriteTerminalRelease(Bundle)
 	}
+}
+
+/**
+ * Protects obsolete settings in the exact admitted source from ordinary scopes.
+ * Metadata and source shape use the same classifier as the real native loader.
+ * Neutral descendants cannot repair an obsolete scalar/array table parent;
+ * nonneutral collisions require an explicit source repair or cleanup first.
+ * @param {String} Source Exact image captured under the lifecycle lease.
+ * @param {Array} Updates Requested manifest/owner effects, without publication.
+ * @returns {Array} Effects that preserve every classified obsolete source value.
+ */
+ConfigScopePreserveObsoleteSource(Source, Updates) {
+	if !(Source is String) || !(Updates is Array)
+		throw TypeError("Scoped source preparation requires an exact image and operation array.")
+	Snapshot := ConfigTomlDecodeSnapshot(Source)
+	Seed := ManifestBuildFeaturesMap()
+	Obsolete := []
+	Classify(Parts, Typed, Raw) {
+		Section := _ConfigTomlSection(Parts), Key := Parts[Parts.Length]
+		if TomlConfigSectionSkipKind(Section == "" ? TOML_RenderKey(Key) : Section) != ""
+			return
+		Value := _ConfigTomlNativeValue(Typed)
+		Literal := Raw is Map ? TOML_RenderValue(Typed) : TOML_StripInlineComment(Raw)
+		Reason := TomlConfigOutdatedReason(Seed, Section, Key, Value, Literal)
+		; The native loader classifies declared wrong types before foreign
+		; ownership, then ignores unknown/foreign values whose type already fits.
+		if TomlConfigValueMatchesManifest(Section, Key, Value, &ExpectedType, Literal) {
+			if TomlConfigUnknownKind(Seed, Section, Key, &ForeignOwner) != "" || ForeignOwner != ""
+				return
+		}
+		if Reason != "" {
+			Obsolete.Push({ parts: Parts.Clone(), descendants: !(Typed is Map) })
+			return
+		}
+		if Typed is Map {
+			Children := Raw is Map ? Raw : _ConfigTomlRawTree(Typed, Raw)
+			for ChildKey, Child in Typed {
+				ChildParts := Parts.Clone()
+				ChildParts.Push(ChildKey)
+				Classify(ChildParts, Child, Children[ChildKey])
+			}
+		}
+	}
+	for Row in Snapshot.Rows
+		Classify(_TOML_ConfigPath(Row.Section, Row.Key), Row.Typed, Row.ChildRaw is Map ? Row.ChildRaw : Row.Raw)
+	Operations := []
+	loop Updates.Length {
+		if !Updates.Has(A_Index) || !IsObject(Updates[A_Index])
+			throw TypeError("Scoped source preparation requires dense operation records.")
+		Update := Updates[A_Index]
+		Operations.Push({ parts: _TOML_ConfigPath(Update.Section, Update.Key),
+			neutral: _ConfigUpdateIsNeutral(Update), row: Update })
+	}
+	return ConfigObsoleteParentsPreserve(Operations, Obsolete)
 }
 
 ; The existing action owner validates grammar and catalogue parameter capability.
