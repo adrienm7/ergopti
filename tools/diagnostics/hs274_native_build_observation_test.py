@@ -474,7 +474,7 @@ class ObservationControls(unittest.TestCase):
         )
         body = swift.read_text()
         returned = body.index("let baselineReceipt = try runSourceCompilation(")
-        status_assert = body.index("XCTAssertEqual(baselineReceipt.status, 0)", returned)
+        status_assert = body.index("XCTAssertEqual(baselineReceipt.status, 0,", returned)
         stderr_assert = body.index("XCTAssertTrue(baselineReceipt.stderr.isEmpty)", status_assert)
         branch = body.index("if baselineReceipt.status != 0 {", stderr_assert)
         call = body.index("String(baselineReceipt.status)", branch)

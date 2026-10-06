@@ -1280,3 +1280,20 @@ observation packet is visible, without a proven reason. The new exact failure
 archive acquisition is refused with zero bytes; no current failure cause is
 inferred. Linux atomic fixture5 and window34 pass; GTK fails and package/install
 are skipped. Release is skipped. These results do not complete item31.
+
+The current baseline-observer source fixture accommodates the diagnostic
+argument in the unchanged original status assertion. A one-character anchor
+repair preserves every assertion and passes25 controls normally and under
+inherited optimization; the original current fixture errors on one of25,
+and both status-removal/wrong-zero mutants fail. The prior Linux25 result
+preceded the message edit; verify-change missed its scanned dependency.
+Manual37491630360 at5880fe694 has a complete Swift380 census:358 PASS,
+7 FAIL,15 SKIP; closed-refusal24 passes, observer25 fails before this repair,
+and actual UI acceptance fails without a qualified failure packet cause.
+Fresh baseline stops at xcodegen_acquisition with xcodegen_transport; actual
+source controls fail with phase_failed. Owned four products remain unexecuted.
+The new exact failure artifact acquisition is refused with zero bytes. Linux
+E2E/GTK/package and first-install lanes pass, while five distribution unit
+lanes fail; those literal preparation/fixture refusals are separate from the
+older GTK failure. These observations complete no item. Current-source hosted
+qualification and original physical requirements remain mandatory.

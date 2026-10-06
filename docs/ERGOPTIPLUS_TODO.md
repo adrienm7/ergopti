@@ -4015,6 +4015,19 @@ products remain unexecuted. No phase observation packet was visible; its
 absence and the actual failure causes are unknown. The new failure archive
 download was refused with zero bytes. This diagnostic completes no WP or item.
 
+The baseline-observer source fixture now recognizes the original status
+assertion with its diagnostic argument. All assertion bodies and native guards
+remain exact. Current-source replay reproduces24 passes/1 error before the
+one-character repair and25/0 afterward, normally and with inherited Python
+optimization; removed-status and wrong-zero mutants still fail. The previous
+Linux25 receipt preceded the Swift message change, and change selection missed
+this scanned dependency. Manual37491630360 at5880fe694 completes Swift380:
+358 PASS,7 FAIL,15 SKIP; the new closed-refusal24 passes. Fresh baseline reports
+xcodegen_transport and retained metadata stops at xcodegen_acquisition; source
+controls report phase_failed without a qualified private cause. Owned-four
+compilation remains unexecuted. The corrected observer25 requires hosted
+requalification; no WP or TODO is complete from these diagnostics.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
