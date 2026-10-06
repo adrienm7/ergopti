@@ -836,7 +836,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if not intent_ok then return reject_row(index, tostring(intentional)) end
 		local personal_ok, personal_intent = pcall(require("hotstrings.personal_adoption").is_preference_intent, u)
 		if not personal_ok then return reject_row(index, tostring(personal_intent)) end
-		intentional = intentional or personal_intent
+		local model_ok, model_intent = pcall(require("toml_codec.record_list").authentic, source_row, nil, path)
+		if not model_ok then return reject_row(index, tostring(model_intent)) end
+		intentional = intentional or personal_intent or model_intent
 		if defaults and manifest_path and not u.delete and not intentional and defaults.has_default(manifest_path) then
 			u = defaults.sparse_operation(manifest_path, u.value)
 		end
@@ -876,6 +878,28 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		row.source_literal = literal
 		if require("toml_codec.leaf_rows").publication_capability(row.source_row) then row.literal_key = true end
 	end
+	local model_row
+	local ordinary = {}
+	for _, row in ipairs(updates) do
+		local checked, owned = pcall(require("toml_codec.record_list").authentic, row.source_row, source or "", path)
+		if not checked then return false, tostring(owned) end
+		if owned then
+			model_row = row.source_row
+			lookup[row.section:lower()][row.key:lower()] = nil
+		else ordinary[#ordinary + 1] = row end
+	end
+	if model_row then
+		local target = { "llm", "models", "user_models" }
+		for _, row in ipairs(ordinary) do
+			local path_segments = row_path(row)
+			local collides = true
+			for index = 1, math.min(#target, #path_segments) do
+				if target[index] ~= path_segments[index]:lower() then collides = false; break end
+			end
+			if collides then return false, "another batch row collides with saved model record ownership" end
+		end
+	end
+	updates = ordinary
 	local decoded_ok, decoded, source_shapes = pcall(require("toml_codec.leaf_rows").decode_source, source or "")
 	if not decoded_ok or type(decoded) ~= "table" or type(source_shapes) ~= "table"
 		or type(source_shapes.numbers) ~= "table" then
@@ -1238,6 +1262,11 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	end
 
 	local content = table.concat(lines)
+	if model_row then
+		local applied, candidate = pcall(require("toml_codec.record_list").apply, model_row, source, content)
+		if not applied then return false, tostring(candidate) end
+		content = candidate
+	end
 	local content_ok, content_value, candidate_shapes = pcall(require("toml_codec.leaf_rows").decode_source, content)
 	if not content_ok or type(content_value) ~= "table" or type(candidate_shapes) ~= "table"
 		or type(candidate_shapes.numbers) ~= "table" then

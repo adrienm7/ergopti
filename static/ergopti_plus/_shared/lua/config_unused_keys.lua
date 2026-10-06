@@ -44,6 +44,7 @@ local TomlCodec     = require("toml_codec")
 local TomlWriter    = require("toml_codec.writer")
 local RecordScanner = require("toml_codec.record_scanner")
 local ConfigOutdated = require("config_outdated")
+local RecordList = require("toml_codec.record_list")
 local LOG           = "config_unused_keys"
 local BOM           = string.char(0xEF, 0xBB, 0xBF)
 
@@ -258,7 +259,7 @@ end
 --- @param source string Exact file content.
 --- @param collect function `collect(decoded, mark, shapes)`: the driver's readers; receipt is optional for old consumers.
 --- @return table scan `{ status = "ok"|"malformed", keys }`.
-local function find_in_source(source, collect, whole_unread_roots)
+local function find_in_source(source, collect, whole_unread_roots, file_path)
 	if type(collect) ~= "function" then
 		error("config_unused_keys: a collector of the driver's readers is required", 2)
 	end
@@ -274,7 +275,10 @@ local function find_in_source(source, collect, whole_unread_roots)
 	-- reader also reads it: warned and offered are one set.
 	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark, shapes) end)
 
+	local record_entries, owns_records = RecordList.cleanup_entries(source, outdated, file_path)
+	if owns_records and #record_entries > 0 then consumption.mark("llm", "models", "user_models") end
 	local keys, whole_roots = {}, {}
+	for _, entry in ipairs(record_entries) do keys[#keys + 1] = entry end
 	local projection = whole_unread_roots and RootCleanup.scan(source)
 	if projection then
 		for _, root in ipairs(projection.order) do
@@ -331,7 +335,7 @@ function M.find(opts)
 	if opts.whole_unread_roots ~= nil and type(opts.whole_unread_roots) ~= "boolean" then
 		error("whole unread roots need explicit native Boolean intent", 2)
 	end
-	local scan = find_in_source(content, opts.collect, opts.whole_unread_roots == true)
+	local scan = find_in_source(content, opts.collect, opts.whole_unread_roots == true, opts.path)
 	for _, entry in ipairs(scan.keys) do
 		if root_receipts[entry] then root_receipts[entry].file_path = opts.path end
 	end
@@ -414,6 +418,20 @@ end
 --- @return string|nil candidate Cleaned content.
 --- @return number|string removed_or_error Number of records cut, or a failure detail.
 function M.remove_from_source(source, keys)
+	local admitted, has_records = pcall(RecordList.cleanup_selection, source, keys)
+	if not admitted then return nil, tostring(has_records) end
+	if has_records then
+		local ordinary = {}
+		for _, entry in ipairs(keys) do if entry.kind ~= "saved_model_record" then ordinary[#ordinary + 1] = entry end end
+		local candidate, removed = source, 0
+		if #ordinary > 0 then
+			candidate, removed = M.remove_from_source(source, ordinary)
+			if not candidate then return nil, removed end
+		end
+		local rendered, content, count = pcall(RecordList.cleanup, source, candidate, keys)
+		if not rendered then return nil, tostring(content) end
+		return content, removed + count
+	end
 	local roots, root_error = root_selection(source, keys)
 	if not roots then return nil, root_error end
 	if #roots > 0 then
@@ -589,6 +607,14 @@ function M.remove(opts)
 	end
 
 	local function validate_roots()
+		local checked, owns_records = pcall(RecordList.cleanup_selection, source, captured_keys, path)
+		if not checked then return false, tostring(owns_records) end
+		if owns_records then
+			if getmetatable(opts.keys) ~= nil or #opts.keys ~= #captured_keys then return false, "the native saved model selection changed" end
+			for index, entry in ipairs(captured_keys) do
+				if not rawequal(opts.keys[index], entry) then return false, "the captured native saved model row changed" end
+			end
+		end
 		local roots, detail = root_selection(source, captured_keys, path)
 		if not roots then return false, detail end
 		if #roots > 0 then
@@ -632,6 +658,7 @@ function M.remove(opts)
 	for _, entry in ipairs(captured_keys) do
 		if root_receipts[entry] then root_receipts[entry].consumed = true end
 	end
+	RecordList.consume_cleanup(captured_keys)
 	result.status = "removed"
 	result.removed = removed_or_err
 	result.previous = source
