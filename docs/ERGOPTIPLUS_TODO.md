@@ -3434,6 +3434,12 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Native run 37525448527 on ad95a2693 confirms independent signature validity but
+refuses Sparkle application retirement with exit 78. The added diagnostic reads
+only the original cached capture and projects six closed refusal categories.
+All original failure and retirement assertions remain; actual cause and the
+corrected AppKit/Brew native acceptance require the next exact-source macOS CI.
+
 The latest origin/dev AppKit receiver registration is merged with the retained
 post-failure WNOWAIT observation and original typed GetCurrentProcess refusal.
 Source controls preserve both histories; native acceptance remains pending.

@@ -86,6 +86,22 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		return StartupFacts(capture: .observed, phase: last, bytes: bytes.count)
 	}
 
+	private enum ChildRefusalCode: String, CaseIterable {
+		case configuration, targetRoot = "target-root", targetBundle = "target-bundle"
+		case receiptPublication = "receipt-publication", control, transport
+	}
+
+	/// Interpret only a single complete fixed frame from the existing private capture.
+	/// Arbitrary native log lines, error descriptions and paths never become facts.
+	private static func parseChildRefusalCode(_ text: String) -> String {
+		guard !text.isEmpty, text.utf8.count <= 16_384, text.hasSuffix("\n") else { return "unavailable" }
+		let prefix = "SPARKLE_CHILD_REFUSAL/1 "
+		let frames = text.components(separatedBy: "\n").filter { $0.hasPrefix(prefix) }
+		guard frames.count == 1, let frame = frames.first,
+			let code = ChildRefusalCode(rawValue: String(frame.dropFirst(prefix.count))) else { return "unavailable" }
+		return code.rawValue
+	}
+
 	private struct Receipt {
 		let status: Int32
 		let stdout: String
@@ -300,6 +316,14 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			let receipt = Receipt(status: process.terminationStatus, stdout: outputText, stderr: errorText)
 			cachedReceipt = receipt
 			return receipt
+		}
+
+		/// The original finish() has already joined exit and closed both captures.
+		/// No path reopen, descriptor, wait, signal or retirement attempt is added.
+		func observedChildRefusalCode() -> String? {
+			guard launched, observedExit, !process.isRunning, let cachedReceipt,
+				cachedReceipt.status == 78 else { return nil }
+			return SparkleArchiveUpdateAcceptanceTests.parseChildRefusalCode(cachedReceipt.stderr)
 		}
 	}
 
@@ -739,6 +763,21 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	func testChildRefusalCaptureProjectsOnlyOneCompleteClosedCategory() {
+		for code in ["configuration", "target-root", "target-bundle", "receipt-publication", "control", "transport"] {
+			XCTAssertEqual(Self.parseChildRefusalCode("Private arbitrary log must stay private\nSPARKLE_CHILD_REFUSAL/1 " + code + "\n"), code)
+		}
+		XCTAssertEqual(Self.parseChildRefusalCode(""), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 /private/never-exported\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 configuration"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 control\nSPARKLE_CHILD_REFUSAL/1 control\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 control\nSPARKLE_CHILD_REFUSAL/1 receipt-publication\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode(String(repeating: "x", count: 16_384) + "\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 transport secret\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("raw SPARKLE_CHILD_REFUSAL/1 target-root\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("Private Sparkle child target refused.\n"), "unavailable")
+	}
+
 	func testSignatureAndApplicationFactsContainOnlyClosedObservations() {
 		XCTAssertEqual(signatureProbeMessage(.installedKey, signature64: true, independentValid: true,
 			installedValid: true, payloadEqual: nil, signatureEqual: nil),
@@ -900,6 +939,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				catch {
 					if label == "application-exit", let application {
 						XCTFail(applicationExitRefusalMessage(error, termination: application.observedTerminationFacts()))
+						if let code = application.observedChildRefusalCode() {
+							XCTFail("Native Sparkle child refusal: category=" + code)
+						}
 					}
 					retirementDebt = true
 					checkpoint("cleanup.debt-" + label, status: "cleanup-debt")
