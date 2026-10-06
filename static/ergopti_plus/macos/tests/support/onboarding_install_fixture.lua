@@ -24,6 +24,7 @@ local MODULE_NAMES = {
 	"infra.text_utils",
 	"platform.remap.ke_paths",
 	"platform.remap.onboarding",
+	"remap.system_extension_observation",
 	"tests.stubs.hs",
 }
 

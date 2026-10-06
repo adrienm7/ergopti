@@ -44,6 +44,7 @@ local text_utils = require("infra.text_utils")
 local KePaths = require("platform.remap.ke_paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
+local SystemExtensionObservation = require("remap.system_extension_observation")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
@@ -88,7 +89,6 @@ local KE_CORE_SERVICE_BIN   = KePaths.CORE_SERVICE
 -- karabiner_cli is present in all KE versions (v14-v16+) and never renamed,
 -- making it the most reliable signal that the full PKG stack is installed.
 local KE_CLI_BIN          = KePaths.CLI
-local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 
 -- macOS deep-links into the relevant System Settings panes. The scheme is
 -- stable across Ventura → Sequoia for these preference IDs.
@@ -213,9 +213,8 @@ function M.is_grabber_running()
 	return KeLifecycle.is_grabber_running()
 end
 
---- True when the KE DriverKit System Extension is both activated and enabled
---- according to systemextensionsctl. A working entry shows the literal token
---- "activated enabled" on the same line as the bundle id.
+--- True when one exact official KE extension row is activated and enabled.
+--- The shared parser rejects misleading names, foreign identities and ambiguity.
 --- @return boolean
 function M.is_sysext_activated()
 	local out, ok = hs.execute("/usr/bin/systemextensionsctl list 2>&1")
@@ -223,12 +222,7 @@ function M.is_sysext_activated()
 		Logger.debug(LOG, "is_sysext_activated: systemextensionsctl ok=%s — assuming inactive.", tostring(ok))
 		return false
 	end
-	for line in out:gmatch("[^\n]+") do
-		if line:find(KE_SYSEXT_BUNDLE, 1, true) and line:find("activated enabled", 1, true) then
-			return true
-		end
-	end
-	return false
+	return SystemExtensionObservation.observe(out).approved
 end
 
 --- Returns a snapshot of every dependency in the KE stack with one boolean per

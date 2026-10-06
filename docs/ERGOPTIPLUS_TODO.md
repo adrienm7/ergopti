@@ -4100,6 +4100,18 @@ owned shipping capture, Swift execution, signing, distribution, installation
 and activation remain unqualified. This is unsigned preparation only; item31
 and all its unfinished work packages remain open.
 
+Shared system-extension observation now requires the exact official Team ID,
+DEXT identifier, enabled/active markers and terminal approval state. Older
+legitimate shared versions remain accepted; displayed version/build values
+never establish package/protocol compatibility or runtime readiness. Seventeen
+frozen refusal cases reproduce false approval in the original adapter. The
+linear successor passes72 focused controls and111 unchanged onboarding
+assertions; ten causal mutants refuse. Long malformed whitespace, empty names
+and malformed same-ID duplicates are explicitly refused without unbounded row
+patterns. The fixture owns the new module during teardown. Actual native CLI
+format, owned dependency enforcement, confirmed updates and installation remain
+unqualified or unfinished. Item31 remains partial.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Still open everywhere:
